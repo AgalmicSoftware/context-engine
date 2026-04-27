@@ -48,6 +48,17 @@ type SurveyDraftStorageVariantKeysArgs = SurveyDraftStorageKeyArgs & {
   includePerQuestionScope?: boolean;
 };
 
+type SurveyDraftLoadPlanArgs = {
+  hasAccount?: boolean;
+  primaryAccountKey?: unknown;
+  primaryAnonKey?: unknown;
+  compatAccountKey?: unknown;
+  compatAnonKey?: unknown;
+  pendingAccountKey?: unknown;
+  perQuestionAccountKey?: unknown;
+  perQuestionAnonKey?: unknown;
+};
+
 type SurveyDraftPayload = {
   meta?: UnknownRecord | null;
   answers?: Record<string, SurveyDraftQuestionEntry | unknown> | null;
@@ -373,6 +384,50 @@ export const buildSurveyDraftStorageVariantKeys = ({
     }) : null,
     purgeKeys,
   };
+};
+
+export const buildSurveyDraftLoadPlan = ({
+  hasAccount = false,
+  primaryAccountKey = '',
+  primaryAnonKey = '',
+  compatAccountKey = '',
+  compatAnonKey = '',
+  pendingAccountKey = '',
+  perQuestionAccountKey = null,
+  perQuestionAnonKey = null,
+}: SurveyDraftLoadPlanArgs = {}) => {
+  const primaryAccount = String(primaryAccountKey || '').trim();
+  const primaryAnon = String(primaryAnonKey || '').trim();
+  const targetKey = hasAccount ? primaryAccount : primaryAnon;
+  const candidates = hasAccount
+    ? [
+        { readKey: primaryAccount, writeKey: null },
+        { readKey: String(compatAccountKey || '').trim(), writeKey: targetKey },
+        { readKey: String(pendingAccountKey || '').trim(), writeKey: targetKey },
+        { readKey: String(perQuestionAccountKey || '').trim(), writeKey: targetKey },
+        { readKey: primaryAnon, writeKey: targetKey },
+        { readKey: String(compatAnonKey || '').trim(), writeKey: targetKey },
+        { readKey: String(perQuestionAnonKey || '').trim(), writeKey: targetKey },
+      ]
+    : [
+        { readKey: primaryAnon, writeKey: null },
+        { readKey: String(compatAnonKey || '').trim(), writeKey: primaryAnon },
+        { readKey: String(pendingAccountKey || '').trim(), writeKey: primaryAnon },
+        { readKey: String(perQuestionAnonKey || '').trim(), writeKey: primaryAnon },
+      ];
+
+  const seen = new Set<string>();
+  return candidates.filter(({ readKey, writeKey }) => {
+    if (!readKey) return false;
+    const normalizedWriteKey = writeKey && writeKey !== readKey ? writeKey : null;
+    const signature = `${readKey}::${normalizedWriteKey || ''}`;
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  }).map(({ readKey, writeKey }) => ({
+    readKey,
+    writeKey: writeKey && writeKey !== readKey ? writeKey : null,
+  }));
 };
 
 export const buildPersistedDraftQuestionEntry = ({
