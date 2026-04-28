@@ -1,4 +1,7 @@
-import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
+import {
+  buildRenderedIdsSignature,
+  normalizeQuestionIdKey,
+} from './surveyToolSignatures.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -228,6 +231,23 @@ type BuildMissingResponseIdsForRenderedQuestionsArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   questionResponses?: Record<string, unknown> | null;
   responderLower?: string;
+};
+
+type BuildNormalizedRenderedQuestionIdsArgs = {
+  renderedIds?: Iterable<unknown> | unknown[];
+};
+
+type BuildLocalCacheHydrationSignatureArgs = {
+  surveyIndex?: unknown;
+  scopeSlugs?: unknown[];
+  networkIdStr?: unknown;
+  account?: unknown;
+  renderedIds?: Iterable<unknown> | unknown[];
+  questionsCacheNonce?: unknown;
+  questionResponsesNonce?: unknown;
+  suppressPrefill?: boolean;
+  submissionError?: unknown;
+  submissionComplete?: boolean;
 };
 
 type BuildPrefilledSingleQuestionStateArgs = {
@@ -1135,6 +1155,40 @@ export const buildMissingResponseIdsForRenderedQuestions = ({
       return !(perQuestion as UnknownRecord)[normalizedResponder];
     });
 };
+
+export const buildNormalizedRenderedQuestionIds = ({
+  renderedIds = [],
+}: BuildNormalizedRenderedQuestionIdsArgs = {}): string[] => Array.from(
+  new Set(
+    Array.from(renderedIds || [])
+      .map((id) => normalizeQuestionIdKey(id))
+      .filter(Boolean)
+  )
+);
+
+export const buildLocalCacheHydrationSignature = ({
+  surveyIndex = 0,
+  scopeSlugs = [],
+  networkIdStr = '',
+  account = '',
+  renderedIds = [],
+  questionsCacheNonce = 0,
+  questionResponsesNonce = 0,
+  suppressPrefill = false,
+  submissionError = '',
+  submissionComplete = false,
+}: BuildLocalCacheHydrationSignatureArgs = {}): string => [
+  String(surveyIndex),
+  Array.isArray(scopeSlugs) ? scopeSlugs.join(',') : '',
+  String(networkIdStr || ''),
+  String(account || '').trim().toLowerCase(),
+  buildRenderedIdsSignature(Array.from(renderedIds || [])),
+  Number(questionsCacheNonce || 0),
+  Number(questionResponsesNonce || 0),
+  suppressPrefill ? 1 : 0,
+  submissionError ? 1 : 0,
+  submissionComplete ? 1 : 0,
+].join('|');
 
 export const buildPrefilledSurveyState = ({
   surveyIndex = 0,
