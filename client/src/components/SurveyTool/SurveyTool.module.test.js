@@ -1493,6 +1493,7 @@ describe('SurveyTool module', () => {
     }));
     subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
     subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({}));
+    subject._canDecryptOtherResponsesRunId = 4;
     subject._canDecryptOtherResponsesKey = 'stale-key';
     subject._canDecryptOtherResponsesInFlight = Promise.resolve(true);
 
@@ -1502,6 +1503,45 @@ describe('SurveyTool module', () => {
     expect(gateSpy).not.toHaveBeenCalled();
     expect(subject.state.canDecryptOtherResponses).toBe(false);
     expect(subject.state.canDecryptOtherResponsesStatus).toBe('needs-wallet');
+    expect(subject._canDecryptOtherResponsesRunId).toBe(5);
+    expect(subject._canDecryptOtherResponsesKey).toBe('');
+    expect(subject._canDecryptOtherResponsesInFlight).toBeNull();
+  });
+
+  it('marks response decrypt access as no-gate when no recipients are configured', async () => {
+    const gateSpy = jest.spyOn(sponsoredAccess, 'checkSponsoredAccess');
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      sbtCacheRevision: 0,
+    });
+    syncClassSetState(subject);
+    subject.state = {
+      ...subject.state,
+      canDecryptOtherResponses: true,
+      canDecryptOtherResponsesStatus: 'granted',
+    };
+    subject.getResponseGatePolicy = jest.fn(() => ({
+      primaryResource: 'surveyResponses',
+      recipients: [],
+    }));
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({}));
+    subject._canDecryptOtherResponsesRunId = 11;
+    subject._canDecryptOtherResponsesKey = 'stale-key';
+    subject._canDecryptOtherResponsesInFlight = Promise.resolve(true);
+
+    const canDecrypt = await subject.refreshCanDecryptOtherResponses();
+
+    expect(canDecrypt).toBe(false);
+    expect(gateSpy).not.toHaveBeenCalled();
+    expect(subject.state.canDecryptOtherResponses).toBe(false);
+    expect(subject.state.canDecryptOtherResponsesStatus).toBe('no-gate');
+    expect(subject._canDecryptOtherResponsesRunId).toBe(12);
     expect(subject._canDecryptOtherResponsesKey).toBe('');
     expect(subject._canDecryptOtherResponsesInFlight).toBeNull();
   });
