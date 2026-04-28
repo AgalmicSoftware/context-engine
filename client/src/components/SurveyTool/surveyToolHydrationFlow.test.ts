@@ -6,6 +6,7 @@ import {
   buildLocalCacheHydrationMemoKey,
   buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
+  buildPrefilledSingleQuestionState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
@@ -443,6 +444,70 @@ describe('surveyToolHydrationFlow', () => {
       { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
       { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
     ]);
+  });
+
+  it('builds single-question prefill state with ensured survey slots', () => {
+    const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses, questionIdResolver }) => {
+      const questionId = questionIdResolver(responses[0]);
+      targetSlice.answers[questionId] = { value: responses[0].answer.value };
+      targetSlice.additionalComments[questionId] = { value: responses[0].additional.value };
+      return true;
+    });
+    const buildSliceFromUserAnswers = jest.fn((_userAnswer, prevSlice) => ({
+      ...(prevSlice || {}),
+      answers: { q1: { value: 'baseline answer' } },
+      additionalComments: { q1: { value: 'baseline notes' } },
+      importance: {},
+      conviction: {},
+    }));
+
+    expect(buildPrefilledSingleQuestionState({
+      surveyIndex: 2,
+      questionId: 'Q1',
+      prevSurveysResponseState: [
+        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+      prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      isDirty: false,
+      submissionComplete: false,
+      userAnswer: {
+        questionID: 'q1',
+        answer: { value: 'hydrated answer' },
+        additional: { value: 'hydrated notes' },
+      },
+      applyResponseHydrationListToSlice,
+      buildSliceFromUserAnswers,
+    })).toEqual({
+      nextSurveysResponseState: [
+        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+        {
+          answers: { q1: { value: 'hydrated answer' } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { value: 'hydrated notes' } },
+        },
+      ],
+      nextBaseline: {
+        answers: { q1: { value: 'baseline answer' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q1: { value: 'baseline notes' } },
+      },
+      shouldWriteBaseline: true,
+    });
+
+    expect(buildPrefilledSingleQuestionState({
+      surveyIndex: 0,
+      questionId: '',
+      prevSurveysResponseState: [],
+      prevEditBaseline: null,
+      isDirty: true,
+      submissionComplete: true,
+      userAnswer: null,
+      applyResponseHydrationListToSlice,
+      buildSliceFromUserAnswers,
+    }).shouldWriteBaseline).toBe(false);
   });
 
   it('builds prefilled survey state with hydrated slice and optional baseline writes', () => {
