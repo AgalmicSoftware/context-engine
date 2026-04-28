@@ -73,12 +73,16 @@ import {
   pickScopedPileQuestionProgress,
 } from './surveyPileLifecycle';
 import {
+  buildPileEmptyProbeStatePlan,
+  buildPileNoNetworkLoadPlan,
+  buildPileResponseCountsCachePlan,
+} from './surveyPileLoadController';
+import {
   buildPileEmptyProbePlan,
   buildPileLoadFailureState,
   buildPileLoadProgressState,
 } from './surveyPileLoadPlanner';
 import {
-  buildPileResponseCounts,
   loadPileScopeCacheSnapshot,
 } from './surveyPileScopeCacheData';
 import {
@@ -1422,13 +1426,19 @@ export class PileViewMode extends SurveyQuestions {
     if (!networkID) {
       // Optimistic Loading: If we have no ID, we are likely still initializing.
       if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
-      this._lastLoadAndSortResultSignature = '';
-      const nextLoading = !this.props.isQuestionCacheReady || recentRateLimit;
-      if (this.state.loading === nextLoading) {
+      const noNetworkLoadPlan = buildPileNoNetworkLoadPlan({
+        currentLoading: this.state.loading,
+        isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+        recentRateLimit,
+      });
+      if (noNetworkLoadPlan.shouldClearLastResultSignature) {
+        this._lastLoadAndSortResultSignature = '';
+      }
+      if (noNetworkLoadPlan.shouldSkipStateUpdate) {
         bumpSurveyPerfCounter('noopSkipCount');
         return;
       }
-      this.setState({ loading: nextLoading });
+      this.setState(noNetworkLoadPlan.nextState);
       return;
     }
 
@@ -1452,21 +1462,15 @@ export class PileViewMode extends SurveyQuestions {
       if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
       const hasPendingMetadataRetries = pendingMetadataCount > 0;
       const responseCountsCacheKey = `${scopeSignature}|${networkID}|${Number(this.props.questionResponsesNonce || 0)}`;
-      let responseCounts = {};
-      if (
-        this._responseCountsCacheKey === responseCountsCacheKey &&
-        this._responseCountsCacheValue &&
-        typeof this._responseCountsCacheValue === 'object'
-      ) {
-        responseCounts = this._responseCountsCacheValue;
-      } else {
-        const nextResponseCounts = buildPileResponseCounts({
-          questionResponses: allResponses,
-        });
-        responseCounts = nextResponseCounts;
-        this._responseCountsCacheKey = responseCountsCacheKey;
-        this._responseCountsCacheValue = nextResponseCounts;
-      }
+      const responseCountsPlan = buildPileResponseCountsCachePlan({
+        cacheKey: responseCountsCacheKey,
+        previousCacheKey: this._responseCountsCacheKey,
+        previousCacheValue: this._responseCountsCacheValue,
+        questionResponses: allResponses,
+      });
+      const responseCounts = responseCountsPlan.responseCounts;
+      this._responseCountsCacheKey = responseCountsPlan.nextCacheKey;
+      this._responseCountsCacheValue = responseCountsPlan.nextCacheValue;
 
       // No defaultTags gating: sessions handle scoping; tags are for organization and user filtering.
 
@@ -1494,37 +1498,35 @@ export class PileViewMode extends SurveyQuestions {
           emptyReadyProbeStartedAtMs: this._emptyReadyProbeStartedAtMs,
           nowMs: Date.now(),
         });
+        const emptyProbeStatePlan = buildPileEmptyProbeStatePlan({
+          action: emptyProbePlan.action,
+          nextProbeStartedAtMs: emptyProbePlan.nextProbeStartedAtMs,
+          nextProbeDelayMs: emptyProbePlan.nextProbeDelayMs,
+          previousPileQuestions: this.state.pileQuestions,
+          previousAllQuestionsForFilter: this.state.allQuestionsForFilter,
+          previousLoading: this.state.loading,
+          areQuestionListsEquivalent: this.areQuestionListsEquivalent,
+        });
+        this._emptyReadyProbeStartedAtMs = emptyProbeStatePlan.nextProbeStartedAtMs;
 
-        if (emptyProbePlan.action === 'continue-loading-immediately') {
-          this._emptyReadyProbeStartedAtMs = 0;
+        if (emptyProbeStatePlan.action !== 'settle-empty') {
           if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
-          this._lastLoadAndSortResultSignature = '';
-          this.setState((prev) => {
-            const samePile = this.areQuestionListsEquivalent(prev.pileQuestions, []);
-            const sameAll = this.areQuestionListsEquivalent(prev.allQuestionsForFilter, []);
-            const sameLoading = prev.loading === true;
-            if (samePile && sameAll && sameLoading) {
-              bumpSurveyPerfCounter('noopSkipCount');
-              return null;
-            }
-            this._pileQuestionsGeneration += 1;
-            return { pileQuestions: [], allQuestionsForFilter: [], loading: true };
-          });
-          return;
-        }
-
-        if (emptyProbePlan.action === 'probe-loading') {
-          this._emptyReadyProbeStartedAtMs = emptyProbePlan.nextProbeStartedAtMs;
-          if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
-          this._lastLoadAndSortResultSignature = '';
-          if (!this.state.loading) {
-            this.setState({ loading: true });
+          if (emptyProbeStatePlan.shouldClearLastResultSignature) {
+            this._lastLoadAndSortResultSignature = '';
           }
-          this.scheduleLoadAndSortQuestions(emptyProbePlan.nextProbeDelayMs);
+          if (emptyProbeStatePlan.shouldBumpNoop) {
+            bumpSurveyPerfCounter('noopSkipCount');
+          } else if (emptyProbeStatePlan.shouldIncrementPileQuestionsGeneration) {
+            this._pileQuestionsGeneration += 1;
+          }
+          if (emptyProbeStatePlan.nextState) {
+            this.setState(emptyProbeStatePlan.nextState);
+          }
+          if (emptyProbeStatePlan.action === 'probe-loading') {
+            this.scheduleLoadAndSortQuestions(emptyProbeStatePlan.nextProbeDelayMs);
+          }
           return;
         }
-
-        this._emptyReadyProbeStartedAtMs = 0;
       }
 
       const acctLower = (this.props.account || '').toLowerCase();
@@ -1899,21 +1901,15 @@ export class PileViewMode extends SurveyQuestions {
           const qNet = qObj?.[networkID] || {};
           mergeQuestionResponses(allResponses, qNet?.questionResponses || {});
         });
-        if (
-          this._responseCountsCacheKey === responseCountsCacheKey &&
-          this._responseCountsCacheValue &&
-          typeof this._responseCountsCacheValue === 'object'
-        ) {
-          responseCounts = this._responseCountsCacheValue;
-        } else {
-          const nextResponseCounts = {};
-          Object.keys(allResponses).forEach((qid) => {
-            nextResponseCounts[qid] = Object.keys(allResponses[qid] || {}).length;
-          });
-          responseCounts = nextResponseCounts;
-          this._responseCountsCacheKey = responseCountsCacheKey;
-          this._responseCountsCacheValue = nextResponseCounts;
-        }
+        const responseCountsPlan = buildPileResponseCountsCachePlan({
+          cacheKey: responseCountsCacheKey,
+          previousCacheKey: this._responseCountsCacheKey,
+          previousCacheValue: this._responseCountsCacheValue,
+          questionResponses: allResponses,
+        });
+        responseCounts = responseCountsPlan.responseCounts;
+        this._responseCountsCacheKey = responseCountsPlan.nextCacheKey;
+        this._responseCountsCacheValue = responseCountsPlan.nextCacheValue;
       }
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
 
