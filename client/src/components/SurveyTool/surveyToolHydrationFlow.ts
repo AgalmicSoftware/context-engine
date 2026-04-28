@@ -95,6 +95,17 @@ type BuildSurveyResponseStateArrayArgs = {
   nextSlice?: ResponseSlice | null;
 };
 
+type LoadLocalCacheHydrationSliceArgs = {
+  scopeSlugs?: unknown[] | null;
+  networkIdStr?: unknown;
+  account?: unknown;
+  renderedQuestionIds?: Iterable<unknown> | unknown[];
+  readQuestionsCache?: ((slug: string) => unknown) | null;
+  mergeQuestionResponses?: ((target: CachedQuestionResponses, source: CachedQuestionResponses) => void) | null;
+  parseResponse?: ((raw: unknown) => unknown) | null;
+  applyCachedResponseEntryToSlice?: ((args: CachedResponseApplyArgs) => boolean) | null;
+};
+
 type BuildMergedSurveyResponseStateArgs = {
   currentState?: unknown[] | null;
   newQuestionPool?: unknown[] | null;
@@ -649,6 +660,37 @@ export const buildMergedHydrationQuestionResponses = ({
   });
 
   return mergedQuestionResponses;
+};
+
+export const loadLocalCacheHydrationSlice = ({
+  scopeSlugs = null,
+  networkIdStr = '',
+  account = '',
+  renderedQuestionIds = [],
+  readQuestionsCache = null,
+  mergeQuestionResponses = null,
+  parseResponse = null,
+  applyCachedResponseEntryToSlice = null,
+}: LoadLocalCacheHydrationSliceArgs = {}): ResponseSlice | null => {
+  const netId = String(networkIdStr || '');
+  const acct = String(account || '').trim().toLowerCase();
+  if (!netId || !acct) return null;
+
+  const mergedQuestionResponses = buildMergedHydrationQuestionResponses({
+    scopeSlugs: Array.isArray(scopeSlugs) ? scopeSlugs : [],
+    networkIdStr: netId,
+    readQuestionsCache,
+    mergeQuestionResponses,
+  });
+  if (Object.keys(mergedQuestionResponses).length === 0) return null;
+
+  return buildCacheHydrationSlice({
+    renderedQuestionIds,
+    mergedQuestionResponses,
+    account: acct,
+    parseResponse,
+    applyCachedResponseEntryToSlice,
+  }).slice;
 };
 
 export const buildSurveyResponseStateArray = ({
