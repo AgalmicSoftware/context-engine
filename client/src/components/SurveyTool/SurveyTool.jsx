@@ -236,9 +236,9 @@ import {
   executePriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  loadMissingResponseIdsForScope,
   loadGroupedMissingResponseRequests,
   buildMissingRenderedResponseResult,
-  buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
@@ -5164,13 +5164,13 @@ export class SurveyQuestions extends Component {
       });
     }
 
-    const questionsCache = ensureQuestionsNet(await readQuestionsCacheAsync(slug), netId);
-    const questionResponses = questionsCache?.[netId]?.questionResponses || {};
-
-    const missingIds = buildMissingResponseIdsForRenderedQuestions({
+    const missingIds = await loadMissingResponseIdsForScope({
+      slug,
+      netId,
       renderedIds,
-      questionResponses,
       responderLower,
+      readQuestionsCacheAsync,
+      ensureQuestionsNet,
     });
 
     return { missingIds, slug, netId };

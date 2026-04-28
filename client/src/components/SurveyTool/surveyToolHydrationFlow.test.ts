@@ -21,6 +21,7 @@ import {
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
   executePriorResponseFetchPlan,
+  loadMissingResponseIdsForScope,
   loadGroupedMissingResponseRequests,
   buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
@@ -1434,6 +1435,27 @@ describe('surveyToolHydrationFlow', () => {
     });
     expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(1, 'alpha');
     expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(2, 'beta');
+  });
+
+  it('loads missing response ids for a single scope from cache state', async () => {
+    const readQuestionsCacheAsync = jest.fn().mockResolvedValue({
+      '84532': {
+        questionResponses: {
+          q1: { '0xabc': { answer: { value: 'present' } } },
+          q2: {},
+        },
+      },
+    });
+    const ensureQuestionsNet = jest.fn((cache) => cache);
+
+    await expect(loadMissingResponseIdsForScope({
+      slug: 'alpha',
+      netId: '84532',
+      renderedIds: ['q1', 'q2', 'q3'],
+      responderLower: '0xAbC',
+      readQuestionsCacheAsync,
+      ensureQuestionsNet,
+    })).resolves.toEqual(['q2', 'q3']);
   });
 
   it('loads grouped missing-response requests from scoped caches', async () => {
