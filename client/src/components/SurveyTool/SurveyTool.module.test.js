@@ -12600,6 +12600,27 @@ describe('SurveyTool module', () => {
     });
   });
 
+  it('loads SurveyQuestions bookmarks from cache into a normalized string set', async () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ questions: ['q1', 2] });
+    const readSpy = jest.spyOn(cacheScripts, 'readCache');
+
+    const subject = new SurveyQuestions({
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+    });
+    subject.setState = jest.fn((next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    await subject.loadBookmarks();
+
+    expect(readSpy).not.toHaveBeenCalled();
+    expect(subject.state.bookmarkedQuestions).toEqual(new Set(['q1', '2']));
+  });
+
   it('coalesces bursty auto-decrypt sweeps into one scheduled pass', async () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,

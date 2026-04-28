@@ -31,6 +31,10 @@ export type SurveyCanDecryptOtherResponsesStatePatch = {
   canDecryptOtherResponsesStatus: string;
 };
 
+export type SurveyBookmarkedQuestionsStatePatch = {
+  bookmarkedQuestions: Set<string>;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -147,6 +151,14 @@ export const buildCanDecryptOtherResponsesState = ({
   canDecryptOtherResponsesStatus: String(status || 'unknown'),
 });
 
+export const buildBookmarkedQuestionsState = (
+  questions: unknown[] | null | undefined = []
+): SurveyBookmarkedQuestionsStatePatch => ({
+  bookmarkedQuestions: new Set(
+    (Array.isArray(questions) ? questions : []).map((questionId) => String(questionId))
+  ),
+});
+
 export const buildInitialSurveyQuestionsState = (
   props: SurveyQuestionsProps = {}
 ): SurveyQuestionsState => ({
@@ -180,7 +192,7 @@ export const buildInitialSurveyQuestionsState = (
   isLoadingResponse: false,
   parsedViewAddressAnswers: null,
   decryptionNonce: 0,
-  bookmarkedQuestions: new Set<string>(),
+  ...buildBookmarkedQuestionsState(),
   showSurveyJson: false,
   copiedSurveyJson: false,
   modifiedCount: 0,

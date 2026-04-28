@@ -1,5 +1,6 @@
 import {
   buildAutoDecryptDisabledState,
+  buildBookmarkedQuestionsState,
   buildCanDecryptOtherResponsesState,
   buildClearedSurveyQuestionPoolState,
   buildInitialSurveyQuestionsState,
@@ -114,6 +115,16 @@ describe('surveyQuestionsTypes', () => {
     })).toEqual({
       canDecryptOtherResponses: true,
       canDecryptOtherResponsesStatus: 'granted',
+    });
+  });
+
+  it('builds normalized bookmarked question state', () => {
+    expect(buildBookmarkedQuestionsState()).toEqual({
+      bookmarkedQuestions: new Set(),
+    });
+
+    expect(buildBookmarkedQuestionsState(['q1', 2])).toEqual({
+      bookmarkedQuestions: new Set(['q1', '2']),
     });
   });
 });
