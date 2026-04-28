@@ -8,6 +8,7 @@ export type PileQuestionLike = {
 
 export type PileQuestionResponsesMap = Record<string, Record<string, unknown>>;
 export type PileQuestionResponseCounts = Record<string, number>;
+export type PileFilterStateLike = Record<string, unknown>;
 
 export type BuildQuestionListSignature = (questions: PileQuestionLike[]) => string;
 export type GetPileVisibleQuestionIds = (questions: PileQuestionLike[], activeIndex: number) => string[];
@@ -101,6 +102,49 @@ export const splitPileMaskedQuestions = ({
   };
 };
 
+export type PileQuestionPipelineState = {
+  sortedQuestions: PileQuestionLike[];
+  visibleQuestions: PileQuestionLike[];
+  hiddenQuestions: PileQuestionLike[];
+  hasHiddenGatedQuestions: boolean;
+};
+
+export const buildPileQuestionPipelineState = ({
+  questions = [],
+  questionResponses = {},
+  responseCounts = {},
+  highlightedQuestionIds = new Set<string>(),
+  account = '',
+}: {
+  questions?: PileQuestionLike[] | null;
+  questionResponses?: PileQuestionResponsesMap | null;
+  responseCounts?: PileQuestionResponseCounts | null;
+  highlightedQuestionIds?: Set<string> | null;
+  account?: string | null;
+} = {}): PileQuestionPipelineState => {
+  const sortedQuestions = sortPileQuestionsByPriority({
+    questions,
+    questionResponses,
+    responseCounts,
+    highlightedQuestionIds,
+    account,
+  });
+  const {
+    hiddenQuestions,
+    visibleQuestions,
+    hasHiddenGatedQuestions,
+  } = splitPileMaskedQuestions({
+    questions: sortedQuestions,
+  });
+
+  return {
+    sortedQuestions,
+    visibleQuestions,
+    hiddenQuestions,
+    hasHiddenGatedQuestions,
+  };
+};
+
 export const buildPileQuestionLoadState = ({
   visibleQuestions = [],
   hiddenQuestions = [],
@@ -184,6 +228,80 @@ export const shouldSkipPileFilterStateUpdate = ({
   !!nextHiddenGated === !!currentHiddenGated &&
   String(nextFilterSignature || '') === String(currentFilterSignature || '')
 );
+
+export type PileFilterResultPlan = {
+  nextState: {
+    pileQuestions: PileQuestionLike[];
+    activePileIndex: number;
+    filterState: PileFilterStateLike;
+    hasHiddenGatedQuestions: boolean;
+  };
+  shouldSkipStateUpdate: boolean;
+  shouldIncrementPileQuestionsGeneration: boolean;
+  nextVisibleSignature: string;
+  currentVisibleSignature: string;
+  nextFilterSignature: string;
+  currentFilterSignature: string;
+};
+
+export const buildPileFilterResultPlan = ({
+  currentVisibleSignature = '',
+  nextVisibleQuestions = [],
+  currentFilterState = {},
+  nextFilterState = {},
+  nextHiddenGated = false,
+  currentHiddenGated = false,
+  buildQuestionListSignature = () => '',
+  serializeFilterState = (filterState: unknown) => JSON.stringify(filterState || {}),
+}: {
+  currentVisibleSignature?: string | null;
+  nextVisibleQuestions?: PileQuestionLike[] | null;
+  currentFilterState?: PileFilterStateLike | null;
+  nextFilterState?: PileFilterStateLike | null;
+  nextHiddenGated?: boolean;
+  currentHiddenGated?: boolean;
+  buildQuestionListSignature?: BuildQuestionListSignature;
+  serializeFilterState?: (filterState: unknown) => string;
+} = {}): PileFilterResultPlan => {
+  const normalizedVisibleQuestions = Array.isArray(nextVisibleQuestions) ? nextVisibleQuestions : [];
+  const normalizedCurrentVisibleSignature = String(currentVisibleSignature || '');
+  const nextVisibleSignature = buildQuestionListSignature(normalizedVisibleQuestions);
+  const normalizedCurrentFilterState = (
+    currentFilterState && typeof currentFilterState === 'object'
+      ? currentFilterState
+      : {}
+  ) as PileFilterStateLike;
+  const normalizedNextFilterState = (
+    nextFilterState && typeof nextFilterState === 'object'
+      ? nextFilterState
+      : {}
+  ) as PileFilterStateLike;
+  const currentFilterSignature = serializeFilterState(normalizedCurrentFilterState);
+  const nextFilterSignature = serializeFilterState(normalizedNextFilterState);
+  const shouldSkipStateUpdate = shouldSkipPileFilterStateUpdate({
+    nextVisibleSignature,
+    currentVisibleSignature: normalizedCurrentVisibleSignature,
+    nextHiddenGated,
+    currentHiddenGated,
+    nextFilterSignature,
+    currentFilterSignature,
+  });
+
+  return {
+    nextState: {
+      pileQuestions: normalizedVisibleQuestions,
+      activePileIndex: 0,
+      filterState: normalizedNextFilterState,
+      hasHiddenGatedQuestions: !!nextHiddenGated,
+    },
+    shouldSkipStateUpdate,
+    shouldIncrementPileQuestionsGeneration: !shouldSkipStateUpdate,
+    nextVisibleSignature,
+    currentVisibleSignature: normalizedCurrentVisibleSignature,
+    nextFilterSignature,
+    currentFilterSignature,
+  };
+};
 
 export type PileLoadResultPlan = {
   nextState: Record<string, unknown>;
