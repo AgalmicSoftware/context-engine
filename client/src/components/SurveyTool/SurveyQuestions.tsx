@@ -3014,22 +3014,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     </Card>
   );
 
-  renderPileGatedPromptCard = ({
-    question,
-  }) => (
-    <Card className={styles.pileCardInner}>
-      <CardBody className={styles.pileCardBody}>
-        <div className={styles.pileCardHeader}>
-          {this.renderPromptWithManualDecrypt(question)}
-        </div>
-        {this.renderGatedPromptNotice({
-          question,
-          tooltipIdSuffix: 'pile',
-        })}
-      </CardBody>
-    </Card>
-  );
-
   renderQuestionMaskedPromptCard = ({
     mode,
     question,
