@@ -1,6 +1,7 @@
 import {
   buildCacheHydrationSlice,
   buildDraftHydrationUpdatePlan,
+  buildDraftHydrationRunPlan,
   buildDraftHydrationRenderedQuestionIds,
   buildDraftHydrationOverwriteDecision,
   buildDraftAwareCacheHydrationState,
@@ -190,6 +191,75 @@ describe('surveyToolHydrationFlow', () => {
       pendingTotal: 2,
       submittedStateActive: true,
       allowOverwrite: false,
+    });
+  });
+
+  it('builds draft hydration run plans from rendered ids, overwrite rules, and update plan state', () => {
+    const cloneBaseline = jest.fn((baseline) => JSON.parse(JSON.stringify(baseline)));
+    const applyDraftEntryToSlice = jest.fn(({ targetSlice, questionId, draftEntry }) => {
+      targetSlice.answers[questionId] = { value: draftEntry.value };
+      return true;
+    });
+
+    expect(buildDraftHydrationRunPlan({
+      hydrationQuestionIds: ['q1'],
+      pileQuestions: [{ id: 'q2' }],
+      forceOverwrite: true,
+      isDirty: false,
+      modifiedCount: 0,
+      pendingStats: { total: 0 },
+      submittedSinceLastEdit: false,
+      submissionComplete: false,
+      prevSurveysResponseState: [
+        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+      surveyIndex: 0,
+      draft: {
+        answers: {
+          q2: { value: 'off-screen' },
+        },
+      },
+      prevSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      prevBaseline: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      cloneBaseline,
+      applyDraftEntryToSlice,
+    })).toEqual({
+      renderedQuestionIds: ['q1', 'q2'],
+      allowOverwrite: true,
+      nextSlice: {
+        answers: { q2: { value: 'off-screen' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      nextBaseline: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      changed: true,
+      baselineChanged: false,
+      updates: {
+        surveysResponseState: [
+          {
+            answers: { q2: { value: 'off-screen' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+      },
     });
   });
 
