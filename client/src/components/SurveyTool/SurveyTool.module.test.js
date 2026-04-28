@@ -323,6 +323,37 @@ describe('SurveyTool module', () => {
     expect(subject._emptySubmitTimer).toBeNull();
   });
 
+  it('cancels the staged no-pending pile feedback when transient pile feedback takes over', () => {
+    jest.useFakeTimers();
+    const subject = new PileViewMode({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    syncClassSetState(subject);
+    subject._isMounted = true;
+
+    subject.showNoPendingPileSubmitFeedback('Submit');
+    expect(subject.state.pileSubmitTempText).toBe('No new or changed responses');
+
+    subject.showTransientSubmitFeedback('Saved', 1500);
+    expect(subject.state.submissionError).toBe('Saved');
+    expect(subject.state.pileSubmitTempText).toBe('Saved');
+
+    jest.advanceTimersByTime(1500);
+    expect(subject.state.submissionError).toBe('');
+    expect(subject.state.pileSubmitTempText).toBeNull();
+
+    jest.advanceTimersByTime(5000);
+    expect(subject.state.pileSubmitTempText).toBeNull();
+    expect(subject._pileSubmitTimer).toBeNull();
+    expect(subject._emptySubmitTimer).toBeNull();
+  });
+
   it('hides the pile submit rail when no rail is visible', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
