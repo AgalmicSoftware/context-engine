@@ -6106,6 +6106,37 @@ describe('SurveyTool module', () => {
     });
   });
 
+  it('clears auto-decrypt state when a blocked provider toggles auto-decrypt', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      autoDecryptEnabled: true,
+      decryptingByKey: { 'q1:answer': true },
+    };
+    syncClassSetState(subject);
+    subject.isAutoDecryptBlocked = jest.fn(() => true);
+    subject.clearAutoDecryptSweepScheduling = jest.fn();
+    subject._autoDecQueue = [{ qid: 'q1', field: 'answer' }];
+    subject._autoDecProcessing = true;
+    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
+
+    subject.toggleAutoDecrypt();
+
+    expect(subject.state.autoDecryptEnabled).toBe(false);
+    expect(subject.state.decryptingByKey).toEqual({});
+    expect(subject._autoDecQueue).toEqual([]);
+    expect(subject._autoDecProcessing).toBe(false);
+    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({});
+    expect(subject.clearAutoDecryptSweepScheduling).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks survey submit while expected survey questions are still loading', async () => {
     jest.useFakeTimers();
     const subject = new SurveyQuestions({

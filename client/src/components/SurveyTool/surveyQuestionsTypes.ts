@@ -21,6 +21,11 @@ export type SurveyQuestionPoolLoadState = {
   isIncomplete: boolean;
 };
 
+export type SurveyAutoDecryptDisabledStatePatch = {
+  autoDecryptEnabled: boolean;
+  decryptingByKey: Record<string, unknown>;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -120,6 +125,11 @@ export const buildSurveyQuestionPoolLoadState = ({
     isIncomplete: expectedIds.length > 0 && pendingCount > 0,
   };
 };
+
+export const buildAutoDecryptDisabledState = (): SurveyAutoDecryptDisabledStatePatch => ({
+  autoDecryptEnabled: false,
+  decryptingByKey: {},
+});
 
 export const buildInitialSurveyQuestionsState = (
   props: SurveyQuestionsProps = {}
