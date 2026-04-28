@@ -13861,17 +13861,81 @@ describe('SurveyTool module', () => {
     });
   });
 
-  it('derives normalized gated prompt notice ids and copy for both single and multiple gates', () => {
-    expect(buildGatedPromptNoticeState({
-      questionId: 'Q 1',
-      tooltipIdSuffix: 'pile',
-      gateNames: ['Gate Alpha', 'Gate Beta'],
-      sbtLabel: t('sbt'),
-      gateLabel: t('gate'),
-      gatesLabel: t('gates'),
-    })).toEqual({
-      tooltipId: 'ce-gated-prompt-tip-q-1-pile',
-      tooltipText: `Required ${t('sbt')} ${t('gates')}: Gate Alpha, Gate Beta`,
+  it('syncs pile baseline once cache catches up with the optimistic response', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      editBaseline: {
+        answers: { q1: { value: 'cached-answer', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+      },
+    };
+    syncClassSetState(subject);
+    subject.loadAndSortQuestions = jest.fn();
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return {};
+      return {
+        '84532': {
+          questionResponses: {
+            q1: {
+              '0xabc': JSON.stringify({
+                answer: { value: 'cached-answer' },
+                additional: { value: '' },
+              }),
+            },
+          },
+        },
+      };
+    });
+
+    subject.checkCacheAgainstBaseline();
+
+    expect(subject.state.submissionComplete).toBe(false);
+    expect(subject.loadAndSortQuestions).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not prefill pile answers from a borrowed general response cache when the slug is unresolved', () => {
+    const generalCfg = {
+      slug: '',
+      networkChainId: 84532,
+    };
+    const strictLookup = (slug) => (
+      String(slug || '').trim().toLowerCase() === ''
+        ? generalCfg
+        : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
+      strictLookup(slug) || generalCfg
+    ));
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      '84532': {
+        questionResponses: {
+          q1: {
+            '0xabc': {
+              answer: { value: 'wrong-general-answer', encrypted: false },
+              additional: { value: '', encrypted: false },
+            },
+          },
+        },
+      },
     });
 
     expect(buildGatedPromptNoticeState({

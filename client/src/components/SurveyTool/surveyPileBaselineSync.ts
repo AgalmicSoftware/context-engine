@@ -9,9 +9,6 @@ type MergeQuestionResponses = (
   target: Record<string, Record<string, unknown>>,
   source: Record<string, Record<string, unknown>>
 ) => Record<string, Record<string, unknown>>;
-type PileQuestionsCacheByNetwork = Record<string, {
-  questionResponses?: Record<string, Record<string, unknown>>;
-} & Record<string, unknown>>;
 
 export type PileBaselineCheckPlan = {
   shouldSkip: boolean;
@@ -100,10 +97,7 @@ export const readPileScopedQuestionResponses = ({
 
   const mergedResponses: Record<string, Record<string, unknown>> = {};
   scopeSlugs.forEach((scopeSlug) => {
-    const rawCache = readQuestionsCache(String(scopeSlug || ''));
-    const parsed = rawCache && typeof rawCache === 'object'
-      ? rawCache as PileQuestionsCacheByNetwork
-      : null;
+    const parsed = readQuestionsCache(String(scopeSlug || '')) as Record<string, any> | null;
     const net = parsed?.[normalizedNetworkId];
     mergeQuestionResponses(mergedResponses, net?.questionResponses || {});
   });
