@@ -243,7 +243,7 @@ import {
   clearPriorResponseAttemptedKeys,
   executePriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
-  buildLocalCacheHydrationSignature,
+  resolveLocalCacheHydrationSignatureLookup,
   loadMissingResponseIdsForScope,
   loadGroupedMissingResponseRequests,
   trackPriorResponseAttemptedKeys,
@@ -5058,22 +5058,20 @@ export class SurveyQuestions extends Component {
 
   buildLocalCacheHydrationSignature = (surveyIndex, renderedIds = []) => {
     try {
-      const context = resolveResponseHydrationContext(this.props, this._getEffectiveDraftSlug());
-      const slug = normalizeSessionSlugValue(context.sessionSlug);
-      const extraSlugs = this.props?.minifiedMode === 'pile'
-        ? getExtraQuestionReadSlugs(this.props, slug)
-        : [];
-      return buildLocalCacheHydrationSignature({
+      return resolveLocalCacheHydrationSignatureLookup({
         surveyIndex,
-        scopeSlugs: [slug, ...extraSlugs],
-        networkIdStr: context.networkIdStr,
-        account: this.props?.account,
         renderedIds,
+        rawSlug: this._getEffectiveDraftSlug(),
+        account: this.props?.account,
+        minifiedMode: this.props?.minifiedMode,
         questionsCacheNonce: this.props.questionsCacheNonce,
         questionResponsesNonce: this.props.questionResponsesNonce,
         suppressPrefill: this.state?.suppressPrefill,
         submissionError: this.state?.submissionError,
         submissionComplete: this.state?.submissionComplete,
+        resolveResponseHydrationContext: (rawSlug) => resolveResponseHydrationContext(this.props, rawSlug),
+        normalizeSessionSlugValue,
+        getExtraScopeSlugs: (slug) => getExtraQuestionReadSlugs(this.props, slug),
       });
     } catch (_) {
       return '';
