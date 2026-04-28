@@ -10,8 +10,6 @@ import {
   FormGroup,
   Label,
   Input,
-  Card,
-  CardBody,
   InputGroup,
   InputGroupText,
   ModalHeader,
@@ -52,6 +50,11 @@ import {
   buildPileSubmitRailViewState,
   buildPileSubmitViewState,
 } from './surveyPileViewState.js';
+import {
+  renderPileActiveQuestionCard,
+  renderPileCardShell,
+  renderPileGatedPromptCard,
+} from './surveyPileActiveQuestionCard';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
   buildClearedTransientSubmitFeedbackState,
@@ -2671,39 +2674,22 @@ export class PileViewMode extends SurveyQuestions {
     questionComponent,
     questionContainerClass,
     footerSection,
-  }) => (
-    <Card className={styles.pileCardInner}>
-      <CardBody className={styles.pileCardBody}>
-        <div className={styles.pileCardHeader}>
-          {this.renderPromptWithManualDecrypt(question)}
-        </div>
-
-        <div className={styles.pileCardMainContent}>
-          <div className={questionContainerClass}>
-            {questionComponent}
-          </div>
-        </div>
-
-        {footerSection}
-      </CardBody>
-    </Card>
-  );
+  }) => renderPileCardShell({
+    promptHeader: this.renderPromptWithManualDecrypt(question),
+    questionComponent,
+    questionContainerClass,
+    footerSection,
+  });
 
   renderPileGatedPromptCard = ({
     question,
-  }) => (
-    <Card className={styles.pileCardInner}>
-      <CardBody className={styles.pileCardBody}>
-        <div className={styles.pileCardHeader}>
-          {this.renderPromptWithManualDecrypt(question)}
-        </div>
-        {this.renderGatedPromptNotice({
-          question,
-          tooltipIdSuffix: 'pile',
-        })}
-      </CardBody>
-    </Card>
-  );
+  }) => renderPileGatedPromptCard({
+    promptHeader: this.renderPromptWithManualDecrypt(question),
+    gatedPromptNotice: this.renderGatedPromptNotice({
+      question,
+      tooltipIdSuffix: 'pile',
+    }),
+  });
 
   renderActiveQuestion = (question) => {
     const { surveysResponseState, showComments, showConviction } = this.state;
@@ -2736,14 +2722,6 @@ export class PileViewMode extends SurveyQuestions {
       responseSlice: slice,
     });
 
-    const promptMasked = this.isQuestionPromptMasked(question);
-    if (promptMasked) {
-      return this.renderQuestionMaskedPromptCard({
-        mode: 'pile',
-        question,
-      });
-    }
-
     const questionComponent = this.renderPileResponseInput({
       question,
       answer,
@@ -2755,9 +2733,13 @@ export class PileViewMode extends SurveyQuestions {
     });
 
     const questionContainerClass = styles[`${question.type}QuestionContainer`] || '';
+    const promptMasked = this.isQuestionPromptMasked(question);
 
-    return this.renderPileCardShell({
+    return renderPileActiveQuestionCard({
       question,
+      promptMasked,
+      renderQuestionMaskedPromptCard: this.renderQuestionMaskedPromptCard,
+      promptHeader: this.renderPromptWithManualDecrypt(question),
       questionComponent,
       questionContainerClass,
       footerSection: this.renderPileFooterSection({
