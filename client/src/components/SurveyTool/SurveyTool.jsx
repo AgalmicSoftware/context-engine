@@ -226,6 +226,7 @@ import {
   buildExitEditingStatePatch,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  buildLocalCacheRehydrationUpdatePlan,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
   resolveExitEditingBaselineSlice,
@@ -5754,11 +5755,12 @@ export class SurveyQuestions extends Component {
       } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
 
       const {
-        nextSlice: next,
-        nextBaseline,
         changed,
         baselineChanged,
-      } = buildLocalCacheRehydrationState({
+        updates,
+      } = buildLocalCacheRehydrationUpdatePlan({
+        prevSurveysResponseState: this.state.surveysResponseState,
+        surveyIndex,
         renderedQuestionIds: renderedIds,
         baseSlice,
         prevBaseline: this.state.editBaseline,
@@ -5779,16 +5781,6 @@ export class SurveyQuestions extends Component {
         if (callback) callback();
         return;
       }
-
-      const nextSurveysResponseState = buildSurveyResponseStateArray({
-        prevSurveysResponseState: this.state.surveysResponseState,
-        surveyIndex,
-        nextSlice: changed ? next : null,
-      });
-
-      const updates = {};
-      if (changed) updates.surveysResponseState = nextSurveysResponseState;
-      if (baselineChanged) updates.editBaseline = nextBaseline;
 
       this.setState(updates, () => {
         this.updateJsonPreview && this.updateJsonPreview();

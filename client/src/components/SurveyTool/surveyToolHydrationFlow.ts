@@ -166,6 +166,11 @@ type BuildExitEditingStatePatchArgs = {
   nextSubmittedSinceLastEdit?: boolean;
 };
 
+type BuildLocalCacheRehydrationUpdatePlanArgs = BuildLocalCacheRehydrationStateArgs & {
+  prevSurveysResponseState?: unknown[] | null;
+  surveyIndex?: unknown;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -846,6 +851,39 @@ export const buildExitEditingStatePatch = ({
     submissionError: '',
     submissionComplete: false,
     submittedSinceLastEdit: !!nextSubmittedSinceLastEdit,
+  };
+};
+
+export const buildLocalCacheRehydrationUpdatePlan = ({
+  prevSurveysResponseState = null,
+  surveyIndex = 0,
+  ...rehydrationArgs
+}: BuildLocalCacheRehydrationUpdatePlanArgs = {}) => {
+  const {
+    nextSlice,
+    nextBaseline,
+    changed,
+    baselineChanged,
+  } = buildLocalCacheRehydrationState(rehydrationArgs);
+
+  const updates: UnknownRecord = {};
+  if (changed) {
+    updates.surveysResponseState = buildSurveyResponseStateArray({
+      prevSurveysResponseState,
+      surveyIndex,
+      nextSlice,
+    });
+  }
+  if (baselineChanged) {
+    updates.editBaseline = nextBaseline;
+  }
+
+  return {
+    nextSlice,
+    nextBaseline,
+    changed,
+    baselineChanged,
+    updates,
   };
 };
 
