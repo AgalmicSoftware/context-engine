@@ -1258,6 +1258,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return buildResponseGateConfigSignature(cfg);
   };
 
+  invalidateCanDecryptOtherResponsesTracking = () => {
+    this._canDecryptOtherResponsesRunId += 1;
+    this._canDecryptOtherResponsesKey = '';
+    this._canDecryptOtherResponsesInFlight = null;
+  };
+
   refreshCanDecryptOtherResponses = async () => {
     try {
       const slug = this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props);
@@ -1276,9 +1282,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
       if (!snapshot.loggedIn) {
         // Invalidate any in-flight checks so they can't race and re-enable decrypt UI after logout.
-        this._canDecryptOtherResponsesRunId += 1;
-        this._canDecryptOtherResponsesKey = '';
-        this._canDecryptOtherResponsesInFlight = null;
+        this.invalidateCanDecryptOtherResponsesTracking();
         if (this.state.canDecryptOtherResponses || this.state.canDecryptOtherResponsesStatus !== 'needs-wallet') {
           this.setState(buildCanDecryptOtherResponsesState({ status: 'needs-wallet' }));
         }
@@ -1288,9 +1292,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       // If there is no gate recipient policy, the response is not decryptable-by-gate (others should not see decrypt buttons).
       if (snapshot.recipients.length === 0) {
         // Invalidate any in-flight checks so they can't race and re-enable decrypt UI.
-        this._canDecryptOtherResponsesRunId += 1;
-        this._canDecryptOtherResponsesKey = '';
-        this._canDecryptOtherResponsesInFlight = null;
+        this.invalidateCanDecryptOtherResponsesTracking();
         if (this.state.canDecryptOtherResponses || this.state.canDecryptOtherResponsesStatus !== 'no-gate') {
           this.setState(buildCanDecryptOtherResponsesState({ status: 'no-gate' }));
         }
