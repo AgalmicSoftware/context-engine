@@ -5542,24 +5542,22 @@ export class SurveyQuestions extends Component {
 
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
 
-    this.setState((prev) => {
-      const {
-        updates,
-      } = buildPrefilledSurveyUpdatePlan({
+    applyLocalCacheRehydrateSuccessEffects({
+      updates: (prev) => buildPrefilledSurveyUpdatePlan({
         surveyIndex,
-        prevSurveysResponseState: prev.surveysResponseState,
-        prevEditBaseline: prev.editBaseline,
-        isDirty: prev.isDirty,
-        submissionComplete: prev.submissionComplete,
+        prevSurveysResponseState: prev?.surveysResponseState,
+        prevEditBaseline: prev?.editBaseline,
+        isDirty: prev?.isDirty,
+        submissionComplete: prev?.submissionComplete,
         responses: userAnswers.responses,
         applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
         buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-      });
-
-      return updates;
-    }, () => {
-      this.updateJsonPreview();
-      this.recalculateEditStats();
+      }).updates,
+      applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
+      afterStateApplied: () => {
+        this.updateJsonPreview();
+        this.recalculateEditStats();
+      },
     });
   };
 
@@ -6405,25 +6403,23 @@ export class SurveyQuestions extends Component {
 
     if (!userAnswer || !questionId) return;
 
-    this.setState((prev) => {
-      const {
-        updates,
-      } = buildPrefilledSingleQuestionUpdatePlan({
+    applyLocalCacheRehydrateSuccessEffects({
+      updates: (prev) => buildPrefilledSingleQuestionUpdatePlan({
         surveyIndex,
         questionId,
-        prevSurveysResponseState: prev.surveysResponseState,
-        prevEditBaseline: prev.editBaseline,
-        isDirty: prev.isDirty,
-        submissionComplete: prev.submissionComplete,
+        prevSurveysResponseState: prev?.surveysResponseState,
+        prevEditBaseline: prev?.editBaseline,
+        isDirty: prev?.isDirty,
+        submissionComplete: prev?.submissionComplete,
         userAnswer,
         applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
         buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-      });
-
-      return updates;
-    }, () => {
-      this.updateJsonPreview();
-      this.recalculateEditStats();
+      }).updates,
+      applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
+      afterStateApplied: () => {
+        this.updateJsonPreview();
+        this.recalculateEditStats();
+      },
     });
   };
   parseAnswerValue = (value) => {
