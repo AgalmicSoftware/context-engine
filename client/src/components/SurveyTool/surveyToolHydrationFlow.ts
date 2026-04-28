@@ -171,6 +171,11 @@ type BuildLocalCacheRehydrationUpdatePlanArgs = BuildLocalCacheRehydrationStateA
   surveyIndex?: unknown;
 };
 
+type BuildDraftHydrationUpdatePlanArgs = BuildDraftHydrationStateArgs & {
+  prevSurveysResponseState?: unknown[] | null;
+  surveyIndex?: unknown;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -865,6 +870,39 @@ export const buildLocalCacheRehydrationUpdatePlan = ({
     changed,
     baselineChanged,
   } = buildLocalCacheRehydrationState(rehydrationArgs);
+
+  const updates: UnknownRecord = {};
+  if (changed) {
+    updates.surveysResponseState = buildSurveyResponseStateArray({
+      prevSurveysResponseState,
+      surveyIndex,
+      nextSlice,
+    });
+  }
+  if (baselineChanged) {
+    updates.editBaseline = nextBaseline;
+  }
+
+  return {
+    nextSlice,
+    nextBaseline,
+    changed,
+    baselineChanged,
+    updates,
+  };
+};
+
+export const buildDraftHydrationUpdatePlan = ({
+  prevSurveysResponseState = null,
+  surveyIndex = 0,
+  ...draftArgs
+}: BuildDraftHydrationUpdatePlanArgs = {}) => {
+  const {
+    nextSlice,
+    nextBaseline,
+    changed,
+    baselineChanged,
+  } = buildDraftHydrationState(draftArgs);
 
   const updates: UnknownRecord = {};
   if (changed) {
