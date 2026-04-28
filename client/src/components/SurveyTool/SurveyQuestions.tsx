@@ -226,8 +226,6 @@ import {
   buildExitEditingStatePatch,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
-  buildRevertPendingStatePatch,
-  buildResetFormStatePatch,
   applyPriorResponseFetchSuccessEffects,
   buildPriorResponseFetchPlan,
   clearPriorResponseAttemptedKeys,
@@ -242,16 +240,8 @@ import {
   buildNormalizedRenderedQuestionIds,
   resolveQuestionSlugMapLookup,
   resolveExitEditingBaselineSlice,
-  resolveRevertPendingBaselineSlice,
-  buildStartFreshSurveyState,
   buildMergedSurveyResponseState,
-  buildPrefilledSingleQuestionState,
-  buildPrefilledSurveyState,
   buildQuestionSlugMapForIds,
-  applyResetFormStateEffects,
-  applyRevertPendingEffects,
-  applyStartFreshEffects,
-  applyPrefillUpdatePlan,
   buildRevertedResponseSlice,
   buildSubmissionGroupContext,
   buildSurveyResponseStateArray,
@@ -377,6 +367,11 @@ import {
   executeSurveyPriorResponseBackfill,
   resolveSurveyMissingRenderedResponseLookup,
 } from './surveyToolHydrationController';
+import {
+  executeSurveyFormStateReset,
+  executeSurveyPendingRevert,
+  executeSurveyStartFresh,
+} from './surveyToolResponseResetController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -4434,28 +4429,24 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   // Reset live form state on account changes (before loading new account data)
   resetFormStateForAccountChange = (callback) => {
-    try {
-      // persist current draft for anon→account migration paths
-      // SYNC CALL ensures draft is saved before state is cleared
-      this.persistDraft();
-    } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-    try {
-      if (this._persistTimer) {
-        clearTimeout(this._persistTimer);
-        this._persistTimer = null;
-      }
-    } catch (e) { surveyLog.warn('SurveyTool: cleanup', e); }
-
-    const initial = this.initializeSurveyResponseState();
-    const nextResetState = buildResetFormStatePatch({
-      initialSurveysResponseState: Array.isArray(initial) ? initial : [],
-      baselineIndex: this.props.surveyIndex || 0,
-      nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
+    executeSurveyFormStateReset({
+      props: this.props,
+      state: this.state,
+      persistDraft: this.persistDraft,
+      clearPersistTimer: () => {
+        if (this._persistTimer) {
+          clearTimeout(this._persistTimer);
+          this._persistTimer = null;
+        }
+      },
+      initializeSurveyResponseState: this.initializeSurveyResponseState,
       cloneValue: this.deepClone,
+      setState: this.setState.bind(this),
+      callback,
+      updateSubmittedSinceLastEdit,
+      onPersistError: (error) => { surveyLog.warn('SurveyTool: fallback', error); },
+      onCleanupError: (error) => { surveyLog.warn('SurveyTool: cleanup', error); },
     });
-
-    this.setState(nextResetState, () => applyResetFormStateEffects({ callback }));
   };
 
 
@@ -4556,42 +4547,22 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
      * Does NOT replace editBaseline; it only resets the live slice so pending → 0.
      */
   handleRevertPendingChanges = () => {
-    try {
-      const surveyIndex =
-        this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
-      const isLoggedIn = !!(this.props.loginComplete && this.props.account);
-      const baselineSlice = resolveRevertPendingBaselineSlice({
-        editBaseline: this.state.editBaseline,
-        isLoggedIn,
-        userAnswers: this.state.userAnswers,
-        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-        buildSliceFromLocalCache: this.buildSliceFromLocalCache,
-      });
-
-      const renderedIds = this.getCurrentRenderedQuestionIds();
-      const nextSlice = buildRevertedResponseSlice({
-        baselineSlice,
-        renderedQuestionIds: renderedIds,
-        cloneFieldState: this.deepClone,
-        buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
-      });
-
-      this.setState(
-        buildRevertPendingStatePatch({
-          prevSurveysResponseState: this.state.surveysResponseState,
-          surveyIndex,
-          nextSlice,
-          isLoggedIn,
-        }),
-        () => applyRevertPendingEffects({
-          clearDraft: this.clearDraft,
-          recalculateEditStats: this.recalculateEditStats,
-          updateJsonPreview: this.updateJsonPreview,
-        })
-      );
-    } catch (e) {
-      surveyLog.warn('[SurveyQuestions] handleRevertPendingChanges failed:', e);
-    }
+    executeSurveyPendingRevert({
+      props: this.props,
+      state: this.state,
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+      buildSliceFromLocalCache: this.buildSliceFromLocalCache,
+      getRenderedQuestionIds: this.getCurrentRenderedQuestionIds,
+      cloneFieldState: this.deepClone,
+      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+      setState: this.setState.bind(this),
+      clearDraft: this.clearDraft,
+      recalculateEditStats: this.recalculateEditStats,
+      updateJsonPreview: this.updateJsonPreview,
+      onFailure: (error) => {
+        surveyLog.warn('[SurveyQuestions] handleRevertPendingChanges failed:', error);
+      },
+    });
   };
 
 
@@ -5388,32 +5359,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   handleStartFresh = () => {
-    const surveyIndex =
-      this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
-    const renderedIds = this.getCurrentRenderedQuestionIds();
-    const { emptySlice, nextSurveysResponseState } = buildStartFreshSurveyState({
-      surveyIndex,
-      renderedQuestionIds: renderedIds,
-      prevSurveysResponseState: this.state.surveysResponseState,
+    executeSurveyStartFresh({
+      props: this.props,
+      state: this.state,
+      getRenderedQuestionIds: this.getCurrentRenderedQuestionIds,
       buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
-    });
-
-    this.setState({
-      suppressPrefill: true,
-      startFresh: true,
-      surveysResponseState: nextSurveysResponseState,
-      editBaseline: this.deepClone(emptySlice), // pending → 0 immediately
-      modifiedCount: 0,
-      hasEncryptedChanges: false,
-      isDirty: false,
-      submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-    }, () => {
-      applyStartFreshEffects({
-        renderedQuestionIds: renderedIds,
-        clearDraftFor: this.clearDraftFor,
-        recalculateEditStats: this.recalculateEditStats,
-        persistDraftSafely: this.persistDraftSafely,
-      });
+      cloneValue: this.deepClone,
+      setState: this.setState.bind(this),
+      clearDraftFor: this.clearDraftFor,
+      recalculateEditStats: this.recalculateEditStats,
+      persistDraftSafely: this.persistDraftSafely,
+      updateSubmittedSinceLastEdit,
     });
   };
 
