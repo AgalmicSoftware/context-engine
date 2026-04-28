@@ -394,6 +394,7 @@ import {
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
   buildAutoDecryptDisabledState,
+  buildBookmarkedQuestionsState,
   buildCanDecryptOtherResponsesState,
   buildClearedSurveyQuestionPoolState,
   buildInitialSurveyQuestionsState,
@@ -4989,14 +4990,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         obj = await readCache('bookmarksCache', slug);
       }
       if (!obj || typeof obj !== 'object') {
-        this.setState({ bookmarkedQuestions: new Set() });
+        this.setState(buildBookmarkedQuestionsState());
         return;
       }
       const list = Array.isArray(obj?.questions) ? obj.questions : [];
-      this.setState({ bookmarkedQuestions: new Set(list) });
+      this.setState(buildBookmarkedQuestionsState(list));
     } catch (error) {
       surveyLog.error('[SurveyQuestions] Error reading bookmarksCache:', error);
-      this.setState({ bookmarkedQuestions: new Set() });
+      this.setState(buildBookmarkedQuestionsState());
     }
   };
 
@@ -5020,7 +5021,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     obj.questions = Array.from(set);
 
     // Update state first for immediate UI feedback
-    this.setState({ bookmarkedQuestions: new Set(obj.questions) });
+    this.setState(buildBookmarkedQuestionsState(obj.questions));
 
     void writeCacheOptimistic('bookmarksCache', slug, obj).catch((error) => {
       surveyLog.error('[SurveyQuestions] Error saving bookmarksCache:', error);
