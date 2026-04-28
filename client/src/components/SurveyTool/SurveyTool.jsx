@@ -227,6 +227,7 @@ import {
   buildLocalCacheHydrationMemoKey,
   buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
+  buildPrefilledSingleQuestionState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
@@ -6603,39 +6604,25 @@ export class SurveyQuestions extends Component {
     if (!userAnswer || !questionId) return;
 
     this.setState((prev) => {
-      const curr =
-        prev.surveysResponseState?.[surveyIndex] ||
-        { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-      const allowOverwrite = !prev.isDirty && !prev.submissionComplete;
-
-      const nextStateArr = buildSurveyResponseStateArray({
-        prevSurveysResponseState: prev.surveysResponseState,
+      const {
+        nextSurveysResponseState,
+        nextBaseline,
+        shouldWriteBaseline,
+      } = buildPrefilledSingleQuestionState({
         surveyIndex,
+        questionId,
+        prevSurveysResponseState: prev.surveysResponseState,
+        prevEditBaseline: prev.editBaseline,
+        isDirty: prev.isDirty,
+        submissionComplete: prev.submissionComplete,
+        userAnswer,
+        applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       });
-
-      const nextSlice = {
-        answers: { ...(nextStateArr[surveyIndex]?.answers || {}) },
-        importance: { ...(nextStateArr[surveyIndex]?.importance || {}) },
-        conviction: { ...(nextStateArr[surveyIndex]?.conviction || {}) },
-        additionalComments: { ...(nextStateArr[surveyIndex]?.additionalComments || {}) },
-      };
-
-      this._applyResponseHydrationListToSlice({
-        targetSlice: nextSlice,
-        currentSlice: curr,
-        responses: [userAnswer],
-        allowOverwrite,
-        questionIdResolver: () => questionId,
-      });
-
-      nextStateArr[surveyIndex] = nextSlice;
-
-      const baseline = this.buildSliceFromUserAnswers(userAnswer, prev.editBaseline || curr);
 
       return {
-        surveysResponseState: nextStateArr,
-        ...(!prev.submissionComplete ? { editBaseline: baseline } : {})
+        surveysResponseState: nextSurveysResponseState,
+        ...(shouldWriteBaseline ? { editBaseline: nextBaseline } : {}),
       };
     }, () => {
       this.updateJsonPreview();
