@@ -1,6 +1,8 @@
 import {
   buildCacheHydrationSlice,
   buildDraftHydrationUpdatePlan,
+  buildDraftHydrationRenderedQuestionIds,
+  buildDraftHydrationOverwriteDecision,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildExitEditingStatePatch,
@@ -141,6 +143,54 @@ describe('surveyToolHydrationFlow', () => {
     });
 
     expect(applyDraftEntryToSlice).not.toHaveBeenCalled();
+  });
+
+  it('builds draft hydration rendered ids with optional pile expansion', () => {
+    expect(buildDraftHydrationRenderedQuestionIds({
+      hydrationQuestionIds: ['q1', 'Q2'],
+      pileQuestions: [
+        { id: 'q2' },
+        { id: 'q3' },
+      ],
+      forceOverwrite: false,
+    })).toEqual(['q1', 'q2']);
+
+    expect(buildDraftHydrationRenderedQuestionIds({
+      hydrationQuestionIds: ['q1', 'Q2'],
+      pileQuestions: [
+        { id: 'q2' },
+        { id: 'q3' },
+      ],
+      forceOverwrite: true,
+    })).toEqual(['q1', 'q2', 'q3']);
+  });
+
+  it('builds draft hydration overwrite decisions from pending edit state', () => {
+    expect(buildDraftHydrationOverwriteDecision({
+      forceOverwrite: true,
+      isDirty: false,
+      modifiedCount: 0,
+      pendingStats: { total: 0 },
+      submittedSinceLastEdit: false,
+      submissionComplete: false,
+    })).toEqual({
+      pendingTotal: 0,
+      submittedStateActive: false,
+      allowOverwrite: true,
+    });
+
+    expect(buildDraftHydrationOverwriteDecision({
+      forceOverwrite: false,
+      isDirty: true,
+      modifiedCount: 2,
+      pendingStats: { total: 2 },
+      submittedSinceLastEdit: true,
+      submissionComplete: true,
+    })).toEqual({
+      pendingTotal: 2,
+      submittedStateActive: true,
+      allowOverwrite: false,
+    });
   });
 
   it('builds draft hydration update plans from slice and baseline changes', () => {

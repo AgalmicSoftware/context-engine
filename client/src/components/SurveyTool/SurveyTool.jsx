@@ -220,6 +220,8 @@ import {
   buildQuestionScanProgressDisplay,
   buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
+  buildDraftHydrationRenderedQuestionIds,
+  buildDraftHydrationOverwriteDecision,
   buildCacheHydrationSlice,
   buildDraftHydrationUpdatePlan,
   buildDraftAwareCacheHydrationState,
@@ -5278,29 +5280,23 @@ export class SurveyQuestions extends Component {
           additionalComments: {}
         };
 
-      const rendered = new Set(this.getHydrationQuestionIds());
-      if (forceOverwrite) {
-        const knownPileIds = Array.isArray(this.state?.pileQuestions)
-          ? this.state.pileQuestions
-          : [];
-        knownPileIds.forEach((q) => {
-          const qid = normalizeQuestionIdKey(q?.id);
-          if (qid) rendered.add(qid);
-        });
-      }
-      if (rendered.size === 0) return;
+      const renderedQuestionIds = buildDraftHydrationRenderedQuestionIds({
+        hydrationQuestionIds: this.getHydrationQuestionIds(),
+        pileQuestions: this.state?.pileQuestions,
+        forceOverwrite,
+      });
+      if (renderedQuestionIds.length === 0) return;
 
       const pendingStats =
         (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) ||
         { total: this.state.modifiedCount || 0 };
-      const submittedStateActive = !!(
-        this.state.submittedSinceLastEdit || this.state.submissionComplete
-      );
-      const allowOverwrite = shouldForceOverwriteDraftValues({
+      const { allowOverwrite } = buildDraftHydrationOverwriteDecision({
         forceOverwrite,
-        isDirty: this.state.isDirty || (this.state.modifiedCount || 0) > 0,
-        pendingTotal: pendingStats.total,
-        submittedStateActive,
+        isDirty: this.state.isDirty,
+        modifiedCount: this.state.modifiedCount,
+        pendingStats,
+        submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+        submissionComplete: this.state.submissionComplete,
       });
 
       const {
@@ -5308,7 +5304,7 @@ export class SurveyQuestions extends Component {
       } = buildDraftHydrationUpdatePlan({
         prevSurveysResponseState: this.state.surveysResponseState,
         surveyIndex,
-        renderedQuestionIds: rendered,
+        renderedQuestionIds,
         draft,
         prevSlice,
         prevBaseline: this.state.editBaseline,
