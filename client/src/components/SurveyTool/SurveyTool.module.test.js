@@ -3026,6 +3026,49 @@ describe('SurveyTool module', () => {
     expect(subject.state.surveysResponseState[0].additionalComments.q1.encryptionGateId).toBe('gate-a');
   });
 
+  it('applies answer and additional audiences into ensured survey slots', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+    subject.scheduleJsonPreviewUpdate = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.invalidateDiffCaches = jest.fn();
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.getEffectiveRecipientsForQid = jest.fn(() => [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }]);
+    subject.getResponseGateOptions = jest.fn(() => [
+      {
+        gateId: 'gate-a',
+        label: 'Gate A',
+        sbtAddresses: ['0x00000000000000000000000000000000000000a1'],
+        sbtSummary: 'Gate A SBT',
+        recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'base' }],
+      },
+    ]);
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [],
+    };
+
+    subject.applyAnswerEncryptionAudience(2, 'q1', 'gate', { gateId: 'gate-a' });
+    expect(subject.state.surveysResponseState).toHaveLength(3);
+    expect(subject.state.surveysResponseState[2].answers.q1.encryptionAudience).toBe('gate');
+    expect(subject.state.surveysResponseState[2].answers.q1.encryptionGateId).toBe('gate-a');
+
+    subject.applyAdditionalEncryptionAudience(2, 'q1', 'follow');
+    expect(subject.state.surveysResponseState[2].additionalComments.q1.audienceMode).toBe('inherit');
+    expect(subject.state.surveysResponseState[2].additionalComments.q1.encryptionGateId).toBe('gate-a');
+  });
+
   it('groups answer and additional encryption work by field-specific gate recipients', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,

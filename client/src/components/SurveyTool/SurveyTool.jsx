@@ -10472,8 +10472,10 @@ export class SurveyQuestions extends Component {
       : null;
 
     this.setState((prev) => {
-      const arr = Array.isArray(prev.surveysResponseState) ? [...prev.surveysResponseState] : [];
-      while (arr.length <= idx) arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
+      const arr = buildSurveyResponseStateArray({
+        prevSurveysResponseState: prev.surveysResponseState,
+        surveyIndex: idx,
+      });
 
       const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
       const nextAnswer = { ...(slice.answers?.[qid] || this.buildEmptyResponseFieldState(qid)) };
@@ -10516,8 +10518,10 @@ export class SurveyQuestions extends Component {
     this.invalidateDiffCaches();
 
     this.setState((prev) => {
-      const arr = Array.isArray(prev.surveysResponseState) ? [...prev.surveysResponseState] : [];
-      while (arr.length <= idx) arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
+      const arr = buildSurveyResponseStateArray({
+        prevSurveysResponseState: prev.surveysResponseState,
+        surveyIndex: idx,
+      });
 
       const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
       const nextAnswer = { ...(slice.answers?.[qid] || this.buildEmptyResponseFieldState(qid)) };
