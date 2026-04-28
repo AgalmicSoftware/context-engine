@@ -54,6 +54,16 @@ const countElements = (node: any, predicate: any) => {
   return count;
 };
 
+const treeHasText = (node: any, text: string) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node).includes(text);
+  }
+  if (typeof node !== 'object') return false;
+  return treeHasText(node?.props?.children, text);
+};
+
 const getElementChildren = (node: any) => {
   const children = node?.props?.children;
   if (children == null) return [];
@@ -108,6 +118,41 @@ const buildBaseProps = () => ({
 });
 
 describe('surveyPileInteractionSurface', () => {
+  it('renders the pile loading empty state with progress copy and fill width', () => {
+    const tree = renderPileInteractionSurface({
+      ...buildBaseProps(),
+      pileQuestions: [],
+      isStillLoading: true,
+      loadingElapsedSec: 12,
+      isHydrating: true,
+      hydrateDone: 3,
+      hydrateDiscovered: 5,
+      scanTotalBlocks: 20,
+      pileScanDisplay: {
+        metaLeftText: 'ignored left',
+        metaRightText: 'ignored right',
+      },
+      scanPercent: 80,
+    });
+
+    const loadingHeadline = findNodeByClassName(tree, 'pileLoadingHeadline');
+    const loadingSubhead = findNodeByClassName(tree, 'pileLoadingSubhead');
+    const progressMeta = findNodeByClassName(tree, 'pileLoadingProgressMeta');
+    const progressFill = findNodeByClassName(tree, 'pileLoadingProgressFill');
+
+    expect(loadingHeadline?.props?.children).toEqual(expect.arrayContaining([
+      'Loading... ',
+      12,
+      's',
+    ]));
+    expect(loadingSubhead?.props?.children).toBe('Loading Metadata (3 / 5)');
+    expect(treeHasText(progressMeta, '2 items left')).toBe(true);
+    expect(treeHasText(progressMeta, '3 / 5')).toBe(true);
+    expect(progressFill?.props?.style).toEqual(expect.objectContaining({
+      width: '60%',
+    }));
+  });
+
   it('renders a windowed pile deck with controls stacked under the cards', () => {
     const renderActiveQuestion = jest.fn((question: any) => (
       <div data-testid={`active-${question.id}`}>{question.prompt}</div>
