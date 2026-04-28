@@ -393,7 +393,9 @@ import {
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
+  buildClearedSurveyQuestionPoolState,
   buildInitialSurveyQuestionsState,
+  buildSurveyQuestionPoolLoadState,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
@@ -5123,29 +5125,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   getSurveyQuestionPoolLoadState = () => {
-    if (this.props.isStandalone || this.props.singleQuestionMode) {
-      return {
-        expectedIds: [],
-        pendingIds: [],
-        pendingCount: 0,
-        isIncomplete: false,
-      };
-    }
-
-    const expectedIds = Array.isArray(this.state.questionPoolExpectedIds)
-      ? this.state.questionPoolExpectedIds
-      : [];
-    const pendingIds = Array.isArray(this.state.questionPoolPendingIds)
-      ? this.state.questionPoolPendingIds
-      : [];
-    const pendingCount = pendingIds.length;
-
-    return {
-      expectedIds,
-      pendingIds,
-      pendingCount,
-      isIncomplete: expectedIds.length > 0 && pendingCount > 0,
-    };
+    return buildSurveyQuestionPoolLoadState({
+      isStandalone: this.props.isStandalone,
+      singleQuestionMode: this.props.singleQuestionMode,
+      questionPoolExpectedIds: this.state.questionPoolExpectedIds,
+      questionPoolPendingIds: this.state.questionPoolPendingIds,
+    });
   };
 
   showTransientSubmitFeedback = (message = '', durationMs = 2000) => {
@@ -5192,7 +5177,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (this.props.isStandalone || this.props.singleQuestionMode) return;
     if (!this.props.surveyId) {
       surveyLog.warn("SurveyQuestions: fetchQuestionPool – no surveyID supplied");
-      this.setState({ questionPool: [], questionPoolExpectedIds: [], questionPoolPendingIds: [] });
+      this.setState(buildClearedSurveyQuestionPoolState());
       return;
     }
 
@@ -5205,7 +5190,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const netIdStr = questionReadContext.networkIdStr;
     if (!netIdStr) {
       surveyLog.error("SurveyQuestions: fetchQuestionPool – network.id undefined");
-      this.setState({ questionPool: [], questionPoolExpectedIds: [], questionPoolPendingIds: [] });
+      this.setState(buildClearedSurveyQuestionPoolState());
       return;
     }
 
@@ -5261,7 +5246,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     if (!surveyData || !Array.isArray(surveyData.questionIDs) || surveyData.questionIDs.length === 0) {
       surveyLog.warn(`SurveyQuestions: survey ${surveyIdLower} still has no questionIDs – aborting pool build`);
-      this.setState({ questionPool: [], questionPoolExpectedIds: [], questionPoolPendingIds: [] });
+      this.setState(buildClearedSurveyQuestionPoolState());
       return;
     }
 

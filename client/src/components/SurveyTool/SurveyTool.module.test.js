@@ -6070,6 +6070,42 @@ describe('SurveyTool module', () => {
     expect(peekSpy).not.toHaveBeenCalled();
   });
 
+  it('reports pending survey question-pool hydration from SurveyQuestions state', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPoolExpectedIds: ['q1', 'q2'],
+      questionPoolPendingIds: ['q2'],
+    };
+
+    expect(subject.getSurveyQuestionPoolLoadState()).toEqual({
+      expectedIds: ['q1', 'q2'],
+      pendingIds: ['q2'],
+      pendingCount: 1,
+      isIncomplete: true,
+    });
+
+    subject.props = {
+      ...subject.props,
+      isStandalone: true,
+    };
+
+    expect(subject.getSurveyQuestionPoolLoadState()).toEqual({
+      expectedIds: [],
+      pendingIds: [],
+      pendingCount: 0,
+      isIncomplete: false,
+    });
+  });
+
   it('blocks survey submit while expected survey questions are still loading', async () => {
     jest.useFakeTimers();
     const subject = new SurveyQuestions({
