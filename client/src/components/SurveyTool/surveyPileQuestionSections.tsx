@@ -31,32 +31,6 @@ export type PileFooterSectionProps = {
   commentsSection: React.ReactNode;
 };
 
-export const buildPileQuestionCommentButtonClassName = ({
-  activeClassName = '',
-  baseClassName = '',
-  commentClassName = '',
-  hasAdditionalContent = false,
-}: {
-  activeClassName?: unknown;
-  baseClassName?: unknown;
-  commentClassName?: unknown;
-  hasAdditionalContent?: unknown;
-} = {}): string => ([
-  String(baseClassName || ''),
-  String(commentClassName || ''),
-  hasAdditionalContent ? String(activeClassName || '') : '',
-].filter(Boolean).join(' '));
-
-export const resolvePileQuestionCommentIconClassName = ({
-  glowClassName = '',
-  hasAdditionalContent = false,
-}: {
-  glowClassName?: unknown;
-  hasAdditionalContent?: unknown;
-} = {}): string | undefined => (
-  hasAdditionalContent ? String(glowClassName || '') || undefined : undefined
-);
-
 export const renderPileAdditionalEditorRow = ({
   input,
   lockControl,
@@ -92,23 +66,12 @@ export const renderPileQuestionIcons = ({
 }: PileQuestionIconsProps): React.ReactElement => (
   <div className={styles.pileCardIcons}>
     <button
-      className={buildPileQuestionCommentButtonClassName({
-        activeClassName: styles.iconButtonActive,
-        baseClassName: styles.iconButton,
-        commentClassName: styles.commentButton,
-        hasAdditionalContent,
-      })}
+      className={`${styles.iconButton} ${styles.commentButton} ${hasAdditionalContent ? styles.iconButtonActive : ''}`}
       onClick={onToggleComments}
       data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
       data-ce-question-id={String(questionId || '').trim().toLowerCase()}
     >
-      <FontAwesomeIcon
-        icon={faComment}
-        className={resolvePileQuestionCommentIconClassName({
-          glowClassName: styles.iconGlow,
-          hasAdditionalContent,
-        })}
-      />
+      <FontAwesomeIcon icon={faComment} className={hasAdditionalContent ? styles.iconGlow : undefined} />
     </button>
 
     {answerLockControl}

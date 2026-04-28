@@ -2,12 +2,10 @@ import React from 'react';
 
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import {
-  buildPileQuestionCommentButtonClassName,
   renderPileAdditionalEditorRow,
   renderPileCommentsSection,
   renderPileQuestionIcons,
   renderPileFooterSection,
-  resolvePileQuestionCommentIconClassName,
 } from './surveyPileQuestionSections';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -127,28 +125,5 @@ describe('surveyPileQuestionSections', () => {
     expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'slider-section')).not.toBeNull();
     expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'question-icons')).not.toBeNull();
     expect(findElement(tree, (node) => isElementNode(node) && node.props['data-testid'] === 'comments-section')).not.toBeNull();
-  });
-
-  it('builds pile question comment display helpers', () => {
-    expect(buildPileQuestionCommentButtonClassName({
-      activeClassName: 'active',
-      baseClassName: 'base',
-      commentClassName: 'comment',
-      hasAdditionalContent: true,
-    })).toBe('base comment active');
-    expect(buildPileQuestionCommentButtonClassName({
-      activeClassName: 'active',
-      baseClassName: 'base',
-      commentClassName: 'comment',
-      hasAdditionalContent: false,
-    })).toBe('base comment');
-    expect(resolvePileQuestionCommentIconClassName({
-      glowClassName: 'glow',
-      hasAdditionalContent: true,
-    })).toBe('glow');
-    expect(resolvePileQuestionCommentIconClassName({
-      glowClassName: 'glow',
-      hasAdditionalContent: false,
-    })).toBeUndefined();
   });
 });
