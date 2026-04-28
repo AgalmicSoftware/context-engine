@@ -232,8 +232,10 @@ import {
   buildResetFormStatePatch,
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyUpdatePlan,
+  buildPriorResponseFetchPlan,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
+  shouldBackfillPriorResponses,
   buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
@@ -5232,23 +5234,17 @@ export class SurveyQuestions extends Component {
 
   ensurePriorResponsesForRenderedIds = async (opts = {}) => {
     const accountLower = String(this.props.account || '').trim().toLowerCase();
-    const viewingOtherSurveyResponder =
-      !!this.props.displayAnswerMode &&
-      !!this.props.viewAddress &&
-      String(this.props.viewAddress || '').trim().toLowerCase() !== accountLower;
-    const viewingOtherQuestionResponder =
-      !!this.props.singleQuestionMode &&
-      !!this.props.responderAddress &&
-      String(this.props.responderAddress || '').trim().toLowerCase() !== accountLower;
-
-    const canBackfill =
-      !!this.props.loginComplete &&
-      !!accountLower &&
-      !viewingOtherSurveyResponder &&
-      !viewingOtherQuestionResponder &&
-      typeof this.props.refreshQuestionResponses === 'function';
-    if (!canBackfill) return false;
-    if (this.state.submissionComplete || this.state.isSubmitting) return false;
+    if (!shouldBackfillPriorResponses({
+      loginComplete: this.props.loginComplete,
+      account: this.props.account,
+      displayAnswerMode: this.props.displayAnswerMode,
+      viewAddress: this.props.viewAddress,
+      singleQuestionMode: this.props.singleQuestionMode,
+      responderAddress: this.props.responderAddress,
+      hasRefreshQuestionResponses: typeof this.props.refreshQuestionResponses === 'function',
+      submissionComplete: this.state.submissionComplete,
+      isSubmitting: this.state.isSubmitting,
+    })) return false;
 
     if (this._priorResponseBackfillInFlight) {
       return this._priorResponseBackfillInFlight;
@@ -5264,35 +5260,19 @@ export class SurveyQuestions extends Component {
           responder: responderLower,
           slug: opts?.slug,
         });
-        const groupedRequests = Array.isArray(missingInfo?.requests) && missingInfo.requests.length > 0
-          ? missingInfo.requests
-          : [{
-            slug: String(missingInfo?.slug || ''),
-            netId: String(missingInfo?.netId || ''),
-            missingIds: Array.isArray(missingInfo?.missingIds) ? missingInfo.missingIds : [],
-          }];
-        const requestsToFetch = groupedRequests
-          .map((entry) => {
-            const requestSlug = String(entry?.slug || '');
-            const requestIds = Array.isArray(entry?.missingIds) ? entry.missingIds : [];
-            const idsToFetch = requestIds.filter((qid) => {
-              const key = `${requestSlug}|${responderLower}|${qid}`;
-              return !this._priorResponseBackfillAttempted.has(key);
-            });
-            return {
-              slug: requestSlug,
-              idsToFetch,
-            };
-          })
-          .filter((entry) => entry.idsToFetch.length > 0);
+        const {
+          requestsToFetch,
+          attemptedKeysToMark,
+        } = buildPriorResponseFetchPlan({
+          missingInfo,
+          responderLower,
+          attemptedKeys: this._priorResponseBackfillAttempted,
+        });
         if (requestsToFetch.length === 0) return false;
 
-        requestsToFetch.forEach((entry) => {
-          entry.idsToFetch.forEach((qid) => {
-            const key = `${entry.slug}|${responderLower}|${qid}`;
-            this._priorResponseBackfillAttempted.add(key);
-            attemptedKeys.push(key);
-          });
+        attemptedKeysToMark.forEach((key) => {
+          this._priorResponseBackfillAttempted.add(key);
+          attemptedKeys.push(key);
         });
 
         if (this._isMounted) {
