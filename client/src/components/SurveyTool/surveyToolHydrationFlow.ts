@@ -343,6 +343,18 @@ type BuildMissingRenderedResponseResultArgs = {
   fallbackNetId?: unknown;
 };
 
+type LoadMissingRenderedResponseInfoArgs = {
+  renderedIds?: Iterable<unknown> | unknown[];
+  slug?: unknown;
+  netId?: unknown;
+  responderLower?: string;
+  shouldGroupByScope?: boolean;
+  slugByQuestionId?: Map<string, unknown> | null;
+  resolveScopeNetId?: ((slug: string, entryNetId: string) => string | null | undefined) | null;
+  readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
+  ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
+};
+
 type BuildNormalizedRenderedQuestionIdsArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
 };
@@ -1672,6 +1684,80 @@ export const buildMissingRenderedResponseResult = ({
     slug: String(fallbackSlug || ''),
     netId: String(fallbackNetId || ''),
     requests: nonEmptyRequests,
+  };
+};
+
+export const loadMissingRenderedResponseInfo = async ({
+  renderedIds = [],
+  slug = '',
+  netId = '',
+  responderLower = '',
+  shouldGroupByScope = false,
+  slugByQuestionId = null,
+  resolveScopeNetId = null,
+  readQuestionsCacheAsync = null,
+  ensureQuestionsNet = null,
+}: LoadMissingRenderedResponseInfoArgs = {}) => {
+  const normalizedNetId = String(netId || '');
+  const normalizedSlug = String(slug || '');
+  const normalizedRenderedIds = buildNormalizedRenderedQuestionIds({
+    renderedIds,
+  });
+
+  if (!normalizedNetId) {
+    return {
+      missingIds: [] as string[],
+      slug: normalizedSlug,
+      netId: '',
+      requests: [] as MissingRenderedResponseRequest[],
+    };
+  }
+
+  if (normalizedRenderedIds.length === 0) {
+    return {
+      missingIds: [] as string[],
+      slug: normalizedSlug,
+      netId: normalizedNetId,
+      requests: [] as MissingRenderedResponseRequest[],
+    };
+  }
+
+  if (shouldGroupByScope) {
+    const scopePlan = buildGroupedRenderedResponseScopePlan({
+      renderedIds: normalizedRenderedIds,
+      slugByQuestionId,
+      fallbackSlug: normalizedSlug,
+      fallbackNetId: normalizedNetId,
+    });
+    const requests = await loadGroupedMissingResponseRequests({
+      scopePlan,
+      fallbackNetId: normalizedNetId,
+      responderLower,
+      resolveScopeNetId,
+      readQuestionsCacheAsync,
+      ensureQuestionsNet,
+    });
+    return buildMissingRenderedResponseResult({
+      requests,
+      fallbackSlug: normalizedSlug,
+      fallbackNetId: normalizedNetId,
+    });
+  }
+
+  const missingIds = await loadMissingResponseIdsForScope({
+    slug: normalizedSlug,
+    netId: normalizedNetId,
+    renderedIds: normalizedRenderedIds,
+    responderLower,
+    readQuestionsCacheAsync,
+    ensureQuestionsNet,
+  });
+
+  return {
+    missingIds,
+    slug: normalizedSlug,
+    netId: normalizedNetId,
+    requests: [] as MissingRenderedResponseRequest[],
   };
 };
 
