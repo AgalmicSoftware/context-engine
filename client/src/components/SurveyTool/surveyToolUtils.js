@@ -137,6 +137,7 @@ export {
   loadGroupedMissingResponseRequests,
   trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
+  loadMissingRenderedResponseInfo,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   buildQuestionSlugMapForIds,
