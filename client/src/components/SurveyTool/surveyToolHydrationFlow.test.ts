@@ -20,9 +20,11 @@ import {
   buildPrefilledSurveyUpdatePlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  clearPriorResponseAttemptedKeys,
   executePriorResponseFetchPlan,
   loadMissingResponseIdsForScope,
   loadGroupedMissingResponseRequests,
+  trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
@@ -1405,6 +1407,31 @@ describe('surveyToolHydrationFlow', () => {
         'beta|0xabc|q3',
       ],
     });
+  });
+
+  it('tracks and clears attempted prior-response keys', () => {
+    const attempted = new Set(['existing']);
+
+    expect(trackPriorResponseAttemptedKeys({
+      attemptedSet: attempted,
+      attemptedKeysToMark: ['alpha|0xabc|q1', '', 'beta|0xabc|q2'],
+    })).toEqual(['alpha|0xabc|q1', 'beta|0xabc|q2']);
+
+    expect(Array.from(attempted)).toEqual([
+      'existing',
+      'alpha|0xabc|q1',
+      'beta|0xabc|q2',
+    ]);
+
+    clearPriorResponseAttemptedKeys({
+      attemptedSet: attempted,
+      attemptedKeys: ['alpha|0xabc|q1', null],
+    });
+
+    expect(Array.from(attempted)).toEqual([
+      'existing',
+      'beta|0xabc|q2',
+    ]);
   });
 
   it('executes grouped prior-response fetch plans in normalized order', async () => {
