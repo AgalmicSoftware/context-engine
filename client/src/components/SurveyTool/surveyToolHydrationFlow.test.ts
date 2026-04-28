@@ -1,5 +1,6 @@
 import {
   buildCacheHydrationSlice,
+  buildDraftHydrationUpdatePlan,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildExitEditingStatePatch,
@@ -114,6 +115,84 @@ describe('surveyToolHydrationFlow', () => {
     });
 
     expect(applyDraftEntryToSlice).not.toHaveBeenCalled();
+  });
+
+  it('builds draft hydration update plans from slice and baseline changes', () => {
+    const cloneBaseline = jest.fn((baseline) => JSON.parse(JSON.stringify(baseline)));
+    const applyDraftEntryToSlice = jest.fn(({ targetSlice, questionId, draftEntry }) => {
+      targetSlice.answers[questionId] = { value: draftEntry.value };
+      targetSlice.additionalComments[questionId] = { value: `${draftEntry.value}-notes` };
+      targetSlice.importance[questionId] = draftEntry.importance;
+      targetSlice.conviction[questionId] = draftEntry.conviction;
+      return true;
+    });
+
+    expect(buildDraftHydrationUpdatePlan({
+      prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+      surveyIndex: 2,
+      renderedQuestionIds: ['q1'],
+      draft: {
+        answers: {
+          q1: { value: 'answer-1', importance: 4, conviction: 7 },
+        },
+        baseline: {
+          q1: { value: 'baseline-1', importance: 2, conviction: 3 },
+        },
+      },
+      prevSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      prevBaseline: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      allowOverwrite: true,
+      cloneBaseline,
+      applyDraftEntryToSlice,
+    })).toEqual({
+      nextSlice: {
+        answers: { q1: { value: 'answer-1' } },
+        importance: { q1: 4 },
+        conviction: { q1: 7 },
+        additionalComments: { q1: { value: 'answer-1-notes' } },
+      },
+      nextBaseline: {
+        answers: { q1: { value: 'baseline-1' } },
+        importance: { q1: 2 },
+        conviction: { q1: 3 },
+        additionalComments: { q1: { value: 'baseline-1-notes' } },
+      },
+      changed: true,
+      baselineChanged: true,
+      updates: {
+        surveysResponseState: [
+          { answers: { keep: { value: 'persisted' } } },
+          {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+          {
+            answers: { q1: { value: 'answer-1' } },
+            importance: { q1: 4 },
+            conviction: { q1: 7 },
+            additionalComments: { q1: { value: 'answer-1-notes' } },
+          },
+        ],
+        editBaseline: {
+          answers: { q1: { value: 'baseline-1' } },
+          importance: { q1: 2 },
+          conviction: { q1: 3 },
+          additionalComments: { q1: { value: 'baseline-1-notes' } },
+        },
+      },
+    });
   });
 
   it('builds local-cache hydration slices from rendered ids and parsed cached responses', () => {
