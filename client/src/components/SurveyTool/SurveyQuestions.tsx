@@ -394,6 +394,12 @@ import {
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import { buildRenderedQuestionIdsFromQuestionPools } from './surveyQuestionScope.js';
 import {
+  buildClearedTransientSubmitFeedbackState,
+  buildQuestionPoolPendingSubmitFeedbackMessage,
+  buildTransientSubmitFeedbackState,
+  normalizeTransientSubmitFeedbackDurationMs,
+} from './surveyQuestionSubmitFeedback.js';
+import {
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
   buildCanDecryptOtherResponsesState,
@@ -5127,7 +5133,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   showTransientSubmitFeedback = (message = '', durationMs = 2000) => {
-    const nextMessage = String(message || '').trim();
     if (this._emptySubmitTimer) {
       clearTimeout(this._emptySubmitTimer);
       this._emptySubmitTimer = null;
@@ -5136,29 +5141,33 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       clearTimeout(this._pileSubmitTimer);
       this._pileSubmitTimer = null;
     }
-    const update = { submissionError: nextMessage };
-    if (Object.prototype.hasOwnProperty.call(this.state || {}, 'pileSubmitTempText')) {
-      update.pileSubmitTempText = nextMessage || null;
-    }
+    const mirrorToPileSubmitText = Object.prototype.hasOwnProperty.call(
+      this.state || {},
+      'pileSubmitTempText'
+    );
+    const update = buildTransientSubmitFeedbackState({
+      message,
+      mirrorToPileSubmitText,
+    });
     this.setState(update);
-    if (!nextMessage) return;
+    if (!update.submissionError) return;
     this._emptySubmitTimer = setTimeout(() => {
       if (!this._isMounted) return;
-      const clearUpdate = { submissionError: '' };
-      if (Object.prototype.hasOwnProperty.call(this.state || {}, 'pileSubmitTempText')) {
-        clearUpdate.pileSubmitTempText = null;
-      }
+      const clearUpdate = buildClearedTransientSubmitFeedbackState({
+        mirrorToPileSubmitText,
+      });
       this.setState(clearUpdate);
       this._emptySubmitTimer = null;
-    }, Math.max(1000, Number(durationMs) || 2000));
+    }, normalizeTransientSubmitFeedbackDurationMs(durationMs));
   };
 
   maybeBlockSubmitUntilQuestionPoolComplete = () => {
     const { isIncomplete, pendingCount } = this.getSurveyQuestionPoolLoadState();
     if (!isIncomplete) return false;
 
-    const questionLabel = pendingCount === 1 ? 'question' : 'questions';
-    this.showTransientSubmitFeedback(`Loading ${pendingCount} more ${questionLabel}...`);
+    this.showTransientSubmitFeedback(buildQuestionPoolPendingSubmitFeedbackMessage({
+      pendingCount,
+    }));
     void this.fetchQuestionPool().catch((error) => {
       surveyLog.warn('SurveyQuestions: submit-triggered question pool refresh failed.', error);
     });

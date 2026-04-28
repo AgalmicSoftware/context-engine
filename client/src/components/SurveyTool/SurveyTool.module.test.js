@@ -266,6 +266,63 @@ describe('SurveyTool module', () => {
     expect(subject._pileSubmitTimer).toBeNull();
   });
 
+  it('shows the pending question-pool submit feedback message for full survey mode', () => {
+    jest.useFakeTimers();
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    syncClassSetState(subject);
+    subject._isMounted = true;
+    subject.fetchQuestionPool = jest.fn().mockResolvedValue(undefined);
+    subject.getSurveyQuestionPoolLoadState = jest.fn(() => ({
+      isIncomplete: true,
+      pendingCount: 1,
+    }));
+
+    const blocked = subject.maybeBlockSubmitUntilQuestionPoolComplete();
+
+    expect(blocked).toBe(true);
+    expect(subject.state.submissionError).toBe('Loading 1 more question...');
+    expect(Object.prototype.hasOwnProperty.call(subject.state, 'pileSubmitTempText')).toBe(false);
+    expect(subject.fetchQuestionPool).toHaveBeenCalledTimes(1);
+
+    jest.advanceTimersByTime(2000);
+    expect(subject.state.submissionError).toBe('');
+    expect(subject._emptySubmitTimer).toBeNull();
+  });
+
+  it('mirrors transient submit feedback into pile submit text for pile mode', () => {
+    jest.useFakeTimers();
+    const subject = new PileViewMode({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    syncClassSetState(subject);
+    subject._isMounted = true;
+
+    subject.showTransientSubmitFeedback('  Saved  ', 1500);
+
+    expect(subject.state.submissionError).toBe('Saved');
+    expect(subject.state.pileSubmitTempText).toBe('Saved');
+
+    jest.advanceTimersByTime(1500);
+
+    expect(subject.state.submissionError).toBe('');
+    expect(subject.state.pileSubmitTempText).toBeNull();
+    expect(subject._emptySubmitTimer).toBeNull();
+  });
+
   it('hides the pile submit rail when no rail is visible', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
