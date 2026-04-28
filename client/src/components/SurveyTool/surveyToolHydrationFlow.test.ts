@@ -18,6 +18,7 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
+  applyPriorResponseFetchSuccessEffects,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
   clearPriorResponseAttemptedKeys,
@@ -1432,6 +1433,32 @@ describe('surveyToolHydrationFlow', () => {
       'existing',
       'beta|0xabc|q2',
     ]);
+  });
+
+  it('applies prior-response fetch success effects only when mounted and fetched', () => {
+    const resetLocalCacheMemo = jest.fn();
+    const triggerRehydrate = jest.fn();
+
+    expect(applyPriorResponseFetchSuccessEffects({
+      fetched: true,
+      isMounted: true,
+      resetLocalCacheMemo,
+      triggerRehydrate,
+    })).toBe(true);
+    expect(resetLocalCacheMemo).toHaveBeenCalledTimes(1);
+    expect(triggerRehydrate).toHaveBeenCalledTimes(1);
+
+    resetLocalCacheMemo.mockClear();
+    triggerRehydrate.mockClear();
+
+    expect(applyPriorResponseFetchSuccessEffects({
+      fetched: false,
+      isMounted: true,
+      resetLocalCacheMemo,
+      triggerRehydrate,
+    })).toBe(false);
+    expect(resetLocalCacheMemo).not.toHaveBeenCalled();
+    expect(triggerRehydrate).not.toHaveBeenCalled();
   });
 
   it('executes grouped prior-response fetch plans in normalized order', async () => {
