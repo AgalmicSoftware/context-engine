@@ -12935,6 +12935,139 @@ describe('SurveyTool module', () => {
     expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
   });
 
+  it('resets pile runtime context and reloads immediately on account change', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject._isMounted = true;
+    syncClassSetState(subject);
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      activePileIndex: 0,
+      submissionComplete: true,
+      submittedSinceLastEdit: true,
+      isDirty: false,
+      modifiedCount: 0,
+      encryptedModifiedCount: 0,
+      autoDecryptEnabled: true,
+      decryptingByKey: { 'q1:answer': true },
+      surveysResponseState: [{ answers: { q1: { value: 'draft' } }, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: { answers: { q1: { value: 'draft' } }, importance: {}, conviction: {}, additionalComments: {} },
+      userAnswers: null,
+    };
+    subject.didEditDiffInputsChange = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.emitPendingStats = jest.fn();
+    subject.syncLoadingElapsedTimer = jest.fn();
+    subject.persistDraft = jest.fn();
+    subject.loadAndSortQuestions = jest.fn();
+    subject.clearAutoDecryptSweepScheduling = jest.fn();
+    subject._autoDecQueue = [{ qid: 'q1', field: 'answer' }];
+    subject._autoDecProcessing = true;
+    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
+
+    const prevProps = {
+      ...subject.props,
+      account: '',
+      loginComplete: false,
+    };
+    const prevState = { ...subject.state };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.persistDraft).toHaveBeenCalledTimes(1);
+    expect(subject.loadAndSortQuestions).toHaveBeenCalledTimes(1);
+    expect(subject.clearAutoDecryptSweepScheduling).toHaveBeenCalledTimes(1);
+    expect(subject.state.loading).toBe(true);
+    expect(subject.state.pileQuestions).toEqual([]);
+    expect(subject.state.activePileIndex).toBe(0);
+    expect(subject.state.submissionComplete).toBe(false);
+    expect(subject.state.submittedSinceLastEdit).toBe(false);
+    expect(subject.state.editBaseline).toBeNull();
+    expect(subject.state.surveysResponseState).toEqual([
+      { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+    ]);
+    expect(subject.state.autoDecryptEnabled).toBe(false);
+    expect(subject.state.decryptingByKey).toEqual({});
+    expect(subject._autoDecQueue).toEqual([]);
+    expect(subject._autoDecProcessing).toBe(false);
+    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({});
+  });
+
+  it('queues pile auto-decrypt refresh on response nonce updates while enabled and unblocked', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      activePileIndex: 0,
+      submissionComplete: false,
+      isDirty: false,
+      modifiedCount: 0,
+      encryptedModifiedCount: 0,
+      autoDecryptEnabled: true,
+      decryptingByKey: {},
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      userAnswers: null,
+    };
+    subject.didEditDiffInputsChange = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.emitPendingStats = jest.fn();
+    subject.syncLoadingElapsedTimer = jest.fn();
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.checkCacheAgainstBaseline = jest.fn();
+    subject.isAutoDecryptBlocked = jest.fn(() => false);
+    subject.queueAutoDecryptVisibleSweep = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      questionResponsesNonce: 6,
+    };
+    const prevState = { ...subject.state };
+    subject.props = {
+      ...subject.props,
+      questionResponsesNonce: 7,
+    };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.scheduleLoadAndSortQuestions).toHaveBeenCalledWith(80);
+    expect(subject.queueAutoDecryptVisibleSweep).toHaveBeenCalledWith('pile-state-change');
+  });
+
   it('keeps optimistic pile state when cache has stale value for a cleared baseline answer', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
