@@ -101,6 +101,7 @@ export {
 } from './surveyToolDraftState.js';
 export {
   buildCacheHydrationSlice,
+  buildDraftHydrationUpdatePlan,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildHydratedResponseSlice,
