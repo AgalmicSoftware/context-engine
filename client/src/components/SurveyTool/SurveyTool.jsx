@@ -224,6 +224,7 @@ import {
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildHydratedResponseSlice,
+  buildInitializedSurveyResponseState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
   buildMergedHydrationQuestionResponses,
@@ -6047,79 +6048,26 @@ export class SurveyQuestions extends Component {
 
 
   initializeSurveyResponseState = () => {
-    if (this.props.singleQuestionMode) {
-      const questionId = this.props.questionID;
-      let initialAnswers = {};
-      let initialAdditionalThoughts = {};
+    const questionPoolIds = Array.isArray(this.props.questionPool)
+      ? this.props.questionPool.map((question) => question.id)
+      : [];
+    const renderedQuestionIds = this.props.singleQuestionMode
+      ? (questionPoolIds.length > 0 ? questionPoolIds : [this.props.questionID])
+      : (this.props.isStandalone
+        ? (questionPoolIds.length > 0 ? questionPoolIds : this.getCurrentRenderedQuestionIds())
+        : (this.getCurrentRenderedQuestionIds().length > 0
+          ? this.getCurrentRenderedQuestionIds()
+          : (Array.isArray(this.state.questionPool) ? this.state.questionPool.map((question) => question.id) : [])));
 
-      if (this.props.questionPool && this.props.questionPool.length > 0) {
-        this.props.questionPool.forEach((question) => {
-          initialAnswers[question.id] = this.buildEmptyResponseFieldState(question.id);
-          initialAdditionalThoughts[question.id] = this.buildEmptyResponseFieldState(question.id, 'additional');
-        });
-      } else if (questionId) {
-        initialAnswers[questionId] = this.buildEmptyResponseFieldState(questionId);
-        initialAdditionalThoughts[questionId] = this.buildEmptyResponseFieldState(questionId, 'additional');
-      }
-
-      return [
-        {
-          answers: initialAnswers,
-          importance: {},
-          conviction: {},
-          additionalComments: initialAdditionalThoughts,
-        },
-      ];
-    } else if (this.props.isStandalone) {
-      let initialAnswers = {};
-      let initialAdditionalThoughts = {};
-      // Seed from currently rendered ids (covers pile or standard pool)
-      const ids =
-        (Array.isArray(this.props.questionPool) && this.props.questionPool.length > 0)
-          ? this.props.questionPool.map(q => q.id)
-          : this.getCurrentRenderedQuestionIds();
-
-      ids.forEach((qid) => {
-        initialAnswers[qid] = this.buildEmptyResponseFieldState(qid);
-        initialAdditionalThoughts[qid] = this.buildEmptyResponseFieldState(qid, 'additional');
-      });
-
-      return [
-        {
-          answers: initialAnswers,
-          importance: {},
-          conviction: {},
-          additionalComments: initialAdditionalThoughts,
-        },
-      ];
-    } else { // Survey mode (multiple questions)
-      const surveyIndex = this.props.surveyIndex;
-      let initialAnswers = {};
-      let initialAdditionalThoughts = {};
-
-      // Prefer rendered ids; fall back to questionPool
-      const ids = this.getCurrentRenderedQuestionIds().length > 0
-        ? this.getCurrentRenderedQuestionIds()
-        : (Array.isArray(this.state.questionPool) ? this.state.questionPool.map(q => q.id) : []);
-
-      ids.forEach((qid) => {
-        initialAnswers[qid] = this.buildEmptyResponseFieldState(qid);
-        initialAdditionalThoughts[qid] = this.buildEmptyResponseFieldState(qid, 'additional');
-      });
-
-      const newSurveysResponseState = [...this.state.surveysResponseState || []];
-      // Ensure the array is long enough for the current surveyIndex
-      while (newSurveysResponseState.length <= surveyIndex) {
-        newSurveysResponseState.push(null);
-      }
-      newSurveysResponseState[surveyIndex] = {
-        answers: initialAnswers,
-        importance: {},
-        conviction: {},
-        additionalComments: initialAdditionalThoughts,
-      };
-      return newSurveysResponseState;
-    }
+    return buildInitializedSurveyResponseState({
+      singleQuestionMode: this.props.singleQuestionMode,
+      isStandalone: this.props.isStandalone,
+      surveyIndex: this.props.surveyIndex,
+      renderedQuestionIds,
+      questionPoolIds,
+      prevSurveysResponseState: this.state.surveysResponseState,
+      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+    });
   };
 
 
