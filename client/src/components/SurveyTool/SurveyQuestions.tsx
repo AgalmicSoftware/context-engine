@@ -223,7 +223,6 @@ import {
   buildDraftHydrationPatchForQuestion,
   buildDraftHydrationRunPlan,
   buildDraftAwareCacheHydrationState,
-  buildExitEditingStatePatch,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
   applyPriorResponseFetchSuccessEffects,
@@ -239,7 +238,6 @@ import {
   loadMissingRenderedResponseInfo,
   buildNormalizedRenderedQuestionIds,
   resolveQuestionSlugMapLookup,
-  resolveExitEditingBaselineSlice,
   buildMergedSurveyResponseState,
   buildQuestionSlugMapForIds,
   buildRevertedResponseSlice,
@@ -344,7 +342,6 @@ import {
   shouldAutoEncryptAdditionalOnAudienceChange,
   shouldEncryptResponseFieldForSubmit,
   shouldForceOverwriteDraftValues,
-  shouldHandleStartFresh,
   shouldRenderInlineSubmitButton,
   shouldRenderSubmittedIndicator,
   shouldShowPileFullLoadingState,
@@ -368,9 +365,11 @@ import {
   resolveSurveyMissingRenderedResponseLookup,
 } from './surveyToolHydrationController';
 import {
+  executeSurveyExitEditing,
   executeSurveyFormStateReset,
   executeSurveyPendingRevert,
   executeSurveyStartFresh,
+  shouldSurveyAutoStartFresh,
 } from './surveyToolResponseResetController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
@@ -4927,15 +4926,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
 
   checkAndHandleStartFresh = () => {
-    const idx = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
-    const slice = (this.state.surveysResponseState && this.state.surveysResponseState[idx]) || {answers:{},additionalComments:{},importance:{},conviction:{}};
-    if (shouldHandleStartFresh({
-      viewAddress: this.props.viewAddress,
-      userHasResponse: this.state.userHasResponse,
-      editBaseline: this.state.editBaseline,
-      isDirty: this.state.isDirty,
-      currentSlice: slice,
-      renderedQuestionIds: readRenderedQuestionIds({
+    if (shouldSurveyAutoStartFresh({
+      props: this.props,
+      state: this.state,
+      getRenderedQuestionIds: () => readRenderedQuestionIds({
         getRenderedQuestionIds: () => this.getCurrentRenderedQuestionIds(),
       }),
     })) {
@@ -9773,46 +9767,24 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
    * - Clears any draft so future rehydrate doesn’t re-apply edits.
    */
   handleExitEditing = () => {
-    try {
-      const surveyIndex =
-        this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
-      const baselineSlice = resolveExitEditingBaselineSlice({
-        responderAddress: this.props.responderAddress,
-        parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
-        userAnswers: this.state.userAnswers,
-        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-        buildSliceFromLocalCache: this.buildSliceFromLocalCache,
-      });
-
-      this.setState(
-        buildExitEditingStatePatch({
-          prevSurveysResponseState: this.state.surveysResponseState,
-          surveyIndex,
-          baselineSlice,
-          renderedQuestionIds: this.getCurrentRenderedQuestionIds(),
-          buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
-          cloneValue: this.deepClone,
-          nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-        }),
-        () => {
-          this.recalculateEditStats && this.recalculateEditStats();
-          this.persistDraftSafely && this.persistDraftSafely();
-          this.updateJsonPreview && this.updateJsonPreview();
-        }
-      );
-
-      this.clearDraft && this.clearDraft();
-    } catch (e) {
-      surveyLog.warn('[SurveyQuestions] handleExitEditing failed:', e);
-      // Minimal fallback
-      this.setState({
-        isEditing: false,
-        displayAnswerMode: true,
-        submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-      }, () => {
-        this.recalculateEditStats && this.recalculateEditStats();
-      });
-    }
+    executeSurveyExitEditing({
+      props: this.props,
+      state: this.state,
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+      buildSliceFromLocalCache: this.buildSliceFromLocalCache,
+      getRenderedQuestionIds: this.getCurrentRenderedQuestionIds,
+      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+      cloneValue: this.deepClone,
+      setState: this.setState.bind(this),
+      recalculateEditStats: this.recalculateEditStats,
+      persistDraftSafely: this.persistDraftSafely,
+      updateJsonPreview: this.updateJsonPreview,
+      clearDraft: this.clearDraft,
+      updateSubmittedSinceLastEdit,
+      onFailure: (error) => {
+        surveyLog.warn('[SurveyQuestions] handleExitEditing failed:', error);
+      },
+    });
   };
 
 
