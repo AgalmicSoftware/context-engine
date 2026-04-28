@@ -250,6 +250,7 @@ import {
   shouldBackfillPriorResponses,
   buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
+  prepareLocalCacheSliceBuild,
   buildMergedSurveyResponseState,
   buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
@@ -5573,24 +5574,24 @@ export class SurveyQuestions extends Component {
         : [];
       const scopeSlugs = [slug, ...extraSlugs];
       const netId = context.networkIdStr;
-      const acct = (this.props?.account || '').toLowerCase();
-      const rendered = this.getCurrentRenderedQuestionIds();
-      const renderedSignature = buildRenderedIdsSignature(rendered);
-      const memoKey = buildLocalCacheHydrationMemoKey({
+      const {
+        renderedIds: rendered,
+        normalizedAccount: acct,
+        memoKey,
+        shouldUseMemo,
+        memoizedValue,
+      } = prepareLocalCacheSliceBuild({
         scopeSlugs,
         networkIdStr: netId,
-        account: acct,
-        renderedSignature,
+        account: this.props?.account,
+        renderedIds: this.getCurrentRenderedQuestionIds(),
         questionsCacheNonce: this.props.questionsCacheNonce,
         questionResponsesNonce: this.props.questionResponsesNonce,
+        existingMemo: this._localCacheSliceMemo,
         normalizeSessionSlugValue,
       });
-      if (
-        this._localCacheSliceMemo &&
-        this._localCacheSliceMemo.hasValue === true &&
-        this._localCacheSliceMemo.key === memoKey
-      ) {
-        return this._localCacheSliceMemo.value;
+      if (shouldUseMemo) {
+        return memoizedValue;
       }
 
       const memoize = (value) => {

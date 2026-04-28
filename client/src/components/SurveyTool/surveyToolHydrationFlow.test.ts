@@ -9,6 +9,7 @@ import {
   loadLocalCacheHydrationSlice,
   buildLocalCacheRehydrationUpdatePlan,
   prepareLocalCacheRehydrateRun,
+  prepareLocalCacheSliceBuild,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
   buildStartFreshSurveyState,
@@ -1899,6 +1900,50 @@ describe('surveyToolHydrationFlow', () => {
       submissionError: 'boom',
       submissionComplete: false,
     })).toBe('2|edge,alpha|84532|0xabc|q2|q1|4|7|1|1|0');
+  });
+
+  it('prepares local-cache slice builds with memo reuse and normalized account state', () => {
+    expect(prepareLocalCacheSliceBuild({
+      scopeSlugs: ['Edge', 'alpha'],
+      networkIdStr: '84532',
+      account: '0xAbC',
+      renderedIds: ['q2', 'q1'],
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      existingMemo: {
+        key: '84532|mismatch',
+        value: { stale: true },
+        hasValue: true,
+      },
+      normalizeSessionSlugValue: (value) => String(value || '').trim().toLowerCase(),
+    })).toEqual({
+      renderedIds: ['q2', 'q1'],
+      normalizedAccount: '0xabc',
+      memoKey: 'edge,alpha|84532|0xabc|q2|q1|4|7',
+      shouldUseMemo: false,
+      memoizedValue: null,
+    });
+
+    expect(prepareLocalCacheSliceBuild({
+      scopeSlugs: ['Edge', 'alpha'],
+      networkIdStr: '84532',
+      account: '0xAbC',
+      renderedIds: ['q2', 'q1'],
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      existingMemo: {
+        key: 'edge,alpha|84532|0xabc|q2|q1|4|7',
+        value: { cached: true },
+        hasValue: true,
+      },
+      normalizeSessionSlugValue: (value) => String(value || '').trim().toLowerCase(),
+    })).toEqual({
+      renderedIds: ['q2', 'q1'],
+      normalizedAccount: '0xabc',
+      memoKey: 'edge,alpha|84532|0xabc|q2|q1|4|7',
+      shouldUseMemo: true,
+      memoizedValue: { cached: true },
+    });
   });
 
   it('builds reverted response slices from baseline state plus rendered empty shells', () => {

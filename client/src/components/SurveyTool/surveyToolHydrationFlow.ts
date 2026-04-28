@@ -95,6 +95,17 @@ type BuildSurveyResponseStateArrayArgs = {
   nextSlice?: ResponseSlice | null;
 };
 
+type PrepareLocalCacheSliceBuildArgs = {
+  scopeSlugs?: unknown[] | null;
+  networkIdStr?: unknown;
+  account?: unknown;
+  renderedIds?: Iterable<unknown> | unknown[];
+  questionsCacheNonce?: unknown;
+  questionResponsesNonce?: unknown;
+  existingMemo?: UnknownRecord | null;
+  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
+};
+
 type LoadLocalCacheHydrationSliceArgs = {
   scopeSlugs?: unknown[] | null;
   networkIdStr?: unknown;
@@ -659,6 +670,40 @@ export const buildLocalCacheHydrationMemoKey = ({
   Number(questionsCacheNonce || 0),
   Number(questionResponsesNonce || 0),
 ].join('|');
+
+export const prepareLocalCacheSliceBuild = ({
+  scopeSlugs = null,
+  networkIdStr = '',
+  account = '',
+  renderedIds = [],
+  questionsCacheNonce = 0,
+  questionResponsesNonce = 0,
+  existingMemo = null,
+  normalizeSessionSlugValue = null,
+}: PrepareLocalCacheSliceBuildArgs = {}) => {
+  const nextRenderedIds = Array.from(renderedIds || []);
+  const normalizedAccount = String(account || '').trim().toLowerCase();
+  const memoKey = buildLocalCacheHydrationMemoKey({
+    scopeSlugs: Array.isArray(scopeSlugs) ? scopeSlugs : [],
+    networkIdStr,
+    account: normalizedAccount,
+    renderedSignature: buildRenderedIdsSignature(nextRenderedIds),
+    questionsCacheNonce,
+    questionResponsesNonce,
+    normalizeSessionSlugValue,
+  });
+
+  const memoRecord = existingMemo && typeof existingMemo === 'object' ? existingMemo : {};
+  const shouldUseMemo = memoRecord.hasValue === true && memoRecord.key === memoKey;
+
+  return {
+    renderedIds: nextRenderedIds,
+    normalizedAccount,
+    memoKey,
+    shouldUseMemo,
+    memoizedValue: shouldUseMemo ? memoRecord.value : null,
+  };
+};
 
 export const buildMergedHydrationQuestionResponses = ({
   scopeSlugs = [],
