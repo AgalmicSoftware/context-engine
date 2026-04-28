@@ -73,6 +73,10 @@ import {
   buildPileLoadProgressState,
 } from './surveyPileLoadPlanner';
 import {
+  buildPileResponseCounts,
+  loadPileScopeCacheSnapshot,
+} from './surveyPileScopeCacheData';
+import {
   buildPileQuestionLoadState,
   buildPileVisibleTransitionPlan,
   shouldSkipPileFilterStateUpdate,
@@ -1537,35 +1541,21 @@ export class PileViewMode extends SurveyQuestions {
     }
 
     try {
-      const allResponses = {};
-      const allQuestions = [];
-      const seenQuestionIds = new Set();
-      const hlSet = new Set();
-      let pendingMetadataCount = 0;
-      for (const scopeSlug of scopeSlugs) {
-        const questionsCache = ensureQuestionsNet(await readQuestionsCacheAsync(scopeSlug), networkID);
-        const networkCache = questionsCache[networkID] || { questions: {}, questionResponses: {} };
-        pendingMetadataCount += Object.keys(networkCache?.pendingQuestionMetadata || {}).length;
-        getHighlightedQuestionIdsSet(scopeSlug).forEach((questionId) => {
-          hlSet.add(String(questionId || '').toLowerCase());
-        });
-        mergeQuestionResponses(allResponses, networkCache.questionResponses || {});
-        const blockedQuestionIds = getBlockedQuestionIdsSet(scopeSlug);
-        Object.keys(networkCache.questions || {}).forEach((questionId) => {
-          const question = networkCache.questions?.[questionId];
-          const normalizedQuestionId = normalizeQuestionIdKey(question?.id || questionId);
-          if (!normalizedQuestionId || blockedQuestionIds.has(normalizedQuestionId)) return;
-          if (seenQuestionIds.has(normalizedQuestionId)) return;
-          seenQuestionIds.add(normalizedQuestionId);
-          allQuestions.push({
-            id: normalizedQuestionId,
-            creator: question?.creator || '',
-            tags: question?.tags || [],
-            ...(question || {}),
-            sessionSlug: scopeSlug,
-          });
-        });
-      }
+      const {
+        allResponses,
+        allQuestions,
+        highlightedQuestionIds: hlSet,
+        pendingMetadataCount,
+      } = await loadPileScopeCacheSnapshot({
+        scopeSlugs,
+        networkIdStr: networkID,
+        readQuestionsCacheAsync,
+        ensureQuestionsNet,
+        getHighlightedQuestionIdsSet,
+        mergeQuestionResponses,
+        getBlockedQuestionIdsSet,
+        normalizeQuestionIdKey,
+      });
       // Read path only: avoid write-on-read feedback loops via questionsCacheNonce.
       if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
       const hasPendingMetadataRetries = pendingMetadataCount > 0;
@@ -1578,10 +1568,9 @@ export class PileViewMode extends SurveyQuestions {
       ) {
         responseCounts = this._responseCountsCacheValue;
       } else {
-        const nextResponseCounts = {};
-        for (const qId in allResponses) {
-          nextResponseCounts[qId] = Object.keys(allResponses[qId]).length;
-        }
+        const nextResponseCounts = buildPileResponseCounts({
+          questionResponses: allResponses,
+        });
         responseCounts = nextResponseCounts;
         this._responseCountsCacheKey = responseCountsCacheKey;
         this._responseCountsCacheValue = nextResponseCounts;
