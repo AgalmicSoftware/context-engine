@@ -122,6 +122,7 @@ export {
   buildPriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   buildQuestionSlugMapForIds,
