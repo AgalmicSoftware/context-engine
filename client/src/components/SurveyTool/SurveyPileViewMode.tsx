@@ -76,6 +76,10 @@ import {
   splitPileMaskedQuestions,
 } from './surveyPileQuestionFlow';
 import {
+  buildEnsureVisiblePileResponseStatePlan,
+  buildInitializePileResponseStatePlan,
+} from './surveyPileResponseWindow';
+import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
   normalizeTransientSubmitFeedbackDurationMs,
@@ -1880,38 +1884,29 @@ export class PileViewMode extends SurveyQuestions {
 
 
   initializeResponseState = (cb) => {
-    // Rebuild guard: keep user's pending edits baseline intact
-    if (this.state.isDirty || (this.state.modifiedCount || 0) > 0) {
-      bumpSurveyPerfCounter('noopSkipCount');
-      if (typeof cb === 'function') cb();
-      return;
-    }
-
-    const pileQuestions = Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : [];
-    const activePileIndex = Number(this.state.activePileIndex || 0);
-    const startIdx = Math.max(0, activePileIndex - 2);
-    const endIdx = Math.min(pileQuestions.length, activePileIndex + 3);
-    const visibleIdsSignature = pileQuestions
-      .slice(startIdx, endIdx)
-      .map((q) => String(q?.id || '').trim().toLowerCase())
-      .filter(Boolean)
-      .join('|');
-    const initializeResponseSig = [
-      visibleIdsSignature,
-    ].join('::');
-    if (initializeResponseSig === this._lastInitializeResponseSig) {
-      bumpSurveyPerfCounter('noopSkipCount');
-      if (typeof cb === 'function') cb();
-      return;
-    }
-    this._lastInitializeResponseSig = initializeResponseSig;
-
-    const initial = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    pileQuestions.slice(startIdx, endIdx).forEach((q) => {
-      if (!q?.id) return;
-      initial.answers[q.id] = this.buildEmptyResponseFieldState(q.id);
-      initial.additionalComments[q.id] = this.buildEmptyResponseFieldState(q.id, 'additional');
+    const initializePlan = buildInitializePileResponseStatePlan({
+      isDirty: this.state.isDirty,
+      modifiedCount: this.state.modifiedCount,
+      pileQuestions: this.state.pileQuestions,
+      activePileIndex: this.state.activePileIndex,
+      lastInitializeResponseSig: this._lastInitializeResponseSig,
+      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
     });
+
+    if (initializePlan.shouldSkip) {
+      bumpSurveyPerfCounter('noopSkipCount');
+      if (typeof cb === 'function') cb();
+      return;
+    }
+
+    this._lastInitializeResponseSig = initializePlan.nextInitializeResponseSig;
+    const initial = initializePlan.initialSlice || {
+      answers: {},
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    };
+
     this.setState({
       surveysResponseState: [initial],
       editBaseline: this.deepClone(initial)
@@ -1922,88 +1917,22 @@ export class PileViewMode extends SurveyQuestions {
 
   ensureVisiblePileResponseState = () => {
     try {
-      const pileQuestions = Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : [];
-      if (pileQuestions.length === 0) return;
-
-      const activePileIndex = Number(this.state.activePileIndex || 0);
-      const startIdx = Math.max(0, activePileIndex - 2);
-      const endIdx = Math.min(pileQuestions.length, activePileIndex + 3);
-
-      const visible = pileQuestions.slice(startIdx, endIdx);
-      if (visible.length === 0) return;
-
-      const slice = this.state.surveysResponseState?.[0] || {
-        answers: {},
-        importance: {},
-        conviction: {},
-        additionalComments: {},
-      };
-
-      let needsInit = false;
-      for (const q of visible) {
-        const qid = q?.id;
-        if (!qid) continue;
-        if (!slice.answers?.[qid] || !slice.additionalComments?.[qid]) {
-          needsInit = true;
-          break;
-        }
-      }
-      if (!needsInit) return;
-
+      let shouldRehydrateVisibleWindow = false;
       this.setState(
         (prev) => {
-          const prevSlice = prev.surveysResponseState?.[0] || {
-            answers: {},
-            importance: {},
-            conviction: {},
-            additionalComments: {},
-          };
-
-          const nextSlice = {
-            answers: { ...(prevSlice.answers || {}) },
-            importance: { ...(prevSlice.importance || {}) },
-            conviction: { ...(prevSlice.conviction || {}) },
-            additionalComments: { ...(prevSlice.additionalComments || {}) },
-          };
-
-          const prevBaseline = prev.editBaseline || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-          const nextBaseline = {
-            answers: { ...prevBaseline.answers },
-            importance: { ...prevBaseline.importance },
-            conviction: { ...prevBaseline.conviction },
-            additionalComments: { ...prevBaseline.additionalComments }
-          };
-
-          let changed = false;
-          let baselineChanged = false;
-          visible.forEach((q) => {
-            const qid = q?.id;
-            if (!qid) return;
-            if (!nextSlice.answers[qid]) {
-              nextSlice.answers[qid] = this.buildEmptyResponseFieldState(qid);
-              changed = true;
-            }
-            if (!nextBaseline.answers[qid]) {
-              nextBaseline.answers[qid] = this.buildEmptyResponseFieldState(qid);
-              baselineChanged = true;
-            }
-            if (!nextSlice.additionalComments[qid]) {
-              nextSlice.additionalComments[qid] = this.buildEmptyResponseFieldState(qid, 'additional');
-              changed = true;
-            }
-            if (!nextBaseline.additionalComments[qid]) {
-              nextBaseline.additionalComments[qid] = this.buildEmptyResponseFieldState(qid, 'additional');
-              baselineChanged = true;
-            }
+          const ensurePlan = buildEnsureVisiblePileResponseStatePlan({
+            pileQuestions: prev.pileQuestions,
+            activePileIndex: prev.activePileIndex,
+            currentSlice: prev.surveysResponseState?.[0],
+            currentBaseline: prev.editBaseline,
+            buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
           });
-
-          const updates = {};
-          if (changed) updates.surveysResponseState = [nextSlice];
-          if (baselineChanged) updates.editBaseline = nextBaseline;
-
-          return (changed || baselineChanged) ? updates : null;
+          if (ensurePlan.shouldSkip) return null;
+          shouldRehydrateVisibleWindow = true;
+          return ensurePlan.updates;
         },
         () => {
+          if (!shouldRehydrateVisibleWindow) return;
           this.rehydrateVisiblePileWindow({
             forceOverwriteDraft: false,
             resetAutoDecryptLedger: false,
