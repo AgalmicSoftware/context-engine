@@ -31,6 +31,7 @@ import {
   applyLocalCacheRehydrateNoChangeEffects,
   applyLocalCacheRehydrateAppliedEffects,
   applyLocalCacheRehydrateSuccessEffects,
+  applyPrefillUpdatePlan,
   applyPrefillStateEffects,
   applyResetFormStateEffects,
   applyRevertPendingEffects,
@@ -1866,11 +1867,36 @@ describe('surveyToolHydrationFlow', () => {
     })).toBe(false);
   });
 
-  it('applies prefill and local-cache post-apply follow-up effects', () => {
+  it('applies prefill update plans and local-cache post-apply follow-up effects', () => {
+    const applyStateUpdates = jest.fn((updates, done) => {
+      if (typeof done === 'function') done();
+    });
     const updateJsonPreview = jest.fn();
     const recalculateEditStats = jest.fn();
     const ensurePriorResponses = jest.fn();
     const callback = jest.fn();
+
+    expect(applyPrefillUpdatePlan({
+      updates: { surveysResponseState: [] },
+      applyStateUpdates,
+      updateJsonPreview,
+      recalculateEditStats,
+    })).toBe(true);
+    expect(applyStateUpdates).toHaveBeenCalledWith({ surveysResponseState: [] }, expect.any(Function));
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
+
+    updateJsonPreview.mockClear();
+    recalculateEditStats.mockClear();
+
+    expect(applyPrefillUpdatePlan({
+      updates: null,
+      applyStateUpdates,
+      updateJsonPreview,
+      recalculateEditStats,
+    })).toBe(false);
+    expect(updateJsonPreview).not.toHaveBeenCalled();
+    expect(recalculateEditStats).not.toHaveBeenCalled();
 
     applyPrefillStateEffects({
       updateJsonPreview,

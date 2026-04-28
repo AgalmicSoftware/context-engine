@@ -9076,6 +9076,81 @@ describe('SurveyTool module', () => {
     expect(subject.recalculateEditStats).toHaveBeenCalled();
   });
 
+  it('prefills multi-question responses into ensured survey slots', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 1,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      isDirty: false,
+      submissionComplete: false,
+    };
+    subject._applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses }) => {
+      targetSlice.answers.q1 = { value: responses[0].answer.value };
+      targetSlice.additionalComments.q1 = { value: responses[0].additional.value };
+      targetSlice.importance.q1 = responses[0].importance;
+      targetSlice.conviction.q1 = responses[0].conviction;
+      return true;
+    });
+    subject.buildSliceFromUserAnswers = jest.fn(() => ({
+      answers: { q1: { value: 'baseline answer' } },
+      additionalComments: { q1: { value: 'baseline notes' } },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+    }));
+    subject.updateJsonPreview = jest.fn();
+    subject.recalculateEditStats = jest.fn();
+    subject.setState = (update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+
+    subject.prefillSurveyResponses({
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: 'hydrated answer' },
+          additional: { value: 'hydrated notes' },
+          importance: 4,
+          conviction: 7,
+        },
+      ],
+    });
+
+    expect(subject.state.surveysResponseState).toHaveLength(2);
+    expect(subject.state.surveysResponseState[0]).toEqual({
+      answers: { keep: { value: 'persisted' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    });
+    expect(subject.state.surveysResponseState[1]).toEqual({
+      answers: { q1: { value: 'hydrated answer' } },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+      additionalComments: { q1: { value: 'hydrated notes' } },
+    });
+    expect(subject.state.editBaseline).toEqual({
+      answers: { q1: { value: 'baseline answer' } },
+      additionalComments: { q1: { value: 'baseline notes' } },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+    });
+    expect(subject.updateJsonPreview).toHaveBeenCalled();
+    expect(subject.recalculateEditStats).toHaveBeenCalled();
+  });
+
   it('merges survey response state into ensured survey slots', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
