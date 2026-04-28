@@ -52,3 +52,40 @@ export const buildRenderedQuestionIdsFromPileWindow = ({
 
   return ids;
 };
+
+export const buildInitialSurveyResponseQuestionIds = ({
+  singleQuestionMode = false,
+  isStandalone = false,
+  questionPoolIds,
+  questionId,
+  getRenderedQuestionIds = null,
+  stateQuestionPool,
+}: {
+  singleQuestionMode?: boolean;
+  isStandalone?: boolean;
+  questionPoolIds?: unknown;
+  questionId?: unknown;
+  getRenderedQuestionIds?: (() => unknown) | null;
+  stateQuestionPool?: unknown;
+} = {}): unknown[] => {
+  const nextQuestionPoolIds = Array.isArray(questionPoolIds) ? questionPoolIds : [];
+
+  if (singleQuestionMode) {
+    return nextQuestionPoolIds.length > 0 ? nextQuestionPoolIds : [questionId];
+  }
+
+  if (isStandalone) {
+    if (nextQuestionPoolIds.length > 0) return nextQuestionPoolIds;
+    const renderedQuestionIds =
+      typeof getRenderedQuestionIds === 'function' ? getRenderedQuestionIds() : [];
+    return Array.isArray(renderedQuestionIds) ? renderedQuestionIds : [];
+  }
+
+  const renderedQuestionIds =
+    typeof getRenderedQuestionIds === 'function' ? getRenderedQuestionIds() : [];
+  if (Array.isArray(renderedQuestionIds) && renderedQuestionIds.length > 0) {
+    return renderedQuestionIds;
+  }
+
+  return toQuestionList(stateQuestionPool).map((question) => question?.id);
+};
