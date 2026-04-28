@@ -111,6 +111,7 @@ export {
   buildRevertPendingStatePatch,
   buildStartFreshSurveyState,
   loadLocalCacheHydrationSlice,
+  prepareLocalCacheRehydrateRun,
   buildResetFormStatePatch,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,

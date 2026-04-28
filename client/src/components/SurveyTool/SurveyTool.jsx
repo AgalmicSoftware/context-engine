@@ -229,6 +229,7 @@ import {
   buildInitializedSurveyResponseState,
   buildLocalCacheRehydrationUpdatePlan,
   loadLocalCacheHydrationSlice,
+  prepareLocalCacheRehydrateRun,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
   buildPrefilledSingleQuestionUpdatePlan,
@@ -5624,26 +5625,28 @@ export class SurveyQuestions extends Component {
 
   rehydrateLocalCacheAnswersForRenderedIds = async (callback) => {
     try {
-      // Bail when Start Fresh suppresses prefill, when a submit error is present,
-      // OR when we have a completed submission (optimistic state) to prevent stale cache overwrite.
-      if (this.state && (this.state.suppressPrefill || this.state.submissionError || this.state.submissionComplete)) {
-        if (callback) callback();
-        return;
-      }
-
       const surveyIndex =
         this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
       const renderedIds = this.getHydrationQuestionIds();
-      const hydrationSig = this.buildLocalCacheHydrationSignature(surveyIndex, renderedIds);
-      if (hydrationSig && this._rehydrateLocalCacheLastSig === hydrationSig) {
-        bumpSurveyPerfCounter('noopSkipCount');
+      const {
+        shouldSkip,
+        shouldBumpNoop,
+        hydrationSig,
+        baseSlice,
+      } = prepareLocalCacheRehydrateRun({
+        state: this.state,
+        surveyIndex,
+        renderedIds,
+        lastHydrationSig: this._rehydrateLocalCacheLastSig,
+        buildHydrationSignature: (idx, ids) => this.buildLocalCacheHydrationSignature(idx, ids),
+      });
+      if (shouldSkip) {
+        if (shouldBumpNoop) {
+          bumpSurveyPerfCounter('noopSkipCount');
+        }
         if (callback) callback();
         return;
       }
-
-      const baseSlice =
-        (this.state.surveysResponseState && this.state.surveysResponseState[surveyIndex]) ||
-        { answers:{}, importance:{}, conviction:{}, additionalComments:{} };
 
       const cacheSlice = await this.buildSliceFromLocalCache();
       DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] built cache slice:', { cacheSlice });
