@@ -9,7 +9,8 @@ import SurveyTool, {
   SurveySelector,
   DeferredCommitSlider,
 } from './SurveyTool.jsx';
-import { PileViewMode, SurveyQuestions as DirectSurveyQuestions } from './SurveyQuestions';
+import { SurveyQuestions as DirectSurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
 import {
   QuestionsDashboard as DirectQuestionsDashboard,
   SurveySelector as DirectSurveySelector,
@@ -123,6 +124,10 @@ describe('SurveyTool module', () => {
     const tree = shell.render();
 
     expect(tree.type).toBe(PileViewMode);
+  });
+
+  it('keeps extracted PileViewMode wired to the SurveyQuestions base class', () => {
+    expect(Object.getPrototypeOf(PileViewMode.prototype)).toBe(DirectSurveyQuestions.prototype);
   });
 
   it('renders triple trailing arrows inside the pile submit button', () => {
