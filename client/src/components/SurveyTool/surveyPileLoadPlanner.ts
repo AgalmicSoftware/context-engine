@@ -23,16 +23,6 @@ export type PileEmptyProbePlan = {
   progressIndicatesDefinitiveEmpty: boolean;
 };
 
-export const buildPileLoadFailureState = ({
-  isQuestionCacheReady = false,
-  recentRateLimit = false,
-}: {
-  isQuestionCacheReady?: boolean;
-  recentRateLimit?: boolean;
-} = {}) => ({
-  loading: !isQuestionCacheReady || !!recentRateLimit,
-});
-
 export const buildPileLoadProgressState = ({
   scopedProgress = null,
   cacheHasLoaded = true,
