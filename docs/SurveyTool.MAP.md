@@ -48,6 +48,10 @@ Both full mode and pile mode should still share code where the semantics truly n
 - Pending-edit diff rules and changed-field meaning
 - Draft persistence and draft rehydration
 - Local cache hydration semantics
+- Shared hydration/read orchestration:
+  - `surveyToolHydrationController.ts`
+- Shared reset/restore orchestration:
+  - `surveyToolResponseResetController.ts`
 - Decrypt lifecycle primitives and task bookkeeping
 - Parse/normalize/apply cached response helpers
 - Common submit/encryption primitives when the behavior is mode-independent
@@ -91,25 +95,41 @@ The pile-only lane has already been split into explicit helpers/controllers. The
 
 This means the next architectural win is no longer “another pile helper peel.” The remaining payoff is in clarifying the **shared core boundary**.
 
-## Recommended Shared-Core Candidates
+## Shared-Core Progress
 
-The best next extraction target is a small shared module or module cluster centered on hydration/response semantics, something like:
+The first shared-core move is no longer hypothetical. The following seams are already extracted from `SurveyQuestions.tsx`:
 
-- `surveyResponseCore.ts`
-- `surveyHydrationCore.ts`
+- `surveyToolHydrationController.ts`
+  - prior-response backfill orchestration
+  - local-cache slice build orchestration
+  - missing-rendered-response lookup orchestration
+  - full-mode and single-question prefill orchestration
+  - draft hydration / local-cache rehydrate orchestration
+- `surveyToolResponseResetController.ts`
+  - account-change reset orchestration
+  - revert-pending orchestration
+  - start-fresh orchestration
+  - exit-editing restore orchestration
+  - auto-start-fresh decision wrapper
 
-The first candidate responsibilities are:
+That means the next shared-core question is no longer “can we extract a controller?” It is:
 
-- `ensurePriorResponsesForRenderedIds`
-- `rehydrateDraftForRenderedIds`
-- `rehydrateLocalCacheAnswersForRenderedIds`
-- response-slice normalization helpers currently coupled to those flows
+1. keep extracting smaller wrappers with diminishing returns, or
+2. pick the next higher-payoff seam deliberately
 
-These are strong candidates because:
+## Recommended Next Candidates
+
+The next realistic candidates are:
+
+- Single-question response bootstrap / fetch lifecycle
+- Shared response-source restore helpers adjacent to decrypt/viewed-response flows
+- A broader inheritance-to-composition boundary pass
+
+These are stronger architectural moves than another tiny helper peel because:
 
 - they are already used by both full mode and pile mode
-- they encode semantics that should stay identical across modes
-- they are more stable than mode-specific render or scheduling behavior
+- they still hold meaningful orchestration weight
+- they are the remaining places where `SurveyQuestions.tsx` is still acting as a giant hybrid runtime
 
 ## Boundary Options
 
@@ -158,15 +178,15 @@ That means:
 
 ## Suggested Next Refactor Step
 
-The next natural code move after this map is:
+The next natural code move after the current controller extractions is:
 
-1. Extract a small shared hydration/response core out of `SurveyQuestions.tsx`.
-2. Keep React lifecycle methods where they are for now.
-3. Move only mode-agnostic logic first.
+1. Decide whether to keep going with mode-agnostic runtime extraction, or pause for a broader boundary redesign.
+2. If continuing incrementally, target the single-question response bootstrap / restore seam next.
+3. Keep React lifecycle ownership where it is until that seam is better isolated.
 
-Recommended first seam:
+Recommended next seam:
 
-- shared hydration/response primitives
+- shared single-question response bootstrap / restore primitives
 
 Do **not** start with:
 
@@ -175,7 +195,7 @@ Do **not** start with:
 - decrypt UI presentation
 - submit UX presentation
 
-Those are either already improved or too mode-specific to serve as the first shared-core seam.
+Those are either already improved or too mode-specific to justify the next high-risk step.
 
 ## Guardrails
 
@@ -196,5 +216,7 @@ If you are resuming this area, read in this order:
 5. `surveyPileQuestionFlow.ts`
 6. `surveyPileLoadController.ts`
 7. `surveyPileBaselineSync.ts`
+8. `surveyToolHydrationController.ts`
+9. `surveyToolResponseResetController.ts`
 
-That sequence gives the fastest accurate picture of what is still shared, what pile owns now, and where the next shared-core seam should come from.
+That sequence gives the fastest accurate picture of what is still shared, what pile owns now, and where the next shared-core decision should come from.
