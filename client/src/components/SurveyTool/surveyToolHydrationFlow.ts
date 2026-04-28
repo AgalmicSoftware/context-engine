@@ -110,6 +110,22 @@ type BuildInitializedSurveyResponseStateArgs = {
   buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
 };
 
+type ShouldHandleStartFreshArgs = {
+  viewAddress?: unknown;
+  userHasResponse?: boolean;
+  editBaseline?: unknown;
+  isDirty?: boolean;
+  currentSlice?: ResponseSlice | null;
+  renderedQuestionIds?: Iterable<unknown> | unknown[];
+};
+
+type BuildStartFreshSurveyStateArgs = {
+  surveyIndex?: unknown;
+  renderedQuestionIds?: Iterable<unknown> | unknown[];
+  prevSurveysResponseState?: unknown[] | null;
+  buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -468,16 +484,17 @@ export const buildMergedSurveyResponseState = ({
   surveyIndex = 0,
   buildEmptyResponseFieldState = null,
 }: BuildMergedSurveyResponseStateArgs = {}) => {
+  const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
   const pool = Array.isArray(newQuestionPool) && newQuestionPool.length > 0
     ? newQuestionPool
     : (Array.isArray(renderedQuestionIds) ? renderedQuestionIds.map((id) => ({ id })) : []);
   const nextSurveysResponseState = buildSurveyResponseStateArray({
     prevSurveysResponseState: currentState,
-    surveyIndex,
+    surveyIndex: normalizedSurveyIndex,
   });
   const prevSlice =
-    nextSurveysResponseState[surveyIndex] && typeof nextSurveysResponseState[surveyIndex] === 'object'
-      ? nextSurveysResponseState[surveyIndex] as ResponseSlice
+    nextSurveysResponseState[normalizedSurveyIndex] && typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
+      ? nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice
       : buildEmptyResponseSlice();
 
   const allowedIds = new Set(
@@ -517,7 +534,7 @@ export const buildMergedSurveyResponseState = ({
     }
   });
 
-  nextSurveysResponseState[surveyIndex] = {
+  nextSurveysResponseState[normalizedSurveyIndex] = {
     answers: mergedAnswers,
     importance: mergedImportance,
     conviction: mergedConviction,
@@ -572,6 +589,74 @@ export const buildInitializedSurveyResponseState = ({
   }
   nextSurveysResponseState[normalizedSurveyIndex] = initialSlice;
   return nextSurveysResponseState;
+};
+
+const getQuestionFieldValue = (
+  fieldMap: Record<string, unknown> | null | undefined,
+  questionId: string,
+) => {
+  if (!fieldMap || typeof fieldMap !== 'object') return undefined;
+  const field = fieldMap[questionId];
+  if (!field || typeof field !== 'object') return undefined;
+  return (field as UnknownRecord).value;
+};
+
+export const shouldHandleStartFresh = ({
+  viewAddress = '',
+  userHasResponse = false,
+  editBaseline = null,
+  isDirty = false,
+  currentSlice = null,
+  renderedQuestionIds = [],
+}: ShouldHandleStartFreshArgs = {}) => {
+  if (viewAddress || userHasResponse || editBaseline || isDirty) return false;
+
+  const slice = currentSlice && typeof currentSlice === 'object'
+    ? currentSlice
+    : buildEmptyResponseSlice();
+
+  const hasAny = Array.from(renderedQuestionIds || []).some((rawQuestionId) => {
+    const questionId = String(rawQuestionId || '');
+    if (!questionId) return false;
+    return (
+      (getQuestionFieldValue(slice.answers as Record<string, unknown>, questionId) ?? '') !== '' ||
+      (getQuestionFieldValue(slice.additionalComments as Record<string, unknown>, questionId) ?? '') !== '' ||
+      Object.prototype.hasOwnProperty.call(slice.importance || {}, questionId) ||
+      Object.prototype.hasOwnProperty.call(slice.conviction || {}, questionId)
+    );
+  });
+
+  return !hasAny;
+};
+
+export const buildStartFreshSurveyState = ({
+  surveyIndex = 0,
+  renderedQuestionIds = [],
+  prevSurveysResponseState = null,
+  buildEmptyResponseFieldState = null,
+}: BuildStartFreshSurveyStateArgs = {}) => {
+  const emptySlice: ResponseSlice = {
+    answers: {},
+    importance: {},
+    conviction: {},
+    additionalComments: {},
+  };
+
+  Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
+    const questionId = String(rawQuestionId || '');
+    if (!questionId || typeof buildEmptyResponseFieldState !== 'function') return;
+    emptySlice.answers![questionId] = buildEmptyResponseFieldState(questionId);
+    emptySlice.additionalComments![questionId] = buildEmptyResponseFieldState(questionId, 'additional');
+  });
+
+  return {
+    emptySlice,
+    nextSurveysResponseState: buildSurveyResponseStateArray({
+      prevSurveysResponseState,
+      surveyIndex,
+      nextSlice: emptySlice,
+    }),
+  };
 };
 
 export const buildPrefilledSurveyState = ({
