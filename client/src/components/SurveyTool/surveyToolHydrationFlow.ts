@@ -476,6 +476,22 @@ type BuildLocalCacheHydrationSignatureArgs = {
   submissionComplete?: boolean;
 };
 
+type ResolveLocalCacheHydrationSignatureLookupArgs = {
+  surveyIndex?: unknown;
+  renderedIds?: Iterable<unknown> | unknown[];
+  rawSlug?: unknown;
+  account?: unknown;
+  minifiedMode?: unknown;
+  questionsCacheNonce?: unknown;
+  questionResponsesNonce?: unknown;
+  suppressPrefill?: boolean;
+  submissionError?: unknown;
+  submissionComplete?: boolean;
+  resolveResponseHydrationContext?: ((rawSlug: unknown) => UnknownRecord | null | undefined) | null;
+  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
+  getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
+};
+
 type BuildQuestionSlugMapForIdsArgs = {
   questionIds?: Iterable<unknown> | unknown[];
   poolQuestions?: unknown[] | null;
@@ -2403,6 +2419,47 @@ export const buildLocalCacheHydrationSignature = ({
   submissionError ? 1 : 0,
   submissionComplete ? 1 : 0,
 ].join('|');
+
+export const resolveLocalCacheHydrationSignatureLookup = ({
+  surveyIndex = 0,
+  renderedIds = [],
+  rawSlug = '',
+  account = '',
+  minifiedMode = '',
+  questionsCacheNonce = 0,
+  questionResponsesNonce = 0,
+  suppressPrefill = false,
+  submissionError = '',
+  submissionComplete = false,
+  resolveResponseHydrationContext = null,
+  normalizeSessionSlugValue = null,
+  getExtraScopeSlugs = null,
+}: ResolveLocalCacheHydrationSignatureLookupArgs = {}): string => {
+  const hydrationContext = typeof resolveResponseHydrationContext === 'function'
+    ? (resolveResponseHydrationContext(rawSlug) || {})
+    : {};
+  const sessionSlug = (hydrationContext as UnknownRecord).sessionSlug;
+  const slug = typeof normalizeSessionSlugValue === 'function'
+    ? normalizeSessionSlugValue(sessionSlug)
+    : String(sessionSlug || '');
+  const extraSlugs = String(minifiedMode || '').trim().toLowerCase() === 'pile'
+    && typeof getExtraScopeSlugs === 'function'
+    ? (getExtraScopeSlugs(slug) || [])
+    : [];
+
+  return buildLocalCacheHydrationSignature({
+    surveyIndex,
+    scopeSlugs: [slug, ...(Array.isArray(extraSlugs) ? extraSlugs : [])],
+    networkIdStr: (hydrationContext as UnknownRecord).networkIdStr,
+    account,
+    renderedIds,
+    questionsCacheNonce,
+    questionResponsesNonce,
+    suppressPrefill,
+    submissionError,
+    submissionComplete,
+  });
+};
 
 export const buildPrefilledSurveyState = ({
   surveyIndex = 0,
