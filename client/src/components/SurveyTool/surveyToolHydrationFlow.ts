@@ -306,6 +306,20 @@ type ClearPriorResponseAttemptedKeysArgs = {
   attemptedKeys?: unknown[] | null;
 };
 
+type RunPriorResponseBackfillAttemptArgs = {
+  responderLower?: string;
+  slug?: unknown;
+  attemptedSet?: Set<string> | null;
+  loadMissingInfo?: ((args: { responder: string; slug?: unknown }) => Promise<MissingRenderedResponseInfo | null | undefined>) | null;
+  setHydratingState?: ((active: boolean) => void) | null;
+  isMounted?: boolean;
+  refreshQuestionResponses?: ((idsToFetch: string[], opts: { slug: string; responder: string }) => Promise<unknown>) | null;
+  readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
+  onFailure?: ((error: unknown) => void) | null;
+  resetLocalCacheMemo?: (() => void) | null;
+  triggerRehydrate?: (() => void) | null;
+};
+
 type ApplyPriorResponseFetchSuccessEffectsArgs = {
   fetched?: boolean;
   isMounted?: boolean;
@@ -1579,6 +1593,75 @@ export const applyPriorResponseFetchSuccessEffects = ({
     triggerRehydrate();
   }
   return true;
+};
+
+export const runPriorResponseBackfillAttempt = async ({
+  responderLower = '',
+  slug = '',
+  attemptedSet = null,
+  loadMissingInfo = null,
+  setHydratingState = null,
+  isMounted = false,
+  refreshQuestionResponses = null,
+  readQuestionsCacheAsync = null,
+  onFailure = null,
+  resetLocalCacheMemo = null,
+  triggerRehydrate = null,
+}: RunPriorResponseBackfillAttemptArgs = {}) => {
+  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  const attemptedKeys: string[] = [];
+  let fetched = false;
+
+  try {
+    const missingInfo = typeof loadMissingInfo === 'function'
+      ? await loadMissingInfo({ responder: normalizedResponder, slug })
+      : null;
+    const {
+      requestsToFetch,
+      attemptedKeysToMark,
+    } = buildPriorResponseFetchPlan({
+      missingInfo,
+      responderLower: normalizedResponder,
+      attemptedKeys: attemptedSet,
+    });
+    if (requestsToFetch.length === 0) return false;
+
+    attemptedKeys.push(...trackPriorResponseAttemptedKeys({
+      attemptedSet,
+      attemptedKeysToMark,
+    }));
+
+    if (!!isMounted && typeof setHydratingState === 'function') {
+      setHydratingState(true);
+    }
+
+    ({ fetched } = await executePriorResponseFetchPlan({
+      requestsToFetch,
+      responderLower: normalizedResponder,
+      refreshQuestionResponses,
+      readQuestionsCacheAsync,
+    }));
+  } catch (error) {
+    clearPriorResponseAttemptedKeys({
+      attemptedSet,
+      attemptedKeys,
+    });
+    if (typeof onFailure === 'function') {
+      onFailure(error);
+    }
+  } finally {
+    if (!!isMounted && typeof setHydratingState === 'function') {
+      setHydratingState(false);
+    }
+  }
+
+  applyPriorResponseFetchSuccessEffects({
+    fetched,
+    isMounted,
+    resetLocalCacheMemo,
+    triggerRehydrate,
+  });
+  return fetched;
 };
 
 export const applyLocalCacheRehydrateMissEffects = ({

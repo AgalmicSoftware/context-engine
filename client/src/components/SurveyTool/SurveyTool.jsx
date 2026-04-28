@@ -270,6 +270,7 @@ import {
   applyLocalCacheRehydrateNoChangeEffects,
   applyLocalCacheRehydrateAppliedEffects,
   applyLocalCacheRehydrateSuccessEffects,
+  runPriorResponseBackfillAttempt,
   buildRevertedResponseSlice,
   buildSubmissionGroupContext,
   buildSurveyResponseStateArray,
@@ -5196,57 +5197,23 @@ export class SurveyQuestions extends Component {
       return this._priorResponseBackfillInFlight;
     }
 
+    const responderLower = String(this.props.account || '').trim().toLowerCase();
     const run = (async () => {
-      let fetched = false;
-      let slug = '';
-      const attemptedKeys = [];
-      try {
-        const responderLower = String(this.props.account || '').trim().toLowerCase();
-        const missingInfo = await this.getMissingRenderedResponseIdsForAccount({
-          responder: responderLower,
-          slug: opts?.slug,
-        });
-        const {
-          requestsToFetch,
-          attemptedKeysToMark,
-        } = buildPriorResponseFetchPlan({
-          missingInfo,
-          responderLower,
-          attemptedKeys: this._priorResponseBackfillAttempted,
-        });
-        if (requestsToFetch.length === 0) return false;
-
-        attemptedKeys.push(...trackPriorResponseAttemptedKeys({
-          attemptedSet: this._priorResponseBackfillAttempted,
-          attemptedKeysToMark,
-        }));
-
-        if (this._isMounted) {
-          this.setState({ isHydratingPriorResponses: true });
-        }
-
-        ({ fetched, slug } = await executePriorResponseFetchPlan({
-          requestsToFetch,
-          responderLower,
-          refreshQuestionResponses: this.props.refreshQuestionResponses,
-          readQuestionsCacheAsync,
-        }));
-      } catch (error) {
-        // Allow retries after transient fetch failures.
-        clearPriorResponseAttemptedKeys({
-          attemptedSet: this._priorResponseBackfillAttempted,
-          attemptedKeys,
-        });
-        surveyLog.warn('[SurveyQuestions] Prior-response backfill failed:', error);
-      } finally {
-        if (this._isMounted) {
-          this.setState({ isHydratingPriorResponses: false });
-        }
-      }
-
-      applyPriorResponseFetchSuccessEffects({
-        fetched,
+      return runPriorResponseBackfillAttempt({
+        responderLower,
+        slug: opts?.slug,
+        attemptedSet: this._priorResponseBackfillAttempted,
+        loadMissingInfo: ({ responder, slug: nextSlug }) => this.getMissingRenderedResponseIdsForAccount({
+          responder,
+          slug: nextSlug,
+        }),
+        setHydratingState: (active) => this.setState({ isHydratingPriorResponses: !!active }),
         isMounted: this._isMounted,
+        refreshQuestionResponses: this.props.refreshQuestionResponses,
+        readQuestionsCacheAsync,
+        onFailure: (error) => {
+          surveyLog.warn('[SurveyQuestions] Prior-response backfill failed:', error);
+        },
         resetLocalCacheMemo: () => {
           // Force the immediate follow-up pass to read the freshly written cache
           // even before parent cache nonces propagate down as props.
@@ -5255,7 +5222,6 @@ export class SurveyQuestions extends Component {
         },
         triggerRehydrate: () => this.rehydrateLocalCacheAnswersForRenderedIds(),
       });
-      return fetched;
     })();
 
     this._priorResponseBackfillInFlight = run.finally(() => {
