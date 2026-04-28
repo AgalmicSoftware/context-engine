@@ -223,10 +223,12 @@ import {
   buildCacheHydrationSlice,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
+  buildExitEditingStatePatch,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
+  resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
   buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
@@ -10953,50 +10955,24 @@ export class SurveyQuestions extends Component {
     try {
       const surveyIndex =
         this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
-
-      // 1) Choose the correct original response to display
-      const sourceAnswers = this.props.responderAddress
-        ? this.state.parsedViewAddressAnswers
-        : this.state.userAnswers;
-
-      // 2) Build a baseline from the chosen source (or local cache as fallback)
-      let baselineSlice = sourceAnswers
-        ? this.buildSliceFromUserAnswers(sourceAnswers)
-        : (this.buildSliceFromLocalCache() || { answers:{}, importance:{}, conviction:{}, additionalComments:{} });
-
-      // 3) Fully restore the baseline so no off-screen edits are retained
-      const nextSlice = {
-        answers: this.deepClone(baselineSlice.answers || {}),
-        importance: { ...(baselineSlice.importance || {}) },
-        conviction: { ...(baselineSlice.conviction || {}) },
-        additionalComments: this.deepClone(baselineSlice.additionalComments || {})
-      };
-
-      const renderedIds = this.getCurrentRenderedQuestionIds();
-      renderedIds.forEach((qid) => {
-        if (!nextSlice.answers[qid]) nextSlice.answers[qid] = this.buildEmptyResponseFieldState(qid);
-        if (!nextSlice.additionalComments[qid]) nextSlice.additionalComments[qid] = this.buildEmptyResponseFieldState(qid, 'additional');
+      const baselineSlice = resolveExitEditingBaselineSlice({
+        responderAddress: this.props.responderAddress,
+        parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
+        userAnswers: this.state.userAnswers,
+        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+        buildSliceFromLocalCache: this.buildSliceFromLocalCache,
       });
 
-      const arr = Array.isArray(this.state.surveysResponseState) ? [...this.state.surveysResponseState] : [];
-      while (arr.length <= surveyIndex) arr.push({ answers:{}, importance:{}, conviction:{}, additionalComments:{} });
-      arr[surveyIndex] = nextSlice;
-
-      // 4) Flip to view mode, set new baseline to the restored slice, and recompute stats
       this.setState(
-        {
-          surveysResponseState: arr,
-          isEditing: false,
-          displayAnswerMode: true,
-          startFresh: false,
-          editBaseline: this.deepClone(nextSlice),
-          isDirty: false,
-          modifiedCount: 0,
-          hasEncryptedChanges: false,
-          submissionError: '',
-          submissionComplete: false,
-          submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-        },
+        buildExitEditingStatePatch({
+          prevSurveysResponseState: this.state.surveysResponseState,
+          surveyIndex,
+          baselineSlice,
+          renderedQuestionIds: this.getCurrentRenderedQuestionIds(),
+          buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+          cloneValue: this.deepClone,
+          nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
+        }),
         () => {
           this.recalculateEditStats && this.recalculateEditStats();
           this.persistDraftSafely && this.persistDraftSafely();
@@ -11004,7 +10980,6 @@ export class SurveyQuestions extends Component {
         }
       );
 
-      // 5) Clear draft so it doesn’t rehydrate back over the view
       this.clearDraft && this.clearDraft();
     } catch (e) {
       surveyLog.warn('[SurveyQuestions] handleExitEditing failed:', e);
