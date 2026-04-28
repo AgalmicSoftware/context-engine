@@ -6,6 +6,23 @@ const toQuestionList = (list: unknown): QuestionLike[] => (
   Array.isArray(list) ? list : []
 );
 
+export const readRenderedQuestionIds = ({
+  getRenderedQuestionIds = null,
+  normalizeRenderedIds = null,
+}: {
+  getRenderedQuestionIds?: (() => unknown) | null;
+  normalizeRenderedIds?: ((args: { renderedIds: unknown[] }) => unknown[]) | null;
+} = {}): unknown[] => {
+  const renderedIds = typeof getRenderedQuestionIds === 'function'
+    ? getRenderedQuestionIds()
+    : [];
+  const nextRenderedIds = Array.isArray(renderedIds) ? renderedIds : [];
+
+  return typeof normalizeRenderedIds === 'function'
+    ? normalizeRenderedIds({ renderedIds: nextRenderedIds })
+    : nextRenderedIds;
+};
+
 export const buildRenderedQuestionIdsFromQuestionPools = ({
   questionPool,
   pileQuestions,
@@ -69,6 +86,9 @@ export const buildInitialSurveyResponseQuestionIds = ({
   stateQuestionPool?: unknown;
 } = {}): unknown[] => {
   const nextQuestionPoolIds = Array.isArray(questionPoolIds) ? questionPoolIds : [];
+  const readCurrentRenderedQuestionIds = () => readRenderedQuestionIds({
+    getRenderedQuestionIds,
+  });
 
   if (singleQuestionMode) {
     return nextQuestionPoolIds.length > 0 ? nextQuestionPoolIds : [questionId];
@@ -76,15 +96,12 @@ export const buildInitialSurveyResponseQuestionIds = ({
 
   if (isStandalone) {
     if (nextQuestionPoolIds.length > 0) return nextQuestionPoolIds;
-    const renderedQuestionIds =
-      typeof getRenderedQuestionIds === 'function' ? getRenderedQuestionIds() : [];
-    return Array.isArray(renderedQuestionIds) ? renderedQuestionIds : [];
+    return readCurrentRenderedQuestionIds();
   }
 
-  const renderedQuestionIds =
-    typeof getRenderedQuestionIds === 'function' ? getRenderedQuestionIds() : [];
-  if (Array.isArray(renderedQuestionIds) && renderedQuestionIds.length > 0) {
-    return renderedQuestionIds;
+  const currentRenderedQuestionIds = readCurrentRenderedQuestionIds();
+  if (currentRenderedQuestionIds.length > 0) {
+    return currentRenderedQuestionIds;
   }
 
   return toQuestionList(stateQuestionPool).map((question) => question?.id);

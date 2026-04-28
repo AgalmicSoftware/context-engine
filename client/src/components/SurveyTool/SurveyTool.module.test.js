@@ -10251,6 +10251,25 @@ describe('SurveyTool module', () => {
     expect(third).toEqual(['q1', 'q2', 'q4', 'q3']);
   });
 
+  it('normalizes hydration question ids from the current rendered-id selector', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['Q1', 'q1', '', 'q2']);
+
+    expect(subject.getHydrationQuestionIds()).toEqual(['q1', 'q2']);
+    expect(subject.getCurrentRenderedQuestionIds).toHaveBeenCalledTimes(1);
+
+    expect(subject.getRenderedQuestionIdsForResponseHydration()).toEqual(['q1', 'q2']);
+    expect(subject.getCurrentRenderedQuestionIds).toHaveBeenCalledTimes(2);
+  });
+
   it('initializes standalone response state from prop question ids before rendered-id lookup', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
