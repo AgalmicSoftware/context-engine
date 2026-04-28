@@ -147,6 +147,14 @@ type BuildResetFormStatePatchArgs = {
   cloneValue?: ((value: unknown) => unknown) | null;
 };
 
+type PrepareLocalCacheRehydrateRunArgs = {
+  state?: UnknownRecord | null;
+  surveyIndex?: unknown;
+  renderedIds?: Iterable<unknown> | unknown[];
+  lastHydrationSig?: unknown;
+  buildHydrationSignature?: ((surveyIndex: number, renderedIds: unknown[]) => string) | null;
+};
+
 type ResolveRevertPendingBaselineSliceArgs = {
   editBaseline?: ResponseSlice | null;
   isLoggedIn?: boolean;
@@ -926,6 +934,54 @@ export const buildResetFormStatePatch = ({
     hasEncryptedChanges: false,
     editBaseline: typeof cloneValue === 'function' ? cloneValue(baselineSource) : baselineSource,
     isLoadingResponse: true,
+  };
+};
+
+export const prepareLocalCacheRehydrateRun = ({
+  state = null,
+  surveyIndex = 0,
+  renderedIds = [],
+  lastHydrationSig = '',
+  buildHydrationSignature = null,
+}: PrepareLocalCacheRehydrateRunArgs = {}) => {
+  const currentState = state && typeof state === 'object' ? state : {};
+  if (currentState.suppressPrefill || currentState.submissionError || currentState.submissionComplete) {
+    return {
+      shouldSkip: true,
+      shouldBumpNoop: false,
+      hydrationSig: '',
+      baseSlice: null,
+    };
+  }
+
+  const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
+  const normalizedRenderedIds = Array.from(renderedIds || []);
+  const hydrationSig = typeof buildHydrationSignature === 'function'
+    ? String(buildHydrationSignature(normalizedSurveyIndex, normalizedRenderedIds) || '')
+    : '';
+
+  if (hydrationSig && String(lastHydrationSig || '') === hydrationSig) {
+    return {
+      shouldSkip: true,
+      shouldBumpNoop: true,
+      hydrationSig,
+      baseSlice: null,
+    };
+  }
+
+  const surveysResponseState = Array.isArray(currentState.surveysResponseState)
+    ? currentState.surveysResponseState
+    : [];
+  const baseSlice =
+    (surveysResponseState[normalizedSurveyIndex] && typeof surveysResponseState[normalizedSurveyIndex] === 'object'
+      ? surveysResponseState[normalizedSurveyIndex]
+      : null) || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+
+  return {
+    shouldSkip: false,
+    shouldBumpNoop: false,
+    hydrationSig,
+    baseSlice,
   };
 };
 
