@@ -247,7 +247,9 @@ import {
   buildLocalCacheRehydrationState,
   buildPrefilledSingleQuestionState,
   buildPrefilledSurveyState,
+  buildQuestionSlugMapForIds,
   buildRevertedResponseSlice,
+  buildSubmissionGroupContext,
   buildSurveyResponseStateArray,
   buildPersistedDraftQuestionRemovalPlan,
   buildPersistedDraftTrackingAfterLoad,
@@ -287,7 +289,6 @@ import {
   getConvictionFromResponse,
   getConvictionFromSlice,
   getConvictionFromSliceStrict,
-  dedupeQuestionReadSlugs,
   getExtraQuestionReadSlugs,
   getHighlightedQuestionIdsSet,
   getImportanceFromResponse,
@@ -5060,21 +5061,9 @@ export class SurveyQuestions extends Component {
   };
 
   resolveQuestionSlugMapForIds = (questionIds = [], opts = {}) => {
-    const normalizedIds = Array.isArray(questionIds)
-      ? Array.from(new Set(questionIds.map((id) => normalizeQuestionIdKey(id)).filter(Boolean)))
-      : [];
-    const slugByQuestionId = new Map();
-    if (normalizedIds.length === 0) return slugByQuestionId;
-
     const poolCombined = []
       .concat(Array.isArray(this.state.questionPool) ? this.state.questionPool : [])
       .concat(Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : []);
-    const poolQuestionById = new Map();
-    poolCombined.forEach((question) => {
-      const questionId = normalizeQuestionIdKey(question?.id);
-      if (!questionId || poolQuestionById.has(questionId)) return;
-      poolQuestionById.set(questionId, question);
-    });
 
     const fallbackSurveyId = Object.prototype.hasOwnProperty.call(opts || {}, 'surveyId')
       ? opts.surveyId
@@ -5084,73 +5073,49 @@ export class SurveyQuestions extends Component {
           : (this.props.surveyId || null)
       );
 
-    normalizedIds.forEach((questionId) => {
-      const question = poolQuestionById.get(questionId) || null;
-      let resolvedSlug = '';
-      let hasExplicitQuestionSlug = false;
+    return buildQuestionSlugMapForIds({
+      questionIds,
+      poolQuestions: poolCombined,
+      normalizeSlug: normalizeSessionSlugValue,
+      resolveQuestionSlug: ({ questionId, question }) => {
+        let resolvedSlug = '';
+        let hasExplicitQuestionSlug = false;
 
-      if (question && Object.prototype.hasOwnProperty.call(question, 'sessionSlug')) {
-        resolvedSlug = normalizeSessionSlugValue(question.sessionSlug);
-        hasExplicitQuestionSlug = question.sessionSlug !== null && question.sessionSlug !== undefined;
-      }
-
-      if (!hasExplicitQuestionSlug && typeof question?.sessionName === 'string') {
-        const mapped = getSessionSlugByName(question.sessionName);
-        if (mapped !== null && mapped !== undefined) {
-          resolvedSlug = normalizeSessionSlugValue(mapped);
-          hasExplicitQuestionSlug = true;
+        if (question && Object.prototype.hasOwnProperty.call(question, 'sessionSlug')) {
+          resolvedSlug = question.sessionSlug;
+          hasExplicitQuestionSlug = question.sessionSlug !== null && question.sessionSlug !== undefined;
         }
-      }
 
-      if (!hasExplicitQuestionSlug) {
-        resolvedSlug = normalizeSessionSlugValue(resolveSlugForIds({
-          sessionName: null,
-          questionId,
-          surveyId: fallbackSurveyId,
-          props: this.props,
-          network: this.props.network,
-        }));
-      }
+        if (!hasExplicitQuestionSlug && typeof question?.sessionName === 'string') {
+          const mapped = getSessionSlugByName(question.sessionName);
+          if (mapped !== null && mapped !== undefined) {
+            resolvedSlug = mapped;
+            hasExplicitQuestionSlug = true;
+          }
+        }
 
-      slugByQuestionId.set(questionId, resolvedSlug);
+        if (!hasExplicitQuestionSlug) {
+          resolvedSlug = resolveSlugForIds({
+            sessionName: null,
+            questionId,
+            surveyId: fallbackSurveyId,
+            props: this.props,
+            network: this.props.network,
+          });
+        }
+
+        return resolvedSlug;
+      },
     });
-
-    return slugByQuestionId;
   };
 
   resolveSubmissionGroupContext = ({ questionIds = [], surveyId = null } = {}) => {
-    const normalizedIds = Array.isArray(questionIds)
-      ? Array.from(new Set(questionIds.map((id) => normalizeQuestionIdKey(id)).filter(Boolean)))
-      : [];
-    if (normalizedIds.length === 0) {
-      return {
-        ok: true,
-        submissionGroupKey: normalizeSessionSlugValue(resolveEffectiveSlug(this.props)),
-        sessionSlugs: [],
-        slugByQuestionId: new Map(),
-      };
-    }
-
-    const slugByQuestionId = this.resolveQuestionSlugMapForIds(normalizedIds, { surveyId });
-    const sessionSlugs = dedupeQuestionReadSlugs(
-      normalizedIds.map((questionId) => slugByQuestionId.get(questionId))
-    );
-    if (sessionSlugs.length > 1) {
-      return {
-        ok: false,
-        submissionGroupKey: '',
-        sessionSlugs,
-        slugByQuestionId,
-        error: 'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.',
-      };
-    }
-
-    return {
-      ok: true,
-      submissionGroupKey: sessionSlugs[0] ?? normalizeSessionSlugValue(resolveEffectiveSlug(this.props)),
-      sessionSlugs,
-      slugByQuestionId,
-    };
+    return buildSubmissionGroupContext({
+      questionIds,
+      slugByQuestionId: this.resolveQuestionSlugMapForIds(questionIds, { surveyId }),
+      fallbackSlug: resolveEffectiveSlug(this.props),
+      normalizeSlug: normalizeSessionSlugValue,
+    });
   };
 
   getMissingRenderedResponseIdsForAccount = async (opts = {}) => {

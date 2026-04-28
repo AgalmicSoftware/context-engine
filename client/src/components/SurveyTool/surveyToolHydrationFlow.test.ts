@@ -23,7 +23,9 @@ import {
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   buildPriorResponseFetchPlan,
+  buildQuestionSlugMapForIds,
   buildRevertedResponseSlice,
+  buildSubmissionGroupContext,
   buildSurveyResponseStateArray,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
@@ -1432,6 +1434,65 @@ describe('surveyToolHydrationFlow', () => {
     expect(buildNormalizedRenderedQuestionIds({
       renderedIds: ['Q1', 'q1', null, 'q2', '', undefined, 'Q2'],
     })).toEqual(['q1', 'q2']);
+  });
+
+  it('builds question slug maps for normalized rendered ids', () => {
+    expect(buildQuestionSlugMapForIds({
+      questionIds: ['Q1', 'q2', 'q1', null],
+      poolQuestions: [
+        { id: 'q1', sessionSlug: 'Edge' },
+        { id: 'q2', sessionSlug: 'alpha' },
+      ],
+      normalizeSlug: (value) => String(value || '').trim().toLowerCase(),
+      resolveQuestionSlug: ({ questionId, question }) => {
+        const questionRecord = question && typeof question === 'object'
+          ? question as Record<string, unknown>
+          : {};
+        return questionRecord.sessionSlug || `fallback-${questionId}`;
+      },
+    })).toEqual(new Map([
+      ['q1', 'edge'],
+      ['q2', 'alpha'],
+    ]));
+  });
+
+  it('builds submission group contexts from slug-mapped questions', () => {
+    expect(buildSubmissionGroupContext({
+      questionIds: ['Q1', 'q2', 'q1'],
+      slugByQuestionId: new Map([
+        ['q1', 'Edge'],
+        ['q2', 'Edge'],
+      ]),
+      fallbackSlug: 'general',
+      normalizeSlug: (value) => String(value || '').trim().toLowerCase(),
+    })).toEqual({
+      ok: true,
+      submissionGroupKey: 'edge',
+      sessionSlugs: ['edge'],
+      slugByQuestionId: new Map([
+        ['q1', 'edge'],
+        ['q2', 'edge'],
+      ]),
+    });
+
+    expect(buildSubmissionGroupContext({
+      questionIds: ['q1', 'q2'],
+      slugByQuestionId: new Map([
+        ['q1', 'alpha'],
+        ['q2', 'beta'],
+      ]),
+      fallbackSlug: 'general',
+      normalizeSlug: (value) => String(value || '').trim().toLowerCase(),
+    })).toEqual({
+      ok: false,
+      submissionGroupKey: '',
+      sessionSlugs: ['alpha', 'beta'],
+      slugByQuestionId: new Map([
+        ['q1', 'alpha'],
+        ['q2', 'beta'],
+      ]),
+      error: 'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.',
+    });
   });
 
   it('builds local-cache hydration signatures from normalized state inputs', () => {
