@@ -233,6 +233,7 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyUpdatePlan,
   buildPriorResponseFetchPlan,
+  executePriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
   buildMissingRenderedResponseResult,
@@ -5237,17 +5238,12 @@ export class SurveyQuestions extends Component {
           this.setState({ isHydratingPriorResponses: true });
         }
 
-        for (const entry of requestsToFetch) {
-          slug = entry.slug;
-          // eslint-disable-next-line no-await-in-loop
-          await this.props.refreshQuestionResponses(entry.idsToFetch, {
-            slug: entry.slug,
-            responder: responderLower,
-          });
-          // eslint-disable-next-line no-await-in-loop
-          await readQuestionsCacheAsync(entry.slug);
-          fetched = true;
-        }
+        ({ fetched, slug } = await executePriorResponseFetchPlan({
+          requestsToFetch,
+          responderLower,
+          refreshQuestionResponses: this.props.refreshQuestionResponses,
+          readQuestionsCacheAsync,
+        }));
       } catch (error) {
         // Allow retries after transient fetch failures.
         attemptedKeys.forEach((key) => this._priorResponseBackfillAttempted.delete(key));

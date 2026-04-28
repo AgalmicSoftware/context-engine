@@ -20,6 +20,7 @@ import {
   buildPrefilledSurveyUpdatePlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  executePriorResponseFetchPlan,
   buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
@@ -1402,6 +1403,36 @@ describe('surveyToolHydrationFlow', () => {
         'beta|0xabc|q3',
       ],
     });
+  });
+
+  it('executes grouped prior-response fetch plans in normalized order', async () => {
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const readQuestionsCacheAsync = jest.fn().mockResolvedValue(undefined);
+
+    await expect(executePriorResponseFetchPlan({
+      requestsToFetch: [
+        { slug: 'alpha', idsToFetch: ['Q1', 'q1'] },
+        { slug: 'beta', idsToFetch: ['q2'] },
+        { slug: '', idsToFetch: ['q3'] },
+      ],
+      responderLower: '0xAbC',
+      refreshQuestionResponses,
+      readQuestionsCacheAsync,
+    })).resolves.toEqual({
+      fetched: true,
+      slug: 'beta',
+    });
+
+    expect(refreshQuestionResponses).toHaveBeenNthCalledWith(1, ['q1'], {
+      slug: 'alpha',
+      responder: '0xabc',
+    });
+    expect(refreshQuestionResponses).toHaveBeenNthCalledWith(2, ['q2'], {
+      slug: 'beta',
+      responder: '0xabc',
+    });
+    expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(1, 'alpha');
+    expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(2, 'beta');
   });
 
   it('builds grouped rendered-response scope plans by slug and network', () => {
