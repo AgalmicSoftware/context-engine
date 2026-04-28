@@ -102,6 +102,8 @@ export {
 export {
   buildCacheHydrationSlice,
   buildDraftHydrationUpdatePlan,
+  buildDraftHydrationRenderedQuestionIds,
+  buildDraftHydrationOverwriteDecision,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildHydratedResponseSlice,
