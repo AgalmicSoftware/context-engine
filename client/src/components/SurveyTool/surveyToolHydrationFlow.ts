@@ -214,6 +214,18 @@ type BuildPriorResponseFetchPlanArgs = {
   attemptedKeys?: Set<string> | null;
 };
 
+type PriorResponseFetchRequest = {
+  slug?: unknown;
+  idsToFetch?: unknown[] | null;
+};
+
+type ExecutePriorResponseFetchPlanArgs = {
+  requestsToFetch?: PriorResponseFetchRequest[] | null;
+  responderLower?: string;
+  refreshQuestionResponses?: ((idsToFetch: string[], opts: { slug: string; responder: string }) => Promise<unknown>) | null;
+  readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
+};
+
 type BuildGroupedRenderedResponseScopePlanArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   slugByQuestionId?: Map<string, unknown> | null;
@@ -1129,6 +1141,45 @@ export const buildPriorResponseFetchPlan = ({
     attemptedKeysToMark: requestsToFetch.flatMap((entry) => (
       entry.idsToFetch.map((qid) => `${entry.slug}|${normalizedResponder}|${qid}`)
     )),
+  };
+};
+
+export const executePriorResponseFetchPlan = async ({
+  requestsToFetch = null,
+  responderLower = '',
+  refreshQuestionResponses = null,
+  readQuestionsCacheAsync = null,
+}: ExecutePriorResponseFetchPlanArgs = {}) => {
+  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  const requests = Array.isArray(requestsToFetch) ? requestsToFetch : [];
+  let fetched = false;
+  let slug = '';
+
+  for (const entry of requests) {
+    const resolvedSlug = String(entry?.slug || '');
+    const idsToFetch = buildNormalizedRenderedQuestionIds({
+      renderedIds: Array.isArray(entry?.idsToFetch) ? entry.idsToFetch : [],
+    });
+    if (!resolvedSlug || idsToFetch.length === 0) continue;
+
+    slug = resolvedSlug;
+    if (typeof refreshQuestionResponses === 'function') {
+      // eslint-disable-next-line no-await-in-loop
+      await refreshQuestionResponses(idsToFetch, {
+        slug: resolvedSlug,
+        responder: normalizedResponder,
+      });
+    }
+    if (typeof readQuestionsCacheAsync === 'function') {
+      // eslint-disable-next-line no-await-in-loop
+      await readQuestionsCacheAsync(resolvedSlug);
+    }
+    fetched = true;
+  }
+
+  return {
+    fetched,
+    slug,
   };
 };
 
