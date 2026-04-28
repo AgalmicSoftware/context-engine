@@ -11959,12 +11959,625 @@ describe('SurveyTool module', () => {
     });
   });
 
-  it('builds shared decrypt start and failure state updates', () => {
-    expect(buildQuestionDecryptStartState(
-      { decryptingByKey: { 'q1:prompt': true } },
-      ['q1:answer', 'q1:additional'],
-    )).toEqual({
-      isDecrypting: true,
+  it('keeps empty piles in loading mode during recent rate limits instead of settling or probing', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+      },
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.isRecentRateLimit = jest.fn(() => true);
+    subject._emptyReadyProbeStartedAtMs = Date.now() - 25000;
+
+    await subject.loadAndSortQuestions();
+
+    expect(subject.state.loading).toBe(true);
+    expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
+    expect(subject._emptyReadyProbeStartedAtMs).toBe(0);
+  });
+
+  it('keeps unanswered questions visible in pile mode when response map is empty', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'freeform', prompt: 'Unanswered prompt' },
+        },
+        questionResponses: {},
+      },
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+
+    await subject.loadAndSortQuestions();
+
+    expect(subject.state.loading).toBe(false);
+    expect(Array.isArray(subject.state.pileQuestions)).toBe(true);
+    expect(subject.state.pileQuestions.map((q) => String(q.id))).toEqual(['q1']);
+    expect(subject.state.allQuestionsForFilter.map((q) => String(q.id))).toEqual(['q1']);
+    expect(subject.state.hasHiddenGatedQuestions).toBe(false);
+  });
+
+  it('settles stuck hydrate 0/0 empty piles into deterministic no-questions state', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+      },
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'hydrate',
+        discoveredQuestions: 0,
+        hydratedQuestions: 0,
+        remainingBlocks: 0,
+      },
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      hasHiddenGatedQuestions: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+
+    await subject.loadAndSortQuestions();
+
+    expect(subject.state.loading).toBe(false);
+    expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
+
+    const tree = subject.render();
+    expect(treeHasText(tree, 'No questions available.')).toBe(true);
+    expect(treeHasText(tree, 'Loading Metadata')).toBe(false);
+  });
+
+  it('settles scan 0/0 empty piles into deterministic no-questions state for newly created sessions', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+      },
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'scan',
+        totalBlocks: 0,
+        requestedTotalBlocks: 0,
+        scannedBlocks: 0,
+        remainingBlocks: 0,
+        discoveredQuestions: 0,
+        hydratedQuestions: 0,
+      },
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      hasHiddenGatedQuestions: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+
+    await subject.loadAndSortQuestions();
+
+    expect(subject.state.loading).toBe(false);
+    expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
+
+    const tree = subject.render();
+    expect(treeHasText(tree, 'No questions available.')).toBe(true);
+    expect(treeHasText(tree, 'Loading...')).toBe(false);
+  });
+
+  it('shows a filtered empty state instead of full loading when filters remove all visible pile cards', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      loginComplete: false,
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 2,
+      questionsCacheNonce: 2,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'scan',
+        totalBlocks: 50000,
+        requestedTotalBlocks: 50000,
+        scannedBlocks: 12500,
+        remainingBlocks: 37500,
+      },
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: [],
+      allQuestionsForFilter: [
+        { id: 'q1', prompt: 'Q1', type: 'binary' },
+      ],
+      activePileIndex: 0,
+      filterState: { questionTypes: ['freeform'] },
+      isFilterActive: true,
+      hasHiddenGatedQuestions: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      loadingElapsedSec: 9,
+    };
+
+    const tree = subject.render();
+    expect(treeHasText(tree, 'No questions match current filters.')).toBe(true);
+    expect(treeHasText(tree, 'Loading...')).toBe(false);
+  });
+
+  it('keeps pile loading when pending question metadata retries exist after hydrate appears settled', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        pendingQuestionMetadata: {
+          q_pending: {
+            attempts: 2,
+            nextRetryAtMs: Date.now() + 60_000,
+          },
+        },
+      },
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      questionResponsesNonce: 2,
+      questionsCacheNonce: 2,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'hydrate',
+        discoveredQuestions: 1,
+        hydratedQuestions: 1,
+        pendingMetadataCount: 1,
+        remainingBlocks: 0,
+      },
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      hasHiddenGatedQuestions: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+
+    await subject.loadAndSortQuestions();
+
+    expect(subject.state.loading).toBe(true);
+    const tree = subject.render();
+    expect(treeHasText(tree, 'Loading...')).toBe(true);
+  });
+
+  it('renders terminal scan errors in pile mode instead of continuing full loading', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'error',
+        errorCode: 'session_not_found',
+        errorMessage: 'No session found for "general".',
+      },
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      hasHiddenGatedQuestions: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+
+    const tree = subject.render();
+    expect(treeHasText(tree, 'No session found for "general".')).toBe(true);
+    expect(treeHasText(tree, 'Loading...')).toBe(false);
+  });
+
+  it('replays pile hydration when the rendered question response snapshot changes', async () => {
+    const cacheState = {
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'freeform', prompt: 'Q1' },
+        },
+        questionResponses: {
+          q1: {},
+        },
+      },
+    };
+    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async () => cacheState);
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 5,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+
+    await subject.loadAndSortQuestions();
+    expect(subject.initializeResponseState).toHaveBeenCalledTimes(1);
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+
+    cacheState['84532'].questionResponses.q1['0xabc'] = {
+      answer: { value: 'Agree', encrypted: false },
+      additional: { value: 'note', encrypted: false },
+      importance: 5,
+      conviction: 7,
+    };
+    subject.props = {
+      ...subject.props,
+      questionResponsesNonce: subject.props.questionResponsesNonce + 1,
+      questionsCacheNonce: subject.props.questionsCacheNonce + 1,
+    };
+    await subject.loadAndSortQuestions();
+
+    expect(subject.initializeResponseState).toHaveBeenCalledTimes(2);
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(2);
+    expect(subject.rehydrateDraftForRenderedIds).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not replay pile hydration when nonce ticks only touch off-screen responses', async () => {
+    const cacheState = {
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'freeform', prompt: 'Q1' },
+        },
+        questionResponses: {
+          q1: {},
+        },
+      },
+    };
+    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async () => cacheState);
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 5,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+
+    await subject.loadAndSortQuestions();
+    expect(subject.initializeResponseState).toHaveBeenCalledTimes(1);
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+
+    cacheState['84532'].questionResponses.q2 = {
+      '0xabc': {
+        answer: { value: 'Off-screen', encrypted: false },
+        additional: { value: '', encrypted: false },
+      },
+    };
+    subject.props = {
+      ...subject.props,
+      questionResponsesNonce: subject.props.questionResponsesNonce + 1,
+      questionsCacheNonce: subject.props.questionsCacheNonce + 1,
+    };
+    await subject.loadAndSortQuestions();
+
+    expect(subject.initializeResponseState).toHaveBeenCalledTimes(1);
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(subject.rehydrateDraftForRenderedIds).toHaveBeenCalledTimes(1);
+  });
+
+  it('rehydrates newly visible pile window answers when active index changes without nonce ticks', async () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      questionResponsesNonce: 5,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      suppressPrefill: false,
       submissionError: '',
       suppressPrefill: true,
       decryptingByKey: {

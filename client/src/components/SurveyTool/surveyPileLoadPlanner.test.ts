@@ -25,6 +25,27 @@ describe('surveyPileLoadPlanner', () => {
     });
   });
 
+  it('keeps unready-empty settlement closed while a recent rate limit is active', () => {
+    expect(buildPileLoadProgressState({
+      scopedProgress: {
+        phase: 'hydrate',
+        discoveredQuestions: 4,
+        hydratedQuestions: 4,
+      },
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      recentRateLimit: true,
+    })).toEqual({
+      scanTotalBlocks: 0,
+      scanRemainingBlocks: 0,
+      hydrateDiscovered: 4,
+      hydrateDone: 4,
+      hasScanOrHydrationWork: false,
+      hydrationProgressSettled: true,
+      canSettleUnreadyEmpty: false,
+    });
+  });
+
   it('keeps pile loading immediately when cold boot, metadata retries, or active work are present', () => {
     expect(buildPileEmptyProbePlan({
       cacheHasLoaded: false,
@@ -52,6 +73,18 @@ describe('surveyPileLoadPlanner', () => {
       nowMs: 5000,
     })).toEqual(expect.objectContaining({
       action: 'continue-loading-immediately',
+    }));
+
+    expect(buildPileEmptyProbePlan({
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      recentRateLimit: true,
+      emptyReadyProbeStartedAtMs: 2500,
+      nowMs: 5000,
+    })).toEqual(expect.objectContaining({
+      action: 'continue-loading-immediately',
+      nextProbeStartedAtMs: 0,
+      nextProbeDelayMs: 0,
     }));
   });
 
