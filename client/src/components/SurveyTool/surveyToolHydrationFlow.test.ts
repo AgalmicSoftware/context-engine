@@ -20,6 +20,7 @@ import {
   buildPrefilledSurveyUpdatePlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   buildPriorResponseFetchPlan,
@@ -1428,6 +1429,41 @@ describe('surveyToolHydrationFlow', () => {
       },
       responderLower: '0xabc',
     })).toEqual(['q2', 'q3']);
+  });
+
+  it('builds normalized missing-response results from grouped scope requests', () => {
+    expect(buildMissingRenderedResponseResult({
+      requests: [
+        { slug: 'alpha', netId: '84532', missingIds: ['Q1', 'q1'] },
+        { slug: 'beta', netId: '84532', missingIds: [] },
+      ],
+      fallbackSlug: 'edge',
+      fallbackNetId: '11155420',
+    })).toEqual({
+      slug: 'alpha',
+      netId: '84532',
+      missingIds: ['q1'],
+      requests: [
+        { slug: 'alpha', netId: '84532', missingIds: ['q1'] },
+      ],
+    });
+
+    expect(buildMissingRenderedResponseResult({
+      requests: [
+        { slug: 'alpha', netId: '84532', missingIds: ['q1'] },
+        { slug: 'beta', netId: '84532', missingIds: ['q2'] },
+      ],
+      fallbackSlug: 'edge',
+      fallbackNetId: '11155420',
+    })).toEqual({
+      slug: 'edge',
+      netId: '11155420',
+      missingIds: [],
+      requests: [
+        { slug: 'alpha', netId: '84532', missingIds: ['q1'] },
+        { slug: 'beta', netId: '84532', missingIds: ['q2'] },
+      ],
+    });
   });
 
   it('normalizes rendered question ids for hydration', () => {
