@@ -50,6 +50,10 @@ import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import {
+  buildNoPendingPileSubmitFeedbackPlan,
+  buildPileSubmitViewState,
+} from './surveyPileViewState.js';
+import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
   applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
@@ -2070,6 +2074,26 @@ export class PileViewMode extends SurveyQuestions {
     return this.computePendingEditStatsAtIndex(0);
   };
 
+  showNoPendingPileSubmitFeedback = (pileSubmitLabel = '') => {
+    if (this._pileSubmitTimer) {
+      clearTimeout(this._pileSubmitTimer);
+      this._pileSubmitTimer = null;
+    }
+
+    const feedbackPlan = buildNoPendingPileSubmitFeedbackPlan({
+      submitLabel: pileSubmitLabel,
+    });
+
+    this.setState({ pileSubmitTempText: feedbackPlan.initialText });
+    this._pileSubmitTimer = setTimeout(() => {
+      this.setState({ pileSubmitTempText: feedbackPlan.restoreText });
+      this._pileSubmitTimer = setTimeout(() => {
+        this.setState({ pileSubmitTempText: feedbackPlan.clearText });
+        this._pileSubmitTimer = null;
+      }, feedbackPlan.clearDelayMs);
+    }, feedbackPlan.initialDelayMs);
+  };
+
   getPileFilterQuestionResponses = () => {
     const slug = resolveEffectiveSlug(this.props);
     const pileFilterContext = resolvePileFilterContext(this.props, slug);
@@ -2827,23 +2851,23 @@ export class PileViewMode extends SurveyQuestions {
     const pileSubmitLabel = (this.props.computeSubmitLabel || computeSubmitLabel)(this, {
       pendingStats: _pileStats,
     });
-    const hasPendingPileChanges = _pileStats.total > 0;
-    const pileSubmittedStateActive = !!(this.state.submittedSinceLastEdit || this.state.submissionComplete);
-    const showPileSubmitSuccessBadge = pileSubmittedStateActive && !this.state.isSubmitting;
-    const shouldHidePileSubmitButton = (
-      !hasPendingPileChanges &&
-      !this.state.isSubmitting &&
-      !pileSubmittedStateActive
-    );
-    const finalSubmitText = this.state.pileSubmitTempText || pileSubmitLabel;
-    const pileSubmitResponderAddress = String(this.props.account || '').trim();
-    const pileSubmitResponderAddressLower =
-      pileSubmitResponderAddress && utils.isAddress(pileSubmitResponderAddress)
-        ? pileSubmitResponderAddress.toLowerCase()
-        : '';
-    const pileSubmitResponderHref = pileSubmitResponderAddressLower
-      ? `/u/${pileSubmitResponderAddressLower}`
-      : '';
+    const {
+      hasPendingPileChanges,
+      pileSubmittedStateActive,
+      showPileSubmitSuccessBadge,
+      shouldHidePileSubmitButton,
+      finalSubmitText,
+      pileSubmitResponderHref,
+    } = buildPileSubmitViewState({
+      pendingStats: _pileStats,
+      isSubmitting: this.state.isSubmitting,
+      submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+      submissionComplete: this.state.submissionComplete,
+      pileSubmitTempText: this.state.pileSubmitTempText,
+      pileSubmitLabel,
+      account: this.props.account,
+      isAddress: utils.isAddress,
+    });
 
     const handleSubmitClick = async () => {
       if (!this.props.loginComplete) {
@@ -2853,18 +2877,7 @@ export class PileViewMode extends SurveyQuestions {
       if (pileSubmittedStateActive) return;
       const currentPending = this.getSubmitCount();
       if (currentPending === 0) {
-        if (this._pileSubmitTimer) {
-          clearTimeout(this._pileSubmitTimer);
-          this._pileSubmitTimer = null;
-        }
-        this.setState({ pileSubmitTempText: 'No new or changed responses' });
-        this._pileSubmitTimer = setTimeout(() => {
-          this.setState({ pileSubmitTempText: pileSubmitLabel });
-          this._pileSubmitTimer = setTimeout(() => {
-            this.setState({ pileSubmitTempText: null });
-            this._pileSubmitTimer = null;
-          }, 1500);
-        }, 2000);
+        this.showNoPendingPileSubmitFeedback(pileSubmitLabel);
         return;
       }
       await this.encryptAndUpload();

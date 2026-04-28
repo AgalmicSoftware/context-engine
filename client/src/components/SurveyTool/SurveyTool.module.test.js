@@ -308,6 +308,67 @@ describe('SurveyTool module', () => {
     expect(submitTrailChildren).toHaveLength(3);
   });
 
+  it('shows and clears the pile submit empty-state feedback without submitting', async () => {
+    jest.useFakeTimers();
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      computeSubmitLabel: jest.fn(() => 'Submit now'),
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    syncClassSetState(subject);
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.getSubmitCount = jest.fn(() => 0);
+    subject.encryptAndUpload = jest.fn().mockResolvedValue(undefined);
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      isHydratingPriorResponses: false,
+      pileSubmitTempText: null,
+    };
+
+    const tree = subject.render();
+    const submitButton = findElement(
+      tree,
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT
+    );
+
+    await submitButton.props.onClick();
+
+    expect(subject.encryptAndUpload).not.toHaveBeenCalled();
+    expect(subject.state.pileSubmitTempText).toBe('No new or changed responses');
+
+    jest.advanceTimersByTime(2000);
+    expect(subject.state.pileSubmitTempText).toBe('Submit');
+
+    jest.advanceTimersByTime(1500);
+    expect(subject.state.pileSubmitTempText).toBeNull();
+    expect(subject._pileSubmitTimer).toBeNull();
+  });
+
   it('hides the pile submit rail when no rail is visible', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
