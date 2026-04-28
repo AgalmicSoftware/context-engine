@@ -3,7 +3,6 @@
 
 import React, { Component } from 'react';
 import {
-  Button,
   Dropdown,
   DropdownToggle,
   DropdownMenu,
@@ -25,12 +24,11 @@ import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
+import { faLock, faUnlock, faCaretUp, faArrowLeft, faArrowRight, faExternalLinkAlt, faExclamationCircle, faMicrophone, faComment } from '@fortawesome/free-solid-svg-icons';
 
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
-import PileHologramAssistant from './PileHologramAssistant';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
@@ -54,6 +52,7 @@ import {
   buildPileSubmitRailViewState,
   buildPileSubmitViewState,
 } from './surveyPileViewState.js';
+import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
@@ -220,7 +219,6 @@ import {
   DEBUG_PREFILL,
   GATE_SBT_HYDRATION_RETRY_MS,
   QUESTION_TAG_DROPDOWN_ROW_STYLE,
-  SHOW_PILE_HOLOGRAM_TOGGLE,
   appendExplicitSessionHintToPath,
   applyExistingGroupPrefix,
   areEnvelopesEquivalent,
@@ -2910,8 +2908,6 @@ export class PileViewMode extends SurveyQuestions {
     });
     const {
       hasPendingPileChanges,
-      pileSubmittedStateActive,
-      showPileSubmitSuccessBadge,
       shouldHidePileSubmitButton,
       finalSubmitText,
       pileSubmitResponderHref,
@@ -2931,11 +2927,6 @@ export class PileViewMode extends SurveyQuestions {
       isAddress: utils.isAddress,
     });
 
-    const activeGreen = '#4cd964';
-    const filterButtonStyle = isFilterActive
-      ? { color: activeGreen, borderColor: activeGreen, opacity: 0.75 }
-      : {};
-    const filterIconStyle = isFilterActive ? { color: activeGreen } : {};
     const gatedEmptyHasDetails = lockedGateDetails.length > 0;
     const gatedEmptyPanel = hiddenMaskedQuestionIds.length > 0
       ? (
@@ -2962,278 +2953,55 @@ export class PileViewMode extends SurveyQuestions {
         </>
       );
 
-    // JSX segments
-
-    const navControls = (
-      <div className={styles.pileNav}>
-        <button
-          onClick={this.handlePrev}
-          disabled={pileQuestions.length === 0 || activePileIndex === 0}
-          className={styles.pileNavArrow}
-          aria-label="Previous Question"
-        >
-          <FontAwesomeIcon icon={faChevronLeft} />
-        </button>
-        <span
-          className={styles.pileNavCounterText}
-          style={{
-            opacity: navCounterVisible ? 0.8 : 0, // Slight visibility tweak for neumorphism
-            transition: 'opacity 0.5s ease-in-out',
-          }}
-        >
-          {pileQuestions.length === 0 ? 0 : activePileIndex + 1} / {pileQuestions.length}
-        </span>
-        <button
-          onClick={this.handleNext}
-          disabled={
-            pileQuestions.length === 0 ||
-            activePileIndex === pileQuestions.length - 1
-          }
-          className={styles.pileNavArrow}
-          aria-label="Next Question"
-        >
-          <FontAwesomeIcon icon={faChevronRight} />
-        </button>
-      </div>
-    );
-
-    const actionControls = (
-      <div className={styles.pileActions}>
-        {/* 1. Filter */}
-        <button
-          onClick={this.toggleFilterModal}
-          className={`${styles.actionButton} ${isFilterActive ? styles.actionButtonActive : ''}`.trim()}
-          style={filterButtonStyle}
-          title="Filter Questions"
-          data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
-        >
-          <FontAwesomeIcon icon={faFilter} style={filterIconStyle} />
-        </button>
-
-        {/* 2. Create/Add */}
-        <button
-          onClick={this.toggleCreate}
-          className={`${styles.actionButton}`}
-          title={showCreate ? "Close Create Interface" : "Create New Question"}
-          data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE}
-        >
-          <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
-        </button>
-
-        {/* 3. View All (Caret) - Moved to bottom (desktop) / right (mobile) */}
-        {this.props.onViewAllClick && (
-          <button
-            onClick={this.handleViewAllFromPile}
-            className={`${styles.actionButton}`}
-            title="View All Questions"
-            data-testid={E2E_TESTIDS.SURVEY_VIEW_ALL}
-          >
-            <FontAwesomeIcon icon={faCaretDown} />
-          </button>
-        )}
-      </div>
-    );
-
-    const footerControls = (
-      <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
-        {showSuccessBadgeLink ? (
-          <a
-            href={pileSubmitResponderHref}
-            className={styles.pileSubmitSuccessBadge}
-            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-            aria-label="View your submitted responses"
-            title="View your submitted responses"
-          >
-            <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-          </a>
-        ) : showSuccessBadgeStatus ? (
-          <div
-            className={styles.pileSubmitSuccessBadge}
-            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-            role="status"
-            aria-label="Submitted"
-            title="Submitted"
-          >
-            <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-          </div>
-        ) : showSubmitButton ? (
-          <Button
-            onClick={this.handlePileSubmitClick}
-            data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-            className={`${styles.pileSubmitButton}${hasPendingPileChanges ? ` ${styles.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styles.pileSubmitButtonInactive}` : ''}`}
-            disabled={this.state.isSubmitting || activePromptMasked}
-          >
-            {this.state.isSubmitting ? (
-              <FontAwesomeIcon icon={faSpinner} spin />
-            ) : (
-              <span className={styles.pileSubmitButtonContent}>
-                <span className={styles.pileSubmitButtonLabel}>{finalSubmitText}</span>
-                <span className={styles.pileSubmitButtonTrail} aria-hidden="true">
-                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
-                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
-                  <FontAwesomeIcon icon={faChevronRight} className={styles.pileSubmitButtonTrailIcon} />
-                </span>
-              </span>
-            )}
-          </Button>
-        ) : null}
-
-        {showClearPendingButton && (
-          <button
-            type="button"
-            className={styles.pileIconButton}
-            onClick={this.handleRevertPendingChanges}
-            title="Clear changes"
-            aria-label="Clear pending changes"
-          >
-            <FontAwesomeIcon icon={faTimes} />
-          </button>
-        )}
-      </div>
-    );
-
     return (
       <div className={styles.pileViewContainer}>
         <div className={styles.pileWrapper}>
-          <div className={styles.pileInteractionUnit}>
-            {SHOW_PILE_HOLOGRAM_TOGGLE && (
-              <button
-                type="button"
-                className={`${styles.pileHologramToggle}${showHologramAssistant ? ` ${styles.pileHologramToggleActive}` : ''}`}
-                onClick={this.toggleHologramAssistant}
-                aria-label={showHologramAssistant ? 'Hide holographic guide' : 'Show holographic guide'}
-                aria-pressed={showHologramAssistant}
-                title={showHologramAssistant ? 'Hide holographic guide' : 'Show holographic guide'}
-                data-testid={E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE}
-              >
-                <FontAwesomeIcon icon={faRobot} />
-              </button>
-            )}
-
-            {showMiniBackgroundSpinner && !showHologramAssistant && (
-              <div className={styles.miniSpinnerWrapper}>
-                <FontAwesomeIcon
-                  icon={faSpinner}
-                  spin
-                  className={styles.miniLoaderIcon}
-                  style={{ opacity: priorResponsesHydrating ? 0.5 : 1 }}
-                  title={
-                    priorResponsesHydrating
-                      ? 'Loading your previous responses...'
-                      : (showLongLoading ? 'Still scanning... checking network' : 'Background refresh active')
-                  }
-                />
-              </div>
-            )}
-
-            {/* Main Card Area */}
-            <div className={styles.pileCardContainer}>
-              {showHologramAssistant ? (
-                <PileHologramAssistant />
-              ) : pileQuestions.length === 0 ? (
-                // Empty / Loading State
-                <div className={styles.pileEmptyState}>
-                  {hasTerminalScanError ? (
-                    <>
-                      <div>{scanErrorMessage}</div>
-                    </>
-                  ) : hasError ? (
-                    <>
-                      <div>Cache initialization error (RPC or metadata fetch failed).</div>
-                      <div style={{ opacity: 0.8, marginTop: 8 }}>
-                        Try refreshing questions/responses or reloading the page.
-                      </div>
-                    </>
-                  ) : isStillLoading ? (
-                    <>
-                      <div style={{fontSize: '2.5rem', display: 'flex', alignItems: 'center', gap: '15px'}}>
-                        <FontAwesomeIcon icon={faSpinner} spin size="1x" />
-                      </div>
-                      <div className={styles.pileLoadingHeadline}>
-                        Loading... {Math.max(0, Number(this.state.loadingElapsedSec || 0))}s
-                      </div>
-                      <div className={styles.pileLoadingSubhead}>
-                        {isHydrating
-                          ? `Loading Metadata (${Math.min(hydrateDone, hydrateDiscovered)} / ${hydrateDiscovered})`
-                          : (showLongLoading ? '' : '')}
-
-                      </div>
-                      {(scanTotalBlocks > 0 || isHydrating) && (
-                        <div className={styles.pileLoadingProgressWrap}>
-                          <div className={styles.pileLoadingProgressMeta}>
-                            <span>
-                              {isHydrating
-                                ? `${Math.max(0, hydrateDiscovered - Math.min(hydrateDone, hydrateDiscovered))} items left`
-                                : pileScanDisplay.metaLeftText}
-                            </span>
-                            <span>
-                              {isHydrating
-                                ? `${Math.min(hydrateDone, hydrateDiscovered)} / ${hydrateDiscovered}`
-                                : pileScanDisplay.metaRightText}
-                            </span>
-                          </div>
-                          <div className={styles.pileLoadingProgressBar}>
-                            <div
-                              className={styles.pileLoadingProgressFill}
-                              style={{
-                                width: `${isHydrating
-                                  ? (hydrateDiscovered > 0 ? Math.round((Math.min(hydrateDone, hydrateDiscovered) / hydrateDiscovered) * 100) : 0)
-                                  : scanPercent}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : showFilteredEmptyState ? (
-                    'No questions match current filters.'
-                  ) : (
-                    showGatedEmptyState ? (
-                      gatedEmptyPanel
-                    ) : (
-                      'No questions available.'
-                    )
-                  )}
-                </div>
-              ) : (
-                // Card Rendering
-                (() => {
-                  const startIdx = Math.max(0, activePileIndex - 2);
-                  const endIdx = Math.min(pileQuestions.length, activePileIndex + 3);
-                  return pileQuestions.slice(startIdx, endIdx).map((q, sliceIdx) => {
-                    const idx = startIdx + sliceIdx;
-                    const offset = idx - activePileIndex;
-
-                    let status = '';
-                    if (offset === 0) status = styles.pileCardActive;
-                    else if (offset === 1) status = styles.pileCardNext;
-                    else if (offset === -1) status = styles.pileCardPrev;
-                    else if (offset > 1) status = styles.pileCardAfter;
-                    else status = styles.pileCardBefore;
-
-                    return (
-                      <div key={q.id} className={`${styles.pileCard} ${status}`}>
-                        {offset === 0 ? (
-                          this.renderActiveQuestion(q)
-                        ) : (
-                          <div className={styles.pileCardInner}></div>
-                        )}
-                      </div>
-                    );
-                  });
-                })()
-              )}
-            </div>
-
-            {!showHologramAssistant && (
-              <div className={styles.pileControls}>
-                {actionControls}
-                {footerControls}
-                {navControls}
-              </div>
-            )}
-
-          </div>
+          {renderPileInteractionSurface({
+            showHologramAssistant,
+            toggleHologramAssistant: this.toggleHologramAssistant,
+            showMiniBackgroundSpinner,
+            priorResponsesHydrating,
+            showLongLoading,
+            loadingElapsedSec: this.state.loadingElapsedSec,
+            pileQuestions,
+            activePileIndex,
+            renderActiveQuestion: this.renderActiveQuestion,
+            hasTerminalScanError,
+            scanErrorMessage,
+            hasError,
+            isStillLoading,
+            hydrateDone,
+            hydrateDiscovered,
+            isHydrating,
+            scanTotalBlocks,
+            pileScanDisplay,
+            scanPercent,
+            showFilteredEmptyState,
+            showGatedEmptyState,
+            gatedEmptyPanel,
+            isFilterActive,
+            toggleFilterModal: this.toggleFilterModal,
+            showCreate,
+            toggleCreate: this.toggleCreate,
+            onViewAllClick: this.props.onViewAllClick,
+            handleViewAllFromPile: this.handleViewAllFromPile,
+            pileTopRailVisible,
+            showSuccessBadgeLink,
+            pileSubmitResponderHref,
+            showSuccessBadgeStatus,
+            showSubmitButton,
+            handlePileSubmitClick: this.handlePileSubmitClick,
+            hasPendingPileChanges,
+            shouldHidePileSubmitButton,
+            isSubmitting: this.state.isSubmitting,
+            activePromptMasked,
+            finalSubmitText,
+            showClearPendingButton,
+            handleRevertPendingChanges: this.handleRevertPendingChanges,
+            navCounterVisible,
+            handlePrev: this.handlePrev,
+            handleNext: this.handleNext,
+          })}
         </div>
 
         {!showHologramAssistant && showCreate && (
