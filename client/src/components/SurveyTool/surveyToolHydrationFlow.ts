@@ -3,20 +3,13 @@ import {
   normalizeQuestionIdKey,
 } from './surveyToolSignatures.js';
 import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
-
-type UnknownRecord = Record<string, unknown>;
-
-type ResponseSlice = {
-  answers?: Record<string, unknown> | null;
-  importance?: Record<string, unknown> | null;
-  conviction?: Record<string, unknown> | null;
-  additionalComments?: Record<string, unknown> | null;
-} & UnknownRecord;
-
-type DraftPayload = {
-  answers?: Record<string, unknown> | null;
-  baseline?: Record<string, unknown> | null;
-} & UnknownRecord;
+import {
+  buildEmptyResponseSlice,
+  isSurveyToolRecord as isRecord,
+  type DraftPayload,
+  type ResponseSlice,
+  type UnknownRecord,
+} from './surveyToolTypes.js';
 
 type DraftHydrationApplyArgs = {
   targetSlice?: ResponseSlice | null;
@@ -617,17 +610,6 @@ type BuildLocalCacheRehydrationStateArgs = {
   applyLocalCacheHydrationEntryToSlice?: ((args: LocalCacheHydrationApplyArgs) => boolean) | null;
   debugLabel?: string;
 };
-
-const buildEmptyResponseSlice = (): ResponseSlice => ({
-  answers: {},
-  importance: {},
-  conviction: {},
-  additionalComments: {},
-});
-
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
 
 export const loadDraftAnswersByQuestionIdSafely = ({
   loadDraft = null,
