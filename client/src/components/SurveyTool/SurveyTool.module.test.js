@@ -14958,6 +14958,56 @@ describe('SurveyTool module', () => {
     expect(subject.loadAndSortQuestions).not.toHaveBeenCalled();
   });
 
+  it('syncs pile baseline once cache catches up with the optimistic response', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      editBaseline: {
+        answers: { q1: { value: 'cached-answer', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+      },
+    };
+    syncClassSetState(subject);
+    subject.loadAndSortQuestions = jest.fn();
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return {};
+      return {
+        '84532': {
+          questionResponses: {
+            q1: {
+              '0xabc': JSON.stringify({
+                answer: { value: 'cached-answer' },
+                additional: { value: '' },
+              }),
+            },
+          },
+        },
+      };
+    });
+
+    subject.checkCacheAgainstBaseline();
+
+    expect(subject.state.submissionComplete).toBe(false);
+    expect(subject.loadAndSortQuestions).toHaveBeenCalledTimes(1);
+  });
+
   it('does not prefill pile answers from a borrowed general response cache when the slug is unresolved', () => {
     const generalCfg = {
       slug: '',
