@@ -394,6 +394,7 @@ import {
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
   buildAutoDecryptDisabledState,
+  buildCanDecryptOtherResponsesState,
   buildClearedSurveyQuestionPoolState,
   buildInitialSurveyQuestionsState,
   buildSurveyQuestionPoolLoadState,
@@ -1279,7 +1280,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         this._canDecryptOtherResponsesKey = '';
         this._canDecryptOtherResponsesInFlight = null;
         if (this.state.canDecryptOtherResponses || this.state.canDecryptOtherResponsesStatus !== 'needs-wallet') {
-          this.setState({ canDecryptOtherResponses: false, canDecryptOtherResponsesStatus: 'needs-wallet' });
+          this.setState(buildCanDecryptOtherResponsesState({ status: 'needs-wallet' }));
         }
         return false;
       }
@@ -1291,7 +1292,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         this._canDecryptOtherResponsesKey = '';
         this._canDecryptOtherResponsesInFlight = null;
         if (this.state.canDecryptOtherResponses || this.state.canDecryptOtherResponsesStatus !== 'no-gate') {
-          this.setState({ canDecryptOtherResponses: false, canDecryptOtherResponsesStatus: 'no-gate' });
+          this.setState(buildCanDecryptOtherResponsesState({ status: 'no-gate' }));
         }
         return false;
       }
@@ -1309,7 +1310,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           this._canDecryptOtherResponsesKey === snapshot.key
         ) {
           // Clear any previously granted permission while we verify against the current gate/session/wallet.
-          this.setState({ canDecryptOtherResponses: false, canDecryptOtherResponsesStatus: 'checking' });
+          this.setState(buildCanDecryptOtherResponsesState({ status: 'checking' }));
         }
         const verdicts = [];
         for (const rk of snapshot.resourceKeysToCheck) {
@@ -1322,10 +1323,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         }
         const { canDecrypt, status } = resolveCanDecryptOtherResponsesVerdict(verdicts);
         if (this._canDecryptOtherResponsesRunId === runId && this._canDecryptOtherResponsesKey === snapshot.key) {
-          this.setState({
-            canDecryptOtherResponses: canDecrypt,
-            canDecryptOtherResponsesStatus: status,
-          });
+          this.setState(buildCanDecryptOtherResponsesState({ canDecrypt, status }));
         }
         return canDecrypt;
       })();
@@ -1334,7 +1332,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       tracked = run
         .catch(() => {
           if (this._canDecryptOtherResponsesRunId === runId && this._canDecryptOtherResponsesKey === snapshot.key) {
-            this.setState({ canDecryptOtherResponses: false, canDecryptOtherResponsesStatus: 'unknown' });
+            this.setState(buildCanDecryptOtherResponsesState({ status: 'unknown' }));
           }
           return false;
         })
@@ -1349,7 +1347,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       return await this._canDecryptOtherResponsesInFlight;
     } catch (_) {
       try {
-        this.setState({ canDecryptOtherResponses: false, canDecryptOtherResponsesStatus: 'unknown' });
+        this.setState(buildCanDecryptOtherResponsesState({ status: 'unknown' }));
       } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       return false;
     }

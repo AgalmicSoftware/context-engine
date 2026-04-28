@@ -1766,6 +1766,42 @@ describe('SurveyTool module', () => {
     expect(subject.state.canDecryptOtherResponsesStatus).toBe('unknown');
   });
 
+  it('marks response decrypt access as needs-wallet when auth is missing', async () => {
+    const gateSpy = jest.spyOn(sponsoredAccess, 'checkSponsoredAccess');
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '',
+      loginComplete: false,
+      network: { id: 84532 },
+      sbtCacheRevision: 0,
+    });
+    syncClassSetState(subject);
+    subject.state = {
+      ...subject.state,
+      canDecryptOtherResponses: true,
+      canDecryptOtherResponsesStatus: 'granted',
+    };
+    subject.getResponseGatePolicy = jest.fn(() => ({
+      primaryResource: 'surveyResponses',
+      recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'baseSepolia' }],
+    }));
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({}));
+    subject._canDecryptOtherResponsesKey = 'stale-key';
+    subject._canDecryptOtherResponsesInFlight = Promise.resolve(true);
+
+    const canDecrypt = await subject.refreshCanDecryptOtherResponses();
+
+    expect(canDecrypt).toBe(false);
+    expect(gateSpy).not.toHaveBeenCalled();
+    expect(subject.state.canDecryptOtherResponses).toBe(false);
+    expect(subject.state.canDecryptOtherResponsesStatus).toBe('needs-wallet');
+    expect(subject._canDecryptOtherResponsesKey).toBe('');
+    expect(subject._canDecryptOtherResponsesInFlight).toBeNull();
+  });
+
   it('keeps lock audience SBT detail links on terminology-aware routes instead of nested /u/ links', () => {
     const address = '0x1111111111111111111111111111111111111111';
     const subject = new SurveyQuestions({

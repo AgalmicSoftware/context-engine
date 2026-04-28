@@ -26,6 +26,11 @@ export type SurveyAutoDecryptDisabledStatePatch = {
   decryptingByKey: Record<string, unknown>;
 };
 
+export type SurveyCanDecryptOtherResponsesStatePatch = {
+  canDecryptOtherResponses: boolean;
+  canDecryptOtherResponsesStatus: string;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -131,6 +136,17 @@ export const buildAutoDecryptDisabledState = (): SurveyAutoDecryptDisabledStateP
   decryptingByKey: {},
 });
 
+export const buildCanDecryptOtherResponsesState = ({
+  canDecrypt = false,
+  status = 'unknown',
+}: {
+  canDecrypt?: boolean;
+  status?: string;
+} = {}): SurveyCanDecryptOtherResponsesStatePatch => ({
+  canDecryptOtherResponses: !!canDecrypt,
+  canDecryptOtherResponsesStatus: String(status || 'unknown'),
+});
+
 export const buildInitialSurveyQuestionsState = (
   props: SurveyQuestionsProps = {}
 ): SurveyQuestionsState => ({
@@ -187,6 +203,5 @@ export const buildInitialSurveyQuestionsState = (
   lockedGateDetailsExpanded: false,
   gateSbtNameRevision: 0,
   hasher: null,
-  canDecryptOtherResponses: false,
-  canDecryptOtherResponsesStatus: 'unknown',
+  ...buildCanDecryptOtherResponsesState(),
 });
