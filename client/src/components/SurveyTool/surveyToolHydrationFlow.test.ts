@@ -8,6 +8,7 @@ import {
   buildInitializedSurveyResponseState,
   loadLocalCacheHydrationSlice,
   buildLocalCacheRehydrationUpdatePlan,
+  prepareLocalCacheRehydrateRun,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
   buildStartFreshSurveyState,
@@ -864,6 +865,70 @@ describe('surveyToolHydrationFlow', () => {
     });
 
     expect(cloneValue).toHaveBeenCalledTimes(1);
+  });
+
+  it('prepares local-cache rehydrate runs with skip and base-slice decisions', () => {
+    expect(prepareLocalCacheRehydrateRun({
+      state: {
+        suppressPrefill: true,
+        submissionError: '',
+        submissionComplete: false,
+      },
+      surveyIndex: 0,
+      renderedIds: ['q1'],
+      lastHydrationSig: '',
+      buildHydrationSignature: jest.fn(),
+    })).toEqual({
+      shouldSkip: true,
+      shouldBumpNoop: false,
+      hydrationSig: '',
+      baseSlice: null,
+    });
+
+    expect(prepareLocalCacheRehydrateRun({
+      state: {
+        suppressPrefill: false,
+        submissionError: '',
+        submissionComplete: false,
+        surveysResponseState: [
+          { answers: { q1: { value: 'keep' } }, importance: {}, conviction: {}, additionalComments: {} },
+        ],
+      },
+      surveyIndex: 0,
+      renderedIds: ['q1'],
+      lastHydrationSig: 'same|sig',
+      buildHydrationSignature: () => 'same|sig',
+    })).toEqual({
+      shouldSkip: true,
+      shouldBumpNoop: true,
+      hydrationSig: 'same|sig',
+      baseSlice: null,
+    });
+
+    expect(prepareLocalCacheRehydrateRun({
+      state: {
+        suppressPrefill: false,
+        submissionError: '',
+        submissionComplete: false,
+        surveysResponseState: [
+          { answers: { q1: { value: 'keep' } }, importance: {}, conviction: {}, additionalComments: {} },
+        ],
+      },
+      surveyIndex: 0,
+      renderedIds: ['q1'],
+      lastHydrationSig: '',
+      buildHydrationSignature: () => 'next|sig',
+    })).toEqual({
+      shouldSkip: false,
+      shouldBumpNoop: false,
+      hydrationSig: 'next|sig',
+      baseSlice: {
+        answers: { q1: { value: 'keep' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+    });
   });
 
   it('resolves revert-pending baseline slices from edit, saved, or cached sources', () => {
