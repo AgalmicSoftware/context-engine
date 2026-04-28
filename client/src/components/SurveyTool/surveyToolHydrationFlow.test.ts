@@ -19,7 +19,9 @@ import {
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
   buildGroupedRenderedResponseScopePlan,
+  buildLocalCacheHydrationSignature,
   buildMissingResponseIdsForRenderedQuestions,
+  buildNormalizedRenderedQuestionIds,
   buildPriorResponseFetchPlan,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
@@ -1424,6 +1426,27 @@ describe('surveyToolHydrationFlow', () => {
       },
       responderLower: '0xabc',
     })).toEqual(['q2', 'q3']);
+  });
+
+  it('normalizes rendered question ids for hydration', () => {
+    expect(buildNormalizedRenderedQuestionIds({
+      renderedIds: ['Q1', 'q1', null, 'q2', '', undefined, 'Q2'],
+    })).toEqual(['q1', 'q2']);
+  });
+
+  it('builds local-cache hydration signatures from normalized state inputs', () => {
+    expect(buildLocalCacheHydrationSignature({
+      surveyIndex: 2,
+      scopeSlugs: ['edge', 'alpha'],
+      networkIdStr: '84532',
+      account: '0xAbC',
+      renderedIds: ['q2', 'q1'],
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      suppressPrefill: true,
+      submissionError: 'boom',
+      submissionComplete: false,
+    })).toBe('2|edge,alpha|84532|0xabc|q2|q1|4|7|1|1|0');
   });
 
   it('builds reverted response slices from baseline state plus rendered empty shells', () => {
