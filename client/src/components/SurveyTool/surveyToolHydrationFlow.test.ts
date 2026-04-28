@@ -15,6 +15,7 @@ import {
   buildLocalCacheRehydrationUpdatePlan,
   prepareLocalCacheRehydrateRun,
   prepareLocalCacheSliceBuild,
+  resolveLocalCacheSliceLookup,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
   buildStartFreshSurveyState,
@@ -2381,6 +2382,40 @@ describe('surveyToolHydrationFlow', () => {
       memoKey: 'edge,alpha|84532|0xabc|q2|q1|4|7',
       shouldUseMemo: true,
       memoizedValue: { cached: true },
+    });
+  });
+
+  it('resolves local-cache slice lookup context before memo preparation', () => {
+    const resolveResponseHydrationContext = jest.fn((rawSlug) => ({
+      sessionSlug: rawSlug,
+      networkIdStr: '84532',
+    }));
+    const normalizeSessionSlugValue = jest.fn((value) => String(value || '').trim().toLowerCase());
+    const getExtraScopeSlugs = jest.fn(() => ['alpha']);
+
+    expect(resolveLocalCacheSliceLookup({
+      rawSlug: 'EDGE',
+      account: '0xAbC',
+      renderedIds: ['q2', 'q1'],
+      minifiedMode: 'pile',
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      existingMemo: {
+        key: '84532|mismatch',
+        value: { stale: true },
+        hasValue: true,
+      },
+      resolveResponseHydrationContext,
+      normalizeSessionSlugValue,
+      getExtraScopeSlugs,
+    })).toEqual({
+      scopeSlugs: ['edge', 'alpha'],
+      networkIdStr: '84532',
+      renderedIds: ['q2', 'q1'],
+      normalizedAccount: '0xabc',
+      memoKey: 'edge,alpha|84532|0xabc|q2|q1|4|7',
+      shouldUseMemo: false,
+      memoizedValue: null,
     });
   });
 
