@@ -369,6 +369,14 @@ type ApplyLocalCacheRehydrateAppliedEffectsArgs = ApplyPrefillStateEffectsArgs &
   callback?: (() => void) | null;
 };
 
+type ApplyLocalCacheRehydrateUpdatePlanArgs =
+  ApplyLocalCacheRehydrateSuccessEffectsArgs &
+  ApplyLocalCacheRehydrateAppliedEffectsArgs & {
+    changed?: boolean;
+    baselineChanged?: boolean;
+    onNoChange?: (() => void) | null;
+  };
+
 type LoadDraftAnswersByQuestionIdSafelyArgs = {
   loadDraft?: (() => unknown) | null;
   buildDraftAnswersByQuestionId?: ((draft: unknown) => unknown) | null;
@@ -1864,6 +1872,40 @@ export const applyPrefillUpdatePlan = ({
     recalculateEditStats,
   }),
 });
+
+export const applyLocalCacheRehydrateUpdatePlan = ({
+  changed = false,
+  baselineChanged = false,
+  updates = null,
+  applyStateUpdates = null,
+  updateJsonPreview = null,
+  recalculateEditStats = null,
+  ensurePriorResponses = null,
+  callback = null,
+  onNoChange = null,
+}: ApplyLocalCacheRehydrateUpdatePlanArgs = {}) => {
+  if (!changed && !baselineChanged) {
+    if (typeof onNoChange === 'function') {
+      onNoChange();
+    }
+    applyLocalCacheRehydrateNoChangeEffects({
+      ensurePriorResponses,
+      callback,
+    });
+    return true;
+  }
+
+  return applyLocalCacheRehydrateSuccessEffects({
+    updates,
+    applyStateUpdates,
+    afterStateApplied: () => applyLocalCacheRehydrateAppliedEffects({
+      updateJsonPreview,
+      recalculateEditStats,
+      ensurePriorResponses,
+      callback,
+    }),
+  });
+};
 
 export const applyLocalCacheRehydrateAppliedEffects = ({
   updateJsonPreview = null,
