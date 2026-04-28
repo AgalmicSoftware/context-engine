@@ -354,6 +354,29 @@ describe('SurveyTool module', () => {
     expect(subject._emptySubmitTimer).toBeNull();
   });
 
+  it('routes pile submit clicks through shared submit flow before no-pending feedback when logged out', async () => {
+    const subject = new PileViewMode({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '',
+      loginComplete: false,
+      network: { id: 1 },
+      computeSubmitLabel: jest.fn(() => 'Submit'),
+    });
+
+    syncClassSetState(subject);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.getSubmitCount = jest.fn(() => 0);
+    subject.encryptAndUpload = jest.fn().mockResolvedValue(undefined);
+    subject.showNoPendingPileSubmitFeedback = jest.fn();
+
+    await subject.handlePileSubmitClick();
+
+    expect(subject.encryptAndUpload).toHaveBeenCalledTimes(1);
+    expect(subject.showNoPendingPileSubmitFeedback).not.toHaveBeenCalled();
+  });
+
   it('hides the pile submit rail when no rail is visible', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',

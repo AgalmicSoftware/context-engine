@@ -2121,6 +2121,35 @@ export class PileViewMode extends SurveyQuestions {
     }, normalizeTransientSubmitFeedbackDurationMs(durationMs));
   };
 
+  handlePileSubmitClick = async () => {
+    const pendingStats = this.getPendingStatsSnapshot();
+    const pileSubmitLabel = (this.props.computeSubmitLabel || computeSubmitLabel)(this, {
+      pendingStats,
+    });
+    const { pileSubmittedStateActive } = buildPileSubmitViewState({
+      pendingStats,
+      isSubmitting: this.state.isSubmitting,
+      submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+      submissionComplete: this.state.submissionComplete,
+      pileSubmitTempText: this.state.pileSubmitTempText,
+      pileSubmitLabel,
+      account: this.props.account,
+      isAddress: utils.isAddress,
+    });
+
+    if (!this.props.loginComplete) {
+      await this.encryptAndUpload();
+      return;
+    }
+    if (pileSubmittedStateActive) return;
+    const currentPending = this.getSubmitCount();
+    if (currentPending === 0) {
+      this.showNoPendingPileSubmitFeedback(pileSubmitLabel);
+      return;
+    }
+    await this.encryptAndUpload();
+  };
+
   getPileFilterQuestionResponses = () => {
     const slug = resolveEffectiveSlug(this.props);
     const pileFilterContext = resolvePileFilterContext(this.props, slug);
@@ -2896,20 +2925,6 @@ export class PileViewMode extends SurveyQuestions {
       isAddress: utils.isAddress,
     });
 
-    const handleSubmitClick = async () => {
-      if (!this.props.loginComplete) {
-        await this.encryptAndUpload();
-        return;
-      }
-      if (pileSubmittedStateActive) return;
-      const currentPending = this.getSubmitCount();
-      if (currentPending === 0) {
-        this.showNoPendingPileSubmitFeedback(pileSubmitLabel);
-        return;
-      }
-      await this.encryptAndUpload();
-    };
-
     const pileTopRailVisible = this.state.isSubmitting || _pileStats.total > 0 || pileSubmittedStateActive;
 
     const activeGreen = '#4cd964';
@@ -3041,7 +3056,7 @@ export class PileViewMode extends SurveyQuestions {
           )
         ) : (
           <Button
-            onClick={handleSubmitClick}
+            onClick={this.handlePileSubmitClick}
             data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
             className={`${styles.pileSubmitButton}${hasPendingPileChanges ? ` ${styles.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styles.pileSubmitButtonInactive}` : ''}`}
             disabled={this.state.isSubmitting || activePromptMasked}
