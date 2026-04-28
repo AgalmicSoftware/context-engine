@@ -15070,6 +15070,58 @@ describe('SurveyTool module', () => {
     expect(subject.state.editBaseline?.answers?.q1?.value).toBe('');
   });
 
+  it('seeds an empty pile baseline from cache prefill when no edit baseline exists yet', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      isDirty: false,
+      modifiedCount: 0,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: null,
+      baselineResponses: null,
+    };
+    subject.updateJsonPreview = jest.fn();
+    syncClassSetState(subject);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return {};
+      return {
+        '84532': {
+          questionResponses: {
+            q1: {
+              '0xabc': {
+                answer: { value: 'cached-answer', encrypted: false },
+                additional: { value: '', encrypted: false },
+              },
+            },
+          },
+        },
+      };
+    });
+
+    subject.prefillUserAnswersFromCache();
+
+    expect(subject.state.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
+    expect(subject.state.editBaseline?.answers?.q1?.value).toBe('cached-answer');
+    expect(subject.state.baselineResponses?.answers?.q1?.value).toBe('cached-answer');
+    expect(subject.state.modifiedCount).toBe(0);
+    expect(subject.state.isDirty).toBe(false);
+  });
+
   it('hydrates off-screen pile draft answers so submit count stays aligned with full mode', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
