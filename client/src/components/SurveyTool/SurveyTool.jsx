@@ -251,6 +251,7 @@ import {
   loadMissingRenderedResponseInfo,
   resolveMissingRenderedResponseLookup,
   buildNormalizedRenderedQuestionIds,
+  resolveQuestionSlugMapLookup,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
   shouldBackfillPriorResponses,
@@ -5086,51 +5087,18 @@ export class SurveyQuestions extends Component {
   };
 
   resolveQuestionSlugMapForIds = (questionIds = [], opts = {}) => {
-    const poolCombined = []
-      .concat(Array.isArray(this.state.questionPool) ? this.state.questionPool : [])
-      .concat(Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : []);
-
-    const fallbackSurveyId = Object.prototype.hasOwnProperty.call(opts || {}, 'surveyId')
-      ? opts.surveyId
-      : (
-        this.props.singleQuestionMode
-          ? null
-          : (this.props.surveyId || null)
-      );
-
-    return buildQuestionSlugMapForIds({
+    return resolveQuestionSlugMapLookup({
       questionIds,
-      poolQuestions: poolCombined,
+      questionPool: this.state?.questionPool,
+      pileQuestions: this.state?.pileQuestions,
+      surveyId: Object.prototype.hasOwnProperty.call(opts || {}, 'surveyId') ? opts.surveyId : undefined,
+      singleQuestionMode: this.props.singleQuestionMode,
+      propsSurveyId: this.props.surveyId,
+      props: this.props,
+      network: this.props.network,
       normalizeSlug: normalizeSessionSlugValue,
-      resolveQuestionSlug: ({ questionId, question }) => {
-        let resolvedSlug = '';
-        let hasExplicitQuestionSlug = false;
-
-        if (question && Object.prototype.hasOwnProperty.call(question, 'sessionSlug')) {
-          resolvedSlug = question.sessionSlug;
-          hasExplicitQuestionSlug = question.sessionSlug !== null && question.sessionSlug !== undefined;
-        }
-
-        if (!hasExplicitQuestionSlug && typeof question?.sessionName === 'string') {
-          const mapped = getSessionSlugByName(question.sessionName);
-          if (mapped !== null && mapped !== undefined) {
-            resolvedSlug = mapped;
-            hasExplicitQuestionSlug = true;
-          }
-        }
-
-        if (!hasExplicitQuestionSlug) {
-          resolvedSlug = resolveSlugForIds({
-            sessionName: null,
-            questionId,
-            surveyId: fallbackSurveyId,
-            props: this.props,
-            network: this.props.network,
-          });
-        }
-
-        return resolvedSlug;
-      },
+      getSessionSlugByName,
+      resolveSlugForIds,
     });
   };
 
