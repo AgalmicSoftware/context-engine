@@ -377,6 +377,62 @@ describe('SurveyTool module', () => {
     expect(subject.showNoPendingPileSubmitFeedback).not.toHaveBeenCalled();
   });
 
+  it('renders the pile clear-pending button only while pending changes are actionable', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+    const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+
+    syncClassSetState(subject);
+    subject.isMaskedPromptText = jest.fn(() => false);
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 2, encrypted: 0 }));
+    subject.handleRevertPendingChanges = jest.fn();
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: visibleList,
+      allQuestionsForFilter: visibleList,
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      showCreate: false,
+      filterModalOpen: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      isSubmitting: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      isHydratingPriorResponses: false,
+    };
+
+    const tree = subject.render();
+    const clearButton = findElement(
+      tree,
+      (node) => node?.props?.title === 'Clear changes'
+    );
+
+    expect(clearButton).not.toBeNull();
+    clearButton.props.onClick();
+    expect(subject.handleRevertPendingChanges).toHaveBeenCalledTimes(1);
+
+    subject.state = {
+      ...subject.state,
+      isSubmitting: true,
+    };
+
+    const submittingTree = subject.render();
+    expect(findElement(submittingTree, (node) => node?.props?.title === 'Clear changes')).toBeNull();
+  });
+
   it('hides the pile submit rail when no rail is visible', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',

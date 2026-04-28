@@ -51,6 +51,7 @@ import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import {
   buildNoPendingPileSubmitFeedbackPlan,
+  buildPileSubmitRailViewState,
   buildPileSubmitViewState,
 } from './surveyPileViewState.js';
 import {
@@ -2914,7 +2915,12 @@ export class PileViewMode extends SurveyQuestions {
       shouldHidePileSubmitButton,
       finalSubmitText,
       pileSubmitResponderHref,
-    } = buildPileSubmitViewState({
+      pileTopRailVisible,
+      showSubmitButton,
+      showSuccessBadgeLink,
+      showSuccessBadgeStatus,
+      showClearPendingButton,
+    } = buildPileSubmitRailViewState({
       pendingStats: _pileStats,
       isSubmitting: this.state.isSubmitting,
       submittedSinceLastEdit: this.state.submittedSinceLastEdit,
@@ -2924,8 +2930,6 @@ export class PileViewMode extends SurveyQuestions {
       account: this.props.account,
       isAddress: utils.isAddress,
     });
-
-    const pileTopRailVisible = this.state.isSubmitting || _pileStats.total > 0 || pileSubmittedStateActive;
 
     const activeGreen = '#4cd964';
     const filterButtonStyle = isFilterActive
@@ -3032,29 +3036,27 @@ export class PileViewMode extends SurveyQuestions {
 
     const footerControls = (
       <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
-        {showPileSubmitSuccessBadge ? (
-          pileSubmitResponderHref ? (
-            <a
-              href={pileSubmitResponderHref}
-              className={styles.pileSubmitSuccessBadge}
-              data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-              aria-label="View your submitted responses"
-              title="View your submitted responses"
-            >
-              <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-            </a>
-          ) : (
-            <div
-              className={styles.pileSubmitSuccessBadge}
-              data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-              role="status"
-              aria-label="Submitted"
-              title="Submitted"
-            >
-              <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-            </div>
-          )
-        ) : (
+        {showSuccessBadgeLink ? (
+          <a
+            href={pileSubmitResponderHref}
+            className={styles.pileSubmitSuccessBadge}
+            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+            aria-label="View your submitted responses"
+            title="View your submitted responses"
+          >
+            <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
+          </a>
+        ) : showSuccessBadgeStatus ? (
+          <div
+            className={styles.pileSubmitSuccessBadge}
+            data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+            role="status"
+            aria-label="Submitted"
+            title="Submitted"
+          >
+            <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
+          </div>
+        ) : showSubmitButton ? (
           <Button
             onClick={this.handlePileSubmitClick}
             data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
@@ -3074,9 +3076,9 @@ export class PileViewMode extends SurveyQuestions {
               </span>
             )}
           </Button>
-        )}
+        ) : null}
 
-        {hasPendingPileChanges && !this.state.isSubmitting && !pileSubmittedStateActive && (
+        {showClearPendingButton && (
           <button
             type="button"
             className={styles.pileIconButton}
