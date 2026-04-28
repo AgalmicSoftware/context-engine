@@ -1265,6 +1265,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this._canDecryptOtherResponsesInFlight = null;
   };
 
+  resetBlockedAutoDecryptSweepInternals = () => {
+    this._autoDecQueue = [];
+    this._autoDecProcessing = false;
+    this._autoDecryptMaskedAttemptSignature = {};
+    this.clearAutoDecryptSweepScheduling();
+  };
+
   startCanDecryptOtherResponsesRun = (snapshotKey = '') => {
     this._canDecryptOtherResponsesKey = String(snapshotKey || '');
     const runId = (Number(this._canDecryptOtherResponsesRunId) || 0) + 1;
@@ -1466,10 +1473,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   componentDidMount() {
     // Force-disable auto-decrypt on wagmi/porto at mount; also clear any in-flight state
     if (this.isAutoDecryptBlocked()) {
-      this._autoDecQueue = [];
-      this._autoDecProcessing = false;
-      this._autoDecryptMaskedAttemptSignature = {};
-      this.clearAutoDecryptSweepScheduling();
+      this.resetBlockedAutoDecryptSweepInternals();
       this.setState(buildAutoDecryptDisabledState());
     }
 
@@ -1614,10 +1618,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       (prevProps.provider !== this.props.provider || prevProps.account !== this.props.account) &&
       this.isAutoDecryptBlocked()
     ) {
-      this._autoDecQueue = [];
-      this._autoDecProcessing = false;
-      this._autoDecryptMaskedAttemptSignature = {};
-      this.clearAutoDecryptSweepScheduling();
+      this.resetBlockedAutoDecryptSweepInternals();
       if (this.state.autoDecryptEnabled || (this.state.decryptingByKey && Object.keys(this.state.decryptingByKey).length > 0)) {
         this.setState(buildAutoDecryptDisabledState());
       }
@@ -4882,10 +4883,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   toggleAutoDecrypt = () => {
     // Guard: auto-decrypt is disabled for wagmi/porto providers
     if (this.isAutoDecryptBlocked()) {
-      this._autoDecQueue = [];
-      this._autoDecProcessing = false;
-      this._autoDecryptMaskedAttemptSignature = {};
-      this.clearAutoDecryptSweepScheduling();
+      this.resetBlockedAutoDecryptSweepInternals();
       this.setState(buildAutoDecryptDisabledState());
       return;
     }
@@ -11964,10 +11962,7 @@ export class PileViewMode extends SurveyQuestions {
       (prevProps.provider !== this.props.provider || prevProps.account !== this.props.account) &&
       this.isAutoDecryptBlocked()
     ) {
-      this._autoDecQueue = [];
-      this._autoDecProcessing = false;
-      this._autoDecryptMaskedAttemptSignature = {};
-      this.clearAutoDecryptSweepScheduling();
+      this.resetBlockedAutoDecryptSweepInternals();
       if (this.state.autoDecryptEnabled || (this.state.decryptingByKey && Object.keys(this.state.decryptingByKey).length > 0)) {
         this.setState(buildAutoDecryptDisabledState());
       }
