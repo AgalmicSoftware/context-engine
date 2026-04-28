@@ -1,4 +1,5 @@
 import {
+  buildAutoDecryptDisabledState,
   buildClearedSurveyQuestionPoolState,
   buildInitialSurveyQuestionsState,
   buildSurveyQuestionPoolLoadState,
@@ -90,6 +91,13 @@ describe('surveyQuestionsTypes', () => {
       pendingIds: [],
       pendingCount: 0,
       isIncomplete: false,
+    });
+  });
+
+  it('builds the auto-decrypt disabled state patch', () => {
+    expect(buildAutoDecryptDisabledState()).toEqual({
+      autoDecryptEnabled: false,
+      decryptingByKey: {},
     });
   });
 });

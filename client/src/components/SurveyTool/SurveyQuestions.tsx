@@ -393,6 +393,7 @@ import {
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
+  buildAutoDecryptDisabledState,
   buildClearedSurveyQuestionPoolState,
   buildInitialSurveyQuestionsState,
   buildSurveyQuestionPoolLoadState,
@@ -1454,7 +1455,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this._autoDecProcessing = false;
       this._autoDecryptMaskedAttemptSignature = {};
       this.clearAutoDecryptSweepScheduling();
-      this.setState({ autoDecryptEnabled: false, decryptingByKey: {} });
+      this.setState(buildAutoDecryptDisabledState());
     }
 
     // Lazy load ZK-compatible Poseidon hasher (poseidon-lite)
@@ -1603,7 +1604,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this._autoDecryptMaskedAttemptSignature = {};
       this.clearAutoDecryptSweepScheduling();
       if (this.state.autoDecryptEnabled || (this.state.decryptingByKey && Object.keys(this.state.decryptingByKey).length > 0)) {
-        this.setState({ autoDecryptEnabled: false, decryptingByKey: {} });
+        this.setState(buildAutoDecryptDisabledState());
       }
     }
 
@@ -4870,7 +4871,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this._autoDecProcessing = false;
       this._autoDecryptMaskedAttemptSignature = {};
       this.clearAutoDecryptSweepScheduling();
-      this.setState({ autoDecryptEnabled: false, decryptingByKey: {} });
+      this.setState(buildAutoDecryptDisabledState());
       return;
     }
     this.setState(
@@ -11953,7 +11954,7 @@ export class PileViewMode extends SurveyQuestions {
       this._autoDecryptMaskedAttemptSignature = {};
       this.clearAutoDecryptSweepScheduling();
       if (this.state.autoDecryptEnabled || (this.state.decryptingByKey && Object.keys(this.state.decryptingByKey).length > 0)) {
-        this.setState({ autoDecryptEnabled: false, decryptingByKey: {} });
+        this.setState(buildAutoDecryptDisabledState());
       }
     }
 
