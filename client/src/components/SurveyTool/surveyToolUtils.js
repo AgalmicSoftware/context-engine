@@ -119,10 +119,12 @@ export {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
+  buildPriorResponseFetchPlan,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
+  shouldBackfillPriorResponses,
   shouldHandleStartFresh,
 } from './surveyToolHydrationFlow.js';
 export {
