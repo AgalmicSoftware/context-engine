@@ -59,6 +59,13 @@ import {
 } from './surveyPileActiveQuestionCard';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
+  buildPileQuestionLoadState,
+  buildPileVisibleTransitionPlan,
+  shouldSkipPileFilterStateUpdate,
+  sortPileQuestionsByPriority,
+  splitPileMaskedQuestions,
+} from './surveyPileQuestionFlow';
+import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
   normalizeTransientSubmitFeedbackDurationMs,
@@ -1750,63 +1757,32 @@ export class PileViewMode extends SurveyQuestions {
         this._emptyReadyProbeStartedAtMs = 0;
       }
 
-      const byCountDesc = (a, b) => {
-        const aCount = responseCounts[a.id?.toLowerCase?.()] || 0;
-        const bCount = responseCounts[b.id?.toLowerCase?.()] || 0;
-        return bCount - aCount;
-      };
-
       const acctLower = (this.props.account || '').toLowerCase();
-      const isLoggedIn = !!acctLower;
-
-      const highlighted = [];
-      const unanswered = [];
-      const answered = [];
-
-      for (const q of allQuestions) {
-        const idL = q.id?.toLowerCase?.();
-        if (!idL) continue;
-
-        if (hlSet.has(idL)) {
-          highlighted.push(q);
-          continue;
-        }
-
-        if (isLoggedIn) {
-          const map = allResponses[idL] || {};
-          const has = !!map[acctLower];
-          if (has) answered.push(q);
-          else unanswered.push(q);
-        } else {
-          unanswered.push(q);
-        }
-      }
-
-      highlighted.sort(byCountDesc);
-      unanswered.sort(byCountDesc);
-      answered.sort(byCountDesc);
-
-      const sorted = isLoggedIn
-        ? [...highlighted, ...unanswered, ...answered]
-        : [...highlighted, ...unanswered];
-
-      const hiddenGated = sorted.filter(
-        (q) => q && this.isMaskedPromptText(q?.prompt) && !q?.promptDecrypted
-      );
-      const sortedVisible = sorted.filter(
-        (q) => !(q && this.isMaskedPromptText(q?.prompt) && !q?.promptDecrypted)
-      );
+      const sorted = sortPileQuestionsByPriority({
+        questions: allQuestions,
+        questionResponses: allResponses,
+        responseCounts,
+        highlightedQuestionIds: hlSet,
+        account: acctLower,
+      });
+      const {
+        hiddenQuestions: hiddenGated,
+        visibleQuestions: sortedVisible,
+        hasHiddenGatedQuestions: nextHidden,
+      } = splitPileMaskedQuestions({
+        questions: sorted,
+      });
       const filterSig = serializeSurveyToolFilterState(this.state.filterState);
       const isFilterActive = !!this.state.isFilterActive || !!filterSig;
       if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
       const settleUnreadyEmpty = canSettleUnreadyEmpty && sortedVisible.length === 0;
-      // Regression guard: only short-circuit to the gated empty state once
-      // masked questions are actually present in cache. A gate hint alone is
-      // not enough because mixed sessions can still hydrate public questions.
-      const nextHidden = hiddenGated.length > 0;
-      const nextLoading = sortedVisible.length > 0
-        ? false
-        : (nextHidden ? false : (settleUnreadyEmpty ? false : (!this.props.isQuestionCacheReady || recentRateLimit)));
+      const { loading: nextLoading } = buildPileQuestionLoadState({
+        visibleQuestions: sortedVisible,
+        hiddenQuestions: hiddenGated,
+        settleUnreadyEmpty,
+        isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+        recentRateLimit,
+      });
       const nextState = {
         // Only update allQuestionsForFilter; pileQuestions is driven by filter
         allQuestionsForFilter: sorted,
@@ -1824,18 +1800,20 @@ export class PileViewMode extends SurveyQuestions {
       let nextActiveIndexForHydration = Number(prev.activePileIndex || 0);
 
       if (!isFilterActive) {
-        const clampedIndex = Math.min(
-          Number(prev.activePileIndex || 0),
-          Math.max(sortedVisible.length - 1, 0)
-        );
-        const pileChanged = !this.areQuestionListsEquivalent(prev.pileQuestions, sortedVisible);
-        const indexChanged = Number(prev.activePileIndex || 0) !== clampedIndex;
-        nextVisibleForHydration = pileChanged
-          ? sortedVisible
-          : (Array.isArray(prev.pileQuestions) ? prev.pileQuestions : []);
-        nextActiveIndexForHydration = (pileChanged || indexChanged)
-          ? clampedIndex
-          : Number(prev.activePileIndex || 0);
+        const {
+          pileChanged,
+          indexChanged,
+          clampedIndex,
+          nextVisibleForHydration: nextVisiblePlan,
+          nextActiveIndexForHydration: nextActivePlan,
+        } = buildPileVisibleTransitionPlan({
+          previousPileQuestions: prev.pileQuestions,
+          previousActivePileIndex: prev.activePileIndex,
+          nextVisibleQuestions: sortedVisible,
+          areQuestionListsEquivalent: this.areQuestionListsEquivalent,
+        });
+        nextVisibleForHydration = nextVisiblePlan;
+        nextActiveIndexForHydration = nextActivePlan;
         if (pileChanged) {
           this._pileQuestionsGeneration += 1;
           nextState.pileQuestions = sortedVisible;
@@ -2253,63 +2231,33 @@ export class PileViewMode extends SurveyQuestions {
       });
     });
     const acctLower = (this.props.account || '').toLowerCase();
-    const isLoggedIn = !!acctLower;
-
-    const byCountDesc = (a, b) => {
-      const aCount = responseCounts[a.id?.toLowerCase?.()] || 0;
-      const bCount = responseCounts[b.id?.toLowerCase?.()] || 0;
-      return bCount - aCount;
-    };
-
-    const highlighted = [];
-    const unanswered = [];
-    const answered = [];
-
-    for (const q of filteredArray) {
-      const idL = q.id?.toLowerCase?.();
-      if (!idL) continue;
-
-      if (hlSet.has(idL)) {
-        highlighted.push(q);
-        continue;
-      }
-
-      if (isLoggedIn) {
-        const map = allResponses[idL] || {};
-        const has = !!map[acctLower];
-        if (has) answered.push(q);
-        else unanswered.push(q);
-      } else {
-        unanswered.push(q);
-      }
-    }
-
-    highlighted.sort(byCountDesc);
-    unanswered.sort(byCountDesc);
-    answered.sort(byCountDesc);
-
-    const sortedFiltered = isLoggedIn
-      ? [...highlighted, ...unanswered, ...answered]
-      : [...highlighted, ...unanswered];
-
-    const hiddenGated = sortedFiltered.filter(
-      (q) => q && this.isMaskedPromptText(q?.prompt) && !q?.promptDecrypted
-    );
-    const sortedFilteredVisible = sortedFiltered.filter(
-      (q) => !(q && this.isMaskedPromptText(q?.prompt) && !q?.promptDecrypted)
-    );
+    const sortedFiltered = sortPileQuestionsByPriority({
+      questions: filteredArray,
+      questionResponses: allResponses,
+      responseCounts,
+      highlightedQuestionIds: hlSet,
+      account: acctLower,
+    });
+    const {
+      visibleQuestions: sortedFilteredVisible,
+      hasHiddenGatedQuestions: nextHiddenGated,
+    } = splitPileMaskedQuestions({
+      questions: sortedFiltered,
+    });
     const nextFilterState = normalizeSurveyToolFilterState(newFilterState || this.state.filterState);
     const nextFilterSig = serializeSurveyToolFilterState(nextFilterState);
     const currentFilterSig = serializeSurveyToolFilterState(this.state.filterState);
     const nextVisibleSig = this.buildQuestionListSignature(sortedFilteredVisible);
     const currentVisibleSig = this.syncCurrentPileQuestionsSignature(this.state.pileQuestions || []);
-    const nextHiddenGated = hiddenGated.length > 0;
 
-    if (
-      nextVisibleSig === currentVisibleSig &&
-      nextHiddenGated === !!this.state.hasHiddenGatedQuestions &&
-      nextFilterSig === currentFilterSig
-    ) {
+    if (shouldSkipPileFilterStateUpdate({
+      nextVisibleSignature: nextVisibleSig,
+      currentVisibleSignature: currentVisibleSig,
+      nextHiddenGated,
+      currentHiddenGated: !!this.state.hasHiddenGatedQuestions,
+      nextFilterSignature: nextFilterSig,
+      currentFilterSignature: currentFilterSig,
+    })) {
       bumpSurveyPerfCounter('noopSkipCount');
       return;
     }
