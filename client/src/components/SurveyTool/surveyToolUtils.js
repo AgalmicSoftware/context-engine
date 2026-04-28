@@ -123,6 +123,7 @@ export {
   executePriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  loadGroupedMissingResponseRequests,
   buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,

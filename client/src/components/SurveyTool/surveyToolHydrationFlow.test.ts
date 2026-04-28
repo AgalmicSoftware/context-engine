@@ -21,6 +21,7 @@ import {
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
   executePriorResponseFetchPlan,
+  loadGroupedMissingResponseRequests,
   buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
@@ -1431,6 +1432,53 @@ describe('surveyToolHydrationFlow', () => {
       slug: 'beta',
       responder: '0xabc',
     });
+    expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(1, 'alpha');
+    expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(2, 'beta');
+  });
+
+  it('loads grouped missing-response requests from scoped caches', async () => {
+    const readQuestionsCacheAsync = jest.fn(async (slug) => {
+      if (slug === 'alpha') {
+        return {
+          '84532': {
+            questionResponses: {
+              q1: { '0xabc': { answer: { value: 'present' } } },
+              q2: {},
+            },
+          },
+        };
+      }
+      if (slug === 'beta') {
+        return {
+          '84532': {
+            questionResponses: {
+              q3: {},
+            },
+          },
+        };
+      }
+      return {};
+    });
+    const ensureQuestionsNet = jest.fn((cache) => cache);
+
+    await expect(loadGroupedMissingResponseRequests({
+      scopePlan: [
+        { slug: 'alpha', netId: '84532', questionIds: ['q1', 'q2'] },
+        { slug: 'alpha', netId: '84532', questionIds: ['q2'] },
+        { slug: 'beta', netId: '84532', questionIds: ['q3'] },
+      ],
+      fallbackNetId: '11155420',
+      responderLower: '0xAbC',
+      resolveScopeNetId: (slug, entryNetId) => (slug === 'beta' ? '84532' : entryNetId),
+      readQuestionsCacheAsync,
+      ensureQuestionsNet,
+    })).resolves.toEqual([
+      { slug: 'alpha', netId: '84532', missingIds: ['q2'] },
+      { slug: 'alpha', netId: '84532', missingIds: ['q2'] },
+      { slug: 'beta', netId: '84532', missingIds: ['q3'] },
+    ]);
+
+    expect(readQuestionsCacheAsync).toHaveBeenCalledTimes(2);
     expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(1, 'alpha');
     expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(2, 'beta');
   });
