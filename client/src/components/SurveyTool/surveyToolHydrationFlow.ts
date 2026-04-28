@@ -250,6 +250,24 @@ type BuildLocalCacheHydrationSignatureArgs = {
   submissionComplete?: boolean;
 };
 
+type BuildQuestionSlugMapForIdsArgs = {
+  questionIds?: Iterable<unknown> | unknown[];
+  poolQuestions?: unknown[] | null;
+  normalizeSlug?: ((value: unknown) => string) | null;
+  resolveQuestionSlug?: ((args: {
+    questionId: string;
+    question?: unknown;
+  }) => unknown) | null;
+};
+
+type BuildSubmissionGroupContextArgs = {
+  questionIds?: Iterable<unknown> | unknown[];
+  slugByQuestionId?: Map<string, unknown> | null;
+  fallbackSlug?: unknown;
+  normalizeSlug?: ((value: unknown) => string) | null;
+  multiSessionError?: string;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -1165,6 +1183,98 @@ export const buildNormalizedRenderedQuestionIds = ({
       .filter(Boolean)
   )
 );
+
+export const buildQuestionSlugMapForIds = ({
+  questionIds = [],
+  poolQuestions = null,
+  normalizeSlug = null,
+  resolveQuestionSlug = null,
+}: BuildQuestionSlugMapForIdsArgs = {}): Map<string, string> => {
+  const normalizedIds = buildNormalizedRenderedQuestionIds({ renderedIds: questionIds });
+  const slugByQuestionId = new Map<string, string>();
+  if (normalizedIds.length === 0) return slugByQuestionId;
+
+  const poolQuestionById = new Map<string, unknown>();
+  (Array.isArray(poolQuestions) ? poolQuestions : []).forEach((question) => {
+    const questionId = normalizeQuestionIdKey(
+      isRecord(question) ? question.id : null
+    );
+    if (!questionId || poolQuestionById.has(questionId)) return;
+    poolQuestionById.set(questionId, question);
+  });
+
+  normalizedIds.forEach((questionId) => {
+    const resolvedSlug = typeof resolveQuestionSlug === 'function'
+      ? resolveQuestionSlug({
+        questionId,
+        question: poolQuestionById.get(questionId),
+      })
+      : '';
+    slugByQuestionId.set(
+      questionId,
+      typeof normalizeSlug === 'function'
+        ? normalizeSlug(resolvedSlug)
+        : String(resolvedSlug ?? '')
+    );
+  });
+
+  return slugByQuestionId;
+};
+
+export const buildSubmissionGroupContext = ({
+  questionIds = [],
+  slugByQuestionId = null,
+  fallbackSlug = '',
+  normalizeSlug = null,
+  multiSessionError = 'Cannot submit responses from multiple sessions at once. Narrow the question view to one session and try again.',
+}: BuildSubmissionGroupContextArgs = {}) => {
+  const normalizedIds = buildNormalizedRenderedQuestionIds({ renderedIds: questionIds });
+  const normalizeValue = (value: unknown): string => (
+    typeof normalizeSlug === 'function'
+      ? normalizeSlug(value)
+      : String(value ?? '')
+  );
+
+  if (normalizedIds.length === 0) {
+    return {
+      ok: true,
+      submissionGroupKey: normalizeValue(fallbackSlug),
+      sessionSlugs: [] as string[],
+      slugByQuestionId: new Map<string, string>(),
+    };
+  }
+
+  const normalizedSlugByQuestionId = new Map<string, string>();
+  const sessionSlugs: string[] = [];
+  const seenSlugs = new Set<string>();
+
+  normalizedIds.forEach((questionId) => {
+    const resolvedSlug = normalizeValue(
+      slugByQuestionId instanceof Map ? slugByQuestionId.get(questionId) : ''
+    );
+    normalizedSlugByQuestionId.set(questionId, resolvedSlug);
+    if (seenSlugs.has(resolvedSlug)) return;
+    seenSlugs.add(resolvedSlug);
+    sessionSlugs.push(resolvedSlug);
+  });
+
+  if (sessionSlugs.length > 1) {
+    return {
+      ok: false,
+      submissionGroupKey: '',
+      sessionSlugs,
+      slugByQuestionId: normalizedSlugByQuestionId,
+      error: multiSessionError,
+    };
+  }
+
+  return {
+    ok: true,
+    submissionGroupKey: sessionSlugs[0] ?? normalizeValue(fallbackSlug),
+    sessionSlugs,
+    slugByQuestionId: normalizedSlugByQuestionId,
+  };
+};
 
 export const buildLocalCacheHydrationSignature = ({
   surveyIndex = 0,
