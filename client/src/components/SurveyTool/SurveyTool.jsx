@@ -233,11 +233,13 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyUpdatePlan,
   buildPriorResponseFetchPlan,
+  clearPriorResponseAttemptedKeys,
   executePriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
   loadMissingResponseIdsForScope,
   loadGroupedMissingResponseRequests,
+  trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
   buildNormalizedRenderedQuestionIds,
   resolveExitEditingBaselineSlice,
@@ -5214,10 +5216,10 @@ export class SurveyQuestions extends Component {
         });
         if (requestsToFetch.length === 0) return false;
 
-        attemptedKeysToMark.forEach((key) => {
-          this._priorResponseBackfillAttempted.add(key);
-          attemptedKeys.push(key);
-        });
+        attemptedKeys.push(...trackPriorResponseAttemptedKeys({
+          attemptedSet: this._priorResponseBackfillAttempted,
+          attemptedKeysToMark,
+        }));
 
         if (this._isMounted) {
           this.setState({ isHydratingPriorResponses: true });
@@ -5231,7 +5233,10 @@ export class SurveyQuestions extends Component {
         }));
       } catch (error) {
         // Allow retries after transient fetch failures.
-        attemptedKeys.forEach((key) => this._priorResponseBackfillAttempted.delete(key));
+        clearPriorResponseAttemptedKeys({
+          attemptedSet: this._priorResponseBackfillAttempted,
+          attemptedKeys,
+        });
         surveyLog.warn('[SurveyQuestions] Prior-response backfill failed:', error);
       } finally {
         if (this._isMounted) {
