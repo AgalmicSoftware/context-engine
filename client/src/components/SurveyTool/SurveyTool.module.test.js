@@ -10428,6 +10428,56 @@ describe('SurveyTool module', () => {
     expect(subject.ensurePriorResponsesForRenderedIds).toHaveBeenCalledTimes(1);
   });
 
+  it('skips setState for local-cache rehydrate when cache data matches current and baseline state', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    const matchingSlice = {
+      answers: {
+        q1: {
+          value: 'cached answer',
+          encrypted: false,
+        },
+      },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+      additionalComments: {
+        q1: {
+          value: 'cached notes',
+          encrypted: false,
+        },
+      },
+    };
+
+    subject.state = {
+      ...subject.state,
+      suppressPrefill: false,
+      submissionError: '',
+      submissionComplete: false,
+      surveysResponseState: [matchingSlice],
+      editBaseline: JSON.parse(JSON.stringify(matchingSlice)),
+    };
+    subject.getHydrationQuestionIds = jest.fn().mockReturnValue(['q1']);
+    subject.buildLocalCacheHydrationSignature = jest.fn().mockReturnValue('rehydrate|q1|unchanged');
+    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue(JSON.parse(JSON.stringify(matchingSlice)));
+    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
+    subject.setState = jest.fn();
+    const callback = jest.fn();
+
+    await subject.rehydrateLocalCacheAnswersForRenderedIds(callback);
+
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.ensurePriorResponsesForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(subject._rehydrateLocalCacheLastSig).toBe('rehydrate|q1|unchanged');
+  });
+
   it('uses clone-free questions cache reads in SurveyQuestions.handleFilter', () => {
     const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
       if (namespace === 'questionsCache') {

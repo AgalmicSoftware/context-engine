@@ -32,6 +32,7 @@ import {
   applyLocalCacheRehydrateNoChangeEffects,
   applyLocalCacheRehydrateAppliedEffects,
   applyLocalCacheRehydrateSuccessEffects,
+  applyLocalCacheRehydrateUpdatePlan,
   applyPrefillUpdatePlan,
   applyPrefillStateEffects,
   applyResetFormStateEffects,
@@ -1952,6 +1953,57 @@ describe('surveyToolHydrationFlow', () => {
       ensurePriorResponses,
       callback,
     });
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
+    expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies local-cache rehydrate update plans for no-change and changed branches', () => {
+    const applyStateUpdates = jest.fn((updates, done) => {
+      if (typeof done === 'function') done();
+    });
+    const updateJsonPreview = jest.fn();
+    const recalculateEditStats = jest.fn();
+    const ensurePriorResponses = jest.fn();
+    const callback = jest.fn();
+    const onNoChange = jest.fn();
+
+    expect(applyLocalCacheRehydrateUpdatePlan({
+      changed: false,
+      baselineChanged: false,
+      updates: { surveysResponseState: [] },
+      applyStateUpdates,
+      updateJsonPreview,
+      recalculateEditStats,
+      ensurePriorResponses,
+      callback,
+      onNoChange,
+    })).toBe(true);
+    expect(onNoChange).toHaveBeenCalledTimes(1);
+    expect(applyStateUpdates).not.toHaveBeenCalled();
+    expect(updateJsonPreview).not.toHaveBeenCalled();
+    expect(recalculateEditStats).not.toHaveBeenCalled();
+    expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    onNoChange.mockClear();
+    ensurePriorResponses.mockClear();
+    callback.mockClear();
+
+    expect(applyLocalCacheRehydrateUpdatePlan({
+      changed: true,
+      baselineChanged: false,
+      updates: { surveysResponseState: [] },
+      applyStateUpdates,
+      updateJsonPreview,
+      recalculateEditStats,
+      ensurePriorResponses,
+      callback,
+      onNoChange,
+    })).toBe(true);
+    expect(onNoChange).not.toHaveBeenCalled();
+    expect(applyStateUpdates).toHaveBeenCalledWith({ surveysResponseState: [] }, expect.any(Function));
     expect(updateJsonPreview).toHaveBeenCalledTimes(1);
     expect(recalculateEditStats).toHaveBeenCalledTimes(1);
     expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
