@@ -418,6 +418,22 @@ type BuildMissingRenderedResponseResultArgs = {
   fallbackNetId?: unknown;
 };
 
+type ResolveMissingRenderedResponseLookupArgs = {
+  responderLower?: unknown;
+  rawSlug?: unknown;
+  fallbackSlug?: unknown;
+  renderedIds?: Iterable<unknown> | unknown[];
+  minifiedMode?: unknown;
+  surveyId?: unknown;
+  resolveResponseHydrationContext?: ((rawSlug: unknown) => UnknownRecord | null | undefined) | null;
+  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
+  getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
+  resolveQuestionSlugMapForIds?: ((questionIds: string[], opts?: UnknownRecord) => Map<string, unknown> | null | undefined) | null;
+  resolveScopeNetId?: ((resolvedSlug: string, entryNetId: string, fallbackNetId: string) => string | null | undefined) | null;
+  readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
+  ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
+};
+
 type LoadMissingRenderedResponseInfoArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   slug?: unknown;
@@ -2068,6 +2084,66 @@ export const loadMissingRenderedResponseInfo = async ({
     netId: normalizedNetId,
     requests: [] as MissingRenderedResponseRequest[],
   };
+};
+
+export const resolveMissingRenderedResponseLookup = async ({
+  responderLower = '',
+  rawSlug = '',
+  fallbackSlug = '',
+  renderedIds = [],
+  minifiedMode = '',
+  surveyId = null,
+  resolveResponseHydrationContext = null,
+  normalizeSessionSlugValue = null,
+  getExtraScopeSlugs = null,
+  resolveQuestionSlugMapForIds = null,
+  resolveScopeNetId = null,
+  readQuestionsCacheAsync = null,
+  ensureQuestionsNet = null,
+}: ResolveMissingRenderedResponseLookupArgs = {}) => {
+  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  if (!normalizedResponder) return { missingIds: [], slug: '', netId: '' };
+
+  const effectiveRawSlug = rawSlug || fallbackSlug;
+  const hydrationContext = typeof resolveResponseHydrationContext === 'function'
+    ? (resolveResponseHydrationContext(effectiveRawSlug) || {})
+    : {};
+  const slug = typeof normalizeSessionSlugValue === 'function'
+    ? normalizeSessionSlugValue((hydrationContext as UnknownRecord).sessionSlug)
+    : String((hydrationContext as UnknownRecord).sessionSlug || '');
+  const netId = String((hydrationContext as UnknownRecord).networkIdStr || '');
+  if (!netId) return { missingIds: [], slug, netId: '' };
+
+  const normalizedRenderedIds = buildNormalizedRenderedQuestionIds({ renderedIds });
+  if (normalizedRenderedIds.length === 0) {
+    return { missingIds: [], slug, netId };
+  }
+
+  const extraSlugs = typeof getExtraScopeSlugs === 'function'
+    ? (getExtraScopeSlugs(slug) || [])
+    : [];
+  const shouldGroupByScope = String(minifiedMode || '').trim().toLowerCase() === 'pile'
+    && Array.isArray(extraSlugs)
+    && extraSlugs.length > 0;
+  const slugByQuestionId = shouldGroupByScope && typeof resolveQuestionSlugMapForIds === 'function'
+    ? (resolveQuestionSlugMapForIds(normalizedRenderedIds, { surveyId }) || null)
+    : null;
+
+  return loadMissingRenderedResponseInfo({
+    renderedIds: normalizedRenderedIds,
+    slug,
+    netId,
+    responderLower: normalizedResponder,
+    shouldGroupByScope,
+    slugByQuestionId,
+    resolveScopeNetId: (resolvedSlug, entryNetId) => (
+      typeof resolveScopeNetId === 'function'
+        ? resolveScopeNetId(resolvedSlug, entryNetId, netId)
+        : (entryNetId || netId)
+    ),
+    readQuestionsCacheAsync,
+    ensureQuestionsNet,
+  });
 };
 
 export const buildNormalizedRenderedQuestionIds = ({

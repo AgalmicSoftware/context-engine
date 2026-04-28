@@ -248,6 +248,7 @@ import {
   trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
   loadMissingRenderedResponseInfo,
+  resolveMissingRenderedResponseLookup,
   buildNormalizedRenderedQuestionIds,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
@@ -5142,41 +5143,32 @@ export class SurveyQuestions extends Component {
   };
 
   getMissingRenderedResponseIdsForAccount = async (opts = {}) => {
-    const responderLower = String(opts?.responder || this.props.account || '').trim().toLowerCase();
-    if (!responderLower) return { missingIds: [], slug: '', netId: '' };
-
     const fallbackSlug = resolveEffectiveSlug(this.props);
-    const rawSlug = opts?.slug ?? this._getEffectiveDraftSlug() ?? fallbackSlug;
-    const context = resolveResponseHydrationContext(this.props, rawSlug);
-    const slug = normalizeSessionSlugValue(context.sessionSlug);
-    const netId = context.networkIdStr;
-    if (!netId) return { missingIds: [], slug, netId: '' };
-
-    const renderedIds = this.getRenderedQuestionIdsForResponseHydration();
-    if (renderedIds.length === 0) return { missingIds: [], slug, netId };
-    const extraSlugs = this.props?.minifiedMode === 'pile'
-      ? getExtraQuestionReadSlugs(this.props, slug)
-      : [];
-    const shouldGroupByScope = this.props?.minifiedMode === 'pile' && extraSlugs.length > 0;
-    const slugByQuestionId = shouldGroupByScope
-      ? this.resolveQuestionSlugMapForIds(renderedIds, { surveyId: this.props.surveyId || null })
-      : null;
-
-    const missingInfo = await loadMissingRenderedResponseInfo({
-      renderedIds,
-      slug,
-      netId,
-      responderLower,
-      shouldGroupByScope,
-      slugByQuestionId,
-      resolveScopeNetId: (resolvedSlug, entryNetId) => {
+    return resolveMissingRenderedResponseLookup({
+      responderLower: opts?.responder || this.props.account,
+      rawSlug: opts?.slug ?? this._getEffectiveDraftSlug() ?? fallbackSlug,
+      fallbackSlug,
+      renderedIds: this.getRenderedQuestionIdsForResponseHydration(),
+      minifiedMode: this.props?.minifiedMode,
+      surveyId: this.props?.surveyId || null,
+      resolveResponseHydrationContext: (nextSlug) => resolveResponseHydrationContext(this.props, nextSlug),
+      normalizeSessionSlugValue,
+      getExtraScopeSlugs: (slug) => (
+        this.props?.minifiedMode === 'pile'
+          ? getExtraQuestionReadSlugs(this.props, slug)
+          : []
+      ),
+      resolveQuestionSlugMapForIds: (questionIds, context) => this.resolveQuestionSlugMapForIds(
+        questionIds,
+        { surveyId: context?.surveyId || null }
+      ),
+      resolveScopeNetId: (resolvedSlug, entryNetId, fallbackNetId) => {
         const resolvedContext = resolveResponseHydrationContext(this.props, normalizeSessionSlugValue(resolvedSlug));
-        return resolvedContext.networkIdStr || entryNetId || netId;
+        return resolvedContext.networkIdStr || entryNetId || fallbackNetId;
       },
       readQuestionsCacheAsync,
       ensureQuestionsNet,
     });
-    return missingInfo;
   };
 
   ensurePriorResponsesForRenderedIds = async (opts = {}) => {
