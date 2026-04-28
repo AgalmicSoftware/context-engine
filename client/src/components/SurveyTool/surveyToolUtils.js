@@ -104,6 +104,7 @@ export {
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildHydratedResponseSlice,
+  buildExitEditingStatePatch,
   buildInitializedSurveyResponseState,
   buildRevertPendingStatePatch,
   buildStartFreshSurveyState,
@@ -116,6 +117,7 @@ export {
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
+  resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
   shouldHandleStartFresh,
 } from './surveyToolHydrationFlow.js';
