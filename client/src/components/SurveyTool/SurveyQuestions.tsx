@@ -5145,25 +5145,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       clearTimeout(this._emptySubmitTimer);
       this._emptySubmitTimer = null;
     }
-    if (this._pileSubmitTimer) {
-      clearTimeout(this._pileSubmitTimer);
-      this._pileSubmitTimer = null;
-    }
-    const mirrorToPileSubmitText = Object.prototype.hasOwnProperty.call(
-      this.state || {},
-      'pileSubmitTempText'
-    );
     const update = buildTransientSubmitFeedbackState({
       message,
-      mirrorToPileSubmitText,
     });
     this.setState(update);
     if (!update.submissionError) return;
     this._emptySubmitTimer = setTimeout(() => {
       if (!this._isMounted) return;
-      const clearUpdate = buildClearedTransientSubmitFeedbackState({
-        mirrorToPileSubmitText,
-      });
+      const clearUpdate = buildClearedTransientSubmitFeedbackState();
       this.setState(clearUpdate);
       this._emptySubmitTimer = null;
     }, normalizeTransientSubmitFeedbackDurationMs(durationMs));
