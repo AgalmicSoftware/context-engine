@@ -15,7 +15,9 @@ import {
   buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
   buildPrefilledSingleQuestionState,
+  buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyState,
+  buildPrefilledSurveyUpdatePlan,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
   resolveExitEditingBaselineSlice,
@@ -1133,6 +1135,68 @@ describe('surveyToolHydrationFlow', () => {
     }).shouldWriteBaseline).toBe(false);
   });
 
+  it('builds single-question prefill update plans with optional baseline writes', () => {
+    const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses, questionIdResolver }) => {
+      const questionId = questionIdResolver(responses[0]);
+      targetSlice.answers[questionId] = { value: responses[0].answer.value };
+      return true;
+    });
+    const buildSliceFromUserAnswers = jest.fn(() => ({
+      answers: { q1: { value: 'baseline' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    }));
+
+    expect(buildPrefilledSingleQuestionUpdatePlan({
+      surveyIndex: 1,
+      questionId: 'q1',
+      prevSurveysResponseState: [
+        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+      prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      isDirty: false,
+      submissionComplete: false,
+      userAnswer: { answer: { value: 'answer-1' } },
+      applyResponseHydrationListToSlice,
+      buildSliceFromUserAnswers,
+    })).toEqual({
+      nextSurveysResponseState: [
+        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+        {
+          answers: { q1: { value: 'answer-1' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+      ],
+      nextBaseline: {
+        answers: { q1: { value: 'baseline' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      shouldWriteBaseline: true,
+      updates: {
+        surveysResponseState: [
+          { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+          {
+            answers: { q1: { value: 'answer-1' } },
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+        editBaseline: {
+          answers: { q1: { value: 'baseline' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+      },
+    });
+  });
+
   it('builds prefilled survey state with hydrated slice and optional baseline writes', () => {
     const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses }) => {
       const first = responses[0];
@@ -1204,6 +1268,71 @@ describe('surveyToolHydrationFlow', () => {
       applyResponseHydrationListToSlice,
       buildSliceFromUserAnswers,
     }).shouldWriteBaseline).toBe(false);
+  });
+
+  it('builds survey prefill update plans with optional baseline writes', () => {
+    const responses = [{ answer: { value: 'answer-1' }, additional: { value: 'notes-1' }, importance: 4, conviction: 7 }];
+    const applyResponseHydrationListToSlice = jest.fn(({ targetSlice, responses: nextResponses }) => {
+      const first = nextResponses[0];
+      targetSlice.answers.q1 = { value: first.answer.value };
+      targetSlice.additionalComments.q1 = { value: first.additional.value };
+      targetSlice.importance.q1 = first.importance;
+      targetSlice.conviction.q1 = first.conviction;
+      return true;
+    });
+    const buildSliceFromUserAnswers = jest.fn(() => ({
+      answers: { q1: { value: 'baseline' } },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+      additionalComments: { q1: { value: 'baseline notes' } },
+    }));
+
+    expect(buildPrefilledSurveyUpdatePlan({
+      surveyIndex: 1,
+      prevSurveysResponseState: [
+        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+      prevEditBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      isDirty: false,
+      submissionComplete: false,
+      responses,
+      applyResponseHydrationListToSlice,
+      buildSliceFromUserAnswers,
+    })).toEqual({
+      nextSurveysResponseState: [
+        { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+        {
+          answers: { q1: { value: 'answer-1' } },
+          importance: { q1: 4 },
+          conviction: { q1: 7 },
+          additionalComments: { q1: { value: 'notes-1' } },
+        },
+      ],
+      nextBaseline: {
+        answers: { q1: { value: 'baseline' } },
+        importance: { q1: 4 },
+        conviction: { q1: 7 },
+        additionalComments: { q1: { value: 'baseline notes' } },
+      },
+      shouldWriteBaseline: true,
+      updates: {
+        surveysResponseState: [
+          { answers: { keep: { value: 'persisted' } }, importance: {}, conviction: {}, additionalComments: {} },
+          {
+            answers: { q1: { value: 'answer-1' } },
+            importance: { q1: 4 },
+            conviction: { q1: 7 },
+            additionalComments: { q1: { value: 'notes-1' } },
+          },
+        ],
+        editBaseline: {
+          answers: { q1: { value: 'baseline' } },
+          importance: { q1: 4 },
+          conviction: { q1: 7 },
+          additionalComments: { q1: { value: 'baseline notes' } },
+        },
+      },
+    });
   });
 
   it('builds reverted response slices from baseline state plus rendered empty shells', () => {
