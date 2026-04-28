@@ -9,6 +9,7 @@ import SurveyTool, {
   SurveySelector,
   DeferredCommitSlider,
 } from './SurveyTool.jsx';
+import { PileViewMode, SurveyQuestions as DirectSurveyQuestions } from './SurveyQuestions';
 import {
   QuestionsDashboard as DirectQuestionsDashboard,
   SurveySelector as DirectSurveySelector,
@@ -82,6 +83,10 @@ describe('SurveyTool module', () => {
     expect(DeferredCommitSlider).toBe(DirectDeferredCommitSlider);
   });
 
+  it('re-exports extracted SurveyQuestions through SurveyTool.jsx', () => {
+    expect(SurveyQuestions).toBe(DirectSurveyQuestions);
+  });
+
   it('re-exports extracted survey tool utils through SurveyTool.jsx', () => {
     expect(computeSubmitLabel).toBe(directComputeSubmitLabel);
     expect(normalizeSurveyToolFilterState).toBe(directNormalizeSurveyToolFilterState);
@@ -105,6 +110,19 @@ describe('SurveyTool module', () => {
     }));
 
     expect(subject.resolveSessionChainId('edge')).toBe(84532);
+  });
+
+  it('renders extracted PileViewMode through SurveyTool.jsx in pile mode', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      onFilterChange: jest.fn(),
+    });
+
+    const tree = shell.render();
+
+    expect(tree.type).toBe(PileViewMode);
   });
 
   it('renders triple trailing arrows inside the pile submit button', () => {
