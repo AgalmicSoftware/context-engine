@@ -69,6 +69,10 @@ import {
   pickScopedPileQuestionProgress,
 } from './surveyPileLifecycle';
 import {
+  buildPileEmptyProbePlan,
+  buildPileLoadProgressState,
+} from './surveyPileLoadPlanner';
+import {
   buildPileQuestionLoadState,
   buildPileVisibleTransitionPlan,
   shouldSkipPileFilterStateUpdate,
@@ -1502,38 +1506,21 @@ export class PileViewMode extends SurveyQuestions {
       doesQuestionProgressMatchSlug(this.props.questionScanProgress.slug, progressSlug)
         ? this.props.questionScanProgress
         : null;
-    const scopedScanTotalBlocks = Math.max(0, Number(scopedProgress?.totalBlocks || 0));
-    const scopedScanRemainingBlocks = Math.max(0, Number(scopedProgress?.remainingBlocks || 0));
-    const scopedHydrateDiscovered = Math.max(0, Number(scopedProgress?.discoveredQuestions || 0));
-    const scopedHydrateDone = Math.max(0, Number(scopedProgress?.hydratedQuestions || 0));
-    const hasScanOrHydrationWork = !!scopedProgress && (
-      (scopedProgress?.phase === 'scan' && scopedScanRemainingBlocks > 0) ||
-      (scopedProgress?.phase === 'hydrate' && scopedHydrateDone < scopedHydrateDiscovered)
-    );
-
-    // Recent rate-limit detector (wired to withRetry)
-    const recentRateLimit = (() => {
-      try {
-        const info = (typeof window !== 'undefined') ? window.__LAST_RPC_RATE_LIMIT_ERROR__ : null;
-        if (!info || !info.ts) return false;
-        const ageMs = Date.now() - info.ts;
-        // Treat the last 2 minutes as "warming/retrying" for UI purposes.
-        return ageMs < 2 * 60 * 1000;
-      } catch (_) {
-        return false;
-      }
-    })();
-    const hydrationProgressSettled = !!scopedProgress && (
-      scopedProgress?.phase === 'hydrate' &&
-      scopedHydrateDone >= scopedHydrateDiscovered
-    );
-    const canSettleUnreadyEmpty = (
-      this.props.cacheHasLoaded !== false &&
-      !this.props.isQuestionCacheReady &&
-      !recentRateLimit &&
-      !hasScanOrHydrationWork &&
-      hydrationProgressSettled
-    );
+    const recentRateLimit = this.isRecentRateLimit();
+    const {
+      scanTotalBlocks: scopedScanTotalBlocks,
+      scanRemainingBlocks: scopedScanRemainingBlocks,
+      hydrateDiscovered: scopedHydrateDiscovered,
+      hydrateDone: scopedHydrateDone,
+      hasScanOrHydrationWork,
+      hydrationProgressSettled,
+      canSettleUnreadyEmpty,
+    } = buildPileLoadProgressState({
+      scopedProgress,
+      cacheHasLoaded: this.props.cacheHasLoaded,
+      isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+      recentRateLimit,
+    });
 
     // If no network ID, we can't load specific data, but we shouldn't hang if we can't determine it yet.
     if (!networkID) {
@@ -1610,31 +1597,24 @@ export class PileViewMode extends SurveyQuestions {
       // question metadata lands. Keep loading and periodically re-check before
       // showing a definitive empty state.
       if (allQuestions.length === 0) {
-        const coldBootInProgress = this.props.cacheHasLoaded === false;
-        const progressIndicatesDefinitiveEmpty = !hasPendingMetadataRetries && !!scopedProgress && (
-          (
-            scopedProgress?.phase === 'scan' &&
-            scopedScanTotalBlocks === 0 &&
-            scopedScanRemainingBlocks === 0 &&
-            scopedHydrateDiscovered === 0 &&
-            scopedHydrateDone === 0
-          ) ||
-          (
-            scopedProgress?.phase !== 'scan' &&
-            scopedProgress?.phase !== 'hydrate' &&
-            scopedScanRemainingBlocks === 0 &&
-            scopedHydrateDiscovered === 0
-          ) ||
-          hydrationProgressSettled
-        );
-        const shouldKeepLoadingImmediately =
-          coldBootInProgress ||
-          recentRateLimit ||
-          hasPendingMetadataRetries ||
-          hasScanOrHydrationWork ||
-          (!this.props.isQuestionCacheReady && !canSettleUnreadyEmpty);
+        const emptyProbePlan = buildPileEmptyProbePlan({
+          cacheHasLoaded: this.props.cacheHasLoaded,
+          isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+          recentRateLimit,
+          hasPendingMetadataRetries,
+          hasScanOrHydrationWork,
+          canSettleUnreadyEmpty,
+          hydrationProgressSettled,
+          scopedProgress,
+          scanTotalBlocks: scopedScanTotalBlocks,
+          scanRemainingBlocks: scopedScanRemainingBlocks,
+          hydrateDiscovered: scopedHydrateDiscovered,
+          hydrateDone: scopedHydrateDone,
+          emptyReadyProbeStartedAtMs: this._emptyReadyProbeStartedAtMs,
+          nowMs: Date.now(),
+        });
 
-        if (shouldKeepLoadingImmediately) {
+        if (emptyProbePlan.action === 'continue-loading-immediately') {
           this._emptyReadyProbeStartedAtMs = 0;
           if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
           this._lastLoadAndSortResultSignature = '';
@@ -1652,23 +1632,14 @@ export class PileViewMode extends SurveyQuestions {
           return;
         }
 
-        const nowMs = Date.now();
-        if (!this._emptyReadyProbeStartedAtMs) {
-          this._emptyReadyProbeStartedAtMs = nowMs;
-        }
-        const emptyProbeWindowMs = progressIndicatesDefinitiveEmpty ? 0 : 20000;
-        const probeAgeMs = Math.max(0, nowMs - Number(this._emptyReadyProbeStartedAtMs || 0));
-        if (probeAgeMs < emptyProbeWindowMs) {
+        if (emptyProbePlan.action === 'probe-loading') {
+          this._emptyReadyProbeStartedAtMs = emptyProbePlan.nextProbeStartedAtMs;
           if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
           this._lastLoadAndSortResultSignature = '';
           if (!this.state.loading) {
             this.setState({ loading: true });
           }
-          const nextProbeDelayMs = Math.min(
-            900,
-            Math.max(160, emptyProbeWindowMs - probeAgeMs)
-          );
-          this.scheduleLoadAndSortQuestions(nextProbeDelayMs);
+          this.scheduleLoadAndSortQuestions(emptyProbePlan.nextProbeDelayMs);
           return;
         }
 
