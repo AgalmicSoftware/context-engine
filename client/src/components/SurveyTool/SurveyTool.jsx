@@ -220,6 +220,8 @@ import {
   buildQuestionScanProgressDisplay,
   buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
+  shouldSkipDraftHydrationRun,
+  buildDraftHydrationSeedContext,
   buildDraftHydrationRunPlan,
   buildCacheHydrationSlice,
   buildDraftHydrationUpdatePlan,
@@ -262,6 +264,7 @@ import {
   applyResetFormStateEffects,
   applyRevertPendingEffects,
   applyStartFreshEffects,
+  applyDraftHydrationEffects,
   applyPrefillStateEffects,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateNoChangeEffects,
@@ -5265,22 +5268,22 @@ export class SurveyQuestions extends Component {
 
   rehydrateDraftForRenderedIds = (forceOverwrite = false) => {
     try {
-      // Bail when Start Fresh suppresses prefill or when a submit error is present
-      if (this.state && (this.state.suppressPrefill || this.state.submissionError)) return;
-
       const draft = this.loadDraft();
-      if (!draft || (!draft.answers && !draft.baseline)) return;
+      if (shouldSkipDraftHydrationRun({
+        suppressPrefill: this.state?.suppressPrefill,
+        submissionError: this.state?.submissionError,
+        draft,
+      })) return;
 
-      const surveyIndex =
-        this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
-
-      const prevSlice =
-        (this.state.surveysResponseState && this.state.surveysResponseState[surveyIndex]) || {
-          answers: {},
-          importance: {},
-          conviction: {},
-          additionalComments: {}
-        };
+      const {
+        surveyIndex,
+        prevSlice,
+      } = buildDraftHydrationSeedContext({
+        isStandalone: this.props.isStandalone,
+        singleQuestionMode: this.props.singleQuestionMode,
+        surveyIndex: this.props.surveyIndex,
+        surveysResponseState: this.state.surveysResponseState,
+      });
 
       const pendingStats =
         (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) ||
@@ -5309,9 +5312,9 @@ export class SurveyQuestions extends Component {
       if (renderedQuestionIds.length === 0) return;
       if (Object.keys(updates).length === 0) return;
 
-      this.setState(updates, () => {
-        this.updateJsonPreview && this.updateJsonPreview();
-      });
+      this.setState(updates, () => applyDraftHydrationEffects({
+        updateJsonPreview: this.updateJsonPreview,
+      }));
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
   };
 
