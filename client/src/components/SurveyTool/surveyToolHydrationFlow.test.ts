@@ -36,6 +36,7 @@ import {
   applyStartFreshEffects,
   applyDraftHydrationEffects,
   applyPriorResponseFetchSuccessEffects,
+  runPriorResponseBackfillAttempt,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
   clearPriorResponseAttemptedKeys,
@@ -1925,6 +1926,70 @@ describe('surveyToolHydrationFlow', () => {
     const updateJsonPreview = jest.fn();
     applyDraftHydrationEffects({ updateJsonPreview });
     expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs prior-response backfill attempts with injected loaders and effects', async () => {
+    const loadMissingInfo = jest.fn().mockResolvedValue({
+      missingIds: ['q1'],
+      slug: 'edge',
+      netId: '84532',
+    });
+    const setHydratingState = jest.fn();
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const readQuestionsCacheAsync = jest.fn().mockResolvedValue(undefined);
+    const resetLocalCacheMemo = jest.fn();
+    const triggerRehydrate = jest.fn();
+    const attemptedSet = new Set<string>();
+
+    await expect(runPriorResponseBackfillAttempt({
+      responderLower: '0xAbC',
+      slug: 'edge',
+      attemptedSet,
+      loadMissingInfo,
+      setHydratingState,
+      isMounted: true,
+      refreshQuestionResponses,
+      readQuestionsCacheAsync,
+      resetLocalCacheMemo,
+      triggerRehydrate,
+    })).resolves.toBe(true);
+
+    expect(loadMissingInfo).toHaveBeenCalledWith({ responder: '0xabc', slug: 'edge' });
+    expect(setHydratingState).toHaveBeenNthCalledWith(1, true);
+    expect(setHydratingState).toHaveBeenNthCalledWith(2, false);
+    expect(refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
+      slug: 'edge',
+      responder: '0xabc',
+    });
+    expect(resetLocalCacheMemo).toHaveBeenCalledTimes(1);
+    expect(triggerRehydrate).toHaveBeenCalledTimes(1);
+    expect(Array.from(attemptedSet)).toEqual(['edge|0xabc|q1']);
+  });
+
+  it('clears attempted keys when prior-response backfill fails', async () => {
+    const onFailure = jest.fn();
+    const attemptedSet = new Set<string>();
+
+    await expect(runPriorResponseBackfillAttempt({
+      responderLower: '0xabc',
+      slug: 'edge',
+      attemptedSet,
+      loadMissingInfo: jest.fn().mockResolvedValue({
+        missingIds: ['q1'],
+        slug: 'edge',
+        netId: '84532',
+      }),
+      setHydratingState: jest.fn(),
+      isMounted: true,
+      refreshQuestionResponses: jest.fn().mockRejectedValue(new Error('boom')),
+      readQuestionsCacheAsync: jest.fn().mockResolvedValue(undefined),
+      onFailure,
+      resetLocalCacheMemo: jest.fn(),
+      triggerRehydrate: jest.fn(),
+    })).resolves.toBe(false);
+
+    expect(Array.from(attemptedSet)).toEqual([]);
+    expect(onFailure).toHaveBeenCalledTimes(1);
   });
 
   it('executes grouped prior-response fetch plans in normalized order', async () => {
