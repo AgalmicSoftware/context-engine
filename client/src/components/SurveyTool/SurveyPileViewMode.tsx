@@ -53,6 +53,7 @@ import {
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitViewState,
 } from './surveyPileViewState.js';
+import { buildRenderedQuestionIdsFromPileWindow } from './surveyQuestionScope.js';
 import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
@@ -788,14 +789,10 @@ export class PileViewMode extends SurveyQuestions {
       return this._currentRenderedQuestionIdsCache;
     }
 
-    const startIdx = Math.max(0, activePileIndex - 2);
-    const endIdx = Math.min(pileQuestions.length, activePileIndex + 3);
-
-    const ids = [];
-    for (let idx = startIdx; idx < endIdx; idx += 1) {
-      const id = pileQuestions[idx]?.id;
-      if (id) ids.push(id);
-    }
+    const ids = buildRenderedQuestionIdsFromPileWindow({
+      pileQuestions,
+      activePileIndex,
+    });
 
     this._currentRenderedQuestionIdsCache = ids;
     this._currentRenderedQuestionIdsCacheKey = key;

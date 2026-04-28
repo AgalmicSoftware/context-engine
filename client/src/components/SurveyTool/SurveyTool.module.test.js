@@ -10306,6 +10306,43 @@ describe('SurveyTool module', () => {
     expect(third).toEqual(['q1', 'q2', 'q4', 'q3']);
   });
 
+  it('memoizes pile rendered question ids until the active pile window changes', () => {
+    const subject = new PileViewMode({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      activePileIndex: 2,
+      pileQuestions: [
+        { id: 'q1' },
+        { id: 'q2' },
+        { id: 'q3' },
+        { id: 'q4' },
+        { id: 'q5' },
+        { id: 'q6' },
+      ],
+    };
+
+    const first = subject.getCurrentRenderedQuestionIds();
+    const second = subject.getCurrentRenderedQuestionIds();
+    expect(second).toBe(first);
+    expect(second).toEqual(['q1', 'q2', 'q3', 'q4', 'q5']);
+
+    subject.state = {
+      ...subject.state,
+      activePileIndex: 4,
+    };
+    const third = subject.getCurrentRenderedQuestionIds();
+    expect(third).not.toBe(second);
+    expect(third).toEqual(['q3', 'q4', 'q5', 'q6']);
+  });
+
   it('invalidates local-cache rehydrate memo before post-backfill rehydrate', async () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,

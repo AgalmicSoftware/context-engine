@@ -392,6 +392,7 @@ import {
 } from './surveyToolUtils.js';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
+import { buildRenderedQuestionIdsFromQuestionPools } from './surveyQuestionScope.js';
 import {
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
@@ -4278,12 +4279,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       return this._currentRenderedQuestionIdsCache;
     }
 
-    const ids = new Set();
+    let renderedIds = [];
     try {
-      questionPool.forEach(q => q?.id && ids.add(q.id));
-      pileQuestions.forEach(q => q?.id && ids.add(q.id));
+      renderedIds = buildRenderedQuestionIdsFromQuestionPools({
+        questionPool,
+        pileQuestions,
+      });
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-    const renderedIds = Array.from(ids);
     this._currentRenderedQuestionIdsCache = renderedIds;
     this._currentRenderedQuestionIdsCacheQuestionPool = questionPool;
     this._currentRenderedQuestionIdsCacheQuestionPoolLength = questionPool.length;
