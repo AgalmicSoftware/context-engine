@@ -1,12 +1,18 @@
 import {
+  applyPrefillUpdatePlan,
   applyDraftHydrationEffects,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateUpdatePlan,
   buildDraftHydrationRunPlan,
   buildDraftHydrationSeedContext,
+  buildPrefilledSingleQuestionUpdatePlan,
+  buildPrefilledSurveyUpdatePlan,
   buildLocalCacheRehydrationUpdatePlan,
   loadDraftAnswersByQuestionIdSafely,
+  loadLocalCacheHydrationSlice,
   prepareLocalCacheRehydrateRun,
+  resolveLocalCacheSliceLookup,
+  resolveMissingRenderedResponseLookup,
   runPriorResponseBackfillAttempt,
   shouldBackfillPriorResponses,
   shouldSkipDraftHydrationRun,
@@ -17,6 +23,270 @@ type SurveyToolLikeState = Record<string, any>;
 type SetStateUpdate = Record<string, unknown> | null | ((prevState: any) => Record<string, unknown> | null);
 type SetState = (update: SetStateUpdate, callback?: () => void) => unknown;
 type CloneValue = (value: any) => any;
+type PrefillStateUpdate = Record<string, unknown> | ((prevState: any) => Record<string, unknown>);
+
+const buildSetStateApplyHandler = (
+  setState: SetState = () => {},
+) => (
+  nextUpdates: PrefillStateUpdate,
+  done?: () => void,
+) => setState(nextUpdates as SetStateUpdate, done);
+
+const executeSurveyPrefillPlan = ({
+  updates = null,
+  setState = () => {},
+  updateJsonPreview = () => {},
+  recalculateEditStats = () => {},
+}: {
+  updates?: PrefillStateUpdate | null;
+  setState?: SetState;
+  updateJsonPreview?: () => void;
+  recalculateEditStats?: () => void;
+} = {}) => applyPrefillUpdatePlan({
+  updates,
+  applyStateUpdates: buildSetStateApplyHandler(setState),
+  updateJsonPreview,
+  recalculateEditStats,
+});
+
+export const buildSurveyLocalCacheSlice = ({
+  props = {},
+  rawSlug = '',
+  renderedIds = [],
+  localCacheSliceMemo = null,
+  resolveResponseHydrationContext = null,
+  normalizeSessionSlugValue = null,
+  getExtraScopeSlugs = null,
+  readQuestionsCache = null,
+  mergeQuestionResponses = null,
+  parseResponse = null,
+  applyCachedResponseEntryToSlice = () => false,
+  setLocalCacheMemo = () => {},
+  resolveLocalCacheSlice = resolveLocalCacheSliceLookup,
+  loadLocalCacheSlice = loadLocalCacheHydrationSlice,
+  onError = () => {},
+}: {
+  props?: SurveyToolLikeProps | null;
+  rawSlug?: unknown;
+  renderedIds?: unknown[];
+  localCacheSliceMemo?: Record<string, unknown> | null;
+  resolveResponseHydrationContext?: ((rawSlug: unknown) => Record<string, unknown> | null | undefined) | null;
+  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
+  getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
+  readQuestionsCache?: ((slug: string) => unknown) | null;
+  mergeQuestionResponses?: ((target: Record<string, unknown>, source: Record<string, unknown>) => void) | null;
+  parseResponse?: ((raw: unknown) => unknown) | null;
+  applyCachedResponseEntryToSlice?: (args: Record<string, unknown>) => boolean;
+  setLocalCacheMemo?: (nextMemo: { key: string; value: unknown; hasValue: boolean }) => void;
+  resolveLocalCacheSlice?: (args?: any) => {
+    scopeSlugs?: unknown[];
+    networkIdStr?: unknown;
+    renderedIds?: unknown[];
+    normalizedAccount?: string;
+    memoKey?: string;
+    shouldUseMemo?: boolean;
+    memoizedValue?: unknown;
+  };
+  loadLocalCacheSlice?: (args?: any) => unknown;
+  onError?: (error: unknown) => void;
+} = {}) => {
+  try {
+    const nextProps = props || {};
+    const localCacheLookup = resolveLocalCacheSlice({
+      rawSlug,
+      account: nextProps.account,
+      renderedIds,
+      minifiedMode: nextProps.minifiedMode,
+      questionsCacheNonce: nextProps.questionsCacheNonce,
+      questionResponsesNonce: nextProps.questionResponsesNonce,
+      existingMemo: localCacheSliceMemo,
+      resolveResponseHydrationContext,
+      normalizeSessionSlugValue,
+      getExtraScopeSlugs,
+    });
+
+    if (localCacheLookup.shouldUseMemo) {
+      return localCacheLookup.memoizedValue ?? null;
+    }
+
+    const memoize = (value: unknown) => {
+      setLocalCacheMemo({
+        key: String(localCacheLookup.memoKey || ''),
+        value,
+        hasValue: true,
+      });
+      return value;
+    };
+
+    const slice = loadLocalCacheSlice({
+      scopeSlugs: Array.isArray(localCacheLookup.scopeSlugs) ? localCacheLookup.scopeSlugs : [],
+      networkIdStr: localCacheLookup.networkIdStr,
+      account: localCacheLookup.normalizedAccount,
+      renderedQuestionIds: Array.isArray(localCacheLookup.renderedIds) ? localCacheLookup.renderedIds : [],
+      readQuestionsCache,
+      mergeQuestionResponses,
+      parseResponse,
+      applyCachedResponseEntryToSlice,
+    });
+
+    if (!slice) {
+      return memoize(null);
+    }
+
+    return memoize(slice);
+  } catch (error) {
+    setLocalCacheMemo({ key: '', value: null, hasValue: false });
+    onError(error);
+    return null;
+  }
+};
+
+export const resolveSurveyMissingRenderedResponseLookup = ({
+  props = {},
+  responder = '',
+  slug = '',
+  fallbackSlug = '',
+  renderedIds = [],
+  resolveQuestionSlugMapForIds = () => new Map<string, unknown>(),
+  resolveResponseHydrationContext = null,
+  normalizeSessionSlugValue = null,
+  getExtraScopeSlugs = null,
+  resolveScopeNetId = null,
+  readQuestionsCacheAsync = null,
+  ensureQuestionsNet = null,
+  resolveMissingLookup = resolveMissingRenderedResponseLookup,
+}: {
+  props?: SurveyToolLikeProps | null;
+  responder?: unknown;
+  slug?: unknown;
+  fallbackSlug?: unknown;
+  renderedIds?: unknown[];
+  resolveQuestionSlugMapForIds?: (questionIds: string[], context?: Record<string, unknown>) => Map<string, unknown> | null | undefined;
+  resolveResponseHydrationContext?: ((rawSlug: unknown) => Record<string, unknown> | null | undefined) | null;
+  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
+  getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
+  resolveScopeNetId?: ((slug: string, entryNetId: string, fallbackNetId: string) => string | null | undefined) | null;
+  readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
+  ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
+  resolveMissingLookup?: (args?: any) => Promise<unknown>;
+} = {}) => {
+  const nextProps = props || {};
+  return resolveMissingLookup({
+    responderLower: responder || nextProps.account,
+    rawSlug: slug,
+    fallbackSlug,
+    renderedIds,
+    minifiedMode: nextProps.minifiedMode,
+    surveyId: nextProps.surveyId || null,
+    resolveResponseHydrationContext,
+    normalizeSessionSlugValue,
+    getExtraScopeSlugs,
+    resolveQuestionSlugMapForIds,
+    resolveScopeNetId,
+    readQuestionsCacheAsync,
+    ensureQuestionsNet,
+  });
+};
+
+export const executeSurveyResponsePrefill = ({
+  state = {},
+  surveyIndex = 0,
+  userAnswers = null,
+  buildSliceFromUserAnswers = null,
+  applyResponseHydrationListToSlice = null,
+  setState = () => {},
+  updateJsonPreview = () => {},
+  recalculateEditStats = () => {},
+  buildUpdatePlan = buildPrefilledSurveyUpdatePlan,
+}: {
+  state?: SurveyToolLikeState | null;
+  surveyIndex?: number;
+  userAnswers?: unknown;
+  buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: unknown) => unknown) | null;
+  applyResponseHydrationListToSlice?: ((args: Record<string, unknown>) => boolean) | null;
+  setState?: SetState;
+  updateJsonPreview?: () => void;
+  recalculateEditStats?: () => void;
+  buildUpdatePlan?: (args?: any) => { updates?: Record<string, unknown> | null | undefined };
+} = {}) => {
+  if (!userAnswers || !Array.isArray((userAnswers as any)?.responses)) {
+    return { applied: false, reason: 'skip' };
+  }
+
+  executeSurveyPrefillPlan({
+    updates: (prev: any) => {
+      const updatePlan = buildUpdatePlan({
+        surveyIndex,
+        prevSurveysResponseState: prev?.surveysResponseState,
+        prevEditBaseline: prev?.editBaseline,
+        isDirty: prev?.isDirty,
+        submissionComplete: prev?.submissionComplete,
+        responses: (userAnswers as any).responses,
+        applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers,
+      });
+      return (updatePlan?.updates && typeof updatePlan.updates === 'object')
+        ? updatePlan.updates
+        : {};
+    },
+    setState,
+    updateJsonPreview,
+    recalculateEditStats,
+  });
+
+  return { applied: true, reason: 'applied' };
+};
+
+export const executeSurveySingleQuestionPrefill = ({
+  state = {},
+  questionId = '',
+  userAnswer = null,
+  buildSliceFromUserAnswers = null,
+  applyResponseHydrationListToSlice = null,
+  setState = () => {},
+  updateJsonPreview = () => {},
+  recalculateEditStats = () => {},
+  buildUpdatePlan = buildPrefilledSingleQuestionUpdatePlan,
+}: {
+  state?: SurveyToolLikeState | null;
+  questionId?: unknown;
+  userAnswer?: unknown;
+  buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: unknown) => unknown) | null;
+  applyResponseHydrationListToSlice?: ((args: Record<string, unknown>) => boolean) | null;
+  setState?: SetState;
+  updateJsonPreview?: () => void;
+  recalculateEditStats?: () => void;
+  buildUpdatePlan?: (args?: any) => { updates?: Record<string, unknown> | null | undefined };
+} = {}) => {
+  const normalizedQuestionId = String(questionId || '');
+  if (!userAnswer || !normalizedQuestionId) {
+    return { applied: false, reason: 'skip' };
+  }
+
+  executeSurveyPrefillPlan({
+    updates: (prev: any) => {
+      const updatePlan = buildUpdatePlan({
+        surveyIndex: 0,
+        questionId: normalizedQuestionId,
+        prevSurveysResponseState: prev?.surveysResponseState,
+        prevEditBaseline: prev?.editBaseline,
+        isDirty: prev?.isDirty,
+        submissionComplete: prev?.submissionComplete,
+        userAnswer,
+        applyResponseHydrationListToSlice,
+        buildSliceFromUserAnswers,
+      });
+      return (updatePlan?.updates && typeof updatePlan.updates === 'object')
+        ? updatePlan.updates
+        : {};
+    },
+    setState,
+    updateJsonPreview,
+    recalculateEditStats,
+  });
+
+  return { applied: true, reason: 'applied' };
+};
 
 export const executeSurveyPriorResponseBackfill = ({
   props = {},
@@ -331,7 +601,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
       changed: rehydrationUpdatePlan.changed,
       baselineChanged: rehydrationUpdatePlan.baselineChanged,
       updates: rehydrationUpdatePlan.updates,
-      applyStateUpdates: (nextUpdates: SetStateUpdate, done?: () => void) => setState(nextUpdates, done),
+      applyStateUpdates: buildSetStateApplyHandler(setState),
       updateJsonPreview,
       recalculateEditStats,
       ensurePriorResponses,
