@@ -52,6 +52,7 @@ import {
   buildNormalizedRenderedQuestionIds,
   buildPriorResponseFetchPlan,
   buildQuestionSlugMapForIds,
+  resolveQuestionSlugMapLookup,
   buildRevertedResponseSlice,
   buildSubmissionGroupContext,
   buildSurveyResponseStateArray,
@@ -2284,6 +2285,32 @@ describe('surveyToolHydrationFlow', () => {
     })).toEqual(new Map([
       ['q1', 'edge'],
       ['q2', 'alpha'],
+    ]));
+  });
+
+  it('resolves question slug map lookups from question pools, session names, and fallback ids', () => {
+    expect(resolveQuestionSlugMapLookup({
+      questionIds: ['Q1', 'q2', 'q3'],
+      questionPool: [
+        { id: 'q1', sessionSlug: 'Edge' },
+      ],
+      pileQuestions: [
+        { id: 'q2', sessionName: 'Alpha Session' },
+      ],
+      surveyId: undefined,
+      singleQuestionMode: false,
+      propsSurveyId: 'survey-1',
+      props: { activeSessionSlug: 'edge' },
+      network: { id: 84532 },
+      normalizeSlug: (value) => String(value || '').trim().toLowerCase(),
+      getSessionSlugByName: (sessionName) => (
+        sessionName === 'Alpha Session' ? 'Alpha' : null
+      ),
+      resolveSlugForIds: ({ questionId, surveyId }) => `${surveyId}:${questionId}`,
+    })).toEqual(new Map([
+      ['q1', 'edge'],
+      ['q2', 'alpha'],
+      ['q3', 'survey-1:q3'],
     ]));
   });
 
