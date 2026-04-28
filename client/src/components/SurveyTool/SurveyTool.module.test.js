@@ -12484,6 +12484,69 @@ describe('SurveyTool module', () => {
     expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
   });
 
+  it('keeps empty piles in loading mode during recent rate limits instead of settling or probing', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+      },
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.isRecentRateLimit = jest.fn(() => true);
+    subject._emptyReadyProbeStartedAtMs = Date.now() - 25000;
+
+    await subject.loadAndSortQuestions();
+
+    expect(subject.state.loading).toBe(true);
+    expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
+    expect(subject._emptyReadyProbeStartedAtMs).toBe(0);
+  });
+
   it('keeps unanswered questions visible in pile mode when response map is empty', async () => {
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
       '84532': {
