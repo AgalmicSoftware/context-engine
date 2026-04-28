@@ -221,6 +221,7 @@ import {
   buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
   buildCacheHydrationSlice,
+  buildDraftHydrationUpdatePlan,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildExitEditingStatePatch,
@@ -5380,11 +5381,10 @@ export class SurveyQuestions extends Component {
       });
 
       const {
-        nextSlice,
-        nextBaseline,
-        changed,
-        baselineChanged,
-      } = buildDraftHydrationState({
+        updates,
+      } = buildDraftHydrationUpdatePlan({
+        prevSurveysResponseState: this.state.surveysResponseState,
+        surveyIndex,
         renderedQuestionIds: rendered,
         draft,
         prevSlice,
@@ -5394,18 +5394,6 @@ export class SurveyQuestions extends Component {
         applyDraftEntryToSlice: this._applyDraftHydrationEntryToSlice,
       });
 
-      const updates = {};
-
-      if (changed) {
-        updates.surveysResponseState = buildSurveyResponseStateArray({
-          prevSurveysResponseState: this.state.surveysResponseState,
-          surveyIndex,
-          nextSlice,
-        });
-      }
-      if (baselineChanged) {
-        updates.editBaseline = nextBaseline;
-      }
       if (Object.keys(updates).length === 0) return;
 
       this.setState(updates, () => {
