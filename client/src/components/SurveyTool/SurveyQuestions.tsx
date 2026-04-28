@@ -1264,6 +1264,24 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this._canDecryptOtherResponsesInFlight = null;
   };
 
+  startCanDecryptOtherResponsesRun = (snapshotKey = '') => {
+    this._canDecryptOtherResponsesKey = String(snapshotKey || '');
+    const runId = (Number(this._canDecryptOtherResponsesRunId) || 0) + 1;
+    this._canDecryptOtherResponsesRunId = runId;
+    return runId;
+  };
+
+  isCurrentCanDecryptOtherResponsesRun = (runId, snapshotKey = '') => (
+    this._canDecryptOtherResponsesRunId === runId &&
+    this._canDecryptOtherResponsesKey === String(snapshotKey || '')
+  );
+
+  clearCanDecryptOtherResponsesInFlightIfTracked = (tracked = null) => {
+    if (this._canDecryptOtherResponsesInFlight === tracked) {
+      this._canDecryptOtherResponsesInFlight = null;
+    }
+  };
+
   refreshCanDecryptOtherResponses = async () => {
     try {
       const slug = this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props);
@@ -1299,17 +1317,15 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         return false;
       }
 
-      if (snapshot.key === this._canDecryptOtherResponsesKey && this._canDecryptOtherResponsesInFlight) {
+      const snapshotKey = String(snapshot.key || '');
+      if (snapshotKey === this._canDecryptOtherResponsesKey && this._canDecryptOtherResponsesInFlight) {
         return await this._canDecryptOtherResponsesInFlight;
       }
-      this._canDecryptOtherResponsesKey = snapshot.key;
-      const runId = (Number(this._canDecryptOtherResponsesRunId) || 0) + 1;
-      this._canDecryptOtherResponsesRunId = runId;
+      const runId = this.startCanDecryptOtherResponsesRun(snapshotKey);
 
       const run = (async () => {
         if (this.state.canDecryptOtherResponsesStatus !== 'checking' &&
-          this._canDecryptOtherResponsesRunId === runId &&
-          this._canDecryptOtherResponsesKey === snapshot.key
+          this.isCurrentCanDecryptOtherResponsesRun(runId, snapshotKey)
         ) {
           // Clear any previously granted permission while we verify against the current gate/session/wallet.
           this.setState(buildCanDecryptOtherResponsesState({ status: 'checking' }));
@@ -1324,7 +1340,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           }));
         }
         const { canDecrypt, status } = resolveCanDecryptOtherResponsesVerdict(verdicts);
-        if (this._canDecryptOtherResponsesRunId === runId && this._canDecryptOtherResponsesKey === snapshot.key) {
+        if (this.isCurrentCanDecryptOtherResponsesRun(runId, snapshotKey)) {
           this.setState(buildCanDecryptOtherResponsesState({ canDecrypt, status }));
         }
         return canDecrypt;
@@ -1333,16 +1349,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       let tracked = null;
       tracked = run
         .catch(() => {
-          if (this._canDecryptOtherResponsesRunId === runId && this._canDecryptOtherResponsesKey === snapshot.key) {
+          if (this.isCurrentCanDecryptOtherResponsesRun(runId, snapshotKey)) {
             this.setState(buildCanDecryptOtherResponsesState({ status: 'unknown' }));
           }
           return false;
         })
         .finally(() => {
           // Only clear the pointer if we're still tracking this exact promise.
-          if (this._canDecryptOtherResponsesInFlight === tracked) {
-            this._canDecryptOtherResponsesInFlight = null;
-          }
+          this.clearCanDecryptOtherResponsesInFlightIfTracked(tracked);
         });
       this._canDecryptOtherResponsesInFlight = tracked;
 
