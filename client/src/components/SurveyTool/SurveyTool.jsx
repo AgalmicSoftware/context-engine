@@ -236,6 +236,7 @@ import {
   executePriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  loadGroupedMissingResponseRequests,
   buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
@@ -5138,39 +5139,23 @@ export class SurveyQuestions extends Component {
       : [];
     if (this.props?.minifiedMode === 'pile' && extraSlugs.length > 0) {
       const slugByQuestionId = this.resolveQuestionSlugMapForIds(renderedIds, { surveyId: this.props.surveyId || null });
-      const cachedQuestionResponsesByScope = new Map();
-      const requests = [];
       const scopePlan = buildGroupedRenderedResponseScopePlan({
         renderedIds,
         slugByQuestionId,
         fallbackSlug: slug,
         fallbackNetId: netId,
       });
-      for (const entry of scopePlan) {
-        const resolvedSlug = normalizeSessionSlugValue(entry.slug);
-        const resolvedContext = resolveResponseHydrationContext(this.props, resolvedSlug);
-        const resolvedNetId = resolvedContext.networkIdStr || entry.netId || netId;
-        if (!resolvedNetId) {
-          requests.push({ slug: resolvedSlug, netId: '', missingIds: [] });
-          continue;
-        }
-        const scopeKey = `${resolvedSlug}|${resolvedNetId}`;
-        let questionResponses = cachedQuestionResponsesByScope.get(scopeKey);
-        if (!questionResponses) {
-          const questionsCache = ensureQuestionsNet(await readQuestionsCacheAsync(resolvedSlug), resolvedNetId);
-          questionResponses = questionsCache?.[resolvedNetId]?.questionResponses || {};
-          cachedQuestionResponsesByScope.set(scopeKey, questionResponses);
-        }
-        requests.push({
-          slug: resolvedSlug,
-          netId: resolvedNetId,
-          missingIds: buildMissingResponseIdsForRenderedQuestions({
-            renderedIds: entry.questionIds,
-            questionResponses,
-            responderLower,
-          }),
-        });
-      }
+      const requests = await loadGroupedMissingResponseRequests({
+        scopePlan,
+        fallbackNetId: netId,
+        responderLower,
+        resolveScopeNetId: (resolvedSlug, entryNetId) => {
+          const resolvedContext = resolveResponseHydrationContext(this.props, normalizeSessionSlugValue(resolvedSlug));
+          return resolvedContext.networkIdStr || entryNetId || netId;
+        },
+        readQuestionsCacheAsync,
+        ensureQuestionsNet,
+      });
 
       return buildMissingRenderedResponseResult({
         requests,

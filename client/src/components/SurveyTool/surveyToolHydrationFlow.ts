@@ -239,6 +239,15 @@ type GroupedRenderedResponseScopePlanEntry = {
   questionIds: string[];
 };
 
+type LoadGroupedMissingResponseRequestsArgs = {
+  scopePlan?: GroupedRenderedResponseScopePlanEntry[] | null;
+  fallbackNetId?: unknown;
+  responderLower?: string;
+  resolveScopeNetId?: ((slug: string, entryNetId: string) => string | null | undefined) | null;
+  readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
+  ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
+};
+
 type BuildMissingResponseIdsForRenderedQuestionsArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   questionResponses?: Record<string, unknown> | null;
@@ -1181,6 +1190,61 @@ export const executePriorResponseFetchPlan = async ({
     fetched,
     slug,
   };
+};
+
+export const loadGroupedMissingResponseRequests = async ({
+  scopePlan = null,
+  fallbackNetId = '',
+  responderLower = '',
+  resolveScopeNetId = null,
+  readQuestionsCacheAsync = null,
+  ensureQuestionsNet = null,
+}: LoadGroupedMissingResponseRequestsArgs = {}) => {
+  const requests = [];
+  const cachedQuestionResponsesByScope = new Map<string, Record<string, unknown>>();
+
+  for (const entry of (Array.isArray(scopePlan) ? scopePlan : [])) {
+    const resolvedSlug = String(entry?.slug || '');
+    const resolvedNetId = String(
+      typeof resolveScopeNetId === 'function'
+        ? (resolveScopeNetId(resolvedSlug, String(entry?.netId || '')) || '')
+        : (entry?.netId || fallbackNetId || '')
+    );
+    if (!resolvedNetId) {
+      requests.push({ slug: resolvedSlug, netId: '', missingIds: [] });
+      continue;
+    }
+
+    const scopeKey = `${resolvedSlug}|${resolvedNetId}`;
+    let questionResponses = cachedQuestionResponsesByScope.get(scopeKey);
+    if (!questionResponses) {
+      const rawCache = typeof readQuestionsCacheAsync === 'function'
+        ? await readQuestionsCacheAsync(resolvedSlug)
+        : {};
+      const questionsCache = typeof ensureQuestionsNet === 'function'
+        ? ensureQuestionsNet(rawCache, resolvedNetId)
+        : rawCache;
+      questionResponses =
+        isRecord(questionsCache) &&
+        isRecord(questionsCache[resolvedNetId]) &&
+        isRecord((questionsCache[resolvedNetId] as UnknownRecord).questionResponses)
+          ? ((questionsCache[resolvedNetId] as UnknownRecord).questionResponses as Record<string, unknown>)
+          : {};
+      cachedQuestionResponsesByScope.set(scopeKey, questionResponses);
+    }
+
+    requests.push({
+      slug: resolvedSlug,
+      netId: resolvedNetId,
+      missingIds: buildMissingResponseIdsForRenderedQuestions({
+        renderedIds: entry?.questionIds || [],
+        questionResponses,
+        responderLower,
+      }),
+    });
+  }
+
+  return requests;
 };
 
 export const buildGroupedRenderedResponseScopePlan = ({
