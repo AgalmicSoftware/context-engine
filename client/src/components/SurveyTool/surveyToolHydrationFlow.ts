@@ -362,6 +362,8 @@ type ApplyPrefillStateEffectsArgs = {
   recalculateEditStats?: (() => void) | null;
 };
 
+type ApplyPrefillUpdatePlanArgs = ApplyLocalCacheRehydrateSuccessEffectsArgs & ApplyPrefillStateEffectsArgs;
+
 type ApplyLocalCacheRehydrateAppliedEffectsArgs = ApplyPrefillStateEffectsArgs & {
   ensurePriorResponses?: (() => void) | null;
   callback?: (() => void) | null;
@@ -1822,6 +1824,20 @@ export const applyPrefillStateEffects = ({
     recalculateEditStats();
   }
 };
+
+export const applyPrefillUpdatePlan = ({
+  updates = null,
+  applyStateUpdates = null,
+  updateJsonPreview = null,
+  recalculateEditStats = null,
+}: ApplyPrefillUpdatePlanArgs = {}) => applyLocalCacheRehydrateSuccessEffects({
+  updates,
+  applyStateUpdates,
+  afterStateApplied: () => applyPrefillStateEffects({
+    updateJsonPreview,
+    recalculateEditStats,
+  }),
+});
 
 export const applyLocalCacheRehydrateAppliedEffects = ({
   updateJsonPreview = null,

@@ -268,7 +268,7 @@ import {
   applyRevertPendingEffects,
   applyStartFreshEffects,
   applyDraftHydrationEffects,
-  applyPrefillStateEffects,
+  applyPrefillUpdatePlan,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateNoChangeEffects,
   applyLocalCacheRehydrateAppliedEffects,
@@ -5444,7 +5444,7 @@ export class SurveyQuestions extends Component {
 
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
 
-    applyLocalCacheRehydrateSuccessEffects({
+    applyPrefillUpdatePlan({
       updates: (prev) => buildPrefilledSurveyUpdatePlan({
         surveyIndex,
         prevSurveysResponseState: prev?.surveysResponseState,
@@ -5456,10 +5456,8 @@ export class SurveyQuestions extends Component {
         buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       }).updates,
       applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
-      afterStateApplied: () => applyPrefillStateEffects({
-        updateJsonPreview: this.updateJsonPreview,
-        recalculateEditStats: this.recalculateEditStats,
-      }),
+      updateJsonPreview: this.updateJsonPreview,
+      recalculateEditStats: this.recalculateEditStats,
     });
   };
 
@@ -6301,7 +6299,7 @@ export class SurveyQuestions extends Component {
 
     if (!userAnswer || !questionId) return;
 
-    applyLocalCacheRehydrateSuccessEffects({
+    applyPrefillUpdatePlan({
       updates: (prev) => buildPrefilledSingleQuestionUpdatePlan({
         surveyIndex,
         questionId,
@@ -6314,10 +6312,8 @@ export class SurveyQuestions extends Component {
         buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       }).updates,
       applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
-      afterStateApplied: () => applyPrefillStateEffects({
-        updateJsonPreview: this.updateJsonPreview,
-        recalculateEditStats: this.recalculateEditStats,
-      }),
+      updateJsonPreview: this.updateJsonPreview,
+      recalculateEditStats: this.recalculateEditStats,
     });
   };
   parseAnswerValue = (value) => {

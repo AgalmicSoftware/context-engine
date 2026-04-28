@@ -132,6 +132,7 @@ export {
   applyRevertPendingEffects,
   applyStartFreshEffects,
   applyDraftHydrationEffects,
+  applyPrefillUpdatePlan,
   applyPrefillStateEffects,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateNoChangeEffects,
