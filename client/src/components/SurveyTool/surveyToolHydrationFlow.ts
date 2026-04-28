@@ -369,6 +369,12 @@ type ApplyLocalCacheRehydrateAppliedEffectsArgs = ApplyPrefillStateEffectsArgs &
   callback?: (() => void) | null;
 };
 
+type LoadDraftAnswersByQuestionIdSafelyArgs = {
+  loadDraft?: (() => unknown) | null;
+  buildDraftAnswersByQuestionId?: ((draft: unknown) => unknown) | null;
+  onError?: ((error: unknown) => void) | null;
+};
+
 type ApplyResetFormStateEffectsArgs = {
   callback?: (() => void) | null;
 };
@@ -614,6 +620,26 @@ const buildEmptyResponseSlice = (): ResponseSlice => ({
 const isRecord = (value: unknown): value is UnknownRecord => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
+
+export const loadDraftAnswersByQuestionIdSafely = ({
+  loadDraft = null,
+  buildDraftAnswersByQuestionId: buildDraftAnswers = null,
+  onError = null,
+}: LoadDraftAnswersByQuestionIdSafelyArgs = {}): UnknownRecord => {
+  if (typeof loadDraft !== 'function' || typeof buildDraftAnswers !== 'function') {
+    return {};
+  }
+
+  try {
+    const draftAnswersByQuestionId = buildDraftAnswers(loadDraft());
+    return isRecord(draftAnswersByQuestionId) ? draftAnswersByQuestionId : {};
+  } catch (error) {
+    if (typeof onError === 'function') {
+      onError(error);
+    }
+    return {};
+  }
+};
 
 const resolveDraftAwareCachedField = ({
   cachedField = null,

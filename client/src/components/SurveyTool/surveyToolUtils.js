@@ -128,6 +128,7 @@ export {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
+  loadDraftAnswersByQuestionIdSafely,
   applyResetFormStateEffects,
   applyRevertPendingEffects,
   applyStartFreshEffects,
