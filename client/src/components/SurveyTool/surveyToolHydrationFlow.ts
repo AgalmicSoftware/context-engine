@@ -100,6 +100,16 @@ type BuildMergedSurveyResponseStateArgs = {
   buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
 };
 
+type BuildInitializedSurveyResponseStateArgs = {
+  singleQuestionMode?: boolean;
+  isStandalone?: boolean;
+  surveyIndex?: unknown;
+  renderedQuestionIds?: unknown[] | null;
+  questionPoolIds?: unknown[] | null;
+  prevSurveysResponseState?: unknown[] | null;
+  buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -514,6 +524,53 @@ export const buildMergedSurveyResponseState = ({
     additionalComments: mergedAdditional,
   };
 
+  return nextSurveysResponseState;
+};
+
+export const buildInitializedSurveyResponseState = ({
+  singleQuestionMode = false,
+  isStandalone = false,
+  surveyIndex = 0,
+  renderedQuestionIds = null,
+  questionPoolIds = null,
+  prevSurveysResponseState = null,
+  buildEmptyResponseFieldState = null,
+}: BuildInitializedSurveyResponseStateArgs = {}) => {
+  const preferredIds = Array.isArray(renderedQuestionIds) && renderedQuestionIds.length > 0
+    ? renderedQuestionIds
+    : (Array.isArray(questionPoolIds) ? questionPoolIds : []);
+
+  const initialAnswers: Record<string, unknown> = {};
+  const initialAdditionalThoughts: Record<string, unknown> = {};
+
+  preferredIds.forEach((rawQuestionId) => {
+    const questionId = String(rawQuestionId || '');
+    if (!questionId) return;
+    if (typeof buildEmptyResponseFieldState === 'function') {
+      initialAnswers[questionId] = buildEmptyResponseFieldState(questionId);
+      initialAdditionalThoughts[questionId] = buildEmptyResponseFieldState(questionId, 'additional');
+    }
+  });
+
+  const initialSlice = {
+    answers: initialAnswers,
+    importance: {},
+    conviction: {},
+    additionalComments: initialAdditionalThoughts,
+  };
+
+  if (singleQuestionMode || isStandalone) {
+    return [initialSlice];
+  }
+
+  const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
+  const nextSurveysResponseState = Array.isArray(prevSurveysResponseState)
+    ? [...prevSurveysResponseState]
+    : [];
+  while (nextSurveysResponseState.length <= normalizedSurveyIndex) {
+    nextSurveysResponseState.push(null);
+  }
+  nextSurveysResponseState[normalizedSurveyIndex] = initialSlice;
   return nextSurveysResponseState;
 };
 

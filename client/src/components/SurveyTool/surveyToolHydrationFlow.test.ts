@@ -3,6 +3,7 @@ import {
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
   buildHydratedResponseSlice,
+  buildInitializedSurveyResponseState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
   buildMergedHydrationQuestionResponses,
@@ -484,6 +485,50 @@ describe('surveyToolHydrationFlow', () => {
     ]);
 
     expect(buildEmptyResponseFieldState).toHaveBeenCalledTimes(2);
+  });
+
+  it('builds initialized survey response state for single and survey modes', () => {
+    const buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
+      value: '',
+      questionId,
+      fieldKey,
+    }));
+
+    expect(buildInitializedSurveyResponseState({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      renderedQuestionIds: ['q1'],
+      questionPoolIds: ['qPool'],
+      prevSurveysResponseState: [],
+      buildEmptyResponseFieldState,
+    })).toEqual([
+      {
+        answers: { q1: { value: '', questionId: 'q1', fieldKey: 'answer' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q1: { value: '', questionId: 'q1', fieldKey: 'additional' } },
+      },
+    ]);
+
+    expect(buildInitializedSurveyResponseState({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 2,
+      renderedQuestionIds: ['q2'],
+      questionPoolIds: ['qPool'],
+      prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+      buildEmptyResponseFieldState,
+    })).toEqual([
+      { answers: { keep: { value: 'persisted' } } },
+      null,
+      {
+        answers: { q2: { value: '', questionId: 'q2', fieldKey: 'answer' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q2: { value: '', questionId: 'q2', fieldKey: 'additional' } },
+      },
+    ]);
   });
 
   it('builds single-question prefill state with ensured survey slots', () => {
