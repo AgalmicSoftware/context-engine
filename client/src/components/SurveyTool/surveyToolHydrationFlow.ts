@@ -133,6 +133,21 @@ type BuildResetFormStatePatchArgs = {
   cloneValue?: ((value: unknown) => unknown) | null;
 };
 
+type ResolveRevertPendingBaselineSliceArgs = {
+  editBaseline?: ResponseSlice | null;
+  isLoggedIn?: boolean;
+  userAnswers?: unknown;
+  buildSliceFromUserAnswers?: ((userAnswers: unknown) => ResponseSlice | null | undefined) | null;
+  buildSliceFromLocalCache?: (() => ResponseSlice | null | undefined) | null;
+};
+
+type BuildRevertPendingStatePatchArgs = {
+  prevSurveysResponseState?: unknown[] | null;
+  surveyIndex?: unknown;
+  nextSlice?: ResponseSlice | null;
+  isLoggedIn?: boolean;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -698,6 +713,51 @@ export const buildResetFormStatePatch = ({
     isLoadingResponse: true,
   };
 };
+
+export const resolveRevertPendingBaselineSlice = ({
+  editBaseline = null,
+  isLoggedIn = false,
+  userAnswers = null,
+  buildSliceFromUserAnswers = null,
+  buildSliceFromLocalCache = null,
+}: ResolveRevertPendingBaselineSliceArgs = {}): ResponseSlice => {
+  if (editBaseline && typeof editBaseline === 'object') {
+    return editBaseline;
+  }
+
+  if (isLoggedIn) {
+    if (userAnswers && typeof buildSliceFromUserAnswers === 'function') {
+      const nextSlice = buildSliceFromUserAnswers(userAnswers);
+      if (nextSlice && typeof nextSlice === 'object') return nextSlice;
+    }
+    if (typeof buildSliceFromLocalCache === 'function') {
+      const cachedSlice = buildSliceFromLocalCache();
+      if (cachedSlice && typeof cachedSlice === 'object') return cachedSlice;
+    }
+  }
+
+  return buildEmptyResponseSlice();
+};
+
+export const buildRevertPendingStatePatch = ({
+  prevSurveysResponseState = null,
+  surveyIndex = 0,
+  nextSlice = null,
+  isLoggedIn = false,
+}: BuildRevertPendingStatePatchArgs = {}) => ({
+  surveysResponseState: buildSurveyResponseStateArray({
+    prevSurveysResponseState,
+    surveyIndex,
+    nextSlice: nextSlice && typeof nextSlice === 'object' ? nextSlice : buildEmptyResponseSlice(),
+  }),
+  isEditing: true,
+  displayAnswerMode: false,
+  startFresh: !isLoggedIn,
+  isDirty: false,
+  modifiedCount: 0,
+  hasEncryptedChanges: false,
+  submissionError: '',
+});
 
 export const buildPrefilledSurveyState = ({
   surveyIndex = 0,
