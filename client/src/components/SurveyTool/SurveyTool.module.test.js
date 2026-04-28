@@ -1842,6 +1842,59 @@ describe('SurveyTool module', () => {
     expect(subject._canDecryptOtherResponsesInFlight).toBeNull();
   });
 
+  it('deduplicates in-flight response decrypt access checks for the same snapshot', async () => {
+    const deferred = createDeferred();
+    const gateSpy = jest.spyOn(sponsoredAccess, 'checkSponsoredAccess')
+      .mockImplementation(() => deferred.promise);
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      sbtCacheRevision: 0,
+    });
+    syncClassSetState(subject);
+    subject.state = {
+      ...subject.state,
+      canDecryptOtherResponses: false,
+      canDecryptOtherResponsesStatus: 'needs-wallet',
+    };
+    subject.getResponseGatePolicy = jest.fn(() => ({
+      primaryResource: 'default',
+      recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'baseSepolia' }],
+    }));
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({}));
+
+    const firstRun = subject.refreshCanDecryptOtherResponses();
+    await Promise.resolve();
+
+    expect(gateSpy).toHaveBeenCalledTimes(1);
+    expect(subject.state.canDecryptOtherResponsesStatus).toBe('checking');
+    expect(subject._canDecryptOtherResponsesInFlight).toBeTruthy();
+
+    const secondRun = subject.refreshCanDecryptOtherResponses();
+    await Promise.resolve();
+
+    expect(gateSpy).toHaveBeenCalledTimes(1);
+    expect(subject._canDecryptOtherResponsesRunId).toBe(1);
+    expect(subject._canDecryptOtherResponsesKey).toContain('0xabc');
+
+    deferred.resolve({
+      status: 'granted',
+      gate: null,
+      resourceKey: 'default',
+    });
+
+    await expect(firstRun).resolves.toBe(true);
+    await expect(secondRun).resolves.toBe(true);
+    expect(subject.state.canDecryptOtherResponses).toBe(true);
+    expect(subject.state.canDecryptOtherResponsesStatus).toBe('granted');
+    expect(subject._canDecryptOtherResponsesInFlight).toBeNull();
+  });
+
   it('keeps lock audience SBT detail links on terminology-aware routes instead of nested /u/ links', () => {
     const address = '0x1111111111111111111111111111111111111111';
     const subject = new SurveyQuestions({
