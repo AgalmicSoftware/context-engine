@@ -1,5 +1,7 @@
 import {
+  buildPileFilterResultPlan,
   buildPileLoadResultPlan,
+  buildPileQuestionPipelineState,
   buildPileQuestionLoadState,
   buildPileVisibleTransitionPlan,
   shouldSkipPileFilterStateUpdate,
@@ -37,6 +39,40 @@ describe('surveyPileQuestionFlow', () => {
     })).toEqual({
       hiddenQuestions: [{ id: 'q1', prompt: '[encrypted]', promptDecrypted: false }],
       visibleQuestions: [{ id: 'q2', prompt: 'Visible question', promptDecrypted: true }],
+      hasHiddenGatedQuestions: true,
+    });
+  });
+
+  it('builds a shared pile question pipeline state from sorted and masked questions', () => {
+    expect(buildPileQuestionPipelineState({
+      questions: [
+        { id: 'q1', prompt: 'Q1' },
+        { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
+        { id: 'q3', prompt: 'Q3' },
+      ],
+      questionResponses: {
+        q1: { '0xabc': { answer: { value: 'yes' } } },
+      },
+      responseCounts: {
+        q1: 3,
+        q2: 7,
+        q3: 2,
+      },
+      highlightedQuestionIds: new Set(['q2']),
+      account: '0xabc',
+    })).toEqual({
+      sortedQuestions: [
+        { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
+        { id: 'q3', prompt: 'Q3' },
+        { id: 'q1', prompt: 'Q1' },
+      ],
+      visibleQuestions: [
+        { id: 'q3', prompt: 'Q3' },
+        { id: 'q1', prompt: 'Q1' },
+      ],
+      hiddenQuestions: [
+        { id: 'q2', prompt: '[encrypted]', promptDecrypted: false },
+      ],
       hasHiddenGatedQuestions: true,
     });
   });
@@ -138,6 +174,56 @@ describe('surveyPileQuestionFlow', () => {
       shouldUpdateState: true,
       shouldIncrementPileQuestionsGeneration: true,
       resultSignature: 'f0::::q4|q5::q4::0::0xabc:q4',
+    });
+  });
+
+  it('builds pile filter result plans that skip redundant updates and normalize active index reset', () => {
+    expect(buildPileFilterResultPlan({
+      currentVisibleSignature: 'q1|q2',
+      nextVisibleQuestions: [{ id: 'q1' }, { id: 'q2' }],
+      currentFilterState: { tags: ['featured'] },
+      nextFilterState: { tags: ['featured'] },
+      nextHiddenGated: false,
+      currentHiddenGated: false,
+      buildQuestionListSignature: (questions) => questions.map((question) => String(question.id)).join('|'),
+      serializeFilterState: (filterState) => JSON.stringify(filterState || {}),
+    })).toEqual({
+      nextState: {
+        pileQuestions: [{ id: 'q1' }, { id: 'q2' }],
+        activePileIndex: 0,
+        filterState: { tags: ['featured'] },
+        hasHiddenGatedQuestions: false,
+      },
+      shouldSkipStateUpdate: true,
+      shouldIncrementPileQuestionsGeneration: false,
+      nextVisibleSignature: 'q1|q2',
+      currentVisibleSignature: 'q1|q2',
+      nextFilterSignature: '{"tags":["featured"]}',
+      currentFilterSignature: '{"tags":["featured"]}',
+    });
+
+    expect(buildPileFilterResultPlan({
+      currentVisibleSignature: 'q1|q2',
+      nextVisibleQuestions: [{ id: 'q3' }],
+      currentFilterState: { tags: ['featured'] },
+      nextFilterState: { questionTypes: ['binary'] },
+      nextHiddenGated: true,
+      currentHiddenGated: false,
+      buildQuestionListSignature: (questions) => questions.map((question) => String(question.id)).join('|'),
+      serializeFilterState: (filterState) => JSON.stringify(filterState || {}),
+    })).toEqual({
+      nextState: {
+        pileQuestions: [{ id: 'q3' }],
+        activePileIndex: 0,
+        filterState: { questionTypes: ['binary'] },
+        hasHiddenGatedQuestions: true,
+      },
+      shouldSkipStateUpdate: false,
+      shouldIncrementPileQuestionsGeneration: true,
+      nextVisibleSignature: 'q3',
+      currentVisibleSignature: 'q1|q2',
+      nextFilterSignature: '{"questionTypes":["binary"]}',
+      currentFilterSignature: '{"tags":["featured"]}',
     });
   });
 
