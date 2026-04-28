@@ -120,6 +120,7 @@ export {
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
   buildPriorResponseFetchPlan,
+  executePriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
   buildMissingRenderedResponseResult,
