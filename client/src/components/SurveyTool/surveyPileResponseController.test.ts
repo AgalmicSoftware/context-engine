@@ -4,18 +4,67 @@ import {
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
 } from './surveyPileResponseController';
+import type { PileResponseSlice } from './surveyPileResponseWindow';
+
+type TestResponseField = {
+  value: string;
+  encrypted: boolean;
+  questionId?: string | null;
+  fieldKey?: string;
+};
+
+type TestResponseSlice = Omit<PileResponseSlice, 'answers' | 'additionalComments'> & {
+  answers: Record<string, TestResponseField>;
+  additionalComments: Record<string, TestResponseField>;
+};
+
+type CachedResponseRecord = {
+  answer?: {
+    value?: string;
+    encrypted?: boolean;
+  };
+  additional?: {
+    value?: string;
+    encrypted?: boolean;
+  };
+};
+
+type PileQuestion = {
+  id: string;
+};
+
+type TestPileState = {
+  pileQuestions: PileQuestion[];
+  activePileIndex: number;
+  surveysResponseState: TestResponseSlice[];
+  editBaseline: TestResponseSlice;
+};
+
+type SeedBaselineNextState = {
+  surveysResponseState: TestResponseSlice[];
+  baselineResponses: TestResponseSlice;
+  editBaseline: TestResponseSlice;
+  modifiedCount: number;
+  isDirty: boolean;
+};
+
+type PatchLiveNextState = {
+  surveysResponseState: TestResponseSlice[];
+};
 
 const cloneValue = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
-const buildEmptyResponseFieldState = (questionId: string | null = null, fieldKey = 'answer') => ({
+const buildEmptyResponseFieldState = (questionId: string | null = null, fieldKey = 'answer'): TestResponseField => ({
   value: '',
   encrypted: false,
   questionId,
   fieldKey,
 });
 
-const buildSynchronousSetState = (stateRef: { current: any }) => (
-  (update: any, callback?: () => void) => {
+type TestSetStateUpdate<State> = Partial<State> | null | ((prevState: State) => Partial<State> | null);
+
+const buildSynchronousSetState = <State extends Record<string, unknown>>(stateRef: { current: State }) => (
+  (update: TestSetStateUpdate<State>, callback?: () => void) => {
     const patch = typeof update === 'function'
       ? update(stateRef.current)
       : update;
@@ -50,13 +99,13 @@ describe('surveyPileResponseController', () => {
       pendingTotal: 0,
       cloneValue,
       applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }) => {
-        const responseRecord = response as any;
+        const responseRecord = response as CachedResponseRecord;
         targetSlice.answers[questionId] = { value: responseRecord.answer?.value || '', encrypted: false };
         targetSlice.additionalComments[questionId] = { value: responseRecord.additional?.value || '', encrypted: false };
         return true;
       },
     });
-    const nextState = plan.nextState as any;
+    const nextState = plan.nextState as unknown as SeedBaselineNextState;
 
     expect(plan.reason).toBe('seed-baseline');
     expect(nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
@@ -93,13 +142,13 @@ describe('surveyPileResponseController', () => {
       pendingTotal: 0,
       cloneValue,
       applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }) => {
-        const responseRecord = response as any;
+        const responseRecord = response as CachedResponseRecord;
         targetSlice.answers[questionId] = { value: responseRecord.answer?.value || '', encrypted: false };
         targetSlice.additionalComments[questionId] = { value: responseRecord.additional?.value || '', encrypted: false };
         return true;
       },
     });
-    const nextState = plan.nextState as any;
+    const nextState = plan.nextState as unknown as PatchLiveNextState;
 
     expect(plan.reason).toBe('patch-live');
     expect(nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
@@ -133,7 +182,7 @@ describe('surveyPileResponseController', () => {
   });
 
   it('backfills missing visible pile response slots and rehydrates the visible window once', () => {
-    const stateRef: { current: any } = {
+    const stateRef: { current: TestPileState } = {
       current: {
         pileQuestions: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }],
         activePileIndex: 0,
