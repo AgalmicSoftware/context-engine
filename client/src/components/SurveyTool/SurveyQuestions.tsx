@@ -392,7 +392,10 @@ import {
 } from './surveyToolUtils.js';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
-import { buildRenderedQuestionIdsFromQuestionPools } from './surveyQuestionScope.js';
+import {
+  buildInitialSurveyResponseQuestionIds,
+  buildRenderedQuestionIdsFromQuestionPools,
+} from './surveyQuestionScope.js';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildQuestionPoolPendingSubmitFeedbackMessage,
@@ -5088,13 +5091,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const questionPoolIds = Array.isArray(this.props.questionPool)
       ? this.props.questionPool.map((question) => question.id)
       : [];
-    const renderedQuestionIds = this.props.singleQuestionMode
-      ? (questionPoolIds.length > 0 ? questionPoolIds : [this.props.questionID])
-      : (this.props.isStandalone
-        ? (questionPoolIds.length > 0 ? questionPoolIds : this.getCurrentRenderedQuestionIds())
-        : (this.getCurrentRenderedQuestionIds().length > 0
-          ? this.getCurrentRenderedQuestionIds()
-          : (Array.isArray(this.state.questionPool) ? this.state.questionPool.map((question) => question.id) : [])));
+    const renderedQuestionIds = buildInitialSurveyResponseQuestionIds({
+      singleQuestionMode: this.props.singleQuestionMode,
+      isStandalone: this.props.isStandalone,
+      questionPoolIds,
+      questionId: this.props.questionID,
+      getRenderedQuestionIds: () => this.getCurrentRenderedQuestionIds(),
+      stateQuestionPool: this.state.questionPool,
+    });
 
     return buildInitializedSurveyResponseState({
       singleQuestionMode: this.props.singleQuestionMode,
