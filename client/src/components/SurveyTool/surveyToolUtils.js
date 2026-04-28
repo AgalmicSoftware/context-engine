@@ -107,6 +107,7 @@ export {
   buildLocalCacheHydrationMemoKey,
   buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
+  buildPrefilledSingleQuestionState,
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,

@@ -47,6 +47,17 @@ type CachedResponseApplyArgs = {
   parseValue?: ((value: unknown) => unknown) | null;
 };
 
+type ResponseHydrationApplyArgs = {
+  targetSlice?: ResponseSlice | null;
+  currentSlice?: ResponseSlice | null;
+  responses?: unknown[];
+  allowOverwrite?: boolean;
+  parseValue?: ((value: unknown) => unknown) | null;
+  questionIdResolver?: ((response: unknown) => string | null | undefined) | null;
+};
+
+type ApplyResponseHydrationListToSlice = ((args: ResponseHydrationApplyArgs) => boolean) | null;
+
 type BuildCacheHydrationSliceArgs = {
   renderedQuestionIds?: Iterable<unknown> | unknown[];
   mergedQuestionResponses?: CachedQuestionResponses | null;
@@ -63,32 +74,34 @@ type BuildPrefilledSurveyStateArgs = {
   isDirty?: boolean;
   submissionComplete?: boolean;
   responses?: unknown[];
-  applyResponseHydrationListToSlice?: ((args: {
-    targetSlice?: ResponseSlice | null;
-    currentSlice?: ResponseSlice | null;
-    responses?: unknown[];
-    allowOverwrite?: boolean;
-  }) => boolean) | null;
+  applyResponseHydrationListToSlice?: ApplyResponseHydrationListToSlice;
   buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: ResponseSlice | null) => ResponseSlice | null) | null;
 };
 
 type BuildHydratedResponseSliceArgs = {
   userAnswers?: unknown;
   prevSlice?: ResponseSlice | null;
-  applyResponseHydrationListToSlice?: ((args: {
-    targetSlice?: ResponseSlice | null;
-    currentSlice?: ResponseSlice | null;
-    responses?: unknown[];
-    allowOverwrite?: boolean;
-    parseValue?: ((value: unknown) => unknown) | null;
-  }) => boolean) | null;
+  applyResponseHydrationListToSlice?: ApplyResponseHydrationListToSlice;
   parseValue?: ((value: unknown) => unknown) | null;
+  questionIdResolver?: ((response: unknown) => string | null | undefined) | null;
 };
 
 type BuildSurveyResponseStateArrayArgs = {
   prevSurveysResponseState?: unknown[] | null;
   surveyIndex?: unknown;
   nextSlice?: ResponseSlice | null;
+};
+
+type BuildPrefilledSingleQuestionStateArgs = {
+  surveyIndex?: unknown;
+  questionId?: unknown;
+  prevSurveysResponseState?: unknown[] | null;
+  prevEditBaseline?: ResponseSlice | null;
+  isDirty?: boolean;
+  submissionComplete?: boolean;
+  userAnswer?: unknown;
+  applyResponseHydrationListToSlice?: ApplyResponseHydrationListToSlice;
+  buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: ResponseSlice | null) => ResponseSlice | null) | null;
 };
 
 type BuildLocalCacheHydrationMemoKeyArgs = {
@@ -332,6 +345,7 @@ export const buildHydratedResponseSlice = ({
   prevSlice = null,
   applyResponseHydrationListToSlice = null,
   parseValue = null,
+  questionIdResolver = null,
 }: BuildHydratedResponseSliceArgs = {}) => {
   const slice = buildEmptyResponseSlice();
   if (!userAnswers) return slice;
@@ -342,13 +356,17 @@ export const buildHydratedResponseSlice = ({
     : [userAnswers];
 
   if (typeof applyResponseHydrationListToSlice === 'function') {
-    applyResponseHydrationListToSlice({
+    const hydrationArgs: ResponseHydrationApplyArgs = {
       targetSlice: slice,
       currentSlice: prevSlice,
       responses,
       allowOverwrite: true,
       parseValue,
-    });
+    };
+    if (typeof questionIdResolver === 'function') {
+      hydrationArgs.questionIdResolver = questionIdResolver;
+    }
+    applyResponseHydrationListToSlice(hydrationArgs);
   }
 
   return slice;
@@ -468,6 +486,61 @@ export const buildPrefilledSurveyState = ({
   nextSurveysResponseState[normalizedSurveyIndex] = nextSlice;
   const baseline = typeof buildSliceFromUserAnswers === 'function'
     ? buildSliceFromUserAnswers({ responses }, prevEditBaseline || currentSlice)
+    : null;
+
+  return {
+    nextSurveysResponseState,
+    nextBaseline: baseline,
+    shouldWriteBaseline: !submissionComplete,
+  };
+};
+
+export const buildPrefilledSingleQuestionState = ({
+  surveyIndex = 0,
+  questionId = '',
+  prevSurveysResponseState = null,
+  prevEditBaseline = null,
+  isDirty = false,
+  submissionComplete = false,
+  userAnswer = null,
+  applyResponseHydrationListToSlice = null,
+  buildSliceFromUserAnswers = null,
+}: BuildPrefilledSingleQuestionStateArgs = {}) => {
+  const normalizedQuestionId = normalizeQuestionIdKey(questionId);
+  const normalizedSurveyIndex = Math.max(0, Number(surveyIndex) || 0);
+  const currentStateArr = Array.isArray(prevSurveysResponseState) ? prevSurveysResponseState : [];
+  const currentSlice = currentStateArr[normalizedSurveyIndex] && typeof currentStateArr[normalizedSurveyIndex] === 'object'
+    ? currentStateArr[normalizedSurveyIndex] as ResponseSlice
+    : buildEmptyResponseSlice();
+  const allowOverwrite = !isDirty && !submissionComplete;
+
+  const nextSurveysResponseState = buildSurveyResponseStateArray({
+    prevSurveysResponseState: currentStateArr,
+    surveyIndex: normalizedSurveyIndex,
+  });
+  const targetSeed = nextSurveysResponseState[normalizedSurveyIndex] && typeof nextSurveysResponseState[normalizedSurveyIndex] === 'object'
+    ? nextSurveysResponseState[normalizedSurveyIndex] as ResponseSlice
+    : buildEmptyResponseSlice();
+  const nextSlice: ResponseSlice = {
+    answers: { ...((targetSeed.answers as Record<string, unknown>) || {}) },
+    importance: { ...((targetSeed.importance as Record<string, unknown>) || {}) },
+    conviction: { ...((targetSeed.conviction as Record<string, unknown>) || {}) },
+    additionalComments: { ...((targetSeed.additionalComments as Record<string, unknown>) || {}) },
+  };
+
+  if (normalizedQuestionId && userAnswer && typeof applyResponseHydrationListToSlice === 'function') {
+    applyResponseHydrationListToSlice({
+      targetSlice: nextSlice,
+      currentSlice,
+      responses: [userAnswer],
+      allowOverwrite,
+      questionIdResolver: () => normalizedQuestionId,
+    });
+  }
+
+  nextSurveysResponseState[normalizedSurveyIndex] = nextSlice;
+  const baseline = typeof buildSliceFromUserAnswers === 'function'
+    ? buildSliceFromUserAnswers(userAnswer, prevEditBaseline || currentSlice)
     : null;
 
   return {
