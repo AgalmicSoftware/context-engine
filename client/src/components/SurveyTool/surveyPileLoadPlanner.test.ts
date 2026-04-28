@@ -1,5 +1,6 @@
 import {
   buildPileEmptyProbePlan,
+  buildPileLoadFailureState,
   buildPileLoadProgressState,
 } from './surveyPileLoadPlanner';
 
@@ -152,5 +153,22 @@ describe('surveyPileLoadPlanner', () => {
       nextProbeDelayMs: 0,
       progressIndicatesDefinitiveEmpty: true,
     });
+  });
+
+  it('builds pile load failure fallbacks that keep warming only when cache is unready or rate-limited', () => {
+    expect(buildPileLoadFailureState({
+      isQuestionCacheReady: false,
+      recentRateLimit: false,
+    })).toEqual({ loading: true });
+
+    expect(buildPileLoadFailureState({
+      isQuestionCacheReady: true,
+      recentRateLimit: true,
+    })).toEqual({ loading: true });
+
+    expect(buildPileLoadFailureState({
+      isQuestionCacheReady: true,
+      recentRateLimit: false,
+    })).toEqual({ loading: false });
   });
 });
