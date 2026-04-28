@@ -226,6 +226,16 @@ type ExecutePriorResponseFetchPlanArgs = {
   readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
 };
 
+type TrackPriorResponseAttemptedKeysArgs = {
+  attemptedSet?: Set<string> | null;
+  attemptedKeysToMark?: unknown[] | null;
+};
+
+type ClearPriorResponseAttemptedKeysArgs = {
+  attemptedSet?: Set<string> | null;
+  attemptedKeys?: unknown[] | null;
+};
+
 type BuildGroupedRenderedResponseScopePlanArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   slugByQuestionId?: Map<string, unknown> | null;
@@ -1160,6 +1170,35 @@ export const buildPriorResponseFetchPlan = ({
       entry.idsToFetch.map((qid) => `${entry.slug}|${normalizedResponder}|${qid}`)
     )),
   };
+};
+
+export const trackPriorResponseAttemptedKeys = ({
+  attemptedSet = null,
+  attemptedKeysToMark = null,
+}: TrackPriorResponseAttemptedKeysArgs = {}): string[] => {
+  const attempted = attemptedSet instanceof Set ? attemptedSet : new Set<string>();
+  const trackedKeys: string[] = [];
+
+  (Array.isArray(attemptedKeysToMark) ? attemptedKeysToMark : []).forEach((rawKey) => {
+    const key = String(rawKey || '');
+    if (!key) return;
+    attempted.add(key);
+    trackedKeys.push(key);
+  });
+
+  return trackedKeys;
+};
+
+export const clearPriorResponseAttemptedKeys = ({
+  attemptedSet = null,
+  attemptedKeys = null,
+}: ClearPriorResponseAttemptedKeysArgs = {}) => {
+  if (!(attemptedSet instanceof Set)) return;
+  (Array.isArray(attemptedKeys) ? attemptedKeys : []).forEach((rawKey) => {
+    const key = String(rawKey || '');
+    if (!key) return;
+    attemptedSet.delete(key);
+  });
 };
 
 export const executePriorResponseFetchPlan = async ({
