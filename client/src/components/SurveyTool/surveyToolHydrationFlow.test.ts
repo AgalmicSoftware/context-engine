@@ -4,6 +4,7 @@ import {
   buildDraftHydrationState,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
   buildMergedHydrationQuestionResponses,
@@ -12,6 +13,7 @@ import {
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
+  shouldHandleStartFresh,
 } from './surveyToolHydrationFlow.js';
 
 describe('surveyToolHydrationFlow', () => {
@@ -529,6 +531,101 @@ describe('surveyToolHydrationFlow', () => {
         additionalComments: { q2: { value: '', questionId: 'q2', fieldKey: 'additional' } },
       },
     ]);
+  });
+
+  it('detects whether start-fresh should run for the current slice', () => {
+    expect(shouldHandleStartFresh({
+      viewAddress: '',
+      userHasResponse: false,
+      editBaseline: null,
+      isDirty: false,
+      currentSlice: {
+        answers: { q1: { value: '   ' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      renderedQuestionIds: ['q1'],
+    })).toBe(false);
+
+    expect(shouldHandleStartFresh({
+      viewAddress: '',
+      userHasResponse: false,
+      editBaseline: null,
+      isDirty: false,
+      currentSlice: {
+        answers: {},
+        importance: { q2: undefined },
+        conviction: {},
+        additionalComments: {},
+      },
+      renderedQuestionIds: ['q2'],
+    })).toBe(false);
+
+    expect(shouldHandleStartFresh({
+      viewAddress: '',
+      userHasResponse: false,
+      editBaseline: null,
+      isDirty: false,
+      currentSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      renderedQuestionIds: ['q3'],
+    })).toBe(true);
+  });
+
+  it('builds start-fresh survey state for rendered questions', () => {
+    const buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
+      value: '',
+      questionId,
+      fieldKey,
+    }));
+
+    expect(buildStartFreshSurveyState({
+      surveyIndex: 2,
+      renderedQuestionIds: ['q1', 'q2'],
+      prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+      buildEmptyResponseFieldState,
+    })).toEqual({
+      emptySlice: {
+        answers: {
+          q1: { value: '', questionId: 'q1', fieldKey: 'answer' },
+          q2: { value: '', questionId: 'q2', fieldKey: 'answer' },
+        },
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: { value: '', questionId: 'q1', fieldKey: 'additional' },
+          q2: { value: '', questionId: 'q2', fieldKey: 'additional' },
+        },
+      },
+      nextSurveysResponseState: [
+        { answers: { keep: { value: 'persisted' } } },
+        {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+        {
+          answers: {
+            q1: { value: '', questionId: 'q1', fieldKey: 'answer' },
+            q2: { value: '', questionId: 'q2', fieldKey: 'answer' },
+          },
+          importance: {},
+          conviction: {},
+          additionalComments: {
+            q1: { value: '', questionId: 'q1', fieldKey: 'additional' },
+            q2: { value: '', questionId: 'q2', fieldKey: 'additional' },
+          },
+        },
+      ],
+    });
+
+    expect(buildEmptyResponseFieldState).toHaveBeenCalledTimes(4);
   });
 
   it('builds single-question prefill state with ensured survey slots', () => {
