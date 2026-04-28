@@ -40,6 +40,7 @@ import {
   runPriorResponseBackfillAttempt,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  resolveLocalCacheHydrationSignatureLookup,
   clearPriorResponseAttemptedKeys,
   executePriorResponseFetchPlan,
   loadMissingResponseIdsForScope,
@@ -2366,6 +2367,35 @@ describe('surveyToolHydrationFlow', () => {
       submissionError: 'boom',
       submissionComplete: false,
     })).toBe('2|edge,alpha|84532|0xabc|q2|q1|4|7|1|1|0');
+  });
+
+  it('resolves local-cache hydration signatures from hydration context and pile scopes', () => {
+    const resolveResponseHydrationContext = jest.fn((rawSlug) => ({
+      sessionSlug: rawSlug,
+      networkIdStr: '84532',
+    }));
+    const normalizeSessionSlugValue = jest.fn((value) => String(value || '').trim().toLowerCase());
+    const getExtraScopeSlugs = jest.fn(() => ['alpha']);
+
+    expect(resolveLocalCacheHydrationSignatureLookup({
+      surveyIndex: 2,
+      renderedIds: ['q2', 'q1'],
+      rawSlug: 'EDGE',
+      account: '0xAbC',
+      minifiedMode: 'pile',
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      suppressPrefill: true,
+      submissionError: 'boom',
+      submissionComplete: false,
+      resolveResponseHydrationContext,
+      normalizeSessionSlugValue,
+      getExtraScopeSlugs,
+    })).toBe('2|edge,alpha|84532|0xabc|q2|q1|4|7|1|1|0');
+
+    expect(resolveResponseHydrationContext).toHaveBeenCalledWith('EDGE');
+    expect(normalizeSessionSlugValue).toHaveBeenCalledWith('EDGE');
+    expect(getExtraScopeSlugs).toHaveBeenCalledWith('edge');
   });
 
   it('prepares local-cache slice builds with memo reuse and normalized account state', () => {

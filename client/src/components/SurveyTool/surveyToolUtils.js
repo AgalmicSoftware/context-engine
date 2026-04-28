@@ -144,6 +144,7 @@ export {
   executePriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  resolveLocalCacheHydrationSignatureLookup,
   loadMissingResponseIdsForScope,
   loadGroupedMissingResponseRequests,
   trackPriorResponseAttemptedKeys,
