@@ -244,6 +244,7 @@ import {
   loadGroupedMissingResponseRequests,
   trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
+  loadMissingRenderedResponseInfo,
   buildNormalizedRenderedQuestionIds,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
@@ -5148,43 +5149,26 @@ export class SurveyQuestions extends Component {
     const extraSlugs = this.props?.minifiedMode === 'pile'
       ? getExtraQuestionReadSlugs(this.props, slug)
       : [];
-    if (this.props?.minifiedMode === 'pile' && extraSlugs.length > 0) {
-      const slugByQuestionId = this.resolveQuestionSlugMapForIds(renderedIds, { surveyId: this.props.surveyId || null });
-      const scopePlan = buildGroupedRenderedResponseScopePlan({
-        renderedIds,
-        slugByQuestionId,
-        fallbackSlug: slug,
-        fallbackNetId: netId,
-      });
-      const requests = await loadGroupedMissingResponseRequests({
-        scopePlan,
-        fallbackNetId: netId,
-        responderLower,
-        resolveScopeNetId: (resolvedSlug, entryNetId) => {
-          const resolvedContext = resolveResponseHydrationContext(this.props, normalizeSessionSlugValue(resolvedSlug));
-          return resolvedContext.networkIdStr || entryNetId || netId;
-        },
-        readQuestionsCacheAsync,
-        ensureQuestionsNet,
-      });
+    const shouldGroupByScope = this.props?.minifiedMode === 'pile' && extraSlugs.length > 0;
+    const slugByQuestionId = shouldGroupByScope
+      ? this.resolveQuestionSlugMapForIds(renderedIds, { surveyId: this.props.surveyId || null })
+      : null;
 
-      return buildMissingRenderedResponseResult({
-        requests,
-        fallbackSlug: slug,
-        fallbackNetId: netId,
-      });
-    }
-
-    const missingIds = await loadMissingResponseIdsForScope({
+    const missingInfo = await loadMissingRenderedResponseInfo({
+      renderedIds,
       slug,
       netId,
-      renderedIds,
       responderLower,
+      shouldGroupByScope,
+      slugByQuestionId,
+      resolveScopeNetId: (resolvedSlug, entryNetId) => {
+        const resolvedContext = resolveResponseHydrationContext(this.props, normalizeSessionSlugValue(resolvedSlug));
+        return resolvedContext.networkIdStr || entryNetId || netId;
+      },
       readQuestionsCacheAsync,
       ensureQuestionsNet,
     });
-
-    return { missingIds, slug, netId };
+    return missingInfo;
   };
 
   ensurePriorResponsesForRenderedIds = async (opts = {}) => {

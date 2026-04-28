@@ -35,6 +35,7 @@ import {
   loadGroupedMissingResponseRequests,
   trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
+  loadMissingRenderedResponseInfo,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   buildPriorResponseFetchPlan,
@@ -1736,6 +1737,68 @@ describe('surveyToolHydrationFlow', () => {
     });
     expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(1, 'alpha');
     expect(readQuestionsCacheAsync).toHaveBeenNthCalledWith(2, 'beta');
+  });
+
+  it('loads missing rendered response info for single-scope and grouped pile flows', async () => {
+    const readQuestionsCacheAsync = jest.fn(async (slug) => {
+      if (slug === 'edge') {
+        return {
+          '84532': {
+            questionResponses: {
+              q1: {
+                '0xabc': {
+                  answer: { value: 'present' },
+                },
+              },
+            },
+          },
+        };
+      }
+      return {
+        '84532': {
+          questionResponses: {},
+        },
+      };
+    });
+    const ensureQuestionsNet = jest.fn((cache) => cache);
+
+    await expect(loadMissingRenderedResponseInfo({
+      renderedIds: ['q1', 'q2'],
+      slug: 'edge',
+      netId: '84532',
+      responderLower: '0xabc',
+      shouldGroupByScope: false,
+      readQuestionsCacheAsync,
+      ensureQuestionsNet,
+    })).resolves.toEqual({
+      missingIds: ['q2'],
+      slug: 'edge',
+      netId: '84532',
+      requests: [],
+    });
+
+    await expect(loadMissingRenderedResponseInfo({
+      renderedIds: ['q1', 'q2'],
+      slug: 'edge',
+      netId: '84532',
+      responderLower: '0xabc',
+      shouldGroupByScope: true,
+      slugByQuestionId: new Map([
+        ['q1', 'alpha'],
+        ['q2', 'beta'],
+      ]),
+      resolveScopeNetId: (_slug, entryNetId) => entryNetId,
+      readQuestionsCacheAsync,
+      ensureQuestionsNet,
+    })).resolves.toEqual({
+      missingIds: [],
+      slug: 'edge',
+      netId: '84532',
+      requests: [
+        { slug: 'alpha', netId: '84532', missingIds: ['q1'] },
+        { slug: 'beta', netId: '84532', missingIds: ['q2'] },
+      ],
+    });
   });
 
   it('loads missing response ids for a single scope from cache state', async () => {
