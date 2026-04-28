@@ -4,6 +4,7 @@ import {
   buildDraftHydrationState,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  buildResetFormStatePatch,
   buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
@@ -626,6 +627,54 @@ describe('surveyToolHydrationFlow', () => {
     });
 
     expect(buildEmptyResponseFieldState).toHaveBeenCalledTimes(4);
+  });
+
+  it('builds reset-form state patches from initialized survey responses', () => {
+    const cloneValue = jest.fn((value) => JSON.parse(JSON.stringify(value)));
+
+    expect(buildResetFormStatePatch({
+      initialSurveysResponseState: [
+        { answers: { keep: { value: 'persisted' } } },
+        {
+          answers: { q2: { value: '' } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q2: { value: '' } },
+        },
+      ],
+      baselineIndex: 1,
+      nextSubmittedSinceLastEdit: false,
+      cloneValue,
+    })).toEqual({
+      surveysResponseState: [
+        { answers: { keep: { value: 'persisted' } } },
+        {
+          answers: { q2: { value: '' } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q2: { value: '' } },
+        },
+      ],
+      isEditing: false,
+      submissionError: '',
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      submitProgress: 0,
+      userHasResponse: false,
+      userAnswers: null,
+      isDirty: false,
+      modifiedCount: 0,
+      hasEncryptedChanges: false,
+      editBaseline: {
+        answers: { q2: { value: '' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q2: { value: '' } },
+      },
+      isLoadingResponse: true,
+    });
+
+    expect(cloneValue).toHaveBeenCalledTimes(1);
   });
 
   it('builds single-question prefill state with ensured survey slots', () => {
