@@ -120,6 +120,8 @@ export {
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
   buildPriorResponseFetchPlan,
+  buildGroupedRenderedResponseScopePlan,
+  buildMissingResponseIdsForRenderedQuestions,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
   resolveExitEditingBaselineSlice,
