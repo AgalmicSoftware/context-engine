@@ -107,6 +107,19 @@ type PrepareLocalCacheSliceBuildArgs = {
   normalizeSessionSlugValue?: ((value: unknown) => string) | null;
 };
 
+type ResolveLocalCacheSliceLookupArgs = {
+  rawSlug?: unknown;
+  account?: unknown;
+  renderedIds?: Iterable<unknown> | unknown[];
+  minifiedMode?: unknown;
+  questionsCacheNonce?: unknown;
+  questionResponsesNonce?: unknown;
+  existingMemo?: UnknownRecord | null;
+  resolveResponseHydrationContext?: ((rawSlug: unknown) => UnknownRecord | null | undefined) | null;
+  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
+  getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
+};
+
 type LoadLocalCacheHydrationSliceArgs = {
   scopeSlugs?: unknown[] | null;
   networkIdStr?: unknown;
@@ -815,6 +828,48 @@ export const prepareLocalCacheSliceBuild = ({
     memoKey,
     shouldUseMemo,
     memoizedValue: shouldUseMemo ? memoRecord.value : null,
+  };
+};
+
+export const resolveLocalCacheSliceLookup = ({
+  rawSlug = '',
+  account = '',
+  renderedIds = [],
+  minifiedMode = '',
+  questionsCacheNonce = 0,
+  questionResponsesNonce = 0,
+  existingMemo = null,
+  resolveResponseHydrationContext = null,
+  normalizeSessionSlugValue = null,
+  getExtraScopeSlugs = null,
+}: ResolveLocalCacheSliceLookupArgs = {}) => {
+  const hydrationContext = typeof resolveResponseHydrationContext === 'function'
+    ? (resolveResponseHydrationContext(rawSlug) || {})
+    : {};
+  const sessionSlug = (hydrationContext as UnknownRecord).sessionSlug;
+  const slug = typeof normalizeSessionSlugValue === 'function'
+    ? normalizeSessionSlugValue(sessionSlug)
+    : String(sessionSlug || '');
+  const extraSlugs = String(minifiedMode || '').trim().toLowerCase() === 'pile'
+    && typeof getExtraScopeSlugs === 'function'
+    ? (getExtraScopeSlugs(slug) || [])
+    : [];
+  const scopeSlugs = [slug, ...(Array.isArray(extraSlugs) ? extraSlugs : [])];
+  const networkIdStr = (hydrationContext as UnknownRecord).networkIdStr;
+
+  return {
+    scopeSlugs,
+    networkIdStr,
+    ...prepareLocalCacheSliceBuild({
+      scopeSlugs,
+      networkIdStr,
+      account,
+      renderedIds,
+      questionsCacheNonce,
+      questionResponsesNonce,
+      existingMemo,
+      normalizeSessionSlugValue,
+    }),
   };
 };
 
