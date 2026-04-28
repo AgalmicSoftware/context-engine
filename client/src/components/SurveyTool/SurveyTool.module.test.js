@@ -6090,6 +6090,60 @@ describe('SurveyTool module', () => {
     expect(subject.persistDraftSafely).toHaveBeenCalledWith(0);
   });
 
+  it('resets form state for account changes from initialized survey state', () => {
+    jest.useFakeTimers();
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 1,
+    });
+
+    subject.state = {
+      ...subject.state,
+      submittedSinceLastEdit: true,
+      surveysResponseState: [{ answers: { stale: { value: 'stale' } } }],
+    };
+    syncClassSetState(subject);
+    subject.persistDraft = jest.fn();
+    subject.initializeSurveyResponseState = jest.fn(() => [
+      { answers: { keep: { value: 'persisted' } } },
+      {
+        answers: { q2: { value: '' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q2: { value: '' } },
+      },
+    ]);
+    subject.deepClone = jest.fn((value) => JSON.parse(JSON.stringify(value)));
+    subject._persistTimer = setTimeout(() => {}, 1000);
+    const callback = jest.fn();
+
+    subject.resetFormStateForAccountChange(callback);
+
+    expect(subject.persistDraft).toHaveBeenCalledTimes(1);
+    expect(subject._persistTimer).toBeNull();
+    expect(subject.state.surveysResponseState).toEqual([
+      { answers: { keep: { value: 'persisted' } } },
+      {
+        answers: { q2: { value: '' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q2: { value: '' } },
+      },
+    ]);
+    expect(subject.state.editBaseline).toEqual({
+      answers: { q2: { value: '' } },
+      importance: {},
+      conviction: {},
+      additionalComments: { q2: { value: '' } },
+    });
+    expect(subject.state.isEditing).toBe(false);
+    expect(subject.state.isLoadingResponse).toBe(true);
+    expect(subject.state.submittedSinceLastEdit).toBe(false);
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
   it('does not short-circuit when state questionPool ref changes under stable ids', async () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
