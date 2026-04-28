@@ -392,76 +392,17 @@ import {
 } from './surveyToolUtils.js';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
+import {
+  buildInitialSurveyQuestionsState,
+  type SurveyQuestionsProps,
+  type SurveyQuestionsState,
+} from './surveyQuestionsTypes.js';
 
 
-export class SurveyQuestions extends Component {
-  constructor(props) {
+export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuestionsState> {
+  constructor(props: SurveyQuestionsProps) {
     super(props);
-    this.state = {
-      surveysResponseState: [],
-      displayAnswerMode: this.props.displayAnswerMode,
-      viewAddressAnswers: '',
-      noResponse: false,
-      responseLookupWarning: '',
-      userHasResponse: false,
-      userResponseEncrypted: false,
-      startFresh: false,
-      userAnswers: null,
-      isDecrypting: false,
-      jsonPreview: '',
-      isEditing: false,
-      isSubmitting: false,
-      submitProgress: 0,
-      submissionComplete: false,
-      submittedSinceLastEdit: updateSubmittedSinceLastEdit(false, 'reset'),
-      responseUrl: '',
-      submissionError: '',
-      currentStep: 0,
-      questionPool: this.props.isStandalone || this.props.singleQuestionMode ? this.props.questionPool || [] : [],
-      questionPoolExpectedIds: [],
-      questionPoolPendingIds: [],
-      showJson: false,
-      showQuestionsJson: false,
-      showResponseJson: false,
-      copiedQuestionsJson: false,
-      copiedResponseJson: false,
-      isLoadingResponse: false,
-      parsedViewAddressAnswers: null,
-      decryptionNonce: 0,
-      bookmarkedQuestions: new Set(),
-      // JSON view state
-      showSurveyJson: false,
-      copiedSurveyJson: false,
-      // Edit/submit tracking
-      modifiedCount: 0,
-      pileDiscardedEdits: false,
-      encryptedModifiedCount: 0,
-      isDirty: false,
-      hasEncryptedChanges: false,
-      // Auto-decrypt toggle and attempt ledger
-      autoDecryptEnabled: false,
-      autoDecryptAttempted: {},
-      showComments: {},
-      lockAudienceMenuByQuestion: {},
-      lockAudienceGateDetailsByQuestion: {},
-      sliderModeByQuestion: {},
-      sliderToggleExpandedByQuestion: {},
-      activeTagModalTag: '',
-      // Defer prefill when login happens before caches are ready
-      prefillQueuedAfterCache: false,
-      // Visual indicator for account-specific prior-response hydration
-      isHydratingPriorResponses: false,
-      // Per-field decrypting map (key = `${qid}:${field}`)
-      decryptingByKey: {},
-      bulkPromptReloading: false,
-      lockedGateDetailsExpanded: false,
-      gateSbtNameRevision: 0,
-      // ZK hasher (injected)
-      hasher: null,
-      // Allow decrypting viewed (non-own) responses only when viewer satisfies the response gate
-      canDecryptOtherResponses: false,
-      canDecryptOtherResponsesStatus: 'unknown',
-    };
+    this.state = buildInitialSurveyQuestionsState(this.props);
     this.bottomRef = React.createRef();
     this.topRef = React.createRef();
     this._submitGuard = false;
