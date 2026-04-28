@@ -134,6 +134,7 @@ export {
   applyStartFreshEffects,
   applyDraftHydrationEffects,
   applyPrefillUpdatePlan,
+  applyLocalCacheRehydrateUpdatePlan,
   applyPrefillStateEffects,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateNoChangeEffects,

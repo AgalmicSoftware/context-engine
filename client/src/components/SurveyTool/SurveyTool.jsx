@@ -270,10 +270,8 @@ import {
   applyStartFreshEffects,
   applyDraftHydrationEffects,
   applyPrefillUpdatePlan,
+  applyLocalCacheRehydrateUpdatePlan,
   applyLocalCacheRehydrateMissEffects,
-  applyLocalCacheRehydrateNoChangeEffects,
-  applyLocalCacheRehydrateAppliedEffects,
-  applyLocalCacheRehydrateSuccessEffects,
   runPriorResponseBackfillAttempt,
   buildRevertedResponseSlice,
   buildSubmissionGroupContext,
@@ -5591,25 +5589,19 @@ export class SurveyQuestions extends Component {
         debugLabel: '[Survey][rehydrateLocal]',
       });
 
-      if (!changed && !baselineChanged) {
-        DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] No changes to apply.');
-        applyLocalCacheRehydrateNoChangeEffects({
-          ensurePriorResponses: () => { void this.ensurePriorResponsesForRenderedIds(); },
-          callback,
-        });
-        return;
-      }
-
-      applyLocalCacheRehydrateSuccessEffects({
+      applyLocalCacheRehydrateUpdatePlan({
+        changed,
+        baselineChanged,
         updates,
         applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
-        afterStateApplied: () => applyLocalCacheRehydrateAppliedEffects({
-          updateJsonPreview: this.updateJsonPreview,
-          // Recalculate immediately to ensure 'Submit (X)' is accurate immediately
-          recalculateEditStats: this.recalculateEditStats,
-          ensurePriorResponses: () => { void this.ensurePriorResponsesForRenderedIds(); },
-          callback,
-        }),
+        updateJsonPreview: this.updateJsonPreview,
+        // Recalculate immediately to ensure 'Submit (X)' is accurate immediately
+        recalculateEditStats: this.recalculateEditStats,
+        ensurePriorResponses: () => { void this.ensurePriorResponsesForRenderedIds(); },
+        callback,
+        onNoChange: () => {
+          DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] No changes to apply.');
+        },
       });
     } catch (e) {
       this._rehydrateLocalCacheLastSig = '';
