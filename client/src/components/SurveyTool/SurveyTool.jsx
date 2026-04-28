@@ -230,6 +230,8 @@ import {
   buildLocalCacheRehydrationUpdatePlan,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
+  buildPrefilledSingleQuestionUpdatePlan,
+  buildPrefilledSurveyUpdatePlan,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
   buildStartFreshSurveyState,
@@ -5607,10 +5609,8 @@ export class SurveyQuestions extends Component {
 
     this.setState((prev) => {
       const {
-        nextSurveysResponseState,
-        nextBaseline,
-        shouldWriteBaseline,
-      } = buildPrefilledSurveyState({
+        updates,
+      } = buildPrefilledSurveyUpdatePlan({
         surveyIndex,
         prevSurveysResponseState: prev.surveysResponseState,
         prevEditBaseline: prev.editBaseline,
@@ -5621,10 +5621,7 @@ export class SurveyQuestions extends Component {
         buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       });
 
-      return {
-        surveysResponseState: nextSurveysResponseState,
-        ...(shouldWriteBaseline ? { editBaseline: nextBaseline } : {})
-      };
+      return updates;
     }, () => {
       this.updateJsonPreview();
       this.recalculateEditStats();
@@ -6469,10 +6466,8 @@ export class SurveyQuestions extends Component {
 
     this.setState((prev) => {
       const {
-        nextSurveysResponseState,
-        nextBaseline,
-        shouldWriteBaseline,
-      } = buildPrefilledSingleQuestionState({
+        updates,
+      } = buildPrefilledSingleQuestionUpdatePlan({
         surveyIndex,
         questionId,
         prevSurveysResponseState: prev.surveysResponseState,
@@ -6484,10 +6479,7 @@ export class SurveyQuestions extends Component {
         buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       });
 
-      return {
-        surveysResponseState: nextSurveysResponseState,
-        ...(shouldWriteBaseline ? { editBaseline: nextBaseline } : {}),
-      };
+      return updates;
     }, () => {
       this.updateJsonPreview();
       this.recalculateEditStats();

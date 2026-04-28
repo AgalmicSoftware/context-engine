@@ -176,6 +176,10 @@ type BuildDraftHydrationUpdatePlanArgs = BuildDraftHydrationStateArgs & {
   surveyIndex?: unknown;
 };
 
+type BuildPrefilledSurveyUpdatePlanArgs = BuildPrefilledSurveyStateArgs;
+
+type BuildPrefilledSingleQuestionUpdatePlanArgs = BuildPrefilledSingleQuestionStateArgs;
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -922,6 +926,46 @@ export const buildDraftHydrationUpdatePlan = ({
     changed,
     baselineChanged,
     updates,
+  };
+};
+
+export const buildPrefilledSurveyUpdatePlan = ({
+  ...args
+}: BuildPrefilledSurveyUpdatePlanArgs = {}) => {
+  const {
+    nextSurveysResponseState,
+    nextBaseline,
+    shouldWriteBaseline,
+  } = buildPrefilledSurveyState(args);
+
+  return {
+    nextSurveysResponseState,
+    nextBaseline,
+    shouldWriteBaseline,
+    updates: {
+      surveysResponseState: nextSurveysResponseState,
+      ...(shouldWriteBaseline ? { editBaseline: nextBaseline } : {}),
+    },
+  };
+};
+
+export const buildPrefilledSingleQuestionUpdatePlan = ({
+  ...args
+}: BuildPrefilledSingleQuestionUpdatePlanArgs = {}) => {
+  const {
+    nextSurveysResponseState,
+    nextBaseline,
+    shouldWriteBaseline,
+  } = buildPrefilledSingleQuestionState(args);
+
+  return {
+    nextSurveysResponseState,
+    nextBaseline,
+    shouldWriteBaseline,
+    updates: {
+      surveysResponseState: nextSurveysResponseState,
+      ...(shouldWriteBaseline ? { editBaseline: nextBaseline } : {}),
+    },
   };
 };
 
