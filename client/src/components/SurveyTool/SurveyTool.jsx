@@ -259,6 +259,9 @@ import {
   buildPrefilledSingleQuestionState,
   buildPrefilledSurveyState,
   buildQuestionSlugMapForIds,
+  applyResetFormStateEffects,
+  applyRevertPendingEffects,
+  applyStartFreshEffects,
   applyPrefillStateEffects,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateNoChangeEffects,
@@ -5336,9 +5339,7 @@ export class SurveyQuestions extends Component {
       cloneValue: this.deepClone,
     });
 
-    this.setState(nextResetState, () => {
-      if (callback) callback();
-    });
+    this.setState(nextResetState, () => applyResetFormStateEffects({ callback }));
   };
 
 
@@ -5466,11 +5467,11 @@ export class SurveyQuestions extends Component {
           nextSlice,
           isLoggedIn,
         }),
-        () => {
-          if (typeof this.clearDraft === 'function') this.clearDraft();
-          this.recalculateEditStats && this.recalculateEditStats();
-          this.updateJsonPreview && this.updateJsonPreview();
-        }
+        () => applyRevertPendingEffects({
+          clearDraft: this.clearDraft,
+          recalculateEditStats: this.recalculateEditStats,
+          updateJsonPreview: this.updateJsonPreview,
+        })
       );
     } catch (e) {
       surveyLog.warn('[SurveyQuestions] handleRevertPendingChanges failed:', e);
@@ -6427,10 +6428,12 @@ export class SurveyQuestions extends Component {
       isDirty: false,
       submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
     }, () => {
-      // clear per-q drafts so they don’t reappear
-      renderedIds.forEach((qid) => { this.clearDraftFor && this.clearDraftFor(qid); });
-      this.recalculateEditStats && this.recalculateEditStats();
-      this.persistDraftSafely && this.persistDraftSafely(0);
+      applyStartFreshEffects({
+        renderedQuestionIds: renderedIds,
+        clearDraftFor: this.clearDraftFor,
+        recalculateEditStats: this.recalculateEditStats,
+        persistDraftSafely: this.persistDraftSafely,
+      });
     });
   };
 

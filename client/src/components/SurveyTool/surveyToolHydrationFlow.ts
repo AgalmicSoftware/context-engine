@@ -327,6 +327,23 @@ type ApplyLocalCacheRehydrateAppliedEffectsArgs = ApplyPrefillStateEffectsArgs &
   callback?: (() => void) | null;
 };
 
+type ApplyResetFormStateEffectsArgs = {
+  callback?: (() => void) | null;
+};
+
+type ApplyRevertPendingEffectsArgs = {
+  clearDraft?: (() => void) | null;
+  recalculateEditStats?: (() => void) | null;
+  updateJsonPreview?: (() => void) | null;
+};
+
+type ApplyStartFreshEffectsArgs = {
+  renderedQuestionIds?: Iterable<unknown> | unknown[];
+  clearDraftFor?: ((questionId: string) => void) | null;
+  recalculateEditStats?: (() => void) | null;
+  persistDraftSafely?: ((delayMs?: number) => void) | null;
+};
+
 type BuildGroupedRenderedResponseScopePlanArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   slugByQuestionId?: Map<string, unknown> | null;
@@ -1589,6 +1606,49 @@ export const applyLocalCacheRehydrateAppliedEffects = ({
   }
   if (typeof callback === 'function') {
     callback();
+  }
+};
+
+export const applyResetFormStateEffects = ({
+  callback = null,
+}: ApplyResetFormStateEffectsArgs = {}) => {
+  if (typeof callback === 'function') {
+    callback();
+  }
+};
+
+export const applyRevertPendingEffects = ({
+  clearDraft = null,
+  recalculateEditStats = null,
+  updateJsonPreview = null,
+}: ApplyRevertPendingEffectsArgs = {}) => {
+  if (typeof clearDraft === 'function') {
+    clearDraft();
+  }
+  if (typeof recalculateEditStats === 'function') {
+    recalculateEditStats();
+  }
+  if (typeof updateJsonPreview === 'function') {
+    updateJsonPreview();
+  }
+};
+
+export const applyStartFreshEffects = ({
+  renderedQuestionIds = [],
+  clearDraftFor = null,
+  recalculateEditStats = null,
+  persistDraftSafely = null,
+}: ApplyStartFreshEffectsArgs = {}) => {
+  Array.from(renderedQuestionIds || []).forEach((questionId) => {
+    const normalizedQuestionId = String(questionId || '');
+    if (!normalizedQuestionId || typeof clearDraftFor !== 'function') return;
+    clearDraftFor(normalizedQuestionId);
+  });
+  if (typeof recalculateEditStats === 'function') {
+    recalculateEditStats();
+  }
+  if (typeof persistDraftSafely === 'function') {
+    persistDraftSafely(0);
   }
 };
 
