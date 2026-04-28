@@ -395,6 +395,7 @@ import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
   buildInitialSurveyResponseQuestionIds,
   buildRenderedQuestionIdsFromQuestionPools,
+  readRenderedQuestionIds,
 } from './surveyQuestionScope.js';
 import {
   buildClearedTransientSubmitFeedbackState,
@@ -4306,10 +4307,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   getHydrationQuestionIds = () => {
-    const renderedIds = Array.isArray(this.getCurrentRenderedQuestionIds?.())
-      ? this.getCurrentRenderedQuestionIds()
-      : [];
-    return buildNormalizedRenderedQuestionIds({ renderedIds });
+    return readRenderedQuestionIds({
+      getRenderedQuestionIds: () => this.getCurrentRenderedQuestionIds(),
+      normalizeRenderedIds: buildNormalizedRenderedQuestionIds,
+    });
   };
 
   buildLocalCacheHydrationSignature = (surveyIndex, renderedIds = []) => {
@@ -4335,8 +4336,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   getRenderedQuestionIdsForResponseHydration = () => {
-    return buildNormalizedRenderedQuestionIds({
-      renderedIds: this.getCurrentRenderedQuestionIds(),
+    return readRenderedQuestionIds({
+      getRenderedQuestionIds: () => this.getCurrentRenderedQuestionIds(),
+      normalizeRenderedIds: buildNormalizedRenderedQuestionIds,
     });
   };
 
@@ -5121,7 +5123,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       editBaseline: this.state.editBaseline,
       isDirty: this.state.isDirty,
       currentSlice: slice,
-      renderedQuestionIds: this.getCurrentRenderedQuestionIds(),
+      renderedQuestionIds: readRenderedQuestionIds({
+        getRenderedQuestionIds: () => this.getCurrentRenderedQuestionIds(),
+      }),
     })) {
       this.handleStartFresh();
     }
