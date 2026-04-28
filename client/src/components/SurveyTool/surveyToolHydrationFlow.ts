@@ -35,6 +35,11 @@ type CachedQuestionResponseMap = Record<string, unknown>;
 
 type CachedQuestionResponses = Record<string, CachedQuestionResponseMap>;
 
+type ParsedCachedResponse = {
+  answer?: unknown;
+  additional?: unknown;
+} & UnknownRecord;
+
 type CachedResponseApplyArgs = {
   targetSlice?: ResponseSlice | null;
   questionId?: string;
@@ -305,13 +310,14 @@ export const buildCacheHydrationSlice = ({
     const parsedResponse = typeof parseResponse === 'function'
       ? parseResponse(rawResponse)
       : rawResponse;
-    if (!parsedResponse || typeof parsedResponse !== 'object') return;
-    if (!parsedResponse.answer || !parsedResponse.additional) return;
+    if (!isRecord(parsedResponse)) return;
+    const hydratedResponse = parsedResponse as ParsedCachedResponse;
+    if (!hydratedResponse.answer || !hydratedResponse.additional) return;
 
     if (applyCachedResponseEntryToSlice({
       targetSlice: slice,
       questionId,
-      response: parsedResponse,
+      response: hydratedResponse,
       parseValue,
     })) {
       changed = true;
@@ -492,11 +498,15 @@ export const buildRevertedResponseSlice = ({
   Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
     const questionId = normalizeQuestionIdKey(rawQuestionId);
     if (!questionId) return;
-    if (!nextSlice.answers?.[questionId] && typeof buildEmptyResponseFieldState === 'function') {
-      nextSlice.answers[questionId] = buildEmptyResponseFieldState(questionId, 'answer');
+    const nextAnswers = (nextSlice.answers || {}) as Record<string, unknown>;
+    if (!nextSlice.answers) nextSlice.answers = nextAnswers;
+    const nextAdditionalComments = (nextSlice.additionalComments || {}) as Record<string, unknown>;
+    if (!nextSlice.additionalComments) nextSlice.additionalComments = nextAdditionalComments;
+    if (!nextAnswers[questionId] && typeof buildEmptyResponseFieldState === 'function') {
+      nextAnswers[questionId] = buildEmptyResponseFieldState(questionId, 'answer');
     }
-    if (!nextSlice.additionalComments?.[questionId] && typeof buildEmptyResponseFieldState === 'function') {
-      nextSlice.additionalComments[questionId] = buildEmptyResponseFieldState(questionId, 'additional');
+    if (!nextAdditionalComments[questionId] && typeof buildEmptyResponseFieldState === 'function') {
+      nextAdditionalComments[questionId] = buildEmptyResponseFieldState(questionId, 'additional');
     }
   });
 

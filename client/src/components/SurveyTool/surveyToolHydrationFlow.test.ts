@@ -363,7 +363,8 @@ describe('surveyToolHydrationFlow', () => {
   });
 
   it('merges hydration question responses across scoped caches', () => {
-    const readQuestionsCache = jest.fn((slug) => ({
+    const readQuestionsCache = jest.fn((slug: string) => {
+      const caches: Record<string, unknown> = {
       alpha: {
         84532: {
           questionResponses: {
@@ -378,7 +379,9 @@ describe('surveyToolHydrationFlow', () => {
           },
         },
       },
-    }[slug] || {}));
+      };
+      return caches[slug] || {};
+    });
     const mergeResponses = jest.fn((target, source) => {
       Object.entries(source).forEach(([questionId, value]) => {
         target[questionId] = {

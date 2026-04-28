@@ -348,7 +348,7 @@ export const buildQuestionCacheHydrationPatch = ({
         qid,
       )
     : add.encryptionAudience;
-  let additionalState = {
+  let additionalState: UnknownRecord = {
     value: additionalEncrypted ? '*' : (typeof parseValue === 'function' ? parseValue(add.value) : add.value),
     encrypted: additionalEncrypted,
     encryptionAudience: additionalAudience,
