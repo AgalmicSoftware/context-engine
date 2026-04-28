@@ -82,10 +82,9 @@ import {
   loadPileScopeCacheSnapshot,
 } from './surveyPileScopeCacheData';
 import {
+  buildPileFilterResultPlan,
   buildPileLoadResultPlan,
-  shouldSkipPileFilterStateUpdate,
-  sortPileQuestionsByPriority,
-  splitPileMaskedQuestions,
+  buildPileQuestionPipelineState,
 } from './surveyPileQuestionFlow';
 import {
   buildPileCachePrefillStatePlan,
@@ -1529,19 +1528,17 @@ export class PileViewMode extends SurveyQuestions {
       }
 
       const acctLower = (this.props.account || '').toLowerCase();
-      const sorted = sortPileQuestionsByPriority({
+      const {
+        sortedQuestions: sorted,
+        visibleQuestions: sortedVisible,
+        hiddenQuestions: hiddenGated,
+        hasHiddenGatedQuestions: nextHidden,
+      } = buildPileQuestionPipelineState({
         questions: allQuestions,
         questionResponses: allResponses,
         responseCounts,
         highlightedQuestionIds: hlSet,
         account: acctLower,
-      });
-      const {
-        hiddenQuestions: hiddenGated,
-        visibleQuestions: sortedVisible,
-        hasHiddenGatedQuestions: nextHidden,
-      } = splitPileMaskedQuestions({
-        questions: sorted,
       });
       const filterSig = serializeSurveyToolFilterState(this.state.filterState);
       const isFilterActive = !!this.state.isFilterActive || !!filterSig;
@@ -1927,44 +1924,37 @@ export class PileViewMode extends SurveyQuestions {
       });
     });
     const acctLower = (this.props.account || '').toLowerCase();
-    const sortedFiltered = sortPileQuestionsByPriority({
+    const {
+      visibleQuestions: sortedFilteredVisible,
+      hasHiddenGatedQuestions: nextHiddenGated,
+    } = buildPileQuestionPipelineState({
       questions: filteredArray,
       questionResponses: allResponses,
       responseCounts,
       highlightedQuestionIds: hlSet,
       account: acctLower,
     });
-    const {
-      visibleQuestions: sortedFilteredVisible,
-      hasHiddenGatedQuestions: nextHiddenGated,
-    } = splitPileMaskedQuestions({
-      questions: sortedFiltered,
-    });
     const nextFilterState = normalizeSurveyToolFilterState(newFilterState || this.state.filterState);
-    const nextFilterSig = serializeSurveyToolFilterState(nextFilterState);
-    const currentFilterSig = serializeSurveyToolFilterState(this.state.filterState);
-    const nextVisibleSig = this.buildQuestionListSignature(sortedFilteredVisible);
-    const currentVisibleSig = this.syncCurrentPileQuestionsSignature(this.state.pileQuestions || []);
-
-    if (shouldSkipPileFilterStateUpdate({
-      nextVisibleSignature: nextVisibleSig,
-      currentVisibleSignature: currentVisibleSig,
+    const filterResultPlan = buildPileFilterResultPlan({
+      currentVisibleSignature: this.syncCurrentPileQuestionsSignature(this.state.pileQuestions || []),
+      nextVisibleQuestions: sortedFilteredVisible,
+      currentFilterState: this.state.filterState,
+      nextFilterState,
       nextHiddenGated,
       currentHiddenGated: !!this.state.hasHiddenGatedQuestions,
-      nextFilterSignature: nextFilterSig,
-      currentFilterSignature: currentFilterSig,
-    })) {
+      buildQuestionListSignature: this.buildQuestionListSignature,
+      serializeFilterState: serializeSurveyToolFilterState,
+    });
+
+    if (filterResultPlan.shouldSkipStateUpdate) {
       bumpSurveyPerfCounter('noopSkipCount');
       return;
     }
 
-    this._pileQuestionsGeneration += 1;
-    this.setState({
-      pileQuestions: sortedFilteredVisible,
-      activePileIndex: 0,
-      filterState: nextFilterState,
-      hasHiddenGatedQuestions: nextHiddenGated,
-    }, () => {
+    if (filterResultPlan.shouldIncrementPileQuestionsGeneration) {
+      this._pileQuestionsGeneration += 1;
+    }
+    this.setState(filterResultPlan.nextState, () => {
         if (typeof this.props.onFilterChange === 'function') {
           try { this.props.onFilterChange(this.state.filterState); } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
         }
