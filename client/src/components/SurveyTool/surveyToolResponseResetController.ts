@@ -1,4 +1,5 @@
 import {
+  buildExitEditingStatePatch,
   applyResetFormStateEffects,
   applyRevertPendingEffects,
   applyStartFreshEffects,
@@ -6,7 +7,9 @@ import {
   buildRevertPendingStatePatch,
   buildRevertedResponseSlice,
   buildStartFreshSurveyState,
+  resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
+  shouldHandleStartFresh,
 } from './surveyToolHydrationFlow.js';
 
 type SurveyToolLikeProps = Record<string, any>;
@@ -226,4 +229,126 @@ export const executeSurveyStartFresh = ({
     reason: 'applied',
     renderedQuestionIds,
   };
+};
+
+export const shouldSurveyAutoStartFresh = ({
+  props = {},
+  state = {},
+  getRenderedQuestionIds = () => [],
+  shouldStartFresh = shouldHandleStartFresh,
+}: {
+  props?: SurveyToolLikeProps | null;
+  state?: SurveyToolLikeState | null;
+  getRenderedQuestionIds?: () => unknown[];
+  shouldStartFresh?: (args?: any) => boolean;
+} = {}) => {
+  const nextProps = props || {};
+  const nextState = state || {};
+  const surveyIndex = resolveActiveSurveyIndex(nextProps);
+  const surveysResponseState = Array.isArray(nextState.surveysResponseState)
+    ? nextState.surveysResponseState
+    : [];
+  const currentSlice = (
+    surveysResponseState[surveyIndex]
+    && typeof surveysResponseState[surveyIndex] === 'object'
+  ) ? surveysResponseState[surveyIndex] : {
+    answers: {},
+    additionalComments: {},
+    importance: {},
+    conviction: {},
+  };
+
+  return shouldStartFresh({
+    viewAddress: nextProps.viewAddress,
+    userHasResponse: nextState.userHasResponse,
+    editBaseline: nextState.editBaseline,
+    isDirty: nextState.isDirty,
+    currentSlice,
+    renderedQuestionIds: getRenderedQuestionIds(),
+  });
+};
+
+export const executeSurveyExitEditing = ({
+  props = {},
+  state = {},
+  buildSliceFromUserAnswers = null,
+  buildSliceFromLocalCache = null,
+  getRenderedQuestionIds = () => [],
+  buildEmptyResponseFieldState = () => null,
+  cloneValue = (value: unknown) => value,
+  setState = () => {},
+  recalculateEditStats = () => {},
+  persistDraftSafely = () => {},
+  updateJsonPreview = () => {},
+  clearDraft = () => {},
+  updateSubmittedSinceLastEdit = (_current: boolean, _action: string) => false,
+  resolveBaselineSlice = resolveExitEditingBaselineSlice,
+  buildStatePatch = buildExitEditingStatePatch,
+  onFailure = () => {},
+}: {
+  props?: SurveyToolLikeProps | null;
+  state?: SurveyToolLikeState | null;
+  buildSliceFromUserAnswers?: ((sourceAnswers: unknown) => unknown) | null;
+  buildSliceFromLocalCache?: (() => unknown) | null;
+  getRenderedQuestionIds?: () => unknown[];
+  buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
+  cloneValue?: (value: unknown) => unknown;
+  setState?: SetState;
+  recalculateEditStats?: () => void;
+  persistDraftSafely?: (delayMs?: number) => void;
+  updateJsonPreview?: () => void;
+  clearDraft?: () => void;
+  updateSubmittedSinceLastEdit?: (current: boolean, action: string) => boolean;
+  resolveBaselineSlice?: (args?: any) => unknown;
+  buildStatePatch?: (args?: any) => Record<string, unknown>;
+  onFailure?: (error: unknown) => void;
+} = {}) => {
+  try {
+    const nextProps = props || {};
+    const nextState = state || {};
+    const surveyIndex = resolveActiveSurveyIndex(nextProps);
+    const baselineSlice = resolveBaselineSlice({
+      responderAddress: nextProps.responderAddress,
+      parsedViewAddressAnswers: nextState.parsedViewAddressAnswers,
+      userAnswers: nextState.userAnswers,
+      buildSliceFromUserAnswers,
+      buildSliceFromLocalCache,
+    });
+
+    setState(
+      buildStatePatch({
+        prevSurveysResponseState: nextState.surveysResponseState,
+        surveyIndex,
+        baselineSlice,
+        renderedQuestionIds: getRenderedQuestionIds(),
+        buildEmptyResponseFieldState,
+        cloneValue,
+        nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit(nextState.submittedSinceLastEdit, 'reset'),
+      }),
+      () => {
+        recalculateEditStats();
+        persistDraftSafely();
+        updateJsonPreview();
+      },
+    );
+
+    clearDraft();
+    return {
+      applied: true,
+      reason: 'applied',
+    };
+  } catch (error) {
+    onFailure(error);
+    setState({
+      isEditing: false,
+      displayAnswerMode: true,
+      submittedSinceLastEdit: updateSubmittedSinceLastEdit((state || {}).submittedSinceLastEdit, 'reset'),
+    }, () => {
+      recalculateEditStats();
+    });
+    return {
+      applied: false,
+      reason: 'fallback',
+    };
+  }
 };
