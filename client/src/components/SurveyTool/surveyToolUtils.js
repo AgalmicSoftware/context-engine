@@ -136,6 +136,7 @@ export {
   applyLocalCacheRehydrateNoChangeEffects,
   applyLocalCacheRehydrateAppliedEffects,
   applyLocalCacheRehydrateSuccessEffects,
+  runPriorResponseBackfillAttempt,
   applyPriorResponseFetchSuccessEffects,
   buildPriorResponseFetchPlan,
   clearPriorResponseAttemptedKeys,
