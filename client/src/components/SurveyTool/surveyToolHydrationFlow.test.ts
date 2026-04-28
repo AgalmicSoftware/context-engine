@@ -18,10 +18,12 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
+  buildPriorResponseFetchPlan,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
+  shouldBackfillPriorResponses,
   shouldHandleStartFresh,
 } from './surveyToolHydrationFlow.js';
 
@@ -1332,6 +1334,66 @@ describe('surveyToolHydrationFlow', () => {
           additionalComments: { q1: { value: 'baseline notes' } },
         },
       },
+    });
+  });
+
+  it('decides when prior-response backfill is allowed', () => {
+    expect(shouldBackfillPriorResponses({
+      loginComplete: true,
+      account: '0xabc',
+      displayAnswerMode: false,
+      viewAddress: '',
+      singleQuestionMode: false,
+      responderAddress: '',
+      hasRefreshQuestionResponses: true,
+      submissionComplete: false,
+      isSubmitting: false,
+    })).toBe(true);
+
+    expect(shouldBackfillPriorResponses({
+      loginComplete: true,
+      account: '0xabc',
+      displayAnswerMode: true,
+      viewAddress: '0xdef',
+      singleQuestionMode: false,
+      responderAddress: '',
+      hasRefreshQuestionResponses: true,
+      submissionComplete: false,
+      isSubmitting: false,
+    })).toBe(false);
+
+    expect(shouldBackfillPriorResponses({
+      loginComplete: true,
+      account: '0xabc',
+      displayAnswerMode: false,
+      viewAddress: '',
+      singleQuestionMode: true,
+      responderAddress: '0xdef',
+      hasRefreshQuestionResponses: true,
+      submissionComplete: false,
+      isSubmitting: false,
+    })).toBe(false);
+  });
+
+  it('builds grouped prior-response fetch plans without reusing attempted ids', () => {
+    expect(buildPriorResponseFetchPlan({
+      missingInfo: {
+        requests: [
+          { slug: 'alpha', missingIds: ['q1', 'q2'] },
+          { slug: 'beta', missingIds: ['q3'] },
+        ],
+      },
+      responderLower: '0xabc',
+      attemptedKeys: new Set(['alpha|0xabc|q2']),
+    })).toEqual({
+      requestsToFetch: [
+        { slug: 'alpha', idsToFetch: ['q1'] },
+        { slug: 'beta', idsToFetch: ['q3'] },
+      ],
+      attemptedKeysToMark: [
+        'alpha|0xabc|q1',
+        'beta|0xabc|q3',
+      ],
     });
   });
 
