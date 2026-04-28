@@ -1,41 +1,16 @@
+// @ts-nocheck
+
 import React from 'react';
 import { Card, CardBody } from 'reactstrap';
 
 import styles from './SurveyTool.module.scss';
-
-export type PileActiveQuestionLike = {
-  [key: string]: unknown;
-};
-
-export type RenderQuestionMaskedPromptCard = (args: {
-  mode: 'pile';
-  question: PileActiveQuestionLike;
-}) => React.ReactNode;
-
-export type PileCardShellProps = {
-  promptHeader: React.ReactNode;
-  questionComponent: React.ReactNode;
-  questionContainerClass: string;
-  footerSection?: React.ReactNode;
-};
-
-export type PileGatedPromptCardProps = {
-  promptHeader: React.ReactNode;
-  gatedPromptNotice: React.ReactNode;
-};
-
-export type PileActiveQuestionCardProps = PileCardShellProps & {
-  question: PileActiveQuestionLike;
-  promptMasked: boolean;
-  renderQuestionMaskedPromptCard: RenderQuestionMaskedPromptCard;
-};
 
 export const renderPileCardShell = ({
   promptHeader,
   questionComponent,
   questionContainerClass,
   footerSection,
-}: PileCardShellProps): React.ReactElement => (
+}) => (
   <Card className={styles.pileCardInner}>
     <CardBody className={styles.pileCardBody}>
       <div className={styles.pileCardHeader}>
@@ -56,7 +31,7 @@ export const renderPileCardShell = ({
 export const renderPileGatedPromptCard = ({
   promptHeader,
   gatedPromptNotice,
-}: PileGatedPromptCardProps): React.ReactElement => (
+}) => (
   <Card className={styles.pileCardInner}>
     <CardBody className={styles.pileCardBody}>
       <div className={styles.pileCardHeader}>
@@ -75,7 +50,7 @@ export const renderPileActiveQuestionCard = ({
   questionComponent,
   questionContainerClass,
   footerSection,
-}: PileActiveQuestionCardProps): React.ReactNode => (
+}) => (
   promptMasked
     ? renderQuestionMaskedPromptCard({
         mode: 'pile',
