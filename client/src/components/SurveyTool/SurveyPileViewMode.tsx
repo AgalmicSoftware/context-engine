@@ -69,7 +69,11 @@ import {
   pickScopedPileQuestionProgress,
 } from './surveyPileLifecycle';
 import {
+  buildPileQuestionSetHydrationPlan,
+} from './surveyPileHydrationPlan';
+import {
   buildPileEmptyProbePlan,
+  buildPileLoadFailureState,
   buildPileLoadProgressState,
 } from './surveyPileLoadPlanner';
 import {
@@ -1703,7 +1707,10 @@ export class PileViewMode extends SurveyQuestions {
       // Treat unexpected errors as warming state if we recently saw rate-limits
       if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
       this._lastLoadAndSortResultSignature = '';
-      this.setState({ loading: !this.props.isQuestionCacheReady || recentRateLimit });
+      this.setState(buildPileLoadFailureState({
+        isQuestionCacheReady: !!this.props.isQuestionCacheReady,
+        recentRateLimit,
+      }));
     }
   };
 
@@ -1775,25 +1782,30 @@ export class PileViewMode extends SurveyQuestions {
     autoDecryptResetReason = 'pile-hydration-reset',
   } = {}) => {
     if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
-    if (resultSignature) {
-      if (resultSignature === this._lastLoadAndSortResultSignature) {
-        bumpSurveyPerfCounter('noopSkipCount');
-        return;
-      }
-      this._lastLoadAndSortResultSignature = resultSignature;
+    const hydrationPlan = buildPileQuestionSetHydrationPlan({
+      requestEpoch,
+      resultSignature,
+      lastResultSignature: this._lastLoadAndSortResultSignature,
+      initializeResponses,
+      forceOverwriteDraft,
+      resetAutoDecryptLedger,
+      autoDecryptReason,
+      autoDecryptResetReason,
+    });
+
+    if (hydrationPlan.shouldSkipDuplicateSignature) {
+      bumpSurveyPerfCounter('noopSkipCount');
+      return;
+    }
+    if (hydrationPlan.shouldUpdateResultSignature) {
+      this._lastLoadAndSortResultSignature = hydrationPlan.nextResultSignature;
     }
 
     const continueHydration = () => {
-      this.rehydrateVisiblePileWindow({
-        requestEpoch,
-        forceOverwriteDraft,
-        resetAutoDecryptLedger,
-        autoDecryptReason,
-        autoDecryptResetReason,
-      });
+      this.rehydrateVisiblePileWindow(hydrationPlan.rehydrateOptions);
     };
 
-    if (!initializeResponses) {
+    if (!hydrationPlan.shouldInitializeResponses) {
       continueHydration();
       return;
     }
