@@ -219,6 +219,7 @@ import {
   buildQuestionIdScopeSignature,
   buildQuestionScanProgressDisplay,
   buildDraftAnswersByQuestionId,
+  loadDraftAnswersByQuestionIdSafely,
   buildDraftHydrationPatchForQuestion,
   shouldSkipDraftHydrationRun,
   buildDraftHydrationSeedContext,
@@ -5563,10 +5564,11 @@ export class SurveyQuestions extends Component {
 
       // Keep draft envelope context in play so cache hydration can avoid re-masking
       // decrypted-empty values during rapid pile navigation.
-      let draftAnswersByQid = {};
-      try {
-        draftAnswersByQid = buildDraftAnswersByQuestionId(this.loadDraft());
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      const draftAnswersByQid = loadDraftAnswersByQuestionIdSafely({
+        loadDraft: () => this.loadDraft(),
+        buildDraftAnswersByQuestionId,
+        onError: (error) => surveyLog.warn('SurveyTool: fallback', error),
+      });
 
       const {
         changed,
