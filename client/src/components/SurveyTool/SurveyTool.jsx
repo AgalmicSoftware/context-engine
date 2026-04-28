@@ -223,6 +223,7 @@ import {
   shouldSkipDraftHydrationRun,
   buildDraftHydrationSeedContext,
   buildDraftHydrationRunPlan,
+  resolveLocalCacheSliceLookup,
   buildCacheHydrationSlice,
   buildDraftHydrationUpdatePlan,
   buildDraftAwareCacheHydrationState,
@@ -5499,29 +5500,25 @@ export class SurveyQuestions extends Component {
 
   buildSliceFromLocalCache = () => {
     try {
-      // Use the same slug resolution as drafts/decrypt (single-Q aware)
-      const context = resolveResponseHydrationContext(this.props, this._getEffectiveDraftSlug());
-      const slug = context.sessionSlug || '';
-      const extraSlugs = this.props?.minifiedMode === 'pile'
-        ? getExtraQuestionReadSlugs(this.props, slug)
-        : [];
-      const scopeSlugs = [slug, ...extraSlugs];
-      const netId = context.networkIdStr;
       const {
+        scopeSlugs,
+        networkIdStr: netId,
         renderedIds: rendered,
         normalizedAccount: acct,
         memoKey,
         shouldUseMemo,
         memoizedValue,
-      } = prepareLocalCacheSliceBuild({
-        scopeSlugs,
-        networkIdStr: netId,
+      } = resolveLocalCacheSliceLookup({
+        rawSlug: this._getEffectiveDraftSlug(),
         account: this.props?.account,
         renderedIds: this.getCurrentRenderedQuestionIds(),
+        minifiedMode: this.props?.minifiedMode,
         questionsCacheNonce: this.props.questionsCacheNonce,
         questionResponsesNonce: this.props.questionResponsesNonce,
         existingMemo: this._localCacheSliceMemo,
+        resolveResponseHydrationContext: (rawSlug) => resolveResponseHydrationContext(this.props, rawSlug),
         normalizeSessionSlugValue,
+        getExtraScopeSlugs: (slug) => getExtraQuestionReadSlugs(this.props, slug),
       });
       if (shouldUseMemo) {
         return memoizedValue;

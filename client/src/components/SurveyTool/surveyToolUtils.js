@@ -105,6 +105,7 @@ export {
   shouldSkipDraftHydrationRun,
   buildDraftHydrationSeedContext,
   buildDraftHydrationRunPlan,
+  resolveLocalCacheSliceLookup,
   buildDraftHydrationRenderedQuestionIds,
   buildDraftHydrationOverwriteDecision,
   buildDraftAwareCacheHydrationState,
