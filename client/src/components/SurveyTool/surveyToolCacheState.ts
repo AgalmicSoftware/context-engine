@@ -4,8 +4,7 @@ import {
   writeCacheOptimistic,
 } from '../../utilities/cache/cacheScripts.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
-
-type UnknownRecord = Record<string, unknown>;
+import type { UnknownRecord } from './surveyToolTypes.js';
 
 type ResponseMetaSource = {
   blockNumber?: unknown;
