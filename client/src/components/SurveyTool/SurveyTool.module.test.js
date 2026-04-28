@@ -130,6 +130,33 @@ describe('SurveyTool module', () => {
     expect(Object.getPrototypeOf(PileViewMode.prototype)).toBe(DirectSurveyQuestions.prototype);
   });
 
+  it('renders the pile gated prompt card through the extracted PileViewMode helper', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      showComments: {},
+      showConviction: {},
+    };
+    subject.isQuestionPromptMasked = jest.fn(() => true);
+    subject.renderPromptWithManualDecrypt = jest.fn(() => <span data-testid="pile-masked-prompt">Prompt</span>);
+    subject.renderGatedPromptNotice = jest.fn(() => <div data-testid="pile-gated-notice" />);
+
+    const tree = subject.renderActiveQuestion({ id: 'q1', prompt: 'masked', promptDecrypted: false });
+
+    expect(treeHasDataTestId(tree, 'pile-masked-prompt')).toBe(true);
+    expect(treeHasDataTestId(tree, 'pile-gated-notice')).toBe(true);
+  });
+
   it('renders triple trailing arrows inside the pile submit button', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
