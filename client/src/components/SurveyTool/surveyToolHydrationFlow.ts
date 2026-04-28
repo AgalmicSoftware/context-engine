@@ -290,6 +290,16 @@ type ApplyLocalCacheRehydrateSuccessEffectsArgs = {
   afterStateApplied?: (() => void) | null;
 };
 
+type ApplyPrefillStateEffectsArgs = {
+  updateJsonPreview?: (() => void) | null;
+  recalculateEditStats?: (() => void) | null;
+};
+
+type ApplyLocalCacheRehydrateAppliedEffectsArgs = ApplyPrefillStateEffectsArgs & {
+  ensurePriorResponses?: (() => void) | null;
+  callback?: (() => void) | null;
+};
+
 type BuildGroupedRenderedResponseScopePlanArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   slugByQuestionId?: Map<string, unknown> | null;
@@ -1428,6 +1438,36 @@ export const applyLocalCacheRehydrateSuccessEffects = ({
     }
   });
   return true;
+};
+
+export const applyPrefillStateEffects = ({
+  updateJsonPreview = null,
+  recalculateEditStats = null,
+}: ApplyPrefillStateEffectsArgs = {}) => {
+  if (typeof updateJsonPreview === 'function') {
+    updateJsonPreview();
+  }
+  if (typeof recalculateEditStats === 'function') {
+    recalculateEditStats();
+  }
+};
+
+export const applyLocalCacheRehydrateAppliedEffects = ({
+  updateJsonPreview = null,
+  recalculateEditStats = null,
+  ensurePriorResponses = null,
+  callback = null,
+}: ApplyLocalCacheRehydrateAppliedEffectsArgs = {}) => {
+  applyPrefillStateEffects({
+    updateJsonPreview,
+    recalculateEditStats,
+  });
+  if (typeof ensurePriorResponses === 'function') {
+    ensurePriorResponses();
+  }
+  if (typeof callback === 'function') {
+    callback();
+  }
 };
 
 export const executePriorResponseFetchPlan = async ({

@@ -257,8 +257,10 @@ import {
   buildPrefilledSingleQuestionState,
   buildPrefilledSurveyState,
   buildQuestionSlugMapForIds,
+  applyPrefillStateEffects,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateNoChangeEffects,
+  applyLocalCacheRehydrateAppliedEffects,
   applyLocalCacheRehydrateSuccessEffects,
   buildRevertedResponseSlice,
   buildSubmissionGroupContext,
@@ -5554,10 +5556,10 @@ export class SurveyQuestions extends Component {
         buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       }).updates,
       applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
-      afterStateApplied: () => {
-        this.updateJsonPreview();
-        this.recalculateEditStats();
-      },
+      afterStateApplied: () => applyPrefillStateEffects({
+        updateJsonPreview: this.updateJsonPreview,
+        recalculateEditStats: this.recalculateEditStats,
+      }),
     });
   };
 
@@ -5705,13 +5707,13 @@ export class SurveyQuestions extends Component {
       applyLocalCacheRehydrateSuccessEffects({
         updates,
         applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
-        afterStateApplied: () => {
-          this.updateJsonPreview && this.updateJsonPreview();
+        afterStateApplied: () => applyLocalCacheRehydrateAppliedEffects({
+          updateJsonPreview: this.updateJsonPreview,
           // Recalculate immediately to ensure 'Submit (X)' is accurate immediately
-          this.recalculateEditStats && this.recalculateEditStats();
-          void this.ensurePriorResponsesForRenderedIds();
-          if (callback) callback();
-        },
+          recalculateEditStats: this.recalculateEditStats,
+          ensurePriorResponses: () => { void this.ensurePriorResponsesForRenderedIds(); },
+          callback,
+        }),
       });
     } catch (e) {
       this._rehydrateLocalCacheLastSig = '';
@@ -6416,10 +6418,10 @@ export class SurveyQuestions extends Component {
         buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       }).updates,
       applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
-      afterStateApplied: () => {
-        this.updateJsonPreview();
-        this.recalculateEditStats();
-      },
+      afterStateApplied: () => applyPrefillStateEffects({
+        updateJsonPreview: this.updateJsonPreview,
+        recalculateEditStats: this.recalculateEditStats,
+      }),
     });
   };
   parseAnswerValue = (value) => {

@@ -23,7 +23,9 @@ import {
   buildPrefilledSurveyUpdatePlan,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateNoChangeEffects,
+  applyLocalCacheRehydrateAppliedEffects,
   applyLocalCacheRehydrateSuccessEffects,
+  applyPrefillStateEffects,
   applyPriorResponseFetchSuccessEffects,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
@@ -1676,6 +1678,34 @@ describe('surveyToolHydrationFlow', () => {
       applyStateUpdates,
       afterStateApplied,
     })).toBe(false);
+  });
+
+  it('applies prefill and local-cache post-apply follow-up effects', () => {
+    const updateJsonPreview = jest.fn();
+    const recalculateEditStats = jest.fn();
+    const ensurePriorResponses = jest.fn();
+    const callback = jest.fn();
+
+    applyPrefillStateEffects({
+      updateJsonPreview,
+      recalculateEditStats,
+    });
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
+
+    updateJsonPreview.mockClear();
+    recalculateEditStats.mockClear();
+
+    applyLocalCacheRehydrateAppliedEffects({
+      updateJsonPreview,
+      recalculateEditStats,
+      ensurePriorResponses,
+      callback,
+    });
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
+    expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledTimes(1);
   });
 
   it('executes grouped prior-response fetch plans in normalized order', async () => {
