@@ -5,6 +5,7 @@ import {
   buildExitEditingStatePatch,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  buildLocalCacheRehydrationUpdatePlan,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
   buildStartFreshSurveyState,
@@ -774,6 +775,95 @@ describe('surveyToolHydrationFlow', () => {
       modifiedCount: 0,
       hasEncryptedChanges: false,
       submissionError: '',
+    });
+  });
+
+  it('builds local-cache rehydration update plans from slice/baseline changes', () => {
+    const cloneBaseline = jest.fn((baseline) => JSON.parse(JSON.stringify(baseline)));
+    const buildDraftAwareState = jest.fn(() => ({
+      effectiveAnswerState: { value: 'cached-answer' },
+      effectiveAdditionalState: { value: 'cached-notes' },
+      canReplaceMaskedAnswerWithDraftEmpty: false,
+      canReplaceMaskedAdditionalWithDraftEmpty: false,
+      canReplaceMaskedBaselineAnswerWithDraftEmpty: false,
+      canReplaceMaskedBaselineAdditionalWithDraftEmpty: false,
+    }));
+    const applyLocalCacheHydrationEntryToSlice = jest.fn(({
+      targetSlice,
+      questionId,
+      cachedAnswer,
+      cachedAdditional,
+    }) => {
+      if (cachedAnswer) targetSlice.answers[questionId] = cachedAnswer;
+      if (cachedAdditional) targetSlice.additionalComments[questionId] = cachedAdditional;
+      return true;
+    });
+
+    expect(buildLocalCacheRehydrationUpdatePlan({
+      prevSurveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+      surveyIndex: 2,
+      renderedQuestionIds: ['q1'],
+      baseSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      prevBaseline: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      cacheSlice: {
+        answers: { q1: { value: 'cached-answer' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q1: { value: 'cached-notes' } },
+      },
+      draftAnswersByQuestionId: {},
+      cloneBaseline,
+      buildDraftAwareCacheHydrationState: buildDraftAwareState,
+      applyLocalCacheHydrationEntryToSlice,
+      debugLabel: '[test][rehydrateLocal]',
+    })).toEqual({
+      nextSlice: {
+        answers: { q1: { value: 'cached-answer' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q1: { value: 'cached-notes' } },
+      },
+      nextBaseline: {
+        answers: { q1: { value: 'cached-answer' } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q1: { value: 'cached-notes' } },
+      },
+      changed: true,
+      baselineChanged: true,
+      updates: {
+        surveysResponseState: [
+          { answers: { keep: { value: 'persisted' } } },
+          {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+          {
+            answers: { q1: { value: 'cached-answer' } },
+            importance: {},
+            conviction: {},
+            additionalComments: { q1: { value: 'cached-notes' } },
+          },
+        ],
+        editBaseline: {
+          answers: { q1: { value: 'cached-answer' } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { value: 'cached-notes' } },
+        },
+      },
     });
   });
 
