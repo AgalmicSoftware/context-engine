@@ -12120,6 +12120,46 @@ describe('SurveyTool module', () => {
     expect(subject.state.surveysResponseState?.[0]?.additionalComments?.q3).toEqual(expect.objectContaining({ value: '' }));
   });
 
+  it('does not rebuild the same visible pile response window twice', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      questionResponsesNonce: 5,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    syncClassSetState(subject);
+    subject.state = {
+      ...subject.state,
+      pileQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Q1' },
+        { id: 'q2', type: 'freeform', prompt: 'Q2' },
+        { id: 'q3', type: 'freeform', prompt: 'Q3' },
+        { id: 'q4', type: 'freeform', prompt: 'Q4' },
+      ],
+      activePileIndex: 1,
+      isDirty: false,
+      modifiedCount: 0,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: null,
+    };
+
+    subject.initializeResponseState();
+    expect(subject.setState).toHaveBeenCalledTimes(1);
+    expect(Object.keys(subject.state.surveysResponseState?.[0]?.answers || {})).toEqual(['q1', 'q2', 'q3', 'q4']);
+
+    subject.initializeResponseState();
+    expect(subject.setState).toHaveBeenCalledTimes(1);
+  });
+
   it('schedules pile reload when scoped hydration progress advances without nonce ticks', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
