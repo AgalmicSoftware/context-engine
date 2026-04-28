@@ -148,6 +148,24 @@ type BuildRevertPendingStatePatchArgs = {
   isLoggedIn?: boolean;
 };
 
+type ResolveExitEditingBaselineSliceArgs = {
+  responderAddress?: unknown;
+  parsedViewAddressAnswers?: unknown;
+  userAnswers?: unknown;
+  buildSliceFromUserAnswers?: ((sourceAnswers: unknown) => ResponseSlice | null | undefined) | null;
+  buildSliceFromLocalCache?: (() => ResponseSlice | null | undefined) | null;
+};
+
+type BuildExitEditingStatePatchArgs = {
+  prevSurveysResponseState?: unknown[] | null;
+  surveyIndex?: unknown;
+  baselineSlice?: ResponseSlice | null;
+  renderedQuestionIds?: Iterable<unknown> | unknown[];
+  buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
+  cloneValue?: ((value: unknown) => unknown) | null;
+  nextSubmittedSinceLastEdit?: boolean;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -758,6 +776,78 @@ export const buildRevertPendingStatePatch = ({
   hasEncryptedChanges: false,
   submissionError: '',
 });
+
+export const resolveExitEditingBaselineSlice = ({
+  responderAddress = '',
+  parsedViewAddressAnswers = null,
+  userAnswers = null,
+  buildSliceFromUserAnswers = null,
+  buildSliceFromLocalCache = null,
+}: ResolveExitEditingBaselineSliceArgs = {}): ResponseSlice => {
+  const sourceAnswers = responderAddress ? parsedViewAddressAnswers : userAnswers;
+  if (sourceAnswers && typeof buildSliceFromUserAnswers === 'function') {
+    const nextSlice = buildSliceFromUserAnswers(sourceAnswers);
+    if (nextSlice && typeof nextSlice === 'object') return nextSlice;
+  }
+  if (typeof buildSliceFromLocalCache === 'function') {
+    const cachedSlice = buildSliceFromLocalCache();
+    if (cachedSlice && typeof cachedSlice === 'object') return cachedSlice;
+  }
+  return buildEmptyResponseSlice();
+};
+
+export const buildExitEditingStatePatch = ({
+  prevSurveysResponseState = null,
+  surveyIndex = 0,
+  baselineSlice = null,
+  renderedQuestionIds = [],
+  buildEmptyResponseFieldState = null,
+  cloneValue = null,
+  nextSubmittedSinceLastEdit = false,
+}: BuildExitEditingStatePatchArgs = {}) => {
+  const normalizedBaselineSlice = baselineSlice && typeof baselineSlice === 'object'
+    ? baselineSlice
+    : buildEmptyResponseSlice();
+  const clone = typeof cloneValue === 'function'
+    ? cloneValue
+    : ((value: unknown) => value);
+
+  const nextSlice: ResponseSlice = {
+    answers: clone(normalizedBaselineSlice.answers || {}) as Record<string, unknown>,
+    importance: { ...((normalizedBaselineSlice.importance as Record<string, unknown>) || {}) },
+    conviction: { ...((normalizedBaselineSlice.conviction as Record<string, unknown>) || {}) },
+    additionalComments: clone(normalizedBaselineSlice.additionalComments || {}) as Record<string, unknown>,
+  };
+
+  Array.from(renderedQuestionIds || []).forEach((rawQuestionId) => {
+    const questionId = String(rawQuestionId || '');
+    if (!questionId) return;
+    if (!nextSlice.answers?.[questionId] && typeof buildEmptyResponseFieldState === 'function') {
+      nextSlice.answers![questionId] = buildEmptyResponseFieldState(questionId);
+    }
+    if (!nextSlice.additionalComments?.[questionId] && typeof buildEmptyResponseFieldState === 'function') {
+      nextSlice.additionalComments![questionId] = buildEmptyResponseFieldState(questionId, 'additional');
+    }
+  });
+
+  return {
+    surveysResponseState: buildSurveyResponseStateArray({
+      prevSurveysResponseState,
+      surveyIndex,
+      nextSlice,
+    }),
+    isEditing: false,
+    displayAnswerMode: true,
+    startFresh: false,
+    editBaseline: clone(nextSlice),
+    isDirty: false,
+    modifiedCount: 0,
+    hasEncryptedChanges: false,
+    submissionError: '',
+    submissionComplete: false,
+    submittedSinceLastEdit: !!nextSubmittedSinceLastEdit,
+  };
+};
 
 export const buildPrefilledSurveyState = ({
   surveyIndex = 0,

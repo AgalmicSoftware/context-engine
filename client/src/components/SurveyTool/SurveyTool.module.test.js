@@ -5308,6 +5308,95 @@ describe('SurveyTool module', () => {
     expect(subject.state.isDirty).toBe(false);
   });
 
+  it('restores the viewed-response slice when exiting edit mode', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 2,
+      responderAddress: '0xdef',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+      parsedViewAddressAnswers: { answer: { value: 'viewed' } },
+      userAnswers: { answer: { value: 'self' } },
+      submittedSinceLastEdit: true,
+    };
+    syncClassSetState(subject);
+    subject.buildSliceFromUserAnswers = jest.fn(() => ({
+      answers: { q1: { value: 'viewed' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    }));
+    subject.buildSliceFromLocalCache = jest.fn(() => ({
+      answers: { q9: { value: 'cached' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    }));
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1', 'q2']);
+    subject.buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
+      value: '',
+      questionId,
+      fieldKey,
+    }));
+    subject.deepClone = jest.fn((value) => JSON.parse(JSON.stringify(value)));
+    subject.recalculateEditStats = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.updateJsonPreview = jest.fn();
+    subject.clearDraft = jest.fn();
+
+    subject.handleExitEditing();
+
+    expect(subject.state.displayAnswerMode).toBe(true);
+    expect(subject.state.isEditing).toBe(false);
+    expect(subject.state.startFresh).toBe(false);
+    expect(subject.state.submittedSinceLastEdit).toBe(false);
+    expect(subject.state.surveysResponseState).toEqual([
+      { answers: { keep: { value: 'persisted' } } },
+      {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      {
+        answers: {
+          q1: { value: 'viewed' },
+          q2: { value: '', questionId: 'q2', fieldKey: 'answer' },
+        },
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: { value: '', questionId: 'q1', fieldKey: 'additional' },
+          q2: { value: '', questionId: 'q2', fieldKey: 'additional' },
+        },
+      },
+    ]);
+    expect(subject.state.editBaseline).toEqual({
+      answers: {
+        q1: { value: 'viewed' },
+        q2: { value: '', questionId: 'q2', fieldKey: 'answer' },
+      },
+      importance: {},
+      conviction: {},
+      additionalComments: {
+        q1: { value: '', questionId: 'q1', fieldKey: 'additional' },
+        q2: { value: '', questionId: 'q2', fieldKey: 'additional' },
+      },
+    });
+    expect(subject.buildSliceFromUserAnswers).toHaveBeenCalledWith({ answer: { value: 'viewed' } });
+    expect(subject.clearDraft).toHaveBeenCalledTimes(1);
+    expect(subject.recalculateEditStats).toHaveBeenCalledTimes(1);
+    expect(subject.persistDraftSafely).toHaveBeenCalledTimes(1);
+    expect(subject.updateJsonPreview).toHaveBeenCalledTimes(1);
+  });
+
   it('renders submitted indicator test id when submitted latch is active', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
