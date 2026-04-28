@@ -2,6 +2,7 @@ import {
   buildInitialSurveyResponseQuestionIds,
   buildRenderedQuestionIdsFromPileWindow,
   buildRenderedQuestionIdsFromQuestionPools,
+  readRenderedQuestionIds,
 } from './surveyQuestionScope.js';
 
 describe('surveyQuestionScope', () => {
@@ -10,6 +11,27 @@ describe('surveyQuestionScope', () => {
       questionPool: [{ id: '' }, { id: 'q1' }, { id: 0 }, { id: 'q2' }],
       pileQuestions: [{ id: null }, { id: 'q2' }, { id: 'q3' }],
     })).toEqual(['q1', 'q2', 'q3']);
+  });
+
+  it('reads rendered question ids and optionally normalizes them', () => {
+    const getRenderedQuestionIds = jest.fn(() => ['Q1', 'q1', '', 'q2']);
+    const normalizeRenderedIds = jest.fn(({ renderedIds }) => (
+      renderedIds.map((id: unknown) => String(id || '').trim().toLowerCase()).filter(Boolean)
+    ));
+
+    expect(readRenderedQuestionIds({
+      getRenderedQuestionIds,
+    })).toEqual(['Q1', 'q1', '', 'q2']);
+
+    expect(readRenderedQuestionIds({
+      getRenderedQuestionIds,
+      normalizeRenderedIds,
+    })).toEqual(['q1', 'q1', 'q2']);
+
+    expect(getRenderedQuestionIds).toHaveBeenCalledTimes(2);
+    expect(normalizeRenderedIds).toHaveBeenCalledWith({
+      renderedIds: ['Q1', 'q1', '', 'q2'],
+    });
   });
 
   it('builds the visible pile window around the active question', () => {
