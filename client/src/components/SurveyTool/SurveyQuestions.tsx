@@ -222,16 +222,12 @@ import {
   buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
   buildDraftHydrationRunPlan,
-  resolveLocalCacheSliceLookup,
   buildDraftAwareCacheHydrationState,
   buildExitEditingStatePatch,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
-  loadLocalCacheHydrationSlice,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
-  buildPrefilledSingleQuestionUpdatePlan,
-  buildPrefilledSurveyUpdatePlan,
   applyPriorResponseFetchSuccessEffects,
   buildPriorResponseFetchPlan,
   clearPriorResponseAttemptedKeys,
@@ -243,14 +239,11 @@ import {
   trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
   loadMissingRenderedResponseInfo,
-  resolveMissingRenderedResponseLookup,
   buildNormalizedRenderedQuestionIds,
   resolveQuestionSlugMapLookup,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
   buildStartFreshSurveyState,
-  buildLocalCacheHydrationMemoKey,
-  prepareLocalCacheSliceBuild,
   buildMergedSurveyResponseState,
   buildPrefilledSingleQuestionState,
   buildPrefilledSurveyState,
@@ -376,9 +369,13 @@ import {
   bumpSurveyPerfCounter,
 } from './surveyToolUtils.js';
 import {
+  buildSurveyLocalCacheSlice,
+  executeSurveyResponsePrefill,
+  executeSurveySingleQuestionPrefill,
   executeSurveyDraftHydration,
   executeSurveyLocalCacheRehydrate,
   executeSurveyPriorResponseBackfill,
+  resolveSurveyMissingRenderedResponseLookup,
 } from './surveyToolHydrationController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
@@ -4359,13 +4356,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   getMissingRenderedResponseIdsForAccount = async (opts = {}) => {
     const fallbackSlug = resolveEffectiveSlug(this.props);
-    return resolveMissingRenderedResponseLookup({
-      responderLower: opts?.responder || this.props.account,
-      rawSlug: opts?.slug ?? this._getEffectiveDraftSlug() ?? fallbackSlug,
+    return resolveSurveyMissingRenderedResponseLookup({
+      props: this.props,
+      responder: opts?.responder || this.props.account,
+      slug: opts?.slug ?? this._getEffectiveDraftSlug() ?? fallbackSlug,
       fallbackSlug,
       renderedIds: this.getRenderedQuestionIdsForResponseHydration(),
-      minifiedMode: this.props?.minifiedMode,
-      surveyId: this.props?.surveyId || null,
       resolveResponseHydrationContext: (nextSlug) => resolveResponseHydrationContext(this.props, nextSlug),
       normalizeSessionSlugValue,
       getExtraScopeSlugs: (slug) => (
@@ -4632,22 +4628,15 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   // Hydrates encrypted: true for any previously encrypted field.
   // Synchronizes state and baseline cleanly to prevent ghost edits.
   prefillSurveyResponses = (userAnswers) => {
-    if (!userAnswers || !Array.isArray(userAnswers.responses)) return;
-
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
 
-    applyPrefillUpdatePlan({
-      updates: (prev) => buildPrefilledSurveyUpdatePlan({
-        surveyIndex,
-        prevSurveysResponseState: prev?.surveysResponseState,
-        prevEditBaseline: prev?.editBaseline,
-        isDirty: prev?.isDirty,
-        submissionComplete: prev?.submissionComplete,
-        responses: userAnswers.responses,
-        applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
-        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-      }).updates,
-      applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
+    executeSurveyResponsePrefill({
+      state: this.state,
+      surveyIndex,
+      userAnswers,
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+      applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
+      setState: this.setState.bind(this),
       updateJsonPreview: this.updateJsonPreview,
       recalculateEditStats: this.recalculateEditStats,
     });
@@ -4655,61 +4644,35 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
 
   buildSliceFromLocalCache = () => {
-    try {
-      const {
-        scopeSlugs,
-        networkIdStr: netId,
-        renderedIds: rendered,
-        normalizedAccount: acct,
-        memoKey,
-        shouldUseMemo,
-        memoizedValue,
-      } = resolveLocalCacheSliceLookup({
-        rawSlug: this._getEffectiveDraftSlug(),
-        account: this.props?.account,
-        renderedIds: this.getCurrentRenderedQuestionIds(),
-        minifiedMode: this.props?.minifiedMode,
-        questionsCacheNonce: this.props.questionsCacheNonce,
-        questionResponsesNonce: this.props.questionResponsesNonce,
-        existingMemo: this._localCacheSliceMemo,
-        resolveResponseHydrationContext: (rawSlug) => resolveResponseHydrationContext(this.props, rawSlug),
-        normalizeSessionSlugValue,
-        getExtraScopeSlugs: (slug) => getExtraQuestionReadSlugs(this.props, slug),
-      });
-      if (shouldUseMemo) {
-        return memoizedValue;
-      }
-
-      const memoize = (value) => {
-        this._localCacheSliceMemo = { key: memoKey, value, hasValue: true };
-        return value;
-      };
-
-      const slice = loadLocalCacheHydrationSlice({
-        scopeSlugs,
-        networkIdStr: netId,
-        account: acct,
-        renderedQuestionIds: rendered,
-        readQuestionsCache,
-        mergeQuestionResponses,
-        parseResponse: (raw) => {
-          let resp = raw;
-          try {
-            if (typeof resp === 'string') { resp = JSON.parse(resp); }
-          } catch { resp = null; }
-          return resp;
-        },
-        applyCachedResponseEntryToSlice: this._applyCachedResponseEntryToSlice,
-      });
-      if (!slice) return memoize(null);
-
-      DEBUG_PREFILL && surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', rendered);
-      return memoize(slice);
-    } catch (e) {
-      this._localCacheSliceMemo = { key: '', value: null, hasValue: false };
-      DEBUG_PREFILL && surveyLog.error('[Survey][buildSlice] Error:', e);
-      return null;
+    const slice = buildSurveyLocalCacheSlice({
+      props: this.props,
+      rawSlug: this._getEffectiveDraftSlug(),
+      renderedIds: this.getCurrentRenderedQuestionIds(),
+      localCacheSliceMemo: this._localCacheSliceMemo,
+      resolveResponseHydrationContext: (rawSlug) => resolveResponseHydrationContext(this.props, rawSlug),
+      normalizeSessionSlugValue,
+      getExtraScopeSlugs: (slug) => getExtraQuestionReadSlugs(this.props, slug),
+      readQuestionsCache,
+      mergeQuestionResponses,
+      parseResponse: (raw) => {
+        let resp = raw;
+        try {
+          if (typeof resp === 'string') { resp = JSON.parse(resp); }
+        } catch { resp = null; }
+        return resp;
+      },
+      applyCachedResponseEntryToSlice: this._applyCachedResponseEntryToSlice,
+      setLocalCacheMemo: (nextMemo) => {
+        this._localCacheSliceMemo = nextMemo;
+      },
+      onError: (error) => {
+        DEBUG_PREFILL && surveyLog.error('[Survey][buildSlice] Error:', error);
+      },
+    });
+    if (slice) {
+      DEBUG_PREFILL && surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', this.getCurrentRenderedQuestionIds());
     }
+    return slice;
   };
 
 
@@ -5400,24 +5363,15 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   // Hydrates encrypted: true for previously encrypted fields.
   // Intelligently merges baseline and preserves un-edited responses cleanly.
   prefillSingleQuestionResponse = (userAnswer) => {
-    const surveyIndex = 0; // single-question context uses index 0
     const questionId = normalizeQuestionIdKey(this.props.questionID);
 
-    if (!userAnswer || !questionId) return;
-
-    applyPrefillUpdatePlan({
-      updates: (prev) => buildPrefilledSingleQuestionUpdatePlan({
-        surveyIndex,
-        questionId,
-        prevSurveysResponseState: prev?.surveysResponseState,
-        prevEditBaseline: prev?.editBaseline,
-        isDirty: prev?.isDirty,
-        submissionComplete: prev?.submissionComplete,
-        userAnswer,
-        applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
-        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-      }).updates,
-      applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
+    executeSurveySingleQuestionPrefill({
+      state: this.state,
+      questionId,
+      userAnswer,
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+      applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
+      setState: this.setState.bind(this),
       updateJsonPreview: this.updateJsonPreview,
       recalculateEditStats: this.recalculateEditStats,
     });
