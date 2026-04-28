@@ -2,6 +2,7 @@ import {
   buildRenderedIdsSignature,
   normalizeQuestionIdKey,
 } from './surveyToolSignatures.js';
+import { shouldForceOverwriteDraftValues } from './surveyToolDraftState.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -207,6 +208,21 @@ type BuildLocalCacheRehydrationUpdatePlanArgs = BuildLocalCacheRehydrationStateA
 type BuildDraftHydrationUpdatePlanArgs = BuildDraftHydrationStateArgs & {
   prevSurveysResponseState?: unknown[] | null;
   surveyIndex?: unknown;
+};
+
+type BuildDraftHydrationRenderedQuestionIdsArgs = {
+  hydrationQuestionIds?: Iterable<unknown> | unknown[];
+  pileQuestions?: unknown[] | null;
+  forceOverwrite?: boolean;
+};
+
+type BuildDraftHydrationOverwriteDecisionArgs = {
+  forceOverwrite?: boolean;
+  isDirty?: boolean;
+  modifiedCount?: unknown;
+  pendingStats?: UnknownRecord | null;
+  submittedSinceLastEdit?: boolean;
+  submissionComplete?: boolean;
 };
 
 type BuildPrefilledSurveyUpdatePlanArgs = BuildPrefilledSurveyStateArgs;
@@ -1249,6 +1265,52 @@ export const buildDraftHydrationUpdatePlan = ({
     changed,
     baselineChanged,
     updates,
+  };
+};
+
+export const buildDraftHydrationRenderedQuestionIds = ({
+  hydrationQuestionIds = [],
+  pileQuestions = null,
+  forceOverwrite = false,
+}: BuildDraftHydrationRenderedQuestionIdsArgs = {}): string[] => {
+  const rendered = new Set(buildNormalizedRenderedQuestionIds({
+    renderedIds: hydrationQuestionIds,
+  }));
+  if (!!forceOverwrite) {
+    (Array.isArray(pileQuestions) ? pileQuestions : []).forEach((question) => {
+      const questionId = normalizeQuestionIdKey(
+        isRecord(question) ? question.id : null
+      );
+      if (questionId) rendered.add(questionId);
+    });
+  }
+  return Array.from(rendered);
+};
+
+export const buildDraftHydrationOverwriteDecision = ({
+  forceOverwrite = false,
+  isDirty = false,
+  modifiedCount = 0,
+  pendingStats = null,
+  submittedSinceLastEdit = false,
+  submissionComplete = false,
+}: BuildDraftHydrationOverwriteDecisionArgs = {}) => {
+  const pendingTotal = Number(
+    isRecord(pendingStats) && Object.prototype.hasOwnProperty.call(pendingStats, 'total')
+      ? pendingStats.total
+      : modifiedCount
+  ) || 0;
+  const submittedStateActive = !!(submittedSinceLastEdit || submissionComplete);
+
+  return {
+    pendingTotal,
+    submittedStateActive,
+    allowOverwrite: shouldForceOverwriteDraftValues({
+      forceOverwrite,
+      isDirty: !!isDirty || Number(modifiedCount || 0) > 0,
+      pendingTotal,
+      submittedStateActive,
+    }),
   };
 };
 
