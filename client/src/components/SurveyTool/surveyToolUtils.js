@@ -119,6 +119,7 @@ export {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
+  applyPriorResponseFetchSuccessEffects,
   buildPriorResponseFetchPlan,
   clearPriorResponseAttemptedKeys,
   executePriorResponseFetchPlan,

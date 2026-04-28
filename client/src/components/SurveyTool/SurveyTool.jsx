@@ -232,6 +232,7 @@ import {
   buildResetFormStatePatch,
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyUpdatePlan,
+  applyPriorResponseFetchSuccessEffects,
   buildPriorResponseFetchPlan,
   clearPriorResponseAttemptedKeys,
   executePriorResponseFetchPlan,
@@ -5244,13 +5245,17 @@ export class SurveyQuestions extends Component {
         }
       }
 
-      if (fetched && this._isMounted) {
-        // Force the immediate follow-up pass to read the freshly written cache
-        // even before parent cache nonces propagate down as props.
-        this._localCacheSliceMemo = { key: '', value: null, hasValue: false };
-        this._rehydrateLocalCacheLastSig = '';
-        this.rehydrateLocalCacheAnswersForRenderedIds();
-      }
+      applyPriorResponseFetchSuccessEffects({
+        fetched,
+        isMounted: this._isMounted,
+        resetLocalCacheMemo: () => {
+          // Force the immediate follow-up pass to read the freshly written cache
+          // even before parent cache nonces propagate down as props.
+          this._localCacheSliceMemo = { key: '', value: null, hasValue: false };
+          this._rehydrateLocalCacheLastSig = '';
+        },
+        triggerRehydrate: () => this.rehydrateLocalCacheAnswersForRenderedIds(),
+      });
       return fetched;
     })();
 
