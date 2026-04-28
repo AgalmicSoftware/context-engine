@@ -392,7 +392,8 @@ import {
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 
-import { PileViewMode, SurveyQuestions } from './SurveyQuestions';
+import { SurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
 
 export {
   SurveySelector,
