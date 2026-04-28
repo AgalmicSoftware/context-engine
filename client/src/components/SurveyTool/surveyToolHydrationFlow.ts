@@ -248,6 +248,15 @@ type LoadGroupedMissingResponseRequestsArgs = {
   ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
 };
 
+type LoadMissingResponseIdsForScopeArgs = {
+  slug?: unknown;
+  netId?: unknown;
+  renderedIds?: Iterable<unknown> | unknown[];
+  responderLower?: string;
+  readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
+  ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
+};
+
 type BuildMissingResponseIdsForRenderedQuestionsArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   questionResponses?: Record<string, unknown> | null;
@@ -1192,6 +1201,38 @@ export const executePriorResponseFetchPlan = async ({
   };
 };
 
+export const loadMissingResponseIdsForScope = async ({
+  slug = '',
+  netId = '',
+  renderedIds = [],
+  responderLower = '',
+  readQuestionsCacheAsync = null,
+  ensureQuestionsNet = null,
+}: LoadMissingResponseIdsForScopeArgs = {}) => {
+  const resolvedSlug = String(slug || '');
+  const resolvedNetId = String(netId || '');
+  if (!resolvedNetId) return [];
+
+  const rawCache = typeof readQuestionsCacheAsync === 'function'
+    ? await readQuestionsCacheAsync(resolvedSlug)
+    : {};
+  const questionsCache = typeof ensureQuestionsNet === 'function'
+    ? ensureQuestionsNet(rawCache, resolvedNetId)
+    : rawCache;
+  const questionResponses =
+    isRecord(questionsCache) &&
+    isRecord(questionsCache[resolvedNetId]) &&
+    isRecord((questionsCache[resolvedNetId] as UnknownRecord).questionResponses)
+      ? ((questionsCache[resolvedNetId] as UnknownRecord).questionResponses as Record<string, unknown>)
+      : {};
+
+  return buildMissingResponseIdsForRenderedQuestions({
+    renderedIds,
+    questionResponses,
+    responderLower,
+  });
+};
+
 export const loadGroupedMissingResponseRequests = async ({
   scopePlan = null,
   fallbackNetId = '',
@@ -1201,7 +1242,7 @@ export const loadGroupedMissingResponseRequests = async ({
   ensureQuestionsNet = null,
 }: LoadGroupedMissingResponseRequestsArgs = {}) => {
   const requests = [];
-  const cachedQuestionResponsesByScope = new Map<string, Record<string, unknown>>();
+  const cachedMissingIdsByScope = new Map<string, string[]>();
 
   for (const entry of (Array.isArray(scopePlan) ? scopePlan : [])) {
     const resolvedSlug = String(entry?.slug || '');
@@ -1216,31 +1257,23 @@ export const loadGroupedMissingResponseRequests = async ({
     }
 
     const scopeKey = `${resolvedSlug}|${resolvedNetId}`;
-    let questionResponses = cachedQuestionResponsesByScope.get(scopeKey);
-    if (!questionResponses) {
-      const rawCache = typeof readQuestionsCacheAsync === 'function'
-        ? await readQuestionsCacheAsync(resolvedSlug)
-        : {};
-      const questionsCache = typeof ensureQuestionsNet === 'function'
-        ? ensureQuestionsNet(rawCache, resolvedNetId)
-        : rawCache;
-      questionResponses =
-        isRecord(questionsCache) &&
-        isRecord(questionsCache[resolvedNetId]) &&
-        isRecord((questionsCache[resolvedNetId] as UnknownRecord).questionResponses)
-          ? ((questionsCache[resolvedNetId] as UnknownRecord).questionResponses as Record<string, unknown>)
-          : {};
-      cachedQuestionResponsesByScope.set(scopeKey, questionResponses);
+    let missingIds = cachedMissingIdsByScope.get(scopeKey);
+    if (!missingIds) {
+      missingIds = await loadMissingResponseIdsForScope({
+        slug: resolvedSlug,
+        netId: resolvedNetId,
+        renderedIds: entry?.questionIds || [],
+        responderLower,
+        readQuestionsCacheAsync,
+        ensureQuestionsNet,
+      });
+      cachedMissingIdsByScope.set(scopeKey, missingIds);
     }
 
     requests.push({
       slug: resolvedSlug,
       netId: resolvedNetId,
-      missingIds: buildMissingResponseIdsForRenderedQuestions({
-        renderedIds: entry?.questionIds || [],
-        questionResponses,
-        responderLower,
-      }),
+      missingIds,
     });
   }
 
