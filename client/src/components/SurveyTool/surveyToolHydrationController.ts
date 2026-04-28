@@ -1,299 +1,22 @@
 import {
-  applyPrefillUpdatePlan,
   applyDraftHydrationEffects,
   applyLocalCacheRehydrateMissEffects,
   applyLocalCacheRehydrateUpdatePlan,
   buildDraftHydrationRunPlan,
   buildDraftHydrationSeedContext,
-  buildPrefilledSingleQuestionUpdatePlan,
-  buildPrefilledSurveyUpdatePlan,
   buildLocalCacheRehydrationUpdatePlan,
   loadDraftAnswersByQuestionIdSafely,
-  loadLocalCacheHydrationSlice,
   prepareLocalCacheRehydrateRun,
-  resolveLocalCacheSliceLookup,
-  resolveMissingRenderedResponseLookup,
   runPriorResponseBackfillAttempt,
   shouldBackfillPriorResponses,
   shouldSkipDraftHydrationRun,
 } from './surveyToolHydrationFlow.js';
 
-type SurveyToolLikeProps = Record<string, unknown>;
-type SurveyToolLikeState = Record<string, unknown>;
-type SetStateUpdate = Record<string, unknown> | null | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
+type SurveyToolLikeProps = Record<string, any>;
+type SurveyToolLikeState = Record<string, any>;
+type SetStateUpdate = Record<string, unknown> | null | ((prevState: any) => Record<string, unknown> | null);
 type SetState = (update: SetStateUpdate, callback?: () => void) => unknown;
-type CloneValue = (value: unknown) => unknown;
-type PrefillStateUpdate = Record<string, unknown> | ((prevState: SurveyToolLikeState) => Record<string, unknown>);
-
-const readUserAnswerResponses = (userAnswers: unknown): unknown[] | null => {
-  if (!userAnswers || typeof userAnswers !== 'object') return null;
-  const responses = (userAnswers as { responses?: unknown }).responses;
-  return Array.isArray(responses) ? responses : null;
-};
-
-const buildSetStateApplyHandler = (
-  setState: SetState = () => {},
-) => (
-  nextUpdates: PrefillStateUpdate,
-  done?: () => void,
-) => setState(nextUpdates as SetStateUpdate, done);
-
-const executeSurveyPrefillPlan = ({
-  updates = null,
-  setState = () => {},
-  updateJsonPreview = () => {},
-  recalculateEditStats = () => {},
-}: {
-  updates?: PrefillStateUpdate | null;
-  setState?: SetState;
-  updateJsonPreview?: () => void;
-  recalculateEditStats?: () => void;
-} = {}) => applyPrefillUpdatePlan({
-  updates,
-  applyStateUpdates: buildSetStateApplyHandler(setState),
-  updateJsonPreview,
-  recalculateEditStats,
-});
-
-export const buildSurveyLocalCacheSlice = ({
-  props = {},
-  rawSlug = '',
-  renderedIds = [],
-  localCacheSliceMemo = null,
-  resolveResponseHydrationContext = null,
-  normalizeSessionSlugValue = null,
-  getExtraScopeSlugs = null,
-  readQuestionsCache = null,
-  mergeQuestionResponses = null,
-  parseResponse = null,
-  applyCachedResponseEntryToSlice = () => false,
-  setLocalCacheMemo = () => {},
-  resolveLocalCacheSlice = resolveLocalCacheSliceLookup,
-  loadLocalCacheSlice = loadLocalCacheHydrationSlice,
-  onError = () => {},
-}: {
-  props?: SurveyToolLikeProps | null;
-  rawSlug?: unknown;
-  renderedIds?: unknown[];
-  localCacheSliceMemo?: Record<string, unknown> | null;
-  resolveResponseHydrationContext?: ((rawSlug: unknown) => Record<string, unknown> | null | undefined) | null;
-  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
-  getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
-  readQuestionsCache?: ((slug: string) => unknown) | null;
-  mergeQuestionResponses?: ((target: Record<string, unknown>, source: Record<string, unknown>) => void) | null;
-  parseResponse?: ((raw: unknown) => unknown) | null;
-  applyCachedResponseEntryToSlice?: (args: Record<string, unknown>) => boolean;
-  setLocalCacheMemo?: (nextMemo: { key: string; value: unknown; hasValue: boolean }) => void;
-  resolveLocalCacheSlice?: (args?: Record<string, unknown>) => {
-    scopeSlugs?: unknown[];
-    networkIdStr?: unknown;
-    renderedIds?: unknown[];
-    normalizedAccount?: string;
-    memoKey?: string;
-    shouldUseMemo?: boolean;
-    memoizedValue?: unknown;
-  };
-  loadLocalCacheSlice?: (args?: Record<string, unknown>) => unknown;
-  onError?: (error: unknown) => void;
-} = {}) => {
-  try {
-    const nextProps = props || {};
-    const localCacheLookup = resolveLocalCacheSlice({
-      rawSlug,
-      account: nextProps.account,
-      renderedIds,
-      minifiedMode: nextProps.minifiedMode,
-      questionsCacheNonce: nextProps.questionsCacheNonce,
-      questionResponsesNonce: nextProps.questionResponsesNonce,
-      existingMemo: localCacheSliceMemo,
-      resolveResponseHydrationContext,
-      normalizeSessionSlugValue,
-      getExtraScopeSlugs,
-    });
-
-    if (localCacheLookup.shouldUseMemo) {
-      return localCacheLookup.memoizedValue ?? null;
-    }
-
-    const memoize = (value: unknown) => {
-      setLocalCacheMemo({
-        key: String(localCacheLookup.memoKey || ''),
-        value,
-        hasValue: true,
-      });
-      return value;
-    };
-
-    const slice = loadLocalCacheSlice({
-      scopeSlugs: Array.isArray(localCacheLookup.scopeSlugs) ? localCacheLookup.scopeSlugs : [],
-      networkIdStr: localCacheLookup.networkIdStr,
-      account: localCacheLookup.normalizedAccount,
-      renderedQuestionIds: Array.isArray(localCacheLookup.renderedIds) ? localCacheLookup.renderedIds : [],
-      readQuestionsCache,
-      mergeQuestionResponses,
-      parseResponse,
-      applyCachedResponseEntryToSlice,
-    });
-
-    if (!slice) {
-      return memoize(null);
-    }
-
-    return memoize(slice);
-  } catch (error) {
-    setLocalCacheMemo({ key: '', value: null, hasValue: false });
-    onError(error);
-    return null;
-  }
-};
-
-export const resolveSurveyMissingRenderedResponseLookup = ({
-  props = {},
-  responder = '',
-  slug = '',
-  fallbackSlug = '',
-  renderedIds = [],
-  resolveQuestionSlugMapForIds = () => new Map<string, unknown>(),
-  resolveResponseHydrationContext = null,
-  normalizeSessionSlugValue = null,
-  getExtraScopeSlugs = null,
-  resolveScopeNetId = null,
-  readQuestionsCacheAsync = null,
-  ensureQuestionsNet = null,
-  resolveMissingLookup = resolveMissingRenderedResponseLookup,
-}: {
-  props?: SurveyToolLikeProps | null;
-  responder?: unknown;
-  slug?: unknown;
-  fallbackSlug?: unknown;
-  renderedIds?: unknown[];
-  resolveQuestionSlugMapForIds?: (questionIds: string[], context?: Record<string, unknown>) => Map<string, unknown> | null | undefined;
-  resolveResponseHydrationContext?: ((rawSlug: unknown) => Record<string, unknown> | null | undefined) | null;
-  normalizeSessionSlugValue?: ((value: unknown) => string) | null;
-  getExtraScopeSlugs?: ((slug: string) => unknown[] | null | undefined) | null;
-  resolveScopeNetId?: ((slug: string, entryNetId: string, fallbackNetId: string) => string | null | undefined) | null;
-  readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
-  ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
-  resolveMissingLookup?: (args?: Record<string, unknown>) => Promise<unknown>;
-} = {}) => {
-  const nextProps = props || {};
-  return resolveMissingLookup({
-    responderLower: responder || nextProps.account,
-    rawSlug: slug,
-    fallbackSlug,
-    renderedIds,
-    minifiedMode: nextProps.minifiedMode,
-    surveyId: nextProps.surveyId || null,
-    resolveResponseHydrationContext,
-    normalizeSessionSlugValue,
-    getExtraScopeSlugs,
-    resolveQuestionSlugMapForIds,
-    resolveScopeNetId,
-    readQuestionsCacheAsync,
-    ensureQuestionsNet,
-  });
-};
-
-export const executeSurveyResponsePrefill = ({
-  state = {},
-  surveyIndex = 0,
-  userAnswers = null,
-  buildSliceFromUserAnswers = null,
-  applyResponseHydrationListToSlice = null,
-  setState = () => {},
-  updateJsonPreview = () => {},
-  recalculateEditStats = () => {},
-  buildUpdatePlan = buildPrefilledSurveyUpdatePlan,
-}: {
-  state?: SurveyToolLikeState | null;
-  surveyIndex?: number;
-  userAnswers?: unknown;
-  buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: unknown) => unknown) | null;
-  applyResponseHydrationListToSlice?: ((args: Record<string, unknown>) => boolean) | null;
-  setState?: SetState;
-  updateJsonPreview?: () => void;
-  recalculateEditStats?: () => void;
-  buildUpdatePlan?: (args?: Record<string, unknown>) => { updates?: Record<string, unknown> | null | undefined };
-} = {}) => {
-  const responses = readUserAnswerResponses(userAnswers);
-  if (!responses) {
-    return { applied: false, reason: 'skip' };
-  }
-
-  executeSurveyPrefillPlan({
-    updates: (prev: SurveyToolLikeState) => {
-      const updatePlan = buildUpdatePlan({
-        surveyIndex,
-        prevSurveysResponseState: prev?.surveysResponseState,
-        prevEditBaseline: prev?.editBaseline,
-        isDirty: prev?.isDirty,
-        submissionComplete: prev?.submissionComplete,
-        responses,
-        applyResponseHydrationListToSlice,
-        buildSliceFromUserAnswers,
-      });
-      return (updatePlan?.updates && typeof updatePlan.updates === 'object')
-        ? updatePlan.updates
-        : {};
-    },
-    setState,
-    updateJsonPreview,
-    recalculateEditStats,
-  });
-
-  return { applied: true, reason: 'applied' };
-};
-
-export const executeSurveySingleQuestionPrefill = ({
-  state = {},
-  questionId = '',
-  userAnswer = null,
-  buildSliceFromUserAnswers = null,
-  applyResponseHydrationListToSlice = null,
-  setState = () => {},
-  updateJsonPreview = () => {},
-  recalculateEditStats = () => {},
-  buildUpdatePlan = buildPrefilledSingleQuestionUpdatePlan,
-}: {
-  state?: SurveyToolLikeState | null;
-  questionId?: unknown;
-  userAnswer?: unknown;
-  buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: unknown) => unknown) | null;
-  applyResponseHydrationListToSlice?: ((args: Record<string, unknown>) => boolean) | null;
-  setState?: SetState;
-  updateJsonPreview?: () => void;
-  recalculateEditStats?: () => void;
-  buildUpdatePlan?: (args?: Record<string, unknown>) => { updates?: Record<string, unknown> | null | undefined };
-} = {}) => {
-  const normalizedQuestionId = String(questionId || '');
-  if (!userAnswer || !normalizedQuestionId) {
-    return { applied: false, reason: 'skip' };
-  }
-
-  executeSurveyPrefillPlan({
-    updates: (prev: SurveyToolLikeState) => {
-      const updatePlan = buildUpdatePlan({
-        surveyIndex: 0,
-        questionId: normalizedQuestionId,
-        prevSurveysResponseState: prev?.surveysResponseState,
-        prevEditBaseline: prev?.editBaseline,
-        isDirty: prev?.isDirty,
-        submissionComplete: prev?.submissionComplete,
-        userAnswer,
-        applyResponseHydrationListToSlice,
-        buildSliceFromUserAnswers,
-      });
-      return (updatePlan?.updates && typeof updatePlan.updates === 'object')
-        ? updatePlan.updates
-        : {};
-    },
-    setState,
-    updateJsonPreview,
-    recalculateEditStats,
-  });
-
-  return { applied: true, reason: 'applied' };
-};
+type CloneValue = (value: any) => any;
 
 export const executeSurveyPriorResponseBackfill = ({
   props = {},
@@ -327,8 +50,8 @@ export const executeSurveyPriorResponseBackfill = ({
   onFailure?: (error: unknown) => void;
   getCurrentInFlight?: () => Promise<boolean> | null;
   setCurrentInFlight?: (value: Promise<boolean> | null) => void;
-  shouldBackfill?: (args?: Record<string, unknown>) => boolean;
-  runBackfillAttempt?: (args?: Record<string, unknown>) => Promise<boolean> | boolean;
+  shouldBackfill?: (args?: any) => boolean;
+  runBackfillAttempt?: (args?: any) => Promise<boolean> | boolean;
 } = {}): false | Promise<boolean> => {
   const nextProps = props || {};
   const nextState = state || {};
@@ -357,16 +80,16 @@ export const executeSurveyPriorResponseBackfill = ({
   let trackedPromise: Promise<boolean> | null = null;
   const runPromise = Promise.resolve().then(() => runBackfillAttempt({
     responderLower,
-    slug,
+    slug: slug as any,
     attemptedSet,
     loadMissingInfo: ({ responder, slug: nextSlug }: { responder: string; slug?: string | null }) => getMissingRenderedResponseIdsForAccount({
       responder,
       slug: nextSlug,
-    }),
+    }) as Promise<any>,
     setHydratingState,
     isMounted,
     refreshQuestionResponses: nextProps.refreshQuestionResponses,
-    readQuestionsCacheAsync,
+    readQuestionsCacheAsync: readQuestionsCacheAsync as any,
     onFailure,
     resetLocalCacheMemo,
     triggerRehydrate,
@@ -388,7 +111,7 @@ export const executeSurveyDraftHydration = ({
   getPendingEditStats = null,
   getHydrationQuestionIds = () => [],
   applyDraftHydrationEntryToSlice = () => false,
-  cloneBaseline = ((value: unknown) => value) as CloneValue,
+  cloneBaseline = ((value: any) => value) as CloneValue,
   setState = () => {},
   updateJsonPreview = () => {},
   onError = () => {},
@@ -407,10 +130,10 @@ export const executeSurveyDraftHydration = ({
   setState?: SetState;
   updateJsonPreview?: () => void;
   onError?: (error: unknown) => void;
-  skipDraftHydrationRun?: (args?: Record<string, unknown>) => boolean;
-  buildDraftSeedContext?: (args?: Record<string, unknown>) => { surveyIndex?: number; prevSlice?: unknown };
-  buildDraftRunPlan?: (args?: Record<string, unknown>) => { renderedQuestionIds?: string[]; updates?: Record<string, unknown> };
-  applyDraftEffects?: (args?: Record<string, unknown>) => void;
+  skipDraftHydrationRun?: (args?: any) => boolean;
+  buildDraftSeedContext?: (args?: any) => { surveyIndex?: number; prevSlice?: any };
+  buildDraftRunPlan?: (args?: any) => { renderedQuestionIds?: string[]; updates?: Record<string, unknown> };
+  applyDraftEffects?: (args?: any) => void;
 } = {}) => {
   try {
     const nextProps = props || {};
@@ -444,10 +167,10 @@ export const executeSurveyDraftHydration = ({
       submissionComplete: nextState.submissionComplete,
       prevSurveysResponseState: nextState.surveysResponseState,
       surveyIndex,
-      draft,
+      draft: draft as any,
       prevSlice,
       prevBaseline: nextState.editBaseline,
-      cloneBaseline,
+      cloneBaseline: cloneBaseline as any,
       applyDraftEntryToSlice: applyDraftHydrationEntryToSlice,
     });
     const renderedQuestionIds = Array.isArray(draftRunPlan.renderedQuestionIds)
@@ -492,7 +215,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
   setLastHydrationSig = () => {},
   loadDraft = () => null,
   buildDraftAnswersByQuestionId = null,
-  cloneBaseline = ((value: unknown) => value) as CloneValue,
+  cloneBaseline = ((value: any) => value) as CloneValue,
   buildDraftAwareCacheHydrationState = (args: Record<string, unknown>) => args,
   applyLocalCacheHydrationEntryToSlice = () => false,
   setState = () => {},
@@ -508,7 +231,6 @@ export const executeSurveyLocalCacheRehydrate = async ({
   buildRehydrationUpdatePlan = buildLocalCacheRehydrationUpdatePlan,
   applyRehydrateMissEffects = applyLocalCacheRehydrateMissEffects,
   applyRehydrateUpdatePlan = applyLocalCacheRehydrateUpdatePlan,
-  isStaleRun = () => false,
 }: {
   props?: SurveyToolLikeProps | null;
   state?: SurveyToolLikeState | null;
@@ -530,12 +252,11 @@ export const executeSurveyLocalCacheRehydrate = async ({
   bumpNoop?: () => void;
   onNoChange?: () => void;
   onError?: (error: unknown) => void;
-  prepareRehydrateRun?: (args?: Record<string, unknown>) => { shouldSkip?: boolean; shouldBumpNoop?: boolean; hydrationSig?: string; baseSlice?: unknown };
-  loadDraftAnswersByQid?: (args?: Record<string, unknown>) => Record<string, unknown>;
-  buildRehydrationUpdatePlan?: (args?: Record<string, unknown>) => { changed?: boolean; baselineChanged?: boolean; updates?: Record<string, unknown> };
-  applyRehydrateMissEffects?: (args?: Record<string, unknown>) => void;
-  applyRehydrateUpdatePlan?: (args?: Record<string, unknown>) => boolean;
-  isStaleRun?: () => boolean;
+  prepareRehydrateRun?: (args?: any) => { shouldSkip?: boolean; shouldBumpNoop?: boolean; hydrationSig?: string; baseSlice?: any };
+  loadDraftAnswersByQid?: (args?: any) => Record<string, unknown>;
+  buildRehydrationUpdatePlan?: (args?: any) => { changed?: boolean; baselineChanged?: boolean; updates?: any };
+  applyRehydrateMissEffects?: (args?: any) => void;
+  applyRehydrateUpdatePlan?: (args?: any) => boolean;
 } = {}) => {
   try {
     const nextProps = props || {};
@@ -569,14 +290,6 @@ export const executeSurveyLocalCacheRehydrate = async ({
     }
 
     const cacheSlice = await buildSliceFromLocalCache();
-    if (isStaleRun()) {
-      return {
-        reason: 'stale',
-        applied: false,
-        renderedQuestionIds,
-        hydrationSig: rehydrateRun.hydrationSig,
-      };
-    }
     if (!cacheSlice) {
       applyRehydrateMissEffects({
         clearHydrationSignature: () => {
@@ -608,8 +321,8 @@ export const executeSurveyLocalCacheRehydrate = async ({
       prevBaseline: nextState.editBaseline,
       cacheSlice,
       draftAnswersByQuestionId,
-      cloneBaseline,
-      buildDraftAwareCacheHydrationState,
+      cloneBaseline: cloneBaseline as any,
+      buildDraftAwareCacheHydrationState: buildDraftAwareCacheHydrationState as any,
       applyLocalCacheHydrationEntryToSlice,
       debugLabel: '[Survey][rehydrateLocal]',
     });
@@ -618,7 +331,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
       changed: rehydrationUpdatePlan.changed,
       baselineChanged: rehydrationUpdatePlan.baselineChanged,
       updates: rehydrationUpdatePlan.updates,
-      applyStateUpdates: buildSetStateApplyHandler(setState),
+      applyStateUpdates: (nextUpdates: SetStateUpdate, done?: () => void) => setState(nextUpdates, done),
       updateJsonPreview,
       recalculateEditStats,
       ensurePriorResponses,
