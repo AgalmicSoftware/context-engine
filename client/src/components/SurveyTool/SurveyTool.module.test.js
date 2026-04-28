@@ -11513,6 +11513,67 @@ describe('SurveyTool module', () => {
     expect(questionCacheCalls.some((args) => args[2]?.clone === false)).toBe(true);
   });
 
+  it('resets pile auto-decrypt sweep state through the shared filter hydration lifecycle', () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace === 'questionsCache') {
+        return {
+          '84532': {
+            questionResponses: {},
+          },
+        };
+      }
+      return {};
+    });
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    syncClassSetState(subject);
+    subject.state = {
+      ...subject.state,
+      allQuestionsForFilter: [],
+      pileQuestions: [],
+      activePileIndex: 0,
+      filterState: {},
+      hasHiddenGatedQuestions: false,
+      autoDecryptEnabled: true,
+      autoDecryptAttempted: { 'q1:answer': true },
+      decryptingByKey: { 'q1:answer': true },
+    };
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.queueAutoDecryptVisibleSweep = jest.fn();
+    subject._autoDecQueue = [{ qid: 'q1', field: 'answer' }];
+    subject._autoDecProcessing = true;
+    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
+
+    subject.handleFilter([{ id: 'q1', type: 'binary', prompt: 'Q1' }], {});
+
+    expect(subject.initializeResponseState).toHaveBeenCalledTimes(1);
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(subject.rehydrateDraftForRenderedIds).toHaveBeenCalledWith(true);
+    expect(subject.state.autoDecryptAttempted).toEqual({});
+    expect(subject.state.decryptingByKey).toEqual({});
+    expect(subject._autoDecQueue).toEqual([]);
+    expect(subject._autoDecProcessing).toBe(false);
+    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({});
+    expect(subject.queueAutoDecryptVisibleSweep).toHaveBeenCalledWith('pile-filter-reset');
+  });
+
   it('avoids redundant pile wrapper state updates when answering', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
@@ -13018,6 +13079,73 @@ describe('SurveyTool module', () => {
 
     expect(subject.buildSliceFromLocalCache).toHaveBeenCalledTimes(2);
     expect(subject.state.surveysResponseState?.[0]?.answers?.q6?.value).toBe('Hydrated q6');
+  });
+
+  it('backfills newly visible pile response slots without clearing the current auto-decrypt ledger', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      questionResponsesNonce: 5,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    syncClassSetState(subject);
+    subject.state = {
+      ...subject.state,
+      pileQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Q1' },
+        { id: 'q2', type: 'freeform', prompt: 'Q2' },
+        { id: 'q3', type: 'freeform', prompt: 'Q3' },
+      ],
+      activePileIndex: 0,
+      surveysResponseState: [{
+        answers: {
+          q1: { value: 'Existing', encrypted: false },
+        },
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: { value: '', encrypted: false },
+        },
+      }],
+      editBaseline: {
+        answers: {
+          q1: { value: 'Existing', encrypted: false },
+        },
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: { value: '', encrypted: false },
+        },
+      },
+      autoDecryptAttempted: { 'q1:answer': true },
+      decryptingByKey: { 'q1:answer': true },
+    };
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.queueAutoDecryptVisibleSweep = jest.fn();
+    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
+
+    subject.ensureVisiblePileResponseState();
+
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(subject.rehydrateDraftForRenderedIds).toHaveBeenCalledWith(false);
+    expect(subject.queueAutoDecryptVisibleSweep).not.toHaveBeenCalled();
+    expect(subject.state.autoDecryptAttempted).toEqual({ 'q1:answer': true });
+    expect(subject.state.decryptingByKey).toEqual({ 'q1:answer': true });
+    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({ 'q1:answer': 'masked-sig' });
+    expect(subject.state.surveysResponseState?.[0]?.answers?.q2).toEqual(expect.objectContaining({ value: '' }));
+    expect(subject.state.surveysResponseState?.[0]?.additionalComments?.q3).toEqual(expect.objectContaining({ value: '' }));
   });
 
   it('schedules pile reload when scoped hydration progress advances without nonce ticks', () => {

@@ -1842,46 +1842,15 @@ export class PileViewMode extends SurveyQuestions {
       ].join('::');
 
       const runHydration = () => {
-        if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
-        if (resultSignature === this._lastLoadAndSortResultSignature) {
-          bumpSurveyPerfCounter('noopSkipCount');
-          return;
-        }
-        this._lastLoadAndSortResultSignature = resultSignature;
-
-        const continueHydration = () => {
-          this.rehydrateLocalCacheAnswersForRenderedIds(() => {
-            if (typeof this.rehydrateDraftForRenderedIds === 'function') {
-              this.rehydrateDraftForRenderedIds(true);
-            }
-            this._autoDecQueue = [];
-            this._autoDecProcessing = false;
-            const hasAutoDecryptLedger =
-              Object.keys(this.state.autoDecryptAttempted || {}).length > 0 ||
-              Object.keys(this.state.decryptingByKey || {}).length > 0;
-            if (!hasAutoDecryptLedger) {
-              if (this.state.autoDecryptEnabled) {
-                try { this.queueAutoDecryptVisibleSweep('pile-hydration'); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-              }
-              return;
-            }
-            this.setState(
-              { autoDecryptAttempted: {}, decryptingByKey: {} },
-              () => {
-                this._autoDecryptMaskedAttemptSignature = {};
-                if (this.state.autoDecryptEnabled) {
-                  try { this.queueAutoDecryptVisibleSweep('pile-hydration-reset'); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-                }
-              }
-            );
-          });
-        };
-
-        if (this.state.submissionComplete) {
-          continueHydration();
-        } else {
-          this.initializeResponseState(continueHydration);
-        }
+        this.runPileQuestionSetHydration({
+          requestEpoch,
+          resultSignature,
+          initializeResponses: !this.state.submissionComplete,
+          forceOverwriteDraft: true,
+          resetAutoDecryptLedger: true,
+          autoDecryptReason: 'pile-hydration',
+          autoDecryptResetReason: 'pile-hydration-reset',
+        });
       };
 
       if (!shouldUpdateState) {
@@ -1898,6 +1867,100 @@ export class PileViewMode extends SurveyQuestions {
       this._lastLoadAndSortResultSignature = '';
       this.setState({ loading: !this.props.isQuestionCacheReady || recentRateLimit });
     }
+  };
+
+  shouldAbortPileHydrationRequest = (requestEpoch = null) => (
+    requestEpoch !== null && requestEpoch !== undefined && requestEpoch !== this._loadAndSortQuestionsEpoch
+  );
+
+  resetPileAutoDecryptLedger = ({
+    requestEpoch = null,
+    queueReason = 'pile-hydration',
+    resetQueueReason = 'pile-hydration-reset',
+  } = {}) => {
+    if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
+    this._autoDecQueue = [];
+    this._autoDecProcessing = false;
+
+    const hasAutoDecryptLedger =
+      Object.keys(this.state.autoDecryptAttempted || {}).length > 0 ||
+      Object.keys(this.state.decryptingByKey || {}).length > 0;
+
+    if (!hasAutoDecryptLedger) {
+      if (this.state.autoDecryptEnabled) {
+        try { this.queueAutoDecryptVisibleSweep(queueReason); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      }
+      return;
+    }
+
+    this.setState(
+      { autoDecryptAttempted: {}, decryptingByKey: {} },
+      () => {
+        if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
+        this._autoDecryptMaskedAttemptSignature = {};
+        if (this.state.autoDecryptEnabled) {
+          try { this.queueAutoDecryptVisibleSweep(resetQueueReason); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+        }
+      }
+    );
+  };
+
+  rehydrateVisiblePileWindow = ({
+    requestEpoch = null,
+    forceOverwriteDraft = false,
+    resetAutoDecryptLedger = false,
+    autoDecryptReason = 'pile-hydration',
+    autoDecryptResetReason = 'pile-hydration-reset',
+  } = {}) => {
+    if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
+    this.rehydrateLocalCacheAnswersForRenderedIds(() => {
+      if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
+      if (typeof this.rehydrateDraftForRenderedIds === 'function') {
+        this.rehydrateDraftForRenderedIds(forceOverwriteDraft);
+      }
+      if (!resetAutoDecryptLedger) return;
+      this.resetPileAutoDecryptLedger({
+        requestEpoch,
+        queueReason: autoDecryptReason,
+        resetQueueReason: autoDecryptResetReason,
+      });
+    });
+  };
+
+  runPileQuestionSetHydration = ({
+    requestEpoch = null,
+    resultSignature = '',
+    initializeResponses = true,
+    forceOverwriteDraft = false,
+    resetAutoDecryptLedger = false,
+    autoDecryptReason = 'pile-hydration',
+    autoDecryptResetReason = 'pile-hydration-reset',
+  } = {}) => {
+    if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
+    if (resultSignature) {
+      if (resultSignature === this._lastLoadAndSortResultSignature) {
+        bumpSurveyPerfCounter('noopSkipCount');
+        return;
+      }
+      this._lastLoadAndSortResultSignature = resultSignature;
+    }
+
+    const continueHydration = () => {
+      this.rehydrateVisiblePileWindow({
+        requestEpoch,
+        forceOverwriteDraft,
+        resetAutoDecryptLedger,
+        autoDecryptReason,
+        autoDecryptResetReason,
+      });
+    };
+
+    if (!initializeResponses) {
+      continueHydration();
+      return;
+    }
+
+    this.initializeResponseState(continueHydration);
   };
 
 
@@ -2027,8 +2090,9 @@ export class PileViewMode extends SurveyQuestions {
           return (changed || baselineChanged) ? updates : null;
         },
         () => {
-          this.rehydrateLocalCacheAnswersForRenderedIds(() => {
-            this.rehydrateDraftForRenderedIds(false);
+          this.rehydrateVisiblePileWindow({
+            forceOverwriteDraft: false,
+            resetAutoDecryptLedger: false,
           });
         }
       );
@@ -2273,24 +2337,13 @@ export class PileViewMode extends SurveyQuestions {
           try { this.props.onFilterChange(this.state.filterState); } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
         }
         // Ensure state is initialized and hydrated for the new set of filtered questions.
-        // This ensures 'editBaseline' is established (preventing ghost counts)
-        // and answers are prefilled (fixing the "does not prefill" issue).
-        this.initializeResponseState(() => {
-            this.rehydrateLocalCacheAnswersForRenderedIds(() => {
-               this.rehydrateDraftForRenderedIds(true);
-               // Trigger auto-decrypt if enabled
-               this._autoDecQueue = [];
-               this._autoDecProcessing = false;
-               this.setState(
-                { autoDecryptAttempted: {}, decryptingByKey: {} },
-                () => {
-                  this._autoDecryptMaskedAttemptSignature = {};
-                  if (this.state.autoDecryptEnabled) {
-                    try { this.queueAutoDecryptVisibleSweep('pile-filter-reset'); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-                  }
-                }
-              );
-            });
+        // This keeps edit baselines and prefilled answers aligned with the active pile window.
+        this.runPileQuestionSetHydration({
+          initializeResponses: true,
+          forceOverwriteDraft: true,
+          resetAutoDecryptLedger: true,
+          autoDecryptReason: 'pile-filter-reset',
+          autoDecryptResetReason: 'pile-filter-reset',
         });
     });
   };
