@@ -235,6 +235,7 @@ import {
   buildPriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
+  buildMissingRenderedResponseResult,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   resolveExitEditingBaselineSlice,
@@ -5170,17 +5171,11 @@ export class SurveyQuestions extends Component {
         });
       }
 
-      const nonEmptyRequests = requests.filter((entry) => entry.missingIds.length > 0);
-      if (nonEmptyRequests.length === 0) {
-        return { missingIds: [], slug, netId, requests: [] };
-      }
-      if (nonEmptyRequests.length === 1) {
-        return {
-          ...nonEmptyRequests[0],
-          requests: nonEmptyRequests,
-        };
-      }
-      return { missingIds: [], slug, netId, requests: nonEmptyRequests };
+      return buildMissingRenderedResponseResult({
+        requests,
+        fallbackSlug: slug,
+        fallbackNetId: netId,
+      });
     }
 
     const questionsCache = ensureQuestionsNet(await readQuestionsCacheAsync(slug), netId);

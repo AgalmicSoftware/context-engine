@@ -233,6 +233,12 @@ type BuildMissingResponseIdsForRenderedQuestionsArgs = {
   responderLower?: string;
 };
 
+type BuildMissingRenderedResponseResultArgs = {
+  requests?: MissingRenderedResponseRequest[] | null;
+  fallbackSlug?: unknown;
+  fallbackNetId?: unknown;
+};
+
 type BuildNormalizedRenderedQuestionIdsArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
 };
@@ -1172,6 +1178,45 @@ export const buildMissingResponseIdsForRenderedQuestions = ({
       if (!perQuestion || typeof perQuestion !== 'object') return true;
       return !(perQuestion as UnknownRecord)[normalizedResponder];
     });
+};
+
+export const buildMissingRenderedResponseResult = ({
+  requests = null,
+  fallbackSlug = '',
+  fallbackNetId = '',
+}: BuildMissingRenderedResponseResultArgs = {}) => {
+  const normalizedRequests = (Array.isArray(requests) ? requests : [])
+    .map((entry) => ({
+      slug: String(entry?.slug || ''),
+      netId: String(entry?.netId || ''),
+      missingIds: buildNormalizedRenderedQuestionIds({
+        renderedIds: Array.isArray(entry?.missingIds) ? entry.missingIds : [],
+      }),
+    }));
+  const nonEmptyRequests = normalizedRequests.filter((entry) => entry.missingIds.length > 0);
+
+  if (nonEmptyRequests.length === 0) {
+    return {
+      missingIds: [] as string[],
+      slug: String(fallbackSlug || ''),
+      netId: String(fallbackNetId || ''),
+      requests: [],
+    };
+  }
+
+  if (nonEmptyRequests.length === 1) {
+    return {
+      ...nonEmptyRequests[0],
+      requests: nonEmptyRequests,
+    };
+  }
+
+  return {
+    missingIds: [] as string[],
+    slug: String(fallbackSlug || ''),
+    netId: String(fallbackNetId || ''),
+    requests: nonEmptyRequests,
+  };
 };
 
 export const buildNormalizedRenderedQuestionIds = ({
