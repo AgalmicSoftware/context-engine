@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import React from 'react';
 import { Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -23,13 +21,130 @@ import { SHOW_PILE_HOLOGRAM_TOGGLE } from './surveyToolRuntimeSupport.js';
 
 const ACTIVE_GREEN = '#4cd964';
 
+type VoidHandler = () => void;
+
+export type PileQuestionLike = {
+  id: React.Key;
+  prompt?: React.ReactNode;
+  [key: string]: unknown;
+};
+
+export type PileScanDisplayLike = {
+  metaLeftText: string;
+  metaRightText: string;
+};
+
+type PileNavControlsProps = {
+  pileQuestions: PileQuestionLike[];
+  activePileIndex: number;
+  navCounterVisible: boolean;
+  handlePrev: VoidHandler;
+  handleNext: VoidHandler;
+};
+
+type PileActionControlsProps = {
+  isFilterActive: boolean;
+  toggleFilterModal: VoidHandler;
+  showCreate: boolean;
+  toggleCreate: VoidHandler;
+  onViewAllClick?: VoidHandler | null;
+  handleViewAllFromPile: VoidHandler;
+};
+
+type PileFooterControlsProps = {
+  pileTopRailVisible: boolean;
+  showSuccessBadgeLink: boolean;
+  pileSubmitResponderHref: string;
+  showSuccessBadgeStatus: boolean;
+  showSubmitButton: boolean;
+  handlePileSubmitClick: VoidHandler;
+  hasPendingPileChanges: boolean;
+  shouldHidePileSubmitButton: boolean;
+  isSubmitting: boolean;
+  activePromptMasked: boolean;
+  finalSubmitText: string;
+  showClearPendingButton: boolean;
+  handleRevertPendingChanges: VoidHandler;
+};
+
+type PileDeckWindowProps = {
+  pileQuestions: PileQuestionLike[];
+  activePileIndex: number;
+  renderActiveQuestion: (question: PileQuestionLike) => React.ReactNode;
+};
+
+type PileEmptyStateProps = {
+  hasTerminalScanError: boolean;
+  scanErrorMessage: string;
+  hasError: boolean;
+  isStillLoading: boolean;
+  loadingElapsedSec: number;
+  hydrateDone: number;
+  hydrateDiscovered: number;
+  isHydrating: boolean;
+  showLongLoading: boolean;
+  scanTotalBlocks: number;
+  pileScanDisplay: PileScanDisplayLike;
+  scanPercent: number;
+  showFilteredEmptyState: boolean;
+  showGatedEmptyState: boolean;
+  gatedEmptyPanel: React.ReactNode;
+};
+
+export type PileInteractionSurfaceProps = {
+  showHologramAssistant: boolean;
+  toggleHologramAssistant: VoidHandler;
+  showMiniBackgroundSpinner: boolean;
+  priorResponsesHydrating: boolean;
+  showLongLoading: boolean;
+  loadingElapsedSec: number;
+  pileQuestions: PileQuestionLike[];
+  activePileIndex: number;
+  renderActiveQuestion: (question: PileQuestionLike) => React.ReactNode;
+  hasTerminalScanError: boolean;
+  scanErrorMessage: string;
+  hasError: boolean;
+  isStillLoading: boolean;
+  hydrateDone: number;
+  hydrateDiscovered: number;
+  isHydrating: boolean;
+  scanTotalBlocks: number;
+  pileScanDisplay: PileScanDisplayLike;
+  scanPercent: number;
+  showFilteredEmptyState: boolean;
+  showGatedEmptyState: boolean;
+  gatedEmptyPanel: React.ReactNode;
+  isFilterActive: boolean;
+  toggleFilterModal: VoidHandler;
+  showCreate: boolean;
+  toggleCreate: VoidHandler;
+  onViewAllClick?: VoidHandler | null;
+  handleViewAllFromPile: VoidHandler;
+  pileTopRailVisible: boolean;
+  showSuccessBadgeLink: boolean;
+  pileSubmitResponderHref: string;
+  showSuccessBadgeStatus: boolean;
+  showSubmitButton: boolean;
+  handlePileSubmitClick: VoidHandler;
+  hasPendingPileChanges: boolean;
+  shouldHidePileSubmitButton: boolean;
+  isSubmitting: boolean;
+  activePromptMasked: boolean;
+  finalSubmitText: string;
+  showClearPendingButton: boolean;
+  handleRevertPendingChanges: VoidHandler;
+  navCounterVisible: boolean;
+  handlePrev: VoidHandler;
+  handleNext: VoidHandler;
+};
+
 const renderPileNavControls = ({
   pileQuestions,
   activePileIndex,
   navCounterVisible,
   handlePrev,
   handleNext,
-}) => (
+}: PileNavControlsProps): React.ReactElement => (
   <div className={styles.pileNav}>
     <button
       onClick={handlePrev}
@@ -69,11 +184,11 @@ const renderPileActionControls = ({
   toggleCreate,
   onViewAllClick,
   handleViewAllFromPile,
-}) => {
-  const filterButtonStyle = isFilterActive
+}: PileActionControlsProps): React.ReactElement => {
+  const filterButtonStyle: React.CSSProperties = isFilterActive
     ? { color: ACTIVE_GREEN, borderColor: ACTIVE_GREEN, opacity: 0.75 }
     : {};
-  const filterIconStyle = isFilterActive ? { color: ACTIVE_GREEN } : {};
+  const filterIconStyle: React.CSSProperties = isFilterActive ? { color: ACTIVE_GREEN } : {};
 
   return (
     <div className={styles.pileActions}>
@@ -124,7 +239,7 @@ const renderPileFooterControls = ({
   finalSubmitText,
   showClearPendingButton,
   handleRevertPendingChanges,
-}) => (
+}: PileFooterControlsProps): React.ReactElement => (
   <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
     {showSuccessBadgeLink ? (
       <a
@@ -186,7 +301,7 @@ const renderPileDeckWindow = ({
   pileQuestions,
   activePileIndex,
   renderActiveQuestion,
-}) => {
+}: PileDeckWindowProps): React.ReactNode[] => {
   const startIdx = Math.max(0, activePileIndex - 2);
   const endIdx = Math.min(pileQuestions.length, activePileIndex + 3);
 
@@ -229,7 +344,7 @@ const renderPileEmptyState = ({
   showFilteredEmptyState,
   showGatedEmptyState,
   gatedEmptyPanel,
-}) => {
+}: PileEmptyStateProps): React.ReactNode => {
   if (hasTerminalScanError) {
     return <div>{scanErrorMessage}</div>;
   }
@@ -347,7 +462,7 @@ export const renderPileInteractionSurface = ({
   navCounterVisible,
   handlePrev,
   handleNext,
-}) => (
+}: PileInteractionSurfaceProps): React.ReactElement => (
   <div className={styles.pileInteractionUnit}>
     {SHOW_PILE_HOLOGRAM_TOGGLE && (
       <button
