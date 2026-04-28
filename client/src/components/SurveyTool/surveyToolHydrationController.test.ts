@@ -1,7 +1,11 @@
 import {
+  buildSurveyLocalCacheSlice,
+  executeSurveyResponsePrefill,
+  executeSurveySingleQuestionPrefill,
   executeSurveyDraftHydration,
   executeSurveyLocalCacheRehydrate,
   executeSurveyPriorResponseBackfill,
+  resolveSurveyMissingRenderedResponseLookup,
 } from './surveyToolHydrationController';
 
 type TestSlice = {
@@ -84,6 +88,150 @@ describe('surveyToolHydrationController', () => {
     expect(currentInFlight).toBeNull();
   });
 
+  it('reuses memoized local-cache slices without rebuilding them', () => {
+    const loadLocalCacheSlice = jest.fn();
+
+    expect(buildSurveyLocalCacheSlice({
+      props: {
+        account: '0xabc',
+        minifiedMode: '',
+        questionsCacheNonce: 1,
+        questionResponsesNonce: 2,
+      },
+      rawSlug: 'edge',
+      renderedIds: ['q1'],
+      localCacheSliceMemo: {
+        key: 'memo-key',
+        value: { answers: { q1: { value: 'cached' } } },
+        hasValue: true,
+      },
+      resolveLocalCacheSlice: () => ({
+        scopeSlugs: ['edge'],
+        networkIdStr: '84532',
+        renderedIds: ['q1'],
+        normalizedAccount: '0xabc',
+        memoKey: 'memo-key',
+        shouldUseMemo: true,
+        memoizedValue: { answers: { q1: { value: 'cached' } } },
+      }),
+      loadLocalCacheSlice,
+      setLocalCacheMemo: jest.fn(),
+    })).toEqual({
+      answers: { q1: { value: 'cached' } },
+    });
+
+    expect(loadLocalCacheSlice).not.toHaveBeenCalled();
+  });
+
+  it('stores built local-cache slices in the shared memo slot and resets memo state on errors', () => {
+    const setLocalCacheMemo = jest.fn();
+
+    expect(buildSurveyLocalCacheSlice({
+      props: {
+        account: '0xabc',
+        minifiedMode: 'pile',
+        questionsCacheNonce: 3,
+        questionResponsesNonce: 4,
+      },
+      rawSlug: 'edge',
+      renderedIds: ['q1'],
+      localCacheSliceMemo: null,
+      resolveLocalCacheSlice: () => ({
+        scopeSlugs: ['edge', 'beta'],
+        networkIdStr: '84532',
+        renderedIds: ['q1'],
+        normalizedAccount: '0xabc',
+        memoKey: 'next-memo',
+        shouldUseMemo: false,
+        memoizedValue: null,
+      }),
+      loadLocalCacheSlice: () => ({
+        answers: { q1: { value: '*' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }),
+      setLocalCacheMemo,
+    })).toEqual({
+      answers: { q1: { value: '*' } },
+      additionalComments: {},
+      importance: {},
+      conviction: {},
+    });
+
+    expect(setLocalCacheMemo).toHaveBeenNthCalledWith(1, {
+      key: 'next-memo',
+      value: {
+        answers: { q1: { value: '*' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      },
+      hasValue: true,
+    });
+
+    const onError = jest.fn();
+    setLocalCacheMemo.mockClear();
+    expect(buildSurveyLocalCacheSlice({
+      props: { account: '0xabc' },
+      rawSlug: 'edge',
+      renderedIds: ['q1'],
+      resolveLocalCacheSlice: () => {
+        throw new Error('lookup failed');
+      },
+      setLocalCacheMemo,
+      onError,
+    })).toBeNull();
+
+    expect(setLocalCacheMemo).toHaveBeenCalledWith({
+      key: '',
+      value: null,
+      hasValue: false,
+    });
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
+  });
+
+  it('routes missing rendered-response lookups through the shared lookup helper', async () => {
+    const resolveMissingLookup = jest.fn().mockResolvedValue({
+      missingIds: ['q1'],
+      slug: 'edge',
+      netId: '84532',
+    });
+
+    await expect(resolveSurveyMissingRenderedResponseLookup({
+      props: {
+        account: '0xabc',
+        minifiedMode: 'pile',
+        surveyId: 'survey-a',
+      },
+      responder: '0xdef',
+      slug: 'edge',
+      fallbackSlug: 'fallback-edge',
+      renderedIds: ['q1', 'Q2'],
+      resolveQuestionSlugMapForIds: jest.fn(() => new Map([['q1', 'edge']])),
+      resolveResponseHydrationContext: jest.fn(() => ({ sessionSlug: 'edge', networkIdStr: '84532' })),
+      normalizeSessionSlugValue: jest.fn((value) => String(value || '').toLowerCase()),
+      getExtraScopeSlugs: jest.fn(() => ['beta']),
+      resolveScopeNetId: jest.fn(() => '84532'),
+      readQuestionsCacheAsync: jest.fn(),
+      ensureQuestionsNet: jest.fn(),
+      resolveMissingLookup,
+    })).resolves.toEqual({
+      missingIds: ['q1'],
+      slug: 'edge',
+      netId: '84532',
+    });
+
+    expect(resolveMissingLookup).toHaveBeenCalledWith(expect.objectContaining({
+      responderLower: '0xdef',
+      rawSlug: 'edge',
+      fallbackSlug: 'fallback-edge',
+      renderedIds: ['q1', 'Q2'],
+      minifiedMode: 'pile',
+      surveyId: 'survey-a',
+    }));
+  });
+
   it('hydrates draft updates through setState only when rendered ids and updates exist', () => {
     const setState = jest.fn((updates, callback) => {
       if (typeof callback === 'function') callback();
@@ -136,6 +284,92 @@ describe('surveyToolHydrationController', () => {
       surveysResponseState: [{}, {}, { answers: { q1: { value: 'draft' } } }],
     }, expect.any(Function));
     expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies multi-question prefill updates through shared state effects', () => {
+    const setState = jest.fn((updates, callback) => {
+      if (typeof callback === 'function') callback();
+      return updates;
+    });
+    const updateJsonPreview = jest.fn();
+    const recalculateEditStats = jest.fn();
+
+    expect(executeSurveyResponsePrefill({
+      state: {},
+      surveyIndex: 2,
+      userAnswers: {
+        responses: [{ questionID: 'q1' }],
+      },
+      buildSliceFromUserAnswers: jest.fn(),
+      applyResponseHydrationListToSlice: jest.fn(),
+      setState,
+      updateJsonPreview,
+      recalculateEditStats,
+      buildUpdatePlan: () => ({
+        updates: {
+          surveysResponseState: [{}, {}, { answers: { q1: { value: 'prefilled' } } }],
+        },
+      }),
+    })).toEqual({
+      applied: true,
+      reason: 'applied',
+    });
+
+    expect(setState).toHaveBeenCalledWith(expect.any(Function), expect.any(Function));
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips shared prefill orchestration when the payload is incomplete', () => {
+    expect(executeSurveyResponsePrefill({
+      surveyIndex: 0,
+      userAnswers: null,
+      setState: jest.fn(),
+    })).toEqual({
+      applied: false,
+      reason: 'skip',
+    });
+
+    expect(executeSurveySingleQuestionPrefill({
+      questionId: '',
+      userAnswer: { answer: { value: 'x' } },
+      setState: jest.fn(),
+    })).toEqual({
+      applied: false,
+      reason: 'skip',
+    });
+  });
+
+  it('applies single-question prefill updates through shared state effects', () => {
+    const setState = jest.fn((updates, callback) => {
+      if (typeof callback === 'function') callback();
+      return updates;
+    });
+    const updateJsonPreview = jest.fn();
+    const recalculateEditStats = jest.fn();
+
+    expect(executeSurveySingleQuestionPrefill({
+      state: {},
+      questionId: 'q1',
+      userAnswer: { questionID: 'q1' },
+      buildSliceFromUserAnswers: jest.fn(),
+      applyResponseHydrationListToSlice: jest.fn(),
+      setState,
+      updateJsonPreview,
+      recalculateEditStats,
+      buildUpdatePlan: () => ({
+        updates: {
+          surveysResponseState: [{ answers: { q1: { value: 'prefilled' } } }],
+        },
+      }),
+    })).toEqual({
+      applied: true,
+      reason: 'applied',
+    });
+
+    expect(setState).toHaveBeenCalledWith(expect.any(Function), expect.any(Function));
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
   });
 
   it('clears hydration signatures and retries prior responses when local-cache rehydrate misses', async () => {
