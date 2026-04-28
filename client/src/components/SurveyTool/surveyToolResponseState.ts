@@ -4,8 +4,7 @@ import {
   RATING_MIN,
 } from '../../utilities/survey/ratingValue.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
-
-type UnknownRecord = Record<string, unknown>;
+import type { UnknownRecord } from './surveyToolTypes.js';
 
 type RatingResponse = {
   answer?: unknown;

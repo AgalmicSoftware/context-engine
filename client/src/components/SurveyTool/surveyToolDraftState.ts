@@ -1,6 +1,5 @@
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
-
-type UnknownRecord = Record<string, unknown>;
+import type { UnknownRecord } from './surveyToolTypes.js';
 
 type SurveyDraftField = {
   value?: unknown;
