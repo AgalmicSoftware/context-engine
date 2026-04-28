@@ -225,6 +225,7 @@ import {
   buildDraftHydrationState,
   buildHydratedResponseSlice,
   buildLocalCacheHydrationMemoKey,
+  buildMergedSurveyResponseState,
   buildMergedHydrationQuestionResponses,
   buildLocalCacheRehydrationState,
   buildPrefilledSingleQuestionState,
@@ -6393,59 +6394,13 @@ export class SurveyQuestions extends Component {
 
 
   mergeSurveyResponseState = (currentState, newQuestionPool, surveyIndex = 0) => {
-    const pool = (Array.isArray(newQuestionPool) && newQuestionPool.length > 0)
-      ? newQuestionPool
-      : this.getCurrentRenderedQuestionIds().map(id => ({ id }));
-    const next = buildSurveyResponseStateArray({
-      prevSurveysResponseState: currentState,
+    return buildMergedSurveyResponseState({
+      currentState,
+      newQuestionPool,
+      renderedQuestionIds: this.getCurrentRenderedQuestionIds(),
       surveyIndex,
+      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
     });
-
-    const prevSlice =
-      next[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-    const allowedIds = new Set(
-      pool.map((q) => (q && q.id ? String(q.id) : null)).filter(Boolean)
-    );
-
-    const mergedAnswers = {};
-    const mergedAdditional = {};
-    const mergedImportance = {};
-    const mergedConviction = {};
-
-    allowedIds.forEach((qid) => {
-      if (prevSlice.answers && prevSlice.answers[qid]) {
-        mergedAnswers[qid] = { ...prevSlice.answers[qid] };
-      } else {
-        mergedAnswers[qid] = this.buildEmptyResponseFieldState(qid);
-      }
-      if (prevSlice.additionalComments && prevSlice.additionalComments[qid]) {
-        mergedAdditional[qid] = { ...prevSlice.additionalComments[qid] };
-      } else {
-        mergedAdditional[qid] = this.buildEmptyResponseFieldState(qid, 'additional');
-      }
-      if (
-        prevSlice.importance &&
-        Object.prototype.hasOwnProperty.call(prevSlice.importance, qid)
-      ) {
-        mergedImportance[qid] = prevSlice.importance[qid];
-      }
-      if (
-        prevSlice.conviction &&
-        Object.prototype.hasOwnProperty.call(prevSlice.conviction, qid)
-      ) {
-        mergedConviction[qid] = prevSlice.conviction[qid];
-      }
-    });
-
-    next[surveyIndex] = {
-      answers: mergedAnswers,
-      importance: mergedImportance,
-      conviction: mergedConviction,
-      additionalComments: mergedAdditional,
-    };
-
-    return next;
   };
 
 

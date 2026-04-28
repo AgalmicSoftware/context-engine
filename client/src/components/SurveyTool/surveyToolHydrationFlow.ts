@@ -92,6 +92,14 @@ type BuildSurveyResponseStateArrayArgs = {
   nextSlice?: ResponseSlice | null;
 };
 
+type BuildMergedSurveyResponseStateArgs = {
+  currentState?: unknown[] | null;
+  newQuestionPool?: unknown[] | null;
+  renderedQuestionIds?: unknown[] | null;
+  surveyIndex?: unknown;
+  buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -439,6 +447,72 @@ export const buildSurveyResponseStateArray = ({
   if (nextSlice && typeof nextSlice === 'object') {
     nextSurveysResponseState[normalizedSurveyIndex] = nextSlice;
   }
+
+  return nextSurveysResponseState;
+};
+
+export const buildMergedSurveyResponseState = ({
+  currentState = null,
+  newQuestionPool = null,
+  renderedQuestionIds = null,
+  surveyIndex = 0,
+  buildEmptyResponseFieldState = null,
+}: BuildMergedSurveyResponseStateArgs = {}) => {
+  const pool = Array.isArray(newQuestionPool) && newQuestionPool.length > 0
+    ? newQuestionPool
+    : (Array.isArray(renderedQuestionIds) ? renderedQuestionIds.map((id) => ({ id })) : []);
+  const nextSurveysResponseState = buildSurveyResponseStateArray({
+    prevSurveysResponseState: currentState,
+    surveyIndex,
+  });
+  const prevSlice =
+    nextSurveysResponseState[surveyIndex] && typeof nextSurveysResponseState[surveyIndex] === 'object'
+      ? nextSurveysResponseState[surveyIndex] as ResponseSlice
+      : buildEmptyResponseSlice();
+
+  const allowedIds = new Set(
+    pool.map((question) => (question && typeof question === 'object' && 'id' in question ? String((question as UnknownRecord).id || '') : ''))
+      .filter(Boolean)
+  );
+
+  const mergedAnswers: Record<string, unknown> = {};
+  const mergedAdditional: Record<string, unknown> = {};
+  const mergedImportance: Record<string, unknown> = {};
+  const mergedConviction: Record<string, unknown> = {};
+
+  allowedIds.forEach((questionId) => {
+    if (prevSlice.answers && prevSlice.answers[questionId]) {
+      mergedAnswers[questionId] = { ...((prevSlice.answers[questionId] as Record<string, unknown>) || {}) };
+    } else if (typeof buildEmptyResponseFieldState === 'function') {
+      mergedAnswers[questionId] = buildEmptyResponseFieldState(questionId);
+    }
+
+    if (prevSlice.additionalComments && prevSlice.additionalComments[questionId]) {
+      mergedAdditional[questionId] = { ...((prevSlice.additionalComments[questionId] as Record<string, unknown>) || {}) };
+    } else if (typeof buildEmptyResponseFieldState === 'function') {
+      mergedAdditional[questionId] = buildEmptyResponseFieldState(questionId, 'additional');
+    }
+
+    if (
+      prevSlice.importance &&
+      Object.prototype.hasOwnProperty.call(prevSlice.importance, questionId)
+    ) {
+      mergedImportance[questionId] = prevSlice.importance[questionId];
+    }
+    if (
+      prevSlice.conviction &&
+      Object.prototype.hasOwnProperty.call(prevSlice.conviction, questionId)
+    ) {
+      mergedConviction[questionId] = prevSlice.conviction[questionId];
+    }
+  });
+
+  nextSurveysResponseState[surveyIndex] = {
+    answers: mergedAnswers,
+    importance: mergedImportance,
+    conviction: mergedConviction,
+    additionalComments: mergedAdditional,
+  };
 
   return nextSurveysResponseState;
 };
