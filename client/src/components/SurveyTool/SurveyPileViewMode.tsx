@@ -2610,6 +2610,22 @@ export class PileViewMode extends SurveyQuestions {
     </Card>
   );
 
+  renderPileGatedPromptCard = ({
+    question,
+  }) => (
+    <Card className={styles.pileCardInner}>
+      <CardBody className={styles.pileCardBody}>
+        <div className={styles.pileCardHeader}>
+          {this.renderPromptWithManualDecrypt(question)}
+        </div>
+        {this.renderGatedPromptNotice({
+          question,
+          tooltipIdSuffix: 'pile',
+        })}
+      </CardBody>
+    </Card>
+  );
+
   renderActiveQuestion = (question) => {
     const { surveysResponseState, showComments, showConviction } = this.state;
     const slice = surveysResponseState[0] || {
