@@ -20,6 +20,9 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
+  applyLocalCacheRehydrateMissEffects,
+  applyLocalCacheRehydrateNoChangeEffects,
+  applyLocalCacheRehydrateSuccessEffects,
   applyPriorResponseFetchSuccessEffects,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
@@ -1612,6 +1615,50 @@ describe('surveyToolHydrationFlow', () => {
     })).toBe(false);
     expect(resetLocalCacheMemo).not.toHaveBeenCalled();
     expect(triggerRehydrate).not.toHaveBeenCalled();
+  });
+
+  it('applies local-cache rehydrate miss, no-change, and success effects', () => {
+    const clearHydrationSignature = jest.fn();
+    const ensurePriorResponses = jest.fn();
+    const callback = jest.fn();
+
+    applyLocalCacheRehydrateMissEffects({
+      clearHydrationSignature,
+      ensurePriorResponses,
+      callback,
+    });
+    expect(clearHydrationSignature).toHaveBeenCalledTimes(1);
+    expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    ensurePriorResponses.mockClear();
+    callback.mockClear();
+
+    applyLocalCacheRehydrateNoChangeEffects({
+      ensurePriorResponses,
+      callback,
+    });
+    expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    const applyStateUpdates = jest.fn((updates, done) => {
+      if (typeof done === 'function') done();
+    });
+    const afterStateApplied = jest.fn();
+
+    expect(applyLocalCacheRehydrateSuccessEffects({
+      updates: { surveysResponseState: [] },
+      applyStateUpdates,
+      afterStateApplied,
+    })).toBe(true);
+    expect(applyStateUpdates).toHaveBeenCalledWith({ surveysResponseState: [] }, expect.any(Function));
+    expect(afterStateApplied).toHaveBeenCalledTimes(1);
+
+    expect(applyLocalCacheRehydrateSuccessEffects({
+      updates: null,
+      applyStateUpdates,
+      afterStateApplied,
+    })).toBe(false);
   });
 
   it('executes grouped prior-response fetch plans in normalized order', async () => {
