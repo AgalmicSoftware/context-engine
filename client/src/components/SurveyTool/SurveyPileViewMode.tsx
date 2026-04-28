@@ -64,8 +64,11 @@ import {
 } from './surveyPileQuestionSections';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
-  isPileCacheConsistentWithBaseline,
-} from './surveyPileCacheSync';
+  buildPileBaselineCheckPlan,
+  buildPileBaselineConsistencyPlan,
+  buildPilePrefillReadPlan,
+  readPileScopedQuestionResponses,
+} from './surveyPileBaselineSync';
 import {
   buildPileComponentUpdatePlan,
   buildPileContextResetState,
@@ -1299,35 +1302,35 @@ export class PileViewMode extends SurveyQuestions {
 
 
   checkCacheAgainstBaseline = () => {
-    if (!this.state.submissionComplete || !this.state.editBaseline) return;
-
     const slug = resolveEffectiveSlug(this.props);
     const pileResponseReadContext = resolvePileResponseReadContext(this.props, slug);
     const effectiveSlug = pileResponseReadContext.sessionSlug || slug;
     const networkID = pileResponseReadContext.networkIdStr;
+    const baselineCheckPlan = buildPileBaselineCheckPlan({
+      submissionComplete: this.state.submissionComplete,
+      editBaseline: this.state.editBaseline,
+      networkIdStr: networkID,
+      pileQuestions: this.state.pileQuestions,
+    });
+    if (baselineCheckPlan.shouldSkip) return;
+
     const acctLower = (this.props.account || '').toLowerCase();
     const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(this.props, effectiveSlug)];
-
-    if (!networkID) return;
-
-    const qRespMap = {};
-    scopeSlugs.forEach((scopeSlug) => {
-      const parsed = readQuestionsCache(scopeSlug) || {};
-      const net = parsed?.[networkID];
-      mergeQuestionResponses(qRespMap, net?.questionResponses || {});
+    const qRespMap = readPileScopedQuestionResponses({
+      scopeSlugs,
+      networkIdStr: networkID,
+      readQuestionsCache,
+      mergeQuestionResponses,
     });
-
-    const baseline = this.state.editBaseline;
-    const renderedIds = this.state.pileQuestions.map(q => q.id);
-    const isConsistent = isPileCacheConsistentWithBaseline({
-      baseline,
-      renderedIds,
+    const baselineConsistencyPlan = buildPileBaselineConsistencyPlan({
+      baseline: this.state.editBaseline,
+      renderedIds: baselineCheckPlan.renderedIds,
       questionResponses: qRespMap,
       account: acctLower,
       valuesEqual: this.valuesEqual,
     });
 
-    if (isConsistent) {
+    if (baselineConsistencyPlan.action === 'sync-cache-caught-up') {
       surveyLog.log("PileViewMode: Cache caught up with baseline. Syncing.");
       this.setState({ submissionComplete: false }, () => {
         // Now it is safe to reload and wipe/rebuild state, as cache matches our optimistic view
@@ -1339,32 +1342,32 @@ export class PileViewMode extends SurveyQuestions {
   };
 
   prefillUserAnswersFromCache = () => {
-    // Strict baseline policy:
-    // - Never baseline from local cache when anon
-    // - Never touch baseline while there are pending edits
-    if (!this.props.account) return;
-    if (this.state.isDirty || (this.state.modifiedCount || 0) > 0) {
-      bumpSurveyPerfCounter('noopSkipCount');
-      surveyLog.debug('baseline-guard: skipped rebuild');
-      return;
-    }
-
     const slug = resolveEffectiveSlug(this.props);
     const pileResponseReadContext = resolvePileResponseReadContext(this.props, slug);
     const effectiveSlug = pileResponseReadContext.sessionSlug || slug;
     const networkID = pileResponseReadContext.networkIdStr;
-    const acctLower = (this.props.account || '').toLowerCase();
-    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(this.props, effectiveSlug)];
-
-    if (!networkID || !Array.isArray(this.state.pileQuestions) || this.state.pileQuestions.length === 0) {
+    const prefillReadPlan = buildPilePrefillReadPlan({
+      account: this.props.account,
+      isDirty: this.state.isDirty,
+      modifiedCount: this.state.modifiedCount,
+      networkIdStr: networkID,
+      pileQuestions: this.state.pileQuestions,
+    });
+    if (prefillReadPlan.shouldSkip) {
+      if (prefillReadPlan.shouldBumpNoop) {
+        bumpSurveyPerfCounter('noopSkipCount');
+        surveyLog.debug('baseline-guard: skipped rebuild');
+      }
       return;
     }
 
-    const qRespMap = {};
-    scopeSlugs.forEach((scopeSlug) => {
-      const parsed = readQuestionsCache(scopeSlug) || {};
-      const net = parsed?.[networkID];
-      mergeQuestionResponses(qRespMap, net?.questionResponses || {});
+    const acctLower = (this.props.account || '').toLowerCase();
+    const scopeSlugs = [effectiveSlug, ...getExtraQuestionReadSlugs(this.props, effectiveSlug)];
+    const qRespMap = readPileScopedQuestionResponses({
+      scopeSlugs,
+      networkIdStr: networkID,
+      readQuestionsCache,
+      mergeQuestionResponses,
     });
 
     const pendingStats = (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) || { total: this.state.modifiedCount || 0 };
