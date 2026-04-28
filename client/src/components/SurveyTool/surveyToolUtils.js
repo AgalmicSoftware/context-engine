@@ -153,6 +153,7 @@ export {
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   buildQuestionSlugMapForIds,
+  resolveQuestionSlugMapLookup,
   buildRevertedResponseSlice,
   buildSubmissionGroupContext,
   buildSurveyResponseStateArray,
