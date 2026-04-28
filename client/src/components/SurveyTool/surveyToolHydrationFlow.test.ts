@@ -1,6 +1,8 @@
 import {
   buildCacheHydrationSlice,
   buildDraftHydrationUpdatePlan,
+  shouldSkipDraftHydrationRun,
+  buildDraftHydrationSeedContext,
   buildDraftHydrationRunPlan,
   buildDraftHydrationRenderedQuestionIds,
   buildDraftHydrationOverwriteDecision,
@@ -32,6 +34,7 @@ import {
   applyResetFormStateEffects,
   applyRevertPendingEffects,
   applyStartFreshEffects,
+  applyDraftHydrationEffects,
   applyPriorResponseFetchSuccessEffects,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
@@ -194,6 +197,60 @@ describe('surveyToolHydrationFlow', () => {
       pendingTotal: 2,
       submittedStateActive: true,
       allowOverwrite: false,
+    });
+  });
+
+  it('decides when draft hydration should skip and resolves its seed context', () => {
+    expect(shouldSkipDraftHydrationRun({
+      suppressPrefill: true,
+      submissionError: '',
+      draft: { answers: { q1: { value: 'x' } } },
+    })).toBe(true);
+
+    expect(shouldSkipDraftHydrationRun({
+      suppressPrefill: false,
+      submissionError: 'failed',
+      draft: { answers: { q1: { value: 'x' } } },
+    })).toBe(true);
+
+    expect(shouldSkipDraftHydrationRun({
+      suppressPrefill: false,
+      submissionError: '',
+      draft: { answers: {}, baseline: {} },
+    })).toBe(false);
+
+    expect(buildDraftHydrationSeedContext({
+      isStandalone: false,
+      singleQuestionMode: false,
+      surveyIndex: 2,
+      surveysResponseState: [
+        { answers: { q0: { value: 'keep-0' } }, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+    })).toEqual({
+      surveyIndex: 2,
+      prevSlice: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+    });
+
+    expect(buildDraftHydrationSeedContext({
+      isStandalone: true,
+      singleQuestionMode: false,
+      surveyIndex: 3,
+      surveysResponseState: [
+        { answers: { q1: { value: 'keep-1' } }, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+    })).toEqual({
+      surveyIndex: 0,
+      prevSlice: {
+        answers: { q1: { value: 'keep-1' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
     });
   });
 
@@ -1862,6 +1919,12 @@ describe('surveyToolHydrationFlow', () => {
     expect(clearDraftFor).toHaveBeenNthCalledWith(2, 'q2');
     expect(recalculateEditStats).toHaveBeenCalledTimes(2);
     expect(persistDraftSafely).toHaveBeenCalledWith(0);
+  });
+
+  it('applies draft hydration follow-up effects', () => {
+    const updateJsonPreview = jest.fn();
+    applyDraftHydrationEffects({ updateJsonPreview });
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
   });
 
   it('executes grouped prior-response fetch plans in normalized order', async () => {
