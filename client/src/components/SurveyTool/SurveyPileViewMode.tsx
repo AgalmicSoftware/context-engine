@@ -53,6 +53,11 @@ import {
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitViewState,
 } from './surveyPileViewState.js';
+import {
+  buildClearedTransientSubmitFeedbackState,
+  buildTransientSubmitFeedbackState,
+  normalizeTransientSubmitFeedbackDurationMs,
+} from './surveyQuestionSubmitFeedback.js';
 import { buildRenderedQuestionIdsFromPileWindow } from './surveyQuestionScope.js';
 import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
@@ -2089,6 +2094,31 @@ export class PileViewMode extends SurveyQuestions {
         this._pileSubmitTimer = null;
       }, feedbackPlan.clearDelayMs);
     }, feedbackPlan.initialDelayMs);
+  };
+
+  showTransientSubmitFeedback = (message = '', durationMs = 2000) => {
+    if (this._emptySubmitTimer) {
+      clearTimeout(this._emptySubmitTimer);
+      this._emptySubmitTimer = null;
+    }
+    if (this._pileSubmitTimer) {
+      clearTimeout(this._pileSubmitTimer);
+      this._pileSubmitTimer = null;
+    }
+    const update = buildTransientSubmitFeedbackState({
+      message,
+      mirrorToPileSubmitText: true,
+    });
+    this.setState(update);
+    if (!update.submissionError) return;
+    this._emptySubmitTimer = setTimeout(() => {
+      if (!this._isMounted) return;
+      const clearUpdate = buildClearedTransientSubmitFeedbackState({
+        mirrorToPileSubmitText: true,
+      });
+      this.setState(clearUpdate);
+      this._emptySubmitTimer = null;
+    }, normalizeTransientSubmitFeedbackDurationMs(durationMs));
   };
 
   getPileFilterQuestionResponses = () => {
