@@ -486,6 +486,20 @@ type BuildQuestionSlugMapForIdsArgs = {
   }) => unknown) | null;
 };
 
+type ResolveQuestionSlugMapLookupArgs = {
+  questionIds?: Iterable<unknown> | unknown[];
+  questionPool?: unknown[] | null;
+  pileQuestions?: unknown[] | null;
+  surveyId?: unknown;
+  singleQuestionMode?: boolean;
+  propsSurveyId?: unknown;
+  props?: UnknownRecord | null;
+  network?: unknown;
+  normalizeSlug?: ((value: unknown) => string) | null;
+  getSessionSlugByName?: ((sessionName: string) => unknown) | null;
+  resolveSlugForIds?: ((args: UnknownRecord) => unknown) | null;
+};
+
 type BuildSubmissionGroupContextArgs = {
   questionIds?: Iterable<unknown> | unknown[];
   slugByQuestionId?: Map<string, unknown> | null;
@@ -2246,6 +2260,69 @@ export const buildQuestionSlugMapForIds = ({
   });
 
   return slugByQuestionId;
+};
+
+export const resolveQuestionSlugMapLookup = ({
+  questionIds = [],
+  questionPool = null,
+  pileQuestions = null,
+  surveyId = undefined,
+  singleQuestionMode = false,
+  propsSurveyId = null,
+  props = null,
+  network = null,
+  normalizeSlug = null,
+  getSessionSlugByName = null,
+  resolveSlugForIds = null,
+}: ResolveQuestionSlugMapLookupArgs = {}): Map<string, string> => {
+  const poolCombined: unknown[] = [
+    ...(Array.isArray(questionPool) ? questionPool : []),
+    ...(Array.isArray(pileQuestions) ? pileQuestions : []),
+  ];
+
+  const fallbackSurveyId = surveyId !== undefined
+    ? surveyId
+    : (!!singleQuestionMode ? null : (propsSurveyId || null));
+
+  return buildQuestionSlugMapForIds({
+    questionIds,
+    poolQuestions: poolCombined,
+    normalizeSlug,
+    resolveQuestionSlug: ({ questionId, question }) => {
+      let resolvedSlug: unknown = '';
+      let hasExplicitQuestionSlug = false;
+
+      if (question && Object.prototype.hasOwnProperty.call(question, 'sessionSlug')) {
+        resolvedSlug = (question as UnknownRecord).sessionSlug;
+        hasExplicitQuestionSlug = (question as UnknownRecord).sessionSlug !== null
+          && (question as UnknownRecord).sessionSlug !== undefined;
+      }
+
+      if (!hasExplicitQuestionSlug && typeof (question as UnknownRecord | null)?.sessionName === 'string') {
+        const mapped = typeof getSessionSlugByName === 'function'
+          ? getSessionSlugByName((question as UnknownRecord).sessionName as string)
+          : null;
+        if (mapped !== null && mapped !== undefined) {
+          resolvedSlug = mapped;
+          hasExplicitQuestionSlug = true;
+        }
+      }
+
+      if (!hasExplicitQuestionSlug) {
+        resolvedSlug = typeof resolveSlugForIds === 'function'
+          ? resolveSlugForIds({
+            sessionName: null,
+            questionId,
+            surveyId: fallbackSurveyId,
+            props,
+            network,
+          })
+          : '';
+      }
+
+      return resolvedSlug;
+    },
+  });
 };
 
 export const buildSubmissionGroupContext = ({
