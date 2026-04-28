@@ -14497,6 +14497,64 @@ describe('SurveyTool module', () => {
     expect(subject.scheduleLoadAndSortQuestions).toHaveBeenCalledWith(80);
   });
 
+  it('checks optimistic pile cache baseline on questionResponsesNonce tick instead of scheduling a reload', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      activePileIndex: 0,
+      submissionComplete: true,
+      isDirty: false,
+      modifiedCount: 0,
+      encryptedModifiedCount: 0,
+      autoDecryptEnabled: false,
+      decryptingByKey: {},
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      userAnswers: null,
+    };
+    subject.didEditDiffInputsChange = jest.fn(() => false);
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.emitPendingStats = jest.fn();
+    subject.syncLoadingElapsedTimer = jest.fn();
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.checkCacheAgainstBaseline = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      questionResponsesNonce: 6,
+    };
+    const prevState = { ...subject.state };
+    subject.props = {
+      ...subject.props,
+      questionResponsesNonce: 7,
+    };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.checkCacheAgainstBaseline).toHaveBeenCalledTimes(1);
+    expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
+  });
+
   it('keeps optimistic pile state when cache has stale value for a cleared baseline answer', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
@@ -14609,6 +14667,59 @@ describe('SurveyTool module', () => {
     expect(subject.state.surveysResponseState?.[0]?.answers?.q1).toBeUndefined();
     expect(subject.state.editBaseline).toBeNull();
     expect(peekSpy).not.toHaveBeenCalled();
+  });
+
+  it('patches live pile survey state from cache prefill without overwriting an existing edit baseline', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      isDirty: false,
+      modifiedCount: 0,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: {
+        answers: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q1: { value: '', encrypted: false } },
+      },
+    };
+    subject.updateJsonPreview = jest.fn();
+    syncClassSetState(subject);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return {};
+      return {
+        '84532': {
+          questionResponses: {
+            q1: {
+              '0xabc': {
+                answer: { value: 'cached-answer', encrypted: false },
+                additional: { value: '', encrypted: false },
+              },
+            },
+          },
+        },
+      };
+    });
+
+    subject.prefillUserAnswersFromCache();
+
+    expect(subject.state.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
+    expect(subject.state.editBaseline?.answers?.q1?.value).toBe('');
   });
 
   it('hydrates off-screen pile draft answers so submit count stays aligned with full mode', () => {
