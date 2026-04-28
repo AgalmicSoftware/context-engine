@@ -1,16 +1,4 @@
-import { isPendingQuestionMetadataPlaceholder } from './surveyQuestionMetadataPlaceholders.js';
-
-type UnknownRecord = Record<string, unknown>;
-type PileScopeQuestionCacheItem = UnknownRecord & {
-  id?: unknown;
-  creator?: unknown;
-  tags?: unknown;
-};
-type PileScopeNetworkCache = UnknownRecord & {
-  pendingQuestionMetadata?: UnknownRecord;
-  questions?: Record<string, PileScopeQuestionCacheItem>;
-  questionResponses?: UnknownRecord;
-};
+type UnknownRecord = Record<string, any>;
 
 type ScopeSetReader = (scopeSlug: string) => Set<string>;
 type MergeQuestionResponses = (target: UnknownRecord, source: UnknownRecord) => UnknownRecord;
@@ -94,13 +82,8 @@ export const loadPileScopeCacheSnapshot = async ({
       (await readQuestionsCacheAsync(scopeSlug)) as UnknownRecord,
       networkId
     );
-    const networkCache = (
-      questionsCache &&
-      typeof questionsCache === 'object' &&
-      questionsCache[networkId] &&
-      typeof questionsCache[networkId] === 'object'
-    )
-      ? questionsCache[networkId] as PileScopeNetworkCache
+    const networkCache = (questionsCache && typeof questionsCache === 'object')
+      ? (questionsCache[networkId] || { questions: {}, questionResponses: {} })
       : { questions: {}, questionResponses: {} };
 
     snapshot.pendingMetadataCount += Object.keys(networkCache?.pendingQuestionMetadata || {}).length;
@@ -112,7 +95,6 @@ export const loadPileScopeCacheSnapshot = async ({
     const blockedQuestionIds = getBlockedQuestionIdsSet(scopeSlug);
     Object.keys(networkCache.questions || {}).forEach((questionId) => {
       const question = networkCache.questions?.[questionId];
-      if (isPendingQuestionMetadataPlaceholder(question)) return;
       const normalizedQuestionId = normalizeQuestionIdKey(question?.id || questionId);
       if (!normalizedQuestionId || blockedQuestionIds.has(normalizedQuestionId)) return;
       if (seenQuestionIds.has(normalizedQuestionId)) return;
