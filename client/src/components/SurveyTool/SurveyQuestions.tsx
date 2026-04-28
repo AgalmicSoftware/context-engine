@@ -1272,6 +1272,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.clearAutoDecryptSweepScheduling();
   };
 
+  resetVisibleAutoDecryptSweepState = () => {
+    this._autoDecryptVisibleSweepCache = null;
+    this.resetBlockedAutoDecryptSweepInternals();
+  };
+
   startCanDecryptOtherResponsesRun = (snapshotKey = '') => {
     this._canDecryptOtherResponsesKey = String(snapshotKey || '');
     const runId = (Number(this._canDecryptOtherResponsesRunId) || 0) + 1;
@@ -3769,31 +3774,19 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     try {
       // Guard: do not run decrypt sweeps while an error is present (avoid clobber after failed submit)
       if (this.state && this.state.submissionError) {
-        this._autoDecryptVisibleSweepCache = null;
-        this._autoDecQueue = [];
-        this._autoDecProcessing = false;
-        this._autoDecryptMaskedAttemptSignature = {};
-        this.clearAutoDecryptSweepScheduling();
+        this.resetVisibleAutoDecryptSweepState();
         return;
       }
 
       // Auto-decrypt now runs in all views (survey, questions, pile).
       // Guard: when logged out, do nothing so we can retry cleanly after login.
       if (!this.props || !this.props.loginComplete || !this.props.account) {
-        this._autoDecryptVisibleSweepCache = null;
-        this._autoDecQueue = [];
-        this._autoDecProcessing = false;
-        this._autoDecryptMaskedAttemptSignature = {};
-        this.clearAutoDecryptSweepScheduling();
+        this.resetVisibleAutoDecryptSweepState();
         return;
       }
 
       if (!this.state.autoDecryptEnabled) {
-        this._autoDecryptVisibleSweepCache = null;
-        this._autoDecQueue = [];
-        this._autoDecProcessing = false;
-        this._autoDecryptMaskedAttemptSignature = {};
-        this.clearAutoDecryptSweepScheduling();
+        this.resetVisibleAutoDecryptSweepState();
         return;
       }
 
