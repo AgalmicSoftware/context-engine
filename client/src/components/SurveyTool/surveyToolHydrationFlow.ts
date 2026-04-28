@@ -210,6 +210,19 @@ type BuildDraftHydrationUpdatePlanArgs = BuildDraftHydrationStateArgs & {
   surveyIndex?: unknown;
 };
 
+type ShouldSkipDraftHydrationRunArgs = {
+  suppressPrefill?: boolean;
+  submissionError?: unknown;
+  draft?: DraftPayload | null;
+};
+
+type BuildDraftHydrationSeedContextArgs = {
+  isStandalone?: boolean;
+  singleQuestionMode?: boolean;
+  surveyIndex?: unknown;
+  surveysResponseState?: unknown[] | null;
+};
+
 type BuildDraftHydrationRunPlanArgs = BuildDraftHydrationUpdatePlanArgs & {
   hydrationQuestionIds?: Iterable<unknown> | unknown[];
   pileQuestions?: unknown[] | null;
@@ -342,6 +355,10 @@ type ApplyStartFreshEffectsArgs = {
   clearDraftFor?: ((questionId: string) => void) | null;
   recalculateEditStats?: (() => void) | null;
   persistDraftSafely?: ((delayMs?: number) => void) | null;
+};
+
+type ApplyDraftHydrationEffectsArgs = {
+  updateJsonPreview?: (() => void) | null;
 };
 
 type BuildGroupedRenderedResponseScopePlanArgs = {
@@ -1379,6 +1396,37 @@ export const buildDraftHydrationRunPlan = ({
   };
 };
 
+export const shouldSkipDraftHydrationRun = ({
+  suppressPrefill = false,
+  submissionError = '',
+  draft = null,
+}: ShouldSkipDraftHydrationRunArgs = {}) => (
+  !!suppressPrefill ||
+  !!submissionError ||
+  !draft ||
+  (!(draft as DraftPayload).answers && !(draft as DraftPayload).baseline)
+);
+
+export const buildDraftHydrationSeedContext = ({
+  isStandalone = false,
+  singleQuestionMode = false,
+  surveyIndex = 0,
+  surveysResponseState = null,
+}: BuildDraftHydrationSeedContextArgs = {}) => {
+  const normalizedSurveyIndex = !!isStandalone || !!singleQuestionMode
+    ? 0
+    : (Number(surveyIndex) || 0);
+  const stateArray = Array.isArray(surveysResponseState) ? surveysResponseState : [];
+  const prevSlice = stateArray[normalizedSurveyIndex] && typeof stateArray[normalizedSurveyIndex] === 'object'
+    ? stateArray[normalizedSurveyIndex] as ResponseSlice
+    : buildEmptyResponseSlice();
+
+  return {
+    surveyIndex: normalizedSurveyIndex,
+    prevSlice,
+  };
+};
+
 export const buildPrefilledSurveyUpdatePlan = ({
   ...args
 }: BuildPrefilledSurveyUpdatePlanArgs = {}) => {
@@ -1649,6 +1697,14 @@ export const applyStartFreshEffects = ({
   }
   if (typeof persistDraftSafely === 'function') {
     persistDraftSafely(0);
+  }
+};
+
+export const applyDraftHydrationEffects = ({
+  updateJsonPreview = null,
+}: ApplyDraftHydrationEffectsArgs = {}) => {
+  if (typeof updateJsonPreview === 'function') {
+    updateJsonPreview();
   }
 };
 
