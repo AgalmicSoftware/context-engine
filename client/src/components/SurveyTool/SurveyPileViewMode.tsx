@@ -59,6 +59,11 @@ import {
 } from './surveyPileActiveQuestionCard';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
+  buildPileCacheUpdatePlan,
+  isPileCacheConsistentWithBaseline,
+  shouldSeedPileBaselineFromPrefill,
+} from './surveyPileCacheSync';
+import {
   buildPileQuestionLoadState,
   buildPileVisibleTransitionPlan,
   shouldSkipPileFilterStateUpdate,
@@ -1066,20 +1071,28 @@ export class PileViewMode extends SurveyQuestions {
       nextQuestionProgress?.phase !== 'hydrate'
     );
 
-    if (cacheReadyTick || nonceTick || responseNonceTick || progressHydrationTick || progressCompletedTick) {
-      if (isOptimistic) {
-        // Optimistic guard: do not reload/wipe state yet. Check if cache has caught up.
-        this.checkCacheAgainstBaseline();
-      } else {
-        // Normal mode: Reload if safe (no pending edits)
-        if (!hasLiveEdits) {
-          this.scheduleLoadAndSortQuestions(80);
-        } else {
-          bumpSurveyPerfCounter('noopSkipCount');
-          surveyLog.debug('PileViewMode: skipped rebuild due to pending edits');
-        }
-      }
-    } else if (this.state.pileQuestions.length === 0 && !hasLiveEdits && !this.props.isQuestionCacheReady && !this.state.loading) {
+    const cacheUpdatePlan = buildPileCacheUpdatePlan({
+      cacheReadyTick,
+      nonceTick,
+      responseNonceTick,
+      progressHydrationTick,
+      progressCompletedTick,
+      isOptimistic,
+      hasLiveEdits,
+      pileQuestionsLength: this.state.pileQuestions.length,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      loading: this.state.loading,
+    });
+
+    if (cacheUpdatePlan.action === 'check-optimistic-baseline') {
+      // Optimistic guard: do not reload/wipe state yet. Check if cache has caught up.
+      this.checkCacheAgainstBaseline();
+    } else if (cacheUpdatePlan.action === 'reload') {
+      this.scheduleLoadAndSortQuestions(cacheUpdatePlan.delayMs);
+    } else if (cacheUpdatePlan.action === 'skip-live-edits') {
+      bumpSurveyPerfCounter('noopSkipCount');
+      surveyLog.debug('PileViewMode: skipped rebuild due to pending edits');
+    } else if (cacheUpdatePlan.action === 'show-loading') {
       // Initial load spinner (guarded against loop)
       this.setState({ loading: true });
     }
@@ -1305,89 +1318,13 @@ export class PileViewMode extends SurveyQuestions {
 
     const baseline = this.state.editBaseline;
     const renderedIds = this.state.pileQuestions.map(q => q.id);
-    let isConsistent = true;
-
-    for (const qid of renderedIds) {
-      const qidLower = (qid || '').toLowerCase();
-      const raw = qRespMap[qidLower]?.[acctLower];
-
-      // Parse cache entry
-      let cacheEntry = null;
-      try { cacheEntry = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { cacheEntry = null; }
-
-      const baseAns = baseline.answers?.[qid];
-      const baseAdd = baseline.additionalComments?.[qid];
-      const baselineAnswerEncrypted =
-        !!(baseAns && (baseAns.encrypted || baseAns.encryptedPortion || baseAns.value === '*'));
-      const baselineAdditionalEncrypted =
-        !!(baseAdd && (baseAdd.encrypted || baseAdd.encryptedPortion || baseAdd.value === '*'));
-      const baselineResponseEncrypted = baselineAnswerEncrypted || baselineAdditionalEncrypted;
-
-      const cacheRatingEncrypted = !!(
-        cacheEntry && (
-          (typeof cacheEntry.importanceEncrypted === 'string' && cacheEntry.importanceEncrypted) ||
-          (typeof cacheEntry.convictionEncrypted === 'string' && cacheEntry.convictionEncrypted)
-        )
-      );
-
-      // 1. Check Answer Consistency
-      if (baseAns && baseAns.value !== undefined) {
-         // If baseline has value, cache MUST have value (equality check)
-         const cacheVal = cacheEntry?.answer?.value;
-         // Use parent's valuesEqual for robust comparison (arrays, numbers)
-         if (!this.valuesEqual(baseAns.value, cacheVal)) {
-           isConsistent = false;
-           break;
-         }
-      }
-
-      // 2. Check Additional Consistency
-      if (baseAdd && baseAdd.value !== undefined) {
-         const cacheAdd = cacheEntry?.additional?.value;
-         if (!this.valuesEqual(baseAdd.value, cacheAdd)) {
-           isConsistent = false;
-           break;
-         }
-      }
-
-      // 3. Check Conviction Consistency
-      if (baseline.conviction && Object.prototype.hasOwnProperty.call(baseline.conviction, qid)) {
-        const baseConv = toNumberOrNull(baseline.conviction[qid]);
-        const cacheConvRaw =
-          cacheEntry?.conviction !== undefined && cacheEntry?.conviction !== null
-            ? cacheEntry.conviction
-            : cacheEntry?.importance;
-        const cacheConv = toNumberOrNull(cacheConvRaw);
-        if (cacheConv === null) {
-          if (!baselineResponseEncrypted && !cacheRatingEncrypted) {
-            isConsistent = false;
-            break;
-          }
-        } else if (baseConv !== cacheConv) {
-          isConsistent = false;
-          break;
-        }
-      }
-
-      // 4. Check Importance Consistency
-      if (baseline.importance && Object.prototype.hasOwnProperty.call(baseline.importance, qid)) {
-        const baseImp = toNumberOrNull(baseline.importance[qid]);
-        const cacheImpRaw =
-          cacheEntry?.importance !== undefined && cacheEntry?.importance !== null
-            ? cacheEntry.importance
-            : cacheEntry?.conviction;
-        const cacheImp = toNumberOrNull(cacheImpRaw);
-        if (cacheImp === null) {
-          if (!baselineResponseEncrypted && !cacheRatingEncrypted) {
-            isConsistent = false;
-            break;
-          }
-        } else if (baseImp !== cacheImp) {
-          isConsistent = false;
-          break;
-        }
-      }
-    }
+    const isConsistent = isPileCacheConsistentWithBaseline({
+      baseline,
+      renderedIds,
+      questionResponses: qRespMap,
+      account: acctLower,
+      valuesEqual: this.valuesEqual,
+    });
 
     if (isConsistent) {
       surveyLog.log("PileViewMode: Cache caught up with baseline. Syncing.");
@@ -1549,18 +1486,13 @@ export class PileViewMode extends SurveyQuestions {
       );
     };
 
-    // Do not clobber an existing edit baseline if the user already started editing.
-    const hadAnyBaseInput = (() => {
-      const hasVal = (v) => v !== undefined && v !== null && (Array.isArray(v) ? v.length > 0 : String(v).length > 0);
-      for (const qid in (currentSlice.answers || {})) { if (hasVal(currentSlice.answers[qid]?.value)) return true; }
-      for (const qid in (currentSlice.additionalComments || {})) { if (hasVal(currentSlice.additionalComments[qid]?.value)) return true; }
-      for (const qid in (currentSlice.importance || {})) { if (Object.prototype.hasOwnProperty.call(currentSlice.importance, qid)) return true; }
-      for (const qid in (currentSlice.conviction || {})) { if (Object.prototype.hasOwnProperty.call(currentSlice.conviction, qid)) return true; }
-      return false;
-    })();
     const pendingStats = (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) || { total: this.state.modifiedCount || 0 };
 
-    if (this.state.editBaseline || hadAnyBaseInput || (pendingStats.total > 0)) {
+    if (!shouldSeedPileBaselineFromPrefill({
+      editBaseline: this.state.editBaseline,
+      currentSlice,
+      pendingTotal: pendingStats.total,
+    })) {
       this.setState({ surveysResponseState: [nextSlice] }, () => this.updateJsonPreview());
     } else {
       setBaselineFrom(nextSlice);
