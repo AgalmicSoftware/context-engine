@@ -228,6 +228,7 @@ import {
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
   buildLocalCacheRehydrationUpdatePlan,
+  loadLocalCacheHydrationSlice,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
   buildPrefilledSingleQuestionUpdatePlan,
@@ -5593,21 +5594,13 @@ export class SurveyQuestions extends Component {
         return value;
       };
 
-      if (!netId || !acct) return memoize(null);
-
-      const mergedQuestionResponses = buildMergedHydrationQuestionResponses({
+      const slice = loadLocalCacheHydrationSlice({
         scopeSlugs,
         networkIdStr: netId,
+        account: acct,
+        renderedQuestionIds: rendered,
         readQuestionsCache,
         mergeQuestionResponses,
-      });
-      if (Object.keys(mergedQuestionResponses).length === 0) return memoize(null);
-
-      DEBUG_PREFILL && surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', rendered);
-      const { slice } = buildCacheHydrationSlice({
-        renderedQuestionIds: rendered,
-        mergedQuestionResponses,
-        account: acct,
         parseResponse: (raw) => {
           let resp = raw;
           try {
@@ -5617,7 +5610,9 @@ export class SurveyQuestions extends Component {
         },
         applyCachedResponseEntryToSlice: this._applyCachedResponseEntryToSlice,
       });
+      if (!slice) return memoize(null);
 
+      DEBUG_PREFILL && surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', rendered);
       return memoize(slice);
     } catch (e) {
       this._localCacheSliceMemo = { key: '', value: null, hasValue: false };

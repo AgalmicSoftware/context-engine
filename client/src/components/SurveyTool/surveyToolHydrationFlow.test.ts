@@ -6,6 +6,7 @@ import {
   buildExitEditingStatePatch,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  loadLocalCacheHydrationSlice,
   buildLocalCacheRehydrationUpdatePlan,
   buildRevertPendingStatePatch,
   buildResetFormStatePatch,
@@ -517,6 +518,93 @@ describe('surveyToolHydrationFlow', () => {
     })).toEqual({});
     expect(readQuestionsCache).toHaveBeenCalledTimes(2);
     expect(mergeResponses).toHaveBeenCalledTimes(2);
+  });
+
+  it('loads local-cache hydration slices from merged scoped caches', () => {
+    const readQuestionsCache = jest.fn((slug: string) => {
+      const caches: Record<string, unknown> = {
+        alpha: {
+          84532: {
+            questionResponses: {
+              q1: {
+                '0xabc': JSON.stringify({
+                  answer: { value: 'alpha-answer' },
+                  additional: { value: 'alpha-notes' },
+                  importance: 4,
+                  conviction: 7,
+                }),
+              },
+            },
+          },
+        },
+        beta: {
+          84532: {
+            questionResponses: {
+              q2: {
+                '0xabc': {
+                  answer: { value: 'beta-answer' },
+                  additional: { value: 'beta-notes' },
+                  importance: 2,
+                  conviction: 3,
+                },
+              },
+            },
+          },
+        },
+      };
+      return caches[slug] || {};
+    });
+    const mergeResponses = jest.fn((target, source) => {
+      Object.entries(source).forEach(([questionId, value]) => {
+        target[questionId] = {
+          ...(target[questionId] || {}),
+          ...(value || {}),
+        };
+      });
+    });
+    const applyCachedResponseEntryToSlice = jest.fn(({ targetSlice, questionId, response }) => {
+      targetSlice.answers[questionId] = { value: response.answer.value };
+      targetSlice.additionalComments[questionId] = { value: response.additional.value };
+      targetSlice.importance[questionId] = response.importance;
+      targetSlice.conviction[questionId] = response.conviction;
+      return true;
+    });
+
+    expect(loadLocalCacheHydrationSlice({
+      scopeSlugs: ['alpha', 'beta'],
+      networkIdStr: '84532',
+      account: '0xAbC',
+      renderedQuestionIds: ['q1', 'q2'],
+      readQuestionsCache,
+      mergeQuestionResponses: mergeResponses,
+      parseResponse: (raw) => {
+        if (typeof raw !== 'string') return raw;
+        try { return JSON.parse(raw); } catch { return null; }
+      },
+      applyCachedResponseEntryToSlice,
+    })).toEqual({
+      answers: {
+        q1: { value: 'alpha-answer' },
+        q2: { value: 'beta-answer' },
+      },
+      importance: { q1: 4, q2: 2 },
+      conviction: { q1: 7, q2: 3 },
+      additionalComments: {
+        q1: { value: 'alpha-notes' },
+        q2: { value: 'beta-notes' },
+      },
+    });
+
+    expect(loadLocalCacheHydrationSlice({
+      scopeSlugs: ['alpha'],
+      networkIdStr: '',
+      account: '0xabc',
+      renderedQuestionIds: ['q1'],
+      readQuestionsCache,
+      mergeQuestionResponses: mergeResponses,
+      parseResponse: (raw) => raw,
+      applyCachedResponseEntryToSlice,
+    })).toBeNull();
   });
 
   it('builds survey response state arrays with ensured indexes', () => {
