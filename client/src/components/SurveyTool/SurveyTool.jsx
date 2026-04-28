@@ -234,7 +234,9 @@ import {
   buildPrefilledSurveyUpdatePlan,
   buildPriorResponseFetchPlan,
   buildGroupedRenderedResponseScopePlan,
+  buildLocalCacheHydrationSignature,
   buildMissingResponseIdsForRenderedQuestions,
+  buildNormalizedRenderedQuestionIds,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
   shouldBackfillPriorResponses,
@@ -5024,9 +5026,7 @@ export class SurveyQuestions extends Component {
     const renderedIds = Array.isArray(this.getCurrentRenderedQuestionIds?.())
       ? this.getCurrentRenderedQuestionIds()
       : [];
-    return Array.from(
-      new Set(renderedIds.map((id) => normalizeQuestionIdKey(id)).filter(Boolean))
-    );
+    return buildNormalizedRenderedQuestionIds({ renderedIds });
   };
 
   buildLocalCacheHydrationSignature = (surveyIndex, renderedIds = []) => {
@@ -5036,35 +5036,27 @@ export class SurveyQuestions extends Component {
       const extraSlugs = this.props?.minifiedMode === 'pile'
         ? getExtraQuestionReadSlugs(this.props, slug)
         : [];
-      const scopeSignature = [slug, ...extraSlugs].join(',');
-      const netId = context.networkIdStr;
-      const accountLower = String(this.props?.account || '').trim().toLowerCase();
-      const renderedSignature = buildRenderedIdsSignature(renderedIds);
-      return [
-        String(surveyIndex),
-        scopeSignature,
-        netId,
-        accountLower,
-        renderedSignature,
-        Number(this.props.questionsCacheNonce || 0),
-        Number(this.props.questionResponsesNonce || 0),
-        this.state?.suppressPrefill ? 1 : 0,
-        this.state?.submissionError ? 1 : 0,
-        this.state?.submissionComplete ? 1 : 0,
-      ].join('|');
+      return buildLocalCacheHydrationSignature({
+        surveyIndex,
+        scopeSlugs: [slug, ...extraSlugs],
+        networkIdStr: context.networkIdStr,
+        account: this.props?.account,
+        renderedIds,
+        questionsCacheNonce: this.props.questionsCacheNonce,
+        questionResponsesNonce: this.props.questionResponsesNonce,
+        suppressPrefill: this.state?.suppressPrefill,
+        submissionError: this.state?.submissionError,
+        submissionComplete: this.state?.submissionComplete,
+      });
     } catch (_) {
       return '';
     }
   };
 
   getRenderedQuestionIdsForResponseHydration = () => {
-    return Array.from(
-      new Set(
-        this.getCurrentRenderedQuestionIds()
-          .map((id) => normalizeQuestionIdKey(id))
-          .filter(Boolean)
-      )
-    );
+    return buildNormalizedRenderedQuestionIds({
+      renderedIds: this.getCurrentRenderedQuestionIds(),
+    });
   };
 
   resolveQuestionSlugMapForIds = (questionIds = [], opts = {}) => {
