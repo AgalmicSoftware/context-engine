@@ -262,6 +262,23 @@ type ApplyPriorResponseFetchSuccessEffectsArgs = {
   triggerRehydrate?: (() => void) | null;
 };
 
+type ApplyLocalCacheRehydrateMissEffectsArgs = {
+  clearHydrationSignature?: (() => void) | null;
+  ensurePriorResponses?: (() => void) | null;
+  callback?: (() => void) | null;
+};
+
+type ApplyLocalCacheRehydrateNoChangeEffectsArgs = {
+  ensurePriorResponses?: (() => void) | null;
+  callback?: (() => void) | null;
+};
+
+type ApplyLocalCacheRehydrateSuccessEffectsArgs = {
+  updates?: UnknownRecord | null;
+  applyStateUpdates?: ((updates: UnknownRecord, callback?: () => void) => void) | null;
+  afterStateApplied?: (() => void) | null;
+};
+
 type BuildGroupedRenderedResponseScopePlanArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   slugByQuestionId?: Map<string, unknown> | null;
@@ -1319,6 +1336,51 @@ export const applyPriorResponseFetchSuccessEffects = ({
   if (typeof triggerRehydrate === 'function') {
     triggerRehydrate();
   }
+  return true;
+};
+
+export const applyLocalCacheRehydrateMissEffects = ({
+  clearHydrationSignature = null,
+  ensurePriorResponses = null,
+  callback = null,
+}: ApplyLocalCacheRehydrateMissEffectsArgs = {}) => {
+  if (typeof clearHydrationSignature === 'function') {
+    clearHydrationSignature();
+  }
+  if (typeof ensurePriorResponses === 'function') {
+    ensurePriorResponses();
+  }
+  if (typeof callback === 'function') {
+    callback();
+  }
+};
+
+export const applyLocalCacheRehydrateNoChangeEffects = ({
+  ensurePriorResponses = null,
+  callback = null,
+}: ApplyLocalCacheRehydrateNoChangeEffectsArgs = {}) => {
+  if (typeof ensurePriorResponses === 'function') {
+    ensurePriorResponses();
+  }
+  if (typeof callback === 'function') {
+    callback();
+  }
+};
+
+export const applyLocalCacheRehydrateSuccessEffects = ({
+  updates = null,
+  applyStateUpdates = null,
+  afterStateApplied = null,
+}: ApplyLocalCacheRehydrateSuccessEffectsArgs = {}) => {
+  if (!updates || typeof updates !== 'object' || typeof applyStateUpdates !== 'function') {
+    return false;
+  }
+
+  applyStateUpdates(updates, () => {
+    if (typeof afterStateApplied === 'function') {
+      afterStateApplied();
+    }
+  });
   return true;
 };
 

@@ -256,6 +256,9 @@ import {
   buildPrefilledSingleQuestionState,
   buildPrefilledSurveyState,
   buildQuestionSlugMapForIds,
+  applyLocalCacheRehydrateMissEffects,
+  applyLocalCacheRehydrateNoChangeEffects,
+  applyLocalCacheRehydrateSuccessEffects,
   buildRevertedResponseSlice,
   buildSubmissionGroupContext,
   buildSurveyResponseStateArray,
@@ -5651,10 +5654,14 @@ export class SurveyQuestions extends Component {
       const cacheSlice = await this.buildSliceFromLocalCache();
       DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] built cache slice:', { cacheSlice });
       if (!cacheSlice) {
-        // Keep retries available when backfill fails transiently under the same signature.
-        this._rehydrateLocalCacheLastSig = '';
-        void this.ensurePriorResponsesForRenderedIds();
-        if (callback) callback();
+        applyLocalCacheRehydrateMissEffects({
+          clearHydrationSignature: () => {
+            // Keep retries available when backfill fails transiently under the same signature.
+            this._rehydrateLocalCacheLastSig = '';
+          },
+          ensurePriorResponses: () => { void this.ensurePriorResponsesForRenderedIds(); },
+          callback,
+        });
         return;
       }
       this._rehydrateLocalCacheLastSig = hydrationSig;
@@ -5689,17 +5696,23 @@ export class SurveyQuestions extends Component {
 
       if (!changed && !baselineChanged) {
         DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] No changes to apply.');
-        void this.ensurePriorResponsesForRenderedIds();
-        if (callback) callback();
+        applyLocalCacheRehydrateNoChangeEffects({
+          ensurePriorResponses: () => { void this.ensurePriorResponsesForRenderedIds(); },
+          callback,
+        });
         return;
       }
 
-      this.setState(updates, () => {
-        this.updateJsonPreview && this.updateJsonPreview();
-        // Recalculate immediately to ensure 'Submit (X)' is accurate immediately
-        this.recalculateEditStats && this.recalculateEditStats();
-        void this.ensurePriorResponsesForRenderedIds();
-        if (callback) callback();
+      applyLocalCacheRehydrateSuccessEffects({
+        updates,
+        applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
+        afterStateApplied: () => {
+          this.updateJsonPreview && this.updateJsonPreview();
+          // Recalculate immediately to ensure 'Submit (X)' is accurate immediately
+          this.recalculateEditStats && this.recalculateEditStats();
+          void this.ensurePriorResponsesForRenderedIds();
+          if (callback) callback();
+        },
       });
     } catch (e) {
       this._rehydrateLocalCacheLastSig = '';
