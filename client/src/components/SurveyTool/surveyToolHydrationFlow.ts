@@ -210,6 +210,17 @@ type BuildDraftHydrationUpdatePlanArgs = BuildDraftHydrationStateArgs & {
   surveyIndex?: unknown;
 };
 
+type BuildDraftHydrationRunPlanArgs = BuildDraftHydrationUpdatePlanArgs & {
+  hydrationQuestionIds?: Iterable<unknown> | unknown[];
+  pileQuestions?: unknown[] | null;
+  forceOverwrite?: boolean;
+  isDirty?: boolean;
+  modifiedCount?: unknown;
+  pendingStats?: UnknownRecord | null;
+  submittedSinceLastEdit?: boolean;
+  submissionComplete?: boolean;
+};
+
 type BuildDraftHydrationRenderedQuestionIdsArgs = {
   hydrationQuestionIds?: Iterable<unknown> | unknown[];
   pileQuestions?: unknown[] | null;
@@ -1311,6 +1322,43 @@ export const buildDraftHydrationOverwriteDecision = ({
       pendingTotal,
       submittedStateActive,
     }),
+  };
+};
+
+export const buildDraftHydrationRunPlan = ({
+  hydrationQuestionIds = [],
+  pileQuestions = null,
+  forceOverwrite = false,
+  isDirty = false,
+  modifiedCount = 0,
+  pendingStats = null,
+  submittedSinceLastEdit = false,
+  submissionComplete = false,
+  ...draftUpdatePlanArgs
+}: BuildDraftHydrationRunPlanArgs = {}) => {
+  const renderedQuestionIds = buildDraftHydrationRenderedQuestionIds({
+    hydrationQuestionIds,
+    pileQuestions,
+    forceOverwrite,
+  });
+  const { allowOverwrite } = buildDraftHydrationOverwriteDecision({
+    forceOverwrite,
+    isDirty,
+    modifiedCount,
+    pendingStats,
+    submittedSinceLastEdit,
+    submissionComplete,
+  });
+  const updatePlan = buildDraftHydrationUpdatePlan({
+    ...draftUpdatePlanArgs,
+    renderedQuestionIds,
+    allowOverwrite,
+  });
+
+  return {
+    renderedQuestionIds,
+    allowOverwrite,
+    ...updatePlan,
   };
 };
 

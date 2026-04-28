@@ -220,8 +220,7 @@ import {
   buildQuestionScanProgressDisplay,
   buildDraftAnswersByQuestionId,
   buildDraftHydrationPatchForQuestion,
-  buildDraftHydrationRenderedQuestionIds,
-  buildDraftHydrationOverwriteDecision,
+  buildDraftHydrationRunPlan,
   buildCacheHydrationSlice,
   buildDraftHydrationUpdatePlan,
   buildDraftAwareCacheHydrationState,
@@ -5280,39 +5279,31 @@ export class SurveyQuestions extends Component {
           additionalComments: {}
         };
 
-      const renderedQuestionIds = buildDraftHydrationRenderedQuestionIds({
-        hydrationQuestionIds: this.getHydrationQuestionIds(),
-        pileQuestions: this.state?.pileQuestions,
-        forceOverwrite,
-      });
-      if (renderedQuestionIds.length === 0) return;
-
       const pendingStats =
         (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) ||
         { total: this.state.modifiedCount || 0 };
-      const { allowOverwrite } = buildDraftHydrationOverwriteDecision({
+      const {
+        renderedQuestionIds,
+        updates,
+      } = buildDraftHydrationRunPlan({
+        hydrationQuestionIds: this.getHydrationQuestionIds(),
+        pileQuestions: this.state?.pileQuestions,
         forceOverwrite,
         isDirty: this.state.isDirty,
         modifiedCount: this.state.modifiedCount,
         pendingStats,
         submittedSinceLastEdit: this.state.submittedSinceLastEdit,
         submissionComplete: this.state.submissionComplete,
-      });
-
-      const {
-        updates,
-      } = buildDraftHydrationUpdatePlan({
         prevSurveysResponseState: this.state.surveysResponseState,
         surveyIndex,
-        renderedQuestionIds,
         draft,
         prevSlice,
         prevBaseline: this.state.editBaseline,
-        allowOverwrite,
         cloneBaseline: this.deepClone,
         applyDraftEntryToSlice: this._applyDraftHydrationEntryToSlice,
       });
 
+      if (renderedQuestionIds.length === 0) return;
       if (Object.keys(updates).length === 0) return;
 
       this.setState(updates, () => {
