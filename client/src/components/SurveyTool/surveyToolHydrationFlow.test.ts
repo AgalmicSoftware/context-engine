@@ -29,6 +29,9 @@ import {
   applyLocalCacheRehydrateAppliedEffects,
   applyLocalCacheRehydrateSuccessEffects,
   applyPrefillStateEffects,
+  applyResetFormStateEffects,
+  applyRevertPendingEffects,
+  applyStartFreshEffects,
   applyPriorResponseFetchSuccessEffects,
   buildGroupedRenderedResponseScopePlan,
   buildLocalCacheHydrationSignature,
@@ -1827,6 +1830,38 @@ describe('surveyToolHydrationFlow', () => {
     expect(recalculateEditStats).toHaveBeenCalledTimes(1);
     expect(ensurePriorResponses).toHaveBeenCalledTimes(1);
     expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies reset, revert, and start-fresh follow-up effects', () => {
+    const callback = jest.fn();
+    const clearDraft = jest.fn();
+    const recalculateEditStats = jest.fn();
+    const updateJsonPreview = jest.fn();
+    const clearDraftFor = jest.fn();
+    const persistDraftSafely = jest.fn();
+
+    applyResetFormStateEffects({ callback });
+    expect(callback).toHaveBeenCalledTimes(1);
+
+    applyRevertPendingEffects({
+      clearDraft,
+      recalculateEditStats,
+      updateJsonPreview,
+    });
+    expect(clearDraft).toHaveBeenCalledTimes(1);
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+
+    applyStartFreshEffects({
+      renderedQuestionIds: ['q1', 'q2'],
+      clearDraftFor,
+      recalculateEditStats,
+      persistDraftSafely,
+    });
+    expect(clearDraftFor).toHaveBeenNthCalledWith(1, 'q1');
+    expect(clearDraftFor).toHaveBeenNthCalledWith(2, 'q2');
+    expect(recalculateEditStats).toHaveBeenCalledTimes(2);
+    expect(persistDraftSafely).toHaveBeenCalledWith(0);
   });
 
   it('executes grouped prior-response fetch plans in normalized order', async () => {
