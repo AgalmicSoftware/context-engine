@@ -180,6 +180,37 @@ type BuildPrefilledSurveyUpdatePlanArgs = BuildPrefilledSurveyStateArgs;
 
 type BuildPrefilledSingleQuestionUpdatePlanArgs = BuildPrefilledSingleQuestionStateArgs;
 
+type ShouldBackfillPriorResponsesArgs = {
+  loginComplete?: boolean;
+  account?: unknown;
+  displayAnswerMode?: boolean;
+  viewAddress?: unknown;
+  singleQuestionMode?: boolean;
+  responderAddress?: unknown;
+  hasRefreshQuestionResponses?: boolean;
+  submissionComplete?: boolean;
+  isSubmitting?: boolean;
+};
+
+type MissingRenderedResponseRequest = {
+  slug?: unknown;
+  netId?: unknown;
+  missingIds?: unknown[] | null;
+};
+
+type MissingRenderedResponseInfo = {
+  requests?: MissingRenderedResponseRequest[] | null;
+  slug?: unknown;
+  netId?: unknown;
+  missingIds?: unknown[] | null;
+};
+
+type BuildPriorResponseFetchPlanArgs = {
+  missingInfo?: MissingRenderedResponseInfo | null;
+  responderLower?: string;
+  attemptedKeys?: Set<string> | null;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -966,6 +997,75 @@ export const buildPrefilledSingleQuestionUpdatePlan = ({
       surveysResponseState: nextSurveysResponseState,
       ...(shouldWriteBaseline ? { editBaseline: nextBaseline } : {}),
     },
+  };
+};
+
+export const shouldBackfillPriorResponses = ({
+  loginComplete = false,
+  account = '',
+  displayAnswerMode = false,
+  viewAddress = '',
+  singleQuestionMode = false,
+  responderAddress = '',
+  hasRefreshQuestionResponses = false,
+  submissionComplete = false,
+  isSubmitting = false,
+}: ShouldBackfillPriorResponsesArgs = {}): boolean => {
+  const accountLower = String(account || '').trim().toLowerCase();
+  const viewingOtherSurveyResponder =
+    !!displayAnswerMode &&
+    !!viewAddress &&
+    String(viewAddress || '').trim().toLowerCase() !== accountLower;
+  const viewingOtherQuestionResponder =
+    !!singleQuestionMode &&
+    !!responderAddress &&
+    String(responderAddress || '').trim().toLowerCase() !== accountLower;
+
+  return !!(
+    loginComplete &&
+    accountLower &&
+    !viewingOtherSurveyResponder &&
+    !viewingOtherQuestionResponder &&
+    hasRefreshQuestionResponses &&
+    !submissionComplete &&
+    !isSubmitting
+  );
+};
+
+export const buildPriorResponseFetchPlan = ({
+  missingInfo = null,
+  responderLower = '',
+  attemptedKeys = null,
+}: BuildPriorResponseFetchPlanArgs = {}) => {
+  const groupedRequests = Array.isArray(missingInfo?.requests) && missingInfo.requests.length > 0
+    ? missingInfo.requests
+    : [{
+      slug: String(missingInfo?.slug || ''),
+      netId: String(missingInfo?.netId || ''),
+      missingIds: Array.isArray(missingInfo?.missingIds) ? missingInfo.missingIds : [],
+    }];
+
+  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  const attempted = attemptedKeys instanceof Set ? attemptedKeys : new Set<string>();
+  const requestsToFetch = groupedRequests
+    .map((entry) => {
+      const requestSlug = String(entry?.slug || '');
+      const requestIds = Array.isArray(entry?.missingIds) ? entry.missingIds : [];
+      const idsToFetch = requestIds
+        .map((qid) => normalizeQuestionIdKey(qid))
+        .filter((qid) => qid && !attempted.has(`${requestSlug}|${normalizedResponder}|${qid}`));
+      return {
+        slug: requestSlug,
+        idsToFetch,
+      };
+    })
+    .filter((entry) => entry.idsToFetch.length > 0);
+
+  return {
+    requestsToFetch,
+    attemptedKeysToMark: requestsToFetch.flatMap((entry) => (
+      entry.idsToFetch.map((qid) => `${entry.slug}|${normalizedResponder}|${qid}`)
+    )),
   };
 };
 
