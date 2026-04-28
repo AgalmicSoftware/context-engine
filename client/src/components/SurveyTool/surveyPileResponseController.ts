@@ -25,16 +25,7 @@ type ApplyCachedResponseEntryToSlice = ({
   response: Record<string, unknown>;
 }) => boolean;
 
-type PileControllerState = Record<string, unknown> & {
-  pileQuestions?: unknown;
-  activePileIndex?: unknown;
-  surveysResponseState?: Array<Partial<PileResponseSlice> | null | undefined>;
-  editBaseline?: Partial<PileResponseSlice> | null;
-};
-type SetStateUpdate =
-  | Record<string, unknown>
-  | null
-  | ((prevState: PileControllerState) => Record<string, unknown> | null);
+type SetStateUpdate = Record<string, unknown> | null | ((prevState: any) => Record<string, unknown> | null);
 type SetState = (update: SetStateUpdate, callback?: () => void) => unknown;
 
 const EMPTY_PILE_RESPONSE_SLICE = (): PileResponseSlice => ({
@@ -154,17 +145,6 @@ export const buildPileCachePrefillStatePlan = ({
   };
 };
 
-export const buildPileInitializeResponseStatePatch = ({
-  cloneValue = defaultCloneValue,
-  initialSlice = EMPTY_PILE_RESPONSE_SLICE(),
-}: {
-  cloneValue?: CloneValue;
-  initialSlice?: Partial<PileResponseSlice> | null;
-} = {}) => ({
-  surveysResponseState: [initialSlice],
-  editBaseline: normalizeResponseSlice(initialSlice, cloneValue),
-});
-
 export const executePileInitializeResponseState = ({
   isDirty = false,
   modifiedCount = 0,
@@ -207,7 +187,10 @@ export const executePileInitializeResponseState = ({
 
   setLastInitializeResponseSig(initializePlan.nextInitializeResponseSig);
   const initialSlice = initializePlan.initialSlice || EMPTY_PILE_RESPONSE_SLICE();
-  setState(buildPileInitializeResponseStatePatch({ cloneValue, initialSlice }), onComplete);
+  setState({
+    surveysResponseState: [initialSlice],
+    editBaseline: normalizeResponseSlice(initialSlice, cloneValue),
+  }, onComplete);
   return initializePlan;
 };
 
@@ -218,7 +201,7 @@ export const executeEnsureVisiblePileResponseState = ({
   onRehydrateVisibleWindow = () => {},
   onError = () => {},
 }: {
-  getState?: () => PileControllerState;
+  getState?: () => any;
   buildEmptyResponseFieldState?: BuildEmptyResponseFieldState;
   setState?: SetState;
   onRehydrateVisibleWindow?: () => void;

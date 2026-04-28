@@ -22,12 +22,11 @@ import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faUnlock, faCaretUp, faArrowLeft, faArrowRight, faExternalLinkAlt, faExclamationCircle, faMicrophone, faComment } from '@fortawesome/free-solid-svg-icons';
+import { faLock, faUnlock, faCaretUp, faArrowLeft, faArrowRight, faExternalLinkAlt, faExclamationCircle, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
-import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
@@ -57,10 +56,15 @@ import {
   renderPileCardShell,
   renderPileGatedPromptCard,
 } from './surveyPileActiveQuestionCard';
+import {
+  renderPileAdditionalEditorRow as renderPileAdditionalEditorRowHelper,
+  renderPileCommentsSection as renderPileCommentsSectionHelper,
+  renderPileQuestionIcons as renderPileQuestionIconsHelper,
+  renderPileFooterSection as renderPileFooterSectionHelper,
+} from './surveyPileQuestionSections';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
   isPileCacheConsistentWithBaseline,
-  shouldSeedPileBaselineFromPrefill,
 } from './surveyPileCacheSync';
 import {
   buildPileComponentUpdatePlan,
@@ -68,9 +72,6 @@ import {
   buildPileQuestionProgressSignals,
   pickScopedPileQuestionProgress,
 } from './surveyPileLifecycle';
-import {
-  buildPileQuestionSetHydrationPlan,
-} from './surveyPileHydrationPlan';
 import {
   buildPileEmptyProbePlan,
   buildPileLoadFailureState,
@@ -87,9 +88,11 @@ import {
   splitPileMaskedQuestions,
 } from './surveyPileQuestionFlow';
 import {
-  buildEnsureVisiblePileResponseStatePlan,
-  buildInitializePileResponseStatePlan,
-} from './surveyPileResponseWindow';
+  buildPileCachePrefillStatePlan,
+  executeEnsureVisiblePileResponseState,
+  executePileInitializeResponseState,
+  executePileQuestionSetHydration,
+} from './surveyPileResponseController';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildTransientSubmitFeedbackState,
@@ -358,12 +361,10 @@ import {
   formatQuestionScanBlockCount,
   getActiveSessionSlugFromProps,
   getBlockedQuestionIdsSet,
-  getConvictionFromResponse,
   getConvictionFromSlice,
   getConvictionFromSliceStrict,
   getExtraQuestionReadSlugs,
   getHighlightedQuestionIdsSet,
-  getImportanceFromResponse,
   getImportanceFromSlice,
   getNormalizedUiRatingValue,
   getPendingStatsSnapshotFromState,
@@ -1363,137 +1364,26 @@ export class PileViewMode extends SurveyQuestions {
       mergeQuestionResponses(qRespMap, net?.questionResponses || {});
     });
 
-    const currentSlice = this.state.surveysResponseState?.[0] || {
-      answers: {},
-      importance: {},
-      conviction: {},
-      additionalComments: {},
-    };
-    const nextSlice = {
-      answers: { ...(currentSlice.answers || {}) },
-      importance: { ...(currentSlice.importance || {}) },
-      conviction: { ...(currentSlice.conviction || {}) },
-      additionalComments: { ...(currentSlice.additionalComments || {}) },
-    };
-
-    const toArray = (v) => (Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : []));
-    const toNumber = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
-    const toBinaryCanonical = (v) => {
-      if (typeof v !== 'string') return v;
-      const low = v.toLowerCase();
-      if (low === 'agree') return 'Agree';
-      if (low === 'unsure') return 'Unsure';
-      if (low === 'disagree') return 'Disagree';
-      return v;
-    };
-
-    let changed = false;
-
-    this.state.pileQuestions.forEach((q) => {
-      const qid = q?.id;
-      const qidLower = (qid || '').toLowerCase();
-      if (!qid) return;
-
-      const raw = qRespMap[qidLower]?.[acctLower];
-      if (!raw) return;
-
-      let respObj = null;
-      try { respObj = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { respObj = null; }
-      if (!respObj) return;
-
-      // Prefill answer
-      if (respObj.answer) {
-        let val = this.parseAnswerValue(respObj.answer.value);
-        if (!respObj.answer.encrypted) {
-          if (q.type === 'multichoice') val = toArray(val);
-          if (q.type === 'rating') val = toNumber(val);
-          if (q.type === 'binary') val = toBinaryCanonical(val);
-        }
-
-        nextSlice.answers[qid] = {
-          ...(nextSlice.answers[qid] || {}),
-          value: val,
-          encrypted: !!respObj.answer.encrypted,
-          encryptionAudience: this.resolveFieldEncryptionAudience(nextSlice.answers[qid] || {}, qid, 'answer'),
-          encryptionGateId: respObj.answer.encrypted
-            ? this.resolveFieldEncryptionGateId(respObj.answer || {}, qid, 'answer')
-            : null,
-          audienceMode: 'explicit',
-          hash: respObj.answer.hash || '',
-          encryptedPortion: respObj.answer.encryptedPortion || '',
-        };
-        changed = true;
-      }
-
-      // Prefill conviction/importance
-      const convictionValue = getConvictionFromResponse(respObj);
-      if (convictionValue !== null) {
-        nextSlice.conviction[qid] = convictionValue;
-        changed = true;
-      }
-      const importanceValue = getImportanceFromResponse(respObj);
-      if (importanceValue !== null) {
-        nextSlice.importance[qid] = importanceValue;
-        changed = true;
-      }
-
-      // Prefill additional comments
-      if (respObj.additional) {
-        const addVal = this.parseAnswerValue(respObj.additional.value);
-        let nextAdditional = {
-          ...(nextSlice.additionalComments[qid] || {}),
-          value: addVal,
-          encrypted: !!respObj.additional.encrypted,
-          encryptionAudience: this.resolveFieldEncryptionAudience(nextSlice.additionalComments[qid] || {}, qid, 'additional'),
-          encryptionGateId: respObj.additional.encrypted
-            ? this.resolveFieldEncryptionGateId(respObj.additional || {}, qid, 'additional')
-            : null,
-          audienceMode: this.normalizeFieldAudienceMode(
-            respObj.additional?.audienceMode,
-            'additional',
-            respObj.additional || {}
-          ),
-          hash: respObj.additional.hash || '',
-          encryptedPortion: respObj.additional.encryptedPortion || '',
-        };
-        if (
-          this.normalizeFieldAudienceMode(
-            respObj.additional?.audienceMode,
-            'additional',
-            respObj.additional || {}
-          ) === 'inherit'
-        ) {
-          nextAdditional = this.buildInheritedAdditionalFieldState(nextAdditional, nextSlice.answers[qid] || {}, qid);
-        }
-        nextSlice.additionalComments[qid] = nextAdditional;
-        changed = true;
-      }
+    const pendingStats = (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) || { total: this.state.modifiedCount || 0 };
+    const prefillPlan = buildPileCachePrefillStatePlan({
+      pileQuestions: this.state.pileQuestions,
+      questionResponsesByQuestionId: qRespMap,
+      account: acctLower,
+      currentSlice: this.state.surveysResponseState?.[0],
+      editBaseline: this.state.editBaseline,
+      pendingTotal: pendingStats.total,
+      cloneValue: this.deepClone,
+      applyCachedResponseEntryToSlice: ({ targetSlice, questionId, response }) => (
+        this._applyCachedResponseEntryToSlice({
+          targetSlice,
+          questionId,
+          response,
+          parseValue: this.parseAnswerValue,
+        })
+      ),
     });
 
-    const setBaselineFrom = (slice) => {
-      this.setState(
-        {
-          surveysResponseState: [slice],
-          baselineResponses: this.deepClone(slice),
-          editBaseline: this.deepClone(slice),
-          modifiedCount: 0,
-          isDirty: false,
-        },
-        () => this.updateJsonPreview()
-      );
-    };
-
-    const pendingStats = (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) || { total: this.state.modifiedCount || 0 };
-
-    if (!shouldSeedPileBaselineFromPrefill({
-      editBaseline: this.state.editBaseline,
-      currentSlice,
-      pendingTotal: pendingStats.total,
-    })) {
-      this.setState({ surveysResponseState: [nextSlice] }, () => this.updateJsonPreview());
-    } else {
-      setBaselineFrom(nextSlice);
-    }
+    this.setState(prefillPlan.nextState, () => this.updateJsonPreview());
   };
 
 
@@ -1781,8 +1671,7 @@ export class PileViewMode extends SurveyQuestions {
     autoDecryptReason = 'pile-hydration',
     autoDecryptResetReason = 'pile-hydration-reset',
   } = {}) => {
-    if (this.shouldAbortPileHydrationRequest(requestEpoch)) return;
-    const hydrationPlan = buildPileQuestionSetHydrationPlan({
+    executePileQuestionSetHydration({
       requestEpoch,
       resultSignature,
       lastResultSignature: this._lastLoadAndSortResultSignature,
@@ -1791,89 +1680,57 @@ export class PileViewMode extends SurveyQuestions {
       resetAutoDecryptLedger,
       autoDecryptReason,
       autoDecryptResetReason,
+      shouldAbortRequest: (nextRequestEpoch) => this.shouldAbortPileHydrationRequest(nextRequestEpoch),
+      setLastResultSignature: (nextResultSignature) => {
+        this._lastLoadAndSortResultSignature = nextResultSignature;
+      },
+      initializeResponseState: (callback) => this.initializeResponseState(callback),
+      rehydrateVisiblePileWindow: (options) => this.rehydrateVisiblePileWindow(options),
+      onNoop: () => {
+        bumpSurveyPerfCounter('noopSkipCount');
+      },
     });
-
-    if (hydrationPlan.shouldSkipDuplicateSignature) {
-      bumpSurveyPerfCounter('noopSkipCount');
-      return;
-    }
-    if (hydrationPlan.shouldUpdateResultSignature) {
-      this._lastLoadAndSortResultSignature = hydrationPlan.nextResultSignature;
-    }
-
-    const continueHydration = () => {
-      this.rehydrateVisiblePileWindow(hydrationPlan.rehydrateOptions);
-    };
-
-    if (!hydrationPlan.shouldInitializeResponses) {
-      continueHydration();
-      return;
-    }
-
-    this.initializeResponseState(continueHydration);
   };
 
 
 
   initializeResponseState = (cb) => {
-    const initializePlan = buildInitializePileResponseStatePlan({
+    executePileInitializeResponseState({
       isDirty: this.state.isDirty,
       modifiedCount: this.state.modifiedCount,
       pileQuestions: this.state.pileQuestions,
       activePileIndex: this.state.activePileIndex,
       lastInitializeResponseSig: this._lastInitializeResponseSig,
       buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
-    });
-
-    if (initializePlan.shouldSkip) {
-      bumpSurveyPerfCounter('noopSkipCount');
-      if (typeof cb === 'function') cb();
-      return;
-    }
-
-    this._lastInitializeResponseSig = initializePlan.nextInitializeResponseSig;
-    const initial = initializePlan.initialSlice || {
-      answers: {},
-      importance: {},
-      conviction: {},
-      additionalComments: {},
-    };
-
-    this.setState({
-      surveysResponseState: [initial],
-      editBaseline: this.deepClone(initial)
-    }, () => {
-      if (typeof cb === 'function') cb();
+      setLastInitializeResponseSig: (nextInitializeResponseSig) => {
+        this._lastInitializeResponseSig = nextInitializeResponseSig;
+      },
+      cloneValue: this.deepClone,
+      setState: this.setState.bind(this),
+      onComplete: () => {
+        if (typeof cb === 'function') cb();
+      },
+      onNoop: () => {
+        bumpSurveyPerfCounter('noopSkipCount');
+      },
     });
   };
 
   ensureVisiblePileResponseState = () => {
-    try {
-      let shouldRehydrateVisibleWindow = false;
-      this.setState(
-        (prev) => {
-          const ensurePlan = buildEnsureVisiblePileResponseStatePlan({
-            pileQuestions: prev.pileQuestions,
-            activePileIndex: prev.activePileIndex,
-            currentSlice: prev.surveysResponseState?.[0],
-            currentBaseline: prev.editBaseline,
-            buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
-          });
-          if (ensurePlan.shouldSkip) return null;
-          shouldRehydrateVisibleWindow = true;
-          return ensurePlan.updates;
-        },
-        () => {
-          if (!shouldRehydrateVisibleWindow) return;
-          this.rehydrateVisiblePileWindow({
-            forceOverwriteDraft: false,
-            resetAutoDecryptLedger: false,
-          });
-        }
-      );
-    } catch (_) {
-      surveyLog.error('ensureVisiblePileResponseState failed:', _);
-    }
+    executeEnsureVisiblePileResponseState({
+      getState: () => this.state,
+      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
+      setState: this.setState.bind(this),
+      onRehydrateVisibleWindow: () => {
+        this.rehydrateVisiblePileWindow({
+          forceOverwriteDraft: false,
+          resetAutoDecryptLedger: false,
+        });
+      },
+      onError: (error) => {
+        surveyLog.error('ensureVisiblePileResponseState failed:', error);
+      },
+    });
   };
 
 
@@ -2308,24 +2165,20 @@ export class PileViewMode extends SurveyQuestions {
     questionId,
     additional,
     glowAdditional,
-  }) => (
-    <div className={styles.pileAdditionalEditor}>
-      <AdditionalCommentsInlineRow
-        input={this.renderPileAdditionalInput({
-          questionId,
-          additional,
-          glowAdditional,
-        })}
-        lockControl={this.renderQuestionAdditionalLockControl({
-          surveyIndex: 0,
-          questionId,
-          additional,
-          glowAdditional,
-          visualContext: 'pile',
-        })}
-      />
-    </div>
-  );
+  }) => renderPileAdditionalEditorRowHelper({
+    input: this.renderPileAdditionalInput({
+      questionId,
+      additional,
+      glowAdditional,
+    }),
+    lockControl: this.renderQuestionAdditionalLockControl({
+      surveyIndex: 0,
+      questionId,
+      additional,
+      glowAdditional,
+      visualContext: 'pile',
+    }),
+  });
 
   renderPileCommentsSection = ({
     questionId,
@@ -2336,31 +2189,24 @@ export class PileViewMode extends SurveyQuestions {
     allowDecryptAdditional,
     decryptTooltip,
     isAdditionalDecrypting,
-  }) => {
-    if (!showComments) return null;
-
-    return (
-      <div className={styles.pileCommentsRow}>
-        {maskedAdditional ? (
-          this.renderQuestionFieldDecryptControl({
-            questionId,
-            fieldKey: 'additional',
-            allowDecrypt: allowDecryptAdditional,
-            decryptTooltip,
-            actionLabel: 'Decrypt Comments',
-            busy: isAdditionalDecrypting,
-            showBusySpinnerWhenAutoDecryptEnabled: true,
-          })
-        ) : (
-          this.renderPileAdditionalEditorRow({
-            questionId,
-            additional,
-            glowAdditional,
-          })
-        )}
-      </div>
-    );
-  };
+  }) => renderPileCommentsSectionHelper({
+    showComments,
+    maskedAdditional,
+    decryptAdditionalControl: this.renderQuestionFieldDecryptControl({
+      questionId,
+      fieldKey: 'additional',
+      allowDecrypt: allowDecryptAdditional,
+      decryptTooltip,
+      actionLabel: 'Decrypt Comments',
+      busy: isAdditionalDecrypting,
+      showBusySpinnerWhenAutoDecryptEnabled: true,
+    }),
+    additionalEditorRow: this.renderPileAdditionalEditorRow({
+      questionId,
+      additional,
+      glowAdditional,
+    }),
+  });
 
   renderPileQuestionIcons = ({
     questionId,
@@ -2368,30 +2214,22 @@ export class PileViewMode extends SurveyQuestions {
     glowAnswer,
     maskedAnswer,
     hasAdditionalContent,
-  }) => (
-    <div className={styles.pileCardIcons}>
-      <button
-        className={`${styles.iconButton} ${styles.commentButton} ${hasAdditionalContent ? styles.iconButtonActive : ''}`}
-        onClick={() => this.toggleComments(questionId)}
-        data-testid={E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE}
-        data-ce-question-id={String(questionId || '').trim().toLowerCase()}
-      >
-        <FontAwesomeIcon icon={faComment} className={hasAdditionalContent ? styles.iconGlow : undefined} />
-      </button>
-
-      {this.renderQuestionAnswerLockControl({
-        surveyIndex: 0,
-        questionId,
-        answer,
-        glowAnswer,
-        ...this.getAnswerLockDisplayState({
-          field: answer,
-          masked: maskedAnswer,
-        }),
-        visualContext: 'pile',
-      })}
-    </div>
-  );
+  }) => renderPileQuestionIconsHelper({
+    questionId,
+    hasAdditionalContent,
+    onToggleComments: () => this.toggleComments(questionId),
+    answerLockControl: this.renderQuestionAnswerLockControl({
+      surveyIndex: 0,
+      questionId,
+      answer,
+      glowAnswer,
+      ...this.getAnswerLockDisplayState({
+        field: answer,
+        masked: maskedAnswer,
+      }),
+      visualContext: 'pile',
+    }),
+  });
 
   renderPileFooterSection = ({
     question,
@@ -2412,39 +2250,34 @@ export class PileViewMode extends SurveyQuestions {
     allowDecryptAdditional,
     decryptTooltip,
     isAdditionalDecrypting,
-  }) => (
-    <div className={styles.pileCardFooter}>
-      <div className={styles.pileControlsRow}>
-        {this.renderPileSliderSection({
-          questionId: question.id,
-          showSlider,
-          convictionValue,
-          importanceValue,
-          activeSliderValue,
-          sliderMode,
-          hasConvictionImportanceValue,
-        })}
-        {this.renderPileQuestionIcons({
-          questionId: question.id,
-          answer,
-          glowAnswer,
-          maskedAnswer,
-          hasAdditionalContent,
-        })}
-      </div>
-
-      {this.renderPileCommentsSection({
-        questionId: question.id,
-        showComments,
-        additional,
-        glowAdditional,
-        maskedAdditional,
-        allowDecryptAdditional,
-        decryptTooltip,
-        isAdditionalDecrypting,
-      })}
-    </div>
-  );
+  }) => renderPileFooterSectionHelper({
+    sliderSection: this.renderPileSliderSection({
+      questionId: question.id,
+      showSlider,
+      convictionValue,
+      importanceValue,
+      activeSliderValue,
+      sliderMode,
+      hasConvictionImportanceValue,
+    }),
+    questionIcons: this.renderPileQuestionIcons({
+      questionId: question.id,
+      answer,
+      glowAnswer,
+      maskedAnswer,
+      hasAdditionalContent,
+    }),
+    commentsSection: this.renderPileCommentsSection({
+      questionId: question.id,
+      showComments,
+      additional,
+      glowAdditional,
+      maskedAdditional,
+      allowDecryptAdditional,
+      decryptTooltip,
+      isAdditionalDecrypting,
+    }),
+  });
 
   renderPileCardShell = ({
     question,
