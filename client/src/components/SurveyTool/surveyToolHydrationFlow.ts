@@ -236,6 +236,13 @@ type ClearPriorResponseAttemptedKeysArgs = {
   attemptedKeys?: unknown[] | null;
 };
 
+type ApplyPriorResponseFetchSuccessEffectsArgs = {
+  fetched?: boolean;
+  isMounted?: boolean;
+  resetLocalCacheMemo?: (() => void) | null;
+  triggerRehydrate?: (() => void) | null;
+};
+
 type BuildGroupedRenderedResponseScopePlanArgs = {
   renderedIds?: Iterable<unknown> | unknown[];
   slugByQuestionId?: Map<string, unknown> | null;
@@ -1199,6 +1206,22 @@ export const clearPriorResponseAttemptedKeys = ({
     if (!key) return;
     attemptedSet.delete(key);
   });
+};
+
+export const applyPriorResponseFetchSuccessEffects = ({
+  fetched = false,
+  isMounted = false,
+  resetLocalCacheMemo = null,
+  triggerRehydrate = null,
+} : ApplyPriorResponseFetchSuccessEffectsArgs = {}) => {
+  if (!fetched || !isMounted) return false;
+  if (typeof resetLocalCacheMemo === 'function') {
+    resetLocalCacheMemo();
+  }
+  if (typeof triggerRehydrate === 'function') {
+    triggerRehydrate();
+  }
+  return true;
 };
 
 export const executePriorResponseFetchPlan = async ({
