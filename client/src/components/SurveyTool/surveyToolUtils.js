@@ -148,6 +148,7 @@ export {
   trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
   loadMissingRenderedResponseInfo,
+  resolveMissingRenderedResponseLookup,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   buildQuestionSlugMapForIds,

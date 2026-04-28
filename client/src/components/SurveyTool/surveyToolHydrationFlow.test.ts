@@ -46,6 +46,7 @@ import {
   trackPriorResponseAttemptedKeys,
   buildMissingRenderedResponseResult,
   loadMissingRenderedResponseInfo,
+  resolveMissingRenderedResponseLookup,
   buildMissingResponseIdsForRenderedQuestions,
   buildNormalizedRenderedQuestionIds,
   buildPriorResponseFetchPlan,
@@ -2082,6 +2083,51 @@ describe('surveyToolHydrationFlow', () => {
         { slug: 'beta', netId: '84532', missingIds: ['q2'] },
       ],
     });
+  });
+
+  it('resolves missing rendered response lookup contexts before loading cache data', async () => {
+    const readQuestionsCacheAsync = jest.fn(async () => ({
+      '84532': {
+        questionResponses: {},
+      },
+    }));
+    const ensureQuestionsNet = jest.fn((cache) => cache);
+    const resolveResponseHydrationContext = jest.fn((rawSlug) => ({
+      sessionSlug: rawSlug,
+      networkIdStr: '84532',
+    }));
+    const normalizeSessionSlugValue = jest.fn((value) => String(value || '').trim().toLowerCase());
+    const getExtraScopeSlugs = jest.fn(() => ['alpha']);
+    const resolveQuestionSlugMapForIds = jest.fn(() => new Map([
+      ['q1', 'alpha'],
+      ['q2', 'beta'],
+    ]));
+
+    await expect(resolveMissingRenderedResponseLookup({
+      responderLower: '0xAbC',
+      rawSlug: 'EDGE',
+      fallbackSlug: 'edge',
+      renderedIds: ['q1', 'Q2'],
+      minifiedMode: 'pile',
+      surveyId: 'survey-1',
+      resolveResponseHydrationContext,
+      normalizeSessionSlugValue,
+      getExtraScopeSlugs,
+      resolveQuestionSlugMapForIds,
+      resolveScopeNetId: (_resolvedSlug, entryNetId, fallbackNetId) => entryNetId || fallbackNetId,
+      readQuestionsCacheAsync,
+      ensureQuestionsNet,
+    })).resolves.toEqual({
+      missingIds: [],
+      slug: 'edge',
+      netId: '84532',
+      requests: [
+        { slug: 'alpha', netId: '84532', missingIds: ['q1'] },
+        { slug: 'beta', netId: '84532', missingIds: ['q2'] },
+      ],
+    });
+
+    expect(resolveQuestionSlugMapForIds).toHaveBeenCalledWith(['q1', 'q2'], { surveyId: 'survey-1' });
   });
 
   it('loads missing response ids for a single scope from cache state', async () => {
