@@ -8,6 +8,19 @@ export type SurveyQuestionsProps = UnknownRecord & {
   questionPool?: unknown[];
 };
 
+export type SurveyQuestionPoolStatePatch = {
+  questionPool: unknown[];
+  questionPoolExpectedIds: string[];
+  questionPoolPendingIds: string[];
+};
+
+export type SurveyQuestionPoolLoadState = {
+  expectedIds: string[];
+  pendingIds: string[];
+  pendingCount: number;
+  isIncomplete: boolean;
+};
+
 export type SurveyQuestionsState = UnknownRecord & {
   surveysResponseState: ResponseSlice[];
   displayAnswerMode: boolean | undefined;
@@ -64,6 +77,48 @@ export type SurveyQuestionsState = UnknownRecord & {
   hasher: unknown;
   canDecryptOtherResponses: boolean;
   canDecryptOtherResponsesStatus: string;
+};
+
+export const buildClearedSurveyQuestionPoolState = (): SurveyQuestionPoolStatePatch => ({
+  questionPool: [],
+  questionPoolExpectedIds: [],
+  questionPoolPendingIds: [],
+});
+
+export const buildSurveyQuestionPoolLoadState = ({
+  isStandalone = false,
+  singleQuestionMode = false,
+  questionPoolExpectedIds,
+  questionPoolPendingIds,
+}: {
+  isStandalone?: boolean;
+  singleQuestionMode?: boolean;
+  questionPoolExpectedIds?: unknown;
+  questionPoolPendingIds?: unknown;
+} = {}): SurveyQuestionPoolLoadState => {
+  if (isStandalone || singleQuestionMode) {
+    return {
+      expectedIds: [],
+      pendingIds: [],
+      pendingCount: 0,
+      isIncomplete: false,
+    };
+  }
+
+  const expectedIds = Array.isArray(questionPoolExpectedIds)
+    ? questionPoolExpectedIds
+    : [];
+  const pendingIds = Array.isArray(questionPoolPendingIds)
+    ? questionPoolPendingIds
+    : [];
+  const pendingCount = pendingIds.length;
+
+  return {
+    expectedIds,
+    pendingIds,
+    pendingCount,
+    isIncomplete: expectedIds.length > 0 && pendingCount > 0,
+  };
 };
 
 export const buildInitialSurveyQuestionsState = (
