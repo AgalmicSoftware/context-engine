@@ -11,25 +11,6 @@ export type PileCacheUpdatePlan = {
   action: PileCacheUpdatePlanAction;
   delayMs: number;
 };
-type PileBaselineField = Record<string, unknown> & {
-  value?: unknown;
-  encrypted?: unknown;
-  encryptedPortion?: unknown;
-};
-type PileBaselineSlice = Record<string, unknown> & {
-  answers?: Record<string, PileBaselineField>;
-  additionalComments?: Record<string, PileBaselineField>;
-  importance?: Record<string, unknown>;
-  conviction?: Record<string, unknown>;
-};
-type PileCacheEntry = Record<string, unknown> & {
-  answer?: PileBaselineField;
-  additional?: PileBaselineField;
-  importance?: unknown;
-  conviction?: unknown;
-  importanceEncrypted?: unknown;
-  convictionEncrypted?: unknown;
-};
 
 export const buildPileCacheUpdatePlan = ({
   cacheReadyTick = false,
@@ -87,29 +68,24 @@ export const buildPileCacheUpdatePlan = ({
   return { action: 'noop', delayMs: normalizedReloadDelayMs };
 };
 
-const asPileBaselineSlice = (value: unknown): PileBaselineSlice => (
-  value && typeof value === 'object' ? value as PileBaselineSlice : {}
-);
-
-export const hasAnyPileBaselineInput = (slice: unknown = {}): boolean => {
-  const baselineSlice = asPileBaselineSlice(slice);
+export const hasAnyPileBaselineInput = (slice: any = {}): boolean => {
   const hasVal = (value: unknown) => (
     value !== undefined &&
     value !== null &&
     (Array.isArray(value) ? value.length > 0 : String(value).length > 0)
   );
 
-  for (const qid in (baselineSlice.answers || {})) {
-    if (hasVal(baselineSlice.answers?.[qid]?.value)) return true;
+  for (const qid in (slice.answers || {})) {
+    if (hasVal(slice.answers?.[qid]?.value)) return true;
   }
-  for (const qid in (baselineSlice.additionalComments || {})) {
-    if (hasVal(baselineSlice.additionalComments?.[qid]?.value)) return true;
+  for (const qid in (slice.additionalComments || {})) {
+    if (hasVal(slice.additionalComments?.[qid]?.value)) return true;
   }
-  for (const qid in (baselineSlice.importance || {})) {
-    if (Object.prototype.hasOwnProperty.call(baselineSlice.importance || {}, qid)) return true;
+  for (const qid in (slice.importance || {})) {
+    if (Object.prototype.hasOwnProperty.call(slice.importance || {}, qid)) return true;
   }
-  for (const qid in (baselineSlice.conviction || {})) {
-    if (Object.prototype.hasOwnProperty.call(baselineSlice.conviction || {}, qid)) return true;
+  for (const qid in (slice.conviction || {})) {
+    if (Object.prototype.hasOwnProperty.call(slice.conviction || {}, qid)) return true;
   }
 
   return false;
@@ -121,7 +97,7 @@ export const shouldSeedPileBaselineFromPrefill = ({
   pendingTotal = 0,
 }: {
   editBaseline?: unknown;
-  currentSlice?: unknown;
+  currentSlice?: any;
   pendingTotal?: number | null;
 } = {}): boolean => {
   if (editBaseline) return false;
@@ -143,14 +119,13 @@ export const isPileCacheConsistentWithBaseline = ({
   account = '',
   valuesEqual = defaultValuesEqual,
 }: {
-  baseline?: unknown;
+  baseline?: any;
   renderedIds?: unknown[] | null;
   questionResponses?: Record<string, Record<string, unknown>> | null;
   account?: string | null;
   valuesEqual?: (left: unknown, right: unknown) => boolean;
 } = {}): boolean => {
-  const baselineSlice = asPileBaselineSlice(baseline);
-  if (!baseline || Object.keys(baselineSlice).length === 0) return false;
+  if (!baseline) return false;
 
   const normalizedRenderedIds = Array.isArray(renderedIds) ? renderedIds : [];
   const normalizedResponses = questionResponses && typeof questionResponses === 'object'
@@ -165,18 +140,15 @@ export const isPileCacheConsistentWithBaseline = ({
     const questionIdLower = questionId.toLowerCase();
     const rawEntry = normalizedResponses[questionIdLower]?.[accountLower];
 
-    let cacheEntry: PileCacheEntry | null = null;
+    let cacheEntry: any = null;
     try {
-      const parsedEntry = typeof rawEntry === 'string' ? JSON.parse(rawEntry) : rawEntry;
-      cacheEntry = parsedEntry && typeof parsedEntry === 'object'
-        ? parsedEntry as PileCacheEntry
-        : null;
+      cacheEntry = typeof rawEntry === 'string' ? JSON.parse(rawEntry) : rawEntry;
     } catch {
       cacheEntry = null;
     }
 
-    const baselineAnswer = baselineSlice.answers?.[questionId];
-    const baselineAdditional = baselineSlice.additionalComments?.[questionId];
+    const baselineAnswer = baseline.answers?.[questionId];
+    const baselineAdditional = baseline.additionalComments?.[questionId];
     const baselineAnswerEncrypted = !!(
       baselineAnswer &&
       (baselineAnswer.encrypted || baselineAnswer.encryptedPortion || baselineAnswer.value === '*')
@@ -207,8 +179,8 @@ export const isPileCacheConsistentWithBaseline = ({
       }
     }
 
-    if (baselineSlice.conviction && Object.prototype.hasOwnProperty.call(baselineSlice.conviction, questionId)) {
-      const baselineConviction = toNumberOrNull(baselineSlice.conviction[questionId]);
+    if (baseline.conviction && Object.prototype.hasOwnProperty.call(baseline.conviction, questionId)) {
+      const baselineConviction = toNumberOrNull(baseline.conviction[questionId]);
       const cacheConvictionRaw =
         cacheEntry?.conviction !== undefined && cacheEntry?.conviction !== null
           ? cacheEntry.conviction
@@ -221,8 +193,8 @@ export const isPileCacheConsistentWithBaseline = ({
       }
     }
 
-    if (baselineSlice.importance && Object.prototype.hasOwnProperty.call(baselineSlice.importance, questionId)) {
-      const baselineImportance = toNumberOrNull(baselineSlice.importance[questionId]);
+    if (baseline.importance && Object.prototype.hasOwnProperty.call(baseline.importance, questionId)) {
+      const baselineImportance = toNumberOrNull(baseline.importance[questionId]);
       const cacheImportanceRaw =
         cacheEntry?.importance !== undefined && cacheEntry?.importance !== null
           ? cacheEntry.importance

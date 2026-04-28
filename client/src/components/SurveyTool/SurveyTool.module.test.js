@@ -12784,9 +12784,179 @@ describe('SurveyTool module', () => {
         answers: { q1: { value: '*' } },
         additionalComments: { q1: { value: '' } },
       },
-      baselineForDecrypt: {
-        answers: { q1: { value: '*' } },
-        additionalComments: { q1: { value: '' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {
+        q1: { value: '', encrypted: false },
+        q2: { value: '', encrypted: false },
+      },
+    };
+
+    const standaloneQuestions = new SurveyQuestions({
+      hideEmbeddedDebugUi: false,
+      useHeaderSubmit: true,
+      isStandalone: true,
+      singleQuestionMode: false,
+      questionPool,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    standaloneQuestions.state = {
+      ...standaloneQuestions.state,
+      questionPool,
+      surveysResponseState: [baseStateSlice],
+      displayAnswerMode: false,
+      userHasResponse: false,
+      startFresh: false,
+      isEditing: false,
+    };
+    standaloneQuestions.renderQuestion = jest.fn(() => null);
+
+    const standaloneTree = standaloneQuestions.render();
+
+    expect(treeHasLabel(standaloneTree, 'question .json')).toBe(true);
+    expect(treeHasLabel(standaloneTree, 'response .json')).toBe(true);
+    expect(treeHasLabel(standaloneTree, 'View Survey .json')).toBe(false);
+  });
+
+  it('schedules pile reload on questionResponsesNonce tick', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      activePileIndex: 0,
+      submissionComplete: false,
+      isDirty: false,
+      modifiedCount: 0,
+      encryptedModifiedCount: 0,
+      autoDecryptEnabled: false,
+      decryptingByKey: {},
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      userAnswers: null,
+    };
+    subject.didEditDiffInputsChange = jest.fn(() => false);
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.emitPendingStats = jest.fn();
+    subject.syncLoadingElapsedTimer = jest.fn();
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.checkCacheAgainstBaseline = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      questionResponsesNonce: 6,
+    };
+    const prevState = { ...subject.state };
+    subject.props = {
+      ...subject.props,
+      questionResponsesNonce: 7,
+    };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.scheduleLoadAndSortQuestions).toHaveBeenCalledWith(80);
+  });
+
+  it('checks optimistic pile cache baseline on questionResponsesNonce tick instead of scheduling a reload', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      questionsCacheNonce: 4,
+      questionResponsesNonce: 7,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      allQuestionsForFilter: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      activePileIndex: 0,
+      submissionComplete: true,
+      isDirty: false,
+      modifiedCount: 0,
+      encryptedModifiedCount: 0,
+      autoDecryptEnabled: false,
+      decryptingByKey: {},
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      userAnswers: null,
+    };
+    subject.didEditDiffInputsChange = jest.fn(() => false);
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.emitPendingStats = jest.fn();
+    subject.syncLoadingElapsedTimer = jest.fn();
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.checkCacheAgainstBaseline = jest.fn();
+
+    const prevProps = {
+      ...subject.props,
+      questionResponsesNonce: 6,
+    };
+    const prevState = { ...subject.state };
+    subject.props = {
+      ...subject.props,
+      questionResponsesNonce: 7,
+    };
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.checkCacheAgainstBaseline).toHaveBeenCalledTimes(1);
+    expect(subject.scheduleLoadAndSortQuestions).not.toHaveBeenCalled();
+  });
+
+  it('keeps optimistic pile state when cache has stale value for a cleared baseline answer', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      submissionComplete: true,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      editBaseline: {
+        answers: { q1: { value: '', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
         importance: {},
         conviction: {},
       },
@@ -12818,5 +12988,141 @@ describe('SurveyTool module', () => {
       tooltipId: 'ce-gated-prompt-tip-fallback-id-full',
       tooltipText: `${t('sbt')} ${t('gate')} required`,
     });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      isDirty: false,
+      modifiedCount: 0,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: null,
+    };
+    subject.updateJsonPreview = jest.fn();
+    syncClassSetState(subject);
+    peekSpy.mockClear();
+
+    subject.prefillUserAnswersFromCache();
+
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.state.surveysResponseState?.[0]?.answers?.q1).toBeUndefined();
+    expect(subject.state.editBaseline).toBeNull();
+    expect(peekSpy).not.toHaveBeenCalled();
+  });
+
+  it('patches live pile survey state from cache prefill without overwriting an existing edit baseline', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      isDirty: false,
+      modifiedCount: 0,
+      pileQuestions: [{ id: 'q1', type: 'freeform', prompt: 'Q1' }],
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: {
+        answers: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+        additionalComments: { q1: { value: '', encrypted: false } },
+      },
+    };
+    subject.updateJsonPreview = jest.fn();
+    syncClassSetState(subject);
+
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
+      if (namespace !== 'questionsCache') return {};
+      return {
+        '84532': {
+          questionResponses: {
+            q1: {
+              '0xabc': {
+                answer: { value: 'cached-answer', encrypted: false },
+                additional: { value: '', encrypted: false },
+              },
+            },
+          },
+        },
+      };
+    });
+
+    subject.prefillUserAnswersFromCache();
+
+    expect(subject.state.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
+    expect(subject.state.editBaseline?.answers?.q1?.value).toBe('');
+  });
+
+  it('hydrates off-screen pile draft answers so submit count stays aligned with full mode', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      questionResponsesNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      pileQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Q1' },
+        { id: 'q2', type: 'freeform', prompt: 'Q2' },
+        { id: 'q3', type: 'freeform', prompt: 'Q3' },
+        { id: 'q4', type: 'freeform', prompt: 'Q4' },
+        { id: 'q5', type: 'freeform', prompt: 'Q5' },
+        { id: 'q6', type: 'freeform', prompt: 'Q6' },
+      ],
+      activePileIndex: 0,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      isDirty: false,
+      modifiedCount: 0,
+      submittedSinceLastEdit: false,
+      submissionComplete: false,
+      submissionError: '',
+    };
+
+    subject.loadDraft = jest.fn(() => ({
+      answers: {
+        q6: {
+          value: 'off-screen draft',
+          answerEncrypted: false,
+          additional: '',
+          additionalEncrypted: false,
+          importance: null,
+          conviction: null,
+        },
+      },
+    }));
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1', 'q2', 'q3']);
+    subject.setState = (updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') callback();
+    };
+
+    subject.rehydrateDraftForRenderedIds(true);
+
+    expect(subject.state.surveysResponseState?.[0]?.answers?.q6?.value).toBe('off-screen draft');
   });
 });
