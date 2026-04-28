@@ -10555,6 +10555,27 @@ describe('SurveyTool module', () => {
     expect(third).toEqual(['q1', 'q2', 'q4', 'q3']);
   });
 
+  it('initializes standalone response state from prop question ids before rendered-id lookup', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      questionPool: [{ id: 'q1' }],
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q2']);
+
+    const initial = subject.initializeSurveyResponseState();
+
+    expect(subject.getCurrentRenderedQuestionIds).not.toHaveBeenCalled();
+    expect(initial).toHaveLength(1);
+    expect(initial[0].answers.q1).toBeDefined();
+    expect(initial[0].answers.q2).toBeUndefined();
+  });
+
   it('memoizes pile rendered question ids until the active pile window changes', () => {
     const subject = new PileViewMode({
       singleQuestionMode: false,

@@ -1,4 +1,5 @@
 import {
+  buildInitialSurveyResponseQuestionIds,
   buildRenderedQuestionIdsFromPileWindow,
   buildRenderedQuestionIdsFromQuestionPools,
 } from './surveyQuestionScope.js';
@@ -37,5 +38,41 @@ describe('surveyQuestionScope', () => {
       pileQuestions: null,
       activePileIndex: 2,
     })).toEqual([]);
+  });
+
+  it('builds initial response-state question ids for single-question and standalone flows', () => {
+    const getRenderedQuestionIds = jest.fn(() => ['q2', 'q3']);
+
+    expect(buildInitialSurveyResponseQuestionIds({
+      singleQuestionMode: true,
+      questionPoolIds: ['q1'],
+      questionId: 'fallback',
+      getRenderedQuestionIds,
+    })).toEqual(['q1']);
+
+    expect(getRenderedQuestionIds).not.toHaveBeenCalled();
+
+    expect(buildInitialSurveyResponseQuestionIds({
+      singleQuestionMode: false,
+      isStandalone: true,
+      questionPoolIds: [],
+      getRenderedQuestionIds,
+    })).toEqual(['q2', 'q3']);
+  });
+
+  it('builds initial response-state question ids for full survey mode from rendered ids first, then state pool', () => {
+    expect(buildInitialSurveyResponseQuestionIds({
+      singleQuestionMode: false,
+      isStandalone: false,
+      getRenderedQuestionIds: () => ['q2', 'q3'],
+      stateQuestionPool: [{ id: 'q4' }],
+    })).toEqual(['q2', 'q3']);
+
+    expect(buildInitialSurveyResponseQuestionIds({
+      singleQuestionMode: false,
+      isStandalone: false,
+      getRenderedQuestionIds: () => [],
+      stateQuestionPool: [{ id: 'q4' }, { id: 'q5' }],
+    })).toEqual(['q4', 'q5']);
   });
 });
