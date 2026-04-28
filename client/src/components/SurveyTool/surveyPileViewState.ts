@@ -1,3 +1,8 @@
+import {
+  isQuestionPromptMasked,
+  shouldShowPileFullLoadingState,
+} from './surveyToolViewState.js';
+
 export const NO_PENDING_PILE_SUBMIT_TEXT = 'No new or changed responses';
 
 export type PilePendingStatsLike = {
@@ -19,6 +24,194 @@ export type PileSubmitRailViewState = PileSubmitViewState & {
   showSuccessBadgeLink: boolean;
   showSuccessBadgeStatus: boolean;
   showClearPendingButton: boolean;
+};
+
+export type PileWorkspaceViewState = {
+  activeQuestion: unknown | null;
+  activePromptMasked: boolean;
+  hasVisibleQuestions: boolean;
+  hydrateDiscovered: number;
+  hydrateDone: number;
+  pendingMetadataCount: number;
+  hasPendingMetadataRetries: boolean;
+  isHydrating: boolean;
+  hasTerminalScanError: boolean;
+  scanErrorMessage: string;
+  hydrationProgressSettled: boolean;
+  priorResponsesHydrating: boolean;
+  hasScanOrHydrationWork: boolean;
+  hasConcreteHiddenQuestions: boolean;
+  preferGatedEmptyState: boolean;
+  showGatedEmptyState: boolean;
+  showFilteredEmptyState: boolean;
+  allowUnreadyEmptySettlement: boolean;
+  isStillLoading: boolean;
+  showMiniBackgroundSpinner: boolean;
+};
+
+export const shouldPreferPileGatedEmptyState = ({
+  hasConcreteHiddenQuestions = false,
+  hasVisibleQuestions = false,
+  firstBoot = false,
+  cacheHasLoaded = true,
+  recentRateLimit = false,
+  hasPendingMetadataRetries = false,
+}: {
+  hasConcreteHiddenQuestions?: boolean;
+  hasVisibleQuestions?: boolean;
+  firstBoot?: boolean;
+  cacheHasLoaded?: boolean | null;
+  recentRateLimit?: boolean;
+  hasPendingMetadataRetries?: boolean;
+} = {}): boolean => {
+  if (!hasConcreteHiddenQuestions) return false;
+  if (hasVisibleQuestions) return false;
+  if (firstBoot) return false;
+  if (cacheHasLoaded === false) return false;
+  if (recentRateLimit) return false;
+  if (hasPendingMetadataRetries) return false;
+  return true;
+};
+
+export const buildPileWorkspaceViewState = ({
+  pileQuestions = [],
+  activePileIndex = 0,
+  loading = false,
+  hiddenMaskedQuestionIds = [],
+  hasHiddenGatedQuestions = false,
+  firstBoot = false,
+  cacheHasLoaded = true,
+  isQuestionCacheReady = false,
+  recentRateLimit = false,
+  scanRemainingBlocks = 0,
+  hydrateDiscovered = 0,
+  hydrateDone = 0,
+  pendingMetadataCount = 0,
+  questionScanPhase = '',
+  questionScanErrorMessage = '',
+  isHydratingPriorResponses = false,
+  isFilterActive = false,
+  hasFilterBaseQuestions = false,
+}: {
+  pileQuestions?: unknown[] | null;
+  activePileIndex?: number | null;
+  loading?: boolean;
+  hiddenMaskedQuestionIds?: unknown[] | null;
+  hasHiddenGatedQuestions?: boolean;
+  firstBoot?: boolean;
+  cacheHasLoaded?: boolean | null;
+  isQuestionCacheReady?: boolean;
+  recentRateLimit?: boolean;
+  scanRemainingBlocks?: number | null;
+  hydrateDiscovered?: number | null;
+  hydrateDone?: number | null;
+  pendingMetadataCount?: number | null;
+  questionScanPhase?: string | null;
+  questionScanErrorMessage?: string | null;
+  isHydratingPriorResponses?: boolean;
+  isFilterActive?: boolean;
+  hasFilterBaseQuestions?: boolean;
+} = {}): PileWorkspaceViewState => {
+  const normalizedPileQuestions = Array.isArray(pileQuestions) ? pileQuestions : [];
+  const normalizedActiveIndex = Math.max(0, Number(activePileIndex || 0));
+  const activeQuestion =
+    normalizedPileQuestions.length > 0
+      ? (normalizedPileQuestions[normalizedActiveIndex] || normalizedPileQuestions[0] || null)
+      : null;
+  const activePromptMasked = isQuestionPromptMasked(activeQuestion as Record<string, unknown> | null);
+  const hasVisibleQuestions = normalizedPileQuestions.length > 0;
+  const normalizedHiddenMaskedQuestionIds = Array.isArray(hiddenMaskedQuestionIds)
+    ? hiddenMaskedQuestionIds
+    : [];
+  const normalizedHydrateDiscovered = Math.max(0, Number(hydrateDiscovered || 0));
+  const normalizedHydrateDone = Math.max(0, Number(hydrateDone || 0));
+  const normalizedPendingMetadataCount = Math.max(0, Number(pendingMetadataCount || 0));
+  const normalizedScanRemainingBlocks = Math.max(0, Number(scanRemainingBlocks || 0));
+  const normalizedQuestionScanPhase = String(questionScanPhase || '').toLowerCase();
+  const hasPendingMetadataRetries = normalizedPendingMetadataCount > 0;
+  const isHydrating = normalizedQuestionScanPhase === 'hydrate';
+  const hasTerminalScanError = normalizedQuestionScanPhase === 'error';
+  const scanErrorMessage = hasTerminalScanError
+    ? String(questionScanErrorMessage || 'Unable to load questions for this session.')
+    : '';
+  const hydrationProgressSettled = (
+    isHydrating &&
+    normalizedHydrateDone >= normalizedHydrateDiscovered
+  );
+  const priorResponsesHydrating = !!isHydratingPriorResponses;
+  const hasScanOrHydrationWork = (
+    (normalizedQuestionScanPhase === 'scan' && normalizedScanRemainingBlocks > 0) ||
+    (isHydrating && (
+      normalizedHydrateDone < normalizedHydrateDiscovered ||
+      hasPendingMetadataRetries
+    ))
+  );
+  const hasConcreteHiddenQuestions = (
+    !!hasHiddenGatedQuestions ||
+    normalizedHiddenMaskedQuestionIds.length > 0
+  );
+  const preferGatedEmptyState = shouldPreferPileGatedEmptyState({
+    hasConcreteHiddenQuestions,
+    hasVisibleQuestions,
+    firstBoot,
+    cacheHasLoaded,
+    recentRateLimit,
+    hasPendingMetadataRetries,
+  });
+  const showGatedEmptyState = hasConcreteHiddenQuestions || preferGatedEmptyState;
+  const showFilteredEmptyState = (
+    !hasVisibleQuestions &&
+    !!isFilterActive &&
+    !!hasFilterBaseQuestions &&
+    !showGatedEmptyState
+  );
+  const allowUnreadyEmptySettlement = (
+    !hasVisibleQuestions &&
+    !firstBoot &&
+    cacheHasLoaded !== false &&
+    !isQuestionCacheReady &&
+    !recentRateLimit &&
+    !hasScanOrHydrationWork &&
+    !hasPendingMetadataRetries &&
+    hydrationProgressSettled
+  ) || preferGatedEmptyState;
+  const isStillLoading = shouldShowPileFullLoadingState({
+    loading,
+    hasVisibleQuestions,
+    firstBoot,
+    isQuestionCacheReady: !!isQuestionCacheReady,
+    recentRateLimit,
+    hasScanOrHydrationWork,
+    allowUnreadyEmptySettlement,
+    allowFilteredEmptySettlement: showFilteredEmptyState,
+    hasTerminalScanError,
+  });
+  const showMiniBackgroundSpinner = hasVisibleQuestions && (
+    priorResponsesHydrating || loading || hasScanOrHydrationWork || recentRateLimit
+  );
+
+  return {
+    activeQuestion,
+    activePromptMasked,
+    hasVisibleQuestions,
+    hydrateDiscovered: normalizedHydrateDiscovered,
+    hydrateDone: normalizedHydrateDone,
+    pendingMetadataCount: normalizedPendingMetadataCount,
+    hasPendingMetadataRetries,
+    isHydrating,
+    hasTerminalScanError,
+    scanErrorMessage,
+    hydrationProgressSettled,
+    priorResponsesHydrating,
+    hasScanOrHydrationWork,
+    hasConcreteHiddenQuestions,
+    preferGatedEmptyState,
+    showGatedEmptyState,
+    showFilteredEmptyState,
+    allowUnreadyEmptySettlement,
+    isStillLoading,
+    showMiniBackgroundSpinner,
+  };
 };
 
 export const buildPileSubmitViewState = ({

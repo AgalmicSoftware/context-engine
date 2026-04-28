@@ -49,6 +49,8 @@ import {
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitRailViewState,
   buildPileSubmitViewState,
+  buildPileWorkspaceViewState,
+  shouldPreferPileGatedEmptyState,
 } from './surveyPileViewState.js';
 import {
   renderPileActiveQuestionCard,
@@ -892,15 +894,14 @@ export class PileViewMode extends SurveyQuestions {
     firstBoot = false,
     recentRateLimit = false,
     hasPendingMetadataRetries = false,
-  } = {}) => {
-    if (!hasConcreteHiddenQuestions) return false;
-    if (hasVisibleQuestions) return false;
-    if (firstBoot) return false;
-    if (this.props.cacheHasLoaded === false) return false;
-    if (recentRateLimit) return false;
-    if (hasPendingMetadataRetries) return false;
-    return true;
-  };
+  } = {}) => shouldPreferPileGatedEmptyState({
+    hasConcreteHiddenQuestions,
+    hasVisibleQuestions,
+    firstBoot,
+    cacheHasLoaded: this.props.cacheHasLoaded,
+    recentRateLimit,
+    hasPendingMetadataRetries,
+  });
 
   syncLoadingElapsedTimer = () => {
     const shouldRun = this.isPileLoadingVisible();
@@ -2779,15 +2780,6 @@ export class PileViewMode extends SurveyQuestions {
       showHologramAssistant
     } = this.state;
 
-    const activeQuestion =
-      Array.isArray(pileQuestions) && pileQuestions.length > 0
-        ? (pileQuestions[activePileIndex] || pileQuestions[0] || null)
-        : null;
-    const activePromptMasked = !!(
-      activeQuestion &&
-      this.isMaskedPromptText(activeQuestion?.prompt) &&
-      !activeQuestion?.promptDecrypted
-    );
     const hiddenMaskSource = (
       Array.isArray(this.state.allQuestionsForFilter) && this.state.allQuestionsForFilter.length > 0
     )
@@ -2798,7 +2790,6 @@ export class PileViewMode extends SurveyQuestions {
     const slug = resolveEffectiveSlug(this.props);
     const firstBoot = !hasCacheHydratedFlag(this.props);
     const recentRateLimit = this.isRecentRateLimit();
-    const hasVisibleQuestions = Array.isArray(pileQuestions) && pileQuestions.length > 0;
     const hasError = !!this.props.cacheInitializationError;
     const progressSlug = normalizeQuestionProgressSlug(slug);
     const questionScanProgress =
@@ -2809,77 +2800,48 @@ export class PileViewMode extends SurveyQuestions {
     const scanProgressDisplay = buildQuestionScanProgressDisplay(questionScanProgress);
     const pileScanDisplay = this.getPileLoadingScanDisplay(questionScanProgress, scanProgressDisplay);
     const scanTotalBlocks = scanProgressDisplay.totalBlocks;
-    const scanRemainingBlocks = scanProgressDisplay.remainingBlocks;
     const scanPercent = pileScanDisplay.percentComplete;
-    const hydrateDiscovered = Math.max(0, Number(questionScanProgress?.discoveredQuestions || 0));
-    const hydrateDone = Math.max(0, Number(questionScanProgress?.hydratedQuestions || 0));
-    const pendingMetadataCount = Math.max(0, Number(questionScanProgress?.pendingMetadataCount || 0));
-    const hasPendingMetadataRetries = pendingMetadataCount > 0;
-    const isHydrating = questionScanProgress?.phase === 'hydrate';
-    const hasTerminalScanError = !!questionScanProgress && questionScanProgress?.phase === 'error';
-    const scanErrorMessage = hasTerminalScanError
-      ? String(questionScanProgress?.errorMessage || 'Unable to load questions for this session.')
-      : '';
-    const hydrationProgressSettled = !!questionScanProgress && (
-      questionScanProgress?.phase === 'hydrate' &&
-      hydrateDone >= hydrateDiscovered
-    );
-    const priorResponsesHydrating = !!this.state.isHydratingPriorResponses;
-    const hasScanOrHydrationWork = !!questionScanProgress && (
-      (questionScanProgress?.phase === 'scan' && scanRemainingBlocks > 0) ||
-      (questionScanProgress?.phase === 'hydrate' && (
-        hydrateDone < hydrateDiscovered ||
-        hasPendingMetadataRetries
-      ))
-    );
-    const hasConcreteHiddenQuestions = (
-      !!this.state.hasHiddenGatedQuestions ||
-      hiddenMaskedQuestionIds.length > 0
-    );
-    const preferGatedEmptyState = this.shouldPreferGatedEmptyState({
-      hasConcreteHiddenQuestions,
-      hasVisibleQuestions,
-      firstBoot,
-      recentRateLimit,
-      hasPendingMetadataRetries,
-    });
     const isFilterActive =
       !!this.state.isFilterActive ||
       isSurveyToolFilterStateActive(this.state.filterState);
     const hasFilterBaseQuestions = Array.isArray(this.state.allQuestionsForFilter) &&
       this.state.allQuestionsForFilter.length > 0;
-    const showGatedEmptyState = hasConcreteHiddenQuestions || preferGatedEmptyState;
-    const lockedGateDetails = this.getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
-    const showFilteredEmptyState = (
-      !hasVisibleQuestions &&
-      isFilterActive &&
-      hasFilterBaseQuestions &&
-      !showGatedEmptyState
-    );
-    const allowUnreadyEmptySettlement = (
-      !hasVisibleQuestions &&
-      !firstBoot &&
-      this.props.cacheHasLoaded !== false &&
-      !this.props.isQuestionCacheReady &&
-      !recentRateLimit &&
-      !hasScanOrHydrationWork &&
-      !hasPendingMetadataRetries &&
-      hydrationProgressSettled
-    ) || preferGatedEmptyState;
-    const isStillLoading = shouldShowPileFullLoadingState({
+    const pileWorkspaceViewState = buildPileWorkspaceViewState({
+      pileQuestions,
+      activePileIndex,
       loading,
-      hasVisibleQuestions,
+      hiddenMaskedQuestionIds,
+      hasHiddenGatedQuestions: !!this.state.hasHiddenGatedQuestions,
       firstBoot,
+      cacheHasLoaded: this.props.cacheHasLoaded,
       isQuestionCacheReady: !!this.props.isQuestionCacheReady,
       recentRateLimit,
-      hasScanOrHydrationWork,
-      allowUnreadyEmptySettlement,
-      allowFilteredEmptySettlement: showFilteredEmptyState,
-      hasTerminalScanError,
+      scanRemainingBlocks: scanProgressDisplay.remainingBlocks,
+      hydrateDiscovered: questionScanProgress?.discoveredQuestions,
+      hydrateDone: questionScanProgress?.hydratedQuestions,
+      pendingMetadataCount: questionScanProgress?.pendingMetadataCount,
+      questionScanPhase: questionScanProgress?.phase,
+      questionScanErrorMessage: questionScanProgress?.errorMessage,
+      isHydratingPriorResponses: this.state.isHydratingPriorResponses,
+      isFilterActive,
+      hasFilterBaseQuestions,
     });
-    const showMiniBackgroundSpinner = hasVisibleQuestions && (
-      priorResponsesHydrating || loading || hasScanOrHydrationWork || recentRateLimit
-    );
+    const {
+      activeQuestion,
+      activePromptMasked,
+      hydrateDiscovered,
+      hydrateDone,
+      hasPendingMetadataRetries,
+      isHydrating,
+      hasTerminalScanError,
+      scanErrorMessage,
+      showGatedEmptyState,
+      showFilteredEmptyState,
+      priorResponsesHydrating,
+      showMiniBackgroundSpinner,
+    } = pileWorkspaceViewState;
+    const lockedGateDetails = this.getMemoizedLockedQuestionGateDetails(hiddenMaskedQuestionIds);
+    const isStillLoading = pileWorkspaceViewState.isStillLoading;
 
     /**
      * PILE MODE — Submit button label (central helper)
