@@ -1,10 +1,24 @@
 import React from 'react';
 
 import PileHologramAssistant from './PileHologramAssistant';
-import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
+import {
+  renderPileInteractionSurface,
+  type PileInteractionSurfaceProps,
+  type PileQuestionLike,
+} from './surveyPileInteractionSurface';
 
-const findElement = (node: any, predicate: any) => {
-  const stack = [node];
+type TestTreeNode = React.ReactNode;
+type TestElementNode = React.ReactElement<{
+  children?: React.ReactNode;
+  className?: string;
+  [key: string]: unknown;
+}>;
+type TestTreePredicate = (node: unknown) => boolean;
+
+const isElementNode = (node: unknown): node is TestElementNode => React.isValidElement(node);
+
+const findElement = (node: TestTreeNode, predicate: TestTreePredicate): unknown => {
+  const stack: unknown[] = [node];
   while (stack.length > 0) {
     const current = stack.pop();
     if (!current) continue;
@@ -16,25 +30,27 @@ const findElement = (node: any, predicate: any) => {
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) return current;
-    const children = current?.props?.children;
+    if (!isElementNode(current)) continue;
+    const children = current.props.children;
     if (children !== undefined) stack.push(children);
   }
   return null;
 };
 
-const nodeHasClassName = (node: any, className: any) => {
-  const value = node?.props?.className;
+const nodeHasClassName = (node: unknown, className: string): boolean => {
+  if (!isElementNode(node)) return false;
+  const value = node.props.className;
   if (typeof value !== 'string') return false;
   return value.split(/\s+/).includes(className);
 };
 
-const findNodeByClassName = (node: any, className: any) => (
-  findElement(node, (candidate: any) => nodeHasClassName(candidate, className))
+const findNodeByClassName = (node: TestTreeNode, className: string): TestElementNode | null => (
+  (findElement(node, (candidate) => nodeHasClassName(candidate, className)) as TestElementNode | null)
 );
 
-const countElements = (node: any, predicate: any) => {
+const countElements = (node: TestTreeNode, predicate: TestTreePredicate): number => {
   let count = 0;
-  const stack = [node];
+  const stack: unknown[] = [node];
 
   while (stack.length > 0) {
     const current = stack.pop();
@@ -47,30 +63,32 @@ const countElements = (node: any, predicate: any) => {
     }
     if (typeof current !== 'object') continue;
     if (predicate(current)) count += 1;
-    const children = current?.props?.children;
+    if (!isElementNode(current)) continue;
+    const children = current.props.children;
     if (children !== undefined) stack.push(children);
   }
 
   return count;
 };
 
-const treeHasText = (node: any, text: string) => {
+const treeHasText = (node: TestTreeNode, text: string): boolean => {
   if (node == null) return false;
   if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
   if (typeof node === 'string' || typeof node === 'number') {
     return String(node).includes(text);
   }
-  if (typeof node !== 'object') return false;
-  return treeHasText(node?.props?.children, text);
+  if (!isElementNode(node)) return false;
+  return treeHasText(node.props.children, text);
 };
 
-const getElementChildren = (node: any) => {
-  const children = node?.props?.children;
+const getElementChildren = (node: TestTreeNode): TestElementNode[] => {
+  if (!isElementNode(node)) return [];
+  const children = node.props.children;
   if (children == null) return [];
-  return (Array.isArray(children) ? children : [children]).filter((child) => child && typeof child === 'object');
+  return (Array.isArray(children) ? children : [children]).filter(isElementNode);
 };
 
-const buildBaseProps = () => ({
+const buildBaseProps = (): PileInteractionSurfaceProps => ({
   showHologramAssistant: false,
   toggleHologramAssistant: jest.fn(),
   showMiniBackgroundSpinner: false,
@@ -79,7 +97,7 @@ const buildBaseProps = () => ({
   loadingElapsedSec: 0,
   pileQuestions: [],
   activePileIndex: 0,
-    renderActiveQuestion: jest.fn(() => <div data-testid="active-question" />),
+  renderActiveQuestion: jest.fn(() => <div data-testid="active-question" />),
   hasTerminalScanError: false,
   scanErrorMessage: '',
   hasError: false,
@@ -118,6 +136,20 @@ const buildBaseProps = () => ({
 });
 
 describe('surveyPileInteractionSurface', () => {
+  it('renders the gated empty panel before the generic empty copy when gating is active', () => {
+    const tree = renderPileInteractionSurface({
+      ...buildBaseProps(),
+      pileQuestions: [],
+      showGatedEmptyState: true,
+      gatedEmptyPanel: <div data-testid="gated-empty">Locked by gate</div>,
+    });
+
+    expect(findElement(tree, (node) => (
+      isElementNode(node) && node.props['data-testid'] === 'gated-empty'
+    ))).not.toBeNull();
+    expect(treeHasText(tree, 'No questions available.')).toBe(false);
+  });
+
   it('renders the pile loading empty state with progress copy and fill width', () => {
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),
@@ -154,7 +186,7 @@ describe('surveyPileInteractionSurface', () => {
   });
 
   it('renders a windowed pile deck with controls stacked under the cards', () => {
-    const renderActiveQuestion = jest.fn((question: any) => (
+    const renderActiveQuestion = jest.fn((question: PileQuestionLike) => (
       <div data-testid={`active-${question.id}`}>{question.prompt}</div>
     ));
     const tree = renderPileInteractionSurface({
@@ -174,12 +206,14 @@ describe('surveyPileInteractionSurface', () => {
 
     const controlsNode = findNodeByClassName(tree, 'pileControls');
     const spinnerNode = findNodeByClassName(tree, 'miniSpinnerWrapper');
-    const deckCardCount = countElements(tree, (node: any) => nodeHasClassName(node, 'pileCard'));
+    const deckCardCount = countElements(tree, (node) => nodeHasClassName(node, 'pileCard'));
     const controlsChildren = getElementChildren(controlsNode);
 
     expect(renderActiveQuestion).toHaveBeenCalledTimes(1);
     expect(renderActiveQuestion).toHaveBeenCalledWith(expect.objectContaining({ id: 'q4' }));
-    expect(findElement(tree, (node: any) => node?.props?.['data-testid'] === 'active-q4')).not.toBeNull();
+    expect(findElement(tree, (node) => (
+      isElementNode(node) && node.props['data-testid'] === 'active-q4'
+    ))).not.toBeNull();
     expect(deckCardCount).toBe(5);
     expect(spinnerNode).not.toBeNull();
     expect(controlsNode).not.toBeNull();
@@ -199,7 +233,9 @@ describe('surveyPileInteractionSurface', () => {
       renderActiveQuestion,
     });
 
-    expect(findElement(tree, (node: any) => node?.type === PileHologramAssistant)).not.toBeNull();
+    expect(findElement(tree, (node) => (
+      isElementNode(node) && node.type === PileHologramAssistant
+    ))).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileControls')).toBeNull();
     expect(findNodeByClassName(tree, 'miniSpinnerWrapper')).toBeNull();
     expect(renderActiveQuestion).not.toHaveBeenCalled();
