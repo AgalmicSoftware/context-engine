@@ -225,6 +225,7 @@ import {
   buildDraftHydrationState,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
   buildMergedHydrationQuestionResponses,
@@ -333,6 +334,7 @@ import {
   shouldAutoEncryptAdditionalOnAudienceChange,
   shouldEncryptResponseFieldForSubmit,
   shouldForceOverwriteDraftValues,
+  shouldHandleStartFresh,
   shouldRenderInlineSubmitButton,
   shouldRenderSubmittedIndicator,
   shouldShowPileFullLoadingState,
@@ -6074,13 +6076,14 @@ export class SurveyQuestions extends Component {
   checkAndHandleStartFresh = () => {
     const idx = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
     const slice = (this.state.surveysResponseState && this.state.surveysResponseState[idx]) || {answers:{},additionalComments:{},importance:{},conviction:{}};
-    const hasAny = this.getCurrentRenderedQuestionIds().some(qid =>
-      (slice.answers?.[qid]?.value ?? '') !== '' ||
-      (slice.additionalComments?.[qid]?.value ?? '') !== '' ||
-      Object.prototype.hasOwnProperty.call(slice.importance || {}, qid) ||
-      Object.prototype.hasOwnProperty.call(slice.conviction || {}, qid)
-    );
-    if (!this.props.viewAddress && !this.state.userHasResponse && !this.state.editBaseline && !this.state.isDirty && !hasAny) {
+    if (shouldHandleStartFresh({
+      viewAddress: this.props.viewAddress,
+      userHasResponse: this.state.userHasResponse,
+      editBaseline: this.state.editBaseline,
+      isDirty: this.state.isDirty,
+      currentSlice: slice,
+      renderedQuestionIds: this.getCurrentRenderedQuestionIds(),
+    })) {
       this.handleStartFresh();
     }
   };
@@ -6546,27 +6549,18 @@ export class SurveyQuestions extends Component {
   handleStartFresh = () => {
     const surveyIndex =
       this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
-
-    // Build empty slice for rendered IDs
-    const emptySlice = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
     const renderedIds = this.getCurrentRenderedQuestionIds();
-
-    renderedIds.forEach((qid) => {
-      emptySlice.answers[qid] = this.buildEmptyResponseFieldState(qid);
-      emptySlice.additionalComments[qid] = this.buildEmptyResponseFieldState(qid, 'additional');
-      // importance deliberately omitted
-    });
-
-    const nextArr = buildSurveyResponseStateArray({
-      prevSurveysResponseState: this.state.surveysResponseState,
+    const { emptySlice, nextSurveysResponseState } = buildStartFreshSurveyState({
       surveyIndex,
-      nextSlice: emptySlice,
+      renderedQuestionIds: renderedIds,
+      prevSurveysResponseState: this.state.surveysResponseState,
+      buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
     });
 
     this.setState({
       suppressPrefill: true,
       startFresh: true,
-      surveysResponseState: nextArr,
+      surveysResponseState: nextSurveysResponseState,
       editBaseline: this.deepClone(emptySlice), // pending → 0 immediately
       modifiedCount: 0,
       hasEncryptedChanges: false,

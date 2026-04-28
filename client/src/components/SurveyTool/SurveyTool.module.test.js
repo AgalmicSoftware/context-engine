@@ -6322,6 +6322,113 @@ describe('SurveyTool module', () => {
     expect(subject.recalculateEditStats).toHaveBeenCalledWith({ total: 3, encrypted: 1 });
   });
 
+  it('auto-starts fresh only when the active slice is effectively empty', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 1,
+      viewAddress: '',
+    });
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        null,
+        {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+      ],
+      userHasResponse: false,
+      editBaseline: null,
+      isDirty: false,
+    };
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1']);
+    subject.handleStartFresh = jest.fn();
+
+    subject.checkAndHandleStartFresh();
+    expect(subject.handleStartFresh).toHaveBeenCalledTimes(1);
+
+    subject.handleStartFresh.mockClear();
+    subject.state.surveysResponseState[1].additionalComments.q1 = { value: 'notes' };
+    subject.checkAndHandleStartFresh();
+    expect(subject.handleStartFresh).not.toHaveBeenCalled();
+  });
+
+  it('builds and applies start-fresh survey state before clearing drafts', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 2,
+    });
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+      submittedSinceLastEdit: true,
+    };
+    syncClassSetState(subject);
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1', 'q2']);
+    subject.buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
+      value: '',
+      questionId,
+      fieldKey,
+    }));
+    subject.deepClone = jest.fn((value) => JSON.parse(JSON.stringify(value)));
+    subject.clearDraftFor = jest.fn();
+    subject.recalculateEditStats = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+
+    subject.handleStartFresh();
+
+    expect(subject.state.suppressPrefill).toBe(true);
+    expect(subject.state.startFresh).toBe(true);
+    expect(subject.state.modifiedCount).toBe(0);
+    expect(subject.state.hasEncryptedChanges).toBe(false);
+    expect(subject.state.isDirty).toBe(false);
+    expect(subject.state.submittedSinceLastEdit).toBe(false);
+    expect(subject.state.surveysResponseState).toEqual([
+      { answers: { keep: { value: 'persisted' } } },
+      {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      {
+        answers: {
+          q1: { value: '', questionId: 'q1', fieldKey: 'answer' },
+          q2: { value: '', questionId: 'q2', fieldKey: 'answer' },
+        },
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: { value: '', questionId: 'q1', fieldKey: 'additional' },
+          q2: { value: '', questionId: 'q2', fieldKey: 'additional' },
+        },
+      },
+    ]);
+    expect(subject.deepClone).toHaveBeenCalledTimes(1);
+    expect(subject.state.editBaseline).toEqual({
+      answers: {
+        q1: { value: '', questionId: 'q1', fieldKey: 'answer' },
+        q2: { value: '', questionId: 'q2', fieldKey: 'answer' },
+      },
+      importance: {},
+      conviction: {},
+      additionalComments: {
+        q1: { value: '', questionId: 'q1', fieldKey: 'additional' },
+        q2: { value: '', questionId: 'q2', fieldKey: 'additional' },
+      },
+    });
+    expect(subject.clearDraftFor).toHaveBeenNthCalledWith(1, 'q1');
+    expect(subject.clearDraftFor).toHaveBeenNthCalledWith(2, 'q2');
+    expect(subject.recalculateEditStats).toHaveBeenCalledTimes(1);
+    expect(subject.persistDraftSafely).toHaveBeenCalledWith(0);
+  });
+
   it('does not short-circuit when state questionPool ref changes under stable ids', async () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,

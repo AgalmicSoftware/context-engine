@@ -105,6 +105,7 @@ export {
   buildDraftHydrationState,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
   buildMergedHydrationQuestionResponses,
@@ -113,6 +114,7 @@ export {
   buildPrefilledSurveyState,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
+  shouldHandleStartFresh,
 } from './surveyToolHydrationFlow.js';
 export {
   buildQuestionScanProgressDisplay,
