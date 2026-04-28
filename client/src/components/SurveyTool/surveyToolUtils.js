@@ -106,6 +106,7 @@ export {
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
   buildStartFreshSurveyState,
+  buildResetFormStatePatch,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
   buildMergedHydrationQuestionResponses,

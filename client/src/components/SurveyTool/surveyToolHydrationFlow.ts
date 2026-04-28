@@ -126,6 +126,13 @@ type BuildStartFreshSurveyStateArgs = {
   buildEmptyResponseFieldState?: ((questionId?: string, fieldKey?: string) => unknown) | null;
 };
 
+type BuildResetFormStatePatchArgs = {
+  initialSurveysResponseState?: unknown[] | null;
+  baselineIndex?: unknown;
+  nextSubmittedSinceLastEdit?: boolean;
+  cloneValue?: ((value: unknown) => unknown) | null;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -656,6 +663,39 @@ export const buildStartFreshSurveyState = ({
       surveyIndex,
       nextSlice: emptySlice,
     }),
+  };
+};
+
+export const buildResetFormStatePatch = ({
+  initialSurveysResponseState = null,
+  baselineIndex = 0,
+  nextSubmittedSinceLastEdit = false,
+  cloneValue = null,
+}: BuildResetFormStatePatchArgs = {}) => {
+  const surveysResponseState = Array.isArray(initialSurveysResponseState)
+    ? initialSurveysResponseState
+    : [];
+  const normalizedBaselineIndex = Math.max(0, Number(baselineIndex) || 0);
+  const baselineSource =
+    surveysResponseState[normalizedBaselineIndex] &&
+    typeof surveysResponseState[normalizedBaselineIndex] === 'object'
+      ? surveysResponseState[normalizedBaselineIndex]
+      : buildEmptyResponseSlice();
+
+  return {
+    surveysResponseState,
+    isEditing: false,
+    submissionError: '',
+    submissionComplete: false,
+    submittedSinceLastEdit: !!nextSubmittedSinceLastEdit,
+    submitProgress: 0,
+    userHasResponse: false,
+    userAnswers: null,
+    isDirty: false,
+    modifiedCount: 0,
+    hasEncryptedChanges: false,
+    editBaseline: typeof cloneValue === 'function' ? cloneValue(baselineSource) : baselineSource,
+    isLoadingResponse: true,
   };
 };
 

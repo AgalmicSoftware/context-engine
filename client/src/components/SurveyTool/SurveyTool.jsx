@@ -225,6 +225,7 @@ import {
   buildDraftHydrationState,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  buildResetFormStatePatch,
   buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
@@ -5425,22 +5426,14 @@ export class SurveyQuestions extends Component {
     } catch (e) { surveyLog.warn('SurveyTool: cleanup', e); }
 
     const initial = this.initializeSurveyResponseState();
+    const nextResetState = buildResetFormStatePatch({
+      initialSurveysResponseState: Array.isArray(initial) ? initial : [],
+      baselineIndex: this.props.surveyIndex || 0,
+      nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
+      cloneValue: this.deepClone,
+    });
 
-    this.setState({
-      surveysResponseState: Array.isArray(initial) ? initial : [],
-      isEditing: false,
-      submissionError: '',
-      submissionComplete: false,
-      submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-      submitProgress: 0,
-      userHasResponse: false,
-      userAnswers: null,
-      isDirty: false,
-      modifiedCount: 0,
-      hasEncryptedChanges: false,
-      editBaseline: this.deepClone(initial[this.props.surveyIndex || 0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
-      isLoadingResponse: true,
-    }, () => {
+    this.setState(nextResetState, () => {
       if (callback) callback();
     });
   };
