@@ -233,6 +233,8 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyUpdatePlan,
   buildPriorResponseFetchPlan,
+  buildGroupedRenderedResponseScopePlan,
+  buildMissingResponseIdsForRenderedQuestions,
   resolveExitEditingBaselineSlice,
   resolveRevertPendingBaselineSlice,
   shouldBackfillPriorResponses,
@@ -5178,14 +5180,21 @@ export class SurveyQuestions extends Component {
     if (this.props?.minifiedMode === 'pile' && extraSlugs.length > 0) {
       const slugByQuestionId = this.resolveQuestionSlugMapForIds(renderedIds, { surveyId: this.props.surveyId || null });
       const cachedQuestionResponsesByScope = new Map();
-      const requestsBySlug = new Map();
-
-      for (const questionId of renderedIds) {
-        const resolvedSlug = normalizeSessionSlugValue(slugByQuestionId.get(questionId) ?? slug);
+      const requests = [];
+      const scopePlan = buildGroupedRenderedResponseScopePlan({
+        renderedIds,
+        slugByQuestionId,
+        fallbackSlug: slug,
+        fallbackNetId: netId,
+      });
+      for (const entry of scopePlan) {
+        const resolvedSlug = normalizeSessionSlugValue(entry.slug);
         const resolvedContext = resolveResponseHydrationContext(this.props, resolvedSlug);
-        const resolvedNetId = resolvedContext.networkIdStr || netId;
-        if (!resolvedNetId) continue;
-
+        const resolvedNetId = resolvedContext.networkIdStr || entry.netId || netId;
+        if (!resolvedNetId) {
+          requests.push({ slug: resolvedSlug, netId: '', missingIds: [] });
+          continue;
+        }
         const scopeKey = `${resolvedSlug}|${resolvedNetId}`;
         let questionResponses = cachedQuestionResponsesByScope.get(scopeKey);
         if (!questionResponses) {
@@ -5193,40 +5202,37 @@ export class SurveyQuestions extends Component {
           questionResponses = questionsCache?.[resolvedNetId]?.questionResponses || {};
           cachedQuestionResponsesByScope.set(scopeKey, questionResponses);
         }
-
-        const perQuestion = questionResponses?.[questionId];
-        if (perQuestion && typeof perQuestion === 'object' && perQuestion[responderLower]) continue;
-
-        if (!requestsBySlug.has(scopeKey)) {
-          requestsBySlug.set(scopeKey, {
-            slug: resolvedSlug,
-            netId: resolvedNetId,
-            missingIds: [],
-          });
-        }
-        requestsBySlug.get(scopeKey).missingIds.push(questionId);
+        requests.push({
+          slug: resolvedSlug,
+          netId: resolvedNetId,
+          missingIds: buildMissingResponseIdsForRenderedQuestions({
+            renderedIds: entry.questionIds,
+            questionResponses,
+            responderLower,
+          }),
+        });
       }
 
-      const requests = Array.from(requestsBySlug.values()).filter((entry) => entry.missingIds.length > 0);
-      if (requests.length === 0) {
+      const nonEmptyRequests = requests.filter((entry) => entry.missingIds.length > 0);
+      if (nonEmptyRequests.length === 0) {
         return { missingIds: [], slug, netId, requests: [] };
       }
-      if (requests.length === 1) {
+      if (nonEmptyRequests.length === 1) {
         return {
-          ...requests[0],
-          requests,
+          ...nonEmptyRequests[0],
+          requests: nonEmptyRequests,
         };
       }
-      return { missingIds: [], slug, netId, requests };
+      return { missingIds: [], slug, netId, requests: nonEmptyRequests };
     }
 
     const questionsCache = ensureQuestionsNet(await readQuestionsCacheAsync(slug), netId);
     const questionResponses = questionsCache?.[netId]?.questionResponses || {};
 
-    const missingIds = renderedIds.filter((qid) => {
-      const perQuestion = questionResponses?.[qid];
-      if (!perQuestion || typeof perQuestion !== 'object') return true;
-      return !perQuestion[responderLower];
+    const missingIds = buildMissingResponseIdsForRenderedQuestions({
+      renderedIds,
+      questionResponses,
+      responderLower,
     });
 
     return { missingIds, slug, netId };

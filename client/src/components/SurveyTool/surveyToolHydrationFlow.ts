@@ -211,6 +211,25 @@ type BuildPriorResponseFetchPlanArgs = {
   attemptedKeys?: Set<string> | null;
 };
 
+type BuildGroupedRenderedResponseScopePlanArgs = {
+  renderedIds?: Iterable<unknown> | unknown[];
+  slugByQuestionId?: Map<string, unknown> | null;
+  fallbackSlug?: unknown;
+  fallbackNetId?: unknown;
+};
+
+type GroupedRenderedResponseScopePlanEntry = {
+  slug: string;
+  netId: string;
+  questionIds: string[];
+};
+
+type BuildMissingResponseIdsForRenderedQuestionsArgs = {
+  renderedIds?: Iterable<unknown> | unknown[];
+  questionResponses?: Record<string, unknown> | null;
+  responderLower?: string;
+};
+
 type BuildPrefilledSingleQuestionStateArgs = {
   surveyIndex?: unknown;
   questionId?: unknown;
@@ -1067,6 +1086,54 @@ export const buildPriorResponseFetchPlan = ({
       entry.idsToFetch.map((qid) => `${entry.slug}|${normalizedResponder}|${qid}`)
     )),
   };
+};
+
+export const buildGroupedRenderedResponseScopePlan = ({
+  renderedIds = [],
+  slugByQuestionId = null,
+  fallbackSlug = '',
+  fallbackNetId = '',
+}: BuildGroupedRenderedResponseScopePlanArgs = {}): GroupedRenderedResponseScopePlanEntry[] => {
+  const groupedByScope = new Map<string, GroupedRenderedResponseScopePlanEntry>();
+
+  Array.from(renderedIds || []).forEach((rawQuestionId) => {
+    const questionId = normalizeQuestionIdKey(rawQuestionId);
+    if (!questionId) return;
+    const resolvedSlug = String(
+      (slugByQuestionId instanceof Map ? slugByQuestionId.get(questionId) : null) ?? fallbackSlug ?? ''
+    );
+    const resolvedNetId = String(fallbackNetId || '');
+    if (!resolvedNetId) return;
+    const scopeKey = `${resolvedSlug}|${resolvedNetId}`;
+    if (!groupedByScope.has(scopeKey)) {
+      groupedByScope.set(scopeKey, {
+        slug: resolvedSlug,
+        netId: resolvedNetId,
+        questionIds: [],
+      });
+    }
+    groupedByScope.get(scopeKey)?.questionIds.push(questionId);
+  });
+
+  return Array.from(groupedByScope.values()).filter((entry) => entry.questionIds.length > 0);
+};
+
+export const buildMissingResponseIdsForRenderedQuestions = ({
+  renderedIds = [],
+  questionResponses = null,
+  responderLower = '',
+}: BuildMissingResponseIdsForRenderedQuestionsArgs = {}): string[] => {
+  const normalizedResponder = String(responderLower || '').trim().toLowerCase();
+  return Array.from(renderedIds || [])
+    .map((qid) => normalizeQuestionIdKey(qid))
+    .filter(Boolean)
+    .filter((questionId) => {
+      const perQuestion = questionResponses && typeof questionResponses === 'object'
+        ? questionResponses[questionId]
+        : null;
+      if (!perQuestion || typeof perQuestion !== 'object') return true;
+      return !(perQuestion as UnknownRecord)[normalizedResponder];
+    });
 };
 
 export const buildPrefilledSurveyState = ({

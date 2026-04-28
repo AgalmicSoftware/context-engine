@@ -18,6 +18,8 @@ import {
   buildPrefilledSingleQuestionUpdatePlan,
   buildPrefilledSurveyState,
   buildPrefilledSurveyUpdatePlan,
+  buildGroupedRenderedResponseScopePlan,
+  buildMissingResponseIdsForRenderedQuestions,
   buildPriorResponseFetchPlan,
   buildRevertedResponseSlice,
   buildSurveyResponseStateArray,
@@ -1395,6 +1397,33 @@ describe('surveyToolHydrationFlow', () => {
         'beta|0xabc|q3',
       ],
     });
+  });
+
+  it('builds grouped rendered-response scope plans by slug and network', () => {
+    expect(buildGroupedRenderedResponseScopePlan({
+      renderedIds: ['q1', 'q2', 'q3'],
+      slugByQuestionId: new Map([
+        ['q1', 'alpha'],
+        ['q2', 'alpha'],
+        ['q3', 'beta'],
+      ]),
+      fallbackSlug: 'edge',
+      fallbackNetId: '84532',
+    })).toEqual([
+      { slug: 'alpha', netId: '84532', questionIds: ['q1', 'q2'] },
+      { slug: 'beta', netId: '84532', questionIds: ['q3'] },
+    ]);
+  });
+
+  it('builds missing response ids for rendered questions from cached responses', () => {
+    expect(buildMissingResponseIdsForRenderedQuestions({
+      renderedIds: ['q1', 'q2', 'q3'],
+      questionResponses: {
+        q1: { '0xabc': { answer: { value: 'present' } } },
+        q2: {},
+      },
+      responderLower: '0xabc',
+    })).toEqual(['q2', 'q3']);
   });
 
   it('builds reverted response slices from baseline state plus rendered empty shells', () => {
