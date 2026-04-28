@@ -225,7 +225,9 @@ import {
   buildDraftHydrationState,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
+  buildRevertPendingStatePatch,
   buildResetFormStatePatch,
+  resolveRevertPendingBaselineSlice,
   buildStartFreshSurveyState,
   buildLocalCacheHydrationMemoKey,
   buildMergedSurveyResponseState,
@@ -5540,21 +5542,13 @@ export class SurveyQuestions extends Component {
       const surveyIndex =
         this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
       const isLoggedIn = !!(this.props.loginComplete && this.props.account);
-
-      // 1) Build the baseline we want to revert to
-      let baselineSlice = this.state.editBaseline;
-
-      if (!baselineSlice && isLoggedIn) {
-        if (this.state.userAnswers) {
-          baselineSlice = this.buildSliceFromUserAnswers(this.state.userAnswers);
-        } else {
-          baselineSlice = this.buildSliceFromLocalCache();
-        }
-      }
-
-      if (!baselineSlice) {
-        baselineSlice = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-      }
+      const baselineSlice = resolveRevertPendingBaselineSlice({
+        editBaseline: this.state.editBaseline,
+        isLoggedIn,
+        userAnswers: this.state.userAnswers,
+        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+        buildSliceFromLocalCache: this.buildSliceFromLocalCache,
+      });
 
       const renderedIds = this.getCurrentRenderedQuestionIds();
       const nextSlice = buildRevertedResponseSlice({
@@ -5564,24 +5558,13 @@ export class SurveyQuestions extends Component {
         buildEmptyResponseFieldState: this.buildEmptyResponseFieldState,
       });
 
-      // 3) Apply slice; do not overwrite editBaseline; reset pending flags
-      const nextSurveysResponseState = buildSurveyResponseStateArray({
-        prevSurveysResponseState: this.state.surveysResponseState,
-        surveyIndex,
-        nextSlice,
-      });
-
       this.setState(
-        {
-          surveysResponseState: nextSurveysResponseState,
-          isEditing: true,
-          displayAnswerMode: false,
-          startFresh: !isLoggedIn,
-          isDirty: false,
-          modifiedCount: 0,
-          hasEncryptedChanges: false,
-          submissionError: '',
-        },
+        buildRevertPendingStatePatch({
+          prevSurveysResponseState: this.state.surveysResponseState,
+          surveyIndex,
+          nextSlice,
+          isLoggedIn,
+        }),
         () => {
           if (typeof this.clearDraft === 'function') this.clearDraft();
           this.recalculateEditStats && this.recalculateEditStats();
