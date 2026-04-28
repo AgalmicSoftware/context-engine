@@ -1,5 +1,6 @@
 import {
   buildAutoDecryptDisabledState,
+  buildCanDecryptOtherResponsesState,
   buildClearedSurveyQuestionPoolState,
   buildInitialSurveyQuestionsState,
   buildSurveyQuestionPoolLoadState,
@@ -98,6 +99,21 @@ describe('surveyQuestionsTypes', () => {
     expect(buildAutoDecryptDisabledState()).toEqual({
       autoDecryptEnabled: false,
       decryptingByKey: {},
+    });
+  });
+
+  it('builds the response-decrypt capability state patch', () => {
+    expect(buildCanDecryptOtherResponsesState()).toEqual({
+      canDecryptOtherResponses: false,
+      canDecryptOtherResponsesStatus: 'unknown',
+    });
+
+    expect(buildCanDecryptOtherResponsesState({
+      canDecrypt: true,
+      status: 'granted',
+    })).toEqual({
+      canDecryptOtherResponses: true,
+      canDecryptOtherResponsesStatus: 'granted',
     });
   });
 });
