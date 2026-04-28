@@ -10513,6 +10513,100 @@ describe('SurveyTool module', () => {
     expect(subject.state.editBaseline?.additionalComments?.q1?.encryptedPortion).toBe('');
   });
 
+  it('rehydrates local-cache answers when draft loading throws', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      suppressPrefill: false,
+      submissionError: '',
+      submissionComplete: false,
+      surveysResponseState: [{
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      }],
+      editBaseline: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+    };
+    subject.loadDraft = jest.fn(() => {
+      throw new Error('draft-load-failed');
+    });
+    subject.getHydrationQuestionIds = jest.fn().mockReturnValue(['q1']);
+    subject.buildLocalCacheHydrationSignature = jest.fn().mockReturnValue('rehydrate|q1|draft-throw');
+    subject.buildSliceFromLocalCache = jest.fn().mockResolvedValue({
+      answers: {
+        q1: {
+          value: 'cached answer',
+          encrypted: false,
+        },
+      },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+      additionalComments: {
+        q1: {
+          value: 'cached notes',
+          encrypted: false,
+        },
+      },
+    });
+    subject.ensurePriorResponsesForRenderedIds = jest.fn().mockResolvedValue(false);
+    subject.setState = (update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+
+    await subject.rehydrateLocalCacheAnswersForRenderedIds();
+
+    expect(subject.loadDraft).toHaveBeenCalledTimes(1);
+    expect(subject.state.surveysResponseState?.[0]).toEqual({
+      answers: {
+        q1: {
+          value: 'cached answer',
+          encrypted: false,
+        },
+      },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+      additionalComments: {
+        q1: {
+          value: 'cached notes',
+          encrypted: false,
+        },
+      },
+    });
+    expect(subject.state.editBaseline).toEqual({
+      answers: {
+        q1: {
+          value: 'cached answer',
+          encrypted: false,
+        },
+      },
+      importance: { q1: 4 },
+      conviction: { q1: 7 },
+      additionalComments: {
+        q1: {
+          value: 'cached notes',
+          encrypted: false,
+        },
+      },
+    });
+    expect(subject.ensurePriorResponsesForRenderedIds).toHaveBeenCalledTimes(1);
+  });
+
   it('uses clone-free questions cache reads in SurveyQuestions.handleFilter', () => {
     const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
       if (namespace === 'questionsCache') {

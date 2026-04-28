@@ -8,6 +8,7 @@ import {
   buildDraftHydrationOverwriteDecision,
   buildDraftAwareCacheHydrationState,
   buildDraftHydrationState,
+  loadDraftAnswersByQuestionIdSafely,
   buildExitEditingStatePatch,
   buildHydratedResponseSlice,
   buildInitializedSurveyResponseState,
@@ -156,6 +157,43 @@ describe('surveyToolHydrationFlow', () => {
     });
 
     expect(applyDraftEntryToSlice).not.toHaveBeenCalled();
+  });
+
+  it('loads draft answers safely for local-cache rehydrate fallback handling', () => {
+    const buildDraftAnswersByQuestionId = jest.fn(() => ({
+      q1: { value: 'draft-answer' },
+    }));
+    const onError = jest.fn();
+
+    expect(loadDraftAnswersByQuestionIdSafely({
+      loadDraft: () => ({ answers: { q1: { value: 'raw-draft' } } }),
+      buildDraftAnswersByQuestionId,
+      onError,
+    })).toEqual({
+      q1: { value: 'draft-answer' },
+    });
+    expect(onError).not.toHaveBeenCalled();
+
+    const draftError = new Error('draft-load-failed');
+    expect(loadDraftAnswersByQuestionIdSafely({
+      loadDraft: () => {
+        throw draftError;
+      },
+      buildDraftAnswersByQuestionId,
+      onError,
+    })).toEqual({});
+    expect(onError).toHaveBeenCalledWith(draftError);
+
+    onError.mockClear();
+    const buildError = new Error('draft-map-failed');
+    expect(loadDraftAnswersByQuestionIdSafely({
+      loadDraft: () => ({ answers: { q1: { value: 'raw-draft' } } }),
+      buildDraftAnswersByQuestionId: () => {
+        throw buildError;
+      },
+      onError,
+    })).toEqual({});
+    expect(onError).toHaveBeenCalledWith(buildError);
   });
 
   it('builds draft hydration rendered ids with optional pile expansion', () => {
