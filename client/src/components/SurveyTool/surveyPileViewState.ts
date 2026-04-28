@@ -13,6 +13,14 @@ export type PileSubmitViewState = {
   pileSubmitResponderHref: string;
 };
 
+export type PileSubmitRailViewState = PileSubmitViewState & {
+  pileTopRailVisible: boolean;
+  showSubmitButton: boolean;
+  showSuccessBadgeLink: boolean;
+  showSuccessBadgeStatus: boolean;
+  showClearPendingButton: boolean;
+};
+
 export const buildPileSubmitViewState = ({
   pendingStats,
   isSubmitting = false,
@@ -57,6 +65,52 @@ export const buildPileSubmitViewState = ({
     pileSubmitResponderHref: pileSubmitResponderAddressLower
       ? `/u/${pileSubmitResponderAddressLower}`
       : '',
+  };
+};
+
+export const buildPileSubmitRailViewState = ({
+  isSubmitting = false,
+  ...rest
+}: {
+  pendingStats?: PilePendingStatsLike | null;
+  isSubmitting?: boolean;
+  submittedSinceLastEdit?: boolean;
+  submissionComplete?: boolean;
+  pileSubmitTempText?: string | null;
+  pileSubmitLabel?: string | null;
+  account?: string | null;
+  isAddress?: (value: string) => boolean;
+} = {}): PileSubmitRailViewState => {
+  const submitViewState = buildPileSubmitViewState({
+    ...rest,
+    isSubmitting,
+  });
+
+  const pileTopRailVisible = (
+    !!isSubmitting ||
+    submitViewState.hasPendingPileChanges ||
+    submitViewState.pileSubmittedStateActive
+  );
+  const showSubmitButton = !submitViewState.showPileSubmitSuccessBadge;
+  const showSuccessBadgeLink =
+    submitViewState.showPileSubmitSuccessBadge &&
+    !!submitViewState.pileSubmitResponderHref;
+  const showSuccessBadgeStatus =
+    submitViewState.showPileSubmitSuccessBadge &&
+    !submitViewState.pileSubmitResponderHref;
+  const showClearPendingButton = (
+    submitViewState.hasPendingPileChanges &&
+    !isSubmitting &&
+    !submitViewState.pileSubmittedStateActive
+  );
+
+  return {
+    ...submitViewState,
+    pileTopRailVisible,
+    showSubmitButton,
+    showSuccessBadgeLink,
+    showSuccessBadgeStatus,
+    showClearPendingButton,
   };
 };
 
