@@ -59,10 +59,15 @@ import {
 } from './surveyPileActiveQuestionCard';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
-  buildPileCacheUpdatePlan,
   isPileCacheConsistentWithBaseline,
   shouldSeedPileBaselineFromPrefill,
 } from './surveyPileCacheSync';
+import {
+  buildPileComponentUpdatePlan,
+  buildPileContextResetState,
+  buildPileQuestionProgressSignals,
+  pickScopedPileQuestionProgress,
+} from './surveyPileLifecycle';
 import {
   buildPileQuestionLoadState,
   buildPileVisibleTransitionPlan,
@@ -411,7 +416,6 @@ import {
   surveyLog,
   toNumberOrNull,
   toResponseRecencyMeta,
-  updateSubmittedSinceLastEdit,
   writeQuestionsCache,
   writeSurveysCache,
   bumpSurveyPerfCounter,
@@ -995,8 +999,61 @@ export class PileViewMode extends SurveyQuestions {
     // 1. Handle Account/Network changes (Reset context)
     const networkChanged = prevProps.network?.id !== this.props.network?.id;
     const accountChanged = (prevProps.account || '').toLowerCase() !== (this.props.account || '').toLowerCase();
+    const providerChanged = prevProps.provider !== this.props.provider;
 
-    if (networkChanged || accountChanged) {
+    const cacheReadyTick =
+      (prevProps.isQuestionCacheReady !== this.props.isQuestionCacheReady && this.props.isQuestionCacheReady) ||
+      (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady && this.props.isResponsesCacheReady);
+    const cacheJustBecameReady = !prevProps.isResponsesCacheReady && this.props.isResponsesCacheReady;
+    const nonceTick = prevProps.questionsCacheNonce !== this.props.questionsCacheNonce;
+    const responseNonceTick =
+      prevProps.questionResponsesNonce !== this.props.questionResponsesNonce;
+    const progressSlug = normalizeQuestionProgressSlug(resolveEffectiveSlug(this.props));
+    const previousQuestionProgress = pickScopedPileQuestionProgress({
+      progress: prevProps.questionScanProgress,
+      progressSlug,
+      doesQuestionProgressMatchSlug,
+    });
+    const nextQuestionProgress = pickScopedPileQuestionProgress({
+      progress: this.props.questionScanProgress,
+      progressSlug,
+      doesQuestionProgressMatchSlug,
+    });
+    const progressSignals = buildPileQuestionProgressSignals({
+      previousProgress: previousQuestionProgress,
+      nextProgress: nextQuestionProgress,
+    });
+    const pileQuestionsChanged = prevState.pileQuestions !== this.state.pileQuestions;
+    const surveysResponseStateChanged = prevState.surveysResponseState !== this.state.surveysResponseState;
+    const commentsChanged = prevState.showComments !== this.state.showComments;
+    const autoDecryptBlocked = this.isAutoDecryptBlocked();
+    const autoDecryptJustEnabled = !prevState.autoDecryptEnabled && this.state.autoDecryptEnabled;
+
+    const updatePlan = buildPileComponentUpdatePlan({
+      networkChanged,
+      accountChanged,
+      cacheReadyTick,
+      nonceTick,
+      responseNonceTick,
+      progressHydrationTick: progressSignals.progressHydrationTick,
+      progressCompletedTick: progressSignals.progressCompletedTick,
+      isOptimistic,
+      hasLiveEdits,
+      pileQuestionsLength: this.state.pileQuestions.length,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      loading: this.state.loading,
+      showLongLoading: this.state.showLongLoading,
+      providerChanged,
+      autoDecryptBlocked,
+      autoDecryptEnabled: this.state.autoDecryptEnabled,
+      pileQuestionsChanged,
+      surveysResponseStateChanged,
+      cacheJustBecameReady,
+      autoDecryptJustEnabled,
+      commentsChanged,
+    });
+
+    if (updatePlan.shouldResetContext) {
       // Persist draft before reset so it survives the login transition
       try { this.persistDraft(); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       this._lastLoadAndSortResultSignature = '';
@@ -1006,16 +1063,9 @@ export class PileViewMode extends SurveyQuestions {
       // If context changes, we must reset optimistic flags and reload immediately
       // We do this regardless of edits because the context (wallet/chain) invalidates the current session
       this.setState(
-        {
-          loading: true,
-          pileQuestions: [],
-          activePileIndex: 0,
-          submissionComplete: false, // Reset on context change
-          submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-          editBaseline: null,
-          // Clear response state to prevent stale data leaks across accounts
-          surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }]
-        },
+        buildPileContextResetState({
+          submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+        }),
         () => {
             if (this._loadAndSortDebounceTimer) {
               clearTimeout(this._loadAndSortDebounceTimer);
@@ -1037,103 +1087,35 @@ export class PileViewMode extends SurveyQuestions {
       return;
     }
 
-    // 2. Handle Cache Updates
-    const cacheReadyTick =
-      (prevProps.isQuestionCacheReady !== this.props.isQuestionCacheReady && this.props.isQuestionCacheReady) ||
-      (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady && this.props.isResponsesCacheReady);
-    const cacheJustBecameReady = !prevProps.isResponsesCacheReady && this.props.isResponsesCacheReady;
-
-    const nonceTick = prevProps.questionsCacheNonce !== this.props.questionsCacheNonce;
-    const responseNonceTick =
-      prevProps.questionResponsesNonce !== this.props.questionResponsesNonce;
-    const progressSlug = normalizeQuestionProgressSlug(resolveEffectiveSlug(this.props));
-    const pickScopedQuestionProgress = (progressIn) => {
-      if (!progressIn || typeof progressIn !== 'object') return null;
-      if (!doesQuestionProgressMatchSlug(progressIn.slug, progressSlug)) return null;
-      return progressIn;
-    };
-    const prevQuestionProgress = pickScopedQuestionProgress(prevProps.questionScanProgress);
-    const nextQuestionProgress = pickScopedQuestionProgress(this.props.questionScanProgress);
-    const prevDiscoveredQuestions = Math.max(0, Number(prevQuestionProgress?.discoveredQuestions || 0));
-    const nextDiscoveredQuestions = Math.max(0, Number(nextQuestionProgress?.discoveredQuestions || 0));
-    const prevHydratedQuestions = Math.max(0, Number(prevQuestionProgress?.hydratedQuestions || 0));
-    const nextHydratedQuestions = Math.max(0, Number(nextQuestionProgress?.hydratedQuestions || 0));
-    const prevPendingMetadataCount = Math.max(0, Number(prevQuestionProgress?.pendingMetadataCount || 0));
-    const nextPendingMetadataCount = Math.max(0, Number(nextQuestionProgress?.pendingMetadataCount || 0));
-    const progressHydrationTick = (
-      (nextDiscoveredQuestions !== prevDiscoveredQuestions ||
-        nextHydratedQuestions !== prevHydratedQuestions ||
-        nextPendingMetadataCount !== prevPendingMetadataCount) &&
-      (nextDiscoveredQuestions > 0 || nextHydratedQuestions > 0 || nextPendingMetadataCount > 0)
-    );
-    const progressCompletedTick = (
-      prevQuestionProgress?.phase === 'hydrate' &&
-      nextQuestionProgress?.phase !== 'hydrate'
-    );
-
-    const cacheUpdatePlan = buildPileCacheUpdatePlan({
-      cacheReadyTick,
-      nonceTick,
-      responseNonceTick,
-      progressHydrationTick,
-      progressCompletedTick,
-      isOptimistic,
-      hasLiveEdits,
-      pileQuestionsLength: this.state.pileQuestions.length,
-      isQuestionCacheReady: this.props.isQuestionCacheReady,
-      loading: this.state.loading,
-    });
-
-    if (cacheUpdatePlan.action === 'check-optimistic-baseline') {
+    if (updatePlan.cacheUpdatePlan.action === 'check-optimistic-baseline') {
       // Optimistic guard: do not reload/wipe state yet. Check if cache has caught up.
       this.checkCacheAgainstBaseline();
-    } else if (cacheUpdatePlan.action === 'reload') {
-      this.scheduleLoadAndSortQuestions(cacheUpdatePlan.delayMs);
-    } else if (cacheUpdatePlan.action === 'skip-live-edits') {
+    } else if (updatePlan.cacheUpdatePlan.action === 'reload') {
+      this.scheduleLoadAndSortQuestions(updatePlan.cacheUpdatePlan.delayMs);
+    } else if (updatePlan.cacheUpdatePlan.action === 'skip-live-edits') {
       bumpSurveyPerfCounter('noopSkipCount');
       surveyLog.debug('PileViewMode: skipped rebuild due to pending edits');
-    } else if (cacheUpdatePlan.action === 'show-loading') {
+    } else if (updatePlan.cacheUpdatePlan.action === 'show-loading') {
       // Initial load spinner (guarded against loop)
       this.setState({ loading: true });
     }
 
     // Clear long-loading if loaded
-    if (!this.state.loading && this.props.isQuestionCacheReady && this.state.showLongLoading) {
+    if (updatePlan.shouldClearLongLoading) {
       this.setState({ showLongLoading: false });
     }
 
     // 3. Auto-Decrypt Logic
-    if (
-      (prevProps.provider !== this.props.provider || prevProps.account !== this.props.account) &&
-      this.isAutoDecryptBlocked()
-    ) {
+    if (updatePlan.shouldDisableBlockedAutoDecrypt) {
       this.resetBlockedAutoDecryptSweepInternals();
       if (this.state.autoDecryptEnabled || (this.state.decryptingByKey && Object.keys(this.state.decryptingByKey).length > 0)) {
         this.setState(buildAutoDecryptDisabledState());
       }
     }
 
-    if (
-      this.state.autoDecryptEnabled &&
-      (
-        nonceTick ||
-        responseNonceTick ||
-        prevState.pileQuestions !== this.state.pileQuestions ||
-        prevState.surveysResponseState !== this.state.surveysResponseState ||
-        cacheJustBecameReady
-      ) &&
-      !this.isAutoDecryptBlocked()
-    ) {
-      this.queueAutoDecryptVisibleSweep('pile-state-change');
-    }
-
-    if (!prevState.autoDecryptEnabled && this.state.autoDecryptEnabled && !this.isAutoDecryptBlocked()) {
-      this.queueAutoDecryptVisibleSweep('pile-enabled');
-    }
-
-    if (this.state.autoDecryptEnabled && prevState.showComments !== this.state.showComments && !this.isAutoDecryptBlocked()) {
-      this.queueAutoDecryptVisibleSweep('pile-comments-toggle');
-    }
+    updatePlan.queueAutoDecryptReasons.forEach((reason) => {
+      this.queueAutoDecryptVisibleSweep(reason);
+    });
 
     this.syncLoadingElapsedTimer();
   }
