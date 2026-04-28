@@ -1,7 +1,9 @@
 import {
+  executeSurveyExitEditing,
   executeSurveyFormStateReset,
   executeSurveyPendingRevert,
   executeSurveyStartFresh,
+  shouldSurveyAutoStartFresh,
 } from './surveyToolResponseResetController';
 
 describe('surveyToolResponseResetController', () => {
@@ -182,5 +184,149 @@ describe('surveyToolResponseResetController', () => {
     expect(clearDraftFor).toHaveBeenNthCalledWith(2, 'q2');
     expect(recalculateEditStats).toHaveBeenCalledTimes(1);
     expect(persistDraftSafely).toHaveBeenCalledWith(0);
+  });
+
+  it('returns whether shared state should auto-enter start-fresh mode', () => {
+    expect(shouldSurveyAutoStartFresh({
+      props: {
+        singleQuestionMode: false,
+        isStandalone: false,
+        surveyIndex: 1,
+        viewAddress: '',
+      },
+      state: {
+        surveysResponseState: [
+          null,
+          {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: {},
+          },
+        ],
+        userHasResponse: false,
+        editBaseline: null,
+        isDirty: false,
+      },
+      getRenderedQuestionIds: () => ['q1'],
+    })).toBe(true);
+
+    expect(shouldSurveyAutoStartFresh({
+      props: {
+        singleQuestionMode: false,
+        isStandalone: false,
+        surveyIndex: 1,
+        viewAddress: '',
+      },
+      state: {
+        surveysResponseState: [
+          null,
+          {
+            answers: {},
+            importance: {},
+            conviction: {},
+            additionalComments: { q1: { value: 'notes' } },
+          },
+        ],
+        userHasResponse: false,
+        editBaseline: null,
+        isDirty: false,
+      },
+      getRenderedQuestionIds: () => ['q1'],
+    })).toBe(false);
+  });
+
+  it('restores the shared edit baseline when exiting edit mode', () => {
+    const setState = jest.fn((updates, callback) => {
+      if (typeof callback === 'function') callback();
+      return updates;
+    });
+    const recalculateEditStats = jest.fn();
+    const persistDraftSafely = jest.fn();
+    const updateJsonPreview = jest.fn();
+    const clearDraft = jest.fn();
+
+    expect(executeSurveyExitEditing({
+      props: {
+        singleQuestionMode: false,
+        isStandalone: false,
+        surveyIndex: 2,
+        responderAddress: '0xdef',
+      },
+      state: {
+        surveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
+        parsedViewAddressAnswers: { answer: { value: 'viewed' } },
+        userAnswers: { answer: { value: 'self' } },
+        submittedSinceLastEdit: true,
+      },
+      buildSliceFromUserAnswers: jest.fn(() => ({
+        answers: { q1: { value: 'viewed' } },
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      })),
+      buildSliceFromLocalCache: jest.fn(),
+      getRenderedQuestionIds: () => ['q1', 'q2'],
+      buildEmptyResponseFieldState: (questionId?: string, fieldKey = 'answer') => ({
+        value: '',
+        questionId,
+        fieldKey,
+      }),
+      cloneValue: (value) => JSON.parse(JSON.stringify(value)),
+      setState,
+      recalculateEditStats,
+      persistDraftSafely,
+      updateJsonPreview,
+      clearDraft,
+      updateSubmittedSinceLastEdit: () => false,
+    })).toEqual({
+      applied: true,
+      reason: 'applied',
+    });
+
+    expect(setState).toHaveBeenCalledWith(expect.objectContaining({
+      isEditing: false,
+      displayAnswerMode: true,
+      startFresh: false,
+      submittedSinceLastEdit: false,
+    }), expect.any(Function));
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
+    expect(persistDraftSafely).toHaveBeenCalledTimes(1);
+    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(clearDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to a minimal exit-editing state when restore orchestration fails', () => {
+    const setState = jest.fn((updates, callback) => {
+      if (typeof callback === 'function') callback();
+      return updates;
+    });
+    const recalculateEditStats = jest.fn();
+    const onFailure = jest.fn();
+
+    expect(executeSurveyExitEditing({
+      props: {},
+      state: {
+        submittedSinceLastEdit: true,
+      },
+      resolveBaselineSlice: () => {
+        throw new Error('boom');
+      },
+      setState,
+      recalculateEditStats,
+      updateSubmittedSinceLastEdit: () => false,
+      onFailure,
+    })).toEqual({
+      applied: false,
+      reason: 'fallback',
+    });
+
+    expect(onFailure).toHaveBeenCalledWith(expect.any(Error));
+    expect(setState).toHaveBeenCalledWith({
+      isEditing: false,
+      displayAnswerMode: true,
+      submittedSinceLastEdit: false,
+    }, expect.any(Function));
+    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
   });
 });
