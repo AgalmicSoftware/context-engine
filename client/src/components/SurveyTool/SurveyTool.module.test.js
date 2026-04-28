@@ -12355,6 +12355,45 @@ describe('SurveyTool module', () => {
     expect(subject._emptyReadyProbeStartedAtMs).toBe(0);
   });
 
+  it('keeps pile loading active after load failures while recent rate-limit warming is active', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockRejectedValue(new Error('boom'));
+
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      sessionSlug: 'edge',
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    syncClassSetState(subject);
+    subject.isRecentRateLimit = jest.fn(() => true);
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+    };
+
+    await subject.loadAndSortQuestions();
+
+    expect(subject.state.loading).toBe(true);
+  });
+
   it('keeps unanswered questions visible in pile mode when response map is empty', async () => {
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
       '84532': {
@@ -13057,6 +13096,79 @@ describe('SurveyTool module', () => {
 
     subject.initializeResponseState();
     expect(subject.setState).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips duplicate pile question-set hydration signatures', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      questionResponsesNonce: 5,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject._loadAndSortQuestionsEpoch = 4;
+    subject._lastLoadAndSortResultSignature = 'same-signature';
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateVisiblePileWindow = jest.fn();
+
+    subject.runPileQuestionSetHydration({
+      requestEpoch: 4,
+      resultSignature: 'same-signature',
+    });
+
+    expect(subject.initializeResponseState).not.toHaveBeenCalled();
+    expect(subject.rehydrateVisiblePileWindow).not.toHaveBeenCalled();
+  });
+
+  it('rehydrates pile windows directly when load-time hydration skips response initialization', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0xabc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      questionResponsesNonce: 5,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject._loadAndSortQuestionsEpoch = 6;
+    subject.initializeResponseState = jest.fn();
+    subject.rehydrateVisiblePileWindow = jest.fn();
+
+    subject.runPileQuestionSetHydration({
+      requestEpoch: 6,
+      resultSignature: 'next-signature',
+      initializeResponses: false,
+      forceOverwriteDraft: true,
+      resetAutoDecryptLedger: true,
+      autoDecryptReason: 'pile-refresh',
+      autoDecryptResetReason: 'pile-refresh-reset',
+    });
+
+    expect(subject.initializeResponseState).not.toHaveBeenCalled();
+    expect(subject.rehydrateVisiblePileWindow).toHaveBeenCalledWith({
+      requestEpoch: 6,
+      forceOverwriteDraft: true,
+      resetAutoDecryptLedger: true,
+      autoDecryptReason: 'pile-refresh',
+      autoDecryptResetReason: 'pile-refresh-reset',
+    });
+    expect(subject._lastLoadAndSortResultSignature).toBe('next-signature');
   });
 
   it('schedules pile reload when scoped hydration progress advances without nonce ticks', () => {
