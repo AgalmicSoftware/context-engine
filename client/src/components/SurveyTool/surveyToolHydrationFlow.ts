@@ -285,8 +285,8 @@ type ApplyLocalCacheRehydrateNoChangeEffectsArgs = {
 };
 
 type ApplyLocalCacheRehydrateSuccessEffectsArgs = {
-  updates?: UnknownRecord | null;
-  applyStateUpdates?: ((updates: UnknownRecord, callback?: () => void) => void) | null;
+  updates?: UnknownRecord | ((prev: UnknownRecord) => UnknownRecord) | null;
+  applyStateUpdates?: ((updates: UnknownRecord | ((prev: UnknownRecord) => UnknownRecord), callback?: () => void) => void) | null;
   afterStateApplied?: (() => void) | null;
 };
 
@@ -1417,7 +1417,8 @@ export const applyLocalCacheRehydrateSuccessEffects = ({
   applyStateUpdates = null,
   afterStateApplied = null,
 }: ApplyLocalCacheRehydrateSuccessEffectsArgs = {}) => {
-  if (!updates || typeof updates !== 'object' || typeof applyStateUpdates !== 'function') {
+  const hasUsableUpdates = !!updates && (typeof updates === 'object' || typeof updates === 'function');
+  if (!hasUsableUpdates || typeof applyStateUpdates !== 'function') {
     return false;
   }
 

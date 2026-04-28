@@ -1655,6 +1655,22 @@ describe('surveyToolHydrationFlow', () => {
     expect(applyStateUpdates).toHaveBeenCalledWith({ surveysResponseState: [] }, expect.any(Function));
     expect(afterStateApplied).toHaveBeenCalledTimes(1);
 
+    const functionalApplyStateUpdates = jest.fn((updater, done) => {
+      if (typeof updater === 'function') {
+        updater({ surveysResponseState: [], editBaseline: null, isDirty: false, submissionComplete: false });
+      }
+      if (typeof done === 'function') done();
+    });
+    afterStateApplied.mockClear();
+
+    expect(applyLocalCacheRehydrateSuccessEffects({
+      updates: (prev) => ({ surveysResponseState: prev.surveysResponseState }),
+      applyStateUpdates: functionalApplyStateUpdates,
+      afterStateApplied,
+    })).toBe(true);
+    expect(functionalApplyStateUpdates).toHaveBeenCalledWith(expect.any(Function), expect.any(Function));
+    expect(afterStateApplied).toHaveBeenCalledTimes(1);
+
     expect(applyLocalCacheRehydrateSuccessEffects({
       updates: null,
       applyStateUpdates,
