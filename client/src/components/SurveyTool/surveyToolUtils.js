@@ -106,6 +106,7 @@ export {
   buildHydratedResponseSlice,
   buildExitEditingStatePatch,
   buildInitializedSurveyResponseState,
+  buildLocalCacheRehydrationUpdatePlan,
   buildRevertPendingStatePatch,
   buildStartFreshSurveyState,
   buildResetFormStatePatch,
