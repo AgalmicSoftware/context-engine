@@ -9,6 +9,14 @@ export type PileQuestionLike = {
 export type PileQuestionResponsesMap = Record<string, Record<string, unknown>>;
 export type PileQuestionResponseCounts = Record<string, number>;
 
+export type BuildQuestionListSignature = (questions: PileQuestionLike[]) => string;
+export type GetPileVisibleQuestionIds = (questions: PileQuestionLike[], activeIndex: number) => string[];
+export type BuildPileVisibleResponseSignature = (
+  questionResponses: PileQuestionResponsesMap,
+  visibleIds: string[],
+  account: string
+) => string;
+
 const byResponseCountDesc = (
   left: PileQuestionLike,
   right: PileQuestionLike,
@@ -176,3 +184,145 @@ export const shouldSkipPileFilterStateUpdate = ({
   !!nextHiddenGated === !!currentHiddenGated &&
   String(nextFilterSignature || '') === String(currentFilterSignature || '')
 );
+
+export type PileLoadResultPlan = {
+  nextState: Record<string, unknown>;
+  nextLoading: boolean;
+  nextVisibleForHydration: PileQuestionLike[];
+  nextActiveIndexForHydration: number;
+  shouldUpdateState: boolean;
+  shouldIncrementPileQuestionsGeneration: boolean;
+  resultSignature: string;
+};
+
+export const buildPileLoadResultPlan = ({
+  previousAllQuestionsForFilter = [],
+  previousPileQuestions = [],
+  previousActivePileIndex = 0,
+  previousHasHiddenGatedQuestions = false,
+  previousLoading = false,
+  sortedQuestions = [],
+  sortedVisibleQuestions = [],
+  hiddenQuestions = [],
+  hasHiddenGatedQuestions = false,
+  isFilterActive = false,
+  filterSig = '',
+  questionResponses = {},
+  account = '',
+  settleUnreadyEmpty = false,
+  isQuestionCacheReady = false,
+  recentRateLimit = false,
+  areQuestionListsEquivalent = (left: unknown, right: unknown) => left === right,
+  buildQuestionListSignature = () => '0:0',
+  getPileVisibleQuestionIds = () => [],
+  buildPileVisibleResponseSignature = () => '',
+}: {
+  previousAllQuestionsForFilter?: PileQuestionLike[] | null;
+  previousPileQuestions?: PileQuestionLike[] | null;
+  previousActivePileIndex?: number | null;
+  previousHasHiddenGatedQuestions?: boolean;
+  previousLoading?: boolean;
+  sortedQuestions?: PileQuestionLike[] | null;
+  sortedVisibleQuestions?: PileQuestionLike[] | null;
+  hiddenQuestions?: PileQuestionLike[] | null;
+  hasHiddenGatedQuestions?: boolean;
+  isFilterActive?: boolean;
+  filterSig?: string | null;
+  questionResponses?: PileQuestionResponsesMap | null;
+  account?: string | null;
+  settleUnreadyEmpty?: boolean;
+  isQuestionCacheReady?: boolean;
+  recentRateLimit?: boolean;
+  areQuestionListsEquivalent?: (left: PileQuestionLike[], right: PileQuestionLike[]) => boolean;
+  buildQuestionListSignature?: BuildQuestionListSignature;
+  getPileVisibleQuestionIds?: GetPileVisibleQuestionIds;
+  buildPileVisibleResponseSignature?: BuildPileVisibleResponseSignature;
+} = {}): PileLoadResultPlan => {
+  const normalizedPreviousAllQuestions = Array.isArray(previousAllQuestionsForFilter)
+    ? previousAllQuestionsForFilter
+    : [];
+  const normalizedPreviousPileQuestions = Array.isArray(previousPileQuestions)
+    ? previousPileQuestions
+    : [];
+  const normalizedSortedQuestions = Array.isArray(sortedQuestions) ? sortedQuestions : [];
+  const normalizedSortedVisibleQuestions = Array.isArray(sortedVisibleQuestions) ? sortedVisibleQuestions : [];
+  const normalizedHiddenQuestions = Array.isArray(hiddenQuestions) ? hiddenQuestions : [];
+  const normalizedPreviousActivePileIndex = Math.max(0, Number(previousActivePileIndex || 0));
+  const normalizedAccount = String(account || '').toLowerCase();
+
+  const { loading: nextLoading } = buildPileQuestionLoadState({
+    visibleQuestions: normalizedSortedVisibleQuestions,
+    hiddenQuestions: normalizedHiddenQuestions,
+    settleUnreadyEmpty,
+    isQuestionCacheReady,
+    recentRateLimit,
+  });
+
+  const nextState: Record<string, unknown> = {
+    allQuestionsForFilter: normalizedSortedQuestions,
+    hasHiddenGatedQuestions: !!hasHiddenGatedQuestions,
+    loading: nextLoading,
+  };
+
+  let shouldUpdateState =
+    !areQuestionListsEquivalent(normalizedPreviousAllQuestions, normalizedSortedQuestions) ||
+    !!previousHasHiddenGatedQuestions !== !!hasHiddenGatedQuestions ||
+    !!previousLoading !== !!nextLoading;
+  let nextVisibleForHydration = normalizedPreviousPileQuestions;
+  let nextActiveIndexForHydration = normalizedPreviousActivePileIndex;
+  let shouldIncrementPileQuestionsGeneration = false;
+
+  if (!isFilterActive) {
+    const {
+      pileChanged,
+      indexChanged,
+      clampedIndex,
+      nextVisibleForHydration: nextVisiblePlan,
+      nextActiveIndexForHydration: nextActivePlan,
+    } = buildPileVisibleTransitionPlan({
+      previousPileQuestions: normalizedPreviousPileQuestions,
+      previousActivePileIndex: normalizedPreviousActivePileIndex,
+      nextVisibleQuestions: normalizedSortedVisibleQuestions,
+      areQuestionListsEquivalent,
+    });
+
+    nextVisibleForHydration = nextVisiblePlan;
+    nextActiveIndexForHydration = nextActivePlan;
+    if (pileChanged) {
+      shouldIncrementPileQuestionsGeneration = true;
+      nextState.pileQuestions = normalizedSortedVisibleQuestions;
+    }
+    if (pileChanged || indexChanged) {
+      nextState.activePileIndex = clampedIndex;
+    }
+    shouldUpdateState = shouldUpdateState || pileChanged || indexChanged;
+  }
+
+  const visibleWindowIds = getPileVisibleQuestionIds(
+    nextVisibleForHydration,
+    nextActiveIndexForHydration
+  );
+  const visibleResponseSignature = buildPileVisibleResponseSignature(
+    questionResponses && typeof questionResponses === 'object' ? questionResponses : {},
+    visibleWindowIds,
+    normalizedAccount
+  );
+  const resultSignature = [
+    isFilterActive ? 'f1' : 'f0',
+    String(filterSig || ''),
+    buildQuestionListSignature(normalizedSortedQuestions),
+    buildQuestionListSignature(normalizedSortedVisibleQuestions),
+    normalizedHiddenQuestions.length > 0 ? 1 : 0,
+    visibleResponseSignature,
+  ].join('::');
+
+  return {
+    nextState,
+    nextLoading,
+    nextVisibleForHydration,
+    nextActiveIndexForHydration,
+    shouldUpdateState,
+    shouldIncrementPileQuestionsGeneration,
+    resultSignature,
+  };
+};

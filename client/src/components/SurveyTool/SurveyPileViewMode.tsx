@@ -77,8 +77,7 @@ import {
   loadPileScopeCacheSnapshot,
 } from './surveyPileScopeCacheData';
 import {
-  buildPileQuestionLoadState,
-  buildPileVisibleTransitionPlan,
+  buildPileLoadResultPlan,
   shouldSkipPileFilterStateUpdate,
   sortPileQuestionsByPriority,
   splitPileMaskedQuestions,
@@ -1654,75 +1653,36 @@ export class PileViewMode extends SurveyQuestions {
       const isFilterActive = !!this.state.isFilterActive || !!filterSig;
       if (requestEpoch !== this._loadAndSortQuestionsEpoch) return;
       const settleUnreadyEmpty = canSettleUnreadyEmpty && sortedVisible.length === 0;
-      const { loading: nextLoading } = buildPileQuestionLoadState({
-        visibleQuestions: sortedVisible,
+      const loadResultPlan = buildPileLoadResultPlan({
+        previousAllQuestionsForFilter: this.state.allQuestionsForFilter,
+        previousPileQuestions: this.state.pileQuestions,
+        previousActivePileIndex: this.state.activePileIndex,
+        previousHasHiddenGatedQuestions: this.state.hasHiddenGatedQuestions,
+        previousLoading: this.state.loading,
+        sortedQuestions: sorted,
+        sortedVisibleQuestions: sortedVisible,
         hiddenQuestions: hiddenGated,
+        hasHiddenGatedQuestions: nextHidden,
+        isFilterActive,
+        filterSig,
+        questionResponses: allResponses,
+        account: acctLower,
         settleUnreadyEmpty,
         isQuestionCacheReady: !!this.props.isQuestionCacheReady,
         recentRateLimit,
+        areQuestionListsEquivalent: this.areQuestionListsEquivalent,
+        buildQuestionListSignature: this.buildQuestionListSignature,
+        getPileVisibleQuestionIds: this.getPileVisibleQuestionIds,
+        buildPileVisibleResponseSignature: this.buildPileVisibleResponseSignature,
       });
-      const nextState = {
-        // Only update allQuestionsForFilter; pileQuestions is driven by filter
-        allQuestionsForFilter: sorted,
-        hasHiddenGatedQuestions: nextHidden,
-        // If we have data, stop loading; if we don't, keep spinner up while cache is
-        // not ready OR we recently hit a rate-limit / quota condition.
-        loading: nextLoading,
-      };
-      const prev = this.state;
-      let shouldUpdateState =
-        !this.areQuestionListsEquivalent(prev.allQuestionsForFilter, sorted) ||
-        prev.hasHiddenGatedQuestions !== nextHidden ||
-        prev.loading !== nextLoading;
-      let nextVisibleForHydration = Array.isArray(prev.pileQuestions) ? prev.pileQuestions : [];
-      let nextActiveIndexForHydration = Number(prev.activePileIndex || 0);
-
-      if (!isFilterActive) {
-        const {
-          pileChanged,
-          indexChanged,
-          clampedIndex,
-          nextVisibleForHydration: nextVisiblePlan,
-          nextActiveIndexForHydration: nextActivePlan,
-        } = buildPileVisibleTransitionPlan({
-          previousPileQuestions: prev.pileQuestions,
-          previousActivePileIndex: prev.activePileIndex,
-          nextVisibleQuestions: sortedVisible,
-          areQuestionListsEquivalent: this.areQuestionListsEquivalent,
-        });
-        nextVisibleForHydration = nextVisiblePlan;
-        nextActiveIndexForHydration = nextActivePlan;
-        if (pileChanged) {
-          this._pileQuestionsGeneration += 1;
-          nextState.pileQuestions = sortedVisible;
-        }
-        if (pileChanged || indexChanged) {
-          nextState.activePileIndex = clampedIndex;
-        }
-        shouldUpdateState = shouldUpdateState || pileChanged || indexChanged;
+      if (loadResultPlan.shouldIncrementPileQuestionsGeneration) {
+        this._pileQuestionsGeneration += 1;
       }
-      const visibleWindowIds = this.getPileVisibleQuestionIds(
-        nextVisibleForHydration,
-        nextActiveIndexForHydration
-      );
-      const visibleResponseSignature = this.buildPileVisibleResponseSignature(
-        allResponses,
-        visibleWindowIds,
-        acctLower
-      );
-      const resultSignature = [
-        isFilterActive ? 'f1' : 'f0',
-        String(filterSig || ''),
-        this.buildQuestionListSignature(sorted),
-        this.buildQuestionListSignature(sortedVisible),
-        hiddenGated.length > 0 ? 1 : 0,
-        visibleResponseSignature,
-      ].join('::');
 
       const runHydration = () => {
         this.runPileQuestionSetHydration({
           requestEpoch,
-          resultSignature,
+          resultSignature: loadResultPlan.resultSignature,
           initializeResponses: !this.state.submissionComplete,
           forceOverwriteDraft: true,
           resetAutoDecryptLedger: true,
@@ -1731,13 +1691,13 @@ export class PileViewMode extends SurveyQuestions {
         });
       };
 
-      if (!shouldUpdateState) {
+      if (!loadResultPlan.shouldUpdateState) {
         bumpSurveyPerfCounter('noopSkipCount');
         runHydration();
         return;
       }
 
-      this.setState(nextState, runHydration);
+      this.setState(loadResultPlan.nextState, runHydration);
     } catch (e) {
       surveyLog.error('Failed to load/sort questions:', e);
       // Treat unexpected errors as warming state if we recently saw rate-limits
