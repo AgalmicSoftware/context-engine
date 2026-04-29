@@ -111,6 +111,10 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - start-fresh orchestration
   - exit-editing restore orchestration
   - auto-start-fresh decision wrapper
+- `surveyToolSingleQuestionController.ts`
+  - single-question viewed-response bootstrap orchestration
+  - single-question own-response bootstrap orchestration
+  - single-question response cache read / reread / write helpers
 
 That means the next shared-core question is no longer “can we extract a controller?” It is:
 
@@ -121,8 +125,8 @@ That means the next shared-core question is no longer “can we extract a contro
 
 The next realistic candidates are:
 
-- Single-question response bootstrap / fetch lifecycle
 - Shared response-source restore helpers adjacent to decrypt/viewed-response flows
+- Single-question fetch metadata shell / lifecycle around the bootstrap controller
 - A broader inheritance-to-composition boundary pass
 
 These are stronger architectural moves than another tiny helper peel because:
@@ -181,12 +185,12 @@ That means:
 The next natural code move after the current controller extractions is:
 
 1. Decide whether to keep going with mode-agnostic runtime extraction, or pause for a broader boundary redesign.
-2. If continuing incrementally, target the single-question response bootstrap / restore seam next.
+2. If continuing incrementally, target shared response-source restore helpers or the remaining single-question fetch shell next.
 3. Keep React lifecycle ownership where it is until that seam is better isolated.
 
 Recommended next seam:
 
-- shared single-question response bootstrap / restore primitives
+- shared response-source restore primitives adjacent to decrypt / viewed-response flows
 
 Do **not** start with:
 
