@@ -26,8 +26,6 @@ import contractScripts, {
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
   getSessionSlugByName,
-  getSessionChainId as resolveSessionChainId,
-  getSessionNetwork as resolveSessionNetwork,
   getReadProviderForSession,
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
@@ -126,9 +124,13 @@ import {
   isKnownOrGeneralSessionSlug,
   isMaskedQuestionPayload,
   pickBetterQuestionPayload,
-  resolveStrictSessionValue,
   shouldRetryMaskedQuestionRefresh,
 } from '../../utilities/survey/questionRouting.js';
+import {
+  getSessionCfg as _getSessionCfg,
+  getSessionChainId as _getSessionChainId,
+  getSessionNetwork as _getSessionNetwork,
+} from '../../utilities/session/mainSiteSessionConfig.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   resolveMainSiteQuestionRouteSessionContext,
@@ -1921,33 +1923,10 @@ export class MainSite extends Component {
   // Per-group localStorage helper (Data by Group = DG)
   DG = createMainSiteDgStorage();
 
-  // Session config + chain resolver (single source of truth)
-  getSessionCfg = (slugIn) => {
-    const normalized = normalizeSessionSlug(slugIn ?? '');
-    if (!normalized) return getSessionConfigBySlugOrDefault('');
-    return resolveStrictSessionValue(
-      normalized,
-      getSessionConfigBySlug,
-      (slug) => getSessionConfigBySlug(slug)
-    );
-  }
-
-  getSessionChainId = (slugIn) => {
-    return resolveStrictSessionValue(
-      normalizeSessionSlug(slugIn ?? ''),
-      getSessionConfigBySlug,
-      resolveSessionChainId
-    );
-  }
-
-  // Resolve wagmi Chain object for current group chain id, or synthesize a minimal object
-  getSessionNetwork = (slugIn) => {
-    return resolveStrictSessionValue(
-      normalizeSessionSlug(slugIn ?? ''),
-      getSessionConfigBySlug,
-      resolveSessionNetwork
-    );
-  }
+  // Session config accessors (extracted to mainSiteSessionConfig.js)
+  getSessionCfg = _getSessionCfg;
+  getSessionChainId = _getSessionChainId;
+  getSessionNetwork = _getSessionNetwork;
 
   normalizeListenerGroupSlug = (slugIn) => {
     const slug = (slugIn ?? '').toString().trim().toLowerCase();
