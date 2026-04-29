@@ -146,6 +146,10 @@ import {
   resolveScopedMetadataSessionSlug as resolveScopedMetadataSessionSlugFn,
 } from './metadataSessionBinding.js';
 import {
+  prepareSurveyMetadataCacheEntry as prepareSurveyMetadataCacheEntryFn,
+  prepareQuestionMetadataCacheEntry as prepareQuestionMetadataCacheEntryFn,
+} from './metadataCacheEntryBuilders.js';
+import {
   DG_PRIMARY_ROUTE_CACHE_NAMES,
   MASKED_Q_DECRYPT_BACKOFF_MAX,
   MASKED_Q_DECRYPT_BACKOFF_TTL_MS,
@@ -1506,30 +1510,13 @@ export class MainSite extends Component {
     if (!sid || !netKey) return false;
     const enforceScopedIsolation = options.enforceScopedIsolation === true;
 
-    let normalizedSurveyData = {
-      ...(surveyData && typeof surveyData === 'object' ? surveyData : {}),
-      surveyID: sid,
-      id: sid,
-      questionIDs: Array.isArray(surveyData?.questionIDs) ? surveyData.questionIDs : [],
-      creator: surveyData?.creator || '',
-    };
-    const sessionEnvelope = this.buildMetadataSessionCacheEnvelope(normalizedSurveyData, slug, {
-      scoped: enforceScopedIsolation,
-      includeSlugField: false,
+    const normalizedSurveyData = prepareSurveyMetadataCacheEntryFn({
+      surveyId: sid,
+      surveyData,
+      slug,
+      creationBlock,
+      enforceScopedIsolation,
     });
-    normalizedSurveyData = {
-      ...normalizedSurveyData,
-      ...sessionEnvelope.metadata,
-    };
-    if (!Object.prototype.hasOwnProperty.call(normalizedSurveyData, 'slug') || normalizedSurveyData.slug == null || String(normalizedSurveyData.slug).trim() === '') {
-      normalizedSurveyData.slug = normalizeSessionSlug(
-        normalizedSurveyData.sessionSlug ||
-        (enforceScopedIsolation ? '' : slug)
-      );
-    }
-    if (Number.isFinite(Number(creationBlock))) {
-      normalizedSurveyData.creationBlock = Number(creationBlock);
-    }
 
     let groupCache = this.DG.read('surveysCache', slug) || {};
     this.mergeLegacyNumericNetworkKey(groupCache, netKey);
@@ -1564,18 +1551,12 @@ export class MainSite extends Component {
     if (!qid || !netKey) return false;
     const enforceScopedIsolation = options.enforceScopedIsolation === true;
 
-    let normalizedQuestionData = {
-      ...(questionData && typeof questionData === 'object' ? questionData : {}),
-      id: qid,
-    };
-    const sessionEnvelope = this.buildMetadataSessionCacheEnvelope(normalizedQuestionData, slug, {
-      scoped: enforceScopedIsolation,
-      includeSlugField: false,
+    const normalizedQuestionData = prepareQuestionMetadataCacheEntryFn({
+      questionId: qid,
+      questionData,
+      slug,
+      enforceScopedIsolation,
     });
-    normalizedQuestionData = {
-      ...normalizedQuestionData,
-      ...sessionEnvelope.metadata,
-    };
 
     let questionsCache = this.DG.read('questionsCache', slug) || {};
     this.mergeLegacyNumericNetworkKey(questionsCache, netKey);
