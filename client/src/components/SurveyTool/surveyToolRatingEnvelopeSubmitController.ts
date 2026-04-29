@@ -1,54 +1,32 @@
-import type { ResponseFieldState } from './surveyToolAudienceDerivationController';
-import type { UnknownRecord } from './surveyToolTypes';
-
-type RatingResponseObject = UnknownRecord & {
-  additional?: ResponseFieldState;
-  answer?: ResponseFieldState;
-  conviction?: unknown;
-  convictionEncrypted?: unknown;
-  importance?: unknown;
-  importanceEncrypted?: unknown;
-  questionID?: unknown;
-  questionId?: unknown;
-};
-
-type RatingSliceForSubmit = {
-  answers?: Record<string, ResponseFieldState>;
-  additionalComments?: Record<string, ResponseFieldState>;
-};
-
-type RatingEncryptionBaseOptions = {
-  provider: unknown;
-  account: string;
-  chainId: number | string;
-  surveyId: string;
-  kind: string;
-  hasher: unknown;
-};
-
 export interface RatingEnvelopeDeps {
   isQuestionLockedForResponse: (qid: string) => boolean;
-  resolveFieldEncryptionAudience: (field: ResponseFieldState, qid: string, fieldKey: string) => string;
+  resolveFieldEncryptionAudience: (field: any, qid: string, fieldKey: string) => string;
   getEffectiveRecipientsForQid: (qid: string) => string[];
-  getEffectiveRecipientsForField: (opts: {
-    questionId: string;
-    fieldKey: string;
-    field: ResponseFieldState;
-  }) => string[];
+  getEffectiveRecipientsForField: (opts: { questionId: string; fieldKey: string; field: any }) => string[];
   getDefaultResponseEncryptionAudienceForQid: (qid: string) => string;
-  buildLitEncryptionOptionsForRecipients: (recipients: string[]) => UnknownRecord | null;
-  encryptEnvelopeValue: (value: unknown, opts: RatingEncryptionBaseOptions & UnknownRecord) => Promise<string>;
-  getImportanceFromResponse: (r: RatingResponseObject) => number | null;
-  getConvictionFromResponse: (r: RatingResponseObject) => number | null;
+  buildLitEncryptionOptionsForRecipients: (recipients: string[]) => any | null;
+  encryptEnvelopeValue: (value: any, opts: any) => Promise<string>;
+  getImportanceFromResponse: (r: any) => number | null;
+  getConvictionFromResponse: (r: any) => number | null;
   warn?: (msg: string, err?: unknown) => void;
 }
 
 export interface RatingEnvelopeContext {
-  sliceForSubmit: RatingSliceForSubmit;
-  userAnswersSource: unknown;
-  questionResponses: RatingResponseObject[];
+  sliceForSubmit: {
+    answers?: Record<string, any>;
+    additionalComments?: Record<string, any>;
+  };
+  userAnswersSource: any;
+  questionResponses: any[];
   changedMapForSubmit: Record<string, Record<string, boolean>>;
-  encryptionBaseOpts: RatingEncryptionBaseOptions;
+  encryptionBaseOpts: {
+    provider: any;
+    account: string;
+    chainId: number | string;
+    surveyId: string;
+    kind: string;
+    hasher: any;
+  };
 }
 
 export interface RatingEnvelopeResult {
@@ -63,7 +41,7 @@ export const RATING_FIELD_SPECS = [
 ] as const;
 
 export function buildRatingBaseline(
-  userAnswersSource: unknown,
+  userAnswersSource: any,
   deps: RatingEnvelopeDeps,
 ): Map<string, {
   importanceEncrypted: string;
@@ -81,16 +59,10 @@ export function buildRatingBaseline(
   try {
     const list =
       userAnswersSource && typeof userAnswersSource === 'object'
-        ? (Array.isArray((userAnswersSource as RatingResponseObject).responses)
-          ? (userAnswersSource as { responses: unknown[] }).responses
-          : [userAnswersSource])
+        ? (Array.isArray(userAnswersSource.responses) ? userAnswersSource.responses : [userAnswersSource])
         : [];
 
-    list.forEach((rawResponseObj) => {
-      const responseObj = rawResponseObj && typeof rawResponseObj === 'object'
-        ? rawResponseObj as RatingResponseObject
-        : null;
-      if (!responseObj) return;
+    list.forEach((responseObj: any) => {
       const qid = String(responseObj?.questionID || responseObj?.questionId || '').trim().toLowerCase();
       if (!qid) return;
 
@@ -179,7 +151,7 @@ export function pickAudienceForRatingEncryption(
 
 export function shouldEncryptRatingForQid(
   qid: string,
-  respObj: RatingResponseObject,
+  respObj: any,
   sliceForSubmit: RatingEnvelopeContext['sliceForSubmit'],
   deps: RatingEnvelopeDeps,
 ): boolean {
