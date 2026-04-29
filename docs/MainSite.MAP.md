@@ -145,6 +145,19 @@
 
 All extracted controllers use a factory-function + host-DI pattern (or pure exports for session config, metadata binding, route resolution, and view prop composition). `MainSite` now wires cache/readiness, scan-policy, profile-scan, metadata-refresh, survey, question, response, and SBT controllers as class-field initializers, leaving route orchestration, deep scans, survey event reconciliation, and final view dispatch inline.
 
+## Extracted Modules
+
+- `client/src/utilities/cache/sessionCacheReadinessController.js`
+  Factory: `createSessionCacheReadinessController(host)`
+  Methods: `setReadinessStateIfChanged`, `syncCacheHasLoadedFlagOnTransition`, `scheduleCacheUpdateFlush`, `queueCacheUpdateFlush`, `flushQueuedCacheUpdates`, `queueLocalRevisionUpdate`, `flushLocalRevisionUpdate`, `handleCrossTabCacheUpdateEvent`, `destroy`
+  Test: `sessionCacheReadinessController.test.js` (26 tests)
+- `client/src/utilities/cache/sessionCachePersistenceController.js`
+  Factory: `createSessionCachePersistenceController(host)`
+  Methods: `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent`, `destroy`
+  Test: `sessionCachePersistenceController.test.js` (11 tests)
+
+Both cache controllers use a factory-function + host-DI pattern rather than class extraction. `MainSite` creates them in the constructor and delegates through forwarding methods.
+
 ## Section Index
 
 | Section | Lines | Purpose | Key Methods |
