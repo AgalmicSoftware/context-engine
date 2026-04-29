@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.jsx`: **1,094 lines**
-  - `SurveyQuestions.tsx`: **9,597 lines**
+  - `SurveyQuestions.tsx`: **9,326 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
 
@@ -187,8 +187,22 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - `buildCanDecryptContext` — shared context builder (slug, cfg, policy, snapshot) eliminating duplicate derivation
   - `evaluateCanDecryptPreCheck` — pure pre-check evaluation (needs-wallet / no-gate / proceed)
   - `resolveCanDecryptGateAccess` — async gate verdict resolution via injected checkAccess dependency
+- `surveyToolResponseGateController.ts`
+  - pure response-gate and lock-audience derivation with dependency injection
+  - `buildRecipientsFromGates`
+  - `resolveGateDisplayLabel`
+  - `resolveConfiguredGateLabel`
+  - `buildGateAudienceSbtItems`
+  - `getQuestionGateOptions`
+  - `getResponseGateOptions`
+  - `getResponseGateOptionById`
+  - `resolveFieldEncryptionGateId`
+  - `getEffectiveRecipientsForField`
+  - `resolveGatedPromptGateNames`
+  - `resolveLockAudienceSessionName`
+  - covered by `surveyToolResponseGateController.test.ts` with 16 tests
 
-That means the single-question fetch lifecycle shell extraction is now substantially complete. The submit-path is now fully decomposed into extracted controllers (payload, changed-fields, rating envelopes, transaction helpers, post-submit cache), leaving `submitSurveyResponse` as a thin orchestrator and `writeSubmittedResponsesToLocalCaches` as a pure helper. The remaining inline code in `fetchSingleQuestionData` is mostly DI-bag assembly and side-effect interpretation, so the next shared-core question is no longer “can we extract a controller?” It is:
+That means the single-question fetch lifecycle shell extraction is now substantially complete. The submit-path is now fully decomposed into extracted controllers (payload, changed-fields, rating envelopes, transaction helpers, post-submit cache), and the response-gate / lock-audience logic now lives in its own extracted controller, leaving `submitSurveyResponse` as a thin orchestrator and `writeSubmittedResponsesToLocalCaches` as a pure helper. The remaining inline code in `fetchSingleQuestionData` is mostly DI-bag assembly and side-effect interpretation, so the next shared-core question is no longer “can we extract a controller?” It is:
 
 1. keep extracting smaller wrappers with diminishing returns, or
 2. pick the next higher-payoff seam deliberately
@@ -205,7 +219,7 @@ These are stronger architectural moves than another tiny helper peel because:
 
 - they are already used by both full mode and pile mode
 - they still hold meaningful orchestration weight
-- they are the remaining places where `SurveyQuestions.tsx` is still acting as a giant hybrid runtime
+- response-gate derivation has already been extracted, so they are the remaining places where `SurveyQuestions.tsx` is still acting as a giant hybrid runtime
 
 ## Boundary Options
 
@@ -257,7 +271,7 @@ That means:
 The next natural code move after the current controller extractions is:
 
 1. Decide whether to keep going with mode-agnostic runtime extraction, or pause for a broader boundary redesign.
-2. If continuing incrementally, target the shared decrypt/source wrappers or a small DI-bag assembly reduction next.
+2. If continuing incrementally, target the shared decrypt/source wrappers or a small DI-bag assembly reduction next rather than revisiting response-gate logic.
 3. Keep React lifecycle ownership where it is until that seam is better isolated.
 
 Recommended next seam:
