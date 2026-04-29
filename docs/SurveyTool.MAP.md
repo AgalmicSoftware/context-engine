@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.jsx`: **1,094 lines**
-  - `SurveyQuestions.tsx`: **9,795 lines**
+  - `SurveyQuestions.tsx`: **9,784 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
 
@@ -179,6 +179,11 @@ The first shared-core move is no longer hypothetical. The following seams are al
 - `surveyToolPostSubmitCacheController.ts`
   - pure post-submit cache write-through logic
   - `writeSubmittedResponsesToLocalCaches` — atomic cache writes for question and survey responses with recency gating, meta stamping, and survey merge
+- `surveyToolCanDecryptController.ts`
+  - pure context/evaluation logic for canDecryptOtherResponses gate resolution
+  - `buildCanDecryptContext` — shared context builder (slug, cfg, policy, snapshot) eliminating duplicate derivation
+  - `evaluateCanDecryptPreCheck` — pure pre-check evaluation (needs-wallet / no-gate / proceed)
+  - `resolveCanDecryptGateAccess` — async gate verdict resolution via injected checkAccess dependency
 
 That means the single-question fetch lifecycle shell extraction is now substantially complete. The submit-path is now fully decomposed into extracted controllers (payload, changed-fields, rating envelopes, transaction helpers, post-submit cache), leaving `submitSurveyResponse` as a thin orchestrator and `writeSubmittedResponsesToLocalCaches` as a pure helper. The remaining inline code in `fetchSingleQuestionData` is mostly DI-bag assembly and side-effect interpretation, so the next shared-core question is no longer “can we extract a controller?” It is:
 
