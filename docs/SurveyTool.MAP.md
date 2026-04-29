@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.jsx`: **1,094 lines**
-  - `SurveyQuestions.tsx`: **9,784 lines**
+  - `SurveyQuestions.tsx`: **9,625 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
 
@@ -136,7 +136,9 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - pure diff computation for `getChangedQidsAndFields`
   - `pickBestField` — case-insensitive field lookup with encryption fallback
   - `pickBestNumber` — case-insensitive numeric field lookup
+  - `buildIndexedQuestionEntryKeys` — pure question ID key normalization and grouping
   - `computeChangedQidsAndFields` — baseline vs current response slice comparison with encryption-aware tolerance
+  - `orchestrateGetChangedQidsAndFields` — full cache management, ID derivation, baseline resolution, and diff delegation
 - `surveyToolResponsePayloadController.ts`
   - pure response payload builder for `prepareJsonAndHash`
   - `buildResponsePayload` — builds canonical response JSON for single-question, standalone, and survey modes
