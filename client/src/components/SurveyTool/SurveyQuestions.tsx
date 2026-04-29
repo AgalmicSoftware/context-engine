@@ -50,6 +50,11 @@ import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import {
+  processRatingEnvelopesForSubmit,
+  type RatingEnvelopeDeps,
+  type RatingEnvelopeContext,
+} from './surveyToolRatingEnvelopeSubmitController';
+import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
   applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
@@ -8994,210 +8999,41 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     // - When the response is encrypted (or rating already encrypted), ensure ratings are stored in envelopes
     //   and remove plaintext copies from the uploaded payload.
     try {
-      const sliceForSubmit =
-        (overrideState && typeof overrideState === 'object')
-          ? overrideState
-          : (this.state.surveysResponseState && this.state.surveysResponseState[idx]) ||
-            { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-      const encChainId = this.resolveSessionChainId(submissionGroupKey);
-      const encSurveyId =
-        (this.props.singleQuestionMode || this.props.isStandalone)
-          ? ethers.constants.HashZero
-          : this.props.surveyId;
-
-      const pickAudienceForQid = (qid) => {
-        const qLower = String(qid || '').trim().toLowerCase();
-        if (!qLower) return { audience: 'self', recipients: [] };
-        if (this.isQuestionLockedForResponse(qLower)) {
-          return {
-            audience: 'gate',
-            recipients: this.getEffectiveRecipientsForQid(qLower),
-          };
-        }
-
-        const ans = sliceForSubmit.answers?.[qLower] || {};
-        const add = sliceForSubmit.additionalComments?.[qLower] || {};
-
-        if (ans?.encrypted) {
-          const aAud = this.resolveFieldEncryptionAudience(ans, qLower, 'answer');
-          if (aAud === 'gate') {
-            return {
-              audience: 'gate',
-              recipients: this.getEffectiveRecipientsForField({
-                questionId: qLower,
-                fieldKey: 'answer',
-                field: ans,
-              }),
-            };
-          }
-          if (aAud === 'self') return { audience: 'self', recipients: [] };
-        }
-
-        if (add?.encrypted) {
-          const dAud = this.resolveFieldEncryptionAudience(add, qLower, 'additional');
-          if (dAud === 'gate') {
-            return {
-              audience: 'gate',
-              recipients: this.getEffectiveRecipientsForField({
-                questionId: qLower,
-                fieldKey: 'additional',
-                field: add,
-              }),
-            };
-          }
-          if (dAud === 'self') return { audience: 'self', recipients: [] };
-        }
-
-        const defaultAudience = this.getDefaultResponseEncryptionAudienceForQid(qLower);
-        return {
-          audience: defaultAudience,
-          recipients: defaultAudience === 'gate' ? this.getEffectiveRecipientsForQid(qLower) : [],
-        };
-      };
-
-      const shouldEncryptRatingForQid = (qid, respObj) => {
-        const locked = this.isQuestionLockedForResponse(qid);
-        const ansState = sliceForSubmit.answers?.[qid];
-        const addState = sliceForSubmit.additionalComments?.[qid];
-        const encryptedState = !!locked || !!ansState?.encrypted || !!addState?.encrypted;
-        const encryptedPayload = !!respObj?.answer?.encrypted || !!respObj?.additional?.encrypted;
-        return encryptedState || encryptedPayload;
-      };
-
-      const baseOpts = {
-        provider: this.props.provider,
-        account: this.props.account,
-        chainId: encChainId,
-        surveyId: encSurveyId,
-        kind: 'rating',
-        hasher: this.state.hasher,
-      };
-      const ratingFieldSpecs = [
-        { fieldKey: 'importance', envelopeKey: 'importanceEncrypted' },
-        { fieldKey: 'conviction', envelopeKey: 'convictionEncrypted' },
-      ];
-
-      // Snapshot latest on-chain rating values/envelopes so non-rating edits don't wipe them.
-      const ratingBaselineByQid = new Map();
-      try {
-        const source = this.state.userAnswers;
-        const list =
-          source && typeof source === 'object'
-            ? (Array.isArray(source.responses) ? source.responses : [source])
-            : [];
-        list.forEach((r) => {
-          const id = String(r?.questionID || r?.questionId || '').trim().toLowerCase();
-          if (!id) return;
-          const impEnv = (typeof r?.importanceEncrypted === 'string') ? r.importanceEncrypted : '';
-          const convEnv = (typeof r?.convictionEncrypted === 'string') ? r.convictionEncrypted : '';
-          const impPlain = getImportanceFromResponse(r);
-          const convPlain = getConvictionFromResponse(r);
-          if (!impEnv && !convEnv && impPlain === null && convPlain === null) return;
-          ratingBaselineByQid.set(id, {
-            importanceEncrypted: impEnv,
-            convictionEncrypted: convEnv,
-            importance: impPlain,
-            conviction: convPlain,
-          });
-        });
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-      // Serialize envelope creation to avoid concurrent wallet signature prompts (eth_signTypedData_v4).
-      for (const respObj of (questionResponses || [])) {
-        const qidRaw = String(respObj?.questionID || respObj?.questionId || '').trim();
-        const qid = qidRaw.toLowerCase();
-        if (!qid) continue;
-
-        const fields =
-          (changedMapForSubmit && (changedMapForSubmit[qidRaw] || changedMapForSubmit[qid])) ||
-          {};
-        const baseline = ratingBaselineByQid.get(qid) || null;
-        const changedByField = {};
-
-        ratingFieldSpecs.forEach(({ fieldKey, envelopeKey }) => {
-          const fieldChanged = !!fields[fieldKey];
-          changedByField[fieldKey] = fieldChanged;
-
-          const baselineEnvelope = baseline?.[envelopeKey] || '';
-          const baselinePlain = baseline?.[fieldKey];
-
-          // Always carry forward existing envelopes so a non-rating edit can't wipe them.
-          if (!respObj[envelopeKey] && baselineEnvelope) respObj[envelopeKey] = baselineEnvelope;
-
-          // Preserve plaintext rating values for non-rating edits when the baseline is plaintext.
-          // (When encryption is active, we migrate plaintext into envelopes below.)
-          if (!fieldChanged && (respObj[fieldKey] === null || respObj[fieldKey] === undefined) && baselinePlain !== null && baselinePlain !== undefined) {
-            respObj[fieldKey] = baselinePlain;
-          }
-        });
-
-        const hasAnyExistingEnvelope = ratingFieldSpecs.some(({ envelopeKey }) => {
-          const env = typeof respObj[envelopeKey] === 'string' ? respObj[envelopeKey] : '';
-          return !!env;
-        });
-
-        // Rating encryption is active when the response is encrypted, or when rating is already encrypted.
-        const shouldEncryptRating = hasAnyExistingEnvelope || shouldEncryptRatingForQid(qid, respObj);
-        if (!shouldEncryptRating) {
-          // Rating stays plaintext; clear any stale envelopes for changed fields.
-          ratingFieldSpecs.forEach(({ fieldKey, envelopeKey }) => {
-            if (changedByField[fieldKey]) respObj[envelopeKey] = '';
-          });
-          continue;
-        }
-
-        const fieldsNeedingEncryption = ratingFieldSpecs.filter(({ fieldKey, envelopeKey }) => {
-          const value = respObj?.[fieldKey];
-          const existingEnvelope = (typeof respObj[envelopeKey] === 'string') ? respObj[envelopeKey] : '';
-          return (
-            value !== undefined &&
-            value !== null &&
-            (changedByField[fieldKey] || !existingEnvelope)
-          );
-        });
-
-        // Only resolve Lit recipients when we actually need to encrypt a value.
-        let lit = undefined;
-        if (fieldsNeedingEncryption.length > 0) {
-          const audienceSelection = pickAudienceForQid(qid);
-          if (audienceSelection.audience === 'gate') {
-            const recipients = audienceSelection.recipients;
-            if (!Array.isArray(recipients) || recipients.length === 0) {
-              throw new Error(`Missing Lit recipients for gated rating encryption (${qid}).`);
-            }
-            lit = this.buildLitEncryptionOptionsForRecipients(recipients);
-            if (!lit) {
-              throw new Error('Lit hooks unavailable; cannot encrypt gated rating.');
-            }
-          }
-        }
-
-        for (const { fieldKey, envelopeKey } of ratingFieldSpecs) {
-          const value = respObj?.[fieldKey];
-          const existingEnvelope = (typeof respObj[envelopeKey] === 'string') ? respObj[envelopeKey] : '';
-          const shouldEncryptField =
-            (value !== undefined && value !== null) &&
-            (changedByField[fieldKey] || !existingEnvelope);
-
-          if (shouldEncryptField) {
-            // eslint-disable-next-line no-await-in-loop
-            respObj[envelopeKey] = await cryptoUtils.encryptEnvelopeValue(value, {
-              ...baseOpts,
-              ...(lit ? { lit } : {}),
-              qId: `${fieldKey}:${qid}`,
-            });
-          } else if (changedByField[fieldKey]) {
-            // Explicit clear on changed plaintext.
-            respObj[envelopeKey] = '';
-          }
-        }
-
-        // Rating is stored in envelopes only when encryption is active.
-        ratingFieldSpecs.forEach(({ fieldKey }) => {
-          respObj[fieldKey] = null;
-        });
-      }
+      await processRatingEnvelopesForSubmit(
+        {
+          sliceForSubmit:
+            (overrideState && typeof overrideState === 'object')
+              ? overrideState
+              : (this.state.surveysResponseState && this.state.surveysResponseState[idx]) ||
+                { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+          userAnswersSource: this.state.userAnswers,
+          questionResponses,
+          changedMapForSubmit,
+          encryptionBaseOpts: {
+            provider: this.props.provider,
+            account: this.props.account,
+            chainId: this.resolveSessionChainId(submissionGroupKey),
+            surveyId:
+              (this.props.singleQuestionMode || this.props.isStandalone)
+                ? ethers.constants.HashZero
+                : this.props.surveyId,
+            kind: 'rating',
+            hasher: this.state.hasher,
+          },
+        },
+        {
+          isQuestionLockedForResponse: (qid) => this.isQuestionLockedForResponse(qid),
+          resolveFieldEncryptionAudience: (field, qid, fk) => this.resolveFieldEncryptionAudience(field, qid, fk),
+          getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
+          getEffectiveRecipientsForField: (opts) => this.getEffectiveRecipientsForField(opts),
+          getDefaultResponseEncryptionAudienceForQid: (qid) => this.getDefaultResponseEncryptionAudienceForQid(qid),
+          buildLitEncryptionOptionsForRecipients: (r) => this.buildLitEncryptionOptionsForRecipients(r),
+          encryptEnvelopeValue: (value, opts) => cryptoUtils.encryptEnvelopeValue(value, opts),
+          getImportanceFromResponse,
+          getConvictionFromResponse,
+          warn: (msg, err) => surveyLog.warn(msg, err),
+        },
+      );
     } catch (e) {
       surveyLog.error('Failed to encrypt response rating:', e);
       throw e;
