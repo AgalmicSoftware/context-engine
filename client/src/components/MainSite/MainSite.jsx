@@ -140,6 +140,12 @@ import {
 } from './routeSessionResolution.js';
 import { resolveMainSiteLitSessionConfig } from './litSessionConfig.js';
 import {
+  buildMetadataSessionCacheEnvelope as buildMetadataSessionCacheEnvelopeFn,
+  resolveMetadataSessionBinding as resolveMetadataSessionBindingFn,
+  resolveMetadataSessionSlug as resolveMetadataSessionSlugFn,
+  resolveScopedMetadataSessionSlug as resolveScopedMetadataSessionSlugFn,
+} from './metadataSessionBinding.js';
+import {
   DG_PRIMARY_ROUTE_CACHE_NAMES,
   MASKED_Q_DECRYPT_BACKOFF_MAX,
   MASKED_Q_DECRYPT_BACKOFF_TTL_MS,
@@ -1477,77 +1483,21 @@ export class MainSite extends Component {
     return 12000;
   };
 
-  resolveMetadataSessionBinding = (metadata, fallbackSlug = '') => {
-    const fallback = normalizeSessionSlug(fallbackSlug || '');
-    if (!metadata || typeof metadata !== 'object') {
-      return { sessionSlug: fallback, authority: 'fallback' };
-    }
-
-    const hasOwn = (key) => Object.prototype.hasOwnProperty.call(metadata, key);
-    const hasExplicitSlugField =
-      hasOwn('sessionSlug') ||
-      hasOwn('slug');
-    const hasExplicitFlag = hasOwn('sessionSlugExplicit');
-    const metadataSlugIsAuthoritative = !hasExplicitFlag || metadata?.sessionSlugExplicit === true;
-
-    if (hasExplicitSlugField && metadataSlugIsAuthoritative) {
-      const explicitCandidates = [
-        metadata?.sessionSlug,
-        metadata?.slug,
-      ];
-      for (let index = 0; index < explicitCandidates.length; index += 1) {
-        const rawValue = explicitCandidates[index];
-        if (rawValue == null) continue;
-        const trimmed = String(rawValue).trim();
-        if (!trimmed) continue;
-        return {
-          sessionSlug: normalizeSessionSlug(trimmed),
-          authority: 'explicit',
-        };
-      }
-    }
-
-    const sessionName = String(metadata?.sessionName || '').trim();
-    if (sessionName) {
-      const byName = getSessionSlugByName(sessionName);
-      if (byName !== null && byName !== undefined) {
-        return {
-          sessionSlug: normalizeSessionSlug(byName),
-          authority: 'name',
-        };
-      }
-    }
-
-    return { sessionSlug: fallback, authority: 'fallback' };
-  };
-
-  resolveMetadataSessionSlug = (metadata, fallbackSlug = '') => (
-    this.resolveMetadataSessionBinding(metadata, fallbackSlug).sessionSlug
+  resolveMetadataSessionBinding = (metadata, fallbackSlug = '') => (
+    resolveMetadataSessionBindingFn(metadata, fallbackSlug)
   );
 
-  resolveScopedMetadataSessionSlug = (metadata, fallbackSlug = '') => {
-    const binding = this.resolveMetadataSessionBinding(metadata, fallbackSlug);
-    if (binding.authority === 'fallback') return '';
-    return normalizeSessionSlug(binding.sessionSlug || '');
-  };
+  resolveMetadataSessionSlug = (metadata, fallbackSlug = '') => (
+    resolveMetadataSessionSlugFn(metadata, fallbackSlug)
+  );
 
-  buildMetadataSessionCacheEnvelope = (metadata, fallbackSlug = '', options = {}) => {
-    const scoped = options.scoped === true;
-    const includeSlugField = options.includeSlugField === true;
-    const binding = this.resolveMetadataSessionBinding(metadata, fallbackSlug);
-    const targetSlug = scoped
-      ? this.resolveScopedMetadataSessionSlug(metadata, fallbackSlug)
-      : normalizeSessionSlug(binding.sessionSlug || '');
-    const next = (metadata && typeof metadata === 'object') ? { ...metadata } : {};
-    next.sessionSlug = targetSlug;
-    next.sessionSlugExplicit = binding.authority === 'explicit';
-    if (includeSlugField) next.slug = targetSlug;
-    return {
-      metadata: next,
-      targetSlug,
-      authority: binding.authority,
-    };
-  };
+  resolveScopedMetadataSessionSlug = (metadata, fallbackSlug = '') => (
+    resolveScopedMetadataSessionSlugFn(metadata, fallbackSlug)
+  );
+
+  buildMetadataSessionCacheEnvelope = (metadata, fallbackSlug = '', options = {}) => (
+    buildMetadataSessionCacheEnvelopeFn(metadata, fallbackSlug, options)
+  );
 
   writeSurveyMetadataToCache = (slugIn, surveyId, surveyData, creationBlock = null, netKeyIn = null, options = {}) => {
     const slug = normalizeSessionSlug(slugIn || '');
