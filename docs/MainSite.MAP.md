@@ -155,6 +155,11 @@ All extracted controllers use a factory-function + host-DI pattern (or pure expo
   Factory: `createSessionCachePersistenceController(host)`
   Methods: `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent`, `destroy`
   Test: `sessionCachePersistenceController.test.js` (11 tests)
+- `client/src/utilities/cache/mainSiteDgStorage.js`
+  Factory: `createMainSiteDgStorage()`
+  Methods: `key`, `read`, `write`, `remove`, `destroy`
+  Test: `mainSiteDgStorage.test.js` (5 tests)
+  Note: no host DI — all dependencies are module imports
 
 Both cache controllers use a factory-function + host-DI pattern rather than class extraction. `MainSite` creates them in the constructor and delegates through forwarding methods.
 
