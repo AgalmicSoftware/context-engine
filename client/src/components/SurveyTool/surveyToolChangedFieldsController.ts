@@ -48,6 +48,42 @@ export interface ChangedFieldsOrchestrationResult {
   newCache: ChangedFieldsDiffCache;
 }
 
+export interface PendingEditStatsParams {
+  idx: number;
+  currentSlice: ResponseSlice;
+  userAnswers: any;
+  existingCache: PendingEditStatsCache | null;
+  diffCacheRef: any;
+  questionPool: any;
+  pileQuestions: any;
+  questionId: string | null | undefined;
+}
+
+export interface PendingEditStatsCache {
+  idx: number;
+  diffCacheRef: any;
+  currentSlice: ResponseSlice;
+  userAnswers: any;
+  questionPool: any;
+  pileQuestions: any;
+  questionId: string | null | undefined;
+  result: { total: number; encrypted: number };
+}
+
+export interface PendingEditStatsDeps {
+  getChangedQidsAndFields: (idx: number) => {
+    changedQids: Set<string>;
+    changedMap: Record<string, Record<string, number>>;
+  };
+  isQuestionLockedForResponse: (qid: string) => boolean;
+  buildRatingEnvelopeQidSetFromUserAnswers: (userAnswers: any) => Set<string>;
+}
+
+export interface PendingEditStatsResult {
+  result: { total: number; encrypted: number };
+  newCache: PendingEditStatsCache;
+}
+
 export const buildIndexedQuestionEntryKeys = (
   source: Record<string, any> | null | undefined,
   normalizeKey: (key: string) => string,
@@ -240,6 +276,65 @@ export const orchestrateGetChangedQidsAndFields = (
       allowLocalCache,
       idsScopeKey,
       idsScopeMode,
+      result,
+    },
+  };
+};
+
+export const computePendingEditStats = (
+  params: PendingEditStatsParams,
+  deps: PendingEditStatsDeps,
+): PendingEditStatsResult => {
+  const pendingCache = params.existingCache;
+  if (
+    pendingCache &&
+    pendingCache.idx === params.idx &&
+    pendingCache.diffCacheRef === params.diffCacheRef &&
+    pendingCache.currentSlice === params.currentSlice &&
+    pendingCache.userAnswers === params.userAnswers &&
+    pendingCache.questionPool === params.questionPool &&
+    pendingCache.pileQuestions === params.pileQuestions &&
+    pendingCache.questionId === params.questionId &&
+    pendingCache.result
+  ) {
+    return { result: pendingCache.result, newCache: pendingCache };
+  }
+
+  const { changedQids, changedMap } = deps.getChangedQidsAndFields(params.idx);
+  const total = changedQids.size;
+
+  const ratingEnvelopeQids =
+    total > 0 ? deps.buildRatingEnvelopeQidSetFromUserAnswers(params.userAnswers) : new Set<string>();
+
+  let encrypted = 0;
+  if (total > 0) {
+    for (const qId of changedQids) {
+      const qLower = String(qId || '').trim().toLowerCase();
+      const fields = changedMap[qId] || {};
+      const aEnc = (fields.answer || fields.encryptedAnswer) && !!(params.currentSlice.answers?.[qId]?.encrypted);
+      const dEnc = (fields.additional || fields.encryptedAdditional) && !!(params.currentSlice.additionalComments?.[qId]?.encrypted);
+      const questionLocked = deps.isQuestionLockedForResponse(qId);
+      const baselineRatingEncrypted = qLower ? ratingEnvelopeQids.has(qLower) : false;
+      const ratingEnc =
+        (fields.importance || fields.conviction) &&
+        (baselineRatingEncrypted || questionLocked ||
+          !!(params.currentSlice.answers?.[qId]?.encrypted) ||
+          !!(params.currentSlice.additionalComments?.[qId]?.encrypted));
+      if (aEnc || dEnc || ratingEnc) encrypted += 1;
+    }
+  }
+
+  const result = { total, encrypted };
+  return {
+    result,
+    newCache: {
+      idx: params.idx,
+      diffCacheRef: params.diffCacheRef,
+      currentSlice: params.currentSlice,
+      userAnswers: params.userAnswers,
+      questionPool: params.questionPool,
+      pileQuestions: params.pileQuestions,
+      questionId: params.questionId,
       result,
     },
   };
