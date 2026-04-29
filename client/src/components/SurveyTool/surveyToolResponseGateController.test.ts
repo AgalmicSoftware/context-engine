@@ -6,6 +6,7 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   resolveLitChain: (...args: any[]) => mockResolveLitChain(...args),
 }));
 
+// eslint-disable-next-line import/first
 import {
   buildRecipientsFromGates,
   getEffectiveRecipientsForField,
