@@ -11,139 +11,8 @@
 - Current length: **12,334 lines**
 - Component type: **React class component** (`MainSite extends Component`)
 - Component count in file: **1 class component** (`MainSite`)
-- Method inventory: **~215 class members**
-- Summary: `MainSite` is the app shell and runtime orchestrator. It resolves active session/group context from URL + Redux, wires extracted runtime controllers for cache readiness, profile scans, SBT/survey/question/response pipelines, metadata refresh, and view prop composition, and keeps route dispatch plus behavior-critical scan/event reconciliation inline.
-
-## Extracted Modules
-
-- `client/src/utilities/cache/sessionCacheReadinessController.ts`
-  Factory: `createSessionCacheReadinessController(host)`
-  Methods: `setReadinessStateIfChanged`, `syncCacheHasLoadedFlagOnTransition`, `scheduleCacheUpdateFlush`, `queueCacheUpdateFlush`, `flushQueuedCacheUpdates`, `queueLocalRevisionUpdate`, `flushLocalRevisionUpdate`, `handleCrossTabCacheUpdateEvent`, `checkAllCachesReady`, `destroy`
-  Test: `sessionCacheReadinessController.test.js`
-- `client/src/utilities/cache/sessionCachePersistenceController.ts`
-  Factory: `createSessionCachePersistenceController(host)`
-  Methods: `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent`, `destroy`
-  Test: `sessionCachePersistenceController.test.js` (11 tests)
-- `client/src/utilities/cache/mainSiteDgStorage.js`
-  Factory: `createMainSiteDgStorage()`
-  Methods: `key`, `read`, `write`, `remove`, `destroy`
-  Test: `mainSiteDgStorage.test.js` (5 tests)
-  Note: no host DI — all dependencies are module imports
-- `client/src/utilities/session/mainSiteSessionScanPolicy.js`
-  Factory: `createSessionScanPolicy(host)`
-  Pattern: Factory with host dependency injection
-  Host interface: `getActiveSessionSlug()`, `getCurrentPath()`, `getSessionSlugHintFromSearch(search)`, `getSessionTokenFromPath(path)`, `isSbtListRoutePath(path)`
-  Public methods: `isSbtInstanceListenerEnabledForGroup`, `isSbtHistoryScanEnabled`, `getSessionScanScope`, `getSessionScanScopeContext`, `shouldAutoRunFullSbtScan`, `shouldAttachSbtDetailInstanceListener`, `getScopedSessionSlugs`, `shouldSkipSessionScanForSlug`, `scanScopeNoop`, `getScopeFilteredSlugs`, `isSessionSlugAllowedForScan`, `logScopeSkipOnce`, `destroy`
-  Internal state: `didLogSessionScanScope` (once flag), `didLogSbtInstanceListenersSuppressed` (once flag), `scopeSkipLogOnce` (Set)
-  Test: `mainSiteSessionScanPolicy.test.js` (17 tests)
-  What stays in MainSite: scan/cache entrypoints that consume scope decisions, plus the forwarding wrappers that expose policy methods on the class
-- `client/src/utilities/session/sessionProfileScanController.ts`
-  Factory: `createSessionProfileScanController(host)`
-  Pattern: Factory with host dependency injection
-  Host interface: `getAccount()`, `getActiveSessionSlug()`, `getNetworkId()`, `getProvider()`, `getScopeFilteredSlugs()`, `getScopedSessionSlugs()`, `getSessionCfg()`, `getSessionChainId()`, `getSessionScanScopeContext()`, `getSessionSlugFromState()`, `isMounted()`, `isSessionSlugAllowedForScan()`, `scanSpecificUserProfile()`
-  Public methods: `hasExplicitProfileScanScopeOverride`, `getProfileScanScopeContext`, `readBoolishRuntimeFlag`, `getUserProfileAllSessionsScanMode`, `isUserProfileAllSessionsScanEnabled`, `getActiveProfileScanChainId`, `readProfileScanStepTimeoutMs`, `readProfileScanSbtBurstSize`, `readProfileScanActivityLookbackBlocks`, `readUserProfileAllSessionsFlag`, `readProfileScanRegistryLookupTimeoutMs`, `getRegistrySessionEntryCount`, `getRegistrySessionCoverageCountForChain`, `getRegistryBootstrapScopeKey`, `getProfileScanListScopeSessionConfigCacheKey`, `resolveListScopeSessionConfigFromRegistry`, `ensureRegistryHydratedForProfileScan`, `isOnchainSessionRegistryEnabled`, `refreshSessionUniverseRegistryCache`, `resolveProfileDeepScanPlan`, `getProfileDeepScanSlugs`, `scheduleProfileScanRetryAfterRegistryHydration`, `shouldBackfillGeneralSession`, `enqueueGeneralSessionBackfill`, `runWithGeneralSessionBackfill`, `emitProfileScanTelemetry`, `isProfileScanTelemetryEnabled`, `isProfileScanColdDiagEnabled`, `emitProfileScanColdDiag`, `destroy`
-  Internal state: `_registryBootstrapPromise`, `_registryBootstrapScopeKey`, `_profileScanRetryAfterRegistry`, `_generalBackfillQueue`, `_profileScanListScopeSessionConfigCache`
-  What stays in MainSite: `scanForSurveyGroup`, `scanSpecificUserProfilePriority`, `scanSpecificUserProfile` (full implementations / cache writes), plus forwarding wrappers that delegate into the controller and `_registryBootstrapPromise` / `_registryBootstrapScopeKey` bridge accessors for extracted controller state
-- `client/src/utilities/session/profileScanReportHelpers.ts`
-  Pattern: Pure exported functions (no host DI)
-  Exports: `createInitialProfileScanReport`, `createProfileScanFanoutPlan`, `resolveProfileScanAttemptedCoverageSlugs`
-  Purpose: profile scan report fanout planning, initial report shape, and attempted coverage slug resolution
-  Test: `profileScanReportHelpers.test.js`
-- `client/src/utilities/session/sessionMetaController.ts`
-  Factory: `createSessionMetaRefreshController(host)`
-  Pattern: Factory with host dependency injection plus pure helpers
-  Exports: `refreshSessionInfoForSlug`, `refreshSessionMetaFieldsForSlug`, `createSessionMetaRefreshController`
-  Purpose: encrypted session info/name/header refresh, Lit decrypt attempt tracking, per-slug override patch creation, and cleanup of decrypt-attempt state
-  Test: `sessionMetaController.test.js`
-
-- `client/src/components/MainSite/metadataSessionBinding.ts`
-  Pattern: Pure exported functions (no host DI)
-  Exports: `resolveMetadataSessionBinding`, `resolveMetadataSessionSlug`, `resolveScopedMetadataSessionSlug`, `buildMetadataSessionCacheEnvelope`
-  Types: `MetadataSessionAuthority`, `MetadataSessionBinding`, `MetadataSessionCacheEnvelope`, `BuildEnvelopeOptions`
-  Test: `metadataSessionBinding.test.ts` (20 tests)
-  Dependencies: `normalizeSessionSlug` (sessionNaming), `getSessionSlugByName` (sessionConfigResolvers)
-  What stays in MainSite: `writeSurveyMetadataToCache`, `writeQuestionMetadataToCache`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` (all call through forwarding wrappers)
-- `client/src/components/MainSite/metadataCacheEntryBuilders.ts`
-  Pattern: Pure exported functions (no host DI)
-  Exports: `prepareSurveyMetadataCacheEntry`, `prepareQuestionMetadataCacheEntry`
-  Types: `PrepareSurveyMetadataCacheEntryArgs`, `PrepareQuestionMetadataCacheEntryArgs`
-  Test: `metadataCacheEntryBuilders.test.ts`
-  Dependencies: `buildMetadataSessionCacheEnvelope` (metadataSessionBinding), `normalizeSessionSlug` (sessionNaming)
-  What stays in MainSite: `writeSurveyMetadataToCache` (DG write, bucket init), `writeQuestionMetadataToCache` (DG write, bucket init)
-- `client/src/components/MainSite/sbtRoutePathHelpers.ts`
-  Pattern: Pure exported functions (no host DI)
-  Exports: `getSbtAddressFromPath`, `isSbtListRoutePath`, `getSbtListRouteSessionSlug`, `getUserAddressFromPath`
-  Purpose: SBT/group list route parsing plus single-SBT and user-address path extraction
-  What stays in MainSite: forwarding wrappers that pass route paths through `getEffectiveRoutePath`, `normalizeSessionSlug`, and `ethers.utils.isAddress`
-- `client/src/components/MainSite/sessionFallbackRedirect.ts`
-  Pattern: Pure exported functions (no host DI)
-  Exports: `getSessionFallbackScopeSlugs`, `getSessionFallbackPreferredTarget`, `isFirstVisitRootRedirectEnabled`, `getFirstVisitRootRedirectTarget`, `getSessionFallbackRedirectStorageKey`, `hasConsumedSessionFallbackRedirect`, `consumeSessionFallbackRedirect`
-  Purpose: List-scope session fallback redirects, preferred target selection, temporary root/About redirect target resolution, cached session-load migration guards, and redirect consumption tracking
-  Test: `sessionFallbackRedirect.test.ts`
-  What stays in MainSite: route-shell application through `applySessionFallbackRedirect`, first-visit `replaceState`, and forwarding wrappers for runtime/config dependencies
-- `client/src/components/MainSite/sessionDisplayHelpers.ts`
-  Pattern: Pure exported functions (no host DI)
-  Exports: `hasEncryptedSessionField`, `getSessionInfoForGroup`, `getSessionNameForGroup`, `getSessionHeaderForGroup`
-  Purpose: Session info/name/header display resolution, encrypted-field placeholders, per-slug overrides, and demo metadata fallbacks
-  What stays in MainSite: state-backed override maps and forwarding wrappers that supply `normalizeSessionSlug`, `getDemoSessionConfigBySlug`, and Arweave URL normalization
-- `client/src/components/MainSite/routeSessionResolution.ts`
-  Pattern: Pure exported functions (no host DI)
-  Exports: `resolveMainSiteExplicitSessionSlugFromPath`, `resolveMainSiteGlobalPrimarySessionSlug`, `resolveMainSiteSessionSlugFromProps`, `resolveMainSiteQuestionRouteSessionContext`, `resolveMainSiteSessionRouteContext`, and related route-session helpers
-  Purpose: route/session slug and id resolution for `MainSite` route dispatch without moving route semantics
-  Test: `routeSessionResolution.test.ts`
-- `client/src/components/MainSite/mainSiteViewProps.ts`
-  Pattern: Pure exported prop composers (no host DI)
-  Exports: `composeMainSiteWalletViewProps`, `composeMainSiteLoginViewProps`, `composeMainSiteAuthViewProps`, `composeMainSiteSurveyCacheViewProps`, `composeMainSiteQuestionCacheViewProps`, `composeMainSiteSessionCacheViewProps`
-  Purpose: exact prop bundles for survey, question, and session lazy views while keeping route/render dispatch in `MainSite`
-  Test: `mainSiteViewProps.test.ts`
-- `client/src/utilities/survey/sessionSurveyCacheController.ts`
-  Factory: `createSessionSurveyCacheController(host)`
-  Pattern: Factory with host dependency injection
-  Public listener methods: `startSurveyAndQuestionEventListener`, `startSurveyAndQuestionEventListenerForGroup`
-  Test: `sessionSurveyCacheController.test.js`
-- `client/src/utilities/survey/sessionQuestionCacheController.ts`
-  Factory: `createSessionQuestionCacheController(host)`
-  Pattern: Factory with host dependency injection
-  Test: `sessionQuestionCacheController.test.js` (27 tests)
-- `client/src/utilities/survey/sessionResponseHydrationController.ts`
-  Factory: `createSessionResponseHydrationController(host)`
-  Pattern: Factory with host dependency injection
-  Test: `sessionResponseHydrationController.test.js` (24 tests)
-- `client/src/utilities/sbt/sessionSbtCacheController.js`
-  Factory: `createSessionSbtCacheController(host)`
-  Pattern: Factory with host dependency injection
-  Public listener methods: `startSbtEventListener`, `startSbtEventListenerForGroup`, `startSbtDetailInstanceListenerForGroup`
-  Test: `sessionSbtCacheController.test.js` (29 tests)
-- `client/src/utilities/sbt/sbtLiveProgressController.js`
-  Factory: `createSbtLiveProgressController({ setState, ...deps })`
-  Purpose: SBT scan live-progress token state, throttled progress commits, and progress cleanup
-  Test: `sbtLiveProgressController.test.js` (3 tests)
-- `client/src/utilities/sbt/sbtRealtimeCoverageController.js`
-  Factory: `createSbtRealtimeCoverageController({ setState })`
-  Purpose: per-group SBT realtime coverage state writes and cleanup flags
-  Test: `sbtRealtimeCoverageController.test.js` (2 tests)
-- `client/src/utilities/sbt/sbtRealtimeListenerCleanupController.js`
-  Factory: `createSbtRealtimeListenerCleanupController({ clearCoverage, contractScripts })`
-  Purpose: SBT factory/instance listener removal wrapper plus coverage cleanup
-  Test: `sbtRealtimeListenerCleanupController.test.js` (2 tests)
-- `client/src/utilities/sbt/sbtRealtimeListenerPlan.js`
-  Exports: `getSbtInstanceListenerPlan`
-  Purpose: pure per-instance SBT listener attach/skip planning for cache address sets, max overrides, and policy gates
-  Test: `sbtRealtimeListenerPlan.test.js` (6 tests)
-- `client/src/utilities/sbt/sbtRealtimeEventBlockResolver.js`
-  Exports: `resolveSbtRealtimeEventBlockNumber`
-  Purpose: realtime SBT event block-number resolution from direct event data, transaction receipts, or current block-window fallback
-  Test: `sbtRealtimeEventBlockResolver.test.js` (6 tests)
-- `client/src/utilities/sbt/sbtRealtimeEventCursorGuard.js`
-  Exports: `getSbtRealtimeEventCursorGuard`
-  Purpose: pure realtime SBT event skip decisions for ordered cursors and network waterlines
-  Test: `sbtRealtimeEventCursorGuard.test.js` (3 tests)
-- `client/src/utilities/sbt/sbtRealtimeCursorCache.js`
-  Exports: `updateSbtRealtimeCursorForNetworkCache`
-  Purpose: idempotent cache mutation for advancing per-network SBT realtime cursors
-  Test: `sbtRealtimeCursorCache.test.js` (4 tests)
-
-All extracted controllers use a factory-function + host-DI pattern (or pure exports for session config, metadata binding, route resolution, and view prop composition). `MainSite` now wires cache/readiness, scan-policy, profile-scan, metadata-refresh, survey, question, response, and SBT controllers as class-field initializers, leaving route orchestration, deep scans, survey event reconciliation, and final view dispatch inline.
+- Method inventory: **243 class methods/properties** + **3 top-level helper functions**
+- Summary: `MainSite` is the app shell and runtime orchestrator. It resolves active session/group context from URL + Redux, hydrates multi-cache state (SBT/surveys/questions/responses), drives profile deep scans and registry hydration, manages per-group listener lifecycles, coordinates Lit/session metadata refresh, and routes to lazy feature views while gating UI readiness via cache flags.
 
 ## Extracted Modules
 
@@ -175,97 +44,130 @@ All extracted controllers use a factory-function + host-DI pattern (or pure expo
 
 | Section | Lines | Purpose | Key Methods |
 |---|---:|---|---|
-| Imports, constants, pure helpers | 1-325 | Dependencies, perf helpers, cache utility helpers, exported pure functions (`shouldFlushCoalescedRun`, etc.) | `shouldFlushCoalescedRun`, `buildQuestionReadyStatePatch`, `shouldEnableSessionRegistryRefresh` |
-| Class state + instance fields | 326-400 | Main runtime state + internal run tokens/queues/controllers | `state`, `_cachePersistenceController`, `_cacheReadinessController`, `_scanPolicy`, `DG` |
-| Cache flush + cross-tab coalescing | 401-725 | Debounced cache/readiness updates and cross-tab sync handling | `setReadinessStateIfChanged`, `scheduleCacheUpdateFlush`, `flushQueuedCacheUpdates`, `handleCrossTabCacheUpdateEvent` |
-| Session path/slug resolution | 728-1473 | Parse `/session/:token`, resolve ids/slugs, locate groups for surveys/questions/SBT links | `resolveSessionPathId`, `resolveSessionPathSlug`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` |
-| DG storage abstraction | 1475-1616 | Per-group storage facade over cache manager/localStorage | `DG.key`, `DG.read`, `DG.write`, `DG.remove` |
-| Session config + scan policy + registry bootstrap | 1619-2456 | Chain/session helpers, scope controls, telemetry, on-chain registry hydration, deep-scan planning | `getSessionCfg`, `getSessionScanScope`, `ensureRegistryHydratedForProfileScan`, `resolveProfileDeepScanPlan`, `runWithGeneralSessionBackfill` |
-| Deep scans (survey lookup + user profile) | 2458-3437 | Cross-group survey discovery + full activity/SBT profile scanning with cache merges | `scanForSurveyGroup`, `scanSpecificUserProfilePriority`, `scanSpecificUserProfile` |
-| Persistent readiness flags | 3441-3495 | Read/write per-slug flags and sync `cacheHasLoaded` from persisted state | `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent` |
-| Mount/unmount lifecycle | 3497-3968 | Boot sequence, initial cache strategy by route, listener startup, cleanup | `componentDidMount`, `componentWillUnmount` |
-| Update lifecycle + deep-link/network handlers | 3970-4466 | React to slug/network/path changes, trigger deep-link scans, readiness recompute | `componentDidUpdate`, `handleDeepLinkScan`, `manageAutoHashPersistence`, `handleNetworkChange`, `checkAllCachesReady` |
-| SBT cache + listeners | 4479-5809 | Light/full SBT discovery, SBT merge logic, listener/event handlers | `ensureLightSbtDiscovery`, `initializeSbtCacheForGroup`, `refreshSbtDataForGroup`, `startSbtEventListenerForGroup`, `onSbtTransferDetectedForGroup` |
-| Survey/question cache initialization | 5812-8093 | Survey cache load + question cache load + chunked response hydration | `initializeSurveyCacheForGroup`, `initializeQuestionCacheForGroup`, `fetchQuestionResponsesChunkedForGroup` |
-| Survey/question event listeners | 8095-8462 | Event subscriptions and cache refresh on new survey/question events | `startSurveyAndQuestionEventListenerForGroup`, `onNewSurveyEventDetectedForGroup` |
-| View routing + child prop composition | 8472-9515 | Route dispatch and prop wiring into lazy views | `getMainView`, `refreshSurveyResponsesByIDForGroup`, `refreshEncryptedQuestionPayloadsForGroup` |
-| Final metadata refresh + render | 9517-9805 | Final question refresh helpers and root shell render | `refreshQuestionMetadataForGroup`, `refreshQuestionResponses`, `render` |
-| PropTypes + Redux connect | 9807-9870 | Type contracts and `connect(...)` wiring | `mapStateToProps` |
+| Imports, constants, pure helpers | 1-270 | Dependencies, perf helpers, cache utility helpers, exported pure functions (`shouldFlushCoalescedRun`, etc.) | `shouldFlushCoalescedRun`, `buildQuestionReadyStatePatch`, `shouldEnableSessionRegistryRefresh` |
+| Class state + instance fields | 271-364 | Main runtime state + internal run tokens/queues/controllers | `state`, `_cachePersistenceController`, `_cacheReadinessController`, `_scanPolicy`, `DG` |
+| Cache flush + cross-tab coalescing | 366-769 | Debounced cache/readiness updates and cross-tab sync handling | `setReadinessStateIfChanged`, `scheduleCacheUpdateFlush`, `flushQueuedCacheUpdates`, `handleCrossTabCacheUpdateEvent` |
+| Session path/slug resolution | 772-1921 | Parse `/session/:token`, resolve ids/slugs, locate groups for surveys/questions/SBT links | `resolveSessionPathId`, `resolveSessionPathSlug`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` |
+| DG storage abstraction | 1928-1928 | Per-group storage facade over cache manager/localStorage | `DG.key`, `DG.read`, `DG.write`, `DG.remove` |
+| Session config + scan policy + registry bootstrap | 1931-2794 | Chain/session helpers, scope controls, telemetry, on-chain registry hydration, deep-scan planning | `getSessionCfg`, `getSessionScanScope`, `ensureRegistryHydratedForProfileScan`, `resolveProfileDeepScanPlan`, `runWithGeneralSessionBackfill` |
+| Deep scans (survey lookup + user profile) | 2796-4372 | Cross-group survey discovery + full activity/SBT profile scanning with cache merges | `scanForSurveyGroup`, `scanSpecificUserProfilePriority`, `scanSpecificUserProfile` |
+| Persistent readiness flags | 4376-4379 | Read/write per-slug flags and sync `cacheHasLoaded` from persisted state | `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent` |
+| Mount/unmount lifecycle | 4381-4881 | Boot sequence, initial cache strategy by route, listener startup, cleanup | `componentDidMount`, `componentWillUnmount` |
+| Update lifecycle + deep-link/network handlers | 4883-5434 | React to slug/network/path changes, trigger deep-link scans, readiness recompute | `componentDidUpdate`, `handleDeepLinkScan`, `manageAutoHashPersistence`, `handleNetworkChange`, `checkAllCachesReady` |
+| SBT cache + listeners | 5436-7497 | Light/full SBT discovery, SBT merge logic, listener/event handlers | `ensureLightSbtDiscovery`, `initializeSbtCacheForGroup`, `refreshSbtDataForGroup`, `startSbtEventListenerForGroup`, `onSbtTransferDetectedForGroup` |
+| Survey/question cache initialization | 7500-10120 | Survey cache load + question cache load + chunked response hydration | `initializeSurveyCacheForGroup`, `initializeQuestionCacheForGroup`, `fetchQuestionResponsesChunkedForGroup` |
+| Survey/question event listeners | 10122-10547 | Event subscriptions and cache refresh on new survey/question events | `startSurveyAndQuestionEventListenerForGroup`, `onNewSurveyEventDetectedForGroup` |
+| View routing + child prop composition | 10556-11993 | Route dispatch and prop wiring into lazy views | `getMainView`, `refreshSurveyResponsesByIDForGroup`, `refreshEncryptedQuestionPayloadsForGroup` |
+| Final metadata refresh + render | 11995-12279 | Final question refresh helpers and root shell render | `refreshQuestionMetadataForGroup`, `refreshQuestionResponses`, `render` |
+| PropTypes + Redux connect | 12284-12334 | Type contracts and `connect(...)` wiring | `mapStateToProps` |
 
 ## Method Index (Grouped by Responsibility)
 
 ### Cache and readiness orchestration
-- `mergeLegacyNumericNetworkKey` (1145-1162)
-- `startCacheReinitRun` (1164-1169)
-- `isCacheReinitRunActive` (1171-1173)
-- `resolveActiveSlugForCacheUpdates` (1179-1194)
-- `setReadinessStateIfChanged` (1196-1197) — forwarding wrapper → `sessionCacheReadinessController.ts`
-- `syncCacheHasLoadedFlagOnTransition` (1199-1200) — forwarding wrapper → `sessionCacheReadinessController.ts`
-- `queueLocalRevisionUpdate` / `flushLocalRevisionUpdate` (1211-1215) — forwarding wrappers → `sessionCacheReadinessController.ts`
-- `handleCrossTabCacheUpdateEvent` (1217-1218) — forwarding wrapper → `sessionCacheReadinessController.ts`
-- `hasPersistedManagedCacheData` / `syncCacheHasLoadedFlagFromPersistent` (3560-3564) — forwarding wrappers → `sessionCachePersistenceController.ts`
-- `checkAllCachesReady` (4530-4531) — forwarding wrapper → `sessionCacheReadinessController.ts`
+- `mergeLegacyNumericNetworkKey` (672-686)
+- `startCacheReinitRun` (688-693)
+- `isCacheReinitRunActive` (695-697)
+- `resolveActiveSlugForCacheUpdates` (699-714)
+- `setReadinessStateIfChanged` (716-716)
+- `syncCacheHasLoadedFlagOnTransition` (718-718)
+- `scheduleCacheUpdateFlush` (720-720)
+- `queueCacheUpdateFlush` (722-722)
+- `flushQueuedCacheUpdates` (724-724)
+- `queueLocalRevisionUpdate` (726-726)
+- `flushLocalRevisionUpdate` (728-728)
+- `handleCrossTabCacheUpdateEvent` (730-730)
+- `hasPersistedManagedCacheData` (4378-4378)
+- `syncCacheHasLoadedFlagFromPersistent` (4379-4379)
+- `checkAllCachesReady` (5393-5434)
 
 ### Session routing and group resolution
-- `getSessionTokenFromPath` (1245-1249)
-- `resolveSessionSlugFromPathToken` (1251-1267)
-- `resolveSessionPathId` / `resolveSessionPathSlug` (1269-1275) — forwarding wrappers → `sessionPathResolverController.ts`
-- `getExplicitSessionSlugFromProps`, `getGlobalPrimarySessionSlugFromProps`, `getSessionSlugFromProps` (1288-1327) — forwarding wrappers → `routeSessionResolution.ts`
-- `getRenderActiveSessionSlug` (1397-1415) — forwarding wrapper → `routeSessionResolution.ts`
-- `getSbtAddressFromPath`, `isSbtListRoutePath`, `getSbtListRouteSessionSlug`, `getUserAddressFromPath` (1466-1487) — forwarding wrappers → `sbtRoutePathHelpers.ts`
-- `findGroupSlugForSurvey` (1733-1747)
-- `getQuestionRouteSessionSlugHint` / `getQuestionRouteSessionIdHint` (1761-1784)
-- `findGroupSlugForQuestion` (1786-1803)
-- `resolveGroupSlugForSbtAddress` (1805-1838)
-- `handleDeepLinkScan` (4322-4366)
-- `manageAutoHashPersistence` (4368-4380)
+- `getSessionTokenFromPath` (772-776)
+- `resolveSessionSlugFromPathToken` (778-790)
+- `resolveSessionPathId` (792-902)
+- `resolveSessionPathSlug` (904-993)
+- `getInitialGroupSlugFromPath` (995-1004)
+- `getSessionSlugFromProps` (1056-1077)
+- `getSessionSlugFromState` (1126)
+- `getActiveSessionSlug` (1128-1130)
+- `getSbtAddressFromPath` (1208-1215)
+- `getUserAddressFromPath` (1243-1254)
+- `findGroupSlugForSurvey` (1662-1733)
+- `getQuestionRouteSessionSlugHint` (1747-1754)
+- `getQuestionRouteSessionIdHint` (1756-1768)
+- `findGroupSlugForQuestion` (1770-1839)
+- `resolveGroupSlugForSbtAddress` (1841-1921)
+- `handleDeepLinkScan` (5156-5193)
+- `manageAutoHashPersistence` (5198-5237)
 
 ### Session metadata + Lit + gated prompt recovery
-- `syncLitHooks` (1501-1536)
-- `getSessionInfoForGroup` / `getSessionNameForGroup` / `getSessionHeaderForGroup` (1538-1567) — forwarding wrappers → `sessionDisplayHelpers.ts`
-- `refreshSessionInfo` / `refreshSessionMetaFields` (1569-1573) — forwarding wrappers → `sessionMetaController.ts`
-- `resolveMetadataSessionBinding`, `resolveMetadataSessionSlug`, `resolveScopedMetadataSessionSlug`, `buildMetadataSessionCacheEnvelope` (1607-1625) — forwarding wrappers → `metadataSessionBinding.ts`
-- `hasMaskedQuestionPayloadInCache`, `buildQuestionDecryptContext`, `refreshEncryptedQuestionPayloadsForGroup`, `refreshQuestionMetadataForGroup` (6287-6297) — forwarding wrappers → `sessionQuestionCacheController.ts`
+- `syncLitHooks` (1268-1301)
+- `getSessionInfoForGroup` (1303-1319)
+- `getSessionNameForGroup` (1321-1337)
+- `hasEncryptedSessionField` (1339-1358)
+- `getSessionHeaderForGroup` (1360-1389)
+- `refreshSessionInfo` (1391-1414)
+- `refreshSessionMetaFields` (1416-1448)
+- `refreshGroupCredentials` (1450-1454)
+- `hasMaskedQuestionPayloadInCache` (11821-11828)
+- `buildQuestionDecryptContext` (11830-11839)
+- `refreshEncryptedQuestionPayloadsForGroup` (11841-11993)
+- `refreshQuestionMetadataForGroup` (11995-12004)
 
 ### Scan scope, registry hydration, and deep scan planning
-Most profile-scan / registry helpers in this block now forward into `client/src/utilities/session/sessionProfileScanController.ts`; the full scan bodies remain in `scanForSurveyGroup` and `scanSpecificUserProfile*`.
-
-- `getSessionCfg`, `getSessionChainId`, `getSessionNetwork` (1843-1845)
-- scan policy wrappers (1847-1876) — forwarding wrappers → `mainSiteSessionScanPolicy.js`
-- profile scan/registry wrappers (1878-1966) — forwarding wrappers → `sessionProfileScanController.ts`
-- `scanForSurveyGroup` (1969-2186)
-- `scanSpecificUserProfilePriority` (2188-2211)
-- `scanSpecificUserProfile` (2213-3552)
+- `getSessionCfg` (1931-1931)
+- `getSessionChainId` (1932-1932)
+- `getSessionNetwork` (1933-1933)
+- `isSbtInstanceListenerEnabledForGroup` (1935-1935)
+- `isSbtHistoryScanEnabled` (1936-1936)
+- `getSessionScanScope` (1937-1937)
+- `getSessionScanScopeContext` (1938-1938)
+- `isSessionSlugAllowedForScan` (1983-1985)
+- `shouldAttachSbtDetailInstanceListener` (1990-1990)
+- `shouldAutoRunFullSbtScan` (1989-1989)
+- `readUserProfileAllSessionsFlag` (2059-2066)
+- `getUserProfileAllSessionsScanMode` (2068-2107)
+- `ensureRegistryHydratedForProfileScan` (2300-2476)
+- `refreshSessionUniverseRegistryCache` (2480-2504)
+- `resolveProfileDeepScanPlan` (2506-2639)
+- `scheduleProfileScanRetryAfterRegistryHydration` (2641-2703)
+- `getScopeFilteredSlugs` (2713-2713)
+- `enqueueGeneralSessionBackfill` (2723-2773)
+- `runWithGeneralSessionBackfill` (2775-2794)
+- `scanForSurveyGroup` (2796-2997)
+- `scanSpecificUserProfilePriority` (3001-3021)
+- `scanSpecificUserProfile` (3023-4372)
 
 ### SBT cache and event pipeline
-- `ensureSessionRouteSbtDiscovery` (4533-4534)
-- `ensureLightSbtDiscovery` / `ensureLightSbtUniverse` (4539-4543)
-- SBT count/history helpers (4545-4569) — forwarding wrappers → `sessionSbtCacheController.js`
-- `initializeSbtCacheForGroup` (4578-4579)
-- `refreshSbtData` / `refreshSbtDataForGroup` (4581-4585)
-- `startSbtEventListenerForGroup` / `startSbtDetailInstanceListenerForGroup` (4590-4594)
-- `onNewSbtEventDetectedForGroup`, `onSbtCreatedDetectedForGroup`, `onSbtIssuedDetectedForGroup`, `onSbtActivityDetectedForGroup`, `onSbtTransferDetectedForGroup` (4599-4624)
+- `ensureLightSbtDiscovery` (5477-5830)
+- `ensureLightSbtUniverse` (5834-5883)
+- `mergeSbtCountMaps` (5885-5896)
+- `mergeSbtCountsPayload` (5898-5917)
+- `initializeSbtCache` (6061-6063)
+- `initializeSbtCacheWithGeneralBackfill` (6065-6077)
+- `initializeSbtCacheForGroup` (6079-6637)
+- `refreshSbtDataForGroup` (6646-7109)
+- `startSbtEventListenerForGroup` (7113-7197)
+- `onNewSbtEventDetectedForGroup` (7202-7283)
+- `onSbtCreatedDetectedForGroup` (7288-7356)
+- `onSbtIssuedDetectedForGroup` (7360-7362)
+- `onSbtTransferDetectedForGroup` (7495-7497)
 
 ### Survey/question/response caches and listeners
-- `initializeSurveyCacheForGroup` (4639-4640) — forwarding wrapper → `sessionSurveyCacheController.ts`
-- `initializeQuestionCacheForGroup` (4656-4657) — forwarding wrapper → `sessionQuestionCacheController.ts`
-- `fetchQuestionResponsesChunkedForGroup` (4672-4673) — forwarding wrapper → `sessionResponseHydrationController.ts`
-- `startSurveyAndQuestionEventListenerForGroup` (4678-4680) — forwarding wrapper → `sessionSurveyCacheController.ts`
-- `onNewSurveyEventDetectedForGroup` (4684-5113)
-- `refreshSurveyResponsesByIDForGroup` (6281-6282)
-- `refreshQuestionResponses` (6299-6300)
+- `initializeSurveyCacheForGroup` (7513-8051)
+- `initializeQuestionCacheForGroup` (8067-9363)
+- `fetchQuestionResponsesChunkedForGroup` (9378-10120)
+- `startSurveyAndQuestionEventListenerForGroup` (10124-10131)
+- `onNewSurveyEventDetectedForGroup` (10136-10547)
+- `refreshSurveyResponsesByIDForGroup` (11753-11817)
+- `refreshQuestionResponses` (12006-12248)
 
 ### Lifecycle and view routing
-- `componentDidMount` (3570-3989)
-- `componentWillUnmount` (3991-4051)
-- `componentDidUpdate` (4053-4320)
-- `handleNetworkChange` (4382-4528)
-- `_renderSurveyIdRoute` (5452-5587)
-- `_renderSurveysOrQuestionsListRoute` (5589-5736)
-- `_renderQuestionDetailRoute` (5738-5829)
-- `_renderSessionRoute` (5831-6050)
-- `getMainView` (6052-6269)
-- `render` (6302-6332)
+- `componentDidMount` (4381-4789)
+- `componentWillUnmount` (4791-4881)
+- `componentDidUpdate` (4883-5154)
+- `handleNetworkChange` (5240-5391)
+- `getMainView` (11523-11742)
+- `render` (12250-12279)
 
 ## Data Flow (Runtime)
 
