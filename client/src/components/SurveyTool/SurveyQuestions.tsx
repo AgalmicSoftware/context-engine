@@ -55,6 +55,11 @@ import {
   type RatingEnvelopeContext,
 } from './surveyToolRatingEnvelopeSubmitController';
 import {
+  ensureIdentifierHash,
+  filterChangedResponsesForSubmit,
+  normalizeSubmitReceipt,
+} from './surveyToolSubmitTransactionController';
+import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
   applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
@@ -8946,44 +8951,27 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       throw new Error('No new or changed responses to submit.');
     }
 
-    let questionIds, questionResponses, surveyId, surveyResponse;
-
-    if (this.props.singleQuestionMode) {
-      const qid = data && data.questionID;
-      if (!qid || !changedSet.has(qid)) {
-        this._submitGuard = false;
-        this.setState({
-          isSubmitting: false,
-          submitProgress: 0,
-          submissionError: 'No new or changed responses to submit.',
-        });
-        throw new Error('No new or changed responses to submit.');
-      }
-      questionIds = [qid];
-      questionResponses = [data];
-      surveyId = ethers.constants.HashZero;
-      surveyResponse = null;
-    } else {
-      const all = (data && Array.isArray(data.responses)) ? data.responses : [];
-      // Filter down to changed qIDs only
-      const filtered = all.filter((r) => r && r.questionID && changedSet.has(r.questionID));
-
-      if (filtered.length === 0) {
-        this._submitGuard = false;
-        this.setState({
-          isSubmitting: false,
-          submitProgress: 0,
-          submissionError: 'No new or changed responses to submit.',
-        });
-        throw new Error('No new or changed responses to submit.');
-      }
-
-      questionIds = filtered.map((r) => r.questionID);
-      questionResponses = filtered;
-      surveyId = this.props.isStandalone ? ethers.constants.HashZero : this.props.surveyId;
-      // Keep surveyResponse semantics identical but with filtered responses
-      surveyResponse = this.props.isStandalone ? null : { ...data, responses: filtered };
+    let filtered;
+    try {
+      filtered = filterChangedResponsesForSubmit({
+        data,
+        changedSet,
+        singleQuestionMode: !!this.props.singleQuestionMode,
+        isStandalone: !!this.props.isStandalone,
+        surveyId: this.props.surveyId,
+        HashZero: ethers.constants.HashZero,
+      });
+    } catch (e) {
+      this._submitGuard = false;
+      this.setState({
+        isSubmitting: false,
+        submitProgress: 0,
+        submissionError: e.message || 'No new or changed responses to submit.',
+      });
+      throw e;
     }
+
+    const { questionIds, questionResponses, surveyId, surveyResponse } = filtered;
 
     const submissionContext = this.resolveSubmissionGroupContext({
       questionIds,
@@ -9039,20 +9027,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       throw e;
     }
 
-    // Centralized identifier hashing right before contract call
-    const ensureHash = (v) => {
-      try {
-        if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') {
-          return cryptoUtils.hashIdentifier(v);
-        }
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      try { if (utils.isHexString(v, 32)) return String(v).toLowerCase(); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-      const s = (v === null || v === undefined) ? '' : String(v);
-      return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
+    const hashDeps = {
+      hashIdentifier: cryptoUtils?.hashIdentifier?.bind(cryptoUtils),
+      isHexString: utils.isHexString,
+      id: utils.id,
+      HashZero: ethers.constants.HashZero,
+      warn: (msg, err) => surveyLog.warn(msg, err),
     };
-
-    const hashedQuestionIds = Array.isArray(questionIds) ? questionIds.map(ensureHash) : [];
-    const hashedSurveyId = ensureHash(surveyId);
+    const hashedQuestionIds = Array.isArray(questionIds)
+      ? questionIds.map((value) => ensureIdentifierHash(value, hashDeps))
+      : [];
+    const hashedSurveyId = ensureIdentifierHash(surveyId, hashDeps);
 
     // Submit tx (must actually send or we throw)
     const tx = await contractScripts.submitResponses(
@@ -9064,33 +9049,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       submissionGroupKey
     );
 
-    // Normalize success:
-    // - ethers.js TransactionResponse → await .wait()
-    // - string hash or object with hash/transactionHash → accept
-    // - otherwise → throw (prevents premature "Submitted" UI)
-    const submittedPayloadMeta = {
-      __ceQuestionResponses: this.deepClone(questionResponses || []),
-      __ceSurveyResponse: surveyResponse ? this.deepClone(surveyResponse) : null,
-      __ceSurveyId: surveyId || null,
-      __ceSubmissionGroupKey: submissionGroupKey,
-    };
-
-    if (tx && typeof tx.wait === 'function') {
-      const receipt = await tx.wait();
-      if (!receipt || (receipt.status !== undefined && receipt.status !== 1)) {
-        throw new Error('Submission failed on-chain.');
-      }
-      return { ...receipt, ...submittedPayloadMeta };
-    }
-
-    if (typeof tx === 'string' && tx.startsWith('0x') && tx.length >= 66) {
-      return { transactionHash: tx, ...submittedPayloadMeta };
-    }
-    if (tx && (tx.transactionHash || tx.hash)) {
-      return { ...tx, ...submittedPayloadMeta };
-    }
-
-    throw new Error('No transaction was sent.');
+    return normalizeSubmitReceipt(tx, {
+      questionResponses,
+      surveyResponse,
+      surveyId,
+      submissionGroupKey,
+      deepClone: (obj) => this.deepClone(obj),
+    });
   };
 
   writeSubmittedResponsesToLocalCaches = async ({
