@@ -11,7 +11,7 @@
 - Current length: **12,334 lines**
 - Component type: **React class component** (`MainSite extends Component`)
 - Component count in file: **1 class component** (`MainSite`)
-- Method inventory: **138 class methods/properties** + **15 top-level helper functions**
+- Method inventory: **243 class methods/properties** + **3 top-level helper functions**
 - Summary: `MainSite` is the app shell and runtime orchestrator. It resolves active session/group context from URL + Redux, hydrates multi-cache state (SBT/surveys/questions/responses), drives profile deep scans and registry hydration, manages per-group listener lifecycles, coordinates Lit/session metadata refresh, and routes to lazy feature views while gating UI readiness via cache flags.
 
 ## Extracted Modules
@@ -44,130 +44,130 @@ All extracted controllers use a factory-function + host-DI pattern (or pure expo
 
 | Section | Lines | Purpose | Key Methods |
 |---|---:|---|---|
-| Imports, constants, pure helpers | 1-325 | Dependencies, perf helpers, cache utility helpers, exported pure functions (`shouldFlushCoalescedRun`, etc.) | `shouldFlushCoalescedRun`, `buildQuestionReadyStatePatch`, `shouldEnableSessionRegistryRefresh` |
-| Class state + instance fields | 326-400 | Main runtime state + internal run tokens/queues/controllers | `state`, `_cachePersistenceController`, `_cacheReadinessController`, `_scanPolicy`, `DG` |
-| Cache flush + cross-tab coalescing | 401-725 | Debounced cache/readiness updates and cross-tab sync handling | `setReadinessStateIfChanged`, `scheduleCacheUpdateFlush`, `flushQueuedCacheUpdates`, `handleCrossTabCacheUpdateEvent` |
-| Session path/slug resolution | 728-1473 | Parse `/session/:token`, resolve ids/slugs, locate groups for surveys/questions/SBT links | `resolveSessionPathId`, `resolveSessionPathSlug`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` |
-| DG storage abstraction | 1475-1616 | Per-group storage facade over cache manager/localStorage | `DG.key`, `DG.read`, `DG.write`, `DG.remove` |
-| Session config + scan policy + registry bootstrap | 1619-2456 | Chain/session helpers, scope controls, telemetry, on-chain registry hydration, deep-scan planning | `getSessionCfg`, `getSessionScanScope`, `ensureRegistryHydratedForProfileScan`, `resolveProfileDeepScanPlan`, `runWithGeneralSessionBackfill` |
-| Deep scans (survey lookup + user profile) | 2458-3437 | Cross-group survey discovery + full activity/SBT profile scanning with cache merges | `scanForSurveyGroup`, `scanSpecificUserProfilePriority`, `scanSpecificUserProfile` |
-| Persistent readiness flags | 3441-3495 | Read/write per-slug flags and sync `cacheHasLoaded` from persisted state | `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent` |
-| Mount/unmount lifecycle | 3497-3968 | Boot sequence, initial cache strategy by route, listener startup, cleanup | `componentDidMount`, `componentWillUnmount` |
-| Update lifecycle + deep-link/network handlers | 3970-4466 | React to slug/network/path changes, trigger deep-link scans, readiness recompute | `componentDidUpdate`, `handleDeepLinkScan`, `manageAutoHashPersistence`, `handleNetworkChange`, `checkAllCachesReady` |
-| SBT cache + listeners | 4479-5809 | Light/full SBT discovery, SBT merge logic, listener/event handlers | `ensureLightSbtDiscovery`, `initializeSbtCacheForGroup`, `refreshSbtDataForGroup`, `startSbtEventListenerForGroup`, `onSbtTransferDetectedForGroup` |
-| Survey/question cache initialization | 5812-8093 | Survey cache load + question cache load + chunked response hydration | `initializeSurveyCacheForGroup`, `initializeQuestionCacheForGroup`, `fetchQuestionResponsesChunkedForGroup` |
-| Survey/question event listeners | 8095-8462 | Event subscriptions and cache refresh on new survey/question events | `startSurveyAndQuestionEventListenerForGroup`, `onNewSurveyEventDetectedForGroup` |
-| View routing + child prop composition | 8472-9515 | Route dispatch and prop wiring into lazy views | `getMainView`, `refreshSurveyResponsesByIDForGroup`, `refreshEncryptedQuestionPayloadsForGroup` |
-| Final metadata refresh + render | 9517-9805 | Final question refresh helpers and root shell render | `refreshQuestionMetadataForGroup`, `refreshQuestionResponses`, `render` |
-| PropTypes + Redux connect | 9807-9870 | Type contracts and `connect(...)` wiring | `mapStateToProps` |
+| Imports, constants, pure helpers | 1-270 | Dependencies, perf helpers, cache utility helpers, exported pure functions (`shouldFlushCoalescedRun`, etc.) | `shouldFlushCoalescedRun`, `buildQuestionReadyStatePatch`, `shouldEnableSessionRegistryRefresh` |
+| Class state + instance fields | 271-364 | Main runtime state + internal run tokens/queues/controllers | `state`, `_cachePersistenceController`, `_cacheReadinessController`, `_scanPolicy`, `DG` |
+| Cache flush + cross-tab coalescing | 366-769 | Debounced cache/readiness updates and cross-tab sync handling | `setReadinessStateIfChanged`, `scheduleCacheUpdateFlush`, `flushQueuedCacheUpdates`, `handleCrossTabCacheUpdateEvent` |
+| Session path/slug resolution | 772-1921 | Parse `/session/:token`, resolve ids/slugs, locate groups for surveys/questions/SBT links | `resolveSessionPathId`, `resolveSessionPathSlug`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` |
+| DG storage abstraction | 1928-1928 | Per-group storage facade over cache manager/localStorage | `DG.key`, `DG.read`, `DG.write`, `DG.remove` |
+| Session config + scan policy + registry bootstrap | 1931-2794 | Chain/session helpers, scope controls, telemetry, on-chain registry hydration, deep-scan planning | `getSessionCfg`, `getSessionScanScope`, `ensureRegistryHydratedForProfileScan`, `resolveProfileDeepScanPlan`, `runWithGeneralSessionBackfill` |
+| Deep scans (survey lookup + user profile) | 2796-4372 | Cross-group survey discovery + full activity/SBT profile scanning with cache merges | `scanForSurveyGroup`, `scanSpecificUserProfilePriority`, `scanSpecificUserProfile` |
+| Persistent readiness flags | 4376-4379 | Read/write per-slug flags and sync `cacheHasLoaded` from persisted state | `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent` |
+| Mount/unmount lifecycle | 4381-4881 | Boot sequence, initial cache strategy by route, listener startup, cleanup | `componentDidMount`, `componentWillUnmount` |
+| Update lifecycle + deep-link/network handlers | 4883-5434 | React to slug/network/path changes, trigger deep-link scans, readiness recompute | `componentDidUpdate`, `handleDeepLinkScan`, `manageAutoHashPersistence`, `handleNetworkChange`, `checkAllCachesReady` |
+| SBT cache + listeners | 5436-7497 | Light/full SBT discovery, SBT merge logic, listener/event handlers | `ensureLightSbtDiscovery`, `initializeSbtCacheForGroup`, `refreshSbtDataForGroup`, `startSbtEventListenerForGroup`, `onSbtTransferDetectedForGroup` |
+| Survey/question cache initialization | 7500-10120 | Survey cache load + question cache load + chunked response hydration | `initializeSurveyCacheForGroup`, `initializeQuestionCacheForGroup`, `fetchQuestionResponsesChunkedForGroup` |
+| Survey/question event listeners | 10122-10547 | Event subscriptions and cache refresh on new survey/question events | `startSurveyAndQuestionEventListenerForGroup`, `onNewSurveyEventDetectedForGroup` |
+| View routing + child prop composition | 10556-11993 | Route dispatch and prop wiring into lazy views | `getMainView`, `refreshSurveyResponsesByIDForGroup`, `refreshEncryptedQuestionPayloadsForGroup` |
+| Final metadata refresh + render | 11995-12279 | Final question refresh helpers and root shell render | `refreshQuestionMetadataForGroup`, `refreshQuestionResponses`, `render` |
+| PropTypes + Redux connect | 12284-12334 | Type contracts and `connect(...)` wiring | `mapStateToProps` |
 
 ## Method Index (Grouped by Responsibility)
 
 ### Cache and readiness orchestration
-- `mergeLegacyNumericNetworkKey` (401-415)
-- `startCacheReinitRun` (417-422)
-- `isCacheReinitRunActive` (424-426)
-- `resolveActiveSlugForCacheUpdates` (428-443)
-- `setReadinessStateIfChanged` (445-492)
-- `syncCacheHasLoadedFlagOnTransition` (494-511)
-- `scheduleCacheUpdateFlush` (530-542)
-- `queueCacheUpdateFlush` (544-564)
-- `flushQueuedCacheUpdates` (566-589)
-- `scheduleLocalRevisionFlush` (608-620)
-- `flushLocalRevisionUpdate` (633-659)
-- `handleCrossTabCacheUpdateEvent` (661-690)
-- `hasPersistedManagedCacheData` (3444-3458)
-- `syncCacheHasLoadedFlagFromPersistent` (3460-3495)
-- `checkAllCachesReady` (4425-4466)
+- `mergeLegacyNumericNetworkKey` (672-686)
+- `startCacheReinitRun` (688-693)
+- `isCacheReinitRunActive` (695-697)
+- `resolveActiveSlugForCacheUpdates` (699-714)
+- `setReadinessStateIfChanged` (716-716)
+- `syncCacheHasLoadedFlagOnTransition` (718-718)
+- `scheduleCacheUpdateFlush` (720-720)
+- `queueCacheUpdateFlush` (722-722)
+- `flushQueuedCacheUpdates` (724-724)
+- `queueLocalRevisionUpdate` (726-726)
+- `flushLocalRevisionUpdate` (728-728)
+- `handleCrossTabCacheUpdateEvent` (730-730)
+- `hasPersistedManagedCacheData` (4378-4378)
+- `syncCacheHasLoadedFlagFromPersistent` (4379-4379)
+- `checkAllCachesReady` (5393-5434)
 
 ### Session routing and group resolution
-- `getSessionTokenFromPath` (728-732)
-- `resolveSessionSlugFromPathToken` (734-762)
-- `resolveSessionPathId` (764-873)
-- `resolveSessionPathSlug` (875-964)
-- `getInitialGroupSlugFromPath` (966-973)
-- `getSessionSlugFromProps` (975-977)
-- `getSessionSlugFromState` (979)
-- `getActiveSessionSlug` (981-983)
-- `getSbtAddressFromPath` (985-992)
-- `getUserAddressFromPath` (994-1005)
-- `findGroupSlugForSurvey` (1253-1302)
-- `getQuestionRouteSessionSlugHint` (1304-1318)
-- `getQuestionRouteSessionIdHint` (1320-1334)
-- `findGroupSlugForQuestion` (1336-1391)
-- `resolveGroupSlugForSbtAddress` (1393-1473)
-- `handleDeepLinkScan` (4194-4231)
-- `manageAutoHashPersistence` (4236-4275)
+- `getSessionTokenFromPath` (772-776)
+- `resolveSessionSlugFromPathToken` (778-790)
+- `resolveSessionPathId` (792-902)
+- `resolveSessionPathSlug` (904-993)
+- `getInitialGroupSlugFromPath` (995-1004)
+- `getSessionSlugFromProps` (1056-1077)
+- `getSessionSlugFromState` (1126)
+- `getActiveSessionSlug` (1128-1130)
+- `getSbtAddressFromPath` (1208-1215)
+- `getUserAddressFromPath` (1243-1254)
+- `findGroupSlugForSurvey` (1662-1733)
+- `getQuestionRouteSessionSlugHint` (1747-1754)
+- `getQuestionRouteSessionIdHint` (1756-1768)
+- `findGroupSlugForQuestion` (1770-1839)
+- `resolveGroupSlugForSbtAddress` (1841-1921)
+- `handleDeepLinkScan` (5156-5193)
+- `manageAutoHashPersistence` (5198-5237)
 
 ### Session metadata + Lit + gated prompt recovery
-- `syncLitHooks` (1018-1056)
-- `getSessionInfoForGroup` (1058-1064)
-- `getSessionNameForGroup` (1066-1072)
-- `hasEncryptedSessionField` (1074-1093)
-- `getSessionHeaderForGroup` (1095-1104)
-- `refreshSessionInfo` (1106-1136)
-- `refreshSessionMetaFields` (1138-1190)
-- `refreshGroupCredentials` (1192-1249)
-- `hasMaskedQuestionPayloadInCache` (9315-9322)
-- `buildQuestionDecryptContext` (9324-9338)
-- `refreshEncryptedQuestionPayloadsForGroup` (9340-9515)
-- `refreshQuestionMetadataForGroup` (9517-9526)
+- `syncLitHooks` (1268-1301)
+- `getSessionInfoForGroup` (1303-1319)
+- `getSessionNameForGroup` (1321-1337)
+- `hasEncryptedSessionField` (1339-1358)
+- `getSessionHeaderForGroup` (1360-1389)
+- `refreshSessionInfo` (1391-1414)
+- `refreshSessionMetaFields` (1416-1448)
+- `refreshGroupCredentials` (1450-1454)
+- `hasMaskedQuestionPayloadInCache` (11821-11828)
+- `buildQuestionDecryptContext` (11830-11839)
+- `refreshEncryptedQuestionPayloadsForGroup` (11841-11993)
+- `refreshQuestionMetadataForGroup` (11995-12004)
 
 ### Scan scope, registry hydration, and deep scan planning
-- `getSessionCfg` (1619-1627)
-- `getSessionChainId` (1629-1635)
-- `getSessionNetwork` (1638-1644)
-- `isSbtInstanceListenerEnabledForGroup` (1652-1671)
-- `isSbtHistoryScanEnabled` (1673-1676)
-- `getSessionScanScope` (1680-1689)
-- `getSessionScanScopeContext` (1691-1707)
-- `isSessionSlugAllowedForScan` (1709-1713)
-- `areSbtInstanceListenersSuppressedByMode` (1732-1755)
-- `shouldAutoRunFullSbtScan` (1757-1774)
-- `readUserProfileAllSessionsFlag` (1898-1905)
-- `getUserProfileAllSessionsScanMode` (1907-1946)
-- `ensureRegistryHydratedForProfileScan` (2006-2110)
-- `refreshSessionUniverseRegistryCache` (2114-2132)
-- `resolveProfileDeepScanPlan` (2134-2273)
-- `scheduleProfileScanRetryAfterRegistryHydration` (2275-2337)
-- `getScopeFilteredSlugs` (2360-2375)
-- `enqueueGeneralSessionBackfill` (2385-2435)
-- `runWithGeneralSessionBackfill` (2437-2456)
-- `scanForSurveyGroup` (2458-2570)
-- `scanSpecificUserProfilePriority` (2574-2594)
-- `scanSpecificUserProfile` (2596-3437)
+- `getSessionCfg` (1931-1931)
+- `getSessionChainId` (1932-1932)
+- `getSessionNetwork` (1933-1933)
+- `isSbtInstanceListenerEnabledForGroup` (1935-1935)
+- `isSbtHistoryScanEnabled` (1936-1936)
+- `getSessionScanScope` (1937-1937)
+- `getSessionScanScopeContext` (1938-1938)
+- `isSessionSlugAllowedForScan` (1983-1985)
+- `shouldAttachSbtDetailInstanceListener` (1990-1990)
+- `shouldAutoRunFullSbtScan` (1989-1989)
+- `readUserProfileAllSessionsFlag` (2059-2066)
+- `getUserProfileAllSessionsScanMode` (2068-2107)
+- `ensureRegistryHydratedForProfileScan` (2300-2476)
+- `refreshSessionUniverseRegistryCache` (2480-2504)
+- `resolveProfileDeepScanPlan` (2506-2639)
+- `scheduleProfileScanRetryAfterRegistryHydration` (2641-2703)
+- `getScopeFilteredSlugs` (2713-2713)
+- `enqueueGeneralSessionBackfill` (2723-2773)
+- `runWithGeneralSessionBackfill` (2775-2794)
+- `scanForSurveyGroup` (2796-2997)
+- `scanSpecificUserProfilePriority` (3001-3021)
+- `scanSpecificUserProfile` (3023-4372)
 
 ### SBT cache and event pipeline
-- `ensureLightSbtDiscovery` (4479-4622)
-- `ensureLightSbtUniverse` (4626-4651)
-- `mergeSbtCountMaps` (4653-4664)
-- `mergeSbtCountsPayload` (4666-4685)
-- `initializeSbtCache` (4687-4689)
-- `initializeSbtCacheWithGeneralBackfill` (4691-4703)
-- `initializeSbtCacheForGroup` (4705-5162)
-- `refreshSbtDataForGroup` (5171-5430)
-- `startSbtEventListenerForGroup` (5434-5516)
-- `onNewSbtEventDetectedForGroup` (5521-5587)
-- `onSbtCreatedDetectedForGroup` (5592-5643)
-- `onSbtIssuedDetectedForGroup` (5647-5730)
-- `onSbtTransferDetectedForGroup` (5734-5809)
+- `ensureLightSbtDiscovery` (5477-5830)
+- `ensureLightSbtUniverse` (5834-5883)
+- `mergeSbtCountMaps` (5885-5896)
+- `mergeSbtCountsPayload` (5898-5917)
+- `initializeSbtCache` (6061-6063)
+- `initializeSbtCacheWithGeneralBackfill` (6065-6077)
+- `initializeSbtCacheForGroup` (6079-6637)
+- `refreshSbtDataForGroup` (6646-7109)
+- `startSbtEventListenerForGroup` (7113-7197)
+- `onNewSbtEventDetectedForGroup` (7202-7283)
+- `onSbtCreatedDetectedForGroup` (7288-7356)
+- `onSbtIssuedDetectedForGroup` (7360-7362)
+- `onSbtTransferDetectedForGroup` (7495-7497)
 
 ### Survey/question/response caches and listeners
-- `initializeSurveyCacheForGroup` (5825-6301)
-- `initializeQuestionCacheForGroup` (6317-7363)
-- `fetchQuestionResponsesChunkedForGroup` (7378-8093)
-- `startSurveyAndQuestionEventListenerForGroup` (8097-8104)
-- `onNewSurveyEventDetectedForGroup` (8109-8462)
-- `refreshSurveyResponsesByIDForGroup` (9252-9311)
-- `refreshQuestionResponses` (9528-9770)
+- `initializeSurveyCacheForGroup` (7513-8051)
+- `initializeQuestionCacheForGroup` (8067-9363)
+- `fetchQuestionResponsesChunkedForGroup` (9378-10120)
+- `startSurveyAndQuestionEventListenerForGroup` (10124-10131)
+- `onNewSurveyEventDetectedForGroup` (10136-10547)
+- `refreshSurveyResponsesByIDForGroup` (11753-11817)
+- `refreshQuestionResponses` (12006-12248)
 
 ### Lifecycle and view routing
-- `componentDidMount` (3497-3883)
-- `componentWillUnmount` (3885-3968)
-- `componentDidUpdate` (3970-4192)
-- `handleNetworkChange` (4278-4423)
-- `getMainView` (8472-9241)
-- `render` (9772-9804)
+- `componentDidMount` (4381-4789)
+- `componentWillUnmount` (4791-4881)
+- `componentDidUpdate` (4883-5154)
+- `handleNetworkChange` (5240-5391)
+- `getMainView` (11523-11742)
+- `render` (12250-12279)
 
 ## Data Flow (Runtime)
 
