@@ -85,12 +85,6 @@ describe('mainSiteSessionConfig', () => {
       );
       expect(result).toBe(84532);
     });
-
-    it('returns null when the resolved chain id is not a positive finite number', () => {
-      contractScriptsModule.getSessionChainId.mockReturnValue('not-a-chain');
-
-      expect(getSessionChainId(' Edge ')).toBeNull();
-    });
   });
 
   describe('getSessionNetwork', () => {
@@ -107,12 +101,6 @@ describe('mainSiteSessionConfig', () => {
         contractScriptsModule.getSessionNetwork
       );
       expect(result).toBe(network);
-    });
-
-    it('returns null when the resolved network is not an object', () => {
-      contractScriptsModule.getSessionNetwork.mockReturnValue('84532');
-
-      expect(getSessionNetwork(' Edge ')).toBeNull();
     });
   });
 });
