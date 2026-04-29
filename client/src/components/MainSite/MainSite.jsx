@@ -89,11 +89,11 @@ import { t } from '../../utilities/ui/terminology.js';
 import {
   initCacheManager,
   peekCacheSync,
-  readCache,
   removeCache,
   subscribeCacheUpdates,
   writeCacheOptimistic,
 } from '../../utilities/cache/cacheScripts.js';
+import { createSessionCachePersistenceController } from '../../utilities/cache/sessionCachePersistenceController.js';
 import { createSessionCacheReadinessController } from '../../utilities/cache/sessionCacheReadinessController.js';
 import {
   ensureQuestionArweaveCacheBranches,
@@ -335,6 +335,14 @@ export class MainSite extends Component {
     }),
   });
 
+  _cachePersistenceController = createSessionCachePersistenceController({
+    dgRead: (name, slug) => this.DG.read(name, slug),
+    dgWrite: (name, slug, obj) => this.DG.write(name, slug, obj),
+    isMounted: () => this._mounted,
+    getActiveSlug: () => this.getSessionSlugFromState(),
+    setState: (updater, cb) => this.setState(updater, cb),
+  });
+
   _queuedSurveyGroupScanId = null;
   _queuedSurveyGroupScanHintedSlug = '';
   _queuedSurveyGroupScanTimer = null;
@@ -352,8 +360,6 @@ export class MainSite extends Component {
   _registryBootstrapScopeKey = '';
   _profileScanRetryAfterRegistry = new Set();
   _profileScanTelemetrySeq = 0;
-  _cacheHasLoadedSyncInFlight = new Map();
-  _cacheHasLoadedSyncTokenBySlug = new Map();
   _cacheReinitRunSeq = 0;
   _activeCacheReinitRunToken = 0;
   _sbtScanProgressMetaBySlug = new Map();
@@ -4707,61 +4713,10 @@ export class MainSite extends Component {
 
 
   // Tiny flag helpers (boolean-only)
-  readFlag(name, slug) { try { return !!this.DG.read(name, slug); } catch(_) { return false; } }
-  writeFlag(name, slug, val) { this.DG.write(name, slug, !!val); }
-
-  hasPersistedManagedCacheData = async (slugIn) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    try {
-      const entries = await Promise.all(
-        DG_PRIMARY_ROUTE_CACHE_NAMES.map((namespace) => readCache(namespace, slug))
-      );
-      return entries.some((entry) => entry != null);
-    } catch (error) {
-      mainSiteLog.warn('[MainSite] Failed to verify persisted cache state', {
-        slug,
-        error: error?.message || error,
-      });
-      return false;
-    }
-  };
-
-  syncCacheHasLoadedFlagFromPersistent = (slugIn, opts = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const force = !!opts.force;
-    if (!force && this._cacheHasLoadedSyncInFlight.has(slug)) {
-      return this._cacheHasLoadedSyncInFlight.get(slug);
-    }
-
-    const runToken = Symbol(`cacheHasLoadedSync:${slug}`);
-    this._cacheHasLoadedSyncTokenBySlug.set(slug, runToken);
-    const run = (async () => {
-      const persisted = await this.hasPersistedManagedCacheData(slug);
-      if (this._cacheHasLoadedSyncTokenBySlug.get(slug) !== runToken) {
-        return persisted;
-      }
-      this.writeFlag('cacheHasLoaded', slug, persisted);
-
-      if (
-        this._mounted &&
-        String(this.getSessionSlugFromState() || '') === String(slug || '')
-      ) {
-        this.setState((prev) => (
-          prev.cacheHasLoaded === persisted ? null : { cacheHasLoaded: persisted }
-        ));
-      }
-
-      return persisted;
-    })();
-
-    this._cacheHasLoadedSyncInFlight.set(slug, run);
-    run.finally(() => {
-      if (this._cacheHasLoadedSyncInFlight.get(slug) === run) {
-        this._cacheHasLoadedSyncInFlight.delete(slug);
-      }
-    });
-    return run;
-  };
+  readFlag(name, slug) { return this._cachePersistenceController.readFlag(name, slug); }
+  writeFlag(name, slug, val) { this._cachePersistenceController.writeFlag(name, slug, val); }
+  hasPersistedManagedCacheData = (...args) => this._cachePersistenceController.hasPersistedManagedCacheData(...args);
+  syncCacheHasLoadedFlagFromPersistent = (...args) => this._cachePersistenceController.syncCacheHasLoadedFlagFromPersistent(...args);
 
   async componentDidMount() {
     if (shouldAutoStartCeRuntimeStats()) {
@@ -5192,6 +5147,9 @@ export class MainSite extends Component {
         this._cacheUpdateUnsubscribe();
       }
       this._cacheUpdateUnsubscribe = null;
+    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
+    try {
+      this._cachePersistenceController.destroy();
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
     try {
       this._cacheReadinessController.destroy();

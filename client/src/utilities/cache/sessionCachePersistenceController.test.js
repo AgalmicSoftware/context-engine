@@ -1,4 +1,4 @@
-jest.mock('utilities/logging', () => ({
+jest.mock('utilities/logging.js', () => ({
   __esModule: true,
   createLogger: jest.fn(() => ({
     log: jest.fn(),
@@ -10,9 +10,9 @@ jest.mock('utilities/logging', () => ({
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
   readCache: jest.fn(),
-}), { virtual: true });
+}));
 
-jest.mock('../../components/MainSite/cacheConstants', () => ({
+jest.mock('../../components/MainSite/cacheConstants.js', () => ({
   __esModule: true,
   DG_PRIMARY_ROUTE_CACHE_NAMES: ['surveysCache', 'questionsCache', 'sbtCache'],
 }));
@@ -20,7 +20,7 @@ jest.mock('../../components/MainSite/cacheConstants', () => ({
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn(),
-}), { virtual: true });
+}));
 
 const {
   createSessionCachePersistenceController,
