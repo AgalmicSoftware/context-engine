@@ -1,33 +1,12 @@
-import type { UnknownRecord } from './surveyToolTypes';
-
-type SubmittedQuestionResponse = UnknownRecord & {
-  answer?: UnknownRecord;
-  questionID?: string;
-};
-
-type SubmittedSurveyResponse = UnknownRecord & {
-  responses?: SubmittedQuestionResponse[];
-};
-
-type SubmitTransaction = UnknownRecord & {
-  hash?: unknown;
-  transactionHash?: unknown;
-  wait?: () => Promise<unknown>;
-};
-
-const isObjectRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
-
 export interface FilteredSubmitPayload {
   questionIds: string[];
-  questionResponses: SubmittedQuestionResponse[];
+  questionResponses: any[];
   surveyId: string;
-  surveyResponse: SubmittedSurveyResponse | null;
+  surveyResponse: any | null;
 }
 
 export function filterChangedResponsesForSubmit(opts: {
-  data: unknown;
+  data: any;
   changedSet: Set<string>;
   singleQuestionMode: boolean;
   isStandalone: boolean;
@@ -42,23 +21,22 @@ export function filterChangedResponsesForSubmit(opts: {
     surveyId,
     HashZero,
   } = opts;
-  const dataRecord = isObjectRecord(data) ? data as SubmittedSurveyResponse & SubmittedQuestionResponse : null;
 
   if (singleQuestionMode) {
-    const qid = typeof dataRecord?.questionID === 'string' ? dataRecord.questionID : '';
-    if (!dataRecord || !qid || !changedSet.has(qid)) {
+    const qid = data && data.questionID;
+    if (!qid || !changedSet.has(qid)) {
       throw new Error('No new or changed responses to submit.');
     }
     return {
       questionIds: [qid],
-      questionResponses: [dataRecord],
+      questionResponses: [data],
       surveyId: HashZero,
       surveyResponse: null,
     };
   }
 
-  const all = Array.isArray(dataRecord?.responses) ? dataRecord.responses : [];
-  const filtered = all.filter((response) => (
+  const all = (data && Array.isArray(data.responses)) ? data.responses : [];
+  const filtered = all.filter((response: any) => (
     response && response.questionID && changedSet.has(response.questionID)
   ));
 
@@ -67,18 +45,18 @@ export function filterChangedResponsesForSubmit(opts: {
   }
 
   return {
-    questionIds: filtered.map((response) => response.questionID || ''),
+    questionIds: filtered.map((response: any) => response.questionID),
     questionResponses: filtered,
     surveyId: isStandalone ? HashZero : surveyId,
-    surveyResponse: isStandalone ? null : { ...(dataRecord || {}), responses: filtered },
+    surveyResponse: isStandalone ? null : { ...data, responses: filtered },
   };
 }
 
 export function ensureIdentifierHash(
-  value: unknown,
+  value: any,
   deps: {
-    hashIdentifier?: (v: unknown) => string;
-    isHexString?: (v: unknown, len: number) => boolean;
+    hashIdentifier?: (v: any) => string;
+    isHexString?: (v: any, len: number) => boolean;
     id?: (v: string) => string;
     HashZero: string;
     warn?: (msg: string, err?: unknown) => void;
@@ -117,27 +95,25 @@ export function ensureIdentifierHash(
 }
 
 export interface SubmitReceiptResult {
-  receipt: unknown;
+  receipt: any;
   submittedPayloadMeta: {
-    __ceQuestionResponses: SubmittedQuestionResponse[];
-    __ceSurveyResponse: SubmittedSurveyResponse | null;
+    __ceQuestionResponses: any[];
+    __ceSurveyResponse: any | null;
     __ceSurveyId: string | null;
     __ceSubmissionGroupKey: string;
   };
 }
 
-type NormalizedSubmitReceipt = UnknownRecord & SubmitReceiptResult['submittedPayloadMeta'];
-
 export async function normalizeSubmitReceipt(
-  tx: unknown,
+  tx: any,
   opts: {
-    questionResponses: SubmittedQuestionResponse[];
-    surveyResponse: SubmittedSurveyResponse | null;
+    questionResponses: any[];
+    surveyResponse: any | null;
     surveyId: string | null;
     submissionGroupKey: string;
-    deepClone: <T>(obj: T) => T;
+    deepClone: (obj: any) => any;
   },
-): Promise<NormalizedSubmitReceipt> {
+): Promise<any> {
   const {
     questionResponses,
     surveyResponse,
@@ -153,23 +129,20 @@ export async function normalizeSubmitReceipt(
     __ceSubmissionGroupKey: submissionGroupKey,
   };
 
-  const txRecord = isObjectRecord(tx) ? tx as SubmitTransaction : null;
-
-  if (txRecord && typeof txRecord.wait === 'function') {
-    const receipt = await txRecord.wait();
-    const receiptRecord = isObjectRecord(receipt) ? receipt : null;
-    if (!receipt || (receiptRecord && receiptRecord.status !== undefined && receiptRecord.status !== 1)) {
+  if (tx && typeof tx.wait === 'function') {
+    const receipt = await tx.wait();
+    if (!receipt || (receipt.status !== undefined && receipt.status !== 1)) {
       throw new Error('Submission failed on-chain.');
     }
-    return { ...(receiptRecord || {}), ...submittedPayloadMeta };
+    return { ...receipt, ...submittedPayloadMeta };
   }
 
   if (typeof tx === 'string' && tx.startsWith('0x') && tx.length >= 66) {
     return { transactionHash: tx, ...submittedPayloadMeta };
   }
 
-  if (txRecord && (txRecord.transactionHash || txRecord.hash)) {
-    return { ...txRecord, ...submittedPayloadMeta };
+  if (tx && (tx.transactionHash || tx.hash)) {
+    return { ...tx, ...submittedPayloadMeta };
   }
 
   throw new Error('No transaction was sent.');
