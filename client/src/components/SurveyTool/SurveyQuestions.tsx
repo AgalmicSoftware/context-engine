@@ -394,6 +394,7 @@ import {
   resolveSurveyBaselineSourceSlice,
   resolveSurveyUserAnswersSlice,
 } from './surveyToolResponseSourceController';
+import { buildResponsePayload } from './surveyToolResponsePayloadController';
 import {
   computeChangedQidsAndFields,
   pickBestField,
@@ -6440,154 +6441,29 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   prepareJsonAndHash = (surveyIndex, responderAddress, overrideState = null) => {
     surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : surveyIndex;
-
-    const surveyHash =
-      this.props.isStandalone || this.props.singleQuestionMode ? undefined : this.props.surveyId;
-
     const surveyResponseState = overrideState || this.state.surveysResponseState[surveyIndex];
-    const poolFromState = Array.isArray(this.state.questionPool) ? this.state.questionPool : [];
-    const pilePool = Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : [];
-
-    if (!surveyResponseState) return {};
-
-    let candidateQuestions = [];
-    if (poolFromState.length > 0) {
-      candidateQuestions = poolFromState;
-    } else if (pilePool.length > 0) {
-      candidateQuestions = pilePool;
-    } else {
-      const ids = new Set([
-        ...Object.keys(surveyResponseState.answers || {}),
-        ...Object.keys(surveyResponseState.additionalComments || {}),
-        ...Object.keys(surveyResponseState.importance || {}),
-        ...Object.keys(surveyResponseState.conviction || {}),
-      ]);
-      candidateQuestions = Array.from(ids).map((id) => ({ id, type: 'freeform', prompt: '' }));
-    }
-
-    const hasMainAnswer = (ans) =>
-      ans !== undefined &&
-      ans !== null &&
-      ans !== '' &&
-      (!Array.isArray(ans) || ans.length > 0);
-
-    const hasAdditional = (val) => val !== undefined && val !== null && val !== '';
-    const hasConviction = (qid) =>
-      getConvictionFromSlice(surveyResponseState, qid) !== null;
-
-    const shouldFilterByAnswered =
-      this.props.isStandalone || this.props.singleQuestionMode || poolFromState.length === 0;
-
-    const answeredQuestions = shouldFilterByAnswered
-      ? candidateQuestions.filter((q) => {
-          const a = surveyResponseState.answers?.[q.id]?.value;
-          const add = surveyResponseState.additionalComments?.[q.id]?.value;
-          return hasMainAnswer(a) || hasAdditional(add) || hasConviction(q.id);
-        })
-      : candidateQuestions;
-
-    const responses = answeredQuestions.map((q) => {
-      const answer = surveyResponseState.answers?.[q.id] || {};
-      const additional = surveyResponseState.additionalComments?.[q.id] || {};
-      const answerAudience = this.resolveFieldEncryptionAudience(answer, q.id, 'answer');
-      const additionalAudience = this.resolveFieldEncryptionAudience(additional, q.id, 'additional');
-      const conviction = getConvictionFromSlice(surveyResponseState, q.id);
-      const importance = getImportanceFromSlice(surveyResponseState, q.id);
-      const importanceForPayload = importance !== null ? importance : conviction;
-
-      return {
-        questionID: q.id,
-        responder: responderAddress || this.props.account,
-        type: q.type,
-        prompt: sanitizeQuestionPromptForResponsePayload(q, {
-          isLocked: this.getQuestionEncryptionGates(q).length > 0,
-        }),
-        conviction: conviction !== null ? conviction : null,
-        importance: importanceForPayload !== null ? importanceForPayload : null,
-        answer: {
-          value: answer.value !== undefined ? answer.value : '',
-          encrypted: !!answer.encrypted,
-          encryptionAudience: answerAudience,
-          encryptionGateId: answer.encrypted ? this.resolveFieldEncryptionGateId(answer, q.id, 'answer') : null,
-          audienceMode: 'explicit',
-          hash: answer.hash || '',
-          encryptedPortion: answer.encrypted ? (answer.encryptedPortion || '') : '',
-        },
-        additional: {
-          value: additional.value !== undefined ? additional.value : '',
-          encrypted: !!additional.encrypted,
-          encryptionAudience: additionalAudience,
-          encryptionGateId: additional.encrypted ? this.resolveFieldEncryptionGateId(additional, q.id, 'additional') : null,
-          audienceMode: this.normalizeFieldAudienceMode(additional?.audienceMode, 'additional', additional),
-          hash: additional.hash || '',
-          encryptedPortion: additional.encrypted ? (additional.encryptedPortion || '') : '',
-        },
-      };
-    });
-
-    if (this.props.singleQuestionMode) {
-      // Resolve session name for single question context:
-      // 1. Prefer metadata from the question object itself (most accurate)
-      // 2. Fallback to current effective context
-      let sessionName = '';
-      const qInPool = (this.state.questionPool && this.state.questionPool[0]);
-      if (qInPool?.sessionName) {
-        sessionName = qInPool.sessionName;
-      } else {
+    return buildResponsePayload({
+      isStandalone: this.props.isStandalone,
+      singleQuestionMode: this.props.singleQuestionMode,
+      surveyId: this.props.surveyId,
+      account: responderAddress || this.props.account,
+      surveyIndex,
+      surveyResponseState,
+      questionPool: Array.isArray(this.state.questionPool) ? this.state.questionPool : [],
+      pileQuestions: Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : [],
+      resolveFieldEncryptionAudience: (field, qid, fieldKey) => this.resolveFieldEncryptionAudience(field, qid, fieldKey),
+      getQuestionEncryptionGates: (q) => this.getQuestionEncryptionGates(q),
+      resolveFieldEncryptionGateId: (field, qid, fieldKey) => this.resolveFieldEncryptionGateId(field, qid, fieldKey),
+      normalizeFieldAudienceMode: (mode, fieldKey, field) => this.normalizeFieldAudienceMode(mode, fieldKey, field),
+      getSurveyMetadataForJson: (hash) => this.getSurveyMetadataForJson(hash),
+      resolveSessionContext: () => {
         const context = resolveResponseJsonContext(this.props, resolveEffectiveSlug(this.props));
-        sessionName = context.sessionConfig?.sessionName || '';
-      }
-
-      if (responses.length > 0) {
-        return {
-          timeStamp: Date.now(),
-          sessionName,
-          ...(sessionName ? { sessionName: sessionName } : {}),
-          ...responses[0],
-        };
-      }
-      const q = candidateQuestions[0];
-      if (q) {
-        return {
-          timeStamp: Date.now(),
-          sessionName,
-          ...(sessionName ? { sessionName: sessionName } : {}),
-          questionID: q.id,
-          type: q.type,
-          prompt: sanitizeQuestionPromptForResponsePayload(q, {
-            isLocked: this.getQuestionEncryptionGates(q).length > 0,
-          }),
-          conviction: null,
-          importance: null,
-          answer: { value: '', encrypted: false, hash: '', encryptedPortion: '' },
-          additional: { value: '', encrypted: false, hash: '', encryptedPortion: '' },
-        };
-      }
-      return {};
-    }
-
-    let surveyTitle = null;
-    let sessionName = '';
-
-    if (surveyHash) {
-      const meta = this.getSurveyMetadataForJson(surveyHash);
-      surveyTitle = meta?.surveyTitle || null;
-      sessionName = meta?.sessionName || '';
-    } else {
-      // Fallback for standalone/general mode
-      const context = resolveResponseJsonContext(this.props, resolveEffectiveSlug(this.props));
-      if (context.sessionConfig?.sessionName) sessionName = context.sessionConfig.sessionName;
-    }
-
-    return {
-      ...(surveyTitle ? { surveyTitle } : {}),
-      ...(surveyHash !== undefined && { surveyID: surveyHash }),
-      responder: responderAddress || this.props.account,
-      timeStamp: Date.now(),
-      sessionName,
-      ...(sessionName ? { sessionName: sessionName } : {}),
-      responses,
-    };
+        return { sessionName: context.sessionConfig?.sessionName || '' };
+      },
+      getConvictionFromSlice,
+      getImportanceFromSlice,
+      sanitizeQuestionPromptForResponsePayload,
+    });
   };
 
 
