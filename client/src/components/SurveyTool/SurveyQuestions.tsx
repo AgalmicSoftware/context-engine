@@ -379,6 +379,9 @@ import {
   writeSingleQuestionResponseToCache,
 } from './surveyToolSingleQuestionController';
 import {
+  resolveSingleQuestionCacheBootstrap,
+} from './surveyToolSingleQuestionCacheBootstrapController';
+import {
   fetchSingleQuestionMetadataCandidates,
   normalizeSingleQuestionMetadataForCache,
   resolveSingleQuestionCacheState,
@@ -5433,105 +5436,96 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       ensureQuestionsNet,
     });
 
-    let qData = null;
-    const recentPayload = readRecentQuestionPayload(questionId);
-    const recentPayloadForAccount = canUseRecentQuestionPayloadForAccount(
-      recentPayload,
-      this.props.account
-    )
-      ? { ...recentPayload, id: questionId }
-      : null;
-    let cacheState = await getCacheStateForSlug(effectiveSingleSlug);
-    if (!cacheState) {
-      if (recentPayloadForAccount) {
-        const shouldBootstrapViewedResponse = !!responderAddress;
-        qData = { ...recentPayloadForAccount, id: questionId };
-        if (!qData.creator) qData.creator = '';
-        if (!Array.isArray(qData.tags)) qData.tags = [];
-        const fallbackNetId = resolveQuestionBootstrapContext(
-          this.props,
-          effectiveSingleSlug
-        ).networkIdStr;
-        if (fallbackNetId) {
-          const bootstrapCache = await updateCacheAtomic('questionsCache', effectiveSingleSlug, (current) => {
-            const nextCache = ensureQuestionsNet(
-              (current && typeof current === 'object') ? current : {},
-              fallbackNetId
-            );
-            nextCache[fallbackNetId].questions[questionId] = {
-              ...(nextCache[fallbackNetId].questions[questionId] || {}),
-              ...qData,
-              id: questionId,
-            };
-            return nextCache;
-          });
-          cacheState = {
-            netIdStr: fallbackNetId,
-            questionsCache: ensureQuestionsNet(bootstrapCache || {}, fallbackNetId),
-          };
+    const cacheBootstrapResult = await resolveSingleQuestionCacheBootstrap({
+      questionId,
+      effectiveSingleSlug,
+      responderAddress: String(responderAddress || ''),
+      account: String(this.props.account || ''),
+      resolveCacheState: (slug) => resolveSingleQuestionCacheState({
+        slug,
+        questionId,
+        resolveQuestionBootstrapContext: (nextSlug) => resolveQuestionBootstrapContext(this.props, nextSlug),
+        readQuestionsCacheAsync,
+        ensureQuestionsNet,
+      }),
+      readRecentPayload: readRecentQuestionPayload,
+      canUseRecentPayload: canUseRecentQuestionPayloadForAccount,
+      resolveBootstrapNetworkId: (slug) => resolveQuestionBootstrapContext(this.props, slug).networkIdStr || '',
+      updateCacheAtomic,
+      ensureQuestionsNet,
+      pickBetterQuestionPayload,
+      areQuestionPayloadsEquivalent,
+      writeQuestionsCache,
+    });
+
+    if (cacheBootstrapResult.status === 'seeded-from-recent') {
+      const {
+        questionData: seededQData,
+        shouldBootstrapViewedResponse,
+        fallbackNetId,
+        cacheState: seededCacheState,
+      } = cacheBootstrapResult;
+      if (isStaleRun()) return;
+      this.setState(
+        (prev) => ({
+          questionPool: [{ ...seededQData, id: seededQData.id }],
+          surveysResponseState: this.mergeSurveyResponseState(
+            prev.surveysResponseState ||
+              [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+            [{ ...seededQData, id: seededQData.id }],
+            0
+          ),
+          viewAddressAnswers: '',
+          parsedViewAddressAnswers: null,
+          noResponse: false,
+          isLoadingResponse: shouldBootstrapViewedResponse,
+        }),
+        () => {
+          this.updateJsonPreview();
+          this.rehydrateDraftForRenderedIds();
         }
-        if (isStaleRun()) return;
-        this.setState(
-          (prev) => ({
-            questionPool: [{ ...qData, id: qData.id }],
-            surveysResponseState: this.mergeSurveyResponseState(
-              prev.surveysResponseState ||
-                [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
-              [{ ...qData, id: qData.id }],
-              0
-            ),
+      );
+      if (shouldBootstrapViewedResponse) {
+        const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry({
+          questionId,
+          attempt: bootstrapRetryAttempt,
+          reason: 'recent-payload-waiting-for-response-bootstrap',
+        });
+        this.updateSingleQuestionDebug({
+          phase: didScheduleRetry
+            ? 'recent-payload-response-bootstrap-retrying'
+            : 'recent-payload-response-bootstrap-exhausted',
+          runId,
+          questionId,
+          effectiveSingleSlug: String(effectiveSingleSlug || ''),
+          responderAddress: String(responderAddress || '').toLowerCase(),
+          retryAttempt: bootstrapRetryAttempt,
+          didScheduleRetry: !!didScheduleRetry,
+        });
+        if (!didScheduleRetry) {
+          this.clearSingleQuestionBootstrapRetry();
+          safeSetState({
             viewAddressAnswers: '',
             parsedViewAddressAnswers: null,
-            noResponse: false,
-            isLoadingResponse: shouldBootstrapViewedResponse,
-          }),
-          () => {
-            this.updateJsonPreview();
-            this.rehydrateDraftForRenderedIds();
-          }
-        );
-        if (shouldBootstrapViewedResponse) {
-          const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry({
-            questionId,
-            attempt: bootstrapRetryAttempt,
-            reason: 'recent-payload-waiting-for-response-bootstrap',
+            noResponse: true,
+            responseLookupWarning: '',
+            isLoadingResponse: false,
           });
-          this.updateSingleQuestionDebug({
-            phase: didScheduleRetry
-              ? 'recent-payload-response-bootstrap-retrying'
-              : 'recent-payload-response-bootstrap-exhausted',
-            runId,
-            questionId,
-            effectiveSingleSlug: String(effectiveSingleSlug || ''),
-            responderAddress: String(responderAddress || '').toLowerCase(),
-            retryAttempt: bootstrapRetryAttempt,
-            didScheduleRetry: !!didScheduleRetry,
-          });
-          if (!didScheduleRetry) {
-            this.clearSingleQuestionBootstrapRetry();
-            safeSetState({
-              viewAddressAnswers: '',
-              parsedViewAddressAnswers: null,
-              noResponse: true,
-              responseLookupWarning: '',
-              isLoadingResponse: false,
-            });
-          }
-          return;
         }
-        if (!fallbackNetId) {
-          this.updateSingleQuestionDebug({
-            phase: 'recent-payload-missing-network',
-            runId,
-            questionId,
-            effectiveSingleSlug: String(effectiveSingleSlug || ''),
-            retryAttempt: bootstrapRetryAttempt,
-          });
-          safeSetState({ isLoadingResponse: false });
-          return;
-        }
+        return;
       }
-      if (!cacheState) {
+      if (!fallbackNetId) {
+        this.updateSingleQuestionDebug({
+          phase: 'recent-payload-missing-network',
+          runId,
+          questionId,
+          effectiveSingleSlug: String(effectiveSingleSlug || ''),
+          retryAttempt: bootstrapRetryAttempt,
+        });
+        safeSetState({ isLoadingResponse: false });
+        return;
+      }
+      if (!seededCacheState) {
         this.updateSingleQuestionDebug({
           phase: 'missing-cache-state',
           runId,
@@ -5546,34 +5540,27 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         return;
       }
     }
-    let { netIdStr, questionsCache } = cacheState;
 
-    // Load or fetch question metadata under the resolved slug
-    qData = questionsCache[netIdStr].questions?.[questionId];
-    if (!qData) {
-      if (recentPayloadForAccount) {
-        qData = { ...recentPayloadForAccount, id: questionId };
-        questionsCache[netIdStr].questions[questionId] = {
-          ...(questionsCache[netIdStr].questions[questionId] || {}),
-          ...qData,
-        };
-        if (!isStaleRun()) {
-          void writeQuestionsCache(effectiveSingleSlug, questionsCache);
-        }
+    if (cacheBootstrapResult.status === 'missing-cache-state') {
+      this.updateSingleQuestionDebug({
+        phase: 'missing-cache-state',
+        runId,
+        questionId,
+        effectiveSingleSlug: String(effectiveSingleSlug || ''),
+      });
+      surveyLog.error('SurveyQuestions: Network ID undefined in fetchSingleQuestionData');
+      if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
+        return;
       }
+      safeSetState({ isLoadingResponse: false });
+      return;
     }
-    if (qData && recentPayloadForAccount) {
-      const pickedFromRecent = pickBetterQuestionPayload(qData, recentPayloadForAccount) || qData;
-      const normalizedPicked = { ...pickedFromRecent, id: questionId };
-      const shouldWriteRecentUpgrade = !areQuestionPayloadsEquivalent(qData, normalizedPicked);
-      qData = normalizedPicked;
-      if (shouldWriteRecentUpgrade) {
-        questionsCache[netIdStr].questions[questionId] = normalizedPicked;
-        if (!isStaleRun()) {
-          void writeQuestionsCache(effectiveSingleSlug, questionsCache);
-        }
-      }
-    }
+
+    let qData = cacheBootstrapResult.questionData;
+    let cacheState = cacheBootstrapResult.cacheState;
+    let { netIdStr, questionsCache } = cacheState;
+    const recentPayloadForAccount = cacheBootstrapResult.recentPayloadForAccount;
+
     const shouldRefetchMasked =
       !!qData &&
       isMaskedQuestionPayload(qData) &&
