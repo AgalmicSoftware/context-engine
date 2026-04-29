@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.jsx`: **1,094 lines**
-  - `SurveyQuestions.tsx`: **11,277 lines**
+  - `SurveyQuestions.tsx`: **10,626 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
 
@@ -123,8 +123,17 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - single-question cache-state lookup
   - single-question metadata timeout / recovery fetch planning
   - single-question metadata cache normalization
+- `surveyToolSingleQuestionCacheBootstrapController.ts`
+  - cache state initialization for single-question mode
+  - recent-payload seeding when cache is empty
+  - recent-payload merge/upgrade for cached question data
+- `surveyToolSingleQuestionMetadataBootstrapController.ts`
+  - metadata refetch gating (masked payloads, force refetch)
+  - candidate fetch orchestration via `fetchSingleQuestionMetadataCandidates`
+  - winning-slug cache rebinding
+  - cache normalization via `normalizeSingleQuestionMetadataForCache`
 
-That means the next shared-core question is no longer “can we extract a controller?” It is:
+That means the single-question fetch lifecycle shell extraction is now substantially complete. The remaining inline code in `fetchSingleQuestionData` is mostly DI-bag assembly and side-effect interpretation, so the next shared-core question is no longer “can we extract a controller?” It is:
 
 1. keep extracting smaller wrappers with diminishing returns, or
 2. pick the next higher-payoff seam deliberately
@@ -133,9 +142,9 @@ That means the next shared-core question is no longer “can we extract a contro
 
 The next realistic candidates are:
 
-- Remaining single-question fetch lifecycle shell around the extracted metadata/bootstrap controllers
 - Shared decrypt/source restore wrappers adjacent to viewed-response handling
-- A broader inheritance-to-composition boundary pass
+- Broader inheritance-to-composition boundary assessment
+- Further reduction of the `fetchSingleQuestionData` DI-bag assembly (diminishing returns)
 
 These are stronger architectural moves than another tiny helper peel because:
 
@@ -193,12 +202,12 @@ That means:
 The next natural code move after the current controller extractions is:
 
 1. Decide whether to keep going with mode-agnostic runtime extraction, or pause for a broader boundary redesign.
-2. If continuing incrementally, target the remaining single-question fetch lifecycle shell or the shared decrypt/source wrappers next.
+2. If continuing incrementally, target the shared decrypt/source wrappers or a small DI-bag assembly reduction next.
 3. Keep React lifecycle ownership where it is until that seam is better isolated.
 
 Recommended next seam:
 
-- remaining single-question fetch lifecycle shell, then reassess before a broader inheritance seam move
+- shared decrypt/source restore wrappers, then reassess before a broader inheritance seam move
 
 Do **not** start with:
 
