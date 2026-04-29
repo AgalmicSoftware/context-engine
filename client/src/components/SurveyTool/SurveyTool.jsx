@@ -1,428 +1,42 @@
 /** @file SurveyTool.jsx */
 
 import React, { Component } from 'react';
-import {
-  Button,
-  Dropdown,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem,
-  FormGroup,
-  Label,
-  Input,
-  Card,
-  CardBody,
-  InputGroup,
-  InputGroupText,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-} from 'reactstrap';
-import { Link } from 'react-router-dom';
-// Styles
 import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
-
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
-
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
-import QuestionFilter from './QuestionFilter';
-import PileHologramAssistant from './PileHologramAssistant';
-import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
-import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import SingleQuestionResponse from './SingleQuestionResponse';
-import TagModal from '../TagPage/TagModal';
-import BinaryChoiceInput from './BinaryChoiceInput';
-import BullhornToggleButton from './BullhornToggleButton';
-import ConvictionImportanceLabel from './ConvictionImportanceLabel';
-import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
-import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
-import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionFooterIcons from './FullQuestionFooterIcons';
-import FullQuestionHeader from './FullQuestionHeader';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
-import GatedPromptNotice from './GatedPromptNotice';
-import MultichoiceQuestionInput from './MultichoiceQuestionInput';
-import QuestionDecryptControl from './QuestionDecryptControl';
-import QuestionCardLinks from './QuestionCardLinks';
-import SurveyAudioFieldInput from './SurveyAudioFieldInput';
-import {
-  applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
-  applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
-  applyDecryptedQuestionStateToSurveySlice as applyDecryptedQuestionStateToSurveySliceHelper,
-  buildAutoDecryptMaskedFieldSignature as buildAutoDecryptMaskedFieldSignatureHelper,
-  buildDecryptTaskKey as buildDecryptTaskKeyHelper,
-  buildFieldDecryptState as buildFieldDecryptStateHelper,
-  buildQuestionDecryptExecutionContext as buildQuestionDecryptExecutionContextHelper,
-  buildQuestionDecryptFailureState as buildQuestionDecryptFailureStateHelper,
-  buildQuestionFieldDisplayState as buildQuestionFieldDisplayStateHelper,
-  buildQuestionDecryptStartState as buildQuestionDecryptStartStateHelper,
-  buildQuestionResponseDisplayState as buildQuestionResponseDisplayStateHelper,
-  buildQuestionRenderDisplayState as buildQuestionRenderDisplayStateHelper,
-  buildSurveyDecryptExecutionContext as buildSurveyDecryptExecutionContextHelper,
-  buildSurveyDecryptSourceState as buildSurveyDecryptSourceStateHelper,
-  buildSurveyDecryptSuccessState as buildSurveyDecryptSuccessStateHelper,
-  buildEmptyQuestionDecryptSlice as buildEmptyQuestionDecryptSliceHelper,
-  buildSelfQuestionDecryptBaseline as buildSelfQuestionDecryptBaselineHelper,
-  buildSelfQuestionDecryptSuccessState as buildSelfQuestionDecryptSuccessStateHelper,
-  clearQuestionFieldBusyMap as clearQuestionFieldBusyMapHelper,
-  collectQuestionRatingEnvelopesByQid as collectQuestionRatingEnvelopesByQidHelper,
-  buildViewedResponseDecryptSuccessState as buildViewedResponseDecryptSuccessStateHelper,
-  buildViewedResponseDecryptBaseline as buildViewedResponseDecryptBaselineHelper,
-  decryptQuestionRatingEnvelopeMap as decryptQuestionRatingEnvelopeMapHelper,
-  decryptQuestionRatingEnvelopes as decryptQuestionRatingEnvelopesHelper,
-  ensureQuestionDecryptSliceShape as ensureQuestionDecryptSliceShapeHelper,
-  finalizeSurveyDecryptAttempt as finalizeSurveyDecryptAttemptHelper,
-  finalizeQuestionDecryptAttempt as finalizeQuestionDecryptAttemptHelper,
-  getViewedResponseOverrideForQuestion as getViewedResponseOverrideForQuestionHelper,
-  getQuestionFieldDecryptSelection as getQuestionFieldDecryptSelectionHelper,
-  getQuestionFieldTaskKey as getQuestionFieldTaskKeyHelper,
-  getQuestionFieldTaskKeys as getQuestionFieldTaskKeysHelper,
-  getQuestionRatingEnvelopes as getQuestionRatingEnvelopesHelper,
-  hydrateLatestQuestionDecryptState as hydrateLatestQuestionDecryptStateHelper,
-  markQuestionFieldBusyMap as markQuestionFieldBusyMapHelper,
-  mergeLatestEncryptedQuestionFields as mergeLatestEncryptedQuestionFieldsHelper,
-  mergeQuestionRatingEnvelopeState as mergeQuestionRatingEnvelopeStateHelper,
-  mergeQuestionResponseOverrideIntoDecryptSlice as mergeQuestionResponseOverrideIntoDecryptSliceHelper,
-  carryForwardSurveyQuestionRatings as carryForwardSurveyQuestionRatingsHelper,
-  normalizeBulkDecryptedSliceForSurveyState as normalizeBulkDecryptedSliceForSurveyStateHelper,
-  normalizeSingleQuestionViewedResponse as normalizeSingleQuestionViewedResponseHelper,
-  parseEncryptedEnvelope as parseEncryptedEnvelopeHelper,
-  prepareQuestionDecryptAttempt as prepareQuestionDecryptAttemptHelper,
-  prepareSurveyDecryptAttempt as prepareSurveyDecryptAttemptHelper,
-  prepareSelfQuestionDecryptState as prepareSelfQuestionDecryptStateHelper,
-  prepareViewedQuestionDecryptState as prepareViewedQuestionDecryptStateHelper,
-  resolveQuestionDecryptHandlingMode as resolveQuestionDecryptHandlingModeHelper,
-  resolveLatestSurveyDecryptResponse as resolveLatestSurveyDecryptResponseHelper,
-  resolveDecryptSurveyId as resolveDecryptSurveyIdHelper,
-  runDedupedDecryptTask as runDedupedDecryptTaskHelper,
-  syncDecryptedQuestionIntoBaseline as syncDecryptedQuestionIntoBaselineHelper,
-} from './surveyToolDecryptFlow.js';
-import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
-
-// Crypto and contract utilities
 import contractScripts, {
-  getAllSessionSlugs,
-  getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
-import { ethers, utils } from 'ethers';
-import CESlider from '../Shared/CESlider';
-import proposalScripts from 'utilities/proposalScripts.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
-import { ENABLE_IMPORTANCE_SLIDER_TOGGLE } from '../../variables/appConfig.js';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { createLogger } from 'utilities/logging.js';
-import { notify } from '../../utilities/ui/notify.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { t } from '../../utilities/ui/terminology.js';
-import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
-import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
-import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
-import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
-import {
-  buildQuestionRoutePath,
-  isMaskedQuestionPayload,
-  parseQuestionSessionIdFromSearch,
-  parseQuestionSessionSlugFromSearch,
-  pickBetterQuestionPayload,
-  shouldRetryMaskedQuestionRefresh,
-} from '../../utilities/survey/questionRouting.js';
-import {
-  sanitizeQuestionPromptForResponsePayload,
-  sanitizeSurveyTitleForResponsePayload,
-} from '../../utilities/arweave/noLeakPayloads.js';
-import {
-  normalizeSessionSlug,
-  resolveSessionAliases,
-  resolveSessionSlugFromPathname,
-} from '../../utilities/session/sessionNaming.js';
-import {
-  resolveSurveyToolDecryptHydrationContext,
-  resolveSurveyToolDraftSessionContext,
-  resolveSurveyToolDraftStorageContext,
-  resolveSurveyToolEffectiveSlug,
-  resolveSurveyToolEnsureQuestionCachedContext,
-  resolveSurveyToolExplicitSessionContext,
-  resolveSurveyToolIdLookupContext,
-  resolveSurveyToolLockAudienceSessionNameContext,
-  resolveSurveyToolQuestionConfigContext,
-  resolveSurveyToolQuestionCountContext,
-  resolveSurveyToolQuestionPayloadCacheWriteContext,
-  resolveSurveyToolQuestionsDashboardLoadContext,
-  resolveSurveyToolPileFilterContext,
-  resolveSurveyToolPileLoadContext,
-  resolveSurveyToolPileWarmSeedContext,
-  resolveSurveyToolPileResponseReadContext,
-  resolveSurveyToolQuestionReadCacheContext,
-  resolveSurveyToolQuestionBootstrapContext,
-  resolveSurveyToolResponseJsonContext,
-  resolveSurveyToolResponseHydrationContext,
-  resolveSurveyToolResponseGateSessionContext,
-  resolveSurveyToolSubmittedCacheWriteContext,
-  resolveSurveyToolSurveyReadContext,
-  resolveSurveyToolUpdateCacheContext,
-} from './surveyToolSessionResolution.js';
-import {
-  buildAnswerLockDisplayState,
-  buildGatedPromptNoticeState,
-  buildLockAudienceButtonAction,
-  buildLockAudienceDisplayState,
-  isQuestionPromptMasked as isQuestionPromptMaskedHelper,
-} from './surveyToolViewState.js';
-import {
-  buildCanDecryptOtherResponsesSnapshot,
-  buildResponseGateConfigSignature,
-  resolveCanDecryptOtherResponsesVerdict,
-} from './surveyToolResponseAccess';
-import {
-  readSessionScanScope,
-  readSessionScanSlugs,
-} from '../../utilities/session/sessionScanScope.js';
+import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import {
   listNamespaceEntriesSync,
-  peekCacheSync,
-  readCache,
   updateCacheAtomic,
-  writeCache,
-  writeCacheOptimistic,
 } from '../../utilities/cache/cacheScripts.js';
-import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import {
-  isTargetedSbtMetadataLookupEnabled,
-  resolveSbtDisplayLabel,
-  warmSbtDisplayNamesTargeted,
-} from '../../utilities/sbt/sbtDisplayNames.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import {
-  normalizeRatingValue,
-  RATING_MAX,
-  RATING_MIN,
-} from '../../utilities/survey/ratingValue.js';
-
-import {
-  EMPTY_QUESTION_POOL,
-  DEBUG_PREFILL,
-  GATE_SBT_HYDRATION_RETRY_MS,
-  QUESTION_TAG_DROPDOWN_ROW_STYLE,
-  SHOW_PILE_HOLOGRAM_TOGGLE,
-  appendExplicitSessionHintToPath,
-  applyExistingGroupPrefix,
-  areEnvelopesEquivalent,
-  areQuestionPayloadsEquivalent,
-  buildQuestionCountScopeContextKey,
-  buildQuestionDashboardLoadContextSignature,
-  buildQuestionFilterStorageKeyPrefix,
-  buildQuestionIdScopeSignature,
-  buildQuestionScanProgressDisplay,
-  buildDraftAnswersByQuestionId,
-  loadDraftAnswersByQuestionIdSafely,
-  buildDraftHydrationPatchForQuestion,
-  shouldSkipDraftHydrationRun,
-  buildDraftHydrationSeedContext,
-  buildDraftHydrationRunPlan,
-  resolveLocalCacheSliceLookup,
-  buildCacheHydrationSlice,
-  buildDraftHydrationUpdatePlan,
-  buildDraftAwareCacheHydrationState,
-  buildDraftHydrationState,
-  buildExitEditingStatePatch,
-  buildHydratedResponseSlice,
-  buildInitializedSurveyResponseState,
-  buildLocalCacheRehydrationUpdatePlan,
-  loadLocalCacheHydrationSlice,
-  prepareLocalCacheRehydrateRun,
-  buildRevertPendingStatePatch,
-  buildResetFormStatePatch,
-  buildPrefilledSingleQuestionUpdatePlan,
-  buildPrefilledSurveyUpdatePlan,
-  applyPriorResponseFetchSuccessEffects,
-  buildPriorResponseFetchPlan,
-  clearPriorResponseAttemptedKeys,
-  executePriorResponseFetchPlan,
-  buildGroupedRenderedResponseScopePlan,
-  resolveLocalCacheHydrationSignatureLookup,
-  loadMissingResponseIdsForScope,
-  loadGroupedMissingResponseRequests,
-  trackPriorResponseAttemptedKeys,
-  buildMissingRenderedResponseResult,
-  loadMissingRenderedResponseInfo,
-  resolveMissingRenderedResponseLookup,
-  buildNormalizedRenderedQuestionIds,
-  resolveQuestionSlugMapLookup,
-  resolveExitEditingBaselineSlice,
-  resolveRevertPendingBaselineSlice,
-  shouldBackfillPriorResponses,
-  buildStartFreshSurveyState,
-  buildLocalCacheHydrationMemoKey,
-  prepareLocalCacheSliceBuild,
-  buildMergedSurveyResponseState,
-  buildMergedHydrationQuestionResponses,
-  buildLocalCacheRehydrationState,
-  buildPrefilledSingleQuestionState,
-  buildPrefilledSurveyState,
-  buildQuestionSlugMapForIds,
-  applyResetFormStateEffects,
-  applyRevertPendingEffects,
-  applyStartFreshEffects,
-  applyDraftHydrationEffects,
-  applyPrefillUpdatePlan,
-  applyLocalCacheRehydrateUpdatePlan,
-  applyLocalCacheRehydrateMissEffects,
-  runPriorResponseBackfillAttempt,
-  buildRevertedResponseSlice,
-  buildSubmissionGroupContext,
-  buildSurveyResponseStateArray,
-  buildPersistedDraftQuestionRemovalPlan,
-  buildPersistedDraftTrackingAfterLoad,
-  buildPersistedDraftTrackingAfterScopedDelete,
-  buildPersistedDraftTrackingAfterWrite,
-  buildPersistedDraftTrackingClearedState,
-  buildPersistedDraftTrackingOnKeyChange,
-  buildPersistedDraftWritePlan,
-  buildPersistDraftAllowedQuestionIds,
-  buildQuestionCacheHydrationPatch,
-  buildQuestionResponseHydrationPatch,
-  loadPreviousPersistedDraftSnapshot,
-  parsePersistedDraftStorageValue,
-  buildPersistedDraftPayload,
-  buildPersistedDraftMapsForAllowedIds,
-  buildRatingEnvelopeQidSetFromUserAnswers,
-  buildSurveyDraftLoadPlan,
-  buildSurveyDraftCompatScope,
-  buildSurveyDraftStorageKey,
-  buildSurveyDraftStorageVariantKeys,
-  buildSliderModeStatePatch,
-  buildSliderPersistOptions,
-  buildRenderedIdsSignature,
-  buildPersistedDraftQuestionEntry,
-  buildSliceToken,
-  buildSurveyDraftSemanticSignature,
-  buildSurveyResponseSliceSignature,
-  canUseRecentQuestionPayloadForAccount,
-  clampSliderValue,
+  normalizeSessionSlugValue,
+  resolveEffectiveSlug,
+  isSurveyToolFilterStateActive,
+  getActiveSessionSlugFromProps,
   computeSubmitLabel,
-  doesQuestionProgressMatchSlug,
   ensureQuestionsNet,
   ensureSurveysNet,
-  formatQuestionScanBlockCount,
-  getActiveSessionSlugFromProps,
-  getBlockedQuestionIdsSet,
-  getConvictionFromResponse,
-  getConvictionFromSlice,
-  getConvictionFromSliceStrict,
-  getExtraQuestionReadSlugs,
-  getHighlightedQuestionIdsSet,
-  getImportanceFromResponse,
-  getImportanceFromSlice,
-  getNormalizedUiRatingValue,
-  getPendingStatsSnapshotFromState,
-  getQuestionConvictionSliderValue,
-  getQuestionImportanceSliderValue,
-  getQuestionSliderMode,
-  getSessionSlugHintFromProps,
-  getSessionSlugPinnedFromProps,
-  hasCacheHydratedFlag,
-  hasConvictionOrImportanceValueForQuestion,
-  hasMeaningfulFieldValue,
-  isIncomingResponseMetaNewer,
-  isSingleSelectMultichoice,
-  isSurveyToolFilterStateActive,
-  mergeDecryptedViewedResponse,
-  mergeQuestionResponses,
-  mergeSurveyResponsePayloads,
-  normalizeMultichoiceValue,
-  normalizeQuestionIdKey,
-  normalizeQuestionProgressSlug,
-  normalizeSessionSlugValue,
-  normalizeSurveyToolFilterState,
-  readQuestionsCache,
-  readQuestionsCacheAsync,
-  readQuestionsCacheRef,
-  readRecentQuestionPayload,
   readSurveysCache,
   readSurveysCacheAsync,
-  readSurveysCacheRef,
-  resolveCurrentTagSessionSlug,
-  resolveDecryptHydrationContext,
-  resolveDraftSessionContext,
-  resolveDraftStorageContext,
-  resolveEffectiveSlug,
-  resolveEnsureQuestionCachedContext,
-  resolveExplicitSessionContext,
-  resolveLockAudienceSessionNameContext,
-  resolvePileFilterContext,
-  resolvePileLoadContext,
-  resolvePileResponseReadContext,
-  resolvePileWarmSeedContext,
-  resolveQuestionBootstrapContext,
-  resolveQuestionCountContext,
-  resolveQuestionPayloadCacheWriteContext,
-  resolveQuestionReadCacheContext,
-  resolveQuestionsDashboardLoadContext,
-  resolveResponseHydrationContext,
-  resolveResponseJsonContext,
-  resolveSlugForIds,
-  resolveSubmittedCacheWriteContext,
-  resolveSurveyReadContext,
-  resolveUpdateCacheContext,
-  scheduleMicrotask,
-  serializeSurveyToolFilterState,
-  shouldExpandSliderToggle,
-  shouldAutoEncryptAdditionalOnAudienceChange,
-  shouldEncryptResponseFieldForSubmit,
-  shouldForceOverwriteDraftValues,
-  shouldHandleStartFresh,
-  shouldRenderInlineSubmitButton,
-  shouldRenderSubmittedIndicator,
-  shouldShowPileFullLoadingState,
-  shouldShowSingleQuestionResponseLookupSpinner,
-  stampResponsePayloadWithMeta,
-  surveyLog,
-  toNumberOrNull,
-  toResponseRecencyMeta,
-  updateSubmittedSinceLastEdit,
-  writeQuestionsCache,
+  readQuestionsCacheAsync,
   writeSurveysCache,
-  bumpSurveyPerfCounter,
+  resolveSlugForIds,
+  serializeSurveyToolFilterState,
+  normalizeSurveyToolFilterState,
+  appendExplicitSessionHintToPath,
+  applyExistingGroupPrefix,
+  surveyLog,
+  resolveUpdateCacheContext,
+  resolveSurveyReadContext,
+  resolveEnsureQuestionCachedContext,
 } from './surveyToolUtils.js';
-
-import { SurveySelector, QuestionsDashboard } from './SurveySelector';
-
+import { SurveySelector } from './SurveySelector';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
-
-export {
-  SurveySelector,
-  QuestionsDashboard,
-};
-
-export {
-  areEnvelopesEquivalent,
-  buildQuestionScanProgressDisplay,
-  buildSurveyDraftSemanticSignature,
-  computeSubmitLabel,
-  doesQuestionProgressMatchSlug,
-  getPendingStatsSnapshotFromState,
-  hasConvictionOrImportanceValueForQuestion,
-  hasMeaningfulFieldValue,
-  normalizeQuestionProgressSlug,
-  normalizeSurveyToolFilterState,
-  resolveEffectiveSlug,
-  resolveSlugForIds,
-  shouldAutoEncryptAdditionalOnAudienceChange,
-  shouldEncryptResponseFieldForSubmit,
-  shouldForceOverwriteDraftValues,
-  shouldRenderInlineSubmitButton,
-  shouldRenderSubmittedIndicator,
-  shouldShowPileFullLoadingState,
-  shouldShowSingleQuestionResponseLookupSpinner,
-  updateSubmittedSinceLastEdit,
-} from './surveyToolUtils.js';
-export { DeferredCommitSlider } from './DeferredCommitSlider';
 
 class SurveyTool extends Component {
 
@@ -1086,9 +700,4 @@ class SurveyTool extends Component {
     );
   }
 }
-
-
-
-export { SurveyQuestions } from './SurveyQuestions';
-
 export default SurveyTool;
