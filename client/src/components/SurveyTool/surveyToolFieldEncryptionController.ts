@@ -1,35 +1,29 @@
-import type { ResponseFieldState } from './surveyToolAudienceDerivationController';
-
 export interface FieldEncryptionDeps {
   isQuestionLockedForResponse: (qid: string) => boolean;
-  buildEmptyResponseFieldState: (qid: string, fieldKey?: string) => ResponseFieldState;
-  resolveFieldEncryptionAudience: (field: ResponseFieldState, qid: string, fieldKey: string) => string;
-  resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => string | null;
-  normalizeFieldAudienceMode: (value: unknown, fieldKey: string, field: ResponseFieldState) => string;
-  buildInheritedAdditionalFieldState: (
-    additionalField: ResponseFieldState,
-    answerField: ResponseFieldState,
-    qid: string | null,
-  ) => ResponseFieldState;
-  normalizeResponseEncryptionAudience: (audience: unknown, qid: string) => string;
+  buildEmptyResponseFieldState: (qid: string, fieldKey?: string) => Record<string, any>;
+  resolveFieldEncryptionAudience: (field: any, qid: string, fieldKey: string) => string;
+  resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => string | null;
+  normalizeFieldAudienceMode: (value: any, fieldKey: string, field: any) => string;
+  buildInheritedAdditionalFieldState: (additionalField: any, answerField: any, qid: string | null) => Record<string, any>;
+  normalizeResponseEncryptionAudience: (audience: any, qid: string) => string;
 }
 
 export interface EncryptionTogglePlan {
-  nextFieldState: ResponseFieldState;
-  nextAdditionalState: ResponseFieldState | null;
+  nextFieldState: Record<string, any>;
+  nextAdditionalState: Record<string, any> | null;
   clearMenus: boolean;
 }
 
 export interface AudienceSelectionPlan {
-  nextAnswerState: ResponseFieldState;
-  nextAdditionalState: ResponseFieldState;
+  nextAnswerState: Record<string, any>;
+  nextAdditionalState: Record<string, any>;
 }
 
 type FieldKey = 'answer' | 'additional';
 type FieldSliceKey = 'answers' | 'additionalComments';
 type FieldSlice = {
-  answers: Record<string, ResponseFieldState>;
-  additionalComments: Record<string, ResponseFieldState>;
+  answers: Record<string, any>;
+  additionalComments: Record<string, any>;
 };
 
 const FIELD_SLICE_KEYS: Record<FieldKey, FieldSliceKey> = {
@@ -41,7 +35,7 @@ const getEmptyFieldState = (
   qid: string,
   fieldKey: FieldKey,
   deps: FieldEncryptionDeps,
-): ResponseFieldState => (
+): Record<string, any> => (
   fieldKey === 'additional'
     ? deps.buildEmptyResponseFieldState(qid, 'additional')
     : deps.buildEmptyResponseFieldState(qid)
@@ -52,7 +46,7 @@ const getFieldState = (
   qid: string,
   fieldKey: FieldKey,
   deps: FieldEncryptionDeps,
-): ResponseFieldState => {
+): Record<string, any> => {
   const sliceKey = FIELD_SLICE_KEYS[fieldKey];
   return {
     ...((slice?.[sliceKey] || {})[qid] || getEmptyFieldState(qid, fieldKey, deps)),
@@ -65,11 +59,11 @@ const buildExplicitFieldState = ({
   encryptionAudience,
   encryptionGateId,
 }: {
-  baseFieldState: ResponseFieldState;
+  baseFieldState: Record<string, any>;
   encrypted: boolean;
   encryptionAudience: string;
   encryptionGateId: string | null;
-}): ResponseFieldState => ({
+}): Record<string, any> => ({
   ...baseFieldState,
   encrypted,
   encryptionAudience,
@@ -84,7 +78,7 @@ const buildToggleFieldState = (
   slice: FieldSlice,
   deps: FieldEncryptionDeps,
 ): {
-  nextFieldState: ResponseFieldState;
+  nextFieldState: Record<string, any>;
   effectiveEncrypted: boolean;
 } => {
   const locked = deps.isQuestionLockedForResponse(qid);
@@ -93,7 +87,7 @@ const buildToggleFieldState = (
   const encryptionAudienceValue = locked
     ? 'gate'
     : (effectiveEncrypted ? deps.resolveFieldEncryptionAudience(currentFieldState, qid, fieldKey) : 'self');
-  const nextFieldState: ResponseFieldState = {
+  const nextFieldState: Record<string, any> = {
     ...currentFieldState,
     encrypted: effectiveEncrypted,
     encryptionAudience: encryptionAudienceValue,
@@ -112,21 +106,17 @@ const buildToggleFieldState = (
 const buildExplicitAudienceSelectionFieldState = (
   qid: string,
   fieldKey: FieldKey,
-  audience: string,
+  normalizedAudience: string,
   gateId: string,
   slice: FieldSlice,
   deps: FieldEncryptionDeps,
-): ResponseFieldState => {
+): Record<string, any> => {
   const currentFieldState = getFieldState(slice, qid, fieldKey, deps);
-  const rawAudience = String(audience || '').trim().toLowerCase();
-  const normalizedAudience = rawAudience === 'gate'
-    ? 'gate'
-    : deps.normalizeResponseEncryptionAudience(audience, qid);
   const normalizedGateId = normalizedAudience === 'gate'
-    ? (deps.resolveFieldEncryptionGateId({
+    ? deps.resolveFieldEncryptionGateId({
         encryptionAudience: normalizedAudience,
         encryptionGateId: gateId || '',
-      }, qid, fieldKey) || String(gateId || '').trim() || null)
+      }, qid, fieldKey)
     : null;
 
   return buildExplicitFieldState({
@@ -141,7 +131,7 @@ export const buildEncryptionTogglePlan = (
   qid: string,
   fieldKey: 'answer' | 'additional',
   newEncryptedState: boolean,
-  slice: FieldSlice,
+  slice: { answers: Record<string, any>; additionalComments: Record<string, any> },
   deps: FieldEncryptionDeps,
 ): EncryptionTogglePlan => {
   const { nextFieldState, effectiveEncrypted } = buildToggleFieldState(
@@ -152,7 +142,7 @@ export const buildEncryptionTogglePlan = (
     deps,
   );
 
-  let nextAdditionalState: ResponseFieldState | null = null;
+  let nextAdditionalState: Record<string, any> | null = null;
   if (fieldKey === 'answer') {
     const currentAdditionalState = getFieldState(slice, qid, 'additional', deps);
     if (
@@ -181,13 +171,14 @@ export const buildAnswerAudienceSelectionPlan = (
   qid: string,
   audience: string,
   gateId: string,
-  slice: FieldSlice,
+  slice: { answers: Record<string, any>; additionalComments: Record<string, any> },
   deps: FieldEncryptionDeps,
 ): AudienceSelectionPlan => {
+  const normalizedAudience = deps.normalizeResponseEncryptionAudience(audience, qid);
   const nextAnswerState = buildExplicitAudienceSelectionFieldState(
     qid,
     'answer',
-    audience,
+    normalizedAudience,
     gateId,
     slice,
     deps,
@@ -213,9 +204,9 @@ export const buildAdditionalAudienceSelectionPlan = (
   qid: string,
   audience: string,
   gateId: string,
-  slice: FieldSlice,
+  slice: { answers: Record<string, any>; additionalComments: Record<string, any> },
   deps: FieldEncryptionDeps,
-): { nextAdditionalState: ResponseFieldState } => {
+): { nextAdditionalState: Record<string, any> } => {
   const nextAnswerState = getFieldState(slice, qid, 'answer', deps);
   const nextAdditionalState = getFieldState(slice, qid, 'additional', deps);
   const rawAudience = String(audience || '').trim().toLowerCase();
@@ -241,11 +232,12 @@ export const buildAdditionalAudienceSelectionPlan = (
     };
   }
 
+  const normalizedAudience = deps.normalizeResponseEncryptionAudience(rawAudience, qid);
   return {
     nextAdditionalState: buildExplicitAudienceSelectionFieldState(
       qid,
       'additional',
-      rawAudience,
+      normalizedAudience,
       gateId,
       slice,
       deps,

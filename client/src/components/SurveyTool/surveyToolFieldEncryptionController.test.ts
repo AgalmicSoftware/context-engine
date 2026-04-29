@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 
 import {
   buildAdditionalAudienceSelectionPlan,
@@ -34,7 +35,7 @@ const makeDeps = (overrides: Partial<FieldEncryptionDeps> = {}): FieldEncryption
   }),
   resolveFieldEncryptionAudience: () => 'self',
   resolveFieldEncryptionGateId: () => 'gate-abc',
-  normalizeFieldAudienceMode: (value) => String(value || ''),
+  normalizeFieldAudienceMode: (value) => value,
   buildInheritedAdditionalFieldState: (additionalField, answerField) => ({
     ...additionalField,
     encrypted: answerField.encrypted,
@@ -42,7 +43,7 @@ const makeDeps = (overrides: Partial<FieldEncryptionDeps> = {}): FieldEncryption
     encryptionGateId: answerField.encryptionGateId,
     audienceMode: 'inherited',
   }),
-  normalizeResponseEncryptionAudience: (audience) => String(audience || ''),
+  normalizeResponseEncryptionAudience: (audience) => audience,
   ...overrides,
 });
 
@@ -138,7 +139,7 @@ describe('surveyToolFieldEncryptionController', () => {
           },
         }),
         makeDeps({
-          normalizeFieldAudienceMode: (value) => String(value || ''),
+          normalizeFieldAudienceMode: (value) => value,
         }),
       );
 
@@ -216,26 +217,6 @@ describe('surveyToolFieldEncryptionController', () => {
         encrypted: true,
         encryptionAudience: 'gate',
         encryptionGateId: 'g1',
-        audienceMode: 'explicit',
-      });
-    });
-
-    it('preserves explicit gate selection even when default normalization is stale', () => {
-      const plan: AudienceSelectionPlan = buildAnswerAudienceSelectionPlan(
-        'q1',
-        'gate',
-        'questionResponses',
-        makeSlice(),
-        makeDeps({
-          normalizeResponseEncryptionAudience: () => 'self',
-          resolveFieldEncryptionGateId: () => null,
-        }),
-      );
-
-      expect(plan.nextAnswerState).toMatchObject({
-        encrypted: true,
-        encryptionAudience: 'gate',
-        encryptionGateId: 'questionResponses',
         audienceMode: 'explicit',
       });
     });
