@@ -1,20 +1,14 @@
-import SurveyTool, {
+import SurveyTool from './SurveyTool.jsx';
+import {
   computeSubmitLabel,
   doesQuestionProgressMatchSlug,
   normalizeSurveyToolFilterState,
   shouldShowPileFullLoadingState,
   buildSurveyDraftSemanticSignature,
-  QuestionsDashboard,
-  SurveyQuestions,
-  SurveySelector,
-  DeferredCommitSlider,
-} from './SurveyTool.jsx';
-import { SurveyQuestions as DirectSurveyQuestions } from './SurveyQuestions';
+} from './surveyToolUtils.js';
+import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
-import {
-  QuestionsDashboard as DirectQuestionsDashboard,
-  SurveySelector as DirectSurveySelector,
-} from './SurveySelector';
+import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import BullhornToggleButton from './BullhornToggleButton';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import DeferredRatingSlider from './DeferredRatingSlider';
@@ -24,11 +18,7 @@ import QuestionCardLinks from './QuestionCardLinks';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import { DeferredCommitSlider as DirectDeferredCommitSlider } from './DeferredCommitSlider';
-import {
-  computeSubmitLabel as directComputeSubmitLabel,
-  normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
-} from './surveyToolUtils.js';
+import { DeferredCommitSlider } from './DeferredCommitSlider';
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import TagModal from '../TagPage/TagModal';
@@ -178,24 +168,6 @@ describe('SurveyTool module', () => {
     jest.useRealTimers();
   });
 
-  it('re-exports extracted SurveySelector classes through SurveyTool.jsx', () => {
-    expect(SurveySelector).toBe(DirectSurveySelector);
-    expect(QuestionsDashboard).toBe(DirectQuestionsDashboard);
-  });
-
-  it('re-exports DeferredCommitSlider through SurveyTool.jsx', () => {
-    expect(DeferredCommitSlider).toBe(DirectDeferredCommitSlider);
-  });
-
-  it('re-exports extracted SurveyQuestions through SurveyTool.jsx', () => {
-    expect(SurveyQuestions).toBe(DirectSurveyQuestions);
-  });
-
-  it('re-exports extracted survey tool utils through SurveyTool.jsx', () => {
-    expect(computeSubmitLabel).toBe(directComputeSubmitLabel);
-    expect(normalizeSurveyToolFilterState).toBe(directNormalizeSurveyToolFilterState);
-  });
-
   it('loads without syntax/runtime import errors', () => {
     expect(SurveyTool).toBeDefined();
   });
@@ -230,7 +202,7 @@ describe('SurveyTool module', () => {
   });
 
   it('keeps extracted PileViewMode wired to the SurveyQuestions base class', () => {
-    expect(Object.getPrototypeOf(PileViewMode.prototype)).toBe(DirectSurveyQuestions.prototype);
+    expect(Object.getPrototypeOf(PileViewMode.prototype)).toBe(SurveyQuestions.prototype);
   });
 
   it('renders the pile gated prompt card through the extracted PileViewMode helper', () => {
