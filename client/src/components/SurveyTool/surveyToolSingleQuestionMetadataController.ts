@@ -1,84 +1,24 @@
-import type { UnknownRecord } from './surveyToolTypes';
-
-type QuestionPayload = UnknownRecord & {
-  creator?: unknown;
-  encryption?: unknown;
-  id?: string;
-  sessionName?: unknown;
-  optionsDecrypted?: unknown;
-  prompt?: unknown;
-  promptDecrypted?: unknown;
-  tags?: unknown;
-  tagsDecrypted?: unknown;
-  type?: unknown;
-};
-
-type QuestionsCache = Record<string, {
-  questions?: Record<string, QuestionPayload>;
-} & UnknownRecord>;
-
 type CacheState = {
   netIdStr: string;
-  questionsCache: QuestionsCache;
+  questionsCache: Record<string, any>;
 } | null;
 
 const normalizeQuestionId = (value: unknown): string => (
   String(value || '').trim().toLowerCase()
 );
 
-const isRecord = (value: unknown): value is UnknownRecord => (
-  !!value && typeof value === 'object' && !Array.isArray(value)
-);
-
-export const buildSingleQuestionEncryptedMetadataPlaceholder = ({
-  questionId = '',
-  sessionSlug = '',
-  existingQuestionData = null,
-}: {
-  questionId?: unknown;
-  sessionSlug?: unknown;
-  existingQuestionData?: QuestionPayload | null;
-} = {}): QuestionPayload | null => {
-  const normalizedQuestionId = normalizeQuestionId(questionId);
-  if (!normalizedQuestionId) return null;
-
-  const existing = isRecord(existingQuestionData) ? existingQuestionData : {};
-  const type = String(existing.type || '').trim() || 'freeform';
-  const sessionName = String(existing.sessionName || sessionSlug || '').trim();
-  const encryption = isRecord(existing.encryption)
-    ? existing.encryption
-    : {
-      enabled: true,
-      status: 'metadata-pending',
-      targets: {
-        questions: true,
-      },
-    };
-
-  return {
-    ...existing,
-    id: normalizedQuestionId,
-    type,
-    prompt: '[encrypted]',
-    tags: Array.isArray(existing.tags) ? existing.tags : [],
-    ...(sessionName ? { sessionName } : {}),
-    encryption,
-    __ceQuestionMetadataPending: true,
-  };
-};
-
 export const resolveSingleQuestionCacheState = async ({
   slug = '',
   questionId = '',
   resolveQuestionBootstrapContext = () => ({ networkIdStr: '' }),
   readQuestionsCacheAsync = async () => null,
-  ensureQuestionsNet = (cache: unknown) => cache as QuestionsCache,
+  ensureQuestionsNet = (cache: unknown) => cache,
 }: {
   slug?: unknown;
   questionId?: unknown;
   resolveQuestionBootstrapContext?: (slug: string) => { networkIdStr?: string | null | undefined };
   readQuestionsCacheAsync?: (slug: string) => Promise<unknown>;
-  ensureQuestionsNet?: (cache: unknown, netId: string) => QuestionsCache;
+  ensureQuestionsNet?: (cache: unknown, netId: string) => any;
 } = {}): Promise<CacheState> => {
   const normalizedSlug = String(slug || '');
   const normalizedQuestionId = normalizeQuestionId(questionId);
@@ -86,16 +26,15 @@ export const resolveSingleQuestionCacheState = async ({
   let netIdStr = String(context?.networkIdStr || '').trim();
   const rawCache = await readQuestionsCacheAsync(normalizedSlug);
   if (!rawCache || typeof rawCache !== 'object') return null;
-  const rawQuestionsCache = rawCache as QuestionsCache;
 
   if (!netIdStr) {
-    const preferredNet = Object.keys(rawQuestionsCache).find((key) => {
-      const bucket = rawQuestionsCache[key];
+    const preferredNet = Object.keys(rawCache as Record<string, any>).find((key) => {
+      const bucket = (rawCache as Record<string, any>)?.[key];
       return !!(bucket && bucket.questions && bucket.questions[normalizedQuestionId]);
     });
-    const fallbackNet = preferredNet || Object.keys(rawQuestionsCache).find((key) => (
-      rawQuestionsCache[key]
-      && typeof rawQuestionsCache[key] === 'object'
+    const fallbackNet = preferredNet || Object.keys(rawCache as Record<string, any>).find((key) => (
+      (rawCache as Record<string, any>)?.[key]
+      && typeof (rawCache as Record<string, any>)[key] === 'object'
     ));
     if (!fallbackNet) return null;
     netIdStr = String(fallbackNet || '').trim();
@@ -119,15 +58,15 @@ const fetchValueWithTimeout = async ({
   pending = Promise.resolve(null),
   timeoutMs = 8000,
 }: {
-  pending?: Promise<unknown>;
+  pending?: Promise<any>;
   timeoutMs?: number;
 }) => new Promise<{
-  value: unknown;
+  value: any;
   timedOut: boolean;
-  pending: Promise<unknown> | null;
+  pending: Promise<any> | null;
 }>((resolve) => {
   let settled = false;
-  const finalize = (result: { value: unknown; timedOut: boolean; pending: Promise<unknown> | null }) => {
+  const finalize = (result: { value: any; timedOut: boolean; pending: Promise<any> | null }) => {
     if (settled) return;
     settled = true;
     clearTimeout(timeoutId);
@@ -146,15 +85,15 @@ const waitForTimedOutFetchRecovery = async ({
   timedOutFetches = [],
   timeoutRecoveryMs = 20000,
 }: {
-  timedOutFetches?: Array<{ slug: string; pending: Promise<unknown> }>;
+  timedOutFetches?: Array<{ slug: string; pending: Promise<any> }>;
   timeoutRecoveryMs?: number;
 }) => {
   if (!Array.isArray(timedOutFetches) || timedOutFetches.length === 0) return null;
 
-  return new Promise<{ slug: string; payload: QuestionPayload } | null>((resolve) => {
+  return new Promise<{ slug: string; payload: any } | null>((resolve) => {
     let settled = false;
     let pendingCount = timedOutFetches.length;
-    const finalize = (result: { slug: string; payload: QuestionPayload } | null) => {
+    const finalize = (result: { slug: string; payload: any } | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeoutId);
@@ -166,8 +105,8 @@ const waitForTimedOutFetchRecovery = async ({
       Promise.resolve(pending)
         .then((value) => {
           if (settled) return;
-          if (value && typeof value === 'object') {
-            finalize({ slug, payload: value as QuestionPayload });
+          if (value) {
+            finalize({ slug, payload: value });
             return;
           }
           pendingCount -= 1;
@@ -188,22 +127,22 @@ export const fetchSingleQuestionMetadataCandidates = async ({
   fetchTimeoutMs = 8000,
   fetchTimeoutRecoveryMs = 20000,
   getQuestionData = async () => null,
-  pickBetterQuestionPayload = (_current, next) => next,
+  pickBetterQuestionPayload = (_current: any, next: any) => next,
   isMaskedQuestionPayload = () => false,
 }: {
-  initialQuestionData?: QuestionPayload | null;
+  initialQuestionData?: any;
   effectiveSingleSlug?: unknown;
   fetchCandidateSlugs?: unknown[];
   fetchTimeoutMs?: number;
   fetchTimeoutRecoveryMs?: number;
-  getQuestionData?: (slug: string) => Promise<unknown>;
-  pickBetterQuestionPayload?: (current: QuestionPayload | null, next: QuestionPayload) => QuestionPayload | null;
-  isMaskedQuestionPayload?: (payload: QuestionPayload) => boolean;
+  getQuestionData?: (slug: string) => Promise<any>;
+  pickBetterQuestionPayload?: (current: any, next: any) => any;
+  isMaskedQuestionPayload?: (payload: any) => boolean;
 } = {}) => {
   let bestQuestionData = initialQuestionData || null;
   let bestSlug = String(effectiveSingleSlug || '');
   let fetchedAny = false;
-  const timedOutFetches: Array<{ slug: string; pending: Promise<unknown> }> = [];
+  const timedOutFetches: Array<{ slug: string; pending: Promise<any> }> = [];
 
   for (const rawCandidateSlug of Array.isArray(fetchCandidateSlugs) ? fetchCandidateSlugs : []) {
     const candidateSlug = String(rawCandidateSlug || '');
@@ -216,9 +155,7 @@ export const fetchSingleQuestionMetadataCandidates = async ({
     if (attemptResult?.timedOut && attemptResult?.pending) {
       timedOutFetches.push({ slug: candidateSlug, pending: attemptResult.pending });
     }
-    const fetched = attemptResult?.value && typeof attemptResult.value === 'object'
-      ? attemptResult.value as QuestionPayload
-      : null;
+    const fetched = attemptResult?.value || null;
     if (!fetched) continue;
     fetchedAny = true;
     const picked = pickBetterQuestionPayload(bestQuestionData, fetched);
@@ -260,14 +197,14 @@ export const normalizeSingleQuestionMetadataForCache = ({
   questionId = '',
   questionData = null,
   existingCachedQuestionData = null,
-  pickBetterQuestionPayload = (_current, next) => next,
+  pickBetterQuestionPayload = (_current: any, next: any) => next,
   areQuestionPayloadsEquivalent = (left: unknown, right: unknown) => left === right,
 }: {
   questionId?: unknown;
-  questionData?: QuestionPayload | null;
-  existingCachedQuestionData?: QuestionPayload | null;
-  pickBetterQuestionPayload?: (current: QuestionPayload | null, next: QuestionPayload) => QuestionPayload | null;
-  areQuestionPayloadsEquivalent?: (left: unknown, right: unknown) => boolean;
+  questionData?: any;
+  existingCachedQuestionData?: any;
+  pickBetterQuestionPayload?: (current: any, next: any) => any;
+  areQuestionPayloadsEquivalent?: (left: any, right: any) => boolean;
 } = {}) => {
   const normalizedQuestionId = normalizeQuestionId(questionId);
   if (!questionData || !normalizedQuestionId) {
