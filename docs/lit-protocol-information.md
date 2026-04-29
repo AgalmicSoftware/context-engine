@@ -1,6 +1,8 @@
 # Lit Protocol - Primitives + SDK + Payments (agent-ready)
 
-This file contains legacy background plus current app wiring. For Context Engine runtime behavior, use the **Context Engine Lit v8 status** section below.
+This file contains legacy background plus current and planned app wiring. The
+runtime section below describes the code currently in this repo; it does not
+imply the corresponding hosted Lit network still exists.
 
 Primary docs:
 - What is Lit: https://developer.litprotocol.com/what-is-lit
@@ -12,24 +14,50 @@ Primary docs:
 
 ---
 
-## Context Engine Lit v8 status (Naga)
+## Context Engine runtime status (legacy Naga-era wiring)
 
-- Runtime is migrated to **Lit SDK v8** (`@lit-protocol/lit-client`, `@lit-protocol/auth`, `@lit-protocol/networks`, `@lit-protocol/contracts`).
+- Runtime is still wired to **Lit SDK v8** (`@lit-protocol/lit-client`, `@lit-protocol/auth`, `@lit-protocol/networks`, `@lit-protocol/contracts`).
+- This section describes current CE code assumptions, not current Lit hosted-environment availability.
 - Product naming in docs is **Context Engine**.
 - `createLitClient({ network })` is used instead of `LitNodeClient/connect()`.
 - `AuthManager.createEoaAuthContext(...)` is used instead of `sessionSigs`.
 - Encryption/decryption uses `litClient.encrypt` and `litClient.decrypt`.
-- Quick-test default network is **`naga-dev`** (free dev network).
-- Quick-test override path is `lit.network` / `litNetwork` config set to **`naga-test`** (paid pre-production).
+- Quick-test default network in the legacy runtime path is **`naga-dev`**.
+- Quick-test override path in the legacy runtime path is `lit.network` / `litNetwork` config set to **`naga-test`**.
 - `/new` Lit payer-wallet authoring is temporarily rollout-gated by
   `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT`; the current default stays
   `false` while CE is still on the Naga-era path and should be revisited during
   the Chipotle cutover.
-- Runtime config should use Naga names only (`naga-dev`, `naga-test`, `naga`).
+- Runtime config in current repo code still uses Naga names only (`naga-dev`, `naga-test`, `naga`).
 - Naga network bootstrap/node URLs and RPC come from `@lit-protocol/networks` at runtime; app code does not hardcode Lit node or RPC endpoints.
 - For `naga-dev`, Context Engine applies handshake v1 compatibility at runtime and derives root key material from on-chain `RootKeySet` events (via the network module RPC) before creating the Lit client.
 - When Porto passkey session-key mode is enabled, typed-data signatures are also auto-signed, so Lit auth flows can run without extra passkey prompts.
 - Payment model note: v8 removes Capacity Credits for new paid flows. `naga-test` uses **Ledger-based payments** via Payment Manager.
+
+---
+
+## External Lit platform state (research baseline: 2026-04-28)
+
+- Naga is no longer a future migration concern; it is sunset. The repo still contains Naga-era wiring, but the hosted Naga path should be treated as legacy.
+- Chipotle production is live at:
+  - `https://api.chipotle.litprotocol.com`
+  - `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
+- Public Chipotle dev materials still exist, but they do **not** recreate the old `naga-dev` / `naga-test` / `naga` split:
+  - `https://api.dev.litprotocol.com` is still published
+  - `https://docs.dev.litprotocol.com` is still published
+  - the public dev dashboard warns that the DEV site is shut down and offers no uptime or state guarantees
+- The strongest environment signal currently published is `GET /core/v1/get_node_chain_config`:
+  - public prod and public dev both report `chain_name: "Base"`, `chain_id: 8453`, `testnet: false`
+  - the environments differ by contract address/state, not by blockchain identity
+- There is no documented Chipotle equivalent of decentralized `naga-test`.
+- Practical migration planning should assume:
+  - true free/local development = self-hosted local node (`http://localhost:8000`)
+  - hosted dev API/docs = preview / non-guaranteed environment
+  - staging = separate production Chipotle account, not a separate testnet
+- CE should therefore treat Chipotle migration as a **re-platform**, not a package bump:
+  - Naga: SDK-first, wallet/auth-context/session-manager/payment-manager, multi-node execution
+  - Chipotle: REST/API-key first, account/usage-key/group/PKP/action registration, single-TEE execution
+- Re-check official Lit docs before implementation; the hosted docs still move and contain contradictions around dev support level and IPFS/action semantics.
 
 ---
 

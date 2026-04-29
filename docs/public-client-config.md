@@ -160,11 +160,11 @@ SPA fallback concept, but their redirect config syntax differs.
   - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
 
 - `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT=false`
-  - Temporary rollout flag for the `/new` SessionWizard Lit payer-wallet UI.
+  - Temporary rollout flag for the legacy Naga-era `/new` SessionWizard Lit payer-wallet UI.
   - `false` hides the Lit worker-secret card in `/new`.
   - `true` enables the existing Lit payer-wallet inputs in `/new`.
-  - This is migration scaffolding for the Naga-to-Chipotle Lit transition, not
-    the long-term Chipotle config surface.
+  - This is migration scaffolding for the current legacy Lit path, not the
+    long-term Chipotle account/API-key config surface.
 
 ## Arweave Read Policy Toggles
 
