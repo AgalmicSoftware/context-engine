@@ -115,6 +115,14 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - single-question viewed-response bootstrap orchestration
   - single-question own-response bootstrap orchestration
   - single-question response cache read / reread / write helpers
+- `surveyToolResponseSourceController.ts`
+  - shared baseline-source selection for diffing / restore paths
+  - shared user-answer slice memo resolution
+  - shared response consistency checks for optimistic submit settlement
+- `surveyToolSingleQuestionMetadataController.ts`
+  - single-question cache-state lookup
+  - single-question metadata timeout / recovery fetch planning
+  - single-question metadata cache normalization
 
 That means the next shared-core question is no longer “can we extract a controller?” It is:
 
@@ -125,8 +133,8 @@ That means the next shared-core question is no longer “can we extract a contro
 
 The next realistic candidates are:
 
-- Shared response-source restore helpers adjacent to decrypt/viewed-response flows
-- Single-question fetch metadata shell / lifecycle around the bootstrap controller
+- Remaining single-question fetch lifecycle shell around the extracted metadata/bootstrap controllers
+- Shared decrypt/source restore wrappers adjacent to viewed-response handling
 - A broader inheritance-to-composition boundary pass
 
 These are stronger architectural moves than another tiny helper peel because:
@@ -185,12 +193,12 @@ That means:
 The next natural code move after the current controller extractions is:
 
 1. Decide whether to keep going with mode-agnostic runtime extraction, or pause for a broader boundary redesign.
-2. If continuing incrementally, target shared response-source restore helpers or the remaining single-question fetch shell next.
+2. If continuing incrementally, target the remaining single-question fetch lifecycle shell or the shared decrypt/source wrappers next.
 3. Keep React lifecycle ownership where it is until that seam is better isolated.
 
 Recommended next seam:
 
-- shared response-source restore primitives adjacent to decrypt / viewed-response flows
+- remaining single-question fetch lifecycle shell, then reassess before a broader inheritance seam move
 
 Do **not** start with:
 
