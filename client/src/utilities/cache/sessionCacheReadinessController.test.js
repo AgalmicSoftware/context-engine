@@ -14,6 +14,11 @@ jest.mock('../../utilities/ui/uiRuntimeStats.js', () => ({
   recordCeRuntimeCacheEvent: jest.fn(),
 }));
 
+jest.mock('../../utilities/web3/contractScripts.js', () => ({
+  __esModule: true,
+  normalizeSessionSlug: jest.fn(),
+}));
+
 const { createSessionCacheReadinessController } = require('./sessionCacheReadinessController.js');
 const { recordCeRuntimeCacheEvent } = require('../../utilities/ui/uiRuntimeStats.js');
 const contractScriptsModule = require('../../utilities/web3/contractScripts.js');
