@@ -5,32 +5,11 @@ import {
   resolveCanDecryptOtherResponsesVerdict,
 } from './surveyToolResponseAccess.js';
 
-export type CanDecryptSessionConfig = Record<string, unknown> & {
-  __registry?: Record<string, unknown>;
-};
-export type CanDecryptPolicy = Record<string, unknown> & {
-  primaryResource?: unknown;
-  recipients?: unknown[];
-};
-export type CanDecryptSnapshot = ReturnType<typeof buildCanDecryptOtherResponsesSnapshot>;
-type BuildCanDecryptSnapshotFn = (args: {
-  account: string;
-  loginComplete: boolean;
-  singleQuestionMode: boolean;
-  isStandalone: boolean;
-  policy: CanDecryptPolicy | null;
-  slug: string;
-  sbtCacheRevision: number;
-  cfg: CanDecryptSessionConfig | null;
-}) => CanDecryptSnapshot;
-
-const buildCanDecryptSnapshot = buildCanDecryptOtherResponsesSnapshot as unknown as BuildCanDecryptSnapshotFn;
-
 export interface CanDecryptContextInputs {
   getEffectiveDraftSlug: () => string;
   resolveEffectiveSlugFromProps: () => string;
-  resolveEffectiveResponseGateConfig: (slug: string) => CanDecryptSessionConfig | null;
-  getResponseGatePolicy: () => CanDecryptPolicy | null;
+  resolveEffectiveResponseGateConfig: (slug: string) => any;
+  getResponseGatePolicy: () => any;
   account: string;
   loginComplete: boolean;
   singleQuestionMode: boolean;
@@ -38,10 +17,12 @@ export interface CanDecryptContextInputs {
   sbtCacheRevision: number;
 }
 
+export type CanDecryptSnapshot = ReturnType<typeof buildCanDecryptOtherResponsesSnapshot>;
+
 export interface CanDecryptContext {
   slug: string;
-  cfg: CanDecryptSessionConfig | null;
-  policy: CanDecryptPolicy | null;
+  cfg: any;
+  policy: any;
   snapshot: CanDecryptSnapshot;
 }
 
@@ -51,14 +32,14 @@ export type CanDecryptPreCheckResult =
   | { earlyExit: false };
 
 export interface ResolveCanDecryptGateAccessParams {
-  cfg: CanDecryptSessionConfig | null;
+  cfg: any;
   slug: string;
   account: string;
   resourceKeysToCheck: string[];
 }
 
 export type CheckAccessFn = (params: {
-  sessionConfig: CanDecryptSessionConfig | null;
+  sessionConfig: any;
   sessionSlug: string;
   account: string;
   resourceKey: string;
@@ -70,7 +51,7 @@ export const buildCanDecryptContext = (
   const slug = inputs.getEffectiveDraftSlug() || inputs.resolveEffectiveSlugFromProps();
   const cfg = inputs.resolveEffectiveResponseGateConfig(slug);
   const policy = inputs.getResponseGatePolicy();
-  const snapshot = buildCanDecryptSnapshot({
+  const snapshot = buildCanDecryptOtherResponsesSnapshot({
     account: inputs.account,
     loginComplete: inputs.loginComplete,
     singleQuestionMode: inputs.singleQuestionMode,

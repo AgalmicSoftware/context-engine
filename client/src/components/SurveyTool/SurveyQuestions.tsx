@@ -188,9 +188,7 @@ import {
   isQuestionPromptMasked as isQuestionPromptMaskedHelper,
 } from './surveyToolViewState.js';
 import {
-  buildCanDecryptOtherResponsesSnapshot,
   buildResponseGateConfigSignature,
-  resolveCanDecryptOtherResponsesVerdict,
 } from './surveyToolResponseAccess';
 import {
   readSessionScanScope,
@@ -435,6 +433,11 @@ import {
   buildFieldEncryptionWorkGroups as buildFieldEncryptionWorkGroupsCore,
   verifyEncryptionIntegrity,
 } from './surveyToolSubmitPrepController';
+import {
+  buildCanDecryptContext,
+  evaluateCanDecryptPreCheck,
+  resolveCanDecryptGateAccess,
+} from './surveyToolCanDecryptController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -1353,35 +1356,25 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   refreshCanDecryptOtherResponses = async () => {
     try {
-      const slug = this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props);
-      const cfg = this.resolveEffectiveResponseGateConfig(slug);
-      const policy = this.getResponseGatePolicy();
-      const snapshot = buildCanDecryptOtherResponsesSnapshot({
+      const ctx = buildCanDecryptContext({
+        getEffectiveDraftSlug: () => this._getEffectiveDraftSlug(),
+        resolveEffectiveSlugFromProps: () => resolveEffectiveSlug(this.props),
+        resolveEffectiveResponseGateConfig: (slug) => this.resolveEffectiveResponseGateConfig(slug),
+        getResponseGatePolicy: () => this.getResponseGatePolicy(),
         account: this.props?.account || '',
         loginComplete: this.props?.loginComplete,
         singleQuestionMode: this.props.singleQuestionMode,
         isStandalone: this.props.isStandalone,
-        policy,
-        slug,
         sbtCacheRevision: this.props?.sbtCacheRevision || 0,
-        cfg,
       });
+      const { cfg, slug, snapshot } = ctx;
+      const preCheck = evaluateCanDecryptPreCheck(snapshot);
 
-      if (!snapshot.loggedIn) {
-        // Invalidate any in-flight checks so they can't race and re-enable decrypt UI after logout.
-        this.invalidateCanDecryptOtherResponsesTracking();
-        if (this.state.canDecryptOtherResponses || this.state.canDecryptOtherResponsesStatus !== 'needs-wallet') {
-          this.setState(buildCanDecryptOtherResponsesState({ status: 'needs-wallet' }));
-        }
-        return false;
-      }
-
-      // If there is no gate recipient policy, the response is not decryptable-by-gate (others should not see decrypt buttons).
-      if (snapshot.recipients.length === 0) {
+      if (preCheck.earlyExit) {
         // Invalidate any in-flight checks so they can't race and re-enable decrypt UI.
         this.invalidateCanDecryptOtherResponsesTracking();
-        if (this.state.canDecryptOtherResponses || this.state.canDecryptOtherResponsesStatus !== 'no-gate') {
-          this.setState(buildCanDecryptOtherResponsesState({ status: 'no-gate' }));
+        if (this.state.canDecryptOtherResponses || this.state.canDecryptOtherResponsesStatus !== preCheck.status) {
+          this.setState(buildCanDecryptOtherResponsesState({ status: preCheck.status }));
         }
         return false;
       }
@@ -1399,16 +1392,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           // Clear any previously granted permission while we verify against the current gate/session/wallet.
           this.setState(buildCanDecryptOtherResponsesState({ status: 'checking' }));
         }
-        const verdicts = [];
-        for (const rk of snapshot.resourceKeysToCheck) {
-          verdicts.push(await checkSponsoredAccess({
-            sessionConfig: cfg,
-            sessionSlug: slug,
-            account: snapshot.account,
-            resourceKey: rk,
-          }));
-        }
-        const { canDecrypt, status } = resolveCanDecryptOtherResponsesVerdict(verdicts);
+        const { canDecrypt, status } = await resolveCanDecryptGateAccess({
+          cfg,
+          slug,
+          account: snapshot.account,
+          resourceKeysToCheck: snapshot.resourceKeysToCheck,
+        }, checkSponsoredAccess);
         if (this.isCurrentCanDecryptOtherResponsesRun(runId, snapshotKey)) {
           this.setState(buildCanDecryptOtherResponsesState({ canDecrypt, status }));
         }
@@ -1440,17 +1429,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   buildCanDecryptOtherResponsesSignature = () => {
     try {
-      const slug = this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props);
-      return buildCanDecryptOtherResponsesSnapshot({
+      return buildCanDecryptContext({
+        getEffectiveDraftSlug: () => this._getEffectiveDraftSlug(),
+        resolveEffectiveSlugFromProps: () => resolveEffectiveSlug(this.props),
+        resolveEffectiveResponseGateConfig: (slug) => this.resolveEffectiveResponseGateConfig(slug),
+        getResponseGatePolicy: () => this.getResponseGatePolicy(),
         account: this.props?.account || '',
         loginComplete: this.props?.loginComplete,
         singleQuestionMode: this.props.singleQuestionMode,
         isStandalone: this.props.isStandalone,
-        policy: this.getResponseGatePolicy(),
-        slug,
         sbtCacheRevision: this.props?.sbtCacheRevision || 0,
-        cfg: this.resolveEffectiveResponseGateConfig(slug),
-      }).signature;
+      }).snapshot.signature;
     } catch (_) {
       return '';
     }
