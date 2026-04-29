@@ -14,105 +14,25 @@ Primary docs:
 
 ---
 
-## Current CE Chipotle plan (2026-05-09)
+## Context Engine runtime status (legacy Naga-era wiring)
 
-- Context Engine cannot preserve its old browser-native Naga auth-context / ACC flow as-is on Chipotle.
-- The current migration direction is therefore **worker-mediated Chipotle execution**:
-  - browser/session authoring stores non-secret Lit config in worker config
-  - worker secrets store the Lit API key material when a per-session account or per-session override is needed
-  - the worker can still fall back to a deployment-level server env key for sponsored/shared-account setups
-- Current worker/runtime split:
-  - worker env fallback: `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY` when self-hosts prefer a usage-only env key)
-  - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`
-  - per-session worker config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }`
-- Runtime security contract:
-  - `op: "encrypt"` wraps a CEK for the configured audience but does not require the author to hold the target SBT
-  - `op: "check"` and `op: "decrypt"` still require the requester to satisfy the SBT gate
-  - Chipotle wrapped keys are v2 JSON payloads containing `{ v: 2, cekHex, policyFingerprint, policy }`; the action returns the CEK only when the embedded policy fingerprint matches the worker-approved policy
-  - legacy v1 / bare-hex Chipotle wrapped keys are rejected by default and should be recreated, not migrated in-place
-  - check/decrypt RPC selection is a worker trust decision: request `rpcUrl` / `customRpcUrl` is rejected unless it exactly matches a worker-approved URL, the action verifies `provider.getNetwork().chainId`, and stored Chipotle metadata does not carry RPC URLs
-- These fields are intentionally treated differently:
-  - `litUsageApiKey` is a secret
-  - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but still operational metadata and should stay in worker config rather than public session metadata by default
-  - the real security boundary is still API-key scope + group membership + Lit Action code; hiding IDs alone is not a sufficient protection model
-- Current Chipotle endpoints/source-of-truth:
-  - prod API: `https://api.chipotle.litprotocol.com`
-  - prod dashboard: `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
-  - dev API: `https://api.dev.litprotocol.com`
-  - dev docs: `https://docs.dev.litprotocol.com`
-  - local self-hosted dev node: `http://localhost:8000`
-  - OpenAPI surface: `https://api.chipotle.litprotocol.com/core/v1/openapi.json`
-  - public prod/dev node-chain config currently reports Base mainnet (`chain_id: 8453`) for the control plane
-- First worker-backed Chipotle slice now implemented in this repo:
-  - worker config/secret schema split for Chipotle fields
-  - sponsored-bundle plumbing for those fields
-  - worker admin actions:
-    - `lit-chipotle-status`
-    - `lit-chipotle-provision`
-    - `lit-chipotle-bootstrap-session`
-- Re-provisioning note: any edit to the default CE Lit Action source changes the
-  derived `litActionCid`. Chipotle-enabled sessions must re-run
-  `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` before live
-  v2 wrapped-key encrypt/decrypt is expected to work. CE intentionally does not
-  fall back to older insecure action CIDs.
-- Current default CE architecture direction:
-  - create one new Lit account per session
-  - create one default group inside that account
-  - create one session PKP
-  - create one scoped runtime usage key
-  - keep groups available for later internal trust boundaries such as
-    `session-content`, `survey-responses`, or future group-prompting action families
-- Live smoke result on April 29, 2026:
-  - the current scoped usage-key test can reach Chipotle through the worker
-  - arbitrary inline `lit_action` execution was rejected as unauthorized
-  - CE should therefore assume real migrations need a registered action CID and matching group scope rather than ad-hoc inline code, and the unsupported generic admin execute helper has been removed
-
-### Immediate migration implications
-
-- Public prod and public dev currently both report `chain_name: "Base"`, `chain_id: 8453`, and `testnet: false`; the current split is different contract state on the same chain, not a separate Chipotle testnet.
-- Practical environment guidance:
-  - use `http://localhost:8000` when you need a true disposable/local dev surface
-  - treat `https://api.dev.litprotocol.com` / `https://docs.dev.litprotocol.com` as preview-style hosted dev materials, not as a durable hosted staging substitute
-  - use separate production Chipotle accounts for staging and production isolation
-- Current Chipotle auth/billing model is account-key + usage-key based, not AuthManager/session-key/PaymentManager based:
-  - account key = master credential; keep it server-side only
-  - usage key = scoped operational secret; rotate/delete it instead of exposing the account key
-  - billing is credit-based; read-only management calls are free while action execution and mutating management calls are metered
-- Current action/runtime migration constraints:
-  - Chipotle docs now center `POST /core/v1/lit_action`, `async function main(...)`, and direct return values
-  - older Naga runtime helpers such as `getRpcUrl`, `signAndCombine*`, runtime permission lookup helpers, and the old ACC/browser auth-context flow should be treated as legacy-only in CE
-  - current primary sources do not document a Chipotle equivalent of arbitrary custom RPC injection at the control-plane layer, so CE should treat custom RPCs as app-supplied worker-managed inputs rather than a guaranteed Lit platform feature
-- Current public docs do not document a Naga-to-Chipotle import path for accounts, usage keys, PKPs, groups, permissions, or balances; plan to recreate those resources during migration.
-- Current public docs are also internally inconsistent about IPFS action execution. CE should therefore treat inline `code` execution as the most certain worker-mediated path until Lit documents the `ipfs_id` / cached-action model more cleanly.
-
-The rest of this document contains legacy background plus repo context that is
-still useful for understanding the older Naga-era implementation.
-
----
-
-## Context Engine runtime status (Chipotle cutover)
-
-- Worker-mediated Chipotle execution is now the active CE Lit runtime for supported sessions.
-- The frontend still keeps the generic Lit SDK helpers for legacy envelope compatibility and tests, but `MainSite` and `/session/new` no longer invent a default hosted Lit network when no Chipotle runtime is configured.
-- `window.__litHooks` are now published only when the active session or wizard has a real Chipotle runtime:
-  - worker URL
-  - `litApiBase`
-  - `litGroupId`
-  - `litPkpId`
-  - `litActionCid`
-- `/session/new` now presents the Lit setup as one manual field:
-  - bootstrap authority: `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`
-  - the worker uses the default Chipotle API base unless worker config/env overrides it, then derives and persists `litApiBase`, `litGroupId`, `litPkpId`, `litActionCid`, and `litUsageApiKey`
-  - scoped-runtime identifiers remain supported as worker-side/admin/sponsored-bundle config, but they are no longer hand-entered in the `/new` Lit card
-- `/admin` Lit quick tests now run against the currently active hook runtime rather than assuming a hidden legacy default.
-- When Porto passkey session-key mode is enabled and the current page has an
-  unlocked in-memory signer, typed-data signatures are auto-signed, so worker
-  auth and any remaining direct Lit SDK auth flows can run without extra
-  passkey prompts. Passive Porto restores only hydrate account metadata; they
-  do not make automatic decrypt paths interactive.
-- For non-creator gated metadata decrypts, CE prefers Lit SBT recipients before
-  trying the self EIP-712 unwrap path, avoiding a needless self-sign attempt
-  when the viewer should use the SBT gate.
+- Runtime is still wired to **Lit SDK v8** (`@lit-protocol/lit-client`, `@lit-protocol/auth`, `@lit-protocol/networks`, `@lit-protocol/contracts`).
+- This section describes current CE code assumptions, not current Lit hosted-environment availability.
+- Product naming in docs is **Context Engine**.
+- `createLitClient({ network })` is used instead of `LitNodeClient/connect()`.
+- `AuthManager.createEoaAuthContext(...)` is used instead of `sessionSigs`.
+- Encryption/decryption uses `litClient.encrypt` and `litClient.decrypt`.
+- Quick-test default network in the legacy runtime path is **`naga-dev`**.
+- Quick-test override path in the legacy runtime path is `lit.network` / `litNetwork` config set to **`naga-test`**.
+- `/new` Lit payer-wallet authoring is temporarily rollout-gated by
+  `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT`; the current default stays
+  `false` while CE is still on the Naga-era path and should be revisited during
+  the Chipotle cutover.
+- Runtime config in current repo code still uses Naga names only (`naga-dev`, `naga-test`, `naga`).
+- Naga network bootstrap/node URLs and RPC come from `@lit-protocol/networks` at runtime; app code does not hardcode Lit node or RPC endpoints.
+- For `naga-dev`, Context Engine applies handshake v1 compatibility at runtime and derives root key material from on-chain `RootKeySet` events (via the network module RPC) before creating the Lit client.
+- When Porto passkey session-key mode is enabled, typed-data signatures are also auto-signed, so Lit auth flows can run without extra passkey prompts.
+- Payment model note: v8 removes Capacity Credits for new paid flows. `naga-test` uses **Ledger-based payments** via Payment Manager.
 
 ---
 
@@ -122,14 +42,14 @@ still useful for understanding the older Naga-era implementation.
 - Chipotle production is live at:
   - `https://api.chipotle.litprotocol.com`
   - `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
-- Public Chipotle dev materials still exist, but they do **not** recreate the old hosted multi-environment split CE used to assume:
+- Public Chipotle dev materials still exist, but they do **not** recreate the old `naga-dev` / `naga-test` / `naga` split:
   - `https://api.dev.litprotocol.com` is still published
   - `https://docs.dev.litprotocol.com` is still published
   - the public dev dashboard warns that the DEV site is shut down and offers no uptime or state guarantees
 - The strongest environment signal currently published is `GET /core/v1/get_node_chain_config`:
   - public prod and public dev both report `chain_name: "Base"`, `chain_id: 8453`, `testnet: false`
   - the environments differ by contract address/state, not by blockchain identity
-- There is no documented Chipotle equivalent of a decentralized/public staging network with the old Naga semantics.
+- There is no documented Chipotle equivalent of decentralized `naga-test`.
 - Practical migration planning should assume:
   - true free/local development = self-hosted local node (`http://localhost:8000`)
   - hosted dev API/docs = preview / non-guaranteed environment
@@ -138,10 +58,6 @@ still useful for understanding the older Naga-era implementation.
   - Naga: SDK-first, wallet/auth-context/session-manager/payment-manager, multi-node execution
   - Chipotle: REST/API-key first, account/usage-key/group/PKP/action registration, single-TEE execution
 - Re-check official Lit docs before implementation; the hosted docs still move and contain contradictions around dev support level and IPFS/action semantics.
-- The currently documented safe path is:
-  - local node for free/local development
-  - separate production Chipotle accounts for staging vs production
-  - worker-mediated CE execution using scoped usage keys rather than browser-held master credentials
 
 ---
 
