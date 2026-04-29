@@ -1,20 +1,14 @@
-import SurveyTool from './SurveyTool';
+import SurveyTool from './SurveyTool.jsx';
 import {
   computeSubmitLabel,
   doesQuestionProgressMatchSlug,
   normalizeSurveyToolFilterState,
   shouldShowPileFullLoadingState,
   buildSurveyDraftSemanticSignature,
-  QuestionsDashboard,
-  SurveyQuestions,
-  SurveySelector,
-  DeferredCommitSlider,
-} from './SurveyTool.jsx';
-import { PileViewMode, SurveyQuestions as DirectSurveyQuestions } from './SurveyQuestions';
-import {
-  QuestionsDashboard as DirectQuestionsDashboard,
-  SurveySelector as DirectSurveySelector,
-} from './SurveySelector';
+} from './surveyToolUtils.js';
+import { SurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
+import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import BullhornToggleButton from './BullhornToggleButton';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import DeferredRatingSlider from './DeferredRatingSlider';
@@ -23,17 +17,6 @@ import FullQuestionRatingInput from './FullQuestionRatingInput';
 import QuestionCardLinks from './QuestionCardLinks';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
-import SurveyQuestionTagControl from './SurveyQuestionTagControl';
-import { DeferredCommitSlider as DirectDeferredCommitSlider } from './DeferredCommitSlider';
-import {
-  computeSubmitLabel as directComputeSubmitLabel,
-  normalizeSurveyToolFilterState as directNormalizeSurveyToolFilterState,
-} from './surveyToolUtils.js';
-import { SurveyQuestions } from './SurveyQuestions';
-import { PileViewMode } from './SurveyPileViewMode';
-import { QuestionsDashboard } from './SurveySelector';
-import DeferredRatingSlider from './DeferredRatingSlider';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import { DeferredCommitSlider } from './DeferredCommitSlider';
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
@@ -100,24 +83,6 @@ describe('SurveyTool module', () => {
     jest.useRealTimers();
   });
 
-  it('re-exports extracted SurveySelector classes through SurveyTool.jsx', () => {
-    expect(SurveySelector).toBe(DirectSurveySelector);
-    expect(QuestionsDashboard).toBe(DirectQuestionsDashboard);
-  });
-
-  it('re-exports DeferredCommitSlider through SurveyTool.jsx', () => {
-    expect(DeferredCommitSlider).toBe(DirectDeferredCommitSlider);
-  });
-
-  it('re-exports extracted SurveyQuestions through SurveyTool.jsx', () => {
-    expect(SurveyQuestions).toBe(DirectSurveyQuestions);
-  });
-
-  it('re-exports extracted survey tool utils through SurveyTool.jsx', () => {
-    expect(computeSubmitLabel).toBe(directComputeSubmitLabel);
-    expect(normalizeSurveyToolFilterState).toBe(directNormalizeSurveyToolFilterState);
-  });
-
   it('loads without syntax/runtime import errors', () => {
     expect(SurveyTool).toBeDefined();
   });
@@ -149,6 +114,37 @@ describe('SurveyTool module', () => {
     const tree = shell.render();
 
     expect(tree.type).toBe(PileViewMode);
+  });
+
+  it('keeps extracted PileViewMode wired to the SurveyQuestions base class', () => {
+    expect(Object.getPrototypeOf(PileViewMode.prototype)).toBe(SurveyQuestions.prototype);
+  });
+
+  it('renders the pile gated prompt card through the extracted PileViewMode helper', () => {
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      showComments: {},
+      showConviction: {},
+    };
+    subject.isQuestionPromptMasked = jest.fn(() => true);
+    subject.renderPromptWithManualDecrypt = jest.fn(() => <span data-testid="pile-masked-prompt">Prompt</span>);
+    subject.renderGatedPromptNotice = jest.fn(() => <div data-testid="pile-gated-notice" />);
+
+    const tree = subject.renderActiveQuestion({ id: 'q1', prompt: 'masked', promptDecrypted: false });
+
+    expect(treeHasDataTestId(tree, 'pile-masked-prompt')).toBe(true);
+    expect(treeHasDataTestId(tree, 'pile-gated-notice')).toBe(true);
   });
 
   it('renders triple trailing arrows inside the pile submit button', () => {

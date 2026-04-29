@@ -4,7 +4,7 @@ import React from 'react';
 
 export const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 export const SurveyTool = React.lazy(() => import('../SurveyTool/SurveyTool'));
-export const SBTPage = React.lazy(() => import('../SBTs/SBTPageRoute'));
+export const SBTPage = React.lazy(() => import('../SBTs/SBTPage'));
 export const SBTsPage = React.lazy(() => import('../SBTs/SBTsList')); // SBTsList, often referred to as SBTsPage in comments
 export const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 export const AdminPage = React.lazy(() => import('../Admin/AdminPage'));
