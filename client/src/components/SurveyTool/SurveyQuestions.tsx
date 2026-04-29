@@ -400,6 +400,15 @@ import {
   pickBestField,
   pickBestNumber,
 } from './surveyToolChangedFieldsController';
+import {
+  getQuestionEncryptionGates as getQuestionEncryptionGatesCore,
+  normalizeFieldAudienceMode as normalizeFieldAudienceModeCore,
+  normalizeResponseEncryptionAudience as normalizeResponseEncryptionAudienceCore,
+  resolveFieldEncryptionAudience as resolveFieldEncryptionAudienceCore,
+  buildEmptyResponseFieldState as buildEmptyResponseFieldStateCore,
+  buildInheritedAdditionalFieldState as buildInheritedAdditionalFieldStateCore,
+  normalizeGateLabelText as normalizeGateLabelTextCore,
+} from './surveyToolAudienceDerivationController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -7514,33 +7523,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }))
   );
 
-  getQuestionEncryptionGates = (question) => {
-    const enc = question?.encryption;
-    if (!enc || typeof enc !== 'object') return [];
-    if (enc.enabled === false) return [];
-    const gates = Array.isArray(enc.gates)
-      ? enc.gates
-      : (enc.gate && typeof enc.gate === 'object' ? [enc.gate] : []);
-    return gates.filter((gate) => gate && typeof gate === 'object');
-  };
+  getQuestionEncryptionGates = (question) => getQuestionEncryptionGatesCore(question);
 
-  normalizeFieldAudienceMode = (value, fieldKey = 'answer', field = {}) => {
-    const normalizedFieldKey = String(fieldKey || '').trim().toLowerCase() === 'additional'
-      ? 'additional'
-      : 'answer';
-    if (normalizedFieldKey !== 'additional') return 'explicit';
-
-    const raw = String(value || '').trim().toLowerCase();
-    if (raw === 'inherit' || raw === 'follow' || raw === 'follow-answer') return 'inherit';
-    if (raw === 'explicit') return 'explicit';
-
-    const hasPersistedState =
-      hasMeaningfulFieldValue(field) ||
-      !!field?.encrypted ||
-      !!field?.encryptedPortion ||
-      !!field?.hash;
-    return hasPersistedState ? 'explicit' : 'inherit';
-  };
+  normalizeFieldAudienceMode = (value, fieldKey = 'answer', field = {}) =>
+    normalizeFieldAudienceModeCore(value, fieldKey, field, hasMeaningfulFieldValue);
 
   getQuestionGateOptions = (questionId) => {
     const qid = normalizeQuestionIdKey(questionId);
@@ -7671,13 +7657,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return matchingOption?.gateId || null;
   };
 
-  buildInheritedAdditionalFieldState = (additionalField = {}, answerField = {}, questionId = null) => ({
-    ...(additionalField && typeof additionalField === 'object' ? additionalField : {}),
-    encrypted: !!answerField?.encrypted,
-    encryptionAudience: this.resolveFieldEncryptionAudience(answerField || {}, questionId, 'answer'),
-    encryptionGateId: this.resolveFieldEncryptionGateId(answerField || {}, questionId, 'answer'),
-    audienceMode: 'inherit',
-  });
+  buildInheritedAdditionalFieldState = (additionalField = {}, answerField = {}, questionId = null) =>
+    buildInheritedAdditionalFieldStateCore(additionalField, answerField, questionId, {
+      resolveFieldEncryptionAudience: (field, qid, fk) => this.resolveFieldEncryptionAudience(field, qid, fk),
+      resolveFieldEncryptionGateId: (field, qid, fk) => this.resolveFieldEncryptionGateId(field, qid, fk),
+    });
 
   getEffectiveRecipientsForField = ({ questionId, fieldKey = 'answer', field = null } = {}) => {
     const qid = normalizeQuestionIdKey(questionId);
@@ -7836,57 +7820,31 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       : 'self'
   );
 
-  normalizeResponseEncryptionAudience = (value, questionId = null) => {
-    const qid = questionId ? String(questionId).toLowerCase() : '';
-    if (qid && this.isQuestionLockedForResponse(qid)) return 'gate';
-
-    const raw = String(value || '').trim().toLowerCase();
-    if (raw === 'gate') {
-      if (qid) {
-        return this.getEffectiveRecipientsForQid(qid).length ? 'gate' : 'self';
-      }
-      return this.hasDefaultResponseGateRecipients() ? 'gate' : 'self';
-    }
-    return 'self';
-  };
+  normalizeResponseEncryptionAudience = (value, questionId = null) =>
+    normalizeResponseEncryptionAudienceCore(value, questionId, {
+      isQuestionLocked: (qid) => this.isQuestionLockedForResponse(qid),
+      getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
+      hasDefaultGateRecipients: () => this.hasDefaultResponseGateRecipients(),
+    });
 
   getDefaultResponseEncryptionEnabled = () => this.getDefaultResponseEncryptionAudience() === 'gate';
 
-  buildEmptyResponseFieldState = (questionId = null, fieldKey = 'answer') => {
-    const qid = questionId ? String(questionId).toLowerCase() : '';
-    const audience = qid
-      ? this.getDefaultResponseEncryptionAudienceForQid(qid)
-      : this.getDefaultResponseEncryptionAudience();
-    const gateId = audience === 'gate'
-      ? this.resolveFieldEncryptionGateId({ encryptionAudience: audience }, qid || null, fieldKey)
-      : null;
-    return {
-      value: '',
-      encrypted: audience === 'gate',
-      encryptionAudience: audience,
-      encryptionGateId: gateId,
-      audienceMode: this.normalizeFieldAudienceMode('', fieldKey, {}),
-      encryptedPortion: '',
-      hash: '',
-    };
-  };
+  buildEmptyResponseFieldState = (questionId = null, fieldKey = 'answer') =>
+    buildEmptyResponseFieldStateCore(questionId, fieldKey, {
+      getDefaultAudienceForQid: (qid) => this.getDefaultResponseEncryptionAudienceForQid(qid),
+      getDefaultAudience: () => this.getDefaultResponseEncryptionAudience(),
+      resolveFieldEncryptionGateId: (field, qid, fk) => this.resolveFieldEncryptionGateId(field, qid, fk),
+      normalizeFieldAudienceMode: (val, fk, f) => this.normalizeFieldAudienceMode(val, fk, f),
+    });
 
-  resolveFieldEncryptionAudience = (field = {}, questionId = null, fieldKey = 'answer') => {
-    const qid = questionId ? String(questionId).toLowerCase() : '';
-    if (field && typeof field === 'object' && field.encryptionAudience) {
-      return this.normalizeResponseEncryptionAudience(field.encryptionAudience, qid || null);
-    }
-    return qid
-      ? this.getDefaultResponseEncryptionAudienceForQid(qid)
-      : this.getDefaultResponseEncryptionAudience();
-  };
+  resolveFieldEncryptionAudience = (field = {}, questionId = null, fieldKey = 'answer') =>
+    resolveFieldEncryptionAudienceCore(field, questionId, fieldKey, {
+      normalizeAudience: (val, qid) => this.normalizeResponseEncryptionAudience(val, qid),
+      getDefaultAudienceForQid: (qid) => this.getDefaultResponseEncryptionAudienceForQid(qid),
+      getDefaultAudience: () => this.getDefaultResponseEncryptionAudience(),
+    });
 
-  normalizeGateLabelText = (value) => {
-    const raw = (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
-    if (!raw) return '';
-    if (/^\[object\s+object\]$/i.test(raw)) return '';
-    return raw;
-  };
+  normalizeGateLabelText = (value) => normalizeGateLabelTextCore(value);
 
   resolveSbtGateLabel = (address, preferredSlug = '') => {
     const normalizedAddress = String(address || '').trim();
