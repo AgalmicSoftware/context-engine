@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 
-import SurveyTool from 'components/SurveyTool/SurveyTool';
+import SurveyTool from "components/SurveyTool/SurveyTool";
 
 import styles from './SurveyPage.module.scss';
 
