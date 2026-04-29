@@ -37,8 +37,6 @@ const makeHost = (overrides = {}) => ({
 });
 
 const setWindowValue = (value) => {
-  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
-  if (descriptor && descriptor.configurable === false) return;
   Object.defineProperty(globalThis, 'window', {
     value,
     configurable: true,
@@ -118,12 +116,9 @@ describe('createSessionScanPolicy', () => {
 
   it('returns false without window and true when the history scan flag is enabled', () => {
     const policy = createSessionScanPolicy(makeHost());
-    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
-    if (!descriptor || descriptor.configurable !== false) {
-      setWindowValue(undefined);
-      expect(policy.isSbtHistoryScanEnabled()).toBe(false);
-    }
+    setWindowValue(undefined);
+    expect(policy.isSbtHistoryScanEnabled()).toBe(false);
 
     setWindowValue(originalWindow);
     window.ENABLE_SBT_HISTORY_SCAN = true;
