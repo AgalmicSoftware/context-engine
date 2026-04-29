@@ -88,11 +88,9 @@ import { readSbtFullScanPolicy } from '../../utilities/sbt/sbtFullScanPolicy.js'
 import { t } from '../../utilities/ui/terminology.js';
 import {
   initCacheManager,
-  peekCacheSync,
-  removeCache,
   subscribeCacheUpdates,
-  writeCacheOptimistic,
 } from '../../utilities/cache/cacheScripts.js';
+import { createMainSiteDgStorage } from '../../utilities/cache/mainSiteDgStorage.js';
 import { createSessionCachePersistenceController } from '../../utilities/cache/sessionCachePersistenceController.js';
 import { createSessionCacheReadinessController } from '../../utilities/cache/sessionCacheReadinessController.js';
 import {
@@ -142,7 +140,6 @@ import {
 } from './routeSessionResolution.js';
 import { resolveMainSiteLitSessionConfig } from './litSessionConfig.js';
 import {
-  DG_MANAGED_CACHE_NAMES,
   DG_PRIMARY_ROUTE_CACHE_NAMES,
   MASKED_Q_DECRYPT_BACKOFF_MAX,
   MASKED_Q_DECRYPT_BACKOFF_TTL_MS,
@@ -155,12 +152,9 @@ import {
   isProfileScanTelemetryEnabled as isMainSiteProfileScanTelemetryEnabled,
 } from './debugTelemetry.js';
 import {
-  bumpMainSitePerfCounter,
   emitMainSiteSbtDebug,
-  getMainSitePerfNow,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-  isMainSitePerfCountersEnabled,
   isRouteResponderAddress,
 } from './mainSiteUtils.js';
 import {
@@ -176,12 +170,6 @@ import {
   SURVEY_RESULTS_RE,
   VALID_SURVEY_ID_RE,
 } from './routeConfig.js';
-import {
-  evictOldDgEntries,
-  removeDgMetaTimestamp,
-  trimLargeArrays,
-  updateDgMetaTimestamp,
-} from './storageEviction.js';
 import {
   buildPublicRoute,
   buildPublicUrl,
@@ -249,7 +237,6 @@ export {
 } from './progressHelpers.js';
 
 const mainSiteLog = createLogger('mainSite');
-const isManagedDgCacheName = (name) => DG_MANAGED_CACHE_NAMES.has(String(name || ''));
 
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
 
@@ -366,7 +353,6 @@ export class MainSite extends Component {
   _sessionRouteLightDiscoveryInFlight = {};
   _lightSbtDiscoveryInFlight = {};
   _mounted = false;
-  _dgLastWrittenJsonByStorageKey = new Map();
   _sessionFallbackRedirectPath = '';
   _lastProcessedQuestionIdFromPath = '';
   _lastProcessedQuestionSlugFromPath = null;
@@ -1933,139 +1919,7 @@ export class MainSite extends Component {
   // You indicated keys will NOT end with ":", so if you change general.slug to "general",
   // DG keys become "dg:sbtCache:general" without special-casing here.
   // Per-group localStorage helper (Data by Group = DG)
-  DG = {
-    key: (name, slug) => `dg:${name}:${slug}`,
-    read: (name, slug, options = {}) => {
-      if (isManagedDgCacheName(name)) {
-        return peekCacheSync(name, slug, options);
-      }
-      try { return JSON.parse(localStorage.getItem(`dg:${name}:${slug}`) || 'null'); } catch { return null; }
-    },
-    write: (name, slug, obj) => {
-      const storageKey = `dg:${name}:${slug}`;
-      if (isManagedDgCacheName(name)) {
-        return writeCacheOptimistic(name, slug, obj)
-          .then((ok) => {
-            if (!ok) {
-              mainSiteLog.warn('[MainSite] DG.write managed cache persist failed', { storageKey, error: 'write returned false' });
-            }
-            return ok;
-          })
-          .catch((e) => {
-            mainSiteLog.warn('[MainSite] DG.write managed cache persist failed', { storageKey, error: e?.message || e });
-            return false;
-          });
-      }
-
-      const perfEnabled = isMainSitePerfCountersEnabled();
-      const perfStartedAt = perfEnabled ? getMainSitePerfNow() : 0;
-      const finalizePerf = (resultKey = '') => {
-        if (!perfEnabled) return;
-        if (resultKey) bumpMainSitePerfCounter(resultKey);
-        const elapsed = Math.max(0, Number(getMainSitePerfNow()) - Number(perfStartedAt || 0));
-        bumpMainSitePerfCounter('dgWriteNonManagedDurationMsTotal', elapsed);
-        bumpMainSitePerfCounter('dgWriteNonManagedDurationSamples', 1);
-      };
-      if (perfEnabled) bumpMainSitePerfCounter('dgWriteNonManagedCalls');
-
-      let ok = true;
-      let serialized = null;
-      try {
-        serialized = JSON.stringify(obj);
-        if (perfEnabled) bumpMainSitePerfCounter('dgWriteNonManagedSerializedBytes', serialized.length);
-      } catch (e) {
-        mainSiteLog.error('[MainSite] DG.write JSON stringify failed', e);
-        finalizePerf('dgWriteNonManagedStringifyFailure');
-        return Promise.resolve(false);
-      }
-      try {
-        const lastWritten = this._dgLastWrittenJsonByStorageKey.get(storageKey);
-        let persistedValue = null;
-        let didReadPersistedValue = false;
-
-        if (lastWritten === serialized) {
-          // Fast path with safety: verify persistence in case localStorage was cleared/evicted externally.
-          persistedValue = localStorage.getItem(storageKey);
-          didReadPersistedValue = true;
-          if (persistedValue === serialized) {
-            updateDgMetaTimestamp(storageKey);
-            finalizePerf('dgWriteNonManagedSkipBySnapshot');
-            return Promise.resolve(true);
-          }
-          this._dgLastWrittenJsonByStorageKey.delete(storageKey);
-        }
-
-        if (!didReadPersistedValue) {
-          persistedValue = localStorage.getItem(storageKey);
-        }
-        if (persistedValue === serialized) {
-          this._dgLastWrittenJsonByStorageKey.set(storageKey, serialized);
-          updateDgMetaTimestamp(storageKey);
-          finalizePerf('dgWriteNonManagedSkipByStorageMatch');
-          return Promise.resolve(true);
-        }
-      } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-
-      try {
-        if (perfEnabled) bumpMainSitePerfCounter('dgWriteNonManagedSetItemAttempts');
-        localStorage.setItem(storageKey, serialized);
-        this._dgLastWrittenJsonByStorageKey.set(storageKey, serialized);
-        updateDgMetaTimestamp(storageKey);
-      } catch (e) {
-        const isQuotaExceeded =
-          e?.name === 'QuotaExceededError' ||
-          e?.code === 22 ||
-          e?.code === 1014;
-
-        if (isQuotaExceeded) {
-          if (perfEnabled) bumpMainSitePerfCounter('dgWriteNonManagedQuotaRetryCount');
-          try { evictOldDgEntries(); } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-          let trimmed = obj;
-          let trimmedSerialized = serialized;
-          try {
-            trimmed = JSON.parse(JSON.stringify(obj));
-            trimLargeArrays(trimmed);
-            trimmedSerialized = JSON.stringify(trimmed);
-          } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-
-          try {
-            if (perfEnabled) bumpMainSitePerfCounter('dgWriteNonManagedSetItemAttempts');
-            localStorage.setItem(storageKey, trimmedSerialized);
-            this._dgLastWrittenJsonByStorageKey.set(storageKey, trimmedSerialized);
-            updateDgMetaTimestamp(storageKey);
-            mainSiteLog.warn('[MainSite] DG.write succeeded after eviction/trim for key:', storageKey);
-            finalizePerf('dgWriteNonManagedQuotaRetrySuccess');
-            return Promise.resolve(true);
-          } catch (retryError) {
-            mainSiteLog.error('[MainSite] DG.write localStorage failed after eviction/trim', retryError);
-            finalizePerf('dgWriteNonManagedQuotaRetryFailure');
-            return Promise.resolve(false);
-          }
-        }
-
-        mainSiteLog.error('[MainSite] DG.write localStorage failed', e);
-        ok = false;
-      }
-      finalizePerf(ok ? 'dgWriteNonManagedWriteSuccess' : 'dgWriteNonManagedWriteFailure');
-      return Promise.resolve(ok);
-    },
-    remove: (name, slug) => {
-      const storageKey = `dg:${name}:${slug}`;
-      if (isManagedDgCacheName(name)) {
-        return removeCache(name, slug).catch((e) => {
-          mainSiteLog.warn('[MainSite] DG.remove managed cache persist failed', { storageKey, error: e?.message || e });
-        });
-      }
-      try {
-        localStorage.removeItem(storageKey);
-      } catch (e) {
-        mainSiteLog.warn('[MainSite] DG.remove localStorage failed', e);
-      }
-      this._dgLastWrittenJsonByStorageKey.delete(storageKey);
-      removeDgMetaTimestamp(storageKey);
-      return Promise.resolve();
-    }
-  };
+  DG = createMainSiteDgStorage();
 
   // Session config + chain resolver (single source of truth)
   getSessionCfg = (slugIn) => {
