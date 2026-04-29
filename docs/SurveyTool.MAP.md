@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.jsx`: **1,094 lines**
-  - `SurveyQuestions.tsx`: **10,195 lines**
+  - `SurveyQuestions.tsx`: **10,123 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
 
@@ -160,6 +160,10 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - `buildEncryptionTogglePlan` — unified toggle for answer/additional with locked-question forcing and inherited additional propagation
   - `buildAnswerAudienceSelectionPlan` — explicit audience selection for answer field with inherited additional propagation
   - `buildAdditionalAudienceSelectionPlan` — additional-comment audience selection with inherit/follow/plaintext/explicit branches
+- `surveyToolSubmitPrepController.ts`
+  - pure pre-submission planning and verification
+  - `buildFieldEncryptionWorkGroups` — groups changed fields by encryption recipients for batch Lit encrypt
+  - `verifyEncryptionIntegrity` — post-encrypt verification that all marked fields have encryptedPortion
 
 That means the single-question fetch lifecycle shell extraction is now substantially complete. The remaining inline code in `fetchSingleQuestionData` is mostly DI-bag assembly and side-effect interpretation, so the next shared-core question is no longer “can we extract a controller?” It is:
 
