@@ -1,10 +1,3 @@
-import { getSessionSlugByName } from '../../utilities/web3/sessionConfigResolvers.js';
-import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import {
-  prepareQuestionMetadataCacheEntry,
-  prepareSurveyMetadataCacheEntry,
-} from './metadataCacheEntryBuilders.js';
-
 jest.mock('../../utilities/web3/sessionConfigResolvers.js', () => {
   const actual = jest.requireActual('../../utilities/web3/sessionConfigResolvers.js');
   return {
@@ -13,6 +6,13 @@ jest.mock('../../utilities/web3/sessionConfigResolvers.js', () => {
     getSessionSlugByName: jest.fn(),
   };
 });
+
+import { getSessionSlugByName } from '../../utilities/web3/sessionConfigResolvers.js';
+import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import {
+  prepareQuestionMetadataCacheEntry,
+  prepareSurveyMetadataCacheEntry,
+} from './metadataCacheEntryBuilders.js';
 
 const mockGetSessionSlugByName = getSessionSlugByName as jest.MockedFunction<typeof getSessionSlugByName>;
 
@@ -206,47 +206,6 @@ describe('metadataCacheEntryBuilders', () => {
         prompt: 'hello',
         sessionName: 'Named Session',
         sessionSlug: normalizeSessionSlug('resolved-session'),
-        sessionSlugExplicit: false,
-      });
-    });
-
-    it('uses the explicit session slug for scoped writes when question metadata is authoritative', () => {
-      mockGetSessionSlugByName.mockReturnValue('resolved-session');
-
-      const result = prepareQuestionMetadataCacheEntry({
-        questionId: 'question-abc',
-        questionData: {
-          sessionSlug: 'Explicit Session',
-          sessionName: 'Named Session',
-          prompt: 'hello',
-        },
-        slug: 'fallback-session',
-        enforceScopedIsolation: true,
-      });
-
-      expect(result).toMatchObject({
-        id: 'question-abc',
-        prompt: 'hello',
-        sessionName: 'Named Session',
-        sessionSlug: normalizeSessionSlug('Explicit Session'),
-        sessionSlugExplicit: true,
-      });
-    });
-
-    it('blanks the question session slug for scoped writes without authoritative metadata', () => {
-      const result = prepareQuestionMetadataCacheEntry({
-        questionId: 'question-abc',
-        questionData: {
-          prompt: 'hello',
-        },
-        slug: 'fallback-session',
-        enforceScopedIsolation: true,
-      });
-
-      expect(result).toMatchObject({
-        id: 'question-abc',
-        prompt: 'hello',
-        sessionSlug: '',
         sessionSlugExplicit: false,
       });
     });

@@ -1,34 +1,7 @@
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import {
-  buildMetadataSessionCacheEnvelope,
-  type MetadataRecord,
-} from './metadataSessionBinding.js';
+import { buildMetadataSessionCacheEnvelope } from './metadataSessionBinding.js';
 
-export type MetadataEntry = MetadataRecord;
-export type SurveyMetadataCacheEntry = MetadataEntry & {
-  surveyID: string;
-  id: string;
-  questionIDs: unknown[];
-  creator: unknown;
-  sessionSlug: string;
-  sessionSlugExplicit: boolean;
-  slug?: string;
-  creationBlock?: number;
-};
-type SurveyMetadataCacheEntryDraft = MetadataEntry & {
-  surveyID: string;
-  id: string;
-  questionIDs: unknown[];
-  creator: unknown;
-  slug?: unknown;
-  sessionSlug?: unknown;
-  creationBlock?: number;
-};
-export type QuestionMetadataCacheEntry = MetadataEntry & {
-  id: string;
-  sessionSlug: string;
-  sessionSlugExplicit: boolean;
-};
+type MetadataEntry = Record<string, any>;
 
 export type PrepareSurveyMetadataCacheEntryArgs = {
   surveyId: string;
@@ -55,12 +28,12 @@ export const prepareSurveyMetadataCacheEntry = ({
   slug,
   creationBlock,
   enforceScopedIsolation,
-}: PrepareSurveyMetadataCacheEntryArgs): SurveyMetadataCacheEntry => {
+}: PrepareSurveyMetadataCacheEntryArgs): Record<string, any> => {
   const sid = String(surveyId || '').toLowerCase();
   const scoped = enforceScopedIsolation === true;
   const source = isMetadataEntry(surveyData) ? surveyData : null;
 
-  let normalizedSurveyData: SurveyMetadataCacheEntryDraft = {
+  let normalizedSurveyData: MetadataEntry = {
     ...(source || {}),
     surveyID: sid,
     id: sid,
@@ -84,7 +57,7 @@ export const prepareSurveyMetadataCacheEntry = ({
   if (Number.isFinite(Number(creationBlock))) {
     normalizedSurveyData.creationBlock = Number(creationBlock);
   }
-  return normalizedSurveyData as SurveyMetadataCacheEntry;
+  return normalizedSurveyData;
 };
 
 export const prepareQuestionMetadataCacheEntry = ({
@@ -92,11 +65,11 @@ export const prepareQuestionMetadataCacheEntry = ({
   questionData,
   slug,
   enforceScopedIsolation,
-}: PrepareQuestionMetadataCacheEntryArgs): QuestionMetadataCacheEntry => {
+}: PrepareQuestionMetadataCacheEntryArgs): Record<string, any> => {
   const qid = String(questionId || '').toLowerCase();
   const source = isMetadataEntry(questionData) ? questionData : null;
 
-  const normalizedQuestionData: MetadataEntry & { id: string } = {
+  const normalizedQuestionData: MetadataEntry = {
     ...(source || {}),
     id: qid,
   };
