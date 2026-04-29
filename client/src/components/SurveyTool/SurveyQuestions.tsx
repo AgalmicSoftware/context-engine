@@ -394,6 +394,10 @@ import {
   resolveSurveyBaselineSourceSlice,
   resolveSurveyUserAnswersSlice,
 } from './surveyToolResponseSourceController';
+import {
+  buildAnswerUpdatePlan,
+  buildAdditionalUpdatePlan,
+} from './surveyToolResponseMutationController';
 import { buildResponsePayload } from './surveyToolResponsePayloadController';
 import {
   computeChangedQidsAndFields,
@@ -5978,86 +5982,36 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const sourceSlice =
       this.state.surveysResponseState?.[surveyIndex] ||
       { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    const prevAnswerState = sourceSlice.answers?.[questionId] || this.buildEmptyResponseFieldState(questionId);
-    const question = this.getQuestionById(questionId);
-    const isBinaryQuestion = !!(question && question.type === 'binary');
-    const currentAnswer = prevAnswerState.value;
-
-    let finalAnswer = answer;
-    if (isBinaryQuestion && this.valuesEqual(currentAnswer, answer)) {
-      finalAnswer = '';
-    }
-
-    const questionLocked = this.isQuestionLockedForResponse(questionId);
-    const previousAudience = this.resolveFieldEncryptionAudience(prevAnswerState, questionId);
-    const hasExistingEncryptionState =
-      typeof prevAnswerState.encrypted === 'boolean' && !!previousAudience;
-    const autoEncryptAnswers = questionLocked || (
-      hasExistingEncryptionState
-        ? false
-        : this.getEffectiveRecipientsForQid(questionId).length > 0
-    );
-    const defaultAudience = autoEncryptAnswers ? 'gate' : 'self';
-    const resolvedAudience = questionLocked
-      ? 'gate'
-      : (previousAudience || defaultAudience);
-    const resolvedGateId = (questionLocked || resolvedAudience === 'gate')
-      ? this.resolveFieldEncryptionGateId(prevAnswerState, questionId, 'answer')
-      : null;
-    const nextEncrypted = questionLocked
-      ? true
-      : (typeof prevAnswerState.encrypted === 'boolean'
-        ? prevAnswerState.encrypted
-        : autoEncryptAnswers);
-
-    const shouldHash = !(Array.isArray(finalAnswer)) && typeof finalAnswer !== 'number' && !isBinaryQuestion;
-    const hasExistingHash = typeof prevAnswerState.hash === 'string' && prevAnswerState.hash.length > 0;
-    const unchangedValue = this.valuesEqual(currentAnswer, finalAnswer);
-    const unchangedEncryption =
-      !!prevAnswerState.encrypted === !!nextEncrypted &&
-      (previousAudience || '') === (resolvedAudience || '') &&
-      String(prevAnswerState.encryptionGateId || '') === String(resolvedGateId || '');
-
-    if (unchangedValue && unchangedEncryption && (!shouldHash || hasExistingHash)) {
+    const plan = buildAnswerUpdatePlan(questionId, answer, sourceSlice, {
+      buildEmptyResponseFieldState: (qid, fk) => this.buildEmptyResponseFieldState(qid, fk),
+      resolveFieldEncryptionAudience: (field, qid, fk) => this.resolveFieldEncryptionAudience(field, qid, fk),
+      resolveFieldEncryptionGateId: (field, qid, fk) => this.resolveFieldEncryptionGateId(field, qid, fk),
+      isQuestionLockedForResponse: (qid) => this.isQuestionLockedForResponse(qid),
+      getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
+      normalizeFieldAudienceMode: (val, fk, f) => this.normalizeFieldAudienceMode(val, fk, f),
+      buildInheritedAdditionalFieldState: (af, ansf, qid) => this.buildInheritedAdditionalFieldState(af, ansf, qid),
+      valuesEqual: (a, b) => this.valuesEqual(a, b),
+      getQuestionById: (qid) => this.getQuestionById(qid),
+      computeHash: (value) => utils.keccak256(utils.toUtf8Bytes(value)),
+    });
+    if (!plan.changed) {
       return;
     }
 
     if (this._draftDirtyQids) this._draftDirtyQids.add(questionId);
     this.invalidateDiffCaches();
 
-    const newSurveysResponseState = [...this.state.surveysResponseState];
+    const newSurveysResponseState = [...(this.state.surveysResponseState || [])];
     const slice = { ...sourceSlice };
-    const answerStr = (Array.isArray(finalAnswer) || typeof finalAnswer === 'number')
-      ? JSON.stringify(finalAnswer)
-      : String(finalAnswer ?? '');
-    const newAnswerHash = shouldHash
-      ? utils.keccak256(utils.toUtf8Bytes(answerStr))
-      : '';
-
     slice.answers = {
       ...(slice.answers || {}),
-      [questionId]: {
-        ...prevAnswerState,
-        value: finalAnswer,
-        encrypted: nextEncrypted,
-        encryptionAudience: resolvedAudience,
-        encryptionGateId: resolvedGateId,
-        audienceMode: 'explicit',
-        hash: newAnswerHash,
-      },
+      [questionId]: plan.nextAnswerState,
     };
 
-    const prevAdditionalState =
-      slice.additionalComments?.[questionId] ||
-      this.buildEmptyResponseFieldState(questionId, 'additional');
-    if (this.normalizeFieldAudienceMode(prevAdditionalState.audienceMode, 'additional', prevAdditionalState) !== 'explicit') {
+    if (plan.nextAdditionalState) {
       slice.additionalComments = {
         ...(slice.additionalComments || {}),
-        [questionId]: this.buildInheritedAdditionalFieldState(
-          prevAdditionalState,
-          slice.answers[questionId],
-          questionId
-        ),
+        [questionId]: plan.nextAdditionalState,
       };
     }
 
@@ -6082,74 +6036,30 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const sourceSlice =
       this.state.surveysResponseState?.[surveyIndex] ||
       { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    const inheritedAnswerState =
-      sourceSlice.answers?.[questionId] ||
-      this.buildEmptyResponseFieldState(questionId);
-    const baseAdditionalState =
-      sourceSlice.additionalComments?.[questionId] ||
-      this.buildEmptyResponseFieldState(questionId, 'additional');
-    const additionalAudienceMode = this.normalizeFieldAudienceMode(
-      baseAdditionalState.audienceMode,
-      'additional',
-      baseAdditionalState
-    );
-    const prevAdditionalState = additionalAudienceMode === 'inherit'
-      ? this.buildInheritedAdditionalFieldState(baseAdditionalState, inheritedAnswerState, questionId)
-      : baseAdditionalState;
-    const currentValue = prevAdditionalState.value;
-    const normalizedAdditional = String(additionalComments ?? '');
-    const newSurveysResponseState = [...this.state.surveysResponseState];
-    const slice = { ...sourceSlice };
-
-    const questionLocked = this.isQuestionLockedForResponse(questionId);
-    const previousAudience = this.resolveFieldEncryptionAudience(prevAdditionalState, questionId, 'additional');
-    const hasExistingEncryptionState =
-      typeof prevAdditionalState.encrypted === 'boolean' && !!previousAudience;
-    const autoEncryptAnswers = questionLocked || (
-      hasExistingEncryptionState
-        ? false
-        : this.getEffectiveRecipientsForQid(questionId).length > 0
-    );
-    const defaultAudience = autoEncryptAnswers ? 'gate' : 'self';
-    const resolvedAudience = questionLocked
-      ? 'gate'
-      : (previousAudience || defaultAudience);
-    const resolvedGateId = (questionLocked || resolvedAudience === 'gate')
-      ? this.resolveFieldEncryptionGateId(prevAdditionalState, questionId, 'additional')
-      : null;
-    const nextEncrypted = questionLocked
-      ? true
-      : (typeof prevAdditionalState.encrypted === 'boolean'
-        ? prevAdditionalState.encrypted
-        : autoEncryptAnswers);
-
-    const unchangedValue = this.valuesEqual(currentValue, normalizedAdditional);
-    const unchangedEncryption =
-      !!prevAdditionalState.encrypted === !!nextEncrypted &&
-      (previousAudience || '') === (resolvedAudience || '') &&
-      String(prevAdditionalState.encryptionGateId || '') === String(resolvedGateId || '') &&
-      this.normalizeFieldAudienceMode(prevAdditionalState.audienceMode, 'additional', prevAdditionalState) === additionalAudienceMode;
-    const hasExistingHash = typeof prevAdditionalState.hash === 'string' && prevAdditionalState.hash.length > 0;
-    if (unchangedValue && unchangedEncryption && hasExistingHash) {
+    const plan = buildAdditionalUpdatePlan(questionId, additionalComments, sourceSlice, {
+      buildEmptyResponseFieldState: (qid, fk) => this.buildEmptyResponseFieldState(qid, fk),
+      resolveFieldEncryptionAudience: (field, qid, fk) => this.resolveFieldEncryptionAudience(field, qid, fk),
+      resolveFieldEncryptionGateId: (field, qid, fk) => this.resolveFieldEncryptionGateId(field, qid, fk),
+      isQuestionLockedForResponse: (qid) => this.isQuestionLockedForResponse(qid),
+      getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
+      normalizeFieldAudienceMode: (val, fk, f) => this.normalizeFieldAudienceMode(val, fk, f),
+      buildInheritedAdditionalFieldState: (af, ansf, qid) => this.buildInheritedAdditionalFieldState(af, ansf, qid),
+      valuesEqual: (a, b) => this.valuesEqual(a, b),
+      getQuestionById: (qid) => this.getQuestionById(qid),
+      computeHash: (value) => utils.keccak256(utils.toUtf8Bytes(value)),
+    });
+    if (!plan.changed) {
       return;
     }
 
     if (this._draftDirtyQids) this._draftDirtyQids.add(questionId);
     this.invalidateDiffCaches();
 
-    const newAnswerHash = utils.keccak256(utils.toUtf8Bytes(normalizedAdditional));
-
+    const newSurveysResponseState = [...(this.state.surveysResponseState || [])];
+    const slice = { ...sourceSlice };
     slice.additionalComments = {
       ...(slice.additionalComments || {}),
-      [questionId]: {
-        ...prevAdditionalState,
-        value: normalizedAdditional,
-        encrypted: nextEncrypted,
-        encryptionAudience: resolvedAudience,
-        encryptionGateId: resolvedGateId,
-        audienceMode: additionalAudienceMode,
-        hash: newAnswerHash
-      }
+      [questionId]: plan.nextAdditionalState,
     };
 
     newSurveysResponseState[surveyIndex] = slice;
