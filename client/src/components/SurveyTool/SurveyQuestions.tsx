@@ -378,6 +378,16 @@ import {
   readSingleQuestionCachedResponderResponse,
   writeSingleQuestionResponseToCache,
 } from './surveyToolSingleQuestionController';
+import {
+  fetchSingleQuestionMetadataCandidates,
+  normalizeSingleQuestionMetadataForCache,
+  resolveSingleQuestionCacheState,
+} from './surveyToolSingleQuestionMetadataController';
+import {
+  areSurveyResponsesConsistent,
+  resolveSurveyBaselineSourceSlice,
+  resolveSurveyUserAnswersSlice,
+} from './surveyToolResponseSourceController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -3269,83 +3279,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
    * used to determine if we can safely turn off 'submissionComplete' flag.
    */
   areResponsesConsistent = (latest, surveyIndex) => {
-    if (!latest || !this.state.editBaseline) return false;
-
-    // We only care about the rendered questions
-    const renderedIds = this.getCurrentRenderedQuestionIds();
-    const baseline = this.state.editBaseline;
-
-    // Convert latest (server format) to a slice-like structure for comparison
-    // or simply compare values directly using helper
-    const latestSlice = this.buildSliceFromUserAnswers(latest);
-
-    // Map latest response objects by qid so we can detect rating envelopes (importanceEncrypted/convictionEncrypted).
-    const latestByQid = new Map();
-    try {
-      const add = (respObj) => {
-        const id = String(respObj?.questionID || respObj?.questionId || respObj?.questionIDHash || '').trim().toLowerCase();
-        if (!id) return;
-        latestByQid.set(id, respObj);
-      };
-      if (latest && typeof latest === 'object') {
-        if (Array.isArray(latest.responses)) latest.responses.forEach(add);
-        else add(latest);
-      }
-    } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-    for (const qid of renderedIds) {
-      const qLower = String(qid || '').trim().toLowerCase();
-      const baseAns = baseline.answers?.[qid];
-      const chainAns = latestSlice.answers?.[qid];
-
-      const baseAdd = baseline.additionalComments?.[qid];
-      const chainAdd = latestSlice.additionalComments?.[qid];
-      const baselineAnswerEncrypted = !!(baseAns && (baseAns.encrypted || baseAns.encryptedPortion || baseAns.value === '*'));
-      const baselineAdditionalEncrypted = !!(baseAdd && (baseAdd.encrypted || baseAdd.encryptedPortion || baseAdd.value === '*'));
-      const baselineResponseEncrypted = baselineAnswerEncrypted || baselineAdditionalEncrypted;
-
-      // Rating envelopes can also suppress importance/conviction plaintext even when answer/additional are not encrypted.
-      const latestRespObj = qLower ? (latestByQid.get(qLower) || null) : null;
-      const latestRatingEncrypted = !!(
-        latestRespObj && (
-          (typeof latestRespObj.importanceEncrypted === 'string' && latestRespObj.importanceEncrypted) ||
-          (typeof latestRespObj.convictionEncrypted === 'string' && latestRespObj.convictionEncrypted)
-        )
-      );
-
-      // If baseline has a value, chain MUST have that value (or newer)
-      // We use valuesEqual to handle arrays/numbers normalization
-      if (!this.valuesEqual(baseAns?.value, chainAns?.value)) return false;
-      if (!this.valuesEqual(baseAdd?.value, chainAdd?.value)) return false;
-
-      // Check importance equality if it exists in baseline
-      if (baseline.importance && Object.prototype.hasOwnProperty.call(baseline.importance, qid)) {
-        const baseImp = Number(baseline.importance[qid]);
-        const chainImp = latestSlice.importance && Object.prototype.hasOwnProperty.call(latestSlice.importance, qid)
-          ? Number(latestSlice.importance[qid])
-          : null;
-        if (chainImp === null) {
-          // Encrypted responses no longer surface importance/conviction in plaintext on-chain.
-          if (!baselineResponseEncrypted && !latestRatingEncrypted) return false;
-        } else if (baseImp !== chainImp) {
-          return false;
-        }
-      }
-
-      if (baseline.conviction && Object.prototype.hasOwnProperty.call(baseline.conviction, qid)) {
-        const baseConv = Number(baseline.conviction[qid]);
-        const chainConv = latestSlice.conviction && Object.prototype.hasOwnProperty.call(latestSlice.conviction, qid)
-          ? Number(latestSlice.conviction[qid])
-          : null;
-        if (chainConv === null) {
-          if (!baselineResponseEncrypted && !latestRatingEncrypted) return false;
-        } else if (baseConv !== chainConv) {
-          return false;
-        }
-      }
-    }
-
-    return true;
+    return areSurveyResponsesConsistent({
+      latest,
+      editBaseline: this.state.editBaseline,
+      renderedIds: this.getCurrentRenderedQuestionIds(),
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+      valuesEqual: this.valuesEqual,
+    });
   };
 
 
@@ -3438,25 +3378,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const isLoggedIn = !!(this.props.account && this.props.loginComplete);
     const allowLocalCache = !this.state.isLoadingResponse && !isLoggedIn;
 
-    const getUserAnswerBaseline = () => {
-      if (!this.state.userAnswers) return null;
-      if (
-        this._userAnswersSliceCache &&
-        this._userAnswersSliceCache.source === this.state.userAnswers &&
-        this._userAnswersSliceCache.value
-      ) {
-        return this._userAnswersSliceCache.value;
-      }
-      const built = this.buildSliceFromUserAnswers(this.state.userAnswers);
-      this._userAnswersSliceCache = { source: this.state.userAnswers, value: built };
-      return built;
-    };
-
-    let baselineSlice =
-      this.state.editBaseline ||
-      getUserAnswerBaseline() ||
-      (allowLocalCache ? this.buildSliceFromLocalCache() : null) ||
-      { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+    let baselineSlice = this.resolveDiffBaselineSlice(allowLocalCache);
 
     const scopedIds = this.getEditTrackingQuestionIds(surveyIndex);
     const hasScopedIds = scopedIds.size > 0;
@@ -4589,6 +4511,35 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     },
   });
 
+  resolveUserAnswersBaselineSlice = () => {
+    const {
+      slice,
+      nextCache,
+    } = resolveSurveyUserAnswersSlice({
+      userAnswers: this.state.userAnswers,
+      userAnswersSliceCache: this._userAnswersSliceCache,
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+    });
+    this._userAnswersSliceCache = nextCache;
+    return slice;
+  };
+
+  resolveDiffBaselineSlice = (allowLocalCache = false) => {
+    const {
+      baselineSlice,
+      nextUserAnswersSliceCache,
+    } = resolveSurveyBaselineSourceSlice({
+      editBaseline: this.state.editBaseline,
+      allowLocalCache,
+      userAnswers: this.state.userAnswers,
+      userAnswersSliceCache: this._userAnswersSliceCache,
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+      buildSliceFromLocalCache: this.buildSliceFromLocalCache,
+    });
+    this._userAnswersSliceCache = nextUserAnswersSliceCache;
+    return baselineSlice;
+  };
+
   // Check if a slice is effectively empty
   isSliceEmpty = (slice) => {
     if (!slice) return true;
@@ -4851,16 +4802,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this.state.surveysResponseState[surveyIndex] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
 
     // Prefer explicit session baseline; else derive from last saved answers; else derive from local cache; else empty
-    let baselineSlice = this.state.editBaseline;
-    if (!baselineSlice && this.state.userAnswers) {
-      baselineSlice = this.buildSliceFromUserAnswers(this.state.userAnswers);
-    }
-    if (!baselineSlice) {
-      baselineSlice = this.buildSliceFromLocalCache();
-    }
-    if (!baselineSlice) {
-      baselineSlice = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    }
+    const baselineSlice = this.resolveDiffBaselineSlice(true);
 
     // Compute how many questions actually changed vs. the baseline
     return this.computeModifiedQuestionsCount(baselineSlice, currentSlice);
@@ -5483,35 +5425,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     const responderAddress = this.props.responderAddress;
 
-    const getCacheStateForSlug = async (slug) => {
-      const context = resolveQuestionBootstrapContext(this.props, slug);
-      let netIdStr = context.networkIdStr;
-      const rawCache = await readQuestionsCacheAsync(slug);
-      if (!rawCache || typeof rawCache !== 'object') return null;
-      if (!netIdStr) {
-        const preferredNet = Object.keys(rawCache).find((key) => {
-          const bucket = rawCache?.[key];
-          return !!(bucket && bucket.questions && bucket.questions[questionId]);
-        });
-        const fallbackNet = preferredNet || Object.keys(rawCache).find((key) => (
-          rawCache?.[key] && typeof rawCache[key] === 'object'
-        ));
-        if (!fallbackNet) return null;
-        netIdStr = String(fallbackNet || '').trim();
-      }
-      if (!netIdStr) return null;
-      const questionsCache = ensureQuestionsNet(rawCache, netIdStr);
-      if (!questionsCache[netIdStr]) {
-        questionsCache[netIdStr] = {
-          questionsLatestBlock: 0,
-          questions: {},
-          questionResponses: {},
-          questionResponsesLatestBlock: 0
-        };
-      }
-      if (!questionsCache[netIdStr].questions) questionsCache[netIdStr].questions = {};
-      return { netIdStr, questionsCache };
-    };
+    const getCacheStateForSlug = async (slug) => resolveSingleQuestionCacheState({
+      slug,
+      questionId,
+      resolveQuestionBootstrapContext: (nextSlug) => resolveQuestionBootstrapContext(this.props, nextSlug),
+      readQuestionsCacheAsync,
+      ensureQuestionsNet,
+    });
 
     let qData = null;
     const recentPayload = readRecentQuestionPayload(questionId);
@@ -5660,103 +5580,26 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       !!this.props.loginComplete &&
       !!this.props.account;
 
-    const fetchQuestionDataWithTimeout = (candidateSlug) => {
-      const pending = Promise.resolve(
-        contractScripts.getQuestionData(
+    const forceQuestionMetadataRefetch = !!opts.forceQuestionMetadataRefetch;
+    if (!qData || shouldRefetchMasked || forceQuestionMetadataRefetch) {
+      const metadataFetchResult = await fetchSingleQuestionMetadataCandidates({
+        initialQuestionData: qData,
+        effectiveSingleSlug,
+        fetchCandidateSlugs,
+        fetchTimeoutMs,
+        fetchTimeoutRecoveryMs,
+        getQuestionData: (candidateSlug) => contractScripts.getQuestionData(
           this.props.provider,
           questionId,
           candidateSlug,
           { decryptContext: this.buildQuestionDecryptContext(candidateSlug) }
-        )
-      ).catch(() => null);
-
-      return new Promise((resolve) => {
-        let settled = false;
-        const finalize = (result) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeoutId);
-          resolve(result);
-        };
-        const timeoutId = setTimeout(
-          () => finalize({ value: null, timedOut: true, pending }),
-          fetchTimeoutMs
-        );
-        pending
-          .then((value) => finalize({ value, timedOut: false, pending: null }))
-          .catch(() => finalize({ value: null, timedOut: false, pending: null }));
+        ),
+        pickBetterQuestionPayload,
+        isMaskedQuestionPayload,
       });
-    };
 
-    const waitForTimedOutFetchRecovery = async (timedOutFetches = []) => {
-      if (!Array.isArray(timedOutFetches) || timedOutFetches.length === 0) return null;
-      return new Promise((resolve) => {
-        let settled = false;
-        let pendingCount = timedOutFetches.length;
-        const finalize = (result) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timeoutId);
-          resolve(result);
-        };
-        const timeoutId = setTimeout(() => finalize(null), fetchTimeoutRecoveryMs);
-        timedOutFetches.forEach(({ slug: candidateSlug, pending }) => {
-          Promise.resolve(pending)
-            .then((value) => {
-              if (settled) return;
-              if (value) {
-                finalize({ slug: candidateSlug, payload: value });
-                return;
-              }
-              pendingCount -= 1;
-              if (pendingCount <= 0) finalize(null);
-            })
-            .catch(() => {
-              pendingCount -= 1;
-              if (!settled && pendingCount <= 0) finalize(null);
-            });
-        });
-      });
-    };
-
-    const forceQuestionMetadataRefetch = !!opts.forceQuestionMetadataRefetch;
-    if (!qData || shouldRefetchMasked || forceQuestionMetadataRefetch) {
-      let bestQuestionData = qData || null;
-      let bestSlug = effectiveSingleSlug;
-      let fetchedAny = false;
-      const timedOutFetches = [];
-
-      for (const candidateSlug of fetchCandidateSlugs) {
-        const attemptResult = await fetchQuestionDataWithTimeout(candidateSlug);
-        if (attemptResult?.timedOut && attemptResult?.pending) {
-          timedOutFetches.push({ slug: candidateSlug, pending: attemptResult.pending });
-        }
-        const fetched = attemptResult?.value || null;
-        if (!fetched) continue;
-        fetchedAny = true;
-        const picked = pickBetterQuestionPayload(bestQuestionData, fetched);
-        if (picked) {
-          bestQuestionData = picked;
-          bestSlug = candidateSlug;
-        }
-        const decrypted = !!(picked && (picked.promptDecrypted || picked.optionsDecrypted || picked.tagsDecrypted));
-        if (decrypted || (picked && !isMaskedQuestionPayload(picked))) break;
-      }
-
-      if (!bestQuestionData && timedOutFetches.length > 0) {
-        const recovered = await waitForTimedOutFetchRecovery(timedOutFetches);
-        if (recovered?.payload) {
-          fetchedAny = true;
-          const picked = pickBetterQuestionPayload(bestQuestionData, recovered.payload);
-          if (picked) {
-            bestQuestionData = picked;
-            bestSlug = recovered.slug || bestSlug;
-          }
-        }
-      }
-
-      qData = bestQuestionData;
-      effectiveSingleSlug = bestSlug;
+      qData = metadataFetchResult.questionData;
+      effectiveSingleSlug = metadataFetchResult.effectiveSingleSlug;
       cacheState = await getCacheStateForSlug(effectiveSingleSlug);
       if (!cacheState) {
         if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
@@ -5777,17 +5620,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry({
           questionId,
           attempt: bootstrapRetryAttempt,
-          reason: fetchedAny
+          reason: metadataFetchResult.fetchedAny
             ? 'no-question-data-yet'
-            : (timedOutFetches.length > 0 ? 'question-fetch-timeout' : 'question-fetch-unavailable'),
+            : (metadataFetchResult.timedOutFetchCount > 0 ? 'question-fetch-timeout' : 'question-fetch-unavailable'),
         });
         this.updateSingleQuestionDebug({
           phase: 'question-data-unavailable',
           runId,
           questionId,
           effectiveSingleSlug: String(effectiveSingleSlug || ''),
-          fetchedAny: !!fetchedAny,
-          timedOutFetchCount: Number(timedOutFetches.length || 0),
+          fetchedAny: !!metadataFetchResult.fetchedAny,
+          timedOutFetchCount: Number(metadataFetchResult.timedOutFetchCount || 0),
           didScheduleRetry: !!didScheduleRetry,
           retryAttempt: bootstrapRetryAttempt,
         });
@@ -5804,20 +5647,24 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       if (!qData) {
         qData = questionsCache[netIdStr].questions?.[questionId];
       }
-      qData.id = questionId;
-      if (!qData.creator) qData.creator = '';
-      if (!Array.isArray(qData.tags)) qData.tags = [];
       const existingCached = questionsCache[netIdStr].questions?.[questionId] || null;
-      const selectedForCache = pickBetterQuestionPayload(existingCached, qData) || qData;
-      const normalizedForCache = { ...selectedForCache, id: questionId };
-      const shouldWriteQuestionPayload = !areQuestionPayloadsEquivalent(existingCached, normalizedForCache);
+      const {
+        normalizedQuestionData,
+        shouldWriteQuestionPayload,
+      } = normalizeSingleQuestionMetadataForCache({
+        questionId,
+        questionData: qData,
+        existingCachedQuestionData: existingCached,
+        pickBetterQuestionPayload,
+        areQuestionPayloadsEquivalent,
+      });
       if (shouldWriteQuestionPayload) {
-        questionsCache[netIdStr].questions[questionId] = normalizedForCache;
+        questionsCache[netIdStr].questions[questionId] = normalizedQuestionData;
         if (!isStaleRun()) {
           void writeQuestionsCache(effectiveSingleSlug, questionsCache);
         }
       }
-      qData = normalizedForCache;
+      qData = normalizedQuestionData;
     }
 
     if (!hasPendingRetryForQuestion || bootstrapRetryAttempt > 0) {
