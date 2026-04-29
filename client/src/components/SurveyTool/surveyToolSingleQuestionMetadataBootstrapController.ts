@@ -1,21 +1,11 @@
-import type { UnknownRecord } from './surveyToolTypes';
-
-type QuestionPayload = UnknownRecord & {
-  id?: string;
-};
-
-type QuestionsCache = Record<string, {
-  questions: Record<string, QuestionPayload | null>;
-} & UnknownRecord>;
-
 export type MetadataBootstrapCacheState = {
   netIdStr: string;
-  questionsCache: QuestionsCache;
+  questionsCache: Record<string, any>;
 };
 
 export type MetadataBootstrapReady = {
   status: 'ready';
-  questionData: QuestionPayload | null;
+  questionData: any;
   effectiveSingleSlug: string;
   cacheState: MetadataBootstrapCacheState;
 };
@@ -34,7 +24,7 @@ export type MetadataBootstrapMissingCacheState = {
 
 export type MetadataBootstrapSkipped = {
   status: 'skipped';
-  questionData: QuestionPayload;
+  questionData: any;
   cacheState: MetadataBootstrapCacheState;
 };
 
@@ -45,20 +35,20 @@ export type MetadataBootstrapResult =
   | MetadataBootstrapSkipped;
 
 export type MetadataBootstrapFetchResult = {
-  questionData: QuestionPayload | null;
+  questionData: any;
   effectiveSingleSlug: string;
   fetchedAny: boolean;
   timedOutFetchCount: number;
 };
 
 export type MetadataBootstrapNormalizationResult = {
-  normalizedQuestionData: QuestionPayload | null;
+  normalizedQuestionData: any;
   shouldWriteQuestionPayload: boolean;
 };
 
 export type ResolveSingleQuestionMetadataBootstrapArgs = {
   questionId?: string;
-  questionData?: QuestionPayload | null;
+  questionData?: any;
   effectiveSingleSlug?: string;
   cacheState?: MetadataBootstrapCacheState | null;
   fetchCandidateSlugs?: string[];
@@ -67,14 +57,14 @@ export type ResolveSingleQuestionMetadataBootstrapArgs = {
   forceRefetch?: boolean;
   loginComplete?: boolean;
   hasAccount?: boolean;
-  isMaskedQuestionPayload?: (payload: QuestionPayload | null) => boolean;
-  fetchSingleQuestionMetadataCandidates?: (args: UnknownRecord) => Promise<MetadataBootstrapFetchResult>;
-  getQuestionData?: (slug: string) => Promise<unknown>;
-  pickBetterQuestionPayload?: (current: QuestionPayload | null, next: QuestionPayload) => QuestionPayload | null;
-  areQuestionPayloadsEquivalent?: (left: QuestionPayload | null, right: QuestionPayload) => boolean;
-  normalizeSingleQuestionMetadataForCache?: (args: UnknownRecord) => MetadataBootstrapNormalizationResult;
+  isMaskedQuestionPayload?: (payload: any) => boolean;
+  fetchSingleQuestionMetadataCandidates?: (args: any) => Promise<MetadataBootstrapFetchResult>;
+  getQuestionData?: (slug: string) => Promise<any>;
+  pickBetterQuestionPayload?: (current: any, next: any) => any;
+  areQuestionPayloadsEquivalent?: (left: any, right: any) => boolean;
+  normalizeSingleQuestionMetadataForCache?: (args: any) => MetadataBootstrapNormalizationResult;
   resolveCacheState?: (slug: string) => Promise<MetadataBootstrapCacheState | null>;
-  writeQuestionsCache?: (slug: string, cache: QuestionsCache) => Promise<unknown>;
+  writeQuestionsCache?: (slug: string, cache: any) => Promise<any>;
 };
 
 export const resolveSingleQuestionMetadataBootstrap = async ({

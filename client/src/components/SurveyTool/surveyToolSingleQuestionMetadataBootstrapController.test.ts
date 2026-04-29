@@ -1,6 +1,6 @@
 import { resolveSingleQuestionMetadataBootstrap } from './surveyToolSingleQuestionMetadataBootstrapController';
 
-const createCacheState = (questions: Record<string, Record<string, unknown> | null> = {}) => ({
+const createCacheState = (questions: Record<string, any> = {}) => ({
   netIdStr: '84532',
   questionsCache: {
     '84532': {
@@ -58,7 +58,7 @@ describe('surveyToolSingleQuestionMetadataBootstrapController', () => {
       throw new Error(`expected ready, got ${result.status}`);
     }
 
-    expect(result.questionData!.prompt).toBe('normalized');
+    expect(result.questionData.prompt).toBe('normalized');
   });
 
   it("returns 'missing-cache-state' when cache rebind fails after fetch", async () => {
@@ -154,6 +154,6 @@ describe('surveyToolSingleQuestionMetadataBootstrapController', () => {
       throw new Error(`expected ready, got ${result.status}`);
     }
 
-    expect(result.questionData!.prompt).toBe('unmasked');
+    expect(result.questionData.prompt).toBe('unmasked');
   });
 });
