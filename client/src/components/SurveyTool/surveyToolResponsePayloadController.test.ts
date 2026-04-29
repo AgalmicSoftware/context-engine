@@ -1,11 +1,6 @@
-import {
-  buildResponsePayload,
-  type BuildResponsePayloadOptions,
-} from './surveyToolResponsePayloadController';
+import { buildResponsePayload } from './surveyToolResponsePayloadController';
 
-const defaultOpts = (
-  overrides: Partial<BuildResponsePayloadOptions> = {},
-): BuildResponsePayloadOptions => ({
+const defaultOpts = (overrides: Partial<any> = {}) => ({
   isStandalone: false,
   singleQuestionMode: false,
   surveyId: 'survey-1',
@@ -27,7 +22,7 @@ const defaultOpts = (
   resolveSessionContext: () => ({ sessionName: '' }),
   getConvictionFromSlice: () => null,
   getImportanceFromSlice: () => null,
-  sanitizeQuestionPromptForResponsePayload: (q) => String(q.prompt || ''),
+  sanitizeQuestionPromptForResponsePayload: (q: any) => q.prompt || '',
   ...overrides,
 });
 
@@ -54,8 +49,8 @@ describe('surveyToolResponsePayloadController', () => {
       responder: '0xUser',
       timeStamp: expect.any(Number),
     }));
-    expect(result.responses!).toHaveLength(1);
-    expect(result.responses![0]).toEqual(expect.objectContaining({
+    expect(result.responses).toHaveLength(1);
+    expect(result.responses[0]).toEqual(expect.objectContaining({
       questionID: 'q1',
       answer: expect.objectContaining({ value: 'Yes' }),
     }));
@@ -74,8 +69,8 @@ describe('surveyToolResponsePayloadController', () => {
       getImportanceFromSlice: () => null,
     }));
 
-    expect(result.responses![0].importance).toBe(8);
-    expect(result.responses![0].conviction).toBe(8);
+    expect(result.responses[0].importance).toBe(8);
+    expect(result.responses[0].conviction).toBe(8);
   });
 
   it('single-question mode returns flat response', () => {
@@ -131,8 +126,8 @@ describe('surveyToolResponsePayloadController', () => {
       resolveFieldEncryptionGateId: () => 'gate-1',
     }));
 
-    expect(result.responses![0].answer.encryptionGateId).toBe('gate-1');
-    expect(result.responses![0].answer.encrypted).toBe(true);
+    expect(result.responses[0].answer.encryptionGateId).toBe('gate-1');
+    expect(result.responses[0].answer.encrypted).toBe(true);
   });
 
   it('does not set encryptionGateId when field is not encrypted', () => {
@@ -147,39 +142,8 @@ describe('surveyToolResponsePayloadController', () => {
       resolveFieldEncryptionGateId: () => 'gate-1',
     }));
 
-    expect(result.responses![0].answer.encryptionGateId).toBeNull();
-    expect(result.responses![0].answer.encrypted).toBe(false);
-  });
-
-  it('does not mark empty additional comments encrypted in submitted payload', () => {
-    const result = buildResponsePayload(defaultOpts({
-      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Encrypted answer' }],
-      surveyResponseState: {
-        answers: {
-          q1: { value: '*', encrypted: true, encryptedPortion: 'answer-envelope', hash: 'answer-hash' },
-        },
-        additionalComments: {
-          q1: { value: '', encrypted: true, encryptionAudience: 'gate', encryptedPortion: '', hash: '' },
-        },
-        importance: {},
-        conviction: {},
-      },
-      resolveFieldEncryptionAudience: (_field, _qid, fieldKey) => (
-        fieldKey === 'additional' ? 'gate' : 'self'
-      ),
-      resolveFieldEncryptionGateId: () => 'gate-1',
-    }));
-
-    expect(result.responses![0].answer).toEqual(expect.objectContaining({
-      encrypted: true,
-      encryptedPortion: 'answer-envelope',
-    }));
-    expect(result.responses![0].additional).toEqual(expect.objectContaining({
-      value: '',
-      encrypted: false,
-      encryptionGateId: null,
-      encryptedPortion: '',
-    }));
+    expect(result.responses[0].answer.encryptionGateId).toBeNull();
+    expect(result.responses[0].answer.encrypted).toBe(false);
   });
 
   it('filters to answered questions when pool is empty (synthesized candidates)', () => {
@@ -194,8 +158,8 @@ describe('surveyToolResponsePayloadController', () => {
       },
     }));
 
-    expect(result.responses!).toHaveLength(2);
-    expect(result.responses!.map((response) => response.questionID)).toEqual(['q1', 'q3']);
+    expect(result.responses).toHaveLength(2);
+    expect(result.responses.map((response: any) => response.questionID)).toEqual(['q1', 'q3']);
   });
 
   it('includes surveyTitle from metadata when available', () => {

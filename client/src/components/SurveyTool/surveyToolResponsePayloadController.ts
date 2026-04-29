@@ -1,60 +1,3 @@
-import type { ResponseSlice, UnknownRecord } from './surveyToolTypes';
-
-type ResponseFieldState = UnknownRecord & {
-  value?: unknown;
-  encrypted?: unknown;
-  hash?: unknown;
-  encryptedPortion?: unknown;
-  audienceMode?: unknown;
-};
-
-type SurveyResponsePayloadState = Omit<
-  ResponseSlice,
-  'answers' | 'additionalComments'
-> & {
-  answers?: Record<string, ResponseFieldState> | null;
-  additionalComments?: Record<string, ResponseFieldState> | null;
-};
-
-type ResponseQuestionSource = UnknownRecord & {
-  id: string;
-  type?: unknown;
-  prompt?: unknown;
-  sessionName?: unknown;
-};
-
-type SurveyMetadataForJson = {
-  surveyTitle: string | null;
-  sessionName: string;
-};
-
-type ResponsePayloadField = UnknownRecord & {
-  value: unknown;
-  encrypted: boolean;
-  encryptionAudience?: unknown;
-  encryptionGateId?: unknown;
-  audienceMode?: unknown;
-  hash: unknown;
-  encryptedPortion: unknown;
-};
-
-type ResponsePayloadEntry = UnknownRecord & {
-  questionID: string;
-  responder?: string;
-  type?: unknown;
-  prompt: string;
-  conviction: number | null;
-  importance: number | null;
-  answer: ResponsePayloadField;
-  additional: ResponsePayloadField;
-};
-
-type ResponsePayload = UnknownRecord & {
-  responses?: ResponsePayloadEntry[];
-  answer?: ResponsePayloadField;
-  additional?: ResponsePayloadField;
-};
-
 export interface BuildResponsePayloadOptions {
   // Mode flags
   isStandalone: boolean;
@@ -66,30 +9,27 @@ export interface BuildResponsePayloadOptions {
   surveyIndex: number;
 
   // State slices
-  surveyResponseState: ResponseSlice | null;
-  questionPool: unknown[];
-  pileQuestions: unknown[];
+  surveyResponseState: Record<string, any> | null;
+  questionPool: any[];
+  pileQuestions: any[];
 
   // DI callbacks (from the class instance)
-  resolveFieldEncryptionAudience: (field: ResponseFieldState, qid: string, fieldKey: string) => unknown;
-  getQuestionEncryptionGates: (q: ResponseQuestionSource) => unknown[];
-  resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => unknown;
-  normalizeFieldAudienceMode: (mode: unknown, fieldKey: string, field: ResponseFieldState) => unknown;
-  getSurveyMetadataForJson: (surveyHash: string) => SurveyMetadataForJson | null;
+  resolveFieldEncryptionAudience: (field: any, qid: string, fieldKey: string) => any;
+  getQuestionEncryptionGates: (q: any) => any[];
+  resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => any;
+  normalizeFieldAudienceMode: (mode: any, fieldKey: string, field: any) => any;
+  getSurveyMetadataForJson: (surveyHash: string) => { surveyTitle: string | null; sessionName: string } | null;
   resolveSessionContext: () => { sessionName: string };
 
   // Imported helpers (already pure, just pass them through)
-  getConvictionFromSlice: (state: ResponseSlice, qid: string) => number | null;
-  getImportanceFromSlice: (state: ResponseSlice, qid: string) => number | null;
-  sanitizeQuestionPromptForResponsePayload: (
-    q: ResponseQuestionSource,
-    opts: { isLocked: boolean },
-  ) => string;
+  getConvictionFromSlice: (state: any, qid: string) => number | null;
+  getImportanceFromSlice: (state: any, qid: string) => number | null;
+  sanitizeQuestionPromptForResponsePayload: (q: any, opts: { isLocked: boolean }) => string;
 }
 
 export const buildResponsePayload = (
   opts: BuildResponsePayloadOptions,
-): ResponsePayload => {
+): Record<string, any> => {
   let surveyIndex = opts.surveyIndex;
   surveyIndex = opts.isStandalone || opts.singleQuestionMode ? 0 : surveyIndex;
   void surveyIndex;
@@ -97,17 +37,13 @@ export const buildResponsePayload = (
   const surveyHash =
     opts.isStandalone || opts.singleQuestionMode ? undefined : opts.surveyId;
 
-  const surveyResponseState = opts.surveyResponseState as SurveyResponsePayloadState | null;
-  const poolFromState = Array.isArray(opts.questionPool)
-    ? opts.questionPool as ResponseQuestionSource[]
-    : [];
-  const pilePool = Array.isArray(opts.pileQuestions)
-    ? opts.pileQuestions as ResponseQuestionSource[]
-    : [];
+  const surveyResponseState = opts.surveyResponseState;
+  const poolFromState = Array.isArray(opts.questionPool) ? opts.questionPool : [];
+  const pilePool = Array.isArray(opts.pileQuestions) ? opts.pileQuestions : [];
 
   if (!surveyResponseState) return {};
 
-  let candidateQuestions: ResponseQuestionSource[] = [];
+  let candidateQuestions: any[] = [];
   if (poolFromState.length > 0) {
     candidateQuestions = poolFromState;
   } else if (pilePool.length > 0) {
@@ -122,20 +58,14 @@ export const buildResponsePayload = (
     candidateQuestions = Array.from(ids).map((id) => ({ id, type: 'freeform', prompt: '' }));
   }
 
-  const hasMainAnswer = (ans: unknown) => (
+  const hasMainAnswer = (ans: any) => (
     ans !== undefined &&
     ans !== null &&
     ans !== '' &&
     (!Array.isArray(ans) || ans.length > 0)
   );
 
-  const hasAdditional = (val: unknown) => {
-    if (val === undefined || val === null) return false;
-    if (typeof val === 'string') return val.trim().length > 0;
-    if (Array.isArray(val)) return val.length > 0;
-    if (typeof val === 'object') return Object.keys(val).length > 0;
-    return true;
-  };
+  const hasAdditional = (val: any) => val !== undefined && val !== null && val !== '';
   const hasConviction = (qid: string) =>
     opts.getConvictionFromSlice(surveyResponseState, qid) !== null;
 
@@ -155,8 +85,6 @@ export const buildResponsePayload = (
     const additional = surveyResponseState.additionalComments?.[q.id] || {};
     const answerAudience = opts.resolveFieldEncryptionAudience(answer, q.id, 'answer');
     const additionalAudience = opts.resolveFieldEncryptionAudience(additional, q.id, 'additional');
-    const additionalHasContent = hasAdditional(additional.value);
-    const additionalEncrypted = additionalHasContent && !!additional.encrypted;
     const conviction = opts.getConvictionFromSlice(surveyResponseState, q.id);
     const importance = opts.getImportanceFromSlice(surveyResponseState, q.id);
     const importanceForPayload = importance !== null ? importance : conviction;
@@ -183,9 +111,9 @@ export const buildResponsePayload = (
       },
       additional: {
         value: additional.value !== undefined ? additional.value : '',
-        encrypted: additionalEncrypted,
+        encrypted: !!additional.encrypted,
         encryptionAudience: additionalAudience,
-        encryptionGateId: additionalEncrypted
+        encryptionGateId: additional.encrypted
           ? opts.resolveFieldEncryptionGateId(additional, q.id, 'additional')
           : null,
         audienceMode: opts.normalizeFieldAudienceMode(
@@ -194,16 +122,16 @@ export const buildResponsePayload = (
           additional,
         ),
         hash: additional.hash || '',
-        encryptedPortion: additionalEncrypted ? (additional.encryptedPortion || '') : '',
+        encryptedPortion: additional.encrypted ? (additional.encryptedPortion || '') : '',
       },
     };
   });
 
   if (opts.singleQuestionMode) {
     let sessionName = '';
-    const qInPool = poolFromState[0];
+    const qInPool = opts.questionPool && opts.questionPool[0];
     if (qInPool?.sessionName) {
-      sessionName = qInPool.sessionName as string;
+      sessionName = qInPool.sessionName;
     } else {
       const context = opts.resolveSessionContext();
       sessionName = context?.sessionName || '';
