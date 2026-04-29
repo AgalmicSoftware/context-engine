@@ -1,0 +1,243 @@
+export interface ResponseFieldState {
+  value?: any;
+  encrypted?: boolean;
+  encryptionAudience?: string;
+  encryptionGateId?: string | null;
+  audienceMode?: string;
+  hash?: string;
+  encryptedPortion?: string;
+  [key: string]: any;
+}
+
+export interface MutationDeps {
+  buildEmptyResponseFieldState: (qid: string, fieldKey?: string) => ResponseFieldState;
+  resolveFieldEncryptionAudience: (field: any, qid: string, fieldKey?: string) => string;
+  resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => string | null;
+  isQuestionLockedForResponse: (qid: string) => boolean;
+  getEffectiveRecipientsForQid: (qid: string) => any[];
+  normalizeFieldAudienceMode: (value: any, fieldKey: string, field: any) => string;
+  buildInheritedAdditionalFieldState: (additionalField: any, answerField: any, qid: string | null) => ResponseFieldState;
+  valuesEqual: (a: any, b: any) => boolean;
+  getQuestionById: (qid: string) => any;
+  computeHash: (value: string) => string;
+}
+
+type MutationSourceSlice = {
+  answers: Record<string, any>;
+  additionalComments: Record<string, any>;
+};
+
+export const resolveFieldEncryptionDefaults = (
+  prevFieldState: ResponseFieldState,
+  questionId: string,
+  fieldKey: string,
+  deps: Pick<
+    MutationDeps,
+    | 'isQuestionLockedForResponse'
+    | 'resolveFieldEncryptionAudience'
+    | 'getEffectiveRecipientsForQid'
+    | 'resolveFieldEncryptionGateId'
+  >,
+): {
+  questionLocked: boolean;
+  resolvedAudience: string;
+  resolvedGateId: string | null;
+  nextEncrypted: boolean;
+} => {
+  const questionLocked = deps.isQuestionLockedForResponse(questionId);
+  const previousAudience = deps.resolveFieldEncryptionAudience(prevFieldState, questionId, fieldKey);
+  const hasExistingEncryptionState =
+    typeof prevFieldState.encrypted === 'boolean' && !!previousAudience;
+  const autoEncrypt = questionLocked || (
+    hasExistingEncryptionState
+      ? false
+      : deps.getEffectiveRecipientsForQid(questionId).length > 0
+  );
+  const defaultAudience = autoEncrypt ? 'gate' : 'self';
+  const resolvedAudience = questionLocked
+    ? 'gate'
+    : (previousAudience || defaultAudience);
+  const resolvedGateId = (questionLocked || resolvedAudience === 'gate')
+    ? deps.resolveFieldEncryptionGateId(prevFieldState, questionId, fieldKey)
+    : null;
+  const nextEncrypted = questionLocked
+    ? true
+    : (typeof prevFieldState.encrypted === 'boolean'
+      ? prevFieldState.encrypted
+      : autoEncrypt);
+
+  return {
+    questionLocked,
+    resolvedAudience,
+    resolvedGateId,
+    nextEncrypted,
+  };
+};
+
+export interface AnswerUpdatePlan {
+  changed: boolean;
+  nextAnswerState: ResponseFieldState;
+  nextAdditionalState: ResponseFieldState | null;
+}
+
+export const buildAnswerUpdatePlan = (
+  questionId: string,
+  answer: any,
+  sourceSlice: MutationSourceSlice,
+  deps: MutationDeps,
+): AnswerUpdatePlan => {
+  const prevAnswerState =
+    sourceSlice.answers?.[questionId] || deps.buildEmptyResponseFieldState(questionId);
+  const question = deps.getQuestionById(questionId);
+  const isBinaryQuestion = !!(question && question.type === 'binary');
+  const currentAnswer = prevAnswerState.value;
+
+  let finalAnswer = answer;
+  if (isBinaryQuestion && deps.valuesEqual(currentAnswer, answer)) {
+    finalAnswer = '';
+  }
+
+  const previousAudience = deps.resolveFieldEncryptionAudience(prevAnswerState, questionId, 'answer');
+  const {
+    resolvedAudience,
+    resolvedGateId,
+    nextEncrypted,
+  } = resolveFieldEncryptionDefaults(prevAnswerState, questionId, 'answer', deps);
+
+  const shouldHash = !(Array.isArray(finalAnswer)) && typeof finalAnswer !== 'number' && !isBinaryQuestion;
+  const hasExistingHash = typeof prevAnswerState.hash === 'string' && prevAnswerState.hash.length > 0;
+  const unchangedValue = deps.valuesEqual(currentAnswer, finalAnswer);
+  const unchangedEncryption =
+    !!prevAnswerState.encrypted === !!nextEncrypted &&
+    (previousAudience || '') === (resolvedAudience || '') &&
+    String(prevAnswerState.encryptionGateId || '') === String(resolvedGateId || '');
+
+  // Regression guard: unchanged writes must preserve existing hashes so wrappers do not
+  // mark the draft dirty when the serialized response payload is identical.
+  if (unchangedValue && unchangedEncryption && (!shouldHash || hasExistingHash)) {
+    return {
+      changed: false,
+      nextAnswerState: prevAnswerState,
+      nextAdditionalState: null,
+    };
+  }
+
+  const answerStr = (Array.isArray(finalAnswer) || typeof finalAnswer === 'number')
+    ? JSON.stringify(finalAnswer)
+    : String(finalAnswer ?? '');
+  const newAnswerHash = shouldHash
+    ? deps.computeHash(answerStr)
+    : '';
+
+  const nextAnswerState: ResponseFieldState = {
+    ...prevAnswerState,
+    value: finalAnswer,
+    encrypted: nextEncrypted,
+    encryptionAudience: resolvedAudience,
+    encryptionGateId: resolvedGateId,
+    audienceMode: 'explicit',
+    hash: newAnswerHash,
+  };
+
+  const prevAdditionalState =
+    sourceSlice.additionalComments?.[questionId] ||
+    deps.buildEmptyResponseFieldState(questionId, 'additional');
+
+  let nextAdditionalState: ResponseFieldState | null = null;
+  if (
+    deps.normalizeFieldAudienceMode(
+      prevAdditionalState.audienceMode,
+      'additional',
+      prevAdditionalState,
+    ) !== 'explicit'
+  ) {
+    // Keep inherited additional encryption aligned with the updated answer unless the
+    // field has explicitly opted out of inheritance.
+    nextAdditionalState = deps.buildInheritedAdditionalFieldState(
+      prevAdditionalState,
+      nextAnswerState,
+      questionId,
+    );
+  }
+
+  return {
+    changed: true,
+    nextAnswerState,
+    nextAdditionalState,
+  };
+};
+
+export interface AdditionalUpdatePlan {
+  changed: boolean;
+  nextAdditionalState: ResponseFieldState;
+}
+
+export const buildAdditionalUpdatePlan = (
+  questionId: string,
+  additionalComments: any,
+  sourceSlice: MutationSourceSlice,
+  deps: MutationDeps,
+): AdditionalUpdatePlan => {
+  const inheritedAnswerState =
+    sourceSlice.answers?.[questionId] ||
+    deps.buildEmptyResponseFieldState(questionId);
+  const baseAdditionalState =
+    sourceSlice.additionalComments?.[questionId] ||
+    deps.buildEmptyResponseFieldState(questionId, 'additional');
+  const additionalAudienceMode = deps.normalizeFieldAudienceMode(
+    baseAdditionalState.audienceMode,
+    'additional',
+    baseAdditionalState,
+  );
+  const prevAdditionalState = additionalAudienceMode === 'inherit'
+    ? deps.buildInheritedAdditionalFieldState(baseAdditionalState, inheritedAnswerState, questionId)
+    : baseAdditionalState;
+  const currentValue = prevAdditionalState.value;
+  const normalizedAdditional = String(additionalComments ?? '');
+
+  const previousAudience = deps.resolveFieldEncryptionAudience(
+    prevAdditionalState,
+    questionId,
+    'additional',
+  );
+  const {
+    resolvedAudience,
+    resolvedGateId,
+    nextEncrypted,
+  } = resolveFieldEncryptionDefaults(prevAdditionalState, questionId, 'additional', deps);
+
+  const unchangedValue = deps.valuesEqual(currentValue, normalizedAdditional);
+  const unchangedEncryption =
+    !!prevAdditionalState.encrypted === !!nextEncrypted &&
+    (previousAudience || '') === (resolvedAudience || '') &&
+    String(prevAdditionalState.encryptionGateId || '') === String(resolvedGateId || '') &&
+    deps.normalizeFieldAudienceMode(
+      prevAdditionalState.audienceMode,
+      'additional',
+      prevAdditionalState,
+    ) === additionalAudienceMode;
+  const hasExistingHash = typeof prevAdditionalState.hash === 'string' && prevAdditionalState.hash.length > 0;
+
+  if (unchangedValue && unchangedEncryption && hasExistingHash) {
+    return {
+      changed: false,
+      nextAdditionalState: prevAdditionalState,
+    };
+  }
+
+  const newAdditionalHash = deps.computeHash(normalizedAdditional);
+  const nextAdditionalState: ResponseFieldState = {
+    ...prevAdditionalState,
+    value: normalizedAdditional,
+    encrypted: nextEncrypted,
+    encryptionAudience: resolvedAudience,
+    encryptionGateId: resolvedGateId,
+    audienceMode: additionalAudienceMode,
+    hash: newAdditionalHash,
+  };
+
+  return {
+    changed: true,
+    nextAdditionalState,
+  };
+};
