@@ -413,6 +413,11 @@ import {
   buildInheritedAdditionalFieldState as buildInheritedAdditionalFieldStateCore,
   normalizeGateLabelText as normalizeGateLabelTextCore,
 } from './surveyToolAudienceDerivationController';
+import {
+  buildEncryptionTogglePlan,
+  buildAnswerAudienceSelectionPlan,
+  buildAdditionalAudienceSelectionPlan,
+} from './surveyToolFieldEncryptionController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -6150,40 +6155,28 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.setState(prev => {
       const arr = Array.isArray(prev.surveysResponseState) ? [...prev.surveysResponseState] : [];
       while (arr.length <= idx) arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-
       const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-      const locked = this.isQuestionLockedForResponse(qid);
-      const effectiveEncrypted = locked ? true : !!newEncryptedState;
-      const curr = { ...(slice.answers?.[qid] || this.buildEmptyResponseFieldState(qid)) };
-      curr.encrypted = effectiveEncrypted;
-      curr.encryptionAudience = locked
-        ? 'gate'
-        : (effectiveEncrypted ? this.resolveFieldEncryptionAudience(curr, qid, 'answer') : 'self');
-      curr.encryptionGateId = effectiveEncrypted && curr.encryptionAudience === 'gate'
-        ? this.resolveFieldEncryptionGateId(curr, qid, 'answer')
-        : null;
-      curr.audienceMode = 'explicit';
 
-      slice.answers = { ...(slice.answers || {}), [qid]: curr };
-      const nextAdditional = {
-        ...(slice.additionalComments?.[qid] || this.buildEmptyResponseFieldState(qid, 'additional')),
-      };
-      if (this.normalizeFieldAudienceMode(nextAdditional.audienceMode, 'additional', nextAdditional) !== 'explicit') {
-        slice.additionalComments = {
-          ...(slice.additionalComments || {}),
-          [qid]: this.buildInheritedAdditionalFieldState(nextAdditional, curr, qid),
-        };
+      const plan = buildEncryptionTogglePlan(qid, 'answer', newEncryptedState, slice, {
+        isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
+        buildEmptyResponseFieldState: (q, fk) => this.buildEmptyResponseFieldState(q, fk),
+        resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
+        resolveFieldEncryptionGateId: (f, q, fk) => this.resolveFieldEncryptionGateId(f, q, fk),
+        normalizeFieldAudienceMode: (v, fk, f) => this.normalizeFieldAudienceMode(v, fk, f),
+        buildInheritedAdditionalFieldState: (af, ans, q) => this.buildInheritedAdditionalFieldState(af, ans, q),
+        normalizeResponseEncryptionAudience: (a, q) => this.normalizeResponseEncryptionAudience(a, q),
+      });
+
+      slice.answers = { ...(slice.answers || {}), [qid]: plan.nextFieldState };
+      if (plan.nextAdditionalState) {
+        slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: plan.nextAdditionalState };
       }
       arr[idx] = slice;
 
       return {
         surveysResponseState: arr,
-        lockAudienceMenuByQuestion: effectiveEncrypted
-          ? prev.lockAudienceMenuByQuestion
-          : {},
-        lockAudienceGateDetailsByQuestion: effectiveEncrypted
-          ? prev.lockAudienceGateDetailsByQuestion
-          : {},
+        lockAudienceMenuByQuestion: plan.clearMenus ? {} : prev.lockAudienceMenuByQuestion,
+        lockAudienceGateDetailsByQuestion: plan.clearMenus ? {} : prev.lockAudienceGateDetailsByQuestion,
         submittedSinceLastEdit: updateSubmittedSinceLastEdit(prev.submittedSinceLastEdit, 'user_edit'),
       };
     }, () => {
@@ -6206,31 +6199,25 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.setState(prev => {
       const arr = Array.isArray(prev.surveysResponseState) ? [...prev.surveysResponseState] : [];
       while (arr.length <= idx) arr.push({ answers: {}, importance: {}, conviction: {}, additionalComments: {} });
-
       const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-      const locked = this.isQuestionLockedForResponse(qid);
-      const effectiveEncrypted = locked ? true : !!newEncryptedState;
-      const curr = { ...(slice.additionalComments?.[qid] || this.buildEmptyResponseFieldState(qid, 'additional')) };
-      curr.encrypted = effectiveEncrypted;
-      curr.encryptionAudience = locked
-        ? 'gate'
-        : (effectiveEncrypted ? this.resolveFieldEncryptionAudience(curr, qid, 'additional') : 'self');
-      curr.encryptionGateId = effectiveEncrypted && curr.encryptionAudience === 'gate'
-        ? this.resolveFieldEncryptionGateId(curr, qid, 'additional')
-        : null;
-      curr.audienceMode = 'explicit';
 
-      slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: curr };
+      const plan = buildEncryptionTogglePlan(qid, 'additional', newEncryptedState, slice, {
+        isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
+        buildEmptyResponseFieldState: (q, fk) => this.buildEmptyResponseFieldState(q, fk),
+        resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
+        resolveFieldEncryptionGateId: (f, q, fk) => this.resolveFieldEncryptionGateId(f, q, fk),
+        normalizeFieldAudienceMode: (v, fk, f) => this.normalizeFieldAudienceMode(v, fk, f),
+        buildInheritedAdditionalFieldState: (af, ans, q) => this.buildInheritedAdditionalFieldState(af, ans, q),
+        normalizeResponseEncryptionAudience: (a, q) => this.normalizeResponseEncryptionAudience(a, q),
+      });
+
+      slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: plan.nextFieldState };
       arr[idx] = slice;
 
       return {
         surveysResponseState: arr,
-        lockAudienceMenuByQuestion: effectiveEncrypted
-          ? prev.lockAudienceMenuByQuestion
-          : {},
-        lockAudienceGateDetailsByQuestion: effectiveEncrypted
-          ? prev.lockAudienceGateDetailsByQuestion
-          : {},
+        lockAudienceMenuByQuestion: plan.clearMenus ? {} : prev.lockAudienceMenuByQuestion,
+        lockAudienceGateDetailsByQuestion: plan.clearMenus ? {} : prev.lockAudienceGateDetailsByQuestion,
         submittedSinceLastEdit: updateSubmittedSinceLastEdit(prev.submittedSinceLastEdit, 'user_edit'),
       };
     }, () => {
@@ -8353,40 +8340,25 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (!qid) return;
     this.invalidateDiffCaches();
 
-    const normalizedAudience = this.normalizeResponseEncryptionAudience(audience, qid);
-    const normalizedGateId = normalizedAudience === 'gate'
-      ? this.resolveFieldEncryptionGateId({
-          encryptionAudience: normalizedAudience,
-          encryptionGateId: options?.gateId || '',
-        }, qid, 'answer')
-      : null;
-
     this.setState((prev) => {
       const arr = buildSurveyResponseStateArray({
         prevSurveysResponseState: prev.surveysResponseState,
         surveyIndex: idx,
       });
-
       const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-      const nextAnswer = { ...(slice.answers?.[qid] || this.buildEmptyResponseFieldState(qid)) };
-      const nextAdditional = { ...(slice.additionalComments?.[qid] || this.buildEmptyResponseFieldState(qid, 'additional')) };
-      const nextAdditionalMode = this.normalizeFieldAudienceMode(nextAdditional.audienceMode, 'additional', nextAdditional);
 
-      nextAnswer.encrypted = true;
-      nextAnswer.encryptionAudience = normalizedAudience;
-      nextAnswer.encryptionGateId = normalizedGateId;
-      nextAnswer.audienceMode = 'explicit';
+      const plan = buildAnswerAudienceSelectionPlan(qid, audience, options?.gateId || '', slice, {
+        isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
+        buildEmptyResponseFieldState: (q, fk) => this.buildEmptyResponseFieldState(q, fk),
+        resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
+        resolveFieldEncryptionGateId: (f, q, fk) => this.resolveFieldEncryptionGateId(f, q, fk),
+        normalizeFieldAudienceMode: (v, fk, f) => this.normalizeFieldAudienceMode(v, fk, f),
+        buildInheritedAdditionalFieldState: (af, ans, q) => this.buildInheritedAdditionalFieldState(af, ans, q),
+        normalizeResponseEncryptionAudience: (a, q) => this.normalizeResponseEncryptionAudience(a, q),
+      });
 
-      if (nextAdditionalMode !== 'explicit') {
-        slice.additionalComments = {
-          ...(slice.additionalComments || {}),
-          [qid]: this.buildInheritedAdditionalFieldState(nextAdditional, nextAnswer, qid),
-        };
-      } else {
-        slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: nextAdditional };
-      }
-
-      slice.answers = { ...(slice.answers || {}), [qid]: nextAnswer };
+      slice.answers = { ...(slice.answers || {}), [qid]: plan.nextAnswerState };
+      slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: plan.nextAdditionalState };
       arr[idx] = slice;
 
       return {
@@ -8412,46 +8384,19 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         prevSurveysResponseState: prev.surveysResponseState,
         surveyIndex: idx,
       });
-
       const slice = { ...(arr[idx] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }) };
-      const nextAnswer = { ...(slice.answers?.[qid] || this.buildEmptyResponseFieldState(qid)) };
-      const nextAdditional = { ...(slice.additionalComments?.[qid] || this.buildEmptyResponseFieldState(qid, 'additional')) };
-      const rawAudience = String(audience || '').trim().toLowerCase();
 
-      if (rawAudience === 'inherit' || rawAudience === 'follow' || rawAudience === 'follow-answer') {
-        slice.additionalComments = {
-          ...(slice.additionalComments || {}),
-          [qid]: this.buildInheritedAdditionalFieldState(nextAdditional, nextAnswer, qid),
-        };
-      } else if (rawAudience === 'none' || rawAudience === 'plaintext' || rawAudience === 'not-encrypted') {
-        slice.additionalComments = {
-          ...(slice.additionalComments || {}),
-          [qid]: {
-            ...nextAdditional,
-            encrypted: false,
-            encryptionAudience: 'self',
-            encryptionGateId: null,
-            audienceMode: 'explicit',
-          },
-        };
-      } else {
-        const normalizedAudience = this.normalizeResponseEncryptionAudience(rawAudience, qid);
-        slice.additionalComments = {
-          ...(slice.additionalComments || {}),
-          [qid]: {
-            ...nextAdditional,
-            encrypted: true,
-            encryptionAudience: normalizedAudience,
-            encryptionGateId: normalizedAudience === 'gate'
-              ? this.resolveFieldEncryptionGateId({
-                  encryptionAudience: normalizedAudience,
-                  encryptionGateId: options?.gateId || '',
-                }, qid, 'additional')
-              : null,
-            audienceMode: 'explicit',
-          },
-        };
-      }
+      const { nextAdditionalState } = buildAdditionalAudienceSelectionPlan(qid, audience, options?.gateId || '', slice, {
+        isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
+        buildEmptyResponseFieldState: (q, fk) => this.buildEmptyResponseFieldState(q, fk),
+        resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
+        resolveFieldEncryptionGateId: (f, q, fk) => this.resolveFieldEncryptionGateId(f, q, fk),
+        normalizeFieldAudienceMode: (v, fk, f) => this.normalizeFieldAudienceMode(v, fk, f),
+        buildInheritedAdditionalFieldState: (af, ans, q) => this.buildInheritedAdditionalFieldState(af, ans, q),
+        normalizeResponseEncryptionAudience: (a, q) => this.normalizeResponseEncryptionAudience(a, q),
+      });
+
+      slice.additionalComments = { ...(slice.additionalComments || {}), [qid]: nextAdditionalState };
 
       arr[idx] = slice;
       return {
