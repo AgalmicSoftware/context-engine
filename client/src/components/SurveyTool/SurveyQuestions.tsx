@@ -412,6 +412,7 @@ import {
 import { buildResponsePayload } from './surveyToolResponsePayloadController';
 import {
   buildIndexedQuestionEntryKeys,
+  computePendingEditStats,
   orchestrateGetChangedQidsAndFields,
 } from './surveyToolChangedFieldsController';
 import {
@@ -8642,56 +8643,27 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const currentSlice =
       (this.state.surveysResponseState && this.state.surveysResponseState[idx]) ||
       { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-    const pendingCache = this._pendingEditStatsCache;
-    if (
-      pendingCache &&
-      pendingCache.idx === idx &&
-      pendingCache.diffCacheRef === this._changedQidsAndFieldsCache &&
-      pendingCache.currentSlice === currentSlice &&
-      pendingCache.userAnswers === this.state.userAnswers &&
-      pendingCache.questionPool === this.state.questionPool &&
-      pendingCache.pileQuestions === this.state.pileQuestions &&
-      pendingCache.questionId === this.props.questionID &&
-      pendingCache.result
-    ) {
-      return pendingCache.result;
+    const { result, newCache } = computePendingEditStats(
+      {
+        idx,
+        currentSlice,
+        userAnswers: this.state.userAnswers,
+        existingCache: this._pendingEditStatsCache,
+        diffCacheRef: this._changedQidsAndFieldsCache,
+        questionPool: this.state.questionPool,
+        pileQuestions: this.state.pileQuestions,
+        questionId: this.props.questionID,
+      },
+      {
+        getChangedQidsAndFields: (i) => this.getChangedQidsAndFields(i),
+        isQuestionLockedForResponse: (qid) => this.isQuestionLockedForResponse(qid),
+        buildRatingEnvelopeQidSetFromUserAnswers,
+      },
+    );
+    if (newCache !== this._pendingEditStatsCache) {
+      newCache.diffCacheRef = this._changedQidsAndFieldsCache;
+      this._pendingEditStatsCache = newCache;
     }
-
-    const { changedQids, changedMap } = this.getChangedQidsAndFields(idx);
-    const total = changedQids.size;
-
-    const ratingEnvelopeQids =
-      total > 0 ? buildRatingEnvelopeQidSetFromUserAnswers(this.state.userAnswers) : new Set();
-
-    let encrypted = 0;
-    if (total > 0) {
-      for (const qId of changedQids) {
-        const qLower = String(qId || '').trim().toLowerCase();
-        const fields = changedMap[qId] || {};
-        const aEnc = (fields.answer || fields.encryptedAnswer) && !!(currentSlice.answers?.[qId]?.encrypted);
-        const dEnc = (fields.additional || fields.encryptedAdditional) && !!(currentSlice.additionalComments?.[qId]?.encrypted);
-        const questionLocked = this.isQuestionLockedForResponse(qId);
-        const baselineRatingEncrypted = qLower ? ratingEnvelopeQids.has(qLower) : false;
-        const ratingEnc =
-          (fields.importance || fields.conviction) &&
-          (baselineRatingEncrypted || questionLocked ||
-            !!(currentSlice.answers?.[qId]?.encrypted) ||
-            !!(currentSlice.additionalComments?.[qId]?.encrypted));
-        if (aEnc || dEnc || ratingEnc) encrypted += 1;
-      }
-    }
-    const result = { total, encrypted };
-    this._pendingEditStatsCache = {
-      idx,
-      diffCacheRef: this._changedQidsAndFieldsCache,
-      currentSlice,
-      userAnswers: this.state.userAnswers,
-      questionPool: this.state.questionPool,
-      pileQuestions: this.state.pileQuestions,
-      questionId: this.props.questionID,
-      result,
-    };
     return result;
   };
 
