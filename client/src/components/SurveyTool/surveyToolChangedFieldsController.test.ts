@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   buildIndexedQuestionEntryKeys,
+  computePendingEditStats,
   computeChangedQidsAndFields,
   orchestrateGetChangedQidsAndFields,
   pickBestField,
@@ -314,6 +315,196 @@ describe('surveyToolChangedFieldsController', () => {
       expect(normalizeResponseEncryptionAudience).toHaveBeenNthCalledWith(1, 'alpha', 'q1');
       expect(normalizeResponseEncryptionAudience).toHaveBeenNthCalledWith(2, 'beta', 'q1');
       expect(getDefaultResponseEncryptionAudienceForQid).toHaveBeenCalled();
+    });
+  });
+
+  describe('computePendingEditStats', () => {
+    it('returns cached result without recomputing when references still match', () => {
+      const currentSlice = buildEmptySlice();
+      const userAnswers = {};
+      const diffCacheRef = {};
+      const questionPool = {};
+      const pileQuestions = {};
+      const result = { total: 3, encrypted: 2 };
+      const existingCache = {
+        idx: 4,
+        diffCacheRef,
+        currentSlice,
+        userAnswers,
+        questionPool,
+        pileQuestions,
+        questionId: 'q1',
+        result,
+      };
+      const getChangedQidsAndFields = vi.fn(() => ({
+        changedQids: new Set<string>(),
+        changedMap: {},
+      }));
+      const buildRatingEnvelopeQidSetFromUserAnswers = vi.fn(() => new Set<string>());
+
+      const stats = computePendingEditStats(
+        {
+          idx: 4,
+          currentSlice,
+          userAnswers,
+          existingCache,
+          diffCacheRef,
+          questionPool,
+          pileQuestions,
+          questionId: 'q1',
+        },
+        {
+          getChangedQidsAndFields,
+          isQuestionLockedForResponse: vi.fn(() => false),
+          buildRatingEnvelopeQidSetFromUserAnswers,
+        },
+      );
+
+      expect(stats.result).toBe(result);
+      expect(stats.newCache).toBe(existingCache);
+      expect(getChangedQidsAndFields).not.toHaveBeenCalled();
+      expect(buildRatingEnvelopeQidSetFromUserAnswers).not.toHaveBeenCalled();
+    });
+
+    it('computes fresh stats and returns a new cache on cache miss', () => {
+      const currentSlice = {
+        ...buildEmptySlice(),
+        additionalComments: { q1: { value: 'note' } },
+      };
+      const userAnswers = { cached: false };
+      const diffCacheRef = {};
+      const questionPool = {};
+      const pileQuestions = {};
+      const getChangedQidsAndFields = vi.fn(() => ({
+        changedQids: new Set(['q1']),
+        changedMap: { q1: { additional: 1 } },
+      }));
+
+      const stats = computePendingEditStats(
+        {
+          idx: 1,
+          currentSlice,
+          userAnswers,
+          existingCache: null,
+          diffCacheRef,
+          questionPool,
+          pileQuestions,
+          questionId: 'q1',
+        },
+        {
+          getChangedQidsAndFields,
+          isQuestionLockedForResponse: vi.fn(() => false),
+          buildRatingEnvelopeQidSetFromUserAnswers: vi.fn(() => new Set<string>()),
+        },
+      );
+
+      expect(getChangedQidsAndFields).toHaveBeenCalledWith(1);
+      expect(stats.result).toEqual({ total: 1, encrypted: 0 });
+      expect(stats.newCache).toEqual({
+        idx: 1,
+        diffCacheRef,
+        currentSlice,
+        userAnswers,
+        questionPool,
+        pileQuestions,
+        questionId: 'q1',
+        result: { total: 1, encrypted: 0 },
+      });
+      expect(stats.newCache.result).toBe(stats.result);
+    });
+
+    it('counts questions with encrypted answer edits', () => {
+      const currentSlice = {
+        ...buildEmptySlice(),
+        answers: { q1: { value: 'changed', encrypted: true } },
+      };
+
+      const stats = computePendingEditStats(
+        {
+          idx: 2,
+          currentSlice,
+          userAnswers: {},
+          existingCache: null,
+          diffCacheRef: {},
+          questionPool: {},
+          pileQuestions: {},
+          questionId: 'q1',
+        },
+        {
+          getChangedQidsAndFields: vi.fn(() => ({
+            changedQids: new Set(['q1']),
+            changedMap: { q1: { answer: 1 } },
+          })),
+          isQuestionLockedForResponse: vi.fn(() => false),
+          buildRatingEnvelopeQidSetFromUserAnswers: vi.fn(() => new Set<string>()),
+        },
+      );
+
+      expect(stats.result).toEqual({ total: 1, encrypted: 1 });
+    });
+
+    it('counts rating edits as encrypted when the question is locked or baseline ratings are encrypted', () => {
+      const currentSlice = buildEmptySlice();
+      const isQuestionLockedForResponse = vi.fn((qid: string) => qid === 'Q1');
+      const buildRatingEnvelopeQidSetFromUserAnswers = vi.fn(() => new Set(['q2']));
+
+      const stats = computePendingEditStats(
+        {
+          idx: 5,
+          currentSlice,
+          userAnswers: { responses: true },
+          existingCache: null,
+          diffCacheRef: {},
+          questionPool: {},
+          pileQuestions: {},
+          questionId: 'q1',
+        },
+        {
+          getChangedQidsAndFields: vi.fn(() => ({
+            changedQids: new Set(['Q1', ' Q2 ']),
+            changedMap: {
+              Q1: { importance: 1 },
+              ' Q2 ': { conviction: 1 },
+            },
+          })),
+          isQuestionLockedForResponse,
+          buildRatingEnvelopeQidSetFromUserAnswers,
+        },
+      );
+
+      expect(stats.result).toEqual({ total: 2, encrypted: 2 });
+      expect(isQuestionLockedForResponse).toHaveBeenCalledTimes(2);
+      expect(buildRatingEnvelopeQidSetFromUserAnswers).toHaveBeenCalledWith({ responses: true });
+    });
+
+    it('returns zero stats for an empty changed set without building rating envelopes', () => {
+      const buildRatingEnvelopeQidSetFromUserAnswers = vi.fn(() => new Set(['q1']));
+      const isQuestionLockedForResponse = vi.fn(() => false);
+
+      const stats = computePendingEditStats(
+        {
+          idx: 6,
+          currentSlice: buildEmptySlice(),
+          userAnswers: {},
+          existingCache: null,
+          diffCacheRef: {},
+          questionPool: {},
+          pileQuestions: {},
+          questionId: null,
+        },
+        {
+          getChangedQidsAndFields: vi.fn(() => ({
+            changedQids: new Set<string>(),
+            changedMap: {},
+          })),
+          isQuestionLockedForResponse,
+          buildRatingEnvelopeQidSetFromUserAnswers,
+        },
+      );
+
+      expect(stats.result).toEqual({ total: 0, encrypted: 0 });
+      expect(buildRatingEnvelopeQidSetFromUserAnswers).not.toHaveBeenCalled();
+      expect(isQuestionLockedForResponse).not.toHaveBeenCalled();
     });
   });
 
