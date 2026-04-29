@@ -2,11 +2,9 @@ import {
   buildAdditionalUpdatePlan,
   buildAnswerUpdatePlan,
   resolveFieldEncryptionDefaults,
-  type MutationDeps,
-  type ResponseFieldState,
 } from './surveyToolResponseMutationController';
 
-const defaultDeps = (overrides: Partial<MutationDeps> = {}): MutationDeps => ({
+const defaultDeps = (overrides: Partial<any> = {}) => ({
   buildEmptyResponseFieldState: (qid: string, fieldKey = 'answer') => ({
     value: '',
     encrypted: false,
@@ -20,13 +18,13 @@ const defaultDeps = (overrides: Partial<MutationDeps> = {}): MutationDeps => ({
   resolveFieldEncryptionGateId: () => null,
   isQuestionLockedForResponse: () => false,
   getEffectiveRecipientsForQid: () => [],
-  normalizeFieldAudienceMode: (_val: unknown, _fk: string, _f: ResponseFieldState) => 'inherit',
-  buildInheritedAdditionalFieldState: (add: ResponseFieldState, ans: ResponseFieldState) => ({
+  normalizeFieldAudienceMode: (_val: any, _fk: string, _f: any) => 'inherit',
+  buildInheritedAdditionalFieldState: (add: any, ans: any) => ({
     ...add,
     encrypted: !!ans?.encrypted,
     audienceMode: 'inherit',
   }),
-  valuesEqual: (a: unknown, b: unknown) => a === b,
+  valuesEqual: (a: any, b: any) => a === b,
   getQuestionById: () => ({ type: 'freeform' }),
   computeHash: (val: string) => `hash-${val}`,
   ...overrides,
@@ -80,54 +78,6 @@ describe('surveyToolResponseMutationController', () => {
       expect(result.nextEncrypted).toBe(true);
       expect(result.resolvedAudience).toBe('gate');
       expect(result.resolvedGateId).toBe('gate-1');
-    });
-
-    it('upgrades untouched plain self defaults when recipients resolve later', () => {
-      const result = resolveFieldEncryptionDefaults(
-        {
-          value: '',
-          encrypted: false,
-          encryptionAudience: 'self',
-          encryptionGateId: null,
-          encryptedPortion: '',
-          hash: '',
-        },
-        'q1',
-        'answer',
-        defaultDeps({
-          getEffectiveRecipientsForQid: () => ['addr1'],
-          resolveFieldEncryptionGateId: () => 'gate-1',
-          resolveFieldEncryptionAudience: () => 'self',
-        }),
-      );
-
-      expect(result.nextEncrypted).toBe(true);
-      expect(result.resolvedAudience).toBe('gate');
-      expect(result.resolvedGateId).toBe('gate-1');
-    });
-
-    it('preserves explicit self encryption when recipients resolve later', () => {
-      const result = resolveFieldEncryptionDefaults(
-        {
-          value: '',
-          encrypted: true,
-          encryptionAudience: 'self',
-          encryptionGateId: null,
-          encryptedPortion: '',
-          hash: '',
-        },
-        'q1',
-        'answer',
-        defaultDeps({
-          getEffectiveRecipientsForQid: () => ['addr1'],
-          resolveFieldEncryptionGateId: () => 'gate-1',
-          resolveFieldEncryptionAudience: () => 'self',
-        }),
-      );
-
-      expect(result.nextEncrypted).toBe(true);
-      expect(result.resolvedAudience).toBe('self');
-      expect(result.resolvedGateId).toBeNull();
     });
   });
 

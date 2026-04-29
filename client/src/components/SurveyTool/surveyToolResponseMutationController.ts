@@ -1,36 +1,30 @@
-import type { UnknownRecord } from './surveyToolTypes';
-
 export interface ResponseFieldState {
-  value?: unknown;
+  value?: any;
   encrypted?: boolean;
   encryptionAudience?: string;
   encryptionGateId?: string | null;
   audienceMode?: string;
   hash?: string;
   encryptedPortion?: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 export interface MutationDeps {
   buildEmptyResponseFieldState: (qid: string, fieldKey?: string) => ResponseFieldState;
-  resolveFieldEncryptionAudience: (field: ResponseFieldState, qid: string, fieldKey?: string) => string;
-  resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => string | null;
+  resolveFieldEncryptionAudience: (field: any, qid: string, fieldKey?: string) => string;
+  resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => string | null;
   isQuestionLockedForResponse: (qid: string) => boolean;
-  getEffectiveRecipientsForQid: (qid: string) => unknown[];
-  normalizeFieldAudienceMode: (value: unknown, fieldKey: string, field: ResponseFieldState) => string;
-  buildInheritedAdditionalFieldState: (
-    additionalField: ResponseFieldState,
-    answerField: ResponseFieldState,
-    qid: string | null,
-  ) => ResponseFieldState;
-  valuesEqual: (a: unknown, b: unknown) => boolean;
-  getQuestionById: (qid: string) => UnknownRecord | null | undefined;
+  getEffectiveRecipientsForQid: (qid: string) => any[];
+  normalizeFieldAudienceMode: (value: any, fieldKey: string, field: any) => string;
+  buildInheritedAdditionalFieldState: (additionalField: any, answerField: any, qid: string | null) => ResponseFieldState;
+  valuesEqual: (a: any, b: any) => boolean;
+  getQuestionById: (qid: string) => any;
   computeHash: (value: string) => string;
 }
 
 type MutationSourceSlice = {
-  answers: Record<string, ResponseFieldState>;
-  additionalComments: Record<string, ResponseFieldState>;
+  answers: Record<string, any>;
+  additionalComments: Record<string, any>;
 };
 
 export const resolveFieldEncryptionDefaults = (
@@ -52,16 +46,8 @@ export const resolveFieldEncryptionDefaults = (
 } => {
   const questionLocked = deps.isQuestionLockedForResponse(questionId);
   const previousAudience = deps.resolveFieldEncryptionAudience(prevFieldState, questionId, fieldKey);
-  const isUntouchedPlainSelfDefault =
-    previousAudience === 'self' &&
-    prevFieldState.encrypted === false &&
-    (prevFieldState.value === undefined || prevFieldState.value === null || String(prevFieldState.value).length === 0) &&
-    !prevFieldState.encryptedPortion &&
-    !prevFieldState.hash &&
-    !prevFieldState.encryptionGateId;
-  const effectivePreviousAudience = isUntouchedPlainSelfDefault ? '' : previousAudience;
   const hasExistingEncryptionState =
-    typeof prevFieldState.encrypted === 'boolean' && !!effectivePreviousAudience;
+    typeof prevFieldState.encrypted === 'boolean' && !!previousAudience;
   const autoEncrypt = questionLocked || (
     hasExistingEncryptionState
       ? false
@@ -70,14 +56,14 @@ export const resolveFieldEncryptionDefaults = (
   const defaultAudience = autoEncrypt ? 'gate' : 'self';
   const resolvedAudience = questionLocked
     ? 'gate'
-    : (effectivePreviousAudience || defaultAudience);
+    : (previousAudience || defaultAudience);
   const resolvedGateId = (questionLocked || resolvedAudience === 'gate')
     ? deps.resolveFieldEncryptionGateId(prevFieldState, questionId, fieldKey)
     : null;
   const nextEncrypted = questionLocked
     ? true
-    : (hasExistingEncryptionState
-      ? !!prevFieldState.encrypted
+    : (typeof prevFieldState.encrypted === 'boolean'
+      ? prevFieldState.encrypted
       : autoEncrypt);
 
   return {
@@ -96,7 +82,7 @@ export interface AnswerUpdatePlan {
 
 export const buildAnswerUpdatePlan = (
   questionId: string,
-  answer: unknown,
+  answer: any,
   sourceSlice: MutationSourceSlice,
   deps: MutationDeps,
 ): AnswerUpdatePlan => {
@@ -188,7 +174,7 @@ export interface AdditionalUpdatePlan {
 
 export const buildAdditionalUpdatePlan = (
   questionId: string,
-  additionalComments: unknown,
+  additionalComments: any,
   sourceSlice: MutationSourceSlice,
   deps: MutationDeps,
 ): AdditionalUpdatePlan => {
