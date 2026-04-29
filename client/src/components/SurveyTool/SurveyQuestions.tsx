@@ -135,7 +135,6 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
-import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
 import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
 import {
   buildQuestionRoutePath,
@@ -424,6 +423,19 @@ import {
   buildInheritedAdditionalFieldState as buildInheritedAdditionalFieldStateCore,
   normalizeGateLabelText as normalizeGateLabelTextCore,
 } from './surveyToolAudienceDerivationController';
+import {
+  buildRecipientsFromGates as buildRecipientsFromGatesController,
+  buildGateAudienceSbtItems as buildGateAudienceSbtItemsController,
+  getQuestionGateOptions as getQuestionGateOptionsController,
+  getResponseGateOptions as getResponseGateOptionsController,
+  getResponseGateOptionById as getResponseGateOptionByIdController,
+  resolveFieldEncryptionGateId as resolveFieldEncryptionGateIdController,
+  getEffectiveRecipientsForField as getEffectiveRecipientsForFieldController,
+  resolveGatedPromptGateNames as resolveGatedPromptGateNamesController,
+  resolveGateDisplayLabel as resolveGateDisplayLabelController,
+  resolveConfiguredGateLabel as resolveConfiguredGateLabelController,
+  resolveLockAudienceSessionName as resolveLockAudienceSessionNameController,
+} from './surveyToolResponseGateController';
 import {
   buildEncryptionTogglePlan,
   buildAnswerAudienceSelectionPlan,
@@ -7256,16 +7268,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   buildGateAudienceSbtItems = (sbtAddresses = [], sessionSlug = '') => (
-    Array.from(new Set(
-      (Array.isArray(sbtAddresses) ? sbtAddresses : [])
-        .map((addr) => String(addr || '').trim())
-        .filter(Boolean)
-    )).map((address) => ({
-      address,
-      label: this.resolveSbtGateLabel(address) || getShortenedAddress(address, false),
-      meta: getShortenedAddress(address, false),
-      href: buildSbtDetailPath(address, sessionSlug),
-    }))
+    buildGateAudienceSbtItemsController(sbtAddresses, sessionSlug, {
+      resolveSbtGateLabel: (address) => this.resolveSbtGateLabel(address),
+      getShortenedAddress,
+      buildSbtDetailPath,
+    })
   );
 
   getQuestionEncryptionGates = (question) => getQuestionEncryptionGatesCore(question);
@@ -7273,134 +7280,56 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   normalizeFieldAudienceMode = (value, fieldKey = 'answer', field = {}) =>
     normalizeFieldAudienceModeCore(value, fieldKey, field, hasMeaningfulFieldValue);
 
-  getQuestionGateOptions = (questionId) => {
-    const qid = normalizeQuestionIdKey(questionId);
-    if (!qid) return [];
-    const question = this.getQuestionById(qid);
-    const gates = this.getQuestionEncryptionGates(question);
-    if (!gates.length) return [];
+  getQuestionGateOptions = (questionId) => (
+    getQuestionGateOptionsController(questionId, {
+      getQuestionById: (qid) => this.getQuestionById(qid),
+      getQuestionEncryptionGates: (question) => this.getQuestionEncryptionGates(question),
+      buildRecipientsFromGates: (gates) => this.buildRecipientsFromGates(gates),
+      normalizeGateLabelText: (value) => this.normalizeGateLabelText(value),
+      resolveConfiguredGateLabel: (opts = {}) => this.resolveConfiguredGateLabel(opts),
+      resolveGateDisplayLabel: (gate = {}, fallbackSbt = '') => this.resolveGateDisplayLabel(gate, fallbackSbt),
+      buildGateAudienceSbtItems: (sbtAddresses = [], sessionSlug = '') => this.buildGateAudienceSbtItems(sbtAddresses, sessionSlug),
+      resolveSbtGateLabel: (address) => this.resolveSbtGateLabel(address),
+      getShortenedAddress,
+      normalizeQuestionIdKey,
+    })
+  );
 
-    const out = [];
-    const dedupe = new Set();
-    gates.forEach((gate, gateIndex) => {
-      const recipients = this.buildRecipientsFromGates([gate]);
-      if (!Array.isArray(recipients) || recipients.length === 0) return;
+  getResponseGateOptions = (questionId = null) => (
+    getResponseGateOptionsController(questionId, {
+      normalizeQuestionIdKey,
+      isQuestionLockedForResponse: (qid) => this.isQuestionLockedForResponse(qid),
+      getQuestionGateOptions: (qid = null) => this.getQuestionGateOptions(qid),
+      getResponseGatePolicy: () => this.getResponseGatePolicy(),
+      buildRecipientsFromGates: (gates) => this.buildRecipientsFromGates(gates),
+      resolveLockAudienceSessionName: () => this.resolveLockAudienceSessionName(),
+      resolveConfiguredGateLabel: (opts = {}) => this.resolveConfiguredGateLabel(opts),
+      resolveGateDisplayLabel: (gate = {}, fallbackSbt = '') => this.resolveGateDisplayLabel(gate, fallbackSbt),
+      buildGateAudienceSbtItems: (sbtAddresses = [], sessionSlug = '') => this.buildGateAudienceSbtItems(sbtAddresses, sessionSlug),
+      resolveSbtGateLabel: (address) => this.resolveSbtGateLabel(address),
+      getShortenedAddress,
+      t,
+      getEffectiveDraftSlug: typeof this._getEffectiveDraftSlug === 'function'
+        ? () => this._getEffectiveDraftSlug()
+        : null,
+      resolveEffectiveSlug: () => resolveEffectiveSlug(this.props),
+    })
+  );
 
-      const sbtAddresses = Array.from(new Set(
-        [
-          ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
-          gate?.sbtAddress,
-        ]
-          .map((addr) => String(addr || '').trim())
-          .filter(Boolean)
-      ));
-      const gateId = this.normalizeGateLabelText(gate?.gateId || gate?.id || '') || `question-gate-${gateIndex}`;
-      const dedupeKey = JSON.stringify({
-        gateId,
-        recipients,
-      });
-      if (dedupe.has(dedupeKey)) return;
-      dedupe.add(dedupeKey);
+  getResponseGateOptionById = (questionId = null, gateId = '') => (
+    getResponseGateOptionByIdController(questionId, gateId, {
+      normalizeGateLabelText: (value) => this.normalizeGateLabelText(value),
+      getResponseGateOptions: (qid = null) => this.getResponseGateOptions(qid),
+    })
+  );
 
-      const label = this.resolveConfiguredGateLabel({
-        gate,
-        resourceKey: gate?.resourceKey || '',
-        sbtAddresses,
-      }) || this.resolveGateDisplayLabel(gate, sbtAddresses[0] || '');
-      out.push({
-        gateId,
-        label: label || `Question gate ${gateIndex + 1}`,
-        sbtAddresses,
-        sbtItems: this.buildGateAudienceSbtItems(sbtAddresses, question?.sessionSlug || ''),
-        sbtSummary: sbtAddresses.length > 0
-          ? sbtAddresses
-            .map((addr) => this.resolveSbtGateLabel(addr) || getShortenedAddress(addr, false))
-            .join(', ')
-          : 'none',
-        recipients,
-      });
-    });
-    return out;
-  };
-
-  getResponseGateOptions = (questionId = null) => {
-    const qid = normalizeQuestionIdKey(questionId);
-    if (qid && this.isQuestionLockedForResponse(qid)) {
-      return this.getQuestionGateOptions(qid);
-    }
-
-    const policy = this.getResponseGatePolicy();
-    const gates = Array.isArray(policy?.gates) ? policy.gates : [];
-    const recipients = Array.isArray(policy?.recipients) ? policy.recipients : [];
-    if (!gates.length) return [];
-    const sessionLabel = this.resolveLockAudienceSessionName();
-
-    const responseGateSessionSlug = this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : resolveEffectiveSlug(this.props);
-    const out = [];
-    const dedupe = new Set();
-    gates.forEach((gate, gateIndex) => {
-      const gateRecipients = recipients[gateIndex]
-        ? [recipients[gateIndex]]
-        : this.buildRecipientsFromGates([gate]);
-      if (!Array.isArray(gateRecipients) || gateRecipients.length === 0) return;
-
-      const sbtAddresses = Array.from(new Set(
-        [
-          ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
-          gate?.sbtAddress,
-        ]
-          .map((addr) => String(addr || '').trim())
-          .filter(Boolean)
-      ));
-      const gateId = this.normalizeGateLabelText(gate?.gateId || gate?.id || gate?.resourceKey) || `gate-${gateIndex}`;
-      const dedupeKey = JSON.stringify({
-        gateId,
-        recipients: gateRecipients,
-      });
-      if (dedupe.has(dedupeKey)) return;
-      dedupe.add(dedupeKey);
-
-      const configuredLabel = this.resolveConfiguredGateLabel({
-        gate,
-        resourceKey: gate?.resourceKey || '',
-        sbtAddresses,
-      }) || this.resolveGateDisplayLabel(gate, sbtAddresses[0] || '');
-      const label = sessionLabel || configuredLabel;
-
-      out.push({
-        gateId,
-        label: label || `${t('gate')} ${gateIndex + 1}`,
-        sbtAddresses,
-        sbtItems: this.buildGateAudienceSbtItems(sbtAddresses, responseGateSessionSlug || ''),
-        sbtSummary: sbtAddresses.length > 0
-          ? sbtAddresses
-            .map((addr) => this.resolveSbtGateLabel(addr) || getShortenedAddress(addr, false))
-            .join(', ')
-          : 'none',
-        recipients: gateRecipients,
-      });
-    });
-
-    return out;
-  };
-
-  getResponseGateOptionById = (questionId = null, gateId = '') => {
-    const normalizedGateId = this.normalizeGateLabelText(gateId);
-    const options = this.getResponseGateOptions(questionId);
-    if (!options.length) return null;
-    if (!normalizedGateId) return options[0];
-    return options.find((option) => option.gateId === normalizedGateId) || options[0];
-  };
-
-  resolveFieldEncryptionGateId = (field = {}, questionId = null, fieldKey = 'answer') => {
-    const qid = questionId ? String(questionId).toLowerCase() : '';
-    const audience = this.resolveFieldEncryptionAudience(field, qid || null, fieldKey);
-    if (audience !== 'gate') return null;
-
-    const explicitGateId = this.normalizeGateLabelText(field?.encryptionGateId || '');
-    const matchingOption = this.getResponseGateOptionById(qid || null, explicitGateId);
-    return matchingOption?.gateId || null;
-  };
+  resolveFieldEncryptionGateId = (field = {}, questionId = null, fieldKey = 'answer') => (
+    resolveFieldEncryptionGateIdController(field, questionId, fieldKey, {
+      resolveFieldEncryptionAudience: (nextField, qid, fk) => this.resolveFieldEncryptionAudience(nextField, qid, fk),
+      normalizeGateLabelText: (value) => this.normalizeGateLabelText(value),
+      getResponseGateOptionById: (qid = null, gateId = '') => this.getResponseGateOptionById(qid, gateId),
+    })
+  );
 
   buildInheritedAdditionalFieldState = (additionalField = {}, answerField = {}, questionId = null) =>
     buildInheritedAdditionalFieldStateCore(additionalField, answerField, questionId, {
@@ -7408,137 +7337,35 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       resolveFieldEncryptionGateId: (field, qid, fk) => this.resolveFieldEncryptionGateId(field, qid, fk),
     });
 
-  getEffectiveRecipientsForField = ({ questionId, fieldKey = 'answer', field = null } = {}) => {
-    const qid = normalizeQuestionIdKey(questionId);
-    if (!qid) return [];
-    if (this.isQuestionLockedForResponse(qid)) {
-      return this.getEffectiveRecipientsForQid(qid);
-    }
+  getEffectiveRecipientsForField = ({ questionId, fieldKey = 'answer', field = null } = {}) => (
+    getEffectiveRecipientsForFieldController({ questionId, fieldKey, field }, {
+      normalizeQuestionIdKey,
+      isQuestionLockedForResponse: (qid) => this.isQuestionLockedForResponse(qid),
+      getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
+      resolveFieldEncryptionAudience: (nextField, qid, fk) => this.resolveFieldEncryptionAudience(nextField, qid, fk),
+      resolveFieldEncryptionGateId: (nextField, qid, fk) => this.resolveFieldEncryptionGateId(nextField, qid, fk),
+      getResponseGateOptionById: (qid = null, gateId = '') => this.getResponseGateOptionById(qid, gateId),
+    })
+  );
 
-    const audience = this.resolveFieldEncryptionAudience(field || {}, qid, fieldKey);
-    if (audience !== 'gate') return [];
+  resolveGatedPromptGateNames = (question) => (
+    resolveGatedPromptGateNamesController(question, {
+      normalizeGateLabelText: (value) => this.normalizeGateLabelText(value),
+      resolveGateDisplayLabel: (gate = {}, fallbackSbt = '') => this.resolveGateDisplayLabel(gate, fallbackSbt),
+      getQuestionEncryptionGates: (nextQuestion) => this.getQuestionEncryptionGates(nextQuestion),
+      getEffectiveDraftSlug: typeof this._getEffectiveDraftSlug === 'function'
+        ? () => this._getEffectiveDraftSlug()
+        : null,
+      resolveEffectiveSlug: () => resolveEffectiveSlug(this.props),
+      resolveEffectiveResponseGateConfig: (slug) => this.resolveEffectiveResponseGateConfig(slug),
+    })
+  );
 
-    const gateId = this.resolveFieldEncryptionGateId(field || {}, qid, fieldKey);
-    const gateOption = this.getResponseGateOptionById(qid, gateId);
-    if (gateOption?.recipients?.length) return gateOption.recipients;
-
-    return this.getEffectiveRecipientsForQid(qid);
-  };
-
-  resolveGatedPromptGateNames = (question) => {
-    const normalize = (value) => this.normalizeGateLabelText(value);
-    const readGateNames = (gateList) => {
-      const names = Array.from(new Set(
-        (Array.isArray(gateList) ? gateList : [])
-          .map((gate) => {
-            if (!gate || typeof gate !== 'object') return '';
-            const sbtAddresses = Array.from(new Set(
-              [
-                ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
-                gate.sbtAddress,
-              ]
-                .map((addr) => String(addr || '').trim())
-                .filter(Boolean)
-            ));
-            const label = this.resolveGateDisplayLabel(gate, sbtAddresses[0] || '');
-            return normalize(label);
-          })
-          .filter((label) => label && label !== 'default gate')
-      ));
-      return names;
-    };
-
-    const fromQuestion = readGateNames(this.getQuestionEncryptionGates(question));
-    if (fromQuestion.length) return fromQuestion;
-
-    const slug = this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : resolveEffectiveSlug(this.props);
-    const cfg = this.resolveEffectiveResponseGateConfig(slug);
-
-    const defaultGateSBTs = Array.isArray(cfg?.defaultGateSBTs) ? cfg.defaultGateSBTs : [];
-    const fromDefaultGateSBTs = Array.from(new Set(
-      defaultGateSBTs
-        .map((entry) => {
-          if (typeof entry === 'string') return normalize(entry);
-          if (!entry || typeof entry !== 'object') return '';
-          return normalize(entry.name || entry.label || entry.title || entry.address);
-        })
-        .filter(Boolean)
-    ));
-    if (fromDefaultGateSBTs.length) return fromDefaultGateSBTs;
-
-    const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-    const encryptionGateMap = isPlainObject(cfg?.encryption?.gates) ? cfg.encryption.gates : null;
-    const sponsoredGateMap = isPlainObject(cfg?.sponsored?.gates) ? cfg.sponsored.gates : null;
-    const gateMap = (encryptionGateMap && Object.keys(encryptionGateMap).length)
-      ? encryptionGateMap
-      : (sponsoredGateMap && Object.keys(sponsoredGateMap).length ? sponsoredGateMap : null);
-    const gateIds = gateMap ? Object.keys(gateMap).filter(Boolean).sort() : [];
-
-    const candidateDefaults = [
-      cfg?.lit?.defaultGateId,
-      cfg?.encryption?.defaultGateId,
-      cfg?.encryption?.primaryGateId,
-      cfg?.sponsored?.defaultGateId,
-      gateIds[0],
-    ]
-      .map((val) => (typeof val === 'string' ? val.trim() : ''))
-      .filter(Boolean);
-    const defaultGateId = candidateDefaults.find((gateId) => gateIds.includes(gateId)) || (gateIds[0] || '');
-
-    if (defaultGateId && gateMap?.[defaultGateId] && typeof gateMap[defaultGateId] === 'object') {
-      const gate = gateMap[defaultGateId];
-      const fallbackLabel = normalize(gate?.label || gate?.name || gate?.title || defaultGateId);
-      const resolvedLabel = normalize(this.resolveGateDisplayLabel({ ...gate, gateId: defaultGateId }, ''));
-      const best = resolvedLabel && resolvedLabel !== 'default gate' ? resolvedLabel : fallbackLabel;
-      if (best && best !== 'default gate') return [best];
-    }
-
-    const legacyGate = cfg?.encryption?.gate;
-    const fromLegacy = readGateNames(
-      legacyGate && typeof legacyGate === 'object' && !Array.isArray(legacyGate) ? [legacyGate] : []
-    );
-    if (fromLegacy.length) return fromLegacy;
-
-    return [];
-  };
-
-  buildRecipientsFromGates = (gates = []) => {
-    const list = Array.isArray(gates) ? gates : [];
-    const out = [];
-    const dedupe = new Set();
-    list.forEach((gate) => {
-      if (!gate || typeof gate !== 'object') return;
-      const chainId = Number(
-        gate.chainId ||
-        this.resolveSessionChainId()
-      ) || null;
-      const chain = resolveLitChain({ chainId, litChain: gate.litChain, chain: gate.chain });
-      const sbtAddresses = Array.from(new Set(
-        [
-          ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
-          gate.sbtAddress,
-        ]
-          .map((addr) => String(addr || '').trim())
-          .filter(Boolean)
-      ));
-      if (!sbtAddresses.length) return;
-
-      const accessControlConditions = buildSbtAccessControlConditions({
-        sbtAddresses,
-        chainId,
-        litChain: chain,
-        mode: gate.mode || 'any',
-      });
-      if (!accessControlConditions) return;
-
-      const recipient = { accessControlConditions, chain };
-      const sig = JSON.stringify(recipient);
-      if (dedupe.has(sig)) return;
-      dedupe.add(sig);
-      out.push(recipient);
-    });
-    return out;
-  };
+  buildRecipientsFromGates = (gates = []) => (
+    buildRecipientsFromGatesController(gates, {
+      resolveSessionChainId: () => this.resolveSessionChainId(),
+    })
+  );
 
   isQuestionLockedForResponse = (questionId) => {
     const q = this.getQuestionById(questionId);
@@ -7987,135 +7814,37 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     );
   };
 
-  resolveGateDisplayLabel = (gate = {}, fallbackSbt = '') => {
-    const readText = (value) => this.normalizeGateLabelText(value);
-    const readAny = (value) => {
-      if (typeof value === 'string') return readText(value);
-      if (!value || typeof value !== 'object') return '';
-      return (
-        readText(value.label) ||
-        readText(value.name) ||
-        readText(value.title) ||
-        readText(value.value) ||
-        readText(value.text) ||
-        readText(value.id) ||
-        readText(value.gateId)
-      );
-    };
+  resolveGateDisplayLabel = (gate = {}, fallbackSbt = '') => (
+    resolveGateDisplayLabelController(gate, fallbackSbt, {
+      normalizeGateLabelText: (value) => this.normalizeGateLabelText(value),
+      resolveSbtGateLabel: (address) => this.resolveSbtGateLabel(address),
+      getShortenedAddress,
+      t,
+    })
+  );
 
-    const label = (
-      readAny(gate?.label) ||
-      readAny(gate?.name) ||
-      readAny(gate?.title) ||
-      readText(gate?.gateId) ||
-      readText(gate?.id)
-    );
-    if (label) return label;
-    if (fallbackSbt) {
-      const sbtName = this.resolveSbtGateLabel(fallbackSbt);
-      return `${t('sbt')} ${sbtName || getShortenedAddress(fallbackSbt, false)}`;
-    }
-    return `default ${t('gateLower')}`;
-  };
+  resolveConfiguredGateLabel = ({ gate = {}, resourceKey = '', sbtAddresses = [] } = {}) => (
+    resolveConfiguredGateLabelController(
+      { gate, resourceKey, sbtAddresses },
+      this._responseGatePolicyCache?.cfg,
+      {
+        normalizeGateLabelText: (value) => this.normalizeGateLabelText(value),
+        resolveGateDisplayLabel: (configuredGate = {}, fallbackSbt = '') => (
+          this.resolveGateDisplayLabel(configuredGate, fallbackSbt)
+        ),
+      },
+    )
+  );
 
-  resolveConfiguredGateLabel = ({ gate = {}, resourceKey = '', sbtAddresses = [] } = {}) => {
-    const cfg = this._responseGatePolicyCache?.cfg || {};
-    const sponsored = (cfg?.sponsored && typeof cfg.sponsored === 'object') ? cfg.sponsored : {};
-    const resources = (sponsored?.resources && typeof sponsored.resources === 'object') ? sponsored.resources : {};
-    const gatesById = (sponsored?.gates && typeof sponsored.gates === 'object') ? sponsored.gates : {};
-
-    const selectedResource = (resources?.[resourceKey] && typeof resources[resourceKey] === 'object')
-      ? resources[resourceKey]
-      : null;
-    const defaultResource = (resources?.default && typeof resources.default === 'object')
-      ? resources.default
-      : null;
-
-    const resourceGateIds = Array.isArray(selectedResource?.gateIds)
-      ? selectedResource.gateIds.map((value) => this.normalizeGateLabelText(value)).filter(Boolean)
-      : [];
-    if (resourceGateIds.length > 1) {
-      const labels = resourceGateIds
-        .map((gateId) => {
-          const configuredGate = gatesById?.[gateId];
-          if (!configuredGate || typeof configuredGate !== 'object') return '';
-          return this.resolveGateDisplayLabel(configuredGate, sbtAddresses[0] || '');
-        })
-        .map((label) => this.normalizeGateLabelText(label))
-        .filter((label) => label && label !== 'default gate');
-      if (labels.length) return labels.join(' + ');
-      return resourceGateIds.join(' + ');
-    }
-
-    const candidateGateIds = [
-      selectedResource?.gateId,
-      gate?.gateId,
-      gate?.id,
-      sponsored?.defaultGateId,
-      defaultResource?.gateId,
-    ].map((value) => this.normalizeGateLabelText(value)).filter(Boolean);
-
-    for (const gateId of candidateGateIds) {
-      const configuredGate = gatesById?.[gateId];
-      if (!configuredGate || typeof configuredGate !== 'object') continue;
-      const label = this.resolveGateDisplayLabel(configuredGate, sbtAddresses[0] || '');
-      if (label && label !== 'default gate') return label;
-    }
-
-    const targetSbtKey = Array.from(new Set(
-      (Array.isArray(sbtAddresses) ? sbtAddresses : [])
-        .map((addr) => String(addr || '').toLowerCase())
-        .filter(Boolean)
-    )).sort().join('|');
-
-    if (targetSbtKey) {
-      const configuredGates = Object.values(gatesById || {});
-      for (const configuredGate of configuredGates) {
-        if (!configuredGate || typeof configuredGate !== 'object') continue;
-        const configuredSbtKey = Array.from(new Set(
-          [
-            ...(Array.isArray(configuredGate.sbtAddresses) ? configuredGate.sbtAddresses : []),
-            configuredGate.sbtAddress,
-          ]
-            .map((addr) => String(addr || '').toLowerCase())
-            .filter(Boolean)
-        )).sort().join('|');
-        if (!configuredSbtKey || configuredSbtKey !== targetSbtKey) continue;
-        const label = this.resolveGateDisplayLabel(configuredGate, sbtAddresses[0] || '');
-        if (label && label !== 'default gate') return label;
-      }
-    }
-
-    return '';
-  };
-
-  resolveLockAudienceSessionName = () => {
-    const fromProps = this.normalizeGateLabelText(this.props.sessionName);
-    if (fromProps) return fromProps;
-
-    const fromPolicyCfg = this.normalizeGateLabelText(this._responseGatePolicyCache?.cfg?.sessionName);
-    if (fromPolicyCfg) return fromPolicyCfg;
-
-    try {
-      const isQuestionResponseFlow = !!(this.props.singleQuestionMode || this.props.isStandalone);
-      const slug = isQuestionResponseFlow
-        ? resolveSlugForIds({
-            questionId: this.props.singleQuestionMode ? this.props.questionID : null,
-            props: this.props,
-            network: this.props.network,
-          })
-        : resolveSlugForIds({
-            surveyId: this.props.surveyId,
-            props: this.props,
-            network: this.props.network,
-          });
-      const lockAudienceContext = resolveLockAudienceSessionNameContext(slug);
-      const fromCfg = this.normalizeGateLabelText(lockAudienceContext.sessionName);
-      if (fromCfg) return fromCfg;
-    } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-    return 'session';
-  };
+  resolveLockAudienceSessionName = () => (
+    resolveLockAudienceSessionNameController({
+      normalizeGateLabelText: (value) => this.normalizeGateLabelText(value),
+      props: this.props,
+      responseGatePolicyCacheCfg: this._responseGatePolicyCache?.cfg,
+      resolveSlugForIds,
+      resolveLockAudienceSessionNameContext,
+    })
+  );
 
   resolveQuestionGateOption = (questionId = null) => {
     const gateDetails = this.getResponseGateOptions(questionId);
