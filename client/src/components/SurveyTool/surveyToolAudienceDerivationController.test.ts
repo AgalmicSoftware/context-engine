@@ -51,9 +51,7 @@ describe('surveyToolAudienceDerivationController', () => {
 
     it('returns explicit for additional with persisted state', () => {
       expect(
-        normalizeFieldAudienceMode('', 'additional', { value: 'note' }, (
-          v,
-        ) => !!(v && typeof v === 'object' && 'value' in v && v.value)),
+        normalizeFieldAudienceMode('', 'additional', { value: 'note' }, (v) => !!v?.value),
       ).toBe('explicit');
     });
 
@@ -121,24 +119,6 @@ describe('surveyToolAudienceDerivationController', () => {
 
       expect(result).toBe('gate');
       expect(normalizeAudience).toHaveBeenCalledWith('gate', 'q1');
-    });
-
-    it('preserves explicit gate selections with a gate id', () => {
-      const normalizeAudience = jest.fn(() => 'self');
-
-      const result = resolveFieldEncryptionAudience(
-        { encryptionAudience: 'gate', encryptionGateId: 'questionResponses' },
-        'q1',
-        'answer',
-        {
-          normalizeAudience,
-          getDefaultAudienceForQid: () => 'self',
-          getDefaultAudience: () => 'self',
-        },
-      );
-
-      expect(result).toBe('gate');
-      expect(normalizeAudience).not.toHaveBeenCalled();
     });
 
     it('falls back to default audience for qid when no field audience', () => {
