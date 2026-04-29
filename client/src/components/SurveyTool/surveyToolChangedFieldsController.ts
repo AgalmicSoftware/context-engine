@@ -24,6 +24,7 @@ export const pickBestField = (
 ): Record<string, any> => {
   const matchingKeys = getMatchingKeys(source, indexed, qidLower);
   if (matchingKeys.length === 0) return {};
+  if (!source) return {};
 
   let exactValue: Record<string, any> | undefined;
   let firstMeaningfulValue: Record<string, any> | undefined;
@@ -62,6 +63,7 @@ export const pickBestNumber = (
 ): number | null => {
   const matchingKeys = getMatchingKeys(source, indexed, qidLower);
   if (matchingKeys.length === 0) return null;
+  if (!source) return null;
   const toNum = (v: any) => (
     v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v)
   );
