@@ -371,6 +371,13 @@ import {
   executeSurveyStartFresh,
   shouldSurveyAutoStartFresh,
 } from './surveyToolResponseResetController';
+import {
+  executeOwnSingleQuestionResponseBootstrap,
+  executeViewedSingleQuestionResponseBootstrap,
+  readFreshSingleQuestionCachedResponderResponse,
+  readSingleQuestionCachedResponderResponse,
+  writeSingleQuestionResponseToCache,
+} from './surveyToolSingleQuestionController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -5831,353 +5838,117 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       }),
       async () => {
         if (isStaleRun()) return;
-        // Helper to write-through response into cache
-        const writeRespToCache = async (responder, respObj) => {
-          if (!responder || !respObj) return;
-          const addr = String(responder).toLowerCase();
+        const writeRespToCache = async (responder, respObj) => writeSingleQuestionResponseToCache({
+          responder,
+          respObj,
+          questionId,
+          effectiveSingleSlug,
+          netIdStr,
+          readQuestionsCacheAsync,
+          ensureQuestionsNet,
+          writeQuestionsCache,
+        });
 
-          // Re-read after await boundaries to avoid stale cache overwrite.
-          let currentCache = ensureQuestionsNet(
-            await readQuestionsCacheAsync(effectiveSingleSlug),
-            netIdStr
-          );
+        const readCachedResponderResponse = (responder) => readSingleQuestionCachedResponderResponse({
+          responder,
+          questionId,
+          netIdStr,
+          questionsCache,
+          cloneValue: this.deepClone,
+        });
 
-          // ensure scaffolding
-          currentCache[netIdStr] = currentCache[netIdStr] || {};
-          currentCache[netIdStr].questionResponses = currentCache[netIdStr].questionResponses || {};
-          currentCache[netIdStr].questionResponses[questionId] =
-            currentCache[netIdStr].questionResponses[questionId] || {};
-          currentCache[netIdStr].questionResponsesMeta = currentCache[netIdStr].questionResponsesMeta || {};
-          currentCache[netIdStr].questionResponsesMeta[questionId] =
-            currentCache[netIdStr].questionResponsesMeta[questionId] || {};
-
-          // Recency guard
-          const prev = currentCache[netIdStr].questionResponsesMeta[questionId][addr] || { bn: 0, txi: 0, li: 0, ts: 0 };
-          const prevBn = Number(prev?.bn ?? prev?.blockNumber ?? 0) || 0;
-          const prevTxi = Number(prev?.txi ?? prev?.transactionIndex ?? prev?.txIndex ?? 0) || 0;
-          const prevLi = Number(prev?.li ?? prev?.logIndex ?? 0) || 0;
-          const prevTs = Number(prev?.ts ?? prev?.timestamp ?? 0) || 0;
-          const bn = Number(respObj?.blockNumber ?? respObj?.bn ?? 0) || 0;
-          const txi = Number(respObj?.transactionIndex ?? respObj?.txIndex ?? respObj?.txi ?? 0) || 0;
-          const li = Number(respObj?.logIndex ?? respObj?.li ?? 0) || 0;
-          const ts = Number(respObj?.timestamp ?? respObj?.ts ?? 0) || 0;
-          const isStaleResponse =
-            bn < prevBn ||
-            (
-              bn === prevBn &&
-              (
-                txi < prevTxi ||
-                (
-                  txi === prevTxi &&
-                  (
-                    li < prevLi ||
-                    (
-                      li === prevLi &&
-                      ts <= prevTs
-                    )
-                  )
-                )
-              )
-            );
-          if (isStaleResponse) return;
-
-          currentCache[netIdStr].questionResponses[questionId][addr] = respObj;
-          currentCache[netIdStr].questionResponsesMeta[questionId][addr] = { bn, txi, li, ts };
-
-          await writeQuestionsCache(effectiveSingleSlug, currentCache);
-        };
-
-        const readCachedResponderResponse = (responder) => {
-          const addr = String(responder || '').toLowerCase();
-          if (!addr) return null;
-          const cached =
-            questionsCache?.[netIdStr]?.questionResponses?.[questionId]?.[addr] || null;
-          if (!cached || typeof cached !== 'object') return null;
-          return this.deepClone(cached);
-        };
-
-        const readFreshCachedResponderResponse = async (responder) => {
-          const addr = String(responder || '').toLowerCase();
-          if (!addr) return null;
-
-          let freshCache = null;
-          try {
-            freshCache = await readQuestionsCacheAsync(effectiveSingleSlug);
-          } catch (_) {
-            freshCache = null;
-          }
-          if (!freshCache || typeof freshCache !== 'object') return null;
-
-          const netCandidates = [];
-          if (netIdStr) netCandidates.push(String(netIdStr));
-          Object.keys(freshCache).forEach((candidateNetId) => {
-            const normalizedNetId = String(candidateNetId || '').trim();
-            if (!normalizedNetId || netCandidates.includes(normalizedNetId)) return;
-            netCandidates.push(normalizedNetId);
-          });
-
-          for (const candidateNetId of netCandidates) {
-            const cached =
-              freshCache?.[candidateNetId]?.questionResponses?.[questionId]?.[addr] || null;
-            if (!cached || typeof cached !== 'object') continue;
-            questionsCache = ensureQuestionsNet(freshCache, netIdStr || candidateNetId);
-            return this.deepClone(cached);
-          }
-          return null;
-        };
+        const readFreshCachedResponderResponse = async (responder) => (
+          readFreshSingleQuestionCachedResponderResponse({
+            responder,
+            questionId,
+            netIdStr,
+            effectiveSingleSlug,
+            readQuestionsCacheAsync,
+            ensureQuestionsNet,
+            cloneValue: this.deepClone,
+            updateQuestionsCache: (nextCache) => {
+              questionsCache = nextCache;
+            },
+          })
+        );
 
         // Fetch latest response for the appropriate address, scoped to this slug
         if (responderAddress) {
-          this.updateSingleQuestionDebug({
-            phase: 'responder-fetch-start',
-            runId,
+          const viewedBootstrapResult = await executeViewedSingleQuestionResponseBootstrap({
+            props: this.props,
+            state: this.state,
             questionId,
-            effectiveSingleSlug: String(effectiveSingleSlug || ''),
-            responderAddress: String(responderAddress || '').toLowerCase(),
+            responderAddress,
+            effectiveSingleSlug,
             bootstrapRetryAttempt,
-          });
-          safeSetState({ isLoadingResponse: true, responseLookupWarning: '' });
-          let latest = null;
-          let latestFromCache = false;
-          let latestCacheSource = '';
-          let responseHash = null;
-          let responseFetchFailed = false;
-          try {
-            latest = await contractScripts.getResponse(
-              this.props.provider,
-              responderAddress,
-              questionId,
-              effectiveSingleSlug,
-              { forceArweaveFetch: bootstrapRetryAttempt > 0 }
-            );
-          } catch (_) {
-            latest = null;
-            responseFetchFailed = true;
-          }
-          if (!latest) {
-            const cachedLatest = readCachedResponderResponse(responderAddress);
-            if (cachedLatest) {
-              latest = cachedLatest;
-              latestFromCache = true;
-              latestCacheSource = 'snapshot';
-            }
-          }
-          if (!latest) {
-            const freshCachedLatest = await readFreshCachedResponderResponse(responderAddress);
-            if (freshCachedLatest) {
-              latest = freshCachedLatest;
-              latestFromCache = true;
-              latestCacheSource = 'persistent';
-            }
-          }
-          if (!latest) {
-            try {
-              responseHash = await contractScripts.getResponseHash(
-                this.props.provider,
-                responderAddress,
-                questionId,
-                effectiveSingleSlug
-              );
-            } catch (_) {
-              responseHash = null;
-              responseFetchFailed = true;
-            }
-          }
-          if (isStaleRun()) return;
-
-          if (latest) {
-            const normalizedLatest = this.normalizeSingleQuestionViewedResponse(latest);
-            if (!normalizedLatest) {
-              this.clearSingleQuestionBootstrapRetry();
-              const malformedWarning = `Response payload for this question could not be rendered for ${String(responderAddress || '').toLowerCase()}.`;
-              this.updateSingleQuestionDebug({
-                phase: 'responder-malformed-response',
-                runId,
-                questionId,
-                effectiveSingleSlug: String(effectiveSingleSlug || ''),
-                responderAddress: String(responderAddress || '').toLowerCase(),
-                latestFromCache,
-              });
-              safeSetState({
-                viewAddressAnswers: '',
-                parsedViewAddressAnswers: null,
-                noResponse: true,
-                responseLookupWarning: malformedWarning,
-                isLoadingResponse: false,
-              });
-              return;
-            }
-            latest = normalizedLatest;
-            this.clearSingleQuestionBootstrapRetry();
-            if (!latestFromCache) {
-              await writeRespToCache(responderAddress, latest);
-            }
-            this.updateSingleQuestionDebug({
-                phase: 'responder-response-loaded',
-                runId,
-                questionId,
-                effectiveSingleSlug: String(effectiveSingleSlug || ''),
-                responderAddress: String(responderAddress || '').toLowerCase(),
-                latestFromCache,
-                latestCacheSource: latestCacheSource || null,
-                responseHash: String(latest?.arweaveTxId || responseHash || ''),
-              });
-            safeSetState((prev) => {
-              const merged = mergeDecryptedViewedResponse(prev.parsedViewAddressAnswers, latest);
-              return {
-                viewAddressAnswers: JSON.stringify(merged),
-                parsedViewAddressAnswers: merged,
-                noResponse: false,
-                responseLookupWarning: '',
-              };
-            });
-          } else if (responseHash) {
-            const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry({
-              questionId,
-              attempt: bootstrapRetryAttempt,
-              reason: responseFetchFailed
-                ? 'response-payload-fetch-failed'
-                : 'response-payload-pending',
-            });
-            this.updateSingleQuestionDebug({
-              phase: didScheduleRetry
-                ? 'responder-hash-no-payload-retrying'
-                : 'responder-hash-no-payload-exhausted',
-              runId,
-              questionId,
-              effectiveSingleSlug: String(effectiveSingleSlug || ''),
-              responderAddress: String(responderAddress || '').toLowerCase(),
-              responseHash: String(responseHash || ''),
-              responseFetchFailed,
-              retryAttempt: bootstrapRetryAttempt,
-              didScheduleRetry: !!didScheduleRetry,
-            });
-            safeSetState({
-              viewAddressAnswers: '',
-              parsedViewAddressAnswers: null,
-              noResponse: false,
-              responseLookupWarning: '',
-            });
-            if (didScheduleRetry) {
-              safeSetState({ isLoadingResponse: true });
-              return;
-            }
-            this.clearSingleQuestionBootstrapRetry();
-            safeSetState({
-              viewAddressAnswers: '',
-              parsedViewAddressAnswers: null,
-              noResponse: true,
-              responseLookupWarning: '',
-            });
-          } else {
-            this.clearSingleQuestionBootstrapRetry();
-            this.updateSingleQuestionDebug({
-              phase: 'responder-no-response',
-              runId,
-              questionId,
-              effectiveSingleSlug: String(effectiveSingleSlug || ''),
-              responderAddress: String(responderAddress || '').toLowerCase(),
-              responseFetchFailed,
-            });
-            safeSetState({
-              viewAddressAnswers: '',
-              parsedViewAddressAnswers: null,
-              noResponse: true,
-              responseLookupWarning: '',
-            });
-          }
-
-          const isOwn =
-            this.props.account &&
-            this.props.responderAddress &&
-            this.props.account.toLowerCase() === this.props.responderAddress.toLowerCase();
-
-          if (isOwn && latest && !this.state.startFresh && !this.state.suppressPrefill) {
-            const hasEncrypted =
-              !!latest.answer?.encryptedPortion || !!latest.additional?.encryptedPortion ||
-              !!latest.answer?.encrypted || !!latest.additional?.encrypted;
-            safeSetState({
-              userHasResponse: true,
-              userResponseEncrypted: !!hasEncrypted,
-              userAnswers: latest,
-            });
-            if (isStaleRun()) return;
-            this.prefillSingleQuestionResponse(latest);
-            if (!hasEncrypted) {
-              safeSetState({ displayAnswerMode: false, isEditing: true });
-            }
-          } else if (isOwn && !latest && !this.state.startFresh) {
-            safeSetState({ userHasResponse: false, userResponseEncrypted: false, userAnswers: null });
-          }
-          this.updateSingleQuestionDebug({
-            phase: 'responder-fetch-complete',
             runId,
-            questionId,
-            effectiveSingleSlug: String(effectiveSingleSlug || ''),
-            responderAddress: String(responderAddress || '').toLowerCase(),
-            isLoadingResponse: false,
-            noResponse: !!(this.state && this.state.noResponse),
+            isStaleRun,
+            safeSetState,
+            updateSingleQuestionDebug: this.updateSingleQuestionDebug,
+            normalizeViewedResponse: this.normalizeSingleQuestionViewedResponse,
+            mergeViewedResponse: mergeDecryptedViewedResponse,
+            scheduleRetry: this.scheduleSingleQuestionBootstrapRetry,
+            clearRetry: this.clearSingleQuestionBootstrapRetry,
+            getResponse: ({
+              provider,
+              responderAddress: nextResponderAddress,
+              questionId: nextQuestionId,
+              effectiveSingleSlug: nextSingleSlug,
+              forceArweaveFetch = false,
+            }) => contractScripts.getResponse(
+              provider,
+              nextResponderAddress,
+              nextQuestionId,
+              nextSingleSlug,
+              { forceArweaveFetch }
+            ),
+            getResponseHash: ({
+              provider,
+              responderAddress: nextResponderAddress,
+              questionId: nextQuestionId,
+              effectiveSingleSlug: nextSingleSlug,
+            }) => contractScripts.getResponseHash(
+              provider,
+              nextResponderAddress,
+              nextQuestionId,
+              nextSingleSlug
+            ),
+            writeResponseToCache: writeRespToCache,
+            readCachedResponderResponse,
+            readFreshCachedResponderResponse,
+            prefillSingleQuestionResponse: this.prefillSingleQuestionResponse,
           });
-          safeSetState({ isLoadingResponse: false });
-        } else {
-          safeSetState({ responseLookupWarning: '' });
-          if (this.props.account) {
-            let latest = null;
-            try {
-              latest = await contractScripts.getResponse(
-                this.props.provider,
-                this.props.account,
-                questionId,
-                effectiveSingleSlug
-              );
-            } catch (_) { latest = null; }
-            if (isStaleRun()) return;
-
-            // Consistency check logic for single question
-            if (this.state.submissionComplete) {
-               surveyLog.log("Comparing incoming chain data vs optimistic baseline (Single Q)");
-               // Only switch off optimistic mode if chain data matches our submitted baseline
-               if (latest && this.areResponsesConsistent(latest, 0)) {
-                  surveyLog.log("Result: New. Chain data consistent. Exiting optimistic mode.");
-                  const hasEncrypted =
-                    !!latest.answer?.encryptedPortion || !!latest.additional?.encryptedPortion ||
-                    !!latest.answer?.encrypted || !!latest.additional?.encrypted;
-
-                  safeSetState({
-                    userHasResponse: true,
-                    userResponseEncrypted: !!hasEncrypted,
-                    userAnswers: latest,
-                    submissionComplete: false // <--- Reset
-                  });
-                  writeRespToCache(this.props.account, latest);
-               } else {
-                  surveyLog.log("Result: Stale. Chain data stale. Staying optimistic.");
-               }
-            }
-            // Normal Path
-            else if (latest && !this.state.startFresh && !this.state.suppressPrefill) {
-              const hasEncrypted =
-                !!latest.answer?.encryptedPortion || !!latest.additional?.encryptedPortion ||
-                !!latest.answer?.encrypted || !!latest.additional?.encrypted;
-              safeSetState({
-                userHasResponse: true,
-                userResponseEncrypted: !!hasEncrypted,
-                userAnswers: latest,
-              });
-              writeRespToCache(this.props.account, latest);
-              if (!hasEncrypted) {
-                if (isStaleRun()) return;
-                this.prefillSingleQuestionResponse(latest);
-                safeSetState({ displayAnswerMode: false, isEditing: true });
-              }
-            } else if (!this.state.startFresh) {
-              // Only reset to "no response" if we aren't holding an optimistic submission
-              if (!this.state.submissionComplete) {
-                safeSetState({ userHasResponse: false, userResponseEncrypted: false, userAnswers: null });
-              }
-            }
+          if (
+            viewedBootstrapResult?.reason === 'stale'
+            || viewedBootstrapResult?.reason === 'retrying'
+            || viewedBootstrapResult?.reason === 'malformed'
+          ) {
+            return;
           }
-          safeSetState({ isLoadingResponse: false });
+        } else {
+          const ownBootstrapResult = await executeOwnSingleQuestionResponseBootstrap({
+            props: this.props,
+            state: this.state,
+            questionId,
+            effectiveSingleSlug,
+            isStaleRun,
+            safeSetState,
+            getResponse: ({
+              provider,
+              responderAddress: nextResponderAddress,
+              questionId: nextQuestionId,
+              effectiveSingleSlug: nextSingleSlug,
+            }) => contractScripts.getResponse(
+              provider,
+              nextResponderAddress,
+              nextQuestionId,
+              nextSingleSlug
+            ),
+            writeResponseToCache: writeRespToCache,
+            areResponsesConsistent: this.areResponsesConsistent,
+            prefillSingleQuestionResponse: this.prefillSingleQuestionResponse,
+          });
+          if (ownBootstrapResult?.reason === 'stale') return;
         }
 
         // Maintain existing preview + local prefill behaviors
