@@ -418,6 +418,10 @@ import {
   buildAnswerAudienceSelectionPlan,
   buildAdditionalAudienceSelectionPlan,
 } from './surveyToolFieldEncryptionController';
+import {
+  buildFieldEncryptionWorkGroups as buildFieldEncryptionWorkGroupsCore,
+  verifyEncryptionIntegrity,
+} from './surveyToolSubmitPrepController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -8494,71 +8498,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   buildFieldEncryptionWorkGroups = (slice = {}, changedQids = new Set()) => {
-    const groups = new Map();
-    const missingRecipients = [];
-
-    const ensureGroup = (recipients = []) => {
-      const normalizedRecipients = Array.isArray(recipients) ? recipients.filter(Boolean) : [];
-      const groupKey = normalizedRecipients.length > 0
-        ? `gate:${JSON.stringify(normalizedRecipients)}`
-        : 'self';
-      if (!groups.has(groupKey)) {
-        groups.set(groupKey, {
-          recipients: normalizedRecipients,
-          qids: new Set(),
-          slice: {
-            answers: {},
-            additionalComments: {},
-            importance: {},
-            conviction: {},
-          },
-        });
-      }
-      return groups.get(groupKey);
-    };
-
-    Array.from(changedQids || []).forEach((qidRaw) => {
-      const qid = normalizeQuestionIdKey(qidRaw);
-      if (!qid) return;
-      const questionLocked = this.isQuestionLockedForResponse(qid);
-      const applyLock = (field, fieldKey = 'answer') => {
-        if (!questionLocked || !field || typeof field !== 'object') return field;
-        return {
-          ...field,
-          encrypted: true,
-          encryptionAudience: 'gate',
-          encryptionGateId: this.resolveFieldEncryptionGateId(field, qid, fieldKey),
-        };
-      };
-
-      const fieldSpecs = [
-        { fieldKey: 'answer', bucketKey: 'answers', value: applyLock(slice.answers?.[qid], 'answer') },
-        { fieldKey: 'additional', bucketKey: 'additionalComments', value: applyLock(slice.additionalComments?.[qid], 'additional') },
-      ];
-
-      fieldSpecs.forEach(({ fieldKey, bucketKey, value }) => {
-        if (!shouldEncryptResponseFieldForSubmit(value)) return;
-        const audience = this.resolveFieldEncryptionAudience(value, qid, fieldKey);
-        const recipients = audience === 'gate'
-          ? this.getEffectiveRecipientsForField({ questionId: qid, fieldKey, field: value })
-          : [];
-        if (audience === 'gate' && (!Array.isArray(recipients) || recipients.length === 0)) {
-          missingRecipients.push(`${fieldKey}:${qid}`);
-          return;
-        }
-        const group = ensureGroup(recipients);
-        group.qids.add(qid);
-        group.slice[bucketKey][qid] = { ...value };
-      });
+    return buildFieldEncryptionWorkGroupsCore(slice, changedQids, {
+      isQuestionLockedForResponse: (q) => this.isQuestionLockedForResponse(q),
+      resolveFieldEncryptionGateId: (f, q, fk) => this.resolveFieldEncryptionGateId(f, q, fk),
+      resolveFieldEncryptionAudience: (f, q, fk) => this.resolveFieldEncryptionAudience(f, q, fk),
+      getEffectiveRecipientsForField: (opts) => this.getEffectiveRecipientsForField(opts),
     });
-
-    return {
-      groups: Array.from(groups.values()).map((group) => ({
-        ...group,
-        qids: Array.from(group.qids || []),
-      })),
-      missingRecipients,
-    };
   };
 
   encryptFieldWorkGroups = async ({ workGroups = [], baseOpts = {} } = {}) => {
@@ -8951,28 +8896,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     surveyLog.log("Verifying encryption...");
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
     const stateToCheck = sliceOverride || this.state.surveysResponseState[surveyIndex];
-    let verificationPassed = true;
+    const { passed, failures } = verifyEncryptionIntegrity(stateToCheck, onlyTheseQids);
 
-    const limitSet = onlyTheseQids ? new Set(Array.from(onlyTheseQids)) : null;
+    failures.forEach((msg) => surveyLog.error(msg));
 
-    if (stateToCheck && stateToCheck.answers) {
-      for (const qId in stateToCheck.answers) {
-        if (limitSet && !limitSet.has(qId)) continue; // verify only changed set when provided
-        const answer = stateToCheck.answers[qId];
-        const additional = stateToCheck.additionalComments ? stateToCheck.additionalComments[qId] : null;
-
-        if (answer && answer.encrypted && !answer.encryptedPortion && answer.value !== '*') {
-          surveyLog.error(`Verification failed: Answer for ${qId} marked encrypted but has no encryptedPortion.`);
-          verificationPassed = false;
-        }
-        if (additional && additional.encrypted && !additional.encryptedPortion && additional.value !== '*') {
-          surveyLog.error(`Verification failed: Additional for ${qId} marked encrypted but has no encryptedPortion.`);
-          verificationPassed = false;
-        }
-      }
-    }
-
-    if (!verificationPassed) {
+    if (!passed) {
       throw new Error("Encryption verification failed. Some data marked for encryption was not processed correctly.");
     }
     surveyLog.log("Encryption verification successful.");
