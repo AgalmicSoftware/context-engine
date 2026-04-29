@@ -1,8 +1,12 @@
+import { describe, it, expect, vi } from 'vitest';
 import {
+  buildIndexedQuestionEntryKeys,
   computeChangedQidsAndFields,
+  orchestrateGetChangedQidsAndFields,
   pickBestField,
   pickBestNumber,
 } from './surveyToolChangedFieldsController';
+import { buildSurveyResponseSliceSignature } from './surveyToolSignatures';
 
 const hasMeaningfulFieldValue = (v: any) => {
   if (!v || typeof v !== 'object') return false;
@@ -21,6 +25,13 @@ const valuesEqual = (left: unknown, right: unknown) => {
 };
 
 const buildIndexedKeys = () => new Map([['q1', ['q1']]]);
+const normalizeKey = (value: string) => String(value || '').trim().toLowerCase();
+const buildEmptySlice = () => ({
+  answers: {},
+  importance: {},
+  conviction: {},
+  additionalComments: {},
+});
 
 const computeChangedFields = ({
   baselineSlice,
@@ -128,6 +139,181 @@ describe('surveyToolChangedFieldsController', () => {
         new Map([['q1', ['q1', 'Q1']]]),
         'q1',
       )).toBe(5);
+    });
+  });
+
+  describe('buildIndexedQuestionEntryKeys', () => {
+    it('groups raw keys by normalized question id', () => {
+      expect(buildIndexedQuestionEntryKeys(
+        { q1: 1, Q1: 2, '  ': 3, q2: 4 },
+        normalizeKey,
+      )).toEqual(new Map([
+        ['q1', ['q1', 'Q1']],
+        ['q2', ['q2']],
+      ]));
+    });
+  });
+
+  describe('orchestrateGetChangedQidsAndFields', () => {
+    it('derives ids from slices when no scoped ids are provided', () => {
+      const baselineSlice = {
+        ...buildEmptySlice(),
+        answers: { Q1: { value: 'old' } },
+      };
+      const currentSlice = {
+        ...buildEmptySlice(),
+        answers: { q1: { value: 'new' } },
+      };
+      const bumpPerfCounter = vi.fn();
+
+      const { result, newCache } = orchestrateGetChangedQidsAndFields(
+        {
+          surveyIndex: 2,
+          currentSlice,
+          isLoggedIn: false,
+          isLoadingResponse: false,
+          scopedIds: new Set(),
+          userAnswers: null,
+        },
+        {
+          resolveDiffBaselineSlice: () => baselineSlice,
+          getIndexedQuestionEntryKeys: (source) => buildIndexedQuestionEntryKeys(source, normalizeKey),
+          getDefaultResponseEncryptionAudience: () => 'default',
+          normalizeResponseEncryptionAudience: (audience) => audience,
+          getDefaultResponseEncryptionAudienceForQid: () => 'default',
+          resolveFieldEncryptionGateId: () => '',
+          normalizeFieldAudienceMode: (mode) => mode,
+          valuesEqual,
+          buildSurveyResponseSliceSignature,
+          buildRatingEnvelopeQidSetFromUserAnswers: () => new Set<string>(),
+          hasMeaningfulFieldValue,
+          bumpPerfCounter,
+        },
+        null,
+      );
+
+      expect(result.changedQids.has('q1')).toBe(true);
+      expect(result.changedMap.q1.answer).toBe(1);
+      expect(newCache.idsScopeMode).toBe('slice');
+      expect(newCache.idsScopeKey).toBe('slice:q1');
+      expect(bumpPerfCounter).toHaveBeenCalledWith('getChangedQidsAndFieldsCount');
+    });
+
+    it('reuses scoped cache result when filtered signatures match', () => {
+      const baselineSliceCached = {
+        ...buildEmptySlice(),
+        answers: { q1: { value: 'same' } },
+      };
+      const currentSliceCached = {
+        ...buildEmptySlice(),
+        answers: { q1: { value: 'same' } },
+      };
+      const baselineSliceNext = {
+        ...buildEmptySlice(),
+        answers: { q1: { value: 'same' } },
+      };
+      const currentSliceNext = {
+        ...buildEmptySlice(),
+        answers: { q1: { value: 'same' } },
+      };
+      const normalizedIdFilter = new Set(['q1']);
+      const cachedResult = { changedQids: new Set<string>(), changedMap: {} };
+      const existingCache = {
+        surveyIndex: 1,
+        currentSlice: currentSliceCached,
+        baselineSlice: baselineSliceCached,
+        currentSliceSignature: buildSurveyResponseSliceSignature(currentSliceCached, { normalizedIdFilter }),
+        baselineSliceSignature: buildSurveyResponseSliceSignature(baselineSliceCached, { normalizedIdFilter }),
+        allowLocalCache: true,
+        idsScopeKey: 'scope:q1',
+        idsScopeMode: 'scope',
+        result: cachedResult,
+      };
+      const bumpPerfCounter = vi.fn();
+      const getIndexedQuestionEntryKeys = vi.fn(() => {
+        throw new Error('unexpected indexing work on scoped cache hit');
+      });
+      const buildRatingEnvelopeQidSetFromUserAnswers = vi.fn(() => {
+        throw new Error('unexpected rating work on scoped cache hit');
+      });
+
+      const orchestration = orchestrateGetChangedQidsAndFields(
+        {
+          surveyIndex: 1,
+          currentSlice: currentSliceNext,
+          isLoggedIn: false,
+          isLoadingResponse: false,
+          scopedIds: new Set(['q1']),
+          userAnswers: null,
+        },
+        {
+          resolveDiffBaselineSlice: () => baselineSliceNext,
+          getIndexedQuestionEntryKeys,
+          getDefaultResponseEncryptionAudience: () => 'default',
+          normalizeResponseEncryptionAudience: (audience) => audience,
+          getDefaultResponseEncryptionAudienceForQid: () => 'default',
+          resolveFieldEncryptionGateId: () => '',
+          normalizeFieldAudienceMode: (mode) => mode,
+          valuesEqual,
+          buildSurveyResponseSliceSignature,
+          buildRatingEnvelopeQidSetFromUserAnswers,
+          hasMeaningfulFieldValue,
+          bumpPerfCounter,
+        },
+        existingCache,
+      );
+
+      expect(orchestration.result).toBe(cachedResult);
+      expect(orchestration.newCache).toBe(existingCache);
+      expect(getIndexedQuestionEntryKeys).not.toHaveBeenCalled();
+      expect(buildRatingEnvelopeQidSetFromUserAnswers).not.toHaveBeenCalled();
+      expect(bumpPerfCounter).toHaveBeenNthCalledWith(1, 'getChangedQidsAndFieldsCount');
+      expect(bumpPerfCounter).toHaveBeenNthCalledWith(2, 'noopSkipCount');
+    });
+
+    it('uses field encryptionAudience values before per-qid defaults', () => {
+      const baselineSlice = {
+        ...buildEmptySlice(),
+        answers: { q1: { value: 'same', encrypted: true, encryptionAudience: 'alpha' } },
+      };
+      const currentSlice = {
+        ...buildEmptySlice(),
+        answers: { q1: { value: 'same', encrypted: true, encryptionAudience: 'beta' } },
+      };
+      const normalizeResponseEncryptionAudience = vi.fn((audience: any, qid: any) => `${qid}:${audience}`);
+      const getDefaultResponseEncryptionAudienceForQid = vi.fn(() => 'default-qid');
+
+      const { result } = orchestrateGetChangedQidsAndFields(
+        {
+          surveyIndex: 0,
+          currentSlice,
+          isLoggedIn: false,
+          isLoadingResponse: false,
+          scopedIds: new Set(['q1']),
+          userAnswers: null,
+        },
+        {
+          resolveDiffBaselineSlice: () => baselineSlice,
+          getIndexedQuestionEntryKeys: (source) => buildIndexedQuestionEntryKeys(source, normalizeKey),
+          getDefaultResponseEncryptionAudience: () => 'default-all',
+          normalizeResponseEncryptionAudience,
+          getDefaultResponseEncryptionAudienceForQid,
+          resolveFieldEncryptionGateId: () => '',
+          normalizeFieldAudienceMode: (mode) => mode,
+          valuesEqual,
+          buildSurveyResponseSliceSignature,
+          buildRatingEnvelopeQidSetFromUserAnswers: () => new Set<string>(),
+          hasMeaningfulFieldValue,
+          bumpPerfCounter: vi.fn(),
+        },
+        null,
+      );
+
+      expect(result.changedQids.has('q1')).toBe(true);
+      expect(result.changedMap.q1.encryptedAnswer).toBe(1);
+      expect(normalizeResponseEncryptionAudience).toHaveBeenNthCalledWith(1, 'alpha', 'q1');
+      expect(normalizeResponseEncryptionAudience).toHaveBeenNthCalledWith(2, 'beta', 'q1');
+      expect(getDefaultResponseEncryptionAudienceForQid).toHaveBeenCalled();
     });
   });
 
