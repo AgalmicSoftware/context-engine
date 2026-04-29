@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.jsx`: **1,094 lines**
-  - `SurveyQuestions.tsx`: **10,123 lines**
+  - `SurveyQuestions.tsx`: **9,959 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
 
@@ -164,8 +164,15 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - pure pre-submission planning and verification
   - `buildFieldEncryptionWorkGroups` — groups changed fields by encryption recipients for batch Lit encrypt
   - `verifyEncryptionIntegrity` — post-encrypt verification that all marked fields have encryptedPortion
+- `surveyToolRatingEnvelopeSubmitController.ts`
+  - pure rating encryption carry-forward and envelope management for submit path
+  - `RATING_FIELD_SPECS` — canonical importance/conviction field+envelope key pairs
+  - `buildRatingBaseline` — snapshot on-chain rating values/envelopes for carry-forward
+  - `pickAudienceForRatingEncryption` — audience/gate resolution for rating envelope encryption
+  - `shouldEncryptRatingForQid` — determines whether rating encryption is active per question
+  - `processRatingEnvelopesForSubmit` — main submit-path rating envelope processor (carry-forward, encrypt, nullify plaintext)
 
-That means the single-question fetch lifecycle shell extraction is now substantially complete. The remaining inline code in `fetchSingleQuestionData` is mostly DI-bag assembly and side-effect interpretation, so the next shared-core question is no longer “can we extract a controller?” It is:
+That means the single-question fetch lifecycle shell extraction is now substantially complete. The submit-path rating encryption logic has also been extracted, leaving `submitSurveyResponse` as a thinner orchestrator. The remaining inline code in `fetchSingleQuestionData` is mostly DI-bag assembly and side-effect interpretation, so the next shared-core question is no longer “can we extract a controller?” It is:
 
 1. keep extracting smaller wrappers with diminishing returns, or
 2. pick the next higher-payoff seam deliberately
