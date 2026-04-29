@@ -8,7 +8,7 @@
 - Session docs lazy view: `client/src/components/DocumentLibrary/SessionDocumentsPage.tsx` (via `routeLazyComponents.js`)
 - Demo route lazy views: `client/src/components/DemoViews/DemosIndex.tsx`, `client/src/components/DemoViews/RiskMatrixDemo.tsx` (via `routeLazyComponents.js`)
 - Navbar account modal surface: `client/src/components/Account/LoginAndSettingsModal.tsx` (mounted by `client/src/components/Navbar/AccountSection.tsx`, outside the route-lazy map)
-- Current length: **12,334 lines**
+- Current length: **12,284 lines**
 - Component type: **React class component** (`MainSite extends Component`)
 - Component count in file: **1 class component** (`MainSite`)
 - Method inventory: **243 class methods/properties** + **3 top-level helper functions**
@@ -38,7 +38,15 @@
   Test: `mainSiteSessionScanPolicy.test.js` (17 tests)
   What stays in MainSite: `shouldBackfillGeneralSession`, `enqueueGeneralSessionBackfill`, `runWithGeneralSessionBackfill`, `hasExplicitProfileScanScopeOverride`, `getProfileScanScopeContext`, profile-scan/registry methods
 
-All extracted controllers use a factory-function + host-DI pattern (or pure exports for session config). `MainSite` creates them as class-field initializers and delegates through forwarding methods.
+- `client/src/components/MainSite/metadataSessionBinding.ts`
+  Pattern: Pure exported functions (no host DI)
+  Exports: `resolveMetadataSessionBinding`, `resolveMetadataSessionSlug`, `resolveScopedMetadataSessionSlug`, `buildMetadataSessionCacheEnvelope`
+  Types: `MetadataSessionAuthority`, `MetadataSessionBinding`, `MetadataSessionCacheEnvelope`, `BuildEnvelopeOptions`
+  Test: `metadataSessionBinding.test.ts` (20 tests)
+  Dependencies: `normalizeSessionSlug` (sessionNaming), `getSessionSlugByName` (sessionConfigResolvers)
+  What stays in MainSite: `writeSurveyMetadataToCache`, `writeQuestionMetadataToCache`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` (all call through forwarding wrappers)
+
+All extracted controllers use a factory-function + host-DI pattern (or pure exports for session config / metadata binding). `MainSite` creates them as class-field initializers and delegates through forwarding methods.
 
 ## Section Index
 
@@ -47,19 +55,19 @@ All extracted controllers use a factory-function + host-DI pattern (or pure expo
 | Imports, constants, pure helpers | 1-270 | Dependencies, perf helpers, cache utility helpers, exported pure functions (`shouldFlushCoalescedRun`, etc.) | `shouldFlushCoalescedRun`, `buildQuestionReadyStatePatch`, `shouldEnableSessionRegistryRefresh` |
 | Class state + instance fields | 271-364 | Main runtime state + internal run tokens/queues/controllers | `state`, `_cachePersistenceController`, `_cacheReadinessController`, `_scanPolicy`, `DG` |
 | Cache flush + cross-tab coalescing | 366-769 | Debounced cache/readiness updates and cross-tab sync handling | `setReadinessStateIfChanged`, `scheduleCacheUpdateFlush`, `flushQueuedCacheUpdates`, `handleCrossTabCacheUpdateEvent` |
-| Session path/slug resolution | 772-1921 | Parse `/session/:token`, resolve ids/slugs, locate groups for surveys/questions/SBT links | `resolveSessionPathId`, `resolveSessionPathSlug`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` |
-| DG storage abstraction | 1928-1928 | Per-group storage facade over cache manager/localStorage | `DG.key`, `DG.read`, `DG.write`, `DG.remove` |
-| Session config + scan policy + registry bootstrap | 1931-2794 | Chain/session helpers, scope controls, telemetry, on-chain registry hydration, deep-scan planning | `getSessionCfg`, `getSessionScanScope`, `ensureRegistryHydratedForProfileScan`, `resolveProfileDeepScanPlan`, `runWithGeneralSessionBackfill` |
-| Deep scans (survey lookup + user profile) | 2796-4372 | Cross-group survey discovery + full activity/SBT profile scanning with cache merges | `scanForSurveyGroup`, `scanSpecificUserProfilePriority`, `scanSpecificUserProfile` |
-| Persistent readiness flags | 4376-4379 | Read/write per-slug flags and sync `cacheHasLoaded` from persisted state | `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent` |
-| Mount/unmount lifecycle | 4381-4881 | Boot sequence, initial cache strategy by route, listener startup, cleanup | `componentDidMount`, `componentWillUnmount` |
-| Update lifecycle + deep-link/network handlers | 4883-5434 | React to slug/network/path changes, trigger deep-link scans, readiness recompute | `componentDidUpdate`, `handleDeepLinkScan`, `manageAutoHashPersistence`, `handleNetworkChange`, `checkAllCachesReady` |
-| SBT cache + listeners | 5436-7497 | Light/full SBT discovery, SBT merge logic, listener/event handlers | `ensureLightSbtDiscovery`, `initializeSbtCacheForGroup`, `refreshSbtDataForGroup`, `startSbtEventListenerForGroup`, `onSbtTransferDetectedForGroup` |
-| Survey/question cache initialization | 7500-10120 | Survey cache load + question cache load + chunked response hydration | `initializeSurveyCacheForGroup`, `initializeQuestionCacheForGroup`, `fetchQuestionResponsesChunkedForGroup` |
-| Survey/question event listeners | 10122-10547 | Event subscriptions and cache refresh on new survey/question events | `startSurveyAndQuestionEventListenerForGroup`, `onNewSurveyEventDetectedForGroup` |
-| View routing + child prop composition | 10556-11993 | Route dispatch and prop wiring into lazy views | `getMainView`, `refreshSurveyResponsesByIDForGroup`, `refreshEncryptedQuestionPayloadsForGroup` |
-| Final metadata refresh + render | 11995-12279 | Final question refresh helpers and root shell render | `refreshQuestionMetadataForGroup`, `refreshQuestionResponses`, `render` |
-| PropTypes + Redux connect | 12284-12334 | Type contracts and `connect(...)` wiring | `mapStateToProps` |
+| Session path/slug resolution | 772-1871 | Parse `/session/:token`, resolve ids/slugs, locate groups for surveys/questions/SBT links | `resolveSessionPathId`, `resolveSessionPathSlug`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` |
+| DG storage abstraction | 1878-1878 | Per-group storage facade over cache manager/localStorage | `DG.key`, `DG.read`, `DG.write`, `DG.remove` |
+| Session config + scan policy + registry bootstrap | 1881-2744 | Chain/session helpers, scope controls, telemetry, on-chain registry hydration, deep-scan planning | `getSessionCfg`, `getSessionScanScope`, `ensureRegistryHydratedForProfileScan`, `resolveProfileDeepScanPlan`, `runWithGeneralSessionBackfill` |
+| Deep scans (survey lookup + user profile) | 2746-4322 | Cross-group survey discovery + full activity/SBT profile scanning with cache merges | `scanForSurveyGroup`, `scanSpecificUserProfilePriority`, `scanSpecificUserProfile` |
+| Persistent readiness flags | 4326-4329 | Read/write per-slug flags and sync `cacheHasLoaded` from persisted state | `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent` |
+| Mount/unmount lifecycle | 4331-4831 | Boot sequence, initial cache strategy by route, listener startup, cleanup | `componentDidMount`, `componentWillUnmount` |
+| Update lifecycle + deep-link/network handlers | 4833-5384 | React to slug/network/path changes, trigger deep-link scans, readiness recompute | `componentDidUpdate`, `handleDeepLinkScan`, `manageAutoHashPersistence`, `handleNetworkChange`, `checkAllCachesReady` |
+| SBT cache + listeners | 5386-7447 | Light/full SBT discovery, SBT merge logic, listener/event handlers | `ensureLightSbtDiscovery`, `initializeSbtCacheForGroup`, `refreshSbtDataForGroup`, `startSbtEventListenerForGroup`, `onSbtTransferDetectedForGroup` |
+| Survey/question cache initialization | 7450-10070 | Survey cache load + question cache load + chunked response hydration | `initializeSurveyCacheForGroup`, `initializeQuestionCacheForGroup`, `fetchQuestionResponsesChunkedForGroup` |
+| Survey/question event listeners | 10072-10497 | Event subscriptions and cache refresh on new survey/question events | `startSurveyAndQuestionEventListenerForGroup`, `onNewSurveyEventDetectedForGroup` |
+| View routing + child prop composition | 10506-11943 | Route dispatch and prop wiring into lazy views | `getMainView`, `refreshSurveyResponsesByIDForGroup`, `refreshEncryptedQuestionPayloadsForGroup` |
+| Final metadata refresh + render | 11945-12229 | Final question refresh helpers and root shell render | `refreshQuestionMetadataForGroup`, `refreshQuestionResponses`, `render` |
+| PropTypes + Redux connect | 12234-12284 | Type contracts and `connect(...)` wiring | `mapStateToProps` |
 
 ## Method Index (Grouped by Responsibility)
 
@@ -94,10 +102,10 @@ All extracted controllers use a factory-function + host-DI pattern (or pure expo
 - `findGroupSlugForSurvey` (1662-1733)
 - `getQuestionRouteSessionSlugHint` (1747-1754)
 - `getQuestionRouteSessionIdHint` (1756-1768)
-- `findGroupSlugForQuestion` (1770-1839)
-- `resolveGroupSlugForSbtAddress` (1841-1921)
-- `handleDeepLinkScan` (5156-5193)
-- `manageAutoHashPersistence` (5198-5237)
+- `findGroupSlugForQuestion` (1720-1789)
+- `resolveGroupSlugForSbtAddress` (1791-1871)
+- `handleDeepLinkScan` (5106-5143)
+- `manageAutoHashPersistence` (5148-5187)
 
 ### Session metadata + Lit + gated prompt recovery
 - `syncLitHooks` (1268-1301)
@@ -108,66 +116,70 @@ All extracted controllers use a factory-function + host-DI pattern (or pure expo
 - `refreshSessionInfo` (1391-1414)
 - `refreshSessionMetaFields` (1416-1448)
 - `refreshGroupCredentials` (1450-1454)
-- `hasMaskedQuestionPayloadInCache` (11821-11828)
-- `buildQuestionDecryptContext` (11830-11839)
-- `refreshEncryptedQuestionPayloadsForGroup` (11841-11993)
-- `refreshQuestionMetadataForGroup` (11995-12004)
+- `resolveMetadataSessionBinding` (1486-1488) — forwarding wrapper → `metadataSessionBinding.ts`
+- `resolveMetadataSessionSlug` (1490-1492) — forwarding wrapper → `metadataSessionBinding.ts`
+- `resolveScopedMetadataSessionSlug` (1494-1496) — forwarding wrapper → `metadataSessionBinding.ts`
+- `buildMetadataSessionCacheEnvelope` (1498-1500) — forwarding wrapper → `metadataSessionBinding.ts`
+- `hasMaskedQuestionPayloadInCache` (11771-11778)
+- `buildQuestionDecryptContext` (11780-11789)
+- `refreshEncryptedQuestionPayloadsForGroup` (11791-11943)
+- `refreshQuestionMetadataForGroup` (11945-11954)
 
 ### Scan scope, registry hydration, and deep scan planning
-- `getSessionCfg` (1931-1931)
-- `getSessionChainId` (1932-1932)
-- `getSessionNetwork` (1933-1933)
-- `isSbtInstanceListenerEnabledForGroup` (1935-1935)
-- `isSbtHistoryScanEnabled` (1936-1936)
-- `getSessionScanScope` (1937-1937)
-- `getSessionScanScopeContext` (1938-1938)
-- `isSessionSlugAllowedForScan` (1983-1985)
-- `shouldAttachSbtDetailInstanceListener` (1990-1990)
-- `shouldAutoRunFullSbtScan` (1989-1989)
-- `readUserProfileAllSessionsFlag` (2059-2066)
-- `getUserProfileAllSessionsScanMode` (2068-2107)
-- `ensureRegistryHydratedForProfileScan` (2300-2476)
-- `refreshSessionUniverseRegistryCache` (2480-2504)
-- `resolveProfileDeepScanPlan` (2506-2639)
-- `scheduleProfileScanRetryAfterRegistryHydration` (2641-2703)
-- `getScopeFilteredSlugs` (2713-2713)
-- `enqueueGeneralSessionBackfill` (2723-2773)
-- `runWithGeneralSessionBackfill` (2775-2794)
-- `scanForSurveyGroup` (2796-2997)
-- `scanSpecificUserProfilePriority` (3001-3021)
-- `scanSpecificUserProfile` (3023-4372)
+- `getSessionCfg` (1881-1881)
+- `getSessionChainId` (1882-1882)
+- `getSessionNetwork` (1883-1883)
+- `isSbtInstanceListenerEnabledForGroup` (1885-1885)
+- `isSbtHistoryScanEnabled` (1886-1886)
+- `getSessionScanScope` (1887-1887)
+- `getSessionScanScopeContext` (1888-1888)
+- `isSessionSlugAllowedForScan` (1933-1935)
+- `shouldAttachSbtDetailInstanceListener` (1940-1940)
+- `shouldAutoRunFullSbtScan` (1939-1939)
+- `readUserProfileAllSessionsFlag` (2009-2016)
+- `getUserProfileAllSessionsScanMode` (2018-2057)
+- `ensureRegistryHydratedForProfileScan` (2250-2426)
+- `refreshSessionUniverseRegistryCache` (2430-2454)
+- `resolveProfileDeepScanPlan` (2456-2589)
+- `scheduleProfileScanRetryAfterRegistryHydration` (2591-2653)
+- `getScopeFilteredSlugs` (2663-2663)
+- `enqueueGeneralSessionBackfill` (2673-2723)
+- `runWithGeneralSessionBackfill` (2725-2744)
+- `scanForSurveyGroup` (2746-2947)
+- `scanSpecificUserProfilePriority` (2951-2971)
+- `scanSpecificUserProfile` (2973-4322)
 
 ### SBT cache and event pipeline
-- `ensureLightSbtDiscovery` (5477-5830)
-- `ensureLightSbtUniverse` (5834-5883)
-- `mergeSbtCountMaps` (5885-5896)
-- `mergeSbtCountsPayload` (5898-5917)
-- `initializeSbtCache` (6061-6063)
-- `initializeSbtCacheWithGeneralBackfill` (6065-6077)
-- `initializeSbtCacheForGroup` (6079-6637)
-- `refreshSbtDataForGroup` (6646-7109)
-- `startSbtEventListenerForGroup` (7113-7197)
-- `onNewSbtEventDetectedForGroup` (7202-7283)
-- `onSbtCreatedDetectedForGroup` (7288-7356)
-- `onSbtIssuedDetectedForGroup` (7360-7362)
-- `onSbtTransferDetectedForGroup` (7495-7497)
+- `ensureLightSbtDiscovery` (5427-5780)
+- `ensureLightSbtUniverse` (5784-5833)
+- `mergeSbtCountMaps` (5835-5846)
+- `mergeSbtCountsPayload` (5848-5867)
+- `initializeSbtCache` (6011-6013)
+- `initializeSbtCacheWithGeneralBackfill` (6015-6027)
+- `initializeSbtCacheForGroup` (6029-6587)
+- `refreshSbtDataForGroup` (6596-7059)
+- `startSbtEventListenerForGroup` (7063-7147)
+- `onNewSbtEventDetectedForGroup` (7152-7233)
+- `onSbtCreatedDetectedForGroup` (7238-7306)
+- `onSbtIssuedDetectedForGroup` (7310-7312)
+- `onSbtTransferDetectedForGroup` (7445-7447)
 
 ### Survey/question/response caches and listeners
-- `initializeSurveyCacheForGroup` (7513-8051)
-- `initializeQuestionCacheForGroup` (8067-9363)
-- `fetchQuestionResponsesChunkedForGroup` (9378-10120)
-- `startSurveyAndQuestionEventListenerForGroup` (10124-10131)
-- `onNewSurveyEventDetectedForGroup` (10136-10547)
-- `refreshSurveyResponsesByIDForGroup` (11753-11817)
-- `refreshQuestionResponses` (12006-12248)
+- `initializeSurveyCacheForGroup` (7463-8001)
+- `initializeQuestionCacheForGroup` (8017-9313)
+- `fetchQuestionResponsesChunkedForGroup` (9328-10070)
+- `startSurveyAndQuestionEventListenerForGroup` (10074-10081)
+- `onNewSurveyEventDetectedForGroup` (10086-10497)
+- `refreshSurveyResponsesByIDForGroup` (11703-11767)
+- `refreshQuestionResponses` (11956-12198)
 
 ### Lifecycle and view routing
-- `componentDidMount` (4381-4789)
-- `componentWillUnmount` (4791-4881)
-- `componentDidUpdate` (4883-5154)
-- `handleNetworkChange` (5240-5391)
-- `getMainView` (11523-11742)
-- `render` (12250-12279)
+- `componentDidMount` (4331-4739)
+- `componentWillUnmount` (4741-4831)
+- `componentDidUpdate` (4833-5104)
+- `handleNetworkChange` (5190-5341)
+- `getMainView` (11473-11692)
+- `render` (12200-12229)
 
 ## Data Flow (Runtime)
 
