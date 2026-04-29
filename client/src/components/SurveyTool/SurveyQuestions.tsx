@@ -387,6 +387,9 @@ import {
   resolveSingleQuestionCacheState,
 } from './surveyToolSingleQuestionMetadataController';
 import {
+  resolveSingleQuestionMetadataBootstrap,
+} from './surveyToolSingleQuestionMetadataBootstrapController';
+import {
   areSurveyResponsesConsistent,
   resolveSurveyBaselineSourceSlice,
   resolveSurveyUserAnswersSlice,
@@ -5561,97 +5564,78 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     let { netIdStr, questionsCache } = cacheState;
     const recentPayloadForAccount = cacheBootstrapResult.recentPayloadForAccount;
 
-    const shouldRefetchMasked =
-      !!qData &&
-      isMaskedQuestionPayload(qData) &&
-      !!this.props.loginComplete &&
-      !!this.props.account;
-
-    const forceQuestionMetadataRefetch = !!opts.forceQuestionMetadataRefetch;
-    if (!qData || shouldRefetchMasked || forceQuestionMetadataRefetch) {
-      const metadataFetchResult = await fetchSingleQuestionMetadataCandidates({
-        initialQuestionData: qData,
-        effectiveSingleSlug,
-        fetchCandidateSlugs,
-        fetchTimeoutMs,
-        fetchTimeoutRecoveryMs,
+    const metadataBootstrapResult = await resolveSingleQuestionMetadataBootstrap({
+      questionId,
+      questionData: qData,
+      effectiveSingleSlug,
+      cacheState,
+      fetchCandidateSlugs,
+      fetchTimeoutMs,
+      fetchTimeoutRecoveryMs,
+      forceRefetch: !!opts.forceQuestionMetadataRefetch,
+      loginComplete: !!this.props.loginComplete,
+      hasAccount: !!this.props.account,
+      isMaskedQuestionPayload,
+      fetchSingleQuestionMetadataCandidates: (args) => fetchSingleQuestionMetadataCandidates({
+        ...args,
         getQuestionData: (candidateSlug) => contractScripts.getQuestionData(
           this.props.provider,
           questionId,
           candidateSlug,
           { decryptContext: this.buildQuestionDecryptContext(candidateSlug) }
         ),
-        pickBetterQuestionPayload,
-        isMaskedQuestionPayload,
-      });
+      }),
+      pickBetterQuestionPayload,
+      areQuestionPayloadsEquivalent,
+      normalizeSingleQuestionMetadataForCache,
+      resolveCacheState: getCacheStateForSlug,
+      writeQuestionsCache,
+    });
 
-      qData = metadataFetchResult.questionData;
-      effectiveSingleSlug = metadataFetchResult.effectiveSingleSlug;
-      cacheState = await getCacheStateForSlug(effectiveSingleSlug);
-      if (!cacheState) {
-        if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
-          return;
-        }
-        safeSetState({ isLoadingResponse: false, questionPool: [] });
+    if (metadataBootstrapResult.status === 'missing-cache-state') {
+      if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
         return;
       }
-      ({ netIdStr, questionsCache } = cacheState);
-      try {
-        if (qData && qData.id !== questionId) qData.id = questionId;
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      safeSetState({ isLoadingResponse: false, questionPool: [] });
+      return;
+    }
 
-      if (!qData && !questionsCache[netIdStr].questions?.[questionId]) {
-        surveyLog.warn(
-          `SurveyQuestions: No question data for ${questionId} (slug='${effectiveSingleSlug}').`
-        );
-        const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry({
-          questionId,
-          attempt: bootstrapRetryAttempt,
-          reason: metadataFetchResult.fetchedAny
-            ? 'no-question-data-yet'
-            : (metadataFetchResult.timedOutFetchCount > 0 ? 'question-fetch-timeout' : 'question-fetch-unavailable'),
-        });
-        this.updateSingleQuestionDebug({
-          phase: 'question-data-unavailable',
-          runId,
-          questionId,
-          effectiveSingleSlug: String(effectiveSingleSlug || ''),
-          fetchedAny: !!metadataFetchResult.fetchedAny,
-          timedOutFetchCount: Number(metadataFetchResult.timedOutFetchCount || 0),
-          didScheduleRetry: !!didScheduleRetry,
-          retryAttempt: bootstrapRetryAttempt,
-        });
-        if (didScheduleRetry) {
-          safeSetState({ isLoadingResponse: true });
-          return;
-        }
-        if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
-          return;
-        }
-        safeSetState({ isLoadingResponse: false, questionPool: [] });
-        return;
-      }
-      if (!qData) {
-        qData = questionsCache[netIdStr].questions?.[questionId];
-      }
-      const existingCached = questionsCache[netIdStr].questions?.[questionId] || null;
-      const {
-        normalizedQuestionData,
-        shouldWriteQuestionPayload,
-      } = normalizeSingleQuestionMetadataForCache({
+    if (metadataBootstrapResult.status === 'unavailable') {
+      surveyLog.warn(
+        `SurveyQuestions: No question data for ${questionId} (slug='${metadataBootstrapResult.effectiveSingleSlug}').`
+      );
+      const didScheduleRetry = this.scheduleSingleQuestionBootstrapRetry({
         questionId,
-        questionData: qData,
-        existingCachedQuestionData: existingCached,
-        pickBetterQuestionPayload,
-        areQuestionPayloadsEquivalent,
+        attempt: bootstrapRetryAttempt,
+        reason: metadataBootstrapResult.retryReason,
       });
-      if (shouldWriteQuestionPayload) {
-        questionsCache[netIdStr].questions[questionId] = normalizedQuestionData;
-        if (!isStaleRun()) {
-          void writeQuestionsCache(effectiveSingleSlug, questionsCache);
-        }
+      this.updateSingleQuestionDebug({
+        phase: 'question-data-unavailable',
+        runId,
+        questionId,
+        effectiveSingleSlug: String(metadataBootstrapResult.effectiveSingleSlug || ''),
+        fetchedAny: !!metadataBootstrapResult.fetchedAny,
+        timedOutFetchCount: Number(metadataBootstrapResult.timedOutFetchCount || 0),
+        didScheduleRetry: !!didScheduleRetry,
+        retryAttempt: bootstrapRetryAttempt,
+      });
+      if (didScheduleRetry) {
+        safeSetState({ isLoadingResponse: true });
+        return;
       }
-      qData = normalizedQuestionData;
+      if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
+        return;
+      }
+      safeSetState({ isLoadingResponse: false, questionPool: [] });
+      return;
+    }
+
+    // 'ready' or 'skipped' — extract resolved data
+    qData = metadataBootstrapResult.questionData;
+    if (metadataBootstrapResult.status === 'ready') {
+      effectiveSingleSlug = metadataBootstrapResult.effectiveSingleSlug;
+      cacheState = metadataBootstrapResult.cacheState;
+      ({ netIdStr, questionsCache } = cacheState);
     }
 
     if (!hasPendingRetryForQuestion || bootstrapRetryAttempt > 0) {
