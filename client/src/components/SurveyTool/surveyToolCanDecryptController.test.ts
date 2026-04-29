@@ -1,4 +1,3 @@
-import { describe, it, expect, vi } from 'vitest';
 
 import {
   buildCanDecryptContext,
@@ -16,8 +15,8 @@ const makeInputs = (
 ): CanDecryptContextInputs => ({
   getEffectiveDraftSlug: () => 'test-slug',
   resolveEffectiveSlugFromProps: () => 'fallback-slug',
-  resolveEffectiveResponseGateConfig: vi.fn().mockReturnValue({ networkChainId: 84532 }),
-  getResponseGatePolicy: vi.fn().mockReturnValue({
+  resolveEffectiveResponseGateConfig: jest.fn().mockReturnValue({ networkChainId: 84532 }),
+  getResponseGatePolicy: jest.fn().mockReturnValue({
     recipients: ['0xabc'],
     primaryResource: 'questionResponses',
   }),
@@ -44,7 +43,7 @@ const makeSnapshot = (
 describe('surveyToolCanDecryptController', () => {
   describe('buildCanDecryptContext', () => {
     it('derives slug from getEffectiveDraftSlug when it is non-empty', () => {
-      const resolveEffectiveSlugFromProps = vi.fn(() => 'fallback-slug');
+      const resolveEffectiveSlugFromProps = jest.fn(() => 'fallback-slug');
       const inputs = makeInputs({ resolveEffectiveSlugFromProps });
 
       const result = buildCanDecryptContext(inputs);
@@ -54,7 +53,7 @@ describe('surveyToolCanDecryptController', () => {
     });
 
     it('falls back to resolveEffectiveSlugFromProps when draft slug is empty', () => {
-      const resolveEffectiveSlugFromProps = vi.fn(() => 'fallback-slug');
+      const resolveEffectiveSlugFromProps = jest.fn(() => 'fallback-slug');
       const inputs = makeInputs({
         getEffectiveDraftSlug: () => '',
         resolveEffectiveSlugFromProps,
@@ -67,7 +66,7 @@ describe('surveyToolCanDecryptController', () => {
     });
 
     it('calls resolveEffectiveResponseGateConfig with the derived slug', () => {
-      const resolveEffectiveResponseGateConfig = vi.fn().mockReturnValue({ networkChainId: 84532 });
+      const resolveEffectiveResponseGateConfig = jest.fn().mockReturnValue({ networkChainId: 84532 });
       const inputs = makeInputs({
         getEffectiveDraftSlug: () => '',
         resolveEffectiveSlugFromProps: () => 'derived-slug',
@@ -84,7 +83,7 @@ describe('surveyToolCanDecryptController', () => {
         recipients: ['0xabc', '0xdef'],
         primaryResource: 'surveyResponses',
       };
-      const getResponseGatePolicy = vi.fn().mockReturnValue(policy);
+      const getResponseGatePolicy = jest.fn().mockReturnValue(policy);
       const inputs = makeInputs({ getResponseGatePolicy });
 
       const result = buildCanDecryptContext(inputs);
@@ -102,8 +101,8 @@ describe('surveyToolCanDecryptController', () => {
         primaryResource: 'questionResponses',
       };
       const inputs = makeInputs({
-        resolveEffectiveResponseGateConfig: vi.fn().mockReturnValue(cfg),
-        getResponseGatePolicy: vi.fn().mockReturnValue(policy),
+        resolveEffectiveResponseGateConfig: jest.fn().mockReturnValue(cfg),
+        getResponseGatePolicy: jest.fn().mockReturnValue(policy),
       });
 
       expect(buildCanDecryptContext(inputs)).toEqual({
@@ -142,7 +141,7 @@ describe('surveyToolCanDecryptController', () => {
 
   describe('resolveCanDecryptGateAccess', () => {
     it('calls checkAccess for each resource key in order', async () => {
-      const checkAccess: CheckAccessFn = vi
+      const checkAccess: CheckAccessFn = jest
         .fn()
         .mockResolvedValueOnce({ status: 'denied' })
         .mockResolvedValueOnce({ status: 'granted' });
@@ -170,7 +169,7 @@ describe('surveyToolCanDecryptController', () => {
     });
 
     it("returns granted when any checked resource is granted, including after an earlier denial", async () => {
-      const checkAccess: CheckAccessFn = vi
+      const checkAccess: CheckAccessFn = jest
         .fn()
         .mockResolvedValueOnce({ status: 'denied' })
         .mockResolvedValueOnce({ status: 'granted' });
@@ -187,7 +186,7 @@ describe('surveyToolCanDecryptController', () => {
     });
 
     it('returns denied when all checked resources are denied', async () => {
-      const checkAccess: CheckAccessFn = vi
+      const checkAccess: CheckAccessFn = jest
         .fn()
         .mockResolvedValueOnce({ status: 'denied' })
         .mockResolvedValueOnce({ status: 'denied' });
@@ -206,7 +205,7 @@ describe('surveyToolCanDecryptController', () => {
     it.each(['unknown', 'error'])(
       'returns unknown when a checked resource resolves to %s and none are granted',
       async (status) => {
-        const checkAccess: CheckAccessFn = vi
+        const checkAccess: CheckAccessFn = jest
           .fn()
           .mockResolvedValueOnce({ status: 'denied' })
           .mockResolvedValueOnce({ status });
@@ -224,7 +223,7 @@ describe('surveyToolCanDecryptController', () => {
     );
 
     it('handles a single-resource check correctly', async () => {
-      const checkAccess: CheckAccessFn = vi.fn().mockResolvedValue({ status: 'granted' });
+      const checkAccess: CheckAccessFn = jest.fn().mockResolvedValue({ status: 'granted' });
 
       await expect(resolveCanDecryptGateAccess({
         cfg: {},

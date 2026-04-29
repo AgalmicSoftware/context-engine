@@ -1,4 +1,3 @@
-import { describe, it, expect, vi } from 'vitest';
 
 import {
   RATING_FIELD_SPECS,
@@ -29,7 +28,7 @@ const buildMockDeps = (overrides: Partial<RatingEnvelopeDeps> = {}): RatingEnvel
   getEffectiveRecipientsForField: () => [],
   getDefaultResponseEncryptionAudienceForQid: () => 'self',
   buildLitEncryptionOptionsForRecipients: () => ({ lit: true }),
-  encryptEnvelopeValue: vi.fn(async (value) => `encrypted:${value}`),
+  encryptEnvelopeValue: jest.fn(async (value) => `encrypted:${value}`),
   getImportanceFromResponse: (r) => r?.importance ?? null,
   getConvictionFromResponse: (r) => r?.conviction ?? null,
   ...overrides,
@@ -344,7 +343,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
 
   describe('processRatingEnvelopesForSubmit', () => {
     it('skips questions with no qid', async () => {
-      const encryptEnvelopeValue = vi.fn(async (value) => `encrypted:${value}`);
+      const encryptEnvelopeValue = jest.fn(async (value) => `encrypted:${value}`);
       const questionResponses: Record<string, any>[] = [{ importance: 5, conviction: 2 }];
 
       const result = await processRatingEnvelopesForSubmit(
@@ -361,7 +360,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('carries forward baseline envelopes on non-rating edits', async () => {
-      const encryptEnvelopeValue = vi.fn(async (value) => `encrypted:${value}`);
+      const encryptEnvelopeValue = jest.fn(async (value) => `encrypted:${value}`);
       const respObj: Record<string, any> = { questionID: 'Q1', importance: null, conviction: null };
 
       await processRatingEnvelopesForSubmit(
@@ -420,7 +419,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('clears stale envelopes for changed fields when not encrypting', async () => {
-      const encryptEnvelopeValue = vi.fn(async (value) => `encrypted:${value}`);
+      const encryptEnvelopeValue = jest.fn(async (value) => `encrypted:${value}`);
       const respObj: Record<string, any> = {
         questionID: 'Q1',
         importance: null,
@@ -445,7 +444,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('encrypts importance and conviction when encryption is active', async () => {
-      const encryptEnvelopeValue = vi.fn(async (value) => `encrypted:${value}`);
+      const encryptEnvelopeValue = jest.fn(async (value: any, _opts?: any) => `encrypted:${value}`);
       const respObj: Record<string, any> = {
         questionID: 'Q1',
         importance: 8,
@@ -566,7 +565,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
       let inFlight = 0;
       let maxInFlight = 0;
       const callOrder: string[] = [];
-      const encryptEnvelopeValue = vi.fn(async (_value, opts: any) => {
+      const encryptEnvelopeValue = jest.fn(async (_value, opts: any) => {
         inFlight += 1;
         maxInFlight = Math.max(maxInFlight, inFlight);
         callOrder.push(String(opts?.qId));

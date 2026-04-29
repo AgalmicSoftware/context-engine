@@ -1,4 +1,3 @@
-import { describe, it, expect, vi } from 'vitest';
 
 import {
   ensureIdentifierHash,
@@ -169,9 +168,9 @@ describe('surveyToolSubmitTransactionController', () => {
 
   describe('ensureIdentifierHash', () => {
     it('uses hashIdentifier when available', () => {
-      const hashIdentifier = vi.fn(() => 'hashed-by-helper');
-      const isHexString = vi.fn(() => false);
-      const id = vi.fn((value: string) => `id:${value}`);
+      const hashIdentifier = jest.fn(() => 'hashed-by-helper');
+      const isHexString = jest.fn(() => false);
+      const id = jest.fn((value: string) => `id:${value}`);
 
       const result = ensureIdentifierHash('value-1', {
         hashIdentifier,
@@ -187,8 +186,8 @@ describe('surveyToolSubmitTransactionController', () => {
     });
 
     it('falls back to isHexString check for 32-byte hex', () => {
-      const isHexString = vi.fn(() => true);
-      const id = vi.fn((value: string) => `id:${value}`);
+      const isHexString = jest.fn(() => true);
+      const id = jest.fn((value: string) => `id:${value}`);
       const value = `0x${'AB'.repeat(32)}`;
 
       const result = ensureIdentifierHash(value, {
@@ -203,8 +202,8 @@ describe('surveyToolSubmitTransactionController', () => {
     });
 
     it('falls through to id() for non-hex strings', () => {
-      const isHexString = vi.fn(() => false);
-      const id = vi.fn((value: string) => `id:${value}`);
+      const isHexString = jest.fn(() => false);
+      const id = jest.fn((value: string) => `id:${value}`);
 
       const result = ensureIdentifierHash('plain-text', {
         isHexString,
@@ -225,12 +224,12 @@ describe('surveyToolSubmitTransactionController', () => {
 
     it('calls warn on hashIdentifier error', () => {
       const error = new Error('hash failed');
-      const warn = vi.fn();
-      const hashIdentifier = vi.fn(() => {
+      const warn = jest.fn();
+      const hashIdentifier = jest.fn(() => {
         throw error;
       });
-      const isHexString = vi.fn(() => false);
-      const id = vi.fn(() => 'id:fallback');
+      const isHexString = jest.fn(() => false);
+      const id = jest.fn(() => 'id:fallback');
 
       const result = ensureIdentifierHash('value-1', {
         hashIdentifier,
@@ -246,11 +245,11 @@ describe('surveyToolSubmitTransactionController', () => {
 
     it('calls warn on isHexString error', () => {
       const error = new Error('hex failed');
-      const warn = vi.fn();
-      const isHexString = vi.fn(() => {
+      const warn = jest.fn();
+      const isHexString = jest.fn(() => {
         throw error;
       });
-      const id = vi.fn(() => 'id:fallback');
+      const id = jest.fn(() => 'id:fallback');
 
       const result = ensureIdentifierHash('value-1', {
         isHexString,
@@ -277,7 +276,7 @@ describe('surveyToolSubmitTransactionController', () => {
     it('awaits tx.wait() for ethers TransactionResponse', async () => {
       let waitResolved = false;
       const tx = {
-        wait: vi.fn(async () => {
+        wait: jest.fn(async () => {
           await Promise.resolve();
           waitResolved = true;
           return {
@@ -298,7 +297,7 @@ describe('surveyToolSubmitTransactionController', () => {
 
     it('throws when tx.wait() returns failed status', async () => {
       const tx = {
-        wait: vi.fn(async () => ({
+        wait: jest.fn(async () => ({
           status: 0,
           transactionHash: TX_HASH,
         })),
@@ -380,7 +379,7 @@ describe('surveyToolSubmitTransactionController', () => {
         surveyID: 'survey-1',
         responses: questionResponses,
       };
-      const deepClone = vi.fn((obj: any) => JSON.parse(JSON.stringify(obj)));
+      const deepClone = jest.fn((obj: any) => JSON.parse(JSON.stringify(obj)));
 
       const result = await normalizeSubmitReceipt(TX_HASH, makeSubmitOpts({
         questionResponses,

@@ -1,4 +1,3 @@
-import { describe, it, expect, vi } from 'vitest';
 import {
   buildIndexedQuestionEntryKeys,
   computePendingEditStats,
@@ -165,7 +164,7 @@ describe('surveyToolChangedFieldsController', () => {
         ...buildEmptySlice(),
         answers: { q1: { value: 'new' } },
       };
-      const bumpPerfCounter = vi.fn();
+      const bumpPerfCounter = jest.fn();
 
       const { result, newCache } = orchestrateGetChangedQidsAndFields(
         {
@@ -230,11 +229,11 @@ describe('surveyToolChangedFieldsController', () => {
         idsScopeMode: 'scope',
         result: cachedResult,
       };
-      const bumpPerfCounter = vi.fn();
-      const getIndexedQuestionEntryKeys = vi.fn(() => {
+      const bumpPerfCounter = jest.fn();
+      const getIndexedQuestionEntryKeys = jest.fn(() => {
         throw new Error('unexpected indexing work on scoped cache hit');
       });
-      const buildRatingEnvelopeQidSetFromUserAnswers = vi.fn(() => {
+      const buildRatingEnvelopeQidSetFromUserAnswers = jest.fn(() => {
         throw new Error('unexpected rating work on scoped cache hit');
       });
 
@@ -281,8 +280,8 @@ describe('surveyToolChangedFieldsController', () => {
         ...buildEmptySlice(),
         answers: { q1: { value: 'same', encrypted: true, encryptionAudience: 'beta' } },
       };
-      const normalizeResponseEncryptionAudience = vi.fn((audience: any, qid: any) => `${qid}:${audience}`);
-      const getDefaultResponseEncryptionAudienceForQid = vi.fn(() => 'default-qid');
+      const normalizeResponseEncryptionAudience = jest.fn((audience: any, qid: any) => `${qid}:${audience}`);
+      const getDefaultResponseEncryptionAudienceForQid = jest.fn(() => 'default-qid');
 
       const { result } = orchestrateGetChangedQidsAndFields(
         {
@@ -305,7 +304,7 @@ describe('surveyToolChangedFieldsController', () => {
           buildSurveyResponseSliceSignature,
           buildRatingEnvelopeQidSetFromUserAnswers: () => new Set<string>(),
           hasMeaningfulFieldValue,
-          bumpPerfCounter: vi.fn(),
+          bumpPerfCounter: jest.fn(),
         },
         null,
       );
@@ -336,11 +335,11 @@ describe('surveyToolChangedFieldsController', () => {
         questionId: 'q1',
         result,
       };
-      const getChangedQidsAndFields = vi.fn(() => ({
+      const getChangedQidsAndFields = jest.fn(() => ({
         changedQids: new Set<string>(),
         changedMap: {},
       }));
-      const buildRatingEnvelopeQidSetFromUserAnswers = vi.fn(() => new Set<string>());
+      const buildRatingEnvelopeQidSetFromUserAnswers = jest.fn(() => new Set<string>());
 
       const stats = computePendingEditStats(
         {
@@ -355,7 +354,7 @@ describe('surveyToolChangedFieldsController', () => {
         },
         {
           getChangedQidsAndFields,
-          isQuestionLockedForResponse: vi.fn(() => false),
+          isQuestionLockedForResponse: jest.fn(() => false),
           buildRatingEnvelopeQidSetFromUserAnswers,
         },
       );
@@ -375,7 +374,7 @@ describe('surveyToolChangedFieldsController', () => {
       const diffCacheRef = {};
       const questionPool = {};
       const pileQuestions = {};
-      const getChangedQidsAndFields = vi.fn(() => ({
+      const getChangedQidsAndFields = jest.fn(() => ({
         changedQids: new Set(['q1']),
         changedMap: { q1: { additional: 1 } },
       }));
@@ -393,8 +392,8 @@ describe('surveyToolChangedFieldsController', () => {
         },
         {
           getChangedQidsAndFields,
-          isQuestionLockedForResponse: vi.fn(() => false),
-          buildRatingEnvelopeQidSetFromUserAnswers: vi.fn(() => new Set<string>()),
+          isQuestionLockedForResponse: jest.fn(() => false),
+          buildRatingEnvelopeQidSetFromUserAnswers: jest.fn(() => new Set<string>()),
         },
       );
 
@@ -431,12 +430,12 @@ describe('surveyToolChangedFieldsController', () => {
           questionId: 'q1',
         },
         {
-          getChangedQidsAndFields: vi.fn(() => ({
+          getChangedQidsAndFields: jest.fn(() => ({
             changedQids: new Set(['q1']),
             changedMap: { q1: { answer: 1 } },
           })),
-          isQuestionLockedForResponse: vi.fn(() => false),
-          buildRatingEnvelopeQidSetFromUserAnswers: vi.fn(() => new Set<string>()),
+          isQuestionLockedForResponse: jest.fn(() => false),
+          buildRatingEnvelopeQidSetFromUserAnswers: jest.fn(() => new Set<string>()),
         },
       );
 
@@ -445,8 +444,8 @@ describe('surveyToolChangedFieldsController', () => {
 
     it('counts rating edits as encrypted when the question is locked or baseline ratings are encrypted', () => {
       const currentSlice = buildEmptySlice();
-      const isQuestionLockedForResponse = vi.fn((qid: string) => qid === 'Q1');
-      const buildRatingEnvelopeQidSetFromUserAnswers = vi.fn(() => new Set(['q2']));
+      const isQuestionLockedForResponse = jest.fn((qid: string) => qid === 'Q1');
+      const buildRatingEnvelopeQidSetFromUserAnswers = jest.fn(() => new Set(['q2']));
 
       const stats = computePendingEditStats(
         {
@@ -460,7 +459,7 @@ describe('surveyToolChangedFieldsController', () => {
           questionId: 'q1',
         },
         {
-          getChangedQidsAndFields: vi.fn(() => ({
+          getChangedQidsAndFields: jest.fn(() => ({
             changedQids: new Set(['Q1', ' Q2 ']),
             changedMap: {
               Q1: { importance: 1 },
@@ -478,8 +477,8 @@ describe('surveyToolChangedFieldsController', () => {
     });
 
     it('returns zero stats for an empty changed set without building rating envelopes', () => {
-      const buildRatingEnvelopeQidSetFromUserAnswers = vi.fn(() => new Set(['q1']));
-      const isQuestionLockedForResponse = vi.fn(() => false);
+      const buildRatingEnvelopeQidSetFromUserAnswers = jest.fn(() => new Set(['q1']));
+      const isQuestionLockedForResponse = jest.fn(() => false);
 
       const stats = computePendingEditStats(
         {
@@ -493,7 +492,7 @@ describe('surveyToolChangedFieldsController', () => {
           questionId: null,
         },
         {
-          getChangedQidsAndFields: vi.fn(() => ({
+          getChangedQidsAndFields: jest.fn(() => ({
             changedQids: new Set<string>(),
             changedMap: {},
           })),
