@@ -7,6 +7,244 @@ export type ResponseSlice = {
 
 export type IndexedKeyMap = Map<string, string[]>;
 
+export interface ChangedFieldsOrchestrationParams {
+  surveyIndex: number;
+  currentSlice: ResponseSlice;
+  isLoggedIn: boolean;
+  isLoadingResponse: boolean;
+  scopedIds: Set<string>;
+  userAnswers: any;
+}
+
+export interface ChangedFieldsDiffCache {
+  surveyIndex: number;
+  currentSlice: ResponseSlice;
+  baselineSlice: ResponseSlice;
+  currentSliceSignature: string;
+  baselineSliceSignature: string;
+  allowLocalCache: boolean;
+  idsScopeKey: string;
+  idsScopeMode: string;
+  result: { changedQids: Set<string>; changedMap: Record<string, Record<string, number>> };
+}
+
+export interface ChangedFieldsOrchestrationDeps {
+  resolveDiffBaselineSlice: (allowLocalCache: boolean) => ResponseSlice;
+  getIndexedQuestionEntryKeys: (source: Record<string, any> | null | undefined) => IndexedKeyMap | null;
+  getDefaultResponseEncryptionAudience: () => any;
+  normalizeResponseEncryptionAudience: (audience: any, qid: string) => any;
+  getDefaultResponseEncryptionAudienceForQid: (qid: string) => any;
+  resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => any;
+  normalizeFieldAudienceMode: (mode: any, fieldKey: string, field: any) => any;
+  valuesEqual: (left: unknown, right: unknown) => boolean;
+  buildSurveyResponseSliceSignature: (slice: ResponseSlice, opts?: { normalizedIdFilter?: Set<string> | null }) => string;
+  buildRatingEnvelopeQidSetFromUserAnswers: (userAnswers: any) => Set<string>;
+  hasMeaningfulFieldValue: (value: any) => boolean;
+  bumpPerfCounter: (name: string) => void;
+}
+
+export interface ChangedFieldsOrchestrationResult {
+  result: { changedQids: Set<string>; changedMap: Record<string, Record<string, number>> };
+  newCache: ChangedFieldsDiffCache;
+}
+
+export const buildIndexedQuestionEntryKeys = (
+  source: Record<string, any> | null | undefined,
+  normalizeKey: (key: string) => string,
+): IndexedKeyMap | null => {
+  if (!source || typeof source !== 'object') return null;
+  const byNormalizedQid: IndexedKeyMap = new Map();
+  Object.keys(source).forEach((rawKey) => {
+    const normalizedKey = normalizeKey(rawKey);
+    if (!normalizedKey) return;
+    const existing = byNormalizedQid.get(normalizedKey);
+    if (existing) existing.push(rawKey);
+    else byNormalizedQid.set(normalizedKey, [rawKey]);
+  });
+  return byNormalizedQid;
+};
+
+export const orchestrateGetChangedQidsAndFields = (
+  params: ChangedFieldsOrchestrationParams,
+  deps: ChangedFieldsOrchestrationDeps,
+  existingCache: ChangedFieldsDiffCache | null,
+): ChangedFieldsOrchestrationResult => {
+  deps.bumpPerfCounter('getChangedQidsAndFieldsCount');
+  const allowLocalCache = !params.isLoadingResponse && !params.isLoggedIn;
+  const baselineSlice = deps.resolveDiffBaselineSlice(allowLocalCache);
+
+  const scopedIds = params.scopedIds;
+  const hasScopedIds = scopedIds.size > 0;
+  let ids = scopedIds;
+  let idsScopeKey = '';
+  let idsScopeMode = hasScopedIds ? 'scope' : 'slice';
+  if (hasScopedIds) {
+    idsScopeKey = `scope:${Array.from(scopedIds).sort().join('|')}`;
+  }
+
+  let signatureMemo: {
+    filter: Set<string> | null;
+    value: { currentSliceSignature: string; baselineSliceSignature: string };
+  } | null = null;
+  const getSliceSignatures = (normalizedIdFilter: Set<string> | null = null) => {
+    if (signatureMemo && signatureMemo.filter === normalizedIdFilter) {
+      return signatureMemo.value;
+    }
+    const value = {
+      currentSliceSignature: deps.buildSurveyResponseSliceSignature(params.currentSlice, { normalizedIdFilter }),
+      baselineSliceSignature: deps.buildSurveyResponseSliceSignature(baselineSlice, { normalizedIdFilter }),
+    };
+    signatureMemo = { filter: normalizedIdFilter, value };
+    return value;
+  };
+
+  if (
+    hasScopedIds &&
+    existingCache &&
+    existingCache.surveyIndex === params.surveyIndex &&
+    existingCache.allowLocalCache === allowLocalCache &&
+    existingCache.idsScopeMode === 'scope' &&
+    existingCache.idsScopeKey === idsScopeKey &&
+    existingCache.result
+  ) {
+    if (
+      existingCache.currentSlice === params.currentSlice &&
+      existingCache.baselineSlice === baselineSlice
+    ) {
+      deps.bumpPerfCounter('noopSkipCount');
+      return { result: existingCache.result, newCache: existingCache };
+    }
+    const {
+      currentSliceSignature,
+      baselineSliceSignature,
+    } = getSliceSignatures(scopedIds);
+    if (
+      existingCache.currentSliceSignature === currentSliceSignature &&
+      existingCache.baselineSliceSignature === baselineSliceSignature
+    ) {
+      deps.bumpPerfCounter('noopSkipCount');
+      return { result: existingCache.result, newCache: existingCache };
+    }
+  } else if (
+    !hasScopedIds &&
+    existingCache &&
+    existingCache.surveyIndex === params.surveyIndex &&
+    existingCache.allowLocalCache === allowLocalCache &&
+    existingCache.idsScopeMode === 'slice' &&
+    existingCache.result &&
+    existingCache.currentSlice === params.currentSlice &&
+    existingCache.baselineSlice === baselineSlice
+  ) {
+    deps.bumpPerfCounter('noopSkipCount');
+    return { result: existingCache.result, newCache: existingCache };
+  }
+
+  if (!hasScopedIds) {
+    const idsFromSlices = new Set<string>();
+    const addNormalizedIds = (source: Record<string, any> | null | undefined) => {
+      const indexed = deps.getIndexedQuestionEntryKeys(source);
+      if (!indexed) return;
+      indexed.forEach((_keys, normalizedQid) => {
+        if (normalizedQid) idsFromSlices.add(normalizedQid);
+      });
+    };
+    addNormalizedIds(baselineSlice.answers);
+    addNormalizedIds(params.currentSlice.answers);
+    addNormalizedIds(baselineSlice.additionalComments);
+    addNormalizedIds(params.currentSlice.additionalComments);
+    addNormalizedIds(baselineSlice.importance);
+    addNormalizedIds(params.currentSlice.importance);
+    addNormalizedIds(baselineSlice.conviction);
+    addNormalizedIds(params.currentSlice.conviction);
+    ids = idsFromSlices;
+    idsScopeKey = `slice:${Array.from(idsFromSlices).sort().join('|')}`;
+    idsScopeMode = 'slice';
+    if (
+      existingCache &&
+      existingCache.surveyIndex === params.surveyIndex &&
+      existingCache.allowLocalCache === allowLocalCache &&
+      existingCache.idsScopeMode === idsScopeMode &&
+      existingCache.idsScopeKey === idsScopeKey &&
+      existingCache.result
+    ) {
+      if (
+        existingCache.currentSlice === params.currentSlice &&
+        existingCache.baselineSlice === baselineSlice
+      ) {
+        deps.bumpPerfCounter('noopSkipCount');
+        return { result: existingCache.result, newCache: existingCache };
+      }
+      const normalizedIdFilter = ids.size > 0 ? ids : null;
+      const {
+        currentSliceSignature,
+        baselineSliceSignature,
+      } = getSliceSignatures(normalizedIdFilter);
+      if (
+        existingCache.currentSliceSignature === currentSliceSignature &&
+        existingCache.baselineSliceSignature === baselineSliceSignature
+      ) {
+        deps.bumpPerfCounter('noopSkipCount');
+        return { result: existingCache.result, newCache: existingCache };
+      }
+    }
+  }
+
+  const ratingEnvelopeQids = deps.buildRatingEnvelopeQidSetFromUserAnswers(params.userAnswers);
+  const baselineAnswerKeysByQid = deps.getIndexedQuestionEntryKeys(baselineSlice.answers);
+  const currentAnswerKeysByQid = deps.getIndexedQuestionEntryKeys(params.currentSlice.answers);
+  const baselineAdditionalKeysByQid = deps.getIndexedQuestionEntryKeys(baselineSlice.additionalComments);
+  const currentAdditionalKeysByQid = deps.getIndexedQuestionEntryKeys(params.currentSlice.additionalComments);
+  const baselineImportanceKeysByQid = deps.getIndexedQuestionEntryKeys(baselineSlice.importance);
+  const currentImportanceKeysByQid = deps.getIndexedQuestionEntryKeys(params.currentSlice.importance);
+  const baselineConvictionKeysByQid = deps.getIndexedQuestionEntryKeys(baselineSlice.conviction);
+  const currentConvictionKeysByQid = deps.getIndexedQuestionEntryKeys(params.currentSlice.conviction);
+
+  const defaultAudience = deps.getDefaultResponseEncryptionAudience();
+  const result = computeChangedQidsAndFields({
+    ids,
+    baselineSlice,
+    currentSlice: params.currentSlice,
+    baselineAnswerKeys: baselineAnswerKeysByQid,
+    currentAnswerKeys: currentAnswerKeysByQid,
+    baselineAdditionalKeys: baselineAdditionalKeysByQid,
+    currentAdditionalKeys: currentAdditionalKeysByQid,
+    baselineImportanceKeys: baselineImportanceKeysByQid,
+    currentImportanceKeys: currentImportanceKeysByQid,
+    baselineConvictionKeys: baselineConvictionKeysByQid,
+    currentConvictionKeys: currentConvictionKeysByQid,
+    ratingEnvelopeQids,
+    valuesEqual: deps.valuesEqual,
+    hasMeaningfulFieldValue: deps.hasMeaningfulFieldValue,
+    resolveAudience: (field, qid) => {
+      if (field && typeof field === 'object' && field.encryptionAudience) {
+        return deps.normalizeResponseEncryptionAudience(field.encryptionAudience, qid as string);
+      }
+      return qid ? deps.getDefaultResponseEncryptionAudienceForQid(qid) : defaultAudience;
+    },
+    resolveGateId: (field, qid, fieldKey) => deps.resolveFieldEncryptionGateId(field, qid, fieldKey),
+    resolveAudienceMode: (field, fieldKey) => deps.normalizeFieldAudienceMode(field?.audienceMode, fieldKey, field),
+  });
+  const normalizedIdFilter = ids.size > 0 ? ids : null;
+  const {
+    currentSliceSignature,
+    baselineSliceSignature,
+  } = getSliceSignatures(normalizedIdFilter);
+  return {
+    result,
+    newCache: {
+      surveyIndex: params.surveyIndex,
+      currentSlice: params.currentSlice,
+      baselineSlice,
+      currentSliceSignature,
+      baselineSliceSignature,
+      allowLocalCache,
+      idsScopeKey,
+      idsScopeMode,
+      result,
+    },
+  };
+};
+
 const getMatchingKeys = (
   source: Record<string, any> | null,
   indexed: IndexedKeyMap | null,

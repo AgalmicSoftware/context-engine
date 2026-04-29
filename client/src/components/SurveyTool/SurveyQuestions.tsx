@@ -411,9 +411,8 @@ import {
 } from './surveyToolResponseMutationController';
 import { buildResponsePayload } from './surveyToolResponsePayloadController';
 import {
-  computeChangedQidsAndFields,
-  pickBestField,
-  pickBestNumber,
+  buildIndexedQuestionEntryKeys,
+  orchestrateGetChangedQidsAndFields,
 } from './surveyToolChangedFieldsController';
 import {
   getQuestionEncryptionGates as getQuestionEncryptionGatesCore,
@@ -3382,206 +3381,48 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       const cached = this._normalizedQuestionEntryKeyCache.get(source);
       if (cached) return cached;
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-    const byNormalizedQid = new Map();
-    Object.keys(source).forEach((rawKey) => {
-      const normalizedKey = normalizeQuestionIdKey(rawKey);
-      if (!normalizedKey) return;
-      const existing = byNormalizedQid.get(normalizedKey);
-      if (existing) existing.push(rawKey);
-      else byNormalizedQid.set(normalizedKey, [rawKey]);
-    });
-
+    const result = buildIndexedQuestionEntryKeys(source, normalizeQuestionIdKey);
     try {
-      this._normalizedQuestionEntryKeyCache.set(source, byNormalizedQid);
+      if (result) this._normalizedQuestionEntryKeyCache.set(source, result);
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-    return byNormalizedQid;
+    return result;
   };
 
   getChangedQidsAndFields = (surveyIndexParam) => measureSync('ce.surveyQuestions.getChangedQidsAndFields', () => {
-    bumpSurveyPerfCounter('getChangedQidsAndFieldsCount');
-    const surveyIndex =
-      this.getActiveSurveyIndex(surveyIndexParam);
-
+    const surveyIndex = this.getActiveSurveyIndex(surveyIndexParam);
     const currentSlice =
       (this.state.surveysResponseState && this.state.surveysResponseState[surveyIndex]) ||
       { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-    // Baseline precedence (anon→empty; logged-in→on-chain snapshot; never drafts)
-    // Do not fall back to local cache if we are currently loading,
-    // OR if we are logged in (authoritative source is chain, not cache).
-    // This prevents "Submit (X)" ghost counts from stale cache data appearing on login.
-    const isLoggedIn = !!(this.props.account && this.props.loginComplete);
-    const allowLocalCache = !this.state.isLoadingResponse && !isLoggedIn;
-
-    let baselineSlice = this.resolveDiffBaselineSlice(allowLocalCache);
-
     const scopedIds = this.getEditTrackingQuestionIds(surveyIndex);
-    const hasScopedIds = scopedIds.size > 0;
-    let ids = scopedIds;
-    let idsScopeKey = '';
-    let idsScopeMode = hasScopedIds ? 'scope' : 'slice';
-    if (hasScopedIds) {
-      idsScopeKey = `scope:${Array.from(scopedIds).sort().join('|')}`;
-    }
-
-    const diffCache = this._changedQidsAndFieldsCache;
-    let signatureMemo = null;
-    const getSliceSignatures = (normalizedIdFilter = null) => {
-      if (signatureMemo && signatureMemo.filter === normalizedIdFilter) {
-        return signatureMemo.value;
-      }
-      const value = {
-        currentSliceSignature: buildSurveyResponseSliceSignature(currentSlice, { normalizedIdFilter }),
-        baselineSliceSignature: buildSurveyResponseSliceSignature(baselineSlice, { normalizedIdFilter }),
-      };
-      signatureMemo = { filter: normalizedIdFilter, value };
-      return value;
-    };
-
-    if (
-      hasScopedIds &&
-      diffCache &&
-      diffCache.surveyIndex === surveyIndex &&
-      diffCache.allowLocalCache === allowLocalCache &&
-      diffCache.idsScopeMode === 'scope' &&
-      diffCache.idsScopeKey === idsScopeKey &&
-      diffCache.result
-    ) {
-      if (
-        diffCache.currentSlice === currentSlice &&
-        diffCache.baselineSlice === baselineSlice
-      ) {
-        bumpSurveyPerfCounter('noopSkipCount');
-        return diffCache.result;
-      }
-      const {
-        currentSliceSignature,
-        baselineSliceSignature,
-      } = getSliceSignatures(scopedIds);
-      if (
-        diffCache.currentSliceSignature === currentSliceSignature &&
-        diffCache.baselineSliceSignature === baselineSliceSignature
-      ) {
-        bumpSurveyPerfCounter('noopSkipCount');
-        return diffCache.result;
-      }
-    } else if (
-      !hasScopedIds &&
-      diffCache &&
-      diffCache.surveyIndex === surveyIndex &&
-      diffCache.allowLocalCache === allowLocalCache &&
-      diffCache.idsScopeMode === 'slice' &&
-      diffCache.result &&
-      diffCache.currentSlice === currentSlice &&
-      diffCache.baselineSlice === baselineSlice
-    ) {
-      bumpSurveyPerfCounter('noopSkipCount');
-      return diffCache.result;
-    }
-
-    if (!hasScopedIds) {
-      const idsFromSlices = new Set();
-      const addNormalizedIds = (source) => {
-        const indexed = this.getIndexedQuestionEntryKeys(source);
-        if (!indexed) return;
-        indexed.forEach((_keys, normalizedQid) => {
-          if (normalizedQid) idsFromSlices.add(normalizedQid);
-        });
-      };
-      addNormalizedIds(baselineSlice.answers);
-      addNormalizedIds(currentSlice.answers);
-      addNormalizedIds(baselineSlice.additionalComments);
-      addNormalizedIds(currentSlice.additionalComments);
-      addNormalizedIds(baselineSlice.importance);
-      addNormalizedIds(currentSlice.importance);
-      addNormalizedIds(baselineSlice.conviction);
-      addNormalizedIds(currentSlice.conviction);
-      ids = idsFromSlices;
-      idsScopeKey = `slice:${Array.from(idsFromSlices).sort().join('|')}`;
-      idsScopeMode = 'slice';
-      if (
-        diffCache &&
-        diffCache.surveyIndex === surveyIndex &&
-        diffCache.allowLocalCache === allowLocalCache &&
-        diffCache.idsScopeMode === idsScopeMode &&
-        diffCache.idsScopeKey === idsScopeKey &&
-        diffCache.result
-      ) {
-        if (
-          diffCache.currentSlice === currentSlice &&
-          diffCache.baselineSlice === baselineSlice
-        ) {
-          bumpSurveyPerfCounter('noopSkipCount');
-          return diffCache.result;
-        }
-        const normalizedIdFilter = ids.size > 0 ? ids : null;
-        const {
-          currentSliceSignature,
-          baselineSliceSignature,
-        } = getSliceSignatures(normalizedIdFilter);
-        if (
-          diffCache.currentSliceSignature === currentSliceSignature &&
-          diffCache.baselineSliceSignature === baselineSliceSignature
-        ) {
-          bumpSurveyPerfCounter('noopSkipCount');
-          return diffCache.result;
-        }
-      }
-    }
-
-    const ratingEnvelopeQids = buildRatingEnvelopeQidSetFromUserAnswers(this.state.userAnswers);
-    const baselineAnswerKeysByQid = this.getIndexedQuestionEntryKeys(baselineSlice.answers);
-    const currentAnswerKeysByQid = this.getIndexedQuestionEntryKeys(currentSlice.answers);
-    const baselineAdditionalKeysByQid = this.getIndexedQuestionEntryKeys(baselineSlice.additionalComments);
-    const currentAdditionalKeysByQid = this.getIndexedQuestionEntryKeys(currentSlice.additionalComments);
-    const baselineImportanceKeysByQid = this.getIndexedQuestionEntryKeys(baselineSlice.importance);
-    const currentImportanceKeysByQid = this.getIndexedQuestionEntryKeys(currentSlice.importance);
-    const baselineConvictionKeysByQid = this.getIndexedQuestionEntryKeys(baselineSlice.conviction);
-    const currentConvictionKeysByQid = this.getIndexedQuestionEntryKeys(currentSlice.conviction);
-
-    const defaultAudience = this.getDefaultResponseEncryptionAudience();
-    const result = computeChangedQidsAndFields({
-      ids,
-      baselineSlice,
-      currentSlice,
-      baselineAnswerKeys: baselineAnswerKeysByQid,
-      currentAnswerKeys: currentAnswerKeysByQid,
-      baselineAdditionalKeys: baselineAdditionalKeysByQid,
-      currentAdditionalKeys: currentAdditionalKeysByQid,
-      baselineImportanceKeys: baselineImportanceKeysByQid,
-      currentImportanceKeys: currentImportanceKeysByQid,
-      baselineConvictionKeys: baselineConvictionKeysByQid,
-      currentConvictionKeys: currentConvictionKeysByQid,
-      ratingEnvelopeQids,
-      valuesEqual: this.valuesEqual,
-      hasMeaningfulFieldValue,
-      resolveAudience: (field, qid) => {
-        if (field && typeof field === 'object' && field.encryptionAudience) {
-          return this.normalizeResponseEncryptionAudience(field.encryptionAudience, qid);
-        }
-        return qid ? this.getDefaultResponseEncryptionAudienceForQid(qid) : defaultAudience;
+    const { result, newCache } = orchestrateGetChangedQidsAndFields(
+      {
+        surveyIndex,
+        currentSlice,
+        isLoggedIn: !!(this.props.account && this.props.loginComplete),
+        isLoadingResponse: !!this.state.isLoadingResponse,
+        scopedIds,
+        userAnswers: this.state.userAnswers,
       },
-      resolveGateId: (field, qid, fieldKey) => this.resolveFieldEncryptionGateId(field, qid, fieldKey),
-      resolveAudienceMode: (field, fieldKey) => this.normalizeFieldAudienceMode(field?.audienceMode, fieldKey, field),
-    });
-    const normalizedIdFilter = ids.size > 0 ? ids : null;
-    const {
-      currentSliceSignature,
-      baselineSliceSignature,
-    } = getSliceSignatures(normalizedIdFilter);
-    this._changedQidsAndFieldsCache = {
-      surveyIndex,
-      currentSlice,
-      baselineSlice,
-      currentSliceSignature,
-      baselineSliceSignature,
-      allowLocalCache,
-      idsScopeKey,
-      idsScopeMode,
-      result,
-    };
-    this._pendingEditStatsCache = null;
+      {
+        resolveDiffBaselineSlice: (allowLocalCache) => this.resolveDiffBaselineSlice(allowLocalCache),
+        getIndexedQuestionEntryKeys: (source) => this.getIndexedQuestionEntryKeys(source),
+        getDefaultResponseEncryptionAudience: () => this.getDefaultResponseEncryptionAudience(),
+        normalizeResponseEncryptionAudience: (audience, qid) => this.normalizeResponseEncryptionAudience(audience, qid),
+        getDefaultResponseEncryptionAudienceForQid: (qid) => this.getDefaultResponseEncryptionAudienceForQid(qid),
+        resolveFieldEncryptionGateId: (field, qid, fieldKey) => this.resolveFieldEncryptionGateId(field, qid, fieldKey),
+        normalizeFieldAudienceMode: (mode, fieldKey, field) => this.normalizeFieldAudienceMode(mode, fieldKey, field),
+        valuesEqual: this.valuesEqual,
+        buildSurveyResponseSliceSignature,
+        buildRatingEnvelopeQidSetFromUserAnswers,
+        hasMeaningfulFieldValue,
+        bumpPerfCounter: bumpSurveyPerfCounter,
+      },
+      this._changedQidsAndFieldsCache,
+    );
+    if (newCache !== this._changedQidsAndFieldsCache) {
+      this._changedQidsAndFieldsCache = newCache;
+      this._pendingEditStatsCache = null;
+    }
     return result;
   });
 
