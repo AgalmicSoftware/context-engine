@@ -8,7 +8,7 @@
 - Session docs lazy view: `client/src/components/DocumentLibrary/SessionDocumentsPage.tsx` (via `routeLazyComponents.js`)
 - Demo route lazy views: `client/src/components/DemoViews/DemosIndex.tsx`, `client/src/components/DemoViews/RiskMatrixDemo.tsx` (via `routeLazyComponents.js`)
 - Navbar account modal surface: `client/src/components/Account/LoginAndSettingsModal.tsx` (mounted by `client/src/components/Navbar/AccountSection.tsx`, outside the route-lazy map)
-- Current length: **12,870 lines**
+- Current length: **12,334 lines**
 - Component type: **React class component** (`MainSite extends Component`)
 - Component count in file: **1 class component** (`MainSite`)
 - Method inventory: **138 class methods/properties** + **15 top-level helper functions**
@@ -29,15 +29,23 @@
   Methods: `key`, `read`, `write`, `remove`, `destroy`
   Test: `mainSiteDgStorage.test.js` (5 tests)
   Note: no host DI — all dependencies are module imports
+- `client/src/utilities/session/mainSiteSessionScanPolicy.js`
+  Factory: `createSessionScanPolicy(host)`
+  Pattern: Factory with host dependency injection
+  Host interface: `getActiveSessionSlug()`, `getCurrentPath()`, `getSessionSlugHintFromSearch(search)`, `getSessionTokenFromPath(path)`, `isSbtListRoutePath(path)`
+  Public methods: `isSbtInstanceListenerEnabledForGroup`, `isSbtHistoryScanEnabled`, `getSessionScanScope`, `getSessionScanScopeContext`, `shouldAutoRunFullSbtScan`, `shouldAttachSbtDetailInstanceListener`, `getScopedSessionSlugs`, `shouldSkipSessionScanForSlug`, `scanScopeNoop`, `getScopeFilteredSlugs`, `isSessionSlugAllowedForScan`, `logScopeSkipOnce`, `destroy`
+  Internal state: `didLogSessionScanScope` (once flag), `didLogSbtInstanceListenersSuppressed` (once flag), `scopeSkipLogOnce` (Set)
+  Test: `mainSiteSessionScanPolicy.test.js` (17 tests)
+  What stays in MainSite: `shouldBackfillGeneralSession`, `enqueueGeneralSessionBackfill`, `runWithGeneralSessionBackfill`, `hasExplicitProfileScanScopeOverride`, `getProfileScanScopeContext`, profile-scan/registry methods
 
-Both cache controllers use a factory-function + host-DI pattern rather than class extraction. `MainSite` creates them in the constructor and delegates through forwarding methods.
+All extracted controllers use a factory-function + host-DI pattern (or pure exports for session config). `MainSite` creates them as class-field initializers and delegates through forwarding methods.
 
 ## Section Index
 
 | Section | Lines | Purpose | Key Methods |
 |---|---:|---|---|
 | Imports, constants, pure helpers | 1-325 | Dependencies, perf helpers, cache utility helpers, exported pure functions (`shouldFlushCoalescedRun`, etc.) | `shouldFlushCoalescedRun`, `buildQuestionReadyStatePatch`, `shouldEnableSessionRegistryRefresh` |
-| Class state + instance fields | 326-400 | Main runtime state + internal run tokens/queues | `state`, `_pendingCacheUpdateFlags`, `_cacheHasLoadedSyncInFlight` |
+| Class state + instance fields | 326-400 | Main runtime state + internal run tokens/queues/controllers | `state`, `_cachePersistenceController`, `_cacheReadinessController`, `_scanPolicy`, `DG` |
 | Cache flush + cross-tab coalescing | 401-725 | Debounced cache/readiness updates and cross-tab sync handling | `setReadinessStateIfChanged`, `scheduleCacheUpdateFlush`, `flushQueuedCacheUpdates`, `handleCrossTabCacheUpdateEvent` |
 | Session path/slug resolution | 728-1473 | Parse `/session/:token`, resolve ids/slugs, locate groups for surveys/questions/SBT links | `resolveSessionPathId`, `resolveSessionPathSlug`, `findGroupSlugForSurvey`, `findGroupSlugForQuestion`, `resolveGroupSlugForSbtAddress` |
 | DG storage abstraction | 1475-1616 | Per-group storage facade over cache manager/localStorage | `DG.key`, `DG.read`, `DG.write`, `DG.remove` |
