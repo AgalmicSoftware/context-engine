@@ -394,6 +394,11 @@ import {
   resolveSurveyBaselineSourceSlice,
   resolveSurveyUserAnswersSlice,
 } from './surveyToolResponseSourceController';
+import {
+  computeChangedQidsAndFields,
+  pickBestField,
+  pickBestNumber,
+} from './surveyToolChangedFieldsController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -3500,8 +3505,6 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       }
     }
 
-    const changedQids = new Set();
-    const changedMap = {};
     const ratingEnvelopeQids = buildRatingEnvelopeQidSetFromUserAnswers(this.state.userAnswers);
     const baselineAnswerKeysByQid = this.getIndexedQuestionEntryKeys(baselineSlice.answers);
     const currentAnswerKeysByQid = this.getIndexedQuestionEntryKeys(currentSlice.answers);
@@ -3512,154 +3515,31 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     const baselineConvictionKeysByQid = this.getIndexedQuestionEntryKeys(baselineSlice.conviction);
     const currentConvictionKeysByQid = this.getIndexedQuestionEntryKeys(currentSlice.conviction);
 
-    const getMatchingKeys = (source, indexed, qidLower) => {
-      if (!source || typeof source !== 'object' || !indexed) return [];
-      return indexed.get(qidLower) || [];
-    };
-
-    const pickBestField = (source, indexed, qidLower) => {
-      const matchingKeys = getMatchingKeys(source, indexed, qidLower);
-      if (matchingKeys.length === 0) return {};
-
-      let exactValue;
-      let firstMeaningfulValue;
-      let firstEncryptedValue;
-      let lastValue = {};
-      for (let i = 0; i < matchingKeys.length; i += 1) {
-        const key = matchingKeys[i];
-        const value = source[key];
-        const normalizedValue = value || {};
-        lastValue = normalizedValue;
-        if (key === qidLower && hasMeaningfulFieldValue(value)) return normalizedValue;
-        if (typeof firstMeaningfulValue === 'undefined' && hasMeaningfulFieldValue(value)) {
-          firstMeaningfulValue = normalizedValue;
-        }
-        if (typeof exactValue === 'undefined' && key === qidLower) {
-          exactValue = normalizedValue;
-        }
-        if (
-          typeof firstEncryptedValue === 'undefined' &&
-          value &&
-          (value.encrypted || value.encryptedPortion)
-        ) {
-          firstEncryptedValue = normalizedValue;
-        }
-      }
-      if (typeof firstMeaningfulValue !== 'undefined') return firstMeaningfulValue;
-      if (typeof exactValue !== 'undefined') return exactValue;
-      if (typeof firstEncryptedValue !== 'undefined') return firstEncryptedValue;
-      return lastValue;
-    };
-
-    const pickBestNumber = (source, indexed, qidLower) => {
-      const matchingKeys = getMatchingKeys(source, indexed, qidLower);
-      if (matchingKeys.length === 0) return null;
-      const toNum = (v) => (v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v));
-      const exactKey = matchingKeys.find((key) => key === qidLower);
-      const exactNum = toNum(exactKey ? source[exactKey] : undefined);
-      if (exactNum !== null) return exactNum;
-      for (let i = 0; i < matchingKeys.length; i += 1) {
-        const nextNum = toNum(source[matchingKeys[i]]);
-        if (nextNum !== null) return nextNum;
-      }
-      return null;
-    };
-
     const defaultAudience = this.getDefaultResponseEncryptionAudience();
-    const resolveAudienceFast = (field = {}, qid = null) => {
-      if (field && typeof field === 'object' && field.encryptionAudience) {
-        return this.normalizeResponseEncryptionAudience(field.encryptionAudience, qid);
-      }
-      return qid ? this.getDefaultResponseEncryptionAudienceForQid(qid) : defaultAudience;
-    };
-    const resolveGateIdFast = (field = {}, qid = null, fieldKey = 'answer') => (
-      this.resolveFieldEncryptionGateId(field, qid, fieldKey)
-    );
-    const resolveAudienceModeFast = (field = {}, fieldKey = 'answer') => (
-      this.normalizeFieldAudienceMode(field?.audienceMode, fieldKey, field)
-    );
-
-    ids.forEach((qId) => {
-      const bAns = pickBestField(baselineSlice.answers, baselineAnswerKeysByQid, qId);
-      const cAns = pickBestField(currentSlice.answers, currentAnswerKeysByQid, qId);
-      const bAdd = pickBestField(baselineSlice.additionalComments, baselineAdditionalKeysByQid, qId);
-      const cAdd = pickBestField(currentSlice.additionalComments, currentAdditionalKeysByQid, qId);
-      const bImpN = pickBestNumber(baselineSlice.importance, baselineImportanceKeysByQid, qId);
-      const cImpN = pickBestNumber(currentSlice.importance, currentImportanceKeysByQid, qId);
-      const bConvN = pickBestNumber(baselineSlice.conviction, baselineConvictionKeysByQid, qId);
-      const cConvN = pickBestNumber(currentSlice.conviction, currentConvictionKeysByQid, qId);
-
-      // valuesEqual('*','*') → unchanged; arrays/nums handled
-      const ansChanged = !this.valuesEqual(bAns.value, cAns.value);
-      const addChanged = !this.valuesEqual(bAdd.value, cAdd.value);
-
-      const qLower = String(qId || '').trim().toLowerCase();
-      const baselineAnswerEncrypted = !!(bAns && (bAns.encrypted || bAns.encryptedPortion || bAns.value === '*'));
-      const baselineAdditionalEncrypted = !!(bAdd && (bAdd.encrypted || bAdd.encryptedPortion || bAdd.value === '*'));
-      const currentAnswerEncrypted = !!(cAns && (cAns.encrypted || cAns.encryptedPortion || cAns.value === '*'));
-      const currentAdditionalEncrypted = !!(cAdd && (cAdd.encrypted || cAdd.encryptedPortion || cAdd.value === '*'));
-      const responseEncrypted =
-        baselineAnswerEncrypted ||
-        baselineAdditionalEncrypted ||
-        currentAnswerEncrypted ||
-        currentAdditionalEncrypted;
-      const ratingEncrypted = qLower ? ratingEnvelopeQids.has(qLower) : false;
-      const allowMissingRatings = responseEncrypted || ratingEncrypted;
-      const missingCurrentImportance = cImpN === null && bImpN !== null;
-      const missingCurrentConviction = cConvN === null && bConvN !== null;
-
-      const impChanged = (bImpN !== cImpN) && !(allowMissingRatings && missingCurrentImportance);
-      const convChanged = (bConvN !== cConvN) && !(allowMissingRatings && missingCurrentConviction);
-
-      const ansHasContent = hasMeaningfulFieldValue(bAns) || hasMeaningfulFieldValue(cAns);
-      const addHasContent = hasMeaningfulFieldValue(bAdd) || hasMeaningfulFieldValue(cAdd);
-
-      // include encryption-flag deltas only when a field actually has content
-      const encAnsChanged = ansHasContent && (!!bAns.encrypted !== !!cAns.encrypted);
-      const encAddChanged = addHasContent && (!!bAdd.encrypted !== !!cAdd.encrypted);
-
-      const bAnsAudience = resolveAudienceFast(bAns, qId);
-      const cAnsAudience = resolveAudienceFast(cAns, qId);
-      const bAddAudience = resolveAudienceFast(bAdd, qId);
-      const cAddAudience = resolveAudienceFast(cAdd, qId);
-      const bAnsGateId = resolveGateIdFast(bAns, qId, 'answer');
-      const cAnsGateId = resolveGateIdFast(cAns, qId, 'answer');
-      const bAddGateId = resolveGateIdFast(bAdd, qId, 'additional');
-      const cAddGateId = resolveGateIdFast(cAdd, qId, 'additional');
-      const bAddAudienceMode = resolveAudienceModeFast(bAdd, 'additional');
-      const cAddAudienceMode = resolveAudienceModeFast(cAdd, 'additional');
-      const ansAudienceChanged = ansHasContent && !!cAns.encrypted && bAnsAudience !== cAnsAudience;
-      const addAudienceChanged = addHasContent && !!cAdd.encrypted && bAddAudience !== cAddAudience;
-      const ansGateChanged = ansHasContent && !!cAns.encrypted && String(bAnsGateId || '') !== String(cAnsGateId || '');
-      const addGateChanged = addHasContent && !!cAdd.encrypted && String(bAddGateId || '') !== String(cAddGateId || '');
-      const addAudienceModeChanged = addHasContent && bAddAudienceMode !== cAddAudienceMode;
-
-      if (
-        ansChanged ||
-        addChanged ||
-        impChanged ||
-        convChanged ||
-        encAnsChanged ||
-        encAddChanged ||
-        ansAudienceChanged ||
-        addAudienceChanged ||
-        ansGateChanged ||
-        addGateChanged ||
-        addAudienceModeChanged
-      ) {
-        changedQids.add(qId);
-        changedMap[qId] = {
-          ...(ansChanged ? { answer: 1 } : null),
-          ...(addChanged ? { additional: 1 } : null),
-          ...(impChanged ? { importance: 1 } : null),
-          ...(convChanged ? { conviction: 1 } : null),
-          ...((encAnsChanged || ansAudienceChanged || ansGateChanged) ? { encryptedAnswer: 1 } : null),
-          ...((encAddChanged || addAudienceChanged || addGateChanged || addAudienceModeChanged) ? { encryptedAdditional: 1 } : null),
-        };
-      }
+    const result = computeChangedQidsAndFields({
+      ids,
+      baselineSlice,
+      currentSlice,
+      baselineAnswerKeys: baselineAnswerKeysByQid,
+      currentAnswerKeys: currentAnswerKeysByQid,
+      baselineAdditionalKeys: baselineAdditionalKeysByQid,
+      currentAdditionalKeys: currentAdditionalKeysByQid,
+      baselineImportanceKeys: baselineImportanceKeysByQid,
+      currentImportanceKeys: currentImportanceKeysByQid,
+      baselineConvictionKeys: baselineConvictionKeysByQid,
+      currentConvictionKeys: currentConvictionKeysByQid,
+      ratingEnvelopeQids,
+      valuesEqual: this.valuesEqual,
+      hasMeaningfulFieldValue,
+      resolveAudience: (field, qid) => {
+        if (field && typeof field === 'object' && field.encryptionAudience) {
+          return this.normalizeResponseEncryptionAudience(field.encryptionAudience, qid);
+        }
+        return qid ? this.getDefaultResponseEncryptionAudienceForQid(qid) : defaultAudience;
+      },
+      resolveGateId: (field, qid, fieldKey) => this.resolveFieldEncryptionGateId(field, qid, fieldKey),
+      resolveAudienceMode: (field, fieldKey) => this.normalizeFieldAudienceMode(field?.audienceMode, fieldKey, field),
     });
-
-    const result = { changedQids, changedMap };
     const normalizedIdFilter = ids.size > 0 ? ids : null;
     const {
       currentSliceSignature,
