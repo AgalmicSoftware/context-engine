@@ -65,7 +65,6 @@ import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import {
   DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE,
   getAllowedSessionSlugs,
-  isSessionSlugAllowedByScope,
   readSessionScanMaxBlockRange,
   readSessionScanScope,
   readSessionScanSlugs,
@@ -80,9 +79,8 @@ import {
   buildQuestionDecryptContextForSession,
   hasMaskedQuestionPayloadImproved,
 } from '../../utilities/session/sessionQuestionDecryption.js';
+import { createSessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
-import { readSbtInstanceListenersMode } from '../../utilities/sbt/sbtInstanceListenersMode.js';
-import { readSbtFullScanPolicy } from '../../utilities/sbt/sbtFullScanPolicy.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
   initCacheManager,
@@ -342,7 +340,13 @@ export class MainSite extends Component {
   _surveyInitPending = {};
   _questionInitPending = {};
   _responseInitPending = {};
-  _scopeSkipLogOnce = new Set();
+  _scanPolicy = createSessionScanPolicy({
+    getActiveSessionSlug: () => this.getActiveSessionSlug(),
+    getCurrentPath: () => this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
+    getSessionSlugHintFromSearch: (search) => this.getSessionSlugHintFromSearch(search),
+    getSessionTokenFromPath: (path) => this.getSessionTokenFromPath(path),
+    isSbtListRoutePath: (path) => this.isSbtListRoutePath(path),
+  });
   _scanSpecificUserProfileInFlight = new Map();
   _profileScanListScopeSessionConfigCache = new Map();
   _registryBootstrapPromise = null;
@@ -1928,81 +1932,10 @@ export class MainSite extends Component {
   getSessionChainId = _getSessionChainId;
   getSessionNetwork = _getSessionNetwork;
 
-  normalizeListenerGroupSlug = (slugIn) => {
-    const slug = (slugIn ?? '').toString().trim().toLowerCase();
-    if (!slug || slug === 'general') return '';
-    return slug;
-  }
-
-  isSbtInstanceListenerEnabledForGroup = (slugIn) => {
-    if (typeof window === 'undefined') return false;
-    if (this.areSbtInstanceListenersSuppressedByMode()) return false;
-
-    if (window.DISABLE_SBT_INSTANCE_LISTENERS === true) return false;
-
-    const raw =
-      typeof window.SBT_INSTANCE_LISTENER_GROUPS !== 'undefined'
-        ? window.SBT_INSTANCE_LISTENER_GROUPS
-        : ['general'];
-
-    const list = Array.isArray(raw) ? raw : [raw];
-    if (!list.length) return false;
-
-    const normalized = new Set(list.map((s) => this.normalizeListenerGroupSlug(s)));
-    if (normalized.has('*') || normalized.has('all')) return true;
-
-    const slug = this.normalizeListenerGroupSlug(slugIn);
-    return normalized.has(slug);
-  }
-
-  isSbtHistoryScanEnabled = () => {
-    if (typeof window === 'undefined') return false;
-    return window.ENABLE_SBT_HISTORY_SCAN === true;
-  }
-
-  // Clamp cross-session, RPC-heavy scan fanout during testing.
-  // Scope is opt-in and defaults to "all" (current behavior).
-  getSessionScanScope = () => {
-    const scope = readSessionScanScope();
-    if (scope !== 'all' && !this._didLogSessionScanScope) {
-      this._didLogSessionScanScope = true;
-      try {
-        console.info(`[Context Engine] CE_SESSION_SCAN_SCOPE=${scope} (cross-session RPC scans clamped)`);
-      } catch (e) { mainSiteLog.warn('MainSite: telemetry', e); }
-    }
-    return scope;
-  }
-
-  getSessionScanScopeContext = (scopeIn) => {
-    const scope = typeof scopeIn === 'string' ? scopeIn : this.getSessionScanScope();
-    const list = readSessionScanSlugs();
-    const querySlug = (() => {
-      try {
-        if (typeof window === 'undefined') return null;
-        return this.getSessionSlugHintFromSearch(window.location?.search || '');
-      } catch (_) {
-        return null;
-      }
-    })();
-    const activeSlug = normalizeSessionSlug(
-      querySlug !== null ? querySlug : (this.getActiveSessionSlug() || '')
-    );
-    const activeSlugFromRoute = (() => {
-      if (querySlug !== null) return true;
-      if (!activeSlug) return false;
-      try {
-        const path = this.getEffectiveRoutePath(
-          this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
-        );
-        const token = this.getSessionTokenFromPath(path);
-        if (!token) return false;
-        return String(token).toLowerCase() !== 'new';
-      } catch (_) {
-        return false;
-      }
-    })();
-    return { scope, list, activeSlug, activeSlugFromRoute };
-  }
+  isSbtInstanceListenerEnabledForGroup = (slugIn) => this._scanPolicy.isSbtInstanceListenerEnabledForGroup(slugIn);
+  isSbtHistoryScanEnabled = () => this._scanPolicy.isSbtHistoryScanEnabled();
+  getSessionScanScope = () => this._scanPolicy.getSessionScanScope();
+  getSessionScanScopeContext = (scopeIn) => this._scanPolicy.getSessionScanScopeContext(scopeIn);
 
   hasExplicitProfileScanScopeOverride = () => {
     try {
@@ -2047,93 +1980,15 @@ export class MainSite extends Component {
     };
   }
 
-  isSessionSlugAllowedForScan = (slugIn, scopeContextIn = null) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const scopeContext = scopeContextIn || this.getSessionScanScopeContext();
-    return isSessionSlugAllowedByScope(slug, scopeContext);
-  }
-
-  logScopeSkipOnce = (operation, slugIn, scopeContextIn = null) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const slugLabel = slug || 'general';
-    const key = `${operation}:${slugLabel}`;
-    if (this._scopeSkipLogOnce.has(key)) return;
-    this._scopeSkipLogOnce.add(key);
-    const scopeContext = scopeContextIn || this.getSessionScanScopeContext();
-    const allowed = getAllowedSessionSlugs(scopeContext.scope, scopeContext.list, scopeContext.activeSlug);
-    mainSiteLog.info('[SessionScanScope] skipped out-of-scope scan/listener', {
-      operation,
-      slug: slugLabel,
-      scope: scopeContext.scope,
-      allowedSlugs: allowed.map((s) => s || 'general'),
-      activeSlug: (scopeContext.activeSlug || 'general'),
-    });
-  }
-
-  areSbtInstanceListenersSuppressedByMode = () => {
-    const mode = readSbtInstanceListenersMode();
-    if (mode === 'off') return true;
-
-    // In restricted scan-scope modes, disable instance listeners by default ("auto") to avoid
-    // per-filter polling via eth_getLogs while running RPC-restricted tests.
-    if (mode === 'auto') {
-      const scope = this.getSessionScanScope();
-      if (scope !== 'all') {
-        if (!this._didLogSbtInstanceListenersSuppressed) {
-          this._didLogSbtInstanceListenersSuppressed = true;
-          try {
-            console.info(
-              `[Context Engine] SBT instance listeners suppressed (auto) because CE_SESSION_SCAN_SCOPE=${scope}. ` +
-              `Set CE_SBT_INSTANCE_LISTENERS_MODE=on to override.`
-            );
-          } catch (e) { mainSiteLog.warn('MainSite: telemetry', e); }
-        }
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  shouldAutoRunFullSbtScan = ({ pathname } = {}) => {
-    const policy = readSbtFullScanPolicy();
-    if (policy === 'manual') return false;
-    if (policy === 'sbts') {
-      const raw =
-        String(pathname || '') ||
-        (this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '');
-      const p = String(raw).split(/[?#]/)[0] || '';
-      if (p.startsWith('/sbt/') || p.startsWith('/group/')) return true;
-      return this.isSbtListRoutePath(p);
-    }
-    return true; // policy === "auto"
-  }
-
-  shouldAttachSbtDetailInstanceListener = () => {
-    if (typeof window === 'undefined') return false;
-    if (this.areSbtInstanceListenersSuppressedByMode()) return false;
-    if (window.DISABLE_SBT_INSTANCE_LISTENERS === true) return false;
-
-    // Align with MAX_SBT_INSTANCE_LISTENERS <= 0 semantics (disable everywhere).
-    const hasMaxOverride = typeof window.MAX_SBT_INSTANCE_LISTENERS !== 'undefined';
-    if (hasMaxOverride) {
-      const n = Number(window.MAX_SBT_INSTANCE_LISTENERS);
-      if (Number.isFinite(n) && n <= 0) return false;
-    }
-
-    return true;
-  }
-
-  getScopedSessionSlugs = (scopeIn) => {
-    const scope = typeof scopeIn === 'string' ? scopeIn : this.getSessionScanScope();
-    if (scope === 'all') return getAllSessionSlugs();
-    const scopeContext = this.getSessionScanScopeContext(scope);
-    const scoped = getAllowedSessionSlugs(scopeContext.scope, scopeContext.list, scopeContext.activeSlug);
-    if (!scoped.length && scopeContext.scope === 'list') {
-      this.logScopeSkipOnce('getScopedSessionSlugs:list-empty', '', scopeContext);
-    }
-    return scoped;
-  }
+  isSessionSlugAllowedForScan = (slugIn, scopeContextIn = null) => (
+    this._scanPolicy.isSessionSlugAllowedForScan(slugIn, scopeContextIn)
+  );
+  logScopeSkipOnce = (operation, slugIn, scopeContextIn = null) => (
+    this._scanPolicy.logScopeSkipOnce(operation, slugIn, scopeContextIn)
+  );
+  shouldAutoRunFullSbtScan = (opts) => this._scanPolicy.shouldAutoRunFullSbtScan(opts);
+  shouldAttachSbtDetailInstanceListener = () => this._scanPolicy.shouldAttachSbtDetailInstanceListener();
+  getScopedSessionSlugs = (scopeIn) => this._scanPolicy.getScopedSessionSlugs(scopeIn);
 
   readBoolishRuntimeFlag = (raw, fallback = false) => {
     if (typeof raw === 'boolean') return raw;
@@ -2851,39 +2706,11 @@ export class MainSite extends Component {
     return this.resolveProfileDeepScanPlan().slugs;
   }
 
-  shouldSkipSessionScanForSlug = (slugIn, operation, scopeContextIn = null) => {
-    const scopeContext = scopeContextIn || this.getSessionScanScopeContext();
-    if (scopeContext.scope === 'all') return false;
-    const allowed = this.isSessionSlugAllowedForScan(slugIn, scopeContext);
-    if (!allowed) this.logScopeSkipOnce(operation, slugIn, scopeContext);
-    return !allowed;
-  }
-
-  scanScopeNoop = (slugIn, operation, onSkipped) => {
-    const scopeContext = this.getSessionScanScopeContext();
-    if (!this.shouldSkipSessionScanForSlug(slugIn, operation, scopeContext)) return false;
-    try {
-      if (typeof onSkipped === 'function') onSkipped();
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    return true;
-  }
-
-  getScopeFilteredSlugs = (slugs = [], scopeIn = null) => {
-    const scopeContext = this.getSessionScanScopeContext(scopeIn || undefined);
-    if (scopeContext.scope === 'all') {
-      return Array.from(new Set((Array.isArray(slugs) ? slugs : []).map((s) => normalizeSessionSlug(s ?? ''))));
-    }
-    const seen = new Set();
-    const out = [];
-    (Array.isArray(slugs) ? slugs : []).forEach((slug) => {
-      const normalized = normalizeSessionSlug(slug ?? '');
-      if (seen.has(normalized)) return;
-      seen.add(normalized);
-      if (this.isSessionSlugAllowedForScan(normalized, scopeContext)) out.push(normalized);
-      else this.logScopeSkipOnce('getScopeFilteredSlugs', normalized, scopeContext);
-    });
-    return out;
-  }
+  shouldSkipSessionScanForSlug = (slugIn, operation, scopeContextIn = null) => (
+    this._scanPolicy.shouldSkipSessionScanForSlug(slugIn, operation, scopeContextIn)
+  );
+  scanScopeNoop = (slugIn, operation, onSkipped) => this._scanPolicy.scanScopeNoop(slugIn, operation, onSkipped);
+  getScopeFilteredSlugs = (slugs = [], scopeIn = null) => this._scanPolicy.getScopeFilteredSlugs(slugs, scopeIn);
 
   shouldBackfillGeneralSession = (slugIn, scopeContextIn = null) => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -4986,6 +4813,9 @@ export class MainSite extends Component {
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
     try {
       this._cacheReadinessController.destroy();
+    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
+    try {
+      this._scanPolicy?.destroy?.();
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
     try {
