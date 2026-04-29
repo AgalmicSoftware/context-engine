@@ -94,6 +94,7 @@ import {
   subscribeCacheUpdates,
   writeCacheOptimistic,
 } from '../../utilities/cache/cacheScripts.js';
+import { createSessionCacheReadinessController } from '../../utilities/cache/sessionCacheReadinessController.js';
 import {
   ensureQuestionArweaveCacheBranches,
   mergeQuestionArweaveCacheBranches,
@@ -102,7 +103,6 @@ import {
 } from '../../utilities/arweave/arweaveRetryHelpers.js';
 import { resolvePersistedQuestionResponsesWatermark } from '../../utilities/survey/questionResponsesWatermark.js';
 import {
-  recordCeRuntimeCacheEvent,
   shouldAutoStartCeRuntimeStats,
   startCeRuntimeStats,
   stopCeRuntimeStats,
@@ -320,6 +320,21 @@ export class MainSite extends Component {
     isCacheManagerReady: false,
   };
 
+  _cacheReadinessController = createSessionCacheReadinessController({
+    getState: () => this.state,
+    setState: (updater, cb) => this.setState(updater, cb),
+    isMounted: () => this._mounted,
+    resolveActiveSlug: () => this.resolveActiveSlugForCacheUpdates(),
+    checkAllCachesReady: () => this.checkAllCachesReady(),
+    syncCacheHasLoadedFlagFromPersistent: (slug, opts) => this.syncCacheHasLoadedFlagFromPersistent(slug, opts),
+    readFlag: (name, slug) => this.readFlag(name, slug),
+    isInitInFlight: (slug) => ({
+      question: !!this._questionInitInFlight?.[slug],
+      survey: !!this._surveyInitInFlight?.[slug],
+      response: !!this._responseInitInFlight?.[slug],
+    }),
+  });
+
   _queuedSurveyGroupScanId = null;
   _queuedSurveyGroupScanHintedSlug = '';
   _queuedSurveyGroupScanTimer = null;
@@ -342,23 +357,6 @@ export class MainSite extends Component {
   _cacheReinitRunSeq = 0;
   _activeCacheReinitRunToken = 0;
   _sbtScanProgressMetaBySlug = new Map();
-  _cacheUpdateFlushTimer = null;
-  _cacheUpdateFlushRaf = null;
-  _pendingCacheUpdateSlug = null;
-  _pendingCacheUpdateFlags = {
-    needsSbtRevision: false,
-    needsQuestionResponsesNonce: false,
-  };
-  _localRevisionFlushTimer = null;
-  _localRevisionFlushRaf = null;
-  _pendingLocalRevisionFlags = {
-    needsSbtRevision: false,
-    needsQuestionResponsesNonce: false,
-  };
-  _pendingLocalRevisionCheckAllCachesReady = false;
-  _pendingReadinessValues = new Map();
-  _lastCacheHasLoadedSyncSlug = '';
-  _lastCacheHasLoadedSyncIsAllReady = null;
   _sessionRouteLightDiscoveryInFlight = {};
   _lightSbtDiscoveryInFlight = {};
   _mounted = false;
@@ -717,252 +715,21 @@ export class MainSite extends Component {
       .toLowerCase();
   };
 
-  setReadinessStateIfChanged = (nextState, cb) => {
-    if (!nextState || typeof nextState !== 'object') {
-      if (typeof cb === 'function') cb();
-      return false;
-    }
-    const keys = Object.keys(nextState);
-    if (!keys.length) {
-      if (typeof cb === 'function') cb();
-      return false;
-    }
-    const pendingValues = this._pendingReadinessValues;
-    const finalize = () => {
-      keys.forEach((key) => {
-        if (!pendingValues.has(key)) return;
-        if (this.state[key] === pendingValues.get(key)) {
-          pendingValues.delete(key);
-        }
-      });
-      if (typeof cb === 'function') cb();
-    };
-    const queueWrite = () => {
-      keys.forEach((key) => {
-        pendingValues.set(key, nextState[key]);
-      });
-      this.setState((prev) => {
-        const shouldApply = keys.some((key) => prev[key] !== nextState[key]);
-        return shouldApply ? nextState : null;
-      }, finalize);
-    };
-    const hasChange = keys.some((key) => {
-      const baseline = pendingValues.has(key) ? pendingValues.get(key) : this.state[key];
-      return baseline !== nextState[key];
-    });
-    if (!hasChange) {
-      const hasPendingCommit = keys.some((key) => (
-        pendingValues.has(key) && this.state[key] !== pendingValues.get(key)
-      ));
-      if (hasPendingCommit) {
-        // Preserve callback ordering when the same value is already queued but not committed yet.
-        queueWrite();
-        return false;
-      }
-      if (typeof cb === 'function') cb();
-      return false;
-    }
-    queueWrite();
-    return true;
-  };
+  setReadinessStateIfChanged = (...args) => this._cacheReadinessController.setReadinessStateIfChanged(...args);
 
-  syncCacheHasLoadedFlagOnTransition = (slugIn, opts = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const forceRequested = !!opts.force;
-    const hasReadyHint = Object.prototype.hasOwnProperty.call(opts, 'isAllReady');
-    const readyHint = hasReadyHint ? !!opts.isAllReady : null;
-    const slugChanged = this._lastCacheHasLoadedSyncSlug !== slug;
-    const readinessChanged = hasReadyHint && this._lastCacheHasLoadedSyncIsAllReady !== readyHint;
-    if (!forceRequested && !slugChanged && !readinessChanged) {
-      return Promise.resolve(false);
-    }
-    // When readiness flips to "all ready", force a fresh read so we do not reuse a stale in-flight sync.
-    const shouldForceSync = forceRequested || (hasReadyHint && readinessChanged && readyHint === true);
-    this._lastCacheHasLoadedSyncSlug = slug;
-    if (hasReadyHint) {
-      this._lastCacheHasLoadedSyncIsAllReady = readyHint;
-    }
-    return this.syncCacheHasLoadedFlagFromPersistent(slug, { force: shouldForceSync });
-  };
+  syncCacheHasLoadedFlagOnTransition = (...args) => this._cacheReadinessController.syncCacheHasLoadedFlagOnTransition(...args);
 
-  clearCacheUpdateFlushSchedule = () => {
-    try {
-      if (
-        this._cacheUpdateFlushRaf != null &&
-        typeof window !== 'undefined' &&
-        typeof window.cancelAnimationFrame === 'function'
-      ) {
-        window.cancelAnimationFrame(this._cacheUpdateFlushRaf);
-      }
-    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
-    this._cacheUpdateFlushRaf = null;
-    try {
-      if (this._cacheUpdateFlushTimer) clearTimeout(this._cacheUpdateFlushTimer);
-    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
-    this._cacheUpdateFlushTimer = null;
-  };
+  scheduleCacheUpdateFlush = (...args) => this._cacheReadinessController.scheduleCacheUpdateFlush(...args);
 
-  scheduleCacheUpdateFlush = () => {
-    if (this._cacheUpdateFlushRaf != null || this._cacheUpdateFlushTimer) return;
-    const flush = () => {
-      this._cacheUpdateFlushRaf = null;
-      this._cacheUpdateFlushTimer = null;
-      this.flushQueuedCacheUpdates();
-    };
-    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-      this._cacheUpdateFlushRaf = window.requestAnimationFrame(flush);
-      return;
-    }
-    this._cacheUpdateFlushTimer = setTimeout(flush, 16);
-  };
+  queueCacheUpdateFlush = (...args) => this._cacheReadinessController.queueCacheUpdateFlush(...args);
 
-  queueCacheUpdateFlush = ({
-    slug = '',
-    needsSbtRevision = false,
-    needsQuestionResponsesNonce = false,
-  } = {}) => {
-    const nextSlug = String(slug || '');
-    const pendingSlug = this._pendingCacheUpdateSlug == null
-      ? null
-      : String(this._pendingCacheUpdateSlug || '');
-    if (pendingSlug !== null && pendingSlug !== nextSlug) {
-      // Drop stale queued flags if active session changed before the scheduled flush runs.
-      this._pendingCacheUpdateFlags = {
-        needsSbtRevision: false,
-        needsQuestionResponsesNonce: false,
-      };
-    }
-    this._pendingCacheUpdateSlug = nextSlug;
-    if (needsSbtRevision) this._pendingCacheUpdateFlags.needsSbtRevision = true;
-    if (needsQuestionResponsesNonce) this._pendingCacheUpdateFlags.needsQuestionResponsesNonce = true;
-    this.scheduleCacheUpdateFlush();
-  };
+  flushQueuedCacheUpdates = (...args) => this._cacheReadinessController.flushQueuedCacheUpdates(...args);
 
-  flushQueuedCacheUpdates = () => {
-    const pendingSlug = String(this._pendingCacheUpdateSlug || '');
-    const flags = this._pendingCacheUpdateFlags || {};
-    if (!flags.needsSbtRevision && !flags.needsQuestionResponsesNonce) return;
-    this._pendingCacheUpdateFlags = {
-      needsSbtRevision: false,
-      needsQuestionResponsesNonce: false,
-    };
-    this._pendingCacheUpdateSlug = null;
-    if (!this._mounted) return;
-    const activeSlug = String(this.resolveActiveSlugForCacheUpdates() || '');
-    if (pendingSlug !== activeSlug) return;
-    this.setState((prev) => {
-      const next = {};
-      if (flags.needsSbtRevision) {
-        next.sbtCacheRevision = Number(prev.sbtCacheRevision || 0) + 1;
-      }
-      if (flags.needsQuestionResponsesNonce) {
-        next.isResponsesCacheReady = true;
-        next.questionResponsesNonce = Number(prev.questionResponsesNonce || 0) + 1;
-      }
-      return next;
-    }, this.checkAllCachesReady);
-  };
+  queueLocalRevisionUpdate = (...args) => this._cacheReadinessController.queueLocalRevisionUpdate(...args);
 
-  clearLocalRevisionFlushSchedule = () => {
-    try {
-      if (
-        this._localRevisionFlushRaf != null &&
-        typeof window !== 'undefined' &&
-        typeof window.cancelAnimationFrame === 'function'
-      ) {
-        window.cancelAnimationFrame(this._localRevisionFlushRaf);
-      }
-    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
-    this._localRevisionFlushRaf = null;
-    try {
-      if (this._localRevisionFlushTimer) clearTimeout(this._localRevisionFlushTimer);
-    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
-    this._localRevisionFlushTimer = null;
-  };
+  flushLocalRevisionUpdate = (...args) => this._cacheReadinessController.flushLocalRevisionUpdate(...args);
 
-  scheduleLocalRevisionFlush = () => {
-    if (this._localRevisionFlushRaf != null || this._localRevisionFlushTimer) return;
-    const flush = () => {
-      this._localRevisionFlushRaf = null;
-      this._localRevisionFlushTimer = null;
-      this.flushLocalRevisionUpdate();
-    };
-    if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-      this._localRevisionFlushRaf = window.requestAnimationFrame(flush);
-      return;
-    }
-    this._localRevisionFlushTimer = setTimeout(flush, 16);
-  };
-
-  queueLocalRevisionUpdate = ({
-    needsSbtRevision = false,
-    needsQuestionResponsesNonce = false,
-    checkAllCachesReady = false,
-  } = {}) => {
-    if (needsSbtRevision) this._pendingLocalRevisionFlags.needsSbtRevision = true;
-    if (needsQuestionResponsesNonce) this._pendingLocalRevisionFlags.needsQuestionResponsesNonce = true;
-    if (checkAllCachesReady) this._pendingLocalRevisionCheckAllCachesReady = true;
-    this.scheduleLocalRevisionFlush();
-  };
-
-  flushLocalRevisionUpdate = () => {
-    const flags = this._pendingLocalRevisionFlags || {};
-    const shouldCheckAllCachesReady = !!this._pendingLocalRevisionCheckAllCachesReady;
-    if (!flags.needsSbtRevision && !flags.needsQuestionResponsesNonce) {
-      this._pendingLocalRevisionCheckAllCachesReady = false;
-      if (shouldCheckAllCachesReady && this._mounted) this.checkAllCachesReady();
-      return;
-    }
-    this._pendingLocalRevisionFlags = {
-      needsSbtRevision: false,
-      needsQuestionResponsesNonce: false,
-    };
-    this._pendingLocalRevisionCheckAllCachesReady = false;
-    if (!this._mounted) return;
-    this.setState((prev) => {
-      const next = {};
-      if (flags.needsSbtRevision) {
-        next.sbtCacheRevision = Number(prev.sbtCacheRevision || 0) + 1;
-      }
-      if (flags.needsQuestionResponsesNonce) {
-        next.questionResponsesNonce = Number(prev.questionResponsesNonce || 0) + 1;
-      }
-      return next;
-    }, () => {
-      if (shouldCheckAllCachesReady) this.checkAllCachesReady();
-    });
-  };
-
-  handleCrossTabCacheUpdateEvent = (evt) => {
-    recordCeRuntimeCacheEvent(evt);
-    const namespace = String(evt?.namespace || '');
-    const slugForEvent = String(evt?.slug || '');
-    const activeSlug = this.resolveActiveSlugForCacheUpdates();
-    if (slugForEvent !== String(activeSlug || '')) return;
-    const isLocalEcho = String(evt?.source || '') === 'local';
-
-    // Ignore same-tab cache echo events while active init/full-scan runs are in flight.
-    // This avoids nonce/readiness feedback loops from our own chunked writes.
-    if (isLocalEcho) {
-      const questionInitBusy = !!(
-        this._questionInitInFlight?.[activeSlug] ||
-        this._surveyInitInFlight?.[activeSlug] ||
-        this._responseInitInFlight?.[activeSlug]
-      );
-      const sbtScanBusy = !!this.readFlag('sbt:fullScanInProgress', activeSlug);
-      if ((namespace === 'questionsCache' || namespace === 'surveysCache') && questionInitBusy) return;
-      if (namespace === 'sbtCache' && sbtScanBusy) return;
-    }
-
-    if (namespace === 'sbtCache') {
-      this.queueCacheUpdateFlush({ slug: activeSlug, needsSbtRevision: true });
-      return;
-    }
-
-    if (namespace === 'questionsCache' || namespace === 'surveysCache') {
-      this.queueCacheUpdateFlush({ slug: activeSlug, needsQuestionResponsesNonce: true });
-    }
-  };
+  handleCrossTabCacheUpdateEvent = (...args) => this._cacheReadinessController.handleCrossTabCacheUpdateEvent(...args);
 
   queueSurveyGroupScan = (surveyID, opts = {}) => {
     const sid = String(surveyID || '').toLowerCase();
@@ -5426,18 +5193,9 @@ export class MainSite extends Component {
       }
       this._cacheUpdateUnsubscribe = null;
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
-    this.clearCacheUpdateFlushSchedule();
-    this.clearLocalRevisionFlushSchedule();
-    this._pendingCacheUpdateFlags = {
-      needsSbtRevision: false,
-      needsQuestionResponsesNonce: false,
-    };
-    this._pendingCacheUpdateSlug = null;
-    this._pendingLocalRevisionFlags = {
-      needsSbtRevision: false,
-      needsQuestionResponsesNonce: false,
-    };
-    this._pendingLocalRevisionCheckAllCachesReady = false;
+    try {
+      this._cacheReadinessController.destroy();
+    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
     try {
       if (this._queuedSurveyGroupScanTimer) clearTimeout(this._queuedSurveyGroupScanTimer);

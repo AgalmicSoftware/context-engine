@@ -7,17 +7,12 @@ jest.mock('utilities/logging.js', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   }),
-}), { virtual: true });
+}));
 
 jest.mock('../../utilities/ui/uiRuntimeStats.js', () => ({
   __esModule: true,
   recordCeRuntimeCacheEvent: jest.fn(),
-}), { virtual: true });
-
-jest.mock('../../utilities/web3/contractScripts.js', () => ({
-  __esModule: true,
-  normalizeSessionSlug: jest.fn(),
-}), { virtual: true });
+}));
 
 const { createSessionCacheReadinessController } = require('./sessionCacheReadinessController.js');
 const { recordCeRuntimeCacheEvent } = require('../../utilities/ui/uiRuntimeStats.js');
@@ -45,15 +40,10 @@ const createMockHost = (overrides = {}) => {
     }),
     isMounted: jest.fn(() => mounted !== false),
     resolveActiveSlug: jest.fn(() => activeSlug || 'test-slug'),
-    getSessionSlugFromState: jest.fn(() => activeSlug || 'test-slug'),
-    getCurrentPathname: jest.fn(() => '/questions'),
     checkAllCachesReady: jest.fn(),
     syncCacheHasLoadedFlagFromPersistent: jest.fn(() => Promise.resolve(true)),
     readFlag: jest.fn(() => false),
     isInitInFlight: jest.fn(() => ({ question: false, survey: false, response: false })),
-    shouldAutoRunFullSbtScan: jest.fn(() => true),
-    initializeSbtCache: jest.fn(() => Promise.resolve()),
-    startSbtEventListener: jest.fn(),
     ...rest,
   };
 };
@@ -88,15 +78,10 @@ const createAsyncSetStateHost = (overrides = {}) => {
     }),
     isMounted: jest.fn(() => mounted !== false),
     resolveActiveSlug: jest.fn(() => activeSlug || 'test-slug'),
-    getSessionSlugFromState: jest.fn(() => activeSlug || 'test-slug'),
-    getCurrentPathname: jest.fn(() => '/questions'),
     checkAllCachesReady: jest.fn(),
     syncCacheHasLoadedFlagFromPersistent: jest.fn(() => Promise.resolve(true)),
     readFlag: jest.fn(() => false),
     isInitInFlight: jest.fn(() => ({ question: false, survey: false, response: false })),
-    shouldAutoRunFullSbtScan: jest.fn(() => true),
-    initializeSbtCache: jest.fn(() => Promise.resolve()),
-    startSbtEventListener: jest.fn(),
     flushNextSetState,
     getPendingSetStateCount: () => queue.length,
     ...rest,
@@ -128,7 +113,7 @@ describe('createSessionCacheReadinessController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    contractScriptsModule.normalizeSessionSlug.mockImplementation(
+    jest.spyOn(contractScriptsModule, 'normalizeSessionSlug').mockImplementation(
       (slug) => String(slug || '').trim().toLowerCase()
     );
   });
@@ -250,86 +235,6 @@ describe('createSessionCacheReadinessController', () => {
         isSBTCacheReady: true,
         isResponsesCacheReady: true,
       });
-    });
-  });
-
-  describe('checkAllCachesReady', () => {
-    it('recomputes aggregate readiness and syncs the persisted loaded flag for the state slug', async () => {
-      const host = createMockHost({
-        initialState: {
-          isSBTCacheReady: true,
-          isSurveyCacheReady: true,
-          isQuestionCacheReady: true,
-          isAllCachesReady: false,
-        },
-        activeSlug: 'route-slug',
-      });
-      const controller = createSessionCacheReadinessController(host);
-
-      controller.checkAllCachesReady();
-      await Promise.resolve();
-
-      expect(host.getState()).toMatchObject({ isAllCachesReady: true });
-      expect(host.syncCacheHasLoadedFlagFromPersistent).toHaveBeenCalledWith('route-slug', { force: true });
-      expect(host.initializeSbtCache).not.toHaveBeenCalled();
-    });
-
-    it('clears aggregate readiness without forcing cache loaded sync when a cache is not ready', async () => {
-      const host = createMockHost({
-        initialState: {
-          isSBTCacheReady: true,
-          isSurveyCacheReady: false,
-          isQuestionCacheReady: true,
-          isAllCachesReady: true,
-        },
-      });
-      const controller = createSessionCacheReadinessController(host);
-
-      controller.checkAllCachesReady();
-      await Promise.resolve();
-
-      expect(host.getState()).toMatchObject({ isAllCachesReady: false });
-      expect(host.syncCacheHasLoadedFlagFromPersistent).toHaveBeenCalledWith('test-slug', { force: false });
-    });
-
-    it('runs the deferred full SBT scan only after all caches are ready on a session route', async () => {
-      const host = createMockHost({
-        initialState: {
-          isSBTCacheReady: true,
-          isSurveyCacheReady: true,
-          isQuestionCacheReady: true,
-        },
-        getCurrentPathname: jest.fn(() => '/session/demo'),
-        readFlag: jest.fn((flag) => flag === 'sbt:deferredFullScanNeeded'),
-      });
-      const controller = createSessionCacheReadinessController(host);
-
-      controller.checkAllCachesReady();
-      await Promise.resolve();
-      await Promise.resolve();
-
-      expect(host.shouldAutoRunFullSbtScan).toHaveBeenCalledWith({ pathname: '/session/demo' });
-      expect(host.initializeSbtCache).toHaveBeenCalledWith({ mode: 'full' });
-      expect(host.startSbtEventListener).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not run the deferred full SBT scan while a full scan is already in progress', async () => {
-      const host = createMockHost({
-        initialState: {
-          isSBTCacheReady: true,
-          isSurveyCacheReady: true,
-          isQuestionCacheReady: true,
-        },
-        getCurrentPathname: jest.fn(() => '/session/demo'),
-        readFlag: jest.fn(() => true),
-      });
-      const controller = createSessionCacheReadinessController(host);
-
-      controller.checkAllCachesReady();
-      await Promise.resolve();
-
-      expect(host.initializeSbtCache).not.toHaveBeenCalled();
-      expect(host.startSbtEventListener).not.toHaveBeenCalled();
     });
   });
 
