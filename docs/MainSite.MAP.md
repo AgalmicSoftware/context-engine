@@ -14,6 +14,19 @@
 - Method inventory: **138 class methods/properties** + **15 top-level helper functions**
 - Summary: `MainSite` is the app shell and runtime orchestrator. It resolves active session/group context from URL + Redux, hydrates multi-cache state (SBT/surveys/questions/responses), drives profile deep scans and registry hydration, manages per-group listener lifecycles, coordinates Lit/session metadata refresh, and routes to lazy feature views while gating UI readiness via cache flags.
 
+## Extracted Modules
+
+- `client/src/utilities/cache/sessionCacheReadinessController.js`
+  Factory: `createSessionCacheReadinessController(host)`
+  Methods: `setReadinessStateIfChanged`, `syncCacheHasLoadedFlagOnTransition`, `scheduleCacheUpdateFlush`, `queueCacheUpdateFlush`, `flushQueuedCacheUpdates`, `queueLocalRevisionUpdate`, `flushLocalRevisionUpdate`, `handleCrossTabCacheUpdateEvent`, `destroy`
+  Test: `sessionCacheReadinessController.test.js` (26 tests)
+- `client/src/utilities/cache/sessionCachePersistenceController.js`
+  Factory: `createSessionCachePersistenceController(host)`
+  Methods: `readFlag`, `writeFlag`, `hasPersistedManagedCacheData`, `syncCacheHasLoadedFlagFromPersistent`, `destroy`
+  Test: `sessionCachePersistenceController.test.js` (11 tests)
+
+Both cache controllers use a factory-function + host-DI pattern rather than class extraction. `MainSite` creates them in the constructor and delegates through forwarding methods.
+
 ## Section Index
 
 | Section | Lines | Purpose | Key Methods |
