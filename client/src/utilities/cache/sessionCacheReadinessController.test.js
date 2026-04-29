@@ -118,7 +118,7 @@ describe('createSessionCacheReadinessController', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(contractScriptsModule, 'normalizeSessionSlug').mockImplementation(
+    contractScriptsModule.normalizeSessionSlug.mockImplementation(
       (slug) => String(slug || '').trim().toLowerCase()
     );
   });
