@@ -38,6 +38,8 @@ import { SurveySelector } from './SurveySelector';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
 
+const cs = contractScripts as Record<string, any>;
+
 type SurveyToolProps = {
   minifiedMode?: string;
   filterState?: any;
@@ -77,7 +79,7 @@ type SurveyToolProps = {
   questionResponsesNonce?: number;
   sessionInfo?: any;
   sessionName?: string;
-  displayAnswerMode?: string;
+  displayAnswerMode?: boolean;
   viewAddress?: string;
   lit?: any;
   litHooks?: any;
@@ -505,7 +507,7 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     if (!surveyData && netIdStr) {
       surveyLog.log(`[SurveyTool] Cache miss. Fetching from chain for ${effectiveSlug}...`);
       try {
-        surveyData = await contractScripts.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug);
+        surveyData = await cs.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug);
 
         if (surveyData) {
           surveyData.surveyID = loweredSurveyID;
@@ -653,7 +655,7 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
           : null,
       };
 
-      let questionData = await contractScripts.getQuestionData(
+      let questionData = await cs.getQuestionData(
         resolvedProps.provider,
         qIdLower,
         fetchSlug,
@@ -663,7 +665,7 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
       const allowGeneralFallback = !currentSlug;
       if (!questionData && fetchSlug !== '' && allowGeneralFallback) {
         surveyLog.log(`SurveyTool: Question ${qIdLower} not found in '${fetchSlug}', trying general fallback...`);
-        questionData = await contractScripts.getQuestionData(
+        questionData = await cs.getQuestionData(
           resolvedProps.provider,
           qIdLower,
           '',
@@ -850,7 +852,7 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     if (!surveyData && netIdStr) {
       surveyLog.log(`[SurveyTool] Cache miss. Fetching from chain for ${effectiveSlug}...`);
       try {
-        surveyData = await contractScripts.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug);
+        surveyData = await cs.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug);
 
         if (surveyData) {
           surveyData.surveyID = loweredSurveyID;
@@ -998,7 +1000,7 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
           : null,
       };
 
-      let questionData = await contractScripts.getQuestionData(
+      let questionData = await cs.getQuestionData(
         resolvedProps.provider,
         qIdLower,
         fetchSlug,
@@ -1008,7 +1010,7 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       const allowGeneralFallback = !currentSlug;
       if (!questionData && fetchSlug !== '' && allowGeneralFallback) {
         surveyLog.log(`SurveyTool: Question ${qIdLower} not found in '${fetchSlug}', trying general fallback...`);
-        questionData = await contractScripts.getQuestionData(
+        questionData = await cs.getQuestionData(
           resolvedProps.provider,
           qIdLower,
           '',
@@ -1126,6 +1128,7 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     }
 
     fetchSurveys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
