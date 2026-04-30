@@ -8,7 +8,7 @@
 - Session docs lazy view: `client/src/components/DocumentLibrary/SessionDocumentsPage.tsx` (via `routeLazyComponents.js`)
 - Demo route lazy views: `client/src/components/DemoViews/DemosIndex.tsx`, `client/src/components/DemoViews/RiskMatrixDemo.tsx` (via `routeLazyComponents.js`)
 - Navbar account modal surface: `client/src/components/Account/LoginAndSettingsModal.tsx` (mounted by `client/src/components/Navbar/AccountSection.tsx`, outside the route-lazy map)
-- Current length: **~6,360 lines** (down from 11,465)
+- Current length: **~6,296 lines** (down from 11,465)
 - Component type: **typed TSX React class component** (`MainSite extends Component`)
 - Type definitions: `client/src/components/MainSite/MainSiteTypes.ts`
 - Component count in file: **1 class component** (`MainSite`)
