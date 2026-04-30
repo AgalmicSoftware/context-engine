@@ -5,7 +5,7 @@ Context Engine is a beta release, with core workflows in place and a clear set o
 ## Recently Completed Foundations
 
 - **Scaling**: the initial on-chain mode may only support hundreds of users per session; scaling to hundreds of thousands will require architectural optimizations and variations which are already planned.
-- **God component decomposition**: `MainSite.jsx` and `SurveyTool.jsx` remain the last production JSX shells, and `SessionWizard.tsx` is still a 5,000+ line orchestrator that needs further decomposition.
+- **God component decomposition**: `MainSite.jsx` is now the last remaining production JSX shell, and controller extraction has reduced it from ~11,400 lines to ~6,274; `SessionWizard.tsx` is still a 5,000+ line orchestrator that needs further decomposition.
 - **Lit Protocol Naga-era runtime → Chipotle re-platform**: CE still ships a legacy Naga-shaped Lit integration even though Naga sunset on April 1, 2026 and Chipotle is now GA. Moving onto the supported stack is a re-platform from SDK/auth-context/PaymentManager/network selection to Chipotle's REST/API-key/account/group model, not a simple dependency bump.
 - **Frontend modernization**: migrate remaining class components to functional React, upgrade React 17 → 18 with Vite, and consolidate SCSS into a standardized design system.
 - **Protected SBT mint-mode hardening**: SBT mint policy still needs an explicit on-chain mode model so protected group-password/signature collections cannot accidentally expose public `claim()` minting.
