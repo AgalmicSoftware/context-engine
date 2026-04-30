@@ -1,14 +1,16 @@
 # Roadmap
 
-Context Engine has its core deliberation, SBT, worker, encryption, and deployment workflows in place. The roadmap below focuses on scale, operator polish, agent access, and maintainability.
+Context Engine is a beta release, with core workflows in place and a clear set of improvements ahead.
 
 ## Recently Completed Foundations
 
 - **Scaling**: the initial on-chain mode may only support hundreds of users per session; scaling to hundreds of thousands will require architectural optimizations and variations which are already planned.
-- **God component decomposition**: `MainSite.jsx`, `SurveyTool.jsx`, and `SessionWizard.jsx` still carry 5,000–15,000+ line responsibilities and need to be split into smaller, more maintainable units.
+- **God component decomposition**: `MainSite.jsx` and `SurveyTool.jsx` remain the last production JSX shells, and `SessionWizard.tsx` is still a 5,000+ line orchestrator that needs further decomposition.
 - **Lit Protocol Naga-era runtime → Chipotle re-platform**: CE still ships a legacy Naga-shaped Lit integration even though Naga sunset on April 1, 2026 and Chipotle is now GA. Moving onto the supported stack is a re-platform from SDK/auth-context/PaymentManager/network selection to Chipotle's REST/API-key/account/group model, not a simple dependency bump.
 - **Frontend modernization**: migrate remaining class components to functional React, upgrade React 17 → 18 with Vite, and consolidate SCSS into a standardized design system.
-- **Worker auth trust-boundary hardening**: browser login to the session worker still needs stricter trusted-origin / SIWE audience binding so off-origin or originless token redemption is not possible.
+- **Protected SBT mint-mode hardening**: SBT mint policy still needs an explicit on-chain mode model so protected group-password/signature collections cannot accidentally expose public `claim()` minting.
+- **Worker auth trust-boundary hardening**: browser login to the session worker still needs durable nonce/rate-limit state plus scope revalidation / revocation boundaries so auth stays correct under concurrency and gate changes.
+- **Browser secret-storage hardening**: SBT invite/recovery secrets should move to export-only defaults with optional encrypted local recovery instead of silent plaintext browser persistence.
 
 
 ## AI Agent Interface

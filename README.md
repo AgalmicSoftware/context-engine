@@ -9,8 +9,12 @@
 **Live demo:** [contextengine.xyz](https://contextengine.xyz)
 
 
-Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens for Groups](https://www.radicalxchange.org/wiki/social-identity/). Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
+Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and negotiation in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens](https://www.radicalxchange.org/wiki/social-identity/) for Groups. Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
 
+## Deployment Modes
+
+- Public version: the hosted public app is available at [contextengine.xyz](https://contextengine.xyz).
+- Private mode: organizations can run Context Engine on their own infrastructure with self-hosted deployment options and the [`contextEngine-cc`](contextEngine-cc/README.md) Claude Code companion integration. See [docs/scaling.md](docs/scaling.md) for deployment profiles.
 
 
 
@@ -19,11 +23,6 @@ Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in larg
 ### Prerequisites
 - Root scripts, worker bundling, contract tooling, and client workflows: Node.js 20.19+ or 22.12+ with npm 10
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
-
-The client install contract is tracked via `client/.npmrc`
-(`legacy-peer-deps=true`), so no manual CLI flag is needed even though
-`react-scripts@4.0.3`'s optional TypeScript peer still conflicts with
-`@lit-protocol/contracts@0.9.1`'s strict peer requirement.
 
 ### Clone and Install
 
@@ -46,15 +45,7 @@ For testing, run modes, and deeper setup:
 - [docs/testing.md](docs/testing.md)
 - [docs/run-modes.md](docs/run-modes.md)
 - [docs/session-creation-guide.md](docs/session-creation-guide.md)
-- [docs/public-client-config.md#netlify-static-deploy](docs/public-client-config.md#netlify-static-deploy) for Netlify/custom-domain static frontend deploys
-
-### Static Frontend Deploy
-
-To host the React frontend on a custom domain with Netlify, build the static
-client bundle and follow the Netlify notes in
-[docs/public-client-config.md#netlify-static-deploy](docs/public-client-config.md#netlify-static-deploy).
-After domain cutover, update the session worker `allowOrigins` list so AI,
-Arweave, auth, and `/health` requests accept the new origin.
+- [docs/public-client-config.md#static-frontend-deploy](docs/public-client-config.md#static-frontend-deploy) for Netlify/custom-domain static frontend deploys
 
 ## Features
 
@@ -90,6 +81,16 @@ Arweave, auth, and `/health` requests accept the new origin.
 ## AI Discourse Corpus
 
 The top-level [`ai-discourse-corpus/`](ai-discourse-corpus/) directory contains reusable JSON sub-corpuses curated from AI policy, safety, governance, science fiction, practitioner interviews, evaluation work, debates, and enriched social-media discussion. Rights for that directory are described separately in [ai-discourse-corpus/LICENSE.md](ai-discourse-corpus/LICENSE.md): no ownership is claimed over upstream source material, and project-authored annotations are dedicated under CC0.
+
+## Video Production Notes
+
+For local Context Engine video work, use the shared VideoFactory tooling in
+`xoCortex/projects/video-factory` for ElevenLabs voice-over generation. Keep
+`ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in VideoFactory's gitignored
+`secrets/.env`, then call `scripts/voice-generation/generate_voice.py` from
+that repo or source `scripts/load_env.sh` before running custom assembly
+scripts. Do not use macOS `say` voices for review cuts that are intended to
+match the Jeanette/Jane ElevenLabs voice.
 
 ## Scaling
 

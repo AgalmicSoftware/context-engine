@@ -212,7 +212,7 @@ Admin test panel:
 - Static custom-domain frontend deploys must add the final browser origin (for
   example `https://app.example`) to the same `allowOrigins` list after DNS
   cutover. See the Netlify/static hosting checklist in
-  [`docs/public-client-config.md#netlify-static-deploy`](public-client-config.md#netlify-static-deploy).
+  [`docs/public-client-config.md#static-frontend-deploy`](public-client-config.md#static-frontend-deploy).
 - When AI/Arweave/Faucet tests hit `Session config not found.`, the panel now auto-attempts
   a signed `/admin/set-config` using the selected session metadata, then retries the test once.
   This recovery also covers login-stage 404s (`Worker login failed (404)`) so fresh workers can be
