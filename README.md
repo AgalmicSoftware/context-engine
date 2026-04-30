@@ -98,6 +98,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - Project framing: [whitepaper/whitepaper.md](whitepaper/whitepaper.md)
 - System design, data flows, and file map: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Docs index: [docs/README.md](docs/README.md)
+- Agent bootstrap and PRD map: [docs/ai-agent-bootstrap.md](docs/ai-agent-bootstrap.md)
 - User guide / end-to-end session setup: [docs/session-creation-guide.md](docs/session-creation-guide.md)
 - Testing guide: [docs/testing.md](docs/testing.md)
 - Run modes: [docs/run-modes.md](docs/run-modes.md)

@@ -13,10 +13,12 @@ and AI tools, plus the fastest post-deploy crawl steps.
     the live `main` branch source tree, `discoverability.html`, and `llms.txt`.
 - `client/public/discoverability.html`
   - Static HTML summary page with direct links to the live app, repo, latest
-    `main` branch source tree, README, architecture, and whitepaper.
+    `main` branch source tree, README, AI agent bootstrap doc,
+    `contextEngine-cc` README, architecture, and whitepaper.
 - `client/public/llms.txt`
   - Plain-text summary for AI tools with the canonical repo plus latest-branch
-    document URLs.
+    document URLs, including the AI agent bootstrap doc and
+    `contextEngine-cc` README.
 - `client/public/robots.txt`
   - Allows crawling and points bots to the sitemap.
 - `client/public/sitemap.xml`
