@@ -78,6 +78,10 @@ import {
   refreshSessionInfoForSlug,
   refreshSessionMetaFieldsForSlug,
 } from '../../utilities/session/sessionMetaController.js';
+import {
+  buildQuestionDecryptContextForSession,
+  hasMaskedQuestionPayloadImproved,
+} from '../../utilities/session/sessionQuestionDecryption.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { readSbtInstanceListenersMode } from '../../utilities/sbt/sbtInstanceListenersMode.js';
 import { readSbtFullScanPolicy } from '../../utilities/sbt/sbtFullScanPolicy.js';
@@ -12446,18 +12450,13 @@ export class MainSite extends Component {
 
   buildQuestionDecryptContext = (slug) => {
     const cfg = this.getSessionCfg(slug) || {};
-    const chainId =
-      Number(cfg?.networkChainId || this.props.network?.id || this.props.network?.chainId || 0) || null;
-    const litHooks = this.state.litHooks || getGlobalLitHooks() || null;
-    return {
+    return buildQuestionDecryptContextForSession({
+      cfg,
       account: this.props.account || '',
       providerLike: this.props.provider || '',
-      chainId,
-      litHooks,
-      litOpts: litHooks && typeof litHooks.getKey === 'function'
-        ? { getKey: litHooks.getKey }
-        : null,
-    };
+      litHooks: this.state.litHooks || getGlobalLitHooks() || null,
+      fallbackChainId: this.props.network?.id || this.props.network?.chainId || null,
+    });
   };
 
   refreshEncryptedQuestionPayloadsForGroup = async (slug, opts = {}) => {
@@ -12504,29 +12503,6 @@ export class MainSite extends Component {
 
       const backoffMs = force ? 0 : 30000;
       const backoffKey = (qid) => `${accountLower}|${slug}|${networkID}|${String(qid || '').toLowerCase()}`;
-
-      const hasImproved = (prevQ, nextQ) => {
-        if (!prevQ || !nextQ) return false;
-        if (isMaskedQuestionPayload(prevQ) && !isMaskedQuestionPayload(nextQ)) return true;
-
-        if (!prevQ.promptDecrypted && !!nextQ.promptDecrypted) return true;
-        if (!prevQ.optionsDecrypted && !!nextQ.optionsDecrypted) return true;
-        if (!prevQ.tagsDecrypted && !!nextQ.tagsDecrypted) return true;
-
-        const prevPromptMasked = String(prevQ.prompt || '') === '[encrypted]';
-        const nextPromptMasked = String(nextQ.prompt || '') === '[encrypted]';
-        if (prevPromptMasked && !nextPromptMasked) return true;
-
-        const prevOptLen = Array.isArray(prevQ.options) ? prevQ.options.length : 0;
-        const nextOptLen = Array.isArray(nextQ.options) ? nextQ.options.length : 0;
-        if (prevOptLen === 0 && nextOptLen > 0) return true;
-
-        const prevTagLen = Array.isArray(prevQ.tags) ? prevQ.tags.length : 0;
-        const nextTagLen = Array.isArray(nextQ.tags) ? nextQ.tags.length : 0;
-        if (prevTagLen === 0 && nextTagLen > 0) return true;
-
-        return false;
-      };
 
       // Time-slice: decrypt only a small number per invocation so we don't stall the app.
       const MAX_ATTEMPTS_PER_RUN = force ? 24 : 12;
@@ -12580,7 +12556,7 @@ export class MainSite extends Component {
               return { qid: id, next: null, improved: false };
             }
 
-            const improved = hasImproved(prev, next);
+            const improved = hasMaskedQuestionPayloadImproved(prev, next);
             if (!improved) {
               const attemptTs = Date.now();
               this._maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
