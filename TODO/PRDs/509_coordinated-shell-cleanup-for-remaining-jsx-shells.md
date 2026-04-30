@@ -1,21 +1,21 @@
 ## PRD 509: Coordinated Shell Cleanup For Remaining JSX Shells
 
 **Priority:** High
-**Status:** Draft
+**Status:** Active
 **Category:** TypeScript migration / shell decomposition
 **Created:** 2026-04-23
 
 ### Summary
 
-The repo is down to three production `.jsx` shells:
+The repo is down to three production `.jsx` surfaces still in the final shell-cleanup lane:
 
-- `client/src/components/MainSite/MainSite.jsx` (`12998` lines)
-- `client/src/components/Sessions/SessionWizard.jsx` (`8504` lines)
-- `client/src/components/SurveyTool/SurveyTool.jsx` (`16106` lines)
+- `client/src/components/MainSite/MainSite.jsx` (`12955` lines)
+- `client/src/components/SurveyTool/SurveyTool.jsx` (`15984` lines)
+- `client/src/components/SurveyTool/DeferredCommitSlider.jsx` (`102` lines)
 
-Everything else in the migration lane is already on `.tsx`, leaving the final risk concentrated in a few large, stateful controller-shell surfaces. These files should not be converted as isolated rename-only slices. They now need one coordinated cleanup plan that stabilizes shared contracts first, then converts the shells in dependency order.
+`SessionWizard` has already crossed to `.tsx`, but the remaining risk is still concentrated in a few large, stateful controller-shell surfaces plus one adjacent JSX leaf. These files should not be converted as isolated rename-only slices. They now need one coordinated cleanup plan that stabilizes shared contracts first, then converts the remaining JSX surfaces in dependency order.
 
-Current production component count before this PRD lands: `100 TSX / 3 JSX`.
+Current production component count before this PRD lands: `110 TSX / 3 JSX`.
 
 ### Why A Coordinated Pass Is Needed
 
@@ -66,9 +66,13 @@ Create or normalize coarse shared types close to the remaining shells and their 
 
 Keep these types honest and coarse. Favor `Record<string, any>` over overfit domain modeling where behavior is already stable but shapes vary.
 
-#### Phase 1: Convert `SessionWizard` First
+#### Phase 1: Convert `DeferredCommitSlider` First
 
-`SessionWizard` is the highest-leverage shared shell because it owns the most cross-cutting payload construction:
+`DeferredCommitSlider` is the safest remaining leaf and sits directly beside `SurveyTool`. Converting it first removes one JSX holdout without disturbing the larger route shells and gives the `SurveyTool` pass a slightly smaller local surface.
+
+#### Phase 2: Convert `SurveyTool`
+
+The earlier `SessionWizard` migration exposed the broad type pressure that still exists around the remaining shells:
 
 - worker secret assembly
 - registry/session metadata normalization
@@ -76,11 +80,7 @@ Keep these types honest and coarse. Favor `Record<string, any>` over overfit dom
 - contract viewer wiring
 - deploy helper callback choreography
 
-Once its shared contracts are stabilized, later shell conversions should require less local containment.
-
-#### Phase 2: Convert `SurveyTool`
-
-After `SessionWizard`, convert `SurveyTool.jsx` while reusing the stabilized shell contracts and extracting any remaining non-UI helpers into adjacent utility modules where that reduces shell surface area.
+That lesson still matters here: convert `SurveyTool.jsx` while reusing the stabilized shell contracts and extracting any remaining non-UI helpers into adjacent utility modules where that reduces shell surface area.
 
 Focus areas:
 
@@ -93,14 +93,14 @@ Focus areas:
 
 `MainSite` should remain the final shell in this lane because it is the broadest route coordinator and lazy-import owner. By the time it is converted:
 
-- `SessionWizard` and `SurveyTool` imports should already be `.tsx`
+- `SurveyTool` and `DeferredCommitSlider` imports should already be `.tsx`
 - route lazy helpers should already reference the final typed surfaces
 - shell-wide helper contracts should already be settled
 
 ### Proposed Order
 
 1. Shared shell contracts and helper extraction
-2. `SessionWizard.jsx -> SessionWizard.tsx`
+2. `DeferredCommitSlider.jsx -> DeferredCommitSlider.tsx`
 3. `SurveyTool.jsx -> SurveyTool.tsx`
 4. `MainSite.jsx -> MainSite.tsx`
 
@@ -117,18 +117,14 @@ Each phase should keep focused verification narrow and explicit.
 
 #### Shared contract phase
 
-- targeted `tsc` grep for `SessionWizard|SurveyTool|MainSite`
+- targeted `tsc` grep for `DeferredCommitSlider|SurveyTool|MainSite`
 - touched unit tests for extracted helper modules
 
-#### SessionWizard phase
+#### DeferredCommitSlider phase
 
-- focused `tsc` lane for `SessionWizard`
-- `SessionWizard.render.test.jsx`
-- `SessionWizard.blankBundle.render.test.tsx`
-- `SessionWizard.sponsoredBundle.test.jsx`
-- `SessionWizard.workerVerification.test.js`
-- `SessionWizard.allowedOrigins.test.js`
-- `MainSite.routes.test.jsx`
+- focused `tsc` lane for `DeferredCommitSlider`
+- `SurveyTool.module.test.js`
+- any directly affected deferred-submit interaction tests
 
 #### SurveyTool phase
 
@@ -150,15 +146,15 @@ Each phase should keep focused verification narrow and explicit.
 Use separate commits:
 
 1. shared shell contract prep
-2. `SessionWizard` conversion
+2. `DeferredCommitSlider` conversion
 3. `SurveyTool` conversion
 4. `MainSite` conversion
 5. any final route-import cleanup if needed
 
 ### Done Criteria
 
-- All three remaining production shell files are `.tsx`
-- `client/src/components` reaches `103 TSX / 0 JSX`
+- All three remaining production JSX files are `.tsx`
+- `client/src/components` reaches `113 TSX / 0 JSX`
 - No `@ts-nocheck` added
 - Focused TypeScript lanes are clean for each shell phase
 - Focused Jest rings pass for each shell phase
@@ -187,7 +183,7 @@ Saved graphic:
 The graphic should visualize the dependency-led order:
 
 - Shared contracts
-- SessionWizard
+- DeferredCommitSlider
 - SurveyTool
 - MainSite
 - final verification / zero-JSX finish line
