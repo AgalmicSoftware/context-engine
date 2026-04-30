@@ -86,12 +86,17 @@ export default function AgentPage() {
     } catch (_) {
       return null;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent]);
   const actionLabels = Array.isArray(agentContract?.actions)
-    ? agentContract.actions.map((action) => toStr(action?.type).trim()).filter(Boolean)
+    ? agentContract.actions
+        .map((action) => toStr(action?.type).trim())
+        .filter(Boolean)
     : [];
   const toolLabels = Array.isArray(agentContract?.tools)
-    ? agentContract.tools.map((tool) => toStr(tool?.name).trim()).filter(Boolean)
+    ? agentContract.tools
+        .map((tool) => toStr(tool?.name).trim())
+        .filter(Boolean)
     : [];
 
   const startAsyncAction = () => {
@@ -181,8 +186,9 @@ export default function AgentPage() {
         {agentContract && (
           <>
             <div>
-              <strong>Contract:</strong> <code>v{toStr(agentContract.version || '1')}</code>{' '}
-              <span>{actionLabels.length} actions</span> <span>· {toolLabels.length} tools</span>
+              <strong>Contract:</strong> <code>v{toStr(agentContract.version || '1')}</code> {' '}
+              <span>{actionLabels.length} actions</span> {' '}
+              <span>· {toolLabels.length} tools</span>
             </div>
             {actionLabels.length ? (
               <div>

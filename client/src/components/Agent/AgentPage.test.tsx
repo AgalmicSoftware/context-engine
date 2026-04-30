@@ -48,6 +48,24 @@ describe('AgentPage', () => {
     expect(screen.getByText('CompareAddresses, PolisReport')).toBeInTheDocument();
   });
 
+  it('renders the current contract summary when the agent exposes describe()', () => {
+    window.__ceAgent = {
+      getState: () => ({ route: '/agent', account: '0xabc' }),
+      describe: () => ({
+        version: 1,
+        actions: [{ type: 'navigate' }, { type: 'fill' }, { type: 'click' }],
+        tools: [{ name: 'CompareAddresses' }, { name: 'PolisReport' }],
+      }),
+    };
+
+    render(<AgentPage />);
+
+    expect(screen.getByText('3 actions')).toBeInTheDocument();
+    expect(screen.getByText('· 2 tools')).toBeInTheDocument();
+    expect(screen.getByText('navigate, fill, click')).toBeInTheDocument();
+    expect(screen.getByText('CompareAddresses, PolisReport')).toBeInTheDocument();
+  });
+
   it('steps through the first configured action when an agent is available', async () => {
     const perform = jest.fn(async () => ({ ok: true }));
     window.__ceAgent = {

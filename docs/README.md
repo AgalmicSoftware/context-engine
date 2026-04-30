@@ -24,14 +24,12 @@ When you add or change a feature, update documentation in the same PR:
 
 ## Core Docs
 
-Architecture and repository conventions:
-- `docs/architecture-overview.md`: first-read runtime, storage, contract, and verification map.
-- `docs/adr/0001-client-domain-boundaries.md`: client domain-boundary rules.
-- `docs/adr/0002-worker-auth-revalidation.md`: worker authentication revalidation policy.
-- `docs/adr/0003-storage-port-and-read-model.md`: storage port and read-model boundary.
-- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md`: accepted worker consistency limits.
-- `docs/adr/0005-route-table-migration.md`: route-table migration decision.
-- `docs/repo-structure.md`: canonical source naming and placement rules.
+Code navigation maps:
+- `docs/ai-agent-bootstrap.md`: current AI-agent entry points, supported contracts, and the PRD map for broader agent usability work.
+- `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
+- `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
+- `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
+- `docs/contractScripts.MAP.md`: web3 integration/navigation map for the `contractScripts` surface.
 
 Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
