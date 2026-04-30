@@ -1,7 +1,6 @@
-/** @file MainSite.jsx */
+/** @file MainSite.tsx */
 
 import React, { Component, Suspense } from "react";
-import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { fetchAccount } from '../../actions/accountActions.js';
 import {
@@ -12,15 +11,16 @@ import {
   toggleDemoMode,
   changeActiveSessionSlug,
 } from '../../actions/sessionStateActions.js';
+import type { MainSiteProps, MainSiteState, AnyRecord } from './MainSiteTypes';
 
 
 
 // Styles
 import "assets/css/contextEngine.scss";
-import styles from "./MainSite.module.scss";
+import stylesRaw from "./MainSite.module.scss";
 
 // Smart contract events / interactions
-import contractScripts, {
+import contractScriptsRaw, {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -88,17 +88,17 @@ import {
 
 // withWagmiBridge is a function component (allowed to use hooks from wagmi and RainbowKit).
 // It passes props to this class-component so that this component can use React hooks.
-import { WagmiHooksHOC } from '../HooksHOC/withWagmiBridge'
+import { WagmiHooksHOC as WagmiHooksHOCRaw } from '../HooksHOC/withWagmiBridge'
 
 // Components
-import Navbar from "../Navbar/Navbar";
-import MainAreaTabs from "../MainContent/MainAreaTabs";
-import RightSide from '../RightSidebar/RightSide';
-import OnboardingOverlay from '../Onboarding/OnboardingOverlay';
-import Footer from "../Footer/Footer";
-import LazyFallback from "../Shared/LazyFallback";
-import DevE2eNav from "../E2E/DevE2eNav";
-import RouteErrorBoundary from '../ErrorBoundary/RouteErrorBoundary';
+import NavbarRaw from "../Navbar/Navbar";
+import MainAreaTabsRaw from "../MainContent/MainAreaTabs";
+import RightSideRaw from '../RightSidebar/RightSide';
+import OnboardingOverlayRaw from '../Onboarding/OnboardingOverlay';
+import FooterRaw from "../Footer/Footer";
+import LazyFallbackRaw from "../Shared/LazyFallback";
+import DevE2eNavRaw from "../E2E/DevE2eNav";
+import RouteErrorBoundaryRaw from '../ErrorBoundary/RouteErrorBoundary';
 
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -139,10 +139,10 @@ import {
   isRouteResponderAddress,
 } from './mainSiteUtils.js';
 import {
-  ExperimentalStub,
-  NotFoundRoute,
+  ExperimentalStub as ExperimentalStubRaw,
+  NotFoundRoute as NotFoundRouteRaw,
   readHashQueryParam,
-  SessionLoadingSkeleton,
+  SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
 import {
   KNOWN_ROUTE_PREFIXES,
@@ -164,26 +164,26 @@ import {
   normalizeRoutePath as normalizeRoutePathFn,
 } from './routePathHelpers.js';
 import {
-  AboutPage,
-  AdminPage,
-  AgentPage,
-  DebateMap,
-  BookmarksPage,
-  CompareAddresses,
-  ContractPage,
-  DemosIndex,
-  OnePageSession,
-  RiskMatrixDemo,
-  SBTPage,
-  SBTsPage,
-  SessionDocumentsPage,
-  SessionWizard,
-  SimulatedUserPage,
-  SponsorPage,
-  SurveyPage,
-  SurveyTool,
-  TagPage,
-  UserPage,
+  AboutPage as AboutPageRaw,
+  AdminPage as AdminPageRaw,
+  AgentPage as AgentPageRaw,
+  DebateMap as DebateMapRaw,
+  BookmarksPage as BookmarksPageRaw,
+  CompareAddresses as CompareAddressesRaw,
+  ContractPage as ContractPageRaw,
+  DemosIndex as DemosIndexRaw,
+  OnePageSession as OnePageSessionRaw,
+  RiskMatrixDemo as RiskMatrixDemoRaw,
+  SBTPage as SBTPageRaw,
+  SBTsPage as SBTsPageRaw,
+  SessionDocumentsPage as SessionDocumentsPageRaw,
+  SessionWizard as SessionWizardRaw,
+  SimulatedUserPage as SimulatedUserPageRaw,
+  SponsorPage as SponsorPageRaw,
+  SurveyPage as SurveyPageRaw,
+  SurveyTool as SurveyToolRaw,
+  TagPage as TagPageRaw,
+  UserPage as UserPageRaw,
 } from './routeLazyComponents.js';
 import {
   buildQuestionReadyStatePatch,
@@ -211,10 +211,44 @@ export {
 const mainSiteLog = createLogger('mainSite');
 
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
+const styles: any = stylesRaw;
+const contractScripts: any = contractScriptsRaw as any;
+const WagmiHooksHOC: any = WagmiHooksHOCRaw;
+const Navbar: any = NavbarRaw;
+const MainAreaTabs: any = MainAreaTabsRaw;
+const RightSide: any = RightSideRaw;
+const OnboardingOverlay: any = OnboardingOverlayRaw;
+const Footer: any = FooterRaw;
+const LazyFallback: any = LazyFallbackRaw;
+const DevE2eNav: any = DevE2eNavRaw;
+const RouteErrorBoundary: any = RouteErrorBoundaryRaw;
+const ExperimentalStub: any = ExperimentalStubRaw;
+const NotFoundRoute: any = NotFoundRouteRaw;
+const SessionLoadingSkeleton: any = SessionLoadingSkeletonRaw;
+const AboutPage: any = AboutPageRaw;
+const AdminPage: any = AdminPageRaw;
+const AgentPage: any = AgentPageRaw;
+const DebateMap: any = DebateMapRaw;
+const BookmarksPage: any = BookmarksPageRaw;
+const CompareAddresses: any = CompareAddressesRaw;
+const ContractPage: any = ContractPageRaw;
+const DemosIndex: any = DemosIndexRaw;
+const OnePageSession: any = OnePageSessionRaw;
+const RiskMatrixDemo: any = RiskMatrixDemoRaw;
+const SBTPage: any = SBTPageRaw;
+const SBTsPage: any = SBTsPageRaw;
+const SessionDocumentsPage: any = SessionDocumentsPageRaw;
+const SessionWizard: any = SessionWizardRaw;
+const SimulatedUserPage: any = SimulatedUserPageRaw;
+const SponsorPage: any = SponsorPageRaw;
+const SurveyPage: any = SurveyPageRaw;
+const SurveyTool: any = SurveyToolRaw;
+const TagPage: any = TagPageRaw;
+const UserPage: any = UserPageRaw;
 
 
-export class MainSite extends Component {
-  state = {
+export class MainSite extends Component<MainSiteProps, MainSiteState> {
+  state: MainSiteState = {
     // Cache readiness flags
     isSBTCacheReady: false,
     isSurveyCacheReady: false,
@@ -252,198 +286,212 @@ export class MainSite extends Component {
     isCacheManagerReady: false,
   };
 
-  _cacheReadinessController = createSessionCacheReadinessController({
+  _cacheReadinessController: any = createSessionCacheReadinessController({
     getState: () => this.state,
-    setState: (updater, cb) => this.setState(updater, cb),
+    setState: (updater: any, cb: any) => (this.setState as any)(updater, cb),
     isMounted: () => this._mounted,
     resolveActiveSlug: () => this.resolveActiveSlugForCacheUpdates(),
     checkAllCachesReady: () => this.checkAllCachesReady(),
-    syncCacheHasLoadedFlagFromPersistent: (slug, opts) => this.syncCacheHasLoadedFlagFromPersistent(slug, opts),
-    readFlag: (name, slug) => this.readFlag(name, slug),
-    isInitInFlight: (slug) => ({
+    syncCacheHasLoadedFlagFromPersistent: (slug: any, opts: any) => this.syncCacheHasLoadedFlagFromPersistent(slug, opts),
+    readFlag: (name: any, slug: any) => this.readFlag(name, slug),
+    isInitInFlight: (slug: any) => ({
       question: !!this._questionCacheController?.isInitInFlight?.(slug),
       survey: !!this._surveyCacheController?.isInitInFlight?.(slug),
       response: !!this._responseHydrationController?.isInitInFlight?.(slug),
     }),
   });
 
-  _cachePersistenceController = createSessionCachePersistenceController({
-    dgRead: (name, slug) => this.DG.read(name, slug),
-    dgWrite: (name, slug, obj) => this.DG.write(name, slug, obj),
+  _cachePersistenceController: any = createSessionCachePersistenceController({
+    dgRead: (name: any, slug: any) => this.DG.read(name, slug),
+    dgWrite: (name: any, slug: any, obj: any) => this.DG.write(name, slug, obj),
     isMounted: () => this._mounted,
     getActiveSlug: () => this.getSessionSlugFromState(),
-    setState: (updater, cb) => this.setState(updater, cb),
+    setState: (updater: any, cb: any) => (this.setState as any)(updater, cb),
   });
 
-  _queuedSurveyGroupScanId = null;
+  _queuedSurveyGroupScanId: any = null;
   _queuedSurveyGroupScanHintedSlug = '';
-  _queuedSurveyGroupScanTimer = null;
-  _surveyGroupScanInFlight = new Set();
-  _scanPolicy = createSessionScanPolicy({
+  _queuedSurveyGroupScanTimer: any = null;
+  _surveyGroupScanInFlight = new Set<any>();
+  _scanPolicy: any = createSessionScanPolicy({
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
     getCurrentPath: () => this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
-    getSessionSlugHintFromSearch: (search) => this.getSessionSlugHintFromSearch(search),
-    getSessionTokenFromPath: (path) => this.getSessionTokenFromPath(path),
-    isSbtListRoutePath: (path) => this.isSbtListRoutePath(path),
+    getSessionSlugHintFromSearch: (search: any) => this.getSessionSlugHintFromSearch(search),
+    getSessionTokenFromPath: (path: any) => this.getSessionTokenFromPath(path),
+    isSbtListRoutePath: (path: any) => this.isSbtListRoutePath(path),
   });
-  _profileScanController = createSessionProfileScanController({
+  _profileScanController: any = createSessionProfileScanController({
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
     getSessionSlugFromState: () => this.getSessionSlugFromState(),
-    getSessionChainId: (slug) => this.getSessionChainId(slug),
-    getSessionCfg: (slug) => this.getSessionCfg(slug),
-    getSessionScanScopeContext: () => this.getSessionScanScopeContext(),
-    getScopedSessionSlugs: (scope) => this.getScopedSessionSlugs(scope),
-    isSessionSlugAllowedForScan: (slug, ctx) => this.isSessionSlugAllowedForScan(slug, ctx),
-    getScopeFilteredSlugs: (slugs, scope) => this.getScopeFilteredSlugs(slugs, scope),
+    getSessionChainId: (slug: any) => this.getSessionChainId(slug),
+    getSessionCfg: (slug: any) => this.getSessionCfg(slug),
+    getSessionScanScopeContext: (scope: any = undefined) => this.getSessionScanScopeContext(scope),
+    getScopedSessionSlugs: (scope: any) => this.getScopedSessionSlugs(scope),
+    isSessionSlugAllowedForScan: (slug: any, ctx: any) => this.isSessionSlugAllowedForScan(slug, ctx),
+    getScopeFilteredSlugs: (slugs: any, scope: any) => this.getScopeFilteredSlugs(slugs, scope),
     getAccount: () => this.props.account,
     getProvider: () => this.props.provider,
     getNetworkId: () => Number(this.props?.network?.id || this.props?.network?.chainId || 0) || null,
     isMounted: () => this._mounted !== false,
-    scanSpecificUserProfile: (address) => this.scanSpecificUserProfile(address),
+    scanSpecificUserProfile: (address: any) => this.scanSpecificUserProfile(address),
   });
-  _sbtCacheController = createSessionSbtCacheController({
-    setState: (...args) => this.setState(...args),
+  _sbtCacheController: any = createSessionSbtCacheController({
+    setState: (...args: any[]) => (this.setState as any)(...args),
     getState: () => this.state,
     isMounted: () => this._mounted,
-    dgRead: (...args) => this.DG.read(...args),
-    dgWrite: (...args) => this.DG.write(...args),
-    dgKey: (...args) => this.DG.key(...args),
+    dgRead: (...args: any[]) => (this.DG.read as any)(...args),
+    dgWrite: (...args: any[]) => (this.DG.write as any)(...args),
+    dgKey: (...args: any[]) => (this.DG.key as any)(...args),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (s) => this.getSessionCfg(s),
-    getSessionChainId: (s) => this.getSessionChainId(s),
+    getSessionCfg: (s: any) => this.getSessionCfg(s),
+    getSessionChainId: (s: any) => this.getSessionChainId(s),
     getSessionScanScope: () => this.getSessionScanScope(),
-    getSessionScanScopeContext: (s) => this.getSessionScanScopeContext(s),
+    getSessionScanScopeContext: (s: any) => this.getSessionScanScopeContext(s),
     getAccount: () => (this.props?.account || ''),
     getCurrentPath: () => (this.props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''),
-    getEffectiveRoutePath: (...args) => this.getEffectiveRoutePath(...args),
-    getScopeFilteredSlugs: (...args) => this.getScopeFilteredSlugs(...args),
-    getScopedSessionSlugs: (...args) => this.getScopedSessionSlugs(...args),
-    shouldSkipSessionScanForSlug: (...args) => this.shouldSkipSessionScanForSlug(...args),
-    scanScopeNoop: (...args) => this.scanScopeNoop(...args),
-    logScopeSkipOnce: (...args) => this.logScopeSkipOnce(...args),
-    isSbtInstanceListenerEnabledForGroup: (...args) => this.isSbtInstanceListenerEnabledForGroup(...args),
-    shouldAutoRunFullSbtScan: (...args) => this.shouldAutoRunFullSbtScan(...args),
+    getEffectiveRoutePath: (...args: any[]) => (this.getEffectiveRoutePath as any)(...args),
+    getScopeFilteredSlugs: (...args: any[]) => (this.getScopeFilteredSlugs as any)(...args),
+    getScopedSessionSlugs: (...args: any[]) => (this.getScopedSessionSlugs as any)(...args),
+    shouldSkipSessionScanForSlug: (...args: any[]) => (this.shouldSkipSessionScanForSlug as any)(...args),
+    scanScopeNoop: (...args: any[]) => (this.scanScopeNoop as any)(...args),
+    logScopeSkipOnce: (...args: any[]) => (this.logScopeSkipOnce as any)(...args),
+    isSbtInstanceListenerEnabledForGroup: (...args: any[]) => (this.isSbtInstanceListenerEnabledForGroup as any)(...args),
+    shouldAutoRunFullSbtScan: (...args: any[]) => (this.shouldAutoRunFullSbtScan as any)(...args),
     isSbtHistoryScanEnabled: () => this.isSbtHistoryScanEnabled(),
     shouldAttachSbtDetailInstanceListener: () => this.shouldAttachSbtDetailInstanceListener(),
-    setReadinessStateIfChanged: (...args) => this.setReadinessStateIfChanged(...args),
-    checkAllCachesReady: (...args) => this.checkAllCachesReady(...args),
-    queueLocalRevisionUpdate: (...args) => this.queueLocalRevisionUpdate(...args),
-    readFlag: (...args) => this.readFlag(...args),
-    writeFlag: (...args) => this.writeFlag(...args),
-    refreshEncryptedQuestionPayloadsForGroup: (...args) => this.refreshEncryptedQuestionPayloadsForGroup(...args),
-    initializeSurveyCacheForGroup: (...args) => this.initializeSurveyCacheForGroup(...args),
-    runWithGeneralSessionBackfill: (...args) => this.runWithGeneralSessionBackfill(...args),
-    mergeLegacyNumericNetworkKey: (...args) => this.mergeLegacyNumericNetworkKey(...args),
+    setReadinessStateIfChanged: (...args: any[]) => (this.setReadinessStateIfChanged as any)(...args),
+    checkAllCachesReady: (...args: any[]) => (this.checkAllCachesReady as any)(...args),
+    queueLocalRevisionUpdate: (...args: any[]) => (this.queueLocalRevisionUpdate as any)(...args),
+    readFlag: (...args: any[]) => (this.readFlag as any)(...args),
+    writeFlag: (...args: any[]) => (this.writeFlag as any)(...args),
+    refreshEncryptedQuestionPayloadsForGroup: (...args: any[]) => (this.refreshEncryptedQuestionPayloadsForGroup as any)(...args),
+    initializeSurveyCacheForGroup: (...args: any[]) => (this.initializeSurveyCacheForGroup as any)(...args),
+    runWithGeneralSessionBackfill: (...args: any[]) => (this.runWithGeneralSessionBackfill as any)(...args),
+    mergeLegacyNumericNetworkKey: (...args: any[]) => (this.mergeLegacyNumericNetworkKey as any)(...args),
   });
-  _surveyCacheController = createSessionSurveyCacheController({
-    setState: (...a) => this.setState(...a),
+  _surveyCacheController: any = createSessionSurveyCacheController({
+    setState: (...a: any[]) => (this.setState as any)(...a),
     getState: () => this.state,
     isMounted: () => this._mounted,
-    dgRead: (...a) => this.DG.read(...a),
-    dgWrite: (...a) => this.DG.write(...a),
+    dgRead: (...a: any[]) => (this.DG.read as any)(...a),
+    dgWrite: (...a: any[]) => (this.DG.write as any)(...a),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (...a) => this.getSessionCfg(...a),
-    getSessionChainId: (...a) => this.getSessionChainId(...a),
+    getSessionCfg: (...a: any[]) => (this.getSessionCfg as any)(...a),
+    getSessionChainId: (...a: any[]) => (this.getSessionChainId as any)(...a),
     getAccount: () => this.props.account,
     getCurrentPath: () => this.props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
-    shouldSkipSessionScanForSlug: (...a) => this.shouldSkipSessionScanForSlug(...a),
-    scanScopeNoop: (...a) => this.scanScopeNoop(...a),
-    logScopeSkipOnce: (...a) => this.logScopeSkipOnce(...a),
-    setReadinessStateIfChanged: (...a) => this.setReadinessStateIfChanged(...a),
-    checkAllCachesReady: (...a) => this.checkAllCachesReady(...a),
-    readFlag: (...a) => this.readFlag(...a),
-    writeFlag: (...a) => this.writeFlag(...a),
-    mergeLegacyNumericNetworkKey: (...a) => this.mergeLegacyNumericNetworkKey(...a),
-    initializeQuestionCacheForGroup: (...a) => this.initializeQuestionCacheForGroup(...a),
-    writeSurveyMetadataToCache: (...a) => this.writeSurveyMetadataToCache(...a),
-    queueLocalRevisionUpdate: (...a) => this.queueLocalRevisionUpdate(...a),
+    shouldSkipSessionScanForSlug: (...a: any[]) => (this.shouldSkipSessionScanForSlug as any)(...a),
+    scanScopeNoop: (...a: any[]) => (this.scanScopeNoop as any)(...a),
+    logScopeSkipOnce: (...a: any[]) => (this.logScopeSkipOnce as any)(...a),
+    setReadinessStateIfChanged: (...a: any[]) => (this.setReadinessStateIfChanged as any)(...a),
+    checkAllCachesReady: (...a: any[]) => (this.checkAllCachesReady as any)(...a),
+    readFlag: (...a: any[]) => (this.readFlag as any)(...a),
+    writeFlag: (...a: any[]) => (this.writeFlag as any)(...a),
+    mergeLegacyNumericNetworkKey: (...a: any[]) => (this.mergeLegacyNumericNetworkKey as any)(...a),
+    initializeQuestionCacheForGroup: (...a: any[]) => (this.initializeQuestionCacheForGroup as any)(...a),
+    writeSurveyMetadataToCache: (...a: any[]) => (this.writeSurveyMetadataToCache as any)(...a),
+    queueLocalRevisionUpdate: (...a: any[]) => (this.queueLocalRevisionUpdate as any)(...a),
     getSessionScanScope: () => this.getSessionScanScope(),
   });
-  _questionCacheController = createSessionQuestionCacheController({
-    setState: (...a) => this.setState(...a),
+  _questionCacheController: any = createSessionQuestionCacheController({
+    setState: (...a: any[]) => (this.setState as any)(...a),
     getState: () => this.state,
     isMounted: () => this._mounted,
-    dgRead: (...a) => this.DG.read(...a),
-    dgWrite: (...a) => this.DG.write(...a),
+    dgRead: (...a: any[]) => (this.DG.read as any)(...a),
+    dgWrite: (...a: any[]) => (this.DG.write as any)(...a),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionCfg: (...a) => this.getSessionCfg(...a),
-    getSessionChainId: (...a) => this.getSessionChainId(...a),
+    getSessionCfg: (...a: any[]) => (this.getSessionCfg as any)(...a),
+    getSessionChainId: (...a: any[]) => (this.getSessionChainId as any)(...a),
     getSessionScanScope: () => this.getSessionScanScope(),
     getAccount: () => this.props.account,
     getProviderLike: () => this.props.provider,
     getNetwork: () => this.props?.network || null,
-    scanScopeNoop: (...a) => this.scanScopeNoop(...a),
-    setReadinessStateIfChanged: (...a) => this.setReadinessStateIfChanged(...a),
-    checkAllCachesReady: (...a) => this.checkAllCachesReady(...a),
-    mergeLegacyNumericNetworkKey: (...a) => this.mergeLegacyNumericNetworkKey(...a),
-    buildMetadataSessionCacheEnvelope: (...a) => this.buildMetadataSessionCacheEnvelope(...a),
-    writeQuestionMetadataToCache: (...a) => this.writeQuestionMetadataToCache(...a),
-    queueLocalRevisionUpdate: (...a) => this.queueLocalRevisionUpdate(...a),
+    scanScopeNoop: (...a: any[]) => (this.scanScopeNoop as any)(...a),
+    setReadinessStateIfChanged: (...a: any[]) => (this.setReadinessStateIfChanged as any)(...a),
+    checkAllCachesReady: (...a: any[]) => (this.checkAllCachesReady as any)(...a),
+    mergeLegacyNumericNetworkKey: (...a: any[]) => (this.mergeLegacyNumericNetworkKey as any)(...a),
+    buildMetadataSessionCacheEnvelope: (...a: any[]) => (this.buildMetadataSessionCacheEnvelope as any)(...a),
+    writeQuestionMetadataToCache: (...a: any[]) => (this.writeQuestionMetadataToCache as any)(...a),
+    queueLocalRevisionUpdate: (...a: any[]) => (this.queueLocalRevisionUpdate as any)(...a),
   });
-  _responseHydrationController = createSessionResponseHydrationController({
-    setState: (...a) => this.setState(...a),
+  _responseHydrationController: any = createSessionResponseHydrationController({
+    setState: (...a: any[]) => (this.setState as any)(...a),
     isMounted: () => this._mounted,
-    dgRead: (...a) => this.DG.read(...a),
-    dgWrite: (...a) => this.DG.write(...a),
+    dgRead: (...a: any[]) => (this.DG.read as any)(...a),
+    dgWrite: (...a: any[]) => (this.DG.write as any)(...a),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getSessionChainId: (...a) => this.getSessionChainId(...a),
+    getSessionChainId: (...a: any[]) => (this.getSessionChainId as any)(...a),
     getAccount: () => this.props.account,
-    scanScopeNoop: (...a) => this.scanScopeNoop(...a),
-    setReadinessStateIfChanged: (...a) => this.setReadinessStateIfChanged(...a),
-    checkAllCachesReady: (...a) => this.checkAllCachesReady(...a),
-    mergeLegacyNumericNetworkKey: (...a) => this.mergeLegacyNumericNetworkKey(...a),
-    queueLocalRevisionUpdate: (...a) => this.queueLocalRevisionUpdate(...a),
+    scanScopeNoop: (...a: any[]) => (this.scanScopeNoop as any)(...a),
+    setReadinessStateIfChanged: (...a: any[]) => (this.setReadinessStateIfChanged as any)(...a),
+    checkAllCachesReady: (...a: any[]) => (this.checkAllCachesReady as any)(...a),
+    mergeLegacyNumericNetworkKey: (...a: any[]) => (this.mergeLegacyNumericNetworkKey as any)(...a),
+    queueLocalRevisionUpdate: (...a: any[]) => (this.queueLocalRevisionUpdate as any)(...a),
   });
-  _scanSpecificUserProfileInFlight = new Map();
+  _scanSpecificUserProfileInFlight = new Map<any, any>();
   _profileScanTelemetrySeq = 0;
   _cacheReinitRunSeq = 0;
   _activeCacheReinitRunToken = 0;
-  _sessionRouteLightDiscoveryInFlight = {};
+  _sessionRouteLightDiscoveryInFlight: AnyRecord = {};
   _mounted = false;
+  _pendingSessionPathIdResolves: Record<string, any> = {} as any;
+  _sessionPathIdResolveAttempts: Record<string, any> = {};
+  _sessionPathResolveErrorCounts: Record<string, any> = {};
+  _sessionPathResolveLastErrors: Record<string, any> = {};
+  _sessionPathResolveRetryTimers: Record<string, any> = {};
+  _pendingSessionPathSlugResolves: Record<string, any> = {} as any;
+  _sessionPathSlugResolveAttempts: Record<string, any> = {};
+  _sessionMetaAttempts: Record<string, any> = {};
+  _lastSessionInfoAttempt = '';
+  _lastGroupChainId: number | null = null;
+  _cacheUpdateUnsubscribe: (() => void) | null = null;
+  _userPriorityPromise: Promise<any> | null = null;
+  _userPriorityTarget: string | null = null;
+  reloadWindowLocation: (() => void) | null = null;
   _sessionFallbackRedirectPath = '';
   _lastProcessedQuestionIdFromPath = '';
-  _lastProcessedQuestionSlugFromPath = null;
+  _lastProcessedQuestionSlugFromPath: string | null = null;
 
   get _registryBootstrapPromise() {
-    return this._profileScanController?._registryBootstrapPromise ?? null;
+    return (this._profileScanController as any)?._registryBootstrapPromise ?? null;
   }
 
-  set _registryBootstrapPromise(value) {
+  set _registryBootstrapPromise(value: any) {
     if (this._profileScanController) {
-      this._profileScanController._registryBootstrapPromise = value;
+      (this._profileScanController as any)._registryBootstrapPromise = value;
     }
   }
 
   get _registryBootstrapScopeKey() {
-    return this._profileScanController?._registryBootstrapScopeKey || '';
+    return (this._profileScanController as any)?._registryBootstrapScopeKey || '';
   }
 
-  set _registryBootstrapScopeKey(value) {
+  set _registryBootstrapScopeKey(value: any) {
     if (this._profileScanController) {
-      this._profileScanController._registryBootstrapScopeKey = value;
+      (this._profileScanController as any)._registryBootstrapScopeKey = value;
     }
   }
 
-  beginSbtLiveProgress = (...args) => this._sbtCacheController.beginSbtLiveProgress(...args);
+  beginSbtLiveProgress = (...args: any[]) => this._sbtCacheController.beginSbtLiveProgress(...args);
 
-  updateSbtLiveProgress = (...args) => this._sbtCacheController.updateSbtLiveProgress(...args);
+  updateSbtLiveProgress = (...args: any[]) => this._sbtCacheController.updateSbtLiveProgress(...args);
 
-  clearSbtLiveProgress = (...args) => this._sbtCacheController.clearSbtLiveProgress(...args);
+  clearSbtLiveProgress = (...args: any[]) => this._sbtCacheController.clearSbtLiveProgress(...args);
 
-  setSbtRealtimeCoverageForGroup = (...args) => this._sbtCacheController.setSbtRealtimeCoverageForGroup(...args);
+  setSbtRealtimeCoverageForGroup = (...args: any[]) => this._sbtCacheController.setSbtRealtimeCoverageForGroup(...args);
 
-  clearSbtRealtimeCoverageForGroup = (...args) => this._sbtCacheController.clearSbtRealtimeCoverageForGroup(...args);
+  clearSbtRealtimeCoverageForGroup = (...args: any[]) => this._sbtCacheController.clearSbtRealtimeCoverageForGroup(...args);
 
-  normalizeSbtRealtimeEventCursor = (...args) => this._sbtCacheController.normalizeSbtRealtimeEventCursor(...args);
+  normalizeSbtRealtimeEventCursor = (...args: any[]) => this._sbtCacheController.normalizeSbtRealtimeEventCursor(...args);
 
-  compareSbtRealtimeEventCursor = (...args) => this._sbtCacheController.compareSbtRealtimeEventCursor(...args);
+  compareSbtRealtimeEventCursor = (...args: any[]) => this._sbtCacheController.compareSbtRealtimeEventCursor(...args);
 
-  removeSbtRealtimeListenersForGroup = (...args) => this._sbtCacheController.removeSbtRealtimeListenersForGroup(...args);
+  removeSbtRealtimeListenersForGroup = (...args: any[]) => this._sbtCacheController.removeSbtRealtimeListenersForGroup(...args);
   normalizeRoutePath = normalizeRoutePathFn;
 
   isGeneralRoutePath = isGeneralRoutePathFn;
 
-  getEffectiveRoutePath = (pathIn = '') => getEffectiveRoutePathFn(pathIn, {
+  getEffectiveRoutePath = (pathIn: any = '') => getEffectiveRoutePathFn(pathIn, {
     windowPathIn: typeof window !== 'undefined'
       ? window.location.pathname
       : '',
@@ -454,10 +502,10 @@ export class MainSite extends Component {
     const scope = String(readSessionScanScope() || '').trim().toLowerCase();
     if (scope !== 'list') return [];
 
-    const dedupeNormalized = (values = []) => {
-      const out = [];
-      const seen = new Set();
-      values.forEach((value) => {
+    const dedupeNormalized = (values: any[] = []) => {
+      const out: string[] = [];
+      const seen = new Set<string>();
+      values.forEach((value: any) => {
         const normalized = normalizeSessionSlug(value || '');
         if (seen.has(normalized)) return;
         seen.add(normalized);
@@ -475,8 +523,8 @@ export class MainSite extends Component {
       const entries = sessionRegistryStore.getAllSessionEntries();
       if (!Array.isArray(entries) || !entries.length) return [];
       return dedupeNormalized(
-        entries.map((entry) => {
-          const cfg = Array.isArray(entry) ? entry[1] : entry;
+        (entries as any[]).map((entry: any) => {
+          const cfg = (Array.isArray(entry) ? entry[1] : entry) as AnyRecord;
           return cfg?.slug || cfg?.sessionSlug || '';
         })
       );
@@ -489,10 +537,10 @@ export class MainSite extends Component {
     const scopeSlugs = this.getSessionFallbackScopeSlugs();
     if (!scopeSlugs.length) return null;
 
-    const generalInScope = scopeSlugs.some((slug) => slug === '' || slug === DEFAULT_SESSION_SLUG_ALIAS);
+    const generalInScope = scopeSlugs.some((slug: any) => slug === '' || slug === DEFAULT_SESSION_SLUG_ALIAS);
     if (generalInScope) return null;
 
-    const firstScopedSlug = scopeSlugs.find((slug) => slug && slug !== DEFAULT_SESSION_SLUG_ALIAS);
+    const firstScopedSlug = scopeSlugs.find((slug: any) => slug && slug !== DEFAULT_SESSION_SLUG_ALIAS);
     if (!firstScopedSlug) return null;
 
     return {
@@ -503,9 +551,10 @@ export class MainSite extends Component {
 
   isFirstVisitRootRedirectEnabled = () => {
     try {
-      if (typeof globalThis !== 'undefined' && typeof globalThis.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED !== 'undefined') {
+      const runtimeGlobals = globalThis as AnyRecord;
+      if (typeof globalThis !== 'undefined' && typeof runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED !== 'undefined') {
         return this.readBoolishRuntimeFlag(
-          globalThis.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
+          runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
           !!CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED
         );
       }
@@ -535,13 +584,13 @@ export class MainSite extends Component {
     };
   };
 
-  getSessionFallbackRedirectStorageKey = (slugIn = '') => {
+  getSessionFallbackRedirectStorageKey = (slugIn: any = '') => {
     const normalizedSlug = normalizeSessionSlug(slugIn || '');
     const storageSlug = normalizedSlug || DEFAULT_SESSION_SLUG_ALIAS;
     return `${SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX}${storageSlug}`;
   };
 
-  hasConsumedSessionFallbackRedirect = (target = null) => {
+  hasConsumedSessionFallbackRedirect = (target: any = null) => {
     if (typeof window === 'undefined' || !window.sessionStorage || !target?.path) return false;
     try {
       return sessionStorage.getItem(this.getSessionFallbackRedirectStorageKey(target.slug)) === 'true';
@@ -551,7 +600,7 @@ export class MainSite extends Component {
     }
   };
 
-  consumeSessionFallbackRedirect = (target = null) => {
+  consumeSessionFallbackRedirect = (target: any = null) => {
     if (typeof window === 'undefined' || !window.sessionStorage || !target?.path) return false;
     try {
       sessionStorage.setItem(this.getSessionFallbackRedirectStorageKey(target.slug), 'true');
@@ -564,7 +613,7 @@ export class MainSite extends Component {
 
   isOnOrWithinRoutePath = isOnOrWithinRoutePathFn;
 
-  syncSessionFallbackRedirectConsumption = ({ pathIn = '' } = {}) => {
+  syncSessionFallbackRedirectConsumption = ({ pathIn = '' }: AnyRecord = {}) => {
     const target = this.getSessionFallbackPreferredTarget();
     if (!target) return null;
     const currentPath = this.getEffectiveRoutePath(pathIn);
@@ -574,14 +623,14 @@ export class MainSite extends Component {
     return target;
   };
 
-  getSessionFallbackRedirectTarget = ({ pathIn = '' } = {}) => {
+  getSessionFallbackRedirectTarget = ({ pathIn = '' }: AnyRecord = {}) => {
     const currentPath = this.getEffectiveRoutePath(pathIn);
     if (!currentPath || currentPath === '/') return null;
     if (!this.isGeneralRoutePath(currentPath)) return null;
     return this.getSessionFallbackPreferredTarget();
   };
 
-  applySessionFallbackRedirect = ({ pathIn = '' } = {}) => {
+  applySessionFallbackRedirect = ({ pathIn = '' }: AnyRecord = {}) => {
     if (typeof window === 'undefined') return null;
     const target = this.getSessionFallbackRedirectTarget({ pathIn });
     if (!target) return null;
@@ -597,12 +646,12 @@ export class MainSite extends Component {
     return target;
   };
 
-  mergeLegacyNumericNetworkKey = (cacheObj, canonicalNetworkKey) => {
+  mergeLegacyNumericNetworkKey = (cacheObj: any, canonicalNetworkKey: any) => {
     if (!cacheObj || typeof cacheObj !== 'object') return false;
     const networkKey = String(canonicalNetworkKey || '');
     if (!networkKey) return false;
     const altKey = Object.keys(cacheObj).find(
-      (k) => k !== networkKey && Number(k) === Number(networkKey)
+      (k: any) => k !== networkKey && Number(k) === Number(networkKey)
     );
     if (!altKey) return false;
     cacheObj[networkKey] = {
@@ -620,7 +669,7 @@ export class MainSite extends Component {
     return token;
   };
 
-  isCacheReinitRunActive = (token) => (
+  isCacheReinitRunActive = (token: any) => (
     !!this._mounted && Number(token || 0) === Number(this._activeCacheReinitRunToken || 0)
   );
 
@@ -641,23 +690,23 @@ export class MainSite extends Component {
       .toLowerCase();
   };
 
-  setReadinessStateIfChanged = (...args) => this._cacheReadinessController.setReadinessStateIfChanged(...args);
+  setReadinessStateIfChanged = (...args: any[]) => this._cacheReadinessController.setReadinessStateIfChanged(...args);
 
-  syncCacheHasLoadedFlagOnTransition = (...args) => this._cacheReadinessController.syncCacheHasLoadedFlagOnTransition(...args);
+  syncCacheHasLoadedFlagOnTransition = (...args: any[]) => this._cacheReadinessController.syncCacheHasLoadedFlagOnTransition(...args);
 
-  scheduleCacheUpdateFlush = (...args) => this._cacheReadinessController.scheduleCacheUpdateFlush(...args);
+  scheduleCacheUpdateFlush = (...args: any[]) => this._cacheReadinessController.scheduleCacheUpdateFlush(...args);
 
-  queueCacheUpdateFlush = (...args) => this._cacheReadinessController.queueCacheUpdateFlush(...args);
+  queueCacheUpdateFlush = (...args: any[]) => this._cacheReadinessController.queueCacheUpdateFlush(...args);
 
-  flushQueuedCacheUpdates = (...args) => this._cacheReadinessController.flushQueuedCacheUpdates(...args);
+  flushQueuedCacheUpdates = (...args: any[]) => this._cacheReadinessController.flushQueuedCacheUpdates(...args);
 
-  queueLocalRevisionUpdate = (...args) => this._cacheReadinessController.queueLocalRevisionUpdate(...args);
+  queueLocalRevisionUpdate = (...args: any[]) => this._cacheReadinessController.queueLocalRevisionUpdate(...args);
 
-  flushLocalRevisionUpdate = (...args) => this._cacheReadinessController.flushLocalRevisionUpdate(...args);
+  flushLocalRevisionUpdate = (...args: any[]) => this._cacheReadinessController.flushLocalRevisionUpdate(...args);
 
-  handleCrossTabCacheUpdateEvent = (...args) => this._cacheReadinessController.handleCrossTabCacheUpdateEvent(...args);
+  handleCrossTabCacheUpdateEvent = (...args: any[]) => this._cacheReadinessController.handleCrossTabCacheUpdateEvent(...args);
 
-  queueSurveyGroupScan = (surveyID, opts = {}) => {
+  queueSurveyGroupScan = (surveyID: any, opts: any = {}) => {
     const sid = String(surveyID || '').toLowerCase();
     if (!sid) return;
     const hintedSlug = normalizeSessionSlug(String(opts?.hintedSlug || ''));
@@ -678,21 +727,21 @@ export class MainSite extends Component {
     }, 0);
   };
 
-  pruneMaskedQuestionDecryptBackoff = (...args) => this._questionCacheController.pruneMaskedQuestionDecryptBackoff(...args);
+  pruneMaskedQuestionDecryptBackoff = (...args: any[]) => this._questionCacheController.pruneMaskedQuestionDecryptBackoff(...args);
 
   // Group slug parser
-  getSessionTokenFromPath = (pathIn = '') => {
+  getSessionTokenFromPath = (pathIn: any = '') => {
     const p = String(this.getEffectiveRoutePath(pathIn) || '').trim();
     if (!p.startsWith('/session/')) return '';
     return (p.split('/').filter(Boolean)[1] || '').trim();
   };
 
-  resolveSessionSlugFromPathToken = (rawToken, { allowAsyncResolve = false } = {}) => {
+  resolveSessionSlugFromPathToken = (rawToken: any, { allowAsyncResolve = false }: AnyRecord = {}) => {
     const result = resolveMainSiteSessionSlugFromPathToken({
       rawToken,
       formatSessionId: sessionRegistryUtils.formatSessionId,
       resolveSessionConfigById: sessionRegistryStore.getSessionConfigById,
-      resolveSessionConfigBySlug: (slug) => sessionRegistryStore.getSessionConfig(slug) || getSessionConfigBySlug(slug),
+      resolveSessionConfigBySlug: (slug: any) => sessionRegistryStore.getSessionConfig(slug) || getSessionConfigBySlug(slug),
     });
     if (!result && allowAsyncResolve) {
       const sessionId = sessionRegistryUtils.formatSessionId(String(rawToken || '').trim());
@@ -701,30 +750,30 @@ export class MainSite extends Component {
     return result;
   };
 
-	  resolveSessionPathId = (sessionIdIn) => {
+	  resolveSessionPathId = (sessionIdIn: any) => {
 	    const sessionId = sessionRegistryUtils.formatSessionId(sessionIdIn);
 	    if (!sessionId) return;
 
-	    this._pendingSessionPathIdResolves = this._pendingSessionPathIdResolves || new Set();
+	    this._pendingSessionPathIdResolves = (this._pendingSessionPathIdResolves || new Set()) as any;
 	    this._sessionPathIdResolveAttempts = this._sessionPathIdResolveAttempts || {};
 	    this._sessionPathResolveErrorCounts = this._sessionPathResolveErrorCounts || { id: {}, slug: {} };
 	    this._sessionPathResolveLastErrors = this._sessionPathResolveLastErrors || { id: {}, slug: {} };
 	    this._sessionPathResolveRetryTimers = this._sessionPathResolveRetryTimers || { id: {}, slug: {} };
 
-	    if (this._pendingSessionPathIdResolves.has(sessionId)) return;
+	    if ((this._pendingSessionPathIdResolves as any).has(sessionId)) return;
 	    const now = Date.now();
 	    const lastAttempt = Number(this._sessionPathIdResolveAttempts[sessionId] || 0);
 	    if (now - lastAttempt < 3000) return;
 
     this._sessionPathIdResolveAttempts[sessionId] = now;
-    this._pendingSessionPathIdResolves.add(sessionId);
+    (this._pendingSessionPathIdResolves as any).add(sessionId);
 
 		    (async () => {
 		      try {
 		        const lit = getGlobalLitHooks();
 		        const chainIds = getSessionRegistryChainIds();
 		        let resolved = false;
-		        let lastErr = null;
+		        let lastErr: any = null;
 		        for (const chainId of chainIds) {
 		          try {
 		            // eslint-disable-next-line no-await-in-loop
@@ -803,9 +852,9 @@ export class MainSite extends Component {
 	      } catch (err) {
 	        mainSiteLog.warn('[SessionRegistry] Failed resolving /session/:sessionId path:', err);
 	      } finally {
-	        this._pendingSessionPathIdResolves.delete(sessionId);
+	        (this._pendingSessionPathIdResolves as any).delete(sessionId);
 	        if (this._mounted) {
-	          this.setState((prev) => ({
+	          this.setState((prev: any) => ({
 	            sessionPathResolutionNonce: Number(prev.sessionPathResolutionNonce || 0) + 1,
 	          }));
 	        }
@@ -813,30 +862,30 @@ export class MainSite extends Component {
 	    })();
 	  };
 
-		  resolveSessionPathSlug = (slugIn) => {
+		  resolveSessionPathSlug = (slugIn: any) => {
 		    const slug = normalizeSessionSlug(slugIn);
 		    if (!slug) return;
 
-	    this._pendingSessionPathSlugResolves = this._pendingSessionPathSlugResolves || new Set();
+	    this._pendingSessionPathSlugResolves = (this._pendingSessionPathSlugResolves || new Set()) as any;
 	    this._sessionPathSlugResolveAttempts = this._sessionPathSlugResolveAttempts || {};
 	    this._sessionPathResolveErrorCounts = this._sessionPathResolveErrorCounts || { id: {}, slug: {} };
 	    this._sessionPathResolveLastErrors = this._sessionPathResolveLastErrors || { id: {}, slug: {} };
 	    this._sessionPathResolveRetryTimers = this._sessionPathResolveRetryTimers || { id: {}, slug: {} };
 
-	    if (this._pendingSessionPathSlugResolves.has(slug)) return;
+	    if ((this._pendingSessionPathSlugResolves as any).has(slug)) return;
 	    const now = Date.now();
 	    const lastAttempt = Number(this._sessionPathSlugResolveAttempts[slug] || 0);
 	    if (now - lastAttempt < 3000) return;
 
     this._sessionPathSlugResolveAttempts[slug] = now;
-    this._pendingSessionPathSlugResolves.add(slug);
+    (this._pendingSessionPathSlugResolves as any).add(slug);
 
 		    (async () => {
 		      try {
 		        const lit = getGlobalLitHooks();
 		        const chainIds = getSessionRegistryChainIds();
 		        let resolved = false;
-		        let lastErr = null;
+		        let lastErr: any = null;
 		        for (const chainId of chainIds) {
 		          try {
 		            // eslint-disable-next-line no-await-in-loop
@@ -894,9 +943,9 @@ export class MainSite extends Component {
 			      } catch (err) {
 		        mainSiteLog.warn('[SessionRegistry] Failed resolving /session/:slug path:', err);
 			      } finally {
-			        this._pendingSessionPathSlugResolves.delete(slug);
+				        (this._pendingSessionPathSlugResolves as any).delete(slug);
 			        if (this._mounted) {
-			          this.setState((prev) => ({
+			          this.setState((prev: any) => ({
 			            sessionPathResolutionNonce: Number(prev.sessionPathResolutionNonce || 0) + 1,
 			          }));
 			        }
@@ -915,7 +964,7 @@ export class MainSite extends Component {
     return DEFAULT_SESSION_SLUG; // canonical default slug in client state
   }
 
-  getExplicitSessionSlugFromProps = (props = this.props, { allowAsyncResolve = true } = {}) => {
+  getExplicitSessionSlugFromProps = (props: any = this.props, { allowAsyncResolve = true }: AnyRecord = {}) => {
     const path = props === this.props
       ? this.getEffectiveRoutePath(
         props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
@@ -944,14 +993,14 @@ export class MainSite extends Component {
     return { hasExplicitSessionSlug: false, sessionSlug: '' };
   };
 
-  getGlobalPrimarySessionSlugFromProps = (props = this.props) => {
+  getGlobalPrimarySessionSlugFromProps = (props: any = this.props) => {
     const primarySessionSlug = normalizeSessionSlug(props?.sessionState?.primarySessionSlug || '');
     const primarySessionExplicit = props?.sessionState?.primarySessionExplicit === true;
     const selectedSessionScope = String(props?.sessionState?.selectedSessionScope || '').trim().toLowerCase();
     const selectedSessionSlugs = Array.isArray(props?.sessionState?.selectedSessionSlugs)
       ? props.sessionState.selectedSessionSlugs
       : [];
-    const listIncludesGeneral = selectedSessionSlugs.some((slug) => normalizeSessionSlug(slug || '') === '');
+    const listIncludesGeneral = selectedSessionSlugs.some((slug: any) => normalizeSessionSlug(slug || '') === '');
     if (primarySessionSlug) return primarySessionSlug;
     if (primarySessionExplicit) {
       if (selectedSessionScope === 'list' && !listIncludesGeneral) {
@@ -965,7 +1014,7 @@ export class MainSite extends Component {
     return '';
   };
 
-  getSessionSlugFromProps = (props = this.props) => {
+  getSessionSlugFromProps = (props: any = this.props) => {
     const routeSession = this.getExplicitSessionSlugFromProps(props, { allowAsyncResolve: true });
     if (routeSession.hasExplicitSessionSlug) return routeSession.sessionSlug;
     const activeSessionSlug = props.activeSessionSlug || '';
@@ -974,7 +1023,7 @@ export class MainSite extends Component {
     const selectedSessionSlugs = Array.isArray(props?.sessionState?.selectedSessionSlugs)
       ? props.sessionState.selectedSessionSlugs
       : [];
-    const listIncludesGeneral = selectedSessionSlugs.some((slug) => normalizeSessionSlug(slug || '') === '');
+    const listIncludesGeneral = selectedSessionSlugs.some((slug: any) => normalizeSessionSlug(slug || '') === '');
     if (activeSessionSlug) return activeSessionSlug;
     if (primarySessionExplicit) {
       if (selectedSessionScope === 'list' && !listIncludesGeneral) {
@@ -988,14 +1037,14 @@ export class MainSite extends Component {
     return '';
   };
 
-  getDisplaySessionCfg = (slugIn) => {
+  getDisplaySessionCfg = (slugIn: any) => {
     const normalized = normalizeSessionSlug(slugIn ?? '');
     const strictCfg = this.getSessionCfg(normalized);
     if (strictCfg) return strictCfg;
     return getDemoSessionConfigBySlug(normalized, { allowDemoFallback: true }) || null;
   };
 
-  getDisplaySessionChainId = (slugIn) => {
+  getDisplaySessionChainId = (slugIn: any) => {
     const strictChainId = this.getSessionChainId(slugIn);
     if (strictChainId) return strictChainId;
     const cfg = this.getDisplaySessionCfg(slugIn);
@@ -1003,7 +1052,7 @@ export class MainSite extends Component {
     return Number.isFinite(chainId) && chainId > 0 ? chainId : null;
   };
 
-  getDisplaySessionNetwork = (slugIn) => {
+  getDisplaySessionNetwork = (slugIn: any) => {
     const strictNetwork = this.getSessionNetwork(slugIn);
     if (strictNetwork?.id) return strictNetwork;
     const chainId = this.getDisplaySessionChainId(slugIn);
@@ -1023,7 +1072,7 @@ export class MainSite extends Component {
 
   handleSessionRegistryCacheUpdated = () => {
     if (!this._mounted) return;
-    this.setState((prev) => ({
+    this.setState((prev: any) => ({
       sessionRegistryRevision: Number(prev?.sessionRegistryRevision || 0) + 1,
     }), () => {
       if (!this._mounted) return;
@@ -1041,7 +1090,7 @@ export class MainSite extends Component {
     this.getSessionSlugFromState() || this.getInitialGroupSlugFromPath()
   );
 
-  getBootstrapActiveSessionSlug = (pathIn = '', searchIn = '') => {
+  getBootstrapActiveSessionSlug = (pathIn: any = '', searchIn: any = '') => {
     const path = this.getEffectiveRoutePath(
       pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
     );
@@ -1051,7 +1100,7 @@ export class MainSite extends Component {
     return this.getRenderActiveSessionSlug(path, search);
   };
 
-  getRenderActiveSessionSlug = (pathIn = '', searchIn = '') => {
+  getRenderActiveSessionSlug = (pathIn: any = '', searchIn: any = '') => {
     const path = this.getEffectiveRoutePath(
       pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
     );
@@ -1061,23 +1110,23 @@ export class MainSite extends Component {
       activeSessionSlug: this.getGlobalPrimarySessionSlugFromProps(this.props),
       isCacheManagerReady: this.state.isCacheManagerReady,
       getSessionConfigBySlug,
-      resolveDisplaySessionConfigBySlug: (slug) => (
+      resolveDisplaySessionConfigBySlug: (slug: any) => (
         getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
       ),
-      resolveSessionConfigById: (sessionId) => sessionRegistryStore.getSessionConfigById(sessionId),
-      resolveSessionSlugFromPathToken: (sessionToken) => (
+      resolveSessionConfigById: (sessionId: any) => sessionRegistryStore.getSessionConfigById(sessionId),
+      resolveSessionSlugFromPathToken: (sessionToken: any) => (
         this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true })
       ),
     });
   };
 
-  resolveTrustedSbtRouteSessionSlug = (searchIn = '') => {
+  resolveTrustedSbtRouteSessionSlug = (searchIn: any = '') => {
     const hintedSlug = resolveMainSiteRouteSessionSlugHint({
       search: searchIn,
       allowSessionIdLookup: true,
-      resolveSessionConfigById: (sessionId) => (
+      resolveSessionConfigById: (sessionId: any) => (
         sessionRegistryStore.getSessionConfigById(
-          sessionRegistryUtils.formatSessionId(sessionId) || sessionId
+        sessionRegistryUtils.formatSessionId(sessionId) || sessionId
         )
       ),
     });
@@ -1096,7 +1145,7 @@ export class MainSite extends Component {
     return null;
   };
 
-  resolvePinnedSbtDetailRouteSlug = async (sbtAddress, opts = {}) => {
+  resolvePinnedSbtDetailRouteSlug = async (sbtAddress: any, opts: any = {}) => {
     const search = typeof opts.search === 'string' ? opts.search : '';
     const fallbackSlug = typeof opts.fallbackSlug === 'string'
       ? opts.fallbackSlug
@@ -1117,7 +1166,7 @@ export class MainSite extends Component {
     return this.resolveGroupSlugForSbtAddress(sbtAddress, { fallbackSlug });
   };
 
-  getSbtAddressFromPath = (pathIn) => {
+  getSbtAddressFromPath = (pathIn: any) => {
     const p = pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
     const clean = String(p || '').split('?')[0].split('#')[0];
     const parts = clean.split('/').filter(Boolean);
@@ -1126,7 +1175,7 @@ export class MainSite extends Component {
     return ethers.utils.isAddress(addr) ? addr : null;
   };
 
-  isSbtListRoutePath = (pathIn = '') => {
+  isSbtListRoutePath = (pathIn: any = '') => {
     const path = this.getEffectiveRoutePath(
       pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
     );
@@ -1139,7 +1188,7 @@ export class MainSite extends Component {
     return slugOrMode !== 'new';
   };
 
-  getSbtListRouteSessionSlug = (pathIn = '') => {
+  getSbtListRouteSessionSlug = (pathIn: any = '') => {
     const path = this.getEffectiveRoutePath(
       pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
     );
@@ -1152,7 +1201,7 @@ export class MainSite extends Component {
     return normalizeSessionSlug(slugOrMode);
   };
 
-  getUserAddressFromPath = (pathIn) => {
+  getUserAddressFromPath = (pathIn: any) => {
     const p = pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
     const clean = String(p || '').split('?')[0].split('#')[0];
     const parts = clean.split('/').filter(Boolean);
@@ -1212,8 +1261,8 @@ export class MainSite extends Component {
     this.setState({ litHooks: hooks });
   };
 
-  getSessionInfoForGroup = (sessionConfig = {}, slug = '') => {
-    const overrides = this.state.sessionInfoOverrides || {};
+  getSessionInfoForGroup = (sessionConfig: any = {}, slug: any = '') => {
+    const overrides = (this.state.sessionInfoOverrides || {}) as AnyRecord;
     const resolvedSlug = normalizeSessionSlug(sessionConfig?.slug || slug || '');
     const override = overrides[String(resolvedSlug || '')];
     if (override !== undefined && override !== null) return override;
@@ -1230,8 +1279,8 @@ export class MainSite extends Component {
     );
   };
 
-  getSessionNameForGroup = (sessionConfig = {}, slug = '') => {
-    const overrides = this.state.sessionNameOverrides || {};
+  getSessionNameForGroup = (sessionConfig: any = {}, slug: any = '') => {
+    const overrides = (this.state.sessionNameOverrides || {}) as AnyRecord;
     const resolvedSlug = normalizeSessionSlug(sessionConfig?.slug || slug || '');
     const override = overrides[String(resolvedSlug || '')];
     if (override !== undefined && override !== null) return override;
@@ -1248,7 +1297,7 @@ export class MainSite extends Component {
     );
   };
 
-  hasEncryptedSessionField = (sessionConfig = {}, field = '') => {
+  hasEncryptedSessionField = (sessionConfig: any = {}, field: any = '') => {
     const encryptedFields = (
       sessionConfig?.encryptedFields && typeof sessionConfig.encryptedFields === 'object'
     ) ? sessionConfig.encryptedFields : null;
@@ -1269,8 +1318,8 @@ export class MainSite extends Component {
     return false;
   };
 
-  getSessionHeaderForGroup = (sessionConfig = {}, slug = '') => {
-    const overrides = this.state.sessionHeaderOverrides || {};
+  getSessionHeaderForGroup = (sessionConfig: any = {}, slug: any = '') => {
+    const overrides = (this.state.sessionHeaderOverrides || {}) as AnyRecord;
     const resolvedSlug = normalizeSessionSlug(sessionConfig?.slug || slug || '');
     const override = overrides[String(resolvedSlug || '')];
     if (override !== undefined && override !== null) {
@@ -1316,7 +1365,7 @@ export class MainSite extends Component {
       });
       this._lastSessionInfoAttempt = result.attemptKey || this._lastSessionInfoAttempt;
       if (!result.shouldUpdate) return;
-      this.setState((prev) => ({
+      this.setState((prev: any) => ({
         sessionInfoOverrides: {
           ...(prev.sessionInfoOverrides || {}),
           [slug]: result.nextValue,
@@ -1341,14 +1390,14 @@ export class MainSite extends Component {
       });
 
       this._sessionMetaAttempts = result.attempts;
-      result.errors.forEach(({ error }) => {
+      result.errors.forEach(({ error }: any) => {
         mainSiteLog.warn('MainSite: fallback', error);
       });
 
       if (!Object.keys(result.patches || {}).length) return;
-      this.setState((prev) => {
-        const nextState = {};
-        Object.entries(result.patches).forEach(([stateKey, patch]) => {
+      this.setState((prev: any) => {
+        const nextState: Record<string, any> = {};
+        Object.entries(result.patches).forEach(([stateKey, patch]: any) => {
           nextState[stateKey] = {
             ...(prev[stateKey] || {}),
             ...patch,
@@ -1382,30 +1431,30 @@ export class MainSite extends Component {
   getSurveyDeepLinkRpcTimeoutMs = () => {
     try {
       if (typeof window !== 'undefined') {
-        const fromWindow = Number(window.CE_SURVEY_DEEPLINK_RPC_TIMEOUT_MS);
+        const fromWindow = Number((window as any).CE_SURVEY_DEEPLINK_RPC_TIMEOUT_MS);
         if (Number.isFinite(fromWindow) && fromWindow > 0) return Math.floor(fromWindow);
       }
     } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
     return 12000;
   };
 
-  resolveMetadataSessionBinding = (metadata, fallbackSlug = '') => (
+  resolveMetadataSessionBinding = (metadata: any, fallbackSlug: any = '') => (
     resolveMetadataSessionBindingFn(metadata, fallbackSlug)
   );
 
-  resolveMetadataSessionSlug = (metadata, fallbackSlug = '') => (
+  resolveMetadataSessionSlug = (metadata: any, fallbackSlug: any = '') => (
     resolveMetadataSessionSlugFn(metadata, fallbackSlug)
   );
 
-  resolveScopedMetadataSessionSlug = (metadata, fallbackSlug = '') => (
+  resolveScopedMetadataSessionSlug = (metadata: any, fallbackSlug: any = '') => (
     resolveScopedMetadataSessionSlugFn(metadata, fallbackSlug)
   );
 
-  buildMetadataSessionCacheEnvelope = (metadata, fallbackSlug = '', options = {}) => (
+  buildMetadataSessionCacheEnvelope = (metadata: any, fallbackSlug: any = '', options: any = {}) => (
     buildMetadataSessionCacheEnvelopeFn(metadata, fallbackSlug, options)
   );
 
-  writeSurveyMetadataToCache = (slugIn, surveyId, surveyData, creationBlock = null, netKeyIn = null, options = {}) => {
+  writeSurveyMetadataToCache = (slugIn: any, surveyId: any, surveyData: any, creationBlock: any = null, netKeyIn: any = null, options: any = {}) => {
     const slug = normalizeSessionSlug(slugIn || '');
     const sid = String(surveyId || surveyData?.surveyID || surveyData?.id || '').toLowerCase();
     const netKey = String(netKeyIn || this.getSessionChainId(slug) || '');
@@ -1446,7 +1495,7 @@ export class MainSite extends Component {
     return true;
   };
 
-  writeQuestionMetadataToCache = (slugIn, questionId, questionData, netKeyIn = null, options = {}) => {
+  writeQuestionMetadataToCache = (slugIn: any, questionId: any, questionData: any, netKeyIn: any = null, options: any = {}) => {
     const slug = normalizeSessionSlug(slugIn || '');
     const qid = String(questionId || questionData?.id || '').toLowerCase();
     const netKey = String(netKeyIn || this.getSessionChainId(slug) || '');
@@ -1492,7 +1541,7 @@ export class MainSite extends Component {
     return true;
   };
 
-  findGroupSlugForSurvey = (surveyID) => {
+  findGroupSlugForSurvey = (surveyID: any) => {
     if (!surveyID) return this.getSessionSlugFromState();
     const sid = String(surveyID).toLowerCase();
 
@@ -1500,11 +1549,11 @@ export class MainSite extends Component {
     const queryHintSlug = this.getSurveyRouteSessionSlugHint();
 
     // Helper: Check if a specific slug/group knows this survey
-    const getCachedSurveySlug = (slug) => {
+    const getCachedSurveySlug = (slug: any) => {
       const cfg = this.getSessionCfg(slug);
       // 1. Config list
       if (Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
-          cfg.HIGHLIGHTED_SURVEY_IDS.some(id => String(id).toLowerCase() === sid)) {
+          cfg.HIGHLIGHTED_SURVEY_IDS.some((id: any) => String(id).toLowerCase() === sid)) {
         return slug;
       }
       // 2. Cached data
@@ -1565,12 +1614,12 @@ export class MainSite extends Component {
     return refSlug !== null ? refSlug : currentSlug;
   }
 
-  getSessionSlugHintFromSearch = (search = '') => {
+  getSessionSlugHintFromSearch = (search: any = '') => {
     try {
       return resolveMainSiteRouteSessionSlugHint({
         search,
         allowSessionIdLookup: true,
-        resolveSessionConfigById: (sessionId) => sessionRegistryStore.getSessionConfigById(sessionId),
+        resolveSessionConfigById: (sessionId: any) => sessionRegistryStore.getSessionConfigById(sessionId),
       });
     } catch (_) {
       return null;
@@ -1586,26 +1635,26 @@ export class MainSite extends Component {
     }
   };
 
-  getQuestionRouteSessionIdHint = ({ requireResolved = false } = {}) => {
+  getQuestionRouteSessionIdHint = ({ requireResolved = false }: any = {}) => {
     try {
       if (typeof window === 'undefined') return null;
       return resolveMainSiteRouteSessionIdHint({
         search: window.location.search || '',
         requireResolved,
         formatSessionId: sessionRegistryUtils.formatSessionId,
-        resolveSessionConfigById: (sessionId) => sessionRegistryStore.getSessionConfigById(sessionId),
+        resolveSessionConfigById: (sessionId: any) => sessionRegistryStore.getSessionConfigById(sessionId),
       });
     } catch (_) {
       return null;
     }
   };
 
-  findGroupSlugForQuestion = (questionID) => {
+  findGroupSlugForQuestion = (questionID: any) => {
     if (!questionID) return this.getSessionSlugFromState();
     const qid = String(questionID).toLowerCase();
     const currentSlug = this.getSessionSlugFromState();
     const querySlug = this.getQuestionRouteSessionSlugHint();
-    const getCachedQuestionSlug = (slug) => {
+    const getCachedQuestionSlug = (slug: any) => {
       const qCache = this.DG.read('questionsCache', slug, { clone: false });
       if (qCache) {
         for (const netKey in qCache) {
@@ -1620,11 +1669,12 @@ export class MainSite extends Component {
       if (sCache) {
         for (const netKey in sCache) {
           const surveys = sCache[netKey]?.surveys || {};
-          for (const sv of Object.values(surveys)) {
-            if (!Array.isArray(sv?.questionIDs)) continue;
-            for (let i = 0; i < sv.questionIDs.length; i += 1) {
-              if (String(sv.questionIDs[i] || '').toLowerCase() === qid) {
-                return this.resolveMetadataSessionSlug(sv, slug);
+          for (const sv of Object.values(surveys as Record<string, any>)) {
+            const survey: any = sv;
+            if (!Array.isArray(survey?.questionIDs)) continue;
+            for (let i = 0; i < survey.questionIDs.length; i += 1) {
+              if (String(survey.questionIDs[i] || '').toLowerCase() === qid) {
+                return this.resolveMetadataSessionSlug(survey, slug);
               }
             }
           }
@@ -1671,7 +1721,7 @@ export class MainSite extends Component {
     return refSlug !== null ? refSlug : currentSlug;
   }
 
-  resolveGroupSlugForSbtAddress = async (sbtAddress, opts = {}) => {
+  resolveGroupSlugForSbtAddress = async (sbtAddress: any, opts: any = {}) => {
     const fallbackSlug = typeof opts.fallbackSlug === 'string'
       ? opts.fallbackSlug
       : (this.getActiveSessionSlug() || '');
@@ -1732,13 +1782,13 @@ export class MainSite extends Component {
     // 3) Factory scan across groups (prefer newer block ranges first)
     try {
       const sorted = getAllSessionSlugs()
-        .map((s) => {
+        .map((s: any) => {
           const cfg = getSessionConfigBySlugOrDefault(s) || {};
           const startRaw = Number(cfg?.blockLimits?.start);
           const start = Number.isFinite(startRaw) && startRaw > 0 ? startRaw : -1;
           return { slug: s, start };
         })
-        .sort((a, b) => (Number(b.start) || 0) - (Number(a.start) || 0));
+        .sort((a: any, b: any) => (Number(b.start) || 0) - (Number(a.start) || 0));
 
       for (const { slug } of sorted) {
         const creationBlock = await contractScripts.getSbtCreationBlockByAddress(
@@ -1758,64 +1808,64 @@ export class MainSite extends Component {
   // You indicated keys will NOT end with ":", so if you change general.slug to "general",
   // DG keys become "dg:sbtCache:general" without special-casing here.
   // Per-group localStorage helper (Data by Group = DG)
-  DG = createMainSiteDgStorage();
+  DG: any = createMainSiteDgStorage();
 
   // Session config accessors (extracted to mainSiteSessionConfig.js)
   getSessionCfg = _getSessionCfg;
   getSessionChainId = _getSessionChainId;
   getSessionNetwork = _getSessionNetwork;
 
-  isSbtInstanceListenerEnabledForGroup = (slugIn) => this._scanPolicy.isSbtInstanceListenerEnabledForGroup(slugIn);
+  isSbtInstanceListenerEnabledForGroup = (slugIn: any) => this._scanPolicy.isSbtInstanceListenerEnabledForGroup(slugIn);
   isSbtHistoryScanEnabled = () => this._scanPolicy.isSbtHistoryScanEnabled();
   getSessionScanScope = () => this._scanPolicy.getSessionScanScope();
-  getSessionScanScopeContext = (scopeIn) => this._scanPolicy.getSessionScanScopeContext(scopeIn);
-  hasExplicitProfileScanScopeOverride = (...args) => this._profileScanController.hasExplicitProfileScanScopeOverride(...args);
-  getProfileScanScopeContext = (...args) => this._profileScanController.getProfileScanScopeContext(...args);
+  getSessionScanScopeContext = (scopeIn: any = undefined) => this._scanPolicy.getSessionScanScopeContext(scopeIn);
+  hasExplicitProfileScanScopeOverride = (...args: any[]) => this._profileScanController.hasExplicitProfileScanScopeOverride(...args);
+  getProfileScanScopeContext = (...args: any[]) => this._profileScanController.getProfileScanScopeContext(...args);
 
-  isSessionSlugAllowedForScan = (slugIn, scopeContextIn = null) => (
+  isSessionSlugAllowedForScan = (slugIn: any, scopeContextIn: any = null) => (
     this._scanPolicy.isSessionSlugAllowedForScan(slugIn, scopeContextIn)
   );
-  logScopeSkipOnce = (operation, slugIn, scopeContextIn = null) => (
+  logScopeSkipOnce = (operation: any, slugIn: any, scopeContextIn: any = null) => (
     this._scanPolicy.logScopeSkipOnce(operation, slugIn, scopeContextIn)
   );
-  shouldAutoRunFullSbtScan = (opts) => this._scanPolicy.shouldAutoRunFullSbtScan(opts);
+  shouldAutoRunFullSbtScan = (opts: any) => this._scanPolicy.shouldAutoRunFullSbtScan(opts);
   shouldAttachSbtDetailInstanceListener = () => this._scanPolicy.shouldAttachSbtDetailInstanceListener();
-  getScopedSessionSlugs = (scopeIn) => this._scanPolicy.getScopedSessionSlugs(scopeIn);
-  readBoolishRuntimeFlag = (...args) => this._profileScanController.readBoolishRuntimeFlag(...args);
-  isProfileScanTelemetryEnabled = (...args) => this._profileScanController.isProfileScanTelemetryEnabled(...args);
-  emitProfileScanTelemetry = (...args) => this._profileScanController.emitProfileScanTelemetry(...args);
-  isProfileScanColdDiagEnabled = (...args) => this._profileScanController.isProfileScanColdDiagEnabled(...args);
-  emitProfileScanColdDiag = (...args) => this._profileScanController.emitProfileScanColdDiag(...args);
-  readProfileScanStepTimeoutMs = (...args) => this._profileScanController.readProfileScanStepTimeoutMs(...args);
-  readProfileScanSbtBurstSize = (...args) => this._profileScanController.readProfileScanSbtBurstSize(...args);
-  readProfileScanActivityLookbackBlocks = (...args) => this._profileScanController.readProfileScanActivityLookbackBlocks(...args);
-  readUserProfileAllSessionsFlag = (...args) => this._profileScanController.readUserProfileAllSessionsFlag(...args);
-  getUserProfileAllSessionsScanMode = (...args) => this._profileScanController.getUserProfileAllSessionsScanMode(...args);
-  isUserProfileAllSessionsScanEnabled = (...args) => this._profileScanController.isUserProfileAllSessionsScanEnabled(...args);
-  getActiveProfileScanChainId = (...args) => this._profileScanController.getActiveProfileScanChainId(...args);
-  getRegistrySessionEntryCount = (...args) => this._profileScanController.getRegistrySessionEntryCount(...args);
-  getRegistrySessionCoverageCountForChain = (...args) => this._profileScanController.getRegistrySessionCoverageCountForChain(...args);
-  getRegistryBootstrapScopeKey = (...args) => this._profileScanController.getRegistryBootstrapScopeKey(...args);
-  readProfileScanRegistryLookupTimeoutMs = (...args) => this._profileScanController.readProfileScanRegistryLookupTimeoutMs(...args);
-  getProfileScanListScopeSessionConfigCacheKey = (...args) => this._profileScanController.getProfileScanListScopeSessionConfigCacheKey(...args);
-  resolveListScopeSessionConfigFromRegistry = (...args) => this._profileScanController.resolveListScopeSessionConfigFromRegistry(...args);
-  ensureRegistryHydratedForProfileScan = (...args) => this._profileScanController.ensureRegistryHydratedForProfileScan(...args);
-  isOnchainSessionRegistryEnabled = (...args) => this._profileScanController.isOnchainSessionRegistryEnabled(...args);
-  refreshSessionUniverseRegistryCache = (...args) => this._profileScanController.refreshSessionUniverseRegistryCache(...args);
-  resolveProfileDeepScanPlan = (...args) => this._profileScanController.resolveProfileDeepScanPlan(...args);
-  scheduleProfileScanRetryAfterRegistryHydration = (...args) => this._profileScanController.scheduleProfileScanRetryAfterRegistryHydration(...args);
-  getProfileDeepScanSlugs = (...args) => this._profileScanController.getProfileDeepScanSlugs(...args);
+  getScopedSessionSlugs = (scopeIn: any) => this._scanPolicy.getScopedSessionSlugs(scopeIn);
+  readBoolishRuntimeFlag = (...args: any[]) => this._profileScanController.readBoolishRuntimeFlag(...args);
+  isProfileScanTelemetryEnabled = (...args: any[]) => this._profileScanController.isProfileScanTelemetryEnabled(...args);
+  emitProfileScanTelemetry = (...args: any[]) => this._profileScanController.emitProfileScanTelemetry(...args);
+  isProfileScanColdDiagEnabled = (...args: any[]) => this._profileScanController.isProfileScanColdDiagEnabled(...args);
+  emitProfileScanColdDiag = (...args: any[]) => this._profileScanController.emitProfileScanColdDiag(...args);
+  readProfileScanStepTimeoutMs = (...args: any[]) => this._profileScanController.readProfileScanStepTimeoutMs(...args);
+  readProfileScanSbtBurstSize = (...args: any[]) => this._profileScanController.readProfileScanSbtBurstSize(...args);
+  readProfileScanActivityLookbackBlocks = (...args: any[]) => this._profileScanController.readProfileScanActivityLookbackBlocks(...args);
+  readUserProfileAllSessionsFlag = (...args: any[]) => this._profileScanController.readUserProfileAllSessionsFlag(...args);
+  getUserProfileAllSessionsScanMode = (...args: any[]) => this._profileScanController.getUserProfileAllSessionsScanMode(...args);
+  isUserProfileAllSessionsScanEnabled = (...args: any[]) => this._profileScanController.isUserProfileAllSessionsScanEnabled(...args);
+  getActiveProfileScanChainId = (...args: any[]) => this._profileScanController.getActiveProfileScanChainId(...args);
+  getRegistrySessionEntryCount = (...args: any[]) => this._profileScanController.getRegistrySessionEntryCount(...args);
+  getRegistrySessionCoverageCountForChain = (...args: any[]) => this._profileScanController.getRegistrySessionCoverageCountForChain(...args);
+  getRegistryBootstrapScopeKey = (...args: any[]) => this._profileScanController.getRegistryBootstrapScopeKey(...args);
+  readProfileScanRegistryLookupTimeoutMs = (...args: any[]) => this._profileScanController.readProfileScanRegistryLookupTimeoutMs(...args);
+  getProfileScanListScopeSessionConfigCacheKey = (...args: any[]) => this._profileScanController.getProfileScanListScopeSessionConfigCacheKey(...args);
+  resolveListScopeSessionConfigFromRegistry = (...args: any[]) => this._profileScanController.resolveListScopeSessionConfigFromRegistry(...args);
+  ensureRegistryHydratedForProfileScan = (...args: any[]) => this._profileScanController.ensureRegistryHydratedForProfileScan(...args);
+  isOnchainSessionRegistryEnabled = (...args: any[]) => this._profileScanController.isOnchainSessionRegistryEnabled(...args);
+  refreshSessionUniverseRegistryCache = (...args: any[]) => this._profileScanController.refreshSessionUniverseRegistryCache(...args);
+  resolveProfileDeepScanPlan = (...args: any[]) => this._profileScanController.resolveProfileDeepScanPlan(...args);
+  scheduleProfileScanRetryAfterRegistryHydration = (...args: any[]) => this._profileScanController.scheduleProfileScanRetryAfterRegistryHydration(...args);
+  getProfileDeepScanSlugs = (...args: any[]) => this._profileScanController.getProfileDeepScanSlugs(...args);
 
-  shouldSkipSessionScanForSlug = (slugIn, operation, scopeContextIn = null) => (
+  shouldSkipSessionScanForSlug = (slugIn: any, operation: any, scopeContextIn: any = null) => (
     this._scanPolicy.shouldSkipSessionScanForSlug(slugIn, operation, scopeContextIn)
   );
-  scanScopeNoop = (slugIn, operation, onSkipped) => this._scanPolicy.scanScopeNoop(slugIn, operation, onSkipped);
-  getScopeFilteredSlugs = (slugs = [], scopeIn = null) => this._scanPolicy.getScopeFilteredSlugs(slugs, scopeIn);
-  shouldBackfillGeneralSession = (...args) => this._profileScanController.shouldBackfillGeneralSession(...args);
-  enqueueGeneralSessionBackfill = (...args) => this._profileScanController.enqueueGeneralSessionBackfill(...args);
-  runWithGeneralSessionBackfill = (...args) => this._profileScanController.runWithGeneralSessionBackfill(...args);
+  scanScopeNoop = (slugIn: any, operation: any, onSkipped: any) => this._scanPolicy.scanScopeNoop(slugIn, operation, onSkipped);
+  getScopeFilteredSlugs = (slugs: any[] = [], scopeIn: any = null) => this._scanPolicy.getScopeFilteredSlugs(slugs, scopeIn);
+  shouldBackfillGeneralSession = (...args: any[]) => this._profileScanController.shouldBackfillGeneralSession(...args);
+  enqueueGeneralSessionBackfill = (...args: any[]) => this._profileScanController.enqueueGeneralSessionBackfill(...args);
+  runWithGeneralSessionBackfill = (...args: any[]) => this._profileScanController.runWithGeneralSessionBackfill(...args);
 
-  scanForSurveyGroup = async (surveyID, opts = {}) => {
+  scanForSurveyGroup = async (surveyID: any, opts: any = {}) => {
     const sid = String(surveyID || '').toLowerCase();
 
     // 1. Guard: Validate ID and prevent concurrent scans for the same ID
@@ -1855,20 +1905,20 @@ export class MainSite extends Component {
       }
       if (this.getSessionChainId(hintedSlug)) {
         const prioritized = [hintedSlug, ...(Array.isArray(allSlugs) ? allSlugs : [])]
-          .map((slug) => normalizeSessionSlug(slug || ''));
+          .map((slug: any) => normalizeSessionSlug(slug || ''));
         allSlugs = Array.from(new Set(prioritized));
       }
     }
 
     const rpcTimeoutMs = this.getSurveyDeepLinkRpcTimeoutMs();
-    const runWithTimeout = async (promiseFactory, label, slug) => {
+    const runWithTimeout = async (promiseFactory: any, label: any, slug: any) => {
       let timeoutId = null;
       try {
         return await Promise.race([
           Promise.resolve().then(() => promiseFactory()),
-          new Promise((_, reject) => {
+          new Promise((_: any, reject: any) => {
             timeoutId = setTimeout(() => {
-              const err = new Error(
+              const err: any = new Error(
                 `[MainSite] DeepLink: ${label} timed out after ${rpcTimeoutMs}ms for slug "${String(slug || '')}".`
               );
               err.code = 'DEEP_LINK_TIMEOUT';
@@ -1908,7 +1958,7 @@ export class MainSite extends Component {
     });
 
     try {
-      let scanLoadError = null;
+      let scanLoadError: any = null;
       // 3. Iterate known sessions (clamped by CE_SESSION_SCAN_SCOPE when set)
       for (const slug of allSlugs) {
         // Note: current slug was only cache-checked above; still probe RPC here.
@@ -1965,7 +2015,7 @@ export class MainSite extends Component {
               return; // Stop scanning, we found it
             }
 
-            scanLoadError = new Error(`Survey metadata fetch returned no data for session "${slug}".`);
+            scanLoadError = new Error(`Survey metadata fetch returned no data for session "${slug}".`) as any;
             scanLoadError.code = 'SURVEY_METADATA_EMPTY';
             scanLoadError.slug = slug;
           }
@@ -1997,7 +2047,7 @@ export class MainSite extends Component {
         isScanningForGroup: null,
         scanFailedFor: null,
         scanErrorFor: sid,
-        scanErrorMessage: String(err?.message || 'Survey resolution failed unexpectedly.'),
+        scanErrorMessage: String((err as any)?.message || 'Survey resolution failed unexpectedly.'),
       });
       return;
     } finally {
@@ -2020,7 +2070,7 @@ export class MainSite extends Component {
 
 
   // Per-user deep search orchestrator (fast lane)
-  scanSpecificUserProfilePriority = async (targetAddress) => {
+  scanSpecificUserProfilePriority = async (targetAddress: any) => {
     if (!targetAddress || !ethers.utils.isAddress(targetAddress)) return;
 
     const targetLower = targetAddress.toLowerCase();
@@ -2042,7 +2092,7 @@ export class MainSite extends Component {
     }
   };
 
-  scanSpecificUserProfile = async (targetAddress) => {
+  scanSpecificUserProfile = async (targetAddress: any) => {
     if (!targetAddress || !ethers.utils.isAddress(targetAddress)) return null;
 
     const targetLower = targetAddress.toLowerCase();
@@ -2094,7 +2144,7 @@ export class MainSite extends Component {
       const listScopeCoverageSlugs = isListScope
         ? Array.from(new Set(
             getAllowedSessionSlugs('list', scopeContext.list, scopeContext.activeSlug)
-              .map((slug) => normalizeSessionSlug(slug || ''))
+              .map((slug: any) => normalizeSessionSlug(slug || ''))
           ))
         : [];
       const attemptedCoverageSlugs = (
@@ -2104,7 +2154,7 @@ export class MainSite extends Component {
         ? listScopeCoverageSlugs
         : [...allSlugs];
       const attemptedCoverageSlugSet = new Set(
-        attemptedCoverageSlugs.map((slug) => normalizeSessionSlug(slug || ''))
+        attemptedCoverageSlugs.map((slug: any) => normalizeSessionSlug(slug || ''))
       );
       this.emitProfileScanColdDiag('plan', {
         targetAddress: targetLower,
@@ -2209,35 +2259,35 @@ export class MainSite extends Component {
         this.scheduleProfileScanRetryAfterRegistryHydration(targetAddress, report.coverageReason);
       }
 
-      const pushUnique = (list, value) => {
+      const pushUnique = (list: any, value: any) => {
         if (!Array.isArray(list)) return;
         const token = String(value || '');
         if (!token) return;
         if (!list.includes(token)) list.push(token);
       };
-      const pushUniqueSample = (list, value, max = 12) => {
+      const pushUniqueSample = (list: any, value: any, max: any = 12) => {
         if (!Array.isArray(list)) return;
         const token = String(value || '').trim().toLowerCase();
         if (!token || list.includes(token)) return;
         if (list.length >= Math.max(1, Number(max) || 1)) return;
         list.push(token);
       };
-      const normalizeEventIdentifier = (raw) => String(raw || '').trim().toLowerCase();
-      const readCreatedSurveyId = (item = {}) => normalizeEventIdentifier(
+      const normalizeEventIdentifier = (raw: any) => String(raw || '').trim().toLowerCase();
+      const readCreatedSurveyId = (item: any = {}) => normalizeEventIdentifier(
         item?.id || item?.surveyId || item?.surveyID
       );
-      const readCreatedQuestionId = (item = {}) => normalizeEventIdentifier(
+      const readCreatedQuestionId = (item: any = {}) => normalizeEventIdentifier(
         item?.id || item?.questionId || item?.questionID
       );
-      const readSurveyResponseId = (item = {}) => normalizeEventIdentifier(
+      const readSurveyResponseId = (item: any = {}) => normalizeEventIdentifier(
         item?.surveyId || item?.surveyID || item?.id
       );
-      const readQuestionResponseId = (item = {}) => normalizeEventIdentifier(
+      const readQuestionResponseId = (item: any = {}) => normalizeEventIdentifier(
         item?.questionId || item?.questionID || item?.id
       );
-      const skippedSlugReasons = {};
+      const skippedSlugReasons: Record<string, any> = {};
 
-      const markSlugSkipped = (slug, reason, extra = {}) => {
+      const markSlugSkipped = (slug: any, reason: any, extra: any = {}) => {
         pushUnique(report.skippedSlugs, slug);
         skippedSlugReasons[String(slug || '')] = String(reason || 'invalid-config');
         report.skippedSlugReasons = { ...skippedSlugReasons };
@@ -2249,7 +2299,7 @@ export class MainSite extends Component {
         });
       };
 
-      const normalizeActivityPayload = (raw) => {
+      const normalizeActivityPayload = (raw: any) => {
         const payload = (raw && typeof raw === 'object') ? raw : {};
         return {
           createdSurveys: Array.isArray(payload.createdSurveys) ? payload.createdSurveys : [],
@@ -2266,7 +2316,7 @@ export class MainSite extends Component {
 
       let anyNewData = false; // track whether anything new was written to caches
 
-      const scanOneSlug = async (slug) => {
+      const scanOneSlug = async (slug: any) => {
         const slugStartedAt = Date.now();
         try {
           let resolvedRegistrySessionCfg = null;
@@ -2322,7 +2372,7 @@ export class MainSite extends Component {
             } catch (fallbackError) {
               mainSiteLog.warn('[DeepSearch] Failed to recover missing blockLimits.start from SessionRegistry fallback.', {
                 slug,
-                error: fallbackError?.message || String(fallbackError),
+                error: (fallbackError as any)?.message || String(fallbackError),
               });
             }
           }
@@ -2450,7 +2500,7 @@ export class MainSite extends Component {
           }
           if (sbtFromBlock > currentBlock) sbtFromBlock = currentBlock;
 
-          const resolveActivityWindow = (lastBlockValue, incompleteFlag) => {
+          const resolveActivityWindow = (lastBlockValue: any, incompleteFlag: any) => {
             const normalizedLastBlock = Number(lastBlockValue || 0);
             const shouldForceBackfill = incompleteFlag === true || normalizedLastBlock < startBlock;
             if (shouldForceBackfill) {
@@ -2477,9 +2527,9 @@ export class MainSite extends Component {
               )
             : null;
           const activityWindows = [surveyActivityWindow, questionActivityWindow].filter(Boolean);
-          const shouldForceActivityBackfill = activityWindows.some((window) => window.shouldForceBackfill);
+          const shouldForceActivityBackfill = activityWindows.some((window: any) => window.shouldForceBackfill);
           let activityFromBlock = activityWindows.length > 0
-            ? Math.min(...activityWindows.map((window) => window.fromBlock))
+            ? Math.min(...activityWindows.map((window: any) => window.fromBlock))
             : currentBlock;
           if (activityFromBlock > currentBlock) activityFromBlock = currentBlock;
 
@@ -2504,10 +2554,10 @@ export class MainSite extends Component {
           });
 
           const resolveBackfillTimeoutMs = (
-            baseTimeoutMs,
-            shouldForceBackfill,
-            allowAdaptiveBackfill,
-            opts = {}
+            baseTimeoutMs: any,
+            shouldForceBackfill: any,
+            allowAdaptiveBackfill: any,
+            opts: any = {}
           ) => {
             const base = Number.isFinite(Number(baseTimeoutMs))
               ? Math.max(5000, Math.floor(Number(baseTimeoutMs)))
@@ -2592,17 +2642,17 @@ export class MainSite extends Component {
           let sbtHadRpcError = false;
           let activityHadRpcError = false;
 
-          const runWithTimeout = async (promise, kind, fromBlock, timeoutMs) => {
+          const runWithTimeout = async (promise: any, kind: any, fromBlock: any, timeoutMs: any) => {
             let timeoutId = null;
             const effectiveTimeoutMs = Number.isFinite(Number(timeoutMs))
               ? Math.max(5000, Math.floor(Number(timeoutMs)))
               : Math.max(5000, Math.floor(Number(slugFetchTimeoutMs || 12000)));
             try {
-              const outcome = await Promise.race([
+              const outcome: any = await Promise.race([
                 Promise.resolve(promise)
-                  .then((value) => ({ timedOut: false, value }))
-                  .catch((error) => ({ timedOut: false, error })),
-                new Promise((resolve) => {
+                  .then((value: any) => ({ timedOut: false, value }))
+                  .catch((error: any) => ({ timedOut: false, error })),
+                new Promise((resolve: any) => {
                   timeoutId = setTimeout(() => {
                     resolve({ timedOut: true });
                   }, effectiveTimeoutMs);
@@ -2711,30 +2761,30 @@ export class MainSite extends Component {
 
           const slugHadRpcError = !!(sbtHadRpcError || activityHadRpcError);
           const sbtAddressSamples = sbts
-            .map((item) => normalizeEventIdentifier(item?.sbtAddress || ''))
+            .map((item: any) => normalizeEventIdentifier(item?.sbtAddress || ''))
             .filter(Boolean);
           const createdSurveyIds = activity.createdSurveys
-            .map((item) => readCreatedSurveyId(item))
+            .map((item: any) => readCreatedSurveyId(item))
             .filter(Boolean);
           const createdQuestionIds = activity.createdQuestions
-            .map((item) => readCreatedQuestionId(item))
+            .map((item: any) => readCreatedQuestionId(item))
             .filter(Boolean);
           const surveyResponseIds = activity.surveyResponses
-            .map((item) => readSurveyResponseId(item))
+            .map((item: any) => readSurveyResponseId(item))
             .filter(Boolean);
           const questionResponseIds = activity.questionResponses
-            .map((item) => readQuestionResponseId(item))
+            .map((item: any) => readQuestionResponseId(item))
             .filter(Boolean);
           report.totalSbtContractsFound += sbtAddressSamples.length;
           report.totalCreatedSurveysFound += createdSurveyIds.length;
           report.totalCreatedQuestionsFound += createdQuestionIds.length;
           report.totalSurveyResponsesFound += surveyResponseIds.length;
           report.totalQuestionResponsesFound += questionResponseIds.length;
-          sbtAddressSamples.forEach((value) => pushUniqueSample(report.sampleSbtAddresses, value));
-          createdSurveyIds.forEach((value) => pushUniqueSample(report.sampleCreatedSurveyIds, value));
-          createdQuestionIds.forEach((value) => pushUniqueSample(report.sampleCreatedQuestionIds, value));
-          surveyResponseIds.forEach((value) => pushUniqueSample(report.sampleSurveyResponseIds, value));
-          questionResponseIds.forEach((value) => pushUniqueSample(report.sampleQuestionResponseIds, value));
+          sbtAddressSamples.forEach((value: any) => pushUniqueSample(report.sampleSbtAddresses, value));
+          createdSurveyIds.forEach((value: any) => pushUniqueSample(report.sampleCreatedSurveyIds, value));
+          createdQuestionIds.forEach((value: any) => pushUniqueSample(report.sampleCreatedQuestionIds, value));
+          surveyResponseIds.forEach((value: any) => pushUniqueSample(report.sampleSurveyResponseIds, value));
+          questionResponseIds.forEach((value: any) => pushUniqueSample(report.sampleQuestionResponseIds, value));
 
           this.emitProfileScanTelemetry('slug-result', {
             targetAddress: targetLower,
@@ -2745,7 +2795,7 @@ export class MainSite extends Component {
             currentBlock,
             sbtCount: sbts.length,
             sbtAddresses: sbts
-              .map((item) => String(item?.sbtAddress || '').toLowerCase())
+              .map((item: any) => String(item?.sbtAddress || '').toLowerCase())
               .filter(Boolean)
               .slice(0, 12),
             createdSurveys: activity.createdSurveys.length,
@@ -2818,12 +2868,12 @@ export class MainSite extends Component {
 
             // Dedup SBTs by address so retries do not duplicate entries.
             const existingSbtMap = new Map();
-            (chainEntry.data.sbts || []).forEach(item => {
+            (chainEntry.data.sbts || []).forEach((item: any) => {
               if (item.sbtAddress) existingSbtMap.set(item.sbtAddress.toLowerCase(), item);
             });
 
             // Merge new SBTs
-            sbts.forEach(newItem => {
+            sbts.forEach((newItem: any) => {
               if (newItem.sbtAddress) {
                 // Overwrite or add. If getSBTsForUser returns current state, this keeps it fresh.
                 existingSbtMap.set(newItem.sbtAddress.toLowerCase(), newItem);
@@ -2833,21 +2883,21 @@ export class MainSite extends Component {
             chainEntry.data.sbts = Array.from(existingSbtMap.values());
 
             // Append other activity arrays with dedupe.
-            const dedupById = (oldArr, newArr) => {
+            const dedupById = (oldArr: any, newArr: any) => {
               const map = new Map();
-              (oldArr || []).forEach(i => map.set(i.id || JSON.stringify(i), i));
-              (newArr || []).forEach(i => map.set(i.id || JSON.stringify(i), i));
+              (oldArr || []).forEach((i: any) => map.set(i.id || JSON.stringify(i), i));
+              (newArr || []).forEach((i: any) => map.set(i.id || JSON.stringify(i), i));
               return Array.from(map.values());
             };
 
-            const buildFallbackMergeKey = (item) => {
+            const buildFallbackMergeKey = (item: any) => {
               try {
                 return `__fallback__${JSON.stringify(item)}`;
               } catch (_) {
                 return `__fallback__${String(item || '')}`;
               }
             };
-            const readResponseRecency = (item) => {
+            const readResponseRecency = (item: any) => {
               const row = (item && typeof item === 'object') ? item : {};
               return {
                 bn: Number(row.blockNumber ?? row.bn ?? 0) || 0,
@@ -2856,7 +2906,7 @@ export class MainSite extends Component {
                 ts: Number(row.timestamp ?? row.ts ?? 0) || 0,
               };
             };
-            const compareResponseRecency = (incoming, existing) => {
+            const compareResponseRecency = (incoming: any, existing: any) => {
               if (incoming.bn > existing.bn) return 1;
               if (incoming.bn < existing.bn) return -1;
               if (incoming.txi > existing.txi) return 1;
@@ -2867,10 +2917,10 @@ export class MainSite extends Component {
               if (incoming.ts < existing.ts) return -1;
               return 0;
             };
-            const upsertByStableResponseKey = (oldArr, newArr, buildKey, opts = {}) => {
+            const upsertByStableResponseKey = (oldArr: any, newArr: any, buildKey: any, opts: any = {}) => {
               const preferNewerByRecency = !!(opts && opts.preferNewerByRecency);
               const map = new Map();
-              const mergeOne = (item, preferIncomingOnTie = false) => {
+              const mergeOne = (item: any, preferIncomingOnTie: any = false) => {
                 if (item == null) return;
                 const key = buildKey(item) || buildFallbackMergeKey(item);
                 if (!map.has(key)) {
@@ -2890,18 +2940,18 @@ export class MainSite extends Component {
                   map.set(key, item);
                 }
               };
-              (oldArr || []).forEach((item) => mergeOne(item, false));
+              (oldArr || []).forEach((item: any) => mergeOne(item, false));
               // Latest scan rows can replace equal-recency rows to preserve fresh payload fields.
-              (newArr || []).forEach((item) => mergeOne(item, true));
+              (newArr || []).forEach((item: any) => mergeOne(item, true));
               return Array.from(map.values());
             };
-            const buildSurveyResponseKey = (item) => {
+            const buildSurveyResponseKey = (item: any) => {
               const surveyId = String(item?.surveyId || item?.surveyID || item?.id || '').trim().toLowerCase();
               const responder = String(item?.responder || '').trim().toLowerCase();
               if (!surveyId || !responder) return '';
               return `${surveyId}|${responder}`;
             };
-            const buildQuestionResponseKey = (item) => {
+            const buildQuestionResponseKey = (item: any) => {
               const questionId = String(item?.questionId || item?.id || '').trim().toLowerCase();
               const responder = String(item?.responder || '').trim().toLowerCase();
               if (!questionId || !responder) return '';
@@ -2994,7 +3044,7 @@ export class MainSite extends Component {
             let sbtCache = this.DG.read('sbtCache', slug) || {};
             if (!sbtCache[netKey]) sbtCache[netKey] = { sbtList: {}, lastBlock: 0 };
 
-            sbts.forEach((item) => {
+            sbts.forEach((item: any) => {
               const addrLower = item.sbtAddress.toLowerCase();
               const existing = sbtCache[netKey].sbtList[addrLower] || {};
 
@@ -3027,7 +3077,7 @@ export class MainSite extends Component {
             }
 
             // Merge Created Surveys
-            activity.createdSurveys.forEach(({ id, data }) => {
+            activity.createdSurveys.forEach(({ id, data }: any) => {
               const idLower = id.toLowerCase();
               if (data) {
                 data.surveyID = idLower;
@@ -3036,7 +3086,7 @@ export class MainSite extends Component {
             });
 
             // Merge Responses
-            activity.surveyResponses.forEach(({ surveyId, response, responder }) => {
+            activity.surveyResponses.forEach(({ surveyId, response, responder }: any) => {
               const sIdLower = surveyId.toLowerCase();
               const rLower = responder.toLowerCase();
               if (!survCache[netKey].surveyResponses[sIdLower]) {
@@ -3047,7 +3097,7 @@ export class MainSite extends Component {
 
             // Backfill response-linked survey metadata for cold user-profile loads.
             const missingSurveyIds = new Set();
-            activity.surveyResponses.forEach(({ surveyId }) => {
+            activity.surveyResponses.forEach(({ surveyId }: any) => {
               const surveyIdLower = String(surveyId || '').toLowerCase();
               if (!surveyIdLower) return;
               if (!survCache[netKey].surveys[surveyIdLower]) {
@@ -3056,7 +3106,7 @@ export class MainSite extends Component {
             });
             if (missingSurveyIds.size > 0) {
               const rows = await Promise.all(
-                Array.from(missingSurveyIds).map(async (surveyIdLower) => {
+                Array.from(missingSurveyIds).map(async (surveyIdLower: any) => {
                   try {
                     const surveyData = await contractScripts.getSurveyDataById(
                       'none',
@@ -3070,7 +3120,7 @@ export class MainSite extends Component {
                   }
                 })
               );
-              rows.forEach(({ surveyIdLower, surveyData }) => {
+              rows.forEach(({ surveyIdLower, surveyData }: any) => {
                 if (!surveyData || typeof surveyData !== 'object') return;
                 surveyData.id = surveyIdLower;
                 surveyData.surveyID = surveyIdLower;
@@ -3117,7 +3167,7 @@ export class MainSite extends Component {
             }
 
             // Merge Created Questions
-            activity.createdQuestions.forEach(({ id, data }) => {
+            activity.createdQuestions.forEach(({ id, data }: any) => {
               const idLower = id.toLowerCase();
               if (data) {
                 data.id = idLower;
@@ -3127,7 +3177,7 @@ export class MainSite extends Component {
 
             // Merge Responses
             activity.questionResponses.forEach(
-              ({ questionId, response, responder, blockNumber, transactionIndex, logIndex, timestamp }) => {
+              ({ questionId, response, responder, blockNumber, transactionIndex, logIndex, timestamp }: any) => {
                 const qIdLower = questionId.toLowerCase();
                 const rLower = responder.toLowerCase();
                 if (!qCache[netKey].questionResponses[qIdLower]) {
@@ -3175,7 +3225,7 @@ export class MainSite extends Component {
 
             // Backfill response-linked question metadata for cold user-profile loads.
             const missingQuestionIds = new Set();
-            activity.questionResponses.forEach(({ questionId }) => {
+            activity.questionResponses.forEach(({ questionId }: any) => {
               const questionIdLower = String(questionId || '').toLowerCase();
               if (!questionIdLower) return;
               if (!qCache[netKey].questions[questionIdLower]) {
@@ -3185,7 +3235,7 @@ export class MainSite extends Component {
             if (missingQuestionIds.size > 0) {
               const decryptContext = this.buildQuestionDecryptContext(slug);
               const rows = await Promise.all(
-                Array.from(missingQuestionIds).map(async (questionIdLower) => {
+                Array.from(missingQuestionIds).map(async (questionIdLower: any) => {
                   try {
                     const questionData = await contractScripts.getQuestionData(
                       'none',
@@ -3202,7 +3252,7 @@ export class MainSite extends Component {
                   }
                 })
               );
-              rows.forEach(({ questionIdLower, questionData }) => {
+              rows.forEach(({ questionIdLower, questionData }: any) => {
                 if (!questionData || typeof questionData !== 'object') return;
                 questionData.id = questionIdLower;
                 qCache[netKey].questions[questionIdLower] = questionData;
@@ -3243,7 +3293,7 @@ export class MainSite extends Component {
           this.emitProfileScanTelemetry('slug-error', {
             targetAddress: targetLower,
             slug,
-            error: String(err?.message || err),
+            error: String((err as any)?.message || err),
             durationMs: Math.max(0, Date.now() - slugStartedAt),
           });
           mainSiteLog.warn(`[DeepSearch] Error scanning slug ${slug}:`, err);
@@ -3260,7 +3310,7 @@ export class MainSite extends Component {
         });
         for (let i = 0; i < allSlugs.length; i += report.sbtBurstSize) {
           const batch = allSlugs.slice(i, i + report.sbtBurstSize);
-          await Promise.all(batch.map((slug) => scanOneSlug(slug)));
+          await Promise.all(batch.map((slug: any) => scanOneSlug(slug)));
         }
       } else {
         this.emitProfileScanTelemetry('scan-mode', {
@@ -3308,8 +3358,8 @@ export class MainSite extends Component {
         isListScope &&
         totalSkippedScan &&
         report.attemptedSlugs.length > 0 &&
-        report.attemptedSlugs.every((slug) => (
-          String(report.skippedSlugReasons?.[String(slug || '')] || '') === 'missing-chain-id'
+        report.attemptedSlugs.every((slug: any) => (
+          String(((report.skippedSlugReasons as Record<string, any>)?.[String(slug || '')]) || '') === 'missing-chain-id'
         ))
       );
       if (unresolvedListScopeChainIds) {
@@ -3342,7 +3392,7 @@ export class MainSite extends Component {
       });
       try {
         if (typeof globalThis !== 'undefined') {
-          globalThis.__CE_PROFILE_SCAN_LAST_EVENT_SUMMARY__ = {
+          (globalThis as any).__CE_PROFILE_SCAN_LAST_EVENT_SUMMARY__ = {
             ts: new Date().toISOString(),
             targetAddress: targetLower,
             attemptedSlugs: [...report.attemptedSlugs],
@@ -3367,7 +3417,7 @@ export class MainSite extends Component {
 
       // Force UI update by bumping revisions ONLY if something actually changed
       if (this._mounted) {
-        this.setState((prev) => ({
+        this.setState((prev: any) => ({
           sbtCacheRevision: anyNewData
             ? prev.sbtCacheRevision + 1
             : prev.sbtCacheRevision,
@@ -3395,10 +3445,10 @@ export class MainSite extends Component {
 
 
   // Tiny flag helpers (boolean-only)
-  readFlag(name, slug) { return this._cachePersistenceController.readFlag(name, slug); }
-  writeFlag(name, slug, val) { this._cachePersistenceController.writeFlag(name, slug, val); }
-  hasPersistedManagedCacheData = (...args) => this._cachePersistenceController.hasPersistedManagedCacheData(...args);
-  syncCacheHasLoadedFlagFromPersistent = (...args) => this._cachePersistenceController.syncCacheHasLoadedFlagFromPersistent(...args);
+  readFlag(name: any, slug: any) { return this._cachePersistenceController.readFlag(name, slug); }
+  writeFlag(name: any, slug: any, val: any) { this._cachePersistenceController.writeFlag(name, slug, val); }
+  hasPersistedManagedCacheData = (...args: any[]) => this._cachePersistenceController.hasPersistedManagedCacheData(...args);
+  syncCacheHasLoadedFlagFromPersistent = (...args: any[]) => this._cachePersistenceController.syncCacheHasLoadedFlagFromPersistent(...args);
 
   async componentDidMount() {
     if (shouldAutoStartCeRuntimeStats()) {
@@ -3450,7 +3500,7 @@ export class MainSite extends Component {
     try {
       await Promise.race([
         initCacheManager(),
-        new Promise((_, reject) => {
+        new Promise((_: any, reject: any) => {
           cacheManagerInitTimeoutId = setTimeout(() => {
             reject(new Error(`cache manager init timed out after ${CACHE_MANAGER_INIT_TIMEOUT_MS}ms`));
           }, CACHE_MANAGER_INIT_TIMEOUT_MS);
@@ -3505,7 +3555,7 @@ export class MainSite extends Component {
       this._registryBootstrapPromise = run;
       this._registryBootstrapScopeKey = this.getRegistryBootstrapScopeKey(bootstrapChainIds);
       run
-        .catch((err) => {
+        .catch((err: any) => {
           mainSiteLog.warn('[SessionRegistry] Failed to load on-chain registry cache:', err);
         })
         .finally(() => {
@@ -3529,7 +3579,7 @@ export class MainSite extends Component {
         // Only bust derived/rehydratable caches; preserve user-authored caches.
         for (const s of getAllSessionSlugs()) {
           await Promise.all(
-            DG_PRIMARY_ROUTE_CACHE_NAMES.map((namespace) => this.DG.remove(namespace, s))
+            DG_PRIMARY_ROUTE_CACHE_NAMES.map((namespace: any) => this.DG.remove(namespace, s))
           );
           await this.syncCacheHasLoadedFlagFromPersistent(s, { force: true });
         }
@@ -3539,7 +3589,7 @@ export class MainSite extends Component {
         });
         if (typeof window !== 'undefined' && window.location && typeof window.location.reload === 'function') {
           mainSiteLog.log('[CacheBust] Forcing one-time reload after cache version change');
-          this.reloadWindowLocation();
+          this.reloadWindowLocation!();
           return;
         }
       }
@@ -3617,7 +3667,7 @@ export class MainSite extends Component {
             contractScripts.listenForSBTInstanceEvents(
               'none',
               [sbtAddressFromPath],
-              (e) => this.onNewSbtEventDetectedForGroup(detailSlug, e),
+              (e: any) => this.onNewSbtEventDetectedForGroup(detailSlug, e),
               detailSlug
             );
           }
@@ -3714,7 +3764,7 @@ export class MainSite extends Component {
           (async () => {
             try {
               if (!this.shouldAutoRunFullSbtScan({ pathname })) return;
-              await new Promise((resolve) => setTimeout(resolve, 250));
+              await new Promise((resolve: any) => setTimeout(resolve, 250));
               await this.initializeSbtCache({ mode: 'full' });
               this.setReadinessStateIfChanged({ isSBTCacheReady: true });
               this.startSbtEventListener();
@@ -3793,11 +3843,11 @@ export class MainSite extends Component {
       this._lastProcessedQuestionIdFromPath = questionIdFromPath;
       this._lastProcessedQuestionSlugFromPath = questionSlug;
       const slugsToRefresh = Array.from(
-        new Set([activeSlug, questionSlug].filter((s) => s !== null && s !== undefined))
+        new Set([activeSlug, questionSlug].filter((s: any) => s !== null && s !== undefined))
       );
-      slugsToRefresh.forEach((slug) => {
+      slugsToRefresh.forEach((slug: any) => {
         if (!this.hasMaskedQuestionPayloadInCache(slug)) return;
-        this.refreshEncryptedQuestionPayloadsForGroup(slug).catch((err) => {
+        this.refreshEncryptedQuestionPayloadsForGroup(slug).catch((err: any) => {
           mainSiteLog.warn('refreshEncryptedQuestionPayloadsForGroup failed during mount:', {
             slug,
             error: err?.message || err,
@@ -3866,10 +3916,10 @@ export class MainSite extends Component {
     try {
       const timers = this._sessionPathResolveRetryTimers;
       if (timers && typeof timers === 'object') {
-        ['id', 'slug'].forEach((kind) => {
+        ['id', 'slug'].forEach((kind: any) => {
           const bucket = timers[kind];
           if (!bucket || typeof bucket !== 'object') return;
-          Object.values(bucket).forEach((t) => {
+          Object.values(bucket).forEach((t: any) => {
             try { clearTimeout(t); } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
           });
         });
@@ -3882,7 +3932,7 @@ export class MainSite extends Component {
     contractScripts.removeSBTInstanceEventsListener('none', [], this.getSessionSlugFromState());
   }
 
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(prevProps: any, prevState: any) {
     this.redirectLegacyDemoPath();
 
     // Handle auto-hash persistence (save on change)
@@ -3947,10 +3997,10 @@ export class MainSite extends Component {
         this._lastProcessedQuestionIdFromPath = questionIdFromPath;
         this._lastProcessedQuestionSlugFromPath = questionSlug;
         const slugsToCheck = Array.from(
-          new Set([activeSlug, questionSlug].filter((s) => s !== null && s !== undefined))
+          new Set([activeSlug, questionSlug].filter((s: any) => s !== null && s !== undefined))
         );
 
-        slugsToCheck.forEach((slug) => {
+        slugsToCheck.forEach((slug: any) => {
           const masked = this.hasMaskedQuestionPayloadInCache(slug);
           const shouldRetry = shouldRetryMaskedQuestionRefresh({
             masked,
@@ -3971,7 +4021,7 @@ export class MainSite extends Component {
           }) || (masked && (authOrProviderChanged || litReadyChanged || entitlementChanged));
 
           if (!shouldRetry) return;
-          this.refreshEncryptedQuestionPayloadsForGroup(slug).catch((err) => {
+          this.refreshEncryptedQuestionPayloadsForGroup(slug).catch((err: any) => {
             mainSiteLog.warn('refreshEncryptedQuestionPayloadsForGroup failed after readiness change:', {
               slug,
               error: err?.message || err,
@@ -3986,7 +4036,7 @@ export class MainSite extends Component {
     const currChainId = this.getSessionChainId(currSlug);
     const toolsDemoOn = typeof this.props.demoMode === 'object' ? !!this.props.demoMode?.tools : !!this.props.demoMode;
     if (this._lastGroupChainId !== currChainId && !toolsDemoOn) {
-      if (window.ENABLE_RPC_DEBUG_LOGGING === true) {
+      if ((window as any).ENABLE_RPC_DEBUG_LOGGING === true) {
         mainSiteLog.log('[RPC_DEBUG_TRIGGER] MainSite: group chain change detected', { old: this._lastGroupChainId, new: currChainId });
       }
       this._lastGroupChainId = currChainId;
@@ -4017,7 +4067,7 @@ export class MainSite extends Component {
       const nextActiveSlug = currSlugFromPath;
       const cacheReinitRunToken = this.startCacheReinitRun();
       const isCacheReinitRunActive = () => this.isCacheReinitRunActive(cacheReinitRunToken);
-      if (window.ENABLE_RPC_DEBUG_LOGGING === true) {
+      if ((window as any).ENABLE_RPC_DEBUG_LOGGING === true) {
         mainSiteLog.log('[RPC_DEBUG_TRIGGER] MainSite: demo slug changed', {
           prevSlug: prevActiveSlug,
           nextSlug: nextActiveSlug,
@@ -4140,9 +4190,9 @@ export class MainSite extends Component {
       this.resolvePinnedSbtDetailRouteSlug(currSbtAddr, {
         search: currSearch,
         fallbackSlug: nextDerivedActiveSlug,
-      }).then((detailSlug) => {
+      }).then((detailSlug: any) => {
         this.setState({ sbtDetailGroupSlug: detailSlug, sbtDetailAddress: currSbtAddr });
-      }).catch((e) => { mainSiteLog.warn('MainSite: fallback', e); });
+      }).catch((e: any) => { mainSiteLog.warn('MainSite: fallback', e); });
     } else if (!currSbtAddr && prevSbtAddr) {
       this.setState({ sbtDetailGroupSlug: null, sbtDetailAddress: null });
     }
@@ -4184,7 +4234,7 @@ export class MainSite extends Component {
     // Check Config (Highlighted list)
     const cfg = this.getSessionCfg(currentSlug);
     const inConfig = Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
-                     cfg.HIGHLIGHTED_SURVEY_IDS.some(id => String(id).toLowerCase() === surveyID);
+                     cfg.HIGHLIGHTED_SURVEY_IDS.some((id: any) => String(id).toLowerCase() === surveyID);
 
     // 3. If missing in current context, trigger the cross-group scan
     if (!inCache && !inConfig) {
@@ -4205,7 +4255,7 @@ export class MainSite extends Component {
       const key = `dg:autoHash:${slug}`;
       const currentSearch = window.location.search || '';
 
-      const hasAutoFlag = (raw) => {
+      const hasAutoFlag = (raw: any) => {
         const cleaned = String(raw || '').replace(/^[?#]/, '');
         if (!cleaned) return false;
         const params = new URLSearchParams(cleaned);
@@ -4282,7 +4332,7 @@ export class MainSite extends Component {
             contractScripts.listenForSBTInstanceEvents(
               'none',
               [sbtAddressFromPath],
-              (e) => this.onNewSbtEventDetectedForGroup(detailSlug, e),
+              (e: any) => this.onNewSbtEventDetectedForGroup(detailSlug, e),
               detailSlug
             );
           }
@@ -4396,8 +4446,8 @@ export class MainSite extends Component {
 
     const slug = this.getSessionSlugFromState();
 
-    this.setState((prev) => {
-      const updates = {};
+    this.setState((prev: any) => {
+      const updates: Record<string, any> = {};
       let changed = false;
 
       if (prev.isAllCachesReady !== nextIsAllReady) {
@@ -4433,131 +4483,131 @@ export class MainSite extends Component {
     }
   };
 
-  ensureSessionRouteSbtDiscovery = (...args) => this._sbtCacheController.ensureSessionRouteSbtDiscovery(...args);
+  ensureSessionRouteSbtDiscovery = (...args: any[]) => this._sbtCacheController.ensureSessionRouteSbtDiscovery(...args);
 
   sendMessageToServer = () => {
   };
 
-  ensureLightSbtDiscovery = (...args) => this._sbtCacheController.ensureLightSbtDiscovery(...args);
+  ensureLightSbtDiscovery = (...args: any[]) => this._sbtCacheController.ensureLightSbtDiscovery(...args);
 
-  ensureLightSbtUniverse = (...args) => this._sbtCacheController.ensureLightSbtUniverse(...args);
+  ensureLightSbtUniverse = (...args: any[]) => this._sbtCacheController.ensureLightSbtUniverse(...args);
 
-  mergeSbtCountMaps = (...args) => this._sbtCacheController.mergeSbtCountMaps(...args);
+  mergeSbtCountMaps = (...args: any[]) => this._sbtCacheController.mergeSbtCountMaps(...args);
 
-  mergeSbtCountsPayload = (...args) => this._sbtCacheController.mergeSbtCountsPayload(...args);
+  mergeSbtCountsPayload = (...args: any[]) => this._sbtCacheController.mergeSbtCountsPayload(...args);
 
-  normalizeSbtHistorySummary = (...args) => this._sbtCacheController.normalizeSbtHistorySummary(...args);
+  normalizeSbtHistorySummary = (...args: any[]) => this._sbtCacheController.normalizeSbtHistorySummary(...args);
 
-  normalizeSbtCountMap = (...args) => this._sbtCacheController.normalizeSbtCountMap(...args);
+  normalizeSbtCountMap = (...args: any[]) => this._sbtCacheController.normalizeSbtCountMap(...args);
 
-  sumSbtCountMap = (...args) => this._sbtCacheController.sumSbtCountMap(...args);
+  sumSbtCountMap = (...args: any[]) => this._sbtCacheController.sumSbtCountMap(...args);
 
-  seedSbtCountMapFromLegacyAddresses = (...args) => this._sbtCacheController.seedSbtCountMapFromLegacyAddresses(...args);
+  seedSbtCountMapFromLegacyAddresses = (...args: any[]) => this._sbtCacheController.seedSbtCountMapFromLegacyAddresses(...args);
 
-  hydrateLegacySbtCountState = (...args) => this._sbtCacheController.hydrateLegacySbtCountState(...args);
+  hydrateLegacySbtCountState = (...args: any[]) => this._sbtCacheController.hydrateLegacySbtCountState(...args);
 
-  buildSbtHistorySummaryFromCounts = (...args) => this._sbtCacheController.buildSbtHistorySummaryFromCounts(...args);
+  buildSbtHistorySummaryFromCounts = (...args: any[]) => this._sbtCacheController.buildSbtHistorySummaryFromCounts(...args);
 
-  getCurrentHolderAddressesFromCounts = (...args) => this._sbtCacheController.getCurrentHolderAddressesFromCounts(...args);
+  getCurrentHolderAddressesFromCounts = (...args: any[]) => this._sbtCacheController.getCurrentHolderAddressesFromCounts(...args);
 
-  initializeSbtCache = (...args) => this._sbtCacheController.initializeSbtCache(...args);
+  initializeSbtCache = (...args: any[]) => this._sbtCacheController.initializeSbtCache(...args);
 
-  initializeSbtCacheWithGeneralBackfill = (...args) => this._sbtCacheController.initializeSbtCacheWithGeneralBackfill(...args);
+  initializeSbtCacheWithGeneralBackfill = (...args: any[]) => this._sbtCacheController.initializeSbtCacheWithGeneralBackfill(...args);
 
-  initializeSbtCacheForGroup = (...args) => this._sbtCacheController.initializeSbtCacheForGroup(...args);
+  initializeSbtCacheForGroup = (...args: any[]) => this._sbtCacheController.initializeSbtCacheForGroup(...args);
 
-  refreshSbtData = (...args) => this._sbtCacheController.refreshSbtData(...args);
+  refreshSbtData = (...args: any[]) => this._sbtCacheController.refreshSbtData(...args);
 
-  refreshSbtDataForGroup = (...args) => this._sbtCacheController.refreshSbtDataForGroup(...args);
+  refreshSbtDataForGroup = (...args: any[]) => this._sbtCacheController.refreshSbtDataForGroup(...args);
 
-  startSbtEventListener = (...args) => this._sbtCacheController.startSbtEventListener(...args);
+  startSbtEventListener = (...args: any[]) => this._sbtCacheController.startSbtEventListener(...args);
 
-  startSbtEventListenerForGroup = (...args) => this._sbtCacheController.startSbtEventListenerForGroup(...args);
+  startSbtEventListenerForGroup = (...args: any[]) => this._sbtCacheController.startSbtEventListenerForGroup(...args);
 
-  onNewSbtEventDetected = (...args) => this._sbtCacheController.onNewSbtEventDetected(...args);
+  onNewSbtEventDetected = (...args: any[]) => this._sbtCacheController.onNewSbtEventDetected(...args);
 
-  onNewSbtEventDetectedForGroup = (...args) => this._sbtCacheController.onNewSbtEventDetectedForGroup(...args);
+  onNewSbtEventDetectedForGroup = (...args: any[]) => this._sbtCacheController.onNewSbtEventDetectedForGroup(...args);
 
-  onSbtCreatedDetected = (...args) => this._sbtCacheController.onSbtCreatedDetected(...args);
+  onSbtCreatedDetected = (...args: any[]) => this._sbtCacheController.onSbtCreatedDetected(...args);
 
-  onSbtCreatedDetectedForGroup = (...args) => this._sbtCacheController.onSbtCreatedDetectedForGroup(...args);
+  onSbtCreatedDetectedForGroup = (...args: any[]) => this._sbtCacheController.onSbtCreatedDetectedForGroup(...args);
 
-  onSbtIssuedDetected = (...args) => this._sbtCacheController.onSbtIssuedDetected(...args);
+  onSbtIssuedDetected = (...args: any[]) => this._sbtCacheController.onSbtIssuedDetected(...args);
 
-  onSbtIssuedDetectedForGroup = (...args) => this._sbtCacheController.onSbtIssuedDetectedForGroup(...args);
+  onSbtIssuedDetectedForGroup = (...args: any[]) => this._sbtCacheController.onSbtIssuedDetectedForGroup(...args);
 
-  onSbtActivityDetected = (...args) => this._sbtCacheController.onSbtActivityDetected(...args);
+  onSbtActivityDetected = (...args: any[]) => this._sbtCacheController.onSbtActivityDetected(...args);
 
-  onSbtActivityDetectedForGroup = (...args) => this._sbtCacheController.onSbtActivityDetectedForGroup(...args);
+  onSbtActivityDetectedForGroup = (...args: any[]) => this._sbtCacheController.onSbtActivityDetectedForGroup(...args);
 
-  onSbtTransferDetected = (...args) => this._sbtCacheController.onSbtTransferDetected(...args);
+  onSbtTransferDetected = (...args: any[]) => this._sbtCacheController.onSbtTransferDetected(...args);
 
-  onSbtTransferDetectedForGroup = (...args) => this._sbtCacheController.onSbtTransferDetectedForGroup(...args);
+  onSbtTransferDetectedForGroup = (...args: any[]) => this._sbtCacheController.onSbtTransferDetectedForGroup(...args);
 
   initializeSurveyCache = async () => {
     return this.initializeSurveyCacheWithGeneralBackfill(this.getActiveSessionSlug());
   };
 
-  initializeSurveyCacheWithGeneralBackfill = async (slugIn) => {
+  initializeSurveyCacheWithGeneralBackfill = async (slugIn: any) => {
     return this.runWithGeneralSessionBackfill({
       slugIn,
       operation: 'initializeSurveyCache',
-      runPrimary: (slug) => this.initializeSurveyCacheForGroup(slug, { background: false }),
-      runGeneral: (slug) => this.initializeSurveyCacheForGroup(slug, { background: true }),
+      runPrimary: (slug: any) => this.initializeSurveyCacheForGroup(slug, { background: false }),
+      runGeneral: (slug: any) => this.initializeSurveyCacheForGroup(slug, { background: true }),
     });
   };
 
-  initializeSurveyCacheForGroup = (...args) => this._surveyCacheController.initializeSurveyCacheForGroup(...args);
+  initializeSurveyCacheForGroup = (...args: any[]) => this._surveyCacheController.initializeSurveyCacheForGroup(...args);
 
 
   initializeQuestionCache = async () => {
     return this.initializeQuestionCacheWithGeneralBackfill(this.getActiveSessionSlug());
   };
 
-  initializeQuestionCacheWithGeneralBackfill = async (slugIn) => {
+  initializeQuestionCacheWithGeneralBackfill = async (slugIn: any) => {
     return this.runWithGeneralSessionBackfill({
       slugIn,
       operation: 'initializeQuestionCache',
-      runPrimary: (slug) => this.initializeQuestionCacheForGroup(slug, { background: false }),
-      runGeneral: (slug) => this.initializeQuestionCacheForGroup(slug, { background: true }),
+      runPrimary: (slug: any) => this.initializeQuestionCacheForGroup(slug, { background: false }),
+      runGeneral: (slug: any) => this.initializeQuestionCacheForGroup(slug, { background: true }),
     });
   };
 
-  initializeQuestionCacheForGroup = (...args) => this._questionCacheController.initializeQuestionCacheForGroup(...args);
+  initializeQuestionCacheForGroup = (...args: any[]) => this._questionCacheController.initializeQuestionCacheForGroup(...args);
 
   fetchQuestionResponsesChunked = async () => {
     return this.fetchQuestionResponsesChunkedWithGeneralBackfill(this.getActiveSessionSlug());
   };
 
-  fetchQuestionResponsesChunkedWithGeneralBackfill = async (slugIn) => {
+  fetchQuestionResponsesChunkedWithGeneralBackfill = async (slugIn: any) => {
     return this.runWithGeneralSessionBackfill({
       slugIn,
       operation: 'fetchQuestionResponsesChunked',
-      runPrimary: (slug) => this.fetchQuestionResponsesChunkedForGroup(slug, { background: false }),
-      runGeneral: (slug) => this.fetchQuestionResponsesChunkedForGroup(slug, { background: true }),
+      runPrimary: (slug: any) => this.fetchQuestionResponsesChunkedForGroup(slug, { background: false }),
+      runGeneral: (slug: any) => this.fetchQuestionResponsesChunkedForGroup(slug, { background: true }),
     });
   };
 
-  fetchQuestionResponsesChunkedForGroup = (...args) => (
+  fetchQuestionResponsesChunkedForGroup = (...args: any[]) => (
     this._responseHydrationController.fetchQuestionResponsesChunkedForGroup(...args)
   );
 
   startSurveyAndQuestionEventListener = async () => this.startSurveyAndQuestionEventListenerForGroup(this.getActiveSessionSlug());
 
-  startSurveyAndQuestionEventListenerForGroup = async (slugIn) => {
+  startSurveyAndQuestionEventListenerForGroup = async (slugIn: any) => {
     const slug = normalizeSessionSlug(slugIn || '');
     mainSiteLog.log("startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener", { slug });
     contractScripts.removeSurveyEventsListener('none', slug); // Ensure clean state
     if (this.shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return;
-    contractScripts.listenForSurveyEvents('none', (e) => this.onNewSurveyEventDetectedForGroup(slug, e), slug);
+    contractScripts.listenForSurveyEvents('none', (e: any) => this.onNewSurveyEventDetectedForGroup(slug, e), slug);
     mainSiteLog.log("Survey & Question event listener started");
   };
 
 
-  onNewSurveyEventDetected = async (event) => this.onNewSurveyEventDetectedForGroup(this.getActiveSessionSlug(), event);
+  onNewSurveyEventDetected = async (event: any) => this.onNewSurveyEventDetectedForGroup(this.getActiveSessionSlug(), event);
 
-  onNewSurveyEventDetectedForGroup = async (slug, event) => { // event: { type, ..., blockNumber }
-    if (window.ENABLE_RPC_DEBUG_LOGGING === true) mainSiteLog.log('[RPC_DEBUG_TRIGGER] MainSite: onNewSurveyEventDetectedForGroup invoked', { event, slug });
+  onNewSurveyEventDetectedForGroup = async (slug: any, event: any) => { // event: { type, ..., blockNumber }
+    if ((window as any).ENABLE_RPC_DEBUG_LOGGING === true) mainSiteLog.log('[RPC_DEBUG_TRIGGER] MainSite: onNewSurveyEventDetectedForGroup invoked', { event, slug });
     mainSiteLog.log("onNewSurveyEventDetectedForGroup() – invoked with event:", event);
 
     const networkID = String(this.getSessionChainId(slug) || '');
@@ -4681,12 +4731,12 @@ export class MainSite extends Component {
             let allQuestionsFetchedSuccessfully = true;
             if (surveyData.questionIDs && surveyData.questionIDs.length > 0) {
               const missingIds = surveyData.questionIDs
-                .map((q) => q.toLowerCase())
-                .filter((qid) => !currentQuestionNetworkCache.questions[qid]);
+                .map((q: any) => q.toLowerCase())
+                .filter((qid: any) => !currentQuestionNetworkCache.questions[qid]);
 
               if (missingIds.length > 0) {
                 const results = await Promise.all(
-                  missingIds.map(async (qid) => {
+                  missingIds.map(async (qid: any) => {
                     try {
                       const questionData = await contractScripts.getQuestionData('none', qid, slug, {
                         decryptContext: this.buildQuestionDecryptContext(slug),
@@ -4700,7 +4750,7 @@ export class MainSite extends Component {
                   })
                 );
 
-                results.forEach(({ qid, questionData }) => {
+                results.forEach(({ qid, questionData }: any) => {
                   if (questionData) {
                     questionData.id = qid;
                     const preparedQuestion = this.buildMetadataSessionCacheEnvelope(questionData, targetSurveySlug || slug, {
@@ -4771,13 +4821,13 @@ export class MainSite extends Component {
         mainSiteLog.log(`Processing QuestionsAdded event with ${event.questionIds.length} questions.`);
 
         try {
-          const idsLower = event.questionIds.map((hex) => hex.toLowerCase());
-          const missing = idsLower.filter((qid) => !currentQuestionNetworkCache.questions[qid]);
+          const idsLower = event.questionIds.map((hex: any) => hex.toLowerCase());
+          const missing = idsLower.filter((qid: any) => !currentQuestionNetworkCache.questions[qid]);
 
           let allNewQuestionsFetchedSuccessfully = true;
           if (missing.length > 0) {
             const results = await Promise.all(
-              missing.map(async (qid) => {
+              missing.map(async (qid: any) => {
                 try {
                   const questionData = await contractScripts.getQuestionData('none', qid, slug, {
                     decryptContext: this.buildQuestionDecryptContext(slug),
@@ -4790,7 +4840,7 @@ export class MainSite extends Component {
                 }
               })
             );
-            results.forEach(({ qid, questionData }) => {
+            results.forEach(({ qid, questionData }: any) => {
               if (questionData) {
                 questionData.id = qid;
                 const preparedQuestion = this.buildMetadataSessionCacheEnvelope(questionData, slug, {
@@ -4840,7 +4890,7 @@ export class MainSite extends Component {
       }
     } else if (event.type === 'ResponsesSubmitted') {
       const surveyIdFromEvent = event.surveyId ? event.surveyId.toLowerCase() : null;
-      const questionIdsFromEvent = event.questionIds.map(q => q.toLowerCase());
+      const questionIdsFromEvent = event.questionIds.map((q: any) => q.toLowerCase());
       const responderAddressLower = event.responder.toLowerCase();
       const eventTransactionIndex = Number(event?.transactionIndex ?? event?.txIndex ?? 0);
       const eventLogIndex = Number(event?.logIndex || 0);
@@ -4871,7 +4921,7 @@ export class MainSite extends Component {
 
       // Question-level responses with recency guard
       // Ensure per-question maps exist
-      questionIdsFromEvent.forEach((qId) => {
+      questionIdsFromEvent.forEach((qId: any) => {
         if (!currentQuestionNetworkCache.questionResponses[qId]) {
           currentQuestionNetworkCache.questionResponses[qId] = {};
         }
@@ -4881,8 +4931,8 @@ export class MainSite extends Component {
       });
 
       const bn = Number(eventBlockNumber || 0);
-      const qIdsToFetch = [];
-      questionIdsFromEvent.forEach((qId) => {
+      const qIdsToFetch: any[] = [];
+      questionIdsFromEvent.forEach((qId: any) => {
         const prev = currentQuestionNetworkCache.questionResponsesMeta[qId][responderAddressLower] || {};
         const prevBn = Number(prev.bn ?? prev.blockNumber ?? 0);
         const prevTxi = Number(prev.txi ?? prev.transactionIndex ?? prev.txIndex ?? 0);
@@ -4916,7 +4966,7 @@ export class MainSite extends Component {
       if (qIdsToFetch.length > 0) {
         let shouldForceResponseBackfill = false;
         const results = await Promise.all(
-          qIdsToFetch.map(async (qId) => {
+          qIdsToFetch.map(async (qId: any) => {
             const data = await contractScripts.getResponse('none', responderAddressLower, qId, slug, {
               forceArweaveFetch: true,
             });
@@ -4926,7 +4976,7 @@ export class MainSite extends Component {
         );
 
         let acceptedAny = false;
-        results.forEach(({ qId, data }) => {
+        results.forEach(({ qId, data }: any) => {
           if (!data) return;
           currentQuestionNetworkCache.questionResponses[qId][responderAddressLower] = data;
           currentQuestionNetworkCache.questionResponsesMeta[qId][responderAddressLower] = {
@@ -4951,7 +5001,7 @@ export class MainSite extends Component {
             background: true,
             forceArweaveFetch: true,
             notifyOnCompletion: true,
-          }).catch((backfillErr) => {
+          }).catch((backfillErr: any) => {
             mainSiteLog.warn('[ResponsesSubmitted] Forced response backfill failed:', backfillErr);
           });
         }
@@ -4976,7 +5026,7 @@ export class MainSite extends Component {
 
   // React routing
 
-  _renderDebateRoute = (fullPath) => (
+  _renderDebateRoute = (fullPath: any) => (
     <ExperimentalStub
       featureName="Debate view"
       path={fullPath}
@@ -5026,7 +5076,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderSimUserRoute = (fullPath, defaultSessionNetwork) => {
+  _renderSimUserRoute = (fullPath: any, defaultSessionNetwork: any) => {
     const simUsername = fullPath.slice(4);
     return (
       <Suspense fallback={<LazyFallback label="Loading profile..." minHeight="40vh" />}>
@@ -5035,7 +5085,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderAtlasRoute = (ctx) => {
+  _renderAtlasRoute = (ctx: any) => {
     const { fullPath, defaultSlug, defaultSessionNetwork, routeDemoMode } = ctx;
     return (
       <Suspense fallback={<LazyFallback label="Loading Atlas..." />}>
@@ -5072,7 +5122,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderTagRoute = (ctx) => {
+  _renderTagRoute = (ctx: any) => {
     const { fullPath, defaultSlug, defaultSessionNetwork } = ctx;
     return (
       <Suspense fallback={<LazyFallback label="Loading Tags..." />}>
@@ -5089,7 +5139,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderCompareRoute = (ctx) => {
+  _renderCompareRoute = (ctx: any) => {
     const { fullPath } = ctx;
     const comparePath = String(fullPath || '').split('?')[0];
     const firstAddress = comparePath.replace(/^\/compare\/?/, '').split('&').filter(Boolean)[0] || '';
@@ -5108,7 +5158,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderContractsRoute = (ctx) => {
+  _renderContractsRoute = (ctx: any) => {
     const { fullPath, defaultSlug } = ctx;
     return (
       <Suspense fallback={<LazyFallback label="Loading Contracts..." />}>
@@ -5121,7 +5171,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderAdminRoute = (ctx) => {
+  _renderAdminRoute = (ctx: any) => {
     const { fullPath, requestedSessionId, requestedChainId } = ctx;
     return (
       <Suspense fallback={<LazyFallback label="Loading Admin..." />}>
@@ -5143,7 +5193,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderSponsorRoute = (ctx) => {
+  _renderSponsorRoute = (ctx: any) => {
     const { fullPath, requestedSessionId, requestedChainId } = ctx;
     return (
       <Suspense fallback={<LazyFallback label="Loading Sponsor..." />}>
@@ -5164,7 +5214,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderSbtsListRoute = (ctx) => {
+  _renderSbtsListRoute = (ctx: any) => {
     const { fullPath, defaultSessionNetwork } = ctx;
     const routeSessionSlug = this.getSbtListRouteSessionSlug(fullPath);
     const allSessionsMode = !routeSessionSlug;
@@ -5198,7 +5248,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderSbtDetailRoute = (ctx) => {
+  _renderSbtDetailRoute = (ctx: any) => {
     const { fullPath, searchStr, defaultSlug, defaultSessionNetwork } = ctx;
     const pathParts = fullPath.split('/');
     const sbtAddress = pathParts[2];
@@ -5240,7 +5290,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderUserProfileRoute = (ctx) => {
+  _renderUserProfileRoute = (ctx: any) => {
     const { fullPath, defaultSlug, defaultSessionNetwork } = ctx;
     const profilePath = fullPath;
     const profileSearchStr = (typeof window !== 'undefined' ? window.location.search : '') || '';
@@ -5276,7 +5326,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderHomeRoute = (ctx) => {
+  _renderHomeRoute = (ctx: any) => {
     const { defaultSlug, defaultSessionNetwork, cacheInitializationError } = ctx;
     return (
       <div id={styles.main} data-testid={E2E_TESTIDS.PAGE_HOME_ROOT}>
@@ -5309,7 +5359,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderSurveyIdRoute = (ctx) => {
+  _renderSurveyIdRoute = (ctx: any) => {
     const {
       surveyIDFromPath,
       fullPath,
@@ -5342,7 +5392,7 @@ export class MainSite extends Component {
 
     const inCache = !!cache?.[netKey]?.surveys?.[sidLower];
     const inConfig = Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
-      cfg.HIGHLIGHTED_SURVEY_IDS.some((id) => id.toLowerCase() === sidLower);
+      cfg.HIGHLIGHTED_SURVEY_IDS.some((id: any) => id.toLowerCase() === sidLower);
 
     // 3. Check Scan State
     const isScanning = this.state.isScanningForGroup === sidLower;
@@ -5451,7 +5501,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderSurveysOrQuestionsListRoute = (ctx) => {
+  _renderSurveysOrQuestionsListRoute = (ctx: any) => {
     const {
       fullPath,
       searchStr,
@@ -5513,7 +5563,7 @@ export class MainSite extends Component {
         isCacheManagerReady: this.state.isCacheManagerReady,
         getSessionConfigBySlug,
         formatSessionId: sessionRegistryUtils.formatSessionId,
-        resolveSessionConfigById: (sessionId) => sessionRegistryStore.getSessionConfigById(sessionId),
+        resolveSessionConfigById: (sessionId: any) => sessionRegistryStore.getSessionConfigById(sessionId),
       })
       : {
         sessionSlug: null,
@@ -5541,7 +5591,7 @@ export class MainSite extends Component {
       : defaultSessionNetwork;
     const pageRefreshSurveyResponsesByID = (
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((id) => this.refreshSurveyResponsesByIDForGroup(effectivePageSlug, id))
+        ? ((id: any) => this.refreshSurveyResponsesByIDForGroup(effectivePageSlug, id))
         : this.refreshSurveyResponsesByID
     );
     const pageRefreshQuestionMetadata = (
@@ -5551,14 +5601,14 @@ export class MainSite extends Component {
     );
     const pageRefreshQuestionResponses = (
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((questionIds, opts = {}) => (
+        ? ((questionIds: any, opts: any = {}) => (
           this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: effectivePageSlug })
         ))
         : this.refreshQuestionResponses
     );
     const pageRefreshSbtData = (
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
-        ? ((addr, slug) => this.refreshSbtData(addr, slug || effectivePageSlug))
+        ? ((addr: any, slug: any) => this.refreshSbtData(addr, slug || effectivePageSlug))
         : this.refreshSbtData
     );
 
@@ -5611,7 +5661,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderQuestionDetailRoute = (ctx) => {
+  _renderQuestionDetailRoute = (ctx: any) => {
     const { fullPath, searchStr, defaultSessionNetwork, cacheInitializationError } = ctx;
     const pathParts = fullPath.split('/');
     const questionIndex = pathParts.indexOf('question');
@@ -5628,7 +5678,7 @@ export class MainSite extends Component {
       isCacheManagerReady: this.state.isCacheManagerReady,
       getSessionConfigBySlug,
       formatSessionId: sessionRegistryUtils.formatSessionId,
-      resolveSessionConfigById: (sessionId) => sessionRegistryStore.getSessionConfigById(sessionId),
+      resolveSessionConfigById: (sessionId: any) => sessionRegistryStore.getSessionConfigById(sessionId),
     });
     const queryQuestionSlug = questionRouteSession.sessionSlug;
     const queryQuestionSessionId = questionRouteSession.sessionId;
@@ -5692,12 +5742,12 @@ export class MainSite extends Component {
             sbtCacheRevision={this.state.sbtCacheRevision}
             questionResponsesNonce={this.state.questionResponsesNonce}
             questionScanProgress={this.state.questionScanProgress}
-            refreshSurveyResponsesByID={(id) => this.refreshSurveyResponsesByIDForGroup(effectiveQuestionSlug, id)}
+            refreshSurveyResponsesByID={(id: any) => this.refreshSurveyResponsesByIDForGroup(effectiveQuestionSlug, id)}
             refreshQuestionMetadata={() => this.refreshQuestionMetadataForGroup(effectiveQuestionSlug)}
-            refreshQuestionResponses={(questionIds, opts = {}) =>
+            refreshQuestionResponses={(questionIds: any, opts: any = {}) =>
               this.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: effectiveQuestionSlug })
             }
-            refreshSbtData={(addr, slug) => this.refreshSbtData(addr, slug || effectiveQuestionSlug)}
+            refreshSbtData={(addr: any, slug: any) => this.refreshSbtData(addr, slug || effectiveQuestionSlug)}
             scanForSurveyGroup={this.scanForSurveyGroup}
             cacheInitializationError={cacheInitializationError}
             litHooks={this.state.litHooks}
@@ -5711,7 +5761,7 @@ export class MainSite extends Component {
     );
   };
 
-  _renderSessionRoute = (ctx) => {
+  _renderSessionRoute = (ctx: any) => {
     const { fullPath, defaultSessionNetwork, cacheInitializationError } = ctx;
     const parts = fullPath.split('/').filter(Boolean);
     const sessionTokenRaw = (parts[1] || '').trim();
@@ -5736,12 +5786,12 @@ export class MainSite extends Component {
     const sessionRoute = resolveMainSiteSessionRouteContext({
       sessionTokenRaw,
       formatSessionId: sessionRegistryUtils.formatSessionId,
-      resolveSessionConfigById: (sessionId) => sessionRegistryStore.getSessionConfigById(sessionId),
-      resolveSessionConfigBySlug: (slug) => getSessionConfigBySlug(slug),
-      resolveDisplaySessionConfigBySlug: (slug) => (
+      resolveSessionConfigById: (sessionId: any) => sessionRegistryStore.getSessionConfigById(sessionId),
+      resolveSessionConfigBySlug: (slug: any) => getSessionConfigBySlug(slug),
+      resolveDisplaySessionConfigBySlug: (slug: any) => (
         getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
       ),
-      resolveSessionSlugFromPathToken: (sessionToken) => (
+      resolveSessionSlugFromPathToken: (sessionToken: any) => (
         sessionToken
           ? this.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true })
           : DEFAULT_SESSION_SLUG
@@ -5766,19 +5816,20 @@ export class MainSite extends Component {
     }
 
     if (sessionRoute.hasUnresolvedSessionId) {
+      const unresolvedSessionId = sessionIdFromPath!;
       const attempts = this._sessionPathIdResolveAttempts || {};
       const pending = this._pendingSessionPathIdResolves || new Set();
-      const hasAttempted = !!attempts[sessionIdFromPath];
-      const isPending = pending.has(sessionIdFromPath);
-      const lastErr = this._sessionPathResolveLastErrors?.id?.[sessionIdFromPath] || null;
-      const retryCount = Number(this._sessionPathResolveErrorCounts?.id?.[sessionIdFromPath] || 0);
+      const hasAttempted = !!attempts[unresolvedSessionId];
+      const isPending = pending.has(unresolvedSessionId);
+      const lastErr = this._sessionPathResolveLastErrors?.id?.[unresolvedSessionId] || null;
+      const retryCount = Number(this._sessionPathResolveErrorCounts?.id?.[unresolvedSessionId] || 0);
       const recentError = !!(lastErr && lastErr.ts && (Date.now() - Number(lastErr.ts || 0)) < 2 * 60 * 1000);
       const keepResolving = recentError && retryCount > 0;
-      this.resolveSessionPathId(sessionIdFromPath);
+      this.resolveSessionPathId(unresolvedSessionId);
       if (!hasAttempted || isPending || keepResolving) {
         return (
           <SessionLoadingSkeleton
-            statusTitle={`Resolving ${sessionIdFromPath} Session...`}
+            statusTitle={`Resolving ${unresolvedSessionId} Session...`}
           />
         );
       }
@@ -5866,7 +5917,7 @@ export class MainSite extends Component {
               provider={this.props.provider}
               account={this.props.account}
               network={sessionNetwork}
-              toggleLoginModal={(loginModalIsOpen) => this.props.toggleLoginModal(loginModalIsOpen)}
+              toggleLoginModal={(loginModalIsOpen: any) => this.props.toggleLoginModal(loginModalIsOpen)}
               loginComplete={this.props.loginComplete}
               sessionToken={sessionTokenRaw}
               sessionSlug={resolvedSlug}
@@ -5943,7 +5994,7 @@ export class MainSite extends Component {
   };
 
 
-  getMainView = (relevantMatch) => {
+  getMainView = (relevantMatch: any) => {
     // Variable initialization
     let surveyIDFromPath = null;
     let parsedFilterStateFromUrl = {};
@@ -6171,21 +6222,21 @@ export class MainSite extends Component {
     catch (e) { mainSiteLog.error('Faucet error:', e); }
   };
 
-  refreshSurveyResponsesByID = async (surveyID) => this.refreshSurveyResponsesByIDForGroup(this.getActiveSessionSlug(), surveyID);
+  refreshSurveyResponsesByID = async (surveyID: any) => this.refreshSurveyResponsesByIDForGroup(this.getActiveSessionSlug(), surveyID);
 
-  refreshSurveyResponsesByIDForGroup = (...args) => this._surveyCacheController.refreshSurveyResponsesByIDForGroup(...args);
+  refreshSurveyResponsesByIDForGroup = (...args: any[]) => this._surveyCacheController.refreshSurveyResponsesByIDForGroup(...args);
 
   refreshQuestionMetadata = async () => this.refreshQuestionMetadataForGroup(this.getActiveSessionSlug());
 
-  hasMaskedQuestionPayloadInCache = (...args) => this._questionCacheController.hasMaskedQuestionPayloadInCache(...args);
+  hasMaskedQuestionPayloadInCache = (...args: any[]) => this._questionCacheController.hasMaskedQuestionPayloadInCache(...args);
 
-  buildQuestionDecryptContext = (...args) => this._questionCacheController.buildQuestionDecryptContext(...args);
+  buildQuestionDecryptContext = (...args: any[]) => this._questionCacheController.buildQuestionDecryptContext(...args);
 
-  refreshEncryptedQuestionPayloadsForGroup = (...args) => this._questionCacheController.refreshEncryptedQuestionPayloadsForGroup(...args);
+  refreshEncryptedQuestionPayloadsForGroup = (...args: any[]) => this._questionCacheController.refreshEncryptedQuestionPayloadsForGroup(...args);
 
-  refreshQuestionMetadataForGroup = (...args) => this._questionCacheController.refreshQuestionMetadataForGroup(...args);
+  refreshQuestionMetadataForGroup = (...args: any[]) => this._questionCacheController.refreshQuestionMetadataForGroup(...args);
 
-  refreshQuestionResponses = (...args) => this._responseHydrationController.refreshQuestionResponses(...args);
+  refreshQuestionResponses = (...args: any[]) => this._responseHydrationController.refreshQuestionResponses(...args);
 
   render() {
     const mainViewDisplay = this.getMainView(null);
@@ -6218,36 +6269,7 @@ export class MainSite extends Component {
     );
   }
 }
-
-
-
-MainSite.propTypes = {
-  fetchSessionState: PropTypes.func.isRequired,
-  fetchAccount: PropTypes.func.isRequired,
-  changeFocusedTab: PropTypes.func.isRequired,
-  toggleLoginModal: PropTypes.func.isRequired,
-  updateLoginInfo: PropTypes.func.isRequired,
-  toggleDemoMode: PropTypes.func.isRequired,
-  changeActiveSessionSlug: PropTypes.func.isRequired,
-  profile: PropTypes.object,
-  account: PropTypes.string,
-  provider: PropTypes.string,
-  network: PropTypes.object,
-  sessionState: PropTypes.object,
-  focusedTab: PropTypes.number,
-  loginComplete: PropTypes.bool,
-  loginInProgress: PropTypes.bool,
-  demoMode: PropTypes.object,
-  demoSurfaceMode: PropTypes.oneOfType([PropTypes.bool, PropTypes.oneOf([null])]),
-  activeSessionSlug: PropTypes.string,
-  // From withWagmiBridge
-  wagmiChainOptions: PropTypes.array,
-  wagmiBlocknumber: PropTypes.number,
-  urlExtension: PropTypes.object, // from react-router
-  path: PropTypes.string, // from react-router via withWagmiBridge
-};
-
-const mapStateToProps = state => ({
+const mapStateToProps = (state: any) => ({
   profile: state.profile,
   account: state.profile.account,
   provider: state.profile.provider,
@@ -6271,4 +6293,4 @@ export default connect(mapStateToProps, {
   updateLoginInfo,
   toggleDemoMode,
   changeActiveSessionSlug
-})(MainSiteWithWagmiHooks);
+})(MainSiteWithWagmiHooks) as unknown as React.ComponentType<Record<string, any>>;

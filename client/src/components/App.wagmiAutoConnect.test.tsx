@@ -94,7 +94,7 @@ const mockAppDependencies = () => {
     __esModule: true,
     default: (Comp: React.ComponentType<any>) => Comp,
   }));
-  jest.doMock('./MainSite/MainSite.jsx', () => ({
+  jest.doMock('./MainSite/MainSite', () => ({
     __esModule: true,
     default: () => null,
   }));
