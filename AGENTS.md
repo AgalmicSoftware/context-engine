@@ -59,7 +59,6 @@ npm run ai:seed-survey:question-types            # seed question type data
 | `client/src/contractsABI/` | Contract ABI JSON files |
 | `contracts/` | Solidity smart contracts |
 | `scripts/test-*.ui.js` | Playwright E2E tests |
-| `contextEngine-cc/` | Claude Code integration (hook + passkey auth) |
 | `ARCHITECTURE.md` | System diagram, data flows, contract addresses |
 
 ### Generated / do-not-edit

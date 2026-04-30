@@ -1,9 +1,6 @@
 // Shared pure utility functions for question/response handling.
-// Used by both the React client AND contextEngine-cc (via symlink).
 // NO browser dependencies — must work in Node.js and browser.
 //
-// If you modify this file, contextEngine-cc will pick up changes automatically
-// via its symlink at contextEngine-cc/lib/shared/questionUtils.mjs
 //
 // Depends on: ethers (v5)
 
