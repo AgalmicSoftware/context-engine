@@ -33,7 +33,7 @@ export const getEffectiveRoutePath = (
   }: {
     windowPathIn?: string;
     redirectPathIn?: string;
-  } = {},
+  } = {}
 ): string => {
   const propPath = String(pathIn || '').trim();
   const windowPath = String(windowPathIn || '').trim();

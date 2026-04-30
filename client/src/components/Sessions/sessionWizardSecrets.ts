@@ -1,29 +1,12 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import { WORKER_SECRET_PERSISTED_FIELDS } from './sessionWizardWorkerSecretSupport';
-import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike, WorkerSecretsRefLike } from '../shellTypes';
+import type {
+  AnyRecord,
+  WorkerSecretSyncResult,
+  WorkerSecretsLike,
+  WorkerSecretsRefLike,
+} from '../shellTypes';
 
-type AsyncShellCallback<TInput extends AnyRecord = AnyRecord, TResult = any> = (input: TInput) => Promise<TResult>;
-
-type SignAdminActionInput = {
-  action: string;
-  body: AnyRecord;
-  targetSlug: string;
-  workerUrl: string;
-};
-
-type PostWorkerSecretsInput = {
-  auth: AnyRecord;
-  secrets: AnyRecord;
-  body: AnyRecord;
-  workerUrl: string;
-  slug: string;
-};
-
-type EnsureSessionConfigInput = {
-  workerUrl: string;
-  slug: string;
-  account: string;
-};
+type AsyncShellCallback = (input?: AnyRecord) => Promise<any>;
 
 export const resolveWorkerSecretsSnapshot = ({
   workerSecretsRef = null,
@@ -51,16 +34,16 @@ export const resolveWorkerSecretsSnapshot = ({
   };
 };
 
-export const buildWorkerSecretsPayload = (workerSecrets: WorkerSecretsLike = {}): Record<string, string> =>
-  WORKER_SECRET_PERSISTED_FIELDS.reduce(
-    (acc, key) => {
-      const trimmed = toStr(workerSecrets?.[key]).trim();
-      if (!trimmed) return acc;
-      acc[key] = trimmed;
-      return acc;
-    },
-    {} as Record<string, string>,
-  );
+export const buildWorkerSecretsPayload = (
+  workerSecrets: WorkerSecretsLike = {}
+): Record<string, string> => (
+  Object.entries(workerSecrets || {}).reduce((acc, [key, value]) => {
+    const trimmed = toStr(value).trim();
+    if (!trimmed) return acc;
+    acc[key] = trimmed;
+    return acc;
+  }, {} as Record<string, string>)
+);
 
 const TRANSIENT_SYNC_ERROR_PATTERNS = [
   'failed to reach worker auth endpoint',
@@ -118,9 +101,9 @@ export const syncWorkerSecretsAfterDeploy = async ({
   account?: string;
   slug?: string;
   deploySecrets?: WorkerSecretsLike | null;
-  signAdminAction?: AsyncShellCallback<SignAdminActionInput, AnyRecord>;
-  postSecrets?: AsyncShellCallback<PostWorkerSecretsInput>;
-  ensureSessionConfig?: AsyncShellCallback<EnsureSessionConfigInput>;
+  signAdminAction?: AsyncShellCallback;
+  postSecrets?: AsyncShellCallback;
+  ensureSessionConfig?: AsyncShellCallback;
   helperWritesSecrets?: boolean;
   retryDelaysMs?: number[];
   wait?: (ms: number) => Promise<void>;
@@ -167,13 +150,12 @@ export const syncWorkerSecretsAfterDeploy = async ({
         sessionSlug: slug,
         secrets,
       };
-      const auth =
-        (await signAdminAction?.({
-          action: 'set-secrets',
-          body: requestBody,
-          targetSlug: slug,
-          workerUrl: resolvedWorkerUrl,
-        })) || {};
+      const auth = await signAdminAction?.({
+        action: 'set-secrets',
+        body: requestBody,
+        targetSlug: slug,
+        workerUrl: resolvedWorkerUrl,
+      });
       await postSecrets?.({ auth, secrets, body: requestBody, workerUrl: resolvedWorkerUrl, slug });
       return { warning: '', note: '', synced: true, attempts: attempt + 1 };
     } catch (err) {
@@ -218,7 +200,7 @@ export const syncWorkerConfigAfterPartialDeploy = async ({
   workerUrl?: string;
   account?: string;
   slug?: string;
-  ensureSessionConfig?: AsyncShellCallback<EnsureSessionConfigInput>;
+  ensureSessionConfig?: AsyncShellCallback;
 } = {}): Promise<WorkerSecretSyncResult> => {
   if (deployResponse?.partial !== true) {
     return { warning: '', note: '', synced: false, skipped: true };
@@ -261,7 +243,7 @@ export const withWorkerConfigSyncWarning = (baseStatus = '', warning = ''): stri
 
 export const withSecretsSyncStatus = (
   baseStatus = '',
-  { warning = '', note = '' }: Partial<WorkerSecretSyncResult> = {},
+  { warning = '', note = '' }: Partial<WorkerSecretSyncResult> = {}
 ): string => {
   const status = toStr(baseStatus).trim();
   const warningText = toStr(warning).trim();
