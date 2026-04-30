@@ -32,7 +32,7 @@ Component: `client/src/components/E2E/DevE2eNav.tsx`
 
 ## Page Roots (Route Readiness)
 
-Route branches in `client/src/components/MainSite/MainSite.jsx` wrap their rendered output with a stable page-root TestID. E2E should prefer waiting on these roots instead of `networkidle`.
+Route branches in `client/src/components/MainSite/MainSite.tsx` wrap their rendered output with a stable page-root TestID. E2E should prefer waiting on these roots instead of `networkidle`.
 The `/about` route renders `client/src/components/About/AboutPage.tsx`.
 The `/` home route renders `client/src/components/MainContent/MainAreaTabs.tsx`, which now mounts `ToolExplorer.tsx` as the tool-launcher tab and `OnboardingWalkthrough.tsx` as the welcome tab.
 
@@ -167,26 +167,26 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 
 | `data-testid` | Component path(s) | Meaning / When Present | TestID API | Disambiguators |
 | --- | --- | --- | --- | --- |
-| `ce-survey-decrypt-prompt` | `client/src/components/SurveyTool/SurveyTool.jsx` | Button that triggers prompt decrypt/reload when the prompt is masked (`[encrypted]`). | yes | `data-ce-question-id` |
-| `ce-survey-gated-prompt-notice` | `client/src/components/SurveyTool/SurveyTool.jsx` | Notice shown when a question prompt is gated/masked and must be decrypted before answering. | yes | `data-ce-question-id` |
-| `ce-survey-locked-banner` | `client/src/components/SurveyTool/SurveyTool.jsx` | Locked-questions banner shown when masked gated questions exist in full mode. | yes |  |
-| `ce-survey-locked-banner-caret` | `client/src/components/SurveyTool/SurveyTool.jsx` | Caret toggle at the bottom-right of the locked banner that expands/collapses gate/SBT requirements. | yes |  |
-| `ce-survey-locked-decrypt` | `client/src/components/SurveyTool/SurveyTool.jsx` | Locked-banner decrypt action button (manual gated prompt retry). | yes |  |
-| `ce-survey-answer-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.jsx`) | Textarea used for a freeform question answer. | yes | `data-ce-question-id` |
-| `ce-survey-submit` | `client/src/components/SurveyTool/SurveyTool.jsx` | Primary submit button (header, footer, or pile view). | yes |  |
-| `ce-survey-create-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Header create icon toggle (open/close CreateQuestionsAndSurveys panel). | yes |  |
-| `ce-survey-create-toggle-pile` | `client/src/components/SurveyTool/SurveyTool.jsx` | Pile view create icon toggle (open/close create interface). | yes |  |
-| `ce-survey-view-all` | `client/src/components/SurveyTool/SurveyTool.jsx` | Pile view "View All Questions" control. | yes |  |
-| `ce-survey-pile-hologram-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Reserved top-right pile-view hologram toggle for the future voice-only avatar mode. The test ID remains stable, but the button is currently hidden in the UI. | yes |  |
+| `ce-survey-decrypt-prompt` | `client/src/components/SurveyTool/SurveyTool.tsx` | Button that triggers prompt decrypt/reload when the prompt is masked (`[encrypted]`). | yes | `data-ce-question-id` |
+| `ce-survey-gated-prompt-notice` | `client/src/components/SurveyTool/SurveyTool.tsx` | Notice shown when a question prompt is gated/masked and must be decrypted before answering. | yes | `data-ce-question-id` |
+| `ce-survey-locked-banner` | `client/src/components/SurveyTool/SurveyTool.tsx` | Locked-questions banner shown when masked gated questions exist in full mode. | yes |  |
+| `ce-survey-locked-banner-caret` | `client/src/components/SurveyTool/SurveyTool.tsx` | Caret toggle at the bottom-right of the locked banner that expands/collapses gate/SBT requirements. | yes |  |
+| `ce-survey-locked-decrypt` | `client/src/components/SurveyTool/SurveyTool.tsx` | Locked-banner decrypt action button (manual gated prompt retry). | yes |  |
+| `ce-survey-answer-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.tsx`) | Textarea used for a freeform question answer. | yes | `data-ce-question-id` |
+| `ce-survey-submit` | `client/src/components/SurveyTool/SurveyTool.tsx` | Primary submit button (header, footer, or pile view). | yes |  |
+| `ce-survey-create-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Header create icon toggle (open/close CreateQuestionsAndSurveys panel). | yes |  |
+| `ce-survey-create-toggle-pile` | `client/src/components/SurveyTool/SurveyTool.tsx` | Pile view create icon toggle (open/close create interface). | yes |  |
+| `ce-survey-view-all` | `client/src/components/SurveyTool/SurveyTool.tsx` | Pile view "View All Questions" control. | yes |  |
+| `ce-survey-pile-hologram-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Reserved top-right pile-view hologram toggle for the future voice-only avatar mode. The test ID remains stable, but the button is currently hidden in the UI. | yes |  |
 | `ce-survey-pile-hologram-panel` | `client/src/components/SurveyTool/PileHologramAssistant.tsx` | Full-card light-blue hologram face takeover rendered while the pile hologram toggle is active. | yes |  |
-| `ce-survey-additional-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Toggle that opens/closes the "Additional comments" section for a question. | yes | `data-ce-question-id` |
-| `ce-survey-additional-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.jsx`) | Textarea used for additional comments. | yes | `data-ce-question-id` |
-| `ce-survey-existing-response-notice` | `client/src/components/SurveyTool/SurveyTool.jsx` | Wrapper shown when the connected wallet already has a submitted response (single-question mode or answer view). Contains Start Fresh / Decrypt-Edit / Exit Editing controls. | yes |  |
-| `ce-survey-submitted-indicator` | `client/src/components/SurveyTool/SurveyTool.jsx` | Submitted-state indicator shown after a successful submit (full + pile views) until any new edit is made. | yes |  |
-| `ce-survey-start-fresh` | `client/src/components/SurveyTool/SurveyTool.jsx` | Clears the current draft and lets the user submit a new response even when one already exists. | yes |  |
-| `ce-survey-decrypt-edit-all` | `client/src/components/SurveyTool/SurveyTool.jsx` | Decrypts all encrypted fields in the existing response and enters editing mode (when supported). | yes |  |
-| `ce-survey-exit-editing` | `client/src/components/SurveyTool/SurveyTool.jsx` | Exits editing mode and returns to viewing the existing submitted response. | yes |  |
-| `ce-survey-filter-toggle` | `client/src/components/SurveyTool/SurveyTool.jsx` | Opens/closes the QuestionFilter panel (header + pile action bar). | yes |  |
+| `ce-survey-additional-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Toggle that opens/closes the "Additional comments" section for a question. | yes | `data-ce-question-id` |
+| `ce-survey-additional-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.tsx`) | Textarea used for additional comments. | yes | `data-ce-question-id` |
+| `ce-survey-existing-response-notice` | `client/src/components/SurveyTool/SurveyTool.tsx` | Wrapper shown when the connected wallet already has a submitted response (single-question mode or answer view). Contains Start Fresh / Decrypt-Edit / Exit Editing controls. | yes |  |
+| `ce-survey-submitted-indicator` | `client/src/components/SurveyTool/SurveyTool.tsx` | Submitted-state indicator shown after a successful submit (full + pile views) until any new edit is made. | yes |  |
+| `ce-survey-start-fresh` | `client/src/components/SurveyTool/SurveyTool.tsx` | Clears the current draft and lets the user submit a new response even when one already exists. | yes |  |
+| `ce-survey-decrypt-edit-all` | `client/src/components/SurveyTool/SurveyTool.tsx` | Decrypts all encrypted fields in the existing response and enters editing mode (when supported). | yes |  |
+| `ce-survey-exit-editing` | `client/src/components/SurveyTool/SurveyTool.tsx` | Exits editing mode and returns to viewing the existing submitted response. | yes |  |
+| `ce-survey-filter-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Opens/closes the QuestionFilter panel (header + pile action bar). | yes |  |
 | `ce-question-filter-modal` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Root wrapper for the QuestionFilter panel (inline and modal variants). | yes |  |
 | `ce-question-filter-section-ai` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Collapsible section header for AI filter controls. | yes |  |
 | `ce-question-filter-section-sbt` | `client/src/components/SurveyTool/QuestionFilter.tsx` | Collapsible section header for SBT filter controls. | yes |  |
