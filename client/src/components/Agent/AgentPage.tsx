@@ -10,8 +10,23 @@ type AgentState = {
   account?: unknown;
 };
 
+type AgentContractAction = {
+  type?: unknown;
+};
+
+type AgentContractTool = {
+  name?: unknown;
+};
+
+type AgentContract = {
+  version?: unknown;
+  actions?: AgentContractAction[] | null;
+  tools?: AgentContractTool[] | null;
+};
+
 type CeAgent = {
   getState?: () => AgentState;
+  describe?: () => AgentContract | null;
   run?: (actions: AgentAction[]) => Promise<unknown>;
   perform?: (action: AgentAction) => Promise<unknown>;
 };
@@ -71,6 +86,7 @@ export default function AgentPage() {
     } catch (_) {
       return null;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent]);
   const actionLabels = Array.isArray(agentContract?.actions)
     ? agentContract.actions
