@@ -188,12 +188,14 @@ The graphic should visualize the dependency-led order:
 
 ### Post-SurveyTool Replication Plan
 
-If the `SurveyTool` decomposition lands cleanly, the same operating model should be reused for the remaining large shell/runtime surfaces instead of inventing a new agent workflow for each file.
+Historical note: this section captures the in-flight follow-on plan from when PRD 509 was still executing. The `.tsx` shell cleanup work described here is complete; any remaining decomposition follow-ups live in their own PRDs.
+
+Once the `SurveyTool` decomposition landed cleanly, the same operating model could be reused for the remaining large shell/runtime surfaces instead of inventing a new agent workflow for each file.
 
 Target follow-on surfaces:
 
 - `client/src/components/Sessions/SessionWizard.tsx`
-- `client/src/components/MainSite/MainSite.jsx`
+- `client/src/components/MainSite/MainSite.tsx`
 
 Execution principle:
 
@@ -204,7 +206,7 @@ Execution principle:
 ### Recommended Follow-On Order
 
 1. Completed: `SurveyTool` split stabilized and documented
-2. `MainSite.jsx -> MainSite.tsx` (remaining work in this PRD)
+2. Completed: `MainSite.jsx -> MainSite.tsx`
 3. Post-PRD: reuse the bounded extraction workflow for `SessionWizard` decomposition
 4. Post-PRD: reuse the bounded extraction workflow for `MainSite` runtime decomposition (PRD 449 — separate from the .tsx conversion in step 2)
 5. Cross-surface review of all splits
@@ -244,7 +246,7 @@ Suggested focus areas:
 
 ### Reusable Agent Prompt After SurveyTool
 
-Use this prompt once the `SurveyTool` process is complete and stable.
+Historical note: the prompt block below is preserved as a reference template from the in-flight phase of PRD 509. It is not active guidance now that the coordinated shell cleanup is complete.
 
 ```md
 We are continuing the large-shell decomposition workflow in:
@@ -254,7 +256,7 @@ We are continuing the large-shell decomposition workflow in:
 `SurveyTool` has already gone through a successful bounded decomposition pass. Reuse that exact working style for the next large surfaces:
 
 - `client/src/components/Sessions/SessionWizard.tsx`
-- `client/src/components/MainSite/MainSite.jsx`
+- `client/src/components/MainSite/MainSite.tsx`
 
 Read first:
 
