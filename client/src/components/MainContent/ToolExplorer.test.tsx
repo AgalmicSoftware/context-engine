@@ -20,7 +20,7 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
   getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
 }));
 
-jest.mock('../SurveyTool/SurveyTool.jsx', () => ({
+jest.mock('../SurveyTool/SurveyTool', () => ({
   __esModule: true,
   default: (props: any) => {
     mockSurveyTool(props);
