@@ -212,6 +212,9 @@ entry_index=0
 
 while IFS= read -r path; do
   [ -n "$path" ] || continue
+  if [ "$path" = "private-pack.manifest.json" ]; then
+    continue
+  fi
   rm -rf "$STAGING_ROOT/$path"
 done < "$MATCHED_PATHS_FILE"
 
