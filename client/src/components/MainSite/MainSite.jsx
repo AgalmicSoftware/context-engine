@@ -40,26 +40,16 @@ import {
 import { ethers } from 'ethers';
 import {
   CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
-  CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS,
-  CE_PROFILE_SCAN_REGISTRY_TIMEOUT_MS,
-  CE_PROFILE_SCAN_SBT_BURST_SIZE,
-  CE_PROFILE_SCAN_SBT_TIMEOUT_MS,
-  CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS,
-  CE_USER_PROFILE_SCAN_ALL_SESSIONS,
-  CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS,
-  CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS,
   DEFAULT_CHAIN_ID,
   DEFAULT_SESSION_SLUG,
   DEFAULT_SESSION_SLUG_ALIAS,
 } from '../../variables/appConfig.js';
 import { getChainById, getSessionRegistryChainIds } from '../../variables/chains.js';
 import {
-  fetchSessionFromRegistry,
   loadGroupRegistryCache,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
   sessionRegistryStore,
   sessionRegistryUtils,
-  upsertSessionRegistryCache,
 } from '../../utilities/web3/sessionRegistry.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import {
@@ -80,6 +70,7 @@ import {
   hasMaskedQuestionPayloadImproved,
 } from '../../utilities/session/sessionQuestionDecryption.js';
 import { createSessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
+import { createSessionProfileScanController } from '../../utilities/session/sessionProfileScanController.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
@@ -156,12 +147,6 @@ import {
   SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX,
 } from './cacheConstants.js';
 import {
-  emitProfileScanColdDiag as emitMainSiteProfileScanColdDiag,
-  emitProfileScanTelemetry as emitMainSiteProfileScanTelemetry,
-  isProfileScanColdDiagEnabled as isMainSiteProfileScanColdDiagEnabled,
-  isProfileScanTelemetryEnabled as isMainSiteProfileScanTelemetryEnabled,
-} from './debugTelemetry.js';
-import {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
@@ -226,7 +211,6 @@ import {
   SBT_PROGRESS_MIN_INTERVAL_MS,
   shouldClearQuestionProgressInFinalize,
   shouldCommitThrottledProgress,
-  shouldEnableSessionRegistryRefresh,
   shouldFlushCoalescedRun,
 } from './progressHelpers.js';
 
@@ -357,11 +341,22 @@ export class MainSite extends Component {
     getSessionTokenFromPath: (path) => this.getSessionTokenFromPath(path),
     isSbtListRoutePath: (path) => this.isSbtListRoutePath(path),
   });
+  _profileScanController = createSessionProfileScanController({
+    getActiveSessionSlug: () => this.getActiveSessionSlug(),
+    getSessionSlugFromState: () => this.getSessionSlugFromState(),
+    getSessionChainId: (slug) => this.getSessionChainId(slug),
+    getSessionCfg: (slug) => this.getSessionCfg(slug),
+    getSessionScanScopeContext: () => this.getSessionScanScopeContext(),
+    getScopedSessionSlugs: (scope) => this.getScopedSessionSlugs(scope),
+    isSessionSlugAllowedForScan: (slug, ctx) => this.isSessionSlugAllowedForScan(slug, ctx),
+    getScopeFilteredSlugs: (slugs, scope) => this.getScopeFilteredSlugs(slugs, scope),
+    getAccount: () => this.props.account,
+    getProvider: () => this.props.provider,
+    getNetworkId: () => Number(this.props?.network?.id || this.props?.network?.chainId || 0) || null,
+    isMounted: () => this._mounted !== false,
+    scanSpecificUserProfile: (address) => this.scanSpecificUserProfile(address),
+  });
   _scanSpecificUserProfileInFlight = new Map();
-  _profileScanListScopeSessionConfigCache = new Map();
-  _registryBootstrapPromise = null;
-  _registryBootstrapScopeKey = '';
-  _profileScanRetryAfterRegistry = new Set();
   _profileScanTelemetrySeq = 0;
   _cacheReinitRunSeq = 0;
   _activeCacheReinitRunToken = 0;
@@ -372,6 +367,26 @@ export class MainSite extends Component {
   _sessionFallbackRedirectPath = '';
   _lastProcessedQuestionIdFromPath = '';
   _lastProcessedQuestionSlugFromPath = null;
+
+  get _registryBootstrapPromise() {
+    return this._profileScanController?._registryBootstrapPromise ?? null;
+  }
+
+  set _registryBootstrapPromise(value) {
+    if (this._profileScanController) {
+      this._profileScanController._registryBootstrapPromise = value;
+    }
+  }
+
+  get _registryBootstrapScopeKey() {
+    return this._profileScanController?._registryBootstrapScopeKey || '';
+  }
+
+  set _registryBootstrapScopeKey(value) {
+    if (this._profileScanController) {
+      this._profileScanController._registryBootstrapScopeKey = value;
+    }
+  }
 
   beginSbtLiveProgress = (slugIn, initialPatch = {}) => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -1867,49 +1882,8 @@ export class MainSite extends Component {
   isSbtHistoryScanEnabled = () => this._scanPolicy.isSbtHistoryScanEnabled();
   getSessionScanScope = () => this._scanPolicy.getSessionScanScope();
   getSessionScanScopeContext = (scopeIn) => this._scanPolicy.getSessionScanScopeContext(scopeIn);
-
-  hasExplicitProfileScanScopeOverride = () => {
-    try {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location?.search || '');
-        if (params.has('ceSessionScanScope')) return true;
-      }
-    } catch (_) {}
-
-    try {
-      if (typeof localStorage !== 'undefined') {
-        if (
-          localStorage.getItem('ce:sessionScanScope') != null ||
-          localStorage.getItem('ce:selectedSessionScope') != null
-        ) {
-          return true;
-        }
-      }
-    } catch (_) {}
-
-    try {
-      if (typeof globalThis !== 'undefined' && typeof globalThis.CE_SESSION_SCAN_SCOPE !== 'undefined') {
-        return true;
-      }
-    } catch (_) {}
-
-    return false;
-  }
-
-  getProfileScanScopeContext = () => {
-    const scopeContext = this.getSessionScanScopeContext();
-    if (scopeContext.scope !== 'list') return scopeContext;
-    if (this.hasExplicitProfileScanScopeOverride()) return scopeContext;
-
-    // Keep the list-scope default for regular app scanning/UI, but do not let the
-    // baked-in default silently clamp profile deep scans that explicitly request
-    // all-session fanout through the profile-scan feature flags.
-    return {
-      ...scopeContext,
-      scope: 'active',
-      list: [],
-    };
-  }
+  hasExplicitProfileScanScopeOverride = (...args) => this._profileScanController.hasExplicitProfileScanScopeOverride(...args);
+  getProfileScanScopeContext = (...args) => this._profileScanController.getProfileScanScopeContext(...args);
 
   isSessionSlugAllowedForScan = (slugIn, scopeContextIn = null) => (
     this._scanPolicy.isSessionSlugAllowedForScan(slugIn, scopeContextIn)
@@ -1920,809 +1894,39 @@ export class MainSite extends Component {
   shouldAutoRunFullSbtScan = (opts) => this._scanPolicy.shouldAutoRunFullSbtScan(opts);
   shouldAttachSbtDetailInstanceListener = () => this._scanPolicy.shouldAttachSbtDetailInstanceListener();
   getScopedSessionSlugs = (scopeIn) => this._scanPolicy.getScopedSessionSlugs(scopeIn);
-
-  readBoolishRuntimeFlag = (raw, fallback = false) => {
-    if (typeof raw === 'boolean') return raw;
-    const val = (raw == null ? '' : String(raw)).trim().toLowerCase();
-    if (val === '1' || val === 'true' || val === 'yes' || val === 'on') return true;
-    if (val === '0' || val === 'false' || val === 'no' || val === 'off') return false;
-    return !!fallback;
-  }
-
-  isProfileScanTelemetryEnabled = isMainSiteProfileScanTelemetryEnabled
-
-  emitProfileScanTelemetry = emitMainSiteProfileScanTelemetry
-
-  isProfileScanColdDiagEnabled = isMainSiteProfileScanColdDiagEnabled
-
-  emitProfileScanColdDiag = emitMainSiteProfileScanColdDiag
-
-  readProfileScanStepTimeoutMs = (kind = 'sbt') => {
-    const normalizedKind = String(kind || '').trim().toLowerCase();
-    const defaultMs = normalizedKind === 'activity'
-      ? Number(CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS || 12000)
-      : Number(CE_PROFILE_SCAN_SBT_TIMEOUT_MS || 30000);
-    const runtimeKey = normalizedKind === 'activity'
-      ? 'CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS'
-      : 'CE_PROFILE_SCAN_SBT_TIMEOUT_MS';
-    try {
-      if (typeof globalThis !== 'undefined') {
-        if (typeof globalThis[runtimeKey] !== 'undefined') {
-          const n = Number(globalThis[runtimeKey]);
-          if (Number.isFinite(n) && n >= 5000) return Math.min(180000, Math.floor(n));
-        }
-        // Backward-compat fallback to legacy single timeout override.
-        if (typeof globalThis.CE_PROFILE_SCAN_SLUG_TIMEOUT_MS !== 'undefined') {
-          const n = Number(globalThis.CE_PROFILE_SCAN_SLUG_TIMEOUT_MS);
-          if (Number.isFinite(n) && n >= 5000) return Math.min(180000, Math.floor(n));
-        }
-      }
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    if (Number.isFinite(defaultMs) && defaultMs >= 5000) {
-      return Math.min(180000, Math.floor(defaultMs));
-    }
-    return normalizedKind === 'activity' ? 12000 : 30000;
-  }
-
-  readProfileScanSbtBurstSize = () => {
-    const fallback = Number(CE_PROFILE_SCAN_SBT_BURST_SIZE || 1);
-    try {
-      if (typeof globalThis !== 'undefined' && typeof globalThis.CE_PROFILE_SCAN_SBT_BURST_SIZE !== 'undefined') {
-        const n = Number(globalThis.CE_PROFILE_SCAN_SBT_BURST_SIZE);
-        if (Number.isFinite(n) && n >= 1) return Math.min(16, Math.floor(n));
-      }
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    if (Number.isFinite(fallback) && fallback >= 1) return Math.min(16, Math.floor(fallback));
-    return 1;
-  }
-
-  readProfileScanActivityLookbackBlocks = ({ useAllSessions = false } = {}) => {
-    const defaultLookback = useAllSessions ? 2500 : 0;
-    try {
-      if (typeof globalThis !== 'undefined' && typeof globalThis.CE_PROFILE_SCAN_ACTIVITY_LOOKBACK_BLOCKS !== 'undefined') {
-        const n = Number(globalThis.CE_PROFILE_SCAN_ACTIVITY_LOOKBACK_BLOCKS);
-        if (Number.isFinite(n) && n >= 0) return Math.min(200000, Math.floor(n));
-      }
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    return defaultLookback;
-  }
-
-  readUserProfileAllSessionsFlag = (runtimeKey, fallback = false) => {
-    try {
-      if (typeof globalThis !== 'undefined' && typeof globalThis[runtimeKey] !== 'undefined') {
-        return this.readBoolishRuntimeFlag(globalThis[runtimeKey], !!fallback);
-      }
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    return !!fallback;
-  }
-
-  getUserProfileAllSessionsScanMode = () => {
-    const hasLegacyRuntimeOverride = (() => {
-      try {
-        return (
-          typeof globalThis !== 'undefined' &&
-          typeof globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS !== 'undefined'
-        );
-      } catch (_) {
-        return false;
-      }
-    })();
-    const legacyAllSessions = this.readUserProfileAllSessionsFlag(
-      'CE_USER_PROFILE_SCAN_ALL_SESSIONS',
-      !!CE_USER_PROFILE_SCAN_ALL_SESSIONS
-    );
-    const useAllSessionsSbtScan = this.readUserProfileAllSessionsFlag(
-      'CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS',
-      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS
-    );
-    const useAllSessionsSurveyActivityScan = this.readUserProfileAllSessionsFlag(
-      'CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS',
-      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS
-    );
-    const useAllSessionsQuestionActivityScan = this.readUserProfileAllSessionsFlag(
-      'CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS',
-      hasLegacyRuntimeOverride ? legacyAllSessions : !!CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS
-    );
-    const useAllSessionsActivityScan = !!(
-      useAllSessionsSurveyActivityScan ||
-      useAllSessionsQuestionActivityScan
-    );
-    return {
-      legacyAllSessions,
-      useAllSessionsSbtScan,
-      useAllSessionsSurveyActivityScan,
-      useAllSessionsQuestionActivityScan,
-      useAllSessionsActivityScan,
-      useAllSessionsScan: !!(useAllSessionsSbtScan || useAllSessionsActivityScan),
-    };
-  }
-
-  isUserProfileAllSessionsScanEnabled = () => {
-    return this.getUserProfileAllSessionsScanMode().useAllSessionsScan;
-  }
-
-  getActiveProfileScanChainId = () => {
-    const activeSlug = this.getSessionSlugFromState();
-    const sessionChainId = Number(this.getSessionChainId(activeSlug) || 0) || 0;
-    if (sessionChainId > 0) return sessionChainId;
-    const explicitNetworkId = Number(this.props?.network?.id || this.props?.network?.chainId || 0) || 0;
-    if (explicitNetworkId > 0) return explicitNetworkId;
-    return null;
-  }
-
-  getRegistrySessionEntryCount = () => {
-    try {
-      const entries = sessionRegistryStore.getAllSessionEntries();
-      return Array.isArray(entries) ? entries.length : 0;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  getRegistrySessionCoverageCountForChain = (chainIdIn = null) => {
-    const activeChainId = Number(chainIdIn || 0) || 0;
-    try {
-      const entries = sessionRegistryStore.getAllSessionEntries();
-      if (!Array.isArray(entries) || entries.length === 0) return 0;
-      // Only count sessions with explicit chain IDs when an active chain is selected.
-      if (activeChainId <= 0) return entries.length;
-      let covered = 0;
-      entries.forEach((entry) => {
-        const cfg = Array.isArray(entry) ? entry[1] : entry;
-        const cfgChainId = Number(
-          cfg?.networkChainId ||
-          cfg?.contracts?.surveys?.chainId ||
-          cfg?.contracts?.sbtFactory?.chainId ||
-          0
-        ) || 0;
-        if (cfgChainId === activeChainId) {
-          covered += 1;
-        }
-      });
-      return covered;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  getRegistryBootstrapScopeKey = (chainIdsIn = null) => {
-    const ids = (Array.isArray(chainIdsIn) ? chainIdsIn : [])
-      .map((id) => Number(id))
-      .filter((id) => Number.isFinite(id) && id > 0)
-      .map((id) => Math.floor(id))
-      .sort((a, b) => a - b);
-    if (ids.length === 0) return 'all';
-    return ids.join(',');
-  }
-
-  readProfileScanRegistryLookupTimeoutMs = () => {
-    const fallback = 12000;
-    try {
-      if (typeof globalThis !== 'undefined' && typeof globalThis.CE_PROFILE_SCAN_REGISTRY_LOOKUP_TIMEOUT_MS !== 'undefined') {
-        const n = Number(globalThis.CE_PROFILE_SCAN_REGISTRY_LOOKUP_TIMEOUT_MS);
-        if (Number.isFinite(n) && n >= 2000) return Math.min(60000, Math.floor(n));
-      }
-    } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    return fallback;
-  }
-
-  getProfileScanListScopeSessionConfigCacheKey = (slugIn, chainIdIn = null) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    // Slug-only cache keys can leak stale config across network switches.
-    const chainId = Number(
-      chainIdIn != null
-        ? chainIdIn
-        : this.getActiveProfileScanChainId()
-    ) || 0;
-    return `${slug}|${chainId > 0 ? Math.floor(chainId) : 0}`;
-  }
-
-  resolveListScopeSessionConfigFromRegistry = async (slugIn, opts = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    if (!slug && slug !== '') return null;
-    const activeChainId = Number(this.getActiveProfileScanChainId() || 0) || 0;
-    const cacheKey = this.getProfileScanListScopeSessionConfigCacheKey(slug, activeChainId);
-
-    const cachedCfg = this._profileScanListScopeSessionConfigCache.get(cacheKey);
-    if (cachedCfg && typeof cachedCfg === 'object') return cachedCfg;
-
-    const existingCfg = this.getSessionCfg(slug);
-    const existingChainId = Number(this.getSessionChainId(slug) || 0) || 0;
-    if (existingCfg && typeof existingCfg === 'object' && existingChainId > 0) {
-      this._profileScanListScopeSessionConfigCache.set(cacheKey, existingCfg);
-      this._profileScanListScopeSessionConfigCache.set(
-        this.getProfileScanListScopeSessionConfigCacheKey(slug, existingChainId),
-        existingCfg
-      );
-      return existingCfg;
-    }
-
-    const orderedChainIds = Array.from(
-      new Set([
-        ...(activeChainId > 0 ? [activeChainId] : []),
-        ...(Number(DEFAULT_CHAIN_ID || 0) > 0 ? [Number(DEFAULT_CHAIN_ID)] : []),
-        ...getSessionRegistryChainIds().map((id) => Number(id)).filter((id) => id > 0),
-      ])
-    );
-    if (!orderedChainIds.length) return null;
-
-    const lookupTimeoutMs = this.readProfileScanRegistryLookupTimeoutMs();
-    const lit = getGlobalLitHooks();
-    const targetAddress = String(opts?.targetAddress || '').toLowerCase();
-    const attemptErrors = [];
-    const runWithTimeout = async (promiseFactory, chainId, bootstrapRpc) => {
-      let timeoutId = null;
-      try {
-        return await Promise.race([
-          Promise.resolve().then(() => promiseFactory()),
-          new Promise((_, reject) => {
-            timeoutId = setTimeout(() => {
-              const err = new Error(
-                `[MainSite] List-scope registry lookup timed out after ${lookupTimeoutMs}ms for slug "${slug}" on chain ${chainId}.`
-              );
-              err.code = 'REGISTRY_LOOKUP_TIMEOUT';
-              reject(err);
-            }, lookupTimeoutMs);
-          }),
-        ]);
-      } finally {
-        if (timeoutId != null) clearTimeout(timeoutId);
-      }
-    };
-
-    for (const registryChainId of orderedChainIds) {
-      for (const bootstrapRpc of [true, false]) {
-        try {
-          const config = await runWithTimeout(
-            () => fetchSessionFromRegistry({
-              chainId: registryChainId,
-              slug,
-              providerLike: this.props.provider,
-              account: this.props.account,
-              lit,
-              bootstrapRpc,
-            }),
-            registryChainId,
-            bootstrapRpc
-          );
-          if (!config || typeof config !== 'object') continue;
-          upsertSessionRegistryCache({ config });
-          const resolvedChainId = Number(
-            config?.networkChainId ||
-            config?.contracts?.surveys?.chainId ||
-            config?.contracts?.sbtFactory?.chainId ||
-            registryChainId ||
-            0
-          ) || null;
-          this._profileScanListScopeSessionConfigCache.set(cacheKey, config);
-          if (resolvedChainId && resolvedChainId > 0) {
-            this._profileScanListScopeSessionConfigCache.set(
-              this.getProfileScanListScopeSessionConfigCacheKey(slug, resolvedChainId),
-              config
-            );
-          }
-          this.emitProfileScanTelemetry('list-scope-chain-id-resolved', {
-            targetAddress: targetAddress || null,
-            slug,
-            chainId: resolvedChainId,
-            registryChainId,
-            bootstrapRpc,
-          });
-          return config;
-        } catch (err) {
-          attemptErrors.push({
-            chainId: registryChainId,
-            bootstrapRpc,
-            error: String(err?.message || err),
-          });
-        }
-      }
-    }
-
-    this.emitProfileScanTelemetry('list-scope-chain-id-unresolved', {
-      targetAddress: targetAddress || null,
-      slug,
-      attemptedChainIds: orderedChainIds,
-      attempts: attemptErrors.slice(0, 6),
-    });
-    return null;
-  }
-
-  ensureRegistryHydratedForProfileScan = async (opts = {}) => {
-    const activeChainId = this.getActiveProfileScanChainId();
-    const scopeContext = this.getProfileScanScopeContext();
-    const beforeCount = this.getRegistrySessionEntryCount();
-    // Do not treat warm cache presence as authoritative coverage for profile fanout.
-    // Partial/stale registry snapshots can contain one active-chain slug and still miss many sessions.
-    // Always attempt a bounded bootstrap pass to refresh authoritative slugs.
-
-    const chainIds = resolveSessionRegistryBootstrapChainIds({
-      scope: scopeContext.scope,
-      list: scopeContext.list,
-      activeChainId,
-      defaultChainId: DEFAULT_CHAIN_ID,
-      forceAllChains: !!opts?.forceAllChains,
-    });
-    const bootstrapScopeKey = this.getRegistryBootstrapScopeKey(chainIds);
-    let run = this._registryBootstrapPromise;
-    const hasScopeMismatch = !!(
-      run &&
-      this._registryBootstrapScopeKey &&
-      this._registryBootstrapScopeKey !== bootstrapScopeKey
-    );
-    if (hasScopeMismatch) {
-      this.emitProfileScanTelemetry('registry-bootstrap-scope-mismatch', {
-        expectedScope: bootstrapScopeKey,
-        inFlightScope: this._registryBootstrapScopeKey,
-        activeChainId: Number(activeChainId || 0) || null,
-      });
-      run = null;
-    }
-    if (!run) {
-      const lit = getGlobalLitHooks();
-      const startedRun = loadGroupRegistryCache({
-        chainIds,
-        account: this.props.account,
-        providerLike: this.props.provider,
-        lit,
-        force: true,
-        bootstrapRpc: true,
-      });
-      this._registryBootstrapPromise = startedRun;
-      this._registryBootstrapScopeKey = bootstrapScopeKey;
-      startedRun
-        .catch((err) => {
-          mainSiteLog.warn('[SessionRegistry] Profile scan registry preload failed:', err);
-        })
-        .finally(() => {
-          if (this._registryBootstrapPromise === startedRun) {
-            this._registryBootstrapPromise = null;
-            this._registryBootstrapScopeKey = '';
-          }
-        });
-      run = startedRun;
-    }
-
-    // Do not block forever; profile scan has retry flow. Keep this long enough to
-    // load authoritative registry slugs on large active-chain registries.
-    const timeoutMs = (() => {
-      const fallback = Number(CE_PROFILE_SCAN_REGISTRY_TIMEOUT_MS || 45000);
-      try {
-        if (typeof globalThis !== 'undefined' && typeof globalThis.CE_PROFILE_SCAN_REGISTRY_TIMEOUT_MS !== 'undefined') {
-          const n = Number(globalThis.CE_PROFILE_SCAN_REGISTRY_TIMEOUT_MS);
-          if (Number.isFinite(n) && n >= 5000) return Math.min(180000, Math.floor(n));
-        }
-      } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-      if (Number.isFinite(fallback) && fallback >= 5000) return Math.min(180000, Math.floor(fallback));
-      return 45000;
-    })();
-    let timedOut = false;
-    let loadMeta = null;
-    let loadError = null;
-    let timeoutId = null;
-    try {
-      await Promise.race([
-        Promise.resolve(run)
-          .then((result) => {
-            loadMeta = (result && typeof result === 'object' && result.__loadMeta)
-              ? result.__loadMeta
-              : null;
-            return result;
-          })
-          .catch((err) => {
-            loadError = err;
-            return null;
-          }),
-        new Promise((resolve) => {
-          timeoutId = setTimeout(() => {
-            timedOut = true;
-            resolve(null);
-          }, timeoutMs);
-        }),
-      ]);
-    } finally {
-      if (timeoutId != null) clearTimeout(timeoutId);
-    }
-    let afterCount = this.getRegistrySessionEntryCount();
-    let hadLoadErrors = !!(loadMeta && loadMeta.hadLoadErrors);
-    let alternateRpcAttempt = null;
-    const shouldRetryWithAlternateRpc = (
-      afterCount <= 0 &&
-      (timedOut || hadLoadErrors || !!loadError)
-    );
-    if (shouldRetryWithAlternateRpc) {
-      const lit = getGlobalLitHooks();
-      let retryTimedOut = false;
-      let retryLoadMeta = null;
-      let retryError = null;
-      let retryTimeoutId = null;
-      try {
-        await Promise.race([
-          Promise.resolve(
-            loadGroupRegistryCache({
-              chainIds,
-              account: this.props.account,
-              providerLike: this.props.provider,
-              lit,
-              force: true,
-              bootstrapRpc: false,
-            })
-          )
-            .then((result) => {
-              retryLoadMeta = (result && typeof result === 'object' && result.__loadMeta)
-                ? result.__loadMeta
-                : null;
-              return result;
-            })
-            .catch((err) => {
-              retryError = err;
-              return null;
-            }),
-          new Promise((resolve) => {
-            retryTimeoutId = setTimeout(() => {
-              retryTimedOut = true;
-              resolve(null);
-            }, timeoutMs);
-          }),
-        ]);
-      } finally {
-        if (retryTimeoutId != null) clearTimeout(retryTimeoutId);
-      }
-      const retryAfterCount = this.getRegistrySessionEntryCount();
-      const retryHadLoadErrors = !!(retryLoadMeta && retryLoadMeta.hadLoadErrors);
-      alternateRpcAttempt = {
-        attempted: true,
-        improved: retryAfterCount > afterCount,
-        timedOut: retryTimedOut,
-        hadLoadErrors: retryHadLoadErrors,
-        hadError: !!retryError,
-        afterCount: retryAfterCount,
-      };
-      if (retryAfterCount > afterCount) {
-        afterCount = retryAfterCount;
-        timedOut = retryTimedOut;
-        hadLoadErrors = retryHadLoadErrors;
-        loadMeta = retryLoadMeta || loadMeta;
-        loadError = retryError;
-      } else {
-        timedOut = timedOut || retryTimedOut;
-        hadLoadErrors = hadLoadErrors || retryHadLoadErrors || !!retryError;
-      }
-    }
-    let mergedLoadMeta = loadMeta && typeof loadMeta === 'object' ? { ...loadMeta } : null;
-    if (alternateRpcAttempt) {
-      mergedLoadMeta = {
-        ...(mergedLoadMeta || {}),
-        alternateRpcAttempt,
-      };
-    }
-    return {
-      hasEntries: afterCount > 0,
-      timedOut,
-      beforeCount,
-      afterCount,
-      hadLoadErrors,
-      loadMeta: mergedLoadMeta,
-    };
-  }
-
-  isOnchainSessionRegistryEnabled = () => shouldEnableSessionRegistryRefresh();
-
-  refreshSessionUniverseRegistryCache = async () => {
-    if (!this.isOnchainSessionRegistryEnabled()) return null;
-    const scopeContext = this.getProfileScanScopeContext();
-    const activeChainId = this.getActiveProfileScanChainId();
-    const chainIds = resolveSessionRegistryBootstrapChainIds({
-      scope: scopeContext.scope,
-      list: scopeContext.list,
-      activeChainId,
-      defaultChainId: DEFAULT_CHAIN_ID,
-    });
-    try {
-      const lit = getGlobalLitHooks();
-      return await loadGroupRegistryCache({
-        chainIds,
-        account: this.props.account,
-        providerLike: this.props.provider,
-        lit,
-        force: true,
-        bootstrapRpc: true,
-      });
-    } catch (err) {
-      mainSiteLog.warn('[SessionRegistry] Refresh cache load failed:', err);
-      return null;
-    }
-  }
-
-  resolveProfileDeepScanPlan = ({ registryStatus = null, useAllSessionsScan = null } = {}) => {
-    const activeChainId = this.getActiveProfileScanChainId();
-    const useAllSessions = typeof useAllSessionsScan === 'boolean'
-      ? useAllSessionsScan
-      : this.isUserProfileAllSessionsScanEnabled();
-    const scopeContext = this.getSessionScanScopeContext();
-    const listScopePrioritySlugs = scopeContext.scope === 'list'
-      ? getAllowedSessionSlugs('list', scopeContext.list, scopeContext.activeSlug)
-      : [];
-    const prioritizeSlugs = (slugs, opts = {}) => {
-      const normalized = Array.from(
-        new Set((Array.isArray(slugs) ? slugs : []).map((slug) => normalizeSessionSlug(slug || '')))
-      );
-      const activeSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
-      const hasGeneral = normalized.includes('');
-      const hasActive = normalized.includes(activeSlug);
-      const explicitPriority = Array.from(
-        new Set((Array.isArray(opts.prioritySlugs) ? opts.prioritySlugs : []).map((slug) => normalizeSessionSlug(slug || '')))
-      ).filter((slug) => normalized.includes(slug));
-      const ordered = [];
-      const push = (slug) => {
-        const normalizedSlug = normalizeSessionSlug(slug || '');
-        if (!normalized.includes(normalizedSlug)) return;
-        if (!ordered.includes(normalizedSlug)) ordered.push(normalizedSlug);
-      };
-
-      if (explicitPriority.length > 0) {
-        explicitPriority.forEach(push);
-        if (hasActive) push(activeSlug);
-        if (hasGeneral) push('');
-      } else {
-        if (hasActive) push(activeSlug);
-        if (hasGeneral) push('');
-      }
-      normalized.forEach(push);
-
-      return {
-        slugs: ordered,
-        relevantSlugs: hasActive ? [activeSlug] : [],
-        prioritizedGeneralFirst: ordered[0] === '',
-        scanOrdering: explicitPriority.length > 0
-          ? (useAllSessions ? 'scope-list-first-all' : 'scope-list-first-scoped')
-          : (useAllSessions ? 'active-first-general-early-all' : 'active-first-general-early-scoped'),
-      };
-    };
-    const dedupeNormalized = (slugs) => Array.from(
-      new Set(
-        (Array.isArray(slugs) ? slugs : []).map((slug) => normalizeSessionSlug(slug || ''))
-      )
-    );
-    if (useAllSessions) {
-      // In on-chain mode, profile deep scans should use authoritative registry slugs only.
-      // Do not silently fall back to legacy demo-session slugs when registry cache is empty.
-      const rawAll = dedupeNormalized(sessionRegistryStore.getAllSessionSlugs() || []);
-      const all = rawAll.filter((slug) => {
-        if (!activeChainId) return true;
-        const slugChainId = Number(this.getSessionChainId(slug) || 0) || 0;
-        if (!slugChainId) return false;
-        return slugChainId === activeChainId;
-      });
-      const scopedFallback = [];
-      const prioritized = prioritizeSlugs(
-        all.length > 0 ? all : scopedFallback,
-        { prioritySlugs: listScopePrioritySlugs }
-      );
-      const slugs = prioritized.slugs;
-      const registryEntryCount = Number(
-        registryStatus && Number.isFinite(Number(registryStatus.afterCount))
-          ? Number(registryStatus.afterCount)
-          : this.getRegistrySessionEntryCount()
-      ) || 0;
-      const hadLoadErrors = !!(registryStatus && registryStatus.hadLoadErrors);
-      const timedOut = !!(registryStatus && registryStatus.timedOut);
-      const hasRegistryEntries = (
-        registryEntryCount > 0 ||
-        !!(registryStatus && registryStatus.hasEntries === true)
-      );
-      const hasAnyActiveChainSlug = all.length > 0;
-      // When registry is healthy but has no sessions on the active chain,
-      // treat the scan as complete-and-empty instead of uncertain.
-      const noActiveChainSlugs =
-        Number(activeChainId || 0) > 0 &&
-        hasRegistryEntries &&
-        !timedOut &&
-        !hadLoadErrors &&
-        !hasAnyActiveChainSlug;
-      const coverageComplete = (
-        hasRegistryEntries &&
-        hasAnyActiveChainSlug &&
-        !hadLoadErrors &&
-        !timedOut
-      ) || noActiveChainSlugs;
-      let coverageReason = noActiveChainSlugs ? 'registry-no-active-chain-slugs' : 'registry-ready';
-      if (!coverageComplete) {
-        if (hadLoadErrors) {
-          coverageReason = 'registry-partial-errors';
-        } else if (timedOut) {
-          coverageReason = 'registry-timeout';
-        } else if (registryEntryCount <= 0) {
-          coverageReason = 'registry-empty';
-        } else if (all.length === 0) {
-          coverageReason = 'registry-no-active-chain-slugs';
-        }
-      }
-      return {
-        slugs,
-        usedAllSessions: true,
-        coverageComplete,
-        coverageReason,
-        registryEntryCount,
-        hadLoadErrors,
-        rawAllSlugCount: rawAll.length,
-        activeChainSlugCount: all.length,
-        scopedFallbackSlugCount: scopedFallback.length,
-        relevantSlugs: prioritized.relevantSlugs,
-        prioritizedGeneralFirst: prioritized.prioritizedGeneralFirst,
-        scanOrdering: prioritized.scanOrdering,
-      };
-    }
-    const prioritized = prioritizeSlugs(
-      dedupeNormalized(this.getScopedSessionSlugs(scopeContext.scope)),
-      { prioritySlugs: listScopePrioritySlugs }
-    );
-    return {
-      slugs: prioritized.slugs,
-      usedAllSessions: false,
-      coverageComplete: true,
-      coverageReason: 'scoped',
-      registryEntryCount: this.getRegistrySessionEntryCount(),
-      relevantSlugs: prioritized.relevantSlugs,
-      prioritizedGeneralFirst: prioritized.prioritizedGeneralFirst,
-      scanOrdering: prioritized.scanOrdering,
-    };
-  }
-
-  scheduleProfileScanRetryAfterRegistryHydration = (targetAddress, reason = '') => {
-    const target = String(targetAddress || '').trim();
-    if (!target || !ethers.utils.isAddress(target)) return;
-    const targetLower = target.toLowerCase();
-    if (this._profileScanRetryAfterRegistry.has(targetLower)) return;
-    const run = this._registryBootstrapPromise;
-    const waitForBootstrap = run
-      ? Promise.resolve(run).catch(() => null)
-      : Promise.resolve(null);
-    const waitForHydration = !!run;
-
-    this._profileScanRetryAfterRegistry.add(targetLower);
-    this.emitProfileScanTelemetry('retry-scheduled', {
-      targetAddress: targetLower,
-      reason: String(reason || ''),
-      waitForHydration,
-    });
-    if (!run) {
-      this.emitProfileScanTelemetry('retry-no-bootstrap-immediate', {
-        targetAddress: targetLower,
-        reason: String(reason || ''),
-      });
-    }
-
-    waitForBootstrap
-      .then(() => {
-        if (this._mounted === false) return;
-        this.emitProfileScanTelemetry('retry-fired', {
-          targetAddress: targetLower,
-          reason: String(reason || ''),
-          waitForHydration,
-        });
-        return this.scanSpecificUserProfile(target)
-          .then((scanReport) => {
-            if (!scanReport || typeof scanReport !== 'object') return;
-            try {
-              if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-                window.dispatchEvent(new CustomEvent(PROFILE_SCAN_REPORT_EVENT, {
-                  detail: {
-                    source: 'registry-retry',
-                    scanReport,
-                  },
-                }));
-              }
-            } catch (e) { mainSiteLog.warn('MainSite: telemetry', e); }
-          })
-          .catch((err) => {
-            this.emitProfileScanTelemetry('retry-failed', {
-              targetAddress: targetLower,
-              reason: String(reason || ''),
-              error: String(err?.message || err),
-            });
-            mainSiteLog.warn('[DeepSearch] Retry after registry hydration failed:', {
-              target: targetLower,
-              reason: String(reason || ''),
-              error: err?.message || String(err),
-            });
-          });
-      })
-      .finally(() => {
-        this._profileScanRetryAfterRegistry.delete(targetLower);
-      });
-  }
-
-  getProfileDeepScanSlugs = () => {
-    return this.resolveProfileDeepScanPlan().slugs;
-  }
+  readBoolishRuntimeFlag = (...args) => this._profileScanController.readBoolishRuntimeFlag(...args);
+  isProfileScanTelemetryEnabled = (...args) => this._profileScanController.isProfileScanTelemetryEnabled(...args);
+  emitProfileScanTelemetry = (...args) => this._profileScanController.emitProfileScanTelemetry(...args);
+  isProfileScanColdDiagEnabled = (...args) => this._profileScanController.isProfileScanColdDiagEnabled(...args);
+  emitProfileScanColdDiag = (...args) => this._profileScanController.emitProfileScanColdDiag(...args);
+  readProfileScanStepTimeoutMs = (...args) => this._profileScanController.readProfileScanStepTimeoutMs(...args);
+  readProfileScanSbtBurstSize = (...args) => this._profileScanController.readProfileScanSbtBurstSize(...args);
+  readProfileScanActivityLookbackBlocks = (...args) => this._profileScanController.readProfileScanActivityLookbackBlocks(...args);
+  readUserProfileAllSessionsFlag = (...args) => this._profileScanController.readUserProfileAllSessionsFlag(...args);
+  getUserProfileAllSessionsScanMode = (...args) => this._profileScanController.getUserProfileAllSessionsScanMode(...args);
+  isUserProfileAllSessionsScanEnabled = (...args) => this._profileScanController.isUserProfileAllSessionsScanEnabled(...args);
+  getActiveProfileScanChainId = (...args) => this._profileScanController.getActiveProfileScanChainId(...args);
+  getRegistrySessionEntryCount = (...args) => this._profileScanController.getRegistrySessionEntryCount(...args);
+  getRegistrySessionCoverageCountForChain = (...args) => this._profileScanController.getRegistrySessionCoverageCountForChain(...args);
+  getRegistryBootstrapScopeKey = (...args) => this._profileScanController.getRegistryBootstrapScopeKey(...args);
+  readProfileScanRegistryLookupTimeoutMs = (...args) => this._profileScanController.readProfileScanRegistryLookupTimeoutMs(...args);
+  getProfileScanListScopeSessionConfigCacheKey = (...args) => this._profileScanController.getProfileScanListScopeSessionConfigCacheKey(...args);
+  resolveListScopeSessionConfigFromRegistry = (...args) => this._profileScanController.resolveListScopeSessionConfigFromRegistry(...args);
+  ensureRegistryHydratedForProfileScan = (...args) => this._profileScanController.ensureRegistryHydratedForProfileScan(...args);
+  isOnchainSessionRegistryEnabled = (...args) => this._profileScanController.isOnchainSessionRegistryEnabled(...args);
+  refreshSessionUniverseRegistryCache = (...args) => this._profileScanController.refreshSessionUniverseRegistryCache(...args);
+  resolveProfileDeepScanPlan = (...args) => this._profileScanController.resolveProfileDeepScanPlan(...args);
+  scheduleProfileScanRetryAfterRegistryHydration = (...args) => this._profileScanController.scheduleProfileScanRetryAfterRegistryHydration(...args);
+  getProfileDeepScanSlugs = (...args) => this._profileScanController.getProfileDeepScanSlugs(...args);
 
   shouldSkipSessionScanForSlug = (slugIn, operation, scopeContextIn = null) => (
     this._scanPolicy.shouldSkipSessionScanForSlug(slugIn, operation, scopeContextIn)
   );
   scanScopeNoop = (slugIn, operation, onSkipped) => this._scanPolicy.scanScopeNoop(slugIn, operation, onSkipped);
   getScopeFilteredSlugs = (slugs = [], scopeIn = null) => this._scanPolicy.getScopeFilteredSlugs(slugs, scopeIn);
-
-  shouldBackfillGeneralSession = (slugIn, scopeContextIn = null) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    if (!slug) return false;
-    const scopeContext = scopeContextIn || this.getSessionScanScopeContext();
-    if (scopeContext.scope !== 'general') return false;
-    return this.isSessionSlugAllowedForScan('', scopeContext);
-  }
-
-  enqueueGeneralSessionBackfill = ({
-    operation = 'unknown',
-    activeSlug = '',
-    runGeneral,
-  } = {}) => {
-    if (typeof runGeneral !== 'function') return;
-
-    const opKey = String(operation || '').trim() || 'unknown';
-    const activeSlugNormalized = normalizeSessionSlug(activeSlug || '');
-    this._generalBackfillQueue = this._generalBackfillQueue || {};
-
-    const slot = this._generalBackfillQueue[opKey] && typeof this._generalBackfillQueue[opKey] === 'object'
-      ? this._generalBackfillQueue[opKey]
-      : {
-        inFlight: null,
-        pending: false,
-        runGeneral: null,
-        activeSlug: '',
-      };
-
-    slot.pending = true;
-    slot.runGeneral = runGeneral;
-    slot.activeSlug = activeSlugNormalized;
-    this._generalBackfillQueue[opKey] = slot;
-    if (slot.inFlight) return;
-
-    slot.inFlight = (async () => {
-      try {
-        while (slot.pending) {
-          if (this._mounted === false) break;
-          slot.pending = false;
-          const runGeneralNow = slot.runGeneral;
-          const activeSlugForRun = slot.activeSlug;
-          if (typeof runGeneralNow !== 'function') continue;
-          try {
-            await runGeneralNow('');
-          } catch (err) {
-            mainSiteLog.warn('[SessionScanScope] background general session backfill failed', {
-              operation: opKey,
-              activeSlug: activeSlugForRun,
-              error: err?.message || String(err),
-            });
-          }
-        }
-      } finally {
-        try {
-          delete this._generalBackfillQueue[opKey];
-        } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-      }
-    })();
-  }
-
-  runWithGeneralSessionBackfill = async ({
-    slugIn,
-    operation = 'unknown',
-    runPrimary,
-    runGeneral,
-  } = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    if (typeof runPrimary !== 'function') return undefined;
-    const primaryResult = await runPrimary(slug);
-    const scopeContext = this.getSessionScanScopeContext();
-    if (!this.shouldBackfillGeneralSession(slug, scopeContext)) return primaryResult;
-
-    const runGeneralFn = typeof runGeneral === 'function' ? runGeneral : runPrimary;
-    this.enqueueGeneralSessionBackfill({
-      operation,
-      activeSlug: slug,
-      runGeneral: runGeneralFn,
-    });
-    return primaryResult;
-  }
+  shouldBackfillGeneralSession = (...args) => this._profileScanController.shouldBackfillGeneralSession(...args);
+  enqueueGeneralSessionBackfill = (...args) => this._profileScanController.enqueueGeneralSessionBackfill(...args);
+  runWithGeneralSessionBackfill = (...args) => this._profileScanController.runWithGeneralSessionBackfill(...args);
 
   scanForSurveyGroup = async (surveyID, opts = {}) => {
     const sid = String(surveyID || '').toLowerCase();
@@ -4748,6 +3952,9 @@ export class MainSite extends Component {
     try {
       this._scanPolicy?.destroy?.();
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
+    try {
+      this._profileScanController.destroy();
+    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
     try {
       if (this._queuedSurveyGroupScanTimer) clearTimeout(this._queuedSurveyGroupScanTimer);
@@ -4793,13 +4000,6 @@ export class MainSite extends Component {
     this._questionInitPending = {};
     this._responseInitPending = {};
     this._sbtScanProgressMetaBySlug.clear();
-    if (this._generalBackfillQueue && typeof this._generalBackfillQueue === 'object') {
-      Object.values(this._generalBackfillQueue).forEach((slot) => {
-        if (!slot || typeof slot !== 'object') return;
-        slot.pending = false;
-      });
-    }
-    this._generalBackfillQueue = {};
     if (this._maskedQuestionDecryptBackoff instanceof Map) {
       this._maskedQuestionDecryptBackoff.clear();
     }
