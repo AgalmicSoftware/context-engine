@@ -110,6 +110,8 @@ function setupSourceRepo() {
     });
 
     writeFile(sourceDir, 'public.txt', 'public one\npublic two\n');
+    writeFile(sourceDir, 'private-pack.manifest.json', '{"generated":"local-only"}\n');
+    writeFile(sourceDir, path.join('.tmp-review', 'review-snapshot.js'), 'temp review snapshot\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'internal\n');
     commitAll(sourceDir, 'Mixed commit', {
       authorDate: '2025-01-04T05:06:07Z',
@@ -231,6 +233,8 @@ test('sync-public-history replays public commits, skips private-only commits, an
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
+    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
     const publicFile = git(sourceDir, ['show', 'release-staging:public.txt']);
     assert.equal(publicFile, 'public one\npublic two\n');
@@ -264,6 +268,8 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
+    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
   });
 });
 
@@ -328,6 +334,8 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
+    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
     const publicFile = git(sourceDir, ['show', 'origin/release-staging:public.txt']);
     assert.equal(publicFile, 'public one\npublic two\npublic three\n');

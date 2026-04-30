@@ -107,6 +107,7 @@ broadcast/
 
 # Local scratch
 /.tmp/
+/.tmp-review/
 /tmp/
 /tmp-launch-channel-chrome.js
 /node-compile-cache/
@@ -166,6 +167,7 @@ docs/outreach/
 
 # Public release staging artifact (output of `make release`)
 /release-public/
+/private-pack.manifest.json
 
 # Python bytecode (repo includes small workflow builders)
 __pycache__/

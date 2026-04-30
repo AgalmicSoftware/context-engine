@@ -65,12 +65,14 @@ Both workflows remove these paths from the public result:
 | `CLAUDE.md` | Maintainer AI instructions |
 | `.claude/`, `.codex/` | AI agent skills and settings |
 | `video-clickthrough-local/` | Durable local video workflow scripts and handoff notes |
+| `.tmp-review/` | Temporary review snapshots / scratch files |
 | `artifacts/` | Local test artifacts |
+| `private-pack.manifest.json` (tracked repo copy) | Generated strip inventory should not ship from the dev tree |
 | `Demo Integration Package/` | Raw source data |
 | `scripts/test-*.js`, `scripts/lib/e2e/` | E2E test layer |
 | `whitepaper/Slides.pdf`, `whitepaper/IdeasMap.md` | Internal whitepaper assets |
 
-A `private-pack.manifest.json` is generated in the output listing every stripped file with its SHA-256 checksum, so the strip can be verified or reversed.
+For the artifact workflow, a fresh `private-pack.manifest.json` is generated in the output listing every stripped file with its SHA-256 checksum, so the strip can be verified or reversed. Any tracked repo-root copy is stripped before publish.
 
 ## PII scan
 
