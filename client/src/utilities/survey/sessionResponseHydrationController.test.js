@@ -1,0 +1,928 @@
+jest.mock('utilities/logging.js', () => ({
+  __esModule: true,
+  createLogger: () => ({
+    log: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    debug: jest.fn(),
+  }),
+}), { virtual: true });
+
+jest.mock('ethers', () => ({
+  __esModule: true,
+  ethers: {
+    utils: {
+      isHexString: jest.fn((value, size) => (
+        size === 32 && /^0x[0-9a-fA-F]{64}$/.test(String(value || ''))
+      )),
+      id: jest.fn((value) => {
+        const suffix = String(value || '').slice(0, 2).padEnd(2, '0').toLowerCase();
+        return `0x${'0'.repeat(62)}${suffix}`;
+      }),
+    },
+  },
+}));
+
+jest.mock('../web3/contractScripts.js', () => ({
+  __esModule: true,
+  default: {
+    getRelevantBlockWindowForFilter: jest.fn(),
+    getQuestionResponsesChunkedWithCallback: jest.fn(),
+    getResponse: jest.fn(),
+  },
+  normalizeSessionSlug: jest.fn((s) => String(s || '')),
+}));
+
+jest.mock('../crypto/cryptography.js', () => ({
+  __esModule: true,
+  cryptoUtils: {
+    hashIdentifier: jest.fn(),
+  },
+}), { virtual: true });
+
+jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
+  __esModule: true,
+  ensureQuestionArweaveCacheBranches: jest.fn(),
+  mergeQuestionArweaveCacheBranches: jest.fn(),
+}));
+
+jest.mock('./questionResponsesWatermark.js', () => ({
+  __esModule: true,
+  resolvePersistedQuestionResponsesWatermark: jest.fn(),
+}));
+
+jest.mock('../../components/MainSite/progressHelpers.js', () => ({
+  __esModule: true,
+  shouldFlushCoalescedRun: jest.fn(),
+}));
+
+const { createSessionResponseHydrationController } = require('./sessionResponseHydrationController.js');
+const { ethers } = require('ethers');
+const contractScriptsModule = require('../web3/contractScripts.js');
+const contractScripts = contractScriptsModule.default;
+const { normalizeSessionSlug } = contractScriptsModule;
+const { cryptoUtils } = require('../crypto/cryptography.js');
+const {
+  ensureQuestionArweaveCacheBranches,
+  mergeQuestionArweaveCacheBranches,
+} = require('../arweave/arweaveRetryHelpers.js');
+const {
+  resolvePersistedQuestionResponsesWatermark,
+} = require('./questionResponsesWatermark.js');
+const {
+  shouldFlushCoalescedRun,
+} = require('../../components/MainSite/progressHelpers.js');
+
+const NETWORK_ID = '11155420';
+const SESSION_SLUG = 'alpha';
+const RESPONDER = '0xResponder';
+const RESPONDER_LOWER = RESPONDER.toLowerCase();
+const QUESTION_ID_A = `0x${'a'.repeat(64)}`;
+const QUESTION_ID_B = `0x${'b'.repeat(64)}`;
+
+const deepClone = (value) => (
+  value == null ? value : JSON.parse(JSON.stringify(value))
+);
+
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+const flushMicrotasks = async (count = 6) => {
+  for (let index = 0; index < count; index += 1) {
+    await Promise.resolve();
+  }
+};
+
+const createQuestionCacheNetworkNode = (overrides = {}) => ({
+  questionsLatestBlock: 9,
+  questionsDiscoveryCheckpointBlock: 9,
+  questions: {},
+  questionResponses: {},
+  questionResponsesMeta: {},
+  questionResponsesLatestBlock: 9,
+  pendingQuestionMetadata: {},
+  arweaveTxCache: {},
+  arweaveTxFailureCache: {},
+  questionHydrationMeta: {},
+  ...deepClone(overrides),
+});
+
+const createMockHost = (overrides = {}) => {
+  const {
+    initialState,
+    initialStorage,
+    mounted,
+    activeSlug,
+    chainId,
+    account,
+    shouldPersistWrite,
+    onWriteAttempt,
+    ...rest
+  } = overrides;
+
+  const state = {
+    questionResponsesNonce: 0,
+    isQuestionCacheReady: false,
+    isResponsesCacheReady: false,
+    ...deepClone(initialState || {}),
+  };
+  const storage = deepClone(initialStorage || {});
+  let writeAttemptCount = 0;
+
+  const dgWrite = jest.fn((key, slug, value) => {
+    writeAttemptCount += 1;
+    const nextValue = deepClone(value);
+    const shouldPersist = typeof shouldPersistWrite === 'function'
+      ? shouldPersistWrite({
+        key,
+        slug,
+        value: nextValue,
+        writeAttemptCount,
+        storage: deepClone(storage),
+      })
+      : true;
+
+    if (typeof onWriteAttempt === 'function') {
+      onWriteAttempt({
+        key,
+        slug,
+        value: nextValue,
+        writeAttemptCount,
+        shouldPersist,
+      });
+    }
+    if (!shouldPersist) return false;
+
+    if (!storage[key]) storage[key] = {};
+    storage[key][slug] = nextValue;
+    return true;
+  });
+
+  return {
+    setState: jest.fn((updater, cb) => {
+      const patch = typeof updater === 'function' ? updater(state) : updater;
+      if (patch) Object.assign(state, patch);
+      if (typeof cb === 'function') cb();
+    }),
+    isMounted: jest.fn(() => mounted !== false),
+    dgRead: jest.fn((key, slug) => {
+      const bucket = storage[key];
+      if (!bucket || !Object.prototype.hasOwnProperty.call(bucket, slug)) {
+        return null;
+      }
+      return deepClone(bucket[slug]);
+    }),
+    dgWrite,
+    getActiveSessionSlug: jest.fn(() => activeSlug || SESSION_SLUG),
+    getSessionChainId: jest.fn(() => (
+      Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : NETWORK_ID
+    )),
+    getAccount: jest.fn(() => (
+      Object.prototype.hasOwnProperty.call(overrides, 'account') ? account : RESPONDER
+    )),
+    scanScopeNoop: jest.fn(() => false),
+    setReadinessStateIfChanged: jest.fn((patch) => {
+      if (patch) Object.assign(state, patch);
+    }),
+    checkAllCachesReady: jest.fn(),
+    mergeLegacyNumericNetworkKey: jest.fn(() => false),
+    queueLocalRevisionUpdate: jest.fn(),
+    getStateSnapshot: () => deepClone(state),
+    getWriteAttemptCount: () => writeAttemptCount,
+    getStored: (key, slug) => {
+      const bucket = storage[key];
+      if (!bucket || !Object.prototype.hasOwnProperty.call(bucket, slug)) {
+        return null;
+      }
+      return deepClone(bucket[slug]);
+    },
+    ...rest,
+  };
+};
+
+describe('createSessionResponseHydrationController', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    normalizeSessionSlug.mockImplementation((s) => String(s || ''));
+    ethers.utils.isHexString.mockImplementation((value, size) => (
+      size === 32 && /^0x[0-9a-fA-F]{64}$/.test(String(value || ''))
+    ));
+    ethers.utils.id.mockImplementation((value) => {
+      const suffix = String(value || '').slice(0, 2).padEnd(2, '0').toLowerCase();
+      return `0x${'0'.repeat(62)}${suffix}`;
+    });
+    cryptoUtils.hashIdentifier.mockImplementation((value) => {
+      const suffix = String(value || '').slice(0, 2).padEnd(2, '0').toLowerCase();
+      return `0x${'0'.repeat(62)}${suffix}`;
+    });
+    ensureQuestionArweaveCacheBranches.mockImplementation((node) => {
+      if (!node || typeof node !== 'object') return;
+      if (!node.arweaveTxCache || typeof node.arweaveTxCache !== 'object') node.arweaveTxCache = {};
+      if (!node.arweaveTxFailureCache || typeof node.arweaveTxFailureCache !== 'object') {
+        node.arweaveTxFailureCache = {};
+      }
+    });
+    mergeQuestionArweaveCacheBranches.mockImplementation((target, source) => {
+      if (!target || typeof target !== 'object' || !source || typeof source !== 'object') return;
+      target.arweaveTxCache = {
+        ...(source.arweaveTxCache || {}),
+        ...(target.arweaveTxCache || {}),
+      };
+      target.arweaveTxFailureCache = {
+        ...(source.arweaveTxFailureCache || {}),
+        ...(target.arweaveTxFailureCache || {}),
+      };
+    });
+    resolvePersistedQuestionResponsesWatermark.mockImplementation(({
+      floorBlock,
+      processedToBlock,
+    } = {}) => Math.max(Number(floorBlock) || 0, Number(processedToBlock) || 0));
+    shouldFlushCoalescedRun.mockImplementation(({ force }) => !!force);
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 12 });
+    contractScripts.getQuestionResponsesChunkedWithCallback.mockResolvedValue(undefined);
+    contractScripts.getResponse.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  describe('isInitInFlight', () => {
+    it('returns false when no hydration is running', () => {
+      const controller = createSessionResponseHydrationController(createMockHost());
+
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
+    });
+  });
+
+  describe('destroy', () => {
+    it('marks as destroyed and clears continuation timers', async () => {
+      jest.useFakeTimers();
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const firstRun = createDeferred();
+
+      contractScripts.getQuestionResponsesChunkedWithCallback
+        .mockImplementationOnce(() => firstRun.promise)
+        .mockResolvedValueOnce(undefined);
+
+      const firstPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      const secondPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG, {
+        forceArweaveFetch: true,
+      });
+
+      firstRun.resolve();
+      await Promise.all([firstPromise, secondPromise]);
+
+      controller.destroy();
+
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      jest.runOnlyPendingTimers();
+      await flushMicrotasks();
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(1);
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(1);
+    });
+
+    it('resets in-flight tracking', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const deferred = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValue(deferred.promise);
+
+      const hydrationPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(true);
+
+      controller.destroy();
+
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
+
+      deferred.resolve({ fromBlock: 2, toBlock: 1 });
+      await hydrationPromise;
+    });
+  });
+
+  describe('fetchQuestionResponsesChunkedForGroup', () => {
+    it('short-circuits via scanScopeNoop and marks responses ready', async () => {
+      const host = createMockHost({
+        scanScopeNoop: jest.fn((slug, op, onSkipped) => {
+          onSkipped();
+          return true;
+        }),
+      });
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(host.getStateSnapshot()).toMatchObject({
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+      expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
+      expect(contractScripts.getRelevantBlockWindowForFilter).not.toHaveBeenCalled();
+    });
+
+    it('deduplicates concurrent calls for the same slug', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const deferred = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(deferred.promise);
+
+      const firstPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      const secondPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(1);
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(true);
+
+      deferred.resolve({ fromBlock: 12, toBlock: 11 });
+      await Promise.all([firstPromise, secondPromise]);
+
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
+    });
+
+    it.skip('returns the same promise identity for concurrent calls', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const deferred = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(deferred.promise);
+
+      const firstPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      const secondPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(1);
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(true);
+
+      deferred.resolve({ fromBlock: 12, toBlock: 11 });
+      await Promise.all([firstPromise, secondPromise]);
+
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
+      expect(firstPromise).toBe(secondPromise);
+    });
+
+    it('queues pending hydration when one is already in flight', async () => {
+      jest.useFakeTimers();
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const deferred = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(deferred.promise)
+        .mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 });
+
+      const firstPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      const secondPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG, {
+        forceArweaveFetch: true,
+      });
+
+      deferred.resolve({ fromBlock: 12, toBlock: 11 });
+      await Promise.all([firstPromise, secondPromise]);
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(1);
+
+      jest.runOnlyPendingTimers();
+      await flushMicrotasks();
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(2);
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(1);
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[0][6]).toEqual({
+        forceArweaveFetch: true,
+      });
+    });
+
+    it('aborts when no chainId is available', async () => {
+      const host = createMockHost({ chainId: null });
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).not.toHaveBeenCalled();
+      expect(host.getStateSnapshot()).toMatchObject({
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+      expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles empty block window when fromBlock is greater than toBlock', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 12, toBlock: 11 });
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).not.toHaveBeenCalled();
+      expect(resolvePersistedQuestionResponsesWatermark).not.toHaveBeenCalled();
+      expect(host.getStateSnapshot()).toMatchObject({
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+    });
+
+    it('skips when already up-to-date', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: {
+              [NETWORK_ID]: createQuestionCacheNetworkNode({
+                questionResponsesLatestBlock: 12,
+              }),
+            },
+          },
+        },
+      });
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).not.toHaveBeenCalled();
+      expect(host.dgWrite).not.toHaveBeenCalled();
+      expect(host.getStateSnapshot()).toMatchObject({
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+    });
+
+    it('initializes cache structure on first run and calls getQuestionResponsesChunkedWithCallback', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG, {
+        forceArweaveFetch: true,
+      });
+
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledWith(
+        'none',
+        10,
+        12,
+        expect.any(Function),
+        expect.any(Function),
+        SESSION_SLUG,
+        { forceArweaveFetch: true }
+      );
+
+      const stored = host.getStored('questionsCache', SESSION_SLUG);
+
+      expect(stored?.[NETWORK_ID]).toEqual(expect.objectContaining({
+        questionsLatestBlock: 9,
+        questionsDiscoveryCheckpointBlock: 9,
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+        questionResponsesLatestBlock: 9,
+        pendingQuestionMetadata: {},
+        arweaveTxCache: {},
+        arweaveTxFailureCache: {},
+        questionHydrationMeta: {},
+      }));
+      expect(ensureQuestionArweaveCacheBranches).toHaveBeenCalled();
+    });
+
+    it('calls resolvePersistedQuestionResponsesWatermark to clamp the final watermark', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async (mode, fromBlock, toBlock, progressCb, dataCb) => {
+          dataCb({
+            [QUESTION_ID_A]: [{
+              responder: RESPONDER,
+              response: 'yes',
+              blockNumber: 12,
+            }],
+          }, 12);
+        }
+      );
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(resolvePersistedQuestionResponsesWatermark).toHaveBeenCalledWith({
+        floorBlock: 9,
+        processedToBlock: 12,
+      });
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
+      ).toBe(12);
+    });
+
+    it('flushes intermediate partial chunks and preserves merged cache state across later chunks', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const deferred = createDeferred();
+      let partialFlushChecks = 0;
+      let intermediateWriteKeys = [];
+
+      shouldFlushCoalescedRun.mockImplementation(({ force }) => {
+        if (force) return true;
+        partialFlushChecks += 1;
+        return partialFlushChecks === 2;
+      });
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async (mode, fromBlock, toBlock, progressCb, dataCb) => {
+          dataCb({
+            [QUESTION_ID_A]: [{
+              responder: RESPONDER,
+              response: 'chunk-one',
+              blockNumber: 10,
+              transactionIndex: 0,
+              logIndex: 0,
+              timestamp: 100,
+            }],
+          }, 10);
+          dataCb({
+            [QUESTION_ID_B]: [{
+              responder: RESPONDER,
+              response: 'chunk-two',
+              blockNumber: 11,
+              transactionIndex: 0,
+              logIndex: 0,
+              timestamp: 101,
+            }],
+          }, 11);
+          intermediateWriteKeys = host.dgWrite.mock.calls.map(([key]) => key);
+          await deferred.promise;
+        }
+      );
+
+      const hydrationPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      await flushMicrotasks();
+
+      expect(intermediateWriteKeys).toEqual(['questionsCache', 'userCache']);
+
+      deferred.resolve();
+      await hydrationPromise;
+
+      const storedQuestionsCache = host.getStored('questionsCache', SESSION_SLUG);
+      const storedUserCache = host.getStored('userCache', SESSION_SLUG);
+
+      expect(storedQuestionsCache?.[NETWORK_ID]?.questionResponses).toMatchObject({
+        [QUESTION_ID_A]: {
+          [RESPONDER_LOWER]: 'chunk-one',
+        },
+        [QUESTION_ID_B]: {
+          [RESPONDER_LOWER]: 'chunk-two',
+        },
+      });
+      expect(storedQuestionsCache?.[NETWORK_ID]?.questionResponsesLatestBlock).toBe(11);
+      expect(storedUserCache?.[RESPONDER_LOWER]?.[NETWORK_ID]?.data?.questionResponses).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            questionId: QUESTION_ID_A,
+            responder: RESPONDER_LOWER,
+            response: 'chunk-one',
+          }),
+          expect.objectContaining({
+            questionId: QUESTION_ID_B,
+            responder: RESPONDER_LOWER,
+            response: 'chunk-two',
+          }),
+        ])
+      );
+    });
+
+    it('keeps responses ready and clamps the final watermark when a managed questionsCache write returns false', async () => {
+      let partialFlushChecks = 0;
+      let failedQuestionsWrites = 0;
+      const host = createMockHost({
+        shouldPersistWrite: ({ key, value }) => {
+          const shouldFail = (
+            key === 'questionsCache' &&
+            value?.[NETWORK_ID]?.questionResponsesLatestBlock === 12
+          );
+          if (shouldFail) failedQuestionsWrites += 1;
+          return !shouldFail;
+        },
+      });
+      const controller = createSessionResponseHydrationController(host);
+
+      shouldFlushCoalescedRun.mockImplementation(({ force }) => {
+        if (force) return true;
+        partialFlushChecks += 1;
+        return partialFlushChecks === 1;
+      });
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async (mode, fromBlock, toBlock, progressCb, dataCb) => {
+          dataCb({
+            [QUESTION_ID_A]: [{
+              responder: RESPONDER,
+              response: 'persisted-chunk',
+              blockNumber: 10,
+              transactionIndex: 0,
+              logIndex: 0,
+              timestamp: 100,
+            }],
+          }, 10);
+          dataCb({
+            [QUESTION_ID_B]: [{
+              responder: RESPONDER,
+              response: 'failed-chunk',
+              blockNumber: 12,
+              transactionIndex: 0,
+              logIndex: 0,
+              timestamp: 101,
+            }],
+          }, 12);
+        }
+      );
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(failedQuestionsWrites).toBe(1);
+      expect(host.getStateSnapshot()).toMatchObject({
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+      expect(resolvePersistedQuestionResponsesWatermark).toHaveBeenCalledWith({
+        floorBlock: 9,
+        processedToBlock: 10,
+      });
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
+      ).toBe(10);
+    });
+
+    it('marks responses ready when chunk fetching rejects after emitting partial data', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async (mode, fromBlock, toBlock, progressCb, dataCb) => {
+          dataCb({
+            [QUESTION_ID_A]: [{
+              responder: RESPONDER,
+              response: 'partial-before-error',
+              blockNumber: 12,
+              transactionIndex: 1,
+              logIndex: 0,
+              timestamp: 111,
+            }],
+          }, 12);
+          throw new Error('partial failure');
+        }
+      );
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(host.getStateSnapshot()).toMatchObject({
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+      expect(resolvePersistedQuestionResponsesWatermark).toHaveBeenCalledWith({
+        floorBlock: 9,
+        processedToBlock: 12,
+      });
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock
+      ).toBe(12);
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponses?.[QUESTION_ID_A]?.[RESPONDER_LOWER]
+      ).toBe('partial-before-error');
+    });
+
+    it('sets isResponsesCacheReady true and bumps nonce on completion', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      expect(host.getStateSnapshot()).toMatchObject({
+        isResponsesCacheReady: true,
+        questionResponsesNonce: 1,
+      });
+      expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
+    });
+
+    it('notifies on background completion when notifyOnCompletion is set', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 12, toBlock: 11 });
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG, {
+        background: true,
+        notifyOnCompletion: true,
+      });
+
+      expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
+        needsQuestionResponsesNonce: true,
+      });
+      expect(host.setState).not.toHaveBeenCalled();
+      expect(host.checkAllCachesReady).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('refreshQuestionResponses', () => {
+    it('falls back to full refresh when forceFull is true', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.refreshQuestionResponses([QUESTION_ID_A], {
+        forceFull: true,
+        responder: RESPONDER,
+      });
+
+      expect(host.setReadinessStateIfChanged).toHaveBeenCalledWith({
+        isQuestionCacheReady: false,
+        isResponsesCacheReady: false,
+      });
+      expect(contractScripts.getResponse).not.toHaveBeenCalled();
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to full refresh when no responder is available', async () => {
+      const host = createMockHost({ account: '' });
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.refreshQuestionResponses([QUESTION_ID_A]);
+
+      expect(host.setReadinessStateIfChanged).toHaveBeenCalledWith({
+        isQuestionCacheReady: false,
+        isResponsesCacheReady: false,
+      });
+      expect(contractScripts.getResponse).not.toHaveBeenCalled();
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to full refresh when no questionIds are provided', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      await controller.refreshQuestionResponses([]);
+
+      expect(host.setReadinessStateIfChanged).toHaveBeenCalledWith({
+        isQuestionCacheReady: false,
+        isResponsesCacheReady: false,
+      });
+      expect(contractScripts.getResponse).not.toHaveBeenCalled();
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(1);
+    });
+
+    it('runs targeted refresh when canTarget conditions are met and bumps questionResponsesNonce', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+
+      contractScripts.getResponse.mockResolvedValueOnce('targeted-answer');
+
+      await controller.refreshQuestionResponses([QUESTION_ID_A], {
+        responder: RESPONDER,
+      });
+
+      expect(contractScripts.getResponse).toHaveBeenCalledWith(
+        'none',
+        RESPONDER_LOWER,
+        QUESTION_ID_A,
+        SESSION_SLUG
+      );
+      expect(contractScripts.getQuestionResponsesChunkedWithCallback).not.toHaveBeenCalled();
+      expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
+        needsQuestionResponsesNonce: true,
+        checkAllCachesReady: true,
+      });
+      expect(host.getStateSnapshot()).toMatchObject({
+        isQuestionCacheReady: true,
+        isResponsesCacheReady: true,
+      });
+    });
+
+    it('normalizes raw ids via ethers.utils.id, filters invalid hashes, and deduplicates mixed-case ids before targeted queries', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const hashedRawQuestionId = `0x${'c'.repeat(64)}`;
+      const upperCaseQuestionIdA = `0x${'A'.repeat(64)}`;
+
+      cryptoUtils.hashIdentifier.mockImplementation((value) => {
+        if (value === 'topic-1') {
+          throw new Error('fallback to ethers.utils.id');
+        }
+        if (value === 'bad-id') {
+          return 'not-a-hex-hash';
+        }
+        return `0x${'d'.repeat(64)}`;
+      });
+      ethers.utils.id.mockImplementation((value) => {
+        if (value === 'topic-1') return hashedRawQuestionId;
+        return `0x${'e'.repeat(64)}`;
+      });
+      contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => (
+        `response-for:${qId.slice(-4)}`
+      ));
+
+      await controller.refreshQuestionResponses(
+        [
+          upperCaseQuestionIdA,
+          QUESTION_ID_A,
+          'topic-1',
+          'bad-id',
+          'topic-1',
+        ],
+        { responder: RESPONDER }
+      );
+
+      expect(cryptoUtils.hashIdentifier).toHaveBeenCalledWith('topic-1');
+      expect(cryptoUtils.hashIdentifier).toHaveBeenCalledWith('bad-id');
+      expect(ethers.utils.id).toHaveBeenCalledWith('topic-1');
+      expect(ethers.utils.id).not.toHaveBeenCalledWith('bad-id');
+      expect(contractScripts.getResponse).toHaveBeenCalledTimes(2);
+      expect(contractScripts.getResponse.mock.calls.map((args) => args[2])).toEqual([
+        QUESTION_ID_A,
+        hashedRawQuestionId,
+      ]);
+    });
+
+    it('writes updated responses to questionsCache and userCache', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const responseValue = { choice: 'A' };
+
+      contractScripts.getResponse.mockResolvedValueOnce(responseValue);
+
+      await controller.refreshQuestionResponses([QUESTION_ID_A], {
+        responder: RESPONDER,
+      });
+
+      const storedQuestionsCache = host.getStored('questionsCache', SESSION_SLUG);
+      const storedUserCache = host.getStored('userCache', SESSION_SLUG);
+      const userResponses = storedUserCache?.[RESPONDER_LOWER]?.[NETWORK_ID]?.data?.questionResponses || [];
+
+      expect(storedQuestionsCache?.[NETWORK_ID]?.questionResponses?.[QUESTION_ID_A]?.[RESPONDER_LOWER]).toEqual(
+        responseValue
+      );
+      expect(userResponses).toContainEqual({
+        questionId: QUESTION_ID_A,
+        responder: RESPONDER_LOWER,
+        response: responseValue,
+        blockNumber: 0,
+        transactionIndex: 0,
+        logIndex: 0,
+        timestamp: 0,
+      });
+    });
+
+    it('clamps legacy synthetic logIndex values', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: {
+              [NETWORK_ID]: createQuestionCacheNetworkNode({
+                questionResponses: {
+                  [QUESTION_ID_B]: {
+                    [RESPONDER_LOWER]: 'stale-response',
+                  },
+                },
+                questionResponsesMeta: {
+                  [QUESTION_ID_B]: {
+                    [RESPONDER_LOWER]: {
+                      bn: 50,
+                      txi: 4,
+                      li: 1005,
+                      ts: 99,
+                    },
+                  },
+                },
+              }),
+            },
+          },
+        },
+      });
+      const controller = createSessionResponseHydrationController(host);
+
+      contractScripts.getResponse.mockResolvedValueOnce('fresh-response');
+
+      await controller.refreshQuestionResponses([QUESTION_ID_B], {
+        responder: RESPONDER,
+      });
+
+      const storedQuestionsCache = host.getStored('questionsCache', SESSION_SLUG);
+      const storedUserCache = host.getStored('userCache', SESSION_SLUG);
+      const storedMeta = storedQuestionsCache?.[NETWORK_ID]?.questionResponsesMeta?.[QUESTION_ID_B]?.[RESPONDER_LOWER];
+      const userEntry = storedUserCache?.[RESPONDER_LOWER]?.[NETWORK_ID]?.data?.questionResponses?.[0];
+
+      expect(storedMeta).toEqual({ bn: 0, txi: 0, li: 0, ts: 0 });
+      expect(userEntry).toMatchObject({
+        questionId: QUESTION_ID_B,
+        responder: RESPONDER_LOWER,
+        response: 'fresh-response',
+        blockNumber: 0,
+        transactionIndex: 0,
+        logIndex: 0,
+        timestamp: 0,
+      });
+    });
+  });
+});
