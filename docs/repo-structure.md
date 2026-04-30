@@ -27,7 +27,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - Session page shell UI belongs under `client/src/components/OnePageSession/`; keep `OnePageSession.tsx` and its helper/test modules co-located there.
 - Demo-only route views belong under `client/src/components/DemoViews/`; keep reusable demo subareas grouped there instead of under generic catch-all names.
 - Session doc-library UI belongs under `client/src/components/DocumentLibrary/`; keep `SessionDocumentsPage.tsx` and `DocumentLibraryPanel.tsx` together there.
-- Rendered React component files use PascalCase filenames. Existing JavaScript components may stay `.jsx`; TypeScript migration slices should use `.tsx`.
+- Rendered React component files use PascalCase filenames and `.tsx` extensions. All production components are now TypeScript.
 - Component-specific styles are co-located as `<ComponentName>.module.scss`.
 - Component-specific tests are co-located beside the source component.
 - Preferred component test naming is `<ComponentName>.test.jsx` for JavaScript tests and `<ComponentName>.test.tsx` once the test itself is converted.
