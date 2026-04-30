@@ -9,6 +9,7 @@ import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
+import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame from './LockableFieldFrame';
 import BlockLimitsField from './BlockLimitsField';
 import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeaderField';
@@ -157,9 +158,7 @@ import {
   isSessionWizardDefaultWorkerPlaceholderUrl,
 } from './sessionWizardWorkerDefaults';
 import {
-  AI_PROVIDER_OPTIONS,
   DEFAULT_AI_MODELS,
-  getAiModelOptions,
   normalizeAiModelForProvider,
   normalizeAiModels,
   normalizeAiProvider,
@@ -2763,129 +2762,19 @@ const SessionWizard = ({
       gateLockProps: fieldGateLockProps,
     };
 
-    if (keyString === 'ai.models.transcription.provider') {
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <Input
-            type="select"
-            value={toStr(value).trim() || 'openai'}
-            onChange={(e) => updateDraftValue(currentPath, e.target.value)}
-          >
-            <option value="openai">OpenAI</option>
-            <option value="local" disabled>Local (coming soon)</option>
-          </Input>
-        </FormGroup>
-      );
-    }
-
-    if (keyString === 'ai.models.fast.provider' || keyString === 'ai.models.thinking.provider') {
-      const aiProviderModelType = keyString === 'ai.models.fast.provider' ? 'fast' : 'thinking';
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <Input
-            type="select"
-            value={normalizeAiProvider(value)}
-            onChange={(e) => {
-              const nextProvider = normalizeAiProvider(e.target.value, 'openai');
-              updateDraftValue(currentPath, nextProvider);
-              const currentModel = toStr(draft?.ai?.models?.[aiProviderModelType]?.model).trim();
-              const nextModel = normalizeAiModelForProvider(aiProviderModelType, nextProvider, currentModel);
-              if (nextModel !== currentModel) {
-                updateDraftValue(['ai', 'models', aiProviderModelType, 'model'], nextModel);
-              }
-            }}
-          >
-            {AI_PROVIDER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value} disabled={!!option.disabled}>{option.label}</option>
-            ))}
-          </Input>
-        </FormGroup>
-      );
-    }
-
-    const modelType =
-      keyString === 'ai.models.fast.model'
-        ? 'fast'
-        : keyString === 'ai.models.thinking.model'
-          ? 'thinking'
-          : keyString === 'ai.models.transcription.model'
-            ? 'transcription'
-            : null;
-    const providerMode = modelType
-      ? normalizeAiProvider(draft?.ai?.models?.[modelType]?.provider || 'openai')
-      : normalizeAiProvider(draft?.ai?.mode || 'openai');
-    const modelOptions =
-      modelType === 'transcription'
-        ? getAiModelOptions('transcription', 'openai')
-        : modelType
-          ? getAiModelOptions(modelType, providerMode)
-          : null;
-    if (modelOptions && modelOptions.length) {
-      const options = Array.from(new Set(modelOptions.filter(Boolean)));
-      const selectedModel = normalizeAiModelForProvider(modelType, providerMode, value);
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <Input
-            type="select"
-            value={selectedModel}
-            onChange={(e) => updateDraftValue(currentPath, e.target.value)}
-          >
-            {options.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </Input>
-        </FormGroup>
-      );
-    }
-
-    if (keyString === 'lit.defaultGateId' || keyString === 'lit.defaultGate') {
-      const activeGate = encryptionGates.find((gate) => gate.id === defaultGateId) || encryptionGates[0] || null;
-      const gateValue = activeGate?.id || '';
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <div className={styles.defaultGateControl}>
-            {activeGate && (
-              <span className={styles.gateColor} style={{ background: activeGate.color }} />
-            )}
-            <Input
-              type="select"
-              className={styles.defaultGateSelect}
-              value={gateValue}
-              onChange={(e) => setDefaultGateId(e.target.value)}
-              disabled={!encryptionGates.length}
-            >
-              {encryptionGates.map((gate) => (
-                <option key={gate.id} value={gate.id}>{gate.label || gate.id}</option>
-              ))}
-            </Input>
-          </div>
-        </FormGroup>
-      );
-    }
+    const aiOrGateSelect = renderAiOrGateSelect({
+      keyString,
+      value,
+      currentPath,
+      displayLabelText,
+      fieldTooltipControl,
+      onUpdateDraftValue: updateDraftValue,
+      draft,
+      encryptionGates,
+      defaultGateId,
+      onSetDefaultGateId: setDefaultGateId,
+    });
+    if (aiOrGateSelect) return aiOrGateSelect;
 
     if (keyString === 'defaultFeaturedSBTs') {
       const selections = normalizeSbtSelection(value);
