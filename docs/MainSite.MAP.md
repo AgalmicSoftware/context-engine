@@ -1,15 +1,16 @@
 # MainSite Map
 
 ## Quick Reference
-- File: `client/src/components/MainSite/MainSite.jsx`
+- File: `client/src/components/MainSite/MainSite.tsx`
 - About route lazy view: `client/src/components/About/AboutPage.tsx` (via `routeLazyComponents.js`)
 - Session wizard lazy view: `client/src/components/Sessions/SessionWizard.tsx` (via `routeLazyComponents.js`)
 - Session page lazy view: `client/src/components/OnePageSession/OnePageSession.tsx` (via `routeLazyComponents.js`)
 - Session docs lazy view: `client/src/components/DocumentLibrary/SessionDocumentsPage.tsx` (via `routeLazyComponents.js`)
 - Demo route lazy views: `client/src/components/DemoViews/DemosIndex.tsx`, `client/src/components/DemoViews/RiskMatrixDemo.tsx` (via `routeLazyComponents.js`)
 - Navbar account modal surface: `client/src/components/Account/LoginAndSettingsModal.tsx` (mounted by `client/src/components/Navbar/AccountSection.tsx`, outside the route-lazy map)
-- Current length: **6,274 lines** (down from 11,465)
-- Component type: **React class component** (`MainSite extends Component`)
+- Current length: **~6,296 lines** (down from 11,465)
+- Component type: **typed TSX React class component** (`MainSite extends Component`)
+- Type definitions: `client/src/components/MainSite/MainSiteTypes.ts`
 - Component count in file: **1 class component** (`MainSite`)
 - Method inventory: **~212 class members**
 - Summary: `MainSite` is the app shell and runtime orchestrator. It resolves active session/group context from URL + Redux, hydrates multi-cache state (SBT/surveys/questions/responses), drives profile deep scans and registry hydration, manages per-group listener lifecycles, coordinates Lit/session metadata refresh, and routes to lazy feature views while gating UI readiness via cache flags.
