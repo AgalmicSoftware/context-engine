@@ -12,6 +12,7 @@ CLAUDE.md
 .claude
 .codex
 video-clickthrough-local
+.tmp-review
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
@@ -22,6 +23,7 @@ scripts/build_external_llm_prompt.py
 .env.e2e*
 artifacts
 tests/artifacts
+private-pack.manifest.json
 Demo Integration Package
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
