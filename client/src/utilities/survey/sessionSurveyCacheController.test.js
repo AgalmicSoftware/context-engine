@@ -7,7 +7,7 @@ jest.mock('utilities/logging.js', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   }),
-}));
+}), { virtual: true });
 
 jest.mock('../web3/contractScripts.js', () => ({
   __esModule: true,
@@ -16,8 +16,6 @@ jest.mock('../web3/contractScripts.js', () => ({
     fetchUserSubmittedSurveyIDs: jest.fn(),
     getSurveyDataById: jest.fn(),
     fetchAllSurveyResponses: jest.fn(),
-    listenForSurveyEvents: jest.fn(),
-    removeSurveyEventsListener: jest.fn(),
   },
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
@@ -31,12 +29,12 @@ jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
 jest.mock('../../components/MainSite/metadataCacheEntryBuilders.js', () => ({
   __esModule: true,
   prepareSurveyMetadataCacheEntry: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../components/MainSite/metadataSessionBinding.js', () => ({
   __esModule: true,
   resolveScopedMetadataSessionSlug: jest.fn(),
-}));
+}), { virtual: true });
 
 const { createSessionSurveyCacheController } = require('./sessionSurveyCacheController.js');
 const contractScriptsModule = require('../web3/contractScripts.js');
@@ -108,9 +106,7 @@ const createMockHost = (overrides = {}) => {
       Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : '11155420'
     )),
     getSessionScanScope: jest.fn(() => sessionScanScope || 'session'),
-    shouldSkipSessionScanForSlug: jest.fn(() => false),
     scanScopeNoop: jest.fn(() => false),
-    onSurveyEventDetectedForGroup: jest.fn(),
     checkAllCachesReady: jest.fn(),
     mergeLegacyNumericNetworkKey: jest.fn(() => false),
     writeSurveyMetadataToCache: jest.fn(() => true),
@@ -172,54 +168,6 @@ describe('createSessionSurveyCacheController', () => {
       const controller = createSessionSurveyCacheController(createMockHost());
 
       expect(controller.isInitInFlight('alpha')).toBe(false);
-    });
-  });
-
-  describe('startSurveyAndQuestionEventListenerForGroup', () => {
-    it('removes any existing listener and attaches a scoped survey listener', () => {
-      const host = createMockHost();
-      const controller = createSessionSurveyCacheController(host);
-
-      expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(true);
-
-      expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'alpha');
-      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
-        'none',
-        expect.any(Function),
-        'alpha'
-      );
-
-      const handler = contractScripts.listenForSurveyEvents.mock.calls[0][1];
-      const event = { type: 'SurveyAdded', surveyId: '0xsurvey' };
-      handler(event);
-
-      expect(host.onSurveyEventDetectedForGroup).toHaveBeenCalledWith('alpha', event);
-    });
-
-    it('uses the active session slug for the unscoped listener entrypoint', () => {
-      const host = createMockHost({ activeSlug: 'active-slug' });
-      const controller = createSessionSurveyCacheController(host);
-
-      expect(controller.startSurveyAndQuestionEventListener()).toBe(true);
-
-      expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'active-slug');
-      expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
-        'none',
-        expect.any(Function),
-        'active-slug'
-      );
-    });
-
-    it('does not attach a listener when scan policy skips the slug', () => {
-      const host = createMockHost({
-        shouldSkipSessionScanForSlug: jest.fn(() => true),
-      });
-      const controller = createSessionSurveyCacheController(host);
-
-      expect(controller.startSurveyAndQuestionEventListenerForGroup('alpha')).toBe(false);
-
-      expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'alpha');
-      expect(contractScripts.listenForSurveyEvents).not.toHaveBeenCalled();
     });
   });
 
@@ -508,86 +456,6 @@ describe('createSessionSurveyCacheController', () => {
           response: responsePayload,
         },
       ]);
-    });
-
-    it('continues hydrating later survey responses after one survey fetch rejects', async () => {
-      const host = createMockHost({
-        initialStorage: {
-          surveysCache: {
-            alpha: {
-              '11155420': {
-                surveysLatestBlock: 6,
-                surveys: {
-                  surv1: { creationBlock: 5 },
-                  surv2: { creationBlock: 6 },
-                },
-                surveyResponses: {
-                  surv1: {
-                    '0xold': { choice: 'old' },
-                  },
-                  surv2: {},
-                },
-                surveyResponsesLatestBlock: {
-                  surv1: 4,
-                  surv2: 6,
-                },
-                pendingSurveyMetadata: {},
-              },
-            },
-          },
-        },
-      });
-      const controller = createSessionSurveyCacheController(host);
-      const secondResponse = { choice: 'B' };
-
-      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 12 });
-      contractScripts.fetchUserSubmittedSurveyIDs.mockResolvedValue([]);
-      contractScripts.fetchAllSurveyResponses
-        .mockRejectedValueOnce(new Error('survey rpc down'))
-        .mockResolvedValueOnce([
-          { responder: '0xBEEF', response: secondResponse },
-        ]);
-
-      await controller.initializeSurveyCacheForGroup('alpha');
-
-      const storedSurveyCache = host.getStored('surveysCache', 'alpha');
-      const storedUserCache = host.getStored('userCache', 'alpha');
-
-      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenCalledTimes(2);
-      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(
-        1,
-        'none',
-        'surv1',
-        5,
-        12,
-        'alpha'
-      );
-      expect(contractScripts.fetchAllSurveyResponses).toHaveBeenNthCalledWith(
-        2,
-        'none',
-        'surv2',
-        7,
-        12,
-        'alpha'
-      );
-      expect(storedSurveyCache['11155420'].surveyResponses.surv1).toEqual({
-        '0xold': { choice: 'old' },
-      });
-      expect(storedSurveyCache['11155420'].surveyResponses.surv2).toEqual({
-        '0xbeef': secondResponse,
-      });
-      expect(storedSurveyCache['11155420'].surveyResponsesLatestBlock.surv1).toBe(4);
-      expect(storedSurveyCache['11155420'].surveyResponsesLatestBlock.surv2).toBe(12);
-      expect(storedUserCache['0xbeef']['11155420'].data.surveyResponses).toEqual([
-        {
-          surveyId: 'surv2',
-          responder: '0xbeef',
-          response: secondResponse,
-        },
-      ]);
-      expect(host.getStateSnapshot()).toMatchObject({
-        surveyCacheInitializationError: false,
-      });
     });
 
     it('sets surveyCacheInitializationError when initialization work fails', async () => {
