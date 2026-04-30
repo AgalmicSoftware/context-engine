@@ -7,15 +7,13 @@
 
 ### Summary
 
-The repo is down to three production `.jsx` surfaces still in the final shell-cleanup lane:
+The repo is down to one production `.jsx` surface still in the final shell-cleanup lane:
 
-- `client/src/components/MainSite/MainSite.jsx` (`12955` lines)
-- `client/src/components/SurveyTool/SurveyTool.jsx` (`15984` lines)
-- `client/src/components/SurveyTool/DeferredCommitSlider.jsx` (`102` lines)
+- `client/src/components/MainSite/MainSite.jsx` (`12265` lines)
 
-`SessionWizard` has already crossed to `.tsx`, but the remaining risk is still concentrated in a few large, stateful controller-shell surfaces plus one adjacent JSX leaf. These files should not be converted as isolated rename-only slices. They now need one coordinated cleanup plan that stabilizes shared contracts first, then converts the remaining JSX surfaces in dependency order.
+`DeferredCommitSlider`, `SessionWizard`, and `SurveyTool` have already crossed to `.tsx`, but the remaining risk is still concentrated in one large, stateful controller-shell surface. This file should not be converted as an isolated rename-only slice. It now needs one coordinated cleanup plan that stabilizes shared contracts first, then converts the remaining JSX surface in dependency order.
 
-Current production component count before this PRD lands: `110 TSX / 3 JSX`.
+Current production component count before this PRD lands: `134 TSX / 1 JSX`.
 
 ### Why A Coordinated Pass Is Needed
 
@@ -38,7 +36,7 @@ That pattern means one-file-at-a-time conversion now creates repeated churn in s
 
 ### Goals
 
-- Convert the last three production `.jsx` files to `.tsx`
+- Convert the last remaining production `.jsx` file to `.tsx`
 - Avoid behavioral regressions, route changes, and UI redesign
 - Preserve runtime exports, lazy imports, tests, and existing caches
 - Minimize repeated local `any` islands by stabilizing shared shell contracts first
@@ -66,11 +64,11 @@ Create or normalize coarse shared types close to the remaining shells and their 
 
 Keep these types honest and coarse. Favor `Record<string, any>` over overfit domain modeling where behavior is already stable but shapes vary.
 
-#### Phase 1: Convert `DeferredCommitSlider` First
+#### Phase 1: Convert `DeferredCommitSlider` First (completed)
 
-`DeferredCommitSlider` is the safest remaining leaf and sits directly beside `SurveyTool`. Converting it first removes one JSX holdout without disturbing the larger route shells and gives the `SurveyTool` pass a slightly smaller local surface.
+`DeferredCommitSlider` was the safest adjacent leaf beside `SurveyTool`, and that conversion has already landed. It no longer counts as a remaining JSX holdout.
 
-#### Phase 2: Convert `SurveyTool`
+#### Phase 2: Convert `SurveyTool` (completed)
 
 The earlier `SessionWizard` migration exposed the broad type pressure that still exists around the remaining shells:
 
@@ -80,7 +78,7 @@ The earlier `SessionWizard` migration exposed the broad type pressure that still
 - contract viewer wiring
 - deploy helper callback choreography
 
-That lesson still matters here: convert `SurveyTool.jsx` while reusing the stabilized shell contracts and extracting any remaining non-UI helpers into adjacent utility modules where that reduces shell surface area.
+That lesson still matters here: `SurveyTool.jsx` has now been converted to `SurveyTool.tsx` while reusing the stabilized shell contracts and extracting any remaining non-UI helpers into adjacent utility modules where that reduces shell surface area.
 
 Focus areas:
 
@@ -93,15 +91,15 @@ Focus areas:
 
 `MainSite` should remain the final shell in this lane because it is the broadest route coordinator and lazy-import owner. By the time it is converted:
 
-- `SurveyTool` and `DeferredCommitSlider` imports should already be `.tsx`
+- `SurveyTool.tsx` and `DeferredCommitSlider.tsx` imports should already be in place
 - route lazy helpers should already reference the final typed surfaces
 - shell-wide helper contracts should already be settled
 
 ### Proposed Order
 
 1. Shared shell contracts and helper extraction
-2. `DeferredCommitSlider.jsx -> DeferredCommitSlider.tsx`
-3. `SurveyTool.jsx -> SurveyTool.tsx`
+2. Completed: `DeferredCommitSlider.jsx -> DeferredCommitSlider.tsx`
+3. Completed: `SurveyTool.jsx -> SurveyTool.tsx`
 4. `MainSite.jsx -> MainSite.tsx`
 
 ### File Organization Rules
@@ -146,15 +144,16 @@ Each phase should keep focused verification narrow and explicit.
 Use separate commits:
 
 1. shared shell contract prep
-2. `DeferredCommitSlider` conversion
-3. `SurveyTool` conversion
+2. Completed: `DeferredCommitSlider` conversion
+3. Completed: `SurveyTool` conversion
 4. `MainSite` conversion
 5. any final route-import cleanup if needed
 
 ### Done Criteria
 
-- All three remaining production JSX files are `.tsx`
-- `client/src/components` reaches `113 TSX / 0 JSX`
+- The last remaining production JSX file (`MainSite.jsx`) is `.tsx`
+- `client/src/components` reaches `135 TSX / 0 JSX`
+- Current state: `134 TSX / 1 JSX`
 - No `@ts-nocheck` added
 - Focused TypeScript lanes are clean for each shell phase
 - Focused Jest rings pass for each shell phase
@@ -194,7 +193,7 @@ If the `SurveyTool` decomposition lands cleanly, the same operating model should
 
 Target follow-on surfaces:
 
-- `client/src/components/Sessions/SessionWizard.jsx`
+- `client/src/components/Sessions/SessionWizard.tsx`
 - `client/src/components/MainSite/MainSite.jsx`
 
 Execution principle:
@@ -205,11 +204,12 @@ Execution principle:
 
 ### Recommended Follow-On Order
 
-1. Finish and stabilize `SurveyTool`
-2. Reuse the same bounded extraction workflow for `SessionWizard`
-3. Reuse the same bounded extraction workflow for `MainSite`
-4. Perform a cross-surface review of all three splits
-5. Run a browser-driven regression sweep across the site with an authenticated session
+1. Completed: `SurveyTool` split stabilized and documented
+2. `MainSite.jsx -> MainSite.tsx` (remaining work in this PRD)
+3. Post-PRD: reuse the bounded extraction workflow for `SessionWizard` decomposition
+4. Post-PRD: reuse the bounded extraction workflow for `MainSite` runtime decomposition (PRD 449 — separate from the .tsx conversion in step 2)
+5. Cross-surface review of all splits
+6. Browser-driven regression sweep
 
 ### Cross-Surface Review Goals
 
@@ -254,7 +254,7 @@ We are continuing the large-shell decomposition workflow in:
 
 `SurveyTool` has already gone through a successful bounded decomposition pass. Reuse that exact working style for the next large surfaces:
 
-- `client/src/components/Sessions/SessionWizard.jsx`
+- `client/src/components/Sessions/SessionWizard.tsx`
 - `client/src/components/MainSite/MainSite.jsx`
 
 Read first:
