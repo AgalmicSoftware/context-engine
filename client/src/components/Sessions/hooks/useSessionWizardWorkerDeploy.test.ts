@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { cryptoUtils } from '../../../utilities/crypto/cryptography.js';
 import { INVALID_SESSION_SLUG_FORMAT_ERROR } from '../sessionWizardSlugValidation';
-import useSessionWizardWorkerDeploy, { type SessionWizardWorkerDeployRuntime } from './useSessionWizardWorkerDeploy';
+import useSessionWizardWorkerDeploy from './useSessionWizardWorkerDeploy';
 
 jest.mock('../../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
@@ -15,7 +15,7 @@ const buildHookOptions = () => ({
       current: {
         draft: {},
         deployForm: {},
-      } as SessionWizardWorkerDeployRuntime,
+      },
     },
     resolvedWalletAccountRef: {
       current: '',
@@ -132,54 +132,5 @@ describe('useSessionWizardWorkerDeploy', () => {
     }));
     expect(options.signTypedAdminAction).not.toHaveBeenCalled();
     expect(cryptoUtils._getProvider).not.toHaveBeenCalled();
-  });
-
-  it('skips a concurrent worker deploy while the first deploy is still resolving', async () => {
-    let resolveAccounts: ((accounts: string[]) => void) | undefined;
-    const providerRequest = jest.fn(() => new Promise<string[]>((resolve) => {
-      resolveAccounts = resolve;
-    }));
-    (cryptoUtils._getProvider as jest.Mock).mockReturnValue({
-      request: providerRequest,
-    });
-    const options = buildHookOptions();
-    options.refs.runtimeRef.current = {
-      ...options.refs.runtimeRef.current,
-      draft: {
-        slug: 'launch-week',
-      },
-      deployForm: {},
-      loginComplete: true,
-    };
-    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
-    let firstDeploy: Promise<unknown> | undefined;
-    let secondDeployResult;
-
-    await act(async () => {
-      firstDeploy = result.current.handleDeployWorker();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      secondDeployResult = await result.current.handleDeployWorker();
-    });
-
-    expect(secondDeployResult).toEqual({
-      ok: false,
-      skipped: true,
-      error: 'Worker deploy already in progress.',
-    });
-    expect(providerRequest).toHaveBeenCalledTimes(1);
-    expect(options.updateDeploymentState).toHaveBeenCalledWith({
-      deployStatus: 'Worker deploy already in progress.',
-    });
-
-    await act(async () => {
-      resolveAccounts?.([]);
-      await firstDeploy;
-    });
-
-    expect(options.updateDeploymentState).toHaveBeenCalledWith({
-      deployInFlight: false,
-    });
   });
 });
