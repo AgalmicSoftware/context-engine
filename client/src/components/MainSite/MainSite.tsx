@@ -434,12 +434,12 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   _activeCacheReinitRunToken = 0;
   _sessionRouteLightDiscoveryInFlight: AnyRecord = {};
   _mounted = false;
-  _pendingSessionPathIdResolves: Record<string, any> = {} as any;
+  _pendingSessionPathIdResolves = new Set<any>();
   _sessionPathIdResolveAttempts: Record<string, any> = {};
   _sessionPathResolveErrorCounts: Record<string, any> = {};
   _sessionPathResolveLastErrors: Record<string, any> = {};
   _sessionPathResolveRetryTimers: Record<string, any> = {};
-  _pendingSessionPathSlugResolves: Record<string, any> = {} as any;
+  _pendingSessionPathSlugResolves = new Set<any>();
   _sessionPathSlugResolveAttempts: Record<string, any> = {};
   _sessionMetaAttempts: Record<string, any> = {};
   _lastSessionInfoAttempt = '';
