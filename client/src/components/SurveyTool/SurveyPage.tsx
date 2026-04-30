@@ -11,7 +11,7 @@ type SurveyPageProps = {
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
   sessionConfig?: unknown;
-  minifiedMode?: unknown;
+  minifiedMode?: string;
   [key: string]: any;
 };
 
