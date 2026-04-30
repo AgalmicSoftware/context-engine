@@ -1,19 +1,19 @@
 ## PRD 509: Coordinated Shell Cleanup For Remaining JSX Shells
 
 **Priority:** High
-**Status:** Active
+**Status:** Done
 **Category:** TypeScript migration / shell decomposition
 **Created:** 2026-04-23
 
 ### Summary
 
-The repo is down to one production `.jsx` surface still in the final shell-cleanup lane:
+The repo has completed the final production `.jsx` shell cleanup lane:
 
-- `client/src/components/MainSite/MainSite.jsx` (`12265` lines)
+- `client/src/components/MainSite/MainSite.tsx` (`~6294` lines)
 
-`DeferredCommitSlider`, `SessionWizard`, and `SurveyTool` have already crossed to `.tsx`, but the remaining risk is still concentrated in one large, stateful controller-shell surface. This file should not be converted as an isolated rename-only slice. It now needs one coordinated cleanup plan that stabilizes shared contracts first, then converts the remaining JSX surface in dependency order.
+`DeferredCommitSlider`, `SessionWizard`, and `SurveyTool` had already crossed to `.tsx`, and the remaining risk stayed concentrated in one large, stateful controller-shell surface. This coordinated pass stabilized the shared contracts first, then converted the remaining JSX surface in dependency order.
 
-Current production component count before this PRD lands: `134 TSX / 1 JSX`.
+Current production component count: `135 TSX / 0 JSX`.
 
 ### Why A Coordinated Pass Is Needed
 
@@ -87,9 +87,9 @@ Focus areas:
 - session scope resolution
 - UI-state helper extraction where already latent in the file
 
-#### Phase 3: Convert `MainSite` Last
+#### Phase 3: Convert `MainSite` Last (completed)
 
-`MainSite` should remain the final shell in this lane because it is the broadest route coordinator and lazy-import owner. By the time it is converted:
+`MainSite` remained the final shell in this lane because it is the broadest route coordinator and lazy-import owner. The conversion is now complete:
 
 - `SurveyTool.tsx` and `DeferredCommitSlider.tsx` imports should already be in place
 - route lazy helpers should already reference the final typed surfaces
@@ -100,7 +100,7 @@ Focus areas:
 1. Shared shell contracts and helper extraction
 2. Completed: `DeferredCommitSlider.jsx -> DeferredCommitSlider.tsx`
 3. Completed: `SurveyTool.jsx -> SurveyTool.tsx`
-4. `MainSite.jsx -> MainSite.tsx`
+4. Completed: `MainSite.jsx -> MainSite.tsx`
 
 ### File Organization Rules
 
@@ -146,17 +146,16 @@ Use separate commits:
 1. shared shell contract prep
 2. Completed: `DeferredCommitSlider` conversion
 3. Completed: `SurveyTool` conversion
-4. `MainSite` conversion
+4. Completed: `MainSite` conversion
 5. any final route-import cleanup if needed
 
 ### Done Criteria
 
-- The last remaining production JSX file (`MainSite.jsx`) is `.tsx`
-- `client/src/components` reaches `135 TSX / 0 JSX`
-- Current state: `134 TSX / 1 JSX`
-- No `@ts-nocheck` added
-- Focused TypeScript lanes are clean for each shell phase
-- Focused Jest rings pass for each shell phase
+- [x] The last remaining production JSX file (`MainSite.jsx`) is now `.tsx`
+- [x] `client/src/components` reaches `135 TSX / 0 JSX`
+- [x] No `@ts-nocheck` added
+- [x] TypeScript is clean for `MainSite`
+- [x] Jest passes
 - No unrelated worktree files are staged or reverted
 
 ### Decision Gates
