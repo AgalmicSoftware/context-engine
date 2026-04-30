@@ -59,7 +59,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | `client/src/contractsABI/` | Contract ABI JSON files |
 | `contracts/` | Solidity smart contracts |
 | `scripts/test-*.ui.js` | Playwright E2E tests |
-| `Local companion (private/dev-only)` | Omitted from the public release; present in full development checkouts for hook + passkey auth |
+| `contextEngine-cc/` | Claude Code integration (hook + passkey auth) |
 | `ARCHITECTURE.md` | System diagram, data flows, contract addresses |
 
 ### Generated / do-not-edit
@@ -83,6 +83,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | [`docs/lit-protocol-information.md`](docs/lit-protocol-information.md) | Lit Protocol docs |
 | [`LICENSING.md`](LICENSING.md) | CPAL/MIT split license |
 | [`CHANGELOG.md`](CHANGELOG.md) | Shipped changes |
+| [`TODO/README.md`](TODO/README.md) | Public roadmap |
 
 ## Conventions
 - Default testnet: OP Sepolia (`11155420`)
@@ -96,7 +97,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Commit messages must not reference internal PRD identifiers (e.g. `PRD 334`, `PRDs 329-336`). Describe the change by what it does, not by the tracking ID — PRDs churn (merged, renumbered, deprecated) and referencing them ties public commit history to internal bookkeeping.
 - Keep fixture/test data non-identifying (no real names, emails, API keys)
 - New user-facing workflow/features should add or update related automated E2E smoke coverage when relevant, especially for UI, encryption, gating, worker, or Arweave flows
-- In full development checkouts, park PRDs and other planned-work writeups under `TODO/` (typically `TODO/PRDs/`), not `docs/`. Those planning docs are intentionally omitted from the public release.
+- Park PRDs and other planned-work writeups under `TODO/` (typically `TODO/PRDs/`), not `docs/`
 
 ## Guardrails
 - **MUST NOT**: commit secrets, API keys, or private keys to the repo

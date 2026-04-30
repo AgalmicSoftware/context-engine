@@ -166,6 +166,7 @@ docs/outreach/
 
 # Public release staging artifact (output of `make release`)
 /release-public/
+/private-pack.manifest.json
 
 # Python bytecode (repo includes small workflow builders)
 __pycache__/

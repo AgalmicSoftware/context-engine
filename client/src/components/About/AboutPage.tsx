@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
@@ -224,6 +224,7 @@ const AboutPage = () => {
   const [showRoadmap, setShowRoadmap] = useState(false);
   const [showRecognition, setShowRecognition] = useState(true);
   const [demoSessionPath, setDemoSessionPath] = useState(() => getAboutDemoSessionPath());
+  const useCaseDetailRef = useRef<HTMLElement | null>(null);
   const activeUseCaseConfig = USE_CASES.find(({ slug }) => slug === activeUseCase) || null;
   const configuredRecognitionIndividuals = getConfiguredRecognitionIndividuals(RECOGNIZED_INDIVIDUALS);
   const hasRecognizedIndividuals = configuredRecognitionIndividuals.length > 0;
@@ -266,6 +267,47 @@ const AboutPage = () => {
       );
     };
   }, []);
+
+  useEffect(() => {
+    if (!activeUseCaseConfig || !useCaseDetailRef.current || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const detailNode = useCaseDetailRef.current;
+    const prefersReducedMotion = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
+    const isCompactViewport = typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 640px)').matches
+      : window.innerWidth <= 640;
+
+    const scrollUseCaseIntoView = () => {
+      const detailRect = detailNode.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      const detailIsFullyVisible = detailRect.top >= 0 && detailRect.bottom <= viewportHeight;
+
+      if (!isCompactViewport && detailIsFullyVisible) {
+        return;
+      }
+
+      detailNode.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    };
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      const frameId = window.requestAnimationFrame(scrollUseCaseIntoView);
+      return () => {
+        if (typeof window.cancelAnimationFrame === 'function') {
+          window.cancelAnimationFrame(frameId);
+        }
+      };
+    }
+
+    scrollUseCaseIntoView();
+    return undefined;
+  }, [activeUseCaseConfig]);
 
   return (
     <div className={styles.aboutPageContainer}>
@@ -355,7 +397,12 @@ const AboutPage = () => {
           </div>
 
           {activeUseCaseConfig && (
-            <article className={styles.useCaseDetail} aria-live="polite" aria-atomic="true">
+            <article
+              ref={useCaseDetailRef}
+              className={styles.useCaseDetail}
+              aria-live="polite"
+              aria-atomic="true"
+            >
               <p className={styles.srOnly}>{activeUseCaseConfig.label}</p>
               <div className={styles.useCaseDetailRow}>
                 <span className={styles.useCaseDetailProblemTag}>

@@ -8,6 +8,8 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'sync-public-history.sh');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
+const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
+const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
 
 function writeFile(rootDir, relativePath, contents) {
@@ -31,6 +33,19 @@ function installSyncScriptFixture(sourceDir) {
     path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
     fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
   );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'install-private-branch-guard.sh'),
+    fs.readFileSync(PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('.githooks', 'pre-push'),
+    fs.readFileSync(PRE_PUSH_HOOK_SOURCE_PATH, 'utf8'),
+  );
+  fs.chmodSync(path.join(sourceDir, 'scripts', 'sync-public-history.sh'), 0o755);
+  fs.chmodSync(path.join(sourceDir, 'scripts', 'install-private-branch-guard.sh'), 0o755);
+  fs.chmodSync(path.join(sourceDir, '.githooks', 'pre-push'), 0o755);
 }
 
 function commitAll(rootDir, message, { authorDate, committerDate }) {
@@ -89,15 +104,14 @@ function setupSourceRepo() {
     });
 
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private only\n');
-    writeFile(sourceDir, 'private-pack.manifest.json', 'tracked stale manifest\n');
-    writeFile(sourceDir, path.join('test', 'contextEngineCc.sw-cache-policy.test.mjs'), 'ce-cc only\n');
-    writeFile(sourceDir, path.join('.tmp-review', 'legacy.old.js'), 'temporary review copy\n');
     commitAll(sourceDir, 'Private-only commit', {
       authorDate: '2025-01-03T04:05:06Z',
       committerDate: '2025-01-03T04:05:06Z',
     });
 
     writeFile(sourceDir, 'public.txt', 'public one\npublic two\n');
+    writeFile(sourceDir, 'private-pack.manifest.json', '{"generated":"local-only"}\n');
+    writeFile(sourceDir, path.join('.tmp-review', 'review-snapshot.js'), 'temp review snapshot\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'internal\n');
     commitAll(sourceDir, 'Mixed commit', {
       authorDate: '2025-01-04T05:06:07Z',
@@ -156,6 +170,27 @@ test('sync-public-history accepts an explicit source branch', () => {
   });
 });
 
+test('sync-public-history installs the private dev push guard before replaying', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });
+
+    const result = runSyncScript(sourceDir, ['--dry-run']);
+
+    assert.equal(result.status, 0);
+    assert.equal(git(sourceDir, ['config', '--local', '--get', 'core.hooksPath']).trim(), '.githooks');
+
+    const upstreamResult = spawnSync(
+      'git',
+      ['rev-parse', '--abbrev-ref', '--symbolic-full-name', 'dev@{upstream}'],
+      {
+        cwd: sourceDir,
+        encoding: 'utf8',
+      },
+    );
+    assert.notEqual(upstreamResult.status, 0);
+  });
+});
+
 test('sync-public-history replays public commits, skips private-only commits, and enforces public identity', () => {
   withSourceRepo(({ sourceDir }) => {
     const result = runSyncScript(sourceDir);
@@ -198,9 +233,8 @@ test('sync-public-history replays public commits, skips private-only commits, an
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
-    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
-    assert.doesNotMatch(trackedPaths, /^test\/contextEngineCc\.sw-cache-policy\.test\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
+    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
     const publicFile = git(sourceDir, ['show', 'release-staging:public.txt']);
     assert.equal(publicFile, 'public one\npublic two\n');
@@ -234,9 +268,8 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
-    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
-    assert.doesNotMatch(trackedPaths, /^test\/contextEngineCc\.sw-cache-policy\.test\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
+    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
   });
 });
 
@@ -301,6 +334,8 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
+    assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
     const publicFile = git(sourceDir, ['show', 'origin/release-staging:public.txt']);
     assert.equal(publicFile, 'public one\npublic two\npublic three\n');

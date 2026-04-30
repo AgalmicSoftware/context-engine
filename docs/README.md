@@ -4,14 +4,14 @@ Primary product and system specification:
 - `spec.md` (repo root)
 
 Canonical reference set:
-- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
+- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `spec.md`
 - the `docs/` reference docs listed below
 
-Non-canonical / internal planning material:
-- internal planning docs that are intentionally omitted from the public release
+Non-canonical / historical planning material:
+- `TODO/`
 - one-off debug prompts or migration notes unless they are explicitly linked below as current reference
 
-Planning docs belong outside `docs/` in the full development repo and are not part of the public release.
+Planning docs should be added under `TODO/`, not `docs/`.
 
 ## How To Keep Docs Updated
 
@@ -23,6 +23,7 @@ When you add or change a feature, update documentation in the same PR:
 ## Core Docs
 
 Code navigation maps:
+- `docs/ai-agent-bootstrap.md`: current AI-agent entry points, supported contracts, and the PRD map for broader agent usability work.
 - `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
 - `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
 - `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
@@ -36,7 +37,7 @@ Session, gates, and the Worker:
 - `docs/scaling.md`: Public scaling reference covering write-path settlement, indexed reads, private compute modes, and deployment profiles.
 
 Keys and RPCs:
-- `docs/public-client-config.md`: public `REACT_APP_*` client config, fallback behavior, and `.env.example` reference.
+- `docs/public-client-config.md`: public `REACT_APP_*` client config, fallback behavior, `.env.example` reference, and Netlify static deploy notes.
 - `docs/resource-keys.md`: Where AI/Arweave/RPC/faucet keys live and the resolution order (local overrides vs worker secrets).
 - `docs/path-rpc.md`: PATH (Pocket) endpoint defaults, client/provider ordering, and legacy PATH override behavior.
 - `docs/rpc-scan-scope.md`: scan-scope flags, profile deep-scan defaults, RPC guardrails, and testing-mode controls.
@@ -50,14 +51,14 @@ Payload schemas:
 
 Local development:
 - `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
-- `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`).
+- `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
 
 Wallets:
 - `docs/porto-information.md`: Porto passkey wallet wiring and deterministic test wallet workflow.
 
 E2E workflows:
-- `docs/e2e-setup.md`: End-to-end workflow scripts (gates Any/All, doc library filetype encryption/decryption).
+- `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.
 - `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
 
 Public discovery:

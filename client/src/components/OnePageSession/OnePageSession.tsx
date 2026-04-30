@@ -26,7 +26,7 @@ import LazyFallback from '../Shared/LazyFallback';
 
 import contractScripts, { getAllSessionSlugs } from '../../utilities/web3/contractScripts.js';
 
-import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/SurveyTool.jsx';
+import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';

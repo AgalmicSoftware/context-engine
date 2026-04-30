@@ -14,6 +14,27 @@ describe('AgentPage', () => {
     expect(screen.getByText('Enabled:')).toBeInTheDocument();
     expect(screen.getByText('no')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.AGENT_LOG)).toHaveTextContent('Log is empty.');
+    expect(screen.getByTestId(E2E_TESTIDS.AGENT_ACTIONS)).not.toHaveValue(
+      expect.stringContaining('ai-browseruse-75209033')
+    );
+  });
+
+  it('renders the current contract summary when the agent exposes describe()', () => {
+    window.__ceAgent = {
+      getState: () => ({ route: '/agent', account: '0xabc' }),
+      describe: () => ({
+        version: 1,
+        actions: [{ type: 'navigate' }, { type: 'fill' }, { type: 'click' }],
+        tools: [{ name: 'CompareAddresses' }, { name: 'PolisReport' }],
+      }),
+    };
+
+    render(<AgentPage />);
+
+    expect(screen.getByText('3 actions')).toBeInTheDocument();
+    expect(screen.getByText('· 2 tools')).toBeInTheDocument();
+    expect(screen.getByText('navigate, fill, click')).toBeInTheDocument();
+    expect(screen.getByText('CompareAddresses, PolisReport')).toBeInTheDocument();
   });
 
   it('steps through the first configured action when an agent is available', async () => {

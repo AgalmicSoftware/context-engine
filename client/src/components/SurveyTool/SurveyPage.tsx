@@ -2,7 +2,7 @@
 
 import React, { Component } from "react";
 
-import SurveyTool from "components/SurveyTool/SurveyTool.jsx";
+import SurveyTool from "components/SurveyTool/SurveyTool";
 
 import styles from "./SurveyPage.module.scss";
 
@@ -11,7 +11,7 @@ type SurveyPageProps = {
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
   sessionConfig?: unknown;
-  minifiedMode?: unknown;
+  minifiedMode?: string;
   [key: string]: any;
 };
 

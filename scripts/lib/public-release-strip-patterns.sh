@@ -11,9 +11,8 @@ local-private-version
 CLAUDE.md
 .claude
 .codex
-private-pack.manifest.json
-.tmp-review
 video-clickthrough-local
+.tmp-review
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
@@ -24,13 +23,13 @@ scripts/build_external_llm_prompt.py
 .env.e2e*
 artifacts
 tests/artifacts
+private-pack.manifest.json
 Demo Integration Package
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 client/src/components/MainSite/MainSite.module.test.js
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
-test/contextEngineCc.sw-cache-policy.test.mjs
 EOF
 }
 
@@ -43,8 +42,6 @@ local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
-test/contextEngineCc.sw-cache-policy.test.mjs
-.tmp-review
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 EOF

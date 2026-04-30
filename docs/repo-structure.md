@@ -11,8 +11,8 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - `script/` holds Foundry Solidity deploy scripts. Keep the singular name; it matches Foundry conventions.
 - `scripts/` holds automation, seeding, audits, migration helpers, and E2E entrypoints.
 - `docs/` holds canonical implementation and operations documentation.
-- Internal planning directories such as `TODO/` are part of the full development checkout but are intentionally omitted from the public release.
-- Private companion directories such as `contextEngine-cc/` are part of the full development checkout but are intentionally omitted from the public release.
+- `TODO/` holds PRDs, planning notes, and unshipped work items.
+- `contextEngine-cc/` holds the local Claude Code companion integration.
 - `test/` holds source-of-truth root Foundry and Node test files when source-adjacent tests are not practical.
 - `tests/` is an index/symlink view over selected test surfaces. Do not assume it is the source of truth.
 - `artifacts/`, `broadcast/`, `cache/`, `dist/`, `out/`, and `tmp/` are generated or runtime output locations and are not canonical homes for new source files.
@@ -27,7 +27,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - Session page shell UI belongs under `client/src/components/OnePageSession/`; keep `OnePageSession.tsx` and its helper/test modules co-located there.
 - Demo-only route views belong under `client/src/components/DemoViews/`; keep reusable demo subareas grouped there instead of under generic catch-all names.
 - Session doc-library UI belongs under `client/src/components/DocumentLibrary/`; keep `SessionDocumentsPage.tsx` and `DocumentLibraryPanel.tsx` together there.
-- Rendered React component files use PascalCase filenames. Existing JavaScript components may stay `.jsx`; TypeScript migration slices should use `.tsx`.
+- Rendered React component files use PascalCase filenames and `.tsx` extensions. All production components are now TypeScript.
 - Component-specific styles are co-located as `<ComponentName>.module.scss`.
 - Component-specific tests are co-located beside the source component.
 - Preferred component test naming is `<ComponentName>.test.jsx` for JavaScript tests and `<ComponentName>.test.tsx` once the test itself is converted.

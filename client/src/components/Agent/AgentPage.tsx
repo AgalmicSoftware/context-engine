@@ -10,8 +10,23 @@ type AgentState = {
   account?: unknown;
 };
 
+type AgentContractAction = {
+  type?: unknown;
+};
+
+type AgentContractTool = {
+  name?: unknown;
+};
+
+type AgentContract = {
+  version?: unknown;
+  actions?: AgentContractAction[] | null;
+  tools?: AgentContractTool[] | null;
+};
+
 type CeAgent = {
   getState?: () => AgentState;
+  describe?: () => AgentContract | null;
   run?: (actions: AgentAction[]) => Promise<unknown>;
   perform?: (action: AgentAction) => Promise<unknown>;
 };
@@ -36,8 +51,6 @@ const defaultActions: AgentAction[] = [
   { type: 'fill', testId: 'ce-compare-address-b', value: '0x0000000000000000000000000000000000000002' },
   { type: 'click', testId: 'ce-compare-run' },
   { type: 'assertVisible', testId: 'ce-compare-result' },
-
-  { type: 'invokeAi', tool: 'PolisReport', params: { sessionSlug: 'ai-browseruse-75209033' } },
 ];
 
 export default function AgentPage() {
@@ -61,6 +74,24 @@ export default function AgentPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent]);
+  const agentContract = useMemo(() => {
+    try {
+      return agent && typeof agent.describe === 'function' ? agent.describe() : null;
+    } catch (_) {
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agent]);
+  const actionLabels = Array.isArray(agentContract?.actions)
+    ? agentContract.actions
+        .map((action) => toStr(action?.type).trim())
+        .filter(Boolean)
+    : [];
+  const toolLabels = Array.isArray(agentContract?.tools)
+    ? agentContract.tools
+        .map((tool) => toStr(tool?.name).trim())
+        .filter(Boolean)
+    : [];
 
   const appendLog = (entry: Record<string, unknown> & { kind: string }) => {
     setLogLines((prev) => [...prev, { at: new Date().toISOString(), ...entry }]);
@@ -124,6 +155,25 @@ export default function AgentPage() {
             <strong>State:</strong> <code>{toStr(agentState.route)}</code> {' '}
             {agentState.account ? <span>(wallet: <code>{toStr(agentState.account)}</code>)</span> : null}
           </div>
+        )}
+        {agentContract && (
+          <>
+            <div>
+              <strong>Contract:</strong> <code>v{toStr(agentContract.version || '1')}</code> {' '}
+              <span>{actionLabels.length} actions</span> {' '}
+              <span>· {toolLabels.length} tools</span>
+            </div>
+            {actionLabels.length ? (
+              <div>
+                <strong>Actions:</strong> <code>{actionLabels.join(', ')}</code>
+              </div>
+            ) : null}
+            {toolLabels.length ? (
+              <div>
+                <strong>Tools:</strong> <code>{toolLabels.join(', ')}</code>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 

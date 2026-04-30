@@ -50,6 +50,26 @@ Optional:
 - `E2E_ENV_FILE=/abs/path/to/custom.env npm run ai:test-survey-authoring:encryption-matrix`
 - `E2E_ENV_DEBUG=1 npm run ai:test-survey-authoring:encryption-matrix`
 
+## Chain Runtime Modes
+
+Current E2E work uses three practical chain-runtime lanes:
+
+| Runtime | How to use it today | Contracts / state | Gas / side effects | Current support |
+| --- | --- | --- | --- | --- |
+| `onchain` | Default shared path | Live deployed contracts and live chain state | Real gas, persistent writes | First-class |
+| `local` | `E2E_CHAIN_MODE=local` on runners that support it | Local Anvil + local deploys | Local gas, no live writes | First-class |
+| manual fork | Start Anvil in fork mode yourself, then point `RPC_URL` at that local fork while keeping `CHAIN` / `CHAIN_ID` / `SESSION_REGISTRY` / `SBT_FACTORY` aligned to the upstream chain | Live deployed contracts and seeded live chain state | Local gas, no live writes | Supported as a manual workaround |
+
+Manual fork recipe today:
+
+1. Start a local Anvil fork against the target chain outside the repo.
+2. Keep the target chain identity explicit with `CHAIN` / `CHAIN_ID` and any contract overrides that should still refer to the upstream deployment.
+3. Point `RPC_URL` at the local Anvil endpoint for the run.
+4. If the forked upstream RPC is not the shared default for that chain, also set `E2E_FORK_RPC_URL` so reports describe the actual upstream you forked.
+5. Choose mock-vs-live toggles independently (`E2E_LIT_MOCK`, `E2E_AI_MOCK`, `E2E_ARWEAVE_MOCK`).
+
+Current committed runners do not yet auto-spawn or tear down a fork runtime for you. First-class `E2E_CHAIN_MODE=fork` orchestration is tracked in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md).
+
 ## Common Env Vars
 
 All new runners accept this common surface:
@@ -107,7 +127,8 @@ Session slug handoff:
 - When not provided, runners generate timestamped slugs that include both `runTag` and a human tag (DD-Mon-YYYY-HH-MM-AM/PM) so it is obvious which runs happened first.
 
 Boundary runner mode:
-- `E2E_CHAIN_MODE=onchain|local` (`onchain` default)
+- Current committed boundary-mode surface: `E2E_CHAIN_MODE=onchain|local` (`onchain` default)
+- First-class `fork` orchestration is not committed yet; use the manual fork workflow above and point `RPC_URL` at your local Anvil fork when needed.
 
 Arweave-required flows:
 - `ARWEAVE_JWK_PATH` is required for doc upload/decrypt flows
@@ -246,7 +267,7 @@ Arweave modes for `ai:test-sbt-metadata-locks`:
 ### Survey / Gated Decrypt
 
 - `npm run -s ai:seed-survey:question-types`
-- `SESSION_SLUG=general2 npm run -s ai:seed-polis:binary-multi-wallet`
+- `SESSION_SLUG=<existing-session-slug> npm run -s ai:seed-polis:binary-multi-wallet`
 - `npm run -s ai:test-gated-decrypt:all-types`
   - Includes submit-latch regression checks in SurveyTool (full + pile): post-success button stays submitted (not `Submit (N)`), and a second click without edits does not retrigger submit.
 - `npm run -s ai:test-survey-authoring:encryption-matrix`
@@ -273,16 +294,17 @@ Arweave modes for `ai:test-sbt-metadata-locks`:
 ### AI Smoke (Deterministic)
 
 These flows are intended to run with `E2E_AI_MOCK=1` for determinism:
-- `npm run -s ai:test-ai:invocations`
+- `SESSION_SLUG=<existing-session-slug> npm run -s ai:test-ai:invocations`
 
 ### AI Smoke (Real Provider, Opt-in)
 
 To verify real provider wiring (non-deterministic output, slower, can fail if your worker has no AI secrets):
 - Ensure `WORKER_URL` points at a `sessionCorsWorker` with `scopes.ai=true` and provider keys configured (or set local AI keys in the UI).
   - See: `docs/session-cors-worker.md`
+- Ensure `SESSION_SLUG` points at an existing session with the expected Polis data available.
 - Run without the client-side mock:
-  - `E2E_AI_MOCK=0 npm run -s ai:test-ai:invocations`
-  - `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s test:e2e`
+  - `SESSION_SLUG=<existing-session-slug> E2E_AI_MOCK=0 npm run -s ai:test-ai:invocations`
+  - `SESSION_SLUG=<existing-session-slug> E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=0 npm run -s test:e2e`
 
 ### Agent Mode (JSON-driven)
 
@@ -292,8 +314,16 @@ Enable it either by:
 - query param `?agent=1` (example: `/agent?agent=1`)
 - or localStorage `ce-agent-enabled=1` (then reload)
 
+Current runtime methods:
+- `window.__ceAgent.getState()`
+- `window.__ceAgent.describe()`
+- `window.__ceAgent.perform(action)`
+- `window.__ceAgent.run(actions)`
+
+Use `window.__ceAgent.describe()` first when you want the current action/tool contract rather than guessing. It returns the supported actions, higher-level tools, activation keys, and the canonical doc paths for this surface.
+
 Smoke runner:
-- `npm run -s ai:test-agent:interface`
+- `SESSION_SLUG=<existing-session-slug> npm run -s ai:test-agent:interface`
 
 Example JSON actions (works via `/agent` panel or `window.__ceAgent.run(...)`):
 ```json
@@ -304,7 +334,7 @@ Example JSON actions (works via `/agent` panel or `window.__ceAgent.run(...)`):
   { "type": "click", "testId": "ce-compare-run" },
   { "type": "assertVisible", "testId": "ce-compare-result" },
 
-  { "type": "invokeAi", "tool": "PolisReport", "params": { "sessionSlug": "ai-browseruse-75209033" } }
+  { "type": "invokeAi", "tool": "PolisReport", "params": { "sessionSlug": "<existing-session-slug>" } }
 ]
 ```
 

@@ -657,11 +657,14 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
 .recognitionItem {
   appearance: none;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: 44px minmax(0, auto);
   align-items: center;
   justify-items: start;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
   min-height: 64px;
   padding: 14px 22px;
   border-radius: 999px;
@@ -1060,10 +1063,11 @@ $modal-muted: rgba(22, 48, 84, 0.82);
 
   .toggleHeaderAside {
     gap: 6px;
+    margin-left: auto;
   }
 
   .recognitionSummary {
-    gap: 5px;
+    display: none;
   }
 
   .recognitionSummaryLogo {
@@ -1169,6 +1173,8 @@ $modal-muted: rgba(22, 48, 84, 0.82);
   }
 
   .recognitionStrip {
+    flex-direction: column;
+    align-items: stretch;
     gap: 12px;
   }
 

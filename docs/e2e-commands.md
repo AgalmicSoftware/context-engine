@@ -33,7 +33,7 @@ Porto-style test wallet.
     - `artifacts/session-workflows/survey-question-types-<run-tag>.json`
     - `artifacts/screenshots/survey-question-types-<run-tag>.png`
 - Seed Polis-style binary questions + multi-wallet responses (deterministic wallets A-E):
-  - `SESSION_SLUG=general2 npm run ai:seed-polis:binary-multi-wallet`
+  - `SESSION_SLUG=<existing-session-slug> npm run ai:seed-polis:binary-multi-wallet`
   - Output:
     - `artifacts/session-workflows/polis-binary-multi-wallet-<run-tag>.json`
 - End-to-end gated decrypt verification (SBT-gated question prompts/tags + encrypted responses) across all question types:
@@ -56,8 +56,8 @@ Porto-style test wallet.
     - `npm run ai:test-profile:sbt-multi-session`
     - `npm run ai:test-profile:activity-multi-session`
   - Docs:
-    - `npm run ai:test-doc-library:session:multi-gate`
-    - `npm run ai:test-doc-library:url-records`
+    - `SESSION_SLUG=<existing-session-slug> npm run ai:test-doc-library:session:multi-gate`
+    - `SESSION_SLUG=<existing-session-slug> npm run ai:test-doc-library:url-records`
     - `npm run ai:test-tool-explorer:doc-save`
   - Surveys/gated decrypt:
     - `npm run ai:test-survey-authoring:encryption-matrix`
@@ -70,8 +70,8 @@ Porto-style test wallet.
   - Admin:
     - `npm run ai:test-admin:gate-update`
 - Gate lifecycle + worker scope:
-  - `npm run ai:test-gate-revocation:decrypt`
-  - `npm run ai:test-worker-scopes:matrix`
+  - `SESSION_SLUG=<existing-session-slug> npm run ai:test-gate-revocation:decrypt`
+  - `SESSION_SLUG=<existing-session-slug> npm run ai:test-worker-scopes:matrix`
 
 ### E2E env file (recommended)
 
@@ -137,7 +137,7 @@ Environment variables supported by `ai:seed-survey:question-types`:
 Environment variables supported by `ai:seed-polis:binary-multi-wallet`:
 
 - `BASE_URL` (default: `http://127.0.0.1:3000`)
-- `SESSION_SLUG` (default: `general2`)
+- `SESSION_SLUG` (required; existing session slug)
 - `AI_RUN_TAG` / `RUN_TAG` (optional explicit run tag; default is timestamp)
 - `BINARY_QUESTION_COUNT` (default: `4`; range `1..12`)
 - `PASSKEY_A`, `PASSKEY_B`, `PASSKEY_C`, `PASSKEY_D`, `PASSKEY_E` (wallet rawIds; defaults are fixture values)
@@ -147,7 +147,7 @@ Environment variables supported by `ai:seed-polis:binary-multi-wallet`:
 Environment variables supported by `ai:test-gated-decrypt:all-types`:
 
 - `BASE_URL` (default: `http://127.0.0.1:3000`)
-- `SESSION_SLUG` (default: `ai-browseruse-75209033`)
+- `SESSION_SLUG` (optional explicit slug; when unset, the runner generates a fresh timestamped slug)
 - `RPC_URL`, `CHAIN_ID`, `SESSION_REGISTRY`, `SBT_FACTORY` (OP Sepolia defaults)
 - `PASSKEY_A` and `PASSKEY_B` (wallet rawIds; defaults are fixture values)
 - `WORKER_URL` (optional override; by default read from on-chain `corsWorkerUrl`)
@@ -173,7 +173,9 @@ Environment variables supported by `ai:ux-workflows`:
 Environment variables used by the new CE E2E runners:
 
 - `AI_RUN_TAG`, `BASE_URL`, `CHAIN_ID`, `RPC_URL`, `SESSION_REGISTRY`, `SBT_FACTORY`, `SESSION_SLUG`, `NO_CLEANUP=1`
-- `E2E_CHAIN_MODE=onchain|local` (used by `ai:test-sbt-contract:boundaries`, default `onchain`)
+- Current committed boundary-mode surface: `E2E_CHAIN_MODE=onchain|local` (used by `ai:test-sbt-contract:boundaries`, default `onchain`)
+- Manual fork workaround: start a local Anvil fork yourself, point `RPC_URL` at it, and keep `CHAIN` / `CHAIN_ID` / contract overrides aligned to the upstream chain
+- First-class `E2E_CHAIN_MODE=fork` orchestration is tracked in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md)
 - `ARWEAVE_JWK_PATH` (required for doc upload/decrypt flows)
 
 Session slug handoff options:
@@ -183,9 +185,15 @@ Session slug handoff options:
   - `npm run -s ai:test-gates:any-all -- --session-slug <slug>`
   - `npm run -s ai:seed-survey:question-types -- --session-slug <slug>`
   - `npm run -s ai:seed-polis:binary-multi-wallet -- --session-slug <slug>`
+  - `npm run -s ai:test-ai:invocations -- --session-slug <slug>`
+  - `npm run -s ai:test-agent:interface -- --session-slug <slug>`
   - `npm run -s ai:test-gated-decrypt:all-types -- --session-slug <slug>`
   - `npm run -s ai:test-doc-library:session -- --session-slug <slug>`
   - `npm run -s ai:test-doc-library:session:filetypes -- --session-slug <slug>`
+  - `npm run -s ai:test-doc-library:session:multi-gate -- --session-slug <slug>`
+  - `npm run -s ai:test-doc-library:url-records -- --session-slug <slug>`
+  - `npm run -s ai:test-gate-revocation:decrypt -- --session-slug <slug>`
+  - `npm run -s ai:test-worker-scopes:matrix -- --session-slug <slug>`
 
 Useful env vars for `ai:wallet`:
 

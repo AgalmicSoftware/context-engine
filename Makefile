@@ -1,4 +1,4 @@
-.PHONY: release release-clean sync-public sync-public-push verify-public-branch
+.PHONY: release release-clean sync-public sync-public-push install-private-branch-guard
 
 RELEASE_DIR ?= ./release-public
 
@@ -20,6 +20,6 @@ sync-public:
 sync-public-push:
 	bash scripts/sync-public-history.sh --push
 
-## Verify that the public branch does not still track strip-listed files.
-verify-public-branch:
-	bash scripts/verify-public-branch.sh release-staging
+## Install the local git hook that blocks pushing the private dev branch to origin.
+install-private-branch-guard:
+	bash scripts/install-private-branch-guard.sh

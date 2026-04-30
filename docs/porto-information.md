@@ -64,7 +64,7 @@ Scripts:
   - Saves a JSON run report under `artifacts/session-workflows/` and a screenshot under
     `artifacts/screenshots/`.
 - `npm run ai:seed-polis:binary-multi-wallet`
-  - Seeds Polis-style binary data for one session slug (default `general2`):
+  - Seeds Polis-style binary data for one existing session slug:
     - creates standalone binary questions,
     - funds deterministic wallets B/C/D/E from walletA when needed,
     - submits yes/no-style responses from deterministic wallets A-E.
@@ -140,7 +140,7 @@ Key env vars for `ai:seed-survey:question-types`:
 
 Key env vars for `ai:seed-polis:binary-multi-wallet`:
 
-- `SESSION_SLUG` (default `general2`)
+- `SESSION_SLUG` (required; existing session slug)
 - `BINARY_QUESTION_COUNT` (default `4`)
 - `PASSKEY_A`, `PASSKEY_B`, `PASSKEY_C`, `PASSKEY_D`, `PASSKEY_E`
 - `FUND_AMOUNT_ETH` (default `0.001`)
@@ -172,7 +172,9 @@ Workflow-runner env vars:
 Common env vars for the new CE E2E runners:
 
 - `AI_RUN_TAG`, `BASE_URL`, `CHAIN_ID`, `RPC_URL`, `SESSION_REGISTRY`, `SBT_FACTORY`, `SESSION_SLUG`, `NO_CLEANUP=1`
-- `E2E_CHAIN_MODE=onchain|local` (used by `ai:test-sbt-contract:boundaries`)
+- Current committed boundary-mode surface: `E2E_CHAIN_MODE=onchain|local` (used by `ai:test-sbt-contract:boundaries`)
+- Manual fork workaround: start a local Anvil fork yourself, point `RPC_URL` at it, and keep `CHAIN` / `CHAIN_ID` / contract overrides aligned to the upstream chain
+- First-class `E2E_CHAIN_MODE=fork` orchestration is tracked in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md)
 - `ARWEAVE_JWK_PATH` required for doc upload/decrypt flows
 - `.env.e2e` / `.env.e2e.local` are auto-loaded by `ai:*` scripts (copy from `.env.e2e.example`)
 - `E2E_ENV_FILE=/abs/path/to/custom.env` can override the auto-discovery path

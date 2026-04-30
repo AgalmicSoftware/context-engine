@@ -1,6 +1,7 @@
 import {
   DEFAULT_PUBLIC_PAGE_DESCRIPTION,
   DEFAULT_PUBLIC_PAGE_TITLE,
+  DEFAULT_PUBLIC_SITE_URL,
   buildCanonicalPublicUrl,
   syncPublicPageHead,
 } from './publicPageHead.js';
@@ -252,6 +253,7 @@ describe('publicPageHead', () => {
     document.head.innerHTML = `
       <link rel="canonical" href="https://contextengine.xyz/" />
       <meta property="og:url" content="https://contextengine.xyz/" />
+      <script type="application/ld+json" data-ce-structured-data="public-page">{}</script>
     `;
 
     syncPublicPageHead({
@@ -263,6 +265,11 @@ describe('publicPageHead', () => {
 
     expect(document.head.querySelectorAll('link[rel="canonical"]')).toHaveLength(1);
     expect(document.head.querySelectorAll('meta[property="og:url"]')).toHaveLength(1);
+    expect(
+      document.head.querySelectorAll(
+        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+      )
+    ).toHaveLength(1);
     expect(document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(
       'https://contextengine.xyz/session/demo'
     );
