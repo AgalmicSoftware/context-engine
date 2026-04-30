@@ -152,7 +152,7 @@ Default worker URL:
 - Legacy untimestamped browser replicas remain a migration bridge only when the registry mirror is blank; once the mirror has a worker URL again, those old cache entries no longer outrank it.
 - `client/src/utilities/session/sessionWorkerAvailability.js` now gives UI a sync worker-config overlay surface for both "is a usable worker-backed config available?" and "what configured worker URL is currently usable?"; when callers opt in, it also returns the shared default/general fallback worker URL synchronously. `SBTsList.jsx`, `LiveDebateMode.jsx`, and `AdminPage.jsx` use it instead of component-local raw `corsWorkerUrl` truthiness.
 - `client/src/utilities/session/sessionParsers.js` now accepts compatibility worker URL aliases like `workerUrl` and `sessionWorkerUrl` too, so the lower-level parser, cache bridge, worker availability helper, and `corsProxy` share the same worker URL normalization rules.
-- `client/src/utilities/session/sessionWorkerUrlCompatibility.js` now owns that remaining worker URL compatibility alias list/read surface plus the shared metadata-strip alias keys reused by `sessionParsers.js`, `sessionWorkerConfigCache.js`, `sessionWorkerAvailability.js`, `canonicalSessionContext.js`, and `sessionWizardWriteNormalization.js`, so worker URL compatibility reads and Arweave metadata stripping no longer drift apart.
+- `client/src/utilities/session/sessionWorkerUrlCompatibility.js` now owns that remaining worker URL compatibility alias list/read surface plus the shared metadata-strip alias keys reused by `sessionParsers.js`, `sessionWorkerConfigCache.js`, `sessionWorkerAvailability.js`, `canonicalSessionContext.js`, and `sessionWizardWriteNormalization.ts`, so worker URL compatibility reads and Arweave metadata stripping no longer drift apart.
 - `client/src/utilities/worker/corsProxy.js` now uses that same configured-worker-URL parser for plain session-config reads, so compatibility keys like `workerUrl` and `sessionWorkerUrl` stay aligned with the shared worker availability helper.
 - `client/src/utilities/worker/workerSessionResolution.js` now owns the shared active-session slug, alias-resolution, and registry/demo session-config lookup scaffold used by both `workerAuth.js` and `corsProxy.js`, while each caller still keeps its own default `allowDemoFallback` policy.
 - `client/src/utilities/worker/workerSessionResolution.js` now also exports the distinct default demo-fallback policy helpers used by `workerAuth.js` and `corsProxy.js`, so the policy-normalization logic is shared while auth still defaults fail-closed and `corsProxy` still allows non-general demo fallback in on-chain mode.
@@ -302,13 +302,13 @@ enforcement is deferred to stage-B strictness work.
 
 ### Client-side helpers
 
-- `routeSessionResolution.js` — route/session precedence for MainSite
+- `routeSessionResolution.ts` — route/session precedence for MainSite
 - `litSessionConfig.js` — Lit protocol chain/network/gate resolution
-- `surveyToolSessionResolution.js` — SurveyTool session context resolution
+- `surveyToolSessionResolution.ts` — SurveyTool session context resolution
 - `canonicalSessionContext.js` — canonical session config assembly with provenance
 - `sessionWorkerConfigCache.js` — browser-side replica cache for Worker KV session config, used as the preferred bridge over the registry worker URL mirror
 - `sessionWorkerAvailability.js` — sync "usable worker-backed config" helper for UI loading-state reads; overlays the cached worker-config replica and preserves the default/general shared worker fallback
-- `sessionWizardWriteNormalization.js` — SessionWizard Stage-A producer write-target normalization for Arweave metadata, registry compatibility fields, and Worker KV config payloads
+- `sessionWizardWriteNormalization.ts` — SessionWizard Stage-A producer write-target normalization for Arweave metadata, registry compatibility fields, and Worker KV config payloads
 
 ### Worker-side boundaries
 

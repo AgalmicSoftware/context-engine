@@ -4,8 +4,16 @@ import {
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
+import type {
+  ResolveSessionConfigById,
+  ResolveSessionConfigBySlug,
+  SessionConfigLike,
+} from '../shellTypes';
 
-const readSessionTokenFromPath = (path = '') => {
+type FormatSessionId = ((value: string) => string | null | undefined) | undefined;
+type ResolveSessionSlugFromPathToken = ((sessionToken: string) => string | null | undefined) | undefined;
+
+const readSessionTokenFromPath = (path = ''): string => {
   const clean = String(path || '').split('?')[0].split('#')[0];
   const parts = clean.split('/').filter(Boolean);
   if (parts[0] !== 'session' || !parts[1]) return '';
@@ -15,7 +23,13 @@ const readSessionTokenFromPath = (path = '') => {
 const resolveExplicitSessionSlugFromPathToken = ({
   sessionToken = '',
   resolveSessionSlugFromPathToken,
-} = {}) => {
+}: {
+  sessionToken?: string;
+  resolveSessionSlugFromPathToken?: ResolveSessionSlugFromPathToken;
+} = {}): {
+  hasExplicitSessionSlug: boolean;
+  sessionSlug: string;
+} => {
   const rawToken = String(sessionToken || '').trim();
   if (!rawToken) {
     return { hasExplicitSessionSlug: false, sessionSlug: '' };
@@ -37,9 +51,12 @@ const resolveExplicitSessionSlugFromPathToken = ({
   return { hasExplicitSessionSlug: false, sessionSlug: '' };
 };
 
-const readResolvedSessionConfigById = (resolveSessionConfigById, sessionId) => (
+const readResolvedSessionConfigById = (
+  resolveSessionConfigById?: ResolveSessionConfigById,
+  sessionId?: string | number | null
+): SessionConfigLike | null => (
   typeof resolveSessionConfigById === 'function'
-    ? (resolveSessionConfigById(sessionId) || null)
+    ? (resolveSessionConfigById(sessionId as string | number) || null)
     : null
 );
 
@@ -47,7 +64,11 @@ export const resolveMainSiteRouteSessionSlugHint = ({
   search = '',
   allowSessionIdLookup = true,
   resolveSessionConfigById,
-} = {}) => {
+}: {
+  search?: string;
+  allowSessionIdLookup?: boolean;
+  resolveSessionConfigById?: ResolveSessionConfigById;
+} = {}): string | null => {
   const sessionSlug = parseQuestionSessionSlugFromSearch(search);
   if (sessionSlug !== null) return sessionSlug;
   if (!allowSessionIdLookup) return null;
@@ -65,7 +86,12 @@ export const resolveMainSiteRouteSessionIdHint = ({
   requireResolved = false,
   formatSessionId,
   resolveSessionConfigById,
-} = {}) => {
+}: {
+  search?: string;
+  requireResolved?: boolean;
+  formatSessionId?: FormatSessionId;
+  resolveSessionConfigById?: ResolveSessionConfigById;
+} = {}): string | null => {
   const raw = parseQuestionSessionIdFromSearch(search);
   if (!raw) return null;
 
@@ -90,7 +116,19 @@ export const resolveMainSiteQuestionRouteSessionContext = ({
   getSessionConfigBySlug,
   formatSessionId,
   resolveSessionConfigById,
-} = {}) => {
+}: {
+  search?: string;
+  isCacheManagerReady?: boolean;
+  getSessionConfigBySlug?: ResolveSessionConfigBySlug;
+  formatSessionId?: FormatSessionId;
+  resolveSessionConfigById?: ResolveSessionConfigById;
+} = {}): {
+  sessionSlug: string | null;
+  sessionId: string | null;
+  sessionSlugKnown: boolean;
+  sessionSlugPinned: boolean;
+  shouldBlockDuringBootstrap: boolean;
+} => {
   const sessionSlug = resolveMainSiteRouteSessionSlugHint({
     search,
     allowSessionIdLookup: true,
@@ -125,7 +163,16 @@ export const resolveMainSiteRenderActiveSessionSlug = ({
   resolveDisplaySessionConfigBySlug,
   resolveSessionConfigById,
   resolveSessionSlugFromPathToken,
-} = {}) => {
+}: {
+  path?: string;
+  search?: string;
+  activeSessionSlug?: string;
+  isCacheManagerReady?: boolean;
+  getSessionConfigBySlug?: ResolveSessionConfigBySlug;
+  resolveDisplaySessionConfigBySlug?: ResolveSessionConfigBySlug;
+  resolveSessionConfigById?: ResolveSessionConfigById;
+  resolveSessionSlugFromPathToken?: ResolveSessionSlugFromPathToken;
+} = {}): string => {
   const sessionToken = readSessionTokenFromPath(path);
   if (sessionToken) {
     const routeSession = resolveExplicitSessionSlugFromPathToken({
@@ -162,7 +209,20 @@ export const resolveMainSiteSessionRouteContext = ({
   resolveSessionConfigBySlug,
   resolveDisplaySessionConfigBySlug,
   resolveSessionSlugFromPathToken,
-} = {}) => {
+}: {
+  sessionTokenRaw?: string;
+  formatSessionId?: FormatSessionId;
+  resolveSessionConfigById?: ResolveSessionConfigById;
+  resolveSessionConfigBySlug?: ResolveSessionConfigBySlug;
+  resolveDisplaySessionConfigBySlug?: ResolveSessionConfigBySlug;
+  resolveSessionSlugFromPathToken?: ResolveSessionSlugFromPathToken;
+} = {}): {
+  sessionIdFromPath: string | null;
+  configBySessionId: SessionConfigLike | null;
+  sessionSlug: string;
+  sessionConfig: SessionConfigLike | null;
+  hasUnresolvedSessionId: boolean;
+} => {
   const sessionIdFromPath = typeof formatSessionId === 'function'
     ? (formatSessionId(sessionTokenRaw) || null)
     : null;
@@ -202,7 +262,12 @@ export const resolveMainSiteSessionSlugFromPathToken = ({
   formatSessionId,
   resolveSessionConfigById,
   resolveSessionConfigBySlug,
-} = {}) => {
+}: {
+  rawToken?: string | null;
+  formatSessionId?: FormatSessionId;
+  resolveSessionConfigById?: ResolveSessionConfigById;
+  resolveSessionConfigBySlug?: ResolveSessionConfigBySlug;
+} = {}): string => {
   const token = String(rawToken || '').trim();
   if (!token) return '';
   if (token.toLowerCase() === 'new') return '';

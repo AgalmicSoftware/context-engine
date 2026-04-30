@@ -5,21 +5,53 @@ import {
   resolveSessionSlugFromPathname,
 } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import type {
+  AnyRecord,
+  NetworkLike,
+  ResolveSessionConfigBySlug,
+  SessionConfigLike,
+  SessionResolutionResult,
+} from '../shellTypes';
 
-const hasNonBlankValue = (value) => toStr(value).trim() !== '';
-const isPlainObject = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const readPositiveNumber = (value) => {
+type SurveyToolSessionSource = {
+  sessionSlug?: string;
+};
+
+type SurveyToolSessionInput = {
+  pathname?: string;
+  activeSessionSlug?: string | null;
+  sessionSlug?: string | null;
+};
+
+type SurveyToolNetworkScopedInput = {
+  sessionSlug?: string | null;
+  network?: NetworkLike;
+  networkChainId?: string | number | null;
+  resolveBySlug?: ResolveSessionConfigBySlug;
+  fallbackSessionSlugs?: string[] | string | null;
+};
+
+type SurveyToolScopedContext = SessionResolutionResult & {
+  scopedSessionSlugs: string[];
+  networkId: number | null;
+  networkIdStr: string;
+  networkSourceSlug: string;
+};
+
+const hasNonBlankValue = (value: unknown): boolean => toStr(value).trim() !== '';
+const isPlainObject = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const readPositiveNumber = (value: unknown): number | null => {
   const num = Number(value || 0);
   return Number.isFinite(num) && num > 0 ? num : null;
 };
-const readSessionChainId = (sessionConfig) => (
+const readSessionChainId = (sessionConfig: SessionConfigLike | null | undefined): number | null => (
   readPositiveNumber(sessionConfig?.networkChainId) ??
   readPositiveNumber(sessionConfig?.contracts?.surveys?.chainId) ??
   readPositiveNumber(sessionConfig?.contracts?.sbtFactory?.chainId) ??
   readPositiveNumber(sessionConfig?.__registry?.chainId) ??
   readPositiveNumber(sessionConfig?.__registry?.registryChainId)
 );
-const normalizeQuestionIdList = (value) => (
+const normalizeQuestionIdList = (value: unknown): string[] => (
   Array.isArray(value)
     ? Array.from(new Set(
       value
@@ -28,10 +60,10 @@ const normalizeQuestionIdList = (value) => (
     ))
     : []
 );
-const normalizeSessionSlugList = (value) => {
+const normalizeSessionSlugList = (value: unknown): string[] => {
   const source = Array.isArray(value) ? value : [value];
   const seen = new Set();
-  const out = [];
+  const out: string[] = [];
   source.forEach((entry) => {
     const slug = normalizeSessionSlug(entry);
     if (slug == null) return;
@@ -42,7 +74,20 @@ const normalizeSessionSlugList = (value) => {
   return out;
 };
 
-const readCanonicalExplicitSlug = (value) => (
+const resolveCanonicalSessionContext = ({
+  source,
+  resolveBySlug,
+}: {
+  source: SurveyToolSessionSource;
+  resolveBySlug?: ResolveSessionConfigBySlug;
+}): SessionResolutionResult => (
+  resolveCanonicalSessionConfig({
+    source,
+    resolveBySlug,
+  }) as SessionResolutionResult
+);
+
+const readCanonicalExplicitSlug = (value: unknown): string => (
   resolveCanonicalSessionConfig({
     source: { sessionSlug: value },
   }).sessionSlug || ''
@@ -52,7 +97,7 @@ const buildSurveyToolSessionSource = ({
   pathname,
   activeSessionSlug,
   sessionSlug,
-} = {}) => {
+}: SurveyToolSessionInput = {}): SurveyToolSessionSource => {
   const routeSlug = resolveSessionSlugFromPathname(pathname);
   if (routeSlug !== null) {
     return { sessionSlug: routeSlug };
@@ -73,7 +118,7 @@ const buildSurveyToolSessionSource = ({
 const buildSurveyToolDraftSessionSource = ({
   effectiveDraftSlug,
   ...input
-} = {}) => {
+}: SurveyToolSessionInput & { effectiveDraftSlug?: string | null } = {}): SurveyToolSessionSource => {
   const baseSource = buildSurveyToolSessionSource(input);
   if (Object.keys(baseSource).length > 0) return baseSource;
 
@@ -92,7 +137,7 @@ const resolveSurveyToolNetworkScopedSessionContext = ({
   networkChainId,
   resolveBySlug,
   fallbackSessionSlugs,
-} = {}) => {
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => {
   const resolved = resolveSurveyToolExplicitSessionContext({
     sessionSlug,
     resolveBySlug,
@@ -140,7 +185,11 @@ const mergeSurveyToolResponseGateSessionConfig = ({
   resolvedSessionConfig,
   providedSessionConfig,
   sessionSlug,
-} = {}) => {
+}: {
+  resolvedSessionConfig?: SessionConfigLike | null;
+  providedSessionConfig?: SessionConfigLike | null;
+  sessionSlug?: string;
+} = {}): SessionConfigLike | null => {
   const canonicalConfig = isPlainObject(resolvedSessionConfig)
     ? resolvedSessionConfig
     : null;
@@ -154,7 +203,7 @@ const mergeSurveyToolResponseGateSessionConfig = ({
   // Some SurveyTool callers pass a display-only subset in props.sessionConfig.
   // Merge it on top of the strictly resolved config without reintroducing
   // default/general fallback for unresolved explicit slugs.
-  const merged = { ...(canonicalConfig || {}), ...overlayConfig };
+  const merged: AnyRecord = { ...(canonicalConfig || {}), ...overlayConfig };
 
   if (canonicalConfig?.lit || overlayConfig?.lit) {
     merged.lit = { ...(canonicalConfig?.lit || {}), ...(overlayConfig?.lit || {}) };
@@ -212,8 +261,8 @@ const mergeSurveyToolResponseGateSessionConfig = ({
   return merged;
 };
 
-export const resolveSurveyToolEffectiveSlug = (input = {}) => (
-  resolveCanonicalSessionConfig({
+export const resolveSurveyToolEffectiveSlug = (input: SurveyToolSessionInput = {}): string => (
+  resolveCanonicalSessionContext({
     source: buildSurveyToolSessionSource(input),
   }).sessionSlug || ''
 );
@@ -221,7 +270,9 @@ export const resolveSurveyToolEffectiveSlug = (input = {}) => (
 export const resolveSurveyToolSessionContext = ({
   resolveBySlug,
   ...input
-} = {}) => resolveCanonicalSessionConfig({
+}: SurveyToolSessionInput & {
+  resolveBySlug?: ResolveSessionConfigBySlug;
+} = {}): SessionResolutionResult => resolveCanonicalSessionContext({
   source: buildSurveyToolSessionSource(input),
   resolveBySlug,
 });
@@ -229,7 +280,10 @@ export const resolveSurveyToolSessionContext = ({
 export const resolveSurveyToolDraftSessionContext = ({
   resolveBySlug,
   ...input
-} = {}) => resolveCanonicalSessionConfig({
+}: SurveyToolSessionInput & {
+  effectiveDraftSlug?: string | null;
+  resolveBySlug?: ResolveSessionConfigBySlug;
+} = {}): SessionResolutionResult => resolveCanonicalSessionContext({
   source: buildSurveyToolDraftSessionSource(input),
   resolveBySlug,
 });
@@ -237,7 +291,10 @@ export const resolveSurveyToolDraftSessionContext = ({
 export const resolveSurveyToolExplicitSessionContext = ({
   sessionSlug,
   resolveBySlug,
-} = {}) => resolveCanonicalSessionConfig({
+}: {
+  sessionSlug?: string | null;
+  resolveBySlug?: ResolveSessionConfigBySlug;
+} = {}): SessionResolutionResult => resolveCanonicalSessionContext({
   source: {
     sessionSlug: normalizeSessionSlug(sessionSlug),
   },
@@ -248,7 +305,13 @@ export const resolveSurveyToolResponseGateSessionContext = ({
   sessionSlug,
   sessionConfig,
   resolveBySlug,
-} = {}) => {
+}: {
+  sessionSlug?: string | null;
+  sessionConfig?: SessionConfigLike | null;
+  resolveBySlug?: ResolveSessionConfigBySlug;
+} = {}): SessionResolutionResult & {
+  effectiveSessionConfig: SessionConfigLike | null;
+} => {
   const resolved = resolveSurveyToolExplicitSessionContext({
     sessionSlug,
     resolveBySlug,
@@ -267,7 +330,13 @@ export const resolveSurveyToolResponseGateSessionContext = ({
 export const resolveSurveyToolQuestionConfigContext = ({
   sessionSlug,
   resolveBySlug,
-} = {}) => {
+}: {
+  sessionSlug?: string | null;
+  resolveBySlug?: ResolveSessionConfigBySlug;
+} = {}): SessionResolutionResult & {
+  blockedQuestionIds: string[];
+  highlightedQuestionIds: string[];
+} => {
   const resolved = resolveSurveyToolExplicitSessionContext({
     sessionSlug,
     resolveBySlug,
@@ -286,7 +355,12 @@ export const resolveSurveyToolQuestionConfigContext = ({
 export const resolveSurveyToolLockAudienceSessionNameContext = ({
   sessionSlug,
   resolveBySlug,
-} = {}) => {
+}: {
+  sessionSlug?: string | null;
+  resolveBySlug?: ResolveSessionConfigBySlug;
+} = {}): SessionResolutionResult & {
+  sessionName: string;
+} => {
   const resolved = resolveSurveyToolExplicitSessionContext({
     sessionSlug,
     resolveBySlug,
@@ -295,10 +369,10 @@ export const resolveSurveyToolLockAudienceSessionNameContext = ({
     ? resolved.sessionConfig
     : null;
   const sessionName = hasNonBlankValue(sessionConfig?.sessionName)
-    ? toStr(sessionConfig.sessionName).trim()
+    ? toStr(sessionConfig?.sessionName).trim()
     : (
       hasNonBlankValue(sessionConfig?.slug)
-        ? toStr(sessionConfig.slug).trim()
+        ? toStr(sessionConfig?.slug).trim()
         : ''
     );
 
@@ -313,7 +387,7 @@ export const resolveSurveyToolDraftStorageContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -325,7 +399,7 @@ export const resolveSurveyToolResponseHydrationContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -337,7 +411,7 @@ export const resolveSurveyToolQuestionBootstrapContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -349,7 +423,7 @@ export const resolveSurveyToolDecryptHydrationContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -361,7 +435,7 @@ export const resolveSurveyToolResponseJsonContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -373,7 +447,7 @@ export const resolveSurveyToolQuestionReadCacheContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -386,7 +460,7 @@ export const resolveSurveyToolQuestionsDashboardLoadContext = ({
   networkChainId,
   resolveBySlug,
   fallbackSessionSlugs,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -399,7 +473,7 @@ export const resolveSurveyToolQuestionPayloadCacheWriteContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -411,7 +485,7 @@ export const resolveSurveyToolEnsureQuestionCachedContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -424,7 +498,7 @@ export const resolveSurveyToolQuestionCountContext = ({
   networkChainId,
   resolveBySlug,
   fallbackSessionSlugs,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -437,7 +511,7 @@ export const resolveSurveyToolIdLookupContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -449,7 +523,7 @@ export const resolveSurveyToolSurveyReadContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -461,7 +535,7 @@ export const resolveSurveyToolUpdateCacheContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -473,7 +547,7 @@ export const resolveSurveyToolSubmittedCacheWriteContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -485,7 +559,7 @@ export const resolveSurveyToolPileWarmSeedContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -497,7 +571,7 @@ export const resolveSurveyToolPileLoadContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -509,7 +583,7 @@ export const resolveSurveyToolPileResponseReadContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => resolveSurveyToolNetworkScopedSessionContext({
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext => resolveSurveyToolNetworkScopedSessionContext({
   sessionSlug,
   network,
   networkChainId,
@@ -521,7 +595,10 @@ export const resolveSurveyToolPileFilterContext = ({
   network,
   networkChainId,
   resolveBySlug,
-} = {}) => {
+}: SurveyToolNetworkScopedInput = {}): SurveyToolScopedContext & {
+  blockedQuestionIds: string[];
+  highlightedQuestionIds: string[];
+} => {
   const resolved = resolveSurveyToolNetworkScopedSessionContext({
     sessionSlug,
     network,
