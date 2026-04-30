@@ -26,8 +26,7 @@
 - Start in `sessionWizardContracts.js` for contract defaults, visible contract keys, or registry-address resolution.
 - Start in `sessionWizardSecrets.ts` for post-deploy worker config sync, secrets sync, or deploy warning/status handling.
 - Start in `sessionWizardWriteNormalization.ts` for worker payload normalization, on-chain compatibility fields, or metadata serialization rules.
-- Start in `sessionWizardStorageProfile.ts` for `/new` Advanced session storage profile defaults and Cloudflare primitive metadata.
-- Start in `CreateSBTGroup.tsx` only when the issue is inside the deferred SBT authoring modal itself; `SessionWizard.tsx` mainly launches and reconciles that flow.
+- Start in `CreateSBTGroup.jsx` only when the issue is inside the deferred SBT authoring modal itself; `SessionWizard.jsx` mainly launches and reconciles that flow.
 
 ## Practical Hierarchy
 
@@ -52,9 +51,8 @@ SessionWizard.tsx
   -> sessionWizardContracts.js
   -> sessionWizardSecrets.ts
   -> sessionWizardWriteNormalization.ts
-  -> sessionWizardStorageProfile.ts
-  -> CreateSBTGroup.tsx
-  -> ContractViewer.tsx
+  -> CreateSBTGroup.jsx
+  -> ContractViewer.jsx
 ```
 
 ## Section Index
@@ -132,7 +130,7 @@ bundle link / imported bundle
 - If a bug is about registry fields or contract addresses, check `sessionWizardContracts.js` first.
 - If a bug is about worker config sync or post-deploy warnings, check `sessionWizardSecrets.ts` first.
 - If a bug is about publish payload shape mismatch between worker config and on-chain metadata, check `sessionWizardWriteNormalization.ts` first.
-- If a bug is about gated field UI, draft persistence, or wizard step order, `SessionWizard.tsx` is the right entrypoint.
+- If a bug is about gated field UI, draft persistence, or wizard step order, `SessionWizard.jsx` is the right entrypoint.
 
 ## Residual Risk
 

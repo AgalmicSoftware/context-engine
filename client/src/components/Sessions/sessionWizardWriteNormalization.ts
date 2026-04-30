@@ -13,24 +13,17 @@ import {
   getVisibleSessionWizardContractKeys,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
-import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
-import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
-import {
-  isWorkerSbtGateCloudflareStorageProfile,
-  normalizeSessionStorageProfileConfig,
-} from './sessionWizardStorageProfile';
 import type {
   AnyRecord,
   ChainIdLike,
   SessionContractLike,
   SessionContractsLike,
-  WorkerSecretsLike,
 } from '../shellTypes';
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const trimString = (value: unknown): string => toStr(value).trim();
-const cloneValue = <T = unknown>(value: T): T => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
+const cloneValue = (value: any): any => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
   if (isObj(value)) {
     return Object.keys(value).reduce<AnyRecord>((acc, key) => {
       acc[key] = cloneValue(value[key]);
@@ -251,7 +244,6 @@ export const buildSessionWizardWorkerConfigPayload = ({
   slug?: string;
   draft?: AnyRecord;
   deployPayload?: AnyRecord;
-  workerSecrets?: WorkerSecretsLike;
   account?: string;
   registryAddress?: string;
   registryChainId?: ChainIdLike;
@@ -284,7 +276,6 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
-  const storageProfile = normalizeSessionStorageProfileConfig(resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile);
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
