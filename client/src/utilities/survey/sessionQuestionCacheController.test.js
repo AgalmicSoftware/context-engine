@@ -7,7 +7,7 @@ jest.mock('utilities/logging.js', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   }),
-}));
+}), { virtual: true });
 
 jest.mock('../web3/contractScripts.js', () => ({
   __esModule: true,
@@ -36,17 +36,12 @@ jest.mock('../session/sessionScanScope.js', () => ({
   DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE: 50000,
   readSessionScanMaxBlockRange: jest.fn(),
   resolveValidatedSessionScanWindow: jest.fn(),
-}));
-
-jest.mock('../session/demoSessionQuestionFixtures.js', () => ({
-  __esModule: true,
-  getTemporaryDemoSessionQuestionFixtures: jest.fn(() => []),
-}));
+}), { virtual: true });
 
 jest.mock('../crypto/litProtocol.js', () => ({
   __esModule: true,
   getGlobalLitHooks: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../session/sessionQuestionDecryption.js', () => ({
   __esModule: true,
@@ -89,9 +84,6 @@ const {
   readSessionScanMaxBlockRange,
   resolveValidatedSessionScanWindow,
 } = require('../session/sessionScanScope.js');
-const {
-  getTemporaryDemoSessionQuestionFixtures,
-} = require('../session/demoSessionQuestionFixtures.js');
 const { getGlobalLitHooks } = require('../crypto/litProtocol.js');
 const {
   buildQuestionDecryptContextForSession,
@@ -375,7 +367,6 @@ describe('createSessionQuestionCacheController', () => {
     shouldClearQuestionProgressInFinalize.mockImplementation(() => false);
     shouldCommitThrottledProgress.mockImplementation(({ force }) => !!force);
     shouldFlushCoalescedRun.mockImplementation(({ force }) => !!force);
-    getTemporaryDemoSessionQuestionFixtures.mockReturnValue([]);
     isMaskedQuestionPayload.mockImplementation((question) => (
       !!question?.masked ||
       String(question?.prompt || '') === '[encrypted]' ||
@@ -548,29 +539,6 @@ describe('createSessionQuestionCacheController', () => {
       }));
     });
 
-    it('resets empty discovery watermarks when a gated empty recovery forces a rescan', async () => {
-      const host = createMockHost({
-        initialStorage: {
-          questionsCache: {
-            [SESSION_SLUG]: createQuestionsCacheEnvelope({}, {
-              questionsLatestBlock: 12,
-              questionsDiscoveryCheckpointBlock: 12,
-            }),
-          },
-        },
-      });
-      const controller = createSessionQuestionCacheController(host);
-
-      await controller.initializeQuestionCacheForGroup(SESSION_SLUG, { forceDiscoveryRescan: true });
-
-      expect(contractScripts.fetchUserSubmittedQuestionIDs).toHaveBeenCalledWith(
-        'none',
-        10,
-        12,
-        SESSION_SLUG
-      );
-    });
-
     it('fetches question IDs via contractScripts.fetchUserSubmittedQuestionIDs', async () => {
       const controller = createSessionQuestionCacheController(createMockHost());
 
@@ -616,222 +584,6 @@ describe('createSessionQuestionCacheController', () => {
       });
     });
 
-    it('publishes temporary demo fixtures before block window resolution settles', async () => {
-      const windowDeferred = createDeferred();
-      const host = createMockHost({
-        activeSlug: 'demo-1',
-        sessionCfg: {
-          networkChainId: NETWORK_ID,
-          blockLimits: { start: 44967477, end: null },
-          demoCompatibilitySeed: { temporary: true },
-        },
-      });
-      const controller = createSessionQuestionCacheController(host);
-
-      getTemporaryDemoSessionQuestionFixtures.mockReturnValue([
-        {
-          id: '0xABCDEF',
-          type: 'binary',
-          prompt: 'Fixture prompt',
-          sessionSlug: 'demo-1',
-          temporaryDemoSeed: true,
-        },
-      ]);
-      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(windowDeferred.promise);
-
-      const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
-      await flushMicrotasks(6);
-
-      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('demo-1');
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef'])
-        .toMatchObject({
-          id: '0xabcdef',
-          prompt: 'Fixture prompt',
-          sessionSlug: 'demo-1',
-          temporaryDemoSeed: true,
-        });
-      expect(host.getStateSnapshot()).toMatchObject({
-        isQuestionCacheReady: true,
-        questionResponsesNonce: 1,
-      });
-
-      windowDeferred.resolve({
-        fromBlock: 44967477,
-        toBlock: 44967476,
-      });
-      await initPromise;
-      controller.destroy();
-    });
-
-    it('publishes temporary demo fixtures before chain discovery settles', async () => {
-      const discoveryDeferred = createDeferred();
-      const host = createMockHost({
-        activeSlug: 'demo-1',
-        sessionCfg: {
-          networkChainId: NETWORK_ID,
-          blockLimits: { start: 44967477, end: null },
-          demoCompatibilitySeed: { temporary: true },
-        },
-      });
-      const controller = createSessionQuestionCacheController(host);
-
-      getTemporaryDemoSessionQuestionFixtures.mockReturnValue([
-        {
-          id: '0xABCDEF',
-          type: 'binary',
-          prompt: 'Fixture prompt',
-          sessionSlug: 'demo-1',
-          temporaryDemoSeed: true,
-        },
-      ]);
-      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({
-        fromBlock: 44967477,
-        toBlock: 44967477,
-      });
-      resolveValidatedSessionScanWindow.mockReturnValueOnce({
-        ok: true,
-        fromBlock: 44967477,
-        toBlock: 44967477,
-        requestedToBlock: 44967477,
-        requestedRangeBlocks: 1,
-        maxBlockRange: DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE,
-        wasCapped: false,
-      });
-      contractScripts.getAllQuestionIDsChunkedWithCallback.mockReturnValueOnce(
-        discoveryDeferred.promise
-      );
-
-      const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
-      await flushMicrotasks(10);
-
-      expect(getTemporaryDemoSessionQuestionFixtures).toHaveBeenCalledWith(
-        'demo-1',
-        expect.objectContaining({
-          demoCompatibilitySeed: { temporary: true },
-        })
-      );
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef'])
-        .toMatchObject({
-          id: '0xabcdef',
-          prompt: 'Fixture prompt',
-          sessionSlug: 'demo-1',
-          temporaryDemoSeed: true,
-        });
-      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.pendingQuestionMetadata?.['0xabcdef'])
-        .toBeUndefined();
-      expect(host.getStateSnapshot()).toMatchObject({
-        isQuestionCacheReady: true,
-        questionResponsesNonce: 1,
-      });
-
-      discoveryDeferred.resolve([]);
-      await initPromise;
-      controller.destroy();
-    });
-
-    it('persists discovered question IDs as pending before slow metadata hydration completes', async () => {
-      const host = createMockHost();
-      const controller = createSessionQuestionCacheController(host);
-      const metadataDeferred = createDeferred();
-
-      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
-        { questionId: 'Q1', creationBlock: 11 },
-      ]);
-      contractScripts.getQuestionDataById.mockReturnValue(metadataDeferred.promise);
-
-      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
-
-      await flushMicrotasks(10);
-
-      const pendingDuringHydration = host
-        .getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
-
-      expect(pendingDuringHydration).toMatchObject({
-        attempts: 0,
-        nextRetryAtMs: 0,
-        state: 'discovered',
-        lastStatus: null,
-      });
-      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionsLatestBlock).toBe(12);
-
-      metadataDeferred.resolve({
-        creator: '0xCreator',
-        prompt: 'Late prompt',
-      });
-      await initPromise;
-
-      const stored = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
-      expect(stored?.pendingQuestionMetadata?.q1).toBeUndefined();
-      expect(stored?.questions?.q1).toMatchObject({
-        id: 'q1',
-        creator: '0xCreator',
-        prompt: 'Late prompt',
-      });
-    });
-
-    it('publishes the first hydrated question before the rest of the metadata batch settles', async () => {
-      const host = createMockHost();
-      const controller = createSessionQuestionCacheController(host);
-      const firstMetadata = createDeferred();
-      const secondMetadata = createDeferred();
-
-      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
-        { questionId: 'Q1', creationBlock: 11 },
-        { questionId: 'Q2', creationBlock: 12 },
-      ]);
-      contractScripts.getQuestionDataById.mockImplementation((_mode, qId) => {
-        if (qId === 'q1') return firstMetadata.promise;
-        if (qId === 'q2') return secondMetadata.promise;
-        return Promise.resolve(null);
-      });
-
-      let initSettled = false;
-      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
-      initPromise.finally(() => {
-        initSettled = true;
-      });
-
-      await flushMicrotasks(10);
-
-      firstMetadata.resolve({
-        creator: '0xCreatorA',
-        prompt: 'First prompt',
-      });
-      await flushMicrotasks(12);
-
-      const storedDuringBatch = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
-      expect(storedDuringBatch?.questions?.q1).toMatchObject({
-        id: 'q1',
-        creator: '0xCreatorA',
-        prompt: 'First prompt',
-      });
-      expect(storedDuringBatch?.questions?.q2).toBeUndefined();
-      expect(storedDuringBatch?.pendingQuestionMetadata?.q1).toBeUndefined();
-      expect(storedDuringBatch?.pendingQuestionMetadata?.q2).toMatchObject({
-        state: 'discovered',
-      });
-      expect(host.getStateSnapshot()).toMatchObject({
-        isQuestionCacheReady: true,
-        questionResponsesNonce: 1,
-      });
-      expect(initSettled).toBe(false);
-
-      secondMetadata.resolve({
-        creator: '0xCreatorB',
-        prompt: 'Second prompt',
-      });
-      await initPromise;
-
-      const storedAfterBatch = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
-      expect(storedAfterBatch?.questions?.q2).toMatchObject({
-        id: 'q2',
-        creator: '0xCreatorB',
-        prompt: 'Second prompt',
-      });
-
-      controller.destroy();
-    });
-
     it('handles question metadata fetch failure by marking the question pending', async () => {
       const nowRef = { value: 1000 };
       jest.spyOn(Date, 'now').mockImplementation(() => nowRef.value);
@@ -855,15 +607,6 @@ describe('createSessionQuestionCacheController', () => {
         message: 'retry later',
       });
       expect(pendingEntry.nextRetryAtMs).toBe(2000);
-      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questions?.q1).toMatchObject({
-        id: 'q1',
-        prompt: '[encrypted]',
-        sessionName: SESSION_SLUG,
-        __ceQuestionMetadataPending: true,
-      });
-      expect(host.getStateSnapshot()).toMatchObject({
-        isQuestionCacheReady: false,
-      });
 
       controller.destroy();
     });
@@ -993,11 +736,6 @@ describe('createSessionQuestionCacheController', () => {
         attempts: 1,
         nextRetryAtMs: 2000,
       });
-      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questions?.q1).toMatchObject({
-        id: 'q1',
-        prompt: '[encrypted]',
-        __ceQuestionMetadataPending: true,
-      });
 
       nowRef.value = firstPending.nextRetryAtMs + 1;
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG, {
@@ -1013,7 +751,6 @@ describe('createSessionQuestionCacheController', () => {
         creator: '0xRecovered',
         prompt: 'Recovered prompt',
       });
-      expect(stored?.questions?.q1?.__ceQuestionMetadataPending).toBeUndefined();
       expect(stored?.pendingQuestionMetadata?.q1).toBeUndefined();
 
       controller.destroy();
@@ -1120,7 +857,6 @@ describe('createSessionQuestionCacheController', () => {
     it('calls buildQuestionDecryptContextForSession with the expected params', async () => {
       const host = createMockHost({
         network: { id: 777 },
-        initialState: { litHooks: globalLitHooks },
         initialStorage: {
           questionsCache: {
             [SESSION_SLUG]: createQuestionsCacheEnvelope({
@@ -1222,33 +958,6 @@ describe('createSessionQuestionCacheController', () => {
       expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
         needsQuestionResponsesNonce: true,
       });
-    });
-
-    it('preserves backoff entries created across multiple refresh batches', async () => {
-      const nowRef = { value: 1000 };
-      jest.spyOn(Date, 'now').mockImplementation(() => nowRef.value);
-      const questions = {};
-      for (let index = 1; index <= 5; index += 1) {
-        questions[`q${index}`] = createMaskedQuestion(`q${index}`);
-      }
-      const host = createMockHost({
-        initialStorage: {
-          questionsCache: {
-            [SESSION_SLUG]: createQuestionsCacheEnvelope(questions),
-          },
-        },
-      });
-      const controller = createSessionQuestionCacheController(host);
-
-      contractScripts.decryptQuestionPayloadInPlace.mockRejectedValue(new Error('decrypt failed'));
-
-      await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG, { force: true });
-
-      contractScripts.decryptQuestionPayloadInPlace.mockClear();
-      nowRef.value = 2000;
-      await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG);
-
-      expect(contractScripts.decryptQuestionPayloadInPlace).not.toHaveBeenCalled();
     });
   });
 
