@@ -5,8 +5,8 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 ## Recently Completed Foundations
 
 - **Scaling**: the initial on-chain mode may only support hundreds of users per session; scaling to hundreds of thousands will require architectural optimizations and variations which are already planned.
-- **God component decomposition**: `MainSite.jsx`, `SurveyTool.jsx`, and `SessionWizard.jsx` still carry 5,000–15,000+ line responsibilities and need to be split into smaller, more maintainable units.
-- **Lit Protocol `naga-dev` → `chipotle`/v3 migration**: the current Lit integration still depends on legacy network infrastructure and needs to move onto the supported stack. Lit is currently deploying their next-generation stack.
+- **God component decomposition**: all production components are now TSX; `MainSite.tsx` is still a ~6,294 line orchestrator that needs runtime decomposition (PRD 449); `SessionWizard.tsx` is still a 5,000+ line orchestrator that needs further decomposition.
+- **Lit Protocol Naga-era runtime → Chipotle re-platform**: CE still ships a legacy Naga-shaped Lit integration even though Naga sunset on April 1, 2026 and Chipotle is now GA. Moving onto the supported stack is a re-platform from SDK/auth-context/PaymentManager/network selection to Chipotle's REST/API-key/account/group model, not a simple dependency bump.
 - **Frontend modernization**: migrate remaining class components to functional React, upgrade React 17 → 18 with Vite, and consolidate SCSS into a standardized design system.
 - **Worker auth trust-boundary hardening**: browser login to the session worker still needs stricter trusted-origin / SIWE audience binding so off-origin or originless token redemption is not possible.
 
