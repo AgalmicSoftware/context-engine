@@ -64,6 +64,7 @@ import { t } from '../../utilities/ui/terminology.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
+import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
 import {
   buildQuestionRoutePath,
   isMaskedQuestionPayload,
@@ -107,6 +108,11 @@ import {
   resolveSurveyToolSurveyReadContext,
   resolveSurveyToolUpdateCacheContext,
 } from './surveyToolSessionResolution.js';
+import {
+  buildCanDecryptOtherResponsesSnapshot,
+  buildResponseGateConfigSignature,
+  resolveCanDecryptOtherResponsesVerdict,
+} from './surveyToolResponseAccess';
 import {
   readSessionScanScope,
   readSessionScanSlugs,
@@ -1410,75 +1416,26 @@ export class SurveyQuestions extends Component {
   };
 
   buildResponseGateConfigSignature = (cfg = {}) => {
-    const normText = (value) => String(value == null ? '' : value).trim().toLowerCase();
-    const normChain = (value) => {
-      const n = Number(value || 0);
-      return Number.isFinite(n) && n > 0 ? String(n) : '';
-    };
-    const normAddresses = (...sources) => Array.from(new Set(
-      sources
-        .flat()
-        .map((addr) => String(addr || '').trim().toLowerCase())
-        .filter(Boolean)
-    )).sort().join(',');
-    const readObj = (value) => (value && typeof value === 'object' ? value : {});
-    const stablePairs = (obj, mapper) => Object.keys(readObj(obj))
-      .sort()
-      .map((key) => `${key}:${mapper(readObj(obj)[key], key)}`)
-      .join('|');
-    const gateSnapshot = (gate = {}) => {
-      const g = readObj(gate);
-      return [
-        normText(g.gateId || g.id),
-        normText(g.label || g.name || g.title),
-        normChain(g.chainId),
-        normText(g.litChain || g.chain),
-        normText(g.mode || g.operator || g.gateMode || g.requireAll),
-        normAddresses(g.sbtAddress, g.sbtAddresses),
-        normText(g.lookupStatus),
-      ].join(',');
-    };
-    const resourceSnapshot = (resource = {}) => {
-      const r = readObj(resource);
-      return [
-        normText(r.status),
-        normText(r.gateId || r.id),
-        normText(r.mode || r.operator),
-        normText(r.allowFallback),
-        gateSnapshot(r.gate),
-      ].join(',');
-    };
-
-    const sponsoredGates = (cfg?.sponsored?.gates && typeof cfg.sponsored.gates === 'object')
-      ? cfg.sponsored.gates
-      : {};
-    const sponsoredResources = (cfg?.sponsored?.resources && typeof cfg.sponsored.resources === 'object')
-      ? cfg.sponsored.resources
-      : {};
-    const registryGates = (cfg?.__registry?.gatesByResource && typeof cfg.__registry.gatesByResource === 'object')
-      ? cfg.__registry.gatesByResource
-      : {};
-
-    const sponsoredGatesSig = stablePairs(sponsoredGates, (gate) => gateSnapshot(gate));
-    const sponsoredResourcesSig = stablePairs(sponsoredResources, (resource) => resourceSnapshot(resource));
-    const registryGatesSig = stablePairs(registryGates, (gate) => gateSnapshot(gate));
-
-    return [
-      Number(cfg?.networkChainId || 0) || 0,
-      String(cfg?.sponsored?.defaultGateId || ''),
-      String(cfg?.__registry?.updatedAt || ''),
-      String(cfg?.__registry?.gateAuthority || ''),
-      sponsoredGatesSig,
-      sponsoredResourcesSig,
-      registryGatesSig,
-    ].join('|');
+    return buildResponseGateConfigSignature(cfg);
   };
 
   refreshCanDecryptOtherResponses = async () => {
     try {
-      const account = String(this.props?.account || '').trim();
-      const loggedIn = !!(this.props?.loginComplete && account);
-      if (!loggedIn) {
+      const slug = this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props);
+      const cfg = this.resolveEffectiveResponseGateConfig(slug);
+      const policy = this.getResponseGatePolicy();
+      const snapshot = buildCanDecryptOtherResponsesSnapshot({
+        account: this.props?.account || '',
+        loginComplete: this.props?.loginComplete,
+        singleQuestionMode: this.props.singleQuestionMode,
+        isStandalone: this.props.isStandalone,
+        policy,
+        slug,
+        sbtCacheRevision: this.props?.sbtCacheRevision || 0,
+        cfg,
+      });
+
+      if (!snapshot.loggedIn) {
         // Invalidate any in-flight checks so they can't race and re-enable decrypt UI after logout.
         this._canDecryptOtherResponsesRunId += 1;
         this._canDecryptOtherResponsesKey = '';
@@ -1489,10 +1446,8 @@ export class SurveyQuestions extends Component {
         return false;
       }
 
-      const policy = this.getResponseGatePolicy();
-      const recipients = Array.isArray(policy?.recipients) ? policy.recipients : [];
       // If there is no gate recipient policy, the response is not decryptable-by-gate (others should not see decrypt buttons).
-      if (recipients.length === 0) {
+      if (snapshot.recipients.length === 0) {
         // Invalidate any in-flight checks so they can't race and re-enable decrypt UI.
         this._canDecryptOtherResponsesRunId += 1;
         this._canDecryptOtherResponsesKey = '';
@@ -1503,64 +1458,32 @@ export class SurveyQuestions extends Component {
         return false;
       }
 
-      const resourceKey = String(
-        policy?.primaryResource ||
-          ((this.props.singleQuestionMode || this.props.isStandalone) ? 'questionResponses' : 'surveyResponses')
-      ).trim() || 'default';
-      // Encryption can include multiple Lit recipients (primary resource gate + fallback default gate).
-      // Treat satisfying either as sufficient to show decrypt buttons for viewed (non-own) responses.
-      const resourceKeysToCheck = Array.from(new Set([resourceKey, 'default'].filter(Boolean)));
-      const resourceKeysSig = resourceKeysToCheck.join(',');
-      const slug = this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props);
-      const cfg = this.resolveEffectiveResponseGateConfig(slug);
-
-      const key = [
-        account.toLowerCase(),
-        String(slug || ''),
-        resourceKeysSig,
-        String(this.props?.sbtCacheRevision || 0),
-        String(cfg?.__registry?.updatedAt || ''),
-        String(cfg?.__registry?.gateAuthority || ''),
-        String(recipients.length),
-      ].join('|');
-      if (key === this._canDecryptOtherResponsesKey && this._canDecryptOtherResponsesInFlight) {
+      if (snapshot.key === this._canDecryptOtherResponsesKey && this._canDecryptOtherResponsesInFlight) {
         return await this._canDecryptOtherResponsesInFlight;
       }
-      this._canDecryptOtherResponsesKey = key;
+      this._canDecryptOtherResponsesKey = snapshot.key;
       const runId = (Number(this._canDecryptOtherResponsesRunId) || 0) + 1;
       this._canDecryptOtherResponsesRunId = runId;
 
       const run = (async () => {
         if (this.state.canDecryptOtherResponsesStatus !== 'checking' &&
           this._canDecryptOtherResponsesRunId === runId &&
-          this._canDecryptOtherResponsesKey === key
+          this._canDecryptOtherResponsesKey === snapshot.key
         ) {
           // Clear any previously granted permission while we verify against the current gate/session/wallet.
           this.setState({ canDecryptOtherResponses: false, canDecryptOtherResponsesStatus: 'checking' });
         }
         const verdicts = [];
-        for (const rk of resourceKeysToCheck) {
+        for (const rk of snapshot.resourceKeysToCheck) {
           verdicts.push(await checkSponsoredAccess({
             sessionConfig: cfg,
             sessionSlug: slug,
-            account,
+            account: snapshot.account,
             resourceKey: rk,
           }));
         }
-        const statuses = verdicts.map((v) => String(v?.status || 'unknown'));
-        const canDecrypt = statuses.includes('granted');
-        const status = canDecrypt
-          ? 'granted'
-          : (statuses.includes('unknown') || statuses.includes('error'))
-            ? 'unknown'
-            : statuses.includes('denied')
-              ? 'denied'
-              : statuses.includes('invalid-gate')
-                ? 'invalid-gate'
-                : statuses.includes('no-gate')
-                ? 'no-gate'
-                  : (statuses[0] || 'unknown');
-        if (this._canDecryptOtherResponsesRunId === runId && this._canDecryptOtherResponsesKey === key) {
+        const { canDecrypt, status } = resolveCanDecryptOtherResponsesVerdict(verdicts);
+        if (this._canDecryptOtherResponsesRunId === runId && this._canDecryptOtherResponsesKey === snapshot.key) {
           this.setState({
             canDecryptOtherResponses: canDecrypt,
             canDecryptOtherResponsesStatus: status,
@@ -1572,7 +1495,7 @@ export class SurveyQuestions extends Component {
       let tracked = null;
       tracked = run
         .catch(() => {
-          if (this._canDecryptOtherResponsesRunId === runId && this._canDecryptOtherResponsesKey === key) {
+          if (this._canDecryptOtherResponsesRunId === runId && this._canDecryptOtherResponsesKey === snapshot.key) {
             this.setState({ canDecryptOtherResponses: false, canDecryptOtherResponsesStatus: 'unknown' });
           }
           return false;
@@ -1596,32 +1519,17 @@ export class SurveyQuestions extends Component {
 
   buildCanDecryptOtherResponsesSignature = () => {
     try {
-      const account = String(this.props?.account || '').trim().toLowerCase();
-      const loggedIn = !!(this.props?.loginComplete && account);
-
-      const policy = this.getResponseGatePolicy();
-      const recipients = Array.isArray(policy?.recipients) ? policy.recipients : [];
-      const resourceKey = String(
-        policy?.primaryResource ||
-          ((this.props.singleQuestionMode || this.props.isStandalone) ? 'questionResponses' : 'surveyResponses')
-      ).trim() || 'default';
-      const resourceKeysToCheck = Array.from(new Set([resourceKey, 'default'].filter(Boolean)));
-      const resourceKeysSig = resourceKeysToCheck.join(',');
-
       const slug = this._getEffectiveDraftSlug() || resolveEffectiveSlug(this.props);
-      const cfg = this.resolveEffectiveResponseGateConfig(slug);
-      const updatedAt = cfg?.__registry?.updatedAt || '';
-      const gateAuthority = cfg?.__registry?.gateAuthority || '';
-
-      return [
-        loggedIn ? account : '<anon>',
-        String(slug || ''),
-        resourceKeysSig,
-        String(this.props?.sbtCacheRevision || 0),
-        String(updatedAt),
-        String(gateAuthority),
-        String(recipients.length),
-      ].join('|');
+      return buildCanDecryptOtherResponsesSnapshot({
+        account: this.props?.account || '',
+        loginComplete: this.props?.loginComplete,
+        singleQuestionMode: this.props.singleQuestionMode,
+        isStandalone: this.props.isStandalone,
+        policy: this.getResponseGatePolicy(),
+        slug,
+        sbtCacheRevision: this.props?.sbtCacheRevision || 0,
+        cfg: this.resolveEffectiveResponseGateConfig(slug),
+      }).signature;
     } catch (_) {
       return '';
     }
@@ -2370,20 +2278,17 @@ export class SurveyQuestions extends Component {
   buildQuestionDecryptContext = (slugIn) => {
     const slug = String(slugIn ?? '').trim().toLowerCase();
     const cfg = resolveExplicitSessionContext(slug).sessionConfig || null;
-    const chainId = this.resolveSessionChainId(slug, cfg);
     const litHooks =
       this.props.lit ||
       this.props.litHooks ||
       (typeof window !== 'undefined' ? (window.__litHooks || window.litHooks) : null);
-    return {
+    return buildQuestionDecryptContextForSession({
+      cfg,
       account: this.props.account || '',
       providerLike: this.props.provider || '',
-      chainId,
       litHooks,
-      litOpts: litHooks && typeof litHooks.getKey === 'function'
-        ? { getKey: litHooks.getKey }
-        : null,
-    };
+      fallbackChainId: this.resolveSessionChainId(slug, cfg),
+    });
   };
 
   hasMaskedCurrentQuestionPayload = () => {
