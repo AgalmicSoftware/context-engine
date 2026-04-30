@@ -13,6 +13,7 @@ import LockableFieldFrame from './LockableFieldFrame';
 import BlockLimitsField from './BlockLimitsField';
 import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
+import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
@@ -2985,27 +2986,19 @@ const SessionWizard = ({
       const faucet = value && typeof value === 'object' ? value : {};
       const isCollapsed = metadataObjectCollapsed.faucet;
       return (
-        <div key={keyString} className={styles.objectGroup}>
-          <div className={styles.objectHeader}>
-            <div className={styles.objectTitle}>{displayLabel}</div>
-            <button
-              type="button"
-              className={styles.objectToggle}
-              onClick={() =>
-                setMetadataObjectCollapsed((prev) => ({ ...prev, faucet: !prev.faucet }))
-              }
-            >
-              <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-            </button>
-          </div>
-          {!isCollapsed && (
-            <div className={styles.objectBody}>
-              {Object.entries(faucet).map(([childKey, childValue]) =>
-                renderField(childKey, childValue, currentPath)
-              )}
-            </div>
+        <CollapsibleFieldGroup
+          key={keyString}
+          title={displayLabel}
+          isCollapsed={isCollapsed}
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, faucet: !prev.faucet }))
+          }
+        >
+          {!isCollapsed && Object.entries(faucet).map(([childKey, childValue]) =>
+            renderField(childKey, childValue, currentPath)
           )}
-        </div>
+        </CollapsibleFieldGroup>
       );
     }
 
@@ -3013,27 +3006,19 @@ const SessionWizard = ({
       const ai = value && typeof value === 'object' ? value : {};
       const isCollapsed = metadataObjectCollapsed.ai;
       return (
-        <div key={keyString} className={styles.objectGroup}>
-          <div className={styles.objectHeader}>
-            <div className={styles.objectTitle}>{displayLabel}</div>
-            <button
-              type="button"
-              className={styles.objectToggle}
-              onClick={() =>
-                setMetadataObjectCollapsed((prev) => ({ ...prev, ai: !prev.ai }))
-              }
-            >
-              <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-            </button>
-          </div>
-          {!isCollapsed && (
-            <div className={styles.objectBody}>
-              {Object.entries(ai).map(([childKey, childValue]) =>
-                renderField(childKey, childValue, currentPath)
-              )}
-            </div>
+        <CollapsibleFieldGroup
+          key={keyString}
+          title={displayLabel}
+          isCollapsed={isCollapsed}
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, ai: !prev.ai }))
+          }
+        >
+          {!isCollapsed && Object.entries(ai).map(([childKey, childValue]) =>
+            renderField(childKey, childValue, currentPath)
           )}
-        </div>
+        </CollapsibleFieldGroup>
       );
     }
 
@@ -3042,27 +3027,19 @@ const SessionWizard = ({
       const lit = value && typeof value === 'object' ? value : {};
       const isCollapsed = metadataObjectCollapsed.lit;
       return (
-        <div key={keyString} className={styles.objectGroup}>
-          <div className={styles.objectHeader}>
-            <div className={styles.objectTitle}>{displayLabel}</div>
-            <button
-              type="button"
-              className={styles.objectToggle}
-              onClick={() =>
-                setMetadataObjectCollapsed((prev) => ({ ...prev, lit: !prev.lit }))
-              }
-            >
-              <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-            </button>
-          </div>
-          {!isCollapsed && (
-            <div className={styles.objectBody}>
-              {Object.entries(lit).map(([childKey, childValue]) =>
-                renderField(childKey, childValue, currentPath)
-              )}
-            </div>
+        <CollapsibleFieldGroup
+          key={keyString}
+          title={displayLabel}
+          isCollapsed={isCollapsed}
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, lit: !prev.lit }))
+          }
+        >
+          {!isCollapsed && Object.entries(lit).map(([childKey, childValue]) =>
+            renderField(childKey, childValue, currentPath)
           )}
-        </div>
+        </CollapsibleFieldGroup>
       );
     }
 
@@ -3111,23 +3088,6 @@ const SessionWizard = ({
       const childNodes = Object.entries(value)
         .map(([childKey, childValue]) => renderField(childKey, childValue, currentPath))
         .filter(Boolean);
-      const isContractsBlock = path.length === 0 && key === 'contracts';
-      const isCollapsed = isContractsBlock && metadataObjectCollapsed.contracts;
-      if (isContractsBlock) {
-        return (
-          <ContractsSection
-            key={keyString}
-            title={displayLabel}
-            variant="object"
-            childNodes={childNodes}
-            emptyMessage="No editable fields in this section yet."
-            isCollapsed={isCollapsed}
-            onToggleCollapsed={() =>
-              setMetadataObjectCollapsed((prev) => ({ ...prev, contracts: !prev.contracts }))
-            }
-          />
-        );
-      }
       return (
         <div key={keyString} className={styles.objectGroup}>
           <div className={styles.objectHeader}>
