@@ -122,27 +122,28 @@ export const createSessionSurveyCacheController = (host = {}) => {
     return { background: prevBackground && nextBackground };
   };
 
-  const initializeSurveyCacheForGroup = async (slugIn, opts = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const suppressUiState = !!(opts && opts.background === true);
-    const rerunOpts = { ...(opts && typeof opts === 'object' ? opts : {}), background: suppressUiState };
-    const setSurveyState = (nextState, cb) => {
-      if (suppressUiState || !isMounted()) return;
-      setState(nextState, cb);
-    };
+  const initializeSurveyCacheForGroup = (slugIn, opts = {}) => {
+    try {
+      const slug = normalizeSessionSlug(slugIn || '');
+      const suppressUiState = !!(opts && opts.background === true);
+      const rerunOpts = { ...(opts && typeof opts === 'object' ? opts : {}), background: suppressUiState };
+      const setSurveyState = (nextState, cb) => {
+        if (suppressUiState || !isMounted()) return;
+        setState(nextState, cb);
+      };
 
-    if (scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
-      setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
-    })) {
-      return;
-    }
+      if (scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
+        setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
+      })) {
+        return Promise.resolve();
+      }
 
-    _surveyInitInFlight = _surveyInitInFlight || {};
-    _surveyInitPending = _surveyInitPending || {};
-    if (_surveyInitInFlight[slug]) {
-      _surveyInitPending[slug] = mergePendingSurveyInitOpts(_surveyInitPending[slug], rerunOpts);
-      return _surveyInitInFlight[slug];
-    }
+      _surveyInitInFlight = _surveyInitInFlight || {};
+      _surveyInitPending = _surveyInitPending || {};
+      if (_surveyInitInFlight[slug]) {
+        _surveyInitPending[slug] = mergePendingSurveyInitOpts(_surveyInitPending[slug], rerunOpts);
+        return _surveyInitInFlight[slug];
+      }
 
     const run = (async () => {
       mainSiteLog.log('initializeSurveyCacheForGroup() - invoked', { slug });
@@ -646,21 +647,25 @@ export const createSessionSurveyCacheController = (host = {}) => {
       }
     })();
 
-    _surveyInitInFlight[slug] = run;
-    try {
-      return await run;
-    } finally {
-      delete _surveyInitInFlight[slug];
-      if (_surveyInitPending[slug]) {
-        const pendingOpts = _surveyInitPending[slug];
-        delete _surveyInitPending[slug];
-        setTimeout(() => {
-          try {
-            if (!isMounted()) return;
-            initializeSurveyCacheForGroup(slug, pendingOpts || rerunOpts);
-          } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-        }, 0);
-      }
+      const finalizeRun = () => {
+        delete _surveyInitInFlight[slug];
+        if (_surveyInitPending[slug]) {
+          const pendingOpts = _surveyInitPending[slug];
+          delete _surveyInitPending[slug];
+          setTimeout(() => {
+            try {
+              if (!isMounted()) return;
+              initializeSurveyCacheForGroup(slug, pendingOpts || rerunOpts);
+            } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
+          }, 0);
+        }
+      };
+
+      const flight = run.finally(finalizeRun);
+      _surveyInitInFlight[slug] = flight;
+      return flight;
+    } catch (err) {
+      return Promise.reject(err);
     }
   };
 
