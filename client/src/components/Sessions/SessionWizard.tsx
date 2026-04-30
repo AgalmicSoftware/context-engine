@@ -117,6 +117,7 @@ import usePendingSbtDrafts, {
   type PendingSbtDraft,
 } from './hooks/usePendingSbtDrafts.js';
 import useSponsoredBundleLifecycle from './hooks/useSponsoredBundleLifecycle';
+import useSessionWizardWorkerDeploy from './hooks/useSessionWizardWorkerDeploy';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
 import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardModals from './SessionWizardModals';
@@ -855,6 +856,7 @@ const SessionWizard = ({
   const workerSecretsRef = useRef<WorkerSecretsLike>(
     sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets, { litPayerWalletInputEnabled })
   );
+  const workerDeployRuntimeRef = useRef(null);
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const defaultSponsoredSbtLookupInFlightRef = useRef('');
   const pendingSbtDeployContextSignature = useMemo(() => (
@@ -922,22 +924,42 @@ const SessionWizard = ({
   }, []);
   const updateSponsoredBundleDeploymentState = useCallback(({
     deployForm: nextDeployForm,
+    deployStatus: nextDeployStatus,
+    deployInFlight: nextDeployInFlight,
     deployComplete: nextDeployComplete,
+    workerMode: nextWorkerMode,
     deployWorkerUrl: nextDeployWorkerUrl,
     provisionedSponsoredContext: nextProvisionedSponsoredContext,
+    forceManualBundleFile: nextForceManualBundleFile,
+    normalModeBundleUrlOverride: nextNormalModeBundleUrlOverride,
     workerUrlAutoFilled: nextWorkerUrlAutoFilled,
   } = {}) => {
     if (nextDeployForm !== undefined) {
       setDeployForm(nextDeployForm);
     }
+    if (typeof nextDeployStatus === 'string') {
+      setDeployStatus(nextDeployStatus);
+    }
+    if (typeof nextDeployInFlight === 'boolean') {
+      setDeployInFlight(nextDeployInFlight);
+    }
     if (typeof nextDeployComplete === 'boolean') {
       setDeployComplete(nextDeployComplete);
+    }
+    if (typeof nextWorkerMode === 'string') {
+      setWorkerMode(nextWorkerMode);
     }
     if (typeof nextDeployWorkerUrl === 'string') {
       setDeployWorkerUrl(nextDeployWorkerUrl);
     }
     if (nextProvisionedSponsoredContext !== undefined) {
       setProvisionedSponsoredContext(nextProvisionedSponsoredContext);
+    }
+    if (typeof nextForceManualBundleFile === 'boolean') {
+      setForceManualBundleFile(nextForceManualBundleFile);
+    }
+    if (typeof nextNormalModeBundleUrlOverride === 'string') {
+      setNormalModeBundleUrlOverride(nextNormalModeBundleUrlOverride);
     }
     if (typeof nextWorkerUrlAutoFilled === 'boolean') {
       setWorkerUrlAutoFilled(nextWorkerUrlAutoFilled);
@@ -3770,7 +3792,6 @@ const SessionWizard = ({
     scheduleAdminUrlStatusReset();
   };
 
-  const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
   const sessionIdDisplay = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
 
   const handleCopySessionId = async () => {
@@ -4071,397 +4092,60 @@ const SessionWizard = ({
     });
   };
 
-  const resolveConnectedAdminAddress = async () => {
-    const cachedResolved = toStr(resolvedWalletAccountRef.current || account).trim();
-    if (cachedResolved) return cachedResolved;
+  const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
+  const embeddedDeployHelperEnabled = typeof draft.embeddedDeployHelperEnabled === 'boolean'
+    ? draft.embeddedDeployHelperEnabled
+    : (CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false);
 
-    const providerObj = cryptoUtils._getProvider(provider || 'wagmi');
-    if (!providerObj) return '';
-
-    let resolvedAddress = toStr(providerObj?.selectedAddress || providerObj?.address).trim();
-    if (typeof providerObj.request === 'function') {
-      try {
-        const accounts = await providerObj.request({ method: 'eth_accounts' });
-        if (Array.isArray(accounts) && accounts[0]) {
-          resolvedAddress = toStr(accounts[0]).trim();
-        }
-      } catch (_) {}
-    }
-
-    if (resolvedAddress) {
-      resolvedWalletAccountRef.current = resolvedAddress;
-      setDeployForm((prev) => (
-        toStr(prev?.adminAddress).trim()
-          ? prev
-          : { ...prev, adminAddress: resolvedAddress }
-      ));
-    }
-    return resolvedAddress;
+  workerDeployRuntimeRef.current = {
+    account,
+    provider,
+    network,
+    loginComplete,
+    loginInProgress,
+    toggleLoginModal,
+    registryAddress,
+    registryChainId,
+    wizardMode,
+    workerMode,
+    bundleMode,
+    bundleFile,
+    forceManualBundleFile,
+    normalModeBundleUrlOverride,
+    workerSecretsEnabled,
+    workerLimitPerWallet,
+    embeddedDeployHelperEnabled,
+    deployHelperUrl,
+    latestChainBlock,
+    sessionId,
+    sessionIdHex,
+    litPayerWalletInputEnabled,
+    draft,
+    deployForm,
   };
 
-  const handleDeployWorker = async (options = {}) => {
-    let helperBase = '';
-    const forceSponsoredAutoDeploy = options?.forceSponsoredAutoDeploy === true;
-    let effectiveBundleMode = 'upload';
-    try {
-      const currentDeployForm = (
-        deployFormRef.current &&
-        typeof deployFormRef.current === 'object'
-      ) ? deployFormRef.current : deployForm;
-      const rawSlug = toStr(draft.slug).trim();
-      const slugValidationError = getSessionSlugValidationError(rawSlug);
-      if (slugValidationError) {
-        setDeployStatus(slugValidationError);
-        return { ok: false, error: slugValidationError };
-      }
-      if (loginComplete !== true) {
-        const loginMessage = (
-          loginInProgress
-            ? 'Finish logging in before deploying the worker.'
-            : 'Connect your wallet to set the admin address.'
-        );
-        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
-        setDeployStatus(loginMessage);
-        return { ok: false, error: loginMessage };
-      }
-      setDeployStatus('Deploying worker…');
-      setDeployInFlight(true);
-      setDeployComplete(false);
-      setWorkerUrlAutoFilled(false);
-      const slug = normalizeSlug(rawSlug) || 'general';
-      const resolvedAdmin = await resolveConnectedAdminAddress();
-      if (!resolvedAdmin) {
-        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
-        throw new Error('Connect your wallet to set the admin address.');
-      }
-      const configuredWorkerUrlBeforeDeploy = normalizeWorkerUrl(toStr(draft.corsWorkerUrl).trim());
-      const workerConfigError = getSessionWizardWorkerDeployValidationError({
-        registryAddress,
-        registryChainId,
-        networkChainId: draft.networkChainId,
-        pathProvider: draft?.rpc?.providers?.path || draft?.rpc?.path || {},
-        faucetRpcUrl: draft?.faucet?.rpcUrl,
-      });
-      if (workerConfigError) {
-        throw new Error(workerConfigError);
-      }
-      const currentWorkerSecrets = getCurrentWorkerSecrets();
-      if (workerSecretsEnabled) {
-        const missing = getMissingWorkerSecretsForDeploy(currentWorkerSecrets);
-        if (missing.length) {
-          throw new Error(`Missing required secrets before deploy: ${missing.join(', ')}`);
-        }
-      }
-      // Regression guard: deploy-ready sponsored links still force the URL path
-      // in normal mode, but manual retry must still be able to override that
-      // path with an uploaded bundle file after a remote fetch failure.
-      const sponsoredAutoDeployReady = (
-        workerMode !== 'default' &&
-        resolveSessionWizardSponsoredAutoDeployReadiness({
-          wizardMode,
-          sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
-          deployForm: currentDeployForm,
-          workerSecretsEnabled,
-          currentWorkerSecrets,
-          getMissingWorkerSecretsForDeploy,
-          hasBundleFile: !!bundleFile,
-          normalModeBundleUrlOverride,
-        }).ready
-      );
-      effectiveBundleMode = resolveSessionWizardDeployBundleMode({
-        wizardMode,
-        bundleMode,
-        bundleUrl: currentDeployForm.bundleUrl,
-        sponsoredAutoDeployReady: forceSponsoredAutoDeploy || sponsoredAutoDeployReady,
-        forceSponsoredAutoDeploy,
-        forceManualBundleFile,
-        hasBundleFile: !!bundleFile,
-        normalModeBundleUrlOverride,
-      });
-      if (effectiveBundleMode === 'upload' && !bundleFile) {
-        throw new Error(
-          effectiveBundleMode === 'upload' && wizardMode === 'normal'
-            ? 'Upload a worker bundle file before deploy.'
-            : 'Upload a worker bundle file or switch to bundle URL.'
-        );
-      }
-      const requestedBundleUrl = resolveSessionWizardBundleUrlForMode({
-        wizardMode,
-        bundleUrl: currentDeployForm.bundleUrl,
-        normalModeBundleUrlOverride,
-      });
-      const {
-        bundleText,
-        bundleUrl,
-      } = await resolveSessionWizardDeployBundlePayload({
-        effectiveBundleMode,
-        bundleFile,
-        bundleUrl: requestedBundleUrl,
-      });
-      const deploySecrets = workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
-      const deployBlockLimits = normalizeBlockLimitsForConfig(draft?.blockLimits, latestChainBlock);
-      const payload = {
-        workerName: currentDeployForm.workerName,
-        sessionSlug: slug,
-        bundleUrl,
-        bundleText: bundleText || undefined,
-        registryAddress: toStr(registryAddress).trim(),
-        registryChainId: Number(registryChainId || draft.networkChainId || 0) || 0,
-        adminAddress: resolvedAdmin,
-        rpcUrl: resolveWorkerRpcUrl(),
-        rpcUrlsByChainId: resolveWorkerRpcUrlMap(),
-        allowOrigins: parseAllowOriginsInput(),
-        limits: Number(workerLimitPerWallet || 0) ? { perWalletPerDay: Number(workerLimitPerWallet) } : {},
-        scopes: {},
-        faucet: resolveWorkerFaucetConfig(),
-        embeddedDeployHelperEnabled,
-      };
-      if (deployBlockLimits) {
-        payload.blockLimits = deployBlockLimits;
-      }
-      if (Object.keys(deploySecrets).length) {
-        payload.secrets = deploySecrets;
-      }
-      const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundleAppliedBundleRef.current);
-      const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
-      const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
-      const submitDeployPayload = async (deployPayload) => {
-        if ((forceSponsoredAutoDeploy || sponsoredAutoDeployReady) && sponsoredDeployGrantToken && sponsoredBootstrapWorkerUrl) {
-          helperBase = sponsoredBootstrapWorkerUrl;
-          const sponsoredDeployRes = await fetch(`${sponsoredBootstrapWorkerUrl}/sponsored/redeem-deploy`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              deployGrantToken: sponsoredDeployGrantToken,
-              deployPayload,
-            }),
-          });
-          const nextDeployStatusCode = sponsoredDeployRes.status;
-          const nextData = await sponsoredDeployRes.json().catch(() => ({}));
-          if (!sponsoredDeployRes.ok) {
-            const err = new Error(nextData?.error || `Worker deploy failed (${sponsoredDeployRes.status}).`);
-            err.statusCode = sponsoredDeployRes.status;
-            err.responseError = nextData?.error || '';
-            err.responseBundleDiagnostics = nextData?.bundleDiagnostics || null;
-            throw err;
-          }
-          return {
-            deployStatusCode: nextDeployStatusCode,
-            data: nextData,
-          };
-        }
-
-        helperBase = normalizeWorkerUrl(deployHelperUrl);
-        if (!helperBase) throw new Error('Deploy-helper URL is missing.');
-        if (!currentDeployForm.apiToken || !currentDeployForm.workerName) {
-          throw new Error('Fill in API token and worker name.');
-        }
-        const res = await fetch(`${helperBase}/deploy`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...deployPayload,
-            apiToken: currentDeployForm.apiToken,
-            accountId: toStr(currentDeployForm.accountId || '').trim() || undefined,
-          }),
-        });
-        const nextDeployStatusCode = res.status;
-        const nextData = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const err = new Error(nextData?.error || `Worker deploy failed (${res.status}).`);
-          err.statusCode = res.status;
-          err.responseError = nextData?.error || '';
-          err.responseBundleDiagnostics = nextData?.bundleDiagnostics || null;
-          throw err;
-        }
-        return {
-          deployStatusCode: nextDeployStatusCode,
-          data: nextData,
-        };
-      };
-      let deployStatusCode = 0;
-      let data = {};
-      ({ deployStatusCode, data } = await submitDeployPayload(payload));
-      const {
-        resolvedDeployWorkerUrl,
-        displayWorkerUrl,
-        deployComplete: isDeployVerified,
-      } = resolveDeployWorkerState({
-        responseWorkerUrl: data?.workerUrl,
-        configuredWorkerUrl: configuredWorkerUrlBeforeDeploy,
-      });
-      if (data?.workerUrl && resolvedDeployWorkerUrl) {
-        updateDraftValue(['corsWorkerUrl'], resolvedDeployWorkerUrl);
-        setWorkerMode('custom');
-        setWorkerUrlAutoFilled(true);
-      }
-      const workerConfigPayload = {
-        ...buildSessionWizardWorkerConfigPayload({
-          slug,
-          draft,
-          deployPayload: payload,
-          account: toStr(resolvedAdmin || currentDeployForm.adminAddress || account).trim(),
-          registryAddress,
-          registryChainId,
-          networkChainId: network?.id,
-          sessionId,
-          latestChainBlock,
-          workerUrl: resolvedDeployWorkerUrl,
-          resolveWorkerFaucetConfig,
-        }),
-        corsWorkerUrl: resolvedDeployWorkerUrl,
-      };
-      const ensureWorkerSessionConfig = async ({ workerUrl, slug: targetSlug }) => {
-        const requestBody = {
-          sessionSlug: targetSlug,
-          adminAddress: workerConfigPayload.adminAddress || account || '',
-          config: workerConfigPayload,
-        };
-        const auth = await signTypedAdminAction({
-          action: 'set-config',
-          body: requestBody,
-          targetSlug,
-          workerUrl,
-          accountOverride: resolvedAdmin,
-        });
-        const configRes = await fetch(`${workerUrl}/admin/set-config`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...requestBody,
-            adminAddress: requestBody.adminAddress || auth.address,
-            ...auth,
-          }),
-        });
-        const configData = await configRes.json().catch(() => ({}));
-        if (!configRes.ok) {
-          throw new Error(configData?.error || 'Failed to sync worker config after deploy.');
-        }
-      };
-      let configSyncStatus = { warning: '', note: '', synced: false, skipped: true };
-      if (resolvedDeployWorkerUrl) {
-        configSyncStatus = await syncWorkerConfigAfterPartialDeploy({
-          deployResponse: data,
-          workerUrl: resolvedDeployWorkerUrl,
-          account: resolvedAdmin,
-          slug,
-          ensureSessionConfig: ensureWorkerSessionConfig,
-        });
-      } else {
-        configSyncStatus = {
-          warning: 'Worker URL unavailable - skipped config sync.',
-          note: '',
-          synced: false,
-          skipped: true,
-        };
-      }
-      let secretsSyncStatus = { warning: '', note: '' };
-      let helperWritesSecrets = false;
-      if (resolvedDeployWorkerUrl && workerSecretsEnabled && Object.keys(deploySecrets).length) {
-        helperWritesSecrets = (
-          data?.writesSessionSecrets === true ||
-          toStr(data?.sessionSecretsKey).startsWith('session:')
-        );
-        secretsSyncStatus = await syncWorkerSecretsAfterDeploy({
-          workerUrl: resolvedDeployWorkerUrl,
-          account: resolvedAdmin,
-          slug,
-          deploySecrets,
-          // Older deploy-helper revisions may not write session-prefixed keys.
-          // If unknown, force a real sync attempt instead of assuming helper success.
-          helperWritesSecrets,
-          signAdminAction: ({ targetSlug, workerUrl, body }) => signTypedAdminAction({
-            action: 'set-secrets',
-            body,
-            targetSlug,
-            workerUrl,
-            accountOverride: resolvedAdmin,
-          }),
-          ensureSessionConfig: ensureWorkerSessionConfig,
-          postSecrets: async ({ auth, secrets, workerUrl, slug }) => {
-            const requestBody = {
-              sessionSlug: slug,
-              secrets,
-            };
-            const secretsRes = await fetch(`${workerUrl}/admin/set-secrets`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...requestBody, ...auth }),
-            });
-            const secretsData = await secretsRes.json().catch(() => ({}));
-            if (!secretsRes.ok) {
-              throw new Error(secretsData?.error || 'Failed to sync worker secrets after deploy.');
-            }
-          },
-        });
-      }
-      cacheSessionWorkerConfigAfterDeploy({
-        deployStatusCode,
-        configSyncStatus,
-        workerUrl: resolvedDeployWorkerUrl,
-        slug,
-        sessionIdHex,
-        registryChainId,
-        config: workerConfigPayload,
-      });
-      if (
-        resolvedDeployWorkerUrl &&
-        workerSecretsEnabled &&
-        Object.keys(deploySecrets).length &&
-        (helperWritesSecrets || secretsSyncStatus?.synced === true || secretsSyncStatus?.deferred === true)
-      ) {
-        setProvisionedSponsoredContext({
-          sessionSlug: slug,
-          workerUrl: resolvedDeployWorkerUrl,
-          fields: buildSponsoredSessionFlagFields({
-            secrets: sanitizeSessionWizardWorkerSecretsForLitMode(
-              deploySecrets,
-              { litPayerWalletInputEnabled }
-            ),
-            workerSecretsEnabled: true,
-          }),
-        });
-      }
-      setDeployWorkerUrl(displayWorkerUrl);
-      const baseDeployStatus = withSessionWizardDeployHelperWorkersDevStatus(
-        data?.workerUrl ? 'Worker deployed.' : 'Worker deployed (URL unavailable).',
-        data,
-      );
-      setDeployStatus(withWorkerConfigSyncWarning(
-        withSecretsSyncStatus(baseDeployStatus, secretsSyncStatus),
-        configSyncStatus.warning,
-      ));
-      setDeployComplete(isDeployVerified);
-      // Manual bundle uploads are one-off retries; clear the cached file so
-      // later URL-mode deploys and sponsored publish flows don't reuse stale bytes.
-      setForceManualBundleFile(false);
-      clearSelectedBundleFile();
-      setNormalModeBundleUrlOverride('');
-      clearCachedWorkerSecretsAfterDeploy();
-      return {
-        ok: true,
-        workerUrl: resolvedDeployWorkerUrl,
-        deployComplete: isDeployVerified,
-      };
-    } catch (err) {
-      if (shouldForceSessionWizardNormalModeManualBundleRetry({
-        err,
-        wizardMode,
-        effectiveBundleMode,
-        hasBundleFile: !!bundleFile,
-      })) {
-        setForceManualBundleFile(true);
-      }
-      const errorMessage = normalizeSessionWizardDeployErrorMessage({ err, helperBase });
-      setDeployStatus(errorMessage);
-      return {
-        ok: false,
-        error: errorMessage,
-      };
-    } finally {
-      setDeployInFlight(false);
-    }
-  };
+  const {
+    handleDeployWorker,
+    resolveConnectedAdminAddress,
+  } = useSessionWizardWorkerDeploy({
+    refs: {
+      runtimeRef: workerDeployRuntimeRef,
+      resolvedWalletAccountRef,
+      sponsoredBundleAppliedBundleRef,
+    },
+    getCurrentWorkerSecrets,
+    getMissingWorkerSecretsForDeploy,
+    resolveWorkerRpcUrl,
+    resolveWorkerRpcUrlMap,
+    resolveWorkerFaucetConfig,
+    parseAllowOriginsInput,
+    signTypedAdminAction,
+    setDeployForm,
+    updateDraftValue,
+    updateDeploymentState: updateSponsoredBundleDeploymentState,
+    clearSelectedBundleFile,
+    clearCachedWorkerSecretsAfterDeploy,
+  });
 
   const resourceGateOptions = useMemo(
     () => encryptionGates.map((gate) => ({ value: gate.id, label: gate.label || gate.id })),
@@ -4590,9 +4274,6 @@ const SessionWizard = ({
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
   const isNormalMode = wizardMode !== 'advanced';
-  const embeddedDeployHelperEnabled = typeof draft.embeddedDeployHelperEnabled === 'boolean'
-    ? draft.embeddedDeployHelperEnabled
-    : (CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false);
   const hasConfiguredDeployHelperUrl = !!normalizeWorkerAuthUrl(toStr(CLOUDFLARE_DEPLOY_HELPER_URL).trim());
   const shouldShowDeployHelperUrlInput = !isNormalMode || !hasConfiguredDeployHelperUrl;
 
