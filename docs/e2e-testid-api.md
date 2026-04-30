@@ -152,6 +152,7 @@ The navbar-mounted account/login/settings surface that owns the shared modal liv
 ## Agent Mode (Dev/E2E)
 
 Agent Mode is a dev/e2e-only global interface `window.__ceAgent` (installed from `client/src/components/App.tsx` and implemented in `client/src/utilities/ceAgent.js`).
+Use `window.__ceAgent.describe()` when you want the current supported action/tool contract and canonical doc paths for this surface.
 
 Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 

@@ -292,6 +292,14 @@ Enable it either by:
 - query param `?agent=1` (example: `/agent?agent=1`)
 - or localStorage `ce-agent-enabled=1` (then reload)
 
+Current runtime methods:
+- `window.__ceAgent.getState()`
+- `window.__ceAgent.describe()`
+- `window.__ceAgent.perform(action)`
+- `window.__ceAgent.run(actions)`
+
+Use `window.__ceAgent.describe()` first when you want the current action/tool contract rather than guessing. It returns the supported actions, higher-level tools, activation keys, and the canonical doc paths for this surface.
+
 Smoke runner:
 - `npm run -s ai:test-agent:interface`
 
