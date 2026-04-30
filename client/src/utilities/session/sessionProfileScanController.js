@@ -244,11 +244,14 @@ export const createSessionProfileScanController = (host) => {
   };
 
   const getRegistryBootstrapScopeKey = (chainIdsIn = null) => {
-    const ids = (Array.isArray(chainIdsIn) ? chainIdsIn : [])
-      .map((id) => Number(id))
-      .filter((id) => Number.isFinite(id) && id > 0)
-      .map((id) => Math.floor(id))
-      .sort((a, b) => a - b);
+    const ids = Array.from(
+      new Set(
+        (Array.isArray(chainIdsIn) ? chainIdsIn : [])
+          .map((id) => Number(id))
+          .filter((id) => Number.isFinite(id) && id > 0)
+          .map((id) => Math.floor(id))
+      )
+    ).sort((a, b) => a - b);
     if (ids.length === 0) return 'all';
     return ids.join(',');
   };
