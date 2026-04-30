@@ -1,12 +1,13 @@
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
 
-jest.mock('react-select', () => ({
+jest.mock('../../Shared/CheckboxMultiSelect', () => ({
   __esModule: true,
   default: ({
     inputId,
-    isMulti,
     onChange,
     options = [],
     value = [],
@@ -14,14 +15,14 @@ jest.mock('react-select', () => ({
     <select
       data-testid={inputId}
       id={inputId}
-      multiple={Boolean(isMulti)}
+      multiple
       onChange={(event) => {
         const selectedValues = Array.from(event.target.selectedOptions).map((option: any) => option.value);
         onChange(
           options.filter((option: any) => selectedValues.includes(String(option.value)))
         );
       }}
-      value={Array.isArray(value) ? value.map((option) => option.value) : (value?.value || '')}
+      value={Array.isArray(value) ? value.map((option) => option.value) : []}
     >
       {options.map((option: any) => (
         <option key={option.value} value={option.value}>
@@ -60,6 +61,16 @@ const setMultiSelectValues = (testId: string, values: string[]) => {
 };
 
 describe('DemoAnalysisWorkspace', () => {
+  it('keeps the selected question banner readable on the light breakdown surface', () => {
+    const scssPath = path.join(__dirname, 'DemoAnalysisWorkspace.module.scss');
+    const scss = fs.readFileSync(scssPath, 'utf8');
+
+    expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*background:\s*linear-gradient\(145deg,\s*#f8fbff 0%,\s*#edf4ff 100%\) !important;/);
+    expect(scss).toMatch(/\.selectedQuestionCard\s*{[\s\S]*border:\s*1px solid rgba\(15,\s*94,\s*199,\s*0\.14\) !important;/);
+    expect(scss).toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#1f2733 !important;/);
+    expect(scss).not.toMatch(/\.selectedQuestionCardPrompt\s*{[\s\S]*color:\s*#f8fbff;/);
+  });
+
   it('starts with empty map and question breakdown states until a question is selected', () => {
     render(<DemoAnalysisWorkspace />);
 
@@ -68,11 +79,10 @@ describe('DemoAnalysisWorkspace', () => {
     expect(screen.queryByTestId('demo-analysis-selected-question')).not.toBeInTheDocument();
   });
 
-  it('updates the report and heatmap when demographics are selected while keeping the map unselected', async () => {
+  it('updates the report when demographics are selected while keeping the map unselected', async () => {
     render(<DemoAnalysisWorkspace />);
 
     expect(screen.getByTestId('demo-analysis-empty-state')).toBeInTheDocument();
-    expect(screen.getByText(/Overall Topic Heatmap/i)).toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
 
     setMultiSelectValues('demo-analysis-select-era', ['Modern', 'Industrial']);
@@ -83,7 +93,6 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.queryByTestId('demo-analysis-empty-state')).not.toBeInTheDocument();
-    expect(screen.getByText(/Era: Modern Topic Heatmap/i)).toBeInTheDocument();
     expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
     expect(screen.getAllByText('Era: Modern').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Era: Industrial').length).toBeGreaterThan(0);
@@ -116,9 +125,13 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBe(suggestionQuestionText);
+    expect(screen.queryByTestId('demo-analysis-breakdown-question')).not.toBeInTheDocument();
     expect(suggestionQuestionText).toBeTruthy();
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/overall/i);
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/personas/i);
+    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/modeled responses/i);
     expect(screen.getByTestId('demo-analysis-report-summary').textContent).toMatch(/:/);
+    expect(screen.getByTestId('demo-analysis-suggestion-0')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('auto-selects a strong correlation from the wand action', async () => {
@@ -131,6 +144,8 @@ describe('DemoAnalysisWorkspace', () => {
     });
 
     expect(screen.getByTestId('demo-analysis-selected-question').textContent).toBeTruthy();
+    expect(screen.getByTestId('demo-analysis-question-banner')).toBeInTheDocument();
+    expect(screen.queryByTestId('demo-analysis-breakdown-question')).not.toBeInTheDocument();
   });
 
   it('keeps auto-select usable after only one demographic segment is chosen', async () => {

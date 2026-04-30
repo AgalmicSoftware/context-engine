@@ -21,7 +21,7 @@ const readmeUrl =
 const architectureUrl =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ARCHITECTURE.md';
 const whitepaperUrl =
-  'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/Whitepaper/whitepaper.md';
+  'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/whitepaper/whitepaper.md';
 const discoverabilityUrl = 'https://contextengine.xyz/discoverability.html';
 const llmsUrl = 'https://contextengine.xyz/llms.txt';
 const rawHtmlDiscoveryUrls = Object.freeze([

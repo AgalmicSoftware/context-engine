@@ -22,6 +22,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { ethers } from 'ethers';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
+import { resolvePublishArweaveUploadOptions, isPublishUploadBootstrapReachabilityError } from '../../utilities/arweave/publishUploadAuth.js';
 import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
 import contractScripts, { getSessionConfigBySlugOrDefault, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
@@ -39,9 +40,9 @@ import {
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import JsonDisplay from '../Shared/Json/JsonDisplay';
 import CETooltip from '../Shared/CETooltip';
-import CEDateTimeInput from '../Shared/CEDateTimeInput.jsx';
+import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
-import CompactImageChooser from '../Shared/CompactImageChooser.jsx';
+import CompactImageChooser from '../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 
@@ -3563,7 +3564,10 @@ class CreateSBTGroup extends Component<any, any> {
       }
 
       const codesToStore = usesInviteCodes ? [groupPassword] : finalPasswordList;
-      this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
+      const recoveryWrite = this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
+      if (!recoveryWrite?.ok) {
+        sbtLog.warn('Failed to persist SBT password recovery codes:', recoveryWrite?.status);
+      }
       this.suppressFormCachePersistenceAfterSuccess();
 
       this.setState({

@@ -488,6 +488,7 @@ const SBTsList = ({
 
   const [globalSessionSelectionRevision, setGlobalSessionSelectionRevision] = useState<any>(0);
   const [sessionConfigRevision, setSessionConfigRevision] = useState<any>(0);
+  const [activeTag, setActiveTag] = useState<any>('');
   const [activeSessionSlug, setActiveGroupSlug] = useState<any>(() => {
     const globalPrimarySessionSlug = normalizeSessionSlug(readStoredGlobalSessionSelection().primarySessionSlug || '');
     try {
@@ -3120,16 +3121,46 @@ const SBTsList = ({
             </div>
           </div>
         )}
-        {details.tags.length > 0 && (
-          <div className={styles.sbtDetailsSection}>
-            <span className={styles.sbtDetailsHeading}>Tags</span>
-            <div className={styles.sbtTagList}>
-              {details.tags.map((tag: any) => (
-                <span key={tag} className={styles.sbtTagChip}>
-                  {tag}
-                </span>
-              ))}
-            </div>
+      </div>
+    );
+  };
+
+  const handleTagChipClick = (event: any, tag: any) => {
+    if (event?.preventDefault) event.preventDefault();
+    if (event?.stopPropagation) event.stopPropagation();
+    const normalizedTag = String(tag || '').trim();
+    if (!normalizedTag) return;
+    setActiveTag(normalizedTag);
+  };
+
+  const renderSbtMetaRow = (sbt: any, details: any, detailsId: any, buttonLabel: any) => {
+    const tags = Array.isArray(details?.tags) ? details.tags : [];
+    const hasTags = tags.length > 0;
+    const hasDetailsToggle = !miniaturized && !!details?.hasDetails;
+    if (!hasTags && !hasDetailsToggle) return null;
+
+    const sbtAddressLower = String(sbt?.sbtAddress || '').toLowerCase();
+    const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
+    const metaRowClassName = [
+      styles.sbtMetaRow,
+      hasTags ? styles.sbtMetaRowWithTags : styles.sbtMetaRowToggleOnly,
+    ].filter(Boolean).join(' ');
+
+    return (
+      <div className={metaRowClassName}>
+        {hasTags && (
+          <div className={styles.sbtTagList}>
+            {tags.map((tag: any) => (
+              <button
+                key={tag}
+                type="button"
+                className={styles.sbtTagChip}
+                aria-label={`Open tag explorer for ${tag}`}
+                onClick={(event: any) => handleTagChipClick(event, tag)}
+              >
+                #{tag}
+              </button>
+            ))}
           </div>
         )}
         {hasDetailsToggle && (
@@ -3147,26 +3178,6 @@ const SBTsList = ({
             />
           </button>
         )}
-      </div>
-    );
-  };
-
-  const renderSbtDetailsToggle = (sbt: any, details: any, detailsId: any, buttonLabel: any) => {
-    if (miniaturized || !details?.hasDetails) return null;
-    const sbtAddressLower = String(sbt?.sbtAddress || '').toLowerCase();
-    const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
-    return (
-      <div className={styles.sbtDetailsFooter}>
-        <button
-          type="button"
-          className={styles.sbtDetailsToggle}
-          aria-controls={detailsId}
-          aria-expanded={isExpanded}
-          aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${buttonLabel}`}
-          onClick={() => toggleExpandedSbt(sbt?.sbtAddress)}
-        >
-          <FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} />
-        </button>
       </div>
     );
   };

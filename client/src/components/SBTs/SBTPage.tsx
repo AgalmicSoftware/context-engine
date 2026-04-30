@@ -4574,7 +4574,7 @@ renderMintButton() {
           </div>
           <p id={styles.miniSbtName}>{sbtName}</p>
           {showMiniSbtAddress ? (
-            <p id={styles.miniSbtAddress}>{proposalScripts.getShortenedAddress(sbtAddressForDisplay, false)}</p>
+            <p id={styles.miniSbtAddress}>{getShortenedAddress(sbtAddressForDisplay, false)}</p>
           ) : null}
           {miniMintArea}
         </div>

@@ -32,7 +32,7 @@ import styles from './SurveyTool.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faCog, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faBullhorn, faRobot } from '@fortawesome/free-solid-svg-icons';
 
-import AudioInput from '../Shared/AudioInput/AudioInput.jsx';
+import AudioInput from '../Shared/AudioInput/AudioInput';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
@@ -50,7 +50,6 @@ import contractScripts, {
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
 import { ethers, utils } from 'ethers';
-import proposalScripts from 'utilities/proposalScripts.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { ENABLE_IMPORTANCE_SLIDER_TOGGLE } from '../../variables/appConfig.js';

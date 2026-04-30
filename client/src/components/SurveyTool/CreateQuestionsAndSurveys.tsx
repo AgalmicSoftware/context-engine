@@ -1,4 +1,4 @@
-/** @file CreateQuestionsAndSurveys.jsx */
+/** @file CreateQuestionsAndSurveys.tsx */
 
 import React, { Component } from 'react';
 import {
@@ -303,8 +303,10 @@ const formatAiPromptModelLabel = (config: any = {}) => {
   return model || provider || 'Configured model';
 };
 
-class CreateQuestionsAndSurveys extends Component {
-  constructor(props) {
+class CreateQuestionsAndSurveys extends Component<any, any> {
+  [key: string]: any;
+
+  constructor(props: any) {
     super(props);
     this.state = {
       title: '',
@@ -394,7 +396,7 @@ class CreateQuestionsAndSurveys extends Component {
       }
       nextState.documentURLs = sanitizeDocumentUrls(props.documentURLs || []);
       // If props provided URLs, we don't necessarily want to pre-fill the input buffer, just the list
-      this.state.docURLInput = '';
+      nextState.docURLInput = '';
     }
     (this.state as any).questions = initialQuestions;
     this._cacheWatchTimer = null;
@@ -1085,7 +1087,8 @@ class CreateQuestionsAndSurveys extends Component {
     this.setState(
       {
         documentURLs: [...safeDocumentUrls, normalizedUrl],
-        docURLInput: ''
+        docURLInput: '',
+        docURLError: ''
       },
       () => {
         this.updateSurveyHash();
@@ -1154,7 +1157,7 @@ class CreateQuestionsAndSurveys extends Component {
 
     updatedQuestions[index] = questionToUpdate;
 
-    this.setState({ questions: updatedQuestions }, () => {
+    this.setState({ questions: updatedQuestions, formValidationError: '' }, () => {
       this.updateSurveyHash();
       this.saveToLocalStorage();
     });
@@ -1202,7 +1205,7 @@ class CreateQuestionsAndSurveys extends Component {
     const q = { ...updatedQuestions[questionIndex] };
 
     if (!Array.isArray(q.options)) q.options = [];
-    const newOptions = q.options.filter((_, i) => i !== optionIndex);
+    const newOptions = q.options.filter((_: any, i: any) => i !== optionIndex);
     q.options = newOptions;
     q.id = this.generateQuestionId(q.type, q.prompt, q.options, q.singleSelect);
 
@@ -1252,7 +1255,7 @@ class CreateQuestionsAndSurveys extends Component {
       bookmarksCache.questions = Array.from(new Set([...(bookmarksCache.questions || []), idL]));
     }
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e: any) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
     this.setState({ bookmarkedQuestionsSet: set });
   };
 
@@ -1290,7 +1293,7 @@ class CreateQuestionsAndSurveys extends Component {
       bookmarksCache.surveys = Array.from(new Set([...(bookmarksCache.surveys || []), idL]));
     }
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
+    void writeCache('bookmarksCache', slug, bookmarksCache).catch((e: any) => { surveyLog.warn('CreateQuestionsAndSurveys: fallback', e); });
     this.setState({ bookmarkedSurveysSet: set });
   };
 
@@ -1685,7 +1688,7 @@ class CreateQuestionsAndSurveys extends Component {
       // Best-effort write-through: failures here must not fail successful on-chain submits.
       try {
         await writeCacheOptimistic('questionsCache', primarySlug, next);
-      } catch (error) {
+      } catch (error: any) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed questions cache write-through', {
           slug: primarySlug,
           error: getErrorMessage(error, String(error)),
@@ -1694,9 +1697,9 @@ class CreateQuestionsAndSurveys extends Component {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed uploaded questions cache', {
-        error: error?.message || String(error),
+        error: getErrorMessage(error, String(error)),
       });
       return false;
     }
@@ -1753,7 +1756,7 @@ class CreateQuestionsAndSurveys extends Component {
 
       try {
         await writeCacheOptimistic('surveysCache', primarySlug, next);
-      } catch (error) {
+      } catch (error: any) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed surveys cache write-through', {
           slug: primarySlug,
           error: getErrorMessage(error, String(error)),
@@ -1762,9 +1765,9 @@ class CreateQuestionsAndSurveys extends Component {
       }
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed submitted survey cache', {
-        error: error?.message || String(error),
+        error: getErrorMessage(error, String(error)),
       });
       return false;
     }
@@ -2307,7 +2310,7 @@ class CreateQuestionsAndSurveys extends Component {
             return qD;
           })
         );
-        questionDataArray.forEach((questionData, index) => {
+        questionDataArray.forEach((questionData: any, index: any) => {
           validateNoLockedPlaintextInPayload(questionData, {
             family: 'question_metadata',
             path: `question metadata[${index}]`,
@@ -2488,13 +2491,13 @@ class CreateQuestionsAndSurveys extends Component {
             return base;
           })
         );
-        questionDataArray.forEach((questionData, index) => {
+        questionDataArray.forEach((questionData: any, index: any) => {
           validateNoLockedPlaintextInPayload(questionData, {
             family: 'question_metadata',
             path: `question metadata[${index}]`,
           });
         });
-        const questionIdsForContract = uniqueQuestions.map(q => q.id);
+        const questionIdsForContract = uniqueQuestions.map((q: any) => q.id);
 
         // Fetch current block number for creationBlock optimization
         let creationBlock = 0;
@@ -2660,7 +2663,7 @@ class CreateQuestionsAndSurveys extends Component {
           });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       surveyLog.error("[CreateQuestionsAndSurveys] Failed to create survey/questions:", error);
       const shouldResetSubmitProgress = !!error?.resetSubmitProgress;
       this.setState({
@@ -3080,7 +3083,7 @@ class CreateQuestionsAndSurveys extends Component {
     const resolvedSessionConfig = this.getResolvedSessionConfig();
     const { gateOptions, defaultGateId } = this.resolveGateOptions(resolvedSessionConfig, { isStandaloneQuestion });
     const hasSelectableGateOptions = Array.isArray(gateOptions) && gateOptions.length > 0;
-    const gateIdSet = new Set((Array.isArray(gateOptions) ? gateOptions : []).map((opt) => opt.id));
+    const gateIdSet: any = new Set((Array.isArray(gateOptions) ? gateOptions : []).map((opt: any) => opt.id));
     const resolvedContracts = mergeSessionContractMaps(
       resolvedSessionConfig?.contracts,
       this.props.contracts,
@@ -3142,7 +3145,7 @@ class CreateQuestionsAndSurveys extends Component {
                 <GateMultiSelectLock
                   gateOptions={gateOptions}
                   selectedGateIds={surveySelectedGateIds}
-                  onChangeSelectedGateIds={(nextIds) => {
+                  onChangeSelectedGateIds={(nextIds: any) => {
                     const normalized = normalizeSelectedGateIds(nextIds);
                     this.setState({ surveyLockGateIds: normalized }, this.saveToLocalStorage);
                     if (!normalized.length) {
@@ -3150,15 +3153,14 @@ class CreateQuestionsAndSurveys extends Component {
                     }
                   }}
                   open={openLockKey === 'survey'}
-                  onToggleOpen={(nextOpen) => {
+                  onToggleOpen={(nextOpen: any) => {
                     if (nextOpen && surveySelectedGateIds.length === 0 && defaultGateId) {
                       this.setState({ surveyLockGateIds: [defaultGateId] }, this.saveToLocalStorage);
                     }
                     this.setState({ openLockKey: nextOpen ? 'survey' : '' });
                   }}
                   disabled={!hasSelectableGateOptions}
-                  badgeText={formatGateBadge(surveySelectedGateIds)}
-                  showDots={true}
+                  showDots={false}
                 />
                 <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="cs-survey-gate-tip" />
                 <CETooltip
@@ -3352,8 +3354,7 @@ class CreateQuestionsAndSurveys extends Component {
                             this.setState({ openLockKey: nextOpen ? lockKey : '' });
                           }}
                           disabled={!hasSelectableGateOptions}
-                          badgeText={formatGateBadge(selectedGateIds)}
-                          showDots={true}
+                          showDots={false}
                         />
                       </>
                     ) : null;

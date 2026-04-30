@@ -3,7 +3,7 @@ import CreateQuestionsAndSurveys, {
   readManagedCacheSnapshot,
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
-} from './CreateQuestionsAndSurveys.jsx';
+} from './CreateQuestionsAndSurveys';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
@@ -30,7 +30,7 @@ const peekCacheSyncMock = cacheScripts.peekCacheSync as jest.Mock;
 const subscribeCacheUpdatesMock = cacheScripts.subscribeCacheUpdates as jest.Mock;
 const writeCacheOptimisticMock = cacheScripts.writeCacheOptimistic as jest.Mock;
 
-const makeInstance = (props = {}) => {
+const makeInstance = (props: CreateQuestionsAndSurveysProps = {}): any => {
   const instance = new CreateQuestionsAndSurveys({
     network: { id: 84532 },
     activeSessionSlug: 'edge',
@@ -70,7 +70,7 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
   return treeHasText(node?.props?.children, text);
 };
 
-const nodeHasClassName = (node, className) => {
+const nodeHasClassName = (node: TreeNode, className: string): boolean => {
   const raw = node?.props?.className;
   if (!raw) return false;
   return String(raw).split(/\s+/).includes(className);

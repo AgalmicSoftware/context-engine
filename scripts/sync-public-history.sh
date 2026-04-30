@@ -397,7 +397,6 @@ printf 'Branch name: %s\n' "$TARGET_BRANCH"
 printf 'Replayed commits: %s\n' "$REPLAYED_COUNT"
 printf 'Skipped commits: %s\n' "$SKIPPED_COUNT"
 printf 'Temp dir: %s\n' "$TMP_ROOT"
-printf 'To verify: bash scripts/verify-public-branch.sh %s\n' "$TARGET_BRANCH"
 if [ "$AUTO_PUSH" -eq 1 ]; then
   printf 'Pushed: yes\n'
 else

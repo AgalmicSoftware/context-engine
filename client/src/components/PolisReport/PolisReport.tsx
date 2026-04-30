@@ -1049,7 +1049,7 @@ export default function PolisReport({
   // Keep the canonical built-in demo aligned with other demo datasets by
   // starting in the shared exploratory UMAP view instead of special-casing
   // a first-load Polis Auto mode.
-  const defaultEmbeddingChoice = 'UMAP';
+  const defaultEmbeddingChoice: string = 'UMAP';
   const defaultManualClusterCount = String(DEFAULT_EXPLORATORY_CLUSTER_COUNT);
   const currentPathname = typeof window !== 'undefined' && window.location?.pathname
     ? window.location.pathname
@@ -1227,7 +1227,7 @@ export default function PolisReport({
   const [errorMessage, setErrorMessage] = useState<any>(null);
 
   // Local state for toggling PDF link in the heading
-  const [isPdfModeActive, setIsPdfModeActive] = useState(false);
+  const [isPdfModeActive, setIsPdfModeActive] = useState<any>(false);
 
   // ADDED: Ref and state for Bee Swarm scroller buttons
   const swarmContainerRef = useRef<any>(null);

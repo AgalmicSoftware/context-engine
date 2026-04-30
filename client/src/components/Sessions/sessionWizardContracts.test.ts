@@ -8,10 +8,11 @@ import {
 } from './sessionWizardContracts.js';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
+type SessionWizardContractsInput = Record<string, unknown>;
 
 describe('sessionWizardContracts', () => {
   test('defaults include session registry address from chains config', () => {
-    const chainContracts = getSessionContractsForChain(DEFAULT_CONFIG_CHAIN_ID);
+    const chainContracts = getSessionContractsForChain(DEFAULT_CONFIG_CHAIN_ID) as SessionWizardContractsInput;
     const defaults = getSessionWizardContractDefaults(DEFAULT_CONFIG_CHAIN_ID);
 
     expect(defaults.surveys).toBe(chainContracts.surveys);

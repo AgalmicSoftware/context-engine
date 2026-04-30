@@ -4,17 +4,16 @@ import historicalFigureDemographics from '../../../variables/demo/historical_fig
 import buildDemoAnalysisData from '../../../utilities/demo/demoAnalysisAdapter.js';
 import {
   buildComparisonGroup,
-  buildIndicatorHeatmapData,
   findMostDivergentPairs,
   parseSegmentKey,
 } from '../../../utilities/demo/demoAnalysisMath.js';
-import ComparisonReport from './ComparisonReport.jsx';
-import ComparisonSuggestions from './ComparisonSuggestions.jsx';
-import DemographicSelector from './DemographicSelector.jsx';
-import IndicatorHeatmap from './IndicatorHeatmap.jsx';
-import QuestionBreakdownChart from './QuestionBreakdownChart.jsx';
-import QuestionDrilldownModal from './QuestionDrilldownModal.jsx';
-import WorldResultsMap from './WorldResultsMap.jsx';
+import ComparisonReport from './ComparisonReport';
+import ComparisonSuggestions from './ComparisonSuggestions';
+import DemographicSelector from './DemographicSelector';
+import QuestionBreakdownChart from './QuestionBreakdownChart';
+import QuestionDrilldownModal from './QuestionDrilldownModal';
+import WorldResultsMap from './WorldResultsMap';
+import SingleQuestionResponse from '../../SurveyTool/SingleQuestionResponse';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 type Question = {
@@ -119,6 +118,10 @@ const DemoAnalysisWorkspace = ({
 
   const selectedQuestion = questionMap.get(selectedQuestionId) || null;
   const drilldownQuestion = questionMap.get(drilldownQuestionId) || null;
+  const activeSuggestionKey = useMemo(() => {
+    if (!selectedQuestionId || selectedSegmentKeys.length < 2) return '';
+    return buildSuggestionSelectionKey(selectedQuestionId, selectedSegmentKeys);
+  }, [selectedQuestionId, selectedSegmentKeys]);
 
   const suggestions = useMemo(() => {
     const related = getDivergentPairs({
@@ -146,15 +149,6 @@ const DemoAnalysisWorkspace = ({
     analysisData.segmentCounts,
     selectedSegmentKeys,
   ]);
-
-  const heatmapData = useMemo(
-    () => buildIndicatorHeatmapData({
-      questions: analysisData.questions,
-      flatResponses: analysisData.flatResponses,
-      selectedSegmentKey: comparisonGroups[0]?.segmentKey || 'All',
-    }),
-    [analysisData.flatResponses, analysisData.questions, comparisonGroups]
-  );
 
   const focusedCountries = useMemo(() => {
     const countries = selectedSegmentKeys
@@ -219,8 +213,30 @@ const DemoAnalysisWorkspace = ({
         onSuggestFromSegment={handleAutoSelectCorrelation}
       />
 
+      {selectedQuestion ? (
+        <section className={styles.selectedQuestionBanner} data-testid="demo-analysis-question-banner">
+          <SingleQuestionResponse
+            mode="fullscreen"
+            questionOnly={true}
+            question={{
+              prompt: selectedQuestion.text,
+              type: 'binary',
+            }}
+            response={null}
+            containerClassName={styles.selectedQuestionCard}
+            bodyClassName={styles.selectedQuestionCardBody}
+            questionPromptClassName={styles.selectedQuestionCardPrompt}
+            questionPromptTestId="demo-analysis-selected-question"
+          />
+        </section>
+      ) : null}
+
       <div className={styles.primaryGrid}>
-        <ComparisonSuggestions suggestions={suggestions} onSuggestionClick={handleSuggestionClick} />
+        <ComparisonSuggestions
+          suggestions={suggestions}
+          onSuggestionClick={handleSuggestionClick}
+          activeSuggestionKey={activeSuggestionKey}
+        />
         <WorldResultsMap
           question={selectedQuestion}
           responses={analysisData.flatResponses}
@@ -228,15 +244,12 @@ const DemoAnalysisWorkspace = ({
         />
       </div>
 
-      <div className={styles.secondaryGrid}>
-        <QuestionBreakdownChart
-          question={selectedQuestion}
-          flatResponses={analysisData.flatResponses}
-          comparisonGroups={comparisonGroups}
-          onOpenDrilldown={openDrilldown}
-        />
-        <IndicatorHeatmap data={heatmapData} />
-      </div>
+      <QuestionBreakdownChart
+        question={selectedQuestion}
+        flatResponses={analysisData.flatResponses}
+        comparisonGroups={comparisonGroups}
+        onOpenDrilldown={openDrilldown}
+      />
 
       <ComparisonReport
         flatResponses={analysisData.flatResponses}

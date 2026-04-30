@@ -56,7 +56,7 @@ const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   return null;
 };
 
-jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
+jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   mockSurveyPage(props);
   if (props.minifiedMode === 'pile') {
     return (
@@ -232,7 +232,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
-  it('uses the title container slot to reserve pile submit rail space when the embedded pile signals visibility', async () => {
+  it('uses the title container slot to keep the pile submit rail off the header title', async () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
@@ -257,21 +257,37 @@ describe('OnePageSession view gating', () => {
     expect(titleContainer).not.toHaveClass(styles.titleContainerWithPileSubmitRail);
   });
 
-  it('limits the pile submit rail title offset to phone widths where the rail is absolute', () => {
+  it('applies pile submit rail title offsets only on pile top-rail breakpoints', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const phoneRailBlock = extractMediaBlock(
       scss,
       '@media only screen and (max-width: 480px)',
       '.titleContainerWithPileSubmitRail'
     );
+    const desktopRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 769px) and (max-width: 1366px)',
+      '.titleContainerWithPileSubmitRail'
+    );
+    const widescreenRailBlock = extractMediaBlock(
+      scss,
+      '@media only screen and (min-width: 1367px)',
+      '.titleContainerWithPileSubmitRail'
+    );
     const tabletRailBlock = extractMediaBlock(
       scss,
-      '@media only screen and (max-width: 600px)',
+      '@media only screen and (min-width: 481px) and (max-width: 768px)',
       '.titleContainerWithPileSubmitRail'
     );
 
+    expect(scss).toContain('.brandingSectionWithPileSubmitRail');
+    expect(scss).toContain('.titleContainerWithPileSubmitRail');
     expect(phoneRailBlock).toContain('.titleContainerWithPileSubmitRail');
-    expect(phoneRailBlock).toContain('transform: translateY(-44px);');
+    expect(phoneRailBlock).toContain('transform: translateY(-40px);');
+    expect(desktopRailBlock).toContain('.titleContainerWithPileSubmitRail');
+    expect(desktopRailBlock).toContain('transform: translateY(-40px);');
+    expect(widescreenRailBlock).toContain('.titleContainerWithPileSubmitRail');
+    expect(widescreenRailBlock).toContain('transform: translateY(-52px);');
     expect(tabletRailBlock).toBeNull();
   });
 
@@ -493,15 +509,35 @@ describe('OnePageSession view gating', () => {
 
     expect(phoneBlock).toContain('.sectionContainer');
     expect(phoneBlock).toContain('border: none;');
+    expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
+    expect(phoneBlock).toContain('font-size: 1em;');
+    expect(phoneBlock).toContain('font-weight: inherit;');
+    expect(phoneBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(phoneBlock).toContain('.sectionHeader {');
+    expect(phoneBlock).toContain('align-items: center;');
+    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
+    expect(phoneBlock).toContain('opacity: 0.6;');
+    expect(phoneBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
+    expect(phoneBlock).toContain('justify-content: center;');
+    expect(phoneBlock).toContain('min-height: 44px;');
+    expect(phoneBlock).toContain('min-width: 44px;');
     expect(smallTabletBlock).toContain('.sectionHeader {');
+    expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('font-size: 1.6em;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderText {');
     expect(smallTabletBlock).toContain('flex-direction: row;');
-    expect(smallTabletBlock).toContain('align-items: baseline;');
+    expect(smallTabletBlock).toContain('align-items: center;');
     expect(smallTabletBlock).toContain('gap: 6px 12px;');
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
-    expect(smallTabletBlock).toContain('font-size: 0.68em;');
-    expect(smallTabletBlock).toContain('color: rgba(244, 247, 255, 0.58);');
+    expect(smallTabletBlock).toContain('font-size: 1.2em;');
+    expect(smallTabletBlock).toContain('font-weight: inherit;');
+    expect(smallTabletBlock).toContain('color: rgba(255, 255, 255, 0.15);');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip {');
+    expect(smallTabletBlock).toContain('justify-content: center;');
+    expect(smallTabletBlock).toContain('min-height: 44px;');
+    expect(smallTabletBlock).toContain('min-width: 44px;');
+    expect(smallTabletBlock).toContain('.documentsSectionHeaderMeta .sectionHeaderTooltip > svg {');
+    expect(smallTabletBlock).toContain('opacity: 0.6;');
     expect(smallTabletBlock).not.toContain('.sectionContainer');
     expect(scss).toMatch(/@media only screen and \(min-width:\s*768px\) and \(max-width:\s*1024px\)\s*{[\s\S]*?\.sectionHeader \.sectionHeaderText\s*{[\s\S]*?flex-direction:\s*column;[\s\S]*?align-items:\s*flex-start;/);
   });
@@ -919,15 +955,69 @@ describe('OnePageSession view gating', () => {
     });
   });
 
+  it('opens linked atlas nodes from the embedded risk matrix and returns to risk matrix when the atlas modal closes', async () => {
+    const props = buildProps();
+
+    render(
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Risk Matrix/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Risk Matrix/i }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('risk-matrix-open-atlas-node'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+    });
+
+    const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
+      embedded: true,
+      requestedModalNodeId: '0x4110000000000000000000000000000000000000000000000000000000000000',
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+    });
+
+    const riskMatrixCalls = mockRiskMatrix.mock.calls.map((args) => args[0]).filter(Boolean);
+    expect(riskMatrixCalls.some((props) => (
+      props?.restoreState?.modal === true
+      && props?.restoreState?.selectedCellId === 'Capabilities_vs_Labor'
+      && props?.restoreState?.comment === 'Return here after checking the atlas node.'
+    ))).toBe(true);
+    expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
+  });
+
   it('restores the one-page session view after closing an atlas node opened from Context', async () => {
     const props = buildProps();
 
     render(
-      <OnePageSession
-        {...props}
-        slug="demo"
-        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
-      />
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
     );
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();

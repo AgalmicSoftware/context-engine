@@ -268,7 +268,7 @@ function unifyAggregatorWithAllQuestionIDs(baseAggregator: any, allKnownQuestion
 
 const INVALID_RESPONSE_TIMESTAMP = Number.NEGATIVE_INFINITY;
 
-const normalizeResponseTimestampMs = (value) => {
+const normalizeResponseTimestampMs = (value: any) => {
   if (value === null || value === undefined || value === '') return INVALID_RESPONSE_TIMESTAMP;
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) return INVALID_RESPONSE_TIMESTAMP;
@@ -288,19 +288,19 @@ const normalizeResponseTimestampMs = (value) => {
   return INVALID_RESPONSE_TIMESTAMP;
 };
 
-const getSurveyResponseQuestionId = (row = {}) => (
+const getSurveyResponseQuestionId = (row: any = {}) => (
   String(row?.questionID || row?.questionId || '').trim().toLowerCase()
 );
 
-const getSurveyResponseEntryTimestampMs = (row = {}) => (
+const getSurveyResponseEntryTimestampMs = (row: any = {}) => (
   normalizeResponseTimestampMs(row?.timestamp ?? row?.timeStamp)
 );
 
-const getSurveyResponsePayloadTimestampMs = (payload = {}) => (
+const getSurveyResponsePayloadTimestampMs = (payload: any = {}) => (
   normalizeResponseTimestampMs(payload?.timestamp ?? payload?.timeStamp)
 );
 
-const getSurveyResponseAggregateTimestampMs = (row = {}, payload = {}) => {
+const getSurveyResponseAggregateTimestampMs = (row: any = {}, payload: any = {}) => {
   const entryTimestamp = getSurveyResponseEntryTimestampMs(row);
   const payloadTimestamp = getSurveyResponsePayloadTimestampMs(payload);
   // Regression guard: merged survey payloads can advance the top-level recency
@@ -317,7 +317,7 @@ const getSurveyResponseAggregateTimestampMs = (row = {}, payload = {}) => {
   return Math.max(entryTimestamp, payloadTimestamp);
 };
 
-const isSurveyQuestionResponseNewer = (candidate, existing) => {
+const isSurveyQuestionResponseNewer = (candidate: any, existing: any) => {
   // Regression guard: current client edits may advance only the payload timestamp.
   // Compare effective recency first, then payload recency, and let later array
   // order win within the same payload revision so stale per-answer timestamps do
@@ -340,16 +340,16 @@ const isSurveyQuestionResponseNewer = (candidate, existing) => {
   return candidate.index >= existing.index;
 };
 
-const normalizeSurveyResponsePayloadByQuestionId = (payload) => {
+const normalizeSurveyResponsePayloadByQuestionId = (payload: any) => {
   const source = (payload && typeof payload === 'object') ? payload : null;
   if (!source) return payload;
   if (!Array.isArray(source.responses)) return { ...source };
 
   const payloadTimestampMs = getSurveyResponsePayloadTimestampMs(source);
-  const passthroughRows = [];
-  const latestByQuestionId = new Map();
+  const passthroughRows: any[] = [];
+  const latestByQuestionId: any = new Map();
 
-  source.responses.forEach((row, index) => {
+  source.responses.forEach((row: any, index: any) => {
     const clonedRow = (row && typeof row === 'object') ? { ...row } : row;
     const questionId = getSurveyResponseQuestionId(row);
     if (!questionId) {
@@ -383,8 +383,8 @@ const normalizeSurveyResponsePayloadByQuestionId = (payload) => {
     ...passthroughRows,
     ...Array.from(latestByQuestionId.values()),
   ]
-    .sort((left, right) => left.orderIndex - right.orderIndex)
-    .map((entry) => entry.row);
+    .sort((left: any, right: any) => left.orderIndex - right.orderIndex)
+    .map((entry: any) => entry.row);
 
   return {
     ...source,
@@ -1483,7 +1483,6 @@ class SurveyResults extends Component<any, any> {
   }
 
 
-
   componentDidUpdate(prevProps: any, prevState: any) {
     const refreshReasons: any = new Set();
     const pendingStatePatch: Record<string, any> = {};
@@ -2372,7 +2371,7 @@ if (this.state.viewMode === 'survey') {
         response: rawResp,
       });
       if (!rawResp || !Array.isArray(rawResp.responses)) return;
-      rawResp.responses.forEach((ans) => {
+      rawResp.responses.forEach((ans: any) => {
         const qIdL = getSurveyResponseQuestionId(ans);
         if (!qIdL) return;
         if (!aggregatorMap[qIdL]) aggregatorMap[qIdL] = [];
@@ -2905,7 +2904,7 @@ switch (exportType) {
     return;
 }
 
-if (!csvContent || !csvContent.trim() || csvContent.split('\n').length < 2) {
+if (!fileContent || !fileContent.trim()) {
   if (!this.state.alertMessage) {
     this.setState({ alertMessage: 'No data available to download for this export type.' });
   }
@@ -3249,10 +3248,10 @@ transformIndividualResponsesToAggregator: any = (individualResponses: any) => {
 
   const aggregator: Record<string, any> = {};
 
-  individualResponses.forEach(response => {
+  individualResponses.forEach((response: any) => {
     const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(response.response); // Already an object
     if (parsedResponse && Array.isArray(parsedResponse.responses)) {
-      parsedResponse.responses.forEach(answerItem => {
+      parsedResponse.responses.forEach((answerItem: any) => {
         const qIdLower = getSurveyResponseQuestionId(answerItem);
         if (!qIdLower) return;
 
@@ -3295,7 +3294,7 @@ getMemoizedViewableResponsesCount: any = (responses: any, questionType: any = ''
   if (cached && cached.questionType === normalizedQuestionType) {
     return cached.count;
   }
-  const count = this.getLatestResponsesByResponder(list).reduce((acc, row) => {
+  const count = this.getLatestResponsesByResponder(list).reduce((acc: any, row: any) => {
     const parsedResponse = row?.response;
     if (!parsedResponse || !parsedResponse.answer) {
       return acc;
@@ -3380,8 +3379,8 @@ resolveSummaryQuestionType: any = (question: any = null, responses: any = []) =>
 
 getLatestResponsesByResponder: any = (responses: any = []) => {
   const responseRows = Array.isArray(responses) ? responses : [];
-  const latestByResponder = new Map();
-  responseRows.forEach((row, index) => {
+  const latestByResponder: any = new Map();
+  responseRows.forEach((row: any, index: any) => {
     const responderKey = String(row?.responder || `__row_${index}`).trim().toLowerCase();
     const timestamp = getSurveyResponseAggregateTimestampMs(row?.response, row);
     const existing = latestByResponder.get(responderKey);
@@ -5323,7 +5322,7 @@ return (
                         {parsedResponse &&
                         parsedResponse.responses &&
                         parsedResponse.responses.length > 0 ? (
-	                          parsedResponse.responses.map((answerItem, aIndex) => {
+	                          parsedResponse.responses.map((answerItem: any, aIndex: any) => {
 	                            const questionId = getSurveyResponseQuestionId(answerItem);
 	                            const questionData = preNetworkQuestions[questionId] || this.getStableFallbackQuestion(questionId, 'individual');
                               const responseKey = this.getLockedResponseKey({

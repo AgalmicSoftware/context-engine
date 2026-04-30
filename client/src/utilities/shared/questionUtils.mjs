@@ -1,9 +1,9 @@
 // Shared pure utility functions for question/response handling.
-// Used by the React client and optional private companion checkouts.
+// Used by both the React client AND contextEngine-cc (via symlink).
 // NO browser dependencies — must work in Node.js and browser.
 //
-// Keep this module safe for symlinked reuse from companion tooling in full
-// development checkouts.
+// If you modify this file, contextEngine-cc will pick up changes automatically
+// via its symlink at contextEngine-cc/lib/shared/questionUtils.mjs
 //
 // Depends on: ethers (v5)
 
@@ -39,7 +39,7 @@ const ethers =
   resolveEthersCompat(ethersModule);
 
 // --- Question ID generation ---
-// Canonical implementation. Matches CreateQuestionsAndSurveys.jsx and SurveyGenerator.jsx.
+// Canonical implementation. Matches CreateQuestionsAndSurveys.jsx and SurveyGenerator.tsx.
 // The ID is a keccak256 hash of "type:prompt[:options][:single]"
 
 export function generateQuestionId(type, prompt, options = [], singleSelect = false) {

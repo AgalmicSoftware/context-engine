@@ -119,7 +119,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
   };
 
   render() {
-    const activeClassName = (isActive) => (isActive ? 'active' : '');
+    const activeClassName = (isActive: boolean) => (isActive ? 'active' : '');
     return (
       <div id={styles.mainAreaTabsAlt}>
                 <Card id={styles.mainTabsCard}>
@@ -220,7 +220,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                         <OnboardingWalkthrough
                           changeTabFunction={(newTab: number) => this.changeTabs(newTab)}
                           //
-                          toggleDemoMode={(demoModeOn) => this.props.toggleDemoMode(demoModeOn)}
+                          toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode(demoModeOn)}
                           demoMode={this.props.demoMode}
                         />
                       </Suspense>

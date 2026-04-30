@@ -1,6 +1,13 @@
-# Releasing a Public Build
+# Releasing Public History or Artifacts
 
-The public release artifact is a copy of the repo with all private/internal content stripped. It is produced by `scripts/prepare-public-release.sh` (see PRD 374).
+This repo now supports two public-release workflows:
+
+- `scripts/prepare-public-release.sh` builds a stripped working-tree artifact in `release-public/`
+- `scripts/sync-public-history.sh` replays `dev` commits onto public `main` one-by-one so GitHub shows readable per-commit diffs
+
+Separately, `.github/workflows/publish-worker-bundles.yml` rebuilds the Cloudflare worker fallback bundles on every push to public `main`/`master`, publishes them as GitHub release assets, and explicitly marks that worker-bundle release as the repo's latest release so the client default bundle URL at `releases/latest/download/sessionCorsWorker.bundle.js` keeps resolving to fresh assets.
+
+Use the history-sync flow when you want a public PR with preserved commit narrative. Use the artifact flow when you need a standalone stripped copy of the repo.
 
 ## Quick start
 
@@ -49,7 +56,7 @@ If your local `dev` has not been rebased onto `origin/main` yet, create a tempor
 
 ## What gets stripped
 
-The release script removes these paths from the exported copy:
+Both workflows remove these paths from the public result:
 
 | Path | Reason |
 |------|--------|
@@ -57,6 +64,7 @@ The release script removes these paths from the exported copy:
 | `contextEngine-cc/` | Claude Code extension (local dev tool) |
 | `CLAUDE.md` | Maintainer AI instructions |
 | `.claude/`, `.codex/` | AI agent skills and settings |
+| `video-clickthrough-local/` | Durable local video workflow scripts and handoff notes |
 | `artifacts/` | Local test artifacts |
 | `Demo Integration Package/` | Raw source data |
 | `scripts/test-*.js`, `scripts/lib/e2e/` | E2E test layer |

@@ -10,6 +10,10 @@ import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { litStorage } from 'utilities/crypto/litProtocol.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import {
+  SBT_PASSWORD_RECOVERY_KIND,
+  SBT_PASSWORD_RECOVERY_STORAGE_KEY,
+} from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import * as terminology from '../../utilities/ui/terminology.js';
 
 jest.mock('utilities/ui/blockieAvatars.js', () => ({
@@ -3537,7 +3541,7 @@ describe('SBTPage modal holder optimizations', () => {
     const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
 
     expect(addressNode).not.toBeNull();
-    expect(flattenText(addressNode)).toContain(proposalScripts.getShortenedAddress(sbtAddress, false));
+    expect(flattenText(addressNode)).toContain(getShortenedAddress(sbtAddress, false));
 
     cryptoModeSpy.mockRestore();
   });

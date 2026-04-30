@@ -3887,7 +3887,7 @@ class UserPage extends Component<any, any> {
     }
   }
 
-  setUsername = () => {
+  setUsername: any = () => {
     const newUsernameToSet = this.state.username;
     const { account, viewAddress, network } = this.props;
 
@@ -5540,7 +5540,6 @@ class UserPage extends Component<any, any> {
             {/* Close “X” is intentionally hidden via CSS; do not delete this feature. */}
             <div className={styles.modalTitleRow}>
               {analysisName || 'User Analysis'}
-              {/* DO NOT DELETE THIS SECTION - button we will be used in the future
               <button
                 type="button"
                 className={styles.refreshIconButton}

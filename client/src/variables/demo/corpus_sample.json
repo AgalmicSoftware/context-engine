@@ -2448,28 +2448,6 @@
           ]
         },
         {
-          "id": "amodei_dario_dwarkesh_2023_scaling",
-          "url": "https://www.dwarkeshpatel.com/p/dario-amodei",
-          "title": "Scaling, Alignment, & AI Progress",
-          "author": "Dario Amodei",
-          "interviewer": "Dwarkesh Patel",
-          "date": "2023-08-15",
-          "image_url": null,
-          "summary": "Dario Amodei, CEO of Anthropic, discusses the relationship between scaling laws and alignment in AI systems. He argues that safety and capabilities development are not fundamentally in tension, but rather complementary pursuits. The conversation covers mechanistic interpretability research aimed at understanding model internals, the development of Constitutional AI and Anthropic's responsible scaling practices (RSP framework). Amodei explains how safety research informs architectural choices and training procedures, making systems more predictable and aligned. He also discusses competitive dynamics between AI labs and how safety practices might influence the future of AI development. The episode provides insights into Anthropic's philosophy that building safe, interpretable systems is achievable without sacrificing performance.",
-          "top_quotes": [
-            "If you can understand the model better, you can also steer it better."
-          ],
-          "tags": [
-            "alignment",
-            "scaling",
-            "interpretability",
-            "anthropic",
-            "rlhf",
-            "constitutional-ai",
-            "safety-culture"
-          ]
-        },
-        {
           "id": "hassabis_demis_dwarkesh_2024_superhuman",
           "url": "https://www.dwarkeshpatel.com/p/demis-hassabis",
           "title": "Scaling, superhuman AIs, AlphaZero atop LLMs, AlphaFold",
@@ -2489,6 +2467,28 @@
             "alphafold",
             "hybrid-architectures",
             "reasoning"
+          ]
+        },
+        {
+          "id": "amodei_dario_dwarkesh_2023_scaling",
+          "url": "https://www.dwarkeshpatel.com/p/dario-amodei",
+          "title": "Scaling, Alignment, & AI Progress",
+          "author": "Dario Amodei",
+          "interviewer": "Dwarkesh Patel",
+          "date": "2023-08-15",
+          "image_url": null,
+          "summary": "Dario Amodei, CEO of Anthropic, discusses the relationship between scaling laws and alignment in AI systems. He argues that safety and capabilities development are not fundamentally in tension, but rather complementary pursuits. The conversation covers mechanistic interpretability research aimed at understanding model internals, the development of Constitutional AI and Anthropic's responsible scaling practices (RSP framework). Amodei explains how safety research informs architectural choices and training procedures, making systems more predictable and aligned. He also discusses competitive dynamics between AI labs and how safety practices might influence the future of AI development. The episode provides insights into Anthropic's philosophy that building safe, interpretable systems is achievable without sacrificing performance.",
+          "top_quotes": [
+            "If you can understand the model better, you can also steer it better."
+          ],
+          "tags": [
+            "alignment",
+            "scaling",
+            "interpretability",
+            "anthropic",
+            "rlhf",
+            "constitutional-ai",
+            "safety-culture"
           ]
         },
         {

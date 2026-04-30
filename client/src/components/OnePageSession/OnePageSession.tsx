@@ -42,6 +42,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
+import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
@@ -57,6 +58,21 @@ const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
+const globalState: any = globalThis as any;
+const contractScriptsAny: any = contractScripts as any;
+const DebateMapAny: any = DebateMap;
+
+const getErrorMessage = (error: any, fallback = 'Unknown error') => (
+  error && typeof error === 'object' && typeof error.message === 'string'
+    ? error.message
+    : fallback
+);
+
+const resolveAutoFeatureBySessionSlug = (metadata: any) => (
+  metadata?.autoFeatureSBTsBySessionSlug !== undefined
+    ? metadata.autoFeatureSBTsBySessionSlug
+    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
+);
 
 const isPerfCountersEnabled = () => {
   try {
@@ -359,6 +375,7 @@ class OnePageSession extends Component<any, any> {
       autoOpenResults: routeUiState.autoOpenResults,
       embeddedAtlasNodeId: null,
       embeddedAtlasReturnState: null,
+      riskMatrixRestoreState: null,
       aggregatorData: {},
       disclaimersActive: true,
       filterState: initialFilterState,
@@ -413,6 +430,7 @@ class OnePageSession extends Component<any, any> {
     this.handleResultsModalClose = this.handleResultsModalClose.bind(this);
     this.handleCorpusAtlasIssueOpen = this.handleCorpusAtlasIssueOpen.bind(this);
     this.handleEmbeddedAtlasModalClose = this.handleEmbeddedAtlasModalClose.bind(this);
+    this.handleRiskMatrixRestoreApplied = this.handleRiskMatrixRestoreApplied.bind(this);
     this.resetDemoURL = this.resetDemoURL.bind(this);
     this.toggleQuestions = this.toggleQuestions.bind(this);
     this.toggleGroups = this.toggleGroups.bind(this);
@@ -1731,8 +1749,8 @@ class OnePageSession extends Component<any, any> {
         } else {
           updateStatus(sbtKey, { status: 'info', name: 'Skipped (unknown path)' });
         }
-      } catch (e) {
-        const msg = (e.message || e.toString() || '').toLowerCase();
+	      } catch (e: any) {
+	        const msg = (getErrorMessage(e, String(e || '')) || String(e || '')).toLowerCase();
 
         if (msg.includes("already owns") || msg.includes("already joined") || msg.includes("user already has")) {
            // Graceful handling of "already owned" revert
@@ -1857,15 +1875,16 @@ class OnePageSession extends Component<any, any> {
     this.setState({ autoOpenResults: false }, () => this.resetDemoURL());
   }
 
-  handleCorpusAtlasIssueOpen(nodeId) {
+  handleCorpusAtlasIssueOpen(nodeId: any, riskMatrixRestoreState: RiskMatrixRestoreState | null = null) {
     const normalizedNodeId = String(nodeId || '').trim();
     if (!normalizedNodeId) return;
 
-    this.setState((prevState) => ({
+    this.setState((prevState: any) => ({
       embeddedAtlasNodeId: normalizedNodeId,
       embeddedAtlasReturnState: prevState.embeddedAtlasReturnState || {
         showResults: prevState.showResults,
         resultsViewMode: prevState.resultsViewMode,
+        riskMatrixRestoreState: riskMatrixRestoreState || null,
       },
       showResults: true,
       resultsViewMode: 'debateAtlas',
@@ -1873,15 +1892,23 @@ class OnePageSession extends Component<any, any> {
   }
 
   handleEmbeddedAtlasModalClose() {
-    this.setState((prevState) => {
+    this.setState((prevState: any) => {
       const returnState = prevState.embeddedAtlasReturnState;
       return {
         embeddedAtlasNodeId: null,
         embeddedAtlasReturnState: null,
+        riskMatrixRestoreState: returnState?.resultsViewMode === 'riskMatrix'
+          ? (returnState?.riskMatrixRestoreState || null)
+          : null,
         showResults: returnState ? returnState.showResults : prevState.showResults,
         resultsViewMode: returnState?.resultsViewMode || prevState.resultsViewMode,
       };
     });
+  }
+
+  handleRiskMatrixRestoreApplied() {
+    if (!this.state.riskMatrixRestoreState) return;
+    this.setState({ riskMatrixRestoreState: null });
   }
 
 
@@ -1969,9 +1996,9 @@ class OnePageSession extends Component<any, any> {
     this.navigateToInternalPath(sbtsListPath());
   }
 
-  handlePileSubmitRailVisibilityChange(visible) {
+  handlePileSubmitRailVisibilityChange(visible: any) {
     const nextVisible = !!visible;
-    this.setState((prevState) => (
+    this.setState((prevState: any) => (
       prevState.pileSubmitRailVisible === nextVisible
         ? null
         : { pileSubmitRailVisible: nextVisible }
@@ -2546,31 +2573,36 @@ class OnePageSession extends Component<any, any> {
                   ) : (
                     <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
                   )}
-                  {renderSectionHeading('Context', 'View')}
-                </span>
-                {this.state.showDocuments && (
-                  <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
-                    <div
-                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FontAwesomeIcon icon={faQuestionCircle} />
-                      <span className={styles.tooltiptext}>
-                        {documentsSectionTooltip}
-                      </span>
-                    </div>
-                    <a
-                      href={DEMO_CORPUS_GITHUB_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.sectionHeaderLink}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} />
-                      <span>GitHub</span>
-                    </a>
+                  <span className={`${styles.sectionHeaderText} ${styles.documentsSectionHeaderText}`.trim()}>
+                    <span className={styles.documentsSectionHeaderTitleRow}>
+                      <span className={styles.sectionHeaderTitle}>Context</span>
+                      {this.state.showDocuments && (
+                        <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
+                          <div
+                            className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                            onClick={(e: any) => e.stopPropagation()}
+                          >
+                            <FontAwesomeIcon icon={faQuestionCircle} />
+                            <span className={styles.tooltiptext}>
+                              {documentsSectionTooltip}
+                            </span>
+                          </div>
+                          <a
+                            href={DEMO_CORPUS_GITHUB_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.sectionHeaderLink}
+                            onClick={(e: any) => e.stopPropagation()}
+                          >
+                            <FontAwesomeIcon icon={faExternalLinkAlt} />
+                            <span>GitHub</span>
+                          </a>
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.sectionHeaderSubtitle}>View</span>
                   </span>
-                )}
+                </span>
               </h2>
             </div>
               {this.state.showDocuments && (
@@ -2696,7 +2728,7 @@ class OnePageSession extends Component<any, any> {
                           embedded={true}
                           requestedModalNodeId={this.state.embeddedAtlasNodeId}
                           onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
-                        />
+	                        />
                       </div>
                     </Suspense>
                   )}

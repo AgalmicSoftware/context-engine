@@ -124,27 +124,22 @@ trap cleanup EXIT
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/prepare-public-release.XXXXXX")
 STAGING_ROOT="$TMP_ROOT/release"
-TRACKED_PATHS_FILE="$TMP_ROOT/tracked-paths.txt"
 MATCHED_PATHS_FILE="$TMP_ROOT/matched-paths.txt"
 STRIP_ENTRIES_FILE="$TMP_ROOT/strip-entries.txt"
-MANIFEST_TMP_PATH="$TMP_ROOT/private-pack.manifest.json"
 MANIFEST_PATH="$STAGING_ROOT/private-pack.manifest.json"
 
 mkdir -p "$STAGING_ROOT"
 
 (
   cd "$REPO_ROOT"
-  git ls-files -z --cached --modified --deduplicate \
-    | while IFS= read -r -d '' path; do
-        if [ -e "$path" ] || [ -L "$path" ]; then
-          printf '%s\0' "$path"
-        fi
-      done
-) > "$TRACKED_PATHS_FILE"
-
-(
-  cd "$REPO_ROOT"
-  tar --null -T "$TRACKED_PATHS_FILE" -cf -
+  tar -cf - \
+    --exclude='./.git' \
+    --exclude='./*/.git' \
+    --exclude='./node_modules' \
+    --exclude='./*/node_modules' \
+    --exclude='./build' \
+    --exclude='./*/build' \
+    .
 ) | (
   cd "$STAGING_ROOT"
   tar -xf -
@@ -213,7 +208,7 @@ entry_index=0
 
   printf '\n  ]\n'
   printf '}\n'
-} > "$MANIFEST_TMP_PATH"
+} > "$MANIFEST_PATH"
 
 while IFS= read -r path; do
   [ -n "$path" ] || continue
@@ -232,8 +227,6 @@ done < "$MATCHED_PATHS_FILE"
     done
   done
 )
-
-mv "$MANIFEST_TMP_PATH" "$MANIFEST_PATH"
 
 mv "$STAGING_ROOT" "$OUTPUT_ABS"
 
