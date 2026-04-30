@@ -39,8 +39,6 @@ const renderAiFieldSelect = (overrides: Partial<RenderAiOrGateSelectParams> = {}
   return { ...view, params };
 };
 
-const asOptionElement = (option: Element): HTMLOptionElement => option as HTMLOptionElement;
-
 describe('renderAiOrGateSelect', () => {
   it('renders transcription provider select with correct options', () => {
     renderAiFieldSelect({
@@ -54,14 +52,11 @@ describe('renderAiOrGateSelect', () => {
     const options = within(select).getAllByRole('option');
 
     expect(select).toHaveValue('openai');
-    expect(options.map((option) => {
-      const optionEl = asOptionElement(option);
-      return {
-        value: optionEl.getAttribute('value'),
-        label: optionEl.textContent,
-        disabled: optionEl.disabled,
-      };
-    })).toEqual([
+    expect(options.map((option) => ({
+      value: option.getAttribute('value'),
+      label: option.textContent,
+      disabled: option.disabled,
+    }))).toEqual([
       { value: 'openai', label: 'OpenAI', disabled: false },
       { value: 'local', label: 'Local (coming soon)', disabled: true },
     ]);
@@ -85,14 +80,11 @@ describe('renderAiOrGateSelect', () => {
     const select = screen.getByRole('combobox');
     const options = within(select).getAllByRole('option');
 
-    expect(options.map((option) => {
-      const optionEl = asOptionElement(option);
-      return {
-        value: optionEl.getAttribute('value'),
-        label: optionEl.textContent,
-        disabled: optionEl.disabled,
-      };
-    })).toEqual(
+    expect(options.map((option) => ({
+      value: option.getAttribute('value'),
+      label: option.textContent,
+      disabled: option.disabled,
+    }))).toEqual(
       AI_PROVIDER_OPTIONS.map((option) => ({
         value: option.value,
         label: option.label,
