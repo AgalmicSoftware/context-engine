@@ -79,6 +79,7 @@ export type UseSponsoredBundleLifecycleOptions = {
   initialSponsoredBundleId?: string | null;
   initialSponsoredBundleKey?: string | null;
   draftSlug?: string | null;
+  litPayerWalletInputEnabled?: boolean;
   refs?: SponsoredBundleRefs;
   getCurrentWorkerSecrets?: () => WorkerSecretsLike;
   applyWorkerSecretsUpdate?: (nextValueOrUpdater: unknown) => unknown;
@@ -89,12 +90,16 @@ export type UseSponsoredBundleLifecycleOptions = {
 
 const normalizeProvisionedSponsoredContextForState = (
   value: AnyRecord | null | undefined = {},
+  { litPayerWalletInputEnabled = true }: { litPayerWalletInputEnabled?: boolean } = {}
 ): AnyRecord => {
   const source = (value && typeof value === 'object') ? value : {};
   return {
     ...buildEmptyProvisionedSponsoredContext(),
     ...source,
-    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(source?.fields),
+    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
+      source?.fields,
+      { litPayerWalletInputEnabled }
+    ),
   };
 };
 
@@ -102,6 +107,7 @@ const useSponsoredBundleLifecycle = ({
   initialSponsoredBundleId,
   initialSponsoredBundleKey,
   draftSlug,
+  litPayerWalletInputEnabled = true,
   refs = {},
   getCurrentWorkerSecrets = () => normalizeWorkerSecrets({}),
   applyWorkerSecretsUpdate = () => undefined,
@@ -212,9 +218,12 @@ const useSponsoredBundleLifecycle = ({
         toStr(currentProvisionedSponsoredContext?.workerUrl || '').trim()
       )
         ? currentProvisionedSponsoredContext
-        : normalizeProvisionedSponsoredContextForState(resolvedBaseline.provisionedSponsoredContext),
+        : normalizeProvisionedSponsoredContextForState(
+            resolvedBaseline.provisionedSponsoredContext,
+            { litPayerWalletInputEnabled }
+          ),
     };
-  }, [buildRestoredSponsoredWorkerSecrets]);
+  }, [buildRestoredSponsoredWorkerSecrets, litPayerWalletInputEnabled]);
 
   const clearSponsoredBundleTracking = useCallback(() => {
     sponsoredBundleApplyRef.current = '';
@@ -270,7 +279,10 @@ const useSponsoredBundleLifecycle = ({
       deployForm: restored.deployForm,
       deployComplete: !!restored.deployComplete,
       deployWorkerUrl: normalizeBaseUrl(toStr(restored.deployWorkerUrl).trim()),
-      provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(restored.provisionedSponsoredContext),
+      provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(
+        restored.provisionedSponsoredContext,
+        { litPayerWalletInputEnabled }
+      ),
     });
     updateDraftCorsWorkerUrl(toStr(restored.corsWorkerUrl || '').trim());
     updateWorkerSecretState({
@@ -286,6 +298,7 @@ const useSponsoredBundleLifecycle = ({
     deployWorkerUrlRef,
     draftRef,
     getCurrentWorkerSecrets,
+    litPayerWalletInputEnabled,
     persistWorkerSecretsRef,
     provisionedSponsoredContextRef,
     resolveSponsoredBundleRestoreState,
@@ -336,7 +349,10 @@ const useSponsoredBundleLifecycle = ({
       deployComplete: !!baselineSource.deployComplete,
       deployWorkerUrl: toStr(baselineSource.deployWorkerUrl || '').trim(),
       corsWorkerUrl: toStr(baselineSource.corsWorkerUrl || '').trim(),
-      provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(baselineSource.provisionedSponsoredContext),
+      provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(
+        baselineSource.provisionedSponsoredContext,
+        { litPayerWalletInputEnabled }
+      ),
       workerSecretsEnabled: baselineSource.workerSecretsEnabled,
       persistWorkerSecrets: baselineSource.persistWorkerSecrets,
     };
@@ -353,7 +369,10 @@ const useSponsoredBundleLifecycle = ({
       deployComplete: false,
       deployWorkerUrl: '',
       workerUrlAutoFilled: false,
-      provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(buildEmptyProvisionedSponsoredContext()),
+      provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(
+        buildEmptyProvisionedSponsoredContext(),
+        { litPayerWalletInputEnabled }
+      ),
     });
     syncSponsoredBootstrapFundingContext(normalizedBundle);
     updateDraftCorsWorkerUrl('');
@@ -366,6 +385,7 @@ const useSponsoredBundleLifecycle = ({
     deployWorkerUrlRef,
     draftRef,
     getCurrentWorkerSecrets,
+    litPayerWalletInputEnabled,
     persistWorkerSecretsRef,
     provisionedSponsoredContextRef,
     resolveSponsoredBundleRestoreState,
@@ -452,8 +472,7 @@ const useSponsoredBundleLifecycle = ({
       } catch (error) {
         if (cancelled) return;
         restoreSponsoredBundleOverrides();
-        const errorLike = (error && typeof error === 'object') ? error as AnyRecord : {};
-        const code = toStr(errorLike?.code || '').trim().toLowerCase();
+        const code = toStr(error?.code || '').trim().toLowerCase();
         if (code === 'expired_bundle') {
           await writeSessionWizardSponsoredBundleCache(bundleId, null);
           if (cancelled) return;
