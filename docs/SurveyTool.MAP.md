@@ -1,12 +1,12 @@
 # SurveyTool Runtime Map
 
 ## Quick Reference
-- Entry wrapper: `client/src/components/SurveyTool/SurveyTool.jsx`
+- Entry wrapper: `client/src/components/SurveyTool/SurveyTool.tsx`
 - Shared runtime: `client/src/components/SurveyTool/SurveyQuestions.tsx`
 - Pile-mode controller: `client/src/components/SurveyTool/SurveyPileViewMode.tsx`
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
-  - `SurveyTool.jsx`: **1,094 lines**
+  - `SurveyTool.tsx`: **1,225 lines**
   - `SurveyQuestions.tsx`: **9,326 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
@@ -14,7 +14,7 @@
 ## Current Runtime Hierarchy
 
 ```text
-SurveyTool.jsx  [top-level wrapper]
+SurveyTool.tsx  [top-level wrapper]
   -> SurveySelector.tsx  [survey/questions selector + filter + results]
      -> QuestionsDashboard.tsx  [question list in "questions" mode]
      -> SurveyQuestions.tsx  [shared full response runtime]
@@ -25,7 +25,7 @@ SurveyTool.jsx  [top-level wrapper]
 
 | File | Primary role | Notes |
 |---|---|---|
-| `SurveyTool.jsx` | Route/mode shell | Chooses full vs pile mode and wires shared props/nonces downward |
+| `SurveyTool.tsx` | Route/mode shell | Functional component with hooks; chooses full vs pile mode, wires shared props/nonces downward, and uses a dual-mode export pattern (hooks runtime for production, legacy shim for tests) |
 | `SurveySelector.tsx` | Survey selection + URL/filter routing | Handles selector state, result toggles, and switching between question/survey views |
 | `QuestionsDashboard.tsx` | Standalone question list entry | Narrow orchestration layer for "questions" mode |
 | `SurveyQuestions.tsx` | Shared survey/question runtime | Owns draft persistence, response hydration, pending-edit semantics, encryption/decrypt, and submission pipeline |
@@ -299,7 +299,7 @@ Those are either already improved or too mode-specific to justify the next high-
 
 If you are resuming this area, read in this order:
 
-1. `SurveyTool.jsx`
+1. `SurveyTool.tsx`
 2. `SurveyQuestions.tsx`
 3. `SurveyPileViewMode.tsx`
 4. `surveyPileResponseController.ts`
