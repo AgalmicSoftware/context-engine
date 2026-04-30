@@ -1,8 +1,8 @@
 ## PRD 509: Coordinated Shell Cleanup For Remaining JSX Shells
 
-**Priority:** High  
-**Status:** Draft  
-**Category:** TypeScript migration / shell decomposition  
+**Priority:** High
+**Status:** Draft
+**Category:** TypeScript migration / shell decomposition
 **Created:** 2026-04-23
 
 ### Summary
