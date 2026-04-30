@@ -3,11 +3,12 @@
 ## Quick Reference
 
 - File: `client/src/components/Sessions/SessionWizard.tsx`
-- Current length: **9,392 lines**
+- Current length: **5,901 lines**
 - Component type: **React function component**
 - Hook inventory: **50 `useEffect` calls**, **32 `useMemo` calls**, **15 `useCallback` calls**
 - Named export count before default export: **39**
 - Summary: `SessionWizard` is the session-creation and publish orchestrator. It bootstraps editable session metadata, manages encryption gates and pending SBT drafts, handles sponsored-bundle overrides, deploys or verifies worker configuration, uploads session metadata, and finally registers the session on-chain.
+- Status note: the section ranges below were captured from an earlier snapshot and need a fuller refresh; use the live file for exact line anchors.
 
 ## Navigation Rules
 

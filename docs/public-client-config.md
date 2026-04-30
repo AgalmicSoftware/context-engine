@@ -19,7 +19,7 @@ stays centralized in `client/src/variables/publicDeploymentConfig.js`.
 3. Restart the dev server: `cd client && npm run dev` (CRA reads `.env` only at build time)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
-## Netlify Static Deploy
+## Static Frontend Deploy
 
 Use this flow when you want to ship the React frontend on a custom domain with
 Netlify static hosting. The built app is a static bundle; it is not a Node
