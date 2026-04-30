@@ -7,7 +7,7 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,225 lines**
-  - `SurveyQuestions.tsx`: **9,375 lines**
+  - `SurveyQuestions.tsx`: **9,326 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
   - `surveyQuestionsJsonDerivation.ts`: **119 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
