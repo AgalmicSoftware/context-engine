@@ -3,7 +3,7 @@
  * @description Dev/E2E-only agent mode — JSON-driven deterministic UI actions via the TestID API.
  *              Gated by non-production bundle + query param agent=1 or localStorage ce-agent-enabled=1.
  *
- * Key exports: installCeAgent
+ * Key exports: installCeAgent, describeCeAgentContract
  */
 // Dev/E2E-only Agent Mode: JSON-driven deterministic actions via the TestID API.
 //
@@ -13,14 +13,18 @@
 //
 // Exposes: window.__ceAgent
 // - getState()
+// - describe()
 // - perform(action)
 // - run(actions[])
 
 import store from '../store.js';
+import { describeCeAgentContract } from './ceAgentContract.js';
 import { E2E_TESTIDS } from './e2eTestIds.js';
 import { toStr } from './shared/primitives.js';
 import { createLogger } from './logging.js';
 import { isDemoModeEnabled } from './demoModeHelpers.js';
+
+export { describeCeAgentContract } from './ceAgentContract.js';
 
 const log = createLogger('ceAgent');
 
@@ -315,6 +319,8 @@ const run = async (actions) => {
   return { ok: true, results };
 };
 
+const describe = () => describeCeAgentContract();
+
 export const installCeAgent = () => {
   if (!isAgentEnabled()) return false;
   if (typeof window === 'undefined') return false;
@@ -322,6 +328,7 @@ export const installCeAgent = () => {
 
   window.__ceAgent = {
     getState,
+    describe,
     perform,
     run,
   };
