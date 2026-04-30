@@ -1,4 +1,4 @@
-import SurveyTool from './SurveyTool.jsx';
+import SurveyTool from './SurveyTool';
 import {
   computeSubmitLabel,
   doesQuestionProgressMatchSlug,
