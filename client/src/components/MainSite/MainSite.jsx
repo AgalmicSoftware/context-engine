@@ -71,6 +71,7 @@ import {
 import { createSessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
 import { createSessionProfileScanController } from '../../utilities/session/sessionProfileScanController.js';
 import { createSessionSbtCacheController } from '../../utilities/sbt/sessionSbtCacheController.js';
+import { createSessionSurveyCacheController } from 'utilities/survey/sessionSurveyCacheController';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { t } from '../../utilities/ui/terminology.js';
 import {
@@ -223,33 +224,6 @@ const mainSiteLog = createLogger('mainSite');
 
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
 
-const normalizeSurveyResponseBatchResult = (batchResult) => {
-  if (Array.isArray(batchResult)) {
-    return { responses: batchResult, hadPartialFailure: false, lowestFailedBlock: null };
-  }
-  const responses = Array.isArray(batchResult?.responses) ? batchResult.responses : [];
-  const lowestFailedBlock = Number(batchResult?.lowestFailedBlock);
-  return {
-    responses,
-    hadPartialFailure: !!batchResult?.hadPartialFailure,
-    lowestFailedBlock: Number.isFinite(lowestFailedBlock) ? lowestFailedBlock : null,
-  };
-};
-
-const resolveSurveyResponseWatermark = ({ startBlock, latestBlock, hadPartialFailure, lowestFailedBlock }) => {
-  if (!hadPartialFailure) return latestBlock;
-  const failedBlock = Number(lowestFailedBlock);
-  if (!Number.isFinite(failedBlock)) return latestBlock;
-  return Math.max(
-    Math.max(0, Number(startBlock) - 1),
-    Math.min(Number(latestBlock) || 0, failedBlock - 1)
-  );
-};
-
-
-
-
-
 
 export class MainSite extends Component {
   state = {
@@ -300,7 +274,7 @@ export class MainSite extends Component {
     readFlag: (name, slug) => this.readFlag(name, slug),
     isInitInFlight: (slug) => ({
       question: !!this._questionInitInFlight?.[slug],
-      survey: !!this._surveyInitInFlight?.[slug],
+      survey: !!this._surveyCacheController?.isInitInFlight?.(slug),
       response: !!this._responseInitInFlight?.[slug],
     }),
   });
@@ -317,10 +291,8 @@ export class MainSite extends Component {
   _queuedSurveyGroupScanHintedSlug = '';
   _queuedSurveyGroupScanTimer = null;
   _surveyGroupScanInFlight = new Set();
-  _surveyInitInFlight = {};
   _questionInitInFlight = {};
   _responseInitInFlight = {};
-  _surveyInitPending = {};
   _questionInitPending = {};
   _responseInitPending = {};
   _scanPolicy = createSessionScanPolicy({
@@ -378,6 +350,30 @@ export class MainSite extends Component {
     initializeSurveyCacheForGroup: (...args) => this.initializeSurveyCacheForGroup(...args),
     runWithGeneralSessionBackfill: (...args) => this.runWithGeneralSessionBackfill(...args),
     mergeLegacyNumericNetworkKey: (...args) => this.mergeLegacyNumericNetworkKey(...args),
+  });
+  _surveyCacheController = createSessionSurveyCacheController({
+    setState: (...a) => this.setState(...a),
+    getState: () => this.state,
+    isMounted: () => this._mounted,
+    dgRead: (...a) => this.DG.read(...a),
+    dgWrite: (...a) => this.DG.write(...a),
+    getActiveSessionSlug: () => this.getActiveSessionSlug(),
+    getSessionCfg: (...a) => this.getSessionCfg(...a),
+    getSessionChainId: (...a) => this.getSessionChainId(...a),
+    getAccount: () => this.props.account,
+    getCurrentPath: () => this.props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
+    shouldSkipSessionScanForSlug: (...a) => this.shouldSkipSessionScanForSlug(...a),
+    scanScopeNoop: (...a) => this.scanScopeNoop(...a),
+    logScopeSkipOnce: (...a) => this.logScopeSkipOnce(...a),
+    setReadinessStateIfChanged: (...a) => this.setReadinessStateIfChanged(...a),
+    checkAllCachesReady: (...a) => this.checkAllCachesReady(...a),
+    readFlag: (...a) => this.readFlag(...a),
+    writeFlag: (...a) => this.writeFlag(...a),
+    mergeLegacyNumericNetworkKey: (...a) => this.mergeLegacyNumericNetworkKey(...a),
+    initializeQuestionCacheForGroup: (...a) => this.initializeQuestionCacheForGroup(...a),
+    writeSurveyMetadataToCache: (...a) => this.writeSurveyMetadataToCache(...a),
+    queueLocalRevisionUpdate: (...a) => this.queueLocalRevisionUpdate(...a),
+    getSessionScanScope: () => this.getSessionScanScope(),
   });
   _scanSpecificUserProfileInFlight = new Map();
   _profileScanTelemetrySeq = 0;
@@ -3846,6 +3842,9 @@ export class MainSite extends Component {
     try {
       this._sbtCacheController.destroy();
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
+    try {
+      this._surveyCacheController?.destroy();
+    } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
     try {
       if (this._queuedSurveyGroupScanTimer) clearTimeout(this._queuedSurveyGroupScanTimer);
@@ -3857,7 +3856,6 @@ export class MainSite extends Component {
     // Cancel pending off-chain metadata retries to avoid background work after unmount.
     try {
       const buckets = [
-        this._pendingSurveyMetadataRetryTimers,
         this._pendingQuestionMetadataRetryTimers,
       ];
       buckets.forEach((bucket) => {
@@ -3866,7 +3864,6 @@ export class MainSite extends Component {
           try { clearTimeout(t); } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
         });
       });
-      this._pendingSurveyMetadataRetryTimers = null;
       this._pendingQuestionMetadataRetryTimers = null;
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
@@ -3884,10 +3881,8 @@ export class MainSite extends Component {
       }
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
-    this._surveyInitInFlight = {};
     this._questionInitInFlight = {};
     this._responseInitInFlight = {};
-    this._surveyInitPending = {};
     this._questionInitPending = {};
     this._responseInitPending = {};
     if (this._maskedQuestionDecryptBackoff instanceof Map) {
@@ -4528,545 +4523,7 @@ export class MainSite extends Component {
     });
   };
 
-  initializeSurveyCacheForGroup = async (slugIn, opts = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const suppressUiState = !!(opts && opts.background === true);
-    const rerunOpts = { ...(opts && typeof opts === 'object' ? opts : {}), background: suppressUiState };
-    const setSurveyState = (nextState, cb) => {
-      if (suppressUiState || !this._mounted) return;
-      this.setState(nextState, cb);
-    };
-    const mergePendingSurveyInitOpts = (prevOpts, nextOpts) => {
-      const nextBackground = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.background === true);
-      if (!prevOpts || typeof prevOpts !== 'object') return { background: nextBackground };
-      const prevBackground = !!(prevOpts.background === true);
-      return { background: prevBackground && nextBackground };
-    };
-    if (this.scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
-      setSurveyState({ isSurveyCacheReady: true }, this.checkAllCachesReady);
-    })) {
-      return;
-    }
-    this._surveyInitInFlight = this._surveyInitInFlight || {};
-    this._surveyInitPending = this._surveyInitPending || {};
-    if (this._surveyInitInFlight[slug]) {
-      this._surveyInitPending[slug] = mergePendingSurveyInitOpts(this._surveyInitPending[slug], rerunOpts);
-      return this._surveyInitInFlight[slug];
-    }
-
-    const run = (async () => {
-    mainSiteLog.log("initializeSurveyCacheForGroup() - invoked", { slug });
-    setSurveyState((prev) =>
-      prev.surveyCacheInitializationError ? { surveyCacheInitializationError: false } : null
-    );
-    const networkID = String(this.getSessionChainId(slug) || '');
-
-    // per-group block window
-    const { fromBlock: baseFrom, toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(slug);
-    if (baseFrom > baseTo) {
-      setSurveyState({ isSurveyCacheReady: true }, this.checkAllCachesReady);
-      return;
-    }
-    const initialLastBlockSurvey = Math.max(0, baseFrom - 1);
-
-    let surveysCache = this.DG.read('surveysCache', slug) || {};
-    // merge any numeric key into string key once
-    this.mergeLegacyNumericNetworkKey(surveysCache, networkID);
-    if (!surveysCache[networkID]) {
-      surveysCache[networkID] = {
-        surveysLatestBlock: initialLastBlockSurvey,
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
-        pendingSurveyMetadata: {} // Retry map for off-chain survey metadata fetches
-      };
-    }
-    let currentNetworkCache = surveysCache[networkID];
-    // Ensure surveysLatestBlock is a number and respects floor
-    let lastProcessedSurveyBlock = Number(currentNetworkCache.surveysLatestBlock) || 0;
-    if (lastProcessedSurveyBlock < initialLastBlockSurvey) {
-        lastProcessedSurveyBlock = initialLastBlockSurvey;
-    }
-    currentNetworkCache.surveysLatestBlock = lastProcessedSurveyBlock;
-
-    // Ensure surveyResponses and surveyResponsesLatestBlock are objects
-    if (typeof currentNetworkCache.surveyResponses !== 'object' || currentNetworkCache.surveyResponses === null) {
-        currentNetworkCache.surveyResponses = {};
-    }
-    if (typeof currentNetworkCache.surveyResponsesLatestBlock !== 'object' || currentNetworkCache.surveyResponsesLatestBlock === null) {
-        currentNetworkCache.surveyResponsesLatestBlock = {};
-    }
-    if (typeof currentNetworkCache.pendingSurveyMetadata !== 'object' || currentNetworkCache.pendingSurveyMetadata === null) {
-        currentNetworkCache.pendingSurveyMetadata = {};
-    }
-    const cachedSurveyRefreshItems = (
-      slug
-        ? Object.values(currentNetworkCache.surveys || {})
-          .map((survey) => ({
-            surveyId: String(survey?.surveyID || survey?.id || '').toLowerCase(),
-            creationBlock: Number.isFinite(Number(survey?.creationBlock)) ? Number(survey.creationBlock) : null,
-          }))
-          .filter((item) => (
-            !!item.surveyId &&
-            !Object.prototype.hasOwnProperty.call(currentNetworkCache.surveys?.[item.surveyId] || {}, 'sessionSlugExplicit')
-          ))
-        : []
-    );
-
-    const latestBlock = baseTo;
-    mainSiteLog.log('Latest block number (Surveys, clamped):', latestBlock);
-
-    const fromBlockForSurveyDiscovery = currentNetworkCache.surveysLatestBlock + 1;
-    let surveyItems = [];
-
-    // Off-chain metadata retry queue (prevents log rescans when Arweave fetch fails)
-    const MAX_PENDING_SURVEY_METADATA_ATTEMPTS = 12;
-    const MAX_PENDING_SURVEY_COOLDOWN_MS = 5 * 60 * 1000;
-    const computeBackoffMs = (attempts) => {
-      const n = Math.max(0, Math.min(6, Number(attempts || 0) - 1));
-      return Math.min(60000, Math.round(1000 * Math.pow(2, n)));
-    };
-    const markPendingSurvey = (surveyIdLower, creationBlock, { bumpAttempts = true, error = null } = {}) => {
-      if (!surveyIdLower) return;
-      if (typeof currentNetworkCache.pendingSurveyMetadata !== 'object' || !currentNetworkCache.pendingSurveyMetadata) {
-        currentNetworkCache.pendingSurveyMetadata = {};
-      }
-      const slot = currentNetworkCache.pendingSurveyMetadata;
-      const prev = slot[surveyIdLower] && typeof slot[surveyIdLower] === 'object'
-        ? slot[surveyIdLower]
-        : { attempts: 0, nextRetryAtMs: 0, creationBlock: null };
-      const attempts = bumpAttempts ? (Number(prev.attempts || 0) + 1) : Number(prev.attempts || 0);
-      const stopDecision = shouldStopPendingMetadataRetry({
-        pendingEntry: { ...prev, attempts },
-        error,
-        maxAttempts: MAX_PENDING_SURVEY_METADATA_ATTEMPTS,
-      });
-      const failureMeta = normalizeArweaveFailureMeta(error);
-      const terminalRetryAtMs = Number(failureMeta.nextRetryAtMs || 0);
-      if (stopDecision.stop) {
-        if (
-          stopDecision.terminal &&
-          Number.isFinite(terminalRetryAtMs) &&
-          terminalRetryAtMs > Date.now()
-        ) {
-          slot[surveyIdLower] = {
-            attempts,
-            nextRetryAtMs: terminalRetryAtMs,
-            creationBlock: Number.isFinite(Number(creationBlock)) ? Number(creationBlock) : (Number(prev.creationBlock) || null),
-            state: failureMeta.state || 'terminal_not_found',
-            lastStatus: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
-            message: String(failureMeta.message || ''),
-          };
-          return;
-        }
-        if (stopDecision.reachedMaxAttempts && !stopDecision.terminal) {
-          const cooldownRetryAtMs = Date.now() + MAX_PENDING_SURVEY_COOLDOWN_MS;
-          const externalNextRetryAt = Number(failureMeta.nextRetryAtMs || 0);
-          slot[surveyIdLower] = {
-            attempts,
-            nextRetryAtMs: Number.isFinite(externalNextRetryAt) && externalNextRetryAt > cooldownRetryAtMs
-              ? externalNextRetryAt
-              : cooldownRetryAtMs,
-            creationBlock: Number.isFinite(Number(creationBlock)) ? Number(creationBlock) : (Number(prev.creationBlock) || null),
-            state: failureMeta.state || 'transient',
-            lastStatus: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
-            message: String(failureMeta.message || ''),
-          };
-          mainSiteLog.warn('[MainSite] Pending survey metadata reached max attempts; applying cooldown', {
-            group: slug,
-            surveyId: surveyIdLower,
-            attempts,
-            nextRetryAtMs: slot[surveyIdLower].nextRetryAtMs,
-          });
-          return;
-        }
-        try { delete slot[surveyIdLower]; } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-        mainSiteLog.warn('[MainSite] Stopping pending survey metadata retry', {
-          group: slug,
-          surveyId: surveyIdLower,
-          terminal: stopDecision.terminal,
-          reachedMaxAttempts: stopDecision.reachedMaxAttempts,
-          attempts,
-          state: failureMeta.state || null,
-          status: failureMeta.status,
-        });
-        return;
-      }
-      const externalNextRetryAt = Number(failureMeta.nextRetryAtMs || 0);
-      const computedNextRetryAt = Date.now() + computeBackoffMs(attempts);
-      slot[surveyIdLower] = {
-        attempts,
-        nextRetryAtMs: Number.isFinite(externalNextRetryAt) && externalNextRetryAt > computedNextRetryAt
-          ? externalNextRetryAt
-          : computedNextRetryAt,
-        creationBlock: Number.isFinite(Number(creationBlock)) ? Number(creationBlock) : (Number(prev.creationBlock) || null),
-        state: failureMeta.state || 'transient',
-        lastStatus: Number.isFinite(Number(failureMeta.status)) ? Number(failureMeta.status) : null,
-        message: String(failureMeta.message || ''),
-      };
-    };
-    const clearPendingSurvey = (surveyIdLower) => {
-      try {
-        if (currentNetworkCache?.pendingSurveyMetadata?.[surveyIdLower]) {
-          delete currentNetworkCache.pendingSurveyMetadata[surveyIdLower];
-        }
-      } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-    };
-    const pruneLoadedPendingSurveyMetadata = () => {
-      try {
-        const pending = currentNetworkCache?.pendingSurveyMetadata;
-        if (!pending || typeof pending !== 'object') return 0;
-        const cachedSurveys = (
-          currentNetworkCache?.surveys && typeof currentNetworkCache.surveys === 'object'
-        ) ? currentNetworkCache.surveys : {};
-        let removed = 0;
-        Object.keys(pending).forEach((sidRaw) => {
-          const sid = String(sidRaw || '').toLowerCase();
-          if (!sid || !cachedSurveys[sid]) return;
-          try {
-            delete pending[sidRaw];
-            removed += 1;
-          } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-        });
-        return removed;
-      } catch (_) {
-        return 0;
-      }
-    };
-    const retryPendingSurveyMetadata = async ({ maxToProcess = 10, batchSize = 3 } = {}) => {
-      try {
-        const removedStalePending = pruneLoadedPendingSurveyMetadata();
-        if (removedStalePending > 0) {
-          this.DG.write('surveysCache', slug, surveysCache);
-        }
-        const pending = currentNetworkCache?.pendingSurveyMetadata;
-        if (!pending || typeof pending !== 'object') return 0;
-        const now = Date.now();
-        const due = Object.keys(pending)
-          .map((sid) => ({ sid, entry: pending[sid] }))
-          .filter((row) => (
-            row &&
-            row.sid &&
-            !currentNetworkCache?.surveys?.[String(row.sid || '').toLowerCase()] &&
-            Number(row.entry?.nextRetryAtMs || 0) <= now
-          ))
-          .sort((a, b) => (Number(a.entry?.nextRetryAtMs || 0) - Number(b.entry?.nextRetryAtMs || 0)))
-          .slice(0, Math.max(0, Number(maxToProcess || 0)));
-        if (!due.length) return 0;
-
-        mainSiteLog.log(`[MainSite] Retrying ${due.length} pending survey metadata fetch(es) (group=${slug}).`);
-
-        for (let i = 0; i < due.length; i += batchSize) {
-          const batch = due.slice(i, i + batchSize);
-          // eslint-disable-next-line no-await-in-loop
-          const results = await Promise.all(batch.map(async ({ sid, entry }) => {
-            const sidLower = String(sid || '').toLowerCase();
-            if (!sidLower) return { sid: sidLower, entry, surveyData: null };
-            if (currentNetworkCache?.surveys?.[sidLower]) {
-              return { sid: sidLower, entry, surveyData: currentNetworkCache.surveys[sidLower], skippedCached: true };
-            }
-            try {
-              const surveyData = await contractScripts.getSurveyDataById('none', sidLower, slug, { throwOnFailure: true });
-              return { sid: sidLower, entry, surveyData };
-            } catch (err) {
-              return { sid: sidLower, entry, surveyData: null, err };
-            }
-          }));
-
-          results.forEach((item) => {
-            const sid = String(item.sid || '').toLowerCase();
-            if (!sid) return;
-            if (item.surveyData) {
-              item.surveyData.surveyID = sid;
-              item.surveyData.id = sid;
-              if (!item.surveyData.questionIDs) item.surveyData.questionIDs = [];
-              if (!item.surveyData.creator) item.surveyData.creator = "";
-              if (item.entry && Number.isFinite(Number(item.entry.creationBlock))) {
-                item.surveyData.creationBlock = Number(item.entry.creationBlock);
-              }
-              const preparedSurvey = this.buildMetadataSessionCacheEnvelope(item.surveyData, slug, {
-                scoped: true,
-                includeSlugField: true,
-              });
-              const preparedSurveyData = {
-                ...item.surveyData,
-                ...preparedSurvey.metadata,
-              };
-              const targetSlug = preparedSurvey.targetSlug;
-              if (targetSlug === slug) {
-                currentNetworkCache.surveys[sid] = preparedSurveyData;
-              } else {
-                try { delete currentNetworkCache.surveys[sid]; } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-                this.writeSurveyMetadataToCache(targetSlug, sid, preparedSurveyData, item.entry?.creationBlock, networkID, {
-                  enforceScopedIsolation: true,
-                });
-              }
-              clearPendingSurvey(sid);
-            } else {
-              markPendingSurvey(sid, item.entry?.creationBlock, { error: item.err });
-            }
-          });
-
-          this.DG.write('surveysCache', slug, surveysCache);
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-
-        return due.length;
-      } catch (_) {
-        return 0;
-      }
-    };
-
-    // If we discovered survey IDs but couldn't fetch their off-chain metadata, retry using the
-    // pending backoff queue without requiring the user to re-enter the page.
-    const schedulePendingSurveyMetadataRetry = () => {
-      try {
-        const pending = currentNetworkCache?.pendingSurveyMetadata;
-        if (!pending || typeof pending !== 'object') return;
-
-        const entries = Object.values(pending).filter((v) => v && typeof v === 'object');
-        if (!entries.length) return;
-
-        let nextAtMs = Infinity;
-        entries.forEach((entry) => {
-          const at = Number(entry.nextRetryAtMs || 0);
-          if (at > 0 && at < nextAtMs) nextAtMs = at;
-        });
-        if (!Number.isFinite(nextAtMs)) nextAtMs = Date.now() + 1500;
-        const delayMs = Math.max(500, nextAtMs - Date.now());
-
-        this._pendingSurveyMetadataRetryTimers = this._pendingSurveyMetadataRetryTimers || {};
-        if (this._pendingSurveyMetadataRetryTimers[slug]) {
-          clearTimeout(this._pendingSurveyMetadataRetryTimers[slug]);
-        }
-        this._pendingSurveyMetadataRetryTimers[slug] = setTimeout(() => {
-          try {
-            if (this._pendingSurveyMetadataRetryTimers) {
-              delete this._pendingSurveyMetadataRetryTimers[slug];
-            }
-            if (!this._mounted) return;
-            // Avoid background churn if the user navigated away, except for explicit
-            // general-scope backfill retries (slug === '').
-            if (typeof this.getActiveSessionSlug === 'function') {
-              const activeSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
-              const allowGeneralBackfillRetry = slug === '' && this.getSessionScanScope() === 'general';
-              if (!allowGeneralBackfillRetry && activeSlug !== slug) return;
-            }
-            this.initializeSurveyCacheForGroup(
-              slug,
-              suppressUiState ? { background: true } : undefined
-            );
-          } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-        }, delayMs);
-      } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
-    };
-
-    // Proactive user cache population
-    let userCache = this.DG.read('userCache', slug) || {};
-    let userCacheModified = false;
-
-    const ensureUserNode = (addr, block) => {
-      const lower = addr.toLowerCase();
-      if (!userCache[lower]) userCache[lower] = {};
-      if (!userCache[lower][networkID]) {
-        userCache[lower][networkID] = {
-          lastBlockScanned: block,
-          lastScanTimestamp: Math.floor(Date.now() / 1000),
-          data: { sbts: [], createdSurveys: [], createdQuestions: [], surveyResponses: [], questionResponses: [] }
-        };
-      }
-      // Update watermark if this scan is newer
-      if (block > userCache[lower][networkID].lastBlockScanned) {
-        userCache[lower][networkID].lastBlockScanned = block;
-        userCache[lower][networkID].lastScanTimestamp = Math.floor(Date.now() / 1000);
-      }
-      return userCache[lower][networkID].data;
-    };
-
-    try {
-        // Even if logs are up-to-date, retry any pending off-chain metadata fetches.
-        await retryPendingSurveyMetadata().catch(() => null);
-
-        if (fromBlockForSurveyDiscovery <= latestBlock) {
-            mainSiteLog.log(`Fetching survey IDs from block ${fromBlockForSurveyDiscovery} to ${latestBlock} (group=${slug})`);
-            // Now returns array of objects { surveyId, creationBlock }
-            surveyItems = await contractScripts.fetchUserSubmittedSurveyIDs(
-                'none',
-                fromBlockForSurveyDiscovery,
-                latestBlock,
-                slug
-            );
-        } else {
-            mainSiteLog.log("No new blocks to fetch survey IDs from.");
-        }
-
-        surveyItems = [
-          ...cachedSurveyRefreshItems,
-          ...(Array.isArray(surveyItems) ? surveyItems : []),
-        ];
-
-        if (surveyItems && surveyItems.length > 0) {
-            for (let item of surveyItems) {
-                const surveyID = item.surveyId.toLowerCase();
-                const creationBlock = item.creationBlock;
-                const existingSurvey = currentNetworkCache.surveys[surveyID];
-                const needsBindingRefresh = (
-                  !!slug &&
-                  !!existingSurvey &&
-                  !Object.prototype.hasOwnProperty.call(existingSurvey, 'sessionSlugExplicit')
-                );
-
-                if (!existingSurvey || needsBindingRefresh) {
-                    let surveyData = null;
-                    let surveyFetchErr = null;
-                    try {
-                      // eslint-disable-next-line no-await-in-loop
-                      surveyData = await contractScripts.getSurveyDataById('none', surveyID, slug, { throwOnFailure: true });
-                    } catch (e) {
-                      surveyFetchErr = e;
-                      surveyData = null;
-                    }
-                    if (surveyData) {
-                        surveyData.surveyID = surveyID;
-                        surveyData.id = surveyID;
-                        if (!surveyData.questionIDs) surveyData.questionIDs = [];
-                        if (!surveyData.creator) surveyData.creator = "";
-                        // Store creationBlock for optimization
-                        surveyData.creationBlock = creationBlock;
-                        const preparedSurvey = this.buildMetadataSessionCacheEnvelope(surveyData, slug, {
-                          scoped: true,
-                          includeSlugField: true,
-                        });
-                        const preparedSurveyData = {
-                          ...surveyData,
-                          ...preparedSurvey.metadata,
-                        };
-                        const targetSlug = preparedSurvey.targetSlug;
-                        if (targetSlug === slug) {
-                          currentNetworkCache.surveys[surveyID] = preparedSurveyData;
-                        } else {
-                          try { delete currentNetworkCache.surveys[surveyID]; } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-                          this.writeSurveyMetadataToCache(targetSlug, surveyID, preparedSurveyData, creationBlock, networkID, {
-                            enforceScopedIsolation: true,
-                          });
-                        }
-                        clearPendingSurvey(surveyID);
-
-                        // Update user cache (creator)
-                        if (targetSlug === slug && preparedSurveyData.creator) {
-                          const uData = ensureUserNode(preparedSurveyData.creator, latestBlock);
-                          if (!uData.createdSurveys) uData.createdSurveys = [];
-                          if (!uData.createdSurveys.some(s => s.id === surveyID)) {
-                            uData.createdSurveys.push({ id: surveyID, data: preparedSurveyData });
-                            userCacheModified = true;
-                          }
-                        }
-                    } else {
-                        // Record for retry so we don't need to rescan logs to rediscover the survey ID.
-                        markPendingSurvey(surveyID, creationBlock, { error: surveyFetchErr });
-                    }
-                }
-            }
-        }
-
-        // Advance discovery watermark as soon as the logs scan succeeds (even if metadata/responses fail).
-        currentNetworkCache.surveysLatestBlock = Math.max(
-          Number(currentNetworkCache.surveysLatestBlock) || 0,
-          latestBlock
-        );
-        this.DG.write('surveysCache', slug, surveysCache);
-
-        for (const surveyID in currentNetworkCache.surveys) {
-            const surveyIDLower = surveyID.toLowerCase();
-            const surveyObj = currentNetworkCache.surveys[surveyID];
-            const surveyResponseLastBlock = currentNetworkCache.surveyResponsesLatestBlock.hasOwnProperty(surveyIDLower)
-                ? currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower]
-                : initialLastBlockSurvey;
-
-            // Start scanning from creation block if we haven't scanned yet, or continue from last scan.
-            // Ensure we don't go below the group's initial block.
-            const startBlock = Math.max(surveyResponseLastBlock + 1, surveyObj?.creationBlock || 0, initialLastBlockSurvey);
-
-            if (latestBlock >= startBlock) {
-                mainSiteLog.log(`Fetching/updating responses for survey ${surveyIDLower}, from block ${startBlock} up to ${latestBlock} (group=${slug})`);
-                const surveyResponseBatch = normalizeSurveyResponseBatchResult(await contractScripts.fetchAllSurveyResponses(
-                    'none',
-                    surveyIDLower,
-                    startBlock, // Use optimized start block
-                    latestBlock,
-                    slug
-                ));
-
-                if (!currentNetworkCache.surveyResponses[surveyIDLower]) {
-                    currentNetworkCache.surveyResponses[surveyIDLower] = {};
-                }
-                for (const item of surveyResponseBatch.responses) {
-                    const responderAddr = item.responder.toLowerCase();
-                    currentNetworkCache.surveyResponses[surveyIDLower][responderAddr] = item.response;
-
-                    // Update user cache (responder)
-                    const uData = ensureUserNode(responderAddr, latestBlock);
-                    if (!uData.surveyResponses) uData.surveyResponses = [];
-                    // Check for existing response for this survey to avoid duplicates
-                    if (!uData.surveyResponses.some(r => r.surveyId === surveyIDLower)) {
-                      uData.surveyResponses.push({
-                        surveyId: surveyIDLower,
-                        responder: responderAddr,
-                        response: item.response
-                      });
-                      userCacheModified = true;
-                    }
-                }
-                // Regression guard: only advance past blocks whose responses fully hydrated.
-                // Otherwise transient Arweave/RPC misses become permanent skips on the next incremental scan.
-                currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
-                  startBlock,
-                  latestBlock,
-                  hadPartialFailure: surveyResponseBatch.hadPartialFailure,
-                  lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
-                });
-            }
-        }
-
-        this.DG.write('surveysCache', slug, surveysCache);
-
-        // Write user cache
-        if (userCacheModified) {
-          this.DG.write('userCache', slug, userCache);
-        }
-
-        // Keep retrying off-chain metadata fetches in the background if any are pending.
-        schedulePendingSurveyMetadataRetry();
-
-        mainSiteLog.log('Surveys cache initialized or updated (group-aware).');
-    } catch (error) {
-        mainSiteLog.error('Error fetching surveys or responses (group-aware):', error);
-        // Persist any partial progress
-        this.DG.write('surveysCache', slug, surveysCache);
-        if (userCacheModified) this.DG.write('userCache', slug, userCache);
-        // Mark error so UI knows we might be incomplete
-        setSurveyState({ surveyCacheInitializationError: true });
-    }
-    })();
-
-    this._surveyInitInFlight[slug] = run;
-    try {
-      return await run;
-    } finally {
-      delete this._surveyInitInFlight[slug];
-      if (this._surveyInitPending[slug]) {
-        const pendingOpts = this._surveyInitPending[slug];
-        delete this._surveyInitPending[slug];
-        setTimeout(() => {
-          try {
-            if (!this._mounted) return;
-            this.initializeSurveyCacheForGroup(slug, pendingOpts || rerunOpts);
-          } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-        }, 0);
-      }
-    }
-  };
+  initializeSurveyCacheForGroup = (...args) => this._surveyCacheController.initializeSurveyCacheForGroup(...args);
 
 
   initializeQuestionCache = async () => {
@@ -8768,71 +8225,7 @@ export class MainSite extends Component {
 
   refreshSurveyResponsesByID = async (surveyID) => this.refreshSurveyResponsesByIDForGroup(this.getActiveSessionSlug(), surveyID);
 
-  refreshSurveyResponsesByIDForGroup = async (slug, surveyID) => {
-    mainSiteLog.log("refreshSurveyResponsesByIDForGroup() for surveyID:", surveyID, 'slug:', slug);
-    const netId = String(this.getSessionChainId(slug) || '');
-    if (!netId) { mainSiteLog.warn("No group chainId available"); return; }
-    const { fromBlock: baseFrom, toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(slug);
-    const initialLastBlockSurvey = Math.max(0, baseFrom - 1);
-    let surveysCache = this.DG.read('surveysCache', slug) || {};
-
-    if (!surveysCache[netId]) {
-      surveysCache[netId] = {
-        surveysLatestBlock: initialLastBlockSurvey,
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {}
-      };
-    }
-    if (!surveysCache[netId].surveyResponses) surveysCache[netId].surveyResponses = {};
-    if (typeof surveysCache[netId].surveyResponsesLatestBlock !== 'object' || surveysCache[netId].surveyResponsesLatestBlock === null) {
-      surveysCache[netId].surveyResponsesLatestBlock = {};
-    }
-
-    const surveyIDLower = surveyID.toLowerCase();
-    const surveyObj = surveysCache[netId].surveys[surveyIDLower];
-    const currentLocalBlock = surveysCache[netId].surveyResponsesLatestBlock.hasOwnProperty(surveyIDLower)
-        ? surveysCache[netId].surveyResponsesLatestBlock[surveyIDLower]
-        : initialLastBlockSurvey;
-
-    const latestChainBlock = baseTo;
-
-    // Use creationBlock to clamp start block
-    const startBlock = Math.max(currentLocalBlock + 1, surveyObj?.creationBlock || 0, initialLastBlockSurvey);
-
-    if (startBlock > latestChainBlock) {
-      mainSiteLog.log("Survey responses are already up-to-date for surveyID:", surveyIDLower);
-      return;
-    }
-
-    mainSiteLog.log(
-      `Fetching new responses for surveyID ${surveyIDLower} from block ${startBlock} to ${latestChainBlock} (group=${slug})`
-    );
-    const surveyResponseBatch = normalizeSurveyResponseBatchResult(await contractScripts.fetchAllSurveyResponses(
-      'none',
-      surveyIDLower,
-      startBlock, // Use optimized start block
-      latestChainBlock,      // toBlock
-      slug
-    ));
-
-    if (!surveysCache[netId].surveyResponses[surveyIDLower]) {
-      surveysCache[netId].surveyResponses[surveyIDLower] = {};
-    }
-    for (const item of surveyResponseBatch.responses) {
-      const responderAddr = item.responder.toLowerCase();
-      surveysCache[netId].surveyResponses[surveyIDLower][responderAddr] = item.response;
-    }
-    surveysCache[netId].surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
-      startBlock,
-      latestBlock: latestChainBlock,
-      hadPartialFailure: surveyResponseBatch.hadPartialFailure,
-      lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
-    });
-    this.DG.write('surveysCache', slug, surveysCache);
-    mainSiteLog.log("Survey responses updated for surveyID:", surveyIDLower);
-    this.queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
-  };
+  refreshSurveyResponsesByIDForGroup = (...args) => this._surveyCacheController.refreshSurveyResponsesByIDForGroup(...args);
 
   refreshQuestionMetadata = async () => this.refreshQuestionMetadataForGroup(this.getActiveSessionSlug());
 
