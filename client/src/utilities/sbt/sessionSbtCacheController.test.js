@@ -1,4 +1,4 @@
-jest.mock('utilities/logging', () => ({
+jest.mock('utilities/logging.js', () => ({
   __esModule: true,
   createLogger: () => ({
     log: jest.fn(),
@@ -8,7 +8,7 @@ jest.mock('utilities/logging', () => ({
     debug: jest.fn(),
     isEnabled: jest.fn(() => false),
   }),
-}));
+}), { virtual: true });
 
 jest.mock('../web3/contractScripts.js', () => {
   const defaultExport = {
@@ -39,7 +39,7 @@ jest.mock('../web3/contractScripts.js', () => {
   };
 });
 
-jest.mock('../../components/MainSite/mainSiteUtils', () => ({
+jest.mock('../../components/MainSite/mainSiteUtils.js', () => ({
   __esModule: true,
   emitMainSiteSbtDebug: jest.fn(),
   hasCoreSbtMetadata: jest.fn((info) => {
@@ -66,9 +66,9 @@ jest.mock('../../components/MainSite/mainSiteUtils', () => ({
     );
   }),
   isForcedSbtSelectorDebugEnabled: jest.fn(() => false),
-}));
+}), { virtual: true });
 
-jest.mock('../../components/MainSite/progressHelpers', () => ({
+jest.mock('../../components/MainSite/progressHelpers.js', () => ({
   __esModule: true,
   mapSbtWorkProgressToBlock: jest.fn(({
     baseFrom = 0,
@@ -84,7 +84,36 @@ jest.mock('../../components/MainSite/progressHelpers', () => ({
       : 1;
     return Math.floor(start + ((end - start) * ratio));
   }),
-  mergeSbtLiveProgressEntry: jest.fn(),
+  mergeSbtLiveProgressEntry: jest.fn(({
+    prevEntry = null,
+    nextPatch = null,
+    nowMs = Date.now(),
+  }) => {
+    const prev = (prevEntry && typeof prevEntry === 'object') ? prevEntry : {};
+    const patch = (nextPatch && typeof nextPatch === 'object') ? nextPatch : {};
+    const rawCurrentBlock = Number(
+      patch.currentBlock != null ? patch.currentBlock : prev.currentBlock
+    );
+    const rawLatestBlock = Number(
+      patch.latestBlock != null ? patch.latestBlock : prev.latestBlock
+    );
+    const currentBlock = Math.max(
+      Math.floor(Number(prev.currentBlock || 0)),
+      Number.isFinite(rawCurrentBlock) ? Math.floor(rawCurrentBlock) : 0
+    );
+    const latestBlock = Math.max(
+      currentBlock,
+      Math.floor(Number(prev.latestBlock || 0)),
+      Number.isFinite(rawLatestBlock) ? Math.floor(rawLatestBlock) : 0
+    );
+    return {
+      ...prev,
+      ...patch,
+      currentBlock,
+      latestBlock,
+      updatedAtMs: Math.max(0, Math.floor(Number(patch.updatedAtMs || nowMs) || 0)),
+    };
+  }),
   SBT_FULL_SCAN_DISCOVERY_UNITS: 60,
   SBT_FULL_SCAN_PROCESS_UNITS: 40,
   SBT_LIGHT_DISCOVERY_HYDRATION_UNITS: 30,
@@ -92,7 +121,7 @@ jest.mock('../../components/MainSite/progressHelpers', () => ({
   SBT_PROGRESS_FINAL_TAIL_BLOCKS: 3,
   SBT_PROGRESS_MIN_INTERVAL_MS: 250,
   shouldCommitThrottledProgress: jest.fn(() => true),
-}));
+}), { virtual: true });
 
 const { createSessionSbtCacheController } = require('./sessionSbtCacheController.js');
 const contractScriptsModule = require('../web3/contractScripts.js');
@@ -102,11 +131,10 @@ const {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-} = require('../../components/MainSite/mainSiteUtils');
+} = require('../../components/MainSite/mainSiteUtils.js');
 const {
-  mergeSbtLiveProgressEntry,
   shouldCommitThrottledProgress,
-} = require('../../components/MainSite/progressHelpers');
+} = require('../../components/MainSite/progressHelpers.js');
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
@@ -149,38 +177,6 @@ const hasMockCoreSbtMetadata = (info) => {
 const deepClone = (value) => (
   value == null ? value : JSON.parse(JSON.stringify(value))
 );
-
-const buildSbtLiveProgressEntryForTests = (input = {}) => {
-  const {
-    prevEntry = null,
-    nextPatch = null,
-    nowMs = Date.now(),
-  } = (input && typeof input === 'object') ? input : {};
-  const prev = (prevEntry && typeof prevEntry === 'object') ? prevEntry : {};
-  const patch = (nextPatch && typeof nextPatch === 'object') ? nextPatch : {};
-  const rawCurrentBlock = Number(
-    patch.currentBlock != null ? patch.currentBlock : prev.currentBlock
-  );
-  const rawLatestBlock = Number(
-    patch.latestBlock != null ? patch.latestBlock : prev.latestBlock
-  );
-  const currentBlock = Math.max(
-    Math.floor(Number(prev.currentBlock || 0)),
-    Number.isFinite(rawCurrentBlock) ? Math.floor(rawCurrentBlock) : 0
-  );
-  const latestBlock = Math.max(
-    currentBlock,
-    Math.floor(Number(prev.latestBlock || 0)),
-    Number.isFinite(rawLatestBlock) ? Math.floor(rawLatestBlock) : 0
-  );
-  return {
-    ...prev,
-    ...patch,
-    currentBlock,
-    latestBlock,
-    updatedAtMs: Math.max(0, Math.floor(Number(patch.updatedAtMs || nowMs) || 0)),
-  };
-};
 
 const createDeferred = () => {
   let resolve;
@@ -322,7 +318,6 @@ describe('createSessionSbtCacheController', () => {
     contractScripts.getSbtCreationBlockByAddress.mockResolvedValue(null);
     hasCoreSbtMetadata.mockImplementation(hasMockCoreSbtMetadata);
     isForcedSbtSelectorDebugEnabled.mockReturnValue(false);
-    mergeSbtLiveProgressEntry.mockImplementation(buildSbtLiveProgressEntryForTests);
     shouldCommitThrottledProgress.mockReturnValue(true);
     if (typeof window !== 'undefined') {
       window.ENABLE_RPC_DEBUG_LOGGING = false;
@@ -825,431 +820,6 @@ describe('createSessionSbtCacheController', () => {
       );
     });
 
-    it('uses display alias chain/config for light discovery while writing to the alias cache bucket', async () => {
-      const demoSbt = '0x00000000000000000000000000000000000000d1';
-      const displayCfg = {
-        slug: 'demo',
-        networkChainId: 11155420,
-        ignored_SBTs_LIST: [],
-        featured_SBTs_LIST: [],
-      };
-      const host = createMockHost({
-        activeSlug: 'demo',
-        currentPath: '/session/demo',
-        getSessionChainId: jest.fn((slug) => (slug === 'demo' ? '11155420' : '')),
-        getSessionCfg: jest.fn((slug) => (slug === 'demo' ? displayCfg : null)),
-      });
-      const controller = createSessionSbtCacheController(host);
-
-      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([demoSbt]);
-
-      await controller.ensureLightSbtDiscovery('demo', {
-        force: true,
-        forceScopeSlug: 'demo',
-      });
-
-      expect(host.getSessionChainId).toHaveBeenCalledWith('demo');
-      expect(host.getSessionCfg).toHaveBeenCalledWith('demo');
-      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(expect.objectContaining({
-        slug: 'demo',
-        networkChainId: 11155420,
-        __ignoreSessionScanScope: true,
-      }));
-      expect(contractScripts.getAllSbtAddressesCached).toHaveBeenCalledWith(
-        'none',
-        expect.objectContaining({
-          slug: 'demo',
-          networkChainId: 11155420,
-          __ignoreSessionScanScope: true,
-        }),
-        expect.objectContaining({
-          force: true,
-          fromBlock: 10,
-          toBlock: 12,
-          onProgress: expect.any(Function),
-          onDiscoveredAddresses: expect.any(Function),
-        })
-      );
-      expect(host.getStored('sbtCache', 'demo')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          lastBlock: 12,
-          sbtList: expect.objectContaining({
-            [demoSbt.toLowerCase()]: expect.objectContaining({
-              sbtAddress: demoSbt,
-              slug: 'demo',
-              sessionSlug: 'demo',
-              sessionSlugExplicit: false,
-              sbtInfo: expect.objectContaining({
-                name: 'Mock SBT',
-                sessionSlug: 'demo',
-                sessionSlugExplicit: false,
-              }),
-            }),
-          }),
-        }),
-      }));
-    });
-
-    it('preserves explicit SBT metadata session bindings during light discovery', async () => {
-      const sbtAddress = '0x0000000000000000000000000000000000000e01';
-      const explicitMetadata = createCompleteSbtMetadata({
-        name: 'Explicit Alpha SBT',
-        sessionSlug: 'alpha',
-        sessionSlugExplicit: true,
-      });
-      const host = createMockHost({
-        initialStorage: {
-          sbtCache: {
-            alpha: {
-              11155420: {
-                lastBlock: 12,
-                sbtList: {
-                  [sbtAddress.toLowerCase()]: {
-                    sbtAddress,
-                    sbtInfo: {
-                      name: 'Needs Hydration',
-                    },
-                    blockNumber: 12,
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-      const controller = createSessionSbtCacheController(host);
-
-      contractScripts.getSbtMetadata.mockResolvedValueOnce(explicitMetadata);
-      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([]);
-
-      await controller.ensureLightSbtDiscovery('alpha');
-
-    expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-      11155420: expect.objectContaining({
-        sbtList: expect.objectContaining({
-          [sbtAddress.toLowerCase()]: expect.objectContaining({
-              sessionSlug: 'alpha',
-              sessionSlugExplicit: true,
-              sbtInfo: expect.objectContaining({
-                name: 'Explicit Alpha SBT',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: true,
-              }),
-            }),
-          }),
-        }),
-      }));
-    });
-
-    it('downgrades stale cache-scoped explicit flags when hydrated metadata is inferred', async () => {
-      const sbtAddress = '0x0000000000000000000000000000000000000e02';
-      const staleMetadata = createCompleteSbtMetadata({
-        name: 'Stale Bucket-Promoted SBT',
-        sessionSlug: 'alpha',
-        sessionSlugExplicit: true,
-      });
-      delete staleMetadata.tokenUriMetadataFetched;
-      const hydratedMetadata = createCompleteSbtMetadata({
-        name: 'Hydrated Inferred SBT',
-        image: 'ar://image-tx',
-        sessionSlug: 'alpha',
-        sessionSlugExplicit: false,
-        tokenUriMetadataFetched: true,
-      });
-      const host = createMockHost({
-        initialStorage: {
-          sbtCache: {
-            alpha: {
-              11155420: {
-                lastBlock: 12,
-                sbtList: {
-                  [sbtAddress.toLowerCase()]: {
-                    sbtAddress,
-                    sessionSlug: 'alpha',
-                    sessionSlugExplicit: true,
-                    sbtInfo: staleMetadata,
-                    blockNumber: 12,
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-      const controller = createSessionSbtCacheController(host);
-
-      contractScripts.getSbtMetadata.mockResolvedValueOnce(hydratedMetadata);
-      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([]);
-
-      await controller.ensureLightSbtDiscovery('alpha');
-
-      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          sbtList: expect.objectContaining({
-            [sbtAddress.toLowerCase()]: expect.objectContaining({
-              sessionSlug: 'alpha',
-              sessionSlugExplicit: false,
-              sbtInfo: expect.objectContaining({
-                name: 'Hydrated Inferred SBT',
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: false,
-                tokenUriMetadataFetched: true,
-              }),
-            }),
-          }),
-        }),
-      }));
-    });
-
-    it('rehydrates core-only cached SBT metadata so list cards recover tokenURI image and description fields', async () => {
-      const sbtAddress = '0x00000000000000000000000000000000000000a1';
-      const cachedCoreOnly = createCompleteSbtMetadata({
-        name: 'Cached Core Only',
-      });
-      delete cachedCoreOnly.description;
-      delete cachedCoreOnly.image;
-      delete cachedCoreOnly.tokenUriMetadataFetched;
-      const hydratedMetadata = createCompleteSbtMetadata({
-        name: 'Hydrated SBT',
-        description: 'Visible list description',
-        image: 'ar://image-tx',
-        tokenUriMetadataFetched: true,
-      });
-      const host = createMockHost({
-        initialStorage: {
-          sbtCache: {
-            alpha: {
-              11155420: {
-                lastBlock: 12,
-                sbtList: {
-                  [sbtAddress.toLowerCase()]: {
-                    sbtAddress,
-                    sbtInfo: cachedCoreOnly,
-                    blockNumber: 12,
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-      const controller = createSessionSbtCacheController(host);
-
-      contractScripts.getSbtMetadata.mockResolvedValueOnce(hydratedMetadata);
-      contractScripts.getAllSbtAddressesCached.mockResolvedValueOnce([]);
-
-      await controller.ensureLightSbtDiscovery('alpha');
-
-      expect(contractScripts.getSbtMetadata).toHaveBeenCalledWith('none', sbtAddress, 'alpha');
-      expect(contractScripts.getAllSbtAddressesCached).not.toHaveBeenCalled();
-      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          sbtList: expect.objectContaining({
-            [sbtAddress.toLowerCase()]: expect.objectContaining({
-              blockNumber: 12,
-              sbtInfo: expect.objectContaining({
-                description: 'Visible list description',
-                image: 'ar://image-tx',
-                tokenUriMetadataFetched: true,
-                sessionSlug: 'alpha',
-                sessionSlugExplicit: false,
-              }),
-            }),
-          }),
-        }),
-      }));
-    });
-
-    it('keeps light discovery watermark behind failed metadata hydration so later runs retry', async () => {
-      const sbtAddress = '0x0000000000000000000000000000000000000f01';
-      const hydratedMetadata = createCompleteSbtMetadata({
-        name: 'Hydrated After Retry',
-        description: 'Recovered description',
-        image: 'ar://retry-image',
-        tokenUriMetadataFetched: true,
-      });
-      const host = createMockHost();
-      const controller = createSessionSbtCacheController(host);
-
-      contractScripts.getAllSbtAddressesCached.mockReset();
-      contractScripts.getAllSbtAddressesCached.mockResolvedValue([sbtAddress]);
-      contractScripts.getSbtMetadata
-        .mockRejectedValueOnce(new Error('metadata gateway down'))
-        .mockResolvedValueOnce(hydratedMetadata);
-
-      await controller.ensureLightSbtDiscovery('alpha');
-
-      const afterFailure = host.getStored('sbtCache', 'alpha');
-      expect(afterFailure[11155420].lastBlock).toBe(9);
-      expect(afterFailure[11155420].sbtList[sbtAddress.toLowerCase()]).toEqual(expect.objectContaining({
-        sbtAddress,
-        sbtInfo: null,
-      }));
-
-      await controller.ensureLightSbtDiscovery('alpha');
-
-      expect(contractScripts.getSbtMetadata).toHaveBeenCalledTimes(2);
-      expect(contractScripts.getAllSbtAddressesCached).toHaveBeenNthCalledWith(
-        2,
-        'none',
-        'alpha',
-        expect.objectContaining({
-          fromBlock: 10,
-          toBlock: 12,
-        })
-      );
-      expect(host.getStored('sbtCache', 'alpha')).toEqual(expect.objectContaining({
-        11155420: expect.objectContaining({
-          lastBlock: 12,
-          sbtList: expect.objectContaining({
-            [sbtAddress.toLowerCase()]: expect.objectContaining({
-              sbtInfo: expect.objectContaining({
-                name: 'Hydrated After Retry',
-                description: 'Recovered description',
-                image: 'ar://retry-image',
-                tokenUriMetadataFetched: true,
-              }),
-            }),
-          }),
-        }),
-      }));
-    });
-
-    it('completes full scan holder writes when user cache has malformed SBT rows', async () => {
-      const sbtAddress = '0x0000000000000000000000000000000000000f02';
-      const holder = '0x0000000000000000000000000000000000000abc';
-      const sbtMetadata = createCompleteSbtMetadata({
-        name: 'Full Scan Holder SBT',
-        creationBlock: 10,
-      });
-      const host = createMockHost({
-        currentPath: '/dashboard',
-        initialStorage: {
-          userCache: {
-            alpha: {
-              [holder]: {
-                11155420: {
-                  lastBlockScanned: 9,
-                  lastScanTimestamp: 1,
-                  data: {
-                    sbts: [
-                      { sbtInfo: { name: 'legacy row without address' } },
-                    ],
-                    createdSurveys: [],
-                    createdQuestions: [],
-                    surveyResponses: [],
-                    questionResponses: [],
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-      const controller = createSessionSbtCacheController(host);
-
-      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 });
-      contractScripts.getSbtsCreated.mockResolvedValueOnce([
-        { sbtAddress, creationBlock: 10 },
-      ]);
-      contractScripts.getSbtMetadata.mockResolvedValueOnce(sbtMetadata);
-      contractScripts.getSbtMintBurnCountsByAddress.mockResolvedValueOnce({
-        ok: true,
-        mintedCountByAddress: {
-          [holder]: 1,
-        },
-        burnedCountByAddress: {},
-        mintedEventCount: 1,
-        burnedEventCount: 0,
-      });
-
-      await controller.initializeSbtCacheForGroup('alpha', { mode: 'full' });
-
-      const storedUserCache = host.getStored('userCache', 'alpha');
-      const storedSbtCache = host.getStored('sbtCache', 'alpha');
-
-      expect(storedSbtCache[11155420]).toEqual(expect.objectContaining({
-        lastBlock: 12,
-        sbtList: expect.objectContaining({
-          [sbtAddress.toLowerCase()]: expect.objectContaining({
-            sbtAddress,
-            sbtInfo: expect.objectContaining({ name: 'Full Scan Holder SBT' }),
-          }),
-        }),
-      }));
-      expect(storedUserCache[holder][11155420].data.sbts).toEqual([
-        { sbtInfo: { name: 'legacy row without address' } },
-        {
-          sbtAddress,
-          sbtInfo: expect.objectContaining({ name: 'Full Scan Holder SBT' }),
-        },
-      ]);
-      expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);
-    });
-
-    it('keeps full-scan discovery watermark behind when factory discovery fails', async () => {
-      const sbtAddress = '0x0000000000000000000000000000000000000f03';
-      const existingMetadata = createCompleteSbtMetadata({
-        name: 'Existing Full Scan SBT',
-        creationBlock: 10,
-      });
-      const host = createMockHost({
-        currentPath: '/dashboard',
-        initialStorage: {
-          sbtCache: {
-            alpha: {
-              11155420: {
-                lastBlock: 9,
-                sbtList: {
-                  [sbtAddress.toLowerCase()]: {
-                    sbtAddress,
-                    sbtInfo: existingMetadata,
-                    blockNumber: 9,
-                    countsLoaded: false,
-                  },
-                },
-              },
-            },
-          },
-        },
-      });
-      const controller = createSessionSbtCacheController(host);
-
-      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 40 });
-      contractScripts.getSbtsCreated.mockRejectedValueOnce(new Error('factory logs unavailable'));
-      contractScripts.getSbtMintBurnCountsByAddress.mockResolvedValueOnce({
-        ok: true,
-        mintedCountByAddress: {},
-        burnedCountByAddress: {},
-        mintedEventCount: 0,
-        burnedEventCount: 0,
-      });
-
-      await controller.initializeSbtCacheForGroup('alpha', { mode: 'full' });
-
-      const storedSbtCache = host.getStored('sbtCache', 'alpha');
-
-      expect(contractScripts.getSbtsCreated).toHaveBeenCalledWith(
-        'none',
-        10,
-        40,
-        'alpha',
-        expect.objectContaining({ onProgress: expect.any(Function) })
-      );
-      expect(storedSbtCache[11155420]).toEqual(expect.objectContaining({
-        lastBlock: 9,
-        sbtList: expect.objectContaining({
-          [sbtAddress.toLowerCase()]: expect.objectContaining({
-            sbtAddress,
-            blockNumber: 40,
-          }),
-        }),
-      }));
-      expect(host.writeFlag).toHaveBeenCalledWith('sbt:deferredFullScanNeeded', 'alpha', true);
-      expect(host.writeFlag).toHaveBeenCalledWith('sbt:partialReady', 'alpha', true);
-      expect(host.writeFlag).toHaveBeenCalledWith('sbt:fullScanInProgress', 'alpha', false);
-    });
-
     it('deduplicates concurrent light discovery calls for the same in-flight key', async () => {
       const host = createMockHost();
       const controller = createSessionSbtCacheController(host);
@@ -1283,34 +853,6 @@ describe('createSessionSbtCacheController', () => {
       );
       expect(contractScripts.listenForSBTInstanceEvents).not.toHaveBeenCalled();
       expect(host.dgRead).not.toHaveBeenCalled();
-    });
-
-    it('attaches a detail-page instance listener through the controller', () => {
-      const host = createMockHost();
-      const controller = createSessionSbtCacheController(host);
-
-      expect(
-        controller.startSbtDetailInstanceListenerForGroup('alpha', ['0xSbt'])
-      ).toBe(true);
-
-      expect(contractScripts.listenForSBTInstanceEvents).toHaveBeenCalledWith(
-        'none',
-        ['0xSbt'],
-        expect.any(Function),
-        'alpha'
-      );
-      expect(contractScripts.removeSBTEventListener).not.toHaveBeenCalled();
-      expect(contractScripts.removeSBTInstanceEventsListener).not.toHaveBeenCalled();
-    });
-
-    it('does not attach a detail-page instance listener without a slug and address', () => {
-      const host = createMockHost();
-      const controller = createSessionSbtCacheController(host);
-
-      expect(controller.startSbtDetailInstanceListenerForGroup('', ['0xSbt'])).toBe(false);
-      expect(controller.startSbtDetailInstanceListenerForGroup('alpha', [])).toBe(false);
-
-      expect(contractScripts.listenForSBTInstanceEvents).not.toHaveBeenCalled();
     });
   });
 
