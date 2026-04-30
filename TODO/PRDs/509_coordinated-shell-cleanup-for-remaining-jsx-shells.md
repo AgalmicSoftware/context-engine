@@ -177,10 +177,12 @@ Pause only if one of these becomes true:
 Planned companion asset for this PRD:
 
 - `TODO/PRDs/assets/509_shell_cleanup_roadmap.png`
+- `TODO/PRDs/assets/509_shell_cleanup_roadmap_v2.png`
 
 Saved graphic:
 
 - [509_shell_cleanup_roadmap.png](/Users/charlie/Desktop/xoCortex/projects/context-engine/TODO/PRDs/assets/509_shell_cleanup_roadmap.png)
+- [509_shell_cleanup_roadmap_v2.png](/Users/charlie/Desktop/xoCortex/projects/context-engine/TODO/PRDs/assets/509_shell_cleanup_roadmap_v2.png)
 
 The graphic should visualize the dependency-led order:
 

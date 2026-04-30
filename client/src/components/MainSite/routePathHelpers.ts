@@ -6,7 +6,7 @@
  */
 import { stripConfiguredPublicBasePath } from './urlUtils.js';
 
-export const normalizeRoutePath = (pathIn = '') => {
+export const normalizeRoutePath = (pathIn = ''): string => {
   const raw = stripConfiguredPublicBasePath(
     String(pathIn || '').trim().split('?')[0].split('#')[0]
   );
@@ -18,7 +18,7 @@ export const normalizeRoutePath = (pathIn = '') => {
   return legacyDemoNormalized.replace(/\/+$/, '');
 };
 
-export const isGeneralRoutePath = (pathIn = '') => {
+export const isGeneralRoutePath = (pathIn = ''): boolean => {
   const path = normalizeRoutePath(pathIn);
   return path === '/' || path === '/session' || path === '/session/general';
 };
@@ -28,8 +28,11 @@ export const getEffectiveRoutePath = (
   {
     windowPathIn = '',
     redirectPathIn = '',
+  }: {
+    windowPathIn?: string;
+    redirectPathIn?: string;
   } = {}
-) => {
+): string => {
   const propPath = String(pathIn || '').trim();
   const windowPath = String(windowPathIn || '').trim();
   const normalizedPropPath = normalizeRoutePath(propPath);
@@ -45,7 +48,7 @@ export const getEffectiveRoutePath = (
   return normalizedPropPath || normalizedWindowPath || '';
 };
 
-export const isOnOrWithinRoutePath = (pathIn = '', routePathIn = '') => {
+export const isOnOrWithinRoutePath = (pathIn = '', routePathIn = ''): boolean => {
   const path = normalizeRoutePath(pathIn);
   const routePath = normalizeRoutePath(routePathIn);
   if (!path || !routePath) return false;

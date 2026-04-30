@@ -13,8 +13,8 @@
 
 - Start in `SessionWizard.jsx` only if you need the top-level UI flow or the full publish pipeline.
 - Start in `sessionWizardContracts.js` for contract defaults, visible contract keys, or registry-address resolution.
-- Start in `sessionWizardSecrets.js` for post-deploy worker config sync, secrets sync, or deploy warning/status handling.
-- Start in `sessionWizardWriteNormalization.js` for worker payload normalization, on-chain compatibility fields, or metadata serialization rules.
+- Start in `sessionWizardSecrets.ts` for post-deploy worker config sync, secrets sync, or deploy warning/status handling.
+- Start in `sessionWizardWriteNormalization.ts` for worker payload normalization, on-chain compatibility fields, or metadata serialization rules.
 - Start in `CreateSBTGroup.jsx` only when the issue is inside the deferred SBT authoring modal itself; `SessionWizard.jsx` mainly launches and reconciles that flow.
 
 ## Practical Hierarchy
@@ -22,8 +22,8 @@
 ```text
 SessionWizard.jsx
   -> sessionWizardContracts.js
-  -> sessionWizardSecrets.js
-  -> sessionWizardWriteNormalization.js
+  -> sessionWizardSecrets.ts
+  -> sessionWizardWriteNormalization.ts
   -> CreateSBTGroup.jsx
   -> ContractViewer.jsx
 ```
@@ -100,8 +100,8 @@ bundle link / imported bundle
 ## Edit Heuristics
 
 - If a bug is about registry fields or contract addresses, check `sessionWizardContracts.js` first.
-- If a bug is about worker config sync or post-deploy warnings, check `sessionWizardSecrets.js` first.
-- If a bug is about publish payload shape mismatch between worker config and on-chain metadata, check `sessionWizardWriteNormalization.js` first.
+- If a bug is about worker config sync or post-deploy warnings, check `sessionWizardSecrets.ts` first.
+- If a bug is about publish payload shape mismatch between worker config and on-chain metadata, check `sessionWizardWriteNormalization.ts` first.
 - If a bug is about gated field UI, draft persistence, or wizard step order, `SessionWizard.jsx` is the right entrypoint.
 
 ## Residual Risk
