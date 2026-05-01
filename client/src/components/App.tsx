@@ -268,6 +268,13 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
+  didBrowserRouteChangeSinceRender = () => {
+    if (typeof window === 'undefined' || !window.location) return false;
+    const browserKey = `${window.location.pathname || ''}${window.location.search || ''}`;
+    const propsKey = `${this.props.location?.pathname || ''}${this.props.location?.search || ''}`;
+    return browserKey !== propsKey;
+  };
+
   componentDidMount() {
     document.body.classList.add("index-page");
 
@@ -279,7 +286,13 @@ class App extends React.Component<AppProps, AppState> {
     try { installCeAgent(); } catch (e) { log.warn('App: fallback', e); }
     // React Router updates do not cover direct history.replaceState/pushState calls,
     // so bridge the History API back into the same head-sync path.
-    this.unsubscribeHistorySync = subscribeToHistorySync(this.syncRouteHead);
+    this.unsubscribeHistorySync = subscribeToHistorySync(() => {
+      this.forceUpdate();
+      this.syncRouteHead();
+    });
+    if (this.didBrowserRouteChangeSinceRender()) {
+      this.forceUpdate();
+    }
     this.syncRouteHead();
 
   }
@@ -303,7 +316,14 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   render() {
-    const location = this.props.location || { pathname: '', search: '' }
+    const location = (
+      typeof window !== 'undefined' && window.location
+        ? {
+          pathname: window.location.pathname || this.props.location?.pathname || '',
+          search: window.location.search || this.props.location?.search || '',
+        }
+        : (this.props.location || { pathname: '', search: '' })
+    );
 
     const search = location.search || ''
     const nftCode = search.substring(search.indexOf("=") + 1);
