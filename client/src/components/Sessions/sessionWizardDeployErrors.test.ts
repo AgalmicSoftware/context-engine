@@ -100,6 +100,14 @@ describe('sessionWizardDeployErrors', () => {
       err: { statusCode: 503 },
     })).toBe('Worker deploy failed (503).');
 
+    expect(normalizeSessionWizardDeployErrorMessage({
+      err: 'Failed to fetch',
+      helperBase: 'https://helper.example.test',
+      currentOrigin: 'https://app.example.test',
+    })).toBe(
+      'Deploy request could not reach https://helper.example.test. This is usually CORS or helper availability; ensure https://app.example.test is allowed and retry.'
+    );
+
     expect(normalizeSessionWizardDeployErrorMessage()).toBe('Worker deploy failed.');
   });
 });

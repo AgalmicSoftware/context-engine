@@ -3,6 +3,7 @@ import useSponsoredBundleLifecycle from './useSponsoredBundleLifecycle.js';
 import {
   isSponsoredBundleExpired,
   normalizeSparseSponsoredBundlePayload,
+  readSponsoredBundleFromArweave,
 } from '../../../utilities/arweave/sponsoredBundles.js';
 import {
   clearSponsoredBootstrapFundingContext,
@@ -74,6 +75,7 @@ jest.mock('../sessionWizardWorkerSecretSupport', () => ({
 
 const mockIsSponsoredBundleExpired = isSponsoredBundleExpired as jest.Mock;
 const mockNormalizeSparseSponsoredBundlePayload = normalizeSparseSponsoredBundlePayload as jest.Mock;
+const mockReadSponsoredBundleFromArweave = readSponsoredBundleFromArweave as jest.Mock;
 const mockClearSponsoredBootstrapFundingContext = clearSponsoredBootstrapFundingContext as jest.Mock;
 const mockNormalizeSponsoredBootstrapFundingContext = normalizeSponsoredBootstrapFundingContext as jest.Mock;
 const mockNormalizeBaseUrl = normalizeBaseUrl as jest.Mock;
@@ -321,5 +323,22 @@ describe('useSponsoredBundleLifecycle', () => {
     });
 
     expect(result.current.sponsoredBundleRetryNonce).toBe(1);
+  });
+
+  it('handles non-object sponsored bundle load failures without crashing and keeps the status retryable', async () => {
+    mockReadSponsoredBundleFromArweave.mockRejectedValueOnce('bundle gateway timeout');
+
+    const { result } = renderHook(() => useSponsoredBundleLifecycle({
+      initialSponsoredBundleId: 'bundle-123',
+      initialSponsoredBundleKey: 'bundle-secret',
+    }));
+
+    await waitFor(() => {
+      expect(result.current.sponsoredBundleStatus).toEqual({
+        tone: 'error',
+        message: 'Failed to load sponsored bundle.',
+        retryable: true,
+      });
+    });
   });
 });
