@@ -1782,6 +1782,7 @@ export const createSessionQuestionCacheController = (
     _maskedQuestionRefreshCursor = _maskedQuestionRefreshCursor || {};
     _maskedQuestionDecryptBackoff = _maskedQuestionDecryptBackoff || new Map();
     pruneMaskedQuestionDecryptBackoff(now);
+    const maskedQuestionDecryptBackoff = _maskedQuestionDecryptBackoff;
 
     const inFlight = _maskedQuestionRefreshInFlight[slug];
     if (inFlight) {
@@ -1839,7 +1840,7 @@ export const createSessionQuestionCacheController = (
         if (!isMaskedQuestionPayload(prev)) continue;
 
         const key = backoffKey(id);
-        const lastAttempt = _maskedQuestionDecryptBackoff.get(key);
+        const lastAttempt = maskedQuestionDecryptBackoff.get(key);
         if (!force && lastAttempt && (now - Number(lastAttempt.ts || 0)) < backoffMs) {
           continue;
         }
@@ -1854,7 +1855,6 @@ export const createSessionQuestionCacheController = (
       let changed = 0;
       for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
         const batch = toProcess.slice(i, i + BATCH_SIZE);
-        // eslint-disable-next-line no-loop-func
         const refreshedBatch: RefreshQuestionPayloadResult[] = await Promise.all(
           batch.map(async (id: string) => {
             const prev = questionMap[id] || {};
@@ -1867,7 +1867,7 @@ export const createSessionQuestionCacheController = (
             } catch (err: unknown) {
               mainSiteLog.warn(`Failed to decrypt cached question payload for ${id}:`, err);
               const attemptTs = Date.now();
-              _maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
+              maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
               pruneMaskedQuestionDecryptBackoff(attemptTs);
               return { qid: id, next: null, improved: false };
             }
@@ -1875,13 +1875,13 @@ export const createSessionQuestionCacheController = (
             const improved = hasMaskedQuestionPayloadImproved(prev, next);
             if (!improved) {
               const attemptTs = Date.now();
-              _maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
+              maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
               pruneMaskedQuestionDecryptBackoff(attemptTs);
               return { qid: id, next: null, improved: false };
             }
 
             // Success: clear backoff so future partial decrypts can run immediately.
-            _maskedQuestionDecryptBackoff.delete(key);
+            maskedQuestionDecryptBackoff.delete(key);
             return { qid: id, next, improved: true };
           })
         );
