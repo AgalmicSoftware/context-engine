@@ -1319,18 +1319,34 @@ export const executeSessionLitChipotleAction = async ({
     }
   }
 
-  return executeLitChipotleAction({
-    runtime: {
-      ...runtime,
-      litActionCid,
-      litPkpId,
-    },
-    request: {
-      // Verify submitted source first, then execute the provisioned action CID
-      // that the session usage key/group is permitted to run.
-      ipfsId: litActionCid,
-      jsParams,
-    },
-    fetchImpl,
-  });
+  const actionRuntime = {
+    ...runtime,
+    litActionCid,
+    litPkpId,
+  };
+  try {
+    return await executeLitChipotleAction({
+      runtime: actionRuntime,
+      request: {
+        // Verify submitted source first, then execute the provisioned action CID
+        // that the session usage key/group is permitted to run.
+        ipfsId: litActionCid,
+        jsParams,
+      },
+      fetchImpl,
+    });
+  } catch (error) {
+    const message = toTrimmedString(error?.message || error).toLowerCase();
+    if (!message.includes('no cached code found') && !message.includes('cache miss for ipfs id')) {
+      throw error;
+    }
+    return executeLitChipotleAction({
+      runtime: actionRuntime,
+      request: {
+        code: actionCode,
+        jsParams,
+      },
+      fetchImpl,
+    });
+  }
 };

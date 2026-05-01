@@ -1,0 +1,765 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { ethers } from 'ethers';
+
+import {
+  bootstrapLitChipotleSession,
+  executeLitChipotleAction,
+  executeSessionLitChipotleAction,
+  normalizeLitChipotleApiBase,
+  provisionLitChipotleAction,
+  readLitChipotleStatus,
+  resolveLitChipotleProvisioningRuntime,
+  resolveLitChipotleRuntime,
+} from './chipotleClient.js';
+
+const ethersUtils = ethers?.utils || ethers;
+
+const jsonResponse = (body, { ok = true, status = 200 } = {}) => ({
+  ok,
+  status,
+  text: async () => JSON.stringify(body),
+});
+
+test('normalizeLitChipotleApiBase trims trailing slashes and core prefix', () => {
+  assert.equal(
+    normalizeLitChipotleApiBase(' https://api.chipotle.litprotocol.com/core/v1/ '),
+    'https://api.chipotle.litprotocol.com'
+  );
+});
+
+test('resolveLitChipotleRuntime prefers request, then session secret, then worker env for the API key', () => {
+  assert.deepEqual(resolveLitChipotleRuntime({
+    env: {
+      LIT_ACCOUNT_API_KEY: 'env-key',
+      LIT_API_BASE: 'https://api.dev.litprotocol.com',
+    },
+    config: {
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+      },
+    },
+    secrets: {
+      litUsageApiKey: 'session-key',
+    },
+    body: {
+      litUsageApiKey: 'request-key',
+      litApiBase: 'https://api.chipotle.litprotocol.com/core/v1',
+    },
+  }), {
+    litApiBase: 'https://api.chipotle.litprotocol.com',
+    litUsageApiKey: 'request-key',
+    apiKeySource: 'request',
+    litGroupId: 'group_123',
+    litPkpId: 'pkp_123',
+    litActionCid: 'bafy123',
+    customRpcUrl: '',
+    customRpcKey: '',
+  });
+});
+
+test('readLitChipotleStatus reads balance plus group memberships from the configured runtime', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/billing/balance')) {
+      return jsonResponse({
+        balance_cents: -500,
+        balance_display: '$5.00 credit',
+      });
+    }
+    if (String(url).endsWith('/core/v1/get_lit_action_client_config')) {
+      return jsonResponse({
+        timeout_ms: 30000,
+        async_timeout_ms: 30000,
+        memory_limit_mb: 256,
+        max_code_length: 10000,
+        max_response_length: 10000,
+        max_console_log_length: 10000,
+        max_fetch_count: 10,
+        max_get_keys_count: 10,
+        max_retries: 2,
+        client_timeout_ms_buffer: 500,
+      });
+    }
+    if (String(url).includes('/core/v1/list_wallets_in_group')) {
+      return jsonResponse([
+        { id: 'pkp_123', name: 'wallet', description: 'desc', wallet_address: '0xabc' },
+      ]);
+    }
+    if (String(url).includes('/core/v1/list_actions')) {
+      return jsonResponse([
+        {
+          id: ethersUtils.keccak256(ethersUtils.toUtf8Bytes('bafy123')),
+          name: 'action',
+          description: 'desc',
+        },
+      ]);
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const status = await readLitChipotleStatus({
+    runtime: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litUsageApiKey: 'lit-secret',
+      apiKeySource: 'session-secret',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    },
+    fetchImpl,
+  });
+
+  assert.equal(status.ready, true);
+  assert.deepEqual(status.balance, {
+    balance_cents: -500,
+    balance_display: '$5.00 credit',
+  });
+  assert.deepEqual(status.groupSummary, {
+    walletCount: 1,
+    actionCount: 1,
+    hasConfiguredPkp: true,
+    hasConfiguredAction: true,
+  });
+  assert.equal(calls[0][1].headers['X-Api-Key'], 'lit-secret');
+});
+
+test('readLitChipotleStatus tolerates status endpoints that a scoped key cannot read', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).endsWith('/core/v1/billing/balance')) {
+      return jsonResponse({ error: 'forbidden' }, { ok: false, status: 403 });
+    }
+    if (String(url).endsWith('/core/v1/get_lit_action_client_config')) {
+      return jsonResponse({ timeout_ms: 30000 });
+    }
+    if (String(url).includes('/core/v1/list_wallets_in_group')) {
+      return jsonResponse({ error: 'missing scope' }, { ok: false, status: 403 });
+    }
+    if (String(url).includes('/core/v1/list_actions')) {
+      return jsonResponse({ error: 'missing scope' }, { ok: false, status: 403 });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const status = await readLitChipotleStatus({
+    runtime: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litUsageApiKey: 'lit-secret',
+      apiKeySource: 'session-secret',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    },
+    fetchImpl,
+  });
+
+  assert.equal(status.ok, true);
+  assert.equal(status.ready, true);
+  assert.equal(status.balance, null);
+  assert.equal(status.clientConfig.timeout_ms, 30000);
+  assert.deepEqual(status.groupSummary, {
+    walletCount: null,
+    actionCount: null,
+    hasConfiguredPkp: null,
+    hasConfiguredAction: null,
+  });
+  assert.deepEqual(status.warnings.map((entry) => entry.step), [
+    'billing.balance',
+    'group.wallets',
+    'group.actions',
+  ]);
+});
+
+test('executeLitChipotleAction posts the configured Lit Action CID and js params', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    return jsonResponse({
+      has_error: false,
+      logs: '',
+      response: { ok: true },
+    });
+  };
+
+  const result = await executeLitChipotleAction({
+    runtime: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litUsageApiKey: 'lit-secret',
+      apiKeySource: 'worker-env',
+      litActionCid: 'bafy123',
+    },
+    request: {
+      jsParams: { hello: 'world' },
+    },
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.request, {
+    ipfs_id: 'bafy123',
+    js_params: { hello: 'world' },
+  });
+  assert.equal(calls[0][0], 'https://api.chipotle.litprotocol.com/core/v1/lit_action');
+  assert.equal(calls[0][1].headers.Authorization, 'Bearer lit-secret');
+});
+
+test('executeSessionLitChipotleAction validates the configured action CID and injects session PKP + requester address', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      return jsonResponse('QmAction123');
+    }
+    if (String(url).endsWith('/core/v1/lit_action')) {
+      return jsonResponse({
+        has_error: false,
+        logs: '',
+        response: {
+          ok: true,
+          ciphertext: 'wrapped-cek',
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const result = await executeSessionLitChipotleAction({
+    config: {
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litPkpId: '0xpkp123',
+      },
+    },
+    secrets: {
+      litUsageApiKey: 'usage-key',
+    },
+    request: {
+      actionCode: 'async function main() { return { ok: true }; }',
+      op: 'encrypt',
+      sbtAddresses: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      gateMode: 'all',
+      rpcUrl: 'https://sepolia.optimism.io',
+      message: '0x1234',
+    },
+    requesterAddress: '0x00000000000000000000000000000000000000aa',
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[1][0], 'https://api.chipotle.litprotocol.com/core/v1/lit_action');
+  assert.deepEqual(JSON.parse(calls[1][1].body), {
+    code: 'async function main() { return { ok: true }; }',
+    js_params: {
+      op: 'encrypt',
+      pkpId: '0xpkp123',
+      requesterAddress: '0x00000000000000000000000000000000000000aa',
+      sbtAddresses: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      gateMode: 'all',
+      rpcUrl: 'https://sepolia.optimism.io/',
+      message: '0x1234',
+    },
+  });
+});
+
+test('executeSessionLitChipotleAction rejects action code that does not match the configured CID', async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      return jsonResponse('QmDifferentAction');
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  await assert.rejects(
+    () => executeSessionLitChipotleAction({
+      config: {
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmAction123',
+          litPkpId: '0xpkp123',
+        },
+      },
+      secrets: {
+        litUsageApiKey: 'usage-key',
+      },
+      request: {
+        actionCode: 'async function main() { return { ok: true }; }',
+        op: 'check',
+        sbtAddresses: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+        rpcUrl: 'https://sepolia.optimism.io',
+      },
+      requesterAddress: '0x00000000000000000000000000000000000000aa',
+      fetchImpl,
+    }),
+    /does not match the configured Lit Action CID/i,
+  );
+});
+
+test('executeSessionLitChipotleAction falls back to a default public RPC for the gate chain when no custom RPC is provided', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      return jsonResponse('QmAction123');
+    }
+    if (String(url).endsWith('/core/v1/lit_action')) {
+      return jsonResponse({
+        has_error: false,
+        logs: '',
+        response: {
+          ok: true,
+          allowed: true,
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const result = await executeSessionLitChipotleAction({
+    config: {
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litPkpId: '0xpkp123',
+      },
+    },
+    secrets: {
+      litUsageApiKey: 'usage-key',
+    },
+    request: {
+      actionCode: 'async function main() { return { ok: true }; }',
+      op: 'check',
+      sbtAddresses: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      chainId: 11155420,
+    },
+    requesterAddress: '0x00000000000000000000000000000000000000aa',
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(JSON.parse(calls[1][1].body), {
+    code: 'async function main() { return { ok: true }; }',
+    js_params: {
+      op: 'check',
+      pkpId: '0xpkp123',
+      requesterAddress: '0x00000000000000000000000000000000000000aa',
+      sbtAddresses: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      gateMode: 'any',
+      rpcUrl: 'https://op-sepolia-testnet.api.pocket.network/',
+    },
+  });
+});
+
+
+test('resolveLitChipotleProvisioningRuntime prefers session account secrets before worker env credentials and accepts group names', () => {
+  assert.deepEqual(resolveLitChipotleProvisioningRuntime({
+    env: {
+      LIT_ACCOUNT_API_KEY: 'env-account-key',
+      LIT_API_BASE: 'https://api.dev.litprotocol.com',
+    },
+    config: {
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'ce-session-content-prod',
+        litPkpId: 'pkp_123',
+      },
+    },
+    secrets: {
+      litAccountApiKey: 'session-account-key',
+    },
+  }), {
+    litApiBase: 'https://api.chipotle.litprotocol.com',
+    litManagementApiKey: 'session-account-key',
+    apiKeySource: 'session-secret',
+    litGroupId: 'ce-session-content-prod',
+    litPkpId: 'pkp_123',
+    litActionCid: '',
+  });
+});
+
+test('bootstrapLitChipotleSession creates a per-session account, group, wallet, usage key, and default action wiring', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/new_account')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        account_name: 'ce-session-session-a',
+        account_description: 'Context Engine Lit account for session Session A',
+      });
+      return jsonResponse({
+        api_key: 'account-key',
+        wallet_address: '0xmasterwallet',
+      });
+    }
+    if (String(url).endsWith('/core/v1/add_group')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        group_name: 'ce-session-session-a-default',
+        group_description: 'Default Lit group for session Session A',
+        pkp_ids_permitted: [],
+        cid_hashes_permitted: [],
+      });
+      return jsonResponse({
+        success: true,
+        group_id: '7',
+      });
+    }
+    if (String(url).endsWith('/core/v1/create_wallet')) {
+      return jsonResponse({
+        wallet_address: '0xpkp123',
+      });
+    }
+    if (String(url).endsWith('/core/v1/list_wallets?page_number=0&page_size=100')) {
+      return jsonResponse([
+        {
+          id: '0',
+          name: 'wallet',
+          description: 'desc',
+          wallet_address: '0xpkp123',
+        },
+      ]);
+    }
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      assert.equal(JSON.parse(options.body), 'async function main() { return { ok: true }; }');
+      return jsonResponse('QmAction123');
+    }
+    if (String(url).endsWith('/core/v1/list_actions?page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_action')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        action_ipfs_cid: 'QmAction123',
+        name: 'ce-sbt-gated-crypto-v3',
+        description: 'Context Engine smoke action',
+      });
+      return jsonResponse({ success: true });
+    }
+    if (String(url).endsWith('/core/v1/list_actions?group_id=7&page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_action_to_group')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        group_id: 7,
+        action_ipfs_cid: 'QmAction123',
+      });
+      return jsonResponse({ success: true });
+    }
+    if (String(url).endsWith('/core/v1/list_wallets_in_group?group_id=7&page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_pkp_to_group')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        group_id: 7,
+        pkp_id: '0xpkp123',
+      });
+      return jsonResponse({ success: true });
+    }
+    if (String(url).endsWith('/core/v1/add_usage_api_key')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        name: 'ce-session-session-a-default-runtime',
+        description: 'Scoped runtime key for session Session A',
+        can_create_groups: false,
+        can_delete_groups: false,
+        can_create_pkps: false,
+        manage_ipfs_ids_in_groups: [],
+        add_pkp_to_groups: [],
+        remove_pkp_from_groups: [],
+        execute_in_groups: [7],
+      });
+      return jsonResponse({
+        success: true,
+        usage_api_key: 'usage-key',
+      });
+    }
+    if (String(url).endsWith('/core/v1/billing/balance')) {
+      return jsonResponse({
+        balance_cents: 0,
+        balance_display: '$0.00',
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const result = await bootstrapLitChipotleSession({
+    config: {
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+      },
+    },
+    request: {
+      sessionName: 'Session A',
+      actionCode: 'async function main() { return { ok: true }; }',
+      actionName: 'ce-sbt-gated-crypto-v3',
+      actionDescription: 'Context Engine smoke action',
+    },
+    sessionSlug: 'session-a',
+    fetchImpl,
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    bootstrapMode: 'session-account',
+    alreadyBootstrapped: false,
+    apiBase: 'https://api.chipotle.litprotocol.com',
+    litActionCid: 'QmAction123',
+    litGroupId: '7',
+    litPkpId: '0xpkp123',
+    accountWalletAddress: '0xmasterwallet',
+    billingBalance: {
+      balance_cents: 0,
+      balance_display: '$0.00',
+    },
+    litCredentials: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litActionCid: 'QmAction123',
+      litGroupId: '7',
+      litPkpId: '0xpkp123',
+    },
+    secretOutputs: {
+      litAccountApiKey: 'account-key',
+      litUsageApiKey: 'usage-key',
+    },
+    steps: {
+      createdAccount: true,
+      createdGroup: true,
+      createdWallet: true,
+      derivedCid: true,
+      registeredAction: true,
+      addedActionToGroup: true,
+      addedPkpToGroup: true,
+      createdUsageKey: true,
+    },
+  });
+  assert.equal(calls[0][1].headers.Authorization, undefined);
+});
+
+test('bootstrapLitChipotleSession reuses an existing account key to create missing group, PKP, usage key, and action wiring', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/add_group')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        group_name: 'ce-session-session-a-default',
+        group_description: 'Default Lit group for session Session A',
+        pkp_ids_permitted: [],
+        cid_hashes_permitted: [],
+      });
+      return jsonResponse({
+        success: true,
+        group_id: '7',
+      });
+    }
+    if (String(url).endsWith('/core/v1/create_wallet')) {
+      return jsonResponse({
+        wallet_address: '0xpkp123',
+      });
+    }
+    if (String(url).endsWith('/core/v1/list_wallets?page_number=0&page_size=100')) {
+      return jsonResponse([
+        {
+          id: '0',
+          name: 'wallet',
+          description: 'desc',
+          wallet_address: '0xpkp123',
+        },
+      ]);
+    }
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      assert.equal(JSON.parse(options.body), 'async function main() { return { ok: true }; }');
+      return jsonResponse('QmAction123');
+    }
+    if (String(url).endsWith('/core/v1/list_actions?page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_action')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        action_ipfs_cid: 'QmAction123',
+        name: 'ce-sbt-gated-crypto-v3',
+        description: 'Context Engine smoke action',
+      });
+      return jsonResponse({ success: true });
+    }
+    if (String(url).endsWith('/core/v1/list_actions?group_id=7&page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_action_to_group')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        group_id: 7,
+        action_ipfs_cid: 'QmAction123',
+      });
+      return jsonResponse({ success: true });
+    }
+    if (String(url).endsWith('/core/v1/list_wallets_in_group?group_id=7&page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_pkp_to_group')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        group_id: 7,
+        pkp_id: '0xpkp123',
+      });
+      return jsonResponse({ success: true });
+    }
+    if (String(url).endsWith('/core/v1/add_usage_api_key')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        name: 'ce-session-session-a-default-runtime',
+        description: 'Scoped runtime key for session Session A',
+        can_create_groups: false,
+        can_delete_groups: false,
+        can_create_pkps: false,
+        manage_ipfs_ids_in_groups: [],
+        add_pkp_to_groups: [],
+        remove_pkp_from_groups: [],
+        execute_in_groups: [7],
+      });
+      return jsonResponse({
+        success: true,
+        usage_api_key: 'usage-key',
+      });
+    }
+    if (String(url).endsWith('/core/v1/billing/balance')) {
+      return jsonResponse({
+        balance_cents: 0,
+        balance_display: '$0.00',
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const result = await bootstrapLitChipotleSession({
+    env: {
+      LIT_ACCOUNT_API_KEY: 'account-key',
+    },
+    config: {
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+      },
+    },
+    request: {
+      sessionName: 'Session A',
+      actionCode: 'async function main() { return { ok: true }; }',
+      actionName: 'ce-sbt-gated-crypto-v3',
+      actionDescription: 'Context Engine smoke action',
+    },
+    sessionSlug: 'session-a',
+    fetchImpl,
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    bootstrapMode: 'existing-account',
+    alreadyBootstrapped: false,
+    apiBase: 'https://api.chipotle.litprotocol.com',
+    litActionCid: 'QmAction123',
+    litGroupId: '7',
+    litPkpId: '0xpkp123',
+    billingBalance: {
+      balance_cents: 0,
+      balance_display: '$0.00',
+    },
+    litCredentials: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litActionCid: 'QmAction123',
+      litGroupId: '7',
+      litPkpId: '0xpkp123',
+    },
+    secretOutputs: {
+      litUsageApiKey: 'usage-key',
+    },
+    steps: {
+      createdAccount: false,
+      createdGroup: true,
+      createdWallet: true,
+      derivedCid: true,
+      registeredAction: true,
+      addedActionToGroup: true,
+      addedPkpToGroup: true,
+      createdUsageKey: true,
+    },
+  });
+  assert.equal(
+    calls.some(([url]) => url.endsWith('/core/v1/new_account')),
+    false,
+  );
+  assert.equal(calls[0][1].headers.Authorization, 'Bearer account-key');
+});
+
+test('provisionLitChipotleAction derives, registers, and attaches a Lit action to the configured group', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/list_groups?page_number=0&page_size=100')) {
+      return jsonResponse([{ id: '7', name: 'ce-session-content-prod', description: 'prod' }]);
+    }
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      assert.equal(JSON.parse(options.body), 'async function main() { return { ok: true }; }');
+      return jsonResponse('QmAction123');
+    }
+    if (String(url).endsWith('/core/v1/list_actions?page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_action')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        action_ipfs_cid: 'QmAction123',
+        name: 'ce-sbt-gated-crypto-v3',
+        description: 'Context Engine smoke action',
+      });
+      return jsonResponse({ success: true });
+    }
+    if (String(url).endsWith('/core/v1/list_actions?group_id=7&page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_action_to_group')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        group_id: 7,
+        action_ipfs_cid: 'QmAction123',
+      });
+      return jsonResponse({ success: true });
+    }
+    if (String(url).endsWith('/core/v1/list_wallets_in_group?group_id=7&page_number=0&page_size=100')) {
+      return jsonResponse([]);
+    }
+    if (String(url).endsWith('/core/v1/add_pkp_to_group')) {
+      assert.deepEqual(JSON.parse(options.body), {
+        group_id: 7,
+        pkp_id: '0xpkp123',
+      });
+      return jsonResponse({ success: true });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const result = await provisionLitChipotleAction({
+    runtime: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litManagementApiKey: 'account-key',
+      apiKeySource: 'worker-env',
+      litGroupId: 'ce-session-content-prod',
+      litPkpId: '0xpkp123',
+    },
+    request: {
+      actionCode: 'async function main() { return { ok: true }; }',
+      actionName: 'ce-sbt-gated-crypto-v3',
+      actionDescription: 'Context Engine smoke action',
+    },
+    fetchImpl,
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    apiBase: 'https://api.chipotle.litprotocol.com',
+    apiKeySource: 'worker-env',
+    litActionCid: 'QmAction123',
+    litGroupId: '7',
+    litPkpId: '0xpkp123',
+    steps: {
+      derivedCid: true,
+      registeredAction: true,
+      addedActionToGroup: true,
+      addedPkpToGroup: true,
+    },
+  });
+  assert.equal(calls[0][1].headers['X-Api-Key'], 'account-key');
+});
