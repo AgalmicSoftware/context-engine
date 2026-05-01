@@ -24,6 +24,7 @@ const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage) => ({
 const mockStoreDispatch = jest.fn();
 const mockSyncPublicPageHead = jest.fn();
 const mockToaster = jest.fn((_props?: any) => null);
+let MockMainSiteComponent: React.ComponentType<any> = () => null;
 let routeProps: any[] = [];
 let mockWalletConnectFallbackEnabled = false;
 
@@ -97,7 +98,7 @@ const mockAppDependencies = () => {
   }));
   jest.doMock('./MainSite/MainSite', () => ({
     __esModule: true,
-    default: () => null,
+    default: (props: any) => <MockMainSiteComponent {...props} />,
   }));
   jest.doMock('./Onboarding/onboardingConfig.js', () => ({
     readColdLoadOnboardingState: mockReadColdLoadOnboardingState,
@@ -178,6 +179,7 @@ describe('App wagmi auto-connect persistence', () => {
     sessionStorage.clear();
     window.history.replaceState({}, '', '/');
     routeProps = [];
+    MockMainSiteComponent = () => null;
     mockWalletConnectFallbackEnabled = false;
     mockConnectorsForWallets.mockReturnValue([]);
     mockMetaMaskWalletCreateConnector.mockReturnValue({
@@ -365,6 +367,26 @@ describe('App wagmi auto-connect persistence', () => {
 
     expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(2);
     expect(mockSyncPublicPageHead).toHaveBeenLastCalledWith();
+  });
+
+  it('re-renders MainSite with the browser path after direct history.replaceState updates', () => {
+    const { default: App } = loadAppModule();
+
+    render(
+      <App
+        params={{}}
+        location={{ search: '', pathname: '/' }}
+        navigate={jest.fn()}
+      />
+    );
+
+    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/');
+
+    act(() => {
+      window.history.replaceState({}, '', '/session/demo?view=results');
+    });
+
+    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/session/demo');
   });
 
   it('reuses the cold-load onboarding snapshot on mount', () => {

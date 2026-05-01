@@ -163,6 +163,7 @@ import {
   isOnOrWithinRoutePath as isOnOrWithinRoutePathFn,
   normalizeRoutePath as normalizeRoutePathFn,
 } from './routePathHelpers.js';
+import { reloadWindowLocation as reloadWindowLocationFn } from './reloadWindowLocation.js';
 import {
   AboutPage as AboutPageRaw,
   AdminPage as AdminPageRaw,
@@ -315,7 +316,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   _surveyGroupScanInFlight = new Set<any>();
   _scanPolicy: any = createSessionScanPolicy({
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getCurrentPath: () => this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
+    getCurrentPath: () => this.getCurrentPathname(),
     getSessionSlugHintFromSearch: (search: any) => this.getSessionSlugHintFromSearch(search),
     getSessionTokenFromPath: (path: any) => this.getSessionTokenFromPath(path),
     isSbtListRoutePath: (path: any) => this.isSbtListRoutePath(path),
@@ -447,7 +448,6 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   _cacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<any> | null = null;
   _userPriorityTarget: string | null = null;
-  reloadWindowLocation: (() => void) | null = null;
   _sessionFallbackRedirectPath = '';
   _lastProcessedQuestionIdFromPath = '';
   _lastProcessedQuestionSlugFromPath: string | null = null;
@@ -673,6 +673,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     !!this._mounted && Number(token || 0) === Number(this._activeCacheReinitRunToken || 0)
   );
 
+  getCurrentPathname = () => (
+    (typeof window !== 'undefined' ? window.location.pathname : '') || this.props.path || ''
+  );
+
   resolveActiveSlugForCacheUpdates = () => {
     const stateSlugRaw = this.getSessionSlugFromState() || '';
     const stateSlug = String(normalizeSessionSlug(stateSlugRaw) || stateSlugRaw || '')
@@ -680,7 +684,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       .toLowerCase();
     if (stateSlug) return stateSlug;
 
-    const path = this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
+    const path = this.getCurrentPathname();
     const token = this.getSessionTokenFromPath(path);
     if (!token) return '';
 
@@ -3449,6 +3453,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   writeFlag(name: any, slug: any, val: any) { this._cachePersistenceController.writeFlag(name, slug, val); }
   hasPersistedManagedCacheData = (...args: any[]) => this._cachePersistenceController.hasPersistedManagedCacheData(...args);
   syncCacheHasLoadedFlagFromPersistent = (...args: any[]) => this._cachePersistenceController.syncCacheHasLoadedFlagFromPersistent(...args);
+  reloadWindowLocation = () => {
+    if (typeof window === 'undefined') return;
+    reloadWindowLocationFn(window);
+  };
 
   async componentDidMount() {
     if (shouldAutoStartCeRuntimeStats()) {
@@ -3486,7 +3494,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const mountPathRaw = (
       didRedirectFirstVisitRoot && typeof window !== 'undefined'
         ? window.location.pathname
-        : this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '')
+        : this.getCurrentPathname()
     ) || '';
     const mountFallbackTarget = this.applySessionFallbackRedirect({ pathIn: mountPathRaw });
     this.syncSessionFallbackRedirectConsumption({ pathIn: mountPathRaw });
@@ -3576,8 +3584,14 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       const VERSION_KEY = 'appCacheVersion';
       const storedVersion = localStorage.getItem(VERSION_KEY);
       if (storedVersion !== CURRENT_CACHE_VERSION) {
+        const cacheRefreshSlugs = [...new Set([
+          ...getAllSessionSlugs(),
+          slug,
+        ].filter(Boolean))];
+        let hadPersistedManagedCache = false;
         // Only bust derived/rehydratable caches; preserve user-authored caches.
-        for (const s of getAllSessionSlugs()) {
+        for (const s of cacheRefreshSlugs) {
+          hadPersistedManagedCache = (await this.hasPersistedManagedCacheData(s)) || hadPersistedManagedCache;
           await Promise.all(
             DG_PRIMARY_ROUTE_CACHE_NAMES.map((namespace: any) => this.DG.remove(namespace, s))
           );
@@ -3587,9 +3601,14 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
         mainSiteLog.log('[CacheBust] Cleared caches for all groups due to version change:', {
           from: storedVersion, to: CURRENT_CACHE_VERSION
         });
-        if (typeof window !== 'undefined' && window.location && typeof window.location.reload === 'function') {
+        if (
+          hadPersistedManagedCache &&
+          typeof window !== 'undefined' &&
+          window.location &&
+          typeof window.location.reload === 'function'
+        ) {
           mainSiteLog.log('[CacheBust] Forcing one-time reload after cache version change');
-          this.reloadWindowLocation!();
+          this.reloadWindowLocation();
           return;
         }
       }
@@ -3628,9 +3647,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       this._cacheUpdateUnsubscribe = subscribeCacheUpdates(this.handleCrossTabCacheUpdateEvent);
     } catch (e) { mainSiteLog.warn('MainSite: cleanup', e); }
 
-    const pathname = this.getEffectiveRoutePath(
-      this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
-    );
+    const pathname = this.getEffectiveRoutePath(this.getCurrentPathname());
     const isDemoPath = pathname.startsWith('/session/');
     const sbtAddressFromPath = this.getSbtAddressFromPath(pathname);
     const isSbtDetailRoute = !!sbtAddressFromPath;
@@ -3833,7 +3850,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     this.checkAllCachesReady();
 
     if (this.props.loginComplete && this.props.account) {
-      const path = this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
+      const path = this.getCurrentPathname();
       const questionIdFromPath = (() => {
         const match = path.match(/\/question\/([^/?#]+)/i);
         return match && match[1] ? String(match[1]).toLowerCase() : '';
@@ -3976,9 +3993,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       const prevPath = this.getEffectiveRoutePath(
         prevProps.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
       );
-      const path = this.getEffectiveRoutePath(
-        this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
-      );
+      const path = this.getEffectiveRoutePath(this.getCurrentPathname());
       const activeSlug = this.getActiveSessionSlug();
       const questionIdFromPath = (() => {
         const match = path.match(/\/question\/([^/?#]+)/i);
@@ -4044,7 +4059,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     }
 
     const prevPathRaw = prevProps.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
-    const currPathRaw = this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
+    const currPathRaw = this.getCurrentPathname();
     const prevPath = this.getEffectiveRoutePath(prevPathRaw);
     const currPath = this.getEffectiveRoutePath(currPathRaw);
     const currSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';
@@ -4204,7 +4219,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   }
 
   handleDeepLinkScan = () => {
-    const fullPath = this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '';
+    const fullPath = this.getCurrentPathname();
 
     // Extract Survey ID from /survey/:id or /survey/:id/results
     let surveyID = null;
@@ -4305,7 +4320,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const sessionNet = this.getSessionNetwork(slug);
     if (!isCacheReinitRunActive()) return;
 
-    const pathname = (this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '');
+    const pathname = this.getCurrentPathname();
     const search = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const sbtAddressFromPath = this.getSbtAddressFromPath(pathname);
     const isSbtDetailRoute = !!sbtAddressFromPath;
@@ -4353,7 +4368,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
           (async () => {
             try {
               if (!isCacheReinitRunActive()) return;
-              const pathname = (this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '');
+              const pathname = this.getCurrentPathname();
               if (!this.shouldAutoRunFullSbtScan({ pathname })) return;
               await this.initializeSbtCacheForGroup(detailSlug, { mode: 'full' });
               if (!isCacheReinitRunActive()) return;
@@ -4382,7 +4397,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
           this.startSbtEventListener();
 
           {
-            const pathname = (this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '');
+            const pathname = this.getCurrentPathname();
             if (this.shouldAutoRunFullSbtScan({ pathname })) {
               await this.initializeSbtCache({ mode: 'full' });
               if (!isCacheReinitRunActive()) return;
@@ -4459,7 +4474,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     void this.syncCacheHasLoadedFlagOnTransition(slug, { isAllReady: nextIsAllReady });
 
     // Deferred full SBT scan trigger (demo-only)
-    const pathname = (this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '');
+    const pathname = this.getCurrentPathname();
     const onDemo = pathname.startsWith('/session/');
     if (!onDemo) return;
 
@@ -6004,9 +6019,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       this.state.surveyCacheInitializationError || this.state.questionCacheInitializationError
     );
 
-    let fullPath = this.getEffectiveRoutePath(
-      this.props.path || (typeof window !== 'undefined' ? window.location.pathname : '') || ''
-    );
+    let fullPath = this.getEffectiveRoutePath(this.getCurrentPathname());
     const searchStr = (typeof window !== 'undefined' ? window.location.search : '') || '';
     const hashStr = (typeof window !== 'undefined' ? window.location.hash : '') || '';
     const searchParams = new URLSearchParams(searchStr);

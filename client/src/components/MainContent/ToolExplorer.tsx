@@ -253,6 +253,11 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     isSBTCacheReady: props.isSBTCacheReady,
     isSurveyCacheReady: props.isSurveyCacheReady,
     isQuestionCacheReady: props.isQuestionCacheReady,
+    ...(expandedToolName === 'Questions'
+      ? {
+        preventUrlChange: true,
+      }
+      : {}),
     ...(expandedToolName === 'Debate Tree'
       ? { demoMode: demoSurfaceEnabled }
       : {}),
