@@ -9,7 +9,6 @@ import contractScripts from '../../utilities/web3/contractScripts.js';
 import { getDemoSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as imageScripts from '../../utilities/ui/imageScripts.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
@@ -21,6 +20,17 @@ import {
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+
+const mockFetchImageFromURL = jest.fn();
+
+jest.mock('../../utilities/ui/imageScripts.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/imageScripts.js');
+  return {
+    __esModule: true,
+    ...actual,
+    fetchImageFromURL: (...args) => mockFetchImageFromURL(...args),
+  };
+});
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 const SBT_FACTORY_RECEIPT_TEST_IFACE = new ethers.utils.Interface([
@@ -53,6 +63,7 @@ const makeInstance = (props = {}) => {
 describe('CreateSBTGroup cache helpers', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    mockFetchImageFromURL.mockReset();
   });
 
   afterEach(() => {
@@ -1600,7 +1611,7 @@ describe('CreateSBTGroup cache helpers', () => {
     });
     instance.state.tokenInfoCollapsed = false;
     const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
-    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+    mockFetchImageFromURL.mockResolvedValue(fetchedFile);
 
     try {
       Object.defineProperty(navigator, 'clipboard', {
@@ -1618,7 +1629,7 @@ describe('CreateSBTGroup cache helpers', () => {
       });
 
       await waitFor(() => {
-        expect(fetchImageSpy).toHaveBeenCalledWith('https://example.com/sbt-image.png');
+        expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/sbt-image.png');
         expect(instance.state.sbtImageFile).toBe(fetchedFile);
       });
 
@@ -1645,7 +1656,7 @@ describe('CreateSBTGroup cache helpers', () => {
     const arweaveRef = `ar://${'a'.repeat(43)}`;
     const normalizedArweaveUrl = normalizeArweaveUrl(arweaveRef);
     const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
-    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+    mockFetchImageFromURL.mockResolvedValue(fetchedFile);
     instance.state.tokenInfoCollapsed = false;
     instance.state.useImageUrl = true;
 
@@ -1662,7 +1673,7 @@ describe('CreateSBTGroup cache helpers', () => {
     });
 
     await waitFor(() => {
-      expect(fetchImageSpy).toHaveBeenCalledWith(normalizedArweaveUrl);
+      expect(mockFetchImageFromURL).toHaveBeenCalledWith(normalizedArweaveUrl);
       expect(instance.state.sbtImageFile).toBe(fetchedFile);
     });
 
@@ -1683,7 +1694,7 @@ describe('CreateSBTGroup cache helpers', () => {
     const arweaveRef = `ar://${'b'.repeat(43)}`;
     const normalizedArweaveUrl = normalizeArweaveUrl(arweaveRef);
     const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
-    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+    mockFetchImageFromURL.mockResolvedValue(fetchedFile);
     instance.commitPendingDocumentUrl = jest.fn(async () => false);
     instance.uploadImageToArweave = jest.fn(async () => null);
     instance.uploadTokenUriToArweave = jest.fn(async () => null);
@@ -1697,7 +1708,7 @@ describe('CreateSBTGroup cache helpers', () => {
       await instance.handleMintClick();
     });
 
-    expect(fetchImageSpy).toHaveBeenCalledWith(normalizedArweaveUrl);
+    expect(mockFetchImageFromURL).toHaveBeenCalledWith(normalizedArweaveUrl);
     expect(instance.state.sbtImageFile).toBe(fetchedFile);
     expect(instance.uploadImageToArweave).toHaveBeenCalledTimes(1);
     expect(instance.uploadTokenUriToArweave).toHaveBeenCalledTimes(1);
@@ -1786,7 +1797,7 @@ describe('CreateSBTGroup cache helpers', () => {
     instance.state.useImageUrl = false;
     URL.createObjectURL = jest.fn(() => 'blob:existing-sbt-preview');
     URL.revokeObjectURL = jest.fn();
-    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockRejectedValue(
+    mockFetchImageFromURL.mockRejectedValue(
       new Error('Invalid image type')
     );
 
@@ -1807,7 +1818,7 @@ describe('CreateSBTGroup cache helpers', () => {
 
       view.rerender(instance.render());
 
-      expect(fetchImageSpy).toHaveBeenCalledWith('https://example.com/not-an-image');
+      expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/not-an-image');
       expect(instance.state.useImageUrl).toBe(false);
       expect(instance.state.sbtImageFile).toBe(existingFile);
       expect(screen.queryByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT)).not.toBeInTheDocument();
@@ -1824,7 +1835,6 @@ describe('CreateSBTGroup cache helpers', () => {
       });
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
-      fetchImageSpy.mockRestore();
     }
   });
 
