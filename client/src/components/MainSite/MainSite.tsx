@@ -3580,7 +3580,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     try {
       // The Arweave reliability rollout changed precheck/cooldown semantics. Force a one-time
       // refresh of derived caches so stale display-blocking failure entries cannot survive.
-      const CURRENT_CACHE_VERSION = '2026-04-06-arweave-reliability-v1';
+      const CURRENT_CACHE_VERSION = '2026-04-30-client-refresh-cache-bust-v2';
       const VERSION_KEY = 'appCacheVersion';
       const storedVersion = localStorage.getItem(VERSION_KEY);
       if (storedVersion !== CURRENT_CACHE_VERSION) {
