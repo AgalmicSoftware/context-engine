@@ -7,15 +7,17 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
 
-const TRACKED_DOC_FILES = Object.freeze([
+const TRACKED_ANCHOR_FILES = Object.freeze([
   'AGENTS.md',
   'docs/MainSite.MAP.md',
   'docs/SessionWizard.MAP.md',
   'docs/SurveyTool.MAP.md',
   'docs/arweave-payloads.md',
   'docs/e2e-testid-api.md',
+  'docs/lit-v3-design.md',
   'docs/porto-information.md',
   'docs/repo-structure.md',
+  'scripts/audit-full.sh',
 ]);
 
 const STALE_COMPONENT_DOC_PATHS = Object.freeze([
@@ -25,6 +27,7 @@ const STALE_COMPONENT_DOC_PATHS = Object.freeze([
   'client/src/components/DocumentLibrary/SessionDocumentsPage.jsx',
   'client/src/components/DemoViews/DemosIndex.jsx',
   'client/src/components/DemoViews/RiskMatrixDemo.jsx',
+  'client/src/components/MainSite/MainSite.jsx',
   'client/src/components/MainContent/MainAreaTabs.jsx',
   'client/src/components/MainContent/ToolExplorer.jsx',
   'client/src/components/Navbar/AccountSection.jsx',
@@ -40,6 +43,7 @@ const STALE_COMPONENT_DOC_PATHS = Object.freeze([
   'client/src/components/SurveyTool/SingleQuestionResponse.jsx',
   'client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx',
   'client/src/components/SurveyTool/SurveyResults.jsx',
+  'client/src/components/SurveyTool/SurveyTool.jsx',
   'client/src/components/UserPage/CompareAddresses.jsx',
   'client/src/components/UserPage/UserPage.jsx',
 ]);
@@ -92,8 +96,8 @@ const OPTIONAL_WORKFLOW_SKILL_CHECKS = Object.freeze([
   },
 ]);
 
-test('tracked docs do not reference stale JSX component paths after the TSX migration', () => {
-  TRACKED_DOC_FILES.forEach((relativePath) => {
+test('tracked anchor files do not reference stale JSX component paths after the TSX migration', () => {
+  TRACKED_ANCHOR_FILES.forEach((relativePath) => {
     const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
     STALE_COMPONENT_DOC_PATHS.forEach((stalePath) => {
       assert.equal(
