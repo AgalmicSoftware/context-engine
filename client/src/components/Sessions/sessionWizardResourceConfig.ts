@@ -42,7 +42,7 @@ export const RESOURCE_SECTION_TOOLTIPS: Readonly<Record<string, string>> = Objec
   rpc: 'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
   arweave: `${t('wallet')} used to pay for Arweave uploads and storage.`,
   txGas: 'Faucet signer used to send small testnet funding grants.',
-  lit: 'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.',
+  lit: 'Worker-mediated Lit Chipotle settings: either a bundle/session account API key for bootstrap, or a scoped usage API key plus the group, PKP, and Lit Action identifiers for this session.',
 });
 
 const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Object.freeze({
@@ -55,7 +55,10 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   arweave: [{ key: 'arweaveJwk', label: 'Arweave JWK', type: 'textarea', rows: 3, required: true }],
   txGas: [{ key: 'faucetPrivateKey', label: 'Faucet private key', type: 'password' }],
   default: [],
-  lit: [{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }],
+  lit: [
+    { key: 'litAccountApiKey', label: 'Lit account API key', type: 'password' },
+    { key: 'litUsageApiKey', label: 'Lit usage API key', type: 'password' },
+  ],
 });
 
 const AI_PROVIDER_SECRET_FIELDS: Readonly<Record<string, SessionWizardSecretField>> = Object.freeze({

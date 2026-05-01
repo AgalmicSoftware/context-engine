@@ -276,8 +276,7 @@ deleted speculatively.
   - `litAccountApiKey` is the per-bundle authority field backed by one disposable Lit account per bundle
   - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
   - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
-- The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
-- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry. The per-grant coordinator stores only the request digest, attempt state, and a credential-redacted safe result. A successful deploy replaces the credential-bearing KV grant record with a secret-free terminal receipt so a lost browser response can be replayed without deploying again.
+- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
   - `version: 1`
@@ -305,7 +304,7 @@ deleted speculatively.
   - If that automatic local asset fetch fails, the normal-mode Publish panel surfaces the fetch error and exposes the known-good manual fallback file (`/dist/sessionCorsWorker.bundle.js`) for retry.
   - For ordinary normal-mode worker deploys, the same `dist/sessionCorsWorker.bundle.js` path is now exposed only after a remote release-asset fetch failure.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
-  - Scoped Chipotle identifiers and `litUsageApiKey` already flow through the worker-mediated Lit execution path.
+  - Scoped Chipotle identifiers and `litUsageApiKey` already flow end-to-end for worker-mediated Lit execution.
   - Authority-bundle bootstrap now centers on `litAccountApiKey` rather than payer-wallet delegation.
 - Login-stage auto-funding now retries the faucet request against `meta.sourceSessionSlug` / `meta.sourceWorkerUrl` when the new sponsored session has not published its own worker yet, so the freshly connected wallet can still get publish gas from the originating sponsored session.
 - After that first worker deploy, later worker config/secrets adjustments are expected to flow through the signed `/admin/set-config` and `/admin/set-secrets` routes rather than the streamlined normal-mode auto-deploy banner.
@@ -909,12 +908,8 @@ Vars:
 - `DEFAULT_SESSION_SLUG` (optional; canonical)
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
-- `CE_OPENAI_TRANSCRIBE_URL` (optional; defaults to `https://api.openai.com/v1/audio/transcriptions`)
 - `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
-- `LIT_API_BASE` (optional; defaults to `https://api.chipotle.litprotocol.com`; production requests are restricted to the approved Chipotle API host)
-- `LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE` (optional; dev/test only, allows `LIT_API_BASE` to target localhost/loopback Chipotle stubs over `http` or `https`)
-
-For local `wrangler dev` placeholders, see `workers/sessionCorsWorker/.dev.vars.example`. Keep real `.dev.vars` files untracked.
+- `LIT_API_BASE` (optional; only if you need a non-default Chipotle API base such as self-hosted/local dev)
 
 Runtime:
 
@@ -1655,23 +1650,6 @@ Never return secrets in responses.
     default because they still reveal operational topology
   - worker env fallback to `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY`) for
     Chipotle-backed requests when a session-specific Lit account/usage key is not present
-  - `/lit/chipotle-action` now receives the worker `env` during authenticated
-    dispatch, so the deployment-level Lit env fallback applies to runtime
-    execution as well as status/provisioning paths
-  - v2 Chipotle wrapped keys bind `{ chainId, gateMode, sbtAddresses,
-litActionCid, litPkpId }` into the encrypted plaintext via a policy
-    fingerprint; decrypt returns the CEK only when the embedded fingerprint
-    matches the worker-approved policy
-  - `encrypt` does not require target SBT ownership, while `check` and
-    `decrypt` still enforce the SBT gate
-  - `check` / `decrypt` derive RPC from worker-approved config, secrets, or
-    defaults. Request `rpcUrl` / `customRpcUrl` is rejected unless it exactly
-    matches that allowlist, and the Lit Action rejects endpoints whose reported
-    chain ID does not match the gate chain. Gate-chain inputs use the same strict
-    parser as worker authority reads, so malformed explicit values cannot fall
-    through to a different configured chain.
-  - stored Chipotle metadata omits RPC URLs; legacy v1 / bare-hex Chipotle
-    wrapped keys are rejected by default and must be recreated with v2 metadata
   - admin `POST /admin/lit-chipotle-status` to query worker-mediated Chipotle
     readiness, billing balance, and configured group/action/PKP membership
     without returning the stored API key
@@ -1688,10 +1666,6 @@ litActionCid, litPkpId }` into the encrypted plaintext via a policy
     `litAccountApiKey` in the encrypted `/sponsor` payload so `/new` can mint a
     fresh group / PKP / usage key for each redeemed session, then keep using
     only the scoped runtime during day-to-day execution
-  - after default action-source changes, operators must re-run
-    `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` so session
-    `litCredentials.litActionCid` points at the newly derived action CID; there
-    is no compatibility fallback to the old action source
 
 ## Gating on login (on-chain)
 

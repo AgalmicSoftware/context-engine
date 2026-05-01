@@ -24,7 +24,13 @@ import {
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr, normalizeSlug as canonicalizeSlug } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
-import { SponsorHandoffResult } from './SponsorHandoffResult';
+import {
+  buildSponsoredBundlePlaintext,
+  generateSponsoredBundleSecret,
+  hasSponsoredBundleFields,
+  uploadSponsoredBundle,
+} from '../../utilities/arweave/sponsoredBundles.js';
+import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -372,8 +378,7 @@ const SPONSORED_FIELD_GROUPS: readonly SponsoredFieldGroup[] = Object.freeze([
   {
     key: 'lit',
     label: 'Lit',
-    notice:
-      'Account API keys are authority for bundle-owned Lit accounts. Usage API keys are scoped runtime secrets. Group, PKP, and Lit Action identifiers are operational config.',
+    notice: 'Account API keys are authority for bundle-owned Lit accounts. Usage API keys are scoped runtime secrets. Group, PKP, and Lit Action identifiers are operational config.',
     fields: [
       { key: 'litApiBase', label: 'Lit API base', type: 'text', placeholder: 'https://api.chipotle.litprotocol.com' },
       { key: 'litGroupId', label: 'Lit group ID', type: 'text', placeholder: 'group_...' },
@@ -782,8 +787,8 @@ const SponsorPage = ({
   const canAdmin =
     !!account && !!selectedConfig && !missingSupportedAdminConfig && isAdminForSelected && hasRegistryEntry;
 
-  const updateBundleField = useCallback((key: SponsorBundleFieldKey, value: string) => {
-    setBundleForm((prev) => ({ ...prev, [key]: value }));
+  const updateBundleField = useCallback((key: any, value: any) => {
+    setBundleForm((prev: any) => ({ ...prev, [key]: value }));
   }, []);
 
   const buildBootstrapUploadAuth = useCallback(

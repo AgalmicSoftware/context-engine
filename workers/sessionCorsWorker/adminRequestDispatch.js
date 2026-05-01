@@ -110,18 +110,6 @@ const mergeAdminSecrets = ({
   return nextSecrets;
 };
 
-const executeDirectSessionConfigMutation = async ({
-  env,
-  slug,
-  existingConfig,
-  mutation,
-  deps,
-} = {}) => {
-  const coordinate = deps?.executeCoordinatedSessionConfigMutation ||
-    executeCoordinatedSessionConfigMutation;
-  return coordinate({ env, slug, existingConfig, mutation });
-};
-
 export const dispatchAdminRequest = async ({
   request,
   env,
@@ -242,15 +230,6 @@ export const dispatchAdminRequest = async ({
     return deps?.json?.({ ok: true }, 200, headers);
   }
 
-  if (action === 'secret-presence') {
-    const existingSecrets = (await deps?.getSessionSecrets?.(env, targetSlug)) || {};
-    return deps?.json?.({
-      ok: true,
-      sessionSlug: targetSlug,
-      secrets: buildSecretPresenceManifest(existingSecrets),
-    }, 200, headers);
-  }
-
   if (action === 'lit-chipotle-status') {
     try {
       const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
@@ -298,20 +277,12 @@ export const dispatchAdminRequest = async ({
         ...(result?.litPkpId ? { litPkpId: result.litPkpId } : {}),
       } : null;
       if (litCredentials) {
-        const mutationResult = await executeDirectSessionConfigMutation({
-          env,
-          slug: targetSlug,
+        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
           existingConfig,
-          mutation: { kind: 'merge-lit-credentials', litCredentials },
-          deps,
+          incomingConfig: { litCredentials },
+          slug: targetSlug,
         });
-        if (!mutationResult?.ok) {
-          return deps?.json?.(
-            mutationResult?.body || { error: 'Session config mutation failed.' },
-            mutationResult?.status || 503,
-            headers,
-          );
-        }
+        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
       }
       return deps?.json?.(result, 200, headers);
     } catch (error) {
@@ -343,20 +314,19 @@ export const dispatchAdminRequest = async ({
         typeof result.litCredentials === 'object'
       ) ? result.litCredentials : null;
       if (litCredentials) {
-        const mutationResult = await executeDirectSessionConfigMutation({
-          env,
-          slug: targetSlug,
+        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
           existingConfig,
-          mutation: { kind: 'merge-lit-credentials', litCredentials },
-          deps,
+          incomingConfig: {
+            litCredentials: {
+              ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
+                ? existingConfig.litCredentials
+                : {}),
+              ...litCredentials,
+            },
+          },
+          slug: targetSlug,
         });
-        if (!mutationResult?.ok) {
-          return deps?.json?.(
-            mutationResult?.body || { error: 'Session config mutation failed.' },
-            mutationResult?.status || 503,
-            headers,
-          );
-        }
+        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
       }
       const responseBody = { ...result };
       delete responseBody.secretOutputs;

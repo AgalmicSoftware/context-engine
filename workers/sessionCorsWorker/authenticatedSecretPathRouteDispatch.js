@@ -1,7 +1,4 @@
 import { readArweaveUploadRequestPayload } from './arweaveUploadRequestNormalization.js';
-import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
-import { workerGroupsRoute as workerGroupsRouteBoundary } from './workerGroups.js';
-import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
   path,
@@ -18,21 +15,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 } = {}) => {
   const isTranscribeRoute = path === '/transcribe' && method === 'POST';
   const isArweaveUploadRoute = path === '/arweave/upload' && method === 'POST';
-  const isStorageRoute = (
-    (path === '/storage/upload' && method === 'POST') ||
-    (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
-    (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
-    (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST'))
-  );
-  const isWorkerGroupsRoute = (
-    (path === '/groups/my-memberships' && (method === 'GET' || method === 'POST')) ||
-    (path === '/groups/members' && (method === 'GET' || method === 'POST')) ||
-    (path === '/groups/list' && (method === 'GET' || method === 'POST')) ||
-    (path === '/groups/create' && method === 'POST') ||
-    (path === '/groups/join' && method === 'POST') ||
-    (path === '/groups/leave' && method === 'POST')
-  );
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
+  if (!isTranscribeRoute && !isArweaveUploadRoute) {
     return { handled: false };
   }
   const isParticipantWrite = (
@@ -55,8 +38,10 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 
   const route = isTranscribeRoute
     ? 'transcribe'
-    : (isStorageRoute ? 'storage' : (isWorkerGroupsRoute ? 'groups' : 'arweave'));
-  const scope = route === 'storage' && scopes?.storage !== true ? 'arweave' : route;
+    : 'arweave';
+  const scope = isTranscribeRoute
+    ? 'transcribe'
+    : 'arweave';
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope,

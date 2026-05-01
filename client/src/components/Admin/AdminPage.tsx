@@ -309,20 +309,25 @@ const AdminPageRuntime = ({
     faucet: false,
     lit: false,
   });
-  const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
-  const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
-  const [litResource, setLitResource] = useState<any>(() => buildAdminLitNotConfiguredResource());
-  const arweaveResourceRequestRef = useRef(0);
-  const faucetResourceRequestRef = useRef(0);
-  const litResourceRequestRef = useRef(0);
-  const secretPresenceRequestRef = useRef(0);
-  const secretPresenceTargetKeyRef = useRef('');
-  const rawMetadataCopyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevSelectedSlugForDraftRef = useRef(selectedSlug);
-  const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
-  const encryptedFieldsSessionKeyRef = useRef('');
-  const metadataDraftTouchedRef = useRef(metadataDraftTouched);
-  metadataDraftTouchedRef.current = metadataDraftTouched;
+  const [faucetResource, setFaucetResource] = useState<any>({
+    address: '',
+    display: 'No faucet key entered',
+    meta: 'Enter a faucet private key above to read the wallet balance.',
+    loading: false,
+  });
+  const [litResource, setLitResource] = useState<any>({
+    address: '',
+    display: 'Lit Chipotle not configured',
+    meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+    loading: false,
+    manualRefreshAvailable: false,
+  });
+  const arweaveResourceRequestRef = useRef<any>(0);
+  const faucetResourceRequestRef = useRef<any>(0);
+  const litResourceRequestRef = useRef<any>(0);
+  const rawMetadataCopyResetRef = useRef<any>(null);
+  const prevSelectedSlugForDraftRef = useRef<any>(selectedSlug);
+  const prevSelectedSlugForAllowOriginsDraftRef = useRef<any>(selectedSlug);
 
   const handleSecretChange = useCallback((key: string, value: string) => {
     setSecrets((prev) => ({ ...prev, [key]: value }));
@@ -692,10 +697,13 @@ const AdminPageRuntime = ({
     });
     setWorkerSecretsDirty(false);
     setClearedSecretKeys(new Set());
-    setStoredSecretPresence({});
-    setSecretPresenceStatus('idle');
-    setSecretPresenceMessage('');
-    setLitResource(buildAdminLitNotConfiguredResource());
+    setLitResource({
+      address: '',
+      display: 'Lit Chipotle not configured',
+      meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+      loading: false,
+      manualRefreshAvailable: false,
+    });
     setShowTestsPanel(false);
   }, [selectedSlug]);
 
@@ -1094,213 +1102,197 @@ const AdminPageRuntime = ({
         if (toggleLoginModal) toggleLoginModal(true);
         throw new Error('Connect a wallet to sign admin requests.');
       }
-      const slug = normalizeSlug(selectedSlug);
-      const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-      if (!baseUrl) throw new Error('Worker URL is missing.');
 
-      const chainId =
-        Number(
-          chainIdOverride || selectedConfig?.__registry?.chainId || selectedConfig?.networkChainId || network?.id || 1,
-        ) || 1;
-
-      return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
-        action,
-        slug,
-        sessionId: selectedWorkerSessionId || undefined,
-        body,
-        workerUrl: baseUrl,
-        context: {
-          account,
-          chainId,
-          providerLike: typeof provider === 'string' ? provider : undefined,
-        },
-      });
-    },
-    [
-      account,
-      network?.id,
-      provider,
-      selectedConfig,
-      selectedConfigWorkerUrl,
-      selectedSlug,
-      selectedWorkerSessionId,
-      toggleLoginModal,
-      workerUrl,
-    ],
-  );
-
-  const postSignedAdminRequest = useCallback(
-    (args: AdminSignedWorkerRequestArgs = {}) =>
-      postSignedAdminWorkerRequest({
-        ...args,
-        workerUrl: args.workerUrl || workerUrl || selectedConfigWorkerUrl,
-        signAdminAction,
-      }),
-    [selectedConfigWorkerUrl, signAdminAction, workerUrl],
-  );
-
-  const mergeStoredSecretPresenceFromPayload = useCallback(
-    (payload: Record<string, unknown> = {}) => {
-      const patch = normalizeAdminSecretPresencePatch(payload);
-      setStoredSecretPresence((prev) => {
-        const next = { ...prev, ...patch };
-        return secretPresenceStatus === 'loaded' ? normalizeAdminSecretPresence(next) : next;
-      });
-      if (secretPresenceStatus !== 'loaded') {
-        setSecretPresenceStatus('partial');
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return { baseUrl, response: res, data };
       }
-    },
-    [secretPresenceStatus],
-  );
 
-  const refreshSecretPresence = useCallback(async () => {
-    let baseUrl = '';
-    let requestId = 0;
-    let targetKey = '';
-    try {
-      if (!selectedConfig) throw new Error('Select a session.');
-      const slug = normalizeSlug(selectedSlug);
-      baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
-      if (!baseUrl) throw new Error('Worker URL is missing.');
-      targetKey = buildAdminSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
-      requestId = secretPresenceRequestRef.current + 1;
-      secretPresenceRequestRef.current = requestId;
-      setSecretPresenceStatus('loading');
-      setSecretPresenceMessage('Checking stored secret status…');
-      const { data } = await postSignedAdminRequest({
-        action: 'secret-presence',
-        body: { sessionSlug: slug },
-        path: '/admin/secret-presence',
-        workerUrl: baseUrl,
-      });
-      if (requestId !== secretPresenceRequestRef.current || targetKey !== secretPresenceTargetKeyRef.current) {
-        return;
+      const responseError = data?.error || '';
+      if (attempt < retryAttempts && isRetryableAdminNonceFailure({
+        responseStatus: res.status,
+        responseError,
+      })) {
+        // A concurrent admin action may have consumed the previous nonce.
+        // Re-sign with a fresh nonce instead of surfacing a transient failure.
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(250 * attempt);
+        continue;
       }
-      setStoredSecretPresence(normalizeAdminSecretPresence(data?.secrets));
-      setSecretPresenceStatus('loaded');
-      setSecretPresenceMessage('Stored secret status refreshed.');
-    } catch (err) {
-      if (
-        requestId &&
-        (requestId !== secretPresenceRequestRef.current || targetKey !== secretPresenceTargetKeyRef.current)
-      ) {
-        return;
-      }
-      setSecretPresenceStatus('error');
-      setSecretPresenceMessage(
-        normalizeAdminWorkerFetchError({
-          error: err,
-          workerBase: baseUrl || normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl),
-        }),
-      );
+
+      lastError = new Error(normalizeAdminWorkerFetchError({
+        error: responseError || `Request failed (${res.status}).`,
+        workerBase: baseUrl,
+        responseStatus: res.status,
+        responseError,
+      }));
+      throw lastError;
     }
-  }, [postSignedAdminRequest, selectedConfig, selectedConfigWorkerUrl, selectedSlug, workerUrl]);
 
-  const refreshLitResource = useCallback(
-    async ({ includeSignedStatus = true }: any = {}) => {
-      const requestId = litResourceRequestRef.current + 1;
-      litResourceRequestRef.current = requestId;
-      const baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
-      const litCredentials =
-        selectedConfig?.litCredentials &&
-        typeof selectedConfig.litCredentials === 'object' &&
-        !Array.isArray(selectedConfig.litCredentials)
-          ? selectedConfig.litCredentials
-          : {};
-      const accountApiKey = toStr(secrets.litAccountApiKey).trim();
-      const usageApiKey = toStr(secrets.litUsageApiKey).trim();
-      const configuredLitApiBase = toStr(litCredentials?.litApiBase).trim();
-      const configuredLitGroupId = toStr(litCredentials?.litGroupId).trim();
-      const configuredLitPkpId = toStr(litCredentials?.litPkpId).trim();
-      const configuredLitActionCid = toStr(litCredentials?.litActionCid).trim();
-      const hasChipotleConfig = !!(
-        configuredLitApiBase ||
-        configuredLitGroupId ||
-        configuredLitPkpId ||
-        configuredLitActionCid
+    throw lastError || new Error(`Failed admin action: ${action}`);
+  }, [
+    selectedConfigWorkerUrl,
+    signAdminAction,
+    workerUrl,
+  ]);
+
+  const refreshLitResource = useCallback(async ({ includeSignedStatus = true }: any = {}) => {
+    const requestId = litResourceRequestRef.current + 1;
+    litResourceRequestRef.current = requestId;
+    const baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
+    const litCredentials = selectedConfig?.litCredentials
+      && typeof selectedConfig.litCredentials === 'object'
+      && !Array.isArray(selectedConfig.litCredentials)
+      ? selectedConfig.litCredentials
+      : {};
+    const accountApiKey = toStr(secrets.litAccountApiKey).trim();
+    const usageApiKey = toStr(secrets.litUsageApiKey).trim();
+    const configuredLitApiBase = toStr(litCredentials?.litApiBase).trim();
+    const configuredLitGroupId = toStr(litCredentials?.litGroupId).trim();
+    const configuredLitPkpId = toStr(litCredentials?.litPkpId).trim();
+    const configuredLitActionCid = toStr(litCredentials?.litActionCid).trim();
+    const hasChipotleConfig = !!(
+      configuredLitApiBase ||
+      configuredLitGroupId ||
+      configuredLitPkpId ||
+      configuredLitActionCid
+    );
+    const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
+
+    if (!useChipotlePath && !baseUrl) {
+      setLitResource({
+        address: '',
+        display: 'Lit Chipotle not configured',
+        meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+        loading: false,
+        manualRefreshAvailable: false,
+      });
+      return;
+    }
+
+    if (!baseUrl || !selectedConfig) {
+      if (requestId !== litResourceRequestRef.current) return;
+      setLitResource({
+        address: '',
+        display: useChipotlePath ? 'Worker unavailable' : 'Lit Chipotle not configured',
+        meta: useChipotlePath
+          ? 'Resolve the worker URL to read Lit Chipotle status.'
+          : 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+        loading: false,
+        manualRefreshAvailable: false,
+      });
+      return;
+    }
+
+    if (!includeSignedStatus) {
+      if (requestId !== litResourceRequestRef.current) return;
+      setLitResource({
+        address: '',
+        display: 'Status not loaded',
+        meta: [
+          accountApiKey ? 'Unsaved account key' : '',
+          usageApiKey ? 'Unsaved usage key' : '',
+          !accountApiKey && !usageApiKey ? 'Saved worker config' : '',
+          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
+          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
+          configuredLitPkpId ? 'PKP configured' : '',
+          configuredLitActionCid ? 'Action configured' : '',
+          'Click refresh to query the worker for Lit Chipotle status.',
+        ].filter(Boolean).join(' • '),
+        loading: false,
+        manualRefreshAvailable: true,
+      });
+      return;
+    }
+
+    setLitResource({
+      address: '',
+      display: 'Loading...',
+      meta: configuredLitGroupId
+        ? `Checking group ${formatPreviewValue(configuredLitGroupId, 20)}`
+        : 'Checking Lit Chipotle worker status',
+      loading: true,
+      manualRefreshAvailable: true,
+    });
+
+    try {
+      const slug = normalizeSlug(selectedSlug);
+      const requestBody = {
+        sessionSlug: slug,
+        ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
+        ...(accountApiKey ? { apiKey: accountApiKey } : {}),
+      };
+      const { data } = await postSignedAdminRequest({
+        action: 'lit-chipotle-status',
+        body: requestBody,
+        path: '/admin/lit-chipotle-status',
+        workerUrl: baseUrl,
+      });
+      if (requestId !== litResourceRequestRef.current) return;
+
+      const ready = data?.ready === true;
+      const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
+      const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object'
+        ? data.groupSummary
+        : {};
+      const walletCount = groupSummary.walletCount == null ? null : Number(groupSummary.walletCount);
+      const actionCount = groupSummary.actionCount == null ? null : Number(groupSummary.actionCount);
+      const hasHardConfigMiss = (
+        groupSummary.hasConfiguredPkp === false ||
+        groupSummary.hasConfiguredAction === false
       );
-      const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
-
-      if (!useChipotlePath && !baseUrl) {
-        setLitResource(buildAdminLitNotConfiguredResource());
-        return;
-      }
-
-      if (!baseUrl || !selectedConfig) {
-        if (requestId !== litResourceRequestRef.current) return;
-        setLitResource(buildAdminLitUnavailableResource({ useChipotlePath }));
-        return;
-      }
-
-      if (!includeSignedStatus) {
-        if (requestId !== litResourceRequestRef.current) return;
-        setLitResource(
-          buildAdminLitStatusNotLoadedResource({
-            hasAccountApiKey: !!accountApiKey,
-            hasUsageApiKey: !!usageApiKey,
-            configuredLitApiBase,
-            configuredLitGroupId,
-            configuredLitPkpId,
-            configuredLitActionCid,
-            formatPreviewValue,
-          }),
-        );
-        return;
-      }
-
-      setLitResource(
-        buildAdminLitLoadingResource({
-          configuredLitGroupId,
-          formatPreviewValue,
-        }),
-      );
-
-      try {
-        const slug = normalizeSlug(selectedSlug);
-        const requestBody = {
-          sessionSlug: slug,
-          ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
-          ...(accountApiKey ? { apiKey: accountApiKey } : {}),
-        };
-        const { data } = await postSignedAdminRequest({
-          action: 'lit-chipotle-status',
-          body: requestBody,
-          path: '/admin/lit-chipotle-status',
-          workerUrl: baseUrl,
-        });
-        if (requestId !== litResourceRequestRef.current) return;
-
-        const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
-        const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object' ? data.groupSummary : {};
-        const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
-        setLitResource(
-          buildAdminLitStatusResource({
-            ready: data?.ready === true,
-            warnings,
-            groupSummary,
-            balanceDisplay,
-            configuredLitApiBase,
-            configuredLitGroupId,
-            configuredLitPkpId,
-            configuredLitActionCid,
-            formatPreviewValue,
-          }),
-        );
-      } catch (error: any) {
-        if (requestId !== litResourceRequestRef.current) return;
-        setLitResource(buildAdminLitErrorResource(getErrorMessage(error, 'Failed to load Lit Chipotle status.')));
-      }
-    },
-    [
-      secrets.litAccountApiKey,
-      secrets.litUsageApiKey,
-      selectedConfig,
-      selectedConfigWorkerUrl,
-      selectedSlug,
-      postSignedAdminRequest,
-      workerUrl,
-    ],
-  );
+      const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
+      setLitResource({
+        address: '',
+        display: ready
+          ? 'Ready'
+          : hasHardConfigMiss
+            ? 'Needs config'
+            : warnings.length
+              ? 'Needs review'
+              : 'Configured',
+        meta: [
+          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
+          balanceDisplay ? `balance ${balanceDisplay}` : '',
+          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
+          configuredLitPkpId
+            ? (groupSummary.hasConfiguredPkp === true
+              ? 'PKP ready'
+              : groupSummary.hasConfiguredPkp === false
+                ? 'PKP missing'
+                : 'PKP unchecked')
+            : (walletCount != null ? `${walletCount} wallet${walletCount === 1 ? '' : 's'}` : ''),
+          configuredLitActionCid
+            ? (groupSummary.hasConfiguredAction === true
+              ? 'Action ready'
+              : groupSummary.hasConfiguredAction === false
+                ? 'Action missing'
+                : 'Action unchecked')
+            : (actionCount != null ? `${actionCount} action${actionCount === 1 ? '' : 's'}` : ''),
+          warnings.length ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : '',
+        ].filter(Boolean).join(' • ') || 'Lit Chipotle status loaded.',
+        loading: false,
+        manualRefreshAvailable: true,
+      });
+    } catch (error: any) {
+      if (requestId !== litResourceRequestRef.current) return;
+      setLitResource({
+        address: '',
+        display: 'Unable to load status',
+        meta: getErrorMessage(error, 'Failed to load Lit Chipotle status.'),
+        loading: false,
+        manualRefreshAvailable: true,
+      });
+    }
+  }, [
+    secrets.litAccountApiKey,
+    secrets.litUsageApiKey,
+    selectedConfig,
+    selectedConfigWorkerUrl,
+    selectedSlug,
+    postSignedAdminRequest,
+    workerUrl,
+  ]);
 
   useEffect(() => {
     refreshLitResource({ includeSignedStatus: false });
@@ -1310,20 +1302,19 @@ const AdminPageRuntime = ({
   }, [refreshLitResource]);
 
   const litResourceLabel = useMemo(() => {
-    const litCredentials =
-      selectedConfig?.litCredentials &&
-      typeof selectedConfig.litCredentials === 'object' &&
-      !Array.isArray(selectedConfig.litCredentials)
-        ? selectedConfig.litCredentials
-        : {};
-    return getAdminLitResourceLabel({
-      hasAccountApiKey: !!toStr(secrets.litAccountApiKey).trim(),
-      hasUsageApiKey: !!toStr(secrets.litUsageApiKey).trim(),
-      configuredLitApiBase: litCredentials?.litApiBase,
-      configuredLitGroupId: litCredentials?.litGroupId,
-      configuredLitPkpId: litCredentials?.litPkpId,
-      configuredLitActionCid: litCredentials?.litActionCid,
-    });
+    const litCredentials = selectedConfig?.litCredentials
+      && typeof selectedConfig.litCredentials === 'object'
+      && !Array.isArray(selectedConfig.litCredentials)
+      ? selectedConfig.litCredentials
+      : {};
+    return (
+      toStr(secrets.litAccountApiKey).trim() ||
+      toStr(secrets.litUsageApiKey).trim() ||
+      toStr(litCredentials?.litApiBase).trim() ||
+      toStr(litCredentials?.litGroupId).trim() ||
+      toStr(litCredentials?.litPkpId).trim() ||
+      toStr(litCredentials?.litActionCid).trim()
+    ) ? 'Lit Chipotle status' : 'Lit sponsorship status';
   }, [selectedConfig, secrets.litAccountApiKey, secrets.litUsageApiKey]);
 
   const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
@@ -1450,37 +1441,34 @@ const AdminPageRuntime = ({
       });
       setSaveStatus(`Worker secrets saved for ${sessionLabel}.`);
 
-      if (canAdminRegistry) {
-        const registryChainId =
-          Number(selectedConfig?.__registry?.registryChainId || selectedConfig?.__registry?.chainId || 0) || 0;
-        const shouldPreserveSponsoredLit =
-          currentSponsoredLit &&
-          !clearedSecretKeys.has('litAccountApiKey') &&
-          !clearedSecretKeys.has('litUsageApiKey') &&
-          !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
-          !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey');
-        const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
-          sponsoredFields: buildSponsoredSessionFlagFields({
-            secrets: secretsPayload,
-            fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
-            includeCustomRpcInAi: true,
-          }),
-        });
-        setChainStatus('Updating sponsored flags on-chain…');
-        await adminSessionRegistryPorts.writes.setSessionFieldsOnChain({
-          providerLike: provider,
-          chainId: registryChainId,
-          slug,
-          fields: sponsoredFields,
-        });
-        setChainStatus('Sponsored flags updated.');
-        await loadSessions();
-      }
-      if (savedPresenceTargetKey === secretPresenceTargetKeyRef.current) {
-        secretPresenceRequestRef.current += 1;
-        mergeStoredSecretPresenceFromPayload(secretsPayload);
-        setSecretPresenceMessage('Stored secret status updated from saved changes.');
-      }
+      const registryChainId = Number(
+        selectedConfig?.__registry?.registryChainId ||
+        selectedConfig?.__registry?.chainId ||
+        selectedConfig?.networkChainId ||
+        network?.id ||
+        0
+      ) || 0;
+      const shouldPreserveSponsoredLit = (
+        currentSponsoredLit &&
+        !clearedSecretKeys.has('litAccountApiKey') &&
+        !clearedSecretKeys.has('litUsageApiKey') &&
+        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
+        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey')
+      );
+      const sponsoredFields = buildSponsoredSessionFlagFields({
+        secrets: secretsPayload,
+        fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
+        includeCustomRpcInAi: true,
+      });
+      setChainStatus('Updating sponsored flags on-chain…');
+      await setSessionFieldsOnChain({
+        providerLike: provider,
+        chainId: registryChainId,
+        slug,
+        fields: sponsoredFields,
+      });
+      setChainStatus('Sponsored flags updated.');
+      await loadSessions();
       setClearedSecretKeys(new Set());
       setWorkerSecretsDirty(false);
     } catch (err: any) {
@@ -2044,8 +2032,9 @@ const AdminPageRuntime = ({
         throw new Error('Lit hooks not initialized.');
       }
       const litNetwork = toStr(hooks?.litNetwork).trim() || 'chipotle';
-      const chainId =
-        Number(groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0) || null;
+      const chainId = Number(
+        groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0
+      ) || null;
       const decrypted = await cryptoUtils.decryptEnvelopeValue(litTestEnvelope, {
         account,
         chainId,
@@ -2062,10 +2051,17 @@ const AdminPageRuntime = ({
     }
   };
 
-  const currentBlockSummary =
-    Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
-      ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
-      : metadataLatestBlockStatus;
+  const SECRET_CARDS = [
+    { key: 'ai', label: 'AI', fields: ['openaiKey', 'anthropicKey', 'openrouterKey'] },
+    { key: 'rpc', label: 'RPC', fields: ['customRpcUrl', 'customRpcKey'] },
+    { key: 'arweave', label: 'Arweave', fields: ['arweaveJwk'] },
+    { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
+    { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
+  ];
+  const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
+  const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
+    ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
+    : metadataLatestBlockStatus;
 
   const handleUseCurrentBlockForMetadata = () => {
     const nextStart = Number(metadataLatestBlock || 0);
@@ -2603,26 +2599,272 @@ const AdminPageRuntime = ({
                 : 'No metadata found for this session yet. Register the session on-chain or select a legacy demo session.'}
             </div>
           )}
-          {metadataOpen && groupMetadata && (
-            <>
-              <AdminPageSessionMetadataSummary
-                groupMetadata={groupMetadata}
-                isWorkerCanonical={sessionCapabilities.isWorkerCanonical}
-                workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
-                allowedOriginCount={effectiveWorkerAllowOrigins.length}
-                allowedOriginsReported={effectiveWorkerCorsState.reported}
-                metadataSlugDisplay={metadataSlugDisplay}
-                metadataSessionUrl={metadataSessionUrl}
-                metadataAdminAddress={metadataAdminAddress}
-                metadataAdminUrl={metadataAdminUrl}
-                metadataUriValue={metadataUriValue}
-                metadataUriUrl={metadataUriUrl}
-                metadataLoadStateLabel={metadataLoadStateLabel}
-              />
-              {sessionCapabilities.usesChainMetadata && metadataContractsNeedVerification && (
-                <div className={styles.warningNote}>
-                  Session metadata could not be loaded, so the contract addresses below are currently synthesized from
-                  chain defaults. Verify them before publishing any metadata update.
+          <div className={styles.grid}>
+            {Object.entries(encryptedFields).map(([key, envelope]: any) => {
+                const resolved = decryptedFields[key] || {};
+                const status = resolved.status || 'locked';
+                const decrypted = toStr(resolved.value);
+                const decryptedPreview = decrypted ? formatPreviewValue(decrypted) : null;
+                return (
+                  <div
+                    key={key}
+                    className={`${styles.statusItem} ${!decryptedPreview ? styles.statusItemClickable : ''}`}
+                    onClick={() => { if (!decryptedPreview && !decryptFieldsBusy) handleDecryptEncryptedFields(); }}
+                    role={!decryptedPreview ? 'button' : undefined}
+                    title={!decryptedPreview ? (walletReady ? 'Click to decrypt' : 'Connect wallet to decrypt') : undefined}
+                  >
+                    <span>{key}</span>
+                    <span>{decryptedPreview || '[encrypted]'}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
+
+      <section className={`${styles.panel} ${styles.gatePanel}`}>
+        <div className={styles.panelHeader}>
+          <div className={styles.panelTitleGroup}>
+            <div className={styles.panelTitleRow}>
+              <div className={styles.panelTitle}>On-chain default gate</div>
+              {renderInfoTooltip(
+                'admin-default-gate-tip',
+                'Match the default worker-auth gate to the session’s intended access model.'
+              )}
+            </div>
+          </div>
+          <Button
+            size="sm"
+            color="secondary"
+            outline
+            className={styles.collapseToggle}
+            onClick={() => toggleSection('defaultGate')}
+            aria-label="Toggle On-chain default gate section"
+          >
+            <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
+          </Button>
+        </div>
+        {defaultGateOpen && (
+          <>
+            <div className={styles.formRow}>
+              <FormGroup>
+                <Label className={styles.gateLabelRow}>
+                  <span>Default gate SBTs</span>
+                  <Input
+                    type="select"
+                    value={defaultGateDraft.mode}
+                    data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
+                    onChange={(e: any) => {
+                      setDefaultGateTouched(true);
+                      setGateConfigDirty(true);
+                      setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
+                    }}
+                    className={styles.gateModeSelect}
+                  >
+                    <option value="any">ANY</option>
+                    <option value="all">ALL</option>
+                  </Input>
+                </Label>
+                <SBTSelector
+                  id="admin-default-gate-sbts"
+                  label=""
+                  selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
+                  onAddSBT={(sbt: any) => {
+                    setDefaultGateTouched(true);
+                    setGateConfigDirty(true);
+                    setDefaultGateDraft((prev: any) => ({
+                      ...prev,
+                      sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
+                    }));
+                  }}
+                  onRemoveSBT={(address: any) => {
+                    setDefaultGateTouched(true);
+                    setGateConfigDirty(true);
+                    setDefaultGateDraft((prev: any) => ({
+                      ...prev,
+                      sbts: dedupeSbtSelections(prev.sbts || []).filter(
+                        (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase()
+                      ),
+                    }));
+                  }}
+                  network={network}
+                  chainId={
+                    Number(selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0) ||
+                    null
+                  }
+                  sessionSlug={normalizeSlug(selectedSlug)}
+                  variant="admin"
+                  ensureLightSbtUniverse={ensureLightSbtUniverse}
+                />
+              </FormGroup>
+            </div>
+            <Button
+              color="primary"
+              className={styles.actionButton}
+              onClick={handleSyncDefaultGate}
+              data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
+              disabled={!canAdmin || gateSyncBusy}
+              style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
+            >
+              Update default gate on-chain
+            </Button>
+            {gateSyncStatus && (
+              <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
+                {gateSyncStatus}
+              </div>
+            )}
+            {gateSyncResult && <div className={styles.statusNote}>{renderTestResult(gateSyncResult)}</div>}
+          </>
+        )}
+      </section>
+
+      <section className={`${styles.panel} ${styles.secretsPanel}`}>
+        <div className={styles.panelHeader}>
+          <div className={styles.panelTitleGroup}>
+            <div className={styles.panelTitleRow}>
+              <div className={styles.panelTitle}>Worker secrets</div>
+              {renderInfoTooltip(
+                'admin-worker-secrets-tip',
+                'Edit operator credentials without revealing what is already stored in the worker.'
+              )}
+            </div>
+          </div>
+          <Button
+            size="sm"
+            color="secondary"
+            outline
+            className={styles.collapseToggle}
+            onClick={() => toggleSection('workerSecrets')}
+            aria-label="Toggle Worker secrets section"
+          >
+            <FontAwesomeIcon icon={workerSecretsOpen ? faCaretUp : faCaretDown} />
+          </Button>
+        </div>
+        {workerSecretsOpen && (
+          <>
+            <div className={styles.secretOptionsGrid}>
+              {SECRET_CARDS.map((card: any) => {
+                const isOpen = openSecretCards[card.key];
+                const hasValue = cardHasValue(card.fields);
+                return (
+                  <div key={card.key} className={`${styles.secretOptionCard}${isOpen ? ` ${styles.activeOption}` : ''}`}>
+                    <button
+                      type="button"
+                      className={styles.secretOptionHeader}
+                      aria-label={card.label}
+                      onClick={() => setOpenSecretCards((p: any) => ({ ...p, [card.key]: !p[card.key] }))}
+                      aria-expanded={isOpen}
+                    >
+                      <FontAwesomeIcon icon={hasValue ? faLock : faLockOpen} style={{ opacity: hasValue ? 0.9 : 0.4, marginRight: 8 }} />
+                      <span className={styles.secretOptionText}>
+                        <span>{card.label}</span>
+                        <span className={styles.secretOptionMeta}>{hasValue ? 'Configured' : 'Empty'}</span>
+                      </span>
+                      <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 'auto' }} />
+                    </button>
+                    {isOpen && (
+                      <div className={styles.secretOptionBody}>
+                        {card.fields.map((fieldKey: any) => {
+                          const secretFieldKey = String(fieldKey);
+                          const isTextarea = secretFieldKey === 'arweaveJwk';
+                          const isPassword = !isTextarea && secretFieldKey !== 'customRpcUrl';
+                          const secretFieldLabels: Record<string, string> = {
+                            openaiKey: 'OpenAI API key',
+                            anthropicKey: 'Anthropic API key',
+                            openrouterKey: 'OpenRouter API key',
+                            customRpcUrl: 'Custom RPC URL',
+                            customRpcKey: 'Custom RPC key',
+                            arweaveJwk: 'Arweave JWK (JSON)',
+                            faucetPrivateKey: 'Faucet private key',
+                            litAccountApiKey: 'Lit account API key',
+                            litUsageApiKey: 'Lit usage API key',
+                          };
+                          const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
+                          return (
+                            <FormGroup key={secretFieldKey}>
+                              <Label>{label}</Label>
+                              <div className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}>
+                                <Input
+                                  type={isTextarea ? 'textarea' : isPassword ? 'password' : 'text'}
+                                  rows={isTextarea ? 3 : undefined}
+                                  value={secrets[secretFieldKey]}
+                                  onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
+                                  className={styles.secretInput}
+                                />
+                                <button
+                                  type="button"
+                                  className={`${styles.secretRemoveButton}${clearedSecretKeys.has(secretFieldKey) ? ` ${styles.secretRemoveButtonActive}` : ''}`}
+                                  onClick={() => handleClearSecret(secretFieldKey)}
+                                  title={`Clear ${label} on next save`}
+                                  aria-label={`Clear ${label}`}
+                                  data-testid={`ce-admin-secret-remove-${secretFieldKey.replace(/([A-Z])/g, '-$1').toLowerCase()}`}
+                                >
+                                  <FontAwesomeIcon icon={faTimes} />
+                                </button>
+                              </div>
+                              {secretFieldKey === 'litAccountApiKey' ? (
+                                <div className={styles.warningNote}>
+                                  Anyone with this key can create new Lit groups, PKPs, usage keys, and actions inside that bundle-owned Lit account. Use disposable per-bundle accounts instead of a shared deployment account.
+                                </div>
+                              ) : null}
+                            </FormGroup>
+                          );
+                        })}
+                        {card.key === 'arweave' && renderInlineResourceSummary({
+                          key: 'arweave-resource',
+                          label: 'Arweave balance',
+                          resource: arweaveResource,
+                          onRefresh: refreshArweaveResource,
+                          refreshLabel: 'Refresh Arweave balance',
+                        })}
+                        {card.key === 'faucet' && renderInlineResourceSummary({
+                          key: 'faucet-resource',
+                          label: 'Faucet balance',
+                          resource: faucetResource,
+                          onRefresh: refreshFaucetResource,
+                          refreshLabel: 'Refresh faucet balance',
+                        })}
+                        {card.key === 'lit' && renderInlineResourceSummary({
+                          key: 'lit-resource',
+                          label: litResourceLabel,
+                          resource: litResource,
+                          onRefresh: () => refreshLitResource({ includeSignedStatus: true }),
+                          refreshLabel: 'Refresh Lit status',
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {canAdmin && workerSecretsDirty && (
+              <Button
+                color="primary"
+                className={styles.actionButton}
+                onClick={handleSaveWorkerSecrets}
+                disabled={!canAdmin}
+              >
+                Save worker secrets
+              </Button>
+            )}
+            {saveStatus && <div className={styles.statusNote}>{saveStatus}</div>}
+            {chainStatus && <div className={styles.statusNote}>{chainStatus}</div>}
+          </>
+        )}
+      </section>
+
+      {showTestsPanel && (
+      <section className={`${styles.panel} ${styles.testsPanel}`}>
+        <div className={styles.panelHeader}>
+          <div className={styles.panelTitleGroup}>
+            <div className={styles.panelTitleRow}>
+              <div className={styles.panelTitle}>Tests</div>
+              {renderInfoTooltip(
+                'admin-tests-tip',
+                <div className={styles.tooltipTextStack}>
+                  <div>Run quick checks against the selected worker and the session&apos;s gate rules.</div>
+                  <div>Run these as a user who holds the sponsored SBT. Tests use the configured worker URL and auth flow.</div>
                 </div>
               )}
               {(canAdminWorker || canAdminRegistry) && (

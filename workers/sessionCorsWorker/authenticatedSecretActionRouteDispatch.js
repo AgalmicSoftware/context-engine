@@ -1,6 +1,5 @@
 import { isModelAllowed } from './aiRequestNormalization.js';
 import { executeSessionLitChipotleAction } from './chipotleClient.js';
-import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return 'claude-3-5-sonnet-20240620';
@@ -118,7 +117,6 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       scopes,
       scope: 'ai',
       route: 'ai',
-      config,
       env,
       slug,
       address,
@@ -126,7 +124,6 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       headers,
       deps: {
         checkRateLimit: deps?.checkRateLimit,
-        computeScopesForLogin: deps?.computeScopesForLogin,
         json: deps?.json,
       },
     });
@@ -217,7 +214,6 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     scopes,
     scope: 'lit',
     route: 'lit',
-    config,
     env,
     slug,
     address,
@@ -256,7 +252,6 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     const result = await (
       deps?.executeSessionLitChipotleAction || executeSessionLitChipotleAction
     )({
-      env,
       config,
       secrets: secretContext.secrets,
       request: body,

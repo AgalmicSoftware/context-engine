@@ -509,7 +509,31 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     [resolvedSessionIdToken, resolvedSessionSlug],
   );
   const networkChainId = network?.id || null;
-  const docSaveGate = useMemo(() => resolveDocUploadsGate(resolvedSessionConfig), [resolvedSessionConfig]);
+  const docSaveGate = useMemo(
+    () => resolveDocUploadsGate(resolvedSessionConfig),
+    [resolvedSessionConfig],
+  );
+  const sessionHasLitChipotle = useMemo(() => {
+    const litCredentials = (
+      resolvedSessionConfig?.litCredentials &&
+      typeof resolvedSessionConfig.litCredentials === 'object' &&
+      !Array.isArray(resolvedSessionConfig.litCredentials)
+    ) ? resolvedSessionConfig.litCredentials : null;
+    return !!(
+      toStr(resolvedSessionConfig?.corsWorkerUrl).trim() &&
+      toStr(litCredentials?.litApiBase).trim() &&
+      toStr(litCredentials?.litActionCid).trim() &&
+      toStr(litCredentials?.litPkpId).trim()
+    );
+  }, [resolvedSessionConfig]);
+  const docSaveSessionChainError = useMemo(() => (
+    docSaveGate.hasRecipients && !sessionHasLitChipotle
+      ? getUnsupportedLitContractAccessControlError({
+        chainId: docSaveGate.chainId || networkChainId || null,
+      })
+      : ''
+  ), [docSaveGate.chainId, docSaveGate.hasRecipients, networkChainId, sessionHasLitChipotle]);
+  const docSaveSessionAudienceAvailable = docSaveGate.hasRecipients && !docSaveSessionChainError;
   const docSaveSessionLabel = useMemo(() => {
     const sessionName = toStr(resolvedSessionConfig?.sessionName).trim();
     if (sessionName) return sessionName;
@@ -732,20 +756,140 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     return parsed;
   }
 
-  function processAndSetQuestions(
-    aiData: GeneratedAiQuestionPayload,
-    docs: string[],
-    fallbackTitle: string = effectiveSurveyTitle,
-  ) {
-    const { statements, surveyTitle } = buildGeneratedSurveyStatements({
-      aiData,
-      questionTypes,
-      count,
-      fallbackTitle,
-      generateQuestionId: generateSurveyGeneratorQuestionId,
-    });
-    setStatementsToUpload(statements);
-    setSurveyTitle(surveyTitle);
+  async function handleUploadSummaryAndCreateQuestions() {
+    try {
+      if (!loginComplete) {
+        toggleLoginModal(true);
+        return;
+      }
+      if (!summaryMd) {
+        throw new Error('No summary available. Please generate it first.');
+      }
+
+      setError('');
+      setShowCreateSurvey(false);
+      setStatementsToUpload([]);
+      setActiveAction('generate');
+      setLoading(true);
+      setWaitingSeconds(0);
+
+      let txId = '';
+      let url = '';
+
+      if (uploadSummaryToArweave) {
+        const arweaveKey = await getEffectiveArweaveKey({
+          sessionSlug: resolvedSessionSlug || '',
+          sessionConfig: resolvedSessionConfig,
+          context: { account, providerLike: provider, chainId: network?.id },
+        });
+        if (encryptSummary) {
+          const litHooks = getGlobalLitHooks();
+          if (!litHooks || typeof litHooks.saveKey !== 'function') {
+            throw new Error('Lit hooks not initialized; connect a wallet to encrypt the summary.');
+          }
+          const gateChainId = summaryGate?.chainId || network?.id;
+          const litChain = resolveLitChain({
+            chainId: gateChainId,
+            litChain: summaryGate?.litChain || summaryGate?.chain,
+          });
+          const unsupportedGateError = sessionHasLitChipotle
+            ? ''
+            : getUnsupportedLitContractAccessControlError({
+              chainId: gateChainId,
+              litChain,
+            });
+          if (unsupportedGateError) {
+            throw new Error(unsupportedGateError);
+          }
+          const selectedAddresses = (summaryGateSBTs || []).map((sbt: any) => sbt.address).filter(Boolean);
+          const sbtAddresses = selectedAddresses.length ? selectedAddresses : summaryGateAddresses;
+          const gateMode = summaryGateMode || summaryGateModeDefault || 'any';
+          const accessControlConditions = buildSbtAccessControlConditions({
+            sbtAddresses,
+            chainId: gateChainId,
+            litChain,
+            mode: gateMode,
+          });
+          if (!accessControlConditions) {
+            throw new Error('Select at least one SBT to encrypt the summary.');
+          }
+
+          const result = await litStorage.uploadEncryptedArweaveData({
+            data: summaryMd,
+            format: 'md',
+            mime: 'text/markdown',
+            name: 'summary.md',
+            arweaveJwk: arweaveKey?.arweaveJwk || '',
+            providerLike: provider,
+            account,
+            chainId: gateChainId || null,
+            contextLabel: `summary:${resolvedSessionSlug || ''}`,
+            lit: {
+              saveKey: litHooks.saveKey,
+              accessControlConditions,
+              chain: litChain,
+            },
+          });
+          if (abortedRef.current) return;
+          txId = result?.txId || '';
+          url = result?.url || '';
+        } else {
+          const result = await uploadMarkdownSummaryToArweave(summaryMd, {
+            sessionSlug: resolvedSessionSlug || '',
+            sessionConfig: resolvedSessionConfig,
+            arweaveJwk: arweaveKey?.arweaveJwk || '',
+            context: { account, providerLike: provider, chainId: network?.id },
+          });
+          if (abortedRef.current) return;
+          txId = result?.txId || '';
+          url = result?.url || '';
+        }
+      }
+
+      setSummaryArweaveTxId(txId || '');
+      setSummaryDocURL(url || '');
+      setDocumentURLs(url ? [url] : []);
+
+      const aiData = await makeSingleAiCall(summaryMd, {
+        sourceTypeOverride: 'document',
+        multiSpeakerHintOverride: 'likely_multiple_speakers'
+      }, count);
+      if (abortedRef.current) return;
+
+      processAndSetQuestions(aiData, url ? [url] : []);
+      setShowCreateSurvey(true);
+    } catch (err: any) {
+      if (!abortedRef.current) {
+        setError(getErrorMessage(err, 'Failed to upload summary or generate questions.'));
+      }
+    } finally {
+      if (!abortedRef.current) {
+        setLoading(false);
+        setActiveAction('');
+        setWaitingSeconds(0);
+      }
+    }
+  }
+
+  function processAndSetQuestions(aiData: any, docs: any, fallbackTitle: any = effectiveSurveyTitle) {
+    const wantedTypes = Object.keys(questionTypes).filter((t: any) => questionTypes[t]);
+    const qs = aiData.questions
+      .filter((q: any) => wantedTypes.includes(q.questionType))
+      .slice(0, count);
+
+    qs.forEach((q: any) => { q.tags = q.tags || []; });
+
+    const formatted = qs.map((q: any) => ({
+      id: generateQuestionId(q.questionType, q.prompt, q.options || []),
+      type: q.questionType,
+      prompt: q.prompt,
+      options: q.questionType === 'multichoice' ? q.options : undefined,
+      tags: q.tags
+    }));
+
+    const resolvedTitle = toStr(aiData?.surveyTitle).trim() || toStr(fallbackTitle).trim();
+    setStatementsToUpload(formatted);
+    setSurveyTitle(resolvedTitle);
     setDocumentURLs(docs);
 
     if (typeof onQuestionsGenerated === 'function') {

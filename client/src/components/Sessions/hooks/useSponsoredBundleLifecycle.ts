@@ -84,8 +84,10 @@ export type UseSponsoredBundleLifecycleOptions = {
   updateWorkerSecretState?: (nextState: SponsoredBundleWorkerSecretStateUpdate) => void;
 };
 
-const normalizeProvisionedSponsoredContextForState = (value: AnyRecord | null | undefined = {}): AnyRecord => {
-  const source = value && typeof value === 'object' ? value : {};
+const normalizeProvisionedSponsoredContextForState = (
+  value: AnyRecord | null | undefined = {},
+): AnyRecord => {
+  const source = (value && typeof value === 'object') ? value : {};
   return {
     ...buildEmptyProvisionedSponsoredContext(),
     ...source,
@@ -191,96 +193,32 @@ const useSponsoredBundleLifecycle = ({
       input: nextKey,
       submitted: nextKey,
     });
-    setSponsoredBundleStatus({ tone: 'info', message: 'Loading sponsored bundle…', retryable: false });
-  }, [activeSponsoredBundleKeyState.input, bundleId]);
-
-  const buildRestoredSponsoredWorkerSecrets = useCallback(
-    ({
-      currentSecrets = {},
-      baselineSecrets = {},
-      appliedBundle = {},
-    }: {
-      currentSecrets?: WorkerSecretsLike | AnyRecord;
-      baselineSecrets?: WorkerSecretsLike | AnyRecord;
-      appliedBundle?: SponsoredBundleLike | AnyRecord;
-    } = {}) => {
-      const next = normalizeWorkerSecrets(currentSecrets);
-      const baseline = normalizeWorkerSecrets(baselineSecrets);
-      const normalizedApplied = normalizeSparseSponsoredBundlePayload(appliedBundle) as SponsoredBundleLike;
-      SPONSORED_BUNDLE_SUPPORTED_FIELDS.forEach((key) => {
-        if (!Object.prototype.hasOwnProperty.call(next, key)) return;
-        const appliedValue = toStr(normalizedApplied?.[key] || '').trim();
-        if (!appliedValue) return;
-        if (toStr(next[key] || '').trim() !== appliedValue) return;
-        next[key] = toStr(baseline[key] || '').trim();
-      });
-      const appliedRpcUrl = toStr(normalizedApplied?.customRpcUrl || '').trim();
-      if (
-        appliedRpcUrl &&
-        toStr(currentSecrets?.customRpcUrl || '').trim() === appliedRpcUrl &&
-        !toStr(currentSecrets?.customRpcKey || '').trim()
-      ) {
-        next.customRpcKey = toStr(baseline.customRpcKey || '').trim();
-      }
-      return next;
-    },
-    [],
-  );
-
-  const resolveSponsoredBundleRestoreState = useCallback(
-    ({
-      currentSecrets = {},
-      currentDeployForm = {},
-      currentDeployComplete = false,
-      currentDeployWorkerUrl = '',
-      currentCorsWorkerUrl = '',
-      currentProvisionedSponsoredContext = buildEmptyProvisionedSponsoredContext(),
-      currentWorkerSecretsEnabled = true,
-      currentPersistWorkerSecrets = false,
-      baseline = {},
-      appliedBundle = {},
-    }: {
-      currentSecrets?: WorkerSecretsLike | AnyRecord;
-      currentDeployForm?: AnyRecord;
-      currentDeployComplete?: boolean;
-      currentDeployWorkerUrl?: string;
-      currentCorsWorkerUrl?: string;
-      currentProvisionedSponsoredContext?: AnyRecord;
-      currentWorkerSecretsEnabled?: boolean;
-      currentPersistWorkerSecrets?: boolean;
-      baseline?: SponsoredBundleBaselineState | AnyRecord;
-      appliedBundle?: SponsoredBundleLike | AnyRecord;
-    } = {}) => {
-      const resolvedBaseline = baseline && typeof baseline === 'object' ? baseline : {};
-      const normalizedApplied = normalizeSparseSponsoredBundlePayload(appliedBundle) as SponsoredBundleLike;
-      const nextSecrets = buildRestoredSponsoredWorkerSecrets({
-        currentSecrets,
-        baselineSecrets: resolvedBaseline.workerSecrets,
-        appliedBundle: normalizedApplied,
-      });
-      return {
-        workerSecrets: nextSecrets,
-        workerSecretsEnabled:
-          currentWorkerSecretsEnabled === true ? !!resolvedBaseline.workerSecretsEnabled : currentWorkerSecretsEnabled,
-        persistWorkerSecrets:
-          currentPersistWorkerSecrets === false ? !!resolvedBaseline.persistWorkerSecrets : currentPersistWorkerSecrets,
-        deployForm: currentDeployForm,
-        deployComplete: currentDeployComplete === false ? !!resolvedBaseline.deployComplete : currentDeployComplete,
-        deployWorkerUrl: toStr(currentDeployWorkerUrl).trim()
-          ? currentDeployWorkerUrl
-          : toStr(resolvedBaseline.deployWorkerUrl || '').trim(),
-        corsWorkerUrl: toStr(currentCorsWorkerUrl).trim()
-          ? currentCorsWorkerUrl
-          : toStr(resolvedBaseline.corsWorkerUrl || '').trim(),
-        provisionedSponsoredContext:
-          toStr(currentProvisionedSponsoredContext?.sessionSlug || '').trim() ||
-          toStr(currentProvisionedSponsoredContext?.workerUrl || '').trim()
-            ? currentProvisionedSponsoredContext
-            : normalizeProvisionedSponsoredContextForState(resolvedBaseline.provisionedSponsoredContext),
-      };
-    },
-    [buildRestoredSponsoredWorkerSecrets],
-  );
+    return {
+      workerSecrets: nextSecrets,
+      workerSecretsEnabled: currentWorkerSecretsEnabled === true
+        ? !!resolvedBaseline.workerSecretsEnabled
+        : currentWorkerSecretsEnabled,
+      persistWorkerSecrets: currentPersistWorkerSecrets === false
+        ? !!resolvedBaseline.persistWorkerSecrets
+        : currentPersistWorkerSecrets,
+      deployForm: currentDeployForm,
+      deployComplete: currentDeployComplete === false
+        ? !!resolvedBaseline.deployComplete
+        : currentDeployComplete,
+      deployWorkerUrl: toStr(currentDeployWorkerUrl).trim()
+        ? currentDeployWorkerUrl
+        : toStr(resolvedBaseline.deployWorkerUrl || '').trim(),
+      corsWorkerUrl: toStr(currentCorsWorkerUrl).trim()
+        ? currentCorsWorkerUrl
+        : toStr(resolvedBaseline.corsWorkerUrl || '').trim(),
+      provisionedSponsoredContext: (
+        toStr(currentProvisionedSponsoredContext?.sessionSlug || '').trim() ||
+        toStr(currentProvisionedSponsoredContext?.workerUrl || '').trim()
+      )
+        ? currentProvisionedSponsoredContext
+        : normalizeProvisionedSponsoredContextForState(resolvedBaseline.provisionedSponsoredContext),
+    };
+  }, [buildRestoredSponsoredWorkerSecrets]);
 
   const clearSponsoredBundleTracking = useCallback(() => {
     sponsoredBundleApplyRef.current = '';
@@ -411,38 +349,52 @@ const useSponsoredBundleLifecycle = ({
         persistWorkerSecrets: false,
         workerSecretsEnabled: true,
       });
-      applyWorkerSecretsUpdate(mergeSponsoredBundleWorkerSecrets(baselineSource.workerSecrets, normalizedBundle));
-      updateDeploymentState({
-        deployForm: mergeSponsoredBundleDeployForm(baselineSource.deployForm, normalizedBundle),
-        deployComplete: false,
-        deployWorkerUrl: '',
-        workerUrlAutoFilled: false,
-        provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(
-          buildEmptyProvisionedSponsoredContext(),
-        ),
-      });
-      syncSponsoredBootstrapFundingContext(normalizedBundle);
-      updateDraftCorsWorkerUrl('');
-      sponsoredBundleApplyRef.current = applyKey;
-      sponsoredBundleTerminalTxIdRef.current = terminalTxId;
-    },
-    [
-      applyWorkerSecretsUpdate,
-      deployCompleteRef,
-      deployFormRef,
-      deployWorkerUrlRef,
-      draftRef,
-      getCurrentWorkerSecrets,
-      persistWorkerSecretsRef,
-      provisionedSponsoredContextRef,
-      resolveSponsoredBundleRestoreState,
-      syncSponsoredBootstrapFundingContext,
-      updateDeploymentState,
-      updateDraftCorsWorkerUrl,
-      updateWorkerSecretState,
-      workerSecretsEnabledRef,
-    ],
-  );
+    }
+    sponsoredBundleBaselineRef.current = {
+      workerSecrets: baselineSource.workerSecrets,
+      deployApiToken: toStr(baselineSource.deployForm?.apiToken || '').trim(),
+      deployComplete: !!baselineSource.deployComplete,
+      deployWorkerUrl: toStr(baselineSource.deployWorkerUrl || '').trim(),
+      corsWorkerUrl: toStr(baselineSource.corsWorkerUrl || '').trim(),
+      provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(baselineSource.provisionedSponsoredContext),
+      workerSecretsEnabled: baselineSource.workerSecretsEnabled,
+      persistWorkerSecrets: baselineSource.persistWorkerSecrets,
+    };
+    sponsoredBundleAppliedBundleRef.current = normalizedBundle;
+    updateWorkerSecretState({
+      persistWorkerSecrets: false,
+      workerSecretsEnabled: true,
+    });
+    applyWorkerSecretsUpdate(
+      mergeSponsoredBundleWorkerSecrets(baselineSource.workerSecrets, normalizedBundle)
+    );
+    updateDeploymentState({
+      deployForm: mergeSponsoredBundleDeployForm(baselineSource.deployForm, normalizedBundle),
+      deployComplete: false,
+      deployWorkerUrl: '',
+      workerUrlAutoFilled: false,
+      provisionedSponsoredContext: normalizeProvisionedSponsoredContextForState(buildEmptyProvisionedSponsoredContext()),
+    });
+    syncSponsoredBootstrapFundingContext(normalizedBundle);
+    updateDraftCorsWorkerUrl('');
+    sponsoredBundleApplyRef.current = applyKey;
+    sponsoredBundleTerminalTxIdRef.current = terminalTxId;
+  }, [
+    applyWorkerSecretsUpdate,
+    deployCompleteRef,
+    deployFormRef,
+    deployWorkerUrlRef,
+    draftRef,
+    getCurrentWorkerSecrets,
+    persistWorkerSecretsRef,
+    provisionedSponsoredContextRef,
+    resolveSponsoredBundleRestoreState,
+    syncSponsoredBootstrapFundingContext,
+    updateDeploymentState,
+    updateDraftCorsWorkerUrl,
+    updateWorkerSecretState,
+    workerSecretsEnabledRef,
+  ]);
 
   useEffect(() => {
     if (!sponsoredBundleAppliedBundleRef.current) return;

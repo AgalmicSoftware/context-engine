@@ -19,7 +19,7 @@ describe('WorkerResourceInputs', () => {
         effectiveDefaultWorkerRpcUrl="https://rpc.example"
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={onUpdateSecret}
-      />,
+      />
     );
 
     const input = screen.getByTestId('secret-customRpcUrl');
@@ -29,13 +29,13 @@ describe('WorkerResourceInputs', () => {
     expect(onUpdateSecret).toHaveBeenCalledWith('customRpcUrl', 'https://rpc.next');
   });
 
-  it('renders only the Chipotle Lit API key field with a stable test id', () => {
+  it('renders Chipotle Lit account and runtime fields with stable test ids', () => {
     const onUpdateSecret = jest.fn();
 
     render(
       <WorkerResourceInputs
         resourceKey="lit"
-        fields={[{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }]}
+        fields={[{ key: 'litUsageApiKey', label: 'Usage API key', type: 'password' }]}
         workerSecrets={{
           litApiBase: 'https://api.chipotle.litprotocol.com',
           litGroupId: 'group_123',
@@ -50,26 +50,27 @@ describe('WorkerResourceInputs', () => {
         effectiveDefaultWorkerRpcUrl=""
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={onUpdateSecret}
-      />,
+      />
     );
 
+    expect(screen.getByTestId('secret-litApiBase')).toHaveValue('https://api.chipotle.litprotocol.com');
+    expect(screen.getByTestId('secret-litGroupId')).toHaveValue('group_123');
+    expect(screen.getByTestId('secret-litPkpId')).toHaveValue('pkp_123');
+    expect(screen.getByTestId('secret-litActionCid')).toHaveValue('bafy123');
     expect(screen.getByTestId('secret-litAccountApiKey')).toHaveValue('account-secret');
-    expect(screen.queryByTestId('secret-litApiBase')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litGroupId')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litPkpId')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litActionCid')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litUsageApiKey')).not.toBeInTheDocument();
-    expect(screen.queryByText(/derives the Lit group, PKP, usage key, and CE action/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('secret-litUsageApiKey')).toBeInTheDocument();
+    expect(screen.getByText(/let the worker bootstrap a fresh group/i)).toBeInTheDocument();
+    expect(screen.getByText(/`Lit account API key` is authority/i)).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId('secret-litAccountApiKey'), { target: { value: 'lit-next' } });
-    expect(onUpdateSecret).toHaveBeenCalledWith('litAccountApiKey', 'lit-next');
+    fireEvent.change(screen.getByTestId('secret-litUsageApiKey'), { target: { value: 'lit-next' } });
+    expect(onUpdateSecret).toHaveBeenCalledWith('litUsageApiKey', 'lit-next');
   });
 
-  it('hides scoped-runtime and legacy payer wallet controls from the simplified Lit card', () => {
+  it('shows only Chipotle Lit fields without legacy payer wallet controls', () => {
     render(
       <WorkerResourceInputs
         resourceKey="lit"
-        fields={[{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }]}
+        fields={[{ key: 'litUsageApiKey', label: 'Usage API key', type: 'password' }]}
         workerSecrets={{ litUsageApiKey: 'lit-secret', litAccountApiKey: 'account-secret' }}
         workerSecretsEnabled
         isNormalMode={false}
@@ -77,11 +78,11 @@ describe('WorkerResourceInputs', () => {
         effectiveDefaultWorkerRpcUrl=""
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={() => {}}
-      />,
+      />
     );
 
     expect(screen.getByTestId('secret-litAccountApiKey')).toBeInTheDocument();
-    expect(screen.queryByTestId('secret-litUsageApiKey')).not.toBeInTheDocument();
+    expect(screen.getByTestId('secret-litUsageApiKey')).toBeInTheDocument();
     expect(screen.queryByDisplayValue(/0x/i)).not.toBeInTheDocument();
   });
 });

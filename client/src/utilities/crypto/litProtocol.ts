@@ -9,171 +9,18 @@
 import { Buffer } from 'buffer/';
 import { ethers } from 'ethers';
 import { cryptoUtils } from './cryptography.js';
-import { DEFAULT_CHIPOTLE_ACTION_CODE } from './litChipotleCatalog.js';
 import {
-  buildLitChipotlePolicy,
-  fingerprintLitChipotlePolicy,
-  normalizeChipotleCekHex,
-  normalizeLitChipotleMetadataVersion,
-} from './litChipotlePolicy.js';
-import { arweaveClient } from '../arweave/arweaveClient.js';
+  DEFAULT_CHIPOTLE_ACTION_CODE,
+} from './litChipotleCatalog.js';
+import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { createLogger } from '../logging';
 import { perfDebugLitGetKey } from '../web3/rpcDebugStats.js';
 import { toStr } from '../shared/primitives.js';
-import { fetchWorkerWithAuth, normalizeWorkerUrl } from '../worker/workerAuth.js';
-
-type UnknownRecord = Record<string, unknown>;
-type ChainInput = unknown;
-type ByteInput = Uint8Array | ArrayBuffer | ArrayBufferView | ArrayLike<number>;
-type LitProviderLike = unknown;
-type LitAccessControlCondition = UnknownRecord & {
-  operator?: 'and' | 'or' | string;
-  contractAddress?: string;
-  standardContractType?: string;
-  chain?: string;
-  method?: string;
-  parameters?: string[];
-  returnValueTest?: {
-    comparator?: string;
-    value?: string;
-  };
-};
-type LitHookOptions = UnknownRecord & {
-  accessControlConditions?: unknown;
-  chain?: unknown;
-  connectTimeout?: unknown;
-  litNetwork?: unknown;
-  resourceId?: unknown;
-  providerLike?: LitProviderLike;
-  resourceAbilityRequests?: unknown;
-  userMaxPrice?: unknown;
-  account?: unknown;
-  requesterAddress?: unknown;
-  ciphertext?: unknown;
-  dataToEncryptHash?: unknown;
-  encryptedSymmetricKey?: unknown;
-  toDecrypt?: unknown;
-  chipotle?: UnknownRecord | null;
-  chainId?: unknown;
-  rpcUrl?: unknown;
-};
-type LitHooksApi = UnknownRecord & {
-  saveKey?: ((...args: unknown[]) => Promise<unknown> | unknown) | null;
-  getKey?: ((...args: unknown[]) => Promise<unknown> | unknown) | null;
-  clearCache?: (() => void) | null;
-  accessControlConditions?: LitAccessControlCondition[] | null;
-  litChain?: unknown;
-  litNetwork?: unknown;
-  chain?: unknown;
-  providerLike?: LitProviderLike;
-  connectTimeout?: unknown;
-  resourceAbilityRequests?: unknown;
-  userMaxPrice?: unknown;
-  __e2eMock?: boolean;
-};
-type LitDevToolsApi = UnknownRecord & {
-  encryptForSbt: (options?: UnknownRecord) => Promise<string>;
-  decryptEnvelope: (envelopeJson: unknown) => Promise<unknown>;
-};
-type LitUploadPayload = UnknownRecord & {
-  v?: 1;
-  kind?: 'text' | 'file' | string;
-  name?: string;
-  format?: string;
-  mime?: string;
-  encoding?: 'utf-8' | 'base64' | string;
-  data?: string;
-};
-type ArweaveJwkLike = string | UnknownRecord;
-type LitUploadOptions = UnknownRecord & {
-  data?: unknown;
-  format?: unknown;
-  name?: unknown;
-  mime?: unknown;
-  arweaveJwk?: unknown;
-  tags?: unknown;
-  arweave?: UnknownRecord;
-  providerLike?: LitProviderLike;
-  account?: unknown;
-  chainId?: unknown;
-  contextLabel?: unknown;
-  lit?: LitHooksApi;
-};
-type LitDownloadOptions = UnknownRecord & {
-  url?: unknown;
-  txId?: unknown;
-  providerLike?: LitProviderLike;
-  account?: unknown;
-  chainId?: unknown;
-  lit?: LitHooksApi;
-  arweave?: UnknownRecord;
-};
-type SbtGateInfo = {
-  sbtAddresses: string[];
-  gateMode: 'any' | 'all';
-  litChain: string;
-  chainId: number | null;
-};
-type ChipotleGate = {
-  sbtAddresses: string[];
-  gateChainId: number | null;
-  gateMode: 'any' | 'all';
-  litChain: string;
-};
-type LitChipotlePolicy = UnknownRecord & {
-  chainId: number;
-  gateMode: 'any' | 'all' | string;
-  sbtAddresses: string[];
-  litActionCid: string;
-  litPkpId: string;
-};
-type LitGetKeyCacheEntry = {
-  expiresAt: number;
-  value?: unknown;
-  errMsg?: string;
-};
-type BufferBigUIntWriter = {
-  writeBigUInt64BE?(value: string | number | bigint, offset?: number): unknown;
-  writeBigUint64BE?(value: string | number | bigint, offset?: number): unknown;
-};
-
-type BufferCtorLike = {
-  prototype?: BufferBigUIntWriter;
-  alloc?: (size: number) => Uint8Array & BufferBigUIntWriter;
-};
-type RuntimeBufferScope = {
-  Buffer?: BufferCtorLike;
-};
-
-declare global {
-  interface Window {
-    __litHooks?: LitHooksApi | null;
-    litHooks?: LitHooksApi | null;
-    __litTools?: LitDevToolsApi | null;
-  }
-
-  var CE_E2E_LIT_MOCK: boolean | undefined;
-}
-
-const isRecord = (value: unknown): value is UnknownRecord =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
-const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
-const toErrorMessage = (err: unknown, fallback = ''): string => {
-  if (isRecord(err) && typeof err.message === 'string') return err.message;
-  const message = String(err || '').trim();
-  return message || fallback;
-};
-const toBytes = (value: unknown): Uint8Array => {
-  if (value instanceof Uint8Array) return value;
-  if (value instanceof ArrayBuffer) return new Uint8Array(value);
-  if (ArrayBuffer.isView(value)) {
-    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-  }
-  if (value && typeof value === 'object' && typeof (value as ArrayLike<number>).length === 'number') {
-    return new Uint8Array(value as ArrayLike<number>);
-  }
-  return new Uint8Array([]);
-};
+import {
+  fetchWorkerWithAuth,
+  normalizeWorkerUrl,
+} from '../worker/workerAuth.js';
+import { getDefaultHttpRpc } from '../../variables/chains.js';
 
 /**
  * @typedef {import('ethers').providers.Provider} EthersProvider
@@ -323,19 +170,14 @@ const toBytes = (value: unknown): Uint8Array => {
 
 const log = createLogger('sbt');
 
-const buildChipotlePolicy = buildLitChipotlePolicy as (input?: UnknownRecord) => LitChipotlePolicy;
-const fingerprintChipotlePolicy = fingerprintLitChipotlePolicy as (policy?: UnknownRecord) => string;
-
 const DEFAULT_LIT_NETWORK = 'chipotle';
 const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_LIT_CONNECT_TIMEOUT = 45000;
 const DEFAULT_LIT_SESSION_TTL_MS = 1000 * 60 * 10;
 
-const asRuntimeBufferScope = (scope: object): RuntimeBufferScope => scope;
-
-const getGlobalScope = (): RuntimeBufferScope | null => {
-  if (typeof globalThis !== 'undefined') return asRuntimeBufferScope(globalThis);
-  if (typeof window !== 'undefined') return asRuntimeBufferScope(window);
+const getGlobalScope = () => {
+  if (typeof globalThis !== 'undefined') return globalThis;
+  if (typeof window !== 'undefined') return window;
   return null;
 };
 
@@ -462,7 +304,7 @@ const isE2eLitMockEnabled = () => {
   return false;
 };
 
-const LIT_CHAIN_BY_ID: Readonly<Record<number, string>> = Object.freeze({
+const LIT_CHAIN_BY_ID = Object.freeze({
   1: 'ethereum',
   10: 'optimism',
   56: 'bsc',
@@ -478,16 +320,18 @@ const LIT_CHAIN_BY_ID: Readonly<Record<number, string>> = Object.freeze({
 
 const LIT_WALLET_CHAIN_FALLBACKS: Readonly<Record<string, string>> = Object.freeze({});
 
-const CHAIN_ID_BY_LIT_CHAIN: Readonly<Record<string, number>> = Object.freeze(
-  Object.entries(LIT_CHAIN_BY_ID).reduce((acc: Record<string, number>, [id, chain]) => {
+const CHAIN_ID_BY_LIT_CHAIN = Object.freeze(
+  Object.entries(LIT_CHAIN_BY_ID).reduce((acc, [id, chain]) => {
     acc[chain] = Number(id);
     return acc;
-  }, {}),
+  }, {})
 );
 
-const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS: Readonly<Record<string, string>> = Object.freeze({});
+const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS = Object.freeze({
+  optimismSepolia: 'Lit does not currently support OP Sepolia for SBT-gated encryption. Choose "only me" private encryption or move the gate to a supported chain such as Base Sepolia.',
+});
 
-const LIT_NETWORK_ALIASES: Readonly<Record<string, string>> = Object.freeze({
+const LIT_NETWORK_ALIASES = Object.freeze({
   chipotle: 'chipotle',
   'chipotle-v3': 'chipotle',
   'naga-dev': 'chipotle',
@@ -529,9 +373,9 @@ const resolveLitCipherPayload = (value: unknown): UnknownRecord | null => {
   return null;
 };
 
-const normalizeSbtAddressList = (values: unknown = []) => {
-  const out: string[] = [];
-  const seen = new Set<string>();
+const normalizeSbtAddressList = (values = []) => {
+  const out = [];
+  const seen = new Set();
   (Array.isArray(values) ? values : []).forEach((raw) => {
     const value = toStr(raw).trim();
     if (!value || !ethers.utils.isAddress(value)) return;
@@ -544,11 +388,11 @@ const normalizeSbtAddressList = (values: unknown = []) => {
   return out;
 };
 
-const extractSbtGateFromAccessControlConditions = (conditions: unknown): SbtGateInfo | null => {
+const extractSbtGateFromAccessControlConditions = (conditions) => {
   const entries = Array.isArray(conditions) ? conditions : [];
-  const sbtAddresses: string[] = [];
-  const seen = new Set<string>();
-  let gateMode: 'any' | 'all' = 'any';
+  const sbtAddresses = [];
+  const seen = new Set();
+  let gateMode = 'any';
   let litChain = '';
 
   entries.forEach((entry) => {
@@ -585,13 +429,16 @@ const extractSbtGateFromAccessControlConditions = (conditions: unknown): SbtGate
   };
 };
 
-const encodeChipotleKeyMessage = (raw: unknown) => {
-  const bytes = toBytes(raw);
+const encodeChipotleKeyMessage = (raw) => {
+  const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw || []);
   return ethers.utils.hexlify(bytes);
 };
 
-const decodeChipotleKeyMessage = (value: unknown) => {
-  const normalized = normalizeChipotleCekHex(value);
+const decodeChipotleKeyMessage = (value) => {
+  const normalized = toStr(value).trim();
+  if (!/^0x[0-9a-f]+$/i.test(normalized)) {
+    throw new Error('Lit Chipotle plaintext did not contain a hex-encoded CEK.');
+  }
   const bytes = ethers.utils.arrayify(normalized);
   if (bytes.length !== 32) {
     throw new Error(`Lit Chipotle CEK had invalid length (${bytes.length}).`);
@@ -599,14 +446,14 @@ const decodeChipotleKeyMessage = (value: unknown) => {
   return bytes;
 };
 
-const parseChipotleActionResponse = (payload: unknown): UnknownRecord => {
-  if (isRecord(payload) && isRecord(payload.response)) {
-    if (isRecord(payload.response.response)) {
+const parseChipotleActionResponse = (payload) => {
+  if (payload && typeof payload === 'object' && payload.response && typeof payload.response === 'object') {
+    if (payload.response.response && typeof payload.response.response === 'object') {
       return payload.response.response;
     }
     return payload.response;
   }
-  return isRecord(payload) ? payload : {};
+  return payload && typeof payload === 'object' ? payload : {};
 };
 
 const buildChipotleDataHashSentinel = ({
@@ -614,62 +461,65 @@ const buildChipotleDataHashSentinel = ({
   chainId = null,
   gateMode = 'any',
   sbtAddresses = [],
-  policyFingerprint = '',
-}: {
-  litActionCid?: unknown;
-  chainId?: unknown;
-  gateMode?: unknown;
-  sbtAddresses?: unknown;
-  policyFingerprint?: unknown;
-} = {}) =>
+} = {}) => (
   [
     'chipotle-v3',
     toStr(litActionCid).trim() || 'action',
     Number(chainId || 0) || 0,
     toStr(gateMode).trim() || 'any',
     normalizeSbtAddressList(sbtAddresses).join(',').toLowerCase(),
-    toStr(policyFingerprint).trim().toLowerCase(),
-  ].join(':');
+  ].join(':')
+);
 
 const buildChipotleGateFromOptions = ({
   accessControlConditions,
   chipotle = {},
   chainId,
-}: {
-  accessControlConditions?: unknown;
-  chipotle?: unknown;
-  chainId?: unknown;
-} = {}): ChipotleGate => {
-  const explicitGate = asRecord(chipotle);
-  const explicitPolicy = isRecord(explicitGate.policy) ? explicitGate.policy : {};
-  const derivedGate =
-    extractSbtGateFromAccessControlConditions(accessControlConditions) || ({} as Partial<SbtGateInfo>);
+  rpcUrl = '',
+} = {}) => {
+  const explicitGate = chipotle && typeof chipotle === 'object' ? chipotle : {};
+  const derivedGate = extractSbtGateFromAccessControlConditions(accessControlConditions) || {};
   const sbtAddresses = normalizeSbtAddressList(
-    explicitGate.sbtAddresses || explicitPolicy.sbtAddresses || derivedGate.sbtAddresses || [],
+    explicitGate.sbtAddresses || derivedGate.sbtAddresses || []
   );
   if (!sbtAddresses.length) {
     throw new Error('Lit Chipotle requires at least one SBT gate address.');
   }
-  const gateChainId =
-    Number(explicitGate.chainId || explicitPolicy.chainId || derivedGate.chainId || chainId || 0) || null;
-  const gateMode =
-    toStr(explicitGate.gateMode || explicitPolicy.gateMode || derivedGate.gateMode || 'any')
-      .trim()
-      .toLowerCase() === 'all'
-      ? 'all'
-      : 'any';
+  const gateChainId = Number(
+    explicitGate.chainId ||
+    derivedGate.chainId ||
+    chainId ||
+    0
+  ) || null;
+  const gateMode = toStr(explicitGate.gateMode || derivedGate.gateMode || 'any').trim().toLowerCase() === 'all'
+    ? 'all'
+    : 'any';
+  const resolvedRpcUrl = toStr(
+    rpcUrl ||
+    explicitGate.rpcUrl ||
+    (gateChainId ? getDefaultHttpRpc(gateChainId) : '')
+  ).trim();
+  if (!resolvedRpcUrl) {
+    throw new Error('Lit Chipotle requires an RPC URL for the target SBT gate chain.');
+  }
   return {
     sbtAddresses,
     gateChainId,
     gateMode,
     litChain: toStr(explicitGate.litChain || derivedGate.litChain).trim(),
+    rpcUrl: resolvedRpcUrl,
   };
 };
 
-const isChipotleRuntimeConfigured = (chipotle: UnknownRecord = {}) =>
-  !!toStr(chipotle?.workerUrl).trim() && !!toStr(chipotle?.sessionSlug).trim();
+const isChipotleRuntimeConfigured = (chipotle = {}) => (
+  !!toStr(chipotle?.workerUrl).trim() &&
+  !!toStr(chipotle?.sessionSlug).trim() &&
+  !!toStr(chipotle?.litCredentials?.litApiBase).trim() &&
+  !!toStr(chipotle?.litCredentials?.litPkpId).trim() &&
+  !!toStr(chipotle?.litCredentials?.litActionCid).trim()
+);
 
-const resolveLitErrorMessage = (err: unknown) => {
+const resolveLitErrorMessage = (err) => {
   if (!err) return 'Unknown Lit error';
   const errRecord = asRecord(err);
   const direct = toStr(errRecord.message || '').trim();
@@ -1226,7 +1076,7 @@ export const buildHatAccessControlConditions = ({
   ];
 };
 
-const normalizeUserMaxPrice = (value: unknown) => {
+const normalizeUserMaxPrice = (value) => {
   if (typeof value === 'bigint') return value;
   const raw = toStr(value).trim();
   if (!raw) return undefined;
@@ -1241,11 +1091,11 @@ const normalizeUserMaxPrice = (value: unknown) => {
   }
 };
 
-const sanitizePublicLitHooks = (hooks: unknown = {}): LitHooksApi => {
-  return hooks as LitHooksApi;
+const sanitizePublicLitHooks = (hooks = {}) => {
+  return hooks && typeof hooks === 'object' ? hooks : hooks;
 };
 
-let e2eLitMockMasterKeyPromise: Promise<CryptoKey> | null = null;
+let e2eLitMockMasterKeyPromise = null;
 const getE2eLitMockMasterKey = async () => {
   if (e2eLitMockMasterKeyPromise) return e2eLitMockMasterKeyPromise;
   e2eLitMockMasterKeyPromise = (async () => {
@@ -1473,24 +1323,22 @@ const createLitChipotleHooks = ({
   accessControlConditions,
   connectTimeout,
   chipotle,
-}: LitHookOptions = {}): LitHooksApi | null => {
-  const chipotleConfig = asRecord(chipotle);
-  const normalizedWorkerUrl = normalizeWorkerUrl(chipotleConfig.workerUrl);
-  const sessionSlug = toStr(chipotleConfig.sessionSlug).trim();
-  const sessionConfig =
-    chipotleConfig.sessionConfig && typeof chipotleConfig.sessionConfig === 'object'
-      ? chipotleConfig.sessionConfig
-      : null;
-  const litCredentials = asRecord(chipotleConfig.litCredentials);
+} = {}) => {
+  const normalizedWorkerUrl = normalizeWorkerUrl(chipotle?.workerUrl);
+  const sessionSlug = toStr(chipotle?.sessionSlug).trim();
+  const sessionConfig = chipotle?.sessionConfig && typeof chipotle.sessionConfig === 'object'
+    ? chipotle.sessionConfig
+    : null;
+  const litCredentials = chipotle?.litCredentials && typeof chipotle.litCredentials === 'object'
+    ? chipotle.litCredentials
+    : {};
   const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
 
-  if (
-    !isChipotleRuntimeConfigured({
-      workerUrl: normalizedWorkerUrl,
-      sessionSlug,
-      litCredentials,
-    })
-  ) {
+  if (!isChipotleRuntimeConfigured({
+    workerUrl: normalizedWorkerUrl,
+    sessionSlug,
+    litCredentials,
+  })) {
     return null;
   }
 
@@ -1499,18 +1347,9 @@ const createLitChipotleHooks = ({
     gate,
     message,
     ciphertext,
-    chipotleMetadata,
-  }: {
-    op?: 'encrypt' | 'decrypt' | string;
-    gate?: ChipotleGate;
-    message?: unknown;
-    ciphertext?: unknown;
-    chipotleMetadata?: unknown;
   } = {}) => {
-    if (!gate) throw new Error('Lit Chipotle gate is required.');
-    const chipotleActionUrl = `${normalizedWorkerUrl.replace(/\/+$/, '')}/lit/chipotle-action`;
     const response = await fetchWorkerWithAuth(
-      chipotleActionUrl,
+      normalizedWorkerUrl,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1521,7 +1360,7 @@ const createLitChipotleHooks = ({
           sbtAddresses: gate.sbtAddresses,
           gateMode: gate.gateMode,
           chainId: gate.gateChainId,
-          ...(chipotleMetadata ? { chipotle: chipotleMetadata } : {}),
+          rpcUrl: gate.rpcUrl,
           ...(message ? { message } : {}),
           ...(ciphertext ? { ciphertext } : {}),
         }),
@@ -1537,24 +1376,21 @@ const createLitChipotleHooks = ({
         workerUrl: normalizedWorkerUrl,
       },
     );
-    const payload = asRecord(await response.json().catch(() => ({})));
+    const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(toStr(payload.error).trim() || `Lit Chipotle request failed (${response.status}).`);
+      throw new Error(payload?.error || `Lit Chipotle request failed (${response.status}).`);
     }
-    const actionResponse = parseChipotleActionResponse(payload);
-    if (actionResponse?.ok === false) {
-      throw new Error(toStr(actionResponse.reason).trim() || 'Lit Chipotle gate check failed.');
-    }
-    return actionResponse;
+    return parseChipotleActionResponse(payload);
   };
 
-  const saveKey = async (symmetricKey: unknown, opts: LitHookOptions = {}) => {
+  const saveKey = async (symmetricKey, opts = {}) => {
     const gate = buildChipotleGateFromOptions({
       accessControlConditions: Array.isArray(opts.accessControlConditions)
         ? opts.accessControlConditions
         : baseConditions,
       chipotle: opts.chipotle || chipotle,
       chainId: opts.chainId || chainId || null,
+      rpcUrl: opts.rpcUrl,
     });
     const wrapped = await executeChipotleAction({
       op: 'encrypt',
@@ -1565,49 +1401,34 @@ const createLitChipotleHooks = ({
     if (!wrappedCiphertext) {
       throw new Error('Lit Chipotle encrypt did not return ciphertext.');
     }
-    const responsePolicy = wrapped?.policy
-      ? buildChipotlePolicy(asRecord(wrapped.policy))
-      : buildChipotlePolicy({
-          chainId: gate.gateChainId,
-          gateMode: gate.gateMode,
-          sbtAddresses: gate.sbtAddresses,
-          litActionCid: litCredentials.litActionCid,
-          litPkpId: litCredentials.litPkpId,
-        });
-    const policyFingerprint = toStr(wrapped?.policyFingerprint || fingerprintChipotlePolicy(responsePolicy)).trim();
-    if (policyFingerprint.toLowerCase() !== fingerprintChipotlePolicy(responsePolicy).toLowerCase()) {
-      throw new Error('Lit Chipotle encrypt returned mismatched policy metadata.');
-    }
     return {
       ciphertext: wrappedCiphertext,
       dataToEncryptHash: buildChipotleDataHashSentinel({
-        litActionCid: responsePolicy.litActionCid,
-        chainId: responsePolicy.chainId,
-        gateMode: responsePolicy.gateMode,
-        sbtAddresses: responsePolicy.sbtAddresses,
-        policyFingerprint,
+        litActionCid: litCredentials.litActionCid,
+        chainId: gate.gateChainId,
+        gateMode: gate.gateMode,
+        sbtAddresses: gate.sbtAddresses,
       }),
       chipotle: {
-        version: 2,
-        litActionCid: responsePolicy.litActionCid,
-        litPkpId: responsePolicy.litPkpId,
-        sbtAddresses: responsePolicy.sbtAddresses,
-        gateMode: responsePolicy.gateMode,
-        chainId: responsePolicy.chainId,
-        policyFingerprint,
-        policy: responsePolicy,
+        version: 1,
+        litActionCid: toStr(litCredentials.litActionCid).trim(),
+        litPkpId: toStr(litCredentials.litPkpId).trim(),
+        sbtAddresses: gate.sbtAddresses,
+        gateMode: gate.gateMode,
+        chainId: gate.gateChainId,
+        rpcUrl: gate.rpcUrl,
       },
     };
   };
 
-  const getKeyUncached = async (opts: LitHookOptions = {}) => {
-    const ciphertext = toStr(opts.ciphertext || opts.encryptedSymmetricKey || opts.toDecrypt).trim();
+  const getKeyUncached = async (opts = {}) => {
+    const ciphertext = toStr(
+      opts.ciphertext ||
+      opts.encryptedSymmetricKey ||
+      opts.toDecrypt
+    ).trim();
     if (!ciphertext) {
       throw new Error('Lit Chipotle decrypt requires ciphertext.');
-    }
-    const metadataVersion = normalizeLitChipotleMetadataVersion(opts.chipotle || {});
-    if (opts.chipotle && metadataVersion !== 2) {
-      throw new Error('Lit Chipotle legacy wrapped keys are not supported.');
     }
     const gate = buildChipotleGateFromOptions({
       accessControlConditions: Array.isArray(opts.accessControlConditions)
@@ -1615,12 +1436,12 @@ const createLitChipotleHooks = ({
         : baseConditions,
       chipotle: opts.chipotle || chipotle,
       chainId: opts.chainId || chainId || null,
+      rpcUrl: opts.rpcUrl,
     });
     const unwrapped = await executeChipotleAction({
       op: 'decrypt',
       gate,
       ciphertext,
-      chipotleMetadata: opts.chipotle || null,
     });
     const plaintext = toStr(unwrapped?.plaintext).trim();
     if (!plaintext) {
@@ -1674,7 +1495,7 @@ const createLitChipotleHooks = ({
  *   resourceAbilityRequests?: unknown,
  *   connectTimeout?: number | string | null,
  *   litConnectTimeout?: number | string | null,
- *   chipotle?: Record<string, unknown>
+ *   chipotle?: Record<string, any>
  * }} [options={}]
  * @returns {LitHooksApi}
  */
@@ -1690,7 +1511,7 @@ export const createLitHooks = ({
   connectTimeout,
   litConnectTimeout,
   chipotle,
-}: LitHookOptions = {}): LitHooksApi | null => {
+} = {}) => {
   ensureLitBufferCompatibility();
   const resolvedChain = resolveLitChain({ chainId, litChain });
   const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);

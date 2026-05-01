@@ -385,13 +385,14 @@ describe('SponsorPage', () => {
     }
   });
 
-  it('uploads an encrypted sponsored bundle and renders an id-only URL with a separate memory-only key', async () => {
-    getFetchMock().mockImplementation((url: any) =>
-      Promise.resolve(
-        String(url).endsWith('/auth/nonce')
-          ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-          : String(url).endsWith('/admin/issue-sponsored-grants')
-            ? {
+  it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
+    getFetchMock().mockImplementation((url: any) => Promise.resolve(
+      String(url).endsWith('/auth/nonce')
+        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+        : String(url).endsWith('/admin/issue-sponsored-grants')
+          ? {
+              ok: true,
+              json: async () => ({
                 ok: true,
                 json: async () => ({
                   ok: true,
@@ -462,18 +463,31 @@ describe('SponsorPage', () => {
     expect(JSON.stringify(envelope)).not.toContain('https://rpc.example.test');
     expect(JSON.stringify(envelope)).not.toContain('cf-live-token');
     expect(JSON.stringify(envelope)).not.toContain('0xsponsoredfaucet');
-    expect(mockEncryptWithPassword).toHaveBeenCalledWith(
-      expect.objectContaining({
-        openaiKey: 'sk-live-openai',
-        arweaveJwk: '{"kty":"RSA"}',
-        faucetPrivateKey: '0xsponsoredfaucet',
-        customRpcUrl: 'https://rpc.example.test',
-        litApiBase: 'https://api.chipotle.litprotocol.com',
-        litGroupId: 'group_123',
-        litPkpId: 'pkp_123',
-        litActionCid: 'bafy123',
-        litAccountApiKey: 'lit-account-secret',
-        litUsageApiKey: 'lit-secret',
+    expect(mockEncryptWithPassword).toHaveBeenCalledWith(expect.objectContaining({
+      openaiKey: 'sk-live-openai',
+      arweaveJwk: '{"kty":"RSA"}',
+      faucetPrivateKey: '0xsponsoredfaucet',
+      customRpcUrl: 'https://rpc.example.test',
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+      litAccountApiKey: 'lit-account-secret',
+      litUsageApiKey: 'lit-secret',
+      bootstrapWorkerUrl: 'https://worker.example.test',
+      deployGrantToken: 'deploy-grant-token',
+      faucetGrantToken: 'faucet-grant-token',
+      meta: expect.objectContaining({
+        sourceSessionSlug: 'edge',
+        sourceWorkerUrl: 'https://worker.example.test',
+      }),
+    }), expect.any(String));
+    expect(mockEncryptWithPassword.mock.calls[0][0]).not.toHaveProperty('cloudflareApiToken');
+    const grantCall = getFetchMock().mock.calls.find(([url]: any[]) => String(url).endsWith('/admin/issue-sponsored-grants'));
+    expect(grantCall).toBeTruthy();
+    expect(JSON.parse(grantCall[1].body)).toEqual(expect.objectContaining({
+      sessionSlug: 'edge',
+      grantRequest: {
         bootstrapWorkerUrl: 'https://worker.example.test',
         deployGrantToken: 'deploy-grant-token',
         faucetGrantToken: 'faucet-grant-token',

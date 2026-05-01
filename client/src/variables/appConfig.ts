@@ -163,7 +163,10 @@ export const POLIS_DEMO_DATA_AUTOLOAD_SLUGS = readPublicListEnv('REACT_APP_POLIS
   ...CE_DEMO_SESSION_SLUGS,
 ]);
 // One-shot testing flag: clamps cross-session fanout defaults to general/list.
-export const CE_RPC_TESTING_MODE = readPublicBoolEnv('REACT_APP_CE_RPC_TESTING_MODE', false);
+export const CE_RPC_TESTING_MODE = readPublicBoolEnv(
+  'REACT_APP_CE_RPC_TESTING_MODE',
+  false
+);
 // On-chain session registry (kept off by default during the migration).
 export const USE_ONCHAIN_SESSION_REGISTRY = readPublicBoolEnv('REACT_APP_USE_ONCHAIN_SESSION_REGISTRY', true);
 // When true, CE_SESSION_SCAN_SLUGS list entries can resolve through demoSessions aliases

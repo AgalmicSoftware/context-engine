@@ -423,66 +423,27 @@ export default function DocumentLibraryPanel({
     };
   }, [sessionConfig]);
   const sessionHasLitChipotle = useMemo(() => {
-    const litCredentials =
+    const litCredentials = (
       sessionConfig &&
       typeof sessionConfig === 'object' &&
       sessionConfig.litCredentials &&
       typeof sessionConfig.litCredentials === 'object' &&
       !Array.isArray(sessionConfig.litCredentials)
-        ? (sessionConfig.litCredentials as Record<string, unknown>)
-        : null;
-    const hasCompleteLitCredentials = !!(
-      litCredentials &&
+    ) ? sessionConfig.litCredentials as Record<string, unknown> : null;
+    return !!(
+      toStr(sessionConfig?.corsWorkerUrl).trim() &&
       toStr(litCredentials?.litApiBase).trim() &&
       toStr(litCredentials?.litActionCid).trim() &&
       toStr(litCredentials?.litPkpId).trim()
     );
-    const litConfig =
-      sessionConfig &&
-      typeof sessionConfig === 'object' &&
-      sessionConfig.lit &&
-      typeof sessionConfig.lit === 'object' &&
-      !Array.isArray(sessionConfig.lit)
-        ? (sessionConfig.lit as Record<string, unknown>)
-        : null;
-    const litNetworkHint = toStr(litConfig?.network || sessionConfig?.litNetwork)
-      .trim()
-      .toLowerCase();
-    return !!(
-      toStr(sessionConfig?.corsWorkerUrl).trim() &&
-      (hasCompleteLitCredentials || litNetworkHint === 'chipotle' || docUploadsGate.hasRecipients)
-    );
-  }, [docUploadsGate.hasRecipients, sessionConfig]);
-  const sessionGateUnsupportedMessage = useMemo(
-    () =>
-      allowsSbtDocumentControls && docUploadsGate.hasRecipients && !sessionHasLitChipotle
-        ? getUnsupportedLitContractAccessControlErrorUntyped({
-            chainId: Number(docUploadsGate.chainId || documentNetwork?.id || 0) || null,
-          })
-        : '',
-    [
-      allowsSbtDocumentControls,
-      docUploadsGate.chainId,
-      docUploadsGate.hasRecipients,
-      documentNetwork?.id,
-      sessionHasLitChipotle,
-    ],
-  );
-  const docAsyncConfigKey = useMemo(
-    () =>
-      buildAsyncContextKeyPart({
-        corsWorkerUrl: toStr(sessionConfig?.corsWorkerUrl).trim(),
-        docLibrary: sessionConfig?.docLibrary || null,
-        docProvider,
-        docUploadsGate,
-        graphqlUrl,
-        graphqlUrls,
-        lit: sessionConfig?.lit || null,
-        litNetwork: toStr(sessionConfig?.litNetwork).trim(),
-        storageProfile: sessionConfig?.storageProfile || null,
-      }),
-    [docProvider, docUploadsGate, graphqlUrl, graphqlUrls, sessionConfig],
-  );
+  }, [sessionConfig]);
+  const sessionGateUnsupportedMessage = useMemo(() => (
+    docUploadsGate.hasRecipients && !sessionHasLitChipotle
+      ? getUnsupportedLitContractAccessControlErrorUntyped({
+        chainId: Number(docUploadsGate.chainId || network?.id || 0) || null,
+      })
+      : ''
+  ), [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id, sessionHasLitChipotle]);
 
   const locationSearch = typeof window !== 'undefined' ? window.location.search || '' : '';
 

@@ -1,18 +1,24 @@
 import { SPONSORED_BUNDLE_SUPPORTED_FIELDS } from '../../utilities/arweave/sponsoredBundles.js';
-import { normalizeSponsoredFieldSnapshot } from '../../utilities/session/sponsoredFlags.js';
+import {
+  normalizeSponsoredFieldSnapshot,
+} from '../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { workerAuthPublishAdapter } from '../../domains/sessions/publish/sessionPublishAdapters.js';
 import { DEFAULT_GATE_KEYS } from './sessionWizardGateUtils';
-import { normalizeSessionWizardSlug } from './sessionWizardUrlSupport';
-import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
+import type {
+  AnyRecord,
+  WorkerSecretsLike,
+} from '../shellTypes';
 
-export const CHIPOTLE_LIT_CONFIG_FIELDS = Object.freeze(['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']);
-
-export const LIT_RUNTIME_RECOVERY_MARKER_FIELD = 'litRuntimeRecovered';
+export const CHIPOTLE_LIT_CONFIG_FIELDS = Object.freeze([
+  'litApiBase',
+  'litGroupId',
+  'litPkpId',
+  'litActionCid',
+]);
 
 export const WORKER_SECRET_CACHE_SAFE_FIELDS = Object.freeze([
   ...CHIPOTLE_LIT_CONFIG_FIELDS,
-  LIT_RUNTIME_RECOVERY_MARKER_FIELD,
 ]);
 
 export const DEFAULT_WORKER_SECRETS: WorkerSecretsLike = {
@@ -27,13 +33,12 @@ export const DEFAULT_WORKER_SECRETS: WorkerSecretsLike = {
   litGroupId: '',
   litPkpId: '',
   litActionCid: '',
-  litRuntimeRecovered: '',
   litAccountApiKey: '',
   litUsageApiKey: '',
 };
 
 export const WORKER_SECRET_PERSISTED_FIELDS = Object.freeze(
-  Object.keys(DEFAULT_WORKER_SECRETS).filter((key) => !WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key)),
+  Object.keys(DEFAULT_WORKER_SECRETS).filter((key) => !WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key))
 );
 
 export const normalizeWorkerSecrets = (value: WorkerSecretsLike | AnyRecord = {}): WorkerSecretsLike => {
@@ -183,31 +188,23 @@ export const resolveSessionWizardChipotleHookConfig = ({
   };
 };
 
+export const buildWorkerLitCredentialsConfig = (
+  workerSecrets: WorkerSecretsLike | AnyRecord = {}
+): Record<string, string> => (
+  CHIPOTLE_LIT_CONFIG_FIELDS.reduce((acc, key) => {
+    const value = toStr((workerSecrets as AnyRecord)?.[key]).trim();
+    if (value) acc[key] = value;
+    return acc;
+  }, {} as Record<string, string>)
+);
+
 export const sanitizeSessionWizardWorkerSecretsForLitMode = (
   value: WorkerSecretsLike | AnyRecord = {},
-): WorkerSecretsLike => {
-  const next = normalizeWorkerSecrets(value);
-  if (toStr(next.litAccountApiKey).trim()) {
-    if (toStr(next[LIT_RUNTIME_RECOVERY_MARKER_FIELD]).trim() !== 'bootstrap') {
-      CHIPOTLE_LIT_CONFIG_FIELDS.forEach((key) => {
-        next[key] = '';
-      });
-    }
-    next.litUsageApiKey = '';
-  }
-  return next;
-};
+): WorkerSecretsLike => normalizeWorkerSecrets(value);
 
-export const resolveSessionWizardEnabledWorkerSecrets = ({
-  workerSecrets = {},
-  workerSecretsEnabled = true,
-}: {
-  workerSecrets?: WorkerSecretsLike | AnyRecord;
-  workerSecretsEnabled?: boolean;
-} = {}): WorkerSecretsLike =>
-  workerSecretsEnabled ? sanitizeSessionWizardWorkerSecretsForLitMode(workerSecrets) : { ...DEFAULT_WORKER_SECRETS };
-
-export const sanitizeSessionWizardSponsoredFieldSnapshotForLitMode = (value: AnyRecord = {}) => {
+export const sanitizeSessionWizardSponsoredFieldSnapshotForLitMode = (
+  value: AnyRecord = {},
+) => {
   return normalizeSponsoredFieldSnapshot(value);
 };
 

@@ -91,15 +91,13 @@ describe('sponsoredBundles', () => {
   });
 
   it('normalizes supported bundle fields and ignores unsupported customRpcKey', () => {
-    expect(
-      normalizeSponsoredBundlePayload({
-        openaiKey: ' sk-openai ',
-        customRpcUrl: ' https://rpc.example ',
-        litApiBase: ' https://api.chipotle.litprotocol.com ',
-        customRpcKey: 'do-not-keep',
-        meta: { label: ' Test label ' },
-      }),
-    ).toEqual({
+    expect(normalizeSponsoredBundlePayload({
+      openaiKey: ' sk-openai ',
+      customRpcUrl: ' https://rpc.example ',
+      litApiBase: ' https://api.chipotle.litprotocol.com ',
+      customRpcKey: 'do-not-keep',
+      meta: { label: ' Test label ' },
+    })).toEqual({
       openaiKey: 'sk-openai',
       anthropicKey: '',
       openrouterKey: '',
@@ -127,19 +125,17 @@ describe('sponsoredBundles', () => {
   });
 
   it('builds sparse sponsored bundle payloads without empty credential fields', () => {
-    expect(
-      buildSponsoredBundlePlaintext({
-        openaiKey: ' sk-openai ',
-        litApiBase: ' https://api.chipotle.litprotocol.com ',
-        litGroupId: ' group_123 ',
-        litPkpId: ' pkp_123 ',
-        litActionCid: ' bafy123 ',
-        litAccountApiKey: ' lit-account-secret ',
-        litUsageApiKey: ' lit-secret ',
-        faucetPrivateKey: '   ',
-        meta: { label: ' Launch Week ' },
-      }),
-    ).toEqual({
+    expect(buildSponsoredBundlePlaintext({
+      openaiKey: ' sk-openai ',
+      litApiBase: ' https://api.chipotle.litprotocol.com ',
+      litGroupId: ' group_123 ',
+      litPkpId: ' pkp_123 ',
+      litActionCid: ' bafy123 ',
+      litAccountApiKey: ' lit-account-secret ',
+      litUsageApiKey: ' lit-secret ',
+      faucetPrivateKey: '   ',
+      meta: { label: ' Launch Week ' },
+    })).toEqual({
       openaiKey: 'sk-openai',
       litApiBase: 'https://api.chipotle.litprotocol.com',
       litGroupId: 'group_123',
@@ -221,24 +217,22 @@ describe('sponsoredBundles', () => {
       },
     });
 
-    expect(mockEncryptWithPassword).toHaveBeenCalledWith(
-      expect.objectContaining({
-        openaiKey: 'sk-live-openai',
-        anthropicKey: 'sk-live-anthropic',
-        arweaveJwk: '{"kty":"RSA"}',
-        customRpcUrl: 'https://rpc.example',
-        litApiBase: 'https://api.chipotle.litprotocol.com',
-        litGroupId: 'group_123',
-        litPkpId: 'pkp_123',
-        litActionCid: 'bafy123',
-        litAccountApiKey: 'lit-account-secret',
-        litUsageApiKey: 'lit-secret',
-        meta: expect.objectContaining({
-          label: 'Launch Week',
-          createdBy: '0xadmin',
-          sourceSessionSlug: 'edge',
-          sourceWorkerUrl: 'https://worker.example',
-        }),
+    expect(mockEncryptWithPassword).toHaveBeenCalledWith(expect.objectContaining({
+      openaiKey: 'sk-live-openai',
+      anthropicKey: 'sk-live-anthropic',
+      arweaveJwk: '{"kty":"RSA"}',
+      customRpcUrl: 'https://rpc.example',
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+      litAccountApiKey: 'lit-account-secret',
+      litUsageApiKey: 'lit-secret',
+      meta: expect.objectContaining({
+        label: 'Launch Week',
+        createdBy: '0xadmin',
+        sourceSessionSlug: 'edge',
+        sourceWorkerUrl: 'https://worker.example',
       }),
       'bundle-secret',
     );

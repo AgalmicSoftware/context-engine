@@ -6,10 +6,13 @@ import {
   DEFAULT_CHIPOTLE_ACTION_NAME,
   DEFAULT_CHIPOTLE_ACTION_PARAMS_EXAMPLE,
 } from '../../utilities/crypto/litChipotleCatalog.js';
-import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
+import type {
+  AnyRecord,
+  WorkerSecretSyncResult,
+  WorkerSecretsLike,
+} from '../shellTypes';
 
-type AsyncShellResult = AnyRecord | null | undefined;
-type AsyncShellCallback<TResult = AsyncShellResult | void> = (input: AnyRecord) => Promise<TResult>;
+type AsyncShellCallback = (input?: AnyRecord) => Promise<any>;
 
 export type LitProvisionSyncResult = WorkerSecretSyncResult & {
   litActionCid?: string;
@@ -17,7 +20,6 @@ export type LitProvisionSyncResult = WorkerSecretSyncResult & {
 };
 
 export type LitBootstrapSyncResult = WorkerSecretSyncResult & {
-  apiBase?: string;
   litActionCid?: string;
   litGroupId?: string;
   litPkpId?: string;
@@ -25,22 +27,6 @@ export type LitBootstrapSyncResult = WorkerSecretSyncResult & {
 
 const toTrimmedString = (value: unknown): string => toStr(value).trim();
 const toErrorMessage = (err: unknown): string => toTrimmedString((err as AnyRecord)?.message || err);
-const defaultWait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-const TRANSIENT_LIT_SYNC_ERROR_PATTERNS = [
-  'failed to reach worker auth endpoint',
-  'failed to fetch',
-  'networkerror',
-  'network request failed',
-  'load failed',
-  'fetch failed',
-];
-
-const isTransientLitSyncError = (err: unknown): boolean => {
-  const message = toErrorMessage(err).toLowerCase();
-  if (!message) return false;
-  return TRANSIENT_LIT_SYNC_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
-};
 
 export const SESSION_WIZARD_CHIPOTLE_ACTION_NAME = DEFAULT_CHIPOTLE_ACTION_NAME;
 export const SESSION_WIZARD_CHIPOTLE_ACTION_DESCRIPTION = DEFAULT_CHIPOTLE_ACTION_DESCRIPTION;
@@ -54,32 +40,20 @@ export const buildSessionWizardLitBootstrapRequest = (
     sessionName = '',
   }: {
     sessionName?: unknown;
-  } = {},
+  } = {}
 ): AnyRecord | null => {
   const litApiBase = toTrimmedString((workerSecrets as AnyRecord)?.litApiBase);
   const litGroupId = toTrimmedString((workerSecrets as AnyRecord)?.litGroupId);
   const litPkpId = toTrimmedString((workerSecrets as AnyRecord)?.litPkpId);
   const litActionCid = toTrimmedString((workerSecrets as AnyRecord)?.litActionCid);
-  const litAccountApiKey = toTrimmedString((workerSecrets as AnyRecord)?.litAccountApiKey);
   const litUsageApiKey = toTrimmedString((workerSecrets as AnyRecord)?.litUsageApiKey);
 
-  if (litAccountApiKey) {
-    return {
-      litAccountApiKey,
-      ...(toTrimmedString(sessionName) ? { sessionName: toTrimmedString(sessionName) } : {}),
-      actionCode: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.code,
-      actionName: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.name,
-      actionDescription: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.description,
-    };
-  }
-
-  if (!(litApiBase || litAccountApiKey) || litGroupId || litPkpId || litActionCid || litUsageApiKey) {
+  if (!litApiBase || litGroupId || litPkpId || litActionCid || litUsageApiKey) {
     return null;
   }
 
   return {
-    ...(litApiBase ? { litApiBase } : {}),
-    ...(litAccountApiKey ? { litAccountApiKey } : {}),
+    litApiBase,
     ...(toTrimmedString(sessionName) ? { sessionName: toTrimmedString(sessionName) } : {}),
     actionCode: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.code,
     actionName: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.name,
@@ -88,7 +62,7 @@ export const buildSessionWizardLitBootstrapRequest = (
 };
 
 export const buildSessionWizardLitProvisionRequest = (
-  workerSecrets: WorkerSecretsLike | AnyRecord = {},
+  workerSecrets: WorkerSecretsLike | AnyRecord = {}
 ): AnyRecord | null => {
   const litApiBase = toTrimmedString((workerSecrets as AnyRecord)?.litApiBase);
   const litGroupId = toTrimmedString((workerSecrets as AnyRecord)?.litGroupId);
@@ -112,7 +86,10 @@ export const buildSessionWizardLitProvisionRequest = (
 const isLitProvisionConfigBootstrapError = (err: unknown): boolean => {
   const message = toErrorMessage(err).toLowerCase();
   if (!message) return false;
-  return message.includes('admin authorization failed') || message.includes('session config not found');
+  return (
+    message.includes('admin authorization failed') ||
+    message.includes('session config not found')
+  );
 };
 
 export const syncWorkerLitActionProvisionAfterDeploy = async ({
@@ -124,21 +101,19 @@ export const syncWorkerLitActionProvisionAfterDeploy = async ({
   postProvision,
   ensureSessionConfig,
   applyProvisionedConfig,
-  retryDelaysMs = [350, 700, 1400, 2200],
-  wait = defaultWait,
 }: {
   workerUrl?: string;
   account?: string;
   slug?: string;
   provisionRequest?: AnyRecord | null;
   signAdminAction?: AsyncShellCallback;
-  postProvision?: AsyncShellCallback<AsyncShellResult>;
+  postProvision?: AsyncShellCallback;
   ensureSessionConfig?: AsyncShellCallback;
   applyProvisionedConfig?: AsyncShellCallback;
-  retryDelaysMs?: number[];
-  wait?: (ms: number) => Promise<void>;
 } = {}): Promise<LitProvisionSyncResult> => {
-  const requestBody = provisionRequest && typeof provisionRequest === 'object' ? { ...provisionRequest } : null;
+  const requestBody = provisionRequest && typeof provisionRequest === 'object'
+    ? { ...provisionRequest }
+    : null;
   if (!requestBody || !toTrimmedString(requestBody.actionCode)) {
     return { warning: '', note: '', synced: false, skipped: true };
   }
@@ -162,9 +137,7 @@ export const syncWorkerLitActionProvisionAfterDeploy = async ({
 
   let lastErr: unknown = null;
   let configSeedAttempted = false;
-  const delays = Array.isArray(retryDelaysMs) ? retryDelaysMs : [];
-  const maxAttempts = Math.max(2, delays.length + 1);
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const auth = await signAdminAction?.({
         action: 'lit-chipotle-provision',
@@ -221,13 +194,6 @@ export const syncWorkerLitActionProvisionAfterDeploy = async ({
           lastErr = configErr;
         }
       }
-      if (attempt < delays.length && isTransientLitSyncError(err)) {
-        const delayMs = Number(delays[attempt] || 0);
-        if (delayMs > 0) {
-          await wait(delayMs);
-        }
-        continue;
-      }
       break;
     }
   }
@@ -248,21 +214,19 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
   postBootstrap,
   ensureSessionConfig,
   applyBootstrappedConfig,
-  retryDelaysMs = [350, 700, 1400, 2200],
-  wait = defaultWait,
 }: {
   workerUrl?: string;
   account?: string;
   slug?: string;
   bootstrapRequest?: AnyRecord | null;
   signAdminAction?: AsyncShellCallback;
-  postBootstrap?: AsyncShellCallback<AsyncShellResult>;
+  postBootstrap?: AsyncShellCallback;
   ensureSessionConfig?: AsyncShellCallback;
   applyBootstrappedConfig?: AsyncShellCallback;
-  retryDelaysMs?: number[];
-  wait?: (ms: number) => Promise<void>;
 } = {}): Promise<LitBootstrapSyncResult> => {
-  const requestBody = bootstrapRequest && typeof bootstrapRequest === 'object' ? { ...bootstrapRequest } : null;
+  const requestBody = bootstrapRequest && typeof bootstrapRequest === 'object'
+    ? { ...bootstrapRequest }
+    : null;
   if (!requestBody || !toTrimmedString(requestBody.actionCode)) {
     return { warning: '', note: '', synced: false, skipped: true };
   }
@@ -286,9 +250,7 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
 
   let lastErr: unknown = null;
   let configSeedAttempted = false;
-  const delays = Array.isArray(retryDelaysMs) ? retryDelaysMs : [];
-  const maxAttempts = Math.max(2, delays.length + 1);
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       const auth = await signAdminAction?.({
         action: 'lit-chipotle-bootstrap-session',
@@ -308,7 +270,6 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
       const litActionCid = toTrimmedString(result?.litActionCid);
       const litGroupId = toTrimmedString(result?.litGroupId);
       const litPkpId = toTrimmedString(result?.litPkpId);
-      const apiBase = toTrimmedString(result?.apiBase || result?.litCredentials?.litApiBase);
       if (!litActionCid || !litGroupId || !litPkpId) {
         return {
           warning: 'Lit bootstrap did not return the full Lit session credentials.',
@@ -318,7 +279,6 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
       }
       if (typeof applyBootstrappedConfig === 'function') {
         await applyBootstrappedConfig({
-          apiBase,
           litActionCid,
           litGroupId,
           litPkpId,
@@ -332,7 +292,6 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
         warning: '',
         note: 'Lit session account auto-created.',
         synced: true,
-        apiBase,
         litActionCid,
         litGroupId,
         litPkpId,
@@ -352,13 +311,6 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
           lastErr = configErr;
         }
       }
-      if (attempt < delays.length && isTransientLitSyncError(err)) {
-        const delayMs = Number(delays[attempt] || 0);
-        if (delayMs > 0) {
-          await wait(delayMs);
-        }
-        continue;
-      }
       break;
     }
   }
@@ -372,7 +324,7 @@ export const syncWorkerLitSessionBootstrapAfterDeploy = async ({
 
 export const withLitBootstrapSyncStatus = (
   baseStatus = '',
-  { warning = '', note = '' }: Partial<LitBootstrapSyncResult> = {},
+  { warning = '', note = '' }: Partial<LitBootstrapSyncResult> = {}
 ): string => {
   const status = toTrimmedString(baseStatus) || 'Worker deployed.';
   const warningText = toTrimmedString(warning);
@@ -384,7 +336,7 @@ export const withLitBootstrapSyncStatus = (
 
 export const withLitProvisionSyncStatus = (
   baseStatus = '',
-  { warning = '', note = '' }: Partial<LitProvisionSyncResult> = {},
+  { warning = '', note = '' }: Partial<LitProvisionSyncResult> = {}
 ): string => {
   const status = toTrimmedString(baseStatus) || 'Worker deployed.';
   const warningText = toTrimmedString(warning);
