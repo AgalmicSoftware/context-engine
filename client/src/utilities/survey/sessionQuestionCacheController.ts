@@ -15,6 +15,7 @@ import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import {
   buildQuestionDecryptContextForSession,
   hasMaskedQuestionPayloadImproved,
+  type QuestionDecryptContext,
 } from '../session/sessionQuestionDecryption.js';
 import {
   buildQuestionReadyStatePatch,
@@ -216,7 +217,7 @@ export interface SessionQuestionCacheController {
     opts?: RefreshEncryptedQuestionPayloadsOptions
   ) => Promise<void>;
   hasMaskedQuestionPayloadInCache: (slug: string) => boolean;
-  buildQuestionDecryptContext: (slug: string) => Record<string, unknown>;
+  buildQuestionDecryptContext: (slug: string) => QuestionDecryptContext;
   refreshQuestionMetadataForGroup: (slug: string) => Promise<void>;
   pruneMaskedQuestionDecryptBackoff: (nowIn?: number) => void;
   isInitInFlight: (slugIn?: string) => boolean;
@@ -423,17 +424,17 @@ export const createSessionQuestionCacheController = (
     return Object.values(questionMap).some((q: unknown) => isMaskedQuestionPayload(q));
   };
 
-  const buildQuestionDecryptContext = (slug: string): Record<string, unknown> => {
+  const buildQuestionDecryptContext = (slug: string): QuestionDecryptContext => {
     const cfg = getSessionCfg(slug) || {};
     const state = getState();
     const network = getNetwork();
-    return (buildQuestionDecryptContextForSession as any)({
+    return buildQuestionDecryptContextForSession({
       cfg,
       account: getAccount() || '',
       providerLike: getProviderLike() || '',
       litHooks: state.litHooks || getGlobalLitHooks() || null,
       fallbackChainId: network?.id || network?.chainId || null,
-    }) as Record<string, unknown>;
+    });
   };
 
   const initializeQuestionCacheForGroup = async (
