@@ -472,7 +472,8 @@ const useSponsoredBundleLifecycle = ({
       } catch (error) {
         if (cancelled) return;
         restoreSponsoredBundleOverrides();
-        const code = toStr(error?.code || '').trim().toLowerCase();
+        const errorLike = (error && typeof error === 'object') ? error as AnyRecord : {};
+        const code = toStr(errorLike?.code || '').trim().toLowerCase();
         if (code === 'expired_bundle') {
           await writeSessionWizardSponsoredBundleCache(bundleId, null);
           if (cancelled) return;

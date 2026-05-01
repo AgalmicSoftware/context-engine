@@ -47,6 +47,7 @@ import type {
   AnyRecord,
   ChainIdLike,
   NetworkLike,
+  WorkerSecretSyncResult,
   WorkerSecretsLike,
 } from '../../shellTypes';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
@@ -266,7 +267,7 @@ const useSessionWizardWorkerDeploy = ({
         runtime.workerMode !== 'default' &&
         resolveSessionWizardSponsoredAutoDeployReadiness({
           wizardMode: runtime.wizardMode,
-          sponsoredBundle: sponsoredBundleAppliedBundleRef?.current,
+          sponsoredBundle: sponsoredBundleAppliedBundleRef?.current || undefined,
           deployForm: currentDeployForm,
           workerSecretsEnabled: runtime.workerSecretsEnabled,
           currentWorkerSecrets,
@@ -307,7 +308,7 @@ const useSessionWizardWorkerDeploy = ({
       });
       const deploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
       const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
-      const payload = {
+      const payload: AnyRecord = {
         workerName: currentDeployForm.workerName,
         sessionSlug: slug,
         bundleUrl,
@@ -408,7 +409,7 @@ const useSessionWizardWorkerDeploy = ({
           workerUrlAutoFilled: true,
         });
       }
-      const workerConfigPayload = {
+      const workerConfigPayload: AnyRecord = {
         ...buildSessionWizardWorkerConfigPayload({
           slug,
           draft: currentDraft,
@@ -417,7 +418,7 @@ const useSessionWizardWorkerDeploy = ({
           registryAddress: runtime.registryAddress,
           registryChainId: runtime.registryChainId,
           networkChainId: runtime.network?.id,
-          sessionId: runtime.sessionId,
+          sessionId: toStr(runtime.sessionId || '').trim(),
           latestChainBlock: runtime.latestChainBlock,
           workerUrl: resolvedDeployWorkerUrl,
           resolveWorkerFaucetConfig,
@@ -457,7 +458,7 @@ const useSessionWizardWorkerDeploy = ({
           throw new Error(configData?.error || 'Failed to sync worker config after deploy.');
         }
       };
-      let configSyncStatus = { warning: '', note: '', synced: false, skipped: true };
+      let configSyncStatus: WorkerSecretSyncResult = { warning: '', note: '', synced: false, skipped: true };
       if (resolvedDeployWorkerUrl) {
         configSyncStatus = await syncWorkerConfigAfterPartialDeploy({
           deployResponse: data,
