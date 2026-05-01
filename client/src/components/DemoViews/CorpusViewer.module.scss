@@ -79,9 +79,18 @@ $text: #f4f7ff;
 
 .sectionBlock {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
   justify-content: flex-start;
   margin-bottom: 14px;
   padding-left: 4px;
+}
+
+.sectionActionRow {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .sectionHeader {
@@ -97,13 +106,16 @@ $text: #f4f7ff;
 }
 
 .githubLink {
+  appearance: none;
   align-items: center;
   background: rgba(255, 255, 255, 0.08);
   box-sizing: border-box;
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-pill);
   color: $text;
+  cursor: pointer;
   display: inline-flex;
+  font: inherit;
   font-size: 12px;
   font-weight: 600;
   gap: 6px;
@@ -120,6 +132,28 @@ $text: #f4f7ff;
 
 .githubLinkIcon {
   font-size: 12px;
+}
+
+.loadCorpusButton:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.loadCorpusButton:disabled:hover {
+  color: $text;
+}
+
+.sectionMeta {
+  color: $muted;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.sectionError {
+  color: #ffb347;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .policyMapLens {
@@ -360,9 +394,10 @@ $text: #f4f7ff;
 }
 
 .metrCard {
-  background: linear-gradient(180deg, rgba(18, 28, 49, 0.96) 0%, rgba(15, 22, 37, 0.96) 100%);
-  border-color: rgba(77, 255, 164, 0.16);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border-color: #d9e2ea;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  color: #2f3437;
 }
 
 .metrSourceCard {
@@ -802,6 +837,36 @@ $text: #f4f7ff;
   color: #4b5563;
 }
 
+.metrCard .entryTitle {
+  color: #2f3437;
+}
+
+.metrCard .entryMeta {
+  color: #5f6b78;
+}
+
+.metrCard .entrySummary {
+  color: #4b5563;
+}
+
+.metrCard .pill {
+  background: rgba(33, 117, 189, 0.08);
+  color: #1b6fb8;
+}
+
+.metrCard .pillButton:hover {
+  background: rgba(33, 117, 189, 0.14);
+  color: #135793;
+}
+
+.metrCard .debateMapLink,
+.metrCard .externalLink,
+.metrCard .externalIconLink {
+  background: #f7fafc;
+  border-color: #d9e2ea;
+  color: #1b6fb8;
+}
+
 .arxivCard .pill {
   background: rgba(33, 117, 189, 0.1);
   color: #1b6fb8;
@@ -1004,6 +1069,64 @@ $text: #f4f7ff;
   font-size: 14px;
   line-height: 1.6;
   margin-bottom: 12px;
+}
+
+.entryInsightBlock {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+.entryInsightLabel {
+  color: $text;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.entryInsightText {
+  color: rgba(244, 247, 255, 0.82);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.entrySupportMeta {
+  color: rgba(244, 247, 255, 0.62);
+  display: grid;
+  font-size: 12px;
+  gap: 4px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.arxivCard .entryInsightBlock,
+.metrCard .entryInsightBlock,
+.insiderCard .entryInsightBlock,
+.tweetCard .entryInsightBlock {
+  background: rgba(15, 23, 42, 0.03);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+.arxivCard .entryInsightLabel,
+.metrCard .entryInsightLabel,
+.insiderCard .entryInsightLabel,
+.tweetCard .entryInsightLabel {
+  color: #2f3437;
+}
+
+.arxivCard .entryInsightText,
+.metrCard .entryInsightText,
+.insiderCard .entryInsightText,
+.tweetCard .entryInsightText,
+.arxivCard .entrySupportMeta,
+.metrCard .entrySupportMeta,
+.insiderCard .entrySupportMeta,
+.tweetCard .entrySupportMeta {
+  color: #536471;
 }
 
 .entryMediaBlock {

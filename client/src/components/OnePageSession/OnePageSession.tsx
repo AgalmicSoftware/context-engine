@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCaretDown,
   faCaretUp,
+  faDownload,
   faExternalLinkAlt,
   faQuestionCircle,
   faSpinner,
@@ -59,6 +60,14 @@ const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
 const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
+const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
+  activeCorpusKey: 'cross_corpus',
+  activeCorpusLabel: 'Cross-Corpus',
+  loadStatus: 'idle',
+  loadButtonLabel: 'Load full corpus',
+  disableLoadButton: false,
+  error: '',
+});
 const globalState: any = globalThis as any;
 const contractScriptsAny: any = contractScripts as any;
 const DebateMapAny: any = DebateMap;
@@ -389,6 +398,8 @@ class OnePageSession extends Component<any, any> {
       disclaimersActive: true,
       filterState: initialFilterState,
       pileSubmitRailVisible: false,
+      corpusViewerLoadRequestNonce: 0,
+      corpusViewerLoadState: DEFAULT_CORPUS_VIEWER_LOAD_STATE,
 
       // Legacy (limited) group password flow state
       // Auto-mint
@@ -1948,6 +1959,38 @@ class OnePageSession extends Component<any, any> {
     }));
   }
 
+  handleCorpusViewerLoadStateChange(nextLoadState: any = DEFAULT_CORPUS_VIEWER_LOAD_STATE) {
+    this.setState((previousState: any) => {
+      const currentLoadState = previousState.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
+      const resolvedNextState = {
+        ...DEFAULT_CORPUS_VIEWER_LOAD_STATE,
+        ...(nextLoadState || {}),
+      };
+
+      if (
+        currentLoadState.activeCorpusKey === resolvedNextState.activeCorpusKey
+        && currentLoadState.activeCorpusLabel === resolvedNextState.activeCorpusLabel
+        && currentLoadState.loadStatus === resolvedNextState.loadStatus
+        && currentLoadState.loadButtonLabel === resolvedNextState.loadButtonLabel
+        && currentLoadState.disableLoadButton === resolvedNextState.disableLoadButton
+        && currentLoadState.error === resolvedNextState.error
+      ) {
+        return null;
+      }
+
+      return {
+        corpusViewerLoadState: resolvedNextState,
+      };
+    });
+  }
+
+  handleLoadFullCorpusClick(event: any) {
+    if (event?.stopPropagation) event.stopPropagation();
+    this.setState((previousState: any) => ({
+      corpusViewerLoadRequestNonce: Number(previousState.corpusViewerLoadRequestNonce || 0) + 1,
+    }));
+  }
+
   handleEmbeddedAtlasModalClose() {
     this.setState((prevState: any) => {
       const returnState = prevState.embeddedAtlasReturnState;
@@ -2196,7 +2239,6 @@ class OnePageSession extends Component<any, any> {
       { key: 'polis', label: 'Report', icon: '🧾' },
       ...(isDemoSlug
         ? [
-            { key: 'analysis', label: 'Breakdown', icon: '📊' },
             { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
             { key: 'analysis', label: 'Breakdown', icon: '📊' },
             { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
@@ -2231,7 +2273,10 @@ class OnePageSession extends Component<any, any> {
       renderSectionHeading('Questions', 'Answer or Add')
     );
     const questionsSectionTooltip = 'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering.';
-    const documentsSectionTooltip = 'This corpus is evolving into a conversational layer for the session: you’ll be able to chat with the material, have it surface and pose relevant questions, and connect those prompts fluidly with responses.';
+    const documentsSectionTooltip = 'Allows the conversation to be enriched by data, and the formats can change per-session';
+    const corpusViewerLoadState = this.state.corpusViewerLoadState || DEFAULT_CORPUS_VIEWER_LOAD_STATE;
+    const loadFullCorpusButtonLabel = corpusViewerLoadState.loadButtonLabel || DEFAULT_CORPUS_VIEWER_LOAD_STATE.loadButtonLabel;
+    const disableLoadFullCorpusButton = !!corpusViewerLoadState.disableLoadButton;
     const pileSubmitRailActive = !this.state.showQuestions && this.state.pileSubmitRailVisible;
     const brandingSectionClassName = [
       styles.brandingSection,
@@ -2689,6 +2734,16 @@ class OnePageSession extends Component<any, any> {
                             <FontAwesomeIcon icon={faExternalLinkAlt} />
                             <span>GitHub</span>
                           </a>
+                          <button
+                            type="button"
+                            className={`${styles.sectionHeaderLink} ${styles.sectionHeaderLinkButton}`.trim()}
+                            onClick={this.handleLoadFullCorpusClick}
+                            disabled={disableLoadFullCorpusButton}
+                            data-testid='ce-demo-documents-load-full-corpus'
+                          >
+                            <FontAwesomeIcon icon={faDownload} />
+                            <span>{loadFullCorpusButtonLabel}</span>
+                          </button>
                         </span>
                       )}
                     </span>
@@ -2726,7 +2781,12 @@ class OnePageSession extends Component<any, any> {
               {this.state.showDocuments && (
                 <div className={styles.miniSectionContent}>
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
-                    <CorpusViewer onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen} showGithubLink={false} />
+                    <CorpusViewer
+                      onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen}
+                      showGithubLink={false}
+                      externalLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
+                      onExternalLoadStateChange={this.handleCorpusViewerLoadStateChange}
+                    />
                   </Suspense>
                 </div>
               )}
@@ -2763,7 +2823,10 @@ class OnePageSession extends Component<any, any> {
 
               {this.state.showResults && (
                 <div className={`${styles.sectionHeaderActionsScroller} ${styles.resultsModeActionsScroller}`}>
-                  <div className={`${styles.sectionHeaderActions} ${styles.resultsModeActions}`}>
+                  <div
+                    className={`${styles.sectionHeaderActions} ${styles.resultsModeActions}`}
+                    data-testid="ce-session-results-view-nav"
+                  >
                     {resultsViewOptions.map(({ key, label, icon }: any) => {
                       const isSelected = resultsViewMode === key;
                       return (

@@ -40,8 +40,7 @@
       "cross_corpus": {
         "label": "Cross-Corpus Debates",
         "sample_count": 8,
-        "full_count": 8,
-        "count": 13
+        "full_count": 8
       }
     }
   },
@@ -264,7 +263,7 @@
         {
           "url": "https://x.com/sama/status/1983584366547829073",
           "author": "@sama",
-          "text": "Yesterday we did a livestream. TL;DR:\n\nWe have set internal goals of having an automated AI research intern by September of 2026 running on hundreds of thousands of GPUs, and a true automated AI researcher by March of 2028. We may totally fail at this goal, but given the extraordinary potential impacts we think it is in the public interest to be transparent about this.\n\nWe have a safety strategy that relies on 5 layers: Value alignment, Goal alignment, Reliability, Adversarial robustness, and System safety. Chain-of-thought faithfulness is a tool we are particularly excited about, but it somewhat fragile and requires drawing a boundary and a clear abstraction.\n\nOn the product side, we are trying to move towards a true platform, where people and companies building on top of our offerings will capture most of the value. Today people can build on our API and apps in ChatGPT; eventually, we want to offer an AI cloud that enables huge businesses.\n\nWe have currently committed to about 30 gigawatts of compute, with a total cost of ownership over the years of about $1.4 trillion. We are comfortable with this given what we see on the horizon for model capability growth and revenue growth. We would like to do more—we would like to build an AI factory that can make 1 gigawatt per week of new capacity, at a greatly reduced cost relative to today—but that will require more confidence in future models, revenue, and technological/financial innovation.\n\nOur new structure is much simpler than our old one. We have a non-profit calledOpenAI Foundation that governs a Public Benefit Corporation called OpenAI Group. The foundation initially owns 26% of the PBC, but it can increase with warrants over time if the PBC does super well. The PBC can attract the resources needed to achieve the mission.\n\nOur mission, for both our non-profit and PBC, remains the same: to ensure that artificial general intelligence benefits all of humanity.\n\nThe nonprofit is initially committing $25 billion to health and curing disease, and AI resilience (all of the things that could help society have a successful transition to a post-AGI world, including technical safety but also things like economic impact, cyber security, and much more). The nonprofit now has the ability to actually deploy capital relatively quickly, unlike before.\n\nIn 2026 we expect that our AI systems may be able to make small new discoveries; in 2028 we could be looking at big ones. This is a really big deal; we think that science, and the institutions that let us widely distribute the fruits of science, are the most important ways that quality of life improves over time.",
+          "text": "Yesterday we did a livestream. TL;DR:\n\nWe have set internal goals of having an automated AI research intern by September of 2026 running on hundreds of thousands of GPUs, and a true automated AI researcher by March of 2028. We may totally fail at this goal, but given the extraordinary potential impacts we think it is in the public interest to be transparent about this.\n\nWe have a safety strategy that relies on 5 layers: Value alignment, Goal alignment, Reliability, Adversarial robustness, and System safety. Chain-of-thought faithfulness is a tool we are particularly excited about, but it is somewhat fragile and requires drawing a boundary and a clear abstraction.\n\nOn the product side, we are trying to move towards a true platform, where people and companies building on top of our offerings will capture most of the value. Today people can build on our API and apps in ChatGPT; eventually, we want to offer an AI cloud that enables huge businesses.\n\nWe have currently committed to about 30 gigawatts of compute, with a total cost of ownership over the years of about $1.4 trillion. We are comfortable with this given what we see on the horizon for model capability growth and revenue growth. We would like to do more—we would like to build an AI factory that can make 1 gigawatt per week of new capacity, at a greatly reduced cost relative to today—but that will require more confidence in future models, revenue, and technological/financial innovation.\n\nOur new structure is much simpler than our old one. We have a non-profit called OpenAI Foundation that governs a Public Benefit Corporation called OpenAI Group. The foundation initially owns 26% of the PBC, but it can increase with warrants over time if the PBC does super well. The PBC can attract the resources needed to achieve the mission.\n\nOur mission, for both our non-profit and PBC, remains the same: to ensure that artificial general intelligence benefits all of humanity.\n\nThe nonprofit is initially committing $25 billion to health and curing disease, and AI resilience (all of the things that could help society have a successful transition to a post-AGI world, including technical safety but also things like economic impact, cyber security, and much more). The nonprofit now has the ability to actually deploy capital relatively quickly, unlike before.\n\nIn 2026 we expect that our AI systems may be able to make small new discoveries; in 2028 we could be looking at big ones. This is a really big deal; we think that science, and the institutions that let us widely distribute the fruits of science, are the most important ways that quality of life improves over time.",
           "created_at": "2025-10-29T17:19:00.000Z",
           "tags": [
             "Alignment",
@@ -3744,7 +3743,7 @@
     "cross_corpus": {
       "label": "Cross-Corpus Debates",
       "icon": "link",
-      "count_full": 13,
+      "count_full": 8,
       "entries": [
         {
           "id": "debate_exponential_progress",
@@ -3950,138 +3949,6 @@
             "Evaluation Awareness",
             "METR",
             "LessWrong"
-          ]
-        },
-        {
-          "id": "debate_ai_water_usage",
-          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "source_label": "Open dataset",
-          "title": "AI Water Usage: Real Crisis or Misunderstood Metric?",
-          "author": "Cross-corpus synthesis",
-          "date": "2026-02-15",
-          "category": "environmental_impact",
-          "summary": "Is AI's water consumption a genuine environmental crisis or an overstated concern driven by misleading per-query metrics?",
-          "central_tension": "AI infrastructure has material local water and energy impacts, but per-query water metrics can mislead without production, siting, and cooling context.",
-          "featured_source_title": "Data Centers Water Footprint: The Need for More Transparency",
-          "featured_source_author": "Ana Pinheiro Privette, Ana Barros, Ximing Cai",
-          "featured_source_corpus": "ArXiv / AGU Advances",
-          "corpora_synthesized": [
-            "ArXiv",
-            "AI Laws",
-            "METR",
-            "Interviews"
-          ],
-          "tags": [
-            "Cross-Corpus",
-            "Water Usage",
-            "Data Centers",
-            "Environmental Impact",
-            "Energy"
-          ]
-        },
-        {
-          "id": "debate_ai_labor_automation",
-          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "source_label": "Open dataset",
-          "title": "AI Labor Automation: Augmentation or Displacement?",
-          "author": "Cross-corpus synthesis",
-          "date": "2026-02-15",
-          "category": "societal_impact",
-          "summary": "Is current AI primarily augmenting workers, or is it already a displacement pressure that requires stronger labor policy?",
-          "central_tension": "Task-level productivity and augmentation signals do not settle displacement, job-quality, or algorithmic employment-governance risks.",
-          "featured_source_title": "The Anthropic Economic Index",
-          "featured_source_author": "Anthropic Societal Impacts Team",
-          "featured_source_corpus": "Interviews / Lab Reports",
-          "corpora_synthesized": [
-            "Interviews",
-            "METR",
-            "AI Laws",
-            "ArXiv"
-          ],
-          "tags": [
-            "Cross-Corpus",
-            "Labor",
-            "Automation",
-            "Employment",
-            "Productivity"
-          ]
-        },
-        {
-          "id": "debate_ai_education_integrity",
-          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "source_label": "Open dataset",
-          "title": "AI in Education: Learning Tool or Assessment Threat?",
-          "author": "Cross-corpus synthesis",
-          "date": "2026-02-15",
-          "category": "societal_impact",
-          "summary": "Should education policy encourage broad AI adoption, or restrict AI use around assessment and student evaluation?",
-          "central_tension": "AI can expand teaching capacity while undermining assessment trust if grading, attribution, and foundational-skill policies lag adoption.",
-          "featured_source_title": "Anthropic Education Report: How educators use Claude",
-          "featured_source_author": "Drew Bent et al.",
-          "featured_source_corpus": "Interviews / Lab Reports",
-          "corpora_synthesized": [
-            "Interviews",
-            "AI Laws",
-            "ArXiv"
-          ],
-          "tags": [
-            "Cross-Corpus",
-            "Education",
-            "Assessment Integrity",
-            "AI Literacy",
-            "Human Oversight"
-          ]
-        },
-        {
-          "id": "debate_ai_copyright_training",
-          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "source_label": "Open dataset",
-          "title": "AI Training and Copyright: Fair Use or Licensing Market?",
-          "author": "Cross-corpus synthesis",
-          "date": "2026-02-15",
-          "category": "policy_dispute",
-          "summary": "Should developers be allowed to train on copyrighted works under fair use, or should licensing and compensation be required?",
-          "central_tension": "AI training copyright policy turns on fair-use facts, market substitution, training-data transparency, and whether licensing can scale.",
-          "featured_source_title": "Copyright and Artificial Intelligence, Part 3: Generative AI Training",
-          "featured_source_author": "U.S. Copyright Office",
-          "featured_source_corpus": "AI Laws",
-          "corpora_synthesized": [
-            "AI Laws",
-            "Court Filings",
-            "Policy Reports"
-          ],
-          "tags": [
-            "Cross-Corpus",
-            "Copyright",
-            "Training Data",
-            "Fair Use",
-            "Transparency"
-          ]
-        },
-        {
-          "id": "debate_multimodal_deepfake_governance",
-          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
-          "source_label": "Open dataset",
-          "title": "Multimodal AI: Can Likeness and Deepfake Rules Keep Up?",
-          "author": "Cross-corpus synthesis",
-          "date": "2026-02-15",
-          "category": "policy_dispute",
-          "summary": "Can watermarking, disclosure, and platform safeguards manage video/audio generation risks, or are stronger restrictions needed?",
-          "central_tension": "Provenance and staged deployment reduce some synthetic-media risks, but likeness, voice, NCII, and election harms often require enforceable duties.",
-          "featured_source_title": "NIST AI 100-4: Reducing Risks Posed by Synthetic Content",
-          "featured_source_author": "NIST",
-          "featured_source_corpus": "AI Laws",
-          "corpora_synthesized": [
-            "AI Laws",
-            "Interviews",
-            "Technical Guidance"
-          ],
-          "tags": [
-            "Cross-Corpus",
-            "Deepfakes",
-            "Multimodal AI",
-            "Watermarking",
-            "Likeness Rights"
           ]
         }
       ]
