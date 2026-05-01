@@ -14,7 +14,17 @@ import {
   SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
-import * as terminology from '../../utilities/ui/terminology.js';
+
+const mockIsCryptoMode = jest.fn(() => true);
+
+jest.mock('../../utilities/ui/terminology.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/terminology.js');
+  return {
+    __esModule: true,
+    ...actual,
+    isCryptoMode: (...args) => mockIsCryptoMode(...args),
+  };
+});
 
 jest.mock('utilities/ui/blockieAvatars.js', () => ({
   generateBlockieDataUrl: jest.fn(() => ''),
@@ -3527,23 +3537,19 @@ describe('SBTPage modal holder optimizations', () => {
   });
 
   it('hides the mini-card address in plain mode', () => {
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
+    mockIsCryptoMode.mockReturnValue(false);
     const { cardNode } = renderMiniCardNode();
 
     expect(findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress)).toBeNull();
-
-    cryptoModeSpy.mockRestore();
   });
 
   it('shows the mini-card address in crypto mode', () => {
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
+    mockIsCryptoMode.mockReturnValue(true);
     const { cardNode, sbtAddress } = renderMiniCardNode();
     const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
 
     expect(addressNode).not.toBeNull();
     expect(flattenText(addressNode)).toContain(getShortenedAddress(sbtAddress, false));
-
-    cryptoModeSpy.mockRestore();
   });
 
   it('includes the resolved session slug in mini-card navigation when one is available', () => {
