@@ -59,7 +59,7 @@ type BuildQuestionReadyArgs = {
   incrementNonce?: boolean;
 };
 
-type QuestionScanProgressLike = {
+export type QuestionScanProgressLike = {
   phase?: string;
   pendingMetadataCount?: number;
   discoveredQuestions?: number;
