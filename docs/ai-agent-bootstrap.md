@@ -51,7 +51,7 @@ It does two things:
 | [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md) | Adds a reproducible “real contracts, local gas” verification lane for agent-driven validation. | `docs/run-modes.md`, `docs/e2e-setup.md`, `.env.e2e.example`, and future E2E chain-runtime support |
 | [PRD 015](../TODO/PRDs/015_mcp-server-contextengine-cc.md) | Adds MCP read/respond tools to `contextEngine-cc` so agents can query sessions and submit responses without the hook path. | `contextEngine-cc/lib/routeInventory.mjs`, current local server + hook |
 | [PRD 075](../TODO/PRDs/075_json-api-and-mcp-resource-creation.md) | Adds headless create-session / create-SBT / create-survey surfaces plus JSON-prefill flows for agents. | current SessionWizard / authoring UI payloads and future create APIs |
-| [PRD 509](../TODO/PRDs/509_coordinated-shell-cleanup-for-remaining-jsx-shells.md) | Removes the last high-risk JSX controller shells so agents can edit the app shell more safely. | `MainSite.jsx`, `SurveyTool.jsx`, `DeferredCommitSlider.jsx` |
+| [PRD 509](../TODO/PRDs/509_coordinated-shell-cleanup-for-remaining-jsx-shells.md) | Removes the last high-risk JSX controller shells so agents can edit the app shell more safely. | `MainSite.tsx`, `SurveyTool.tsx`, `DeferredCommitSlider.tsx` |
 | [PRD 204](../TODO/PRDs/204_contextengine-cc-native-terminal-panel.md) | Tracks an optional future native Claude terminal panel, while keeping the current hook/statusline/PWA path as the supported default. | `contextEngine-cc/status/statusline.mjs`, `contextEngine-cc/hook/hook.mjs` |
 
 ## Practical Rule Of Thumb
