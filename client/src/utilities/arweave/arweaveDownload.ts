@@ -43,7 +43,6 @@ export interface ArweaveDownloadOpsDeps {
   runArweaveTxFetchCoalesced: (opts: {
     chainId: number;
     txId: string;
-    forceFetch?: boolean;
     task: () => Promise<string>;
   }) => Promise<string>;
   buildArweaveDebugContext?: (...args: unknown[]) => unknown;
@@ -139,7 +138,6 @@ export function createArweaveDownloadOps({
     return runArweaveTxFetchCoalesced({
       chainId,
       txId: normalizedTxId,
-      forceFetch: forceArweaveFetch,
       task: async () => {
         const cached = await readArweaveTxCacheEntry({ groupKeyOrCfg, txId: normalizedTxId });
         if (!forceArweaveFetch && cached && typeof cached.text === 'string' && cached.text.length > 0) {
