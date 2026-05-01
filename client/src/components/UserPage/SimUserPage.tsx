@@ -11,7 +11,7 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from '../../utilities/ui/historicalFigureAvatars.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { buildAtlasNodeRoute, buildPublicRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 
 type SimUserPageProps = {

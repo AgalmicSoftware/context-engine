@@ -5,8 +5,6 @@ import { deserializeFilterState, serializeFilterState } from '../../utilities/su
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import { buildAtlasNodeRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
-import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
-import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { sbtBasePath, t } from '../../utilities/ui/terminology.js';
 import styles from './BookmarksPage.module.scss';
