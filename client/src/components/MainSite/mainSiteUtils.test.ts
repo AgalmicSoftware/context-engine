@@ -33,7 +33,7 @@ import {
   isMainSitePerfCountersEnabled,
   bumpMainSitePerfCounter,
   getMainSitePerfNow,
-} from './mainSiteUtils.ts';
+} from './mainSiteUtils';
 
 type MainSiteTestGlobals = typeof globalThis & {
   CE_SBT_SELECTOR_DEBUG?: unknown;

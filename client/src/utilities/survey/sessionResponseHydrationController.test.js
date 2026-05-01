@@ -22,7 +22,7 @@ jest.mock('ethers', () => ({
       }),
     },
   },
-}));
+}), { virtual: true });
 
 jest.mock('../web3/contractScripts.js', () => ({
   __esModule: true,
@@ -32,7 +32,7 @@ jest.mock('../web3/contractScripts.js', () => ({
     getResponse: jest.fn(),
   },
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
-}));
+}), { virtual: true });
 
 jest.mock('../crypto/cryptography.js', () => ({
   __esModule: true,
@@ -45,12 +45,12 @@ jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
   __esModule: true,
   ensureQuestionArweaveCacheBranches: jest.fn(),
   mergeQuestionArweaveCacheBranches: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('./questionResponsesWatermark.js', () => ({
   __esModule: true,
   resolvePersistedQuestionResponsesWatermark: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../components/MainSite/progressHelpers.js', () => ({
   __esModule: true,
