@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { cryptoUtils } from '../../../utilities/crypto/cryptography.js';
 import { INVALID_SESSION_SLUG_FORMAT_ERROR } from '../sessionWizardSlugValidation';
-import useSessionWizardWorkerDeploy from './useSessionWizardWorkerDeploy';
+import useSessionWizardWorkerDeploy, { type SessionWizardWorkerDeployRuntime } from './useSessionWizardWorkerDeploy';
 
 jest.mock('../../../utilities/crypto/cryptography.js', () => ({
   cryptoUtils: {
@@ -15,7 +15,7 @@ const buildHookOptions = () => ({
       current: {
         draft: {},
         deployForm: {},
-      },
+      } as SessionWizardWorkerDeployRuntime,
     },
     resolvedWalletAccountRef: {
       current: '',
