@@ -291,7 +291,7 @@ Intent for these features:
 ### Frontend (React)
 
 - UI lives under `client/` and is primarily React class components with some modern hooks-based modules.
-- Routing is centralized via `client/src/components/MainSite/MainSite.jsx` (path parsing and lazy module loading).
+- Routing is centralized via `client/src/components/MainSite/MainSite.tsx` (path parsing and lazy module loading).
 - State management uses Redux (`client/src/store.js`, reducers under `client/src/reducers/`).
 - Group/session-aware caches are stored in localStorage under `dg:<cacheName>:<slug>` keys (see `docs/cache/*`).
 

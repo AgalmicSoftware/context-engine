@@ -9,6 +9,7 @@ const ROOT = path.resolve(__dirname, '..');
 
 const TRACKED_ANCHOR_FILES = Object.freeze([
   'AGENTS.md',
+  'ARCHITECTURE.md',
   'docs/MainSite.MAP.md',
   'docs/SessionWizard.MAP.md',
   'docs/SurveyTool.MAP.md',
@@ -18,6 +19,7 @@ const TRACKED_ANCHOR_FILES = Object.freeze([
   'docs/porto-information.md',
   'docs/repo-structure.md',
   'scripts/audit-full.sh',
+  'spec.md',
 ]);
 
 const STALE_COMPONENT_DOC_PATHS = Object.freeze([
