@@ -6,11 +6,6 @@ import {
 } from '../arweave/arweaveRetryHelpers.js';
 import { prepareSurveyMetadataCacheEntry } from '../../components/MainSite/metadataCacheEntryBuilders.js';
 import { resolveScopedMetadataSessionSlug } from '../../components/MainSite/metadataSessionBinding.js';
-import {
-  normalizeSurveyResponseBatchResult,
-  resolveSurveyResponseWatermark,
-  type SurveyResponseItem,
-} from './sessionSurveyResponseHelpers.js';
 
 type StateRecord = Record<string, unknown>;
 type CacheRecord = Record<string, unknown>;
@@ -23,6 +18,24 @@ interface SurveyInitOptions {
 interface QueueLocalRevisionUpdateOptions {
   needsQuestionResponsesNonce?: boolean;
   checkAllCachesReady?: boolean;
+}
+
+interface SurveyResponseItem {
+  responder: string;
+  response: unknown;
+}
+
+interface NormalizedSurveyResponseBatchResult {
+  responses: SurveyResponseItem[];
+  hadPartialFailure: boolean;
+  lowestFailedBlock: number | null;
+}
+
+interface ResolveSurveyResponseWatermarkArgs {
+  startBlock: number;
+  latestBlock: number;
+  hadPartialFailure: boolean;
+  lowestFailedBlock: number | null;
 }
 
 interface SurveyMetadata extends CacheRecord {
@@ -101,37 +114,6 @@ interface PendingSurveyRetryResult {
   err?: unknown;
 }
 
-interface SurveyContractScripts {
-  getRelevantBlockWindowForFilter: (
-    slug: string
-  ) => Promise<{ fromBlock: number; toBlock: number }>;
-  getSurveyDataById: (
-    providerName: string,
-    surveyId: string,
-    slug: string,
-    opts?: CacheRecord
-  ) => Promise<SurveyMetadata | null>;
-  fetchUserSubmittedSurveyIDs: (
-    providerName: string,
-    fromBlock: number,
-    toBlock: number,
-    slug: string
-  ) => Promise<SurveyDiscoveryItem[]>;
-  fetchAllSurveyResponses: (
-    providerName: string,
-    surveyId: string,
-    startBlock: number,
-    latestBlock: number,
-    slug: string
-  ) => Promise<unknown>;
-  listenForSurveyEvents?: (
-    providerName: string,
-    handler: (event: unknown) => unknown,
-    slug: string
-  ) => unknown;
-  removeSurveyEventsListener?: (providerName: string, slug: string) => unknown;
-}
-
 export interface SessionSurveyCacheHost {
   [key: string]: unknown;
   setState?: (updater: SetStateArg, cb?: () => void) => void;
@@ -142,9 +124,7 @@ export interface SessionSurveyCacheHost {
   getActiveSessionSlug?: () => string;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getSessionScanScope?: () => string;
-  shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
-  onSurveyEventDetectedForGroup?: (slug: string, event: unknown) => unknown;
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   writeSurveyMetadataToCache?: (
@@ -159,16 +139,55 @@ export interface SessionSurveyCacheHost {
 }
 
 export interface SessionSurveyCacheController {
-  initializeSurveyCacheForGroup: (slug: string, opts?: SurveyInitOptions) => Promise<void>;
+  initializeSurveyCacheForGroup: (slug: string) => Promise<void>;
   refreshSurveyResponsesByIDForGroup: (slug: string, surveyID: string) => Promise<void>;
-  startSurveyAndQuestionEventListener: () => boolean;
-  startSurveyAndQuestionEventListenerForGroup: (slugIn?: string | null) => boolean;
   isInitInFlight: (slug: string) => boolean;
   destroy: () => void;
 }
 
 const mainSiteLog = createLogger('mainSite');
-const surveyContractScripts = contractScripts as unknown as SurveyContractScripts;
+const contractScriptsAny = contractScripts as any;
+
+const normalizeSurveyResponseBatchResult = (
+  batchResult: unknown
+): NormalizedSurveyResponseBatchResult => {
+  if (Array.isArray(batchResult)) {
+    return {
+      responses: batchResult as SurveyResponseItem[],
+      hadPartialFailure: false,
+      lowestFailedBlock: null,
+    };
+  }
+  const batchRecord = (
+    batchResult && typeof batchResult === 'object'
+      ? batchResult
+      : {}
+  ) as CacheRecord;
+  const responses = Array.isArray(batchRecord.responses)
+    ? (batchRecord.responses as SurveyResponseItem[])
+    : [];
+  const lowestFailedBlock = Number(batchRecord.lowestFailedBlock);
+  return {
+    responses,
+    hadPartialFailure: !!batchRecord.hadPartialFailure,
+    lowestFailedBlock: Number.isFinite(lowestFailedBlock) ? lowestFailedBlock : null,
+  };
+};
+
+const resolveSurveyResponseWatermark = ({
+  startBlock,
+  latestBlock,
+  hadPartialFailure,
+  lowestFailedBlock,
+}: ResolveSurveyResponseWatermarkArgs): number => {
+  if (!hadPartialFailure) return latestBlock;
+  const failedBlock = Number(lowestFailedBlock);
+  if (!Number.isFinite(failedBlock)) return latestBlock;
+  return Math.max(
+    Math.max(0, Number(startBlock) - 1),
+    Math.min(Number(latestBlock) || 0, failedBlock - 1)
+  );
+};
 
 export const createSessionSurveyCacheController = (
   host: SessionSurveyCacheHost = {}
@@ -204,16 +223,6 @@ export const createSessionSurveyCacheController = (
   );
   const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean => (
     typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false
-  );
-  const shouldSkipSessionScanForSlug = (slug: string, op: string, scopeCtx?: unknown): boolean => (
-    typeof host.shouldSkipSessionScanForSlug === 'function'
-      ? host.shouldSkipSessionScanForSlug(slug, op, scopeCtx)
-      : false
-  );
-  const onSurveyEventDetectedForGroup = (slug: string, event: unknown): unknown => (
-    typeof host.onSurveyEventDetectedForGroup === 'function'
-      ? host.onSurveyEventDetectedForGroup(slug, event)
-      : undefined
   );
   const checkAllCachesReady = (): void => {
     if (typeof host.checkAllCachesReady === 'function') {
@@ -315,7 +324,7 @@ export const createSessionSurveyCacheController = (
         ));
         const networkID = String(getSessionChainId(slug) || '');
 
-        const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
+        const { fromBlock: baseFrom, toBlock: baseTo } = await contractScriptsAny.getRelevantBlockWindowForFilter(slug);
         if (baseFrom > baseTo) {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
           return;
@@ -569,7 +578,7 @@ export const createSessionSurveyCacheController = (
                   };
                 }
                 try {
-                  const surveyData = await surveyContractScripts.getSurveyDataById(
+                  const surveyData = await contractScriptsAny.getSurveyDataById(
                     'none',
                     sidLower,
                     slug,
@@ -688,7 +697,7 @@ export const createSessionSurveyCacheController = (
 
           if (fromBlockForSurveyDiscovery <= latestBlock) {
             mainSiteLog.log(`Fetching survey IDs from block ${fromBlockForSurveyDiscovery} to ${latestBlock} (group=${slug})`);
-            surveyItems = await surveyContractScripts.fetchUserSubmittedSurveyIDs(
+            surveyItems = await contractScriptsAny.fetchUserSubmittedSurveyIDs(
               'none',
               fromBlockForSurveyDiscovery,
               latestBlock,
@@ -719,7 +728,7 @@ export const createSessionSurveyCacheController = (
                 let surveyFetchErr: unknown = null;
                 try {
                   // eslint-disable-next-line no-await-in-loop
-                  surveyData = await surveyContractScripts.getSurveyDataById(
+                  surveyData = await contractScriptsAny.getSurveyDataById(
                     'none',
                     surveyID,
                     slug,
@@ -791,48 +800,38 @@ export const createSessionSurveyCacheController = (
               mainSiteLog.log(
                 `Fetching/updating responses for survey ${surveyIDLower}, from block ${startBlock} up to ${latestBlock} (group=${slug})`
               );
-              try {
-                const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
-                  'none',
-                  surveyIDLower,
-                  startBlock,
-                  latestBlock,
-                  slug
-                ));
+              const surveyResponseBatch = normalizeSurveyResponseBatchResult(await contractScriptsAny.fetchAllSurveyResponses(
+                'none',
+                surveyIDLower,
+                startBlock,
+                latestBlock,
+                slug
+              ));
 
-                if (!currentNetworkCache.surveyResponses[surveyIDLower]) {
-                  currentNetworkCache.surveyResponses[surveyIDLower] = {};
-                }
-                for (const item of surveyResponseBatch.responses) {
-                  const responderAddr = item.responder.toLowerCase();
-                  currentNetworkCache.surveyResponses[surveyIDLower][responderAddr] = item.response;
-
-                  const uData = ensureUserNode(responderAddr, latestBlock);
-                  if (!uData.surveyResponses) uData.surveyResponses = [];
-                  if (!uData.surveyResponses.some((response) => response.surveyId === surveyIDLower)) {
-                    uData.surveyResponses.push({
-                      surveyId: surveyIDLower,
-                      responder: responderAddr,
-                      response: item.response,
-                    });
-                    userCacheModified = true;
-                  }
-                }
-                currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
-                  startBlock,
-                  latestBlock,
-                  hadPartialFailure: surveyResponseBatch.hadPartialFailure,
-                  lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
-                });
-              } catch (error: unknown) {
-                mainSiteLog.warn('Error fetching survey responses; leaving watermark unchanged', {
-                  slug,
-                  surveyID: surveyIDLower,
-                  startBlock,
-                  latestBlock,
-                  error,
-                });
+              if (!currentNetworkCache.surveyResponses[surveyIDLower]) {
+                currentNetworkCache.surveyResponses[surveyIDLower] = {};
               }
+              for (const item of surveyResponseBatch.responses) {
+                const responderAddr = item.responder.toLowerCase();
+                currentNetworkCache.surveyResponses[surveyIDLower][responderAddr] = item.response;
+
+                const uData = ensureUserNode(responderAddr, latestBlock);
+                if (!uData.surveyResponses) uData.surveyResponses = [];
+                if (!uData.surveyResponses.some((response) => response.surveyId === surveyIDLower)) {
+                  uData.surveyResponses.push({
+                    surveyId: surveyIDLower,
+                    responder: responderAddr,
+                    response: item.response,
+                  });
+                  userCacheModified = true;
+                }
+              }
+              currentNetworkCache.surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
+                startBlock,
+                latestBlock,
+                hadPartialFailure: surveyResponseBatch.hadPartialFailure,
+                lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
+              });
             }
           }
 
@@ -875,27 +874,6 @@ export const createSessionSurveyCacheController = (
     }
   };
 
-  const startSurveyAndQuestionEventListenerForGroup = (slugIn: string | null = ''): boolean => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    mainSiteLog.log('startSurveyAndQuestionEventListenerForGroup() – Setting up survey & question events listener', { slug });
-    if (typeof surveyContractScripts.removeSurveyEventsListener === 'function') {
-      surveyContractScripts.removeSurveyEventsListener('none', slug);
-    }
-    if (shouldSkipSessionScanForSlug(slug, 'startSurveyAndQuestionEventListenerForGroup')) return false;
-    if (typeof surveyContractScripts.listenForSurveyEvents !== 'function') return false;
-    surveyContractScripts.listenForSurveyEvents(
-      'none',
-      (event: unknown) => onSurveyEventDetectedForGroup(slug, event),
-      slug
-    );
-    mainSiteLog.log('Survey & Question event listener started');
-    return true;
-  };
-
-  const startSurveyAndQuestionEventListener = (): boolean => (
-    startSurveyAndQuestionEventListenerForGroup(getActiveSessionSlug())
-  );
-
   const refreshSurveyResponsesByIDForGroup = async (slugIn: string, surveyID: string): Promise<void> => {
     const slug = normalizeSessionSlug(slugIn || '');
     mainSiteLog.log('refreshSurveyResponsesByIDForGroup() for surveyID:', surveyID, 'slug:', slug);
@@ -904,7 +882,7 @@ export const createSessionSurveyCacheController = (
       mainSiteLog.warn('No group chainId available');
       return;
     }
-    const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom, toBlock: baseTo } = await contractScriptsAny.getRelevantBlockWindowForFilter(slug);
     const initialLastBlockSurvey = Math.max(0, baseFrom - 1);
     const surveysCache = (dgRead('surveysCache', slug) || {}) as Record<string, SurveyNetworkCache>;
 
@@ -949,7 +927,7 @@ export const createSessionSurveyCacheController = (
     mainSiteLog.log(
       `Fetching new responses for surveyID ${surveyIDLower} from block ${startBlock} to ${latestChainBlock} (group=${slug})`
     );
-    const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
+    const surveyResponseBatch = normalizeSurveyResponseBatchResult(await contractScriptsAny.fetchAllSurveyResponses(
       'none',
       surveyIDLower,
       startBlock,
@@ -978,8 +956,6 @@ export const createSessionSurveyCacheController = (
   return {
     initializeSurveyCacheForGroup,
     refreshSurveyResponsesByIDForGroup,
-    startSurveyAndQuestionEventListener,
-    startSurveyAndQuestionEventListenerForGroup,
     isInitInFlight,
     destroy,
   };
