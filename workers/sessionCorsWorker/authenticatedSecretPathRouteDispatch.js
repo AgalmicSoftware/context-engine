@@ -15,18 +15,13 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 } = {}) => {
   const isTranscribeRoute = path === '/transcribe' && method === 'POST';
   const isArweaveUploadRoute = path === '/arweave/upload' && method === 'POST';
-  const isStorageRoute = (
-    (path === '/storage/upload' && method === 'POST') ||
-    (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
-    (path === '/storage/list' && (method === 'GET' || method === 'POST'))
-  );
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute) {
+  if (!isTranscribeRoute && !isArweaveUploadRoute) {
     return { handled: false };
   }
 
   const route = isTranscribeRoute
     ? 'transcribe'
-    : (isStorageRoute ? 'storage' : 'arweave');
+    : 'arweave';
   const scope = isTranscribeRoute
     ? 'transcribe'
     : 'arweave';

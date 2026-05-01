@@ -1,4 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
+import { WORKER_SECRET_PERSISTED_FIELDS } from './sessionWizardWorkerSecretSupport';
 import type {
   AnyRecord,
   WorkerSecretSyncResult,
@@ -36,8 +37,8 @@ export const resolveWorkerSecretsSnapshot = ({
 export const buildWorkerSecretsPayload = (
   workerSecrets: WorkerSecretsLike = {}
 ): Record<string, string> => (
-  Object.entries(workerSecrets || {}).reduce((acc, [key, value]) => {
-    const trimmed = toStr(value).trim();
+  WORKER_SECRET_PERSISTED_FIELDS.reduce((acc, key) => {
+    const trimmed = toStr(workerSecrets?.[key]).trim();
     if (!trimmed) return acc;
     acc[key] = trimmed;
     return acc;

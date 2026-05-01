@@ -212,7 +212,6 @@ import {
   DEFAULT_WORKER_SECRETS,
   buildWorkerLitCredentialsConfig,
   getSessionWizardWorkerResourceKeys,
-  resolveSessionWizardEnabledWorkerSecrets,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -427,9 +426,9 @@ export const resolveSessionWizardChipotleHookConfig = ({
   draft = null,
 }: {
   workerSecretsEnabled?: boolean;
-  workerSecrets?: WorkerSecretsLike | UnknownRecord;
+  workerSecrets?: WorkerSecretsLike | AnyRecord;
   resolvedWorkerUrl?: string;
-  draft?: UnknownRecord | null;
+  draft?: AnyRecord | null;
 } = {}) => {
   if (!workerSecretsEnabled) return null;
   const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
@@ -947,10 +946,6 @@ const SessionWizard = ({
       defaults: DEFAULT_WORKER_SECRETS,
     })
   ), []);
-  const getCurrentEnabledWorkerSecrets = useCallback(() => resolveSessionWizardEnabledWorkerSecrets({
-    workerSecrets: getCurrentWorkerSecrets(),
-    workerSecretsEnabled,
-  }), [getCurrentWorkerSecrets, workerSecretsEnabled]);
   const applyWorkerSecretsUpdate = useCallback((nextValueOrUpdater) => {
     const current = resolveWorkerSecretsSnapshot({
       workerSecretsRef,
@@ -1098,15 +1093,6 @@ const SessionWizard = ({
   const workerResourceKeys = useMemo(
     () => getSessionWizardWorkerResourceKeys(),
     []
-  );
-  const normalizedDraftStorageProfile = useMemo(
-    () => normalizeSessionStorageProfileConfig(draft?.storageProfile),
-    [draft?.storageProfile]
-  );
-  const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
-  const visibleWorkerResourceKeys = useMemo(
-    () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
-    [cloudflareWorkerSbtGateMode, workerResourceKeys]
   );
   const setSessionHeaderStatus = useCallback((text = '', tone = 'default') => {
     setSessionHeaderUploadStatus(text);
@@ -4081,22 +4067,18 @@ const SessionWizard = ({
     }
     if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
     const rpcUrl = resolveWorkerRpcUrl();
-    if (!rpcUrl) missing.push('Worker RPC URL');
+    if (!rpcUrl) missing.push('RPC URL (include key in URL)');
     const hasAnyChipotleField = (
       CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
       !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
       !!toStr(secretsSnapshot?.litUsageApiKey).trim()
     );
-    const accountKeyOnlyChipotleConfig = !!toStr(secretsSnapshot?.litAccountApiKey).trim();
     const bootstrapOnlyChipotleConfig = (
-      accountKeyOnlyChipotleConfig ||
-      (
-        !!toStr(secretsSnapshot?.litApiBase).trim() &&
-        !toStr(secretsSnapshot?.litGroupId).trim() &&
-        !toStr(secretsSnapshot?.litPkpId).trim() &&
-        !toStr(secretsSnapshot?.litActionCid).trim() &&
-        !toStr(secretsSnapshot?.litUsageApiKey).trim()
-      )
+      !!toStr(secretsSnapshot?.litApiBase).trim() &&
+      !toStr(secretsSnapshot?.litGroupId).trim() &&
+      !toStr(secretsSnapshot?.litPkpId).trim() &&
+      !toStr(secretsSnapshot?.litActionCid).trim() &&
+      !toStr(secretsSnapshot?.litUsageApiKey).trim()
     );
     if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
       const requiredChipotleFields = [
@@ -4132,7 +4114,7 @@ const SessionWizard = ({
     const chainId = Number(registryChainId || draft?.networkChainId || network?.id || 0) || null;
     const chipotle = resolveSessionWizardChipotleHookConfig({
       workerSecretsEnabled,
-      workerSecrets: chipotleHookWorkerSecrets,
+      workerSecrets,
       resolvedWorkerUrl: resolvedWorkerBaseUrlForDelegation,
       draft,
     });
@@ -4155,8 +4137,13 @@ const SessionWizard = ({
     provider,
     registryChainId,
     resolvedWorkerBaseUrlForDelegation,
-    chipotleHookWorkerSecrets,
     workerSecretsEnabled,
+    workerSecrets.litAccountApiKey,
+    workerSecrets.litActionCid,
+    workerSecrets.litApiBase,
+    workerSecrets.litGroupId,
+    workerSecrets.litPkpId,
+    workerSecrets.litUsageApiKey,
   ]);
 
   const clearWorkerSecretFields = () => {

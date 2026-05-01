@@ -1,6 +1,6 @@
 # Lit v3 Design: Chipotle Worker-Mediated SBT-Gated Encryption
 
-_Last updated: May 9, 2026._
+_Last updated: April 29, 2026._
 
 ## Why this doc exists
 
@@ -77,24 +77,17 @@ Lit Action / PKP:
 
 ## Proposed v3 envelope direction
 
-The current v2 envelope should remain readable for non-Chipotle recipients, but
-Chipotle wrapped-key recipients now fail closed unless they use the v2
-policy-bound wrapped-key format.
+The current v2 envelope should remain readable during migration, but new v3 writes should stop depending on browser ACC `saveKey/getKey` semantics.
 
 Recommended v3 envelope shape:
 
 - ciphertext: existing CE AES-GCM encrypted payload
-- cekWrap: Chipotle ciphertext wrapping a JSON plaintext `{ v: 2, cekHex, policyFingerprint, policy }`
-- policy: canonical SBT gate policy `{ chainId, gateMode, sbtAddresses, litActionCid, litPkpId }`
-- litV: explicit wrapped-key version `2`
-- rpc: no stored request-selected RPC URL; check/decrypt RPC is chosen from the worker allowlist and verified by `provider.getNetwork().chainId`
+- cekWrap: PKP- or action-mediated wrapped CEK for Chipotle release
+- gate: explicit SBT gate metadata needed for verification
+- litV: explicit schema version such as `chipotle-sbt-v1`
+- rpcHint: optional worker-managed RPC selector when the Lit Action must read a non-default chain
 
 This keeps the user data format close to CE's current envelope model while swapping only the Lit recipient mechanism.
-
-Operationally, default Lit Action source changes require re-running
-`lit-chipotle-provision` or `lit-chipotle-bootstrap-session` for each
-Chipotle-enabled session. The worker verifies submitted action source against
-the configured `litActionCid` and does not fall back to old action CIDs.
 
 ## First real vertical slice
 
@@ -133,7 +126,7 @@ The current browser Lit runtime fans out from `client/src/utilities/crypto/litPr
 
 ### Session metadata and MainSite
 
-- `client/src/components/MainSite/MainSite.tsx`
+- `client/src/components/MainSite/MainSite.jsx`
 - `client/src/components/Sessions/SessionWizard.tsx`
 
 ### SBT metadata
@@ -219,7 +212,7 @@ The SBT gate itself still belongs in the Lit Action logic and request params, no
 
 Session Wizard now has two Chipotle automation paths:
 
-1. **Per-session account bootstrap**: when the wizard has only the visible Lit API key, it can call worker admin `lit-chipotle-bootstrap-session` after deploy. E2E/deploy env should prefer `LIT_USAGE_API_KEY`; the internal `litAccountApiKey` field and legacy `LIT_ACCOUNT_API_KEY` env fallback remain for backward compatibility. The worker uses the default Chipotle API base unless worker config/env overrides it, then:
+1. **Per-session account bootstrap**: when the wizard only has `litApiBase`, it can call worker admin `lit-chipotle-bootstrap-session` after deploy. The worker then:
    - creates a new Lit account
    - stores `litAccountApiKey` and `litUsageApiKey` as session secrets
    - creates the default group

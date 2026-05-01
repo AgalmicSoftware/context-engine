@@ -19,7 +19,7 @@ describe('sessionWizardSponsoredBundleSupport', () => {
       litAccountApiKey: 'account-secret',
       litUsageApiKey: 'lit-secret',
       deployGrantToken: 'deploy-token',
-    })).toBe('Sponsored resources applied: OpenAI key, Arweave wallet, Lit Chipotle config, Lit API key, Lit usage key, deploy access.');
+    })).toBe('Sponsored resources applied: OpenAI key, Arweave wallet, Lit Chipotle config, Lit account key, Lit usage key, deploy access.');
   });
 
   it('derives advanced-field notices from the sponsored bundle state', () => {

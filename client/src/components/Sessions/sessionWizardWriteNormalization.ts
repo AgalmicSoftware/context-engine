@@ -13,11 +13,13 @@ import {
   getVisibleSessionWizardContractKeys,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
+import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
 import type {
   AnyRecord,
   ChainIdLike,
   SessionContractLike,
   SessionContractsLike,
+  WorkerSecretsLike,
 } from '../shellTypes';
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -244,6 +246,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
   slug?: string;
   draft?: AnyRecord;
   deployPayload?: AnyRecord;
+  workerSecrets?: WorkerSecretsLike;
   account?: string;
   registryAddress?: string;
   registryChainId?: ChainIdLike;
@@ -295,10 +298,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     faucet: isObj(resolvedDeployPayload.faucet)
       ? cloneValue(resolvedDeployPayload.faucet)
       : cloneValue(resolveWorkerFaucetConfig()),
-    litCredentials: isWorkerSbtGateCloudflareStorageProfile(storageProfile)
-      ? {}
-      : buildWorkerLitCredentialsConfig(workerSecrets),
-    storageProfile,
+    litCredentials: buildWorkerLitCredentialsConfig(workerSecrets),
   };
 
   if (

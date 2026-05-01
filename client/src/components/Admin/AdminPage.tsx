@@ -246,15 +246,31 @@ const AdminPage = ({
     litAccountApiKey: '',
     litUsageApiKey: '',
   });
-  const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
-  const [clearedSecretKeys, setClearedSecretKeys] = useState<AdminSecretKeySet>(() => new Set());
-  const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
-  const [arweaveResource, setArweaveResource] = useState<any>(() => buildAdminArweaveEmptyResource());
-  const [faucetResource, setFaucetResource] = useState<any>(() => buildAdminFaucetEmptyResource());
-  const [litResource, setLitResource] = useState<any>(() => buildAdminLitNotConfiguredResource());
-  const arweaveResourceRequestRef = useRef(0);
-  const faucetResourceRequestRef = useRef(0);
-  const litResourceRequestRef = useRef(0);
+  const [workerSecretsDirty, setWorkerSecretsDirty] = useState<any>(false);
+  const [clearedSecretKeys, setClearedSecretKeys] = useState<any>(() => new Set());
+  const [openSecretCards, setOpenSecretCards] = useState<any>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
+  const [arweaveResource, setArweaveResource] = useState<any>({
+    address: '',
+    display: 'No JWK entered',
+    meta: 'Enter a JWK above to read the public wallet balance.',
+    loading: false,
+  });
+  const [faucetResource, setFaucetResource] = useState<any>({
+    address: '',
+    display: 'No faucet key entered',
+    meta: 'Enter a faucet private key above to read the wallet balance.',
+    loading: false,
+  });
+  const [litResource, setLitResource] = useState<any>({
+    address: '',
+    display: 'Lit Chipotle not configured',
+    meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+    loading: false,
+    manualRefreshAvailable: false,
+  });
+  const arweaveResourceRequestRef = useRef<any>(0);
+  const faucetResourceRequestRef = useRef<any>(0);
+  const litResourceRequestRef = useRef<any>(0);
   const rawMetadataCopyResetRef = useRef<any>(null);
   const prevSelectedSlugForDraftRef = useRef<any>(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef<any>(selectedSlug);
@@ -606,7 +622,13 @@ const AdminPage = ({
     });
     setWorkerSecretsDirty(false);
     setClearedSecretKeys(new Set());
-    setLitResource(buildAdminLitNotConfiguredResource());
+    setLitResource({
+      address: '',
+      display: 'Lit Chipotle not configured',
+      meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+      loading: false,
+      manualRefreshAvailable: false,
+    });
     setShowTestsPanel(false);
   }, [selectedSlug]);
 
@@ -1084,34 +1106,60 @@ const AdminPage = ({
     const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
 
     if (!useChipotlePath && !baseUrl) {
-      setLitResource(buildAdminLitNotConfiguredResource());
+      setLitResource({
+        address: '',
+        display: 'Lit Chipotle not configured',
+        meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+        loading: false,
+        manualRefreshAvailable: false,
+      });
       return;
     }
 
     if (!baseUrl || !selectedConfig) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource(buildAdminLitUnavailableResource({ useChipotlePath }));
+      setLitResource({
+        address: '',
+        display: useChipotlePath ? 'Worker unavailable' : 'Lit Chipotle not configured',
+        meta: useChipotlePath
+          ? 'Resolve the worker URL to read Lit Chipotle status.'
+          : 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+        loading: false,
+        manualRefreshAvailable: false,
+      });
       return;
     }
 
     if (!includeSignedStatus) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource(buildAdminLitStatusNotLoadedResource({
-        hasAccountApiKey: !!accountApiKey,
-        hasUsageApiKey: !!usageApiKey,
-        configuredLitApiBase,
-        configuredLitGroupId,
-        configuredLitPkpId,
-        configuredLitActionCid,
-        formatPreviewValue,
-      }));
+      setLitResource({
+        address: '',
+        display: 'Status not loaded',
+        meta: [
+          accountApiKey ? 'Unsaved account key' : '',
+          usageApiKey ? 'Unsaved usage key' : '',
+          !accountApiKey && !usageApiKey ? 'Saved worker config' : '',
+          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
+          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
+          configuredLitPkpId ? 'PKP configured' : '',
+          configuredLitActionCid ? 'Action configured' : '',
+          'Click refresh to query the worker for Lit Chipotle status.',
+        ].filter(Boolean).join(' • '),
+        loading: false,
+        manualRefreshAvailable: true,
+      });
       return;
     }
 
-    setLitResource(buildAdminLitLoadingResource({
-      configuredLitGroupId,
-      formatPreviewValue,
-    }));
+    setLitResource({
+      address: '',
+      display: 'Loading...',
+      meta: configuredLitGroupId
+        ? `Checking group ${formatPreviewValue(configuredLitGroupId, 20)}`
+        : 'Checking Lit Chipotle worker status',
+      loading: true,
+      manualRefreshAvailable: true,
+    });
 
     try {
       const slug = normalizeSlug(selectedSlug);
@@ -1128,27 +1176,59 @@ const AdminPage = ({
       });
       if (requestId !== litResourceRequestRef.current) return;
 
+      const ready = data?.ready === true;
       const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
       const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object'
         ? data.groupSummary
         : {};
+      const walletCount = groupSummary.walletCount == null ? null : Number(groupSummary.walletCount);
+      const actionCount = groupSummary.actionCount == null ? null : Number(groupSummary.actionCount);
+      const hasHardConfigMiss = (
+        groupSummary.hasConfiguredPkp === false ||
+        groupSummary.hasConfiguredAction === false
+      );
       const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
-      setLitResource(buildAdminLitStatusResource({
-        ready: data?.ready === true,
-        warnings,
-        groupSummary,
-        balanceDisplay,
-        configuredLitApiBase,
-        configuredLitGroupId,
-        configuredLitPkpId,
-        configuredLitActionCid,
-        formatPreviewValue,
-      }));
+      setLitResource({
+        address: '',
+        display: ready
+          ? 'Ready'
+          : hasHardConfigMiss
+            ? 'Needs config'
+            : warnings.length
+              ? 'Needs review'
+              : 'Configured',
+        meta: [
+          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
+          balanceDisplay ? `balance ${balanceDisplay}` : '',
+          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
+          configuredLitPkpId
+            ? (groupSummary.hasConfiguredPkp === true
+              ? 'PKP ready'
+              : groupSummary.hasConfiguredPkp === false
+                ? 'PKP missing'
+                : 'PKP unchecked')
+            : (walletCount != null ? `${walletCount} wallet${walletCount === 1 ? '' : 's'}` : ''),
+          configuredLitActionCid
+            ? (groupSummary.hasConfiguredAction === true
+              ? 'Action ready'
+              : groupSummary.hasConfiguredAction === false
+                ? 'Action missing'
+                : 'Action unchecked')
+            : (actionCount != null ? `${actionCount} action${actionCount === 1 ? '' : 's'}` : ''),
+          warnings.length ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : '',
+        ].filter(Boolean).join(' • ') || 'Lit Chipotle status loaded.',
+        loading: false,
+        manualRefreshAvailable: true,
+      });
     } catch (error: any) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource(buildAdminLitErrorResource(
-        getErrorMessage(error, 'Failed to load Lit Chipotle status.')
-      ));
+      setLitResource({
+        address: '',
+        display: 'Unable to load status',
+        meta: getErrorMessage(error, 'Failed to load Lit Chipotle status.'),
+        loading: false,
+        manualRefreshAvailable: true,
+      });
     }
   }, [
     secrets.litAccountApiKey,
@@ -1174,15 +1254,13 @@ const AdminPage = ({
       ? selectedConfig.litCredentials
       : {};
     return (
-      getAdminLitResourceLabel({
-        hasAccountApiKey: !!toStr(secrets.litAccountApiKey).trim(),
-        hasUsageApiKey: !!toStr(secrets.litUsageApiKey).trim(),
-        configuredLitApiBase: litCredentials?.litApiBase,
-        configuredLitGroupId: litCredentials?.litGroupId,
-        configuredLitPkpId: litCredentials?.litPkpId,
-        configuredLitActionCid: litCredentials?.litActionCid,
-      })
-    );
+      toStr(secrets.litAccountApiKey).trim() ||
+      toStr(secrets.litUsageApiKey).trim() ||
+      toStr(litCredentials?.litApiBase).trim() ||
+      toStr(litCredentials?.litGroupId).trim() ||
+      toStr(litCredentials?.litPkpId).trim() ||
+      toStr(litCredentials?.litActionCid).trim()
+    ) ? 'Lit Chipotle status' : 'Lit sponsorship status';
   }, [selectedConfig, secrets.litAccountApiKey, secrets.litUsageApiKey]);
 
   const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
@@ -1896,6 +1974,13 @@ const AdminPage = ({
     }
   };
 
+  const SECRET_CARDS = [
+    { key: 'ai', label: 'AI', fields: ['openaiKey', 'anthropicKey', 'openrouterKey'] },
+    { key: 'rpc', label: 'RPC', fields: ['customRpcUrl', 'customRpcKey'] },
+    { key: 'arweave', label: 'Arweave', fields: ['arweaveJwk'] },
+    { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
+    { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
+  ];
   const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
   const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
     ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
@@ -3039,9 +3124,20 @@ const AdminPage = ({
                       <div className={styles.secretOptionBody}>
                         {card.fields.map((fieldKey: any) => {
                           const secretFieldKey = String(fieldKey);
-                          const inputType = getAdminSecretFieldInputType(secretFieldKey);
-                          const isTextarea = inputType === 'textarea';
-                          const label = getAdminSecretFieldLabel(secretFieldKey);
+                          const isTextarea = secretFieldKey === 'arweaveJwk';
+                          const isPassword = !isTextarea && secretFieldKey !== 'customRpcUrl';
+                          const secretFieldLabels: Record<string, string> = {
+                            openaiKey: 'OpenAI API key',
+                            anthropicKey: 'Anthropic API key',
+                            openrouterKey: 'OpenRouter API key',
+                            customRpcUrl: 'Custom RPC URL',
+                            customRpcKey: 'Custom RPC key',
+                            arweaveJwk: 'Arweave JWK (JSON)',
+                            faucetPrivateKey: 'Faucet private key',
+                            litAccountApiKey: 'Lit account API key',
+                            litUsageApiKey: 'Lit usage API key',
+                          };
+                          const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
                           return (
                             <FormGroup key={secretFieldKey}>
                               <Label>{label}</Label>

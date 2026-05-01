@@ -14,7 +14,7 @@ Primary docs:
 
 ---
 
-## Current CE Chipotle plan (2026-05-09)
+## Current CE Chipotle plan (2026-04-29)
 
 - Context Engine cannot preserve its old browser-native Naga auth-context / ACC flow as-is on Chipotle.
 - The current migration direction is therefore **worker-mediated Chipotle execution**:
@@ -25,12 +25,6 @@ Primary docs:
   - worker env fallback: `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY` when self-hosts prefer a usage-only env key)
   - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`
   - per-session worker config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }`
-- Runtime security contract:
-  - `op: "encrypt"` wraps a CEK for the configured audience but does not require the author to hold the target SBT
-  - `op: "check"` and `op: "decrypt"` still require the requester to satisfy the SBT gate
-  - Chipotle wrapped keys are v2 JSON payloads containing `{ v: 2, cekHex, policyFingerprint, policy }`; the action returns the CEK only when the embedded policy fingerprint matches the worker-approved policy
-  - legacy v1 / bare-hex Chipotle wrapped keys are rejected by default and should be recreated, not migrated in-place
-  - check/decrypt RPC selection is a worker trust decision: request `rpcUrl` / `customRpcUrl` is rejected unless it exactly matches a worker-approved URL, the action verifies `provider.getNetwork().chainId`, and stored Chipotle metadata does not carry RPC URLs
 - These fields are intentionally treated differently:
   - `litUsageApiKey` is a secret
   - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but still operational metadata and should stay in worker config rather than public session metadata by default
@@ -50,11 +44,6 @@ Primary docs:
     - `lit-chipotle-status`
     - `lit-chipotle-provision`
     - `lit-chipotle-bootstrap-session`
-- Re-provisioning note: any edit to the default CE Lit Action source changes the
-  derived `litActionCid`. Chipotle-enabled sessions must re-run
-  `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` before live
-  v2 wrapped-key encrypt/decrypt is expected to work. CE intentionally does not
-  fall back to older insecure action CIDs.
 - Current default CE architecture direction:
   - create one new Lit account per session
   - create one default group inside that account
@@ -100,19 +89,11 @@ still useful for understanding the older Naga-era implementation.
   - `litGroupId`
   - `litPkpId`
   - `litActionCid`
-- `/session/new` now presents the Lit setup as one manual field:
-  - bootstrap authority: `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`
-  - the worker uses the default Chipotle API base unless worker config/env overrides it, then derives and persists `litApiBase`, `litGroupId`, `litPkpId`, `litActionCid`, and `litUsageApiKey`
-  - scoped-runtime identifiers remain supported as worker-side/admin/sponsored-bundle config, but they are no longer hand-entered in the `/new` Lit card
+- `/session/new` now treats Lit setup in two distinct modes:
+  - bootstrap authority: `litApiBase` + `litAccountApiKey`
+  - scoped runtime: `litApiBase` + `litGroupId` + `litPkpId` + `litActionCid` + `litUsageApiKey`
 - `/admin` Lit quick tests now run against the currently active hook runtime rather than assuming a hidden legacy default.
-- When Porto passkey session-key mode is enabled and the current page has an
-  unlocked in-memory signer, typed-data signatures are auto-signed, so worker
-  auth and any remaining direct Lit SDK auth flows can run without extra
-  passkey prompts. Passive Porto restores only hydrate account metadata; they
-  do not make automatic decrypt paths interactive.
-- For non-creator gated metadata decrypts, CE prefers Lit SBT recipients before
-  trying the self EIP-712 unwrap path, avoiding a needless self-sign attempt
-  when the viewer should use the SBT gate.
+- When Porto passkey session-key mode is enabled, typed-data signatures are still auto-signed, so worker auth and any remaining direct Lit SDK auth flows can run without extra passkey prompts.
 
 ---
 
@@ -597,10 +578,10 @@ Key official pages used for traceability: see [Lit Protocol Developer Docs](http
 - Dev helper: `window.__litTools.encryptForSbt({ value, sbtAddresses, contextLabel })` returns a v1 envelope string.
 - Dev helper: `window.__litTools.decryptEnvelope(envelopeJson)` decrypts a v1 envelope (if you hold the gate SBT).
 - `/admin` now uses worker-mediated Lit status/bootstrap/provision checks; there is no supported generic admin execute helper.
-- `/new` Session Wizard no longer shows a Lit quick-test panel or scoped runtime fields; when old Lit metadata is rewritten it normalizes legacy network labels onto `chipotle`.
+- `/new` Session Wizard no longer shows a Lit quick-test panel; when old Lit metadata is rewritten it normalizes legacy network labels onto `chipotle`.
 - Demo session secrets live in `client/src/variables/demo/demo_sessions.json` under the `test` session.
 
 - CE should default to one reusable group per environment or trust boundary, not one group per session. The SBT gate itself belongs in Lit Action code and request params. Session-specific groups remain an optional isolation choice, not the default migration target.
 - Session Wizard can now automate both Chipotle setup modes from canonical CE action source:
   - existing-account mode: use `lit-chipotle-provision` to register the default CE action into a configured group/PKP, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`
-  - bootstrap mode: use `lit-chipotle-bootstrap-session` with a stored/session/deployment `litAccountApiKey` to derive the missing default group, PKP, usage key, and CE action before persisting the returned `litCredentials`; if no account key is available, the worker can still create a brand-new session account
+  - bootstrap mode: use `lit-chipotle-bootstrap-session` to either create a brand-new Lit account or, when a session/deployment `litAccountApiKey` already exists, derive the missing default group, PKP, usage key, and CE action inside that existing account before persisting the returned `litCredentials`

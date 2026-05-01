@@ -109,7 +109,6 @@ If you deploy via the Group Wizard and a deploy-helper:
   - `litAccountApiKey` is the per-bundle authority field backed by one disposable Lit account per bundle
   - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
   - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
-- The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
 - The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
@@ -829,21 +828,6 @@ Never return secrets in responses.
     default because they still reveal operational topology
   - worker env fallback to `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY`) for
     Chipotle-backed requests when a session-specific Lit account/usage key is not present
-  - `/lit/chipotle-action` now receives the worker `env` during authenticated
-    dispatch, so the deployment-level Lit env fallback applies to runtime
-    execution as well as status/provisioning paths
-  - v2 Chipotle wrapped keys bind `{ chainId, gateMode, sbtAddresses,
-    litActionCid, litPkpId }` into the encrypted plaintext via a policy
-    fingerprint; decrypt returns the CEK only when the embedded fingerprint
-    matches the worker-approved policy
-  - `encrypt` does not require target SBT ownership, while `check` and
-    `decrypt` still enforce the SBT gate
-  - `check` / `decrypt` derive RPC from worker-approved config, secrets, or
-    defaults. Request `rpcUrl` / `customRpcUrl` is rejected unless it exactly
-    matches that allowlist, and the Lit Action rejects endpoints whose reported
-    chain ID does not match the gate chain.
-  - stored Chipotle metadata omits RPC URLs; legacy v1 / bare-hex Chipotle
-    wrapped keys are rejected by default and must be recreated with v2 metadata
   - admin `POST /admin/lit-chipotle-status` to query worker-mediated Chipotle
     readiness, billing balance, and configured group/action/PKP membership
     without returning the stored API key
@@ -860,10 +844,6 @@ Never return secrets in responses.
     `litAccountApiKey` in the encrypted `/sponsor` payload so `/new` can mint a
     fresh group / PKP / usage key for each redeemed session, then keep using
     only the scoped runtime during day-to-day execution
-  - after default action-source changes, operators must re-run
-    `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` so session
-    `litCredentials.litActionCid` points at the newly derived action CID; there
-    is no compatibility fallback to the old action source
 
 ## Gating on login (on-chain)
 

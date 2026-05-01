@@ -238,9 +238,8 @@ const buildDecryptedSponsoredBundle = (overrides = {}) => {
     openrouterKey: 'sponsored-openrouter',
     arweaveJwk: '{"kty":"RSA"}',
     faucetPrivateKey: '0xsponsoredfaucet',
-    customRpcUrl: 'https://sponsored-rpc.example',
-    litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
-    litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+    customRpcUrl: 'https://sponsored-rpc.example.test',
+    litAccountApiKey: 'lit-account-secret',
     customRpcKey: 'ignore-me',
     meta: {
       label: 'Launch Week',
@@ -509,14 +508,13 @@ describe('SessionWizard sponsored bundle flow', () => {
     }));
   });
 
-  it('re-derives the Lit payer address when a sponsored bundle includes a payer key', () => {
-    const litPayerPrivateKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
+  it('merges sponsored Lit authority fields into worker secrets', () => {
     expect(mergeSponsoredBundleWorkerSecrets({}, {
-      litPayerPrivateKey,
-      litPayerAddress: '0x0000000000000000000000000000000000000001',
+      litAccountApiKey: 'account-secret',
+      litUsageApiKey: 'usage-secret',
     })).toEqual(expect.objectContaining({
-      litPayerPrivateKey,
-      litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+      litAccountApiKey: 'account-secret',
+      litUsageApiKey: 'usage-secret',
     }));
   });
 
@@ -993,8 +991,8 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(screen.queryByText('OpenRouter key')).not.toBeInTheDocument();
     expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('{"kty":"RSA"}');
     expect(getFieldInputByLabel('Faucet private key')).toHaveValue('0xsponsoredfaucet');
-    expect(getFieldInputByLabel('Lit API key')).toHaveValue('lit-account-secret');
-    expect(screen.queryByText('Lit usage API key')).not.toBeInTheDocument();
+    expect(getFieldInputByLabel('Lit account API key')).toHaveValue('lit-account-secret');
+    expect(getFieldInputByLabel('Lit usage API key')).toHaveValue('');
     expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example.test');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
     expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
@@ -1342,7 +1340,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
     expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example.test');
-    expect(getFieldInputByLabel('Lit API key')).toHaveValue('lit-account-secret');
+    expect(getFieldInputByLabel('Lit account API key')).toHaveValue('lit-account-secret');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
     expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
   });

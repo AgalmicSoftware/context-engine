@@ -91,28 +91,7 @@ export const buildWorkerLitCredentialsConfig = (
 
 export const sanitizeSessionWizardWorkerSecretsForLitMode = (
   value: WorkerSecretsLike | AnyRecord = {},
-): WorkerSecretsLike => {
-  const next = normalizeWorkerSecrets(value);
-  if (toStr(next.litAccountApiKey).trim()) {
-    CHIPOTLE_LIT_CONFIG_FIELDS.forEach((key) => {
-      next[key] = '';
-    });
-    next.litUsageApiKey = '';
-  }
-  return next;
-};
-
-export const resolveSessionWizardEnabledWorkerSecrets = ({
-  workerSecrets = {},
-  workerSecretsEnabled = true,
-}: {
-  workerSecrets?: WorkerSecretsLike | AnyRecord;
-  workerSecretsEnabled?: boolean;
-} = {}): WorkerSecretsLike => (
-  workerSecretsEnabled
-    ? sanitizeSessionWizardWorkerSecretsForLitMode(workerSecrets)
-    : { ...DEFAULT_WORKER_SECRETS }
-);
+): WorkerSecretsLike => normalizeWorkerSecrets(value);
 
 export const sanitizeSessionWizardSponsoredFieldSnapshotForLitMode = (
   value: AnyRecord = {},

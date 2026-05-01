@@ -484,29 +484,13 @@ export default function DocumentLibraryPanel({
       typeof sessionConfig.litCredentials === 'object' &&
       !Array.isArray(sessionConfig.litCredentials)
     ) ? sessionConfig.litCredentials as Record<string, unknown> : null;
-    const hasCompleteLitCredentials = !!(
-      litCredentials &&
+    return !!(
+      toStr(sessionConfig?.corsWorkerUrl).trim() &&
       toStr(litCredentials?.litApiBase).trim() &&
       toStr(litCredentials?.litActionCid).trim() &&
       toStr(litCredentials?.litPkpId).trim()
     );
-    const litConfig = (
-      sessionConfig &&
-      typeof sessionConfig === 'object' &&
-      sessionConfig.lit &&
-      typeof sessionConfig.lit === 'object' &&
-      !Array.isArray(sessionConfig.lit)
-    ) ? sessionConfig.lit as Record<string, unknown> : null;
-    const litNetworkHint = toStr(litConfig?.network || sessionConfig?.litNetwork).trim().toLowerCase();
-    return !!(
-      toStr(sessionConfig?.corsWorkerUrl).trim() &&
-      (
-        hasCompleteLitCredentials ||
-        litNetworkHint === 'chipotle' ||
-        docUploadsGate.hasRecipients
-      )
-    );
-  }, [docUploadsGate.hasRecipients, sessionConfig]);
+  }, [sessionConfig]);
   const sessionGateUnsupportedMessage = useMemo(() => (
     docUploadsGate.hasRecipients && !sessionHasLitChipotle
       ? getUnsupportedLitContractAccessControlErrorUntyped({
@@ -514,17 +498,6 @@ export default function DocumentLibraryPanel({
       })
       : ''
   ), [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id, sessionHasLitChipotle]);
-  const docAsyncConfigKey = useMemo(() => buildAsyncContextKeyPart({
-    corsWorkerUrl: toStr(sessionConfig?.corsWorkerUrl).trim(),
-    docLibrary: sessionConfig?.docLibrary || null,
-    docProvider,
-    docUploadsGate,
-    graphqlUrl,
-    graphqlUrls,
-    lit: sessionConfig?.lit || null,
-    litNetwork: toStr(sessionConfig?.litNetwork).trim(),
-    storageProfile: sessionConfig?.storageProfile || null,
-  }), [docProvider, docUploadsGate, graphqlUrl, graphqlUrls, sessionConfig]);
 
   const locationSearch = typeof window !== 'undefined' ? (window.location.search || '') : '';
 

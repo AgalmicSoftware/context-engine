@@ -1,13 +1,5 @@
 import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
 import { ethers } from 'ethers';
-import {
-  buildLitChipotlePolicy,
-  buildLitChipotleWrappedPlaintext,
-  fingerprintLitChipotlePolicy,
-  normalizeChipotleCekHex,
-  normalizeChipotleSbtAddresses,
-  normalizeLitChipotleMetadataVersion,
-} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
 
 const DEFAULT_LIT_API_BASE = 'https://api.chipotle.litprotocol.com';
 const CHIPOTLE_API_PREFIX = '/core/v1';
@@ -406,6 +398,20 @@ const normalizeSessionScopedNameSegment = (value, fallback = 'session') => {
   return normalized || fallback;
 };
 
+const normalizeSbtAddressList = (values = []) => {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(values) ? values : []).forEach((raw) => {
+    const value = toTrimmedString(raw);
+    if (!value) return;
+    const normalized = value.toLowerCase();
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(value);
+  });
+  return out;
+};
+
 const normalizeGateMode = (value) => (
   toTrimmedString(value).toLowerCase() === 'all' ? 'all' : 'any'
 );
@@ -479,49 +485,38 @@ const resolveSessionChipotleRpcUrl = ({
   request = {},
   config = {},
   secrets = {},
-  chainId = 0,
-  op = '',
 } = {}) => {
   const requestBody = isObj(request) ? request : {};
-  const normalizedChainId = toChainId(chainId);
-  const requestRpcUrl = toTrimmedString(requestBody.rpcUrl || requestBody.customRpcUrl);
+  const explicitRpcUrl = toTrimmedString(
+    requestBody.rpcUrl ||
+    requestBody.customRpcUrl ||
+    secrets?.customRpcUrl
+  );
+  if (explicitRpcUrl) {
+    return validateChipotleRpcUrl(explicitRpcUrl);
+  }
+
+  const chainId = toChainId(
+    requestBody.chainId ||
+    requestBody.gateChainId ||
+    config?.networkChainId ||
+    config?.registryChainId
+  );
   const candidates = normalizeChipotleRpcCandidateList([
-    secrets?.customRpcUrl,
-    ...resolveConfigMappedChipotleRpcUrls({ config, chainId: normalizedChainId }),
-    ...resolveDefaultChipotleRpcUrls(normalizedChainId),
+    ...resolveConfigMappedChipotleRpcUrls({ config, chainId }),
+    ...resolveDefaultChipotleRpcUrls(chainId),
   ]);
-  const approvedUrls = [];
-  const seen = new Set();
   for (const candidate of candidates) {
     try {
-      const normalized = validateChipotleRpcUrl(candidate);
-      const key = normalized.toLowerCase();
-      if (seen.has(key)) continue;
-      seen.add(key);
-      approvedUrls.push(normalized);
+      return validateChipotleRpcUrl(candidate);
     } catch {
       // Ignore invalid candidates and keep walking the fallback chain.
     }
   }
 
-  if (requestRpcUrl) {
-    const normalizedRequestRpcUrl = validateChipotleRpcUrl(requestRpcUrl);
-    const approved = approvedUrls.some((candidate) => (
-      candidate.toLowerCase() === normalizedRequestRpcUrl.toLowerCase()
-    ));
-    if (!approved) {
-      throw new Error('Lit Chipotle request RPC URL is not approved for this gate chain.');
-    }
-    return op === 'encrypt' ? '' : normalizedRequestRpcUrl;
-  }
-
-  if (op === 'encrypt') return '';
-
-  if (approvedUrls.length) return approvedUrls[0];
-
-  if (normalizedChainId) {
+  if (chainId) {
     throw new Error(
-      `Lit Chipotle RPC URL is required or chain ${normalizedChainId} must have a known default RPC.`
+      `Lit Chipotle RPC URL is required or chain ${chainId} must have a known default RPC.`
     );
   }
   throw new Error('Lit Chipotle RPC URL is required.');
@@ -855,25 +850,21 @@ export const bootstrapLitChipotleSession = async ({
 } = {}) => {
   const litCredentials = isObj(config?.litCredentials) ? config.litCredentials : {};
   const secretAccountApiKey = toTrimmedString(secrets?.litAccountApiKey);
-  const requestBody = isObj(request) ? request : {};
-  const requestAccountApiKey = toTrimmedString(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString(env?.LIT_ACCOUNT_API_KEY);
-  const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
+  const existingAccountApiKey = secretAccountApiKey || envAccountApiKey;
   const existingAccountApiKeySource = secretAccountApiKey
     ? 'session-secret'
-    : requestAccountApiKey
-      ? 'admin-request'
-      : envAccountApiKey
+    : envAccountApiKey
       ? 'worker-env'
       : 'missing';
   const existingUsageApiKey = toTrimmedString(secrets?.litUsageApiKey);
   const existingGroupId = toTrimmedString(litCredentials?.litGroupId);
   const existingPkpId = toTrimmedString(litCredentials?.litPkpId);
   const existingActionCid = toTrimmedString(litCredentials?.litActionCid);
+  const requestBody = isObj(request) ? request : {};
   const litApiBase = normalizeLitChipotleApiBase(
     requestBody.litApiBase ||
     litCredentials.litApiBase ||
-    env?.LIT_API_BASE ||
     DEFAULT_LIT_API_BASE
   );
 
@@ -1024,9 +1015,7 @@ export const bootstrapLitChipotleSession = async ({
         litPkpId,
       },
       secretOutputs: {
-        ...(secretAccountApiKey || requestAccountApiKey
-          ? { litAccountApiKey: existingAccountApiKey }
-          : {}),
+        ...(secretAccountApiKey ? { litAccountApiKey: existingAccountApiKey } : {}),
         ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
       },
       steps: {
@@ -1177,23 +1166,14 @@ export const executeLitChipotleAction = async ({
     payload.js_params = actionRequest.js_params;
   }
 
-  let response;
-  try {
-    response = await fetchChipotleJson({
-      apiBase: runtime.litApiBase,
-      apiKey: runtime.litUsageApiKey,
-      path: '/lit_action',
-      method: 'POST',
-      body: payload,
-      fetchImpl,
-    });
-  } catch (error) {
-    const message = toTrimmedString(error?.message || error);
-    if (/not found/i.test(message)) {
-      throw new Error('Lit Chipotle action was not found or is not permitted for this session usage key. Re-run Lit Chipotle provisioning for this session worker.');
-    }
-    throw error;
-  }
+  const response = await fetchChipotleJson({
+    apiBase: runtime.litApiBase,
+    apiKey: runtime.litUsageApiKey,
+    path: '/lit_action',
+    method: 'POST',
+    body: payload,
+    fetchImpl,
+  });
 
   return {
     ok: true,
@@ -1246,107 +1226,53 @@ export const executeSessionLitChipotleAction = async ({
     throw new Error('Lit Chipotle op must be check, encrypt, or decrypt.');
   }
 
-  const sbtAddresses = normalizeChipotleSbtAddresses(requestBody.sbtAddresses);
+  const sbtAddresses = normalizeSbtAddressList(requestBody.sbtAddresses);
   if (!sbtAddresses.length) {
     throw new Error('Lit Chipotle requires at least one SBT address.');
   }
 
-  const gateMode = normalizeGateMode(requestBody.gateMode);
-  const gateChainId = toChainId(
-    requestBody.chainId ||
-    requestBody.gateChainId ||
-    config?.networkChainId ||
-    config?.registryChainId
-  );
-  if (!gateChainId) {
-    throw new Error('Lit Chipotle requires a gate chain ID.');
-  }
-  const policy = buildLitChipotlePolicy({
-    chainId: gateChainId,
-    gateMode,
-    sbtAddresses,
-    litActionCid,
-    litPkpId,
-  });
-  const expectedPolicyFingerprint = fingerprintLitChipotlePolicy(policy);
   const rpcUrl = resolveSessionChipotleRpcUrl({
     request: requestBody,
     config,
     secrets,
-    chainId: gateChainId,
-    op,
   });
+  const gateMode = normalizeGateMode(requestBody.gateMode);
   const normalizedRequesterAddress = toTrimmedString(requesterAddress);
   if (!normalizedRequesterAddress) {
     throw new Error('Requester address unavailable for Lit Chipotle action.');
   }
 
-  // Regression guard: RPC is an authorization oracle for check/decrypt.
-  // Keep it worker-approved and out of stored Chipotle metadata.
   const jsParams = {
     op,
     pkpId: litPkpId,
-    litActionCid,
     requesterAddress: normalizedRequesterAddress,
     sbtAddresses,
     gateMode,
-    expectedChainId: gateChainId,
-    expectedPolicyFingerprint,
-    policy,
+    rpcUrl,
   };
-  if (rpcUrl) {
-    jsParams.rpcUrl = rpcUrl;
-  }
   if (op === 'encrypt') {
-    const cekHex = normalizeChipotleCekHex(requestBody.message);
-    const wrappedPlaintext = buildLitChipotleWrappedPlaintext({
-      cekHex,
-      policy,
-    });
-    jsParams.message = JSON.stringify(wrappedPlaintext);
-    if (!cekHex) {
+    jsParams.message = toTrimmedString(requestBody.message);
+    if (!jsParams.message) {
       throw new Error('Lit Chipotle encrypt requires a message.');
     }
   }
   if (op === 'decrypt') {
-    const metadataVersion = normalizeLitChipotleMetadataVersion(requestBody.chipotle || {});
-    if (metadataVersion && metadataVersion !== 2) {
-      throw new Error('Lit Chipotle legacy wrapped keys are not supported.');
-    }
     jsParams.ciphertext = toTrimmedString(requestBody.ciphertext);
     if (!jsParams.ciphertext) {
       throw new Error('Lit Chipotle decrypt requires ciphertext.');
     }
   }
 
-  const actionRuntime = {
-    ...runtime,
-    litActionCid,
-    litPkpId,
-  };
-  try {
-    return await executeLitChipotleAction({
-      runtime: actionRuntime,
-      request: {
-        // Verify submitted source first, then execute the provisioned action CID
-        // that the session usage key/group is permitted to run.
-        ipfsId: litActionCid,
-        jsParams,
-      },
-      fetchImpl,
-    });
-  } catch (error) {
-    const message = toTrimmedString(error?.message || error).toLowerCase();
-    if (!message.includes('no cached code found') && !message.includes('cache miss for ipfs id')) {
-      throw error;
-    }
-    return executeLitChipotleAction({
-      runtime: actionRuntime,
-      request: {
-        code: actionCode,
-        jsParams,
-      },
-      fetchImpl,
-    });
-  }
+  return executeLitChipotleAction({
+    runtime: {
+      ...runtime,
+      litActionCid,
+      litPkpId,
+    },
+    request: {
+      code: actionCode,
+      jsParams,
+    },
+    fetchImpl,
+  });
 };
