@@ -1,7 +1,7 @@
 import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import ConnectedSurveyResults, {
@@ -2673,11 +2673,28 @@ describe('SurveyResults demo results views', () => {
       </MemoryRouter>
     );
 
+    const demoNav = screen.getByTestId('ce-surveyresults-demo-view-nav');
+    expect(within(demoNav).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual([
+      'Report',
+      'Atlas',
+      'Breakdown',
+      'Risk Matrix',
+    ]);
+
     expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByTestId('ce-surveyresults-demo-surface-report')).not.toBeInTheDocument();
     expect(mockPolisReport).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
+    const reportButton = screen.getByTestId('ce-surveyresults-demo-view-report');
+    const atlasButton = screen.getByTestId('ce-surveyresults-demo-view-atlas');
+    const breakdownButton = screen.getByTestId('ce-surveyresults-demo-view-breakdown');
+    const riskMatrixButton = screen.getByTestId('ce-surveyresults-demo-view-riskMatrix');
+
+    expect(reportButton.compareDocumentPosition(atlasButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(atlasButton.compareDocumentPosition(breakdownButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(breakdownButton.compareDocumentPosition(riskMatrixButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(reportButton);
     rerenderSubject();
 
     await waitFor(() => {
@@ -2687,7 +2704,7 @@ describe('SurveyResults demo results views', () => {
     expect(subject.state.demoResultsViewMode).toBe('report');
     expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-report'));
+    fireEvent.click(reportButton);
     rerenderSubject();
 
     await waitFor(() => {
@@ -2696,7 +2713,7 @@ describe('SurveyResults demo results views', () => {
     expect(subject.state.demoResultsViewMode).toBe('raw');
     expect(screen.getByTestId('ce-surveyresults-demo-view-report')).toHaveAttribute('aria-pressed', 'false');
 
-    fireEvent.click(screen.getByTestId('ce-surveyresults-demo-view-breakdown'));
+    fireEvent.click(breakdownButton);
     rerenderSubject();
 
     await waitFor(() => {

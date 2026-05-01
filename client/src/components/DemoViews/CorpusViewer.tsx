@@ -5,6 +5,7 @@ import {
   faBook,
   faBrain,
   faChartBar,
+  faDownload,
   faExternalLinkAlt,
   faFileAlt,
   faGavel,
@@ -29,7 +30,11 @@ import PolicyGlobe, {
 } from './PolicyGlobe';
 import policyStyles from './PolicyGlobe.module.scss';
 import TweetCard, { DebateMapSection, ExternalSourceLink } from './TweetCard';
-import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
+import {
+  buildPublicRepoBlobUrl,
+  buildPublicRepoRawUrl,
+  PUBLIC_AI_DISCOURSE_CORPUS_URL,
+} from '../../variables/publicRepoMetadata.js';
 
 type CorpusEntry = {
   id?: string;
@@ -69,6 +74,15 @@ type AtlasIssueOpenHandler = (...args: any[]) => void;
 type CorpusViewerProps = {
   onAtlasIssueOpen?: AtlasIssueOpenHandler | null;
   showGithubLink?: boolean;
+  externalLoadRequestNonce?: number;
+  onExternalLoadStateChange?: ((state: {
+    activeCorpusKey: string;
+    activeCorpusLabel: string;
+    loadStatus: CorpusLoadStatus;
+    loadButtonLabel: string;
+    disableLoadButton: boolean;
+    error: string;
+  }) => void) | null;
 };
 
 type EntryCardProps = {
@@ -84,15 +98,29 @@ type EmptyCorpusStateProps = {
   text?: string;
 };
 
-// Hidden tabs — restore by adding 'cross_corpus' or 'lesswrong_posts' back to this array
 const CORPUS_ORDER = [
+  'cross_corpus',
   'tweets',
   'ai_laws_policy',
   'arxiv_ai_safety',
+  'lesswrong_posts',
   'dwarkesh_lab_insiders',
   'ai_scifi_books',
   'metr_evals_metrics',
 ];
+
+const FULL_CORPUS_RAW_PATH_BY_KEY = Object.freeze<Record<string, string>>({
+  tweets: 'ai-discourse-corpus/corpuses/enriched-tweets.json',
+  ai_laws_policy: 'ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json',
+  arxiv_ai_safety: 'ai-discourse-corpus/corpuses/arxiv-ai-safety-corpus.json',
+  lesswrong_posts: 'ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json',
+  cross_corpus: 'ai-discourse-corpus/corpuses/cross-corpus-debates.json',
+  dwarkesh_lab_insiders: 'ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json',
+  ai_scifi_books: 'ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json',
+  metr_evals_metrics: 'ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json',
+});
+
+type CorpusLoadStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
 const ICONS: Record<string, IconDefinition> = {
   bird: faTwitter,
@@ -225,8 +253,178 @@ const getPolicyMapFill = (status = '', isFallback = false) => {
 };
 
 const shouldUseHalfWidthGrid = (corpusKey = '') => (
-  corpusKey === 'tweets' || corpusKey === 'arxiv_ai_safety'
+  corpusKey === 'tweets' || corpusKey === 'arxiv_ai_safety' || corpusKey === 'cross_corpus'
 );
+
+const normalizeEntryText = (value: unknown = '') => String(value || '').replace(/\s+/g, ' ').trim();
+
+const toTitleCase = (value: unknown = '') => normalizeEntryText(value)
+  .toLowerCase()
+  .split(/\s+/)
+  .filter(Boolean)
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ');
+
+const normalizeSourceUrl = (value: unknown = '') => {
+  if (typeof value === 'string') return normalizeEntryText(value);
+  if (value && typeof value === 'object' && 'url' in value) {
+    return normalizeEntryText((value as { url?: unknown }).url);
+  }
+  return '';
+};
+
+const getCorpusCount = (value: unknown = 0) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0;
+};
+
+const formatCorpusDisplayName = (value: unknown = '') => {
+  const normalized = normalizeEntryText(value).toLowerCase();
+  if (!normalized) return '';
+  if (normalized === 'metr') return 'METR';
+  if (normalized === 'metr_reports') return 'METR Reports';
+  if (normalized === 'lesswrong') return 'LessWrong';
+  if (normalized === 'dwarkesh') return 'Dwarkesh';
+  if (normalized === 'ai_scifi') return 'AI Sci-Fi';
+  if (normalized === 'ai_laws') return 'AI Laws';
+  return toTitleCase(normalized.replace(/[_-]+/g, ' '));
+};
+
+const flattenArgumentTreeNodes = (node: unknown): any[] => {
+  if (!node || typeof node !== 'object') return [];
+  const nodeObject = node as Record<string, any>;
+  const children = Array.isArray(nodeObject.children) ? nodeObject.children : [];
+  return [nodeObject, ...children.flatMap((child) => flattenArgumentTreeNodes(child))];
+};
+
+const buildLoadedEntry = (entry: CorpusEntry = {}) => {
+  const sourceLinks = Array.isArray(entry?.source_links) ? entry.source_links : [];
+  const fallbackUrl = normalizeSourceUrl(sourceLinks[0]);
+  const sourceUrl = normalizeEntryText(entry?.source_url);
+  const questionSummary = normalizeEntryText(entry?.question);
+  const relevanceSummary = normalizeEntryText(entry?.relevance_to_ai_discourse);
+  const summary = normalizeEntryText(entry?.summary) || questionSummary || relevanceSummary;
+  const tags = Array.isArray(entry?.tags) && entry.tags.length > 0
+    ? entry.tags
+    : (Array.isArray(entry?.themes) ? entry.themes.slice(0, 6) : []);
+
+  return {
+    ...entry,
+    url: normalizeEntryText(entry?.url) || sourceUrl || fallbackUrl,
+    summary,
+    tags,
+  };
+};
+
+const buildCrossCorpusDebateEntries = (payload: Record<string, any> = {}) => {
+  const debates = Array.isArray(payload?.debates) ? payload.debates : [];
+  const datasetUrl = buildPublicRepoBlobUrl(FULL_CORPUS_RAW_PATH_BY_KEY.cross_corpus);
+  const fallbackCorpora = Array.isArray(payload?.meta?.corpora_synthesized)
+    ? payload.meta.corpora_synthesized.map((value: unknown) => formatCorpusDisplayName(value)).filter(Boolean)
+    : [];
+
+  return debates.map((debate: Record<string, any>, index: number) => {
+    const contestedPremises = Array.isArray(debate?.premise_extraction?.contested_premises)
+      ? debate.premise_extraction.contested_premises
+      : [];
+    const leadPremise = contestedPremises.find((premise: Record<string, any>) => normalizeEntryText(premise?.premise)) || null;
+    const argumentNodes = flattenArgumentTreeNodes(debate?.argument_tree?.root);
+    const supportingNodes = argumentNodes.filter((node: Record<string, any>) => normalizeEntryText(node?.source?.title));
+    const featuredSource = supportingNodes[0]?.source || {};
+    const corporaSynthesized = Array.from(
+      new Set(
+        supportingNodes
+          .map((node: Record<string, any>) => formatCorpusDisplayName(node?.source?.corpus))
+          .filter(Boolean)
+      )
+    );
+    const confirmedAgreements = Array.isArray(debate?.agreement_map?.confirmed_agreements)
+      ? debate.agreement_map.confirmed_agreements
+      : [];
+    const normalizedCategory = formatCorpusDisplayName(debate?.category);
+
+    return buildLoadedEntry({
+      id: debate?.id || `cross-corpus-${index}`,
+      title: debate?.title,
+      author: 'Cross-corpus synthesis',
+      date: payload?.meta?.date_generated || '',
+      url: datasetUrl,
+      source_label: 'Open dataset',
+      category: normalizedCategory,
+      summary: debate?.question,
+      central_tension: leadPremise?.premise || debate?.agreement_map?.narrowed_disagreement || '',
+      featured_source_title: featuredSource?.title || '',
+      featured_source_author: featuredSource?.author || '',
+      featured_source_corpus: formatCorpusDisplayName(featuredSource?.corpus),
+      corpora_synthesized: corporaSynthesized.length > 0 ? corporaSynthesized : fallbackCorpora,
+      confirmed_agreement_count: confirmedAgreements.length,
+      tags: [
+        'Cross-Corpus',
+        normalizedCategory,
+        ...corporaSynthesized.slice(0, 3),
+      ].filter(Boolean),
+    });
+  });
+};
+
+const truncateEntryText = (value: unknown = '', maxLength = 240) => {
+  const normalized = normalizeEntryText(value);
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+};
+
+const buildEntryInsight = (entry: CorpusEntry = {}) => {
+  const novelArguments = normalizeEntryText(
+    entry.novel_arguments_and_concepts || entry.novel_arguments_and_perspectives
+  );
+  if (novelArguments) {
+    return {
+      label: 'Novel argument',
+      text: truncateEntryText(novelArguments, 280),
+    };
+  }
+
+  const centralTension = normalizeEntryText(entry.central_tension);
+  if (centralTension) {
+    return {
+      label: 'Central tension',
+      text: truncateEntryText(centralTension, 240),
+    };
+  }
+
+  return null;
+};
+
+const buildEntrySupportMeta = (entry: CorpusEntry = {}) => {
+  const lines: string[] = [];
+  const corpora = Array.isArray(entry.corpora_synthesized)
+    ? entry.corpora_synthesized.map((value) => normalizeEntryText(value)).filter(Boolean)
+    : [];
+
+  if (corpora.length > 0) {
+    lines.push(`Synthesizes: ${corpora.slice(0, 4).join(' • ')}`);
+  }
+
+  const featuredSourceTitle = normalizeEntryText(entry.featured_source_title);
+  if (featuredSourceTitle) {
+    const featuredSourceMeta = [
+      normalizeEntryText(entry.featured_source_corpus),
+      normalizeEntryText(entry.featured_source_author),
+    ].filter(Boolean).join(' • ');
+    lines.push(
+      featuredSourceMeta
+        ? `Featured source: ${featuredSourceTitle} (${featuredSourceMeta})`
+        : `Featured source: ${featuredSourceTitle}`
+    );
+  }
+
+  const confirmedAgreementCount = getCorpusCount(entry.confirmed_agreement_count);
+  if (confirmedAgreementCount > 0) {
+    lines.push(`Shared ground: ${confirmedAgreementCount} confirmed agreements`);
+  }
+
+  return lines;
+};
 
 const formatAuthors = (entry: CorpusEntry = {}) => {
   if (entry.author) return entry.author;
@@ -283,6 +481,36 @@ const buildCorpusDefinitions = (): CorpusDefinition[] => (
     .filter((corpus): corpus is CorpusDefinition => Boolean(corpus))
 );
 
+const buildLoadedCorpusDefinition = (
+  key = '',
+  payload: any = {},
+  fallbackCorpus: CorpusDefinition
+): CorpusDefinition => {
+  const rawEntries = Array.isArray(payload)
+    ? payload
+    : (Array.isArray(payload?.entries) ? payload.entries : []);
+  const loadedEntries = key === 'cross_corpus' && Array.isArray(payload?.debates)
+    ? buildCrossCorpusDebateEntries(payload)
+    : rawEntries.map((entry: CorpusEntry) => buildLoadedEntry(entry));
+  const orderedEntries = key === 'dwarkesh_lab_insiders'
+    ? diversifyInsiderEntries(loadedEntries)
+    : loadedEntries;
+  const countFull = getCorpusCount(
+    payload?.meta?.total_entries
+      || payload?.meta?.entry_count
+      || payload?.meta?.debate_count
+      || payload?.meta?.count_full
+      || loadedEntries.length
+      || fallbackCorpus?.count_full
+  );
+
+  return {
+    ...fallbackCorpus,
+    count_full: countFull || fallbackCorpus?.count_full,
+    entries: orderedEntries,
+  };
+};
+
 const getEntryYear = (entry: CorpusEntry = {}) => {
   if (entry.year) return entry.year;
   const datedValue = entry.date || entry.date_enacted || entry.created_at;
@@ -320,6 +548,8 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
   const isMetrCorpus = corpusKey === 'metr_evals_metrics';
   const meta = buildNonTweetMeta(corpusKey, entry);
   const summaryText = entry.summary || '';
+  const entryInsight = buildEntryInsight(entry);
+  const entrySupportMeta = buildEntrySupportMeta(entry);
   const tags = Array.isArray(entry.tags) ? entry.tags : [];
   const policyStatusGroup = isPolicyCorpus ? getPolicyStatusGroup(entry) : null;
   const policyFlag = isPolicyCorpus ? getJurisdictionFlag(entry.jurisdiction) : null;
@@ -409,6 +639,21 @@ const EntryCard = ({ corpusKey, entry, onTagClick, onAtlasIssueOpen }: EntryCard
         {summaryText}
       </div>
 
+      {entryInsight ? (
+        <div className={styles.entryInsightBlock}>
+          <div className={styles.entryInsightLabel}>{entryInsight.label}</div>
+          <div className={styles.entryInsightText}>{entryInsight.text}</div>
+        </div>
+      ) : null}
+
+      {entrySupportMeta.length > 0 ? (
+        <div className={styles.entrySupportMeta}>
+          {entrySupportMeta.map((line) => (
+            <div key={line}>{line}</div>
+          ))}
+        </div>
+      ) : null}
+
       <div className={styles.pillRow}>
         {tags.slice(0, 6).map((tag) => (
           <button
@@ -461,24 +706,118 @@ const EmptyCorpusState = ({ corpus, title, text }: EmptyCorpusStateProps) => (
   </div>
 );
 
-const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }: CorpusViewerProps) => {
-  const corpusDefinitions = useMemo(() => buildCorpusDefinitions(), []);
+const CorpusViewer = ({
+  onAtlasIssueOpen = null,
+  showGithubLink = true,
+  externalLoadRequestNonce = 0,
+  onExternalLoadStateChange = null,
+}: CorpusViewerProps) => {
+  const [corpusDefinitions, setCorpusDefinitions] = useState<CorpusDefinition[]>(() => buildCorpusDefinitions());
+  const [corpusLoadStatusByKey, setCorpusLoadStatusByKey] = useState<Record<string, CorpusLoadStatus>>({});
+  const [corpusLoadErrorByKey, setCorpusLoadErrorByKey] = useState<Record<string, string>>({});
   // Intentionally cross-corpus: tag explorer shows every record with the clicked tag across all demo corpuses, ignoring any per-tab (e.g. PolicyGlobe) filter.
   const demoCorpusRecords = useMemo(
     () => getDemoCorpusRecords(corpusDefinitions),
     [corpusDefinitions]
   );
 
-  const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'tweets');
+  const [activeCorpusKey, setActiveCorpusKey] = useState(corpusDefinitions[0]?.key || 'cross_corpus');
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [mobileTweetsExpanded, setMobileTweetsExpanded] = useState(false);
   const isMobileTweetPreview = useIsMobileTweetPreview();
+  const handledExternalLoadRequestNonceRef = React.useRef(externalLoadRequestNonce);
 
   const activeCorpus = corpusDefinitions.find((corpus) => corpus.key === activeCorpusKey) || corpusDefinitions[0];
+  const activeCorpusLoadStatus = activeCorpus ? (corpusLoadStatusByKey[activeCorpus.key] || 'idle') : 'idle';
+  const activeCorpusLoadError = activeCorpus ? corpusLoadErrorByKey[activeCorpus.key] || '' : '';
+  const activeCorpusTotalCount = getCorpusCount(activeCorpus?.count_full) || activeCorpus?.entries.length || 0;
+  const activeCorpusCountLabel = activeCorpus
+    ? `${activeCorpus.entries.length.toLocaleString()} of ${activeCorpusTotalCount.toLocaleString()} entries`
+    : '';
+  const loadFullCorpusLabel = activeCorpusLoadStatus === 'loading'
+    ? 'Loading full corpus…'
+    : activeCorpusLoadStatus === 'loaded'
+      ? 'Full corpus loaded'
+      : activeCorpusLoadStatus === 'error'
+        ? 'Retry full corpus'
+        : 'Load full corpus';
+  const disableLoadFullCorpusButton = (
+    activeCorpusLoadStatus === 'loading' || activeCorpusLoadStatus === 'loaded'
+  );
 
   useEffect(() => {
     setMobileTweetsExpanded(false);
   }, [activeCorpusKey]);
+
+  const handleLoadFullCorpus = React.useCallback(async () => {
+    if (!activeCorpus) return;
+    const rawPath = FULL_CORPUS_RAW_PATH_BY_KEY[activeCorpus.key];
+    if (!rawPath || activeCorpusLoadStatus === 'loading' || activeCorpusLoadStatus === 'loaded') return;
+
+    setCorpusLoadStatusByKey((previous) => ({
+      ...previous,
+      [activeCorpus.key]: 'loading',
+    }));
+    setCorpusLoadErrorByKey((previous) => ({
+      ...previous,
+      [activeCorpus.key]: '',
+    }));
+
+    try {
+      const response = await fetch(buildPublicRepoRawUrl(rawPath), { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`GitHub returned ${response.status}`);
+      }
+
+      const payload = await response.json();
+      setCorpusDefinitions((previous) => previous.map((corpus) => (
+        corpus.key === activeCorpus.key
+          ? buildLoadedCorpusDefinition(activeCorpus.key, payload, corpus)
+          : corpus
+      )));
+      setCorpusLoadStatusByKey((previous) => ({
+        ...previous,
+        [activeCorpus.key]: 'loaded',
+      }));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unable to load the full corpus right now.';
+      setCorpusLoadStatusByKey((previous) => ({
+        ...previous,
+        [activeCorpus.key]: 'error',
+      }));
+      setCorpusLoadErrorByKey((previous) => ({
+        ...previous,
+        [activeCorpus.key]: errorMessage,
+      }));
+    }
+  }, [activeCorpus, activeCorpusLoadStatus]);
+
+  useEffect(() => {
+    if (!activeCorpus || typeof onExternalLoadStateChange !== 'function') return;
+
+    onExternalLoadStateChange({
+      activeCorpusKey: activeCorpus.key,
+      activeCorpusLabel: activeCorpus.tabLabel,
+      loadStatus: activeCorpusLoadStatus,
+      loadButtonLabel: loadFullCorpusLabel,
+      disableLoadButton: disableLoadFullCorpusButton,
+      error: activeCorpusLoadError,
+    });
+  }, [
+    activeCorpus,
+    activeCorpusLoadError,
+    activeCorpusLoadStatus,
+    disableLoadFullCorpusButton,
+    loadFullCorpusLabel,
+    onExternalLoadStateChange,
+  ]);
+
+  useEffect(() => {
+    if (externalLoadRequestNonce === handledExternalLoadRequestNonceRef.current) return;
+    handledExternalLoadRequestNonceRef.current = externalLoadRequestNonce;
+    if (!externalLoadRequestNonce) return;
+    void handleLoadFullCorpus();
+  }, [externalLoadRequestNonce, handleLoadFullCorpus]);
 
   if (!activeCorpus) return null;
 
@@ -583,15 +922,37 @@ const CorpusViewer = ({ onAtlasIssueOpen = null, showGithubLink = true }: Corpus
 
       {showGithubLink ? (
         <div className={styles.sectionBlock}>
-          <a
-            href={PUBLIC_AI_DISCOURSE_CORPUS_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.githubLink}
-          >
-            <FontAwesomeIcon className={styles.githubLinkIcon} icon={faGithub} />
-            <span>Full corpus on GitHub</span>
-          </a>
+          <div className={styles.sectionActionRow}>
+            <a
+              href={PUBLIC_AI_DISCOURSE_CORPUS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.githubLink}
+            >
+              <FontAwesomeIcon className={styles.githubLinkIcon} icon={faGithub} />
+              <span>Full corpus on GitHub</span>
+            </a>
+            <button
+              type="button"
+              className={`${styles.githubLink} ${styles.loadCorpusButton}`.trim()}
+              onClick={handleLoadFullCorpus}
+              disabled={disableLoadFullCorpusButton}
+              data-testid="ce-context-load-full-corpus"
+            >
+              <FontAwesomeIcon className={styles.githubLinkIcon} icon={faDownload} />
+              <span>{loadFullCorpusLabel}</span>
+            </button>
+          </div>
+          <div className={styles.sectionMeta} data-testid="ce-context-corpus-status">
+            {activeCorpusLoadStatus === 'loaded'
+              ? `Loaded full ${activeCorpus.tabLabel} corpus • ${activeCorpus.entries.length.toLocaleString()} entries`
+              : `Curated ${activeCorpus.tabLabel} sample • ${activeCorpusCountLabel}`}
+          </div>
+          {activeCorpusLoadError ? (
+            <div className={styles.sectionError} role="status">
+              {activeCorpusLoadError}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
