@@ -438,10 +438,7 @@ const useSessionWizardWorkerDeploy = ({
       const ensureWorkerSessionConfig = async ({
         workerUrl,
         slug: targetSlug,
-      }: {
-        workerUrl: string;
-        slug: string;
-      }) => {
+      }: AnyRecord) => {
         const requestBody = {
           sessionSlug: targetSlug,
           adminAddress: workerConfigPayload.adminAddress || runtime.account || '',
