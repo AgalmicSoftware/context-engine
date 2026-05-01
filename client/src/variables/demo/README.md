@@ -44,7 +44,7 @@ The main consumers of this folder are:
 - [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
 - [`sessionSourceResolver.js`](../../utilities/session/sessionSourceResolver.js)
 - [`PolisReport.tsx`](../../components/PolisReport/PolisReport.tsx)
-- [`DebateMap.jsx`](../../components/DebateMap/DebateMap.jsx)
+- [`DebateMap.tsx`](../../components/DebateMap/DebateMap.tsx)
 - [`PoliticalCompassView.tsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.tsx)
 - [`DebateSelector.tsx`](../../components/DemoViews/DebateHUD/DebateSelector.tsx)
 - [`ArgumentTreeView.tsx`](../../components/DemoViews/DebateHUD/ArgumentTreeView.tsx)
