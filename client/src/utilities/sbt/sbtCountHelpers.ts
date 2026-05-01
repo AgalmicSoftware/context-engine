@@ -14,18 +14,6 @@ export interface SbtCountsPayloadInput {
   burnedEventCount?: unknown;
 }
 
-export interface SbtCountsScanCheckpointInput extends SbtCountsPayloadInput {
-  phase?: unknown;
-  blockNumber?: unknown;
-}
-
-export interface SbtCountsScanCheckpoint extends SbtCountsPayload {
-  phase: 'activity';
-  blockNumber: number;
-  scanStartBlock: number;
-  scanToBlock: number;
-}
-
 export interface SbtCountState {
   mintedAddresses?: string[];
   burnedAddresses?: string[];
@@ -166,45 +154,4 @@ export const getCurrentHolderAddressesFromCounts = (counts: Partial<SbtCountsPay
     }
   });
   return holders;
-};
-
-
-export const normalizeSbtCountsScanCheckpoint = (
-  checkpointIn: SbtCountsScanCheckpointInput | null | undefined,
-  {
-    startBlock,
-    toBlock,
-  }: {
-    startBlock: unknown;
-    toBlock: unknown;
-  }
-): SbtCountsScanCheckpoint | null => {
-  if (!checkpointIn || typeof checkpointIn !== 'object') return null;
-  const phase = String(checkpointIn.phase || '').trim();
-  if (phase !== 'activity') return null;
-
-  const scanStartBlock = Math.floor(Number(startBlock));
-  const scanToBlock = Math.floor(Number(toBlock));
-  if (!Number.isFinite(scanStartBlock) || !Number.isFinite(scanToBlock)) return null;
-
-  const checkpointFloor = scanStartBlock - 1;
-  const blockNumber = Math.max(
-    checkpointFloor,
-    Math.min(scanToBlock, Math.floor(Number(checkpointIn.blockNumber ?? checkpointFloor)))
-  );
-  const mintedCountByAddress = normalizeSbtCountMap(checkpointIn.mintedCountByAddress);
-  const burnedCountByAddress = normalizeSbtCountMap(checkpointIn.burnedCountByAddress);
-  const mintedEventCountRaw = Math.floor(Number(checkpointIn.mintedEventCount || 0));
-  const burnedEventCountRaw = Math.floor(Number(checkpointIn.burnedEventCount || 0));
-
-  return {
-    phase,
-    blockNumber,
-    scanStartBlock,
-    scanToBlock,
-    mintedCountByAddress,
-    burnedCountByAddress,
-    mintedEventCount: mintedEventCountRaw > 0 ? mintedEventCountRaw : sumSbtCountMap(mintedCountByAddress),
-    burnedEventCount: burnedEventCountRaw > 0 ? burnedEventCountRaw : sumSbtCountMap(burnedCountByAddress),
-  };
 };
