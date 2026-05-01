@@ -20,6 +20,9 @@ type Question = {
   id: string;
   text: string;
   options: string[];
+  category?: string;
+  keyTension?: string;
+  sourcePromptType?: string;
 };
 
 type FlatResponse = {
@@ -53,6 +56,14 @@ type ComparisonGroup = {
 
 type QuestionTagsById = Record<string, QuestionTag[]>;
 
+type QuestionProfileSummary = {
+  profileId: string;
+  label: string;
+  confidence: string;
+  rationale: string;
+  count: number;
+};
+
 type Suggestion = {
   pair: string[];
   questionId: string;
@@ -65,6 +76,7 @@ type AnalysisData = {
   demographics: DemographicsByCategory;
   segmentCounts: SegmentCounts;
   questionTagsData: QuestionTagsById;
+  questionProfileSummaries: Record<string, QuestionProfileSummary[]>;
 };
 
 type DemoAnalysisWorkspaceProps = {
@@ -118,6 +130,9 @@ const DemoAnalysisWorkspace = ({
 
   const selectedQuestion = questionMap.get(selectedQuestionId) || null;
   const drilldownQuestion = questionMap.get(drilldownQuestionId) || null;
+  const selectedQuestionTags = selectedQuestionId
+    ? (analysisData.questionTagsData[selectedQuestionId] || [])
+    : [];
   const activeSuggestionKey = useMemo(() => {
     if (!selectedQuestionId || selectedSegmentKeys.length < 2) return '';
     return buildSuggestionSelectionKey(selectedQuestionId, selectedSegmentKeys);
@@ -228,6 +243,24 @@ const DemoAnalysisWorkspace = ({
             questionPromptClassName={styles.selectedQuestionCardPrompt}
             questionPromptTestId="demo-analysis-selected-question"
           />
+          {(selectedQuestionTags.length > 0 || selectedQuestion.keyTension) ? (
+            <div className={styles.selectedQuestionGrounding}>
+              {selectedQuestionTags.length > 0 ? (
+                <div className={styles.selectedQuestionGroundingPills}>
+                  {selectedQuestionTags.map((tag) => (
+                    <span key={tag.tagID} className={styles.ratePill}>
+                      {tag.tagName}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {selectedQuestion.keyTension ? (
+                <p className={styles.selectedQuestionTension}>
+                  <strong>Key tension:</strong> {selectedQuestion.keyTension}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -265,6 +298,7 @@ const DemoAnalysisWorkspace = ({
         comparisonGroups={comparisonGroups}
         flatResponses={analysisData.flatResponses}
         questionTags={analysisData.questionTagsData[drilldownQuestionId] || []}
+        questionProfileSummaries={analysisData.questionProfileSummaries[drilldownQuestionId] || []}
         onClose={() => setDrilldownQuestionId('')}
       />
     </div>
