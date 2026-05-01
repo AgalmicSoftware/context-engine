@@ -10,6 +10,8 @@ const ROOT = path.resolve(__dirname, '..');
 const TRACKED_ANCHOR_FILES = Object.freeze([
   'AGENTS.md',
   'ARCHITECTURE.md',
+  'client/src/variables/demo/LOOPHOLE_SCHEMA.md',
+  'client/src/variables/demo/README.md',
   'docs/MainSite.MAP.md',
   'docs/SessionWizard.MAP.md',
   'docs/SurveyTool.MAP.md',
@@ -22,50 +24,53 @@ const TRACKED_ANCHOR_FILES = Object.freeze([
   'spec.md',
 ]);
 
-const STALE_COMPONENT_DOC_PATHS = Object.freeze([
-  'client/src/components/About/AboutPage.jsx',
-  'client/src/components/Account/LoginAndSettingsModal.jsx',
-  'client/src/components/DocumentLibrary/DocumentLibraryPanel.jsx',
-  'client/src/components/DocumentLibrary/SessionDocumentsPage.jsx',
-  'client/src/components/DemoViews/DemosIndex.jsx',
-  'client/src/components/DemoViews/RiskMatrixDemo.jsx',
-  'client/src/components/MainSite/MainSite.jsx',
-  'client/src/components/MainContent/MainAreaTabs.jsx',
-  'client/src/components/MainContent/ToolExplorer.jsx',
-  'client/src/components/Navbar/AccountSection.jsx',
-  'client/src/components/OnePageSession/OnePageSession.jsx',
-  'client/src/components/SBTs/CreateSBTGroup.jsx',
-  'client/src/components/SBTs/SBTPage.jsx',
-  'client/src/components/SBTs/SBTSelector.jsx',
-  'client/src/components/Sessions/SessionWizard.jsx',
-  'client/src/components/Shared/AudioInput/AudioInput.jsx',
-  'client/src/components/SurveyTool/AudioInput.jsx',
-  'client/src/components/SurveyTool/CreateQuestionsAndSurveys.jsx',
-  'client/src/components/SurveyTool/QuestionFilter.jsx',
-  'client/src/components/SurveyTool/SingleQuestionResponse.jsx',
-  'client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.jsx',
-  'client/src/components/SurveyTool/SurveyResults.jsx',
-  'client/src/components/SurveyTool/SurveyTool.jsx',
-  'client/src/components/UserPage/CompareAddresses.jsx',
-  'client/src/components/UserPage/UserPage.jsx',
+const MIGRATED_COMPONENT_DOC_PATHS = Object.freeze([
+  'client/src/components/About/AboutPage.tsx',
+  'client/src/components/Account/LoginAndSettingsModal.tsx',
+  'client/src/components/DocumentLibrary/DocumentLibraryPanel.tsx',
+  'client/src/components/DocumentLibrary/SessionDocumentsPage.tsx',
+  'client/src/components/DemoViews/DemosIndex.tsx',
+  'client/src/components/DemoViews/RiskMatrixDemo.tsx',
+  'client/src/components/DebateMap/DebateMap.tsx',
+  'client/src/components/MainSite/MainSite.tsx',
+  'client/src/components/MainContent/MainAreaTabs.tsx',
+  'client/src/components/MainContent/ToolExplorer.tsx',
+  'client/src/components/Navbar/AccountSection.tsx',
+  'client/src/components/OnePageSession/OnePageSession.tsx',
+  'client/src/components/SBTs/CreateSBTGroup.tsx',
+  'client/src/components/SBTs/SBTPage.tsx',
+  'client/src/components/SBTs/SBTSelector.tsx',
+  'client/src/components/Sessions/SessionWizard.tsx',
+  'client/src/components/Shared/AudioInput/AudioInput.tsx',
+  'client/src/components/SurveyTool/AudioInput.tsx',
+  'client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx',
+  'client/src/components/SurveyTool/QuestionFilter.tsx',
+  'client/src/components/SurveyTool/SingleQuestionResponse.tsx',
+  'client/src/components/SurveyTool/SurveyGenerator/SurveyGenerator.tsx',
+  'client/src/components/SurveyTool/SurveyResults.tsx',
+  'client/src/components/SurveyTool/SurveyTool.tsx',
+  'client/src/components/UserPage/CompareAddresses.tsx',
+  'client/src/components/UserPage/UserPage.tsx',
 ]);
+
+const toLegacyJsxPath = (relativePath) => relativePath.replace(/\.tsx$/, '.jsx');
 
 const OPTIONAL_WORKFLOW_SKILL_CHECKS = Object.freeze([
   {
     skillPath: 'scripts/lib/e2e/workflow-skills/session-setup-flow/SKILL.md',
-    stalePaths: ['client/src/components/Sessions/SessionWizard.jsx'],
+    stalePaths: [toLegacyJsxPath('client/src/components/Sessions/SessionWizard.tsx')],
     livePaths: ['client/src/components/Sessions/SessionWizard.tsx'],
   },
   {
     skillPath: 'scripts/lib/e2e/workflow-skills/sbt-collect-flow/SKILL.md',
-    stalePaths: ['client/src/components/SBTs/SBTPage.jsx'],
+    stalePaths: [toLegacyJsxPath('client/src/components/SBTs/SBTPage.tsx')],
     livePaths: ['client/src/components/SBTs/SBTPage.tsx'],
   },
   {
     skillPath: 'scripts/lib/e2e/workflow-skills/sbt-create-flow/SKILL.md',
     stalePaths: [
-      'client/src/components/SBTs/CreateSBTGroup.jsx',
-      'client/src/components/SBTs/SBTPage.jsx',
+      toLegacyJsxPath('client/src/components/SBTs/CreateSBTGroup.tsx'),
+      toLegacyJsxPath('client/src/components/SBTs/SBTPage.tsx'),
     ],
     livePaths: [
       'client/src/components/SBTs/CreateSBTGroup.tsx',
@@ -74,15 +79,15 @@ const OPTIONAL_WORKFLOW_SKILL_CHECKS = Object.freeze([
   },
   {
     skillPath: 'scripts/lib/e2e/workflow-skills/survey-authoring-flow/SKILL.md',
-    stalePaths: ['client/src/components/SurveyTool/CreateSurvey.jsx'],
+    stalePaths: [toLegacyJsxPath('client/src/components/SurveyTool/CreateSurvey.tsx')],
     livePaths: ['client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx'],
   },
   {
     skillPath: 'scripts/lib/e2e/workflow-skills/survey-response-flow/SKILL.md',
     stalePaths: [
-      'client/src/components/SurveyTool/AudioInput.jsx',
-      'client/src/components/SurveyTool/SingleQuestionResponse.jsx',
-      'client/src/components/SurveyTool/SurveyResults.jsx',
+      toLegacyJsxPath('client/src/components/SurveyTool/AudioInput.tsx'),
+      toLegacyJsxPath('client/src/components/SurveyTool/SingleQuestionResponse.tsx'),
+      toLegacyJsxPath('client/src/components/SurveyTool/SurveyResults.tsx'),
     ],
     livePathAlternates: [
       [
@@ -99,9 +104,13 @@ const OPTIONAL_WORKFLOW_SKILL_CHECKS = Object.freeze([
 ]);
 
 test('tracked anchor files do not reference stale JSX component paths after the TSX migration', () => {
+  MIGRATED_COMPONENT_DOC_PATHS.forEach((livePath) => {
+    assert.equal(fs.existsSync(path.join(ROOT, livePath)), true, `${livePath} should exist`);
+  });
+
   TRACKED_ANCHOR_FILES.forEach((relativePath) => {
     const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
-    STALE_COMPONENT_DOC_PATHS.forEach((stalePath) => {
+    MIGRATED_COMPONENT_DOC_PATHS.map(toLegacyJsxPath).forEach((stalePath) => {
       assert.equal(
         source.includes(stalePath),
         false,
