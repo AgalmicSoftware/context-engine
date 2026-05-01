@@ -294,8 +294,8 @@ import SessionWizard, {
   finalizeSessionWizardPendingSbtDraft,
   persistSessionWizardSbtRecoveryCodes,
   promotePendingSbtSelectionsAfterDeploy,
+  resolveSessionWizardChipotleHookConfig,
   resolveSessionWizardSelectorSourceConfig,
-  resolveSessionWizardLitPaymentDelegation,
   resolveSessionWizardWorkerBaseUrl,
 } from './SessionWizard';
 
@@ -1047,6 +1047,61 @@ describe('SessionWizard rendered validation', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL)).toBeChecked();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_UPLOAD)).not.toBeChecked();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);
+  });
+
+  it('builds Chipotle worker config for global Lit hooks when Lit v3 worker secrets are present', () => {
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim().replace(/\/+$/, ''));
+    try {
+      expect(resolveSessionWizardChipotleHookConfig({
+        workerSecretsEnabled: true,
+        resolvedWorkerUrl: 'https://chipotle-worker.example.test/',
+        draft: {
+          slug: 'chipotle-hook-session',
+          sessionName: 'Chipotle Hook Session',
+        },
+        workerSecrets: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: '21',
+          litPkpId: '0xaeb338631a7cb716c7ac2effd22b7b69ebcd137b',
+          litActionCid: 'QmYyLDMz1AQYo3mPeHbBLTyfae8fhK5muXyqPhnAedJbr4',
+        },
+      })).toEqual(expect.objectContaining({
+        enabled: true,
+        workerUrl: 'https://chipotle-worker.example.test',
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmYyLDMz1AQYo3mPeHbBLTyfae8fhK5muXyqPhnAedJbr4',
+          litGroupId: '21',
+          litPkpId: '0xaeb338631a7cb716c7ac2effd22b7b69ebcd137b',
+        },
+        sessionConfig: {
+          slug: 'chipotle-hook-session',
+          sessionName: 'Chipotle Hook Session',
+          corsWorkerUrl: 'https://chipotle-worker.example.test',
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litActionCid: 'QmYyLDMz1AQYo3mPeHbBLTyfae8fhK5muXyqPhnAedJbr4',
+            litGroupId: '21',
+            litPkpId: '0xaeb338631a7cb716c7ac2effd22b7b69ebcd137b',
+          },
+        },
+      }));
+
+      expect(resolveSessionWizardChipotleHookConfig({
+        workerSecretsEnabled: true,
+        resolvedWorkerUrl: 'https://chipotle-worker.example.test',
+        workerSecrets: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+        },
+        draft: {
+          slug: 'chipotle-hook-session',
+        },
+      })).toBeNull();
+    } finally {
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
   });
 
   it('restores the configured release bundle URL after returning from advanced mode to normal mode', async () => {
@@ -3482,117 +3537,87 @@ describe('SessionWizard rendered validation', () => {
     });
   });
 
-  it('renders a compact Lit private key row in the normal-mode worker secret view', async () => {
+  it('renders Chipotle Lit account and runtime fields in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 
     selectNormalModeCard('Worker');
     const litCard = (await screen.findByText('LIT')).closest(`[data-testid="${E2E_TESTIDS.WIZARD_RESOURCE_CARD}"]`);
 
     expect(litCard).not.toBeNull();
-    expect(within(litCard).getByText('Private key')).toBeInTheDocument();
-    expect(within(litCard).getByRole('button', { name: 'Generate' })).toBeInTheDocument();
-    expect(within(litCard).queryByText('Account')).not.toBeInTheDocument();
-    expect(within(litCard).queryByText('Ready for Lit sponsorship.')).not.toBeInTheDocument();
+    expect(within(litCard).getByText('Lit API base')).toBeInTheDocument();
+    expect(within(litCard).getByText('Lit group ID')).toBeInTheDocument();
+    expect(within(litCard).getByText('Lit PKP ID')).toBeInTheDocument();
+    expect(within(litCard).getByText('Lit Action CID')).toBeInTheDocument();
+    expect(within(litCard).getByText('Lit account API key')).toBeInTheDocument();
+    expect(within(litCard).getByText('Lit usage API key')).toBeInTheDocument();
+    expect(within(litCard).queryByText('Private key')).not.toBeInTheDocument();
   });
 
-  it('reveals the Lit wallet and copies it after a private key is entered', async () => {
-    const originalClipboard = navigator.clipboard;
-    const writeText = jest.fn().mockResolvedValue(undefined);
-    const validKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
-    const expectedAddress = ethers.utils.computeAddress(validKey);
-
-    try {
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: { writeText },
-      });
-
-      renderSessionWizard();
-      selectNormalModeCard('Worker');
-
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY), {
-        target: { value: validKey },
-      });
-
-      expect(await screen.findByText('Account')).toBeInTheDocument();
-      expect(screen.queryByText('Ready for Lit sponsorship.')).not.toBeInTheDocument();
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS)).toHaveValue(expectedAddress);
-
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_COPY_LIT_PAYER_ADDRESS));
-
-      await waitFor(() => {
-        expect(writeText).toHaveBeenCalledWith(expectedAddress);
-      });
-    } finally {
-      Object.defineProperty(navigator, 'clipboard', {
-        configurable: true,
-        value: originalClipboard,
-      });
-    }
-  });
-
-  it('re-derives the Lit payer address when the private key changes', async () => {
-    const firstKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
-    const secondKey = '0x8b3a350cf5c34c9194ca3a545d8f8a5f8d79f6c43f95b0f37cd0f2c0b9f0c2ef';
-    const firstAddress = ethers.utils.computeAddress(firstKey);
-    const secondAddress = ethers.utils.computeAddress(secondKey);
-
+  it('does not enable Chipotle wizard hooks while only bootstrap authority fields are present', async () => {
+    const litProtocol = require('../../utilities/crypto/litProtocol.js');
+    litProtocol.createLitHooks.mockClear();
     renderSessionWizard();
     selectNormalModeCard('Worker');
 
-    const keyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY);
-    fireEvent.change(keyInput, {
-      target: { value: firstKey },
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
+      target: { value: 'https://api.chipotle.litprotocol.com' },
     });
-
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS)).toHaveValue(firstAddress);
-
-    fireEvent.change(keyInput, {
-      target: { value: secondKey },
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
+      target: { value: 'account-secret' },
     });
 
     await waitFor(() => {
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS)).toHaveValue(secondAddress);
+      expect(litProtocol.createLitHooks).not.toHaveBeenCalled();
     });
   });
 
-  it('waits for a worker URL before enabling Lit payment delegation in wizard hooks', async () => {
+  it('waits for a worker URL before enabling Chipotle wizard hooks', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
+    litProtocol.createLitHooks.mockClear();
 
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Worker');
 
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY), {
-      target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
+      target: { value: 'https://api.chipotle.litprotocol.com' },
+    });
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID), {
+      target: { value: 'group_123' },
+    });
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID), {
+      target: { value: 'pkp_123' },
+    });
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID), {
+      target: { value: 'bafy123' },
     });
 
     await waitFor(() => {
-      const lastCall = litProtocol.createLitHooks.mock.calls[litProtocol.createLitHooks.mock.calls.length - 1]?.[0];
-      expect(lastCall?.paymentDelegation).toBeUndefined();
+      expect(litProtocol.createLitHooks).not.toHaveBeenCalled();
     });
   });
 
-  it('disables Lit payment delegation resolution when user-paid mode is enabled', () => {
-    const validKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
-    const baseArgs = {
-      workerSecretsEnabled: true,
-      resolvedWorkerUrl: 'https://deployed.example.test',
-      litPayerPrivateKey: validKey,
-      draft: { slug: 'edge' },
-      chainId: 84532,
-    };
+  it('uses the current Chipotle Lit tooltip copy in the worker panel', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      renderSessionWizard();
+      selectNormalModeCard('Worker');
 
-    expect(resolveSessionWizardLitPaymentDelegation(baseArgs)).toEqual(expect.objectContaining({
-      enabled: true,
-      workerUrl: 'https://deployed.example.test',
-      bootstrapLitPayerPrivateKey: validKey,
-    }));
-    expect(resolveSessionWizardLitPaymentDelegation({
-      ...baseArgs,
-      workerSecretsEnabled: false,
-    })).toBeUndefined();
+      const trigger = await screen.findByTestId('ce-wizard-resource-tooltip-lit');
+      fireEvent.mouseOver(trigger);
+      expect(await screen.findByText(
+        'Worker-mediated Lit Chipotle settings: either a bundle/session account API key for bootstrap, or a scoped usage API key plus the group, PKP, and Lit Action identifiers for this session.'
+      )).toBeInTheDocument();
+      fireEvent.mouseOut(trigger);
+    } finally {
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+      jest.useRealTimers();
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('renders worker resource tooltips for each visible secret section', async () => {
@@ -3607,7 +3632,7 @@ describe('SessionWizard rendered validation', () => {
         ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
         ['arweave', 'Account used to pay for Arweave uploads and storage.'],
         ['txGas', 'Faucet signer used to send small testnet funding grants.'],
-        ['lit', 'Payer account used to sponsor Lit operations for this session.'],
+        ['lit', 'Worker-mediated Lit Chipotle settings: either a bundle/session account API key for bootstrap, or a scoped usage API key plus the group, PKP, and Lit Action identifiers for this session.'],
       ];
 
       for (const [resourceKey, copy] of tooltipCases) {
@@ -3719,16 +3744,14 @@ describe('SessionWizard rendered validation', () => {
     }
   });
 
-  it('hides Lit worker UI and strips cached Lit sponsorship state when the rollout flag is off', async () => {
+  it('keeps Chipotle Lit UI visible while stripping cached legacy payer secrets from saved drafts', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     const cachedLitKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
-    const cachedLitAddress = ethers.utils.computeAddress(cachedLitKey);
-    mockEnableLitSessionPayerWalletInput = false;
     localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
       workerSecretsEnabled: true,
       workerSecrets: {
         litPayerPrivateKey: cachedLitKey,
-        litPayerAddress: cachedLitAddress,
+        litPayerAddress: ethers.utils.computeAddress(cachedLitKey),
       },
       provisionedSponsoredContext: {
         sessionSlug: 'edge',
@@ -3742,24 +3765,24 @@ describe('SessionWizard rendered validation', () => {
     renderSessionWizard();
     selectNormalModeCard('Worker');
 
-    expect(screen.queryByText('LIT')).not.toBeInTheDocument();
+    expect(screen.getByText('LIT')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-wizard-resource-tooltip-lit')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-wizard-resource-tooltip-lit')).toBeInTheDocument();
 
     await waitFor(() => {
-      const lastCall = litProtocol.createLitHooks.mock.calls[litProtocol.createLitHooks.mock.calls.length - 1]?.[0];
-      expect(lastCall?.paymentDelegation).toBeUndefined();
+      expect(litProtocol.createLitHooks).not.toHaveBeenCalled();
     });
 
     await waitFor(() => {
       const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
-      expect(cached.workerSecrets?.litPayerPrivateKey).toBe('');
-      expect(cached.workerSecrets?.litPayerAddress).toBe('');
-      expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('0');
+      expect(cached.workerSecrets?.litPayerPrivateKey).toBeUndefined();
+      expect(cached.workerSecrets?.litPayerAddress).toBeUndefined();
+      expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('1');
     });
   });
 
-  it('excludes hidden Lit secrets from deploy payloads and sponsored outputs when the rollout flag is off', async () => {
+  it('excludes cached legacy Lit payer secrets from deploy payloads', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
@@ -3772,7 +3795,6 @@ describe('SessionWizard rendered validation', () => {
     const verifyMessageSpy = jest
       .spyOn(ethers.utils, 'verifyMessage')
       .mockReturnValue(TEST_ADMIN_ADDRESS);
-    mockEnableLitSessionPayerWalletInput = false;
     localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
       workerSecretsEnabled: true,
       workerSecrets: {
@@ -3856,6 +3878,7 @@ describe('SessionWizard rendered validation', () => {
         target: { value: '{"kty":"RSA","n":"abc"}' },
       });
 
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
@@ -3984,8 +4007,11 @@ describe('SessionWizard rendered validation', () => {
       fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
         target: { value: '  {"kty":"RSA","n":"abc"}  ' },
       });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY), {
-        target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
+        target: { value: 'https://api.chipotle.litprotocol.com' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
+        target: { value: ' account-secret ' },
       });
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
@@ -4004,7 +4030,7 @@ describe('SessionWizard rendered validation', () => {
       expect(deployPayload.secrets).toEqual(expect.objectContaining({
         openaiKey: 'sk-latest',
         arweaveJwk: '{"kty":"RSA","n":"abc"}',
-        litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+        litAccountApiKey: 'account-secret',
       }));
 
       await waitFor(() => {
@@ -4018,7 +4044,7 @@ describe('SessionWizard rendered validation', () => {
           secrets: expect.objectContaining({
             openaiKey: 'sk-latest',
             arweaveJwk: '{"kty":"RSA","n":"abc"}',
-            litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+            litAccountApiKey: 'account-secret',
           }),
         }),
       }));
@@ -4027,7 +4053,7 @@ describe('SessionWizard rendered validation', () => {
       expect(secretsSyncPayload.secrets).toEqual(expect.objectContaining({
         openaiKey: 'sk-latest',
         arweaveJwk: '{"kty":"RSA","n":"abc"}',
-        litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+        litAccountApiKey: 'account-secret',
       }));
 
       await waitFor(() => {
@@ -4042,6 +4068,281 @@ describe('SessionWizard rendered validation', () => {
         }));
       });
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      web3ProviderSpy.mockRestore();
+      verifyMessageSpy.mockRestore();
+    }
+  });
+
+  it('auto-provisions the default Chipotle Lit action after deploy when the wizard has group and PKP config', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
+      getSigner: () => ({
+        getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
+        signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
+      }),
+    }));
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/lit-chipotle-provision')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            litActionCid: 'QmZPKjGtD4qLZhr17juP8XgUKV1A34Y9GtUUpeJNJ7f2vL',
+            litGroupId: '7',
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+      fireEvent.change(screen.getAllByRole('combobox')[0], {
+        target: { value: '84532' },
+      });
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Chipotle Provision Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'chipotle-provision-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
+      fireEvent.change(deployHelperInput, {
+        target: { value: 'https://deploy-helper.example.test' },
+      });
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-latest' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"abc"}' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
+        target: { value: 'https://api.chipotle.litprotocol.com' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID), {
+        target: { value: 'ce-session-content-prod' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID), {
+        target: { value: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_USAGE_API_KEY), {
+        target: { value: 'lit-usage-key' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+          'Lit provisioning note: Lit action auto-provisioned.'
+        );
+      });
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID)).toHaveValue(
+        'QmZPKjGtD4qLZhr17juP8XgUKV1A34Y9GtUUpeJNJ7f2vL'
+      );
+
+      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'lit-chipotle-provision',
+        body: expect.objectContaining({
+          litGroupId: 'ce-session-content-prod',
+          litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
+        }),
+      }));
+
+      const provisionCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'));
+      const provisionPayload = JSON.parse(provisionCall[1].body);
+      expect(provisionPayload.actionName).toBe('ce-sbt-gated-crypto-v3');
+
+      const configSyncCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
+      const configSyncPayload = JSON.parse(configSyncCall[1].body);
+      expect(configSyncPayload.config.litCredentials).toEqual(expect.objectContaining({
+        litActionCid: 'QmZPKjGtD4qLZhr17juP8XgUKV1A34Y9GtUUpeJNJ7f2vL',
+        litGroupId: '7',
+      }));
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      web3ProviderSpy.mockRestore();
+      verifyMessageSpy.mockRestore();
+    }
+  });
+
+  it('auto-bootstraps a new per-session Lit account when only the Lit API base is configured', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
+      getSigner: () => ({
+        getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
+        signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
+      }),
+    }));
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/lit-chipotle-bootstrap-session')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            litActionCid: 'QmBootstrapAction123',
+            litGroupId: '7',
+            litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+      fireEvent.change(screen.getAllByRole('combobox')[0], {
+        target: { value: '84532' },
+      });
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Chipotle Bootstrap Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'chipotle-bootstrap-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
+      fireEvent.change(deployHelperInput, {
+        target: { value: 'https://deploy-helper.example.test' },
+      });
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-latest' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"abc"}' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
+        target: { value: 'https://api.chipotle.litprotocol.com' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+          'Lit bootstrap note: Lit session account auto-created.'
+        );
+      });
+
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID)).toHaveValue('7');
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID)).toHaveValue(
+        '0x1e5ed88b177bde881bb5e68b338c26c675e8f142'
+      );
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID)).toHaveValue(
+        'QmBootstrapAction123'
+      );
+
+      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'lit-chipotle-bootstrap-session',
+        body: expect.objectContaining({
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          sessionName: 'Chipotle Bootstrap Session',
+        }),
+      }));
+      expect(
+        global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'))
+      ).toBe(false);
     } finally {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);

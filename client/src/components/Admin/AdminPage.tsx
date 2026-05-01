@@ -1047,8 +1047,8 @@ const AdminPage = ({
   });
   const [litResource, setLitResource] = useState<any>({
     address: '',
-    display: 'No Lit payer key entered',
-    meta: 'Enter a Lit payer private key above or save one to the worker, then refresh status.',
+    display: 'Lit Chipotle not configured',
+    meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
     loading: false,
     manualRefreshAvailable: false,
   });
@@ -1409,10 +1409,13 @@ const AdminPage = ({
     });
     setWorkerSecretsDirty(false);
     setClearedSecretKeys(new Set());
-    setStoredSecretPresence({});
-    setSecretPresenceStatus('idle');
-    setSecretPresenceMessage('');
-    setLitResource(buildAdminLitNotConfiguredResource());
+    setLitResource({
+      address: '',
+      display: 'Lit Chipotle not configured',
+      meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+      loading: false,
+      manualRefreshAvailable: false,
+    });
     setShowTestsPanel(false);
   }, [selectedSlug]);
 
@@ -1905,34 +1908,60 @@ const AdminPage = ({
     const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
 
     if (!useChipotlePath && !baseUrl) {
-      setLitResource(buildAdminLitNotConfiguredResource());
+      setLitResource({
+        address: '',
+        display: 'Lit Chipotle not configured',
+        meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+        loading: false,
+        manualRefreshAvailable: false,
+      });
       return;
     }
 
     if (!baseUrl || !selectedConfig) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource(buildAdminLitUnavailableResource({ useChipotlePath }));
+      setLitResource({
+        address: '',
+        display: useChipotlePath ? 'Worker unavailable' : 'Lit Chipotle not configured',
+        meta: useChipotlePath
+          ? 'Resolve the worker URL to read Lit Chipotle status.'
+          : 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
+        loading: false,
+        manualRefreshAvailable: false,
+      });
       return;
     }
 
     if (!includeSignedStatus) {
       if (requestId !== litResourceRequestRef.current) return;
-      setLitResource(buildAdminLitStatusNotLoadedResource({
-        hasAccountApiKey: !!accountApiKey,
-        hasUsageApiKey: !!usageApiKey,
-        configuredLitApiBase,
-        configuredLitGroupId,
-        configuredLitPkpId,
-        configuredLitActionCid,
-        formatPreviewValue,
-      }));
+      setLitResource({
+        address: '',
+        display: 'Status not loaded',
+        meta: [
+          accountApiKey ? 'Unsaved account key' : '',
+          usageApiKey ? 'Unsaved usage key' : '',
+          !accountApiKey && !usageApiKey ? 'Saved worker config' : '',
+          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
+          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
+          configuredLitPkpId ? 'PKP configured' : '',
+          configuredLitActionCid ? 'Action configured' : '',
+          'Click refresh to query the worker for Lit Chipotle status.',
+        ].filter(Boolean).join(' • '),
+        loading: false,
+        manualRefreshAvailable: true,
+      });
       return;
     }
 
-    setLitResource(buildAdminLitLoadingResource({
-      configuredLitGroupId,
-      formatPreviewValue,
-    }));
+    setLitResource({
+      address: '',
+      display: 'Loading...',
+      meta: configuredLitGroupId
+        ? `Checking group ${formatPreviewValue(configuredLitGroupId, 20)}`
+        : 'Checking Lit Chipotle worker status',
+      loading: true,
+      manualRefreshAvailable: true,
+    });
 
     try {
       const slug = normalizeSlug(selectedSlug);
@@ -1949,29 +1978,56 @@ const AdminPage = ({
       });
       if (requestId !== litResourceRequestRef.current) return;
 
-      const address = toStr(data?.payerAddress || payerStatus.address).trim();
-      const availableBalance = toStr(data?.balance?.availableBalance || '').trim();
-      const totalBalance = toStr(data?.balance?.totalBalance || '').trim();
       const ready = data?.ready === true;
-      const delegatedUsers = Number(data?.delegatedUsersCount || 0) || 0;
+      const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
+      const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object'
+        ? data.groupSummary
+        : {};
+      const walletCount = groupSummary.walletCount == null ? null : Number(groupSummary.walletCount);
+      const actionCount = groupSummary.actionCount == null ? null : Number(groupSummary.actionCount);
+      const hasHardConfigMiss = (
+        groupSummary.hasConfiguredPkp === false ||
+        groupSummary.hasConfiguredAction === false
+      );
+      const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
       setLitResource({
-        address,
-        display: availableBalance ? `${Number(availableBalance).toFixed(4)} ETH` : 'Deposit required',
+        address: '',
+        display: ready
+          ? 'Ready'
+          : hasHardConfigMiss
+            ? 'Needs config'
+            : warnings.length
+              ? 'Needs review'
+              : 'Configured',
         meta: [
-          address ? shortAddress(address) : '',
-          ready ? 'Ready' : 'Needs funds',
-          totalBalance ? `total ${Number(totalBalance).toFixed(4)} ETH` : '',
-          delegatedUsers ? `${delegatedUsers} delegated user${delegatedUsers === 1 ? '' : 's'}` : '',
-        ].filter(Boolean).join(' • '),
+          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
+          balanceDisplay ? `balance ${balanceDisplay}` : '',
+          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
+          configuredLitPkpId
+            ? (groupSummary.hasConfiguredPkp === true
+              ? 'PKP ready'
+              : groupSummary.hasConfiguredPkp === false
+                ? 'PKP missing'
+                : 'PKP unchecked')
+            : (walletCount != null ? `${walletCount} wallet${walletCount === 1 ? '' : 's'}` : ''),
+          configuredLitActionCid
+            ? (groupSummary.hasConfiguredAction === true
+              ? 'Action ready'
+              : groupSummary.hasConfiguredAction === false
+                ? 'Action missing'
+                : 'Action unchecked')
+            : (actionCount != null ? `${actionCount} action${actionCount === 1 ? '' : 's'}` : ''),
+          warnings.length ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : '',
+        ].filter(Boolean).join(' • ') || 'Lit Chipotle status loaded.',
         loading: false,
         manualRefreshAvailable: true,
       });
     } catch (error: any) {
       if (requestId !== litResourceRequestRef.current) return;
       setLitResource({
-        address: payerStatus.address,
+        address: '',
         display: 'Unable to load status',
-        meta: getErrorMessage(error, 'Failed to load Lit payer status.'),
+        meta: getErrorMessage(error, 'Failed to load Lit Chipotle status.'),
         loading: false,
         manualRefreshAvailable: true,
       });
@@ -1992,6 +2048,22 @@ const AdminPage = ({
       litResourceRequestRef.current += 1;
     };
   }, [refreshLitResource]);
+
+  const litResourceLabel = useMemo(() => {
+    const litCredentials = selectedConfig?.litCredentials
+      && typeof selectedConfig.litCredentials === 'object'
+      && !Array.isArray(selectedConfig.litCredentials)
+      ? selectedConfig.litCredentials
+      : {};
+    return (
+      toStr(secrets.litAccountApiKey).trim() ||
+      toStr(secrets.litUsageApiKey).trim() ||
+      toStr(litCredentials?.litApiBase).trim() ||
+      toStr(litCredentials?.litGroupId).trim() ||
+      toStr(litCredentials?.litPkpId).trim() ||
+      toStr(litCredentials?.litActionCid).trim()
+    ) ? 'Lit Chipotle status' : 'Lit sponsorship status';
+  }, [selectedConfig, secrets.litAccountApiKey, secrets.litUsageApiKey]);
 
   const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
     let currentOrigin = '';
@@ -2715,7 +2787,7 @@ const AdminPage = ({
     { key: 'rpc', label: 'RPC', fields: ['customRpcUrl', 'customRpcKey'] },
     { key: 'arweave', label: 'Arweave', fields: ['arweaveJwk'] },
     { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
-    { key: 'lit', label: 'Lit', fields: ['litPayerPrivateKey'] },
+    { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
   ];
   const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
   const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
@@ -3893,12 +3965,10 @@ const AdminPage = ({
                             customRpcKey: 'Custom RPC key',
                             arweaveJwk: 'Arweave JWK (JSON)',
                             faucetPrivateKey: 'Faucet private key',
-                            litPayerPrivateKey: 'Lit payer private key',
+                            litAccountApiKey: 'Lit account API key',
+                            litUsageApiKey: 'Lit usage API key',
                           };
                           const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
-                          const litPayerStatus = secretFieldKey === 'litPayerPrivateKey'
-                            ? getLitPayerWalletStatus(secrets.litPayerPrivateKey)
-                            : null;
                           return (
                             <FormGroup key={secretFieldKey}>
                               <Label>{label}</Label>
@@ -3921,34 +3991,10 @@ const AdminPage = ({
                                   <FontAwesomeIcon icon={faTimes} />
                                 </button>
                               </div>
-                              {secretFieldKey === 'litPayerPrivateKey' ? (
-                                <>
-                                  <div className={styles.secretInputRow} style={{ marginTop: 8 }}>
-                                    <Input
-                                      type="text"
-                                      value={litPayerStatus?.address || ''}
-                                      placeholder="Derived payer address"
-                                      readOnly
-                                      disabled
-                                      className={styles.secretInput}
-                                    />
-                                    <Button
-                                      type="button"
-                                      color="secondary"
-                                      outline
-                                      className={styles.secretRemoveButton}
-                                      onClick={() => {
-                                        const nextWallet = createLitPayerWallet();
-                                        handleSecretChange('litPayerPrivateKey', nextWallet.privateKey);
-                                      }}
-                                    >
-                                      Generate
-                                    </Button>
-                                  </div>
-                                  <div className={styles.warningNote}>
-                                    Anyone with this key can spend the session&apos;s Lit sponsorship balance. Only bundle it when you intend to grant sponsored Lit usage.
-                                  </div>
-                                </>
+                              {secretFieldKey === 'litAccountApiKey' ? (
+                                <div className={styles.warningNote}>
+                                  Anyone with this key can create new Lit groups, PKPs, usage keys, and actions inside that bundle-owned Lit account. Use disposable per-bundle accounts instead of a shared deployment account.
+                                </div>
                               ) : null}
                             </FormGroup>
                           );

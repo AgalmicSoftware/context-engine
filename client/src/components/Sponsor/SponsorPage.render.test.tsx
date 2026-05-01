@@ -296,7 +296,6 @@ describe('SponsorPage', () => {
   });
 
   it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
-    const expectedLitPayerAddress = '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7';
     getFetchMock().mockImplementation((url: any) => Promise.resolve(
       String(url).endsWith('/auth/nonce')
         ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
@@ -374,8 +373,12 @@ describe('SponsorPage', () => {
       arweaveJwk: '{"kty":"RSA"}',
       faucetPrivateKey: '0xsponsoredfaucet',
       customRpcUrl: 'https://rpc.example.test',
-      litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
-      litPayerAddress: expectedLitPayerAddress,
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+      litAccountApiKey: 'lit-account-secret',
+      litUsageApiKey: 'lit-secret',
       bootstrapWorkerUrl: 'https://worker.example.test',
       deployGrantToken: 'deploy-grant-token',
       faucetGrantToken: 'faucet-grant-token',

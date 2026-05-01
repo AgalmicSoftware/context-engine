@@ -631,17 +631,7 @@ const SponsorPage = ({
   const canAdmin = !!account && !!selectedConfig && !missingSupportedAdminConfig && isAdminForSelected && hasRegistryEntry;
 
   const updateBundleField = useCallback((key: any, value: any) => {
-    setBundleForm((prev: any) => {
-      if (key === 'litPayerPrivateKey') {
-        const nextStatus = getLitPayerWalletStatus(value);
-        return {
-          ...prev,
-          litPayerPrivateKey: value,
-          litPayerAddress: nextStatus.address || '',
-        };
-      }
-      return { ...prev, [key]: value };
-    });
+    setBundleForm((prev: any) => ({ ...prev, [key]: value }));
   }, []);
 
   const buildBootstrapUploadAuth = useCallback(async ({ workerUrl: overrideWorkerUrl }: any = {}) => {
@@ -1010,22 +1000,6 @@ const SponsorPage = ({
                       <div className={styles.statusNote}>
                         Uses sponsoring worker: {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
                       </div>
-                    ) : null}
-                    {group.key === 'lit' ? (
-                      <Button
-                        color="secondary"
-                        outline
-                        onClick={() => {
-                          const nextWallet = createLitPayerWallet();
-                          setBundleForm((prev: any) => ({
-                            ...prev,
-                            litPayerPrivateKey: nextWallet.privateKey,
-                            litPayerAddress: nextWallet.address,
-                          }));
-                        }}
-                      >
-                        Generate Lit payer wallet
-                      </Button>
                     ) : null}
                     {group.notice ? <div className={styles.warningNote}>{group.notice}</div> : null}
                   </div>

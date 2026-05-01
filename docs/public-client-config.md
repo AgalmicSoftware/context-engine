@@ -19,7 +19,7 @@ stays centralized in `client/src/variables/publicDeploymentConfig.js`.
 3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
-## Static Frontend Deploy
+## Netlify Static Deploy
 
 Use this flow when you want to ship the React frontend on a custom domain with
 Netlify static hosting. The built app is a static bundle; it is not a Node
@@ -128,9 +128,8 @@ SPA fallback concept, but their redirect config syntax differs.
 
 - Do **not** add Lit API keys to `client/.env` or any `REACT_APP_*` variable.
 - Chipotle auth is now intended to stay server-side:
-  - preferred deployment/sponsor worker env fallback: `LIT_USAGE_API_KEY`
-  - legacy-compatible deployment/sponsor worker env fallback: `LIT_ACCOUNT_API_KEY`
-  - per-session worker-secret overrides: `litAccountApiKey` (internal field behind the visible "Lit API key" input), `litUsageApiKey`
+  - optional deployment/sponsor worker env fallback: `LIT_ACCOUNT_API_KEY`
+  - per-session worker-secret overrides: `litAccountApiKey`, `litUsageApiKey`
 - Session-scoped non-secret Chipotle identifiers are no longer treated like browser env vars:
   - `litApiBase`
   - `litGroupId`
@@ -141,13 +140,11 @@ SPA fallback concept, but their redirect config syntax differs.
   - exposing them can reveal app architecture and action identity
   - they also make abuse easier if a scoped usage key later leaks
 - Do not rely on hiding those identifiers as the main security boundary. The real boundary is the Lit API key scope, the permitted group/PKP/action relationship, and the Lit Action code itself.
-- If a deployment intentionally makes those identifiers public, treat that as an explicit tradeoff rather than an accident. Never expose `LIT_USAGE_API_KEY`, `LIT_ACCOUNT_API_KEY`, `litUsageApiKey`, wallet private keys, or paid RPC URLs that embed provider secrets.
-- If a sponsored bundle intentionally carries `litAccountApiKey`, treat that as an explicit Lit authority transfer rather than an ordinary config convenience. The durable OSS-friendly version of that pattern is one disposable Lit key per bundle, not one long-lived deployment key copied into many bundles.
-- Chipotle v2 metadata may store the non-secret policy fields and policy fingerprint needed to bind a wrapped CEK to an audience, but it must not store secret-bearing RPC URLs. Decrypt/check RPC selection is derived from worker-approved config, secrets, or defaults.
-- Re-provision Chipotle-enabled sessions after default Lit Action source changes so `litActionCid` matches the currently bundled action source. Old v1 / bare-hex Chipotle wrapped keys are not a compatibility target.
+- If a deployment intentionally makes those identifiers public, treat that as an explicit tradeoff rather than an accident. Never expose `LIT_ACCOUNT_API_KEY`, `litUsageApiKey`, wallet private keys, or paid RPC URLs that embed provider secrets.
+- If a sponsored bundle intentionally carries `litAccountApiKey`, treat that as an explicit authority transfer rather than an ordinary config convenience. The durable OSS-friendly version of that pattern is one disposable Lit account per bundle, not one long-lived deployment account copied into many bundles.
 - Current public prod/dev Chipotle environments both report Base mainnet, so environment isolation should come from separate Chipotle accounts, usage keys, groups, and PKPs rather than from shipping different public chain IDs alone.
 - The default CE automation path is now one new Lit account per session. Groups are reserved for internal trust boundaries or future action families inside that session account rather than as the primary cross-session isolation primitive.
-- There is no longer a client-side Lit payer-wallet feature gate in `/new`; the manual `/new` Lit card asks only for one Lit API key. E2E/deploy env should prefer `LIT_USAGE_API_KEY`; `litAccountApiKey` remains the internal worker-secret field backing that visible input for backward compatibility.
+- There is no longer a client-side Lit payer-wallet feature gate in `/new`; Chipotle account/usage-key fields are the active path.
 
 ## RPC Defaults
 
@@ -198,13 +195,6 @@ SPA fallback concept, but their redirect config syntax differs.
   - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
   - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
 
-- `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT=false`
-  - Temporary rollout flag for the legacy Naga-era `/new` SessionWizard Lit payer-wallet UI.
-  - `false` hides the Lit worker-secret card in `/new`.
-  - `true` enables the existing Lit payer-wallet inputs in `/new`.
-  - This is migration scaffolding for the current legacy Lit path, not the
-    long-term Chipotle account/API-key config surface.
-
 ## Arweave Read Policy Toggles
 
 - `REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA=false`
@@ -243,5 +233,5 @@ SPA fallback concept, but their redirect config syntax differs.
   - Allows off-list question activity discovery in `UserPage` / compare deep scans when enabled.
 
 - `litActionCid` can be omitted during session setup.
-  - If the wizard only has the visible Lit API key (`litAccountApiKey` internally), the worker can now auto-bootstrap the default group, PKP, usage key, and CE action for that session, using the default Chipotle API base unless worker config/env overrides it.
+  - If the wizard only has `litApiBase`, the worker can now auto-bootstrap a new Lit account for that session and create the default group, PKP, usage key, and CE action.
   - If the wizard already has `litGroupId` and `litPkpId`, the worker can still auto-provision the default CE Lit action into an existing account and write the returned CID back into worker config after deploy.

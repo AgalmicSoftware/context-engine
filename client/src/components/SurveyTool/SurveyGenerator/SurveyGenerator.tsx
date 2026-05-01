@@ -536,13 +536,26 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
     () => resolveDocUploadsGate(resolvedSessionConfig),
     [resolvedSessionConfig],
   );
+  const sessionHasLitChipotle = useMemo(() => {
+    const litCredentials = (
+      resolvedSessionConfig?.litCredentials &&
+      typeof resolvedSessionConfig.litCredentials === 'object' &&
+      !Array.isArray(resolvedSessionConfig.litCredentials)
+    ) ? resolvedSessionConfig.litCredentials : null;
+    return !!(
+      toStr(resolvedSessionConfig?.corsWorkerUrl).trim() &&
+      toStr(litCredentials?.litApiBase).trim() &&
+      toStr(litCredentials?.litActionCid).trim() &&
+      toStr(litCredentials?.litPkpId).trim()
+    );
+  }, [resolvedSessionConfig]);
   const docSaveSessionChainError = useMemo(() => (
-    docSaveGate.hasRecipients
+    docSaveGate.hasRecipients && !sessionHasLitChipotle
       ? getUnsupportedLitContractAccessControlError({
         chainId: docSaveGate.chainId || networkChainId || null,
       })
       : ''
-  ), [docSaveGate.chainId, docSaveGate.hasRecipients, networkChainId]);
+  ), [docSaveGate.chainId, docSaveGate.hasRecipients, networkChainId, sessionHasLitChipotle]);
   const docSaveSessionAudienceAvailable = docSaveGate.hasRecipients && !docSaveSessionChainError;
   const docSaveSessionLabel = useMemo(() => {
     const sessionName = toStr(resolvedSessionConfig?.sessionName).trim();
@@ -782,10 +795,12 @@ export default function AudioSurveyGenerator(rawProps: any = {}) {
             chainId: gateChainId,
             litChain: summaryGate?.litChain || summaryGate?.chain,
           });
-          const unsupportedGateError = getUnsupportedLitContractAccessControlError({
-            chainId: gateChainId,
-            litChain,
-          });
+          const unsupportedGateError = sessionHasLitChipotle
+            ? ''
+            : getUnsupportedLitContractAccessControlError({
+              chainId: gateChainId,
+              litChain,
+            });
           if (unsupportedGateError) {
             throw new Error(unsupportedGateError);
           }

@@ -31,7 +31,11 @@ export const getSessionWizardSecretFieldTestId = (fieldKey: string): string | un
   if (fieldKey === 'openrouterKey') return E2E_TESTIDS.WIZARD_SECRET_OPENROUTER_KEY;
   if (fieldKey === 'arweaveJwk') return E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK;
   if (fieldKey === 'faucetPrivateKey') return E2E_TESTIDS.WIZARD_SECRET_FAUCET_PRIVATE_KEY;
-  if (fieldKey === 'litPayerPrivateKey') return E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY;
-  if (fieldKey === 'litPayerAddress') return E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS;
+  if (fieldKey === 'litApiBase') return E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE;
+  if (fieldKey === 'litGroupId') return E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID;
+  if (fieldKey === 'litPkpId') return E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID;
+  if (fieldKey === 'litActionCid') return E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID;
+  if (fieldKey === 'litAccountApiKey') return E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY;
+  if (fieldKey === 'litUsageApiKey') return E2E_TESTIDS.WIZARD_SECRET_LIT_USAGE_API_KEY;
   return undefined;
 };

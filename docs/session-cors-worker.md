@@ -120,7 +120,6 @@ If you deploy via the Group Wizard and a deploy-helper:
   - `litAccountApiKey` is the per-bundle authority field backed by one disposable Lit account per bundle
   - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
   - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
-- The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
 - The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
@@ -146,7 +145,8 @@ If you deploy via the Group Wizard and a deploy-helper:
   - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
   - `dist/sessionCorsWorker.bundle.js` remains a generated local/manual fallback bundle for upload retries, but the client build no longer serves `/worker/sessionCorsWorker.bundle.js`.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
-  - Lit payer secrets remain bundled/applied end-to-end, but they are still optional for deploy-readiness; they continue to drive `sponsored_lit` and payment delegation only when a valid Lit payer key is present.
+  - Scoped Chipotle identifiers and `litUsageApiKey` already flow end-to-end for worker-mediated Lit execution.
+  - Authority-bundle bootstrap now centers on `litAccountApiKey` rather than payer-wallet delegation.
 - Login-stage auto-funding now retries the faucet request against `meta.sourceSessionSlug` / `meta.sourceWorkerUrl` when the new sponsored session has not published its own worker yet, so the freshly connected wallet can still get publish gas from the originating sponsored session.
 - After that first worker deploy, later worker config/secrets adjustments are expected to flow through the signed `/admin/set-config` and `/admin/set-secrets` routes rather than the streamlined normal-mode auto-deploy banner.
 - `customRpcKey` is intentionally out of scope for this MVP and is ignored if present in a bundle payload.
@@ -154,7 +154,7 @@ If you deploy via the Group Wizard and a deploy-helper:
 Temporary standard-link fixture:
 - `client/public/standard-sponsored-links.json` is a tracked public manifest for up to ten disposable sponsored setup URLs.
 - It is intentionally operator-managed and does not read back worker KV or grant state. An active fixture entry is public because the operator chose to publish that bearer URL.
-- Fixture links should be created through `/sponsor` with disposable, resource-limited credentials: capped AI/provider keys, small faucet balances, short expirations, and revocable Arweave/Lit payer wallets.
+- Fixture links should be created through `/sponsor` with disposable, resource-limited credentials: capped AI/provider keys, small faucet balances, short expirations, revocable Arweave wallets, and either revocable Lit usage keys or disposable Lit bundle accounts.
 - Use it only for short-lived low-friction demos or launches. Replace it with a worker-backed claim service before treating sponsored-link inventory as durable availability infrastructure.
 
 Deploy error visibility:
@@ -212,7 +212,7 @@ Admin test panel:
 - Static custom-domain frontend deploys must add the final browser origin (for
   example `https://app.example`) to the same `allowOrigins` list after DNS
   cutover. See the Netlify/static hosting checklist in
-  [`docs/public-client-config.md#static-frontend-deploy`](public-client-config.md#static-frontend-deploy).
+  [`docs/public-client-config.md#netlify-static-deploy`](public-client-config.md#netlify-static-deploy).
 - When AI/Arweave/Faucet tests hit `Session config not found.`, the panel now auto-attempts
   a signed `/admin/set-config` using the selected session metadata, then retries the test once.
   This recovery also covers login-stage 404s (`Worker login failed (404)`) so fresh workers can be
@@ -262,8 +262,7 @@ Vars:
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
 - `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
-- `LIT_API_BASE` (optional; defaults to `https://api.chipotle.litprotocol.com`; production requests are restricted to the approved Chipotle API host)
-- `LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE` (optional; dev/test only, allows `LIT_API_BASE` to target localhost/loopback Chipotle stubs over `http` or `https`)
+- `LIT_API_BASE` (optional; only if you need a non-default Chipotle API base such as self-hosted/local dev)
 
 Runtime:
 - Enable Node.js compatibility when deploying from the dashboard.
@@ -846,21 +845,6 @@ Never return secrets in responses.
     default because they still reveal operational topology
   - worker env fallback to `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY`) for
     Chipotle-backed requests when a session-specific Lit account/usage key is not present
-  - `/lit/chipotle-action` now receives the worker `env` during authenticated
-    dispatch, so the deployment-level Lit env fallback applies to runtime
-    execution as well as status/provisioning paths
-  - v2 Chipotle wrapped keys bind `{ chainId, gateMode, sbtAddresses,
-    litActionCid, litPkpId }` into the encrypted plaintext via a policy
-    fingerprint; decrypt returns the CEK only when the embedded fingerprint
-    matches the worker-approved policy
-  - `encrypt` does not require target SBT ownership, while `check` and
-    `decrypt` still enforce the SBT gate
-  - `check` / `decrypt` derive RPC from worker-approved config, secrets, or
-    defaults. Request `rpcUrl` / `customRpcUrl` is rejected unless it exactly
-    matches that allowlist, and the Lit Action rejects endpoints whose reported
-    chain ID does not match the gate chain.
-  - stored Chipotle metadata omits RPC URLs; legacy v1 / bare-hex Chipotle
-    wrapped keys are rejected by default and must be recreated with v2 metadata
   - admin `POST /admin/lit-chipotle-status` to query worker-mediated Chipotle
     readiness, billing balance, and configured group/action/PKP membership
     without returning the stored API key
@@ -877,10 +861,6 @@ Never return secrets in responses.
     `litAccountApiKey` in the encrypted `/sponsor` payload so `/new` can mint a
     fresh group / PKP / usage key for each redeemed session, then keep using
     only the scoped runtime during day-to-day execution
-  - after default action-source changes, operators must re-run
-    `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` so session
-    `litCredentials.litActionCid` points at the newly derived action CID; there
-    is no compatibility fallback to the old action source
 
 ## Gating on login (on-chain)
 

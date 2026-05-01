@@ -20,14 +20,17 @@ export type SessionMetadata = Record<string, any> & {
   sponsoredSbtAddress?: string;
 };
 
-const DEFAULT_LIT_NETWORK = 'naga-dev';
+const DEFAULT_LIT_NETWORK = 'chipotle';
 const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
-  'naga-dev': 'naga-dev',
-  nagadev: 'naga-dev',
-  'naga-test': 'naga-test',
-  nagatest: 'naga-test',
-  'naga-mainnet': 'naga',
-  datil: 'naga',
+  chipotle: 'chipotle',
+  'chipotle-v3': 'chipotle',
+  'naga-dev': 'chipotle',
+  nagadev: 'chipotle',
+  'naga-test': 'chipotle',
+  nagatest: 'chipotle',
+  'naga-mainnet': 'chipotle',
+  naga: 'chipotle',
+  datil: 'chipotle',
 } as const);
 
 const isObj = (value: unknown): value is SessionMetadata => (
