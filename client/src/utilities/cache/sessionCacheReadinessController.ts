@@ -2,8 +2,6 @@ import { createLogger } from 'utilities/logging.js';
 import { recordCeRuntimeCacheEvent } from '../../utilities/ui/uiRuntimeStats.js';
 import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 
-type CacheInitMode = 'auto' | 'partial' | 'full';
-
 export interface SessionCacheReadinessHost {
   getState?: () => Record<string, unknown>;
   setState?: (
@@ -12,8 +10,6 @@ export interface SessionCacheReadinessHost {
   ) => void;
   isMounted?: () => boolean;
   resolveActiveSlug?: () => string;
-  getSessionSlugFromState?: () => string;
-  getCurrentPathname?: () => string;
   checkAllCachesReady?: () => void;
   syncCacheHasLoadedFlagFromPersistent?: (
     slug: string,
@@ -23,9 +19,6 @@ export interface SessionCacheReadinessHost {
     slug: string
   ) => { question?: boolean; survey?: boolean; response?: boolean } | null;
   readFlag?: (name: string, slug: string) => unknown;
-  shouldAutoRunFullSbtScan?: (opts: { pathname: string }) => boolean;
-  initializeSbtCache?: (opts: { mode: CacheInitMode }) => Promise<unknown>;
-  startSbtEventListener?: () => unknown;
 }
 
 interface CacheUpdateFlags {
@@ -38,7 +31,6 @@ export interface SessionCacheReadinessController {
     nextState: Record<string, unknown> | null | undefined,
     cb?: () => void
   ) => boolean;
-  checkAllCachesReady: () => void;
   syncCacheHasLoadedFlagOnTransition: (
     slug: string,
     opts?: { force?: boolean; isAllReady?: boolean }
@@ -119,17 +111,7 @@ export const createSessionCacheReadinessController = (
     typeof host.resolveActiveSlug === 'function' ? host.resolveActiveSlug() || '' : ''
   );
 
-  const resolveStateSlug = (): string => String(
-    typeof host.getSessionSlugFromState === 'function'
-      ? host.getSessionSlugFromState() || ''
-      : resolveActiveSlug()
-  );
-
-  const getCurrentPathname = (): string => String(
-    typeof host.getCurrentPathname === 'function' ? host.getCurrentPathname() || '' : ''
-  );
-
-  const callHostCheckAllCachesReady = (): void => {
+  const checkAllCachesReady = (): void => {
     if (typeof host.checkAllCachesReady === 'function') host.checkAllCachesReady();
   };
 
@@ -173,7 +155,7 @@ export const createSessionCacheReadinessController = (
         next.questionResponsesNonce = Number(prev.questionResponsesNonce ?? 0) + 1;
       }
       return next;
-    }, callHostCheckAllCachesReady);
+    }, checkAllCachesReady);
   };
 
   const scheduleCacheUpdateFlush = (): void => {
@@ -238,7 +220,7 @@ export const createSessionCacheReadinessController = (
     const shouldCheckAllCachesReady = !!pendingLocalRevisionCheckAllCachesReady;
     if (!flags.needsSbtRevision && !flags.needsQuestionResponsesNonce) {
       pendingLocalRevisionCheckAllCachesReady = false;
-      if (shouldCheckAllCachesReady && isMounted()) callHostCheckAllCachesReady();
+      if (shouldCheckAllCachesReady && isMounted()) checkAllCachesReady();
       return;
     }
     pendingLocalRevisionFlags = createDefaultCacheUpdateFlags();
@@ -254,7 +236,7 @@ export const createSessionCacheReadinessController = (
       }
       return next;
     }, () => {
-      if (shouldCheckAllCachesReady) callHostCheckAllCachesReady();
+      if (shouldCheckAllCachesReady) checkAllCachesReady();
     });
   };
 
@@ -367,56 +349,6 @@ export const createSessionCacheReadinessController = (
     return host.syncCacheHasLoadedFlagFromPersistent(slug, { force: shouldForceSync });
   };
 
-  const runDeferredFullSbtScan = (slug: string, pathname: string): void => {
-    void (async () => {
-      try {
-        if (
-          typeof host.shouldAutoRunFullSbtScan === 'function' &&
-          !host.shouldAutoRunFullSbtScan({ pathname })
-        ) {
-          return;
-        }
-        log.log('[SBT Deferred] Kicking off full scan after questions & surveys are ready...');
-        if (typeof host.initializeSbtCache === 'function') {
-          await host.initializeSbtCache({ mode: 'full' });
-        }
-        if (typeof host.startSbtEventListener === 'function') {
-          host.startSbtEventListener();
-        }
-        log.log('[SBT Deferred] Full scan complete; listener started.');
-      } catch (e) {
-        log.error('[SBT Deferred] Full scan failed:', e);
-      }
-    })();
-  };
-
-  const checkAllCachesReady = (): void => {
-    const state = getState();
-    const isSBTCacheReady = !!state.isSBTCacheReady;
-    const isSurveyCacheReady = !!state.isSurveyCacheReady;
-    const isQuestionCacheReady = !!state.isQuestionCacheReady;
-    const nextIsAllReady = !!(isSBTCacheReady && isSurveyCacheReady && isQuestionCacheReady);
-    const slug = resolveStateSlug();
-
-    setState((prev) => {
-      if (prev.isAllCachesReady === nextIsAllReady) return null;
-      return { isAllCachesReady: nextIsAllReady };
-    });
-    void syncCacheHasLoadedFlagOnTransition(slug, { isAllReady: nextIsAllReady });
-
-    const pathname = getCurrentPathname();
-    if (!pathname.startsWith('/session/')) return;
-
-    const shouldKickOff =
-      isSBTCacheReady && isSurveyCacheReady && isQuestionCacheReady &&
-      !!(typeof host.readFlag === 'function' && host.readFlag('sbt:deferredFullScanNeeded', slug)) &&
-      !(typeof host.readFlag === 'function' && host.readFlag('sbt:fullScanInProgress', slug));
-
-    if (shouldKickOff) {
-      runDeferredFullSbtScan(slug, pathname);
-    }
-  };
-
   const handleCrossTabCacheUpdateEvent = (evt: ReadinessEvent): void => {
     recordCeRuntimeCacheEvent(evt);
     const namespace = String(evt?.namespace || '');
@@ -467,7 +399,6 @@ export const createSessionCacheReadinessController = (
 
   return {
     setReadinessStateIfChanged,
-    checkAllCachesReady,
     syncCacheHasLoadedFlagOnTransition,
     clearCacheUpdateFlushSchedule,
     scheduleCacheUpdateFlush,
