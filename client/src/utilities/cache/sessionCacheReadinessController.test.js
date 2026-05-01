@@ -7,17 +7,17 @@ jest.mock('utilities/logging.js', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   }),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/ui/uiRuntimeStats.js', () => ({
   __esModule: true,
   recordCeRuntimeCacheEvent: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn(),
-}));
+}), { virtual: true });
 
 const { createSessionCacheReadinessController } = require('./sessionCacheReadinessController.js');
 const { recordCeRuntimeCacheEvent } = require('../../utilities/ui/uiRuntimeStats.js');
