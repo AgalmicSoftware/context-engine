@@ -532,6 +532,24 @@ describe('MainSite route render smoke', () => {
       .toBe(subject.ensureLightSbtUniverse);
   });
 
+  it('prefers the live browser pathname when the path prop is stale after a direct history rewrite', async () => {
+    const sessionConfig = buildSessionConfig({
+      slug: 'demo',
+      sessionName: 'Demo Session',
+    });
+    const subject = createSubject({
+      path: '/',
+      activeSessionSlug: 'demo',
+      sessionConfig,
+    });
+    window.history.replaceState({}, '', '/session/demo');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
+  });
+
   it('keeps PUBLIC_URL when canonicalizing /new to /session/new', async () => {
     // Synthetic subpath fixture: current deploys use '/', but we intentionally
     // keep this coverage so optional subpath hosting keeps working.

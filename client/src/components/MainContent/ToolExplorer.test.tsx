@@ -132,7 +132,10 @@ describe('ToolExplorer session propagation', () => {
 
     expect(await screen.findByTestId('mock-survey-tool')).toHaveAttribute('data-active-session-slug', 'demo');
     expect(mockSurveyTool).toHaveBeenCalledWith(
-      expect.objectContaining({ activeSessionSlug: 'demo' })
+      expect.objectContaining({
+        activeSessionSlug: 'demo',
+        preventUrlChange: true,
+      })
     );
   });
 
