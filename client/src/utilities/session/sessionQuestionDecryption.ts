@@ -1,14 +1,10 @@
 import { isMaskedQuestionPayload } from '../survey/questionRouting.js';
 
-export interface QuestionDecryptLitHooks extends Record<string, unknown> {
-  getKey?: (...args: unknown[]) => unknown;
-}
-
 export interface QuestionDecryptContext {
   account: string;
-  providerLike: unknown;
+  providerLike: string;
   chainId: number | null;
-  litHooks: QuestionDecryptLitHooks | null;
+  litHooks: Record<string, unknown> | null;
   litOpts: { getKey: (...args: unknown[]) => unknown } | null;
 }
 
@@ -21,25 +17,20 @@ export const buildQuestionDecryptContextForSession = ({
 }: {
   cfg?: { networkChainId?: unknown; [key: string]: unknown } | null;
   account?: string;
-  providerLike?: unknown;
-  litHooks?: unknown;
+  providerLike?: string;
+  litHooks?: Record<string, unknown> | null;
   fallbackChainId?: unknown;
 } = {}): QuestionDecryptContext => {
   const chainId = Number(
     cfg?.networkChainId || fallbackChainId || 0
   ) || null;
-  const normalizedLitHooks = (
-    litHooks && typeof litHooks === 'object'
-      ? litHooks as QuestionDecryptLitHooks
-      : null
-  );
   return {
     account,
     providerLike,
     chainId,
-    litHooks: normalizedLitHooks,
-    litOpts: normalizedLitHooks && typeof normalizedLitHooks.getKey === 'function'
-      ? { getKey: normalizedLitHooks.getKey }
+    litHooks: litHooks || null,
+    litOpts: litHooks && typeof litHooks.getKey === 'function'
+      ? { getKey: litHooks.getKey as (...args: unknown[]) => unknown }
       : null,
   };
 };
