@@ -104,8 +104,8 @@ describe('deploy-helper worker', () => {
         openaiKey: '  sk-openai  ',
         arweaveJwk: { kty: 'RSA', n: 'abc' },
         faucetPrivateKey: 12345,
-        litPayerPrivateKey: '  0xlit  ',
-        litPayerAddress: '  0x00000000000000000000000000000000000000bb  ',
+        litAccountApiKey: '  lit-account-secret  ',
+        litUsageApiKey: '  lit-usage-secret  ',
       },
     }), {}, {});
     const payload = await response.json();
@@ -141,8 +141,8 @@ describe('deploy-helper worker', () => {
       openaiKey: 'sk-openai',
       arweaveJwk: '{"kty":"RSA","n":"abc"}',
       faucetPrivateKey: '12345',
-      litPayerPrivateKey: '0xlit',
-      litPayerAddress: '0x00000000000000000000000000000000000000bb',
+      litAccountApiKey: 'lit-account-secret',
+      litUsageApiKey: 'lit-usage-secret',
     });
 
     const configRewrite = fetchMock.calls[8];

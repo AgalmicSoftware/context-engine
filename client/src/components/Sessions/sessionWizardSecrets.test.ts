@@ -45,9 +45,15 @@ describe('sessionWizardSecrets', () => {
       anthropicKey: '',
       arweaveJwk: '   {"kty":"RSA"}   ',
       customRpcUrl: '   ',
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litAccountApiKey: ' account-secret ',
+      litUsageApiKey: ' lit-secret ',
     })).toEqual({
       openaiKey: 'sk-123',
       arweaveJwk: '{"kty":"RSA"}',
+      litAccountApiKey: 'account-secret',
+      litUsageApiKey: 'lit-secret',
     });
   });
 

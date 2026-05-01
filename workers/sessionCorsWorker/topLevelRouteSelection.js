@@ -27,12 +27,6 @@ export const resolveTopLevelRouteSelection = ({
     };
   }
 
-  if (path === '/lit/payment-delegation' && method === 'POST' && !hasTrimmedAuthorization) {
-    return {
-      kind: 'lit-payment-delegation-bootstrap',
-    };
-  }
-
   if (path === '/sponsored/redeem-deploy' && method === 'POST') {
     return {
       kind: 'sponsored-bootstrap-redeem',

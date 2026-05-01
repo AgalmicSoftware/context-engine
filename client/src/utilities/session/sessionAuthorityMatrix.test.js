@@ -36,4 +36,13 @@ describe('sessionAuthorityMatrix', () => {
       ]),
     }));
   });
+
+  it('stores Lit Chipotle identifiers in worker config authority instead of worker secrets', () => {
+    expect(AUTHORITY_MATRIX.workerConfig.fields).toContain('litCredentials');
+    expect(AUTHORITY_MATRIX.secrets.fields).not.toContain('litCredentials');
+    expect(AUTHORITY_MATRIX.secrets.fields).toEqual(expect.arrayContaining([
+      'litAccountApiKey',
+      'litUsageApiKey',
+    ]));
+  });
 });

@@ -237,8 +237,8 @@ export const sanitizeSecrets = (incoming) => {
     'customRpcKey',
     'arweaveJwk',
     'faucetPrivateKey',
-    'litPayerPrivateKey',
-    'litPayerAddress',
+    'litAccountApiKey',
+    'litUsageApiKey',
   ];
   const out = {};
   allowed.forEach((key) => {
