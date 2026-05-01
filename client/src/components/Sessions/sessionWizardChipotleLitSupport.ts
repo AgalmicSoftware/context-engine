@@ -12,7 +12,7 @@ import type {
   WorkerSecretsLike,
 } from '../shellTypes';
 
-type AsyncShellCallback = (input?: AnyRecord) => Promise<any>;
+type AsyncShellCallback = (input: AnyRecord) => Promise<any>;
 
 export type LitProvisionSyncResult = WorkerSecretSyncResult & {
   litActionCid?: string;
