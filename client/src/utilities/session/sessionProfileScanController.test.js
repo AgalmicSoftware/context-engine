@@ -1,6 +1,6 @@
 jest.mock('ethers', () => ({
   ethers: { utils: { isAddress: jest.fn() } },
-}));
+}), { virtual: true });
 
 jest.mock('utilities/logging.js', () => ({
   __esModule: true,
@@ -11,22 +11,22 @@ jest.mock('utilities/logging.js', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   }),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   __esModule: true,
   getGlobalLitHooks: jest.fn(() => ({})),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/session/sessionScanScope.js', () => ({
   __esModule: true,
   getAllowedSessionSlugs: jest.fn(() => []),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/session/registryBootstrapChainIds.js', () => ({
   __esModule: true,
   resolveSessionRegistryBootstrapChainIds: jest.fn(() => undefined),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
@@ -42,7 +42,7 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
     getAllSessionSlugs: jest.fn(() => []),
   },
   upsertSessionRegistryCache: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../variables/appConfig.js', () => ({
   CE_PROFILE_SCAN_ACTIVITY_TIMEOUT_MS: 12000,
