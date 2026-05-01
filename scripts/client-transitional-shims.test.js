@@ -10,8 +10,42 @@ const CLIENT_SRC = path.join(ROOT, 'client/src');
 const ADJACENT_TS_REEXPORT_RE = /from ['"]\.\/[^'"]+\.ts['"]/;
 const PURE_TS_REEXPORT_LINE_RE = /^export (?:\*|\{\s*default\s*\}) from ['"]\.\/[^'"]+\.ts['"];\s*$/;
 
-const EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES = Object.freeze({
-  'client/src/variables/appConfig.js': 'initializes runtime config before re-exporting the typed config surface',
+const EXPECTED_COMPONENT_SHIM_CLUSTERS = Object.freeze({
+  'client/src/components/MainSite': Object.freeze([
+    'cacheConstants.js',
+    'debugTelemetry.js',
+    'litSessionConfig.js',
+    'mainSiteUtils.js',
+    'progressHelpers.js',
+    'reloadWindowLocation.js',
+    'routeConfig.js',
+    'routeLazyComponents.js',
+    'routeStyles.js',
+    'storageEviction.js',
+    'urlUtils.js',
+  ]),
+  'client/src/components/SBTs': Object.freeze([
+    'sbtSelectorSessionResolution.js',
+    'sbtSessionUniverse.js',
+  ]),
+  'client/src/components/Sessions': Object.freeze([
+    'cloudflareTokenTemplate.js',
+    'sessionWizardContracts.js',
+    'sessionWizardDraftCache.js',
+  ]),
+  'client/src/components/SurveyTool': Object.freeze([
+    'surveyToolCacheState.js',
+    'surveyToolDraftState.js',
+    'surveyToolNavigation.js',
+    'surveyToolResponseMerge.js',
+    'surveyToolResponseState.js',
+    'surveyToolRuntimeSupport.js',
+    'surveyToolScope.js',
+    'surveyToolSignatures.js',
+    'surveyToolSliderState.js',
+    'surveyToolSlugLookup.js',
+    'surveyToolViewState.js',
+  ]),
 });
 
 const stripLineComments = (source) => source
