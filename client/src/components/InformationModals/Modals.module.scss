@@ -1,6 +1,6 @@
 /* @file Modals.module.scss */
 
-/* --- GreetingModal.jsx --- */
+/* --- GreetingModal.tsx --- */
 
 @media (min-width: 0px) and (max-width: 319px) {
   #rulesModal {
@@ -1573,7 +1573,7 @@ input[type='radio']:checked:after {
   border: 2px solid white;
 }
 
-/* --- SiteLoadOptions.jsx --- */
+/* --- SiteLoadOptions.tsx --- */
 
 @media (min-width: 320px) and (max-width: 465px) {
   #betaExplainerBulletText {

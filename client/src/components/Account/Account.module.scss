@@ -1,7 +1,7 @@
 /* @file Account.module.scss */
 @use "sass:color";
 
-/* --- LoginAndSettingsModal.jsx --- */
+/* --- LoginAndSettingsModal.tsx --- */
 
 @media (min-width: 0px) and (max-width: 319px) {
   #navConnectContainer {
@@ -1784,7 +1784,7 @@ h1 {
   width: 60px;
 }
 
-/* --- LoginAndSettingsModal.jsx --- */
+/* --- LoginAndSettingsModal.tsx --- */
 
 #verifyingText {
   color: var(--ce-color-white) !important;
@@ -3147,7 +3147,7 @@ h1 {
   display: none;
 }
 
-/* --- LoginAndSettingsModal.jsx (continued) --- */
+/* --- LoginAndSettingsModal.tsx (continued) --- */
 
 /// Overrides for wallet-connect modal
 

@@ -188,7 +188,7 @@ describe('SurveyTool module', () => {
     expect(subject.resolveSessionChainId('edge')).toBe(84532);
   });
 
-  it('renders extracted PileViewMode through SurveyTool.jsx in pile mode', () => {
+  it('renders extracted PileViewMode through SurveyTool.tsx in pile mode', () => {
     const shell = new SurveyTool({
       minifiedMode: 'pile',
       network: { id: 84532 },
