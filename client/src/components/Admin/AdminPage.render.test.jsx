@@ -439,11 +439,11 @@ describe('AdminPage rendered interactions', () => {
     expect(payload.slug).toBe('test_a');
   });
 
-  it('saves Lit payer secrets and updates the sponsored_lit session flag', async () => {
+  it('saves Lit account API keys and updates the sponsored_lit session flag', async () => {
     global.fetch = jest.fn((url) => Promise.resolve(
       String(url).endsWith('/auth/nonce')
         ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
-        : { ok: true, json: async () => ({ ok: true, payerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7' }) }
+        : { ok: true, json: async () => ({ ok: true }) }
     ));
 
     await renderAdminPage();
@@ -452,8 +452,8 @@ describe('AdminPage rendered interactions', () => {
     const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
-    fireEvent.change(getSecretInputByLabel('Lit payer private key'), {
-      target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
+    fireEvent.change(getSecretInputByLabel('Lit account API key'), {
+      target: { value: 'account-secret' },
     });
 
     await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
@@ -465,7 +465,44 @@ describe('AdminPage rendered interactions', () => {
     const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
     const payload = JSON.parse(adminCall[1].body);
     expect(payload.secrets).toEqual(expect.objectContaining({
-      litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+      litAccountApiKey: 'account-secret',
+    }));
+    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
+      chainId: 84532,
+      slug: 'edge',
+      fields: expect.objectContaining({
+        sponsored_lit: '1',
+      }),
+    }));
+  });
+
+  it('saves Lit usage API keys and updates the sponsored_lit session flag', async () => {
+    global.fetch = jest.fn((url) => Promise.resolve(
+      String(url).endsWith('/auth/nonce')
+        ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
+        : { ok: true, json: async () => ({ ok: true }) }
+    ));
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
+
+    fireEvent.change(getSecretInputByLabel('Lit usage API key'), {
+      target: { value: 'lit-secret' },
+    });
+
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
+    });
+
+    const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
+    const payload = JSON.parse(adminCall[1].body);
+    expect(payload.secrets).toEqual(expect.objectContaining({
+      litUsageApiKey: 'lit-secret',
     }));
     expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
       chainId: 84532,
@@ -511,56 +548,35 @@ describe('AdminPage rendered interactions', () => {
     }));
   });
 
-  it('does not mark sponsored_lit active when the Lit payer key is invalid', async () => {
+  it('only signs Lit Chipotle status requests after the explicit refresh action', async () => {
     sessionEntries = [[
       'edge',
       buildSessionConfig({
         sponsoredKeys: { lit: true },
-      }),
-    ]];
-
-    await renderAdminPage();
-    await waitForResolvedWorkerUrl();
-
-    const workerSecretsPanel = await openWorkerSecretsPanel();
-    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
-
-    fireEvent.change(getSecretInputByLabel('Lit payer private key'), {
-      target: { value: '0xabc123' },
-    });
-
-    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Worker secrets saved for edge/)).toBeInTheDocument();
-    });
-
-    expect(mockSetSessionFieldsOnChain).toHaveBeenCalledWith(expect.objectContaining({
-      chainId: 84532,
-      slug: 'edge',
-      fields: expect.objectContaining({
-        sponsored_lit: '0',
-      }),
-    }));
-  });
-
-  it('only signs Lit status requests after the explicit refresh action', async () => {
-    sessionEntries = [[
-      'edge',
-      buildSessionConfig({
-        sponsoredKeys: { lit: true },
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group_123',
+          litPkpId: 'pkp_123',
+          litActionCid: 'bafy123',
+        },
       }),
     ]];
     global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/admin/lit-status')
+      String(url).endsWith('/admin/lit-chipotle-status')
         ? {
             ok: true,
             json: async () => ({
               ok: true,
-              payerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
               ready: true,
-              balance: { availableBalance: '0.5', totalBalance: '1.0' },
-              delegatedUsersCount: 2,
+              apiBase: 'https://api.chipotle.litprotocol.com',
+              balance: { balance_display: '$5.00 credit' },
+              warnings: [],
+              groupSummary: {
+                walletCount: 1,
+                actionCount: 1,
+                hasConfiguredPkp: true,
+                hasConfiguredAction: true,
+              },
             }),
           }
         : { ok: true, json: async () => ({ ok: true }) }
@@ -572,42 +588,60 @@ describe('AdminPage rendered interactions', () => {
     await waitFor(() => {
       expect(
         mockBuildSignedAdminActionAuth.mock.calls.find(
-          ([args]) => args?.action === 'lit-status'
+          ([args]) => args?.action === 'lit-chipotle-status'
         )
       ).toBeUndefined();
     });
-    expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-status'))).toBeUndefined();
+    expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-chipotle-status'))).toBeUndefined();
 
     const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
+
+    expect(await screen.findByText('Lit Chipotle status')).toBeInTheDocument();
 
     const refreshButton = await screen.findByRole('button', { name: 'Refresh Lit status' });
     await clickAndSettle(refreshButton);
 
     await waitFor(() => {
       expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
-        action: 'lit-status',
+        action: 'lit-chipotle-status',
         slug: 'edge',
         workerUrl: 'https://worker.example.test',
       }));
       expect(global.fetch).toHaveBeenCalledWith(
-        'https://worker.example.test/admin/lit-status',
+        'https://worker.example.test/admin/lit-chipotle-status',
         expect.objectContaining({ method: 'POST' }),
       );
+      expect(screen.getByText('Ready')).toBeInTheDocument();
     });
   });
 
-  it('allows Lit status refresh to query a worker-stored payer before sponsored_lit is synced', async () => {
+  it('passes an unsaved Lit usage API key to the Chipotle status refresh request', async () => {
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        sponsoredKeys: { lit: true },
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group_123',
+        },
+      }),
+    ]];
     global.fetch = jest.fn((url) => Promise.resolve(
-      String(url).endsWith('/admin/lit-status')
+      String(url).endsWith('/admin/lit-chipotle-status')
         ? {
             ok: true,
             json: async () => ({
               ok: true,
-              payerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
-              ready: true,
-              balance: { availableBalance: '0.5', totalBalance: '1.0' },
-              delegatedUsersCount: 2,
+              ready: false,
+              apiBase: 'https://api.chipotle.litprotocol.com',
+              warnings: [],
+              groupSummary: {
+                walletCount: null,
+                actionCount: null,
+                hasConfiguredPkp: null,
+                hasConfiguredAction: null,
+              },
             }),
           }
         : { ok: true, json: async () => ({ ok: true }) }
@@ -619,19 +653,19 @@ describe('AdminPage rendered interactions', () => {
     const workerSecretsPanel = await openWorkerSecretsPanel();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Lit' }));
 
+    fireEvent.change(getSecretInputByLabel('Lit usage API key'), {
+      target: { value: 'lit-inline-test-key' },
+    });
+
     const refreshButton = await screen.findByRole('button', { name: 'Refresh Lit status' });
     await clickAndSettle(refreshButton);
 
     await waitFor(() => {
-      expect(mockBuildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
-        action: 'lit-status',
-        slug: 'edge',
-        workerUrl: 'https://worker.example.test',
-      }));
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://worker.example.test/admin/lit-status',
-        expect.objectContaining({ method: 'POST' }),
-      );
+      const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-chipotle-status'));
+      expect(adminCall).toBeDefined();
+      const payload = JSON.parse(adminCall[1].body);
+      expect(payload.litUsageApiKey).toBe('lit-inline-test-key');
+      expect(payload.sessionSlug).toBe('edge');
     });
   });
 

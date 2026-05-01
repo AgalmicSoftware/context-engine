@@ -10,11 +10,20 @@ describe('SessionWizard secret field test ids', () => {
     expect(getSessionWizardSecretFieldTestId('faucetPrivateKey')).toBe(
       E2E_TESTIDS.WIZARD_SECRET_FAUCET_PRIVATE_KEY
     );
-    expect(getSessionWizardSecretFieldTestId('litPayerPrivateKey')).toBe(
-      E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY
+    expect(getSessionWizardSecretFieldTestId('litApiBase')).toBe(
+      E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE
     );
-    expect(getSessionWizardSecretFieldTestId('litPayerAddress')).toBe(
-      E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS
+    expect(getSessionWizardSecretFieldTestId('litGroupId')).toBe(
+      E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID
+    );
+    expect(getSessionWizardSecretFieldTestId('litPkpId')).toBe(
+      E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID
+    );
+    expect(getSessionWizardSecretFieldTestId('litActionCid')).toBe(
+      E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID
+    );
+    expect(getSessionWizardSecretFieldTestId('litUsageApiKey')).toBe(
+      E2E_TESTIDS.WIZARD_SECRET_LIT_USAGE_API_KEY
     );
   });
 

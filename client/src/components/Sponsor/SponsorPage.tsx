@@ -32,10 +32,6 @@ import {
   uploadSponsoredBundle,
 } from '../../utilities/arweave/sponsoredBundles.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
-import {
-  createLitPayerWallet,
-  getLitPayerWalletStatus,
-} from '../../utilities/crypto/litPayerWallet.js';
 
 const buildSignedBootstrapAdminAuthUntyped = buildSignedBootstrapAdminAuth as any;
 const uploadSponsoredBundleUntyped = uploadSponsoredBundle as any;
@@ -91,8 +87,12 @@ const buildEmptyBundleForm = () => ({
   arweaveJwk: '',
   faucetPrivateKey: '',
   customRpcUrl: '',
-  litPayerPrivateKey: '',
-  litPayerAddress: '',
+  litApiBase: '',
+  litGroupId: '',
+  litPkpId: '',
+  litActionCid: '',
+  litAccountApiKey: '',
+  litUsageApiKey: '',
   cloudflareApiToken: '',
 });
 const normalizeSponsorBundleForm = (raw: any = {}) => {
@@ -100,10 +100,6 @@ const normalizeSponsorBundleForm = (raw: any = {}) => {
   Object.keys(next).forEach((key: any) => {
     next[key] = toStr(raw?.[key] || '').trim();
   });
-  if (next.litPayerPrivateKey) {
-    const payerStatus = getLitPayerWalletStatus(next.litPayerPrivateKey);
-    next.litPayerAddress = payerStatus.address || next.litPayerAddress;
-  }
   return next;
 };
 const readSponsorPageCache = () => {
@@ -219,10 +215,14 @@ const SPONSORED_FIELD_GROUPS = Object.freeze([
   {
     key: 'lit',
     label: 'Lit',
-    notice: 'Danger: anyone who decrypts this bundle can spend the sponsored Lit payer balance for this session until you rotate the key.',
+    notice: 'Account API keys are authority for bundle-owned Lit accounts. Usage API keys are scoped runtime secrets. Group, PKP, and Lit Action identifiers are operational config.',
     fields: [
-      { key: 'litPayerPrivateKey', label: 'Lit payer private key', type: 'password', placeholder: '0x...' },
-      { key: 'litPayerAddress', label: 'Lit payer address', type: 'text', placeholder: 'Derived from private key', readOnly: true },
+      { key: 'litApiBase', label: 'Lit API base', type: 'text', placeholder: 'https://api.chipotle.litprotocol.com' },
+      { key: 'litGroupId', label: 'Lit group ID', type: 'text', placeholder: 'group_...' },
+      { key: 'litPkpId', label: 'Lit PKP ID', type: 'text', placeholder: 'pkp_...' },
+      { key: 'litActionCid', label: 'Lit Action CID', type: 'text', placeholder: 'bafy...' },
+      { key: 'litAccountApiKey', label: 'Lit account API key', type: 'password', placeholder: 'lit-account-...' },
+      { key: 'litUsageApiKey', label: 'Lit usage API key', type: 'password', placeholder: 'lit-usage-...' },
     ],
   },
   {
@@ -597,17 +597,7 @@ const SponsorPage = ({
   const canAdmin = !!account && !!selectedConfig && !missingSupportedAdminConfig && isAdminForSelected && hasRegistryEntry;
 
   const updateBundleField = useCallback((key: any, value: any) => {
-    setBundleForm((prev: any) => {
-      if (key === 'litPayerPrivateKey') {
-        const nextStatus = getLitPayerWalletStatus(value);
-        return {
-          ...prev,
-          litPayerPrivateKey: value,
-          litPayerAddress: nextStatus.address || '',
-        };
-      }
-      return { ...prev, [key]: value };
-    });
+    setBundleForm((prev: any) => ({ ...prev, [key]: value }));
   }, []);
 
   const buildBootstrapUploadAuth = useCallback(async ({ workerUrl: overrideWorkerUrl }: any = {}) => {
@@ -745,8 +735,12 @@ const SponsorPage = ({
         arweaveJwk: bundleForm.arweaveJwk,
         faucetPrivateKey: bundleForm.faucetPrivateKey,
         customRpcUrl: bundleForm.customRpcUrl,
-        litPayerPrivateKey: bundleForm.litPayerPrivateKey,
-        litPayerAddress: bundleForm.litPayerAddress,
+        litApiBase: bundleForm.litApiBase,
+        litGroupId: bundleForm.litGroupId,
+        litPkpId: bundleForm.litPkpId,
+        litActionCid: bundleForm.litActionCid,
+        litAccountApiKey: bundleForm.litAccountApiKey,
+        litUsageApiKey: bundleForm.litUsageApiKey,
         bootstrapWorkerUrl: resolvedGrantWorkerUrl,
         deployGrantToken,
         faucetGrantToken,
@@ -957,22 +951,6 @@ const SponsorPage = ({
                       <div className={styles.statusNote}>
                         Uses sponsoring worker: {deploySponsoringWorkerUrl || 'Select a session with a usable worker URL.'}
                       </div>
-                    ) : null}
-                    {group.key === 'lit' ? (
-                      <Button
-                        color="secondary"
-                        outline
-                        onClick={() => {
-                          const nextWallet = createLitPayerWallet();
-                          setBundleForm((prev: any) => ({
-                            ...prev,
-                            litPayerPrivateKey: nextWallet.privateKey,
-                            litPayerAddress: nextWallet.address,
-                          }));
-                        }}
-                      >
-                        Generate Lit payer wallet
-                      </Button>
                     ) : null}
                     {group.notice ? <div className={styles.warningNote}>{group.notice}</div> : null}
                   </div>

@@ -218,6 +218,12 @@ describe('SponsorPage', () => {
     expect(getFieldInputByLabel('Arweave JWK')).toBeInTheDocument();
     expect(getFieldInputByLabel('Faucet private key')).toBeInTheDocument();
     expect(getFieldInputByLabel('Custom RPC URL')).toBeInTheDocument();
+    expect(getFieldInputByLabel('Lit API base')).toBeInTheDocument();
+    expect(getFieldInputByLabel('Lit group ID')).toBeInTheDocument();
+    expect(getFieldInputByLabel('Lit PKP ID')).toBeInTheDocument();
+    expect(getFieldInputByLabel('Lit Action CID')).toBeInTheDocument();
+    expect(getFieldInputByLabel('Lit account API key')).toBeInTheDocument();
+    expect(getFieldInputByLabel('Lit usage API key')).toBeInTheDocument();
     expect(getFieldInputByLabel('Cloudflare API token')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('No expiry')).toBeInTheDocument();
     expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveAttribute('min', expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/));
@@ -290,7 +296,6 @@ describe('SponsorPage', () => {
   });
 
   it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
-    const expectedLitPayerAddress = '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7';
     getFetchMock().mockImplementation((url: any) => Promise.resolve(
       String(url).endsWith('/auth/nonce')
         ? { ok: true, json: async () => ({ nonce: 'test-admin-nonce' }) }
@@ -323,11 +328,23 @@ describe('SponsorPage', () => {
     fireEvent.change(getFieldInputByLabel('Custom RPC URL'), {
       target: { value: 'https://rpc.example.test' },
     });
-    fireEvent.change(getFieldInputByLabel('Lit payer private key'), {
-      target: { value: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5' },
+    fireEvent.change(getFieldInputByLabel('Lit API base'), {
+      target: { value: 'https://api.chipotle.litprotocol.com' },
     });
-    await waitFor(() => {
-      expect(getFieldInputByLabel('Lit payer address')).toHaveValue(expectedLitPayerAddress);
+    fireEvent.change(getFieldInputByLabel('Lit group ID'), {
+      target: { value: 'group_123' },
+    });
+    fireEvent.change(getFieldInputByLabel('Lit PKP ID'), {
+      target: { value: 'pkp_123' },
+    });
+    fireEvent.change(getFieldInputByLabel('Lit Action CID'), {
+      target: { value: 'bafy123' },
+    });
+    fireEvent.change(getFieldInputByLabel('Lit account API key'), {
+      target: { value: 'lit-account-secret' },
+    });
+    fireEvent.change(getFieldInputByLabel('Lit usage API key'), {
+      target: { value: 'lit-secret' },
     });
     fireEvent.change(getFieldInputByLabel('Cloudflare API token'), {
       target: { value: 'cf-live-token' },
@@ -356,8 +373,12 @@ describe('SponsorPage', () => {
       arweaveJwk: '{"kty":"RSA"}',
       faucetPrivateKey: '0xsponsoredfaucet',
       customRpcUrl: 'https://rpc.example.test',
-      litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
-      litPayerAddress: expectedLitPayerAddress,
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+      litAccountApiKey: 'lit-account-secret',
+      litUsageApiKey: 'lit-secret',
       bootstrapWorkerUrl: 'https://worker.example.test',
       deployGrantToken: 'deploy-grant-token',
       faucetGrantToken: 'faucet-grant-token',

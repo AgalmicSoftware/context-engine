@@ -196,8 +196,8 @@ Wizard UX notes:
 - In `/session/new`, new session drafts seed `defaultSbtTags` with `group, event, idea, demographic, location`.
 - In `/session/new`, new session drafts seed OpenAI `gpt-5` for both fast/thinking models and set `ai.reasoningEffort` to `low`.
 - Session metadata now uses `sessionName`/`sessionInfo`/`sessionInfoEncrypted`/`sessionHeaderImg` as canonical keys; legacy `org*` aliases are not consumed in `/session/new`.
-- The wizard writes canonical Lit v8 network names (`naga-dev`, `naga-test`, `naga`) in metadata.
-- In `/session/new`, worker secrets are configured before the deploy action. OpenAI key is required by default, Anthropic key appears (and becomes required) when any AI model provider is set to Anthropic, OpenRouter key is available as an optional worker secret, and Lit sponsorship now adds a per-session payer private key plus derived payer address/generate action in the worker-secrets area.
+- The wizard no longer invents default legacy Lit network metadata for new sessions; active Lit runtime now comes from worker-mediated Chipotle config.
+- In `/session/new`, worker secrets are configured before the deploy action. OpenAI key is required by default, Anthropic key appears (and becomes required) when any AI model provider is set to Anthropic, OpenRouter key is available as an optional worker secret, and Lit setup now centers on worker-mediated Chipotle inputs (`litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`) or disposable per-bundle `litAccountApiKey` authority that can mint a fresh group / PKP / usage key for each redeemed session.
 - In `/session/new`, the AI metadata block is collapsible; model provider options show OpenAI/Anthropic/OpenRouter/Custom, with OpenRouter and Custom currently disabled.
 - In `/session/new`, the Lit metadata block is collapsible and `arweave` / `litCredentials` metadata sections are hidden from the form. `litCredentials` reads are now intentionally fenced off so payer material does not flow through metadata.
 - The worker code preview in `/session/new` shows unbundled source only and is collapsed by default.

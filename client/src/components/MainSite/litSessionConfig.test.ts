@@ -50,18 +50,10 @@ describe('litSessionConfig', () => {
     }).chainId).toBeNull();
   });
 
-  it('resolves litNetwork from config with naga-dev default', () => {
-    expect(resolveConfig({
-      sessionConfig: { lit: { network: 'custom-net' } },
-    }).litNetwork).toBe('custom-net');
-
-    expect(resolveConfig({
-      sessionConfig: { litNetwork: 'legacy-net' },
-    }).litNetwork).toBe('legacy-net');
-
+  it('only publishes a litNetwork label when a Chipotle worker runtime is configured', () => {
     expect(resolveConfig({
       sessionConfig: {},
-    }).litNetwork).toBe('naga-dev');
+    }).litNetwork).toBe('');
   });
 
   it('reads optional lit.userMaxPrice deployment defaults without requiring new UI fields', () => {
@@ -98,7 +90,43 @@ describe('litSessionConfig', () => {
   it('returns default and null values when no config provided', () => {
     const result = resolveMainSiteLitSessionConfig();
     expect(result.chainId).toBeNull();
-    expect(result.litNetwork).toBe('naga-dev');
+    expect(result.litNetwork).toBe('');
     expect(result.accessControlConditions).toBeNull();
+    expect(result.chipotle).toBeNull();
+  });
+
+  it('surfaces Chipotle runtime config when the session has worker credentials', () => {
+    const result = resolveConfig({
+      sessionConfig: {
+        corsWorkerUrl: 'https://worker.example.test',
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmAction123',
+          litGroupId: '7',
+          litPkpId: '0xpkp123',
+        },
+      },
+    });
+
+    expect(result.chipotle).toEqual({
+      enabled: true,
+      workerUrl: 'https://worker.example.test',
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litGroupId: '7',
+        litPkpId: '0xpkp123',
+      },
+      sessionConfig: {
+        corsWorkerUrl: 'https://worker.example.test',
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmAction123',
+          litGroupId: '7',
+          litPkpId: '0xpkp123',
+        },
+      },
+    });
+    expect(result.litNetwork).toBe('chipotle');
   });
 });

@@ -2,8 +2,12 @@ import {
   resolveAdminRequestAuthority,
 } from './adminRequestAuthority.js';
 import {
-  readLitPayerStatus,
-} from './litPaymentDelegation.js';
+  bootstrapLitChipotleSession,
+  provisionLitChipotleAction,
+  readLitChipotleStatus,
+  resolveLitChipotleProvisioningRuntime,
+  resolveLitChipotleRuntime,
+} from './chipotleClient.js';
 import {
   buildSponsoredGrantToken,
   computeSponsoredGrantExpirationTtl,
@@ -22,8 +26,8 @@ const ALLOWED_SECRET_KEYS = [
   'customRpcKey',
   'arweaveJwk',
   'faucetPrivateKey',
-  'litPayerPrivateKey',
-  'litPayerAddress',
+  'litAccountApiKey',
+  'litUsageApiKey',
 ];
 
 const toTrimmedString = (value) => (
@@ -54,6 +58,21 @@ const buildSetConfigIncomingConfig = ({
   }
 
   return nextIncoming;
+};
+
+const mergeAdminSecrets = ({
+  existingSecrets,
+  incomingSecrets,
+  deps,
+} = {}) => {
+  const nextSecrets = { ...((existingSecrets && typeof existingSecrets === 'object') ? existingSecrets : {}) };
+  const normalizedIncoming = incomingSecrets && typeof incomingSecrets === 'object' ? incomingSecrets : {};
+  ALLOWED_SECRET_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(normalizedIncoming, key)) return;
+    const value = deps?.normalizeSecretValue?.(normalizedIncoming[key]);
+    if (value !== undefined) nextSecrets[key] = value;
+  });
+  return nextSecrets;
 };
 
 export const dispatchAdminRequest = async ({
@@ -126,32 +145,119 @@ export const dispatchAdminRequest = async ({
     const incoming = body?.secrets && typeof body.secrets === 'object' ? body.secrets : null;
     if (!incoming) return deps?.json?.({ error: 'Missing secrets.' }, 400, headers);
 
-    const nextSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
-    ALLOWED_SECRET_KEYS.forEach((key) => {
-      if (Object.prototype.hasOwnProperty.call(incoming, key)) {
-        const value = deps?.normalizeSecretValue?.(incoming[key]);
-        if (value !== undefined) nextSecrets[key] = value;
-      }
+    const nextSecrets = mergeAdminSecrets({
+      existingSecrets: (await deps?.getSessionSecrets?.(env, targetSlug)) || {},
+      incomingSecrets: incoming,
+      deps,
     });
     await deps?.putSessionSecrets?.(env, targetSlug, nextSecrets);
     return deps?.json?.({ ok: true }, 200, headers);
   }
 
-  if (action === 'lit-status') {
-    const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
-    const providedPrivateKey = deps?.normalizeSecretValue?.(body?.litPayerPrivateKey);
-    const litPayerPrivateKey = providedPrivateKey || existingSecrets.litPayerPrivateKey || '';
-    if (!litPayerPrivateKey) {
-      return deps?.json?.({ error: 'Lit payer key not configured.' }, 404, headers);
-    }
+  if (action === 'lit-chipotle-status') {
     try {
-      const status = await (deps?.readLitPayerStatus || readLitPayerStatus)({
-        litNetwork: body?.litNetwork || existingConfig?.lit?.network || existingConfig?.litNetwork || 'naga-dev',
-        litPayerPrivateKey,
+      const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
+      const runtime = (deps?.resolveLitChipotleRuntime || resolveLitChipotleRuntime)({
+        env,
+        config: existingConfig,
+        secrets: existingSecrets,
+        body,
       });
-      return deps?.json?.({ ok: true, ...status }, 200, headers);
+      const status = await (deps?.readLitChipotleStatus || readLitChipotleStatus)({
+        runtime,
+        fetchImpl: deps?.fetchImpl,
+      });
+      return deps?.json?.(status, 200, headers);
     } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Failed to read Lit payer status.' }, 502, headers);
+      return deps?.json?.({ error: error?.message || 'Failed to read Lit Chipotle status.' }, 502, headers);
+    }
+  }
+
+  if (action === 'lit-chipotle-provision') {
+    try {
+      const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
+      const runtime = (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({
+        env,
+        config: existingConfig,
+        secrets: existingSecrets,
+        body,
+      });
+      const result = await (deps?.provisionLitChipotleAction || provisionLitChipotleAction)({
+        runtime,
+        request: body,
+        fetchImpl: deps?.fetchImpl,
+      });
+      const litCredentials = (
+        result?.litActionCid ||
+        result?.litGroupId ||
+        result?.litPkpId
+      ) ? {
+        ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
+          ? existingConfig.litCredentials
+          : {}),
+        ...(result?.apiBase ? { litApiBase: result.apiBase } : {}),
+        ...(result?.litActionCid ? { litActionCid: result.litActionCid } : {}),
+        ...(result?.litGroupId ? { litGroupId: result.litGroupId } : {}),
+        ...(result?.litPkpId ? { litPkpId: result.litPkpId } : {}),
+      } : null;
+      if (litCredentials) {
+        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
+          existingConfig,
+          incomingConfig: { litCredentials },
+          slug: targetSlug,
+        });
+        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
+      }
+      return deps?.json?.(result, 200, headers);
+    } catch (error) {
+      return deps?.json?.({ error: error?.message || 'Failed to provision Lit Chipotle action.' }, 502, headers);
+    }
+  }
+
+  if (action === 'lit-chipotle-bootstrap-session') {
+    try {
+      const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
+      const result = await (deps?.bootstrapLitChipotleSession || bootstrapLitChipotleSession)({
+        env,
+        config: existingConfig,
+        secrets: existingSecrets,
+        request: body,
+        sessionSlug: targetSlug,
+        fetchImpl: deps?.fetchImpl,
+      });
+      const nextSecrets = mergeAdminSecrets({
+        existingSecrets,
+        incomingSecrets: result?.secretOutputs,
+        deps,
+      });
+      if (Object.keys(nextSecrets).length) {
+        await deps?.putSessionSecrets?.(env, targetSlug, nextSecrets);
+      }
+      const litCredentials = (
+        result?.litCredentials &&
+        typeof result.litCredentials === 'object'
+      ) ? result.litCredentials : null;
+      if (litCredentials) {
+        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
+          existingConfig,
+          incomingConfig: {
+            litCredentials: {
+              ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
+                ? existingConfig.litCredentials
+                : {}),
+              ...litCredentials,
+            },
+          },
+          slug: targetSlug,
+        });
+        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
+      }
+      const responseBody = { ...result };
+      delete responseBody.secretOutputs;
+      delete responseBody.litCredentials;
+      return deps?.json?.(responseBody, 200, headers);
+    } catch (error) {
+      return deps?.json?.({ error: error?.message || 'Failed to bootstrap a Lit session account.' }, 502, headers);
     }
   }
 

@@ -505,13 +505,28 @@ export default function DocumentLibraryPanel({
       hasRecipients: Boolean(resolved?.hasRecipients),
     };
   }, [sessionConfig]);
+  const sessionHasLitChipotle = useMemo(() => {
+    const litCredentials = (
+      sessionConfig &&
+      typeof sessionConfig === 'object' &&
+      sessionConfig.litCredentials &&
+      typeof sessionConfig.litCredentials === 'object' &&
+      !Array.isArray(sessionConfig.litCredentials)
+    ) ? sessionConfig.litCredentials as Record<string, unknown> : null;
+    return !!(
+      toStr(sessionConfig?.corsWorkerUrl).trim() &&
+      toStr(litCredentials?.litApiBase).trim() &&
+      toStr(litCredentials?.litActionCid).trim() &&
+      toStr(litCredentials?.litPkpId).trim()
+    );
+  }, [sessionConfig]);
   const sessionGateUnsupportedMessage = useMemo(() => (
-    docUploadsGate.hasRecipients
+    docUploadsGate.hasRecipients && !sessionHasLitChipotle
       ? getUnsupportedLitContractAccessControlErrorUntyped({
         chainId: Number(docUploadsGate.chainId || network?.id || 0) || null,
       })
       : ''
-  ), [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id]);
+  ), [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id, sessionHasLitChipotle]);
 
   const locationSearch = typeof window !== 'undefined' ? (window.location.search || '') : '';
 
@@ -955,7 +970,9 @@ export default function DocumentLibraryPanel({
     const list = (customSbtList || []).map((e) => e.address).filter(Boolean);
     const chainId = Number(sbtChainId || docUploadsGate.chainId || network?.id || 0) || null;
     const litChain = resolveLitChainUntyped({ chainId });
-    const customUnsupportedMessage = getUnsupportedLitContractAccessControlErrorUntyped({ chainId, litChain });
+    const customUnsupportedMessage = sessionHasLitChipotle
+      ? ''
+      : getUnsupportedLitContractAccessControlErrorUntyped({ chainId, litChain });
     if (customUnsupportedMessage) {
       return { ok: false, error: customUnsupportedMessage };
     }
@@ -978,6 +995,7 @@ export default function DocumentLibraryPanel({
     customSbtList,
     customGateMode,
     sessionGateUnsupportedMessage,
+    sessionHasLitChipotle,
     sbtChainId,
   ]);
 

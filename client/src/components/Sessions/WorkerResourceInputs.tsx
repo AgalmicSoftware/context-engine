@@ -1,11 +1,7 @@
 /** @file WorkerResourceInputs.tsx */
 import React from 'react';
-import { Button, FormGroup, Input, Label } from 'reactstrap';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCopy } from '@fortawesome/free-solid-svg-icons';
+import { FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { getLitPayerWalletStatus } from '../../utilities/crypto/litPayerWallet.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
 type ResourceSecretField = {
@@ -15,6 +11,7 @@ type ResourceSecretField = {
   required?: boolean;
   placeholder?: string;
   rows?: number;
+  readOnly?: boolean;
 };
 
 type WorkerSecrets = Record<string, unknown>;
@@ -27,11 +24,8 @@ export type WorkerResourceInputsProps = {
   isNormalMode: boolean;
   showSponsoredFaucetNotice: boolean;
   effectiveDefaultWorkerRpcUrl?: string;
-  walletLabel?: string;
   getSecretFieldTestId?: (fieldKey: string) => string | undefined;
   onUpdateSecret: (fieldKey: string, value: string) => void;
-  onGenerateLitPayer: () => void;
-  onCopyLitPayerAddress: (value: string) => void | Promise<void>;
 };
 
 const WorkerResourceInputs = ({
@@ -42,111 +36,110 @@ const WorkerResourceInputs = ({
   isNormalMode,
   showSponsoredFaucetNotice,
   effectiveDefaultWorkerRpcUrl = '',
-  walletLabel = 'Wallet',
   getSecretFieldTestId,
   onUpdateSecret,
-  onGenerateLitPayer,
-  onCopyLitPayerAddress,
 }: WorkerResourceInputsProps) => {
   const buildSecretFieldTestId = typeof getSecretFieldTestId === 'function'
     ? getSecretFieldTestId
     : () => undefined;
+
+  const renderGenericField = (field: ResourceSecretField) => {
+    const value = toStr(workerSecrets[field.key]);
+    const label = `${field.label}${field.required ? ' *' : ''}`;
+    const isTextarea = field.type === 'textarea';
+    const placeholder = (
+      resourceKey === 'rpc' &&
+      field.key === 'customRpcUrl' &&
+      !toStr(value).trim()
+    )
+      ? (effectiveDefaultWorkerRpcUrl || field.placeholder || '')
+      : (field.placeholder || '');
+
+    return (
+      <FormGroup key={field.key} className={`${styles.resourceInput} ${!isTextarea ? styles.inlineLabelInput : ''}`}>
+        <Label>{label}</Label>
+        <Input
+          type={isTextarea ? 'textarea' : field.type}
+          rows={isTextarea ? field.rows || 3 : undefined}
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onUpdateSecret(field.key, e.target.value)}
+          disabled={!workerSecretsEnabled}
+          required={workerSecretsEnabled && field.required}
+          readOnly={field.readOnly}
+          data-testid={buildSecretFieldTestId(field.key)}
+        />
+        {!isNormalMode && field.key === 'faucetPrivateKey' && showSponsoredFaucetNotice && (
+          <div className={styles.helperText}>
+            Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.
+          </div>
+        )}
+      </FormGroup>
+    );
+  };
 
   if (!fields.length) {
     return null;
   }
 
   if (resourceKey === 'lit') {
-    const payerPrivateKey = toStr(workerSecrets.litPayerPrivateKey).trim();
-    const hasLitPayerPrivateKey = !!payerPrivateKey;
-    const payerStatus = getLitPayerWalletStatus(payerPrivateKey);
-    const payerAddress = payerStatus.address || toStr(workerSecrets.litPayerAddress).trim();
+    const chipotleFields: ResourceSecretField[] = [
+      {
+        key: 'litApiBase',
+        label: 'Lit API base',
+        type: 'text',
+        placeholder: 'https://api.chipotle.litprotocol.com',
+      },
+      {
+        key: 'litGroupId',
+        label: 'Lit group ID',
+        type: 'text',
+        placeholder: 'group_...',
+      },
+      {
+        key: 'litPkpId',
+        label: 'Lit PKP ID',
+        type: 'text',
+        placeholder: 'pkp_...',
+      },
+      {
+        key: 'litActionCid',
+        label: 'Lit Action CID',
+        type: 'text',
+        placeholder: 'bafy...',
+      },
+      {
+        key: 'litAccountApiKey',
+        label: 'Lit account API key',
+        type: 'password',
+        placeholder: 'Paste account API key',
+      },
+      {
+        key: 'litUsageApiKey',
+        label: 'Lit usage API key',
+        type: 'password',
+        placeholder: 'Paste usage API key',
+      },
+    ];
 
     return (
       <div className={styles.resourceFields}>
-        <div className={styles.litCompactRow}>
-          <FormGroup className={`${styles.resourceInput} ${styles.inlineLabelInput} ${styles.litCompactField}`}>
-            <Label>Private key</Label>
-            <Input
-              type="password"
-              value={toStr(workerSecrets.litPayerPrivateKey)}
-              placeholder="0x..."
-              onChange={(e) => onUpdateSecret('litPayerPrivateKey', e.target.value)}
-              disabled={!workerSecretsEnabled}
-              data-testid={buildSecretFieldTestId('litPayerPrivateKey')}
-            />
-          </FormGroup>
-          <Button
-            type="button"
-            className={styles.secondaryButton}
-            onClick={onGenerateLitPayer}
-            disabled={!workerSecretsEnabled}
-          >
-            Generate
-          </Button>
+        <div className={styles.resourceInputGrid}>
+          {chipotleFields.map(renderGenericField)}
         </div>
-        {hasLitPayerPrivateKey && payerAddress && (
-          <FormGroup className={`${styles.resourceInput} ${styles.inlineLabelInput} ${styles.litCompactField}`}>
-            <Label>{walletLabel}</Label>
-            <div className={styles.copyFieldRow}>
-              <Input
-                type="text"
-                value={payerAddress}
-                readOnly
-                data-testid={buildSecretFieldTestId('litPayerAddress')}
-              />
-              <Button
-                type="button"
-                size="sm"
-                className={styles.secondaryButton}
-                onClick={() => onCopyLitPayerAddress(payerAddress)}
-                data-testid={E2E_TESTIDS.WIZARD_COPY_LIT_PAYER_ADDRESS}
-                aria-label="Copy Lit payer address"
-              >
-                <FontAwesomeIcon icon={faCopy} /> Copy
-              </Button>
-            </div>
-          </FormGroup>
-        )}
+        <div className={styles.helperText}>
+          Enter `Lit API base` plus `Lit account API key` to let the worker bootstrap a fresh group, PKP, usage key, and CE action for this session after deploy. Or fill the group, PKP, action CID, and usage key fields to point at an existing scoped runtime instead.
+        </div>
+        <div className={styles.helperText}>
+          `Lit account API key` is authority. `Lit usage API key` is the scoped runtime credential. Leave the usage key blank when the worker should derive or rotate it server-side.
+        </div>
       </div>
     );
   }
 
   return (
     <div className={styles.resourceInputGrid}>
-      {fields.map((field) => {
-        const value = toStr(workerSecrets[field.key]);
-        const label = `${field.label}${field.required ? ' *' : ''}`;
-        const isTextarea = field.type === 'textarea';
-        const placeholder = (
-          resourceKey === 'rpc' &&
-          field.key === 'customRpcUrl' &&
-          !toStr(value).trim()
-        )
-          ? (effectiveDefaultWorkerRpcUrl || field.placeholder || '')
-          : (field.placeholder || '');
-
-        return (
-          <FormGroup key={field.key} className={`${styles.resourceInput} ${!isTextarea ? styles.inlineLabelInput : ''}`}>
-            <Label>{label}</Label>
-            <Input
-              type={isTextarea ? 'textarea' : field.type}
-              rows={isTextarea ? field.rows || 3 : undefined}
-              value={value}
-              placeholder={placeholder}
-              onChange={(e) => onUpdateSecret(field.key, e.target.value)}
-              disabled={!workerSecretsEnabled}
-              required={workerSecretsEnabled && field.required}
-              data-testid={buildSecretFieldTestId(field.key)}
-            />
-            {!isNormalMode && field.key === 'faucetPrivateKey' && showSponsoredFaucetNotice && (
-              <div className={styles.helperText}>
-                Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.
-              </div>
-            )}
-          </FormGroup>
-        );
-      })}
+      {fields.map(renderGenericField)}
     </div>
   );
 };

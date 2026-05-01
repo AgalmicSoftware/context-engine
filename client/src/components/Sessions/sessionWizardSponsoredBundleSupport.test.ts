@@ -13,8 +13,11 @@ describe('sessionWizardSponsoredBundleSupport', () => {
     expect(buildSponsoredBundleAppliedStatusMessage({
       openaiKey: 'sk-openai',
       arweaveJwk: '{"kty":"RSA"}',
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litAccountApiKey: 'account-secret',
+      litUsageApiKey: 'lit-secret',
       deployGrantToken: 'deploy-token',
-    })).toBe('Sponsored resources applied: OpenAI key, Arweave wallet, deploy access.');
+    })).toBe('Sponsored resources applied: OpenAI key, Arweave wallet, Lit Chipotle config, Lit account key, Lit usage key, deploy access.');
   });
 
   it('derives advanced-field notices from the sponsored bundle state', () => {
