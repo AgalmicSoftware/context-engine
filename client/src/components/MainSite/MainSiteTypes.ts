@@ -1,3 +1,5 @@
+import type { QuestionScanProgressLike } from './progressHelpers.ts';
+
 export type AnyRecord = Record<string, any>;
 
 export type MainSiteProps = {
@@ -47,10 +49,10 @@ export type MainSiteState = {
   sbtRealtimeCoverageBySlug: AnyRecord;
   questionResponsesNonce: number;
   sessionRegistryRevision: number;
-  questionScanProgress: any | null;
-  isScanningForGroup: any | null;
-  scanFailedFor: any | null;
-  scanErrorFor: any | null;
+  questionScanProgress: QuestionScanProgressLike | null;
+  isScanningForGroup: string | null;
+  scanFailedFor: string | null;
+  scanErrorFor: string | null;
   scanErrorMessage: string;
   sbtDetailGroupSlug: string | null;
   sbtDetailAddress: string | null;
