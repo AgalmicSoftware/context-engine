@@ -11,7 +11,7 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from '../../utilities/ui/historicalFigureAvatars.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { buildAtlasNodeRoute, buildPublicRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
 
 type SimUserPageProps = {
@@ -260,7 +260,10 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                     </p>
                     <div className={styles.positionList}>
                       {atlasPositions.map((pos) => {
-                        const atlasHref = buildPublicRoute(`/atlas/${pos.nodeId}?demo=1`);
+                        const atlasHref = buildAtlasNodeRoute(pos.nodeId, {
+                          demo: true,
+                          returnTo: readWindowLocationPath(),
+                        });
                         const voteDisplay = pos.vote > 0 ? `+${pos.vote}` : pos.vote;
                         const voteMeaning = pos.vote > 0 ? 'Agrees with the topic framing' : 'Challenges the topic framing';
 

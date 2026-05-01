@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faAtlas,
@@ -11,7 +11,7 @@ import {
 
 import corpusDebateMapLinks from '../../variables/demo/corpus_debate_map_links.json';
 import debateMapData from '../../variables/demo/debate_map_demo_data.json';
-import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { buildAtlasNodeRoute } from '../../utilities/ui/publicUrl.js';
 import styles from './CorpusViewer.module.scss';
 
 type AtlasNode = {
@@ -88,13 +88,6 @@ export type TweetCardProps = {
 const debateMapNodes = debateMapData as AtlasNode[];
 const legacyDebateMapLinks = corpusDebateMapLinks as Record<string, LegacyIssueLink[]>;
 
-const buildPublicRoute = (pathname = '') => {
-  const normalizedPath = String(pathname || '').trim();
-  if (!normalizedPath) return readPublicUrlBasePath() || '/';
-  const basePath = readPublicUrlBasePath();
-  return `${basePath}${normalizedPath}` || normalizedPath;
-};
-
 const buildAtlasIssueIndex = (
   nodes: AtlasNode[] | null | undefined,
   parentPath: string[] = [],
@@ -127,7 +120,10 @@ const formatDate = (value: unknown) => {
   });
 };
 
-const resolveDebateMapIssues = (entry: CorpusEntry | null | undefined = {}) => {
+const resolveDebateMapIssues = (
+  entry: CorpusEntry | null | undefined = {},
+  atlasReturnTo = ''
+) => {
   const rawIssues = Array.isArray(entry?.debate_map_issues)
     ? entry.debate_map_issues
     : (Array.isArray(entry?.debateMapIssues)
@@ -146,7 +142,10 @@ const resolveDebateMapIssues = (entry: CorpusEntry | null | undefined = {}) => {
     seenIssueIds.add(atlasIssue.id);
     normalizedIssues.push({
       id: atlasIssue.id,
-      href: `${buildPublicRoute(`/atlas/${atlasIssue.id}`)}?demo=1`,
+      href: buildAtlasNodeRoute(atlasIssue.id, {
+        demo: true,
+        returnTo: atlasReturnTo,
+      }),
       label: labelOverride || atlasIssue.label,
       pathLabel: atlasIssue.pathLabel,
     });
@@ -210,7 +209,9 @@ export const DebateMapSection = ({
   inline = false,
   showAtlasIcon = false,
 }: DebateMapSectionProps) => {
-  const linkedIssues = resolveDebateMapIssues(entry);
+  const location = useLocation();
+  const atlasReturnTo = `${location.pathname || ''}${location.search || ''}${location.hash || ''}` || '/';
+  const linkedIssues = resolveDebateMapIssues(entry, atlasReturnTo);
 
   if (linkedIssues.length === 0) return null;
 
