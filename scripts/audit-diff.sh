@@ -17,9 +17,17 @@ if [ -z "$BASE" ]; then
   BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null || echo "HEAD~10")
 fi
 
-LEGACY_WORKER_HITS=$(grep -RIn --include='*.js' --include='*.jsx' 'LEGACY_WORKER' client/src workers 2>/dev/null || true)
+LEGACY_WORKER_HITS=$(
+  grep -RIn \
+    --include='*.js' \
+    --include='*.jsx' \
+    --include='*.mjs' \
+    --include='*.ts' \
+    --include='*.tsx' \
+    'LEGACY_WORKER' client/src workers 2>/dev/null || true
+)
 if [ -n "$LEGACY_WORKER_HITS" ]; then
-  echo "WARN: LEGACY_WORKER references detected in client/src or workers JS sources:"
+  echo "WARN: LEGACY_WORKER references detected in client/src or workers source files:"
   echo "$LEGACY_WORKER_HITS"
 fi
 
@@ -29,7 +37,7 @@ mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/audit-$(date +%Y%m%d-%H%M%S).txt"
 
 echo "Generating diff: $BASE..HEAD"
-git diff "$BASE"..HEAD -- '*.js' '*.jsx' '*.mjs' ':!*.test.*' ':!*.spec.*' ':!*node_modules*' > "$DIFF_FILE"
+git diff "$BASE"..HEAD -- '*.js' '*.jsx' '*.mjs' '*.ts' '*.tsx' ':!*.test.*' ':!*.spec.*' ':!*node_modules*' > "$DIFF_FILE"
 
 DIFF_LINES=$(wc -l < "$DIFF_FILE" | tr -d ' ')
 echo "Diff: $DIFF_LINES lines → $DIFF_FILE"
