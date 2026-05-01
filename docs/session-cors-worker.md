@@ -88,13 +88,21 @@ If you deploy via the Group Wizard and a deploy-helper:
   - `arweaveJwk`
   - `faucetPrivateKey`
   - `customRpcUrl`
-  - `litPayerPrivateKey`
-  - `litPayerAddress` (derived helper field)
+  - `litApiBase`
+  - `litGroupId`
+  - `litPkpId`
+  - `litActionCid`
+  - `litAccountApiKey`
+  - `litUsageApiKey`
   - `bootstrapWorkerUrl`
   - `deployGrantToken`
   - `faucetGrantToken`
   - `meta.label`, `meta.createdAt`, `meta.createdBy`, optional `meta.expiresAt`
   - `meta.sourceSessionSlug`, `meta.sourceWorkerUrl` (bootstrap funding/deploy provenance)
+- Agreed next sponsorship hard-cut:
+  - `litAccountApiKey` is the per-bundle authority field backed by one disposable Lit account per bundle
+  - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
+  - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
 - The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
@@ -120,7 +128,8 @@ If you deploy via the Group Wizard and a deploy-helper:
   - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
   - `dist/sessionCorsWorker.bundle.js` remains a generated local/manual fallback bundle for upload retries, but the client build no longer serves `/worker/sessionCorsWorker.bundle.js`.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
-  - Lit payer secrets remain bundled/applied end-to-end, but they are still optional for deploy-readiness; they continue to drive `sponsored_lit` and payment delegation only when a valid Lit payer key is present.
+  - Scoped Chipotle identifiers and `litUsageApiKey` already flow end-to-end for worker-mediated Lit execution.
+  - Authority-bundle bootstrap now centers on `litAccountApiKey` rather than payer-wallet delegation.
 - Login-stage auto-funding now retries the faucet request against `meta.sourceSessionSlug` / `meta.sourceWorkerUrl` when the new sponsored session has not published its own worker yet, so the freshly connected wallet can still get publish gas from the originating sponsored session.
 - After that first worker deploy, later worker config/secrets adjustments are expected to flow through the signed `/admin/set-config` and `/admin/set-secrets` routes rather than the streamlined normal-mode auto-deploy banner.
 - `customRpcKey` is intentionally out of scope for this MVP and is ignored if present in a bundle payload.
@@ -128,7 +137,7 @@ If you deploy via the Group Wizard and a deploy-helper:
 Temporary standard-link fixture:
 - `client/public/standard-sponsored-links.json` is a tracked public manifest for up to ten disposable sponsored setup URLs.
 - It is intentionally operator-managed and does not read back worker KV or grant state. An active fixture entry is public because the operator chose to publish that bearer URL.
-- Fixture links should be created through `/sponsor` with disposable, resource-limited credentials: capped AI/provider keys, small faucet balances, short expirations, and revocable Arweave/Lit payer wallets.
+- Fixture links should be created through `/sponsor` with disposable, resource-limited credentials: capped AI/provider keys, small faucet balances, short expirations, revocable Arweave wallets, and either revocable Lit usage keys or disposable Lit bundle accounts.
 - Use it only for short-lived low-friction demos or launches. Replace it with a worker-backed claim service before treating sponsored-link inventory as durable availability infrastructure.
 
 Deploy error visibility:
@@ -186,7 +195,7 @@ Admin test panel:
 - Static custom-domain frontend deploys must add the final browser origin (for
   example `https://app.example`) to the same `allowOrigins` list after DNS
   cutover. See the Netlify/static hosting checklist in
-  [`docs/public-client-config.md#static-frontend-deploy`](public-client-config.md#static-frontend-deploy).
+  [`docs/public-client-config.md#netlify-static-deploy`](public-client-config.md#netlify-static-deploy).
 - When AI/Arweave/Faucet tests hit `Session config not found.`, the panel now auto-attempts
   a signed `/admin/set-config` using the selected session metadata, then retries the test once.
   This recovery also covers login-stage 404s (`Worker login failed (404)`) so fresh workers can be
@@ -211,6 +220,8 @@ Vars:
 - `DEFAULT_SESSION_SLUG` (optional; canonical)
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
+- `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
+- `LIT_API_BASE` (optional; only if you need a non-default Chipotle API base such as self-hosted/local dev)
 
 Runtime:
 - Enable Node.js compatibility when deploying from the dashboard.
@@ -737,7 +748,7 @@ Admin requests require a fresh signed SIWE message (no session token):
 - `POST /admin/set-config`
 - `POST /admin/set-secrets`
 - `POST /admin/set-limits`
-- `POST /admin/lit-status`
+- `POST /admin/lit-chipotle-status`
 
 Never return secrets in responses.
 
@@ -770,12 +781,29 @@ Never return secrets in responses.
   `arweaveJwk`, scalar-to-string normalization, and the existing allowed-key
   filter before `set-secrets` persists session secrets.
 - Lit sponsorship now adds:
-  - `litPayerPrivateKey` / `litPayerAddress` as supported worker-secret fields
-  - runtime `POST /lit/payment-delegation` for authenticated member delegation handoff
-  - bootstrap `POST /lit/payment-delegation` (no bearer token, signed admin body)
-    when a temporary `litPayerPrivateKey` is supplied before session secrets exist
-  - admin `POST /admin/lit-status` to inspect derived payer address, ledger balance,
-    readiness, and restriction metadata without returning the stored private key.
+  - `litUsageApiKey` as a supported worker-secret field for scoped Chipotle execution
+  - `litAccountApiKey` as a server-only session secret for per-session-account provisioning and later action management
+  - `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }` as worker config
+    metadata; these are not cryptographic secrets, but they stay worker-side by
+    default because they still reveal operational topology
+  - worker env fallback to `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY`) for
+    Chipotle-backed requests when a session-specific Lit account/usage key is not present
+  - admin `POST /admin/lit-chipotle-status` to query worker-mediated Chipotle
+    readiness, billing balance, and configured group/action/PKP membership
+    without returning the stored API key
+  - admin `POST /admin/lit-chipotle-provision` to register the default CE action
+    into an existing Lit account using a stored session `litAccountApiKey` or a
+    deployment-level fallback account key
+  - admin `POST /admin/lit-chipotle-bootstrap-session` to either create a
+    brand-new Lit account for the session or, when a session/deployment
+    `litAccountApiKey` already exists, derive the missing group / PKP / usage
+    key / CE action inside that account, then persist the returned
+    `litCredentials` plus any newly generated session secrets in the same
+    worker-side flow
+  - planned sponsored-bundle authority mode: carry a disposable per-bundle
+    `litAccountApiKey` in the encrypted `/sponsor` payload so `/new` can mint a
+    fresh group / PKP / usage key for each redeemed session, then keep using
+    only the scoped runtime during day-to-day execution
 
 ## Gating on login (on-chain)
 

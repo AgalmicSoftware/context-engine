@@ -42,7 +42,7 @@ SessionWizard.tsx
 
 | Section | Lines | Purpose | Key Exports / Helpers |
 |---|---:|---|---|
-| Imports, constants, pure helpers | 1-2327 | File-level helpers, worker deploy validation, sponsored-bundle helpers, session ID generation, cache helpers | `getSessionSlugValidationError`, `resolveSessionWizardDeployBundlePayload`, `buildSessionWizardPublishPlan`, `resolveSessionWizardLitPaymentDelegation` |
+| Imports, constants, pure helpers | 1-2327 | File-level helpers, worker deploy validation, sponsored-bundle helpers, session ID generation, cache helpers | `getSessionSlugValidationError`, `resolveSessionWizardDeployBundlePayload`, `buildSessionWizardPublishPlan`, `resolveSessionWizardChipotleHookConfig` |
 | Component bootstrap and cached draft hydration | 2329-3006 | Initializes persisted wizard state, session metadata draft, gate state, worker state, sponsored-bundle state, and refs used across async flows | `SessionWizard`, `resolveSessionWizardSelectorSourceConfig`, `applyWorkerSecretsUpdate` |
 | Derived config and synchronization effects | 3010-4054 | Keeps chain defaults, gate/resource snapshots, header preview state, and source-session inheritance aligned with the active draft | registry-chain effects, gate sync effects, session-header preview effects |
 | Draft mutation and modal orchestration | 4070-4655 | Core draft updates, gate editing, resource-gate resolution, create-SBT modal wiring, contract viewer controls | `updateDraftValue`, `updateEncryptionGate`, `handleGateAddSbt`, `handleSavePendingSbtDraft` |

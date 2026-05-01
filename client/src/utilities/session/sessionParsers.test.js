@@ -60,7 +60,7 @@ describe('sessionParsers', () => {
     expect(parsed.metadata.sessionName).toBe('Alpha Session');
     expect(parsed.metadata.sessionInfo).toBe('Fixture metadata for parser tests.');
     expect(parsed.metadata.tags).toEqual(['alpha', 'beta']);
-    expect(parsed.metadata.lit.network).toBe('naga-test');
+    expect(parsed.metadata.lit.network).toBe('chipotle');
     expect(parsed.metadata.lit.userMaxPrice).toBe('123');
     expect(parsed.metadata.sponsored).toBeUndefined();
     expect(parsed.metadata.sponsoredSbtAddress).toBeUndefined();
@@ -81,7 +81,7 @@ describe('sessionParsers', () => {
     ]));
     expect(parsed.metadata.sessionName).toBeUndefined();
     expect(parsed.metadata.tags).toBeUndefined();
-    expect(parsed.metadata.lit).toEqual({ network: 'naga-dev' });
+    expect(parsed.metadata.lit).toEqual({ network: 'chipotle' });
   });
 
   it('parses worker config fields and trims nested string values', () => {

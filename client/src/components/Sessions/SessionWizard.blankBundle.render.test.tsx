@@ -65,7 +65,7 @@ jest.mock('../ContractPage/contractViewerUtils.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: jest.fn(() => []),
-  createLitHooks: jest.fn(() => ({ saveKey: jest.fn(), getKey: jest.fn(), litNetwork: 'naga-dev' })),
+  createLitHooks: jest.fn(() => ({ saveKey: jest.fn(), getKey: jest.fn(), litNetwork: 'chipotle' })),
   resolveLitChain: jest.fn(() => 'baseSepolia'),
   getGlobalLitHooks: jest.fn(() => null),
   setGlobalLitHooks: jest.fn(),
@@ -178,7 +178,6 @@ jest.mock('../../variables/appConfig.js', () => {
   const actual = jest.requireActual('../../variables/appConfig.js');
   return {
     ...actual,
-    ENABLE_LIT_SESSION_PAYER_WALLET_INPUT: true,
     CLOUDFLARE_WORKER_BUNDLE_URL: '',
   };
 });

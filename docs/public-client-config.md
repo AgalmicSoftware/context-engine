@@ -19,7 +19,7 @@ stays centralized in `client/src/variables/publicDeploymentConfig.js`.
 3. Restart the dev server: `cd client && npm run dev` (CRA reads `.env` only at build time)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
-## Static Frontend Deploy
+## Netlify Static Deploy
 
 Use this flow when you want to ship the React frontend on a custom domain with
 Netlify static hosting. The built app is a static bundle; it is not a Node
@@ -123,6 +123,28 @@ SPA fallback concept, but their redirect config syntax differs.
 - Browser/runtime overrides still exist for some flags (`globalThis`,
   `localStorage`, URL params). The env values only set the boot defaults.
 
+## Lit / Chipotle config boundary
+
+- Do **not** add Lit API keys to `client/.env` or any `REACT_APP_*` variable.
+- Chipotle auth is now intended to stay server-side:
+  - optional deployment/sponsor worker env fallback: `LIT_ACCOUNT_API_KEY`
+  - per-session worker-secret overrides: `litAccountApiKey`, `litUsageApiKey`
+- Session-scoped non-secret Chipotle identifiers are no longer treated like browser env vars:
+  - `litApiBase`
+  - `litGroupId`
+  - `litPkpId`
+  - `litActionCid`
+- Those values are authored through the Session Wizard / Admin flows and persist in worker config as `litCredentials`, not in the public client bundle.
+- `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but CE still treats them as worker-side operational metadata by default:
+  - exposing them can reveal app architecture and action identity
+  - they also make abuse easier if a scoped usage key later leaks
+- Do not rely on hiding those identifiers as the main security boundary. The real boundary is the Lit API key scope, the permitted group/PKP/action relationship, and the Lit Action code itself.
+- If a deployment intentionally makes those identifiers public, treat that as an explicit tradeoff rather than an accident. Never expose `LIT_ACCOUNT_API_KEY`, `litUsageApiKey`, wallet private keys, or paid RPC URLs that embed provider secrets.
+- If a sponsored bundle intentionally carries `litAccountApiKey`, treat that as an explicit authority transfer rather than an ordinary config convenience. The durable OSS-friendly version of that pattern is one disposable Lit account per bundle, not one long-lived deployment account copied into many bundles.
+- Current public prod/dev Chipotle environments both report Base mainnet, so environment isolation should come from separate Chipotle accounts, usage keys, groups, and PKPs rather than from shipping different public chain IDs alone.
+- The default CE automation path is now one new Lit account per session. Groups are reserved for internal trust boundaries or future action families inside that session account rather than as the primary cross-session isolation primitive.
+- There is no longer a client-side Lit payer-wallet feature gate in `/new`; Chipotle account/usage-key fields are the active path.
+
 ## RPC Defaults
 
 - Canonical anonymous RPC defaults now live in `client/src/variables/rpcDefaults.js`.
@@ -158,13 +180,6 @@ SPA fallback concept, but their redirect config syntax differs.
   - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.
   - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
   - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
-
-- `REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT=false`
-  - Temporary rollout flag for the legacy Naga-era `/new` SessionWizard Lit payer-wallet UI.
-  - `false` hides the Lit worker-secret card in `/new`.
-  - `true` enables the existing Lit payer-wallet inputs in `/new`.
-  - This is migration scaffolding for the current legacy Lit path, not the
-    long-term Chipotle account/API-key config surface.
 
 ## Arweave Read Policy Toggles
 
@@ -202,3 +217,7 @@ SPA fallback concept, but their redirect config syntax differs.
 
 - `REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS=false`
   - Allows off-list question activity discovery in `UserPage` / compare deep scans when enabled.
+
+- `litActionCid` can be omitted during session setup.
+  - If the wizard only has `litApiBase`, the worker can now auto-bootstrap a new Lit account for that session and create the default group, PKP, usage key, and CE action.
+  - If the wizard already has `litGroupId` and `litPkpId`, the worker can still auto-provision the default CE Lit action into an existing account and write the returned CID back into worker config after deploy.

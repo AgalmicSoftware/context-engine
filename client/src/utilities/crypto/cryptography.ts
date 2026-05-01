@@ -1111,6 +1111,7 @@ const maybeAddOneLitRecipient = async (cekRaw, litOpts /* optional */) => {
     ...(litOpts.accessControlConditions ? { accessControlConditions: litOpts.accessControlConditions } : {}),
     ...(litOpts.chain ? { chain: litOpts.chain } : {}),
     ...(litOpts.resourceId ? { resourceId: litOpts.resourceId } : {}),
+    ...(result?.chipotle ? { chipotle: result.chipotle } : {}),
   };
 
   if (result?.ciphertext && result?.dataToEncryptHash) {
@@ -1381,6 +1382,7 @@ const unwrapCekFromRecipients = async ({ env, account, chainId, providerLike, li
           encryptedSymmetricKey: litData.encryptedSymmetricKey,
           ciphertext: litData.ciphertext,
           dataToEncryptHash: litData.dataToEncryptHash,
+          chipotle: litData.chipotle,
           accessControlConditions: litData.accessControlConditions,
           chain: litData.chain,
           resourceId: litData.resourceId,

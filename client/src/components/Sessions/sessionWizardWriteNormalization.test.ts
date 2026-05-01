@@ -182,6 +182,13 @@ describe('sessionWizardWriteNormalization', () => {
           balanceThresholdEth: '0.001',
         },
       },
+      workerSecrets: {
+        litApiBase: ' https://api.chipotle.litprotocol.com ',
+        litGroupId: ' group_123 ',
+        litPkpId: ' pkp_123 ',
+        litActionCid: ' bafy123 ',
+        litUsageApiKey: 'lit-secret',
+      },
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
       workerUrl: ' https://worker.example/ ',
       latestChainBlock: 500,
@@ -201,6 +208,12 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.rpcUrl).toBe('https://rpc.example');
     expect(payload.blockLimits).toEqual({ start: 250, end: 275 });
     expect(payload.embeddedDeployHelperEnabled).toBe(false);
+    expect(payload.litCredentials).toEqual({
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    });
     expect(payload.sessionId).toBe('0x123e4567e89b12d3a456426614174000');
     expect(payload.contracts.surveys).toEqual({ address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID });
     expect(payload.contracts.sessionRegistry).toEqual({

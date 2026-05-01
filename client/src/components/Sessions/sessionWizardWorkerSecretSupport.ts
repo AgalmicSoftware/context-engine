@@ -1,19 +1,24 @@
-import {
-  getLitPayerWalletStatus,
-  deriveLitPayerAddress,
-} from '../../utilities/crypto/litPayerWallet.js';
 import { SPONSORED_BUNDLE_SUPPORTED_FIELDS } from '../../utilities/arweave/sponsoredBundles.js';
 import {
   normalizeSponsoredFieldSnapshot,
-  SPONSORED_FIELD_KEYS,
 } from '../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { DEFAULT_GATE_KEYS } from './sessionWizardGateUtils';
 import type {
   AnyRecord,
-  ChainIdLike,
   WorkerSecretsLike,
 } from '../shellTypes';
+
+export const CHIPOTLE_LIT_CONFIG_FIELDS = Object.freeze([
+  'litApiBase',
+  'litGroupId',
+  'litPkpId',
+  'litActionCid',
+]);
+
+export const WORKER_SECRET_CACHE_SAFE_FIELDS = Object.freeze([
+  ...CHIPOTLE_LIT_CONFIG_FIELDS,
+]);
 
 export const DEFAULT_WORKER_SECRETS: WorkerSecretsLike = {
   openaiKey: '',
@@ -23,9 +28,17 @@ export const DEFAULT_WORKER_SECRETS: WorkerSecretsLike = {
   customRpcKey: '',
   arweaveJwk: '',
   faucetPrivateKey: '',
-  litPayerPrivateKey: '',
-  litPayerAddress: '',
+  litApiBase: '',
+  litGroupId: '',
+  litPkpId: '',
+  litActionCid: '',
+  litAccountApiKey: '',
+  litUsageApiKey: '',
 };
+
+export const WORKER_SECRET_PERSISTED_FIELDS = Object.freeze(
+  Object.keys(DEFAULT_WORKER_SECRETS).filter((key) => !WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key))
+);
 
 export const normalizeWorkerSecrets = (value: WorkerSecretsLike | AnyRecord = {}): WorkerSecretsLike => {
   const next: WorkerSecretsLike = { ...DEFAULT_WORKER_SECRETS };
@@ -34,9 +47,6 @@ export const normalizeWorkerSecrets = (value: WorkerSecretsLike | AnyRecord = {}
     const v = toStr((value as AnyRecord)[key]).trim();
     next[key] = v === '[redacted]' ? '' : v;
   });
-  if (next.litPayerPrivateKey) {
-    next.litPayerAddress = deriveLitPayerAddress(next.litPayerPrivateKey);
-  }
   return next;
 };
 
@@ -69,70 +79,24 @@ export const mergeSponsoredBundleDeployForm = (
     : {};
 };
 
+export const buildWorkerLitCredentialsConfig = (
+  workerSecrets: WorkerSecretsLike | AnyRecord = {}
+): Record<string, string> => (
+  CHIPOTLE_LIT_CONFIG_FIELDS.reduce((acc, key) => {
+    const value = toStr((workerSecrets as AnyRecord)?.[key]).trim();
+    if (value) acc[key] = value;
+    return acc;
+  }, {} as Record<string, string>)
+);
+
 export const sanitizeSessionWizardWorkerSecretsForLitMode = (
   value: WorkerSecretsLike | AnyRecord = {},
-  { litPayerWalletInputEnabled = true }: { litPayerWalletInputEnabled?: boolean } = {}
-): WorkerSecretsLike => {
-  const next = normalizeWorkerSecrets(value);
-  if (litPayerWalletInputEnabled) return next;
-  return {
-    ...next,
-    litPayerPrivateKey: '',
-    litPayerAddress: '',
-  };
-};
+): WorkerSecretsLike => normalizeWorkerSecrets(value);
 
 export const sanitizeSessionWizardSponsoredFieldSnapshotForLitMode = (
   value: AnyRecord = {},
-  { litPayerWalletInputEnabled = true }: { litPayerWalletInputEnabled?: boolean } = {}
 ) => {
-  const next = normalizeSponsoredFieldSnapshot(value);
-  if (!litPayerWalletInputEnabled) {
-    next[SPONSORED_FIELD_KEYS.lit] = '0';
-  }
-  return next;
+  return normalizeSponsoredFieldSnapshot(value);
 };
 
-export const getSessionWizardWorkerResourceKeys = (
-  { litPayerWalletInputEnabled = true }: { litPayerWalletInputEnabled?: boolean } = {}
-) => (
-  litPayerWalletInputEnabled
-    ? DEFAULT_GATE_KEYS
-    : DEFAULT_GATE_KEYS.filter((key) => key !== 'lit')
-);
-
-export const resolveSessionWizardLitPaymentDelegation = ({
-  workerSecretsEnabled = true,
-  resolvedWorkerUrl = '',
-  litPayerPrivateKey = '',
-  draft = null,
-  chainId = null,
-}: {
-  workerSecretsEnabled?: boolean;
-  resolvedWorkerUrl?: string;
-  litPayerPrivateKey?: string;
-  draft?: AnyRecord | null;
-  chainId?: ChainIdLike;
-} = {}) => {
-  const litPayerStatus = getLitPayerWalletStatus(litPayerPrivateKey);
-  // Regression guard: user-paid mode can leave a valid payer key in memory.
-  // Keep delegation aligned with workerSecretsEnabled so the toggle fully disables sponsorship.
-  if (!(workerSecretsEnabled && resolvedWorkerUrl && litPayerStatus.valid)) {
-    return undefined;
-  }
-  return {
-    enabled: true,
-    bootstrapLitPayerPrivateKey: litPayerStatus.privateKey,
-    sessionSlug: toStr(draft?.slug || '').trim(),
-    sessionConfig: {
-      ...(draft && typeof draft === 'object' ? draft : {}),
-      networkChainId: chainId,
-      corsWorkerUrl: resolvedWorkerUrl,
-      sponsoredKeys: {
-        ...((draft?.sponsoredKeys && typeof draft.sponsoredKeys === 'object') ? draft.sponsoredKeys : {}),
-        lit: true,
-      },
-    },
-    workerUrl: resolvedWorkerUrl,
-  };
-};
+export const getSessionWizardWorkerResourceKeys = () => DEFAULT_GATE_KEYS;

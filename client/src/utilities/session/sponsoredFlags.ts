@@ -1,4 +1,3 @@
-import { getLitPayerWalletStatus } from '../crypto/litPayerWallet.js';
 import { toStr } from '../shared/primitives.js';
 
 export const SPONSORED_FIELD_KEYS = Object.freeze({
@@ -57,7 +56,8 @@ export const buildSponsoredFlagFields = ({
   const customRpcKey = toStr(secrets.customRpcKey).trim();
   const arweaveJwk = toStr(secrets.arweaveJwk).trim();
   const faucetKey = toStr(secrets.faucetPrivateKey).trim();
-  const litPayerStatus = getLitPayerWalletStatus(secrets.litPayerPrivateKey);
+  const litAccountApiKey = toStr(secrets.litAccountApiKey).trim();
+  const litUsageApiKey = toStr(secrets.litUsageApiKey).trim();
 
   const current = {
     [SPONSORED_FIELD_KEYS.ai]: (
@@ -69,7 +69,7 @@ export const buildSponsoredFlagFields = ({
     [SPONSORED_FIELD_KEYS.rpc]: (customRpcUrl || customRpcKey) ? '1' : '0',
     [SPONSORED_FIELD_KEYS.faucet]: faucetKey ? '1' : '0',
     [SPONSORED_FIELD_KEYS.arweave]: arweaveJwk ? '1' : '0',
-    [SPONSORED_FIELD_KEYS.lit]: litPayerStatus.valid ? '1' : '0',
+    [SPONSORED_FIELD_KEYS.lit]: (litUsageApiKey || litAccountApiKey) ? '1' : '0',
     [SPONSORED_FIELD_KEYS.transcribe]: openaiKey ? '1' : '0',
   };
 

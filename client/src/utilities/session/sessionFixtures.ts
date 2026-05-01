@@ -38,7 +38,7 @@ export const VALID_ARWEAVE_METADATA = deepFreeze({
   sessionName: 'Alpha Session',
   sessionInfo: 'Fixture metadata for parser tests.',
   tags: ['alpha', 'fixture'],
-  lit: { network: 'naga-dev' },
+  lit: { network: 'chipotle' },
 });
 
 export const VALID_WORKER_CONFIG = deepFreeze({

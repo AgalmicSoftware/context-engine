@@ -32,16 +32,24 @@ function collectContextEngineCcTestFiles(rootDir = path.resolve(__dirname, '..')
   return walkDir(ccRoot).map((absolutePath) => path.relative(rootDir, absolutePath));
 }
 
-function hasRunnableContextEngineCc(rootDir = path.resolve(__dirname, '..')) {
-  return REQUIRED_CONTEXTENGINE_CC_FILES.every((relativePath) =>
-    fs.existsSync(path.join(rootDir, relativePath))
+function getMissingContextEngineCcFiles(rootDir = path.resolve(__dirname, '..')) {
+  return REQUIRED_CONTEXTENGINE_CC_FILES.filter((relativePath) =>
+    !fs.existsSync(path.join(rootDir, relativePath))
   );
+}
+
+function hasRunnableContextEngineCc(rootDir = path.resolve(__dirname, '..')) {
+  return getMissingContextEngineCcFiles(rootDir).length === 0;
 }
 
 function runContextEngineCcTests(rootDir = path.resolve(__dirname, '..'), nodeArgs = []) {
   const files = collectContextEngineCcTestFiles(rootDir);
-  if (!files.length || !hasRunnableContextEngineCc(rootDir)) {
-    console.log('contextEngine-cc runtime or tests unavailable in this checkout; skipping test:cc');
+  const missingFiles = getMissingContextEngineCcFiles(rootDir);
+  if (!files.length || missingFiles.length) {
+    const reason = !files.length
+      ? 'no contextEngine-cc test files found'
+      : `missing runtime files: ${missingFiles.join(', ')}`;
+    console.log(`contextEngine-cc runtime or tests unavailable in this checkout; skipping test:cc (${reason})`);
     return 0;
   }
 
@@ -63,6 +71,7 @@ if (require.main === module) {
 
 module.exports = {
   collectContextEngineCcTestFiles,
+  getMissingContextEngineCcFiles,
   hasRunnableContextEngineCc,
   REQUIRED_CONTEXTENGINE_CC_FILES,
   runContextEngineCcTests,

@@ -31,9 +31,6 @@ import {
   getGlobalLitHooks,
   setGlobalLitHooks,
 } from '../../utilities/crypto/litProtocol.js';
-import {
-  createLitPayerWallet,
-} from '../../utilities/crypto/litPayerWallet.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
@@ -50,7 +47,6 @@ import {
   CLOUDFLARE_WORKER_BUNDLE_URL,
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
   DEFAULT_CHAIN_ID,
-  ENABLE_LIT_SESSION_PAYER_WALLET_INPUT,
 } from '../../variables/appConfig.js';
 import {
   getChainById,
@@ -201,9 +197,10 @@ import {
   __test__resetSessionWizardSponsoredBundleCacheKey,
 } from './sessionWizardSponsoredBundleCache';
 import {
+  CHIPOTLE_LIT_CONFIG_FIELDS,
   DEFAULT_WORKER_SECRETS,
+  buildWorkerLitCredentialsConfig,
   getSessionWizardWorkerResourceKeys,
-  resolveSessionWizardLitPaymentDelegation,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -360,7 +357,6 @@ export { __test__resetSessionWizardSponsoredBundleCacheKey } from './sessionWiza
 export {
   mergeSponsoredBundleDeployForm,
   mergeSponsoredBundleWorkerSecrets,
-  resolveSessionWizardLitPaymentDelegation,
 } from './sessionWizardWorkerSecretSupport';
 export {
   buildSessionWizardWorkerRpcUrlMap,
@@ -411,6 +407,41 @@ export const buildPublishedPendingSbtLinks = ({
       };
     })
     .filter((entry): entry is PublishedPendingSbtLink => !!entry && entry.href !== '#');
+};
+
+export const resolveSessionWizardChipotleHookConfig = ({
+  workerSecretsEnabled = true,
+  workerSecrets = {},
+  resolvedWorkerUrl = '',
+  draft = null,
+}: {
+  workerSecretsEnabled?: boolean;
+  workerSecrets?: WorkerSecretsLike | AnyRecord;
+  resolvedWorkerUrl?: string;
+  draft?: AnyRecord | null;
+} = {}) => {
+  if (!workerSecretsEnabled) return null;
+  const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
+  const normalizedWorkerUrl = normalizeWorkerAuthUrl(resolvedWorkerUrl);
+  if (
+    !normalizedWorkerUrl ||
+    !toStr(litCredentials?.litApiBase).trim() ||
+    !toStr(litCredentials?.litPkpId).trim() ||
+    !toStr(litCredentials?.litActionCid).trim()
+  ) {
+    return null;
+  }
+  return {
+    enabled: true,
+    workerUrl: normalizedWorkerUrl,
+    sessionSlug: normalizeSlug(draft?.slug || ''),
+    litCredentials,
+    sessionConfig: {
+      ...(draft && typeof draft === 'object' ? draft : {}),
+      corsWorkerUrl: normalizedWorkerUrl,
+      litCredentials,
+    },
+  };
 };
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
@@ -525,7 +556,6 @@ const SessionWizard = ({
   const resolvedActiveSessionSlug = sessionRegistryUtils.normalizeSlug(
     activeSessionSlug ?? ''
   );
-  const litPayerWalletInputEnabled = ENABLE_LIT_SESSION_PAYER_WALLET_INPUT === true;
   const cachedWizard = useMemo(() => readSessionWizardCache(), []);
   const cachedDraftHasEmbeddedDeployHelperEnabled = (
     typeof cachedWizard?.draft?.embeddedDeployHelperEnabled === 'boolean'
@@ -822,10 +852,7 @@ const SessionWizard = ({
     ...buildEmptyProvisionedSponsoredContext(),
     sessionSlug: sessionRegistryUtils.normalizeSlug(cachedWizard?.provisionedSponsoredContext?.sessionSlug),
     workerUrl: normalizeWorkerAuthUrl(toStr(cachedWizard?.provisionedSponsoredContext?.workerUrl).trim()),
-    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
-      cachedWizard?.provisionedSponsoredContext?.fields,
-      { litPayerWalletInputEnabled }
-    ),
+    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(cachedWizard?.provisionedSponsoredContext?.fields),
   }));
   const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() => (
     readSessionWizardNewSessionBannerDismissed()
@@ -833,7 +860,7 @@ const SessionWizard = ({
   const [newSessionBannerDismissedContext, setNewSessionBannerDismissedContext] = useState('');
   const [workerSecrets, setWorkerSecrets] = useState<WorkerSecretsLike>(() => {
     const cached = cachedWizard?.workerSecrets;
-    return sanitizeSessionWizardWorkerSecretsForLitMode(cached, { litPayerWalletInputEnabled });
+    return sanitizeSessionWizardWorkerSecretsForLitMode(cached);
   });
   const deployFormRef = useRef<DeployFormState>(deployForm);
   const resolvedWalletAccountRef = useRef(toStr(account).trim());
@@ -846,15 +873,12 @@ const SessionWizard = ({
     ...buildEmptyProvisionedSponsoredContext(),
     sessionSlug: sessionRegistryUtils.normalizeSlug(cachedWizard?.provisionedSponsoredContext?.sessionSlug),
     workerUrl: normalizeWorkerAuthUrl(toStr(cachedWizard?.provisionedSponsoredContext?.workerUrl).trim()),
-    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
-      cachedWizard?.provisionedSponsoredContext?.fields,
-      { litPayerWalletInputEnabled }
-    ),
+    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(cachedWizard?.provisionedSponsoredContext?.fields),
   });
   const workerSecretsEnabledRef = useRef(workerSecretsEnabled);
   const persistWorkerSecretsRef = useRef(persistWorkerSecrets);
   const workerSecretsRef = useRef<WorkerSecretsLike>(
-    sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets, { litPayerWalletInputEnabled })
+    sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets)
   );
   const workerDeployRuntimeRef = useRef(null);
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
@@ -891,9 +915,8 @@ const SessionWizard = ({
     resolveWorkerSecretsSnapshot({
       workerSecretsRef,
       defaults: DEFAULT_WORKER_SECRETS,
-    }),
-    { litPayerWalletInputEnabled }
-  ), [litPayerWalletInputEnabled]);
+    })
+  ), []);
   const applyWorkerSecretsUpdate = useCallback((nextValueOrUpdater) => {
     const current = resolveWorkerSecretsSnapshot({
       workerSecretsRef,
@@ -906,13 +929,12 @@ const SessionWizard = ({
       {
         ...DEFAULT_WORKER_SECRETS,
         ...((nextValue && typeof nextValue === 'object') ? nextValue : {}),
-      },
-      { litPayerWalletInputEnabled }
+      }
     );
     workerSecretsRef.current = next;
     setWorkerSecrets(next);
     return next;
-  }, [litPayerWalletInputEnabled]);
+  }, []);
   const updateSponsoredBundleDraftCorsWorkerUrl = useCallback((nextCorsWorkerUrl = '') => {
     setDraft((prev) => {
       const desiredWorkerUrl = toStr(nextCorsWorkerUrl || '').trim();
@@ -986,7 +1008,6 @@ const SessionWizard = ({
     initialSponsoredBundleId,
     initialSponsoredBundleKey,
     draftSlug: draft?.slug,
-    litPayerWalletInputEnabled,
     refs: {
       draftRef,
       deployFormRef,
@@ -1038,8 +1059,8 @@ const SessionWizard = ({
     publish: true,
   }));
   const workerResourceKeys = useMemo(
-    () => getSessionWizardWorkerResourceKeys({ litPayerWalletInputEnabled }),
-    [litPayerWalletInputEnabled]
+    () => getSessionWizardWorkerResourceKeys(),
+    []
   );
   const setSessionHeaderStatus = useCallback((text = '', tone = 'default') => {
     setSessionHeaderUploadStatus(text);
@@ -3810,26 +3831,6 @@ const SessionWizard = ({
     scheduleSessionIdStatusReset();
   };
 
-  const handleCopyLitPayerAddress = async (value) => {
-    const nextValue = toStr(value).trim();
-    if (!nextValue) return;
-    try {
-      await navigator.clipboard.writeText(nextValue);
-      notify.success('Copied to clipboard');
-    } catch {
-      notify.warn('Copy failed');
-    }
-  };
-
-  const handleGenerateLitPayer = () => {
-    const nextWallet = createLitPayerWallet();
-    applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
-      ...prev,
-      litPayerPrivateKey: nextWallet.privateKey,
-      litPayerAddress: nextWallet.address,
-    }));
-  };
-
   const handleRegenerateSessionId = () => {
     if (slugPinnedByPendingSbtDrafts && privateSlugMode) {
       setSessionIdStatus('Remove queued SBT drafts before changing the session URL.');
@@ -3907,12 +3908,10 @@ const SessionWizard = ({
 
     return buildSponsoredSessionFlagFields({
       secrets: sanitizeSessionWizardWorkerSecretsForLitMode(
-        secretsSnapshot,
-        { litPayerWalletInputEnabled }
+        secretsSnapshot
       ),
       fallbackFields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
-        fallbackFields,
-        { litPayerWalletInputEnabled }
+        fallbackFields
       ),
       workerSecretsEnabled,
     });
@@ -3962,30 +3961,48 @@ const SessionWizard = ({
     if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
     const rpcUrl = resolveWorkerRpcUrl();
     if (!rpcUrl) missing.push('RPC URL (include key in URL)');
+    const hasAnyChipotleField = (
+      CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
+      !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
+      !!toStr(secretsSnapshot?.litUsageApiKey).trim()
+    );
+    const bootstrapOnlyChipotleConfig = (
+      !!toStr(secretsSnapshot?.litApiBase).trim() &&
+      !toStr(secretsSnapshot?.litGroupId).trim() &&
+      !toStr(secretsSnapshot?.litPkpId).trim() &&
+      !toStr(secretsSnapshot?.litActionCid).trim() &&
+      !toStr(secretsSnapshot?.litUsageApiKey).trim()
+    );
+    if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
+      const requiredChipotleFields = [
+        ['litApiBase', 'Lit API base'],
+        ['litGroupId', 'Lit group ID'],
+        ['litPkpId', 'Lit PKP ID'],
+      ];
+      requiredChipotleFields.forEach(([key, label]) => {
+        if (!toStr(secretsSnapshot?.[key]).trim()) missing.push(label);
+      });
+    }
     return missing;
   };
 
   useEffect(() => {
     const previousHooks = getGlobalLitHooks();
     const chainId = Number(registryChainId || draft?.networkChainId || network?.id || 0) || null;
-    const litPayerPrivateKeyForWizard = litPayerWalletInputEnabled
-      ? toStr(workerSecrets.litPayerPrivateKey).trim()
-      : '';
-    const paymentDelegation = resolveSessionWizardLitPaymentDelegation({
+    const chipotle = resolveSessionWizardChipotleHookConfig({
       workerSecretsEnabled,
+      workerSecrets,
       resolvedWorkerUrl: resolvedWorkerBaseUrlForDelegation,
-      litPayerPrivateKey: litPayerPrivateKeyForWizard,
       draft,
-      chainId,
     });
-    const nextHooks = createLitHooks({
+    const nextHooks = chipotle ? createLitHooks({
       providerLike: provider,
       account,
       chainId,
       litChain: resolveLitChain({ chainId }),
-      litNetwork: draft?.lit?.network || draft?.litNetwork || previousHooks?.litNetwork || 'naga-dev',
-      paymentDelegation,
-    });
+      litNetwork: 'chipotle',
+      chipotle,
+    }) : null;
     setGlobalLitHooks(nextHooks);
     return () => {
       setGlobalLitHooks(previousHooks);
@@ -3997,9 +4014,13 @@ const SessionWizard = ({
     provider,
     registryChainId,
     resolvedWorkerBaseUrlForDelegation,
-    litPayerWalletInputEnabled,
     workerSecretsEnabled,
-    workerSecrets.litPayerPrivateKey,
+    workerSecrets.litAccountApiKey,
+    workerSecrets.litActionCid,
+    workerSecrets.litApiBase,
+    workerSecrets.litGroupId,
+    workerSecrets.litPkpId,
+    workerSecrets.litUsageApiKey,
   ]);
 
   const clearWorkerSecretFields = () => {
@@ -4119,7 +4140,6 @@ const SessionWizard = ({
     latestChainBlock,
     sessionId,
     sessionIdHex,
-    litPayerWalletInputEnabled,
     draft,
     deployForm,
   };
@@ -4134,6 +4154,7 @@ const SessionWizard = ({
       sponsoredBundleAppliedBundleRef,
     },
     getCurrentWorkerSecrets,
+    applyWorkerSecretsUpdate,
     getMissingWorkerSecretsForDeploy,
     resolveWorkerRpcUrl,
     resolveWorkerRpcUrlMap,
@@ -4217,13 +4238,10 @@ const SessionWizard = ({
         isNormalMode={isNormalMode}
         showSponsoredFaucetNotice={showSponsoredFaucetNotice}
         effectiveDefaultWorkerRpcUrl={effectiveDefaultWorkerRpcUrl}
-        walletLabel={t('wallet')}
         getSecretFieldTestId={getSessionWizardSecretFieldTestId}
         onUpdateSecret={(fieldKey: string, nextValue: string) => {
           applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, [fieldKey]: nextValue }));
         }}
-        onGenerateLitPayer={handleGenerateLitPayer}
-        onCopyLitPayerAddress={handleCopyLitPayerAddress}
       />
     );
   };

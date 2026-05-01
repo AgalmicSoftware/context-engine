@@ -7,6 +7,7 @@ import {
   buildSbtAccessControlConditions,
   resolveLitChain,
 } from '../../utilities/crypto/litProtocol.js';
+import { toStr } from '../../utilities/shared/primitives';
 
 export const resolveMainSiteLitSessionConfig = ({
   sessionConfig,
@@ -16,9 +17,22 @@ export const resolveMainSiteLitSessionConfig = ({
   networkChainIdFallback?: number | null;
 } = {}) => {
   const cfg: any = sessionConfig || {};
+  const litCredentials = (
+    cfg?.litCredentials &&
+    typeof cfg.litCredentials === 'object' &&
+    !Array.isArray(cfg.litCredentials)
+  ) ? cfg.litCredentials : null;
+  const chipotleWorkerUrl = toStr(cfg?.corsWorkerUrl).trim();
+  const hasChipotleRuntime = (
+    chipotleWorkerUrl &&
+    litCredentials &&
+    toStr(litCredentials?.litApiBase).trim() &&
+    toStr(litCredentials?.litPkpId).trim() &&
+    toStr(litCredentials?.litActionCid).trim()
+  );
   const gate = getDefaultSponsoredGate(cfg);
   const chainId = gate?.chainId || cfg?.networkChainId || networkChainIdFallback || null;
-  const litNetwork = cfg?.lit?.network || cfg?.litNetwork || 'naga-dev';
+  const litNetwork = hasChipotleRuntime ? 'chipotle' : '';
   const userMaxPrice = cfg?.lit?.userMaxPrice || cfg?.litUserMaxPrice || '';
   const litChain = resolveLitChain({
     chainId,
@@ -42,5 +56,11 @@ export const resolveMainSiteLitSessionConfig = ({
     litChain,
     gateAddresses,
     accessControlConditions,
+    chipotle: hasChipotleRuntime ? {
+      enabled: true,
+      workerUrl: chipotleWorkerUrl,
+      litCredentials,
+      sessionConfig: cfg,
+    } : null,
   };
 };

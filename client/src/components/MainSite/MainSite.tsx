@@ -1234,26 +1234,24 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     if (typeof window === 'undefined') return;
     const slug = this.getActiveSessionSlug();
     const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice } = resolveMainSiteLitSessionConfig({
+    const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } = resolveMainSiteLitSessionConfig({
       sessionConfig: cfg,
       networkChainIdFallback: this.props.network?.id || null,
     });
 
-    const hooks = createLitHooks({
+    const hooks = chipotle ? createLitHooks({
       providerLike: this.props.provider,
       account: this.props.account,
       chainId,
       litChain,
       litNetwork,
       userMaxPrice,
-      paymentDelegation: {
-        enabled: cfg?.sponsoredKeys?.lit === true,
-        sessionSlug: slug,
-        sessionConfig: cfg,
-        workerUrl: cfg?.corsWorkerUrl || '',
-      },
       accessControlConditions: accessControlConditions || undefined,
-    });
+      chipotle: {
+        ...chipotle,
+        sessionSlug: slug,
+      },
+    }) : null;
 
     setGlobalLitHooks(hooks);
     attachLitDevTools({

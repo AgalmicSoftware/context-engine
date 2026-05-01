@@ -243,13 +243,6 @@ export const CE_RPC_TESTING_MODE = readPublicBoolEnv(
   'REACT_APP_CE_RPC_TESTING_MODE',
   false
 );
-// Temporary Lit sponsorship rollout toggle for SessionWizard while CE is still on the
-// Naga-era Lit path. Default false keeps the Lit payer-wallet UI hidden in `/new`
-// until the funded/payer flow is intentionally enabled for the Chipotle migration path.
-export const ENABLE_LIT_SESSION_PAYER_WALLET_INPUT = readPublicBoolEnv(
-  'REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT',
-  false
-);
 // On-chain session registry (kept off by default during the migration).
 export const USE_ONCHAIN_SESSION_REGISTRY = readPublicBoolEnv(
   'REACT_APP_USE_ONCHAIN_SESSION_REGISTRY',
