@@ -20,7 +20,7 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 declare -A DOMAINS
 DOMAINS[worker]="workers/sessionCorsWorker/worker.js workers/deploy-helper/worker.js"
 DOMAINS[crypto]="client/src/utilities/crypto/ client/src/utilities/web3/contractScripts.impl.ts client/src/utilities/web3/sessionRegistry.ts"
-DOMAINS[client]="client/src/reducers/ client/src/utilities/session/ client/src/utilities/worker/ client/src/components/SBTs/SBTPage.jsx client/src/components/SurveyTool/SurveyTool.jsx"
+DOMAINS[client]="client/src/reducers/ client/src/utilities/session/ client/src/utilities/worker/ client/src/components/SBTs/SBTPage.tsx client/src/components/SurveyTool/SurveyTool.tsx"
 DOMAINS[cecc]="contextEngine-cc/lib/ contextEngine-cc/hook/"
 DOMAINS[rpc]="client/src/utilities/web3/rpcReadCache.ts client/src/utilities/web3/rpcSelection.ts client/src/utilities/web3/rpcDebugStats.ts"
 DOMAINS[arweave]="client/src/utilities/arweave/"
