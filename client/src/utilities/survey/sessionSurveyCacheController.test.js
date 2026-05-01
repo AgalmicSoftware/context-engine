@@ -18,13 +18,13 @@ jest.mock('../web3/contractScripts.js', () => ({
     fetchAllSurveyResponses: jest.fn(),
   },
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
-}));
+}), { virtual: true });
 
 jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
   __esModule: true,
   normalizeArweaveFailureMeta: jest.fn(),
   shouldStopPendingMetadataRetry: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../components/MainSite/metadataCacheEntryBuilders.js', () => ({
   __esModule: true,
