@@ -1391,17 +1391,6 @@ export const createSessionSbtCacheController = (host = {}) => {
         }
         return best;
       };
-      const normalizeCountMap = (value) => {
-        const out = {};
-        Object.entries(value || {}).forEach(([addrRaw, countRaw]) => {
-          const addr = String(addrRaw || '').toLowerCase();
-          if (!addr) return;
-          const count = Math.max(0, Math.floor(Number(countRaw || 0)));
-          if (count <= 0) return;
-          out[addr] = count;
-        });
-        return out;
-      };
       let cachedCreationBlock = resolveCreationBlock(existing, info);
       const loadHistorySummary = async () => {
         try {
@@ -1515,10 +1504,6 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
 
       const startBlock = cachedCreationBlock != null ? Math.max(baseFrom, cachedCreationBlock) : baseFrom;
-      const sumCountMap = (value) => Object.values(value || {}).reduce((sum, count) => {
-        const n = Math.max(0, Math.floor(Number(count || 0)));
-        return sum + n;
-      }, 0);
       const normalizeCountsScanCheckpoint = (checkpointIn) => {
         if (!checkpointIn || typeof checkpointIn !== 'object') return null;
         const phase = String(checkpointIn.phase || '').trim();
@@ -1527,8 +1512,8 @@ export const createSessionSbtCacheController = (host = {}) => {
           startBlock - 1,
           Math.min(baseTo, Math.floor(Number(checkpointIn.blockNumber ?? (startBlock - 1))))
         );
-        const mintedCountByAddress = normalizeCountMap(checkpointIn.mintedCountByAddress);
-        const burnedCountByAddress = normalizeCountMap(checkpointIn.burnedCountByAddress);
+        const mintedCountByAddress = normalizeSbtCountMap(checkpointIn.mintedCountByAddress);
+        const burnedCountByAddress = normalizeSbtCountMap(checkpointIn.burnedCountByAddress);
         const mintedEventCountRaw = Math.floor(Number(checkpointIn.mintedEventCount || 0));
         const burnedEventCountRaw = Math.floor(Number(checkpointIn.burnedEventCount || 0));
         return {
@@ -1538,8 +1523,8 @@ export const createSessionSbtCacheController = (host = {}) => {
           scanToBlock: baseTo,
           mintedCountByAddress,
           burnedCountByAddress,
-          mintedEventCount: mintedEventCountRaw > 0 ? mintedEventCountRaw : sumCountMap(mintedCountByAddress),
-          burnedEventCount: burnedEventCountRaw > 0 ? burnedEventCountRaw : sumCountMap(burnedCountByAddress),
+          mintedEventCount: mintedEventCountRaw > 0 ? mintedEventCountRaw : sumSbtCountMap(mintedCountByAddress),
+          burnedEventCount: burnedEventCountRaw > 0 ? burnedEventCountRaw : sumSbtCountMap(burnedCountByAddress),
         };
       };
       let latestCountsCheckpoint = normalizeCountsScanCheckpoint(existing?.countsScanCheckpoint);
@@ -1713,8 +1698,8 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
 
       const countsOk = counts?.ok !== false;
-      const existingPublicMintedMap = normalizeCountMap(existing?.mintedCountByAddress);
-      const existingPublicBurnedMap = normalizeCountMap(existing?.burnedCountByAddress);
+      const existingPublicMintedMap = normalizeSbtCountMap(existing?.mintedCountByAddress);
+      const existingPublicBurnedMap = normalizeSbtCountMap(existing?.burnedCountByAddress);
       const mintedMap = countsOk ? (counts?.mintedCountByAddress || {}) : existingPublicMintedMap;
       const burnedMap = countsOk ? (counts?.burnedCountByAddress || {}) : existingPublicBurnedMap;
       const mintedAddresses = countsOk
