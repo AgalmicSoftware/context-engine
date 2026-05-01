@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
+import demoAnalysisData from '../../variables/demo/demo_analysis_data.json';
 import demoPolisData from '../../variables/demo/demo_polis_data.json';
 import historicalFigureDemographics from '../../variables/demo/historical_figure_demographics.js';
 import buildDemoAnalysisData, {
@@ -11,6 +12,10 @@ import buildDemoAnalysisData, {
 describe('demoAnalysisAdapter', () => {
   const analysisData: any = buildDemoAnalysisData(
     demoPolisData,
+    historicalFigureDemographics as Record<string, any>
+  );
+  const modeledAnalysisData: any = buildDemoAnalysisData(
+    demoAnalysisData,
     historicalFigureDemographics as Record<string, any>
   );
 
@@ -87,6 +92,30 @@ describe('demoAnalysisAdapter', () => {
     expect(tagNames).toContain('arXiv');
     expect(tagNames).toContain('LessWrong');
     expect(tagIds).not.toContain('ai-daily-integration');
+  });
+
+  it('preserves per-question key tensions so the UI can explain why a split matters', () => {
+    expect(modeledAnalysisData.questions[0]?.keyTension).toContain('Experts range from <10% to 99.9% probability');
+    expect(modeledAnalysisData.questions[0]?.sourcePromptType).toBe('binary');
+  });
+
+  it('summarizes the modeled respondent profiles for each question when synthetic rows are present', () => {
+    const questionProfiles = modeledAnalysisData.questionProfileSummaries['0'] || [];
+    const profileIds = questionProfiles.map((profile: any) => profile.profileId);
+
+    expect(profileIds).toEqual([
+      'bridge_builder',
+      'consensus_echo',
+      'historical_baseline',
+    ]);
+    expect(questionProfiles.find((profile: any) => profile.profileId === 'historical_baseline')).toMatchObject({
+      label: 'Historical persona baseline',
+      confidence: 'High',
+    });
+    expect(questionProfiles.find((profile: any) => profile.profileId === 'consensus_echo')).toMatchObject({
+      label: 'Consensus echo',
+      confidence: 'Medium',
+    });
   });
 
   it('normalizes corpus source aliases so breakdown tags stay clean', () => {

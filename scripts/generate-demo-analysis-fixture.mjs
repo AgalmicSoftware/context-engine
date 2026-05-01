@@ -58,11 +58,32 @@ export const QUESTION_OVERRIDES_BY_QUESTION_ID = Object.freeze(
 export const SYNTHETIC_PARTICIPANT_CONFIG = Object.freeze(
   generationConfig?.syntheticParticipantConfig || {}
 );
+const BASE_PROFILE_ID = 'historical_baseline';
+const BASE_PROFILE_LABEL = 'Historical persona baseline';
+const BASE_PROFILE_CONFIDENCE = 'High';
+const BASE_PROFILE_RATIONALE = 'Original historical-figure vote row anchored to the canonical demo persona fixtures and explicit tree/POLIS mappings.';
 
 const HASH_SEED = 2166136261 >>> 0;
 const HASH_DIVISOR = 0xffffffff;
+const UTC_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const UTC_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const clampNumber = (value, min, max) => Math.min(max, Math.max(min, value));
+const padUtcTime = (value) => String(Number(value) || 0).padStart(2, '0');
+
+const formatDemoUtcDateTime = (timestamp) => {
+  const date = new Date(Number(timestamp));
+  if (Number.isNaN(date.getTime())) return '';
+
+  return [
+    UTC_WEEKDAYS[date.getUTCDay()],
+    UTC_MONTHS[date.getUTCMonth()],
+    padUtcTime(date.getUTCDate()),
+    `${padUtcTime(date.getUTCHours())}:${padUtcTime(date.getUTCMinutes())}:${padUtcTime(date.getUTCSeconds())}`,
+    'UTC',
+    date.getUTCFullYear(),
+  ].join(' ');
+};
 
 const normalizeSourceTag = (value = '') => {
   const trimmed = String(value || '').trim().toLowerCase();
@@ -284,6 +305,12 @@ const buildSyntheticParticipantRows = ({
       participant: buildSyntheticParticipantAddress(participant, `${profile?.id || variantIndex}`),
       xid: String(participant?.xid || '').trim(),
       groupId: Number(participant?.groupId ?? 0),
+      profileId: String(profile?.id || `variant-${variantIndex}`).trim(),
+      profileLabel: String(profile?.label || profile?.id || `Variant ${variantIndex + 1}`).trim(),
+      profileConfidence: String(profile?.confidence || 'Medium').trim(),
+      profileRationale: String(profile?.rationale || '').trim(),
+      profileSourceType: 'synthetic_variant',
+      profileParentXid: String(participant?.xid || '').trim(),
       nVotes: normalizedVotes.length,
       nAgree: normalizedVotes.filter((value) => value === 1).length,
       nDisagree: normalizedVotes.filter((value) => value === -1).length,
@@ -401,6 +428,12 @@ const buildParticipantRow = (
     participant: String(participant?.participant || '').trim(),
     xid,
     groupId: Number(participant?.groupId ?? 0),
+    profileId: BASE_PROFILE_ID,
+    profileLabel: BASE_PROFILE_LABEL,
+    profileConfidence: BASE_PROFILE_CONFIDENCE,
+    profileRationale: BASE_PROFILE_RATIONALE,
+    profileSourceType: 'historical_baseline',
+    profileParentXid: xid,
     nVotes: normalizedVotes.length,
     nAgree: normalizedVotes.filter((value) => value === 1).length,
     nDisagree: normalizedVotes.filter((value) => value === -1).length,
@@ -422,6 +455,7 @@ const buildCommentRows = (
 
   return {
     ...comment,
+    datetime: formatDemoUtcDateTime(comment?.timestamp) || String(comment?.datetime || '').trim(),
     agrees: summary.agrees,
     disagrees: summary.disagrees,
   };

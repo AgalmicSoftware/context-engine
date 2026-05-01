@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import DemoAnalysisWorkspace from './DemoAnalysisWorkspace';
 
 jest.mock('../../Shared/CheckboxMultiSelect', () => ({
@@ -134,6 +134,65 @@ describe('DemoAnalysisWorkspace', () => {
     expect(screen.getByTestId('demo-analysis-suggestion-0')).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('shows corpus grounding and key tension for the selected question banner', async () => {
+    render(
+      <DemoAnalysisWorkspace
+        demoData={{
+          comments: [
+            {
+              commentBody: 'Custom grounded question',
+              type: 'binary',
+              category: 'CUSTOM GROUNDING',
+              key_tension: 'A concrete test tension for the selected question banner.',
+              sources: 'tweets, LessWrong',
+            },
+          ],
+          participantsVotes: [
+            {
+              participant: '0xbase-ada',
+              xid: 'AdaLovelace',
+              votes: { 0: 1 },
+            },
+            {
+              participant: '0xbase-grace',
+              xid: 'GraceHopper',
+              votes: { 0: -1 },
+            },
+          ],
+        }}
+        metadataByXid={{
+          AdaLovelace: {
+            eraBucket: 'Modern',
+            region: 'Europe',
+            country: 'United Kingdom',
+            gender: 'Woman',
+            affiliation: 'Mathematics',
+            atlasCategory: 'Foundations',
+          },
+          GraceHopper: {
+            eraBucket: 'Industrial',
+            region: 'North America',
+            country: 'United States',
+            gender: 'Woman',
+            affiliation: 'Computer Science',
+            atlasCategory: 'Foundations',
+          },
+        }}
+      />
+    );
+
+    fireEvent.click(await screen.findByTestId('demo-analysis-suggestion-0'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('demo-analysis-selected-question')).toBeInTheDocument();
+    });
+
+    const banner = screen.getByTestId('demo-analysis-question-banner');
+    expect(within(banner).getByText('Custom Grounding')).toBeInTheDocument();
+    expect(within(banner).getByText('Tweets')).toBeInTheDocument();
+    expect(within(banner).getByText(/Key tension:/i)).toBeInTheDocument();
+  });
+
   it('auto-selects a strong correlation from the wand action', async () => {
     render(<DemoAnalysisWorkspace />);
 
@@ -170,5 +229,23 @@ describe('DemoAnalysisWorkspace', () => {
     setMultiSelectValues('demo-analysis-select-era', ['Modern']);
 
     expect(screen.getByTestId('demo-analysis-empty-state')).toBeInTheDocument();
+  });
+
+  it('exposes modeled respondent profiles in the drilldown modal instead of hiding synthetic rows', async () => {
+    render(<DemoAnalysisWorkspace />);
+
+    fireEvent.click(await screen.findByTestId('demo-analysis-suggestion-0'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('demo-analysis-selected-question')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
+
+    expect(screen.getByTestId('demo-analysis-drilldown-modal')).toBeInTheDocument();
+    expect(screen.getByText('Modeled respondent mix')).toBeInTheDocument();
+    expect(screen.getByText('Historical persona baseline')).toBeInTheDocument();
+    expect(screen.getByText('Consensus echo')).toBeInTheDocument();
+    expect(screen.getByText('Bridge builder')).toBeInTheDocument();
   });
 });

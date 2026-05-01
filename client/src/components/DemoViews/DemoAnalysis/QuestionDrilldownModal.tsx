@@ -6,6 +6,9 @@ type DrilldownQuestion = {
   id: string;
   text: string;
   options: string[];
+  category?: string;
+  keyTension?: string;
+  sourcePromptType?: string;
 };
 
 type ComparisonGroup = {
@@ -24,12 +27,21 @@ type QuestionTag = {
   tagName: string;
 };
 
+type QuestionProfileSummary = {
+  profileId: string;
+  label: string;
+  confidence: string;
+  rationale: string;
+  count: number;
+};
+
 export type QuestionDrilldownModalProps = {
   isOpen: boolean;
   question?: DrilldownQuestion | null;
   comparisonGroups?: ComparisonGroup[] | null;
   flatResponses?: FlatResponse[] | null;
   questionTags?: QuestionTag[] | null;
+  questionProfileSummaries?: QuestionProfileSummary[] | null;
   onClose: () => void;
 };
 
@@ -39,6 +51,7 @@ const QuestionDrilldownModal = ({
   comparisonGroups = [],
   flatResponses = [],
   questionTags = [],
+  questionProfileSummaries = [],
   onClose,
 }: QuestionDrilldownModalProps) => {
   if (!isOpen || !question) return null;
@@ -46,6 +59,7 @@ const QuestionDrilldownModal = ({
   const segmentKeys = ['All', ...(comparisonGroups || []).map((group) => group.segmentKey)];
   const responses = Array.isArray(flatResponses) ? flatResponses : [];
   const tags = Array.isArray(questionTags) ? questionTags : [];
+  const profileSummaries = Array.isArray(questionProfileSummaries) ? questionProfileSummaries : [];
 
   return (
     <div className={styles.modalBackdrop}>
@@ -69,6 +83,40 @@ const QuestionDrilldownModal = ({
             ))}
           </div>
         )}
+
+        {question.keyTension ? (
+          <div className={styles.drilldownInsightCard}>
+            <div className={styles.drilldownInsightLabel}>Key tension</div>
+            <div className={styles.drilldownInsightText}>{question.keyTension}</div>
+          </div>
+        ) : null}
+
+        {profileSummaries.length > 0 ? (
+          <div className={styles.drilldownProfileSection}>
+            <div className={styles.drilldownProfileHeader}>
+              <h4 className={styles.drilldownSectionTitle}>Modeled respondent mix</h4>
+              <p className={styles.drilldownSectionMeta}>
+                The demo analysis combines the base historical personas with explicit modeled variants so the density is visible instead of hidden.
+              </p>
+            </div>
+            <div className={styles.drilldownProfileGrid}>
+              {profileSummaries.map((profileSummary) => (
+                <div key={profileSummary.profileId} className={styles.drilldownProfileCard}>
+                  <div className={styles.drilldownProfileTopRow}>
+                    <span className={styles.drilldownProfileLabel}>{profileSummary.label}</span>
+                    <span className={styles.ratePill}>{profileSummary.confidence}</span>
+                  </div>
+                  <div className={styles.drilldownProfileCount}>
+                    {profileSummary.count} modeled respondents
+                  </div>
+                  <div className={styles.drilldownProfileRationale}>
+                    {profileSummary.rationale}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className={styles.tableWrap}>
           <table className={styles.dataTable}>

@@ -86,6 +86,8 @@ describe('demo data fixture cleanup', () => {
       tweets: 25,
       ai_laws_policy: 20,
       arxiv_ai_safety: 20,
+      lesswrong_posts: 20,
+      cross_corpus: 8,
       dwarkesh_lab_insiders: 20,
       ai_scifi_books: 20,
       metr_evals_metrics: 15,
@@ -105,6 +107,16 @@ describe('demo data fixture cleanup', () => {
         'gpt3_language_models_few_shot',
         'gpt4_technical_report',
         'attention_all_you_need_vaswani_2017',
+      ],
+      lesswrong_posts: [
+        'yudkowsky_ai_box',
+        'bostrom_dragon_tyrant',
+        'sequences_rationality_az',
+      ],
+      cross_corpus: [
+        'debate_exponential_progress',
+        'debate_reward_hacking_misalignment',
+        'debate_predeployment_eval_adequacy',
       ],
       dwarkesh_lab_insiders: [
         'amodei_dario_dwarkesh_2026_scaling',
@@ -142,6 +154,37 @@ describe('demo data fixture cleanup', () => {
           expectedIds
         );
       });
+  });
+
+  it('keeps the canonical demo fixtures internally consistent with normalized UTC datetimes', () => {
+    const formatDemoUtcDateTime = (timestamp) => {
+      const date = new Date(Number(timestamp));
+      const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const pad = (value) => String(value).padStart(2, '0');
+      return [
+        weekdays[date.getUTCDay()],
+        months[date.getUTCMonth()],
+        pad(date.getUTCDate()),
+        `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`,
+        'UTC',
+        date.getUTCFullYear(),
+      ].join(' ');
+    };
+
+    [demoPolisData.comments, demoAnalysisData.comments].forEach((comments) => {
+      comments.forEach((comment) => {
+        expect(comment.datetime).toBe(formatDemoUtcDateTime(comment.timestamp));
+      });
+    });
+  });
+
+  it('removes the known demo corpus text glitches that made the sample feel synthetic', () => {
+    const serializedCorpusSample = JSON.stringify(corpusSample);
+
+    expect(serializedCorpusSample).not.toMatch(/partneredwith/);
+    expect(serializedCorpusSample).not.toMatch(/calledOpenAI/);
+    expect(serializedCorpusSample).not.toMatch(/it somewhat fragile/);
   });
 
   it('covers every atlas leaf node with at least one Loophole historical case', () => {

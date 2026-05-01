@@ -86,6 +86,8 @@ type RateVisualizerProps = {
   colorScale: ColorScale;
 };
 
+type BinaryResponseTone = 'agree' | 'unsure' | 'disagree';
+
 type ComparisonReportProps = {
   flatResponses?: FlatResponse[];
   questions?: Question[];
@@ -95,6 +97,50 @@ type ComparisonReportProps = {
 };
 
 const Collapse = ({ isOpen, children }: CollapseProps) => (isOpen ? <div>{children}</div> : null);
+
+const BINARY_RESPONSE_TONE_BY_LABEL: Record<string, BinaryResponseTone> = {
+  agree: 'agree',
+  unsure: 'unsure',
+  disagree: 'disagree',
+};
+
+const getBinaryResponseTone = (responseText = ''): BinaryResponseTone | null => {
+  const normalized = String(responseText || '').trim().toLowerCase();
+  return BINARY_RESPONSE_TONE_BY_LABEL[normalized] || null;
+};
+
+const getResponsePillToneClassName = (tone: BinaryResponseTone) => {
+  if (tone === 'agree') return styles.responsePillAgree;
+  if (tone === 'disagree') return styles.responsePillDisagree;
+  return styles.responsePillUnsure;
+};
+
+type ResponseLineProps = {
+  responseText: string;
+  context?: 'card' | 'tooltip';
+};
+
+const ResponseLine = ({ responseText, context = 'card' }: ResponseLineProps) => {
+  const tone = getBinaryResponseTone(responseText);
+  const Wrapper = context === 'tooltip' ? 'p' : 'div';
+  const baseClassName = context === 'tooltip' ? styles.tooltipResponse : styles.responseText;
+
+  if (!tone) {
+    return <Wrapper className={baseClassName}>Response: "{responseText}"</Wrapper>;
+  }
+
+  return (
+    <Wrapper className={`${baseClassName} ${styles.responseTextPillRow}`}>
+      <span className={styles.responseTextPillLabel}>Response:</span>
+      <span
+        className={`${styles.responsePill} ${getResponsePillToneClassName(tone)}`}
+        data-testid={`ce-demo-analysis-response-pill-${context}-${tone}`}
+      >
+        {responseText}
+      </span>
+    </Wrapper>
+  );
+};
 
 const ComparisonLegend = ({ groups, colorScale }: ComparisonLegendProps) => (
   <div className={styles.legendContainer}>
@@ -164,14 +210,10 @@ const DivergenceVisualizer = ({ groupRates, colorScale }: RateVisualizerProps) =
 };
 
 const ConsensusVisualizer = ({ groupRates, colorScale }: RateVisualizerProps) => {
-  const consensusRate = Math.min(...groupRates.map((group) => group.rate));
   const sortedGroupRates = [...groupRates].sort((left, right) => right.rate - left.rate);
 
   return (
     <div className={styles.consensusVisualizer}>
-      <div className={styles.consensusHeader}>
-        Consensus: Minimum agreement of <strong>{(consensusRate * 100).toFixed(0)}%</strong>
-      </div>
       <div className={styles.consensusBreakdown}>
         {sortedGroupRates.map((group) => {
           const originalIndex = groupRates.findIndex((entry) => entry.groupName === group.groupName);
@@ -339,7 +381,7 @@ const ComparisonReport = ({
     const tooltipForPoint = (point: BeeswarmPoint) => (
       <div className={styles.tooltipContent}>
         <p className={styles.tooltipQuestion}>{point.questionText}</p>
-        <p className={styles.tooltipResponse}>Response: "{point.responseText}"</p>
+        <ResponseLine responseText={point.responseText} context="tooltip" />
         {point.tags.length > 0 && (
           <p className={styles.tooltipTags}>Tags: {point.tags.map((tag) => tag.tagName).join(', ')}</p>
         )}
@@ -409,7 +451,7 @@ const ComparisonReport = ({
                 onClick={() => onInspectQuestion(item.questionId)}
               >
                 <div className={styles.questionText}>{item.questionText}</div>
-                <div className={styles.responseText}>Response: "{item.responseText}"</div>
+                <ResponseLine responseText={item.responseText} />
                 <div className={styles.scoreVisualizerContainer}>{scoreElement}</div>
               </button>
             </li>
@@ -512,7 +554,11 @@ const ComparisonReport = ({
       </div>
 
       {hoveredContent && (
-        <div className={styles.beeTooltip} style={{ left: tooltipPos.x, top: tooltipPos.y }}>
+        <div
+          className={styles.beeTooltip}
+          data-testid="demo-analysis-beeswarm-tooltip"
+          style={{ left: tooltipPos.x, top: tooltipPos.y }}
+        >
           {hoveredContent}
         </div>
       )}

@@ -151,6 +151,9 @@
     "variantProfiles": [
       {
         "id": "consensus_echo",
+        "label": "Consensus echo",
+        "confidence": "Medium",
+        "rationale": "A modeled respondent that stays close to the historical persona's baseline but nudges uncertain answers toward the local majority signal.",
         "mutationRate": 0.14,
         "missingVoteFillRate": 0.22,
         "dropVoteRate": 0.02,
@@ -161,6 +164,9 @@
       },
       {
         "id": "bridge_builder",
+        "label": "Bridge builder",
+        "confidence": "Medium-Low",
+        "rationale": "A modeled respondent that softens sharp positions and fills missing votes to represent adjacent, persuadable viewpoints rather than direct replicas.",
         "mutationRate": 0.22,
         "missingVoteFillRate": 0.34,
         "dropVoteRate": 0.04,
