@@ -4746,8 +4746,8 @@ const isDemoAlternateResultsView = isDemoQuestionResults && demoResultsViewMode 
 const demoResultsViewOptions = isDemoQuestionResults
   ? [
       { key: 'report', label: 'Report' },
-      { key: 'breakdown', label: 'Breakdown' },
       { key: 'atlas', label: 'Atlas' },
+      { key: 'breakdown', label: 'Breakdown' },
       { key: 'riskMatrix', label: 'Risk Matrix' },
     ]
   : [];
