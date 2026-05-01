@@ -1070,6 +1070,40 @@ describe('DebateMap', () => {
     expect(onModalClose).toHaveBeenCalledTimes(1);
   });
 
+  it('returns to the originating route when a deep-linked atlas modal closes', async () => {
+    mockNavigate.mockClear();
+
+    render(
+      <MemoryRouter initialEntries={[
+        '/atlas/0x1110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fsu%2FFranklin%3Ftab%3Datlas%23positions',
+      ]}>
+        <Routes>
+          <Route
+            path="/atlas/:nodeId"
+            element={(
+              <DebateMapComponent
+                account=""
+                provider=""
+                network={{ id: 84532 }}
+                activeSessionSlug=""
+                toggleLoginModal={jest.fn()}
+                demoMode={true}
+              />
+            )}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByTitle('Copy Deep Link URL')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle('Close'));
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/su/Franklin?tab=atlas#positions', { replace: true });
+    });
+  });
+
   it('resets atlas modal scroll position when switching to a different requested node', async () => {
     const baseProps = {
       account: '',

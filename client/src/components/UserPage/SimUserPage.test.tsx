@@ -71,17 +71,22 @@ describe('SimUserPage', () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     const mutableEnv = process.env as Record<string, string | undefined>;
     mutableEnv.PUBLIC_URL = '/ce/';
+    const priorUrl = window.location.href;
     try {
+      window.history.replaceState({}, '', '/ce/su/Franklin?tab=atlas#positions');
       render(<SimUserPage simUsername="Franklin" />);
 
       const atlasLinks = await screen.findAllByRole('link', { name: /Open .* in the atlas/i });
       const atlasLink = atlasLinks[0];
-      expect(atlasLink.getAttribute('href')).toMatch(/^\/ce\/atlas\/.+\?demo=1$/);
+      expect(atlasLink.getAttribute('href')).toMatch(
+        /^\/ce\/atlas\/.+\?demo=1&returnTo=%2Fce%2Fsu%2FFranklin%3Ftab%3Datlas%23positions$/
+      );
 
       const profileLinks = (await screen.findAllByRole('link'))
         .filter((link) => /^\/ce\/su\//.test(link.getAttribute('href') || ''));
       expect(profileLinks.length).toBeGreaterThan(0);
     } finally {
+      window.history.replaceState({}, '', priorUrl);
       if (previousPublicUrl === undefined) delete mutableEnv.PUBLIC_URL;
       else mutableEnv.PUBLIC_URL = previousPublicUrl;
     }

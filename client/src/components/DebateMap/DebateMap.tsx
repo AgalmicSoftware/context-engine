@@ -6,7 +6,7 @@ import {
   faPlus, faNetworkWired, faArrowLeft, faFire, faSitemap, faCaretDown, faCaretUp,
   faArrowUp, faArrowDown, faList, faCircle, faExternalLinkAlt
 } from '@fortawesome/free-solid-svg-icons';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FormGroup, Label, Input } from 'reactstrap';
 import treeData from '../../variables/demo/debate_map_demo_data.json';
 import historicalData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
@@ -19,7 +19,7 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from 'utilities/ui/historicalFigureAvatars.js';
-import { buildPublicRoute } from 'utilities/ui/publicUrl.js';
+import { buildPublicRoute, readSafeInternalReturnTo } from 'utilities/ui/publicUrl.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { buildTagHref } from '../SurveyTool/QuestionTagDropdown';
@@ -2858,8 +2858,11 @@ const DebateMap = ({
   const externalDemoEnabled = externalDemoMode && typeof externalDemoMode === 'object'
     ? !!externalDemoMode.tools
     : !!externalDemoMode;
-  const urlDemoParam = typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('demo') === '1';
+  // Routing Hooks
+  const { nodeId: paramNodeId } = useParams<{ nodeId?: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const urlDemoParam = new URLSearchParams(location.search || '').get('demo') === '1';
   const initialDemoEnabled = externalDemoEnabled || urlDemoParam;
   const [visualMode, setVisualMode] = useState<DebateVisualMode>(() => getInitialDebateVisualMode(atlasLayoutMode));
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -2884,10 +2887,6 @@ const DebateMap = ({
 
   // Ref to track if we've already handled the deep link for the current ID
   const hasHandledDeepLink = useRef(false);
-
-  // Routing Hooks
-  const { nodeId: paramNodeId } = useParams<{ nodeId?: string }>();
-  const navigate = useNavigate();
 
   // --- NODE ID PARSING (Fallback to manual URL check for wildcard routes) ---
   const effectiveNodeId = useMemo(() => {
@@ -2925,6 +2924,12 @@ const DebateMap = ({
     setModalNodeId(String(requestedModalNodeId).trim() || null);
   }, [requestedModalNodeId]);
 
+  const modalReturnTo = useMemo(() => {
+    if (embedded || typeof window === 'undefined') return '';
+    const params = new URLSearchParams(location.search || '');
+    return readSafeInternalReturnTo(params.get('returnTo') || '', window);
+  }, [embedded, location.search]);
+
   const selectedCategory = useMemo(() => (
     selectedCategoryId ? findAtlasNodeById(treeDataState, selectedCategoryId) : null
   ), [selectedCategoryId, treeDataState]);
@@ -2956,8 +2961,14 @@ const DebateMap = ({
   const handleNodeClick = useCallback((node: DebateNode) => setModalNodeId(String(node?.id || '').trim() || null), []);
   const closeModal = useCallback(() => {
     setModalNodeId(null);
-    onModalClose?.();
-  }, [onModalClose]);
+    if (typeof onModalClose === 'function') {
+      onModalClose();
+      return;
+    }
+    if (modalReturnTo) {
+      navigate(modalReturnTo, { replace: true });
+    }
+  }, [modalReturnTo, navigate, onModalClose]);
 
   const handleBookmark = useCallback((id: string) => {
     setBookmarkedNodes(prev => {

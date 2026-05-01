@@ -294,7 +294,7 @@ describe('CorpusViewer', () => {
 
   it('maps legacy tweet debate tags into atlas issue links', () => {
     render(
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/session/demo']}>
         <CorpusViewer />
       </MemoryRouter>
     );
@@ -306,7 +306,7 @@ describe('CorpusViewer', () => {
     expect(within(tweetCard).getByRole('link', { name: 'Exponential Progress Debate' })).toBeInTheDocument();
     expect(issueLink).toHaveAttribute(
       'href',
-      '/atlas/0x2110000000000000000000000000000000000000000000000000000000000000?demo=1'
+      '/atlas/0x2110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fsession%2Fdemo'
     );
   });
 

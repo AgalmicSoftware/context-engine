@@ -17,7 +17,11 @@ import {
   type RiskMatrixCorpusRef,
   type RiskMatrixHistoricalFigure,
 } from '../../variables/demo/riskMatrixCommentContext';
-import { buildPublicRoute, buildPublicUrlPath } from '../../utilities/ui/publicUrl.js';
+import {
+  buildAtlasNodeRoute,
+  buildPublicUrlPath,
+  readWindowLocationPath,
+} from '../../utilities/ui/publicUrl.js';
 import { getHistoricalFigureAvatarByName } from '../../utilities/ui/historicalFigureAvatars.js';
 
 export type RiskValence = 'opportunity' | 'risk';
@@ -922,7 +926,10 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
       <section className={styles.atlasScenarioRail} aria-label="Related atlas scenario visualizations">
         <div className={styles.atlasScenarioGrid}>
           {scenarios.map((scenario) => {
-            const atlasHref = `${buildPublicRoute(`/atlas/${scenario.atlasNodeId}`)}?demo=1`;
+            const atlasHref = buildAtlasNodeRoute(scenario.atlasNodeId, {
+              demo: true,
+              returnTo: readWindowLocationPath(),
+            });
             const atlasLinkLabel = scenario.atlasNodeLabel;
             const atlasLinkAriaLabel = `Open atlas node ${scenario.atlasNodeLabel}`;
             const atlasLinkTestId = `ce-risk-matrix-atlas-link-${toTestIdFragment(scenario.id)}`;
