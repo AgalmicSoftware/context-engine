@@ -28,7 +28,6 @@ export interface ArweaveUploadOpts {
   tags: ArweaveUploadTag[];
   adminAuth?: unknown;
   skipAuth?: boolean;
-  forceDirectArweaveUpload?: boolean;
 }
 
 export const buildArweaveUploadTags = (
@@ -70,18 +69,14 @@ export const resolveArweaveUploadOpts = async (
   const tags = buildArweaveUploadTags(cfg, slug);
 
   let arweaveJwk = '';
-  let arweaveJwkSource = '';
   try {
     const result = await getEffectiveArweaveKey({ sessionSlug: slug, sessionConfig: cfg });
     arweaveJwk = result?.arweaveJwk || '';
-    arweaveJwkSource = String(result?.source || '').trim().toLowerCase();
   } catch (_) {
     arweaveJwk = '';
-    arweaveJwkSource = '';
   }
-  const forceDirectArweaveUpload = !!arweaveJwk && arweaveJwkSource === 'local';
 
-  const bootstrapAuth = arweaveJwk && !forceDirectArweaveUpload
+  const bootstrapAuth = arweaveJwk
     ? await buildArweaveUploadBootstrapAuth({
         signer: signer as LooseRecord | null,
         providerLike,
@@ -95,7 +90,6 @@ export const resolveArweaveUploadOpts = async (
     sessionSlug: slug,
     sessionConfig: cfg as Record<string, unknown>,
     tags,
-    ...(forceDirectArweaveUpload ? { forceDirectArweaveUpload: true, skipAuth: true } : {}),
     ...(bootstrapAuth ? { adminAuth: bootstrapAuth, skipAuth: true } : {}),
   };
 };
