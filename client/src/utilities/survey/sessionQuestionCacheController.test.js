@@ -959,6 +959,33 @@ describe('createSessionQuestionCacheController', () => {
         needsQuestionResponsesNonce: true,
       });
     });
+
+    it('preserves backoff entries created across multiple refresh batches', async () => {
+      const nowRef = { value: 1000 };
+      jest.spyOn(Date, 'now').mockImplementation(() => nowRef.value);
+      const questions = {};
+      for (let index = 1; index <= 5; index += 1) {
+        questions[`q${index}`] = createMaskedQuestion(`q${index}`);
+      }
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(questions),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      contractScripts.decryptQuestionPayloadInPlace.mockRejectedValue(new Error('decrypt failed'));
+
+      await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG, { force: true });
+
+      contractScripts.decryptQuestionPayloadInPlace.mockClear();
+      nowRef.value = 2000;
+      await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG);
+
+      expect(contractScripts.decryptQuestionPayloadInPlace).not.toHaveBeenCalled();
+    });
   });
 
   describe('hasMaskedQuestionPayloadInCache', () => {
