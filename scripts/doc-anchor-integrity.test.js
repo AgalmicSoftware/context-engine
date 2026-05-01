@@ -42,7 +42,6 @@ const MIGRATED_COMPONENT_DOC_PATHS = Object.freeze([
   'client/src/components/SBTs/SBTSelector.tsx',
   'client/src/components/Sessions/SessionWizard.tsx',
   'client/src/components/Shared/AudioInput/AudioInput.tsx',
-  'client/src/components/SurveyTool/AudioInput.tsx',
   'client/src/components/SurveyTool/CreateQuestionsAndSurveys.tsx',
   'client/src/components/SurveyTool/QuestionFilter.tsx',
   'client/src/components/SurveyTool/SingleQuestionResponse.tsx',
@@ -85,18 +84,13 @@ const OPTIONAL_WORKFLOW_SKILL_CHECKS = Object.freeze([
   {
     skillPath: 'scripts/lib/e2e/workflow-skills/survey-response-flow/SKILL.md',
     stalePaths: [
+      'client/src/components/SurveyTool/AudioInput.tsx',
       toLegacyJsxPath('client/src/components/SurveyTool/AudioInput.tsx'),
       toLegacyJsxPath('client/src/components/SurveyTool/SingleQuestionResponse.tsx'),
       toLegacyJsxPath('client/src/components/SurveyTool/SurveyResults.tsx'),
     ],
-    livePathAlternates: [
-      [
-        'client/src/components/SurveyTool/AudioInput.tsx',
-        'client/src/components/Shared/AudioInput/AudioInput.tsx',
-      ],
-    ],
     livePaths: [
-      'client/src/components/SurveyTool/AudioInput.tsx',
+      'client/src/components/Shared/AudioInput/AudioInput.tsx',
       'client/src/components/SurveyTool/SingleQuestionResponse.tsx',
       'client/src/components/SurveyTool/SurveyResults.tsx',
     ],
