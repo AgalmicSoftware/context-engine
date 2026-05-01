@@ -1,13 +1,13 @@
 jest.mock('utilities/logging.js', () => ({
   __esModule: true,
   createLogger: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   getAllSessionSlugs: jest.fn(),
   normalizeSessionSlug: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/session/sessionScanScope.js', () => ({
   __esModule: true,
@@ -15,17 +15,17 @@ jest.mock('../../utilities/session/sessionScanScope.js', () => ({
   readSessionScanSlugs: jest.fn(),
   getAllowedSessionSlugs: jest.fn(),
   isSessionSlugAllowedByScope: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/sbt/sbtInstanceListenersMode.js', () => ({
   __esModule: true,
   readSbtInstanceListenersMode: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/sbt/sbtFullScanPolicy.js', () => ({
   __esModule: true,
   readSbtFullScanPolicy: jest.fn(),
-}));
+}), { virtual: true });
 
 const makeHost = (overrides = {}) => ({
   getActiveSessionSlug: jest.fn().mockReturnValue(''),
