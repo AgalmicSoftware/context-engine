@@ -159,7 +159,6 @@ export interface SessionProfileScanHost {
   getAccount?: () => unknown;
   getActiveSessionSlug?: () => string;
   getScopedSessionSlugs?: (scope: string) => string[];
-  getScopeFilteredSlugs?: (slugs?: string[], scopeIn?: string | null) => string[];
   isMounted?: () => boolean;
   scanSpecificUserProfile?: (address: string) => Promise<unknown>;
   isSessionSlugAllowedForScan?: (slug: string, scopeContext: SessionScanScopeContext) => boolean;
