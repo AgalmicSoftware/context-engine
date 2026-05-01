@@ -222,6 +222,13 @@ describe('sessionWizardPublishFlow', () => {
       effectiveBundleMode: 'url',
       hasBundleFile: false,
     })).toBe(false);
+
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: 'Failed to fetch bundle (404).',
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(true);
   });
 
   it('fills publish progress within an active step and completes at 100 once done', () => {

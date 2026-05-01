@@ -109,16 +109,20 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   helperBase,
   currentOrigin,
 }: {
-  err?: AnyRecord | null;
+  err?: unknown;
   helperBase?: unknown;
   currentOrigin?: unknown;
 } = {}): string => {
-  const raw = toStr(err?.message).trim();
+  const error = (err && typeof err === 'object') ? err as AnyRecord : {};
+  const raw = toStr(
+    error?.message ||
+    (typeof err === 'string' || typeof err === 'number' ? err : '')
+  ).trim();
   const lowered = raw.toLowerCase();
-  const statusCode = Number(err?.statusCode || 0);
-  const responseError = toStr(err?.responseError).trim();
+  const statusCode = Number(error?.statusCode || 0);
+  const responseError = toStr(error?.responseError).trim();
   const responseLower = responseError.toLowerCase();
-  const bundleDiagnostics = err?.responseBundleDiagnostics;
+  const bundleDiagnostics = error?.responseBundleDiagnostics;
   const diagnosticsSummary = bundleDiagnostics
     ? formatSessionWizardDeployBundleDiagnostics(bundleDiagnostics)
     : '';
