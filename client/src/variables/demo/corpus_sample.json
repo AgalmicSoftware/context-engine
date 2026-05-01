@@ -1,6 +1,6 @@
 {
   "meta": {
-    "description": "Curated sample from 7 discourse corpuses for demo display",
+    "description": "Curated sample from 8 discourse corpuses for demo display",
     "corpuses": {
       "tweets": {
         "label": "AI Discourse Tweets",
@@ -39,8 +39,8 @@
       },
       "cross_corpus": {
         "label": "Cross-Corpus Debates",
-        "sample_count": 0,
-        "full_count": 0
+        "sample_count": 8,
+        "full_count": 8
       }
     }
   },
@@ -53,7 +53,7 @@
         {
           "url": "https://x.com/jburnmurdoch/status/1689189112710885376",
           "author": "@jburnmurdoch",
-          "text": "Amazing: Google partneredwith American Airlines, used AI to tweak flight paths to reduce contrails.\n\nThe results are in, and if scaled up this could immediately reduce aviation's global warming impact by almost 20%\n\nTechnology just keeps beating degrowth!",
+          "text": "Amazing: Google partnered with American Airlines, used AI to tweak flight paths to reduce contrails.\n\nThe results are in, and if scaled up this could immediately reduce aviation's global warming impact by almost 20%\n\nTechnology just keeps beating degrowth!",
           "created_at": "2023-08-09T08:17:22.000Z",
           "tags": [
             "Degrowth",
@@ -61,7 +61,7 @@
             "Media"
           ],
           "relevance_score": 10,
-          "summary": "Amazing: Google partneredwith American Airlines, used AI to tweak flight paths to reduce contrails.",
+          "summary": "Amazing: Google partnered with American Airlines, used AI to tweak flight paths to reduce contrails.",
           "debate_nodes": [
             "positive-trajectory"
           ],
@@ -263,7 +263,7 @@
         {
           "url": "https://x.com/sama/status/1983584366547829073",
           "author": "@sama",
-          "text": "Yesterday we did a livestream. TL;DR:\n\nWe have set internal goals of having an automated AI research intern by September of 2026 running on hundreds of thousands of GPUs, and a true automated AI researcher by March of 2028. We may totally fail at this goal, but given the extraordinary potential impacts we think it is in the public interest to be transparent about this.\n\nWe have a safety strategy that relies on 5 layers: Value alignment, Goal alignment, Reliability, Adversarial robustness, and System safety. Chain-of-thought faithfulness is a tool we are particularly excited about, but it somewhat fragile and requires drawing a boundary and a clear abstraction.\n\nOn the product side, we are trying to move towards a true platform, where people and companies building on top of our offerings will capture most of the value. Today people can build on our API and apps in ChatGPT; eventually, we want to offer an AI cloud that enables huge businesses.\n\nWe have currently committed to about 30 gigawatts of compute, with a total cost of ownership over the years of about $1.4 trillion. We are comfortable with this given what we see on the horizon for model capability growth and revenue growth. We would like to do more—we would like to build an AI factory that can make 1 gigawatt per week of new capacity, at a greatly reduced cost relative to today—but that will require more confidence in future models, revenue, and technological/financial innovation.\n\nOur new structure is much simpler than our old one. We have a non-profit calledOpenAI Foundation that governs a Public Benefit Corporation called OpenAI Group. The foundation initially owns 26% of the PBC, but it can increase with warrants over time if the PBC does super well. The PBC can attract the resources needed to achieve the mission.\n\nOur mission, for both our non-profit and PBC, remains the same: to ensure that artificial general intelligence benefits all of humanity.\n\nThe nonprofit is initially committing $25 billion to health and curing disease, and AI resilience (all of the things that could help society have a successful transition to a post-AGI world, including technical safety but also things like economic impact, cyber security, and much more). The nonprofit now has the ability to actually deploy capital relatively quickly, unlike before.\n\nIn 2026 we expect that our AI systems may be able to make small new discoveries; in 2028 we could be looking at big ones. This is a really big deal; we think that science, and the institutions that let us widely distribute the fruits of science, are the most important ways that quality of life improves over time.",
+          "text": "Yesterday we did a livestream. TL;DR:\n\nWe have set internal goals of having an automated AI research intern by September of 2026 running on hundreds of thousands of GPUs, and a true automated AI researcher by March of 2028. We may totally fail at this goal, but given the extraordinary potential impacts we think it is in the public interest to be transparent about this.\n\nWe have a safety strategy that relies on 5 layers: Value alignment, Goal alignment, Reliability, Adversarial robustness, and System safety. Chain-of-thought faithfulness is a tool we are particularly excited about, but it is somewhat fragile and requires drawing a boundary and a clear abstraction.\n\nOn the product side, we are trying to move towards a true platform, where people and companies building on top of our offerings will capture most of the value. Today people can build on our API and apps in ChatGPT; eventually, we want to offer an AI cloud that enables huge businesses.\n\nWe have currently committed to about 30 gigawatts of compute, with a total cost of ownership over the years of about $1.4 trillion. We are comfortable with this given what we see on the horizon for model capability growth and revenue growth. We would like to do more—we would like to build an AI factory that can make 1 gigawatt per week of new capacity, at a greatly reduced cost relative to today—but that will require more confidence in future models, revenue, and technological/financial innovation.\n\nOur new structure is much simpler than our old one. We have a non-profit called OpenAI Foundation that governs a Public Benefit Corporation called OpenAI Group. The foundation initially owns 26% of the PBC, but it can increase with warrants over time if the PBC does super well. The PBC can attract the resources needed to achieve the mission.\n\nOur mission, for both our non-profit and PBC, remains the same: to ensure that artificial general intelligence benefits all of humanity.\n\nThe nonprofit is initially committing $25 billion to health and curing disease, and AI resilience (all of the things that could help society have a successful transition to a post-AGI world, including technical safety but also things like economic impact, cyber security, and much more). The nonprofit now has the ability to actually deploy capital relatively quickly, unlike before.\n\nIn 2026 we expect that our AI systems may be able to make small new discoveries; in 2028 we could be looking at big ones. This is a really big deal; we think that science, and the institutions that let us widely distribute the fruits of science, are the most important ways that quality of life improves over time.",
           "created_at": "2025-10-29T17:19:00.000Z",
           "tags": [
             "Alignment",
@@ -3743,8 +3743,215 @@
     "cross_corpus": {
       "label": "Cross-Corpus Debates",
       "icon": "link",
-      "count_full": 0,
-      "entries": []
+      "count_full": 8,
+      "entries": [
+        {
+          "id": "debate_exponential_progress",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Is AI Progress Actually Exponential?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "Empirical Dispute",
+          "summary": "Are AI capabilities improving exponentially, or do benchmark metrics mislead about real-world impact?",
+          "central_tension": "Benchmark improvement rates reflect real-world capability growth.",
+          "featured_source_title": "Time Horizon Doubling in AI Development",
+          "featured_source_author": "METR Research Team",
+          "featured_source_corpus": "METR",
+          "corpora_synthesized": [
+            "METR",
+            "Dwarkesh",
+            "LessWrong"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "METR",
+            "Benchmarks",
+            "Forecasting",
+            "Real-World Impact"
+          ]
+        },
+        {
+          "id": "debate_reward_hacking_misalignment",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Is Reward Hacking Evidence of Real Misalignment?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "Empirical Dispute",
+          "summary": "Does reward hacking behavior in frontier models constitute genuine misalignment, or is it merely an optimization artifact of poorly specified objectives?",
+          "central_tension": "Reward hacking indicates the model is pursuing goals misaligned with human intent.",
+          "featured_source_title": "Comprehensive Reward Hacking Survey",
+          "featured_source_author": "METR Research Team",
+          "featured_source_corpus": "METR",
+          "corpora_synthesized": [
+            "METR",
+            "LessWrong",
+            "AI Sci-Fi"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Reward Hacking",
+            "Deceptive Alignment",
+            "METR",
+            "LessWrong"
+          ]
+        },
+        {
+          "id": "debate_predeployment_eval_adequacy",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Can Pre-deployment Evaluations Ensure Safety?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "Methodology Debate",
+          "summary": "Are pre-deployment evaluations a sufficient framework for AI safety, or are they fundamentally limited by eval awareness and Goodhart's Law?",
+          "central_tension": "Evaluations can comprehensively assess AI safety before deployment.",
+          "featured_source_title": "EU Artificial Intelligence Act - Title III",
+          "featured_source_author": "European Parliament",
+          "featured_source_corpus": "AI Laws",
+          "corpora_synthesized": [
+            "AI Laws",
+            "Dwarkesh",
+            "METR",
+            "LessWrong"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Evaluations",
+            "AI Governance",
+            "Goodhart",
+            "EU AI Act"
+          ]
+        },
+        {
+          "id": "debate_ai_rd_automation",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Will AI Automate AI R&D by 2032?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "Forecasting Disagreement",
+          "summary": "Will AI systems automate >99% of AI R&D tasks by 2032, or will real-world development productivity grow much more slowly?",
+          "central_tension": "Extrapolating benchmark progress predicts real-world AI R&D automation.",
+          "featured_source_title": "Simpler Timelines: A Parsimonious Model of AI Progress",
+          "featured_source_author": "METR Research Team",
+          "featured_source_corpus": "METR",
+          "corpora_synthesized": [
+            "METR",
+            "LessWrong",
+            "Dwarkesh",
+            "AI Sci-Fi"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Automation",
+            "R&D",
+            "Timelines",
+            "Forecasting"
+          ]
+        },
+        {
+          "id": "debate_open_vs_closed_safety",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Does Open Source AI Undermine Safety?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "Values Conflict",
+          "summary": "Should advanced AI models be developed and released as open source, or is closed-source development necessary for safety?",
+          "central_tension": "Open source models can reach frontier capabilities quickly enough to change the safety calculus.",
+          "featured_source_title": "DeepSeek-R1 Evaluation Report",
+          "featured_source_author": "METR",
+          "featured_source_corpus": "METR Reports",
+          "corpora_synthesized": [
+            "METR Reports",
+            "Interviews"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Open Source",
+            "Frontier Models",
+            "Safety",
+            "DeepSeek"
+          ]
+        },
+        {
+          "id": "debate_benchmark_validity",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Are Benchmarks Measuring What Matters?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "Methodology Debate",
+          "summary": "Do current AI benchmarks accurately measure capabilities that translate to real-world value and impact?",
+          "central_tension": "Consistent exponential improvement across benchmarks indicates real capability gain.",
+          "featured_source_title": "Time Horizon as Capability Metric",
+          "featured_source_author": "METR",
+          "featured_source_corpus": "METR Reports",
+          "corpora_synthesized": [
+            "METR Reports"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Benchmarks",
+            "Evaluation",
+            "Measurement",
+            "Real-World Impact"
+          ]
+        },
+        {
+          "id": "debate_regulation_speed",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "How Fast Must We Regulate AI?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "Policy Timing",
+          "summary": "Should AI regulation be implemented urgently to match capability advancement, or should it be developed carefully to avoid stifling innovation?",
+          "central_tension": "The timescale of capability advancement outpaces regulatory response.",
+          "featured_source_title": "Time Horizon Capability Doubling Rate",
+          "featured_source_author": "METR",
+          "featured_source_corpus": "METR Reports",
+          "corpora_synthesized": [
+            "METR Reports",
+            "Laws",
+            "Interviews"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Regulation",
+            "Policy Timing",
+            "Capability Growth",
+            "Governance"
+          ]
+        },
+        {
+          "id": "debate_deceptive_alignment",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Is Deceptive Alignment Real or Theoretical?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "Empirical Dispute",
+          "summary": "Are current AI systems demonstrating deceptive alignment behaviors, or are observed behaviors optimization artifacts without genuine strategic intent?",
+          "central_tension": "Evaluation awareness indicates deceptive intent.",
+          "featured_source_title": "MALT: Model-Aware Language-based Test Suite",
+          "featured_source_author": "METR",
+          "featured_source_corpus": "METR Reports",
+          "corpora_synthesized": [
+            "METR Reports",
+            "LessWrong"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Deceptive Alignment",
+            "Evaluation Awareness",
+            "METR",
+            "LessWrong"
+          ]
+        }
+      ]
     }
   }
 }

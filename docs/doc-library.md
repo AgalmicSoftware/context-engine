@@ -22,6 +22,7 @@ Docs can be associated with:
   - Saved Tool Explorer sources are written as Lit-encrypted session docs with an audience of either `only me` or the session `docUploads` gate when that gate exists.
   - When the save option is enabled, generated surveys store doc-library viewer URLs for those saved extra sources instead of the raw source URLs.
   - `View` defaults to the sample demo corpus viewer used on `/session/demo` when demo surfaces are enabled.
+  - The demo corpus viewer now exposes the full curated tab set, including `LessWrong` and `Cross-Corpus Debates`, instead of keeping those slices hidden.
   - The local `Demo corpus` checkbox starts checked in demo-enabled mode; unchecking it switches the panel to the real session Doc Library when a session context is available.
   - When demo surfaces are disabled globally, `View` opens directly to the real session Doc Library or its empty state, and the local demo toggle is hidden.
   - In `View`, the session Doc Library is browse-only: upload/link entry controls stay in `Add`.
