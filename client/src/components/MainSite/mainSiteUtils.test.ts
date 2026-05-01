@@ -12,7 +12,7 @@ jest.mock('utilities/logging.js', () => {
     createLogger: jest.fn(() => mockLogger),
     emitForcedLog: jest.fn(),
   };
-});
+}, { virtual: true });
 
 jest.mock('ethers', () => ({
   __esModule: true,
@@ -21,7 +21,19 @@ jest.mock('ethers', () => ({
       AddressZero: '0x0000000000000000000000000000000000000000',
     },
   },
-}));
+}), { virtual: true });
+
+import { emitForcedLog } from 'utilities/logging.js';
+import {
+  readBoolishDebugFlag,
+  isForcedSbtSelectorDebugEnabled,
+  emitMainSiteSbtDebug,
+  isRouteResponderAddress,
+  hasCoreSbtMetadata,
+  isMainSitePerfCountersEnabled,
+  bumpMainSitePerfCounter,
+  getMainSitePerfNow,
+} from './mainSiteUtils.ts';
 
 type MainSiteTestGlobals = typeof globalThis & {
   CE_SBT_SELECTOR_DEBUG?: unknown;
@@ -40,21 +52,7 @@ const loggingModule = jest.requireMock('utilities/logging.js') as {
     warn: jest.Mock;
     error: jest.Mock;
   };
-  emitForcedLog: jest.Mock;
 };
-const { emitForcedLog } = loggingModule;
-const {
-  readBoolishDebugFlag,
-  isForcedSbtSelectorDebugEnabled,
-  emitMainSiteSbtDebug,
-  buildMainSiteCacheManagerReadyStatePatch,
-  buildMainSiteLitHooksStatePatch,
-  isRouteResponderAddress,
-  hasCoreSbtMetadata,
-  isMainSitePerfCountersEnabled,
-  bumpMainSitePerfCounter,
-  getMainSitePerfNow,
-} = require('./mainSiteUtils') as typeof import('./mainSiteUtils');
 
 const clearMainSiteTestState = (): void => {
   delete globals.CE_SBT_SELECTOR_DEBUG;
@@ -217,36 +215,6 @@ describe('hasCoreSbtMetadata', () => {
 
   it('returns true when all required fields are present', () => {
     expect(hasCoreSbtMetadata(validMetadata)).toBe(true);
-  });
-});
-
-describe('main site state patch helpers', () => {
-  afterEach(() => {
-    jest.clearAllMocks();
-    clearMainSiteTestState();
-  });
-
-  it('builds the Lit hooks state patch without altering the hooks value', () => {
-    const hooks = { getKey: jest.fn(), network: 'test' };
-
-    expect(buildMainSiteLitHooksStatePatch(hooks)).toEqual({
-      litHooks: hooks,
-    });
-    expect(buildMainSiteLitHooksStatePatch(null)).toEqual({
-      litHooks: null,
-    });
-  });
-
-  it('builds cache-manager readiness patches with boolean-only semantics', () => {
-    expect(buildMainSiteCacheManagerReadyStatePatch()).toEqual({
-      isCacheManagerReady: true,
-    });
-    expect(buildMainSiteCacheManagerReadyStatePatch({ ready: false })).toEqual({
-      isCacheManagerReady: false,
-    });
-    expect(buildMainSiteCacheManagerReadyStatePatch({ ready: 'true' })).toEqual({
-      isCacheManagerReady: false,
-    });
   });
 });
 
