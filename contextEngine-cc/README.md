@@ -8,7 +8,7 @@ Claude Code extension for [Context Engine](../README.md) — surfaces passkey-ga
 cd contextEngine-cc
 npm install
 ./install.sh
-npm run dev
+npm start
 ```
 
 Then open `http://localhost:7391` to authenticate. Run `npm test` for the local `contextEngine-cc` test suite.
@@ -16,10 +16,10 @@ Responses submitted through the CC extension now attempt on-chain submission imm
 
 ## How It Works
 
-1. A **local server** (port 7391) authenticates you via passkey/SIWE, loads survey questions from on-chain session data (currently OP Sepolia), and serves them over a local API.
+1. A **local server** (port 7391) authenticates you via passkey, loads survey questions from on-chain session data (currently OP Sepolia), and serves them over a local API.
 2. A **Claude Code hook** fires on every non-trivial tool use (Bash, Task) and fetches the next unseen question from the server.
 3. Claude presents the question to you via `AskUserQuestion` and submits your response plus field-level audience choices back to the server for later on-chain submission.
-4. A Claude Code `statusLine` command renders Context Engine progress, cooldown, pending answers, and the latest surfaced prompt in the terminal footer.
+4. A Claude Code `statusLine` command renders Context Engine progress, cooldown, pending answers, and a manual `press q for question` hint in the terminal footer.
 
 ```
 Claude Code ──PreToolUse──▸ hook.mjs ──GET──▸ localhost:7391/api/hook/question
@@ -33,7 +33,7 @@ Claude Code ──PreToolUse──▸ hook.mjs ──GET──▸ localhost:7391
 Claude Code ◂──additionalContext──── hook.mjs ◂─────┘
      │
      ▼
-AskUserQuestion → user answers → curl POST /api/respond → stored locally
+AskUserQuestion → user answers → submit.mjs → POST /api/respond → stored locally
 ```
 
 ## Response Audiences
@@ -50,6 +50,8 @@ Accepted audience values:
 - `"self"`: encrypt for the responding wallet
 - `"gate"`: tag the field to a specific session gate
 - `"follow"`: additional comments only; keeps comments aligned to the answer audience until explicitly changed
+
+Gate-audience response encryption uses the session worker's Chipotle Lit route. CE-CC no longer imports `@lit-protocol/*` or `viem` from the sibling client, and it does not run a direct browser/Naga Lit SDK path. If a selected gate needs Lit but the session worker lacks Chipotle credentials, Lit scope, or session sign-in, CE-CC fails closed before uploading plaintext.
 
 ## Prerequisites
 
@@ -70,7 +72,8 @@ Chain defaults:
 `contextEngine-cc` is currently supported only inside this repository layout. It is not a standalone package yet.
 
 - `lib/constants.mjs` reads ABI and chain configuration from sibling `client/src/...`
-- `lib/litNodeHooks.mjs` resolves `viem` and `@lit-protocol/*` from sibling `client/node_modules`
+- `lib/litNodeHooks.mjs` calls the session worker's `/lit/chipotle-action` endpoint for SBT-gated response encryption; it does not depend on sibling `client/node_modules`
+- `lib/litChipotleActionCatalog.mjs` mirrors the canonical Chipotle Lit Action source from `client/src/utilities/crypto/litChipotleCatalog.ts`; tests guard this mirror against drift
 - `lib/shared/` mirrors or symlinks utilities from the sibling `client/` tree
 
 Standalone extraction is out of scope for this cleanup. Publishing `contextEngine-cc` outside the monorepo would require dependency and shared-module extraction work first.
@@ -84,8 +87,11 @@ cd contextEngine-cc
 
 This does three things:
 1. Runs `npm install` (only dependency: `ethers@5`)
-2. Copies the PreToolUse hook, SessionStart hook, protocol file, and status line scripts to `~/.claude/plugins/contextEngine-cc/` and registers them in `~/.claude/settings.json`
-3. Creates or updates a managed survey-hooks block in the target project's `CLAUDE.md`
+2. Copies the full CE-CC runtime bundle to `~/.claude/plugins/contextEngine-cc/`
+3. Registers CE-CC activation in the target project's `.claude/settings.local.json` by default
+4. Creates or updates a managed survey-hooks block in the target project's `CLAUDE.md`
+
+Local installs also scrub legacy CE-CC-owned hook and status-line entries from `~/.claude/settings.json` so old global installs stop affecting unrelated Claude Code sessions.
 
 ### Install options
 
@@ -93,6 +99,7 @@ This does three things:
 ./install.sh --hook-only     # Only install the hook (skip npm install)
 ./install.sh --server-only   # Only install dependencies (skip hook registration)
 ./install.sh --claude-md-only # Only install or refresh the managed CLAUDE.md block
+./install.sh --hook-only --global-hooks # Opt into ~/.claude/settings.json activation
 ```
 
 ### Custom server URL
@@ -102,6 +109,18 @@ SERVER_URL=http://192.168.1.5:7391 ./install.sh
 ```
 
 Re-running the installer with an explicit `SERVER_URL=...` updates the stored plugin server URL without wiping existing hook session selections.
+
+By default, activation is written to:
+
+```text
+<project>/.claude/settings.local.json
+```
+
+If you want CE-CC active across all Claude Code sessions, opt in explicitly with:
+
+```bash
+./install.sh --global-hooks
+```
 
 `install.sh` manages only the block between these markers in the target `CLAUDE.md`:
 
@@ -113,7 +132,7 @@ Re-running the installer with an explicit `SERVER_URL=...` updates the stored pl
 
 If the target `CLAUDE.md` already exists, the installer replaces only that managed block and leaves unrelated content alone. If no `CLAUDE.md` exists, it creates one. When the file already has a leading Markdown heading, the managed block is inserted immediately after that heading; otherwise the block is prepended.
 
-When you run `./install.sh` from inside `contextEngine-cc/`, the installer prefers the parent repo's `CLAUDE.md` if one exists. Use `PROJECT_DIR=/path/to/project` to target a different repo explicitly.
+When you run `./install.sh` from inside `contextEngine-cc/`, the installer targets the parent repo by default for both `CLAUDE.md` and `.claude/settings.local.json`, even on a first install before that parent repo has its own `CLAUDE.md`. Use `PROJECT_DIR=/path/to/project` to target a different repo explicitly.
 
 If you already use a custom Claude Code `statusLine`, the installer leaves it alone. You can enable the Context Engine dashboard manually later by pointing `statusLine.command` at:
 
@@ -121,7 +140,7 @@ If you already use a custom Claude Code `statusLine`, the installer leaves it al
 {
   "statusLine": {
     "type": "command",
-    "command": "node ~/.claude/plugins/contextEngine-cc/status/statusline.mjs"
+    "command": "node ~/.claude/plugins/contextEngine-cc/status/entry.mjs"
   }
 }
 ```
@@ -135,7 +154,13 @@ npm start
 npm run dev
 ```
 
-The server starts on `http://localhost:7391`.
+`npm start` now keeps the output intentionally short:
+
+- if CE-CC is not running yet, it starts the local server and prints one sign-in line
+- if CE-CC is already running on `127.0.0.1:7391`, it exits cleanly and prints the same passkey sign-in URL instead of throwing `EADDRINUSE`
+- if some other process owns port `7391`, it prints a short conflict message telling you which URL to check
+
+The sign-in URL is `http://localhost:7391`.
 The browser frontend stays build-free inside `public/`: `index.html` is the DOM shell, `styles.css` holds the shared page styling, and `js/*.mjs` contains the browser modules served directly by the local server.
 Verbose runtime tracing is off by default. Set `CE_CC_DEBUG=1` when you want debug logs from the server, router, question scanning, and submission pipeline:
 
@@ -150,7 +175,7 @@ Security defaults:
 ## Authenticate
 
 1. Open `http://localhost:7391` in your browser
-2. Create or use a passkey (WebAuthn) — or sign in with SIWE from the Context Engine PWA
+2. Create or use a passkey (WebAuthn), then sign into the sessions you want to submit through
 3. Your JWT token is saved to `~/.claude/plugins/contextEngine-cc/.state/token.jwt`
 
 If your token expires, the hook will open the browser automatically and show a macOS notification.
@@ -190,7 +215,7 @@ curl -s http://localhost:7391/api/sessions \
 
 ## Hook Behavior
 
-The hook fires as a `PreToolUse` hook on `Bash|Write|Edit|Task` tool calls and as a `Notification` hook for idle prompts. It filters for long-running operations to avoid interrupting fast commands:
+The hook fires as a `PreToolUse` hook on `Bash|Write|Edit|Read|Glob|Grep|Task` tool calls and as a `Notification` hook for idle prompts. It filters for long-running operations to avoid interrupting fast commands:
 
 - **Always triggers**: `Task` (agent) calls, Bash commands without an explicit short timeout
 - **Skips**: Fast commands (`echo`, `ls`, `cat`, `head`, `tail`, `pwd`, etc.), Bash with `timeout < 30s`
@@ -206,9 +231,21 @@ node ~/.claude/plugins/contextEngine-cc/hook/manual-question.mjs
 
 The helper tries the configured sessions and returns compact JSON without the terminal box renderer. For debugging, the raw route remains available with `presentation=debug` or the default route output.
 
+For Claude-facing manual `q` flows, the helper also returns a top-level `submitMeta` object containing the canonical `questionId`, `session`, `questionType`, and default encryption audiences to pass back to `/api/respond`. Consumers should reuse that `submitMeta` directly instead of reconstructing the session slug from config.
+
+Normal Claude-side response submission should prefer the wrapper instead of raw `curl`:
+
+```bash
+node ~/.claude/plugins/contextEngine-cc/hook/submit.mjs --meta '{"questionId":"...","session":"...","questionType":"..."}'
+```
+
+That still does not make plaintext answers impossible for Claude to see, but it reduces how often answer text has to appear in shell command logs.
+
+When `/api/respond` auto-submits successfully, the JSON response now includes `txExplorerUrl` whenever the active chain metadata has a transaction explorer base URL. CE-CC defaults to Blockscout links on supported public testnets, and private/corporate deployments can override that destination with `CE_TX_EXPLORER_BASE_URL` to surface internal explorer links instead.
+
 ### Hook timeout
 
-The installer sets `timeout: 5000` (5 seconds) in `~/.claude/settings.json`. If your RPC or Arweave calls are slow on first load, increase this:
+The installer sets `timeout: 15000` (15 seconds). For local installs, adjust the timeout in your project's `.claude/settings.local.json`. For global installs, adjust `~/.claude/settings.json` instead:
 
 ```json
 {
@@ -217,7 +254,7 @@ The installer sets `timeout: 5000` (5 seconds) in `~/.claude/settings.json`. If 
       "matcher": "Bash|Write|Edit|Task",
       "hooks": [{
         "type": "command",
-        "command": "node ~/.claude/plugins/contextEngine-cc/hook/hook.mjs",
+        "command": "node ~/.claude/plugins/contextEngine-cc/hook/entry.mjs",
         "timeout": 15000
       }]
     }]
@@ -237,7 +274,7 @@ The installer also configures a Claude Code `statusLine` command when no other s
 - Worker-auth gaps for selected sessions when immediate submit cannot push on-chain yet
 - Aggregate question progress across selected sessions
 - Current cooldown / readiness
-- The latest question surfaced by the hook, or a redacted ready-question hint when enabled
+- Manual `press q for question` guidance, plus optional phase hints only when explicitly enabled
 
 The dashboard is driven by `GET /api/status` and keeps a short local cache so terminal redraws stay responsive even if the local server is busy.
 
@@ -256,7 +293,7 @@ The dashboard is driven by `GET /api/status` and keeps a short local cache so te
    ```bash
    rm ~/.claude/plugins/contextEngine-cc/.state/last-ts
    ```
-6. **Hook timeout too short**: Increase `timeout` in `~/.claude/settings.json` (see above)
+6. **Hook timeout too short**: Increase `timeout` in your CE-CC activation settings file (see above)
 
 ### Verify the hook works
 
@@ -264,7 +301,7 @@ Test the hook manually:
 
 ```bash
 echo '{"tool_name":"Bash","tool_input":{"command":"sleep 60","timeout":120000}}' \
-  | node ~/.claude/plugins/contextEngine-cc/hook/hook.mjs
+  | node ~/.claude/plugins/contextEngine-cc/hook/entry.mjs
 ```
 
 You should see JSON with `hookSpecificOutput.additionalContext` containing the question. If you see no output, the hook is silently allowing (check the troubleshooting steps above).
@@ -281,13 +318,13 @@ curl -s "http://localhost:7391/api/hook/question?session=YOUR-SESSION-UUID" \
   -H "Authorization: Bearer $(cat ~/.claude/plugins/contextEngine-cc/.state/token.jwt)"
 ```
 
-### Responses stay pending or `submit-onchain` says "No worker token stored"
+### Responses stay pending or session sign-in is still required
 
-Auto-submit still needs a valid per-session worker token so CE-CC can upload the payload to the session worker before writing on-chain.
+Auto-submit still needs a completed per-session sign-in so CE-CC can upload the payload to the session backend before writing on-chain. Gate-audience encrypted responses also use that worker token to call the worker-mediated Chipotle route, so missing session sign-in or missing Lit worker scope blocks encrypted upload rather than falling back to plaintext.
 
 1. Open `http://localhost:7391`
-2. Complete the worker-auth flow for the affected session inside the PWA
-3. Verify token readiness:
+2. Complete session sign-in for the affected session inside the PWA
+3. Verify session sign-in readiness:
    ```bash
    curl -s http://localhost:7391/api/auth/check \
      -H "Authorization: Bearer $(cat ~/.claude/plugins/contextEngine-cc/.state/token.jwt)"
@@ -301,7 +338,7 @@ All state is stored in `~/.claude/plugins/contextEngine-cc/.state/`:
 | File | Purpose |
 |------|---------|
 | `config.json` | Server URL and default session |
-| `token.jwt` | Authentication token (passkey/SIWE) |
+| `token.jwt` | Authentication token (passkey) |
 | `seen.json` | Map of question IDs already shown (prevents repeats) |
 | `last-ts` | Timestamp of last question shown (cooldown timer) |
 | `last-auth-ts` | Timestamp of last auth prompt (5-min auth cooldown) |
@@ -320,18 +357,18 @@ Server data is stored in `contextEngine-cc/.data/`:
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/auth/local-jwt` | No (trusted local requests only) | Issue a local JWT (skip-SIWE flow) |
+| POST | `/api/auth/local-jwt` | No (trusted local requests only) | Issue a local JWT for Claude Code |
 | GET | `/api/me` | Yes | Return current user info |
-| GET | `/api/auth/check` | Yes | Check per-session worker-token freshness for the selected sessions |
+| GET | `/api/auth/check` | Yes | Check per-session sign-in readiness for the selected sessions |
 | GET | `/api/sessions` | Yes | List available sessions |
 | GET | `/api/session/worker-url` | Yes | Get CORS worker URL for a session |
 | GET | `/api/questions?session=&seen=` | Yes | Get random unseen question plus `gateOptions` / `defaultGateId` for response audiences |
 | GET | `/api/hook/question?session=&seen=` | Yes | Get question formatted for terminal, raw data, and gate-aware audience defaults |
 | GET | `/api/hook/question?session=&presentation=compact` | Yes | Get compact hook/manual question JSON without terminal box rendering or prior-response text |
-| GET | `/api/status` | Yes | Get status line summary (sessions, pending, cooldown, latest question, worker-token readiness) |
+| GET | `/api/status` | Yes | Get status line summary (sessions, pending, cooldown, latest question, session sign-in readiness) |
 | GET | `/api/settings` | Yes | Get submission settings (`autoSubmitResponses` defaults to `true`) plus active chain metadata |
 | POST | `/api/settings` | Yes | Update submission settings; POST `{"autoSubmitResponses":false}` to keep responses pending-only |
-| POST | `/api/respond` | Yes | Submit a response; it is stored locally first and then auto-submitted on-chain when enabled, with `requiresWorkerAuth` surfaced when the session still lacks worker auth |
+| POST | `/api/respond` | Yes | Submit a response; it is stored locally first and then auto-submitted on-chain when enabled, with `requiresWorkerAuth` surfaced when the session still lacks session sign-in and `txExplorerUrl` returned on successful on-chain submit when explorer metadata is configured |
 | GET | `/api/responses/pending?session=` | Yes | List pending local responses for the authenticated wallet |
 | POST | `/api/responses/submit-onchain` | Yes | Submit pending local responses on-chain |
 | POST | `/api/responses/mark-submitted` | Yes | Mark a local response as submitted and persist confirmed local state |
@@ -342,15 +379,20 @@ Server data is stored in `contextEngine-cc/.data/`:
 cd contextEngine-cc
 ./uninstall.sh
 
-# Or target a different project CLAUDE.md explicitly
+# Or target a different project explicitly
 PROJECT_DIR=/path/to/project ./uninstall.sh
+
+# Remove explicit global activation too
+./uninstall.sh --global-hooks
 ```
 
-This removes the hook entries from `~/.claude/settings.json` and deletes `~/.claude/plugins/contextEngine-cc/`. Server data in `.data/` is preserved.
+By default, this removes CE-CC activation from the targeted project's `.claude/settings.local.json`, removes the managed survey-hooks block from that project's `CLAUDE.md`, and deletes `~/.claude/plugins/contextEngine-cc/` when no explicit global CE-CC activation remains. Server data in `.data/` is preserved.
+
+If you installed CE-CC with `--global-hooks`, plain uninstall keeps the shared plugin bundle in place so unrelated Claude Code sessions do not break. Rerun uninstall with `--global-hooks` to remove CE-CC-owned entries from `~/.claude/settings.json` and then delete the shared plugin bundle too.
 
 `uninstall.sh` also removes only the installer-managed survey-hooks block between the same `contextengine-cc:survey-hooks` markers from the targeted `CLAUDE.md`. If no managed block is present, unrelated file content is left untouched.
 
-Like `install.sh`, `uninstall.sh` walks upward from the current directory to find the nearest project `CLAUDE.md` and, when run from inside `contextEngine-cc/`, skips the subproject copy in favor of the parent repo's `CLAUDE.md`. Use `PROJECT_DIR=/path/to/project` to target a different repo explicitly.
+Like `install.sh`, `uninstall.sh` targets the parent repo when run from inside `contextEngine-cc/` and uses `PROJECT_DIR=/path/to/project` when you want to target a different project explicitly.
 
 ## License
 
