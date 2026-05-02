@@ -3986,12 +3986,28 @@ const SessionWizard = ({
     return missing;
   };
 
+  const chipotleHookWorkerSecrets = useMemo<WorkerSecretsLike>(() => ({
+    litApiBase: workerSecrets.litApiBase,
+    litGroupId: workerSecrets.litGroupId,
+    litPkpId: workerSecrets.litPkpId,
+    litActionCid: workerSecrets.litActionCid,
+    litAccountApiKey: workerSecrets.litAccountApiKey,
+    litUsageApiKey: workerSecrets.litUsageApiKey,
+  }), [
+    workerSecrets.litAccountApiKey,
+    workerSecrets.litActionCid,
+    workerSecrets.litApiBase,
+    workerSecrets.litGroupId,
+    workerSecrets.litPkpId,
+    workerSecrets.litUsageApiKey,
+  ]);
+
   useEffect(() => {
     const previousHooks = getGlobalLitHooks();
     const chainId = Number(registryChainId || draft?.networkChainId || network?.id || 0) || null;
     const chipotle = resolveSessionWizardChipotleHookConfig({
       workerSecretsEnabled,
-      workerSecrets,
+      workerSecrets: chipotleHookWorkerSecrets,
       resolvedWorkerUrl: resolvedWorkerBaseUrlForDelegation,
       draft,
     });
@@ -4014,13 +4030,8 @@ const SessionWizard = ({
     provider,
     registryChainId,
     resolvedWorkerBaseUrlForDelegation,
+    chipotleHookWorkerSecrets,
     workerSecretsEnabled,
-    workerSecrets.litAccountApiKey,
-    workerSecrets.litActionCid,
-    workerSecrets.litApiBase,
-    workerSecrets.litGroupId,
-    workerSecrets.litPkpId,
-    workerSecrets.litUsageApiKey,
   ]);
 
   const clearWorkerSecretFields = () => {
