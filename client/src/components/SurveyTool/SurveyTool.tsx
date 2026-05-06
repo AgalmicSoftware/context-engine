@@ -7,15 +7,12 @@ import SurveyResults from './SurveyResults';
 import contractScripts, {
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
-import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import {
   listNamespaceEntriesSync,
   updateCacheAtomic,
 } from '../../utilities/cache/cacheScripts.js';
 import {
-  normalizeSessionSlugValue,
   resolveEffectiveSlug,
-  isSurveyToolFilterStateActive,
   getActiveSessionSlugFromProps,
   computeSubmitLabel,
   ensureQuestionsNet,
@@ -25,24 +22,60 @@ import {
   readQuestionsCacheAsync,
   writeSurveysCache,
   resolveSlugForIds,
-  serializeSurveyToolFilterState,
-  normalizeSurveyToolFilterState,
-  appendExplicitSessionHintToPath,
-  applyExistingGroupPrefix,
   surveyLog,
   resolveUpdateCacheContext,
   resolveSurveyReadContext,
   resolveEnsureQuestionCachedContext,
 } from './surveyToolUtils.js';
+import {
+  buildSurveyToolHydratedFilterState,
+  buildSurveyToolLoadingStatePatch,
+  buildSurveyToolPubKeyStatePatch,
+  buildSurveyToolQuestionsCacheNoncePatch,
+  buildSurveyToolFilterStateUrlPath,
+  buildSurveyToolResultsModalStatePatch,
+  buildSurveyToolSurveyListStatePatch,
+  buildSurveyToolSurveyListFromBag,
+  findSurveyInAllSurveyCaches,
+  getInitialCacheState,
+  getNormalizedSurveyIdFromPropsValue,
+  getResolvedSurveyToolPropsFromProps,
+  getSurveyToolSessionPropFromProps,
+  resolveSurveyToolResultsModalCloseState,
+  resolveSurveyToolRenderMode,
+  resolveSurveyToolSelectorRenderState,
+  shouldBumpSurveyToolQuestionsCacheNonce,
+  shouldFetchSurveyToolSurveysOnPropsChange,
+  shouldOpenSurveyToolResultsOnPropsChange,
+  shouldRouteSurveyToolMountToQuestions,
+} from './surveyToolTopLevelHelpers';
 import { SurveySelector } from './SurveySelector';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
 
-const cs = contractScripts as Record<string, any>;
+type SurveyToolRecord = Record<string, unknown>;
+type SurveyToolQuestionDataRecord = SurveyToolRecord & {
+  creator?: unknown;
+  id?: unknown;
+  tags?: unknown;
+};
+type SurveyToolSurveyDataRecord = SurveyToolRecord & {
+  creator?: unknown;
+  id?: unknown;
+  questionIDs?: unknown[];
+  surveyID?: unknown;
+  title?: unknown;
+};
+type SurveyToolContractScripts = Record<string, unknown> & {
+  getSurveyDataById: (...args: unknown[]) => Promise<unknown>;
+  getQuestionData: (...args: unknown[]) => Promise<SurveyToolQuestionDataRecord | null | undefined>;
+};
+
+const cs = contractScripts as unknown as SurveyToolContractScripts;
 
 type SurveyToolProps = {
   minifiedMode?: string;
-  filterState?: any;
+  filterState?: unknown;
   autoOpenResults?: boolean;
   singleQuestionMode?: boolean;
   questionID?: string;
@@ -52,7 +85,7 @@ type SurveyToolProps = {
   sessionSlug?: string;
   sessionSlugPinned?: boolean;
   account?: string;
-  provider?: any;
+  provider?: unknown;
   loginComplete?: boolean;
   loginInProgress?: boolean;
   network?: { id?: number; chainId?: number; name?: string };
@@ -60,13 +93,13 @@ type SurveyToolProps = {
   networkLatestBlock?: number;
   sbtCacheRevision?: number;
   toggleLoginModal?: () => void;
-  refreshSurveyResponsesByID?: (...args: any[]) => any;
-  refreshQuestionMetadata?: (...args: any[]) => any;
-  refreshQuestionResponses?: (...args: any[]) => any;
-  defaultTags?: any[];
-  defaultFeaturedSBTs?: any[];
-  defaultFilterState?: any;
-  onFilterChange?: (...args: any[]) => any;
+  refreshSurveyResponsesByID?: (...args: unknown[]) => unknown;
+  refreshQuestionMetadata?: (...args: unknown[]) => unknown;
+  refreshQuestionResponses?: (...args: unknown[]) => unknown;
+  defaultTags?: unknown[];
+  defaultFeaturedSBTs?: unknown[];
+  defaultFilterState?: unknown;
+  onFilterChange?: (...args: unknown[]) => unknown;
   onResultsModalClose?: () => void;
   preventUrlChange?: boolean;
   miniMode?: boolean;
@@ -75,94 +108,135 @@ type SurveyToolProps = {
   isResponsesCacheReady?: boolean;
   isSurveyCacheReady?: boolean;
   isSBTCacheReady?: boolean;
-  questionScanProgress?: any;
+  questionScanProgress?: unknown;
   questionResponsesNonce?: number;
-  sessionInfo?: any;
+  sessionInfo?: unknown;
   sessionName?: string;
   displayAnswerMode?: boolean;
   viewAddress?: string;
-  lit?: any;
-  litHooks?: any;
-  [key: string]: any;
+  lit?: unknown;
+  litHooks?: unknown;
+  [key: string]: unknown;
+};
+
+type SurveyToolLitHookSource = {
+  getKey?: unknown;
+};
+type SurveyToolWindowWithLitHooks = Window & {
+  __litHooks?: unknown;
+  litHooks?: unknown;
+};
+type SurveyToolQuestionsCacheNonceState = Record<string, unknown> & {
+  questionsCacheNonce?: unknown;
+};
+type SurveyToolEnsureQuestionContext = Record<string, unknown> & {
+  sessionName?: unknown;
+};
+type SurveyToolCacheState = ReturnType<typeof getInitialCacheState> & SurveyToolRecord;
+type SurveyToolCachePatch = SurveyToolRecord & {
+  surveyResponses?: Record<string, unknown>;
+  surveyResponsesLatestBlock?: Record<string, unknown>;
+  surveys?: Record<string, unknown>;
+};
+type SurveyToolLegacyCacheState = {
+  cache?: unknown;
+};
+type SurveyToolLegacyState = SurveyToolLegacyCacheState & SurveyToolRecord & {
+  cache: SurveyToolCacheState;
+  hydratedFilterState: unknown;
+  loading: boolean;
+  pubKey: string;
+  questionsCacheNonce: number;
+  showResultsModal: boolean;
+  surveys?: unknown[];
+};
+type SurveyToolSetStateInput =
+  | SurveyToolRecord
+  | null
+  | undefined
+  | ((state: SurveyToolLegacyState, props: SurveyToolProps) => unknown);
+type SurveyToolSurveyFetchContext = {
+  netIdStr?: unknown;
+  slug?: unknown;
+};
+type SurveyToolQuestionRefTarget = {
+  handlePrimarySubmitClick?: () => void;
+  state?: {
+    isSubmitting?: unknown;
+  };
+};
+type SurveyToolCacheUpdaterFn = (cache: unknown) => unknown;
+type SurveyToolCacheUpdater = (updater: unknown, cb?: () => void) => unknown;
+type SurveyToolQuestionCacheEnsurer = (questionId: unknown, ctx?: SurveyToolEnsureQuestionContext) => unknown;
+type SurveyToolFilterStateUrlUpdater = (newFilterState: unknown) => unknown;
+type SurveyToolLegacyInstance = {
+  _lastSurveysCtx: SurveyToolSurveyFetchContext;
+  _surveyToolFetchEpoch: number;
+  closeResultsModal: () => void;
+  componentDidMount: () => Promise<void>;
+  componentDidUpdate: (prevProps: SurveyToolProps) => void;
+  componentWillUnmount: () => void;
+  ensureQuestionCached: (questionId: unknown, ctx?: SurveyToolEnsureQuestionContext) => Promise<void>;
+  fetchSurveys: () => Promise<void>;
+  findSurveyInAllCaches: (surveyID: unknown) => ReturnType<typeof findSurveyInAllSurveyCaches>;
+  getNormalizedSurveyIdFromProps: () => ReturnType<typeof getNormalizedSurveyIdFromPropsValue>;
+  getResolvedSurveyToolProps: () => SurveyToolProps;
+  getSurveyData: (surveyID: unknown) => Promise<SurveyToolSurveyDataRecord | null>;
+  getSurveyToolSessionProp: () => ReturnType<typeof getSurveyToolSessionPropFromProps>;
+  handleHeaderSubmitClick: () => void;
+  handleTopLevelFilterStateUrlUpdate: SurveyToolFilterStateUrlUpdater;
+  loadInitialData: () => Promise<void>;
+  props: SurveyToolProps;
+  render: () => ReturnType<typeof renderSurveyToolContent>;
+  setState: (next: SurveyToolSetStateInput, cb?: () => void) => unknown;
+  state: SurveyToolLegacyState;
+  surveyQuestionsRef: { current: SurveyToolQuestionRefTarget | null };
+  updateCache: SurveyToolCacheUpdater;
+  updatePubKey: (newPubKey: string) => void;
+  updateSelectedSurvey?: () => void;
 };
 
 type SurveyToolRenderArgs = {
   props: SurveyToolProps;
-  cache: any;
+  cache: unknown;
   showResultsModal: boolean;
   pubKey: string;
   questionsCacheNonce: number;
-  hydratedFilterState: any;
-  updateCache: (...args: any[]) => any;
+  hydratedFilterState: unknown;
+  updateCache: SurveyToolCacheUpdater;
   updatePubKey: (newPubKey: string) => void;
-  ensureQuestionCached: (...args: any[]) => any;
+  ensureQuestionCached: SurveyToolQuestionCacheEnsurer;
   closeResultsModal: () => void;
-  handleTopLevelFilterStateUrlUpdate: (...args: any[]) => any;
-};
-
-const getInitialCacheState = () => ({
-  surveyIDs: [],
-  questionIDs: [],
-  questionResponses: {},
-  arweaveContent: {},
-});
-
-const getSurveyToolSessionPropFromProps = (props: SurveyToolProps) => {
-  if (typeof props.sessionSlug === 'string') return normalizeSessionSlugValue(props.sessionSlug);
-  return undefined;
-};
-
-const getResolvedSurveyToolPropsFromProps = (props: SurveyToolProps) => {
-  const sessionSlug = getSurveyToolSessionPropFromProps(props);
-  if (typeof sessionSlug === 'undefined') return props;
-  return {
-    ...props,
-    sessionSlug,
-  };
-};
-
-const getNormalizedSurveyIdFromPropsValue = (props: SurveyToolProps) => {
-  const { surveyId, surveyID } = props;
-  const rawId = surveyId || surveyID;
-  return rawId ? String(rawId).trim().toLowerCase() : null;
+  handleTopLevelFilterStateUrlUpdate: SurveyToolFilterStateUrlUpdater;
 };
 
 const buildHydratedFilterState = (props: SurveyToolProps) => {
-  let urlFilterState = null;
-  const isPile = props.minifiedMode === 'pile';
-  const hasPropFilter = isSurveyToolFilterStateActive(props.filterState);
+  if (typeof window === 'undefined') return null;
 
-  if (!isPile && !hasPropFilter && typeof window !== 'undefined') {
+  const { filterState, cleanUrl, error } = buildSurveyToolHydratedFilterState({
+    props,
+    href: window.location.href,
+  });
+
+  if (error) {
+    surveyLog.error("SurveyTool: Error hydrating filter state from URL", error);
+    return filterState;
+  }
+
+  if (cleanUrl) {
     try {
-      const url = new URL(window.location.href);
-      const filterParam = url.searchParams.get('filter');
-      if (filterParam) {
-        urlFilterState = normalizeSurveyToolFilterState(deserializeFilterState(filterParam));
-        url.searchParams.delete('filter');
-        window.history.replaceState({}, '', url.toString());
-      }
+      window.history.replaceState({}, '', cleanUrl);
     } catch (e) {
       surveyLog.error("SurveyTool: Error hydrating filter state from URL", e);
     }
   }
 
-  return urlFilterState;
+  return filterState;
 };
 
-const updateFilterStateUrlForProps = (props: SurveyToolProps, newFilterState: any) => {
+const updateFilterStateUrlForProps = (props: SurveyToolProps, newFilterState: unknown) => {
   if (typeof window === 'undefined') return;
-  const serializedState = serializeSurveyToolFilterState(newFilterState);
-  const normalizedSurveyId = getNormalizedSurveyIdFromPropsValue(props);
-  const slug = resolveEffectiveSlug(getResolvedSurveyToolPropsFromProps(props)) || '';
-  let newPath = normalizedSurveyId
-    ? `/survey/${normalizedSurveyId}/results`
-    : `/questions/results`;
-
-  if (serializedState) {
-    newPath += `?filter=${serializedState}`;
-  }
-  newPath = appendExplicitSessionHintToPath(newPath, slug);
-  newPath = applyExistingGroupPrefix(newPath);
+  const newPath = buildSurveyToolFilterStateUrlPath(props, newFilterState);
 
   if (!props.preventUrlChange) {
     const currentUrl = `${window.location.pathname}${window.location.search || ''}`;
@@ -170,6 +244,18 @@ const updateFilterStateUrlForProps = (props: SurveyToolProps, newFilterState: an
       window.history.replaceState({}, '', newPath);
     }
   }
+};
+
+const getSurveyToolWindowLitHooks = (): unknown => {
+  if (typeof window === 'undefined') return null;
+  const surveyToolWindow = window as SurveyToolWindowWithLitHooks;
+  return surveyToolWindow.__litHooks || surveyToolWindow.litHooks || null;
+};
+
+const getSurveyToolLitGetKey = (litHooks: unknown): ((...args: unknown[]) => unknown) | null => {
+  if (!litHooks || (typeof litHooks !== 'object' && typeof litHooks !== 'function')) return null;
+  const getKey = (litHooks as SurveyToolLitHookSource).getKey;
+  return typeof getKey === 'function' ? getKey as (...args: unknown[]) => unknown : null;
 };
 
 const renderSurveyToolContent = ({
@@ -187,8 +273,12 @@ const renderSurveyToolContent = ({
 }: SurveyToolRenderArgs) => {
   const activeSessionSlug = getActiveSessionSlugFromProps(props);
   const toolSessionSlug = getSurveyToolSessionPropFromProps(props);
+  const renderModeState = resolveSurveyToolRenderMode({
+    minifiedMode: props.minifiedMode,
+    singleQuestionMode: props.singleQuestionMode,
+  });
 
-  if (props.minifiedMode === 'pile') {
+  if (renderModeState.shouldRenderPileMode) {
     return (
       <PileViewMode
         {...props}
@@ -206,7 +296,7 @@ const renderSurveyToolContent = ({
     );
   }
 
-  if (props.singleQuestionMode) {
+  if (renderModeState.shouldRenderSingleQuestionMode) {
     return (
       <div id={styles.surveySelectorRow}>
         <SurveyQuestions
@@ -216,6 +306,8 @@ const renderSurveyToolContent = ({
           toggleLoginModal={props.toggleLoginModal}
           account={props.account}
           provider={props.provider}
+          lit={props.lit}
+          litHooks={props.litHooks}
           loginComplete={props.loginComplete}
           loginInProgress={props.loginInProgress}
           network={props.network}
@@ -244,24 +336,21 @@ const renderSurveyToolContent = ({
     );
   }
 
-  const { surveyId, surveyID } = props;
-  if (
-    surveyId &&
-    surveyID &&
-    String(surveyId).trim().toLowerCase() !== String(surveyID).trim().toLowerCase()
-  ) {
-    if (process.env.NODE_ENV !== 'production') {
-      surveyLog.warn(
-        `[SurveyTool] Both surveyId and surveyID props were provided with different values. Preferring surveyId: "${surveyId}" over surveyID: "${surveyID}"`
-      );
-    }
-  }
-  const rawId = surveyId || surveyID;
-  const normalizedSurveyId = rawId ? String(rawId).trim().toLowerCase() : null;
+  const selectorRenderState = resolveSurveyToolSelectorRenderState({
+    props,
+    hydratedFilterState,
+  });
+  const {
+    normalizedSurveyId,
+    effectiveFilterState,
+    shouldWarnMismatchedSurveyIds,
+    mismatchedSurveyIdWarning,
+  } = selectorRenderState;
 
-  let effectiveFilterState = normalizeSurveyToolFilterState(props.filterState);
-  if (!serializeSurveyToolFilterState(effectiveFilterState)) {
-    effectiveFilterState = normalizeSurveyToolFilterState(hydratedFilterState || {});
+  if (shouldWarnMismatchedSurveyIds) {
+    if (process.env.NODE_ENV !== 'production') {
+      surveyLog.warn(mismatchedSurveyIdWarning);
+    }
   }
 
   return (
@@ -274,6 +363,8 @@ const renderSurveyToolContent = ({
         toggleLoginModal={props.toggleLoginModal}
         account={props.account}
         provider={props.provider}
+        lit={props.lit}
+        litHooks={props.litHooks}
         loginComplete={props.loginComplete}
         loginInProgress={props.loginInProgress}
         network={props.network}
@@ -311,6 +402,8 @@ const renderSurveyToolContent = ({
         isOpen={showResultsModal}
         onClose={closeResultsModal}
         provider={props.provider}
+        lit={props.lit}
+        litHooks={props.litHooks}
         network={props.network}
         networkChainId={props.networkChainId}
         sbtCacheRevision={props.sbtCacheRevision}
@@ -344,26 +437,12 @@ const renderSurveyToolContent = ({
   );
 };
 
-const findSurveyInAllCaches = (surveyID: any) => {
-  if (!surveyID) return null;
-  const sid = String(surveyID).toLowerCase();
-
-  const entries = listNamespaceEntriesSync('surveysCache', { cloneValues: false });
-  for (const entry of entries) {
-    const slug = String(entry?.slug || '');
-    const cache = (entry?.value && typeof entry.value === 'object') ? entry.value : {};
-    for (const netKey in cache) {
-      if (cache[netKey]?.surveys?.[sid]) {
-        const foundData = cache[netKey].surveys[sid];
-        return { data: foundData, foundSlug: slug };
-      }
-    }
-  }
-  return null;
+const findSurveyInAllCaches = (surveyID: unknown) => {
+  return findSurveyInAllSurveyCaches(surveyID, listNamespaceEntriesSync);
 };
 
 const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
-  const instance: any = {
+  const instance = {
     props,
     state: {
       cache: getInitialCacheState(),
@@ -378,12 +457,14 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     surveyQuestionsRef: { current: null },
     _surveyToolFetchEpoch: 0,
     _lastSurveysCtx: {},
-  };
+  } as unknown as SurveyToolLegacyInstance;
 
-  instance.setState = (next: any, cb?: () => void) => {
-    const patch = typeof next === 'function' ? next(instance.state, instance.props) : next;
+  instance.setState = (next: SurveyToolSetStateInput, cb?: () => void) => {
+    const patch = typeof next === 'function'
+      ? next(instance.state as SurveyToolLegacyState, instance.props)
+      : next;
     if (patch && typeof patch === 'object') {
-      instance.state = { ...instance.state, ...patch };
+      instance.state = { ...instance.state, ...patch as SurveyToolRecord };
     }
     if (typeof cb === 'function') cb();
     return patch;
@@ -401,59 +482,43 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
   };
 
   instance.updatePubKey = (newPubKey: string) => {
-    instance.setState({ pubKey: newPubKey });
+    instance.setState(buildSurveyToolPubKeyStatePatch({ pubKey: newPubKey }));
   };
 
   instance.getNormalizedSurveyIdFromProps = () => getNormalizedSurveyIdFromPropsValue(instance.props);
 
-  instance.handleTopLevelFilterStateUrlUpdate = (newFilterState: any) => {
+  instance.handleTopLevelFilterStateUrlUpdate = (newFilterState: unknown) => {
     updateFilterStateUrlForProps(instance.props, newFilterState);
   };
 
-  instance.findSurveyInAllCaches = (surveyID: any) => findSurveyInAllCaches(surveyID);
+  instance.findSurveyInAllCaches = (surveyID: unknown) => findSurveyInAllCaches(surveyID);
 
   instance.componentDidMount = async () => {
-    if (
-      !window.location.pathname.includes('/survey/') &&
-      !window.location.pathname.includes('/question/') &&
-      !window.location.pathname.includes('/questions') &&
-      !window.location.pathname.includes('/surveys')
-    ) {
-      if (instance.props.minifiedMode !== 'pile' && !instance.props.preventUrlChange && !instance.props.miniMode) {
-        window.history.pushState({}, '', '/questions');
-      }
+    if (shouldRouteSurveyToolMountToQuestions({
+      pathname: window.location.pathname,
+      props: instance.props,
+    })) {
+      window.history.pushState({}, '', '/questions');
     }
 
     instance.fetchSurveys();
   };
 
   instance.componentDidUpdate = (prevProps: SurveyToolProps) => {
-    if (
-      prevProps.network?.id !== instance.props.network?.id ||
-      (prevProps.isSurveyCacheReady !== instance.props.isSurveyCacheReady && instance.props.isSurveyCacheReady)
-    ) {
+    if (shouldFetchSurveyToolSurveysOnPropsChange({ prevProps, props: instance.props })) {
       instance.fetchSurveys();
     }
 
-    if (instance.props.autoOpenResults && !prevProps.autoOpenResults && !instance.state.showResultsModal) {
-      instance.setState({ showResultsModal: true });
+    if (shouldOpenSurveyToolResultsOnPropsChange({
+      prevProps,
+      props: instance.props,
+      showResultsModal: instance.state.showResultsModal,
+    })) {
+      instance.setState(buildSurveyToolResultsModalStatePatch({ open: true }));
     }
 
-    const questionCacheReadyChanged =
-      prevProps.isQuestionCacheReady !== instance.props.isQuestionCacheReady;
-    const responsesCacheReadyChanged =
-      prevProps.isResponsesCacheReady !== instance.props.isResponsesCacheReady;
-    const questionResponsesNonceChanged =
-      prevProps.questionResponsesNonce !== instance.props.questionResponsesNonce;
-    const networkChanged = prevProps.network?.id !== instance.props.network?.id;
-
-    if (
-      (questionCacheReadyChanged && instance.props.isQuestionCacheReady) ||
-      (responsesCacheReadyChanged && instance.props.isResponsesCacheReady) ||
-      questionResponsesNonceChanged ||
-      networkChanged
-    ) {
-      instance.setState((prev: any) => ({ questionsCacheNonce: prev.questionsCacheNonce + 1 }));
+    if (shouldBumpSurveyToolQuestionsCacheNonce({ prevProps, props: instance.props })) {
+      instance.setState((prev: SurveyToolQuestionsCacheNonceState) => buildSurveyToolQuestionsCacheNoncePatch(prev));
     }
   };
 
@@ -461,18 +526,20 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
 
   instance.closeResultsModal = () => {
     const hasExternalCloseHandler = typeof instance.props.onResultsModalClose === 'function';
-    let oldPath = window.location.pathname;
-    if (oldPath.endsWith('/results') && !hasExternalCloseHandler) {
-      const trimmed = oldPath.slice(0, oldPath.length - '/results'.length);
-      window.history.pushState({}, '', trimmed);
+    const closeState = resolveSurveyToolResultsModalCloseState({
+      pathname: window.location.pathname,
+      hasExternalCloseHandler,
+    });
+    if (closeState.shouldTrimResultsPath) {
+      window.history.pushState({}, '', closeState.nextPathname);
     }
-    instance.setState({ showResultsModal: false });
-    if (hasExternalCloseHandler) {
+    instance.setState(buildSurveyToolResultsModalStatePatch({ open: false }));
+    if (closeState.shouldCallExternalCloseHandler && typeof instance.props.onResultsModalClose === 'function') {
       instance.props.onResultsModalClose();
     }
   };
 
-  instance.getSurveyData = async (surveyID: any) => {
+  instance.getSurveyData = async (surveyID: unknown) => {
     if (instance.props.singleQuestionMode) {
       return null;
     }
@@ -486,13 +553,13 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
 
     surveyLog.log(`[SurveyTool] Getting data for ${loweredSurveyID} in context: ${effectiveSlug} (Chain: ${netIdStr})`);
 
-    let surveyData: any = null;
+    let surveyData: SurveyToolSurveyDataRecord | null = null;
 
     if (netIdStr) {
       const surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
 
       if (surveysCache[netIdStr]?.surveys?.[loweredSurveyID]) {
-        surveyData = surveysCache[netIdStr].surveys[loweredSurveyID];
+        surveyData = surveysCache[netIdStr].surveys[loweredSurveyID] as SurveyToolSurveyDataRecord;
       }
     }
 
@@ -500,14 +567,14 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
       const found = instance.findSurveyInAllCaches(loweredSurveyID);
       if (found) {
         surveyLog.log(`[SurveyTool] Found survey ${loweredSurveyID} cached in different group: '${found.foundSlug}'. Using cached data.`);
-        surveyData = found.data;
+        surveyData = found.data as SurveyToolSurveyDataRecord;
       }
     }
 
     if (!surveyData && netIdStr) {
       surveyLog.log(`[SurveyTool] Cache miss. Fetching from chain for ${effectiveSlug}...`);
       try {
-        surveyData = await cs.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug);
+        surveyData = await cs.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug) as SurveyToolSurveyDataRecord | null;
 
         if (surveyData) {
           surveyData.surveyID = loweredSurveyID;
@@ -538,7 +605,7 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     const requestEpoch = (Number(instance._surveyToolFetchEpoch || 0) + 1);
     instance._surveyToolFetchEpoch = requestEpoch;
     if (!instance.state.loading) {
-      instance.setState({ loading: true });
+      instance.setState(buildSurveyToolLoadingStatePatch({ loading: true }));
     }
 
     const resolvedProps = instance.getResolvedSurveyToolProps();
@@ -549,7 +616,7 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     if (!netIdStr) {
       if (requestEpoch !== instance._surveyToolFetchEpoch) return;
       surveyLog.error('SurveySelector: Network ID is undefined in fetchSurveys.');
-      instance.setState({ surveys: [], loading: false });
+      instance.setState(buildSurveyToolSurveyListStatePatch());
       return;
     }
 
@@ -567,52 +634,36 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     if (!surveyBag || Object.keys(surveyBag).length === 0) {
       if (prevCount > 0 && !ctxChanged) {
         if (requestEpoch !== instance._surveyToolFetchEpoch) return;
-        instance.setState({ loading: false }, instance.updateSelectedSurvey);
+        instance.setState(buildSurveyToolLoadingStatePatch(), instance.updateSelectedSurvey);
         return;
       }
       if (requestEpoch !== instance._surveyToolFetchEpoch) return;
-      instance.setState({ surveys: [], loading: false }, instance.updateSelectedSurvey);
+      instance.setState(buildSurveyToolSurveyListStatePatch(), instance.updateSelectedSurvey);
       instance._lastSurveysCtx = { slug: effectiveSlug, netIdStr };
       return;
     }
 
-    const next: any[] = [];
-    const seen = new Set();
-
-    for (const sid of Object.keys(surveyBag)) {
-      const sData = surveyBag[sid];
-      if (!sData || !sData.title || !Array.isArray(sData.questionIDs)) continue;
-
-      const qids = (sData.questionIDs || []).map((q: any) => String(q || '').toLowerCase());
-      if (qids.length === 0) continue;
-
-      if (!sData.id) sData.id = sData.surveyID || sid;
-      const lowered = String(sData.id || sid).toLowerCase();
-      if (!seen.has(lowered)) {
-        seen.add(lowered);
-        next.push(sData);
-      }
-    }
+    const next = buildSurveyToolSurveyListFromBag(surveyBag);
 
     if (next.length === 0 && prevCount > 0 && !ctxChanged) {
       if (requestEpoch !== instance._surveyToolFetchEpoch) return;
-      instance.setState({ loading: false }, instance.updateSelectedSurvey);
+      instance.setState(buildSurveyToolLoadingStatePatch(), instance.updateSelectedSurvey);
       return;
     }
 
     const warming = (!instance.props.isSurveyCacheReady || !instance.props.isQuestionCacheReady);
     if (next.length < prevCount && !ctxChanged && warming) {
       if (requestEpoch !== instance._surveyToolFetchEpoch) return;
-      instance.setState({ loading: false }, instance.updateSelectedSurvey);
+      instance.setState(buildSurveyToolLoadingStatePatch(), instance.updateSelectedSurvey);
       return;
     }
 
     if (requestEpoch !== instance._surveyToolFetchEpoch) return;
-    instance.setState({ surveys: next, loading: false }, instance.updateSelectedSurvey);
+    instance.setState(buildSurveyToolSurveyListStatePatch({ surveys: next }), instance.updateSelectedSurvey);
     instance._lastSurveysCtx = { slug: effectiveSlug, netIdStr };
   };
 
-  instance.ensureQuestionCached = async (questionId: any, ctx: any = {}) => {
+  instance.ensureQuestionCached = async (questionId: unknown, ctx: SurveyToolEnsureQuestionContext = {}) => {
     const resolvedProps = instance.getResolvedSurveyToolProps();
     const currentSlug = resolveEffectiveSlug(resolvedProps);
     const currentCacheContext = resolveEnsureQuestionCachedContext(resolvedProps, currentSlug);
@@ -644,14 +695,15 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
       const litHooks =
         resolvedProps.lit ||
         resolvedProps.litHooks ||
-        (typeof window !== 'undefined' ? ((window as any).__litHooks || (window as any).litHooks) : null);
+        getSurveyToolWindowLitHooks();
+      const litGetKey = getSurveyToolLitGetKey(litHooks);
       const decryptContext = {
         account: resolvedProps.account || '',
         providerLike: resolvedProps.provider || '',
         chainId: currentCacheContext.networkId || null,
         litHooks,
-        litOpts: litHooks && typeof litHooks.getKey === 'function'
-          ? { getKey: litHooks.getKey }
+        litOpts: litGetKey
+          ? { getKey: litGetKey }
           : null,
       };
 
@@ -678,9 +730,9 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
         if (!questionData.creator) questionData.creator = "";
         if (!questionData.tags) questionData.tags = [];
 
-        const persistedCache = await updateCacheAtomic('questionsCache', currentSlug, (current: any) => {
+        const persistedCache = await updateCacheAtomic('questionsCache', currentSlug, (current: unknown) => {
           const nextCache = ensureQuestionsNet(
-            (current && typeof current === 'object') ? current : {},
+            (current && typeof current === 'object') ? current as SurveyToolRecord : {},
             netIdStr
           );
           nextCache[netIdStr].questions[qIdLower] = questionData;
@@ -695,18 +747,19 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
             questionId: qIdLower,
           });
         }
-        instance.setState((prevState: any) => ({ questionsCacheNonce: prevState.questionsCacheNonce + 1 }));
+        instance.setState((prevState: SurveyToolQuestionsCacheNonceState) => buildSurveyToolQuestionsCacheNoncePatch(prevState));
       } else {
         surveyLog.warn(`SurveyTool: Question data not found on chain for ID: ${qIdLower}`);
       }
     }
   };
 
-  instance.updateCache = (updater: any, cb?: () => void) => {
+  instance.updateCache = (updater: unknown, cb?: () => void) => {
     if (typeof updater !== 'function') {
       surveyLog.error('updateCache expects a function; got:', updater);
       return;
     }
+    const updateCacheFn = updater as SurveyToolCacheUpdaterFn;
     const resolvedProps = instance.getResolvedSurveyToolProps();
     const slug = resolveEffectiveSlug(resolvedProps);
     const updateCacheContext = resolveUpdateCacheContext(resolvedProps, slug);
@@ -714,21 +767,21 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     const netIdStr = updateCacheContext.networkIdStr;
 
     instance.setState(
-      (prev: any) => {
-        const newCache = updater(prev.cache || {});
+      (prev: SurveyToolLegacyCacheState) => {
+        const newCache = updateCacheFn(prev.cache || {}) as SurveyToolCachePatch;
         if (netIdStr) {
           try {
             const global = ensureSurveysNet(readSurveysCache(effectiveSlug), netIdStr);
             const net = global[netIdStr];
 
             if (newCache.surveys) {
-              net.surveys = { ...net.surveys, ...newCache.surveys };
+              net.surveys = { ...net.surveys, ...newCache.surveys } as typeof net.surveys;
             }
             if (newCache.surveyResponses) {
               net.surveyResponses = {
                 ...net.surveyResponses,
                 ...newCache.surveyResponses,
-              };
+              } as typeof net.surveyResponses;
             }
             if (newCache.surveyResponsesLatestBlock) {
               net.surveyResponsesLatestBlock = {
@@ -768,20 +821,20 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
   const propsRef = useRef(props);
   propsRef.current = props;
 
-  const [cache, setCache] = useState(getInitialCacheState);
+  const [cache, setCache] = useState<SurveyToolCacheState>(getInitialCacheState);
   const [showResultsModal, setShowResultsModal] = useState(props.autoOpenResults || false);
   const [pubKey, setPubKey] = useState('');
   const [questionsCacheNonce, setQuestionsCacheNonce] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [surveys, setSurveys] = useState<any[]>();
+  const [surveys, setSurveys] = useState<unknown[]>();
   const [hydratedFilterState] = useState(() => buildHydratedFilterState(props));
   const [cacheCallbackTick, setCacheCallbackTick] = useState(0);
 
-  const surveyQuestionsRef = useRef<any>(null);
+  const surveyQuestionsRef = useRef<SurveyToolQuestionRefTarget | null>(null);
   const _surveyToolFetchEpoch = useRef(0);
-  const _lastSurveysCtx = useRef<any>({});
+  const _lastSurveysCtx = useRef<SurveyToolSurveyFetchContext>({});
   const loadingRef = useRef(loading);
-  const surveysRef = useRef<any[] | undefined>(surveys);
+  const surveysRef = useRef<unknown[] | undefined>(surveys);
   const showResultsModalRef = useRef(showResultsModal);
   const pendingUpdateCacheCallbacksRef = useRef<Array<() => void>>([]);
   const didRunFetchUpdateEffectRef = useRef(false);
@@ -812,11 +865,11 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
 
   const getNormalizedSurveyIdFromProps = () => getNormalizedSurveyIdFromPropsValue(propsRef.current);
 
-  const handleTopLevelFilterStateUrlUpdate = useCallback((newFilterState: any) => {
+  const handleTopLevelFilterStateUrlUpdate = useCallback((newFilterState: unknown) => {
     updateFilterStateUrlForProps(propsRef.current, newFilterState);
   }, []);
 
-  const getSurveyData = async (surveyID: any) => {
+  const getSurveyData = async (surveyID: unknown) => {
     const currentProps = propsRef.current;
     if (currentProps.singleQuestionMode) {
       return null;
@@ -831,13 +884,13 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
 
     surveyLog.log(`[SurveyTool] Getting data for ${loweredSurveyID} in context: ${effectiveSlug} (Chain: ${netIdStr})`);
 
-    let surveyData: any = null;
+    let surveyData: SurveyToolSurveyDataRecord | null = null;
 
     if (netIdStr) {
       const surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
 
       if (surveysCache[netIdStr]?.surveys?.[loweredSurveyID]) {
-        surveyData = surveysCache[netIdStr].surveys[loweredSurveyID];
+        surveyData = surveysCache[netIdStr].surveys[loweredSurveyID] as SurveyToolSurveyDataRecord;
       }
     }
 
@@ -845,14 +898,14 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       const found = findSurveyInAllCaches(loweredSurveyID);
       if (found) {
         surveyLog.log(`[SurveyTool] Found survey ${loweredSurveyID} cached in different group: '${found.foundSlug}'. Using cached data.`);
-        surveyData = found.data;
+        surveyData = found.data as SurveyToolSurveyDataRecord;
       }
     }
 
     if (!surveyData && netIdStr) {
       surveyLog.log(`[SurveyTool] Cache miss. Fetching from chain for ${effectiveSlug}...`);
       try {
-        surveyData = await cs.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug);
+        surveyData = await cs.getSurveyDataById(resolvedProps.provider, loweredSurveyID, effectiveSlug) as SurveyToolSurveyDataRecord | null;
 
         if (surveyData) {
           surveyData.surveyID = loweredSurveyID;
@@ -919,23 +972,7 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       return;
     }
 
-    const next: any[] = [];
-    const seen = new Set();
-
-    for (const sid of Object.keys(surveyBag)) {
-      const sData = surveyBag[sid];
-      if (!sData || !sData.title || !Array.isArray(sData.questionIDs)) continue;
-
-      const qids = (sData.questionIDs || []).map((q: any) => String(q || '').toLowerCase());
-      if (qids.length === 0) continue;
-
-      if (!sData.id) sData.id = sData.surveyID || sid;
-      const lowered = String(sData.id || sid).toLowerCase();
-      if (!seen.has(lowered)) {
-        seen.add(lowered);
-        next.push(sData);
-      }
-    }
+    const next = buildSurveyToolSurveyListFromBag(surveyBag);
 
     if (next.length === 0 && prevCount > 0 && !ctxChanged) {
       if (requestEpoch !== _surveyToolFetchEpoch.current) return;
@@ -957,7 +994,7 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     _lastSurveysCtx.current = { slug: effectiveSlug, netIdStr };
   }, []);
 
-  const ensureQuestionCached = useCallback(async (questionId: any, ctx: any = {}) => {
+  const ensureQuestionCached = useCallback(async (questionId: unknown, ctx: SurveyToolEnsureQuestionContext = {}) => {
     const resolvedProps = getResolvedSurveyToolProps();
     const currentSlug = resolveEffectiveSlug(resolvedProps);
     const currentCacheContext = resolveEnsureQuestionCachedContext(resolvedProps, currentSlug);
@@ -989,14 +1026,15 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       const litHooks =
         resolvedProps.lit ||
         resolvedProps.litHooks ||
-        (typeof window !== 'undefined' ? ((window as any).__litHooks || (window as any).litHooks) : null);
+        getSurveyToolWindowLitHooks();
+      const litGetKey = getSurveyToolLitGetKey(litHooks);
       const decryptContext = {
         account: resolvedProps.account || '',
         providerLike: resolvedProps.provider || '',
         chainId: currentCacheContext.networkId || null,
         litHooks,
-        litOpts: litHooks && typeof litHooks.getKey === 'function'
-          ? { getKey: litHooks.getKey }
+        litOpts: litGetKey
+          ? { getKey: litGetKey }
           : null,
       };
 
@@ -1023,9 +1061,9 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
         if (!questionData.creator) questionData.creator = "";
         if (!questionData.tags) questionData.tags = [];
 
-        const persistedCache = await updateCacheAtomic('questionsCache', currentSlug, (current: any) => {
+        const persistedCache = await updateCacheAtomic('questionsCache', currentSlug, (current: unknown) => {
           const nextCache = ensureQuestionsNet(
-            (current && typeof current === 'object') ? current : {},
+            (current && typeof current === 'object') ? current as SurveyToolRecord : {},
             netIdStr
           );
           nextCache[netIdStr].questions[qIdLower] = questionData;
@@ -1047,19 +1085,20 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     }
   }, []);
 
-  const updateCache = useCallback((updater: any, cb?: () => void) => {
+  const updateCache = useCallback((updater: unknown, cb?: () => void) => {
     if (typeof updater !== 'function') {
       surveyLog.error('updateCache expects a function; got:', updater);
       return;
     }
+    const updateCacheFn = updater as SurveyToolCacheUpdaterFn;
     const resolvedProps = getResolvedSurveyToolProps();
     const slug = resolveEffectiveSlug(resolvedProps);
     const updateCacheContext = resolveUpdateCacheContext(resolvedProps, slug);
     const effectiveSlug = updateCacheContext.sessionSlug || slug;
     const netIdStr = updateCacheContext.networkIdStr;
 
-    setCache((prevCache: any) => {
-      const newCache = updater(prevCache || {});
+    setCache((prevCache) => {
+      const newCache = updateCacheFn(prevCache || {}) as SurveyToolCachePatch;
       if (typeof cb === 'function') {
         pendingUpdateCacheCallbacksRef.current.push(cb);
       }
@@ -1069,13 +1108,13 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
           const net = global[netIdStr];
 
           if (newCache.surveys) {
-            net.surveys = { ...net.surveys, ...newCache.surveys };
+            net.surveys = { ...net.surveys, ...newCache.surveys } as typeof net.surveys;
           }
           if (newCache.surveyResponses) {
             net.surveyResponses = {
               ...net.surveyResponses,
               ...newCache.surveyResponses,
-            };
+            } as typeof net.surveyResponses;
           }
           if (newCache.surveyResponsesLatestBlock) {
             net.surveyResponsesLatestBlock = {
@@ -1088,7 +1127,7 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
           surveyLog.warn('[SurveyTool] updateCache merge failed:', err);
         }
       }
-      return newCache;
+      return newCache as SurveyToolCacheState;
     });
     if (typeof cb === 'function') {
       setCacheCallbackTick(t => t + 1);
@@ -1099,13 +1138,15 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     const currentProps = propsRef.current;
     const onClose = currentProps.onResultsModalClose;
     const hasExternalCloseHandler = typeof onClose === 'function';
-    let oldPath = window.location.pathname;
-    if (oldPath.endsWith('/results') && !hasExternalCloseHandler) {
-      const trimmed = oldPath.slice(0, oldPath.length - '/results'.length);
-      window.history.pushState({}, '', trimmed);
+    const closeState = resolveSurveyToolResultsModalCloseState({
+      pathname: window.location.pathname,
+      hasExternalCloseHandler,
+    });
+    if (closeState.shouldTrimResultsPath) {
+      window.history.pushState({}, '', closeState.nextPathname);
     }
     setShowResultsModal(false);
-    if (hasExternalCloseHandler) {
+    if (closeState.shouldCallExternalCloseHandler && typeof onClose === 'function') {
       onClose();
     }
   }, []);
@@ -1116,15 +1157,11 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
   }, [cache, cacheCallbackTick]);
 
   useEffect(() => {
-    if (
-      !window.location.pathname.includes('/survey/') &&
-      !window.location.pathname.includes('/question/') &&
-      !window.location.pathname.includes('/questions') &&
-      !window.location.pathname.includes('/surveys')
-    ) {
-      if (props.minifiedMode !== 'pile' && !props.preventUrlChange && !props.miniMode) {
-        window.history.pushState({}, '', '/questions');
-      }
+    if (shouldRouteSurveyToolMountToQuestions({
+      pathname: window.location.pathname,
+      props,
+    })) {
+      window.history.pushState({}, '', '/questions');
     }
 
     fetchSurveys();
@@ -1139,10 +1176,13 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       return;
     }
 
-    if (
-      prevFetchNetworkIdRef.current !== props.network?.id ||
-      (prevSurveyCacheReadyRef.current !== props.isSurveyCacheReady && props.isSurveyCacheReady)
-    ) {
+    if (shouldFetchSurveyToolSurveysOnPropsChange({
+      prevProps: {
+        network: { id: prevFetchNetworkIdRef.current },
+        isSurveyCacheReady: prevSurveyCacheReadyRef.current,
+      },
+      props,
+    })) {
       fetchSurveys();
     }
 
@@ -1157,7 +1197,11 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       return;
     }
 
-    if (props.autoOpenResults && !prevAutoOpenResultsRef.current && !showResultsModalRef.current) {
+    if (shouldOpenSurveyToolResultsOnPropsChange({
+      prevProps: { autoOpenResults: prevAutoOpenResultsRef.current },
+      props,
+      showResultsModal: showResultsModalRef.current,
+    })) {
       setShowResultsModal(true);
     }
 
@@ -1174,20 +1218,15 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       return;
     }
 
-    const questionCacheReadyChanged =
-      prevQuestionCacheReadyRef.current !== props.isQuestionCacheReady;
-    const responsesCacheReadyChanged =
-      prevResponsesCacheReadyRef.current !== props.isResponsesCacheReady;
-    const questionResponsesNonceChanged =
-      prevQuestionResponsesNonceRef.current !== props.questionResponsesNonce;
-    const networkChanged = prevNonceNetworkIdRef.current !== props.network?.id;
-
-    if (
-      (questionCacheReadyChanged && props.isQuestionCacheReady) ||
-      (responsesCacheReadyChanged && props.isResponsesCacheReady) ||
-      questionResponsesNonceChanged ||
-      networkChanged
-    ) {
+    if (shouldBumpSurveyToolQuestionsCacheNonce({
+      prevProps: {
+        isQuestionCacheReady: prevQuestionCacheReadyRef.current,
+        isResponsesCacheReady: prevResponsesCacheReadyRef.current,
+        questionResponsesNonce: prevQuestionResponsesNonceRef.current,
+        network: { id: prevNonceNetworkIdRef.current },
+      },
+      props,
+    })) {
       setQuestionsCacheNonce((prev) => prev + 1);
     }
 
@@ -1217,7 +1256,8 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
   });
 };
 
-function SurveyTool(this: any, props: SurveyToolProps) {
+function SurveyTool(props: SurveyToolProps): React.ReactElement;
+function SurveyTool(this: unknown, props: SurveyToolProps) {
   if (new.target) {
     return createLegacySurveyToolInstance(props);
   }

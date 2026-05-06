@@ -1,7 +1,13 @@
 import { resolveSingleQuestionCacheBootstrap } from './surveyToolSingleQuestionCacheBootstrapController';
 
-const ensureQuestionsNet = (cache: Record<string, any>, netId: string) => {
-  const nextCache = { ...(cache || {}) };
+type TestQuestionsCache = Record<string, {
+  questions: Record<string, Record<string, unknown>>;
+}>;
+
+const ensureQuestionsNet = (cache: unknown, netId: string): TestQuestionsCache => {
+  const nextCache = {
+    ...((cache && typeof cache === 'object') ? cache as TestQuestionsCache : {}),
+  };
 
   nextCache[netId] = nextCache[netId] || { questions: {} };
   nextCache[netId].questions = nextCache[netId].questions || {};
@@ -73,7 +79,7 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       throw new Error(`expected ready, got ${result.status}`);
     }
 
-    expect(result.questionData.prompt).toBe('newer');
+    expect(result.questionData!.prompt).toBe('newer');
     expect(writeQuestionsCache).toHaveBeenCalledTimes(1);
   });
 
@@ -154,7 +160,7 @@ describe('surveyToolSingleQuestionCacheBootstrapController', () => {
       throw new Error(`expected ready, got ${result.status}`);
     }
 
-    expect(result.questionData.prompt).toBe('seeded');
+    expect(result.questionData!.prompt).toBe('seeded');
     expect(writeQuestionsCache).toHaveBeenCalled();
   });
 

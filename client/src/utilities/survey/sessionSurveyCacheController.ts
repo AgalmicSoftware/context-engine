@@ -114,6 +114,31 @@ interface PendingSurveyRetryResult {
   err?: unknown;
 }
 
+interface SurveyContractScripts {
+  getRelevantBlockWindowForFilter: (
+    slug: string
+  ) => Promise<{ fromBlock: number; toBlock: number }>;
+  getSurveyDataById: (
+    providerName: string,
+    surveyId: string,
+    slug: string,
+    opts?: CacheRecord
+  ) => Promise<SurveyMetadata | null>;
+  fetchUserSubmittedSurveyIDs: (
+    providerName: string,
+    fromBlock: number,
+    toBlock: number,
+    slug: string
+  ) => Promise<SurveyDiscoveryItem[]>;
+  fetchAllSurveyResponses: (
+    providerName: string,
+    surveyId: string,
+    startBlock: number,
+    latestBlock: number,
+    slug: string
+  ) => Promise<unknown>;
+}
+
 export interface SessionSurveyCacheHost {
   [key: string]: unknown;
   setState?: (updater: SetStateArg, cb?: () => void) => void;
@@ -139,14 +164,14 @@ export interface SessionSurveyCacheHost {
 }
 
 export interface SessionSurveyCacheController {
-  initializeSurveyCacheForGroup: (slug: string) => Promise<void>;
+  initializeSurveyCacheForGroup: (slug: string, opts?: SurveyInitOptions) => Promise<void>;
   refreshSurveyResponsesByIDForGroup: (slug: string, surveyID: string) => Promise<void>;
   isInitInFlight: (slug: string) => boolean;
   destroy: () => void;
 }
 
 const mainSiteLog = createLogger('mainSite');
-const contractScriptsAny = contractScripts as any;
+const surveyContractScripts = contractScripts as unknown as SurveyContractScripts;
 
 const normalizeSurveyResponseBatchResult = (
   batchResult: unknown
@@ -324,7 +349,7 @@ export const createSessionSurveyCacheController = (
         ));
         const networkID = String(getSessionChainId(slug) || '');
 
-        const { fromBlock: baseFrom, toBlock: baseTo } = await contractScriptsAny.getRelevantBlockWindowForFilter(slug);
+        const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
         if (baseFrom > baseTo) {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
           return;
@@ -578,7 +603,7 @@ export const createSessionSurveyCacheController = (
                   };
                 }
                 try {
-                  const surveyData = await contractScriptsAny.getSurveyDataById(
+                  const surveyData = await surveyContractScripts.getSurveyDataById(
                     'none',
                     sidLower,
                     slug,
@@ -697,7 +722,7 @@ export const createSessionSurveyCacheController = (
 
           if (fromBlockForSurveyDiscovery <= latestBlock) {
             mainSiteLog.log(`Fetching survey IDs from block ${fromBlockForSurveyDiscovery} to ${latestBlock} (group=${slug})`);
-            surveyItems = await contractScriptsAny.fetchUserSubmittedSurveyIDs(
+            surveyItems = await surveyContractScripts.fetchUserSubmittedSurveyIDs(
               'none',
               fromBlockForSurveyDiscovery,
               latestBlock,
@@ -728,7 +753,7 @@ export const createSessionSurveyCacheController = (
                 let surveyFetchErr: unknown = null;
                 try {
                   // eslint-disable-next-line no-await-in-loop
-                  surveyData = await contractScriptsAny.getSurveyDataById(
+                  surveyData = await surveyContractScripts.getSurveyDataById(
                     'none',
                     surveyID,
                     slug,
@@ -800,7 +825,7 @@ export const createSessionSurveyCacheController = (
               mainSiteLog.log(
                 `Fetching/updating responses for survey ${surveyIDLower}, from block ${startBlock} up to ${latestBlock} (group=${slug})`
               );
-              const surveyResponseBatch = normalizeSurveyResponseBatchResult(await contractScriptsAny.fetchAllSurveyResponses(
+              const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
                 'none',
                 surveyIDLower,
                 startBlock,
@@ -882,7 +907,7 @@ export const createSessionSurveyCacheController = (
       mainSiteLog.warn('No group chainId available');
       return;
     }
-    const { fromBlock: baseFrom, toBlock: baseTo } = await contractScriptsAny.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
     const initialLastBlockSurvey = Math.max(0, baseFrom - 1);
     const surveysCache = (dgRead('surveysCache', slug) || {}) as Record<string, SurveyNetworkCache>;
 
@@ -927,7 +952,7 @@ export const createSessionSurveyCacheController = (
     mainSiteLog.log(
       `Fetching new responses for surveyID ${surveyIDLower} from block ${startBlock} to ${latestChainBlock} (group=${slug})`
     );
-    const surveyResponseBatch = normalizeSurveyResponseBatchResult(await contractScriptsAny.fetchAllSurveyResponses(
+    const surveyResponseBatch = normalizeSurveyResponseBatchResult(await surveyContractScripts.fetchAllSurveyResponses(
       'none',
       surveyIDLower,
       startBlock,

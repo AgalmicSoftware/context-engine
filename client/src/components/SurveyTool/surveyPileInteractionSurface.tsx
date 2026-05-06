@@ -138,6 +138,97 @@ export type PileInteractionSurfaceProps = {
   handleNext: VoidHandler;
 };
 
+export const PILE_SCAN_ERROR_DETAIL_STYLE: React.CSSProperties = {
+  opacity: 0.8,
+  marginTop: 8,
+};
+
+export const PILE_LOADING_ICON_WRAP_STYLE: React.CSSProperties = {
+  fontSize: '2.5rem',
+  display: 'flex',
+  alignItems: 'center',
+  gap: '15px',
+};
+
+export const resolvePileNavCounterStyle = (navCounterVisible: unknown): React.CSSProperties => ({
+  opacity: navCounterVisible ? 0.8 : 0,
+  transition: 'opacity 0.5s ease-in-out',
+});
+
+export const resolvePileFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
+  isFilterActive
+    ? { color: ACTIVE_GREEN, borderColor: ACTIVE_GREEN, opacity: 0.75 }
+    : {}
+);
+
+export const resolvePileFilterIconStyle = (isFilterActive: unknown): React.CSSProperties => (
+  isFilterActive ? { color: ACTIVE_GREEN } : {}
+);
+
+export const buildPileFilterButtonClassName = (
+  styleMap: Record<string, string>,
+  isFilterActive: unknown
+) => [
+  styleMap.actionButton,
+  isFilterActive ? styleMap.actionButtonActive : '',
+].filter(Boolean).join(' ');
+
+export const buildPileFooterClassName = (
+  styleMap: Record<string, string>,
+  pileTopRailVisible: unknown
+) => `${styleMap.pileFooter}${pileTopRailVisible ? '' : ` ${styleMap.pileFooterHidden}`}`;
+
+export const buildPileSubmitButtonClassName = (
+  styleMap: Record<string, string>,
+  hasPendingPileChanges: unknown,
+  shouldHidePileSubmitButton: unknown
+) => `${styleMap.pileSubmitButton}${hasPendingPileChanges ? ` ${styleMap.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styleMap.pileSubmitButtonInactive}` : ''}`;
+
+export const resolvePileCardStatusClassName = (
+  styleMap: Record<string, string>,
+  offset: number
+) => {
+  if (offset === 0) return styleMap.pileCardActive;
+  if (offset === 1) return styleMap.pileCardNext;
+  if (offset === -1) return styleMap.pileCardPrev;
+  if (offset > 1) return styleMap.pileCardAfter;
+  return styleMap.pileCardBefore;
+};
+
+export const buildPileCardClassName = (
+  styleMap: Record<string, string>,
+  statusClassName: string
+) => `${styleMap.pileCard} ${statusClassName}`;
+
+export const resolvePileLoadingProgressFillStyle = ({
+  isHydrating,
+  hydrateDone,
+  hydrateDiscovered,
+  scanPercent,
+}: {
+  isHydrating: boolean;
+  hydrateDone: number;
+  hydrateDiscovered: number;
+  scanPercent: number;
+}): React.CSSProperties => ({
+  width: `${isHydrating
+    ? (hydrateDiscovered > 0
+      ? Math.round((Math.min(hydrateDone, hydrateDiscovered) / hydrateDiscovered) * 100)
+      : 0)
+    : scanPercent}%`,
+});
+
+export const buildPileHologramToggleClassName = (
+  styleMap: Record<string, string>,
+  showHologramAssistant: unknown
+) => `${styleMap.pileHologramToggle}${showHologramAssistant ? ` ${styleMap.pileHologramToggleActive}` : ''}`;
+
+export const resolvePileMiniLoaderStyle = (
+  priorResponsesHydrating: unknown
+): React.CSSProperties => ({
+  opacity: priorResponsesHydrating ? 0.5 : 1,
+});
+
 const renderPileNavControls = ({
   pileQuestions,
   activePileIndex,
@@ -156,10 +247,7 @@ const renderPileNavControls = ({
     </button>
     <span
       className={styles.pileNavCounterText}
-      style={{
-        opacity: navCounterVisible ? 0.8 : 0,
-        transition: 'opacity 0.5s ease-in-out',
-      }}
+      style={resolvePileNavCounterStyle(navCounterVisible)}
     >
       {pileQuestions.length === 0 ? 0 : activePileIndex + 1} / {pileQuestions.length}
     </span>
@@ -185,16 +273,14 @@ const renderPileActionControls = ({
   onViewAllClick,
   handleViewAllFromPile,
 }: PileActionControlsProps): React.ReactElement => {
-  const filterButtonStyle: React.CSSProperties = isFilterActive
-    ? { color: ACTIVE_GREEN, borderColor: ACTIVE_GREEN, opacity: 0.75 }
-    : {};
-  const filterIconStyle: React.CSSProperties = isFilterActive ? { color: ACTIVE_GREEN } : {};
+  const filterButtonStyle = resolvePileFilterButtonStyle(isFilterActive);
+  const filterIconStyle = resolvePileFilterIconStyle(isFilterActive);
 
   return (
     <div className={styles.pileActions}>
       <button
         onClick={toggleFilterModal}
-        className={`${styles.actionButton} ${isFilterActive ? styles.actionButtonActive : ''}`.trim()}
+        className={buildPileFilterButtonClassName(styles, isFilterActive)}
         style={filterButtonStyle}
         title="Filter Questions"
         data-testid={E2E_TESTIDS.SURVEY_FILTER_TOGGLE}
@@ -240,7 +326,7 @@ const renderPileFooterControls = ({
   showClearPendingButton,
   handleRevertPendingChanges,
 }: PileFooterControlsProps): React.ReactElement => (
-  <div className={`${styles.pileFooter}${pileTopRailVisible ? '' : ` ${styles.pileFooterHidden}`}`}>
+  <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
     {showSuccessBadgeLink ? (
       <a
         href={pileSubmitResponderHref}
@@ -265,7 +351,7 @@ const renderPileFooterControls = ({
       <Button
         onClick={handlePileSubmitClick}
         data-testid={E2E_TESTIDS.SURVEY_SUBMIT}
-        className={`${styles.pileSubmitButton}${hasPendingPileChanges ? ` ${styles.submitGlow}` : ''}${shouldHidePileSubmitButton ? ` ${styles.pileSubmitButtonInactive}` : ''}`}
+        className={buildPileSubmitButtonClassName(styles, hasPendingPileChanges, shouldHidePileSubmitButton)}
         disabled={isSubmitting || activePromptMasked}
       >
         {isSubmitting ? (
@@ -309,15 +395,10 @@ const renderPileDeckWindow = ({
     const idx = startIdx + sliceIdx;
     const offset = idx - activePileIndex;
 
-    let status = '';
-    if (offset === 0) status = styles.pileCardActive;
-    else if (offset === 1) status = styles.pileCardNext;
-    else if (offset === -1) status = styles.pileCardPrev;
-    else if (offset > 1) status = styles.pileCardAfter;
-    else status = styles.pileCardBefore;
+    const status = resolvePileCardStatusClassName(styles, offset);
 
     return (
-      <div key={q.id} className={`${styles.pileCard} ${status}`}>
+      <div key={q.id} className={buildPileCardClassName(styles, status)}>
         {offset === 0 ? (
           renderActiveQuestion(q)
         ) : (
@@ -353,7 +434,7 @@ const renderPileEmptyState = ({
     return (
       <>
         <div>Cache initialization error (RPC or metadata fetch failed).</div>
-        <div style={{ opacity: 0.8, marginTop: 8 }}>
+        <div style={PILE_SCAN_ERROR_DETAIL_STYLE}>
           Try refreshing questions/responses or reloading the page.
         </div>
       </>
@@ -363,7 +444,7 @@ const renderPileEmptyState = ({
   if (isStillLoading) {
     return (
       <>
-        <div style={{ fontSize: '2.5rem', display: 'flex', alignItems: 'center', gap: '15px' }}>
+        <div style={PILE_LOADING_ICON_WRAP_STYLE}>
           <FontAwesomeIcon icon={faSpinner} spin size="1x" />
         </div>
         <div className={styles.pileLoadingHeadline}>
@@ -391,13 +472,12 @@ const renderPileEmptyState = ({
             <div className={styles.pileLoadingProgressBar}>
               <div
                 className={styles.pileLoadingProgressFill}
-                style={{
-                  width: `${isHydrating
-                    ? (hydrateDiscovered > 0
-                      ? Math.round((Math.min(hydrateDone, hydrateDiscovered) / hydrateDiscovered) * 100)
-                      : 0)
-                    : scanPercent}%`,
-                }}
+                style={resolvePileLoadingProgressFillStyle({
+                  isHydrating,
+                  hydrateDone,
+                  hydrateDiscovered,
+                  scanPercent,
+                })}
               />
             </div>
           </div>
@@ -467,7 +547,7 @@ export const renderPileInteractionSurface = ({
     {SHOW_PILE_HOLOGRAM_TOGGLE && (
       <button
         type="button"
-        className={`${styles.pileHologramToggle}${showHologramAssistant ? ` ${styles.pileHologramToggleActive}` : ''}`}
+        className={buildPileHologramToggleClassName(styles, showHologramAssistant)}
         onClick={toggleHologramAssistant}
         aria-label={showHologramAssistant ? 'Hide holographic guide' : 'Show holographic guide'}
         aria-pressed={showHologramAssistant}
@@ -484,7 +564,7 @@ export const renderPileInteractionSurface = ({
           icon={faSpinner}
           spin
           className={styles.miniLoaderIcon}
-          style={{ opacity: priorResponsesHydrating ? 0.5 : 1 }}
+          style={resolvePileMiniLoaderStyle(priorResponsesHydrating)}
           title={
             priorResponsesHydrating
               ? 'Loading your previous responses...'
