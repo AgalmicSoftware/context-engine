@@ -9,6 +9,12 @@ type LoggerMethod = (...args: unknown[]) => void;
 type LoggerShape = ReturnType<typeof createLogger> & Record<string, unknown>;
 type PerfCounterScope = Record<string, number | string | null | undefined>;
 type PerfCounterStore = Record<string, PerfCounterScope | unknown>;
+type MainSiteCacheManagerReadyStatePatch = {
+  isCacheManagerReady: boolean;
+};
+type MainSiteLitHooksStatePatch<T> = {
+  litHooks: T;
+};
 type CoreSbtMetadataCandidate = {
   tokenURI?: unknown;
   tokenUri?: unknown;
@@ -122,6 +128,18 @@ export const hasCoreSbtMetadata = (info: unknown): boolean => {
     adminOk
   );
 };
+
+export const buildMainSiteLitHooksStatePatch = <T>(litHooks: T): MainSiteLitHooksStatePatch<T> => ({
+  litHooks,
+});
+
+export const buildMainSiteCacheManagerReadyStatePatch = ({
+  ready = true,
+}: {
+  ready?: unknown;
+} = {}): MainSiteCacheManagerReadyStatePatch => ({
+  isCacheManagerReady: ready === true,
+});
 
 export const isMainSitePerfCountersEnabled = (): boolean => {
   try {

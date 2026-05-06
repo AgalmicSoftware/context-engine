@@ -6,7 +6,7 @@ import {
 } from '../../variables/appConfig.js';
 
 type GlobalSessionScope = 'all' | 'active' | 'general' | 'list';
-type GlobalSessionSelectionInput = Record<string, any>;
+type GlobalSessionSelectionInput = Record<string, unknown>;
 type GlobalSessionSelection = {
   primarySessionSlug: string;
   primarySessionExplicit: boolean;
@@ -25,6 +25,9 @@ const LEGACY_SCOPE_STORAGE_KEY = 'ce:sessionScanScope';
 const LEGACY_SLUGS_STORAGE_KEY = 'ce:sessionScanSlugs';
 const VALID_SCOPE_MODES = new Set<GlobalSessionScope>(['all', 'active', 'general', 'list']);
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
+const isRecord = (value: unknown): value is GlobalSessionSelectionInput => (
+  !!value && typeof value === 'object'
+);
 export const DEFAULT_GLOBAL_SESSION_SCOPE: GlobalSessionScope = VALID_SCOPE_MODES.has(
   toStr(CE_SESSION_SCAN_SCOPE).trim().toLowerCase() as GlobalSessionScope
 )
@@ -112,9 +115,9 @@ const readStoredPrimarySessionExplicit = (): boolean => {
 };
 
 export const normalizeGlobalSessionSelection = (
-  value: GlobalSessionSelectionInput = {}
+  value: unknown = {}
 ): GlobalSessionSelection => {
-  const source = value && typeof value === 'object' ? value : {};
+  const source = isRecord(value) ? value : {};
   const hasExplicitPrimarySessionSlug =
     Object.prototype.hasOwnProperty.call(source, 'primarySessionSlug') ||
     Object.prototype.hasOwnProperty.call(source, 'activeSessionSlug') ||
@@ -189,7 +192,7 @@ export const readStoredGlobalSessionSelection = (): GlobalSessionSelection => {
 };
 
 export const resolveScopedSessionSlugsFromSelection = (
-  value: GlobalSessionSelectionInput = {}
+  value: unknown = {}
 ): string[] => {
   const selection = normalizeGlobalSessionSelection(value);
   if (selection.selectedSessionScope === 'general') return [''];
@@ -199,7 +202,7 @@ export const resolveScopedSessionSlugsFromSelection = (
 };
 
 export const dispatchGlobalSessionSelectionUpdatedEvent = (
-  value: GlobalSessionSelectionInput = {}
+  value: unknown = {}
 ): GlobalSessionSelection => {
   const target = safeWindow();
   if (!target || typeof target.dispatchEvent !== 'function') return normalizeGlobalSessionSelection(value);
@@ -215,16 +218,16 @@ export const dispatchGlobalSessionSelectionUpdatedEvent = (
 const writeLegacyRuntimeSessionGlobals = (selection: GlobalSessionSelection): void => {
   try {
     if (typeof globalThis === 'undefined' || !globalThis) return;
-    const runtimeGlobals = globalThis as Record<string, any>;
+    const runtimeGlobals = globalThis as Record<string, unknown>;
     runtimeGlobals.CE_SESSION_SCAN_SCOPE = selection.selectedSessionScope;
     runtimeGlobals.CE_SESSION_SCAN_SLUGS = [...selection.selectedSessionSlugs];
   } catch (_) {}
 };
 
 export const persistGlobalSessionSelection = (
-  value: GlobalSessionSelectionInput = {}
+  value: unknown = {}
 ): GlobalSessionSelection => {
-  const source = value && typeof value === 'object' ? value : {};
+  const source = isRecord(value) ? value : {};
   const storedSelection = readStoredGlobalSessionSelection();
   const hasPrimaryInput =
     hasOwn(source, 'primarySessionSlug') ||
@@ -279,7 +282,7 @@ export const persistGlobalSessionSelection = (
 };
 
 export const writeGlobalSessionSelection = (
-  value: GlobalSessionSelectionInput = {}
+  value: unknown = {}
 ): GlobalSessionSelection => {
   const selection = persistGlobalSessionSelection(value);
   dispatchGlobalSessionSelectionUpdatedEvent(selection);

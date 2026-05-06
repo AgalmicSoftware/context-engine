@@ -21,6 +21,22 @@ const mockSBTsPage = jest.fn(() => null);
 const mockCompareAddresses = jest.fn(() => null);
 const mockTagPage = jest.fn(() => null);
 const mockDebateMap = jest.fn(() => null);
+const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
+const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
+
+const restoreSessionScanGlobals = () => {
+  if (typeof ORIGINAL_SESSION_SCAN_SCOPE === 'undefined') {
+    try { delete globalThis.CE_SESSION_SCAN_SCOPE; } catch (_) {}
+  } else {
+    globalThis.CE_SESSION_SCAN_SCOPE = ORIGINAL_SESSION_SCAN_SCOPE;
+  }
+
+  if (typeof ORIGINAL_SESSION_SCAN_SLUGS === 'undefined') {
+    try { delete globalThis.CE_SESSION_SCAN_SLUGS; } catch (_) {}
+  } else {
+    globalThis.CE_SESSION_SCAN_SLUGS = ORIGINAL_SESSION_SCAN_SLUGS;
+  }
+};
 
 jest.mock('react-redux', () => ({
   connect: () => (Comp) => Comp,
@@ -473,7 +489,9 @@ describe('MainSite route render smoke', () => {
     } else {
       process.env.PUBLIC_URL = originalPublicUrl;
     }
+    restoreSessionScanGlobals();
     window.history.replaceState({}, '', '/');
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -487,7 +505,9 @@ describe('MainSite route render smoke', () => {
     } else {
       process.env.PUBLIC_URL = originalPublicUrl;
     }
+    restoreSessionScanGlobals();
     window.history.replaceState({}, '', '/');
+    window.sessionStorage.clear();
   });
 
   it('renders the wizard root for /new, canonicalizes the alias, and forwards query params', async () => {
@@ -548,6 +568,53 @@ describe('MainSite route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
+  });
+
+  it('redirects a general route to the first list-scoped session once and consumes the redirect', async () => {
+    globalThis.CE_SESSION_SCAN_SCOPE = 'list';
+    globalThis.CE_SESSION_SCAN_SLUGS = [' Edge ', 'alpha'];
+
+    const sessionConfig = buildSessionConfig({
+      slug: 'edge',
+      sessionName: 'Edge Session',
+    });
+    const subject = createSubject({
+      path: '/session/general',
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    expect(subject.getSessionFallbackPreferredTarget()).toEqual({
+      slug: 'edge',
+      path: '/session/edge',
+    });
+
+    const firstRender = render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'edge');
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/session/edge');
+    expect(window.location.pathname).toBe('/session/edge');
+
+    const storageKey = subject.getSessionFallbackRedirectStorageKey('edge');
+    expect(window.sessionStorage.getItem(storageKey)).toBe('true');
+
+    firstRender.unmount();
+    replaceStateSpy.mockClear();
+
+    const secondSubject = createSubject({
+      path: '/session/general',
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+
+    render(secondSubject.render());
+
+    expect(window.location.pathname).toBe('/session/general');
+    expect(window.sessionStorage.getItem(storageKey)).toBe('true');
+    expect(replaceStateSpy).not.toHaveBeenCalled();
   });
 
   it('keeps PUBLIC_URL when canonicalizing /new to /session/new', async () => {

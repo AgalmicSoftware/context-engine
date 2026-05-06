@@ -1,7 +1,7 @@
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import { toStr, normalizeSlug as normalizeBaseSlug } from '../shared/primitives.js';
 
-type DemoSessionConfig = Record<string, any>;
+type DemoSessionConfig = Record<string, unknown>;
 type DemoSessionMap = Record<string, DemoSessionConfig>;
 type SessionTemplateSeedMap = Record<string, readonly string[]>;
 
@@ -23,7 +23,7 @@ const normalizeLegacyAliasToken = (raw: unknown): string => (
 const cloneValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
-    return Object.keys(value).reduce<Record<string, any>>((acc, key) => {
+    return Object.keys(value).reduce<Record<string, unknown>>((acc, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
     }, {}) as T;
