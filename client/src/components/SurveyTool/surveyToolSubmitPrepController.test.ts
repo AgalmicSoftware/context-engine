@@ -242,6 +242,40 @@ describe('surveyToolSubmitPrepController', () => {
       expect(result.failures).toHaveLength(0);
     });
 
+    it('passes for empty encrypted additional comment without encryptedPortion', () => {
+      const slice = makeSlice({
+        answers: {
+          q1: { encrypted: true, encryptedPortion: 'abc', value: '*' },
+        },
+        additionalComments: {
+          q1: { encrypted: true, value: '' },
+        },
+      });
+
+      const result = verifyEncryptionIntegrity(slice);
+
+      expect(result.passed).toBe(true);
+      expect(result.failures).toHaveLength(0);
+    });
+
+    it('fails for non-empty encrypted additional comment without encryptedPortion', () => {
+      const slice = makeSlice({
+        answers: {
+          q1: { encrypted: true, encryptedPortion: 'abc', value: '*' },
+        },
+        additionalComments: {
+          q1: { encrypted: true, value: 'notes' },
+        },
+      });
+
+      const result = verifyEncryptionIntegrity(slice);
+
+      expect(result.passed).toBe(false);
+      expect(result.failures).toEqual([
+        'Verification failed: Additional for q1 marked encrypted but has no encryptedPortion.',
+      ]);
+    });
+
     it('respects onlyTheseQids filter', () => {
       const slice = makeSlice({
         answers: {

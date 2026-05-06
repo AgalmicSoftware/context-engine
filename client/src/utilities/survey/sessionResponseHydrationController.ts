@@ -35,7 +35,7 @@ interface ResponseInitOptions {
   notifyOnCompletion?: boolean;
 }
 
-interface RefreshQuestionResponsesOptions {
+export interface RefreshQuestionResponsesOptions {
   slug?: string;
   responder?: string;
   questionIDs?: string[];
@@ -120,6 +120,31 @@ interface PartialResponseAggregateRow extends CacheRecord {
 
 type PartialResponseAggregate = Record<string, PartialResponseAggregateRow[]>;
 
+interface ResponseHydrationContractScripts {
+  getRelevantBlockWindowForFilter: (
+    slug: string
+  ) => Promise<{ fromBlock: number; toBlock: number }>;
+  getQuestionResponsesChunkedWithCallback: (
+    providerName: string,
+    fromBlock: number,
+    toBlock: number,
+    handleProgress: unknown,
+    handlePartialData: unknown,
+    slug: string,
+    opts?: CacheRecord
+  ) => Promise<unknown>;
+  getResponse: (
+    providerName: string,
+    responder: string,
+    questionId: string,
+    slug: string
+  ) => Promise<unknown>;
+}
+
+interface ResponseHydrationCryptoUtils {
+  hashIdentifier?: (value: unknown) => string;
+}
+
 export interface SessionResponseHydrationHost {
   [key: string]: unknown;
   setState?: (updater: SetStateArg, cb?: () => void) => void;
@@ -166,8 +191,8 @@ interface SessionResponseHydrationControllerRuntime {
 }
 
 const mainSiteLog = createLogger('mainSite');
-const contractScriptsAny = contractScripts as any;
-const cryptoUtilsAny = cryptoUtils as any;
+const responseHydrationContractScripts = contractScripts as unknown as ResponseHydrationContractScripts;
+const responseHydrationCryptoUtils = cryptoUtils as unknown as ResponseHydrationCryptoUtils;
 
 const isRecord = (value: unknown): value is CacheRecord => (
   !!value && typeof value === 'object'
@@ -399,7 +424,7 @@ export const createSessionResponseHydrationController = (
 
       const networkID = String(getSessionChainId(slug) || '');
       const { fromBlock: baseFrom, toBlock: baseTo } =
-        await contractScriptsAny.getRelevantBlockWindowForFilter(slug);
+        await responseHydrationContractScripts.getRelevantBlockWindowForFilter(slug);
       if (baseFrom > baseTo) {
         setResponseState((prev) => ({
           isResponsesCacheReady: true,
@@ -1112,7 +1137,7 @@ export const createSessionResponseHydrationController = (
       };
 
       try {
-        await contractScriptsAny.getQuestionResponsesChunkedWithCallback(
+        await responseHydrationContractScripts.getQuestionResponsesChunkedWithCallback(
           'none',
           lastProcessedQRBlock + 1,
           latestBlock,
@@ -1245,8 +1270,8 @@ export const createSessionResponseHydrationController = (
         mainSiteLog.warn('MainSite: fallback', e);
       }
       try {
-        if (cryptoUtilsAny && typeof cryptoUtilsAny.hashIdentifier === 'function') {
-          return String(cryptoUtilsAny.hashIdentifier(value) || '').toLowerCase();
+        if (typeof responseHydrationCryptoUtils.hashIdentifier === 'function') {
+          return String(responseHydrationCryptoUtils.hashIdentifier(value) || '').toLowerCase();
         }
       } catch (e: unknown) {
         mainSiteLog.warn('MainSite: fallback', e);
@@ -1279,13 +1304,13 @@ export const createSessionResponseHydrationController = (
       setState({ isResponsesCacheReady: false });
 
       const networkID = String(getSessionChainId(slug) || '');
-      const { fromBlock: baseFrom } = await contractScriptsAny.getRelevantBlockWindowForFilter(slug);
+      const { fromBlock: baseFrom } = await responseHydrationContractScripts.getRelevantBlockWindowForFilter(slug);
       const initialLastBlockQR = Math.max(0, Number(baseFrom || 0) - 1);
 
       const results = await Promise.all(
         normalizedQids.map(async (qId): Promise<{ qId: string; response: unknown | null }> => {
           try {
-            const response = await contractScriptsAny.getResponse('none', responderLower, qId, slug);
+            const response = await responseHydrationContractScripts.getResponse('none', responderLower, qId, slug);
             return { qId, response };
           } catch (e: unknown) {
             mainSiteLog.warn(`refreshQuestionResponses(targeted): failed qId=${qId}`, e);

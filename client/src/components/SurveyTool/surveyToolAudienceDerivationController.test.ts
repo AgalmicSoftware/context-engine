@@ -51,7 +51,9 @@ describe('surveyToolAudienceDerivationController', () => {
 
     it('returns explicit for additional with persisted state', () => {
       expect(
-        normalizeFieldAudienceMode('', 'additional', { value: 'note' }, (v) => !!v?.value),
+        normalizeFieldAudienceMode('', 'additional', { value: 'note' }, (
+          v,
+        ) => !!(v && typeof v === 'object' && 'value' in v && v.value)),
       ).toBe('explicit');
     });
 

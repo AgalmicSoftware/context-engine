@@ -7,8 +7,10 @@ import {
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
-const applyStateUpdate = (stateRef: { current: Record<string, any> }, update: any) => {
-  const patch = typeof update === 'function' ? update(stateRef.current) : update;
+const applyStateUpdate = (stateRef: { current: Record<string, unknown> }, update: unknown) => {
+  const patch = typeof update === 'function'
+    ? (update as (state: Record<string, unknown>) => Record<string, unknown> | null)(stateRef.current)
+    : update;
   stateRef.current = { ...stateRef.current, ...(patch || {}) };
   return patch;
 };
@@ -166,6 +168,60 @@ describe('surveyToolSingleQuestionController', () => {
     expect(stateRef.current.isLoadingResponse).toBe(false);
   });
 
+  it('prefills encrypted own single-question responses when loading as the signed-in account', async () => {
+    const latest = {
+      answer: { value: '*', encrypted: true, encryptedPortion: 'cipher-answer' },
+      importance: 4,
+    };
+    const stateRef = {
+      current: {
+        submissionComplete: false,
+        startFresh: false,
+        suppressPrefill: false,
+        isLoadingResponse: true,
+        userHasResponse: false,
+        userResponseEncrypted: false,
+        userAnswers: null,
+        displayAnswerMode: true,
+        isEditing: false,
+      },
+    };
+    const safeSetState = jest.fn((update) => applyStateUpdate(stateRef, update));
+    const writeResponseToCache = jest.fn();
+    const prefillSingleQuestionResponse = jest.fn();
+
+    await expect(executeOwnSingleQuestionResponseBootstrap({
+      props: {
+        provider: {},
+        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+      state: stateRef.current,
+      questionId: 'q1',
+      effectiveSingleSlug: 'edge',
+      safeSetState,
+      getResponse: jest.fn().mockResolvedValue(latest),
+      writeResponseToCache,
+      areResponsesConsistent: jest.fn(),
+      prefillSingleQuestionResponse,
+    })).resolves.toEqual(expect.objectContaining({
+      applied: true,
+      reason: 'loaded',
+      latest,
+    }));
+
+    expect(writeResponseToCache).toHaveBeenCalledWith(
+      '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      latest
+    );
+    expect(prefillSingleQuestionResponse).toHaveBeenCalledWith(latest);
+    expect(stateRef.current.userHasResponse).toBe(true);
+    expect(stateRef.current.userResponseEncrypted).toBe(true);
+    expect(stateRef.current.userAnswers).toEqual(latest);
+    expect(stateRef.current.displayAnswerMode).toBe(false);
+    expect(stateRef.current.isEditing).toBe(true);
+    expect(stateRef.current.isLoadingResponse).toBe(false);
+  });
+
   it('reuses fresh cache entries from alternate network buckets and updates the caller cache reference', async () => {
     const responderAddress = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const freshCache = {
@@ -187,7 +243,7 @@ describe('surveyToolSingleQuestionController', () => {
       netIdStr: '',
       effectiveSingleSlug: 'edge',
       readQuestionsCacheAsync: jest.fn().mockResolvedValue(freshCache),
-      ensureQuestionsNet: jest.fn((cache) => cache),
+      ensureQuestionsNet: jest.fn((cache) => cache as typeof freshCache),
       cloneValue: clone,
       updateQuestionsCache,
     })).resolves.toEqual({
@@ -234,7 +290,7 @@ describe('surveyToolSingleQuestionController', () => {
       effectiveSingleSlug: 'edge',
       netIdStr: '84532',
       readQuestionsCacheAsync: jest.fn().mockResolvedValue(clone(existingCache)),
-      ensureQuestionsNet: jest.fn((cache) => cache),
+      ensureQuestionsNet: jest.fn((cache) => cache as typeof existingCache),
       writeQuestionsCache,
     });
 

@@ -49,6 +49,13 @@ import {
   buildPileSubmitRailViewState,
   buildPileSubmitViewState,
   buildPileWorkspaceViewState,
+  buildPileFilterActivePatch,
+  buildPileLoadingElapsedPatch,
+  buildPileLoadingPatch,
+  buildPileNavCounterVisiblePatch,
+  buildPileShowLongLoadingPatch,
+  buildPileSubmissionCompletePatch,
+  buildPileSubmitTempTextPatch,
   shouldPreferPileGatedEmptyState,
 } from './surveyPileViewState.js';
 import {
@@ -57,10 +64,10 @@ import {
   renderPileGatedPromptCard,
 } from './surveyPileActiveQuestionCard';
 import {
-  renderPileAdditionalEditorRow as renderPileAdditionalEditorRowHelper,
-  renderPileCommentsSection as renderPileCommentsSectionHelper,
-  renderPileQuestionIcons as renderPileQuestionIconsHelper,
-  renderPileFooterSection as renderPileFooterSectionHelper,
+  renderPileAdditionalEditorRow,
+  renderPileCommentsSection,
+  renderPileQuestionIcons,
+  renderPileFooterSection,
 } from './surveyPileQuestionSections';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
@@ -177,7 +184,13 @@ import { notify } from '../../utilities/ui/notify.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
-import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
+import {
+  SPONSORED_GATE_STATES,
+  checkSponsoredAccess,
+  getGateSbtAddresses,
+  resolveSponsoredGateStateForResource,
+} from '../../utilities/web3/sponsoredAccess.js';
+import { resolveEncryptionGate } from '../../utilities/crypto/encryptionGates.js';
 import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
 import { buildQuestionDecryptContextForSession } from '../../utilities/session/sessionQuestionDecryption.js';
 import {
@@ -228,7 +241,6 @@ import {
   buildGatedPromptNoticeState,
   buildLockAudienceButtonAction,
   buildLockAudienceDisplayState,
-  isQuestionPromptMasked as isQuestionPromptMaskedHelper,
 } from './surveyToolViewState.js';
 import {
   buildCanDecryptOtherResponsesSnapshot,
@@ -633,6 +645,7 @@ export class PileViewMode extends SurveyQuestions {
   _emptyReadyProbeStartedAtMs = 0;
   _pileScanDisplayBaselineKey = '';
   _pileScanDisplayBaselineRemaining = 0;
+  _lastGatedEmptyRecoveryKey = '';
 
   buildQuestionOptionsDigest = (options) => {
     if (!Array.isArray(options) || options.length === 0) return '0:0';
@@ -856,6 +869,108 @@ export class PileViewMode extends SurveyQuestions {
     }
   };
 
+  getEffectivePileSessionConfig = (propsIn = this.props) => {
+    const slug = resolveEffectiveSlug(propsIn);
+    const context = resolvePileLoadContext(propsIn, slug);
+    const resolvedConfig = (context?.sessionConfig && typeof context.sessionConfig === 'object')
+      ? context.sessionConfig
+      : {};
+    const propConfig = (propsIn?.sessionConfig && typeof propsIn.sessionConfig === 'object')
+      ? propsIn.sessionConfig
+      : {};
+    return {
+      ...resolvedConfig,
+      ...propConfig,
+      __registry: {
+        ...((resolvedConfig.__registry && typeof resolvedConfig.__registry === 'object') ? resolvedConfig.__registry : {}),
+        ...((propConfig.__registry && typeof propConfig.__registry === 'object') ? propConfig.__registry : {}),
+        gatesByResource: {
+          ...(
+            resolvedConfig.__registry &&
+            typeof resolvedConfig.__registry === 'object' &&
+            resolvedConfig.__registry.gatesByResource &&
+            typeof resolvedConfig.__registry.gatesByResource === 'object'
+              ? resolvedConfig.__registry.gatesByResource
+              : {}
+          ),
+          ...(
+            propConfig.__registry &&
+            typeof propConfig.__registry === 'object' &&
+            propConfig.__registry.gatesByResource &&
+            typeof propConfig.__registry.gatesByResource === 'object'
+              ? propConfig.__registry.gatesByResource
+              : {}
+          ),
+        },
+      },
+    };
+  };
+
+  hasRestrictedSessionQuestionGate = (propsIn = this.props) => {
+    const cfg = this.getEffectivePileSessionConfig(propsIn);
+    const primaryState = resolveSponsoredGateStateForResource(cfg, 'questionResponses');
+    if (primaryState?.status === SPONSORED_GATE_STATES.OPEN) return false;
+    if (primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED && primaryState.gate) return true;
+
+    const defaultState = resolveSponsoredGateStateForResource(cfg, 'default');
+    if (defaultState?.status === SPONSORED_GATE_STATES.RESTRICTED && defaultState.gate) return true;
+
+    const legacyGate = resolveEncryptionGate(cfg);
+    return getGateSbtAddresses(legacyGate).length > 0;
+  };
+
+  maybeRecoverUnhydratedGatedPile = () => {
+    if (typeof this.props.refreshQuestionMetadata !== 'function') return false;
+    if (!this.hasRestrictedSessionQuestionGate(this.props)) return false;
+    if (Array.isArray(this.state?.pileQuestions) && this.state.pileQuestions.length > 0) return false;
+    if (this.state?.hasHiddenGatedQuestions) return false;
+
+    const slug = resolveEffectiveSlug(this.props);
+    const progressSlug = normalizeQuestionProgressSlug(slug);
+    const questionScanProgress =
+      this.props.questionScanProgress &&
+      doesQuestionProgressMatchSlug(this.props.questionScanProgress.slug, progressSlug)
+        ? this.props.questionScanProgress
+        : null;
+    const hydrateDiscovered = Math.max(0, Number(questionScanProgress?.discoveredQuestions || 0));
+    const pendingMetadataCount = Math.max(0, Number(questionScanProgress?.pendingMetadataCount || 0));
+    const shouldRecover = (
+      !!this.props.isQuestionCacheReady ||
+      hydrateDiscovered > 0 ||
+      pendingMetadataCount > 0
+    );
+    if (!shouldRecover) return false;
+
+    const forceDiscoveryRescan = !!this.props.isQuestionCacheReady && !questionScanProgress;
+    const recoveryKey = [
+      normalizeSessionSlugValue(slug),
+      String(this.props.account || '').trim().toLowerCase(),
+      Number(this.props.questionsCacheNonce || 0),
+      Number(this.props.questionResponsesNonce || 0),
+      forceDiscoveryRescan ? 'force' : 'retry',
+      String(questionScanProgress?.phase || ''),
+      hydrateDiscovered,
+      pendingMetadataCount,
+    ].join('|');
+    if (this._lastGatedEmptyRecoveryKey === recoveryKey) return false;
+    this._lastGatedEmptyRecoveryKey = recoveryKey;
+
+    try {
+      const maybePromise = this.props.refreshQuestionMetadata({
+        forceDiscoveryRescan,
+      });
+      if (maybePromise && typeof maybePromise.catch === 'function') {
+        maybePromise.catch((err) => {
+          surveyLog.warn('[pile] gated empty metadata recovery failed', err);
+        });
+      }
+    } catch (err) {
+      surveyLog.warn('[pile] gated empty metadata recovery failed', err);
+      return false;
+    }
+    return true;
+  };
+
   isPileLoadingVisible = () => {
     const slug = resolveEffectiveSlug(this.props);
     const progressSlug = normalizeQuestionProgressSlug(slug);
@@ -890,6 +1005,17 @@ export class PileViewMode extends SurveyQuestions {
     const hasFilterBaseQuestions = Array.isArray(this.state?.allQuestionsForFilter) &&
       this.state.allQuestionsForFilter.length > 0;
     const recentRateLimit = this.isRecentRateLimit();
+    const hasSessionQuestionGate = this.hasRestrictedSessionQuestionGate(this.props);
+    const hasUnhydratedGatedQuestions = (
+      hasSessionQuestionGate &&
+      !hasVisibleQuestions &&
+      !this.state?.hasHiddenGatedQuestions &&
+      (
+        hydrateDiscovered > 0 ||
+        pendingMetadataCount > 0 ||
+        !!this.props.isQuestionCacheReady
+      )
+    );
     const preferGatedEmptyState = this.shouldPreferGatedEmptyState({
       hasConcreteHiddenQuestions: !!this.state.hasHiddenGatedQuestions,
       hasVisibleQuestions,
@@ -906,7 +1032,7 @@ export class PileViewMode extends SurveyQuestions {
       !hasScanOrHydrationWork &&
       !hasPendingMetadataRetries &&
       hydrationProgressSettled
-    ) || preferGatedEmptyState;
+    ) || preferGatedEmptyState || hasUnhydratedGatedQuestions;
     const allowFilteredEmptySettlement = (
       !hasVisibleQuestions &&
       isFilterActive &&
@@ -950,7 +1076,7 @@ export class PileViewMode extends SurveyQuestions {
           const started = Number(this._loadingStartedAtMs || Date.now());
           const elapsed = Math.max(0, Math.floor((Date.now() - started) / 1000));
           if (elapsed !== Number(this.state.loadingElapsedSec || 0)) {
-            this.setState({ loadingElapsedSec: elapsed });
+            this.setState(buildPileLoadingElapsedPatch(elapsed));
           }
         }, 1000);
       }
@@ -963,7 +1089,7 @@ export class PileViewMode extends SurveyQuestions {
     }
     this._loadingStartedAtMs = null;
     if (this.state.loadingElapsedSec !== 0) {
-      this.setState({ loadingElapsedSec: 0 });
+      this.setState(buildPileLoadingElapsedPatch(0));
     }
   };
 
@@ -982,12 +1108,13 @@ export class PileViewMode extends SurveyQuestions {
     this._isMounted = true;
     this.syncCurrentPileQuestionsSignature(this.state.pileQuestions);
     this.loadAndSortQuestions();
+    this.maybeRecoverUnhydratedGatedPile();
     this.syncLoadingElapsedTimer();
     this.notifyPileSubmitRailVisibility();
     // Start long-loading timer
     this.loadingTimeout = setTimeout(() => {
       if (this.state.loading || !this.props.isQuestionCacheReady) {
-        this.setState({ showLongLoading: true });
+        this.setState(buildPileShowLongLoadingPatch(true));
       }
     }, 10000);
   }
@@ -1103,7 +1230,7 @@ export class PileViewMode extends SurveyQuestions {
       this._autoDecryptMaskedAttemptSignature = {};
       this.clearAutoDecryptSweepScheduling();
       if (this.state.autoDecryptEnabled) {
-        this.setState({ autoDecryptEnabled: false, decryptingByKey: {} });
+        this.setState(buildAutoDecryptDisabledState());
       }
       this.syncLoadingElapsedTimer();
       return;
@@ -1119,12 +1246,12 @@ export class PileViewMode extends SurveyQuestions {
       surveyLog.debug('PileViewMode: skipped rebuild due to pending edits');
     } else if (updatePlan.cacheUpdatePlan.action === 'show-loading') {
       // Initial load spinner (guarded against loop)
-      this.setState({ loading: true });
+      this.setState(buildPileLoadingPatch(true));
     }
 
     // Clear long-loading if loaded
     if (updatePlan.shouldClearLongLoading) {
-      this.setState({ showLongLoading: false });
+      this.setState(buildPileShowLongLoadingPatch(false));
     }
 
     // 3. Auto-Decrypt Logic
@@ -1139,6 +1266,7 @@ export class PileViewMode extends SurveyQuestions {
       this.queueAutoDecryptVisibleSweep(reason);
     });
 
+    this.maybeRecoverUnhydratedGatedPile();
     this.syncLoadingElapsedTimer();
   }
 
@@ -1206,11 +1334,11 @@ export class PileViewMode extends SurveyQuestions {
     }
 
     // Show the counter immediately
-    this.setState({ navCounterVisible: true });
+    this.setState(buildPileNavCounterVisiblePatch(true));
 
     // Schedule fade-out after 2 seconds
     this._navFadeTimer = setTimeout(() => {
-      this.setState({ navCounterVisible: false });
+      this.setState(buildPileNavCounterVisiblePatch(false));
       this._navFadeTimer = null;
     }, 2000);
   };
@@ -1332,7 +1460,7 @@ export class PileViewMode extends SurveyQuestions {
 
     if (baselineConsistencyPlan.action === 'sync-cache-caught-up') {
       surveyLog.log("PileViewMode: Cache caught up with baseline. Syncing.");
-      this.setState({ submissionComplete: false }, () => {
+      this.setState(buildPileSubmissionCompletePatch(false), () => {
         // Now it is safe to reload and wipe/rebuild state, as cache matches our optimistic view
         this.loadAndSortQuestions();
       });
@@ -1765,11 +1893,11 @@ export class PileViewMode extends SurveyQuestions {
       submitLabel: pileSubmitLabel,
     });
 
-    this.setState({ pileSubmitTempText: feedbackPlan.initialText });
+    this.setState(buildPileSubmitTempTextPatch(feedbackPlan.initialText));
     this._pileSubmitTimer = setTimeout(() => {
-      this.setState({ pileSubmitTempText: feedbackPlan.restoreText });
+      this.setState(buildPileSubmitTempTextPatch(feedbackPlan.restoreText));
       this._pileSubmitTimer = setTimeout(() => {
-        this.setState({ pileSubmitTempText: feedbackPlan.clearText });
+        this.setState(buildPileSubmitTempTextPatch(feedbackPlan.clearText));
         this._pileSubmitTimer = null;
       }, feedbackPlan.clearDelayMs);
     }, feedbackPlan.initialDelayMs);
@@ -1858,7 +1986,7 @@ export class PileViewMode extends SurveyQuestions {
 
   handlePileFilterActivityChange = (isActive) => {
     if (!!this.state.isFilterActive === !!isActive) return;
-    this.setState({ isFilterActive: !!isActive });
+    this.setState(buildPileFilterActivePatch(isActive));
   };
 
 
@@ -2154,7 +2282,7 @@ export class PileViewMode extends SurveyQuestions {
     questionId,
     additional,
     glowAdditional,
-  }) => renderPileAdditionalEditorRowHelper({
+  }) => renderPileAdditionalEditorRow({
     input: this.renderPileAdditionalInput({
       questionId,
       additional,
@@ -2178,7 +2306,7 @@ export class PileViewMode extends SurveyQuestions {
     allowDecryptAdditional,
     decryptTooltip,
     isAdditionalDecrypting,
-  }) => renderPileCommentsSectionHelper({
+  }) => renderPileCommentsSection({
     showComments,
     maskedAdditional,
     decryptAdditionalControl: this.renderQuestionFieldDecryptControl({
@@ -2203,7 +2331,7 @@ export class PileViewMode extends SurveyQuestions {
     glowAnswer,
     maskedAnswer,
     hasAdditionalContent,
-  }) => renderPileQuestionIconsHelper({
+  }) => renderPileQuestionIcons({
     questionId,
     hasAdditionalContent,
     onToggleComments: () => this.toggleComments(questionId),
@@ -2239,7 +2367,7 @@ export class PileViewMode extends SurveyQuestions {
     allowDecryptAdditional,
     decryptTooltip,
     isAdditionalDecrypting,
-  }) => renderPileFooterSectionHelper({
+  }) => renderPileFooterSection({
     sliderSection: this.renderPileSliderSection({
       questionId: question.id,
       showSlider,
@@ -2404,6 +2532,7 @@ export class PileViewMode extends SurveyQuestions {
       isSurveyToolFilterStateActive(this.state.filterState);
     const hasFilterBaseQuestions = Array.isArray(this.state.allQuestionsForFilter) &&
       this.state.allQuestionsForFilter.length > 0;
+    const hasSessionQuestionGate = this.hasRestrictedSessionQuestionGate(this.props);
     const pileWorkspaceViewState = buildPileWorkspaceViewState({
       pileQuestions,
       activePileIndex,
@@ -2423,6 +2552,7 @@ export class PileViewMode extends SurveyQuestions {
       isHydratingPriorResponses: this.state.isHydratingPriorResponses,
       isFilterActive,
       hasFilterBaseQuestions,
+      hasSessionQuestionGate,
     });
     const {
       activeQuestion,

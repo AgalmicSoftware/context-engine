@@ -1,6 +1,14 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import BeeswarmPlot, { normalizeTooltipVoteBreakdown, resolveTooltipLayout } from './BeeswarmPlot';
+import BeeswarmPlot, {
+  buildBeeswarmTooltipSegmentClassName,
+  buildBeeswarmTooltipStatClassName,
+  normalizeTooltipVoteBreakdown,
+  resolveTooltipLayout,
+  resolveTooltipPositionStyle,
+  resolveTooltipResponseSegmentStyle,
+} from './BeeswarmPlot';
+import styles from './BeeswarmPlot.module.scss';
 
 describe('BeeswarmPlot', () => {
   const samplePoint = [
@@ -75,6 +83,21 @@ describe('BeeswarmPlot', () => {
       unsure: 0,
       total: 5,
     });
+  });
+
+  it('builds tooltip display classes and inline styles', () => {
+    expect(resolveTooltipPositionStyle({ left: 24, top: 36 })).toEqual({
+      left: 24,
+      top: 36,
+    });
+    expect(buildBeeswarmTooltipStatClassName(styles, 'tooltipStatAgree')).toBe(
+      `${styles.tooltipStat} ${styles.tooltipStatAgree}`
+    );
+    expect(buildBeeswarmTooltipSegmentClassName(styles, 'tooltipResponseSegmentAgree')).toBe(
+      `${styles.tooltipResponseSegment} ${styles.tooltipResponseSegmentAgree}`
+    );
+    expect(resolveTooltipResponseSegmentStyle(3, 12)).toEqual({ width: '25.00%' });
+    expect(resolveTooltipResponseSegmentStyle(3, 0)).toEqual({ width: '300.00%' });
   });
 
   it('repositions right-edge tooltips to the left so the card keeps its full width', () => {

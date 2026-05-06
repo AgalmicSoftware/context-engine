@@ -1,30 +1,36 @@
+import type { UnknownRecord } from './surveyToolTypes';
+
 export interface ResponseFieldState {
-  value?: any;
+  value?: unknown;
   encrypted?: boolean;
   encryptionAudience?: string;
   encryptionGateId?: string | null;
   audienceMode?: string;
   hash?: string;
   encryptedPortion?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface MutationDeps {
   buildEmptyResponseFieldState: (qid: string, fieldKey?: string) => ResponseFieldState;
-  resolveFieldEncryptionAudience: (field: any, qid: string, fieldKey?: string) => string;
-  resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => string | null;
+  resolveFieldEncryptionAudience: (field: ResponseFieldState, qid: string, fieldKey?: string) => string;
+  resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => string | null;
   isQuestionLockedForResponse: (qid: string) => boolean;
-  getEffectiveRecipientsForQid: (qid: string) => any[];
-  normalizeFieldAudienceMode: (value: any, fieldKey: string, field: any) => string;
-  buildInheritedAdditionalFieldState: (additionalField: any, answerField: any, qid: string | null) => ResponseFieldState;
-  valuesEqual: (a: any, b: any) => boolean;
-  getQuestionById: (qid: string) => any;
+  getEffectiveRecipientsForQid: (qid: string) => unknown[];
+  normalizeFieldAudienceMode: (value: unknown, fieldKey: string, field: ResponseFieldState) => string;
+  buildInheritedAdditionalFieldState: (
+    additionalField: ResponseFieldState,
+    answerField: ResponseFieldState,
+    qid: string | null,
+  ) => ResponseFieldState;
+  valuesEqual: (a: unknown, b: unknown) => boolean;
+  getQuestionById: (qid: string) => UnknownRecord | null | undefined;
   computeHash: (value: string) => string;
 }
 
 type MutationSourceSlice = {
-  answers: Record<string, any>;
-  additionalComments: Record<string, any>;
+  answers: Record<string, ResponseFieldState>;
+  additionalComments: Record<string, ResponseFieldState>;
 };
 
 export const resolveFieldEncryptionDefaults = (
@@ -82,7 +88,7 @@ export interface AnswerUpdatePlan {
 
 export const buildAnswerUpdatePlan = (
   questionId: string,
-  answer: any,
+  answer: unknown,
   sourceSlice: MutationSourceSlice,
   deps: MutationDeps,
 ): AnswerUpdatePlan => {
@@ -174,7 +180,7 @@ export interface AdditionalUpdatePlan {
 
 export const buildAdditionalUpdatePlan = (
   questionId: string,
-  additionalComments: any,
+  additionalComments: unknown,
   sourceSlice: MutationSourceSlice,
   deps: MutationDeps,
 ): AdditionalUpdatePlan => {

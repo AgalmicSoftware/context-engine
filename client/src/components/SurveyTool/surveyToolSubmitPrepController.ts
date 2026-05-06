@@ -1,21 +1,40 @@
-import { shouldEncryptResponseFieldForSubmit } from './surveyToolDraftState';
+import {
+  hasMeaningfulFieldValue,
+  shouldEncryptResponseFieldForSubmit,
+} from './surveyToolDraftState';
 import { normalizeQuestionIdKey } from './surveyToolSignatures';
+import type { ResponseFieldState } from './surveyToolAudienceDerivationController';
+
+type SubmitResponseFieldState = ResponseFieldState & {
+  encrypted?: boolean;
+};
+
+type SubmitPrepSlice = {
+  answers?: Record<string, SubmitResponseFieldState>;
+  additionalComments?: Record<string, SubmitResponseFieldState>;
+  importance?: Record<string, unknown>;
+  conviction?: Record<string, unknown>;
+};
 
 export interface SubmitPrepDeps {
   isQuestionLockedForResponse: (qid: string) => boolean;
-  resolveFieldEncryptionGateId: (field: any, qid: string, fieldKey: string) => string | null;
-  resolveFieldEncryptionAudience: (field: any, qid: string, fieldKey: string) => string;
-  getEffectiveRecipientsForField: (opts: { questionId: string; fieldKey: string; field: any }) => string[];
+  resolveFieldEncryptionGateId: (field: SubmitResponseFieldState, qid: string, fieldKey: string) => string | null;
+  resolveFieldEncryptionAudience: (field: SubmitResponseFieldState, qid: string, fieldKey: string) => string;
+  getEffectiveRecipientsForField: (opts: {
+    questionId: string;
+    fieldKey: string;
+    field: SubmitResponseFieldState;
+  }) => string[];
 }
 
 export interface EncryptionWorkGroup {
   recipients: string[];
   qids: string[];
   slice: {
-    answers: Record<string, any>;
-    additionalComments: Record<string, any>;
-    importance: Record<string, any>;
-    conviction: Record<string, any>;
+    answers: Record<string, SubmitResponseFieldState>;
+    additionalComments: Record<string, SubmitResponseFieldState>;
+    importance: Record<string, unknown>;
+    conviction: Record<string, unknown>;
   };
 }
 
@@ -34,7 +53,7 @@ type MutableEncryptionWorkGroup = {
 };
 
 export const buildFieldEncryptionWorkGroups = (
-  slice: Record<string, any>,
+  slice: SubmitPrepSlice | null | undefined,
   changedQids: Set<string>,
   deps: SubmitPrepDeps,
 ): EncryptionWorkGroupsResult => {
@@ -66,7 +85,10 @@ export const buildFieldEncryptionWorkGroups = (
     const qid = normalizeQuestionIdKey(qidRaw);
     if (!qid) return;
     const questionLocked = deps.isQuestionLockedForResponse(qid);
-    const applyLock = (field: any, fieldKey: EncryptionFieldKey = 'answer') => {
+    const applyLock = (
+      field: SubmitResponseFieldState | undefined,
+      fieldKey: EncryptionFieldKey = 'answer',
+    ): SubmitResponseFieldState | undefined => {
       if (!questionLocked || !field || typeof field !== 'object') return field;
       return {
         ...field,
@@ -79,14 +101,14 @@ export const buildFieldEncryptionWorkGroups = (
     const fieldSpecs: Array<{
       fieldKey: EncryptionFieldKey;
       bucketKey: EncryptionBucketKey;
-      value: any;
+      value: SubmitResponseFieldState | undefined;
     }> = [
       { fieldKey: 'answer', bucketKey: 'answers', value: applyLock(sourceSlice.answers?.[qid], 'answer') },
       { fieldKey: 'additional', bucketKey: 'additionalComments', value: applyLock(sourceSlice.additionalComments?.[qid], 'additional') },
     ];
 
     fieldSpecs.forEach(({ fieldKey, bucketKey, value }) => {
-      if (!shouldEncryptResponseFieldForSubmit(value)) return;
+      if (!value || !shouldEncryptResponseFieldForSubmit(value)) return;
       const audience = deps.resolveFieldEncryptionAudience(value, qid, fieldKey);
       const recipients = audience === 'gate'
         ? deps.getEffectiveRecipientsForField({ questionId: qid, fieldKey, field: value })
@@ -111,7 +133,7 @@ export const buildFieldEncryptionWorkGroups = (
 };
 
 export const verifyEncryptionIntegrity = (
-  slice: Record<string, any>,
+  slice: SubmitPrepSlice | null | undefined,
   onlyTheseQids: Set<string> | null = null,
 ): { passed: boolean; failures: string[] } => {
   const failures: string[] = [];
@@ -130,7 +152,13 @@ export const verifyEncryptionIntegrity = (
         failures.push(`Verification failed: Answer for ${qId} marked encrypted but has no encryptedPortion.`);
         verificationPassed = false;
       }
-      if (additional && additional.encrypted && !additional.encryptedPortion && additional.value !== '*') {
+      if (
+        additional &&
+        additional.encrypted &&
+        !additional.encryptedPortion &&
+        additional.value !== '*' &&
+        hasMeaningfulFieldValue(additional)
+      ) {
         failures.push(`Verification failed: Additional for ${qId} marked encrypted but has no encryptedPortion.`);
         verificationPassed = false;
       }

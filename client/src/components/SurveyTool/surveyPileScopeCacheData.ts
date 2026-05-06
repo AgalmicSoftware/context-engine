@@ -1,4 +1,14 @@
-type UnknownRecord = Record<string, any>;
+type UnknownRecord = Record<string, unknown>;
+type PileScopeQuestionCacheItem = UnknownRecord & {
+  id?: unknown;
+  creator?: unknown;
+  tags?: unknown;
+};
+type PileScopeNetworkCache = UnknownRecord & {
+  pendingQuestionMetadata?: UnknownRecord;
+  questions?: Record<string, PileScopeQuestionCacheItem>;
+  questionResponses?: UnknownRecord;
+};
 
 type ScopeSetReader = (scopeSlug: string) => Set<string>;
 type MergeQuestionResponses = (target: UnknownRecord, source: UnknownRecord) => UnknownRecord;
@@ -82,8 +92,13 @@ export const loadPileScopeCacheSnapshot = async ({
       (await readQuestionsCacheAsync(scopeSlug)) as UnknownRecord,
       networkId
     );
-    const networkCache = (questionsCache && typeof questionsCache === 'object')
-      ? (questionsCache[networkId] || { questions: {}, questionResponses: {} })
+    const networkCache = (
+      questionsCache &&
+      typeof questionsCache === 'object' &&
+      questionsCache[networkId] &&
+      typeof questionsCache[networkId] === 'object'
+    )
+      ? questionsCache[networkId] as PileScopeNetworkCache
       : { questions: {}, questionResponses: {} };
 
     snapshot.pendingMetadataCount += Object.keys(networkCache?.pendingQuestionMetadata || {}).length;

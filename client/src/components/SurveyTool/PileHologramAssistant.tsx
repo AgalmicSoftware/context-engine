@@ -119,6 +119,10 @@ const buildLongitudePath = (offsetX: number) => {
   ].join(' ');
 };
 
+export const resolvePileHologramMeshLineStyle = (opacity: unknown): React.CSSProperties => ({
+  opacity: Number(opacity || 0),
+});
+
 function PileHologramAssistant() {
   return (
     <div
@@ -201,7 +205,7 @@ function PileHologramAssistant() {
                     key={`row-${offsetY}`}
                     d={buildLatitudePath(offsetY)}
                     className={styles.pileHologramMeshLine}
-                    style={{ opacity }}
+                    style={resolvePileHologramMeshLineStyle(opacity)}
                   />
                 );
               })}
@@ -212,7 +216,7 @@ function PileHologramAssistant() {
                     key={`col-${offsetX}`}
                     d={buildLongitudePath(offsetX)}
                     className={styles.pileHologramMeshLine}
-                    style={{ opacity }}
+                    style={resolvePileHologramMeshLineStyle(opacity)}
                   />
                 );
               })}

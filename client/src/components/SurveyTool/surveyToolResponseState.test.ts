@@ -213,6 +213,45 @@ describe('surveyToolResponseState', () => {
     });
   });
 
+  it('builds cache hydration patches from answer-only encrypted responses', () => {
+    const deps = {
+      parseValue: jest.fn((value) => value),
+      normalizeResponseEncryptionAudience: jest.fn((audience) => audience || 'self'),
+      getDefaultResponseEncryptionAudienceForQid: jest.fn(() => 'gate'),
+      resolveFieldEncryptionGateId: jest.fn((_field, qid, fieldKey) => `${qid}:${fieldKey}`),
+      normalizeFieldAudienceMode: jest.fn((mode) => mode || 'explicit'),
+    };
+
+    expect(buildQuestionCacheHydrationPatch({
+      questionId: 'Q1',
+      response: {
+        answer: {
+          value: 'encrypted plaintext should be masked',
+          encrypted: true,
+          encryptedPortion: 'ans-env',
+        },
+        importance: 4,
+      },
+      deps,
+    })).toEqual({
+      changed: true,
+      answerState: {
+        value: '*',
+        encrypted: true,
+        encryptionAudience: 'gate',
+        encryptionGateId: 'q1:answer',
+        audienceMode: 'explicit',
+        hash: '',
+        encryptedPortion: 'ans-env',
+      },
+      additionalState: undefined,
+      importanceChanged: true,
+      importanceValue: 4,
+      convictionChanged: true,
+      convictionValue: 4,
+    });
+  });
+
   it('reads conviction and importance from response slices with strict and fallback variants', () => {
     const slice = {
       conviction: { q1: '2' },

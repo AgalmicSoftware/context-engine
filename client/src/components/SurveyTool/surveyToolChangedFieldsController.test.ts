@@ -5,12 +5,14 @@ import {
   orchestrateGetChangedQidsAndFields,
   pickBestField,
   pickBestNumber,
+  type ResponseFieldState,
+  type ResponseSlice,
 } from './surveyToolChangedFieldsController';
 import { buildSurveyResponseSliceSignature } from './surveyToolSignatures';
 
-const hasMeaningfulFieldValue = (v: any) => {
+const hasMeaningfulFieldValue = (v: unknown) => {
   if (!v || typeof v !== 'object') return false;
-  const val = v.value;
+  const val = (v as { value?: unknown }).value;
   if (val === undefined || val === null || val === '' || val === '*') return false;
   if (Array.isArray(val) && val.length === 0) return false;
   return true;
@@ -42,23 +44,13 @@ const computeChangedFields = ({
   resolveGateId = () => '',
   resolveAudienceMode = () => 'default',
 }: {
-  baselineSlice: {
-    answers: Record<string, any>;
-    importance: Record<string, any>;
-    conviction: Record<string, any>;
-    additionalComments: Record<string, any>;
-  };
-  currentSlice: {
-    answers: Record<string, any>;
-    importance: Record<string, any>;
-    conviction: Record<string, any>;
-    additionalComments: Record<string, any>;
-  };
+  baselineSlice: ResponseSlice;
+  currentSlice: ResponseSlice;
   ids?: Set<string>;
   ratingEnvelopeQids?: Set<string>;
-  resolveAudience?: (field: any) => string;
-  resolveGateId?: (field: any) => string;
-  resolveAudienceMode?: (field: any) => string;
+  resolveAudience?: (field: ResponseFieldState) => string;
+  resolveGateId?: (field: ResponseFieldState) => string;
+  resolveAudienceMode?: (field: ResponseFieldState) => string;
 }) => computeChangedQidsAndFields({
   ids,
   baselineSlice,
@@ -280,7 +272,7 @@ describe('surveyToolChangedFieldsController', () => {
         ...buildEmptySlice(),
         answers: { q1: { value: 'same', encrypted: true, encryptionAudience: 'beta' } },
       };
-      const normalizeResponseEncryptionAudience = jest.fn((audience: any, qid: any) => `${qid}:${audience}`);
+      const normalizeResponseEncryptionAudience = jest.fn((audience: unknown, qid: string) => `${qid}:${audience}`);
       const getDefaultResponseEncryptionAudienceForQid = jest.fn(() => 'default-qid');
 
       const { result } = orchestrateGetChangedQidsAndFields(

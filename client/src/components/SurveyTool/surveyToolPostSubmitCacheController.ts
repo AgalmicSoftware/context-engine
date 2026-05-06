@@ -10,20 +10,52 @@ import {
 } from './surveyToolCacheState.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import { normalizeSessionSlugValue } from './surveyToolScope.js';
+import type { UnknownRecord } from './surveyToolTypes.js';
+
+type ResponseMetaBoundary = UnknownRecord & {
+  blockNumber?: unknown;
+  bn?: unknown;
+  transactionIndex?: unknown;
+  txIndex?: unknown;
+  txi?: unknown;
+  logIndex?: unknown;
+  li?: unknown;
+  timestamp?: unknown;
+  ts?: unknown;
+  transactionHash?: unknown;
+  txHash?: unknown;
+  hash?: unknown;
+};
+
+type SubmittedQuestionResponse = UnknownRecord & {
+  questionID?: unknown;
+  questionId?: unknown;
+  type?: unknown;
+  prompt?: unknown;
+  sessionName?: unknown;
+};
+
+type SubmittedSurveyResponse = UnknownRecord & {
+  surveyID?: unknown;
+  surveyId?: unknown;
+  surveyTitle?: unknown;
+  sessionName?: unknown;
+  responses?: unknown[];
+};
 
 export interface PostSubmitCacheDeps {
   account: string;
   effectiveDraftSlug: string;
   singleQuestionMode: boolean;
   isStandalone: boolean;
-  deepClone: (obj: any) => any;
+  deepClone: <T>(obj: T) => T;
   resolveSubmittedCacheWriteContext: (slug: string) => { networkIdStr: string };
 }
 
 export interface PostSubmitCacheParams {
-  receipt?: any;
-  questionResponses?: any[];
-  surveyResponse?: any;
+  receipt?: ResponseMetaBoundary | null;
+  questionResponses?: SubmittedQuestionResponse[] | null;
+  surveyResponse?: SubmittedSurveyResponse | null;
   surveyId?: string | null;
   submissionSlug?: string | null;
 }
@@ -164,7 +196,10 @@ export async function writeSubmittedResponsesToLocalCaches(
         ? net.surveyResponses[surveyIdLower][responderLower].responses
         : [];
       const mergedQuestionIds = mergedResponses
-        .map((row: any) => normalizeQuestionIdKey(row?.questionID || row?.questionId))
+        .map((row: unknown) => {
+          const rowRecord = (row && typeof row === 'object') ? row as UnknownRecord : {};
+          return normalizeQuestionIdKey(rowRecord.questionID || rowRecord.questionId);
+        })
         .filter(Boolean);
       net.surveys[surveyIdLower] = {
         ...prevSurvey,
