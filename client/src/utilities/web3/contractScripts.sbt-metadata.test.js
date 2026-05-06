@@ -153,6 +153,68 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     }));
   });
 
+  it('falls back to hasPasswordMint when mintMode is unavailable on the contract', async () => {
+    const metadataUrl = 'https://example.com/metadata/legacy-flags.json';
+    const stub = baseContractStub(metadataUrl);
+    stub.hasPasswordMint.mockResolvedValue(true);
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'application/json; charset=utf-8' },
+      json: async () => ({
+        name: 'Legacy Flag SBT',
+        hasPasswordMint: false,
+      }),
+      text: async () => '',
+    });
+
+    const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: {},
+    });
+
+    expect(meta).toEqual(expect.objectContaining({
+      tokenURI: metadataUrl,
+      hasPasswordMint: true,
+    }));
+  });
+
+  it.each([
+    ['PublicClaim', 0, true, false],
+    ['PasswordCommitReveal', 1, false, true],
+    ['UnlimitedGroupSignature', 2, true, false],
+    ['LimitedInviteSignature', 3, false, true],
+  ])('derives %s metadata from on-chain mintMode()', async (_label, mintMode, legacyHasPasswordMint, expectedHasPasswordMint) => {
+    const metadataUrl = `https://example.com/metadata/mint-mode-${mintMode}.json`;
+    const stub = baseContractStub(metadataUrl);
+    stub.hasPasswordMint.mockResolvedValue(legacyHasPasswordMint);
+    stub.mintMode = jest.fn().mockResolvedValue(ethers.BigNumber.from(mintMode));
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      headers: { get: () => 'application/json; charset=utf-8' },
+      json: async () => ({
+        name: `Mint Mode ${mintMode} SBT`,
+        hasPasswordMint: legacyHasPasswordMint,
+      }),
+      text: async () => '',
+    });
+
+    const meta = await contractScripts.getSbtMetadata('none', sbtAddress, {
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: {},
+    });
+
+    expect(meta).toEqual(expect.objectContaining({
+      tokenURI: metadataUrl,
+      mintMode,
+      hasPasswordMint: expectedHasPasswordMint,
+    }));
+    expect(stub.mintMode).toHaveBeenCalledTimes(1);
+  });
+
   it('parses encrypted tags, document URLs, and gate metadata from tokenURI JSON', async () => {
     const metadataUrl = 'https://example.com/metadata/private-sbt.json';
     const stub = baseContractStub(metadataUrl);

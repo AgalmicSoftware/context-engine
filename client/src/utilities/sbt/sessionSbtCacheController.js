@@ -11,14 +11,11 @@ import {
 } from '../../components/MainSite/mainSiteUtils.js';
 import {
   mapSbtWorkProgressToBlock,
-  mergeSbtLiveProgressEntry,
   SBT_FULL_SCAN_DISCOVERY_UNITS,
   SBT_FULL_SCAN_PROCESS_UNITS,
   SBT_LIGHT_DISCOVERY_HYDRATION_UNITS,
   SBT_LIGHT_DISCOVERY_SCAN_UNITS,
   SBT_PROGRESS_FINAL_TAIL_BLOCKS,
-  SBT_PROGRESS_MIN_INTERVAL_MS,
-  shouldCommitThrottledProgress,
 } from '../../components/MainSite/progressHelpers.js';
 import {
   normalizeSbtCountMap,
@@ -37,11 +34,17 @@ import {
   normalizeSbtRealtimeEventCursor,
   compareSbtRealtimeEventCursor,
 } from './sbtRealtimeCursorHelpers.js';
+import { createSbtLiveProgressController } from './sbtLiveProgressController.js';
+import { createSbtRealtimeCoverageController } from './sbtRealtimeCoverageController.js';
+import { createSbtRealtimeListenerCleanupController } from './sbtRealtimeListenerCleanupController.js';
+import { getSbtInstanceListenerPlan } from './sbtRealtimeListenerPlan.js';
+import { resolveSbtRealtimeEventBlockNumber } from './sbtRealtimeEventBlockResolver.js';
+import { getSbtRealtimeEventCursorGuard } from './sbtRealtimeEventCursorGuard.js';
+import { updateSbtRealtimeCursorForNetworkCache } from './sbtRealtimeCursorCache.js';
 
 const mainSiteLog = createLogger('mainSite');
 
 export const createSessionSbtCacheController = (host = {}) => {
-  let _sbtScanProgressMetaBySlug = new Map();
   let _sessionRouteLightDiscoveryInFlight = {};
   let _lightSbtDiscoveryInFlight = {};
 
@@ -163,130 +166,21 @@ export const createSessionSbtCacheController = (host = {}) => {
       : false
   );
 
-  const beginSbtLiveProgress = (slugIn, initialPatch = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const token = Number(_sbtScanProgressMetaBySlug.get(slug)?.token || 0) + 1;
-    const nowMs = Date.now();
-    _sbtScanProgressMetaBySlug.set(slug, {
-      token,
-      lastCommitMs: nowMs,
-    });
-    setState((prev) => ({
-      sbtScanProgressBySlug: {
-        ...(prev?.sbtScanProgressBySlug || {}),
-        [slug]: mergeSbtLiveProgressEntry({
-          prevEntry: null,
-          nextPatch: {
-            slug,
-            ...initialPatch,
-            updatedAtMs: nowMs,
-          },
-          nowMs,
-        }),
-      },
-    }));
-    return token;
-  };
+  const sbtLiveProgressController = createSbtLiveProgressController({ setState });
+  const beginSbtLiveProgress = sbtLiveProgressController.beginSbtLiveProgress;
+  const updateSbtLiveProgress = sbtLiveProgressController.updateSbtLiveProgress;
+  const clearSbtLiveProgress = sbtLiveProgressController.clearSbtLiveProgress;
 
+  const sbtRealtimeCoverageController = createSbtRealtimeCoverageController({ setState });
+  const setSbtRealtimeCoverageForGroup = sbtRealtimeCoverageController.setSbtRealtimeCoverageForGroup;
+  const clearSbtRealtimeCoverageForGroup = sbtRealtimeCoverageController.clearSbtRealtimeCoverageForGroup;
 
-  const updateSbtLiveProgress = (slugIn, token, nextPatch = {}, options = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const meta = _sbtScanProgressMetaBySlug.get(slug);
-    if (!meta || Number(meta.token || 0) !== Number(token || 0)) return false;
-    const nowMs = Date.now();
-    if (!shouldCommitThrottledProgress({
-      force: options?.force === true,
-      nowMs,
-      lastCommitMs: Number(meta.lastCommitMs || 0),
-      minIntervalMs: SBT_PROGRESS_MIN_INTERVAL_MS,
-    })) {
-      return false;
-    }
-    meta.lastCommitMs = nowMs;
-    _sbtScanProgressMetaBySlug.set(slug, meta);
-    setState((prev) => {
-      const prevEntry = prev?.sbtScanProgressBySlug?.[slug] || null;
-      const nextEntry = mergeSbtLiveProgressEntry({
-        prevEntry,
-        nextPatch: {
-          slug,
-          ...nextPatch,
-          updatedAtMs: nowMs,
-        },
-        nowMs,
-      });
-      if (
-        prevEntry &&
-        Number(prevEntry.currentBlock || 0) === Number(nextEntry.currentBlock || 0) &&
-        Number(prevEntry.latestBlock || 0) === Number(nextEntry.latestBlock || 0)
-      ) {
-        return null;
-      }
-      return {
-        sbtScanProgressBySlug: {
-          ...(prev?.sbtScanProgressBySlug || {}),
-          [slug]: nextEntry,
-        },
-      };
-    });
-    return true;
-  };
-
-
-  const clearSbtLiveProgress = (slugIn, token = null) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const meta = _sbtScanProgressMetaBySlug.get(slug);
-    if (token != null && Number(meta?.token || 0) !== Number(token || 0)) return;
-    _sbtScanProgressMetaBySlug.delete(slug);
-    setState((prev) => {
-      const current = prev?.sbtScanProgressBySlug || {};
-      if (!Object.prototype.hasOwnProperty.call(current, slug)) return null;
-      const next = { ...current };
-      delete next[slug];
-      return { sbtScanProgressBySlug: next };
-    });
-  };
-
-
-  const setSbtRealtimeCoverageForGroup = (slugIn, hasCoverage = true) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    setState((prev) => {
-      const currentMap = prev?.sbtRealtimeCoverageBySlug || {};
-      if (hasCoverage) {
-        if (currentMap[slug] === true) return null;
-        return {
-          sbtRealtimeCoverageBySlug: {
-            ...currentMap,
-            [slug]: true,
-          },
-        };
-      }
-      if (!Object.prototype.hasOwnProperty.call(currentMap, slug)) return null;
-      const next = { ...currentMap };
-      delete next[slug];
-      return { sbtRealtimeCoverageBySlug: next };
-    });
-  };
-
-
-  const clearSbtRealtimeCoverageForGroup = (slugIn) => {
-    setSbtRealtimeCoverageForGroup(slugIn, false);
-  };
-
-
-  const removeSbtRealtimeListenersForGroup = (slugIn, {
-    removeFactory = true,
-    removeInstance = true,
-  } = {}) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    clearSbtRealtimeCoverageForGroup(slug);
-    if (removeFactory) {
-      contractScripts.removeSBTEventListener('none', slug);
-    }
-    if (removeInstance) {
-      contractScripts.removeSBTInstanceEventsListener('none', [], slug);
-    }
-  };
+  const sbtRealtimeListenerCleanupController = createSbtRealtimeListenerCleanupController({
+    clearCoverage: clearSbtRealtimeCoverageForGroup,
+    contractScripts,
+  });
+  const removeSbtRealtimeListenersForGroup =
+    sbtRealtimeListenerCleanupController.removeSbtRealtimeListenersForGroup;
 
 
   const ensureSessionRouteSbtDiscovery = (slugIn) => {
@@ -1785,11 +1679,20 @@ export const createSessionSbtCacheController = (host = {}) => {
 
       const cache = dgRead('sbtCache', slug, { clone: false }) || {};
       const sbtList = cache[networkID]?.sbtList || {};
-      const addresses = Object.values(sbtList)
-        .map((entry) => entry && entry.sbtAddress)
-        .filter(Boolean);
+      const allowInstanceListeners = isSbtInstanceListenerEnabledForGroup(slug);
+      const hasMaxOverride =
+        typeof window !== 'undefined' && typeof window.MAX_SBT_INSTANCE_LISTENERS !== 'undefined';
+      const instanceListenerPlan = getSbtInstanceListenerPlan({
+        allowInstanceListeners,
+        maxOverridePresent: hasMaxOverride,
+        maxOverrideValue: typeof window !== 'undefined'
+          ? window.MAX_SBT_INSTANCE_LISTENERS
+          : undefined,
+        networkID,
+        sbtList,
+      });
 
-      if (!addresses.length) {
+      if (instanceListenerPlan.reason === 'empty-cache') {
         setSbtRealtimeCoverageForGroup(slug, true);
         if (window.ENABLE_RPC_DEBUG_LOGGING === true) {
           mainSiteLog.log('[SBT Instances] No SBT addresses found in cache; not attaching instance listeners.', { slug, networkID });
@@ -1797,53 +1700,44 @@ export const createSessionSbtCacheController = (host = {}) => {
         return;
       }
 
-      const allowInstanceListeners = isSbtInstanceListenerEnabledForGroup(slug);
-      const hasMaxOverride =
-        typeof window !== 'undefined' && typeof window.MAX_SBT_INSTANCE_LISTENERS !== 'undefined';
-      let maxInstanceListeners = 25;
-      if (hasMaxOverride) {
-        const n = Number(window.MAX_SBT_INSTANCE_LISTENERS);
-        if (Number.isFinite(n)) maxInstanceListeners = n;
-      }
-
-      if (!allowInstanceListeners) {
+      if (instanceListenerPlan.reason === 'disabled') {
         if (window.ENABLE_RPC_DEBUG_LOGGING === true) {
           mainSiteLog.log('[SBT Instances] Disabled for this group; skipping instance listeners.', { slug, networkID });
         }
         return;
       }
 
-      if (hasMaxOverride && maxInstanceListeners <= 0) {
+      if (instanceListenerPlan.reason === 'max-disabled') {
         if (window.ENABLE_RPC_DEBUG_LOGGING === true) {
           mainSiteLog.log('[SBT Instances] MAX_SBT_INSTANCE_LISTENERS <= 0; skipping instance listeners.', {
             slug,
             networkID,
-            max: maxInstanceListeners
+            max: instanceListenerPlan.maxInstanceListeners
           });
         }
         return;
       }
 
-      if (addresses.length > maxInstanceListeners) {
+      if (instanceListenerPlan.reason === 'too-many') {
         mainSiteLog.warn('[SBT Instances] Too many SBTs for per-instance listeners; skipping.', {
           slug,
           networkID,
-          count: addresses.length,
-          max: maxInstanceListeners
+          count: instanceListenerPlan.count,
+          max: instanceListenerPlan.maxInstanceListeners
         });
         return;
       }
 
       contractScripts.listenForSBTInstanceEvents(
         'none',
-        addresses,
+        instanceListenerPlan.addresses,
         (e) => onNewSbtEventDetectedForGroup(slug, e),
         slug
       );
       setSbtRealtimeCoverageForGroup(slug, true);
 
       if (window.ENABLE_RPC_DEBUG_LOGGING === true) {
-        mainSiteLog.log('[SBT Instances] Instance listeners attached.', { slug, networkID, count: addresses.length });
+        mainSiteLog.log('[SBT Instances] Instance listeners attached.', { slug, networkID, count: instanceListenerPlan.count });
       }
     } catch (err) {
       clearSbtRealtimeCoverageForGroup(slug);
@@ -1866,30 +1760,13 @@ export const createSessionSbtCacheController = (host = {}) => {
         return;
     }
 
-    let eventBlockNumber = event.blockNumber;
-    if (!eventBlockNumber && event.transactionHash) {
-        // Use group-aware read provider for receipt lookup
-        let readProvider = null;
-        try {
-           readProvider = getReadProviderForSession(slug);
-        } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
-        if (readProvider && typeof readProvider.getTransactionReceipt === 'function') {
-          try {
-              const receipt = await readProvider.getTransactionReceipt(event.transactionHash);
-              eventBlockNumber = receipt?.blockNumber;
-          } catch (e) {
-              mainSiteLog.error("Failed to get block number from transaction hash for SBT event", e);
-              const { toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(slug);
-              eventBlockNumber = baseTo;
-          }
-        } else {
-          const { toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(slug);
-          eventBlockNumber = baseTo;
-        }
-    } else if (!eventBlockNumber) {
-        const { toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(slug);
-        eventBlockNumber = baseTo;
-    }
+    const eventBlockNumber = await resolveSbtRealtimeEventBlockNumber({
+      event,
+      getReadProviderForSession,
+      getRelevantBlockWindowForFilter: contractScripts.getRelevantBlockWindowForFilter,
+      log: mainSiteLog,
+      slug,
+    });
 
     const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(slug);
     let currentCache = dgRead('sbtCache', slug) || {};
@@ -1904,20 +1781,22 @@ export const createSessionSbtCacheController = (host = {}) => {
     if (!networkCache.sbtList) networkCache.sbtList = {};
 
     const overallLastBlockProcessedByNetwork = Number(networkCache.lastBlock) || 0;
-    const eventCursor = normalizeSbtRealtimeEventCursor({
-      blockNumber: eventBlockNumber,
+    const cursorGuard = getSbtRealtimeEventCursorGuard({
+      eventBlockNumber,
       transactionIndex: event?.transactionIndex,
       logIndex: event?.logIndex,
+      lastRealtimeEventCursor: networkCache.lastRealtimeEventCursor,
+      overallLastBlockProcessedByNetwork,
     });
-    const lastRealtimeCursor = normalizeSbtRealtimeEventCursor(networkCache.lastRealtimeEventCursor);
-    if (lastRealtimeCursor && eventCursor && compareSbtRealtimeEventCursor(eventCursor, lastRealtimeCursor) <= 0) {
+    const { eventCursor, lastRealtimeCursor } = cursorGuard;
+    if (cursorGuard.reason === 'cursor') {
       mainSiteLog.log("Skipping older or already processed ordered SBT event in onNewSbtEventDetectedForGroup.", {
         eventCursor,
         lastRealtimeCursor,
       });
       return;
     }
-    if (eventBlockNumber < overallLastBlockProcessedByNetwork) {
+    if (cursorGuard.reason === 'block') {
       mainSiteLog.log("Skipping older or already processed SBT event in onNewSbtEventDetectedForGroup.", {eventBlockNumber, overallLastBlockProcessedByNetwork});
       return;
     }
@@ -1995,13 +1874,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         blockNumber: eventBlockNumber,
       };
       networkCache.lastBlock = Math.max(networkCache.lastBlock || 0, eventBlockNumber);
-      const normalizedCursor = normalizeSbtRealtimeEventCursor(eventCursor);
-      if (normalizedCursor) {
-        const previousCursor = normalizeSbtRealtimeEventCursor(networkCache.lastRealtimeEventCursor);
-        if (!previousCursor || compareSbtRealtimeEventCursor(normalizedCursor, previousCursor) > 0) {
-          networkCache.lastRealtimeEventCursor = normalizedCursor;
-        }
-      }
+      updateSbtRealtimeCursorForNetworkCache(networkCache, eventCursor);
 
       dgWrite('sbtCache', slug, currentCache);
       queueLocalRevisionUpdate({ needsSbtRevision: true });
@@ -2133,13 +2006,7 @@ export const createSessionSbtCacheController = (host = {}) => {
 
     sbtEntry.blockNumber = Math.max(sbtEntry.blockNumber || 0, eventBlockNumber);
     networkCache.lastBlock = Math.max(networkCache.lastBlock || 0, eventBlockNumber);
-    const normalizedCursor = normalizeSbtRealtimeEventCursor(eventCursor);
-    if (normalizedCursor) {
-      const previousCursor = normalizeSbtRealtimeEventCursor(networkCache.lastRealtimeEventCursor);
-      if (!previousCursor || compareSbtRealtimeEventCursor(normalizedCursor, previousCursor) > 0) {
-        networkCache.lastRealtimeEventCursor = normalizedCursor;
-      }
-    }
+    updateSbtRealtimeCursorForNetworkCache(networkCache, eventCursor);
 
     dgWrite('sbtCache', slug, currentCache);
     queueLocalRevisionUpdate({ needsSbtRevision: true });
@@ -2164,7 +2031,7 @@ export const createSessionSbtCacheController = (host = {}) => {
 
 
   const destroy = () => {
-    _sbtScanProgressMetaBySlug.clear();
+    sbtLiveProgressController.destroy();
     _sessionRouteLightDiscoveryInFlight = {};
     _lightSbtDiscoveryInFlight = {};
   };
