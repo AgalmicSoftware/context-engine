@@ -2134,6 +2134,61 @@ describe('UserPage cache refresh pipeline', () => {
     expect(instance.state.questionCreationInfo[0].prompt).toBe('Who goes there?');
   });
 
+  it('preserves source session slugs for profile question cards', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const viewLower = viewAddress.toLowerCase();
+    const networkID = '84532';
+    const instance = makeInstance({
+      viewAddress,
+      activeSessionSlug: 'demo',
+    });
+
+    const dataByNamespace = {
+      surveysCache: [],
+      sbtCache: [],
+      userCache: [],
+      questionsCache: [{
+        slug: 'demo',
+        data: {
+          [networkID]: {
+            questions: {
+              q1: {
+                id: 'q1',
+                creator: viewAddress,
+                prompt: 'Question tied to demo-4',
+                sessionName: 'demo-4',
+                type: 'freeform',
+              },
+            },
+            questionResponses: {
+              q1: {
+                [viewLower]: JSON.stringify({
+                  answer: { value: 'Visible answer' },
+                }),
+              },
+            },
+          },
+        },
+      }],
+    };
+
+    instance._dgHasAny = jest.fn(() => true);
+    instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
+
+    instance._refreshAllDataFromCache({ force: true, markLoading: true });
+
+    expect(instance.state.questionCreationInfo[0]).toEqual(expect.objectContaining({
+      id: 'q1',
+      sessionSlug: 'demo-4',
+      slug: 'demo-4',
+    }));
+    expect(instance.state.questionResponseInfo[0]).toEqual(expect.objectContaining({
+      id: 'q1',
+      sessionSlug: 'demo-4',
+      slug: 'demo-4',
+    }));
+  });
+
   it('shows question responses even when question metadata has not been cached yet', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const networkID = '84532';
