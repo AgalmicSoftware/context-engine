@@ -75,7 +75,6 @@ import {
   buildSbtPageRelevantInfoPatch,
   buildSbtPageResolvedSessionSlugPatch,
   buildSbtPageSbtInfoPatch,
-  buildSbtPageSectionHeaderClassName,
   buildSbtPageSessionSbtAddresses,
   buildSbtPageSessionSbtAddressesMemoState,
   coerceSbtPageEpochSeconds,
@@ -117,7 +116,6 @@ import {
   resolveSbtPageLocalStorageJsonWriteDecision,
   resolveSbtPageActionFeedbackState,
   resolveSbtPageEffectiveSessionSlug,
-  resolveSbtPageFullViewShellState,
   resolveSbtPageHolderFilterItems,
   resolveSbtPageHolderLoadingState,
   resolveSbtPageHolderModalDisplayState,
@@ -148,7 +146,6 @@ import {
   resolveSbtPagePasswordInventoryDisplayState,
   resolveSbtPagePasswordJoinButtonState,
   resolveSbtPagePendingButtonContentState,
-  resolveSbtPageQuestionIconStyle,
   resolveSbtPageRemainingBlocksCount,
   resolveSbtPageRelevantInfoDisplayState,
   resolveSbtPageRelevantInfoLists,
@@ -161,19 +158,11 @@ import {
   resolveSbtPageAdminActionState,
   resolveSbtPageAdminBurnButtonState,
   resolveSbtPageAdminCreatorAddresses,
-  resolveSbtPageBookmarkButtonDisplayState,
   resolveSbtPageBurnAuthLabel,
   resolveSbtPageChainMetadataReadNeeds,
   resolveSbtPageCopyableErrorText,
-  resolveSbtPageCopyErrorButtonStyle,
-  resolveSbtPageCopyIconState,
   resolveSbtPageCountdownDisplaySeconds,
-  resolveSbtPageInlineLockIconStyle,
-  resolveSbtPageInteractiveCursorStyle,
-  resolveSbtPageItalicNoteStyle,
-  resolveSbtPageMutedInfoIconStyle,
   resolveSbtPageRecoveryCacheChainId,
-  resolveSbtPageRefreshIndicatorStyle,
   resolveSbtPageMaxTokensDisplay,
   resolveSbtPageScanProgressDisplay,
   resolveSbtPageScanProgressFillStyle,
@@ -185,7 +174,6 @@ import {
   resolveSbtPageUserAdminStatus,
   resolveSbtPageSessionDisplayConfig,
   resolveSbtPageSessionDisplayLabel,
-  resolveSbtPageSectionToggleDisplayState,
   resolveSbtPageStatusButtonContentState,
   resolveSbtAddress,
   resolveSbtAddressString,
@@ -256,62 +244,6 @@ describe('sbtPageHelpers', () => {
       state: { showActions: 'open' },
       stateKey: 'showActions',
     })).toEqual({ showActions: false });
-    expect(resolveSbtPageSectionToggleDisplayState({ open: true })).toEqual({
-      isOpen: true,
-      shouldRenderClosedIcon: false,
-      shouldRenderOpenIcon: true,
-    });
-    expect(resolveSbtPageSectionToggleDisplayState({ open: false })).toEqual({
-      isOpen: false,
-      shouldRenderClosedIcon: true,
-      shouldRenderOpenIcon: false,
-    });
-    expect(buildSbtPageSectionHeaderClassName({
-      baseClassName: 'section-header',
-      roundedClassName: 'rounded-header',
-    })).toBe('section-header rounded-header');
-    expect(resolveSbtPageBookmarkButtonDisplayState({ bookmarked: true })).toEqual({
-      iconStyle: { color: '#FFD700' },
-    });
-    expect(resolveSbtPageBookmarkButtonDisplayState({ bookmarked: false })).toEqual({
-      iconStyle: { color: undefined },
-    });
-    expect(resolveSbtPageInteractiveCursorStyle()).toEqual({ cursor: 'pointer' });
-    expect(resolveSbtPageQuestionIconStyle()).toEqual({
-      marginLeft: '5px',
-      color: '#00ff9d',
-      cursor: 'pointer',
-      opacity: 0.5,
-    });
-    expect(resolveSbtPageItalicNoteStyle()).toEqual({ fontStyle: 'italic' });
-    expect(resolveSbtPageCopyErrorButtonStyle()).toEqual({
-      background: 'transparent',
-      border: 'none',
-      marginLeft: '8px',
-      cursor: 'pointer',
-    });
-    expect(resolveSbtPageMutedInfoIconStyle()).toEqual({ opacity: 0.5 });
-    expect(resolveSbtPageInlineLockIconStyle()).toEqual({ marginRight: '6px' });
-    expect(resolveSbtPageRefreshIndicatorStyle()).toEqual({
-      marginLeft: '10px',
-      fontSize: '0.8em',
-      opacity: 0.7,
-    });
-    expect(resolveSbtPageCopyIconState({
-      copiedAddress: 'contract',
-      targetKey: 'contract',
-    })).toEqual({
-      shouldRenderCopiedIcon: true,
-      shouldRenderDefaultIcon: false,
-    });
-    expect(resolveSbtPageCopyIconState({
-      copied: false,
-      copiedAddress: 'contract',
-      targetKey: 'contract',
-    })).toEqual({
-      shouldRenderCopiedIcon: false,
-      shouldRenderDefaultIcon: true,
-    });
     expect(buildSbtPageAddressChangeResetMintUiPatch({
       sbtAddressChanged: false,
     })).toBeNull();
@@ -3322,45 +3254,6 @@ describe('sbtPageHelpers', () => {
       { sourceKey: 'image-a', activeIndex: 1, maxIndex: 2 },
       { displayImageFallbackKey: 'image-a', displayImageFallbackIndex: 0 }
     )).toBeNull();
-  });
-
-  it('resolves full SBT page shell display states', () => {
-    expect(resolveSbtPageFullViewShellState({
-      hasSbtAddress: false,
-      sbtInfo: { name: 'Hidden' },
-    })).toEqual({
-      shouldRenderContent: false,
-      shouldRenderError: false,
-      shouldRenderLoading: false,
-      shouldRenderMissingAddress: true,
-    });
-    expect(resolveSbtPageFullViewShellState({
-      error: 'failed',
-      hasSbtAddress: true,
-    })).toEqual({
-      shouldRenderContent: false,
-      shouldRenderError: true,
-      shouldRenderLoading: false,
-      shouldRenderMissingAddress: false,
-    });
-    expect(resolveSbtPageFullViewShellState({
-      hasSbtAddress: true,
-    })).toEqual({
-      shouldRenderContent: false,
-      shouldRenderError: false,
-      shouldRenderLoading: true,
-      shouldRenderMissingAddress: false,
-    });
-    expect(resolveSbtPageFullViewShellState({
-      error: 'stale',
-      hasSbtAddress: true,
-      sbtInfo: { name: 'Loaded' },
-    })).toEqual({
-      shouldRenderContent: true,
-      shouldRenderError: false,
-      shouldRenderLoading: false,
-      shouldRenderMissingAddress: false,
-    });
   });
 
   it('builds holder occurrence maps, net counts, holder lists, and signatures', () => {
