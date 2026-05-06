@@ -1,24 +1,62 @@
 import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import {
+  isPlainAnalysisObject,
+  toAnalysisRecord,
+  type UserPageUnknownRecord,
+} from './userPageCoreHelpers';
 
-export type UserPageUnknownRecord = Record<string, unknown>;
-
-export type UserPageBookmarkUserEntry = UserPageUnknownRecord & {
-  address?: unknown;
-  nickname?: unknown;
-  username?: unknown;
-  networkId?: unknown;
-};
-export type UserPageBookmarkUserValue = string | UserPageBookmarkUserEntry;
-export type UserPageBookmarksCache = UserPageUnknownRecord & {
-  surveys: unknown[];
-  questions: unknown[];
-  users: UserPageBookmarkUserValue[];
-  filters: unknown[];
-};
-export type UserPageBookmarkStatus = {
-  bookmarked: boolean;
-  nickname: string | null;
-};
+export {
+  isPlainAnalysisObject,
+  toAnalysisRecord,
+} from './userPageCoreHelpers';
+export type { UserPageUnknownRecord } from './userPageCoreHelpers';
+export {
+  applyUserPageBookmarkNicknameSave,
+  applyUserPageBookmarkToggle,
+  buildDefaultUserPageBookmarksCache,
+  buildUserPageBookmarkStatusStateUpdate,
+  buildUserPageBookmarkToggleStatePatch,
+  buildUserPageHeaderBookmarkClassName,
+  isBookmarkUserEntry,
+  isBookmarkUserObjectForAddress,
+  isBookmarkValueForAddress,
+  normalizeUserPageBookmarksCache,
+  resolveUserPageBookmarkButtonDisplayState,
+  resolveUserPageBookmarkNickname,
+  resolveUserPageBookmarkStatus,
+  resolveUserPageBookmarksLinkDisplayState,
+} from './userPageBookmarkHelpers';
+export type {
+  UserPageBookmarkStatus,
+  UserPageBookmarksCache,
+  UserPageBookmarkUserEntry,
+  UserPageBookmarkUserValue,
+} from './userPageBookmarkHelpers';
+export {
+  buildUserPageAnalysisModalStatePatch,
+  buildUserPageBooleanTogglePatch,
+  buildUserPageCopiedStatePatch,
+  buildUserPageCreatedQuestionWrapperClassName,
+  buildUserPageFullProfileModalStatePatch,
+  buildUserPageNicknameEditCancelStatePatch,
+  buildUserPageNicknameEditOpenStatePatch,
+  buildUserPageNicknameInputStatePatch,
+  buildUserPageNicknameSaveStatePatch,
+  buildUserPageRootClassName,
+  buildUserPageSelectedTabStatePatch,
+  buildUserPageSurveyExpansionTogglePatch,
+  buildUserPageUsernameChangeStatePatch,
+  buildUserPageUsernameEditCancelStatePatch,
+  buildUserPageUsernameEditOpenStatePatch,
+  buildUserPageUsernameErrorStatePatch,
+  buildUserPageUsernameLoadedStatePatch,
+  buildUserPageUsernameSaveStatePatch,
+  buildUserPageViewAddressStatePatch,
+  resolveUserPageAvatarDisplayState,
+  resolveUserPageCopyIconDisplayState,
+  resolveUserPageInlineEnteredIndicatorDisplayState,
+  resolveUserPageUsernameErrorDisplayState,
+} from './userPageDisplayStateHelpers';
 export type UserPageAnalysisFingerprintInput = {
   address?: unknown;
   model?: unknown;
@@ -151,96 +189,6 @@ type BuildUserPageUncertaintyLoadingFlagsArgs = {
   keepSurveyLoadingDuringDeepScan?: unknown;
   prevState?: unknown;
   uncertainResources?: unknown;
-};
-type BuildUserPageBooleanTogglePatchArgs = {
-  state?: unknown;
-  stateKey?: unknown;
-};
-type BuildUserPageSelectedTabStatePatchArgs = {
-  selectedTab?: unknown;
-};
-type BuildUserPageAnalysisModalStatePatchArgs = {
-  open?: unknown;
-};
-type BuildUserPageFullProfileModalStatePatchArgs = {
-  open?: unknown;
-};
-type BuildUserPageCopiedStatePatchArgs = {
-  copied?: unknown;
-};
-type ResolveUserPageCopyIconDisplayStateArgs = {
-  copied?: unknown;
-};
-type ResolveUserPageBookmarkButtonDisplayStateArgs = {
-  bookmarked?: unknown;
-};
-type BuildUserPageRootClassNameArgs = {
-  baseClassName?: unknown;
-  minimized?: unknown;
-  minimizedClassName?: unknown;
-};
-type BuildUserPageHeaderBookmarkClassNameArgs = {
-  baseClassName?: unknown;
-  headerClassName?: unknown;
-};
-type BuildUserPageCreatedQuestionWrapperClassNameArgs = {
-  baseClassName?: unknown;
-  bolderClassName?: unknown;
-};
-type ResolveUserPageAvatarDisplayStateArgs = {
-  blockieUrl?: unknown;
-};
-type ResolveUserPageBookmarksLinkDisplayStateArgs = {
-  baseClassName?: unknown;
-  inlineClassName?: unknown;
-};
-type ResolveUserPageInlineEnteredIndicatorDisplayStateArgs = {
-  value?: unknown;
-};
-type BuildUserPageNicknameInputStatePatchArgs = {
-  nicknameInput?: unknown;
-};
-type BuildUserPageNicknameSaveStatePatchArgs = {
-  bookmarked?: unknown;
-  nickname?: unknown;
-};
-type BuildUserPageUsernameStatePatchArgs = {
-  username?: unknown;
-};
-type BuildUserPageUsernameErrorStatePatchArgs = {
-  usernameError?: unknown;
-};
-type ResolveUserPageUsernameErrorDisplayStateArgs = {
-  usernameError?: unknown;
-};
-type UserPageUsernameErrorDisplayState = {
-  shouldRenderUsernameError: boolean;
-  usernameErrorText: string;
-};
-type UserPageCopyIconDisplayState = {
-  copiedIconStyle: Record<string, string>;
-  defaultIconStyle: Record<string, string>;
-};
-type UserPageBookmarkButtonDisplayState = {
-  ariaLabel: string;
-  iconStyle: Record<string, string | undefined>;
-  title: string;
-};
-type UserPageAvatarDisplayState = {
-  avatarStyle: Record<string, string>;
-};
-type UserPageBookmarksLinkDisplayState = {
-  className: string;
-  style: Record<string, string>;
-};
-type UserPageInlineEnteredIndicatorDisplayState = {
-  shouldRenderEnteredIndicator: boolean;
-};
-type BuildUserPageViewAddressStatePatchArgs = {
-  viewAddress?: unknown;
-};
-type BuildUserPageSurveyExpansionTogglePatchArgs = BuildUserPageBooleanTogglePatchArgs & {
-  surveyId?: unknown;
 };
 type UserPageUncertaintyLoadingFlags = {
   hasGateUncertainty: boolean;
@@ -546,38 +494,6 @@ type ResolveUserPageQuestionSourceSessionSlugArgs = {
   getSessionSlugByName?: UserPageSessionSlugByNameReader;
   questionData?: unknown;
 };
-type ResolveUserPageBookmarkStatusArgs = {
-  address?: unknown;
-  users?: unknown;
-};
-type ResolveUserPageBookmarkNicknameArgs = ResolveUserPageBookmarkStatusArgs & {
-  trim?: unknown;
-};
-type ApplyUserPageBookmarkNicknameSaveArgs = {
-  address?: unknown;
-  bookmarksCache?: unknown;
-  networkId?: unknown;
-  nickname?: unknown;
-  onchainUsername?: unknown;
-};
-type UserPageBookmarkNicknameSaveResult = {
-  bookmarksCache: UserPageBookmarksCache;
-  nickname: string;
-  stillBookmarked: boolean;
-};
-type ApplyUserPageBookmarkToggleArgs = {
-  address?: unknown;
-  bookmarkMeta?: unknown;
-  bookmarksCache?: unknown;
-  currentNickname?: unknown;
-  networkId?: unknown;
-  onchainUsername?: unknown;
-};
-type UserPageBookmarkToggleResult = {
-  bookmarked: boolean;
-  bookmarksCache: UserPageBookmarksCache;
-  statePatch: UserPageUnknownRecord;
-};
 type BuildUserPageAiSessionScopeContextArgs = {
   activeSessionSlug?: unknown;
   scanScope?: unknown;
@@ -742,11 +658,6 @@ type ResolveUserPageAiAvailabilityRefreshArgs = {
 };
 type BuildUserPageAiAvailabilityStatePatchArgs = {
   available?: unknown;
-};
-type BuildUserPageBookmarkStatusStateUpdateArgs = {
-  bookmarked?: unknown;
-  nickname?: unknown;
-  state?: unknown;
 };
 type UserPageAiAvailabilityStatePatch = {
   aiAvailable: boolean | null;
@@ -982,219 +893,6 @@ export type UserPageAnalysisCacheEntry = UserPageUnknownRecord & {
   address?: unknown;
   networkId?: unknown;
   result?: unknown;
-};
-
-export const isPlainAnalysisObject = (value: unknown): value is UserPageUnknownRecord => (
-  value != null &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
-
-export const toAnalysisRecord = (value: unknown): UserPageUnknownRecord => (
-  isPlainAnalysisObject(value) ? value : {}
-);
-
-export const buildUserPageBooleanTogglePatch = ({
-  state = {},
-  stateKey = '',
-}: BuildUserPageBooleanTogglePatchArgs = {}): Record<string, boolean> => {
-  const key = String(stateKey || '');
-  const source = toAnalysisRecord(state);
-  return {
-    [key]: !source[key],
-  };
-};
-
-export const buildUserPageSelectedTabStatePatch = ({
-  selectedTab = '',
-}: BuildUserPageSelectedTabStatePatchArgs = {}): Record<string, string> => ({
-  selectedTab: String(selectedTab || ''),
-});
-
-export const buildUserPageAnalysisModalStatePatch = ({
-  open = false,
-}: BuildUserPageAnalysisModalStatePatchArgs = {}): Record<string, boolean> => ({
-  showAnalysisModal: open === true,
-});
-
-export const buildUserPageFullProfileModalStatePatch = ({
-  open = false,
-}: BuildUserPageFullProfileModalStatePatchArgs = {}): Record<string, boolean> => ({
-  showFullProfileModal: open === true,
-});
-
-export const buildUserPageCopiedStatePatch = ({
-  copied = false,
-}: BuildUserPageCopiedStatePatchArgs = {}): Record<string, boolean> => ({
-  copied: copied === true,
-});
-
-export const resolveUserPageCopyIconDisplayState = ({
-  copied = false,
-}: ResolveUserPageCopyIconDisplayStateArgs = {}): UserPageCopyIconDisplayState => {
-  const isCopied = !!copied;
-  return {
-    copiedIconStyle: { display: isCopied ? 'inline' : 'none' },
-    defaultIconStyle: { display: isCopied ? 'none' : 'inline' },
-  };
-};
-
-export const resolveUserPageBookmarkButtonDisplayState = ({
-  bookmarked = false,
-}: ResolveUserPageBookmarkButtonDisplayStateArgs = {}): UserPageBookmarkButtonDisplayState => {
-  const isBookmarked = !!bookmarked;
-  const label = isBookmarked ? 'Remove bookmark' : 'Bookmark user';
-  return {
-    ariaLabel: label,
-    iconStyle: { color: isBookmarked ? 'yellow' : undefined },
-    title: label,
-  };
-};
-
-export const buildUserPageRootClassName = ({
-  baseClassName = '',
-  minimized = false,
-  minimizedClassName = '',
-}: BuildUserPageRootClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  minimized ? String(minimizedClassName || '') : '',
-].filter(Boolean).join(' '));
-
-export const buildUserPageHeaderBookmarkClassName = ({
-  baseClassName = '',
-  headerClassName = '',
-}: BuildUserPageHeaderBookmarkClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(headerClassName || ''),
-].filter(Boolean).join(' '));
-
-export const buildUserPageCreatedQuestionWrapperClassName = ({
-  baseClassName = '',
-  bolderClassName = '',
-}: BuildUserPageCreatedQuestionWrapperClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(bolderClassName || ''),
-].filter(Boolean).join(' '));
-
-export const resolveUserPageAvatarDisplayState = ({
-  blockieUrl = '',
-}: ResolveUserPageAvatarDisplayStateArgs = {}): UserPageAvatarDisplayState => ({
-  avatarStyle: {
-    backgroundImage: `url(${String(blockieUrl || '')})`,
-    backgroundPosition: 'center',
-    backgroundSize: 'cover',
-  },
-});
-
-export const resolveUserPageBookmarksLinkDisplayState = ({
-  baseClassName = '',
-  inlineClassName = '',
-}: ResolveUserPageBookmarksLinkDisplayStateArgs = {}): UserPageBookmarksLinkDisplayState => ({
-  className: [
-    String(baseClassName || ''),
-    String(inlineClassName || ''),
-  ].filter(Boolean).join(' '),
-  style: { marginLeft: '12px' },
-});
-
-export const resolveUserPageInlineEnteredIndicatorDisplayState = ({
-  value = '',
-}: ResolveUserPageInlineEnteredIndicatorDisplayStateArgs = {}): UserPageInlineEnteredIndicatorDisplayState => ({
-  shouldRenderEnteredIndicator: String(value || '').length > 0,
-});
-
-export const buildUserPageNicknameEditOpenStatePatch = (): Record<string, boolean> => ({
-  isEditingNickname: true,
-});
-
-export const buildUserPageNicknameEditCancelStatePatch = ({
-  nicknameInput = '',
-}: BuildUserPageNicknameInputStatePatchArgs = {}): Record<string, string | boolean> => ({
-  isEditingNickname: false,
-  nicknameInput: String(nicknameInput || ''),
-});
-
-export const buildUserPageNicknameInputStatePatch = ({
-  nicknameInput = '',
-}: BuildUserPageNicknameInputStatePatchArgs = {}): Record<string, string> => ({
-  nicknameInput: String(nicknameInput || ''),
-});
-
-export const buildUserPageNicknameSaveStatePatch = ({
-  bookmarked = false,
-  nickname = '',
-}: BuildUserPageNicknameSaveStatePatchArgs = {}): Record<string, string | boolean> => ({
-  nicknameInput: String(nickname || ''),
-  bookmarked: Boolean(bookmarked),
-  isEditingNickname: false,
-});
-
-export const buildUserPageUsernameChangeStatePatch = ({
-  username = '',
-}: BuildUserPageUsernameStatePatchArgs = {}): Record<string, string> => ({
-  username: String(username || ''),
-  usernameError: '',
-});
-
-export const buildUserPageUsernameLoadedStatePatch = ({
-  username = '',
-}: BuildUserPageUsernameStatePatchArgs = {}): Record<string, string> => ({
-  username: String(username || ''),
-});
-
-export const buildUserPageUsernameEditOpenStatePatch = (): Record<string, boolean> => ({
-  isEditingUsername: true,
-});
-
-export const buildUserPageUsernameEditCancelStatePatch = (): Record<string, boolean> => ({
-  isEditingUsername: false,
-});
-
-export const buildUserPageUsernameSaveStatePatch = ({
-  username = '',
-}: BuildUserPageUsernameStatePatchArgs = {}): Record<string, string | boolean> => ({
-  username: String(username || ''),
-  usernameError: '',
-  isEditingUsername: false,
-});
-
-export const buildUserPageUsernameErrorStatePatch = ({
-  usernameError = '',
-}: BuildUserPageUsernameErrorStatePatchArgs = {}): Record<string, string> => ({
-  usernameError: String(usernameError || ''),
-});
-
-export const resolveUserPageUsernameErrorDisplayState = ({
-  usernameError = '',
-}: ResolveUserPageUsernameErrorDisplayStateArgs = {}): UserPageUsernameErrorDisplayState => {
-  const usernameErrorText = String(usernameError || '');
-  return {
-    shouldRenderUsernameError: !!usernameErrorText,
-    usernameErrorText,
-  };
-};
-
-export const buildUserPageViewAddressStatePatch = (
-  args: BuildUserPageViewAddressStatePatchArgs = {},
-): Record<string, unknown> => ({
-  viewAddress: Object.prototype.hasOwnProperty.call(args, 'viewAddress') ? args.viewAddress : '',
-});
-
-export const buildUserPageSurveyExpansionTogglePatch = ({
-  state = {},
-  stateKey = '',
-  surveyId = '',
-}: BuildUserPageSurveyExpansionTogglePatchArgs = {}): UserPageUnknownRecord => {
-  const collectionKey = String(stateKey || '');
-  const surveyKey = String(surveyId);
-  const source = toAnalysisRecord(state);
-  const previousExpansion = toAnalysisRecord(source[collectionKey]);
-  return {
-    [collectionKey]: {
-      ...previousExpansion,
-      [surveyKey]: !previousExpansion[surveyKey],
-    },
-  };
 };
 
 export const toAnalysisCacheBucket = (value: unknown): UserPageUnknownRecord => (
@@ -3071,23 +2769,6 @@ export const buildUserPageAiAvailabilityStatePatch = ({
   aiAvailable: available === null ? null : Boolean(available),
 });
 
-export const buildUserPageBookmarkStatusStateUpdate = ({
-  bookmarked = false,
-  nickname = null,
-  state = null,
-}: BuildUserPageBookmarkStatusStateUpdateArgs = {}): UserPageUnknownRecord | null => {
-  const currentState = isPlainAnalysisObject(state) ? state : {};
-  const nextState: UserPageUnknownRecord = {};
-  const nextBookmarked = Boolean(bookmarked);
-  if (currentState.bookmarked !== nextBookmarked) {
-    nextState.bookmarked = nextBookmarked;
-  }
-  if (nickname != null && currentState.nicknameInput !== nickname) {
-    nextState.nicknameInput = nickname;
-  }
-  return Object.keys(nextState).length > 0 ? nextState : null;
-};
-
 export const resolveUserPageAiAvailabilityRefresh = ({
   nextAccount = '',
   nextIsQuestionCacheReady = false,
@@ -3167,240 +2848,6 @@ export const extractUserPageAnalysisImportance = (value: unknown): unknown => {
     (candidate && typeof candidate === 'object' && candidateRecord.encrypted === true)
   ) ? undefined : candidate;
 };
-
-export const isBookmarkUserEntry = (value: unknown): value is UserPageBookmarkUserEntry => (
-  isPlainAnalysisObject(value)
-);
-
-export const isBookmarkUserObjectForAddress = (
-  value: unknown,
-  addressLower: string
-): value is UserPageBookmarkUserEntry => (
-  isBookmarkUserEntry(value) &&
-  String(value.address || '').toLowerCase() === addressLower
-);
-
-export const isBookmarkValueForAddress = (
-  value: unknown,
-  addressLower: string
-): boolean => (
-  (typeof value === 'string' && String(value).toLowerCase() === addressLower) ||
-  isBookmarkUserObjectForAddress(value, addressLower)
-);
-
-export const buildDefaultUserPageBookmarksCache = (): UserPageBookmarksCache => ({
-  surveys: [],
-  questions: [],
-  users: [],
-  filters: [],
-});
-
-export const normalizeUserPageBookmarksCache = (value: unknown): UserPageBookmarksCache => {
-  const defaultCache = buildDefaultUserPageBookmarksCache();
-  if (!isPlainAnalysisObject(value)) return defaultCache;
-  return {
-    ...defaultCache,
-    ...value,
-    surveys: Array.isArray(value.surveys) ? [...value.surveys] : [],
-    questions: Array.isArray(value.questions) ? [...value.questions] : [],
-    users: Array.isArray(value.users) ? [...value.users] as UserPageBookmarkUserValue[] : [],
-    filters: Array.isArray(value.filters) ? [...value.filters] : [],
-  };
-};
-
-export const resolveUserPageBookmarkStatus = ({
-  address = '',
-  users = [],
-}: ResolveUserPageBookmarkStatusArgs = {}): UserPageBookmarkStatus => {
-  const addressLower = String(address || '').toLowerCase();
-  let bookmarked = false;
-  let nickname: string | null = null;
-  if (!addressLower) return { bookmarked, nickname };
-
-  for (const user of Array.isArray(users) ? users : []) {
-    if (typeof user === 'string') {
-      if (String(user).toLowerCase() === addressLower) {
-        bookmarked = true;
-      }
-    } else if (isBookmarkUserEntry(user)) {
-      const userAddress = String(user.address || '').toLowerCase();
-      if (userAddress === addressLower) {
-        bookmarked = true;
-        if (typeof user.nickname === 'string' && user.nickname) {
-          nickname = user.nickname;
-        }
-      }
-    }
-    if (bookmarked && nickname) break;
-  }
-
-  return { bookmarked, nickname };
-};
-
-export const resolveUserPageBookmarkNickname = ({
-  address = '',
-  trim = false,
-  users = [],
-}: ResolveUserPageBookmarkNicknameArgs = {}): string => {
-  const addressLower = String(address || '').toLowerCase();
-  if (!addressLower) return '';
-  const user = (Array.isArray(users) ? users : []).find((entry) => (
-    isBookmarkUserObjectForAddress(entry, addressLower)
-  ));
-  if (!user || typeof user.nickname !== 'string') return '';
-  const nickname = trim ? user.nickname.trim() : user.nickname;
-  return nickname || '';
-};
-
-export const applyUserPageBookmarkNicknameSave = ({
-  address = '',
-  bookmarksCache = null,
-  networkId = null,
-  nickname = '',
-  onchainUsername = null,
-}: ApplyUserPageBookmarkNicknameSaveArgs = {}): UserPageBookmarkNicknameSaveResult => {
-  const rawAddr = String(address || '');
-  const addrLower = rawAddr.toLowerCase();
-  const normalizedNickname = String(nickname || '').trim();
-  const networkIdStr = networkId != null ? String(networkId) : null;
-  const username = String(onchainUsername || '').trim();
-  const cache = isPlainAnalysisObject(bookmarksCache)
-    ? bookmarksCache as UserPageBookmarksCache
-    : buildDefaultUserPageBookmarksCache();
-
-  cache.surveys = Array.isArray(cache.surveys) ? cache.surveys : [];
-  cache.questions = Array.isArray(cache.questions) ? cache.questions : [];
-  cache.users = Array.isArray(cache.users) ? cache.users : [];
-  cache.filters = Array.isArray(cache.filters) ? cache.filters : [];
-
-  if (!addrLower) {
-    return {
-      bookmarksCache: cache,
-      nickname: normalizedNickname,
-      stillBookmarked: false,
-    };
-  }
-
-  const users = cache.users;
-  const objIdx = users.findIndex((user) => (
-    isBookmarkUserObjectForAddress(user, addrLower)
-  ));
-  const strIdx = users.findIndex((user) => (
-    typeof user === 'string' && String(user).toLowerCase() === addrLower
-  ));
-  const baseObj: UserPageBookmarkUserEntry = {
-    address: addrLower,
-    ...(normalizedNickname ? { nickname: normalizedNickname } : {}),
-  };
-  if (username) baseObj.username = username;
-  if (networkIdStr) baseObj.networkId = networkIdStr;
-
-  if (objIdx > -1) {
-    const existing = isBookmarkUserEntry(users[objIdx]) ? users[objIdx] : {};
-    const merged: UserPageBookmarkUserEntry = {
-      ...existing,
-      address: addrLower,
-      ...(username ? { username } : {}),
-      ...(networkIdStr ? { networkId: networkIdStr } : {}),
-    };
-    if (normalizedNickname) {
-      merged.nickname = normalizedNickname;
-    } else if ('nickname' in merged) {
-      delete merged.nickname;
-    }
-    users[objIdx] = merged;
-  } else if (strIdx > -1) {
-    if (normalizedNickname) {
-      users[strIdx] = baseObj;
-    }
-  } else if (normalizedNickname) {
-    users.push(baseObj);
-  }
-
-  return {
-    bookmarksCache: cache,
-    nickname: normalizedNickname,
-    stillBookmarked: users.some((user) => isBookmarkValueForAddress(user, addrLower)),
-  };
-};
-
-export const applyUserPageBookmarkToggle = ({
-  address = '',
-  bookmarkMeta = null,
-  bookmarksCache = null,
-  currentNickname = '',
-  networkId = null,
-  onchainUsername = null,
-}: ApplyUserPageBookmarkToggleArgs = {}): UserPageBookmarkToggleResult => {
-  const rawAddr = String(address || '');
-  const addrLower = rawAddr.toLowerCase();
-  const cache = isPlainAnalysisObject(bookmarksCache)
-    ? bookmarksCache as UserPageBookmarksCache
-    : buildDefaultUserPageBookmarksCache();
-  cache.surveys = Array.isArray(cache.surveys) ? cache.surveys : [];
-  cache.questions = Array.isArray(cache.questions) ? cache.questions : [];
-  cache.users = Array.isArray(cache.users) ? cache.users : [];
-  cache.filters = Array.isArray(cache.filters) ? cache.filters : [];
-
-  if (!addrLower) {
-    return {
-      bookmarked: false,
-      bookmarksCache: cache,
-      statePatch: {},
-    };
-  }
-
-  const users = cache.users;
-  const idx = users.findIndex((user) => isBookmarkValueForAddress(user, addrLower));
-  if (idx > -1) {
-    users.splice(idx, 1);
-    return {
-      bookmarked: false,
-      bookmarksCache: cache,
-      statePatch: {
-        isEditingNickname: false,
-        nicknameInput: '',
-      },
-    };
-  }
-
-  const meta = isPlainAnalysisObject(bookmarkMeta) ? bookmarkMeta : {};
-  const username = onchainUsername || '';
-  const shouldUseObject =
-    Boolean(meta.nickname || meta.username) ||
-    Boolean(currentNickname) ||
-    Boolean(username);
-  if (shouldUseObject) {
-    const entry: UserPageBookmarkUserEntry = {
-      address: addrLower,
-      ...(currentNickname ? { nickname: currentNickname } : {}),
-      ...(username ? { username } : {}),
-      ...(networkId != null ? { networkId: String(networkId) } : {}),
-    };
-    if (meta.nickname != null) entry.nickname = meta.nickname;
-    if (meta.username != null) entry.username = meta.username;
-    users.push(entry);
-  } else {
-    users.push(rawAddr);
-  }
-
-  return {
-    bookmarked: true,
-    bookmarksCache: cache,
-    statePatch: {},
-  };
-};
-
-export const buildUserPageBookmarkToggleStatePatch = ({
-  bookmarked = false,
-  statePatch = {},
-}: {
-  bookmarked?: unknown;
-  statePatch?: unknown;
-} = {}): UserPageUnknownRecord => ({
-  bookmarked: Boolean(bookmarked),
-  ...toAnalysisRecord(statePatch),
-});
 
 export const cloneUserPageParsedResponsePayload = (value: unknown): unknown => {
   if (value == null || typeof value !== 'object') return value;
