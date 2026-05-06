@@ -19,6 +19,19 @@ import type {
   SbtNameLookupState,
 } from './sbtSelectorNameLookupHelpers';
 export {
+  buildSelectedSbtHydrationAddresses,
+  buildSelectedSbtHydrationSignature,
+  resolveSbtSelectorLoadOptionsRequestDecision,
+  resolveSbtSelectorTargetedHydrationDecision,
+} from './sbtSelectorHydrationRequestHelpers';
+export type {
+  BuildSelectedSbtHydrationSignatureArgs,
+  ResolveSbtSelectorLoadOptionsRequestDecisionArgs,
+  ResolveSbtSelectorTargetedHydrationDecisionArgs,
+  SbtSelectorLoadOptionsRequestDecision,
+  SbtSelectorTargetedHydrationDecision,
+} from './sbtSelectorHydrationRequestHelpers';
+export {
   buildSbtSelectorCustomAddressClearPatch,
   buildSbtSelectorCustomAddressInputPatch,
   buildSbtSelectorDiscoveringPatch,
@@ -480,23 +493,6 @@ type BuildSbtSelectorNameLookupFetchListResult = {
   addresses: string[];
   nameLookupState: SbtNameLookupState;
 };
-type ResolveSbtSelectorTargetedHydrationDecisionArgs = {
-  addresses?: unknown;
-  hits?: unknown;
-  targetedLookupEnabled?: unknown;
-};
-type BuildSelectedSbtHydrationSignatureArgs = {
-  addresses?: unknown;
-  networkID?: unknown;
-  slug?: unknown;
-};
-type ResolveSbtSelectorLoadOptionsRequestDecisionArgs = {
-  forceReload?: unknown;
-  inflightRequest?: unknown;
-  inflightSig?: unknown;
-  lastRequestSig?: unknown;
-  requestSig?: unknown;
-};
 type ResolveSbtSelectorUpdateEffectsArgs = {
   cacheChanged?: unknown;
   chainIdChanged?: unknown;
@@ -529,18 +525,6 @@ type ResolveSbtSelectorUpdateSignalsArgs = {
   prevSelectedSBTs?: unknown;
   prevSessionConfig?: unknown;
   prevSourceSessionSlug?: unknown;
-};
-type SbtSelectorTargetedHydrationDecision = {
-  hasHits: boolean;
-  hasUnresolvedAddresses: boolean;
-  shouldClearRetry: boolean;
-  shouldReloadOptions: boolean;
-  shouldRetry: boolean;
-};
-type SbtSelectorLoadOptionsRequestDecision = {
-  shouldQueueRerun: boolean;
-  shouldReturnInflight: boolean;
-  shouldSkipUnchanged: boolean;
 };
 type SbtSelectorUpdateEffects = {
   shouldEnsureUniverse: boolean;
@@ -729,82 +713,6 @@ export const shouldAutoSearchOtherSbtSelectorSessions = (
     return !!fallback;
   }
   return !!fallback;
-};
-
-export const buildSelectedSbtHydrationAddresses = (selectedSBTs: unknown): string[] => {
-  const selected = Array.isArray(selectedSBTs) ? selectedSBTs : [];
-  return Array.from(new Set(
-    selected
-      .map((entry: unknown) => {
-        const record = isRecord(entry) ? entry as SbtSelectorScopedEntry : {};
-        return String(record.address || '').trim();
-      })
-      .filter((value: string) => ethers.utils.isAddress(value))
-      .map((value: string) => ethers.utils.getAddress(value))
-  ));
-};
-
-export const buildSelectedSbtHydrationSignature = ({
-  addresses = [],
-  networkID = null,
-  slug = '',
-}: BuildSelectedSbtHydrationSignatureArgs = {}): string => (
-  `${String(slug || '')}|${Number(networkID || 0)}|${(Array.isArray(addresses) ? addresses : []).join(',')}`
-);
-
-export const resolveSbtSelectorTargetedHydrationDecision = ({
-  addresses = [],
-  hits = [],
-  targetedLookupEnabled = false,
-}: ResolveSbtSelectorTargetedHydrationDecisionArgs = {}): SbtSelectorTargetedHydrationDecision => {
-  const addressList = Array.isArray(addresses) ? addresses : [];
-  const hitList = Array.isArray(hits) ? hits : [];
-  const hasHits = hitList.length > 0;
-  const resolvedAddresses = new Set<string>(
-    hitList
-      .map((entry: unknown) => {
-        const record = isRecord(entry) ? entry : {};
-        return String(record.address || '').trim().toLowerCase();
-      })
-      .filter(Boolean)
-  );
-  const hasUnresolvedAddresses = addressList.some(
-    (address: unknown) => !resolvedAddresses.has(String(address || '').trim().toLowerCase())
-  );
-  if (!hasHits) {
-    return {
-      hasHits: false,
-      hasUnresolvedAddresses,
-      shouldClearRetry: !targetedLookupEnabled,
-      shouldReloadOptions: false,
-      shouldRetry: !!targetedLookupEnabled,
-    };
-  }
-  return {
-    hasHits: true,
-    hasUnresolvedAddresses,
-    shouldClearRetry: !hasUnresolvedAddresses || !targetedLookupEnabled,
-    shouldReloadOptions: true,
-    shouldRetry: hasUnresolvedAddresses && !!targetedLookupEnabled,
-  };
-};
-
-export const resolveSbtSelectorLoadOptionsRequestDecision = ({
-  forceReload = false,
-  inflightRequest = null,
-  inflightSig = '',
-  lastRequestSig = '',
-  requestSig = '',
-}: ResolveSbtSelectorLoadOptionsRequestDecisionArgs = {}): SbtSelectorLoadOptionsRequestDecision => {
-  const hasInflight = !!inflightRequest;
-  const forced = !!forceReload;
-  const currentRequestSig = String(requestSig || '');
-  const currentInflightSig = String(inflightSig || '');
-  return {
-    shouldQueueRerun: hasInflight && (forced || currentRequestSig !== currentInflightSig),
-    shouldReturnInflight: hasInflight,
-    shouldSkipUnchanged: !forced && !hasInflight && currentRequestSig === String(lastRequestSig || ''),
-  };
 };
 
 export const resolveSbtSelectorUpdateSignals = ({
