@@ -1,8 +1,3 @@
-jest.mock('../../../utilities/ui/jsonFunctions', () => ({
-  copyJsonToClipboard: jest.fn(() => Promise.resolve()),
-  formatJsonForDisplay: jest.fn(() => '{\n  "alpha": 1\n}'),
-}));
-
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
@@ -11,6 +6,11 @@ import {
   copyJsonToClipboard,
   formatJsonForDisplay,
 } from '../../../utilities/ui/jsonFunctions';
+
+jest.mock('../../../utilities/ui/jsonFunctions', () => ({
+  copyJsonToClipboard: jest.fn(() => Promise.resolve()),
+  formatJsonForDisplay: jest.fn(() => '{\n  "alpha": 1\n}'),
+}));
 
 describe('JsonDisplay', () => {
   afterEach(() => {

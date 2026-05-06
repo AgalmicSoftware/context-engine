@@ -81,6 +81,7 @@ type AudioInputProps = {
   showRecordingTimerInTextbox?: boolean;
   recordingDurationSeconds?: number | string | null;
   enableDownloads?: boolean;
+  style?: React.CSSProperties;
 };
 
 type PlaceholderStyle = React.CSSProperties & {
