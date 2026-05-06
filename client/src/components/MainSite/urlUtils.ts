@@ -30,7 +30,11 @@ export const buildPublicUrl = (pathname = '', search = '', hash = ''): string =>
   return `${buildPublicRoute(pathname)}${normalizedSearch}${normalizedHash}`;
 };
 
-export const replaceRouteResponderQueryParam = (pathname: any, responder: any, search = ''): void => {
+export const replaceRouteResponderQueryParam = (
+  pathname: string | null | undefined,
+  responder: unknown,
+  search = ''
+): void => {
   if (typeof window === 'undefined' || !pathname || !isRouteResponderAddress(responder)) return;
   const params = new URLSearchParams(String(search || ''));
   params.set('responder', String(responder || '').trim());

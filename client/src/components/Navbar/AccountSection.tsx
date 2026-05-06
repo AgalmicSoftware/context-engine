@@ -3,6 +3,7 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { toggleLoginModal } from '../../actions/sessionStateActions.js';
+import type { RootState } from '../../reducers/index.js';
 
 import styles from "./Navbar.module.scss";
 
@@ -26,16 +27,6 @@ type AccountSectionProps = {
   sendTestETH?: (amountToSend: unknown) => void;
   demoMode?: unknown;
   toggleDemoMode?: (demoModeOn: boolean) => void;
-};
-
-type RootState = {
-  sessionState: {
-    loginModalToggled?: boolean;
-    loginComplete?: boolean;
-  };
-  profile: {
-    userImageURL?: string | null;
-  };
 };
 
 const LoginButton = LoginButtonRaw as React.ComponentType<any>;

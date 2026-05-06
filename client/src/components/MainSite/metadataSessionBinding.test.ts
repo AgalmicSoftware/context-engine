@@ -1,12 +1,3 @@
-jest.mock('../../utilities/web3/sessionConfigResolvers.js', () => {
-  const actual = jest.requireActual('../../utilities/web3/sessionConfigResolvers.js');
-  return {
-    __esModule: true,
-    ...actual,
-    getSessionSlugByName: jest.fn(),
-  };
-});
-
 import { getSessionSlugByName } from '../../utilities/web3/sessionConfigResolvers.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
@@ -15,6 +6,15 @@ import {
   resolveMetadataSessionSlug,
   resolveScopedMetadataSessionSlug,
 } from './metadataSessionBinding.js';
+
+jest.mock('../../utilities/web3/sessionConfigResolvers.js', () => {
+  const actual = jest.requireActual('../../utilities/web3/sessionConfigResolvers.js');
+  return {
+    __esModule: true,
+    ...actual,
+    getSessionSlugByName: jest.fn(),
+  };
+});
 
 const mockGetSessionSlugByName = getSessionSlugByName as jest.MockedFunction<typeof getSessionSlugByName>;
 

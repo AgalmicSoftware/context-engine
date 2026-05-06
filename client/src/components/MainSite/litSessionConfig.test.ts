@@ -1,7 +1,7 @@
 import { resolveMainSiteLitSessionConfig } from './litSessionConfig.js';
 
 const VALID_SBT_ADDRESS = '0x0000000000000000000000000000000000000001';
-const resolveConfig: any = resolveMainSiteLitSessionConfig;
+const resolveConfig = resolveMainSiteLitSessionConfig;
 
 const buildSessionConfigWithGate = ({
   chainId,
@@ -128,5 +128,24 @@ describe('litSessionConfig', () => {
       },
     });
     expect(result.litNetwork).toBe('chipotle');
+  });
+
+  it('surfaces a worker-mediated Chipotle runtime from a worker URL and default gate without mirrored credentials', () => {
+    const sessionConfig = {
+      ...buildSessionConfigWithGate({ chainId: 84532 }),
+      corsWorkerUrl: 'https://worker.example.test',
+      lit: { network: 'chipotle' },
+    };
+
+    const result = resolveConfig({ sessionConfig });
+
+    expect(result.chipotle).toEqual({
+      enabled: true,
+      workerUrl: 'https://worker.example.test',
+      litCredentials: {},
+      sessionConfig,
+    });
+    expect(result.litNetwork).toBe('chipotle');
+    expect(result.accessControlConditions).toEqual(expect.any(Array));
   });
 });

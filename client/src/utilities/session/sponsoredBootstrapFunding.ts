@@ -2,7 +2,7 @@ import { normalizeSessionSlug } from './sessionNaming.js';
 import { normalizeBaseUrl } from '../urlUtils.js';
 import { toStr } from '../shared/primitives.js';
 
-type SponsoredBootstrapFundingInput = Record<string, any>;
+type SponsoredBootstrapFundingInput = Record<string, unknown>;
 type SponsoredBootstrapFundingContext = {
   sessionSlug: string;
   workerUrl: string;
@@ -23,6 +23,10 @@ const hasFundingContext = (
   !!toStr(value?.sessionSlug).trim() || !!toStr(value?.workerUrl).trim()
 );
 
+const isObj = (value: unknown): value is SponsoredBootstrapFundingInput => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
 const persistSponsoredBootstrapFundingContext = (
   normalized: SponsoredBootstrapFundingContext
 ): SponsoredBootstrapFundingContext => {
@@ -41,9 +45,9 @@ const persistSponsoredBootstrapFundingContext = (
 };
 
 export const normalizeSponsoredBootstrapFundingContext = (
-  value: SponsoredBootstrapFundingInput = {}
+  value: unknown = {}
 ): SponsoredBootstrapFundingContext => {
-  const source = value && typeof value === 'object' ? value : {};
+  const source = isObj(value) ? value : {};
   const faucetGrantToken = toStr(
     source.faucetGrantToken ??
     ''
@@ -82,7 +86,7 @@ export const readSponsoredBootstrapFundingContext = (): SponsoredBootstrapFundin
 };
 
 export const writeSponsoredBootstrapFundingContext = (
-  value: SponsoredBootstrapFundingInput = {}
+  value: unknown = {}
 ): SponsoredBootstrapFundingContext => {
   const normalized = normalizeSponsoredBootstrapFundingContext(value);
   return persistSponsoredBootstrapFundingContext(normalized);

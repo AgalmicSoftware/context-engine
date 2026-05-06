@@ -24,11 +24,11 @@ const BASE_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze([
   'https://sepolia.base.org', // intentional: production RPC fallback snapshot
 ]);
 const OP_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze([
-  'https://sepolia.optimism.io', // intentional: production RPC fallback snapshot
   'https://optimism-sepolia.publicnode.com', // intentional: production RPC fallback snapshot
   'https://optimism-sepolia-rpc.publicnode.com', // intentional: production RPC fallback snapshot
   'https://optimism-sepolia.gateway.tenderly.co', // intentional: production RPC fallback snapshot
   'https://optimism-sepolia.drpc.org', // intentional: production RPC fallback snapshot
+  'https://sepolia.optimism.io', // intentional: production RPC fallback snapshot
 ]);
 
 const withoutLeadingOptionalRpcUrls = (urls, optionalUrls = []) => {
@@ -93,6 +93,13 @@ describe('chains RPC defaults', () => {
 
     expect(withoutLeadingOptionalRpcUrls(optimismSepolia.rpcUrls?.public?.http, optionalPrefixUrls)).toEqual(OP_SEPOLIA_PUBLIC_RPC_URLS);
     expect(withoutLeadingOptionalRpcUrls(optimismSepolia.rpcUrls?.default?.http, optionalPrefixUrls)).toEqual(OP_SEPOLIA_PUBLIC_RPC_URLS);
+  });
+
+  it('does not use the rate-limited OP Labs public RPC as the first wallet fallback', () => {
+    const url = getDefaultHttpRpc(11155420, { allowPath: false });
+    expect(url).toBe(OP_SEPOLIA_PUBLIC_RPC_URLS[0]);
+    expect(url).not.toBe('https://sepolia.optimism.io');
+    expect(chainHttpRpcNoPath(optimismSepolia)).toBe(url);
   });
 
   it('returns a non-sepolia.base.org fallback URL when PATH is disabled', () => {

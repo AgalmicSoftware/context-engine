@@ -60,6 +60,22 @@
   Test: `metadataCacheEntryBuilders.test.ts`
   Dependencies: `buildMetadataSessionCacheEnvelope` (metadataSessionBinding), `normalizeSessionSlug` (sessionNaming)
   What stays in MainSite: `writeSurveyMetadataToCache` (DG write, bucket init), `writeQuestionMetadataToCache` (DG write, bucket init)
+- `client/src/components/MainSite/sbtRoutePathHelpers.ts`
+  Pattern: Pure exported functions (no host DI)
+  Exports: `getSbtAddressFromPath`, `isSbtListRoutePath`, `getSbtListRouteSessionSlug`, `getUserAddressFromPath`
+  Purpose: SBT/group list route parsing plus single-SBT and user-address path extraction
+  What stays in MainSite: forwarding wrappers that pass route paths through `getEffectiveRoutePath`, `normalizeSessionSlug`, and `ethers.utils.isAddress`
+- `client/src/components/MainSite/sessionFallbackRedirect.ts`
+  Pattern: Pure exported functions (no host DI)
+  Exports: `getSessionFallbackScopeSlugs`, `getSessionFallbackPreferredTarget`, `isFirstVisitRootRedirectEnabled`, `getFirstVisitRootRedirectTarget`, `getSessionFallbackRedirectStorageKey`, `hasConsumedSessionFallbackRedirect`, `consumeSessionFallbackRedirect`
+  Purpose: List-scope session fallback redirects, preferred target selection, first-visit root redirect target resolution, and sessionStorage consumption tracking
+  Test: `sessionFallbackRedirect.test.ts`
+  What stays in MainSite: route-shell application through `applySessionFallbackRedirect`, first-visit `replaceState`, and forwarding wrappers for runtime/config dependencies
+- `client/src/components/MainSite/sessionDisplayHelpers.ts`
+  Pattern: Pure exported functions (no host DI)
+  Exports: `hasEncryptedSessionField`, `getSessionInfoForGroup`, `getSessionNameForGroup`, `getSessionHeaderForGroup`
+  Purpose: Session info/name/header display resolution, encrypted-field placeholders, per-slug overrides, and demo metadata fallbacks
+  What stays in MainSite: state-backed override maps and forwarding wrappers that supply `normalizeSessionSlug`, `getDemoSessionConfigBySlug`, and Arweave URL normalization
 - `client/src/utilities/survey/sessionSurveyCacheController.js`
   Factory: `createSessionSurveyCacheController(host)`
   Pattern: Factory with host dependency injection
@@ -76,6 +92,34 @@
   Factory: `createSessionSbtCacheController(host)`
   Pattern: Factory with host dependency injection
   Test: `sessionSbtCacheController.test.js` (29 tests)
+- `client/src/utilities/sbt/sbtLiveProgressController.js`
+  Factory: `createSbtLiveProgressController({ setState, ...deps })`
+  Purpose: SBT scan live-progress token state, throttled progress commits, and progress cleanup
+  Test: `sbtLiveProgressController.test.js` (3 tests)
+- `client/src/utilities/sbt/sbtRealtimeCoverageController.js`
+  Factory: `createSbtRealtimeCoverageController({ setState })`
+  Purpose: per-group SBT realtime coverage state writes and cleanup flags
+  Test: `sbtRealtimeCoverageController.test.js` (2 tests)
+- `client/src/utilities/sbt/sbtRealtimeListenerCleanupController.js`
+  Factory: `createSbtRealtimeListenerCleanupController({ clearCoverage, contractScripts })`
+  Purpose: SBT factory/instance listener removal wrapper plus coverage cleanup
+  Test: `sbtRealtimeListenerCleanupController.test.js` (2 tests)
+- `client/src/utilities/sbt/sbtRealtimeListenerPlan.js`
+  Exports: `getSbtInstanceListenerPlan`
+  Purpose: pure per-instance SBT listener attach/skip planning for cache address sets, max overrides, and policy gates
+  Test: `sbtRealtimeListenerPlan.test.js` (6 tests)
+- `client/src/utilities/sbt/sbtRealtimeEventBlockResolver.js`
+  Exports: `resolveSbtRealtimeEventBlockNumber`
+  Purpose: realtime SBT event block-number resolution from direct event data, transaction receipts, or current block-window fallback
+  Test: `sbtRealtimeEventBlockResolver.test.js` (6 tests)
+- `client/src/utilities/sbt/sbtRealtimeEventCursorGuard.js`
+  Exports: `getSbtRealtimeEventCursorGuard`
+  Purpose: pure realtime SBT event skip decisions for ordered cursors and network waterlines
+  Test: `sbtRealtimeEventCursorGuard.test.js` (3 tests)
+- `client/src/utilities/sbt/sbtRealtimeCursorCache.js`
+  Exports: `updateSbtRealtimeCursorForNetworkCache`
+  Purpose: idempotent cache mutation for advancing per-network SBT realtime cursors
+  Test: `sbtRealtimeCursorCache.test.js` (4 tests)
 
 All extracted controllers use a factory-function + host-DI pattern (or pure exports for session config / metadata binding). `MainSite` now wires cache/readiness, scan-policy, profile-scan, survey, question, response, and SBT controllers as class-field initializers, leaving route orchestration, deep scans, and a smaller set of event/view methods inline.
 

@@ -1,6 +1,6 @@
 import { FETCH_ACCOUNT, LOGIN_ACCOUNT, CHANGE_NETWORK } from '../actions/types';
 
-type AccountState = {
+export type AccountState = {
   account: string;
   provider: string;
   network: any;

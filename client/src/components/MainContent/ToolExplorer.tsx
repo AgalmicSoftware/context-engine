@@ -246,6 +246,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     ...expandedComponent.data,
     account: props.account,
     provider: props.provider,
+    litHooks: props.litHooks,
     activeSessionSlug: props.activeSessionSlug,
     loginComplete: props.loginComplete,
     toggleLoginModal: props.toggleLoginModal,

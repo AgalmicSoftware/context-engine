@@ -8,6 +8,35 @@ import { getSessionNetwork } from '../../utilities/web3/contractScripts.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 import { createLogger } from 'utilities/logging.js';
 
+export interface WagmiInjectedProps {
+  wagmiProvider: ReturnType<typeof useProvider>;
+  wagmiWsProvider: ReturnType<typeof useProvider>;
+  wagmiNetwork: ReturnType<typeof useNetwork>['chain'];
+  network: ReturnType<typeof useNetwork>['chain'] | typeof base | typeof baseSepolia | undefined;
+  wagmiChainOptions: ReturnType<typeof useNetwork>['chains'];
+  wagmiAddress: ReturnType<typeof useAccount>['address'];
+  wagmiBalance: ReturnType<typeof useBalance>;
+  wagmiBlocknumber: ReturnType<typeof useBlockNumber>['data'];
+  wagmiDisconnect: ReturnType<typeof useDisconnect>['disconnect'];
+  openConnectModal: ReturnType<typeof useConnectModal>['openConnectModal'];
+  openAccountModal: ReturnType<typeof useAccountModal>['openAccountModal'];
+  openChainModal: ReturnType<typeof useChainModal>['openChainModal'];
+  examplePropFunc: (args: unknown) => void;
+  urlExtension?: string;
+}
+
+type WagmiManagedPropKeys = Exclude<keyof WagmiInjectedProps, 'urlExtension'>;
+
+type WagmiBridgeRuntimeProps = {
+  __ceRequireWagmiBlockNumber?: boolean;
+  activeSessionSlug?: string;
+  changeAccount?: (payload: Record<string, unknown>) => void;
+  updateLoginInfo?: (payload: Record<string, unknown>) => void;
+  provider?: string | null;
+  account?: string;
+  loginComplete?: boolean;
+};
+
 const accountLog = createLogger('account');
 
 declare global {
@@ -16,11 +45,11 @@ declare global {
   }
 }
 
-export function WagmiHooksHOC(Component: React.ComponentType<any>) {
-    return function WrappedComponent(props: Record<string, any>) {
+export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P>) {
+    return function WrappedComponent(props: Omit<P, WagmiManagedPropKeys> & WagmiBridgeRuntimeProps) {
         // wagmi hooks
         const { address, isConnecting, isDisconnected } = useAccount({
-          onConnect({ address }: any) {
+          onConnect({ address }: { address?: string }) {
             accountLog.log("Connected – address: " + address)
           },
           onDisconnect() {
@@ -64,7 +93,7 @@ export function WagmiHooksHOC(Component: React.ComponentType<any>) {
 
         // Prioritize group-derived network; then wallet network; then fallback list head
         const currentNetwork =
-          groupResolvedNetwork ?? chain ?? knownChains[0];
+          (groupResolvedNetwork as WagmiInjectedProps['network']) ?? chain ?? knownChains[0];
 
         // Removed: local JsonRpcProvider + window.defaultProvider anti-pattern.
         // Downstream components should use the centralized, group-aware read provider
@@ -128,11 +157,10 @@ export function WagmiHooksHOC(Component: React.ComponentType<any>) {
             // Only one HOC instance owns the bridge
             if (!bridgeOwnerRef.current) return;
 
-            const canDispatch =
-              typeof props.changeAccount === 'function' &&
-              typeof props.updateLoginInfo === 'function';
+            const changeAccount = props.changeAccount;
+            const updateLoginInfo = props.updateLoginInfo;
 
-            if (!canDispatch) return;
+            if (typeof changeAccount !== 'function' || typeof updateLoginInfo !== 'function') return;
 
             const addrLower = (address || '').toLowerCase();
             const reduxAddrLower = (props.account || '').toLowerCase();
@@ -154,19 +182,19 @@ export function WagmiHooksHOC(Component: React.ComponentType<any>) {
               if (!alreadyWagmi || !acctMatches) {
                 if (!mountedRef.current) return;
                 // First time (or account mismatch): run the 3-step sequence
-                props.updateLoginInfo({
+                updateLoginInfo({
                   loginInProgress: true,
                   loginComplete: false,
                   provider: 'wagmi',
                 });
 
-                props.changeAccount({
+                changeAccount({
                   account: address,
                   provider: 'wagmi',
                   network: chain || currentNetwork,
                 });
 
-                props.updateLoginInfo({
+                updateLoginInfo({
                   loginInProgress: false,
                   loginComplete: true,
                   provider: 'wagmi',
@@ -174,7 +202,7 @@ export function WagmiHooksHOC(Component: React.ComponentType<any>) {
               } else {
                 if (!mountedRef.current) return;
                 // Already wagmi + same account: refresh network/balance only (no login flags)
-                props.changeAccount({
+                changeAccount({
                   account: address,
                   provider: 'wagmi',
                   network: chain || currentNetwork,
@@ -190,12 +218,12 @@ export function WagmiHooksHOC(Component: React.ComponentType<any>) {
               if (props.provider === 'wagmi' && (props.account || props.loginComplete)) {
                 if (!mountedRef.current) return;
                 // Only clear if Redux currently reflects wagmi (avoid clobbering Web3Auth)
-                props.updateLoginInfo({
+                updateLoginInfo({
                   loginInProgress: false,
                   loginComplete: false,
                   provider: null,
                 });
-                props.changeAccount({});
+                changeAccount({});
                 lastHydratedRef.current.key = `|${chainId == null ? 'null' : chainId}`;
               }
             }
@@ -208,22 +236,26 @@ export function WagmiHooksHOC(Component: React.ComponentType<any>) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [address, chain?.id, currentNetwork?.id, props.provider, props.account, props.loginComplete]);
 
-        return <Component {...props}
-                  wagmiProvider={provider}
-                  wagmiWsProvider={wsProvider}
-                  wagmiNetwork={chain}
-                  network={currentNetwork}
-                  wagmiChainOptions={chains}
-                  wagmiAddress={address}
-                  wagmiBalance={balance}
-                  wagmiBlocknumber={blockNumber}
-                  wagmiDisconnect={disconnect}
-                  openConnectModal={openConnectModal}
-                  openAccountModal={openAccountModal}
-                  openChainModal={openChainModal}
-                  examplePropFunc={examplePropFunc}
-                  urlExtension={props.urlExtension}
-                />
+        const injectedProps = {
+          wagmiProvider: provider,
+          wagmiWsProvider: wsProvider,
+          wagmiNetwork: chain,
+          network: currentNetwork,
+          wagmiChainOptions: chains,
+          wagmiAddress: address,
+          wagmiBalance: balance,
+          wagmiBlocknumber: blockNumber,
+          wagmiDisconnect: disconnect,
+          openConnectModal,
+          openAccountModal,
+          openChainModal,
+          examplePropFunc,
+          urlExtension: (props as { urlExtension?: unknown }).urlExtension as string | undefined,
+        } satisfies WagmiInjectedProps;
+
+        const componentProps = { ...props, ...injectedProps } as P;
+
+        return <Component {...componentProps} />
       }
 }
 

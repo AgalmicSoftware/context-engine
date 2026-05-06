@@ -67,6 +67,31 @@ describe('sessionParsers', () => {
     expect(raw).toEqual(original);
   });
 
+  it('preserves future public metadata fields while stripping internal parser fields', () => {
+    const parsed = parseSessionMetadata({
+      sessionName: ' Future Session ',
+      __fromCache: true,
+      display: {
+        accentColor: 'teal',
+        nested: {
+          mode: 'compact',
+        },
+      },
+      customList: ['alpha', { enabled: true }],
+    });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.metadata.sessionName).toBe('Future Session');
+    expect(parsed.metadata.__fromCache).toBeUndefined();
+    expect(parsed.metadata.display).toEqual({
+      accentColor: 'teal',
+      nested: {
+        mode: 'compact',
+      },
+    });
+    expect(parsed.metadata.customList).toEqual(['alpha', { enabled: true }]);
+  });
+
   it('rejects corrupt metadata field types instead of coercing them', () => {
     const parsed = parseSessionMetadata({
       ...CORRUPT_METADATA_TYPES,
@@ -99,6 +124,28 @@ describe('sessionParsers', () => {
       allowOrigins: ['https://example.com'],
       limits: { perWalletPerDay: '3' },
       rpcEndpoint: 'https://rpc.example.com',
+    });
+  });
+
+  it('parses public Lit credential fields from worker config without accepting secret API keys', () => {
+    const parsed = parseWorkerConfig({
+      corsWorkerUrl: 'https://worker.example.com',
+      litCredentials: {
+        litApiBase: ' https://api.chipotle.litprotocol.com ',
+        litGroupId: ' 7 ',
+        litPkpId: ' 0xpkp123 ',
+        litActionCid: ' QmAction123 ',
+        litAccountApiKey: 'secret-account-key',
+        litUsageApiKey: 'secret-usage-key',
+      },
+    });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.config.litCredentials).toEqual({
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: '7',
+      litPkpId: '0xpkp123',
+      litActionCid: 'QmAction123',
     });
   });
 

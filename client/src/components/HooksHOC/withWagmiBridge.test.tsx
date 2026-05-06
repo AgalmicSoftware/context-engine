@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, waitFor, cleanup, act } from '@testing-library/react';
 import { WagmiHooksHOC } from './withWagmiBridge';
+import type { WagmiInjectedProps } from './withWagmiBridge';
 import { getSessionNetwork } from '../../utilities/web3/contractScripts.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 
@@ -44,6 +45,22 @@ jest.mock('utilities/logging.js', () => ({
 
 const mockGetSessionNetwork = getSessionNetwork as jest.Mock;
 const mockClearUserExplicitlyDisconnected = clearUserExplicitlyDisconnected as jest.Mock;
+
+type TypedProbeOwnProps = {
+  label: string;
+  urlExtension?: string;
+};
+
+const TypedProbe = (_props: TypedProbeOwnProps & WagmiInjectedProps) => null;
+const TypedWrapped = WagmiHooksHOC(TypedProbe);
+const typedWrappedProps: React.ComponentProps<typeof TypedWrapped> = {
+  label: 'typed-probe',
+  urlExtension: 'session/demo',
+};
+void typedWrappedProps;
+// @ts-expect-error injected wagmi props are supplied by the HOC
+const typedWrappedPropsWithInjected: React.ComponentProps<typeof TypedWrapped> = { label: 'typed-probe', wagmiAddress: '0xabc' };
+void typedWrappedPropsWithInjected;
 
 const buildProps = (overrides: Record<string, any> = {}): any => ({
   changeAccount: jest.fn(),
