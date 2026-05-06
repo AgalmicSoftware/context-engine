@@ -104,6 +104,8 @@ OpenClaw compatibility means:
 
 `contextEngine-cc/lib/agent/openclawContracts.mjs` contains only pure adapter
 envelopes for approval and draft forwarding.
+Envelope validation requires canonical `/api/agent/*` HTTP paths and rejects DOM
+scraping hints such as `document.querySelector`.
 
 ## Telegram Compatibility
 
@@ -117,6 +119,7 @@ Rules:
 - Mini App `initData` must be validated server-side before trusting Telegram
   identity. The helper follows Telegram's official Mini App HMAC validation
   flow: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
+  and rejects stale or far-future `auth_date` values.
 - SecureStorage may store only short-lived scoped grants or refresh handles
   when feature-detected.
 - CloudStorage may store only non-sensitive preferences.
