@@ -6,6 +6,14 @@ import {
 const LEGACY_CREATE_SBT_FORM_CACHE_KEY = 'createSbtFormCache';
 const SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX = 'dg:createSbtFormCache:';
 
+type StorageLike = {
+  getItem: (key: string) => string | null;
+  setItem: (key: string, value: string) => void;
+  removeItem: (key: string) => void;
+};
+
+type CreateSbtDraftPayload = Record<string, unknown>;
+
 export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
   legacyKey: LEGACY_CREATE_SBT_FORM_CACHE_KEY,
   scopedKeyPrefix: SCOPED_CREATE_SBT_FORM_CACHE_KEY_PREFIX,
@@ -14,7 +22,11 @@ export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
   removeAfter: 'one public release after scoped create-SBT draft writes are verified',
 });
 
-const getSessionStorage = (storageIn: any) => {
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  !!value && typeof value === 'object'
+);
+
+const getSessionStorage = (storageIn?: StorageLike | null): StorageLike | null => {
   if (storageIn !== undefined) return storageIn;
   try {
     if (typeof window !== 'undefined' && window.sessionStorage) return window.sessionStorage;
@@ -24,12 +36,12 @@ const getSessionStorage = (storageIn: any) => {
   return null;
 };
 
-const removeCacheKey = (storage: any, key: string) => {
+const removeCacheKey = (storage: StorageLike | null, key: string) => {
   if (!storage || !key) return;
   removeKeys(storage, key);
 };
 
-export const normalizeCreateSbtFormCacheSessionSlug = (value = ''): string => {
+export const normalizeCreateSbtFormCacheSessionSlug = (value: unknown = ''): string => {
   const normalized = String(value || '').trim().toLowerCase();
   return normalized === 'general' ? '' : normalized;
 };
@@ -54,13 +66,13 @@ const hasTagDraft = (value: unknown): boolean => {
   return value.split(',').some((tag) => hasNonEmptyText(tag));
 };
 
-const hasMetadataLockDraft = (value: any): boolean => {
-  if (!value || typeof value !== 'object') return false;
+const hasMetadataLockDraft = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
   return Object.values(value).some((gateIds) => hasNonEmptyList(gateIds));
 };
 
-const hasSubstantiveDistributionDraft = (value: any): boolean => {
-  if (!value || typeof value !== 'object') return false;
+const hasSubstantiveDistributionDraft = (value: unknown): boolean => {
+  if (!isRecord(value)) return false;
 
   // Ignore persisted defaults like authoring-chain metadata and only count
   // user-entered distribution changes as substantive draft progress.
@@ -77,8 +89,8 @@ const hasSubstantiveDistributionDraft = (value: any): boolean => {
   );
 };
 
-export const hasMeaningfulCreateSbtFormPayload = (parsed: any): boolean => {
-  if (!parsed || typeof parsed !== 'object') return false;
+export const hasMeaningfulCreateSbtFormPayload = (parsed: unknown): boolean => {
+  if (!isRecord(parsed)) return false;
 
   const hasName = hasNonEmptyText(parsed.sbtName);
   if (!hasName) return false;
@@ -104,16 +116,16 @@ const readCreateSbtFormPayload = ({
   key,
   clearInvalid = false,
 }: {
-  storage: any;
+  storage: StorageLike | null;
   key: string;
   clearInvalid?: boolean;
-}) => {
+}): CreateSbtDraftPayload | null => {
   if (!storage || !key) return null;
-  const result = safeJsonRead(
+  const result = safeJsonRead<CreateSbtDraftPayload>(
     storage,
     key,
     (parsed) => {
-      if (parsed && typeof parsed === 'object') return parsed;
+      if (isRecord(parsed)) return parsed;
       throw new Error('Create SBT form cache payload must be a JSON object.');
     },
     { clearInvalid }
@@ -121,7 +133,13 @@ const readCreateSbtFormPayload = ({
   return result.ok ? result.value : null;
 };
 
-const migrateLegacyCreateSbtFormCache = ({ storage, sessionSlug = '' }: { storage: any; sessionSlug?: string }) => {
+const migrateLegacyCreateSbtFormCache = ({
+  storage,
+  sessionSlug = '',
+}: {
+  storage: StorageLike | null;
+  sessionSlug?: string;
+}) => {
   if (!storage) return;
   const scopedKey = getScopedCreateSbtFormCacheKey(sessionSlug);
   try {
@@ -130,7 +148,7 @@ const migrateLegacyCreateSbtFormCache = ({ storage, sessionSlug = '' }: { storag
     const legacyPayload = readCreateSbtFormPayload({
       storage,
       key: LEGACY_CREATE_SBT_FORM_CACHE_KEY,
-    }) as any;
+    });
     const legacySessionSlug = legacyPayload &&
       Object.prototype.hasOwnProperty.call(legacyPayload, '_sessionSlug')
       ? normalizeCreateSbtFormCacheSessionSlug(legacyPayload._sessionSlug)
@@ -155,7 +173,7 @@ export const hasCachedCreateSbtForm = ({
   clearInvalid = false,
 }: {
   sessionSlug?: string;
-  storage?: any;
+  storage?: StorageLike | null;
   migrateLegacyToSessionKey?: boolean;
   clearInvalid?: boolean;
 } = {}): boolean => {

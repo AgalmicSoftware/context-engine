@@ -11,6 +11,41 @@ contract SBTFactory {
     event SBTCreated(address indexed sbtAddress);
     event SBTCreatedDeterministic(address indexed sbtAddress, bytes32 indexed salt);
 
+    function _deriveMintMode(
+        uint256 limitedNumber,
+        bool hasPasswordMint,
+        bytes32[] memory hashedPasswords,
+        bytes32 groupPasswordHash,
+        bool allowGroupPasswordHashInit
+    ) internal pure returns (MySBT.MintMode) {
+        bool hasHashedPasswords = hashedPasswords.length > 0;
+        bool hasGroupSignerHash = groupPasswordHash != bytes32(0);
+
+        if (allowGroupPasswordHashInit) {
+            require(!hasGroupSignerHash, "Deferred group signer hash must start empty");
+        }
+
+        if (hasPasswordMint) {
+            if (hasHashedPasswords) {
+                require(!hasGroupSignerHash, "Password mint cannot also configure signer hash");
+                require(!allowGroupPasswordHashInit, "Password mint cannot defer signer hash");
+                return MySBT.MintMode.PasswordCommitReveal;
+            }
+
+            require(limitedNumber > 0, "Invite mint requires positive max tokens");
+            require(hasGroupSignerHash || allowGroupPasswordHashInit, "Invite mint requires signer hash");
+            return MySBT.MintMode.LimitedInviteSignature;
+        }
+
+        require(!hasHashedPasswords, "Public/group mint cannot preload passwords");
+
+        if (hasGroupSignerHash || allowGroupPasswordHashInit) {
+            return MySBT.MintMode.UnlimitedGroupSignature;
+        }
+
+        return MySBT.MintMode.PublicClaim;
+    }
+
     function _buildCreationCode(
         string memory name,
         string memory symbol,
@@ -25,6 +60,8 @@ contract SBTFactory {
         bool allowTokenURIInit,
         bool allowGroupPasswordHashInit
     ) internal pure returns (bytes memory) {
+        MySBT.MintMode mintMode =
+            _deriveMintMode(limitedNumber, hasPasswordMint, hashedPasswords, groupPasswordHash, allowGroupPasswordHashInit);
         return abi.encodePacked(
             type(MySBT).creationCode,
             abi.encode(
@@ -33,7 +70,7 @@ contract SBTFactory {
                 limitedNumber,
                 adminAddress,
                 mintingEndTime,
-                hasPasswordMint,
+                mintMode,
                 burnAuth,
                 hashedPasswords,
                 tokenURI,
@@ -74,13 +111,14 @@ contract SBTFactory {
         string memory tokenURI,
         bytes32 groupPasswordHash
     ) external {
+        MySBT.MintMode mintMode = _deriveMintMode(limitedNumber, hasPasswordMint, hashedPasswords, groupPasswordHash, false);
         MySBT newSBT = new MySBT(
             name,
             symbol,
             limitedNumber,
             adminAddress,
             mintingEndTime,
-            hasPasswordMint,
+            mintMode,
             burnAuth,
             hashedPasswords,
             tokenURI,
@@ -119,13 +157,14 @@ contract SBTFactory {
         string memory tokenURI,
         bytes32 groupPasswordHash
     ) external returns (address) {
+        MySBT.MintMode mintMode = _deriveMintMode(limitedNumber, hasPasswordMint, hashedPasswords, groupPasswordHash, false);
         MySBT newSBT = new MySBT{salt: salt}(
             name,
             symbol,
             limitedNumber,
             adminAddress,
             mintingEndTime,
-            hasPasswordMint,
+            mintMode,
             burnAuth,
             hashedPasswords,
             tokenURI,
@@ -169,17 +208,22 @@ contract SBTFactory {
         bytes32 finalGroupPasswordHash,
         bool initializeGroupPasswordHash
     ) external returns (address) {
+        MySBT.MintMode mintMode =
+            _deriveMintMode(limitedNumber, hasPasswordMint, hashedPasswords, bytes32(0), initializeGroupPasswordHash);
         require(
             initializeGroupPasswordHash || finalGroupPasswordHash == bytes32(0),
             "Configured deterministic deploy requires deferred group password init"
         );
+        if (initializeGroupPasswordHash) {
+            require(finalGroupPasswordHash != bytes32(0), "Configured deterministic deploy requires final signer hash");
+        }
         MySBT newSBT = new MySBT{salt: salt}(
             name,
             symbol,
             limitedNumber,
             adminAddress,
             mintingEndTime,
-            hasPasswordMint,
+            mintMode,
             burnAuth,
             hashedPasswords,
             "",
