@@ -1,0 +1,753 @@
+import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
+
+type UnknownRecord = Record<string, unknown>;
+type BuildSurveyResultsBooleanTogglePatchArgs = {
+  prevState?: unknown;
+  stateKey?: unknown;
+};
+type BuildSurveyResultsKeyedTogglePatchArgs = {
+  forceValue?: unknown;
+  itemKey?: unknown;
+  mapKey?: unknown;
+  prevState?: unknown;
+};
+type BuildSurveyResultsQuestionIdSortPatchArgs = {
+  column?: unknown;
+  prevState?: unknown;
+};
+type BuildSurveyResultsDemoViewSelectPatchArgs = {
+  nextView?: unknown;
+  prevState?: unknown;
+};
+type BuildSurveyResultsFilterLoadingUpdateArgs = {
+  loading?: unknown;
+  pendingValue?: unknown;
+  stateFilterLoading?: unknown;
+};
+type BuildSurveyResultsFilterLoadingStatePatchArgs = {
+  nextLoading?: unknown;
+  prevState?: unknown;
+};
+type BuildSurveyResultsQuestionFilterCountPatchArgs = {
+  count?: unknown;
+  props?: unknown;
+  state?: unknown;
+};
+
+export type SurveyResultsResponseField = UnknownRecord & {
+  value?: unknown;
+  hash?: unknown;
+  encrypted?: unknown;
+  timestamp?: unknown;
+  timeStamp?: unknown;
+  type?: unknown;
+};
+
+export type SurveyResultsAnswerRow = UnknownRecord & {
+  questionID?: unknown;
+  questionId?: unknown;
+  timestamp?: unknown;
+  timeStamp?: unknown;
+  answer?: SurveyResultsResponseField | unknown;
+  additional?: SurveyResultsResponseField | unknown;
+  prompt?: unknown;
+  type?: unknown;
+  questionType?: unknown;
+  conviction?: unknown;
+  importance?: unknown;
+};
+
+export type SurveyResultsSurveyResponsePayload = UnknownRecord & {
+  responses?: SurveyResultsAnswerRow[] | unknown;
+  timestamp?: unknown;
+  timeStamp?: unknown;
+};
+
+export type SurveyResultsAggregateRow = UnknownRecord & {
+  responder?: unknown;
+  questionId?: unknown;
+  response?: unknown;
+  timestamp?: unknown;
+  mergedResponse?: unknown;
+};
+
+export type SurveyResultsAggregator = Record<string, SurveyResultsAggregateRow[] | unknown>;
+export type SurveyResultsQuestionLookupEntry = UnknownRecord & { type?: unknown };
+export type SurveyResultsQuestionLookup = Record<string, SurveyResultsQuestionLookupEntry | undefined>;
+
+type SurveyQuestionResponseCandidate = {
+  index: number;
+  entryTimestampMs: number;
+  payloadTimestampMs: number;
+  aggregateTimestampMs: number;
+};
+
+type SurveyResponseNormalizationEntry = {
+  index: number;
+  orderIndex: number;
+  row: unknown;
+};
+
+type SurveyResponseLatestEntry = SurveyResponseNormalizationEntry & SurveyQuestionResponseCandidate;
+
+export const buildSurveyResultsAlertMessagePatch = (alertMessage: unknown) => ({
+  alertMessage: String(alertMessage ?? ''),
+});
+
+export const buildSurveyResultsCsvFileNamePatch = (csvFileName: unknown) => ({
+  csvFileName,
+});
+
+export const buildSurveyResultsExportTypePatch = (exportType: unknown) => ({
+  exportType,
+  alertMessage: '',
+});
+
+export const buildSurveyResultsFilterActivePatch = (isFilterActive: unknown) => ({
+  isFilterActive,
+});
+
+export const buildSurveyResultsFilterLoadingUpdate = ({
+  loading = false,
+  pendingValue = null,
+  stateFilterLoading = false,
+}: BuildSurveyResultsFilterLoadingUpdateArgs = {}) => {
+  const nextLoading = !!loading;
+  const baseline = pendingValue != null ? pendingValue : !!stateFilterLoading;
+  const shouldQueueState = baseline !== nextLoading;
+  return {
+    nextLoading,
+    nextPendingValue: shouldQueueState ? nextLoading : pendingValue,
+    shouldQueueState,
+  };
+};
+
+export const buildSurveyResultsFilterLoadingStatePatch = ({
+  nextLoading = false,
+  prevState = {},
+}: BuildSurveyResultsFilterLoadingStatePatchArgs = {}): { filterLoading: boolean } | null => {
+  const normalizedNextLoading = !!nextLoading;
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  return stateRecord.filterLoading === normalizedNextLoading
+    ? null
+    : { filterLoading: normalizedNextLoading };
+};
+
+export const buildSurveyResultsQuestionFilterCountPatch = ({
+  count,
+  props = {},
+  state = {},
+}: BuildSurveyResultsQuestionFilterCountPatchArgs = {}): { filteredQuestionsCount: unknown } | null => {
+  const propsRecord = (props && typeof props === 'object')
+    ? props as UnknownRecord
+    : {};
+  const stateRecord = (state && typeof state === 'object')
+    ? state as UnknownRecord
+    : {};
+
+  if (!propsRecord.isQuestionCacheReady) return null;
+
+  const baseMap =
+    (stateRecord.viewMode === 'survey' && stateRecord.surveyViewMode === 'aggregate')
+      ? (stateRecord.aggregateQuestionResponses || {})
+      : (stateRecord.aggregatorQuestionResponses || {});
+  const baseQuestions = Object.keys(Object(baseMap)).length;
+
+  const hasAnyResponses =
+    baseQuestions > 0 ||
+    Object.keys(Object(stateRecord.questionResponses || {})).length > 0 ||
+    Object.keys(Object(stateRecord.sbtFilteredAggregatorQuestionResponses || {})).length > 0;
+
+  if (
+    count === 0 &&
+    (!hasAnyResponses || stateRecord.filterLoading || !propsRecord.isResponsesCacheReady)
+  ) {
+    return null;
+  }
+
+  if (count === stateRecord.filteredQuestionsCount) return null;
+  return buildSurveyResultsFilteredQuestionsCountPatch(count);
+};
+
+export const buildSurveyResultsBooleanTogglePatch = ({
+  prevState = {},
+  stateKey = '',
+}: BuildSurveyResultsBooleanTogglePatchArgs = {}): Record<string, boolean> => {
+  const key = String(stateKey || '');
+  if (!key) return {};
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  return { [key]: !stateRecord[key] };
+};
+
+export const buildSurveyResultsKeyedTogglePatch = ({
+  forceValue,
+  itemKey,
+  mapKey = '',
+  prevState = {},
+}: BuildSurveyResultsKeyedTogglePatchArgs = {}): Record<string, UnknownRecord> => {
+  const mapName = String(mapKey || '');
+  if (!mapName) return {};
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  const currentMap = (stateRecord[mapName] && typeof stateRecord[mapName] === 'object')
+    ? stateRecord[mapName] as UnknownRecord
+    : {};
+  const key = String(itemKey);
+  const nextValue = typeof forceValue === 'boolean' ? forceValue : !currentMap[key];
+  return {
+    [mapName]: {
+      ...currentMap,
+      [key]: nextValue,
+    },
+  };
+};
+
+export const buildSurveyResultsQuestionIdSortPatch = ({
+  column = '',
+  prevState = {},
+}: BuildSurveyResultsQuestionIdSortPatchArgs = {}): {
+  questionIdSortAsc: boolean;
+  questionIdSortBy: unknown;
+} => {
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  const nextAsc = stateRecord.questionIdSortBy === column
+    ? !stateRecord.questionIdSortAsc
+    : true;
+  return {
+    questionIdSortBy: column,
+    questionIdSortAsc: nextAsc,
+  };
+};
+
+export const buildSurveyResultsDemoAtlasNodePatch = (demoResultsAtlasNodeId: unknown = null) => ({
+  demoResultsAtlasNodeId,
+});
+
+export const buildSurveyResultsDemoAtlasOpenPatch = (nodeId: unknown = '') => {
+  const normalizedNodeId = String(nodeId || '').trim();
+  return {
+    demoResultsViewMode: 'atlas',
+    demoResultsAtlasNodeId: normalizedNodeId || null,
+  };
+};
+
+export const buildSurveyResultsDemoViewSelectPatch = ({
+  nextView = 'report',
+  prevState = {},
+}: BuildSurveyResultsDemoViewSelectPatchArgs = {}) => {
+  const allowedViews = new Set(['report', 'breakdown', 'atlas', 'riskMatrix']);
+  const normalizedView = allowedViews.has(String(nextView)) ? String(nextView) : 'report';
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  return {
+    demoResultsViewMode: stateRecord.demoResultsViewMode === normalizedView ? 'raw' : normalizedView,
+    demoResultsAtlasNodeId: normalizedView === 'atlas' ? stateRecord.demoResultsAtlasNodeId : null,
+  };
+};
+
+export const buildSurveyResultsViewStatePatch = (
+  viewMode: unknown,
+  surveyId: unknown
+) => ({
+  viewMode,
+  surveyId,
+});
+
+export const buildSurveyResultsEmptySurveyModePatch = () => ({
+  responses: [],
+  sbtFilteredResponses: [],
+  aggregateQuestionResponses: {},
+  sbtFilteredAggregatorQuestionResponses: {},
+  surveyTitle: '',
+  surveyDocumentURLs: [],
+  totalQuestionsCount: 0,
+  totalResponsesCount: 0,
+  filteredResponsesCount: 0,
+  surveyResultsHydrated: true,
+});
+
+export const buildSurveyResultsSurveyModeHydratedPatch = ({
+  aggregateQuestionResponses,
+  filteredResponsesCount,
+  responses,
+  sbtFilteredAggregatorQuestionResponses,
+  sbtFilteredResponses,
+  surveyDocumentURLs,
+  surveyTitle,
+  totalQuestionsCount,
+  totalResponsesCount,
+}: {
+  aggregateQuestionResponses: unknown;
+  filteredResponsesCount: unknown;
+  responses: unknown;
+  sbtFilteredAggregatorQuestionResponses: unknown;
+  sbtFilteredResponses: unknown;
+  surveyDocumentURLs: unknown;
+  surveyTitle: unknown;
+  totalQuestionsCount: unknown;
+  totalResponsesCount: unknown;
+}) => ({
+  aggregateQuestionResponses,
+  sbtFilteredAggregatorQuestionResponses,
+  sbtFilteredResponses,
+  surveyTitle,
+  surveyDocumentURLs,
+  totalQuestionsCount,
+  totalResponsesCount,
+  responses,
+  filteredResponsesCount,
+  surveyResultsHydrated: true,
+});
+
+export const buildSurveyResultsFilteredQuestionModeHydratedPatch = ({
+  aggregatorQuestionResponses,
+  currentFilteredQuestionsCount,
+  currentFilteredResponsesCount,
+  initialFilteredCount,
+  questionResponses,
+  sbtFilteredAggregatorQuestionResponses,
+  totalQuestionsCount,
+  totalResponsesCount,
+}: {
+  aggregatorQuestionResponses: unknown;
+  currentFilteredQuestionsCount: unknown;
+  currentFilteredResponsesCount: unknown;
+  initialFilteredCount: number;
+  questionResponses: unknown;
+  sbtFilteredAggregatorQuestionResponses: unknown;
+  totalQuestionsCount: number;
+  totalResponsesCount: number;
+}) => ({
+  aggregatorQuestionResponses,
+  sbtFilteredAggregatorQuestionResponses:
+    sbtFilteredAggregatorQuestionResponses || aggregatorQuestionResponses,
+  questionResponses,
+  totalQuestionsCount,
+  totalResponsesCount,
+  filteredQuestionsCount:
+    typeof currentFilteredQuestionsCount === 'number'
+      ? Math.min(currentFilteredQuestionsCount, totalQuestionsCount)
+      : totalQuestionsCount,
+  filteredResponsesCount:
+    typeof currentFilteredResponsesCount === 'number'
+      ? currentFilteredResponsesCount
+      : initialFilteredCount,
+  questionResultsHydrated: true,
+});
+
+export const buildSurveyResultsUnfilteredQuestionModeHydratedPatch = ({
+  aggregatorQuestionResponses,
+  filteredResponsesCount,
+  questionResponses,
+  totalQuestionsCount,
+  totalResponsesCount,
+}: {
+  aggregatorQuestionResponses: unknown;
+  filteredResponsesCount: number;
+  questionResponses: unknown;
+  totalQuestionsCount: number;
+  totalResponsesCount: number;
+}) => ({
+  aggregatorQuestionResponses,
+  sbtFilteredAggregatorQuestionResponses: aggregatorQuestionResponses,
+  questionResponses,
+  totalQuestionsCount,
+  totalResponsesCount,
+  filteredQuestionsCount: totalQuestionsCount,
+  filteredResponsesCount,
+  questionResultsHydrated: true,
+});
+
+export const buildSurveyResultsNetworkLatestBlockPatch = (networkLatestBlock: unknown) => ({
+  networkLatestBlock: Number(networkLatestBlock || 0),
+});
+
+export const buildSurveyResultsFilteredQuestionsCountPatch = (filteredQuestionsCount: unknown) => ({
+  filteredQuestionsCount,
+});
+
+export const buildSurveyResultsSurveyViewModePatch = (surveyViewMode: unknown) => ({
+  surveyViewMode,
+});
+
+export const buildSurveyResultsBookmarkFeedbackPatch = (filterBookmarkedFeedback: unknown) => ({
+  filterBookmarkedFeedback: !!filterBookmarkedFeedback,
+});
+
+export const buildSurveyResultsBookmarkedSurveyIdsPatch = (bookmarkedSurveyIDs: unknown = []) => ({
+  bookmarkedSurveyIDs: Array.isArray(bookmarkedSurveyIDs) ? [...bookmarkedSurveyIDs] : [],
+});
+
+export const buildSurveyResultsBookmarkedQuestionIdsPatch = (bookmarkedQuestionIDs: unknown = []) => ({
+  bookmarkedQuestionIDs: Array.isArray(bookmarkedQuestionIDs) ? [...bookmarkedQuestionIDs] : [],
+});
+
+export const buildSurveyResultsLockedResponsesDecryptingPatch = (
+  lockedResponsesDecrypting: unknown
+) => ({
+  lockedResponsesDecrypting: !!lockedResponsesDecrypting,
+  alertMessage: '',
+});
+
+export const buildSurveyResultsLockedResponsesDecryptCompletePatch = ({
+  anyDecrypted = false,
+  decryptedResponseOverrides = {},
+  walletLowerLabel = 'wallet',
+}: {
+  anyDecrypted?: unknown;
+  decryptedResponseOverrides?: unknown;
+  walletLowerLabel?: unknown;
+} = {}) => ({
+  lockedResponsesDecrypting: false,
+  decryptedResponseOverrides,
+  ...(anyDecrypted
+    ? {}
+    : {
+      alertMessage: `Unable to decrypt locked responses with the connected ${String(walletLowerLabel || 'wallet')}.`,
+    }),
+});
+
+export const toggleSurveyResultsLockedResponseDetailsPatch = (prevState: {
+  lockedResponseDetailsOpen?: unknown;
+} = {}) => ({
+  lockedResponseDetailsOpen: !prevState.lockedResponseDetailsOpen,
+});
+
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+export const normalizeSignatureValue = (
+  value: unknown,
+  trail: WeakSet<object> = new WeakSet<object>()
+): unknown => {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'bigint') return `__bigint:${value.toString(10)}`;
+  if (typeof value !== 'object') return value;
+  if (trail.has(value)) return '__circular__';
+  trail.add(value);
+  if (Array.isArray(value)) {
+    const arr = value.map((entry) => normalizeSignatureValue(entry, trail));
+    trail.delete(value);
+    return arr;
+  }
+  const record = value as UnknownRecord;
+  const out: UnknownRecord = {};
+  Object.keys(record).sort().forEach((key) => {
+    out[key] = normalizeSignatureValue(record[key], trail);
+  });
+  trail.delete(value);
+  return out;
+};
+
+export const stableSerializeSignatureValue = (value: unknown): string => {
+  try {
+    return JSON.stringify(normalizeSignatureValue(value));
+  } catch (_) {
+    try {
+      return String(value);
+    } catch (_) {
+      return '[[unserializable]]';
+    }
+  }
+};
+
+export const mixSurveySignatureHash = (seed: unknown, text: unknown): number => {
+  let hash = Number(seed) >>> 0;
+  const input = String(text || '');
+  for (let i = 0; i < input.length; i += 1) {
+    hash = Math.imul(hash ^ input.charCodeAt(i), 16777619) >>> 0;
+  }
+  return hash >>> 0;
+};
+
+export const buildSurveyResponderPayloadSignature = (payload: unknown): string => {
+  if (typeof payload === 'string') return `s:${payload}`;
+  return `o:${stableSerializeSignatureValue(payload)}`;
+};
+
+export const buildSurveyRespondersSignature = (
+  surveyResponsesByResponder: UnknownRecord = {}
+): string => {
+  const responders = Object.keys(surveyResponsesByResponder || {})
+    .sort((a, b) => String(a).localeCompare(String(b)));
+  let hash = 2166136261;
+  responders.forEach((responder) => {
+    const responderLower = String(responder || '').toLowerCase();
+    hash = mixSurveySignatureHash(hash, responderLower);
+    hash = mixSurveySignatureHash(
+      hash,
+      buildSurveyResponderPayloadSignature(surveyResponsesByResponder?.[responder])
+    );
+  });
+  return `${responders.length}:${hash >>> 0}`;
+};
+
+const surveyResponderPayloadRefIds = new WeakMap<object, number>();
+let surveyResponderPayloadRefSeq = 1;
+
+export const getSurveyResponderPayloadRefId = (value: unknown): string => {
+  if (!value || typeof value !== 'object') {
+    return `p:${typeof value}:${String(value)}`;
+  }
+  const objectValue = value as object;
+  let refId = surveyResponderPayloadRefIds.get(objectValue);
+  if (!refId) {
+    refId = surveyResponderPayloadRefSeq;
+    surveyResponderPayloadRefSeq += 1;
+    surveyResponderPayloadRefIds.set(objectValue, refId);
+  }
+  return `o:${refId}`;
+};
+
+export const buildSurveyRespondersPayloadRefSignature = (
+  surveyResponsesByResponder: UnknownRecord = {}
+): string => {
+  const responders = Object.keys(surveyResponsesByResponder || {})
+    .sort((a, b) => String(a).localeCompare(String(b)));
+  let hash = 2166136261;
+  responders.forEach((responder) => {
+    const responderLower = String(responder || '').toLowerCase();
+    hash = mixSurveySignatureHash(hash, responderLower);
+    const payload = surveyResponsesByResponder?.[responder];
+    if (typeof payload === 'string') {
+      hash = mixSurveySignatureHash(hash, `s:${payload.length}:${payload}`);
+      return;
+    }
+    hash = mixSurveySignatureHash(hash, getSurveyResponderPayloadRefId(payload));
+    const payloadResponses = isRecord(payload) && Array.isArray(payload.responses)
+      ? payload.responses
+      : [];
+    hash = mixSurveySignatureHash(hash, `r:${payloadResponses.length}`);
+    payloadResponses.forEach((entry) => {
+      hash = mixSurveySignatureHash(hash, getSurveyResponderPayloadRefId(entry));
+    });
+  });
+  return `${responders.length}:${hash >>> 0}`;
+};
+
+export const INVALID_RESPONSE_TIMESTAMP = Number.NEGATIVE_INFINITY;
+
+export const normalizeResponseTimestampMs = (value: unknown): number => {
+  if (value === null || value === undefined || value === '') return INVALID_RESPONSE_TIMESTAMP;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return INVALID_RESPONSE_TIMESTAMP;
+    return Math.abs(value) < 1e12 ? Math.floor(value * 1000) : value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return INVALID_RESPONSE_TIMESTAMP;
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      const numeric = Number(trimmed);
+      if (!Number.isFinite(numeric)) return INVALID_RESPONSE_TIMESTAMP;
+      return Math.abs(numeric) < 1e12 ? Math.floor(numeric * 1000) : numeric;
+    }
+    const parsed = Date.parse(trimmed);
+    return Number.isNaN(parsed) ? INVALID_RESPONSE_TIMESTAMP : parsed;
+  }
+  return INVALID_RESPONSE_TIMESTAMP;
+};
+
+export const getSurveyResponseQuestionId = (row: unknown = {}): string => {
+  if (!isRecord(row)) return '';
+  return String(row.questionID || row.questionId || '').trim().toLowerCase();
+};
+
+export const getSurveyResponseEntryTimestampMs = (row: unknown = {}): number => {
+  if (!isRecord(row)) return INVALID_RESPONSE_TIMESTAMP;
+  return normalizeResponseTimestampMs(row.timestamp ?? row.timeStamp);
+};
+
+export const getSurveyResponsePayloadTimestampMs = (payload: unknown = {}): number => {
+  if (!isRecord(payload)) return INVALID_RESPONSE_TIMESTAMP;
+  return normalizeResponseTimestampMs(payload.timestamp ?? payload.timeStamp);
+};
+
+export const getSurveyResponseAggregateTimestampMs = (
+  row: unknown = {},
+  payload: unknown = {}
+): number => {
+  const entryTimestamp = getSurveyResponseEntryTimestampMs(row);
+  const payloadTimestamp = getSurveyResponsePayloadTimestampMs(payload);
+  // Current client edits can advance only the top-level payload timestamp.
+  // Effective recency must include that value so stale answer rows do not win.
+  if (
+    entryTimestamp === INVALID_RESPONSE_TIMESTAMP &&
+    payloadTimestamp === INVALID_RESPONSE_TIMESTAMP
+  ) {
+    return 0;
+  }
+  if (entryTimestamp === INVALID_RESPONSE_TIMESTAMP) return payloadTimestamp;
+  if (payloadTimestamp === INVALID_RESPONSE_TIMESTAMP) return entryTimestamp;
+  return Math.max(entryTimestamp, payloadTimestamp);
+};
+
+export const isSurveyQuestionResponseNewer = (
+  candidate: SurveyQuestionResponseCandidate,
+  existing: SurveyQuestionResponseCandidate
+): boolean => {
+  // Compare effective recency first, then payload recency, and finally preserve
+  // later array order within the same payload revision.
+  if (candidate.aggregateTimestampMs !== existing.aggregateTimestampMs) {
+    return candidate.aggregateTimestampMs > existing.aggregateTimestampMs;
+  }
+  if (candidate.payloadTimestampMs !== existing.payloadTimestampMs) {
+    return candidate.payloadTimestampMs > existing.payloadTimestampMs;
+  }
+  if (
+    candidate.payloadTimestampMs !== INVALID_RESPONSE_TIMESTAMP &&
+    candidate.payloadTimestampMs === existing.payloadTimestampMs
+  ) {
+    return candidate.index >= existing.index;
+  }
+  if (candidate.entryTimestampMs !== existing.entryTimestampMs) {
+    return candidate.entryTimestampMs > existing.entryTimestampMs;
+  }
+  return candidate.index >= existing.index;
+};
+
+export const normalizeSurveyResponsePayloadByQuestionId = (payload: unknown): unknown => {
+  const source = isRecord(payload) ? payload : null;
+  if (!source) return payload;
+  if (!Array.isArray(source.responses)) return { ...source };
+
+  const payloadTimestampMs = getSurveyResponsePayloadTimestampMs(source);
+  const passthroughRows: SurveyResponseNormalizationEntry[] = [];
+  const latestByQuestionId = new Map<string, SurveyResponseLatestEntry>();
+
+  source.responses.forEach((row, index) => {
+    const clonedRow = isRecord(row) ? { ...row } : row;
+    const questionId = getSurveyResponseQuestionId(row);
+    if (!questionId) {
+      passthroughRows.push({
+        index,
+        orderIndex: index,
+        row: clonedRow,
+      });
+      return;
+    }
+
+    const candidate: SurveyResponseLatestEntry = {
+      index,
+      orderIndex: index,
+      row: clonedRow,
+      entryTimestampMs: getSurveyResponseEntryTimestampMs(row),
+      payloadTimestampMs,
+      aggregateTimestampMs: getSurveyResponseAggregateTimestampMs(row, source),
+    };
+    const existing = latestByQuestionId.get(questionId);
+    if (!existing || isSurveyQuestionResponseNewer(candidate, existing)) {
+      latestByQuestionId.set(questionId, {
+        ...candidate,
+        orderIndex: existing?.orderIndex ?? index,
+      });
+    }
+  });
+
+  const normalizedResponses = [
+    ...passthroughRows,
+    ...Array.from(latestByQuestionId.values()),
+  ]
+    .sort((left, right) => left.orderIndex - right.orderIndex)
+    .map((entry) => entry.row);
+
+  return {
+    ...source,
+    responses: normalizedResponses,
+  };
+};
+
+const normalizeTsToMs = (val: unknown): number => {
+  if (val == null) return NaN;
+  if (typeof val === 'number') return val < 1e12 ? Math.floor(val * 1000) : val;
+  if (typeof val === 'string') {
+    if (/^\d+$/.test(val)) {
+      const n = parseInt(val, 10);
+      return n < 1e12 ? n * 1000 : n;
+    }
+    const d = Date.parse(val);
+    return Number.isNaN(d) ? NaN : d;
+  }
+  return NaN;
+};
+
+const readTimestampValue = (value: unknown): unknown => (
+  isRecord(value) ? value.timestamp ?? value.timeStamp : undefined
+);
+
+const readAnswerTimestampValue = (value: unknown): unknown => {
+  if (!isRecord(value)) return undefined;
+  return isRecord(value.answer) ? value.answer.timestamp ?? value.answer.timeStamp : undefined;
+};
+
+export const pickTimestampMs = (
+  primary: unknown,
+  fallback1: unknown,
+  fallback2: unknown
+): number => {
+  const candidates = [
+    readTimestampValue(primary),
+    readAnswerTimestampValue(primary),
+    readTimestampValue(fallback1),
+    readTimestampValue(fallback2),
+  ].filter((candidate) => candidate !== undefined && candidate !== null);
+
+  for (const candidate of candidates) {
+    const ms = normalizeTsToMs(candidate);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  return Number.NEGATIVE_INFINITY;
+};
+
+export const formatTsForCsv = (ms: unknown): string => (
+  typeof ms === 'number' && ms > 0 && Number.isFinite(ms)
+    ? new Date(ms).toISOString()
+    : ''
+);
+
+export const countQuestionModeResponses = (
+  aggregatorByQuestion: SurveyResultsAggregator = {},
+  questionLookup: SurveyResultsQuestionLookup = {}
+): number => {
+  let total = 0;
+  Object.keys(aggregatorByQuestion || {}).forEach((questionId) => {
+    const rows = Array.isArray(aggregatorByQuestion[questionId])
+      ? aggregatorByQuestion[questionId] as SurveyResultsAggregateRow[]
+      : [];
+    const questionType = String(
+      questionLookup?.[String(questionId || '').toLowerCase()]?.type || ''
+    ).toLowerCase();
+    rows.forEach((row) => {
+      const parsedResponse = row?.response;
+      if (isFreeformBlankAnswer(questionType, parsedResponse)) return;
+      total += 1;
+    });
+  });
+  return total;
+};
+
+export const hasAnyCountableSurveyAnswer = (
+  parsedSurveyResponse: unknown,
+  questionLookup: SurveyResultsQuestionLookup = {}
+): boolean => {
+  const answers = isRecord(parsedSurveyResponse) && Array.isArray(parsedSurveyResponse.responses)
+    ? parsedSurveyResponse.responses
+    : [];
+  if (answers.length === 0) return false;
+  for (let i = 0; i < answers.length; i += 1) {
+    const answer = answers[i];
+    const qid = getSurveyResponseQuestionId(answer);
+    const questionType = String(questionLookup?.[qid]?.type || '').toLowerCase();
+    if (isFreeformBlankAnswer(questionType, answer)) continue;
+    return true;
+  }
+  return false;
+};

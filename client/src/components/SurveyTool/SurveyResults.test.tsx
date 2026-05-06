@@ -5,8 +5,23 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import ConnectedSurveyResults, {
+  SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
+  SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
+  SURVEY_RESULTS_METADATA_MISSING_STYLE,
+  SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
+  SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+  SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
+  SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE,
+  SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE,
+  SURVEY_RESULTS_TABLE_BOOKMARK_STYLE,
+  SURVEY_RESULTS_TABLE_CELL_STYLE,
+  SURVEY_RESULTS_TRAILING_LABEL_STYLE,
+  buildSurveyResultsAggregatorPanelClassName,
+  buildSurveyResultsMultichoiceOptionClassName,
   countQuestionModeResponses,
   hasAnyCountableSurveyAnswer,
+  resolveSurveyResultsSyncDetailsStyle,
+  resolveSurveyResultsToggleKnobStyle,
 } from './SurveyResults';
 import styles from './SurveyResults.module.scss';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
@@ -237,6 +252,51 @@ describe('hasAnyCountableSurveyAnswer', () => {
     };
 
     expect(hasAnyCountableSurveyAnswer(parsedSurveyResponse, {})).toBe(true);
+  });
+});
+
+describe('SurveyResults display helpers', () => {
+  it('builds aggregator classes and table icon styles', () => {
+    expect(SURVEY_RESULTS_CLICKABLE_ICON_STYLE).toEqual({ cursor: 'pointer' });
+    expect(SURVEY_RESULTS_METADATA_MISSING_STYLE).toEqual({
+      fontStyle: 'italic',
+      color: '#bbb',
+      padding: '1rem',
+    });
+    expect(SURVEY_RESULTS_TABLE_CELL_STYLE).toEqual({ textAlign: 'center' });
+    expect(SURVEY_RESULTS_SORTABLE_HEADER_STYLE).toEqual({
+      textAlign: 'center',
+      cursor: 'pointer',
+    });
+    expect(SURVEY_RESULTS_TABLE_BOOKMARK_STYLE).toEqual({
+      marginRight: '6px',
+      cursor: 'pointer',
+    });
+    expect(SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE).toEqual({ marginLeft: '6px' });
+    expect(SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE).toEqual({
+      marginLeft: '8px',
+      cursor: 'pointer',
+    });
+    expect(SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE).toEqual({ marginRight: 4 });
+    expect(SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE).toEqual({ marginRight: '6px' });
+    expect(SURVEY_RESULTS_MINI_PROGRESS_STYLE).toEqual({ minWidth: '100px' });
+    expect(SURVEY_RESULTS_TRAILING_LABEL_STYLE).toEqual({ marginLeft: '10px' });
+    expect(buildSurveyResultsAggregatorPanelClassName(styles)).toBe(
+      `${styles.surveyResultsAggregatorPanel} ${styles.surveyResultsAggregatorText}`
+    );
+    expect(buildSurveyResultsMultichoiceOptionClassName(styles)).toBe(
+      `${styles.surveyResultsFreeformAnswer} ${styles.surveyResultsMultichoiceOption}`
+    );
+    expect(resolveSurveyResultsSyncDetailsStyle(true)).toEqual({ display: 'block' });
+    expect(resolveSurveyResultsSyncDetailsStyle(false)).toEqual({ display: undefined });
+    expect(resolveSurveyResultsToggleKnobStyle(true)).toEqual({
+      left: '31px',
+      backgroundColor: '#4caf50',
+    });
+    expect(resolveSurveyResultsToggleKnobStyle(false)).toEqual({
+      left: '1px',
+      backgroundColor: '#fff',
+    });
   });
 });
 
