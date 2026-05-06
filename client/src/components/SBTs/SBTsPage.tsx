@@ -19,171 +19,153 @@ import { createLogger } from '../../utilities/logging.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
-
-type AnyRecord = Record<string, any>;
-type MaybeRecord = AnyRecord | null;
-type MemoBucket = {
+import {
+  asSBTsPageFeaturedProgress as asFeaturedProgress,
+  asSBTsPageFeaturedSbt as asFeaturedSbt,
+  buildSBTsPageCacheFeaturedCardModel as buildCacheFeaturedCardModel,
+  buildSBTsPageFeaturedEntryModel as buildFeaturedEntryModel,
+  buildSBTsPageFeaturedProgressSignature as buildFeaturedProgressSignature,
+  buildSBTsPageBooleanTogglePatch as buildBooleanTogglePatch,
+  buildSBTsPageInitialState as buildInitialState,
+  dedupeSBTsPageAddressListCaseInsensitive as dedupeAddressListCaseInsensitive,
+  dedupeSBTsPageSessionSlugList as dedupeSessionSlugList,
+  isSBTsPageSessionAutoFeatureEnabled as isSessionAutoFeatureEnabled,
+  isSBTsPageRecord as isRecord,
+  normalizeSBTsPageFeaturedEntries as normalizeFeaturedEntries,
+  resolveSBTsPageAutoFeatureBySessionSlug as resolveAutoFeatureBySessionSlug,
+  resolveSBTsPageDisplaySessionConfig as resolveDisplaySessionConfig,
+  resolveSBTsPageDisplaySessionLists as resolveDisplaySessionLists,
+  resolveSBTsPageFeaturedSbtSessionSlug as resolveFeaturedSbtSessionSlug,
+  resolveSBTsPageReferrerSessionSlug as resolveReferrerSessionSlug,
+  resolveSBTsPageCacheFeaturedCardLinkStyle as resolveCacheFeaturedCardLinkStyle,
+  type SBTsPageFeaturedProgressLike as FeaturedProgressLike,
+  type SBTsPageFeaturedSbtLike as FeaturedSbtLike,
+  type SBTsPageFeaturedSbtMetadataLike as FeaturedSbtMetadataLike,
+  type SBTsPageSessionConfigLike as SBTSessionConfigLike,
+  type SBTsPageUnknownRecord as UnknownRecord,
+} from './sbtOverviewPageHelpers';
+type FeaturedEntry = {
+  address: string;
+  sessionSlug: string;
+};
+type CacheBackedFeaturedCard = {
+  address: string;
+  sessionSlug: string;
+  sbt: FeaturedSbtLike & { sbtInfo: FeaturedSbtMetadataLike };
+};
+type FeaturedRenderEntry =
+  | { kind: 'cache'; entry: CacheBackedFeaturedCard }
+  | { kind: 'fallback'; entry: FeaturedEntry };
+type MemoBucket<T> = {
   key: string;
-  result: any[];
+  result: T[];
 };
 
-type SBTsPageProps = AnyRecord;
+type FeaturedListArgs = {
+  baseFeaturedList?: unknown;
+  effectiveSessionSlug?: unknown;
+  autoFeature?: unknown;
+  isSBTCacheReady?: unknown;
+  isAllSessionsMode?: boolean;
+  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
+};
+type FeaturedEntriesArgs = {
+  baseFeaturedList?: unknown;
+  effectiveSessionSlug?: unknown;
+  effectiveSessionAutoFeature?: unknown;
+  isSBTCacheReady?: unknown;
+  isAllSessionsMode?: boolean;
+  includeListScopeSessions?: boolean;
+  listScopeSessionSlugs?: unknown;
+  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
+};
+type FeaturedCacheCardsArgs = {
+  featuredEntries?: unknown;
+  isSBTCacheReady?: unknown;
+  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
+};
+
+type SBTsPageProps = UnknownRecord & {
+  sessionSlug?: string | null;
+  sessionConfig?: SBTSessionConfigLike | null;
+  activeSessionSlug?: string | null;
+  sessionName?: string;
+  sessionInfo?: string;
+  provider?: unknown;
+  network?: unknown;
+  account?: unknown;
+  litHooks?: unknown;
+  loginComplete?: boolean;
+  toggleLoginModal?: unknown;
+  isSBTCacheReady?: boolean;
+  sbtCacheRevision?: number | string | null;
+  defaultSbtTags?: unknown;
+  defaultFeaturedSBTs?: unknown[];
+  onCreateGroupToggleExternal?: () => void;
+  showCreateGroupExternal?: boolean;
+  hideMiniActionRow?: boolean;
+  showCreateGroupAboveFeatured?: boolean;
+  preferCacheBackedFeaturedCards?: boolean;
+  miniaturized?: boolean;
+  refreshSbtData?: unknown;
+  onRequestSbtCacheRefresh?: unknown;
+  latestBlockNumber?: unknown;
+  sbtScanProgressBySlug?: Record<string, FeaturedProgressLike | unknown>;
+  sbtRealtimeCoverageBySlug?: unknown;
+  ensureLightSbtDiscovery?: unknown;
+  ensureLightSbtUniverse?: unknown;
+  refreshSessionUniverseRegistryCache?: unknown;
+};
 type SBTsPageState = {
   showSBTsList: boolean;
   showCreateGroup: boolean;
 };
 
-const SBTsListComponent = SBTsList as any;
-const CreateGroupComponent = CreateGroup as any;
-const SBTPageComponent = SBTPage as any;
+const SBTsListComponent = SBTsList as React.ComponentType<Record<string, unknown>>;
+const CreateGroupComponent = CreateGroup as React.ComponentType<Record<string, unknown>>;
+const SBTPageComponent = SBTPage as React.ComponentType<Record<string, unknown>>;
 
 const sbtLog = createLogger('sbt');
 
-const normalizeFeaturedCardImageUrl = (value: any) => {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  if (/^ipfs:\/\//i.test(raw)) return `https://ipfs.io/ipfs/${raw.replace(/^ipfs:\/\//i, '')}`;
-  return normalizeArweaveUrl(raw, { contextLabel: 'sbt_page_featured_image' });
-};
-
-const dedupeAddressListCaseInsensitive = (list: any) => {
-  const seen = new Set();
-  const out: string[] = [];
-  (Array.isArray(list) ? list : []).forEach((addr) => {
-    const raw = String(addr || '').trim();
-    if (!raw) return;
-    const lower = raw.toLowerCase();
-    if (seen.has(lower)) return;
-    seen.add(lower);
-    out.push(raw);
-  });
-  return out;
-};
-
-const dedupeSessionSlugList = (list: any) => {
-  const seen = new Set();
-  const out: string[] = [];
-  (Array.isArray(list) ? list : []).forEach((slug) => {
-    const normalized = normalizeSessionSlug(slug || '');
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(normalized);
-  });
-  return out;
-};
-
-const buildFeaturedProgressSignature = (progressBySlug: AnyRecord = {}, slugs: any[] = []) => (
-  dedupeSessionSlugList(slugs).map((slug) => {
-    const progress = progressBySlug?.[slug];
-    if (!progress || typeof progress !== 'object') return `${slug}:idle`;
-    return [
-      slug,
-      Number(progress.currentBlock || 0),
-      Number(progress.latestBlock || 0),
-      Number(progress.displayCurrentBlock || 0),
-      Number(progress.liveCurrentBlock || 0),
-      Number(progress.lastBlock || 0),
-      progress.scanInProgress ? '1' : '0',
-      progress.deferred ? '1' : '0',
-    ].join(':');
-  }).join('|')
+const getDisplaySessionConfig = (slugIn: unknown = ''): SBTSessionConfigLike | null => (
+  resolveDisplaySessionConfig({
+    getDemoSessionConfigBySlug,
+    getSessionConfigBySlug,
+    getSessionConfigBySlugOrDefault,
+    slugIn,
+  })
 );
 
-const hasOwn = (obj: any, key: string) => (
-  !!obj && typeof obj === 'object' && Object.prototype.hasOwnProperty.call(obj, key)
-);
-
-const hasAuthoritativeSessionSlug = (obj: any) => {
-  if (!hasOwn(obj, 'sessionSlug')) return false;
-  const hasExplicitFlag = hasOwn(obj, 'sessionSlugExplicit');
-  return obj.sessionSlugExplicit === true || !hasExplicitFlag;
-};
-
-const resolveFeaturedSbtSessionSlug = (sbt: any) => {
-  const info = sbt?.sbtInfo || {};
-
-  if (hasAuthoritativeSessionSlug(info)) {
-    return normalizeSessionSlug(info?.sessionSlug || '');
-  }
-  if (hasAuthoritativeSessionSlug(sbt)) {
-    return normalizeSessionSlug(sbt?.sessionSlug || '');
-  }
-
-  // Auto-feature must respect metadata authority boundaries, not cache/source buckets.
-  const legacyRaw = info?.slug;
-  if (legacyRaw != null && String(legacyRaw).trim() !== '') {
-    return normalizeSessionSlug(legacyRaw);
-  }
-
-  return '';
-};
-
-const getDisplaySessionConfig = (slugIn = '') => {
-  const slug = normalizeSessionSlug(slugIn || '');
-  if (!slug) {
-    return (
-      getSessionConfigBySlugOrDefault('')
-      || getDemoSessionConfigBySlug('', { allowDemoFallback: true })
-      || null
-    );
-  }
-  return (
-    getSessionConfigBySlug(slug)
-    || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
-    || null
-  );
-};
-
-const getDisplaySessionLists = (slugIn = '') => {
-  const sessionConfig = getDisplaySessionConfig(slugIn) || {};
-  return {
-    featured_SBTs_LIST: Array.isArray(sessionConfig?.featured_SBTs_LIST)
-      ? sessionConfig.featured_SBTs_LIST
-      : [],
-    ignored_SBTs_LIST: Array.isArray(sessionConfig?.ignored_SBTs_LIST)
-      ? sessionConfig.ignored_SBTs_LIST
-      : [],
-  };
-};
-
-const resolveAutoFeatureBySessionSlug = (metadata: MaybeRecord = null) => (
-  metadata?.autoFeatureSBTsBySessionSlug !== undefined
-    ? metadata.autoFeatureSBTsBySessionSlug
-    : metadata?.autoFeatureSBTsWithFeaturedSbtTags
-);
-
-const isSessionAutoFeatureEnabled = (sessionConfig: AnyRecord | null = null) => (
-  resolveAutoFeatureBySessionSlug(sessionConfig) !== false
+const getDisplaySessionLists = (slugIn: unknown = '') => (
+  resolveDisplaySessionLists({
+    getDemoSessionConfigBySlug,
+    getSessionConfigBySlug,
+    getSessionConfigBySlugOrDefault,
+    slugIn,
+  })
 );
 
 export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
-  _featuredListMemo: MemoBucket;
+  _featuredListMemo: MemoBucket<string>;
 
-  _featuredEntriesMemo: MemoBucket;
+  _featuredEntriesMemo: MemoBucket<FeaturedEntry>;
 
-  _featuredCacheCardsMemo: MemoBucket;
+  _featuredCacheCardsMemo: MemoBucket<CacheBackedFeaturedCard>;
 
   constructor(props: SBTsPageProps) {
     super(props);
-    const initialCreateGroupSessionSlug = normalizeSessionSlug(
-      props.sessionSlug || props.sessionConfig?.slug || props.activeSessionSlug || ''
-    );
-    this.state = {
-      showSBTsList: false,
-      // Initialize Create Group open when cache exists (idempotent; only at mount time)
-      showCreateGroup: hasCachedCreateSbtForm({
-        sessionSlug: initialCreateGroupSessionSlug,
-        migrateLegacyToSessionKey: true,
-        clearInvalid: true,
-      } as any),
-    };
+    this.state = buildInitialState({
+      activeSessionSlug: props.activeSessionSlug,
+      hasCachedCreateSbtForm,
+      sessionConfig: props.sessionConfig,
+      sessionSlug: props.sessionSlug,
+    });
 
     this.toggleSBTsList = this.toggleSBTsList.bind(this);
     this.toggleCreateGroup = this.toggleCreateGroup.bind(this);
@@ -193,7 +175,10 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
   }
 
   toggleSBTsList() {
-    this.setState((prevState) => ({ showSBTsList: !prevState.showSBTsList }));
+    this.setState((prevState) => buildBooleanTogglePatch({
+      state: prevState,
+      stateKey: 'showSBTsList',
+    }) as Pick<SBTsPageState, 'showSBTsList'>);
   }
 
   toggleCreateGroup() {
@@ -201,7 +186,10 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       this.props.onCreateGroupToggleExternal();
       return;
     }
-    this.setState((prevState) => ({ showCreateGroup: !prevState.showCreateGroup }));
+    this.setState((prevState) => buildBooleanTogglePatch({
+      state: prevState,
+      stateKey: 'showCreateGroup',
+    }) as Pick<SBTsPageState, 'showCreateGroup'>);
   }
 
   getMemoizedFeaturedList({
@@ -211,7 +199,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     isSBTCacheReady,
     isAllSessionsMode = false,
     progressBySlug = {},
-  }: AnyRecord) {
+  }: FeaturedListArgs): string[] {
     const baseList = dedupeAddressListCaseInsensitive(baseFeaturedList);
     const sessionSlugTarget = normalizeSessionSlug(effectiveSessionSlug || '');
     const key = [
@@ -230,18 +218,20 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     let next = baseList;
     if (autoFeature && !isAllSessionsMode) {
       try {
-        const cache = peekCacheSync('sbtCache', effectiveSessionSlug, { clone: false });
-        if (cache && typeof cache === 'object') {
+        const cache = peekCacheSync('sbtCache', String(effectiveSessionSlug || ''), { clone: false });
+        if (isRecord(cache)) {
           const autoFeaturedAddresses: string[] = [];
-          Object.values(cache).forEach((netNode: any) => {
-            const sbtList = netNode && typeof netNode === 'object' ? netNode.sbtList : null;
-            if (!sbtList || typeof sbtList !== 'object') return;
-            Object.values(sbtList).forEach((sbt: any) => {
+          Object.values(cache).forEach((netNode) => {
+            const netRecord = isRecord(netNode) ? netNode : null;
+            const sbtList = isRecord(netRecord?.sbtList) ? netRecord.sbtList : null;
+            if (!sbtList) return;
+            Object.values(sbtList).forEach((rawSbt) => {
+              const sbt = asFeaturedSbt(rawSbt);
               if (!sbt?.sbtAddress) return;
               if (sbt?.sbtInfo?.unlisted || sbt?.unlisted) return;
               const sbtSessionSlug = resolveFeaturedSbtSessionSlug(sbt);
               if (sbtSessionSlug !== sessionSlugTarget) return;
-              autoFeaturedAddresses.push(sbt.sbtAddress);
+              autoFeaturedAddresses.push(String(sbt.sbtAddress));
             });
           });
           if (autoFeaturedAddresses.length > 0) {
@@ -266,7 +256,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     includeListScopeSessions = false,
     listScopeSessionSlugs = [],
     progressBySlug = {},
-  }: AnyRecord) {
+  }: FeaturedEntriesArgs): FeaturedEntry[] {
     const normalizedEffectiveSlug = normalizeSessionSlug(effectiveSessionSlug || '');
     const scopedSessionSlugs = includeListScopeSessions
       ? dedupeSessionSlugList(listScopeSessionSlugs)
@@ -305,8 +295,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       return this._featuredEntriesMemo.result;
     }
 
-    const seenAddresses = new Set();
-    const next: AnyRecord[] = [];
+    const seenAddresses = new Set<string>();
+    const next: FeaturedEntry[] = [];
     orderedSessionSlugs.forEach((slug) => {
       const featuredForSlug = slug === normalizedEffectiveSlug
         ? baseList
@@ -322,7 +312,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         isAllSessionsMode,
         progressBySlug,
       });
-      addresses.forEach((address: any) => {
+      addresses.forEach((address) => {
         const rawAddress = String(address || '').trim();
         if (!rawAddress) return;
         const lower = rawAddress.toLowerCase();
@@ -343,12 +333,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     featuredEntries = [],
     isSBTCacheReady = false,
     progressBySlug = {},
-  }: AnyRecord) {
-    const normalizedEntries = (Array.isArray(featuredEntries) ? featuredEntries : []).map((entry) => ({
-      address: String(entry?.address || '').trim(),
-      lowerAddress: String(entry?.address || '').trim().toLowerCase(),
-      sessionSlug: normalizeSessionSlug(entry?.sessionSlug || ''),
-    })).filter((entry) => entry.address && entry.lowerAddress);
+  }: FeaturedCacheCardsArgs): CacheBackedFeaturedCard[] {
+    const normalizedEntries = normalizeFeaturedEntries(featuredEntries);
     const key = [
       String(Number(this.props.sbtCacheRevision || 0)),
       isSBTCacheReady ? '1' : '0',
@@ -362,29 +348,31 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       return this._featuredCacheCardsMemo.result;
     }
 
-    const next = normalizedEntries.map((entry) => {
-      let cacheMatch: AnyRecord | null = null;
+    const next = normalizedEntries.map<CacheBackedFeaturedCard | null>((entry) => {
+      let cacheMatch: CacheBackedFeaturedCard['sbt'] | null = null;
       try {
         const cache = peekCacheSync('sbtCache', entry.sessionSlug, { clone: false });
-        if (cache && typeof cache === 'object') {
-          Object.values(cache).some((netNode: any) => {
-            const candidate = netNode?.sbtList?.[entry.lowerAddress];
+        if (isRecord(cache)) {
+          Object.values(cache).some((netNode) => {
+            const netRecord = isRecord(netNode) ? netNode : null;
+            const sbtList = isRecord(netRecord?.sbtList) ? netRecord.sbtList : null;
+            const candidate = asFeaturedSbt(sbtList?.[entry.lowerAddress]);
             if (!candidate?.sbtInfo) return false;
-            cacheMatch = candidate;
+            cacheMatch = candidate as FeaturedSbtLike & { sbtInfo: FeaturedSbtMetadataLike };
             return true;
           });
         }
       } catch (e) {
         sbtLog.warn('[SBTsPage] cache-backed featured lookup failed:', e);
       }
-      const resolvedCacheMatch = cacheMatch as AnyRecord | null;
+      const resolvedCacheMatch = cacheMatch as CacheBackedFeaturedCard['sbt'] | null;
       if (!resolvedCacheMatch || !resolvedCacheMatch.sbtInfo) return null;
       return {
         address: entry.address,
         sessionSlug: entry.sessionSlug,
         sbt: resolvedCacheMatch,
       };
-    }).filter(Boolean);
+    }).filter((entry): entry is CacheBackedFeaturedCard => !!entry);
 
     this._featuredCacheCardsMemo = { key, result: next };
     return next;
@@ -407,8 +395,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     let referrerSlug = '';
     try {
       const ref = (typeof document !== 'undefined' ? document.referrer : '') || '';
-      const m = ref.match(/\/session\/([^/?#]+)/i);
-      if (m && m[1]) referrerSlug = normalizeSessionSlug(m[1].trim());
+      referrerSlug = resolveReferrerSessionSlug(ref);
     } catch (e) { sbtLog.warn('SBTsPage: fallback', e); }
 
     // Resolve by URL → explicit prop → Redux → referrer → default general
@@ -419,7 +406,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const groupFromRef   = referrerSlug ? getDisplaySessionConfig(referrerSlug) : null;
     const activeGroup    = groupFromUrl || groupFromProp || groupFromRedux || groupFromRef || getDisplaySessionConfig('');
 
-    const canonicalSlug = activeGroup?.slug || ''; // '' means general
+    const canonicalSlug = normalizeSessionSlug(activeGroup?.slug || ''); // '' means general
     const urlHasNoSlug  = onSbtsRoute && effectiveUrlSlug === undefined && !isCreateRoute;
 
     // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show
@@ -464,6 +451,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             account={account}
             loginComplete={loginComplete}
             provider={provider}
+            litHooks={this.props.litHooks}
             toggleLoginModal={toggleLoginModal}
             expanded={true}
             network={network}
@@ -519,14 +507,14 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         progressBySlug,
       })
       : [];
-    const cacheBackedFeaturedCardMap = new Map(
-      cacheBackedFeaturedCards.map((entry: any) => {
+    const cacheBackedFeaturedCardMap = new Map<string, CacheBackedFeaturedCard>(
+      cacheBackedFeaturedCards.map((entry) => {
         const sessionSlug = normalizeSessionSlug(entry?.sessionSlug || '');
         const lowerAddress = String(entry?.address || '').trim().toLowerCase();
         return [`${sessionSlug}|${lowerAddress}`, entry];
       })
     );
-    const featuredRenderEntries = actualFeaturedEntries.map((entry) => {
+    const featuredRenderEntries: FeaturedRenderEntry[] = actualFeaturedEntries.map((entry) => {
       const sessionSlug = normalizeSessionSlug(entry?.sessionSlug || '');
       const lowerAddress = String(entry?.address || '').trim().toLowerCase();
       const cacheKey = `${sessionSlug}|${lowerAddress}`;
@@ -539,7 +527,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     });
     const featuredSessionSlugs = dedupeSessionSlugList([
       effectiveSessionSlug,
-      ...actualFeaturedEntries.map(({ sessionSlug }: AnyRecord) => sessionSlug),
+      ...actualFeaturedEntries.map((entry) => entry.sessionSlug),
     ]);
     const featuredScanActive = featuredSessionSlugs.some((slug) => {
       const progress = progressBySlug[slug];
@@ -556,6 +544,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         account={account}
         loginComplete={loginComplete}
         provider={provider}
+        litHooks={this.props.litHooks}
         toggleLoginModal={toggleLoginModal}
         expanded={effectiveShowCreateGroup}
         network={network}
@@ -591,30 +580,32 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                   />
                 )}
                 <div className={styles.sbtGrid}>
-                {featuredRenderEntries.map(({ kind, entry }: AnyRecord, index: number) => {
+                {featuredRenderEntries.map(({ kind, entry }, index: number) => {
                   if (kind === 'cache') {
-                    const sbt = entry?.sbt || null;
-                    const sbtInfo = sbt?.sbtInfo || {};
-                    const sbtAddress = String(entry?.address || '').trim();
-                    const resolvedSessionSlug = normalizeSessionSlug(entry?.sessionSlug || effectiveSessionSlug || '');
-                    const sbtKey = `${resolvedSessionSlug || 'general'}:${String(sbtAddress || '').toLowerCase() || index}`;
-                    const imageUrl = normalizeFeaturedCardImageUrl(sbtInfo?.image) || defaultSbtImage;
-                    const sbtName = getSbtDisplayName(sbtInfo) || `Unnamed ${t('sbt')}`;
-                    const shortenedAddress = getShortenedAddress(sbtAddress, false);
-                    const mintingEndTime = Number(sbtInfo?.mintingEndTime || 0);
-                    const isMintingActive = mintingEndTime === 0 || mintingEndTime > Math.floor(Date.now() / 1000);
-                    const isPasswordLocked = !!(sbtInfo?.hasPasswordMint);
+                    const {
+                      imageUrl,
+                      isMintingActive,
+                      isPasswordLocked,
+                      resolvedSessionSlug,
+                      sbtAddress,
+                      sbtKey,
+                      sbtName,
+                      shortenedAddress,
+                    } = buildCacheFeaturedCardModel({
+                      defaultImage: defaultSbtImage,
+                      effectiveSessionSlug,
+                      entry,
+                      getDisplayName: getSbtDisplayName,
+                      getShortAddress: getShortenedAddress,
+                      index,
+                      sbtLabel: t('sbt'),
+                    });
                     return (
                       <a
                         key={sbtKey}
                         href={buildSbtDetailPath(sbtAddress, resolvedSessionSlug)}
                         className={sbtPageStyles.sbtItem}
-                        style={{
-                          minWidth: '240px',
-                          maxWidth: '240px',
-                          textDecoration: 'none',
-                          cursor: 'pointer',
-                        }}
+                        style={resolveCacheFeaturedCardLinkStyle()}
                         data-testid={`cache-featured-sbt-link-${String(sbtAddress || '').toLowerCase()}`}
                       >
                         <div className={sbtPageStyles.iconOverlay}>
@@ -641,15 +632,22 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                     );
                   }
 
-                  const { address: sbtAddress, sessionSlug } = entry;
-                  const resolvedSessionSlug = normalizeSessionSlug(sessionSlug || effectiveSessionSlug || '');
-                  const sbtKey = `${resolvedSessionSlug || 'general'}:${String(sbtAddress || '').toLowerCase() || index}`;
+                  const {
+                    resolvedSessionSlug,
+                    sbtAddress,
+                    sbtKey,
+                  } = buildFeaturedEntryModel({
+                    effectiveSessionSlug,
+                    entry,
+                    index,
+                  });
                   return (
                     <SBTPageComponent
                       key={sbtKey}
                       SBTAddress={sbtAddress}
                       account={account}
                       provider={provider}
+                      litHooks={this.props.litHooks}
                       network={network}
                       miniaturized={true}
                       miniMintable={true}
@@ -695,6 +693,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             provider={provider}
             network={network}
             account={account}
+            litHooks={this.props.litHooks}
             loginComplete={loginComplete}
             toggleLoginModal={toggleLoginModal}
             miniaturized={false}
@@ -720,8 +719,12 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
   }
 }
 
-const mapStateToProps = (state: AnyRecord) => ({
-  activeSessionSlug: state.sessionState.activeSessionSlug,
-});
+const mapStateToProps = (state: UnknownRecord) => {
+  const sessionState = isRecord(state.sessionState) ? state.sessionState : {};
+  const activeSessionSlug = sessionState.activeSessionSlug == null
+    ? undefined
+    : String(sessionState.activeSessionSlug);
+  return { activeSessionSlug };
+};
 
 export default connect(mapStateToProps)(SBTsPage);

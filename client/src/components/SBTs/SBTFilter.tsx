@@ -4,439 +4,151 @@ import React from 'react';
 import { FormGroup, Label, Input, Button } from 'reactstrap';
 import styles from './SBTSelector.module.scss';
 import SBTSelector from './SBTSelector';
+import {
+  asCacheObject,
+  asResponseEntry,
+  asSelectedSbtEntry,
+  buildItemsSourceSignature,
+  buildNetHoldersSet,
+  buildNetHoldersSetFromCounts,
+  buildSbtFilterFetchedHolderCacheEntryPatch,
+  buildSbtFilterFetchedHolderRevisionKey,
+  buildSbtFilterHolderFetchResult,
+  buildSbtFilterBooleanTogglePatch,
+  buildSbtFilterExternalStateSyncPatch,
+  buildSbtFilterSbtEntryCachePatch,
+  buildSbtFilterInitialState,
+  buildSbtFilterHolderRequestKey,
+  buildSbtFilterHolderRevisionKey,
+  buildSbtFilterLastAppliedSnapshotPatch,
+  buildSbtFilterLoadingPatch,
+  buildSbtFilterQuickChipClassName,
+  buildSbtFilterQuickChipDisplayState,
+  buildSbtFilterQuickChipSelectedAddressSet,
+  buildSbtFilterSelectionAddPatch,
+  buildSbtFilterSelectionRemovePatch,
+  buildSbtFilterSelectionStateFromState,
+  buildSbtFilterHolderSelectionSets,
+  buildSbtFilterSbtCacheMemoKey,
+  buildSbtFilterSelectedEntryList,
+  buildSbtFilterSnapshot,
+  buildSbtFilterStateSignature,
+  buildSbtFilterSurfaceClassNames,
+  buildUniqueSbtEntries,
+  computeHolderListFingerprint,
+  countMapFingerprint,
+  doesSbtFilterAddressPassSelection,
+  isSbtFilterDataReady,
+  getCachedSbtFilterQuestionEntry,
+  getCachedSbtFilterQuestionResponseMap,
+  filterSbtFilterObjectItems,
+  hasActiveSbtFilterState,
+  hasSbtFilterFeaturedOptions,
+  isRecord,
+  getSbtFilterItemCount,
+  isLatestSbtFilterApplyRun,
+  normalizeAggregatorResponseEntries,
+  normalizeAddressCountMap,
+  readMemoizedSbtFilterSbtCacheBySlug,
+  readMemoizedSbtFilterSbtNetBucketBySlug,
+  readSbtFilterQuestionsNetBucketBySlug,
+  readSbtFilterSbtCacheBySlug,
+  readSbtOptionAddress,
+  resolveEffectiveSbtFilterNetwork,
+  resolveSbtFilterAddressItemDecision,
+  resolveSbtFilterAddressItemsToFilter,
+  resolveSbtFilterCreationBlock,
+  resolveSbtFilterButtonText,
+  resolveSbtFilterChainId,
+  resolveSbtFilterEmptyResponderShortCircuit,
+  resolveSbtFilterEntryCountMapUsage,
+  resolveSbtFilterExternalStateSync,
+  resolveSbtFilterGroupSlug,
+  resolveSbtFilterHolderScanFromBlock,
+  resolveSbtFilterItemParticipantAddresses,
+  resolveSbtFilterLayoutDisplayState,
+  resolveSbtFilterLoadingUpdate,
+  resolveSbtFilterModeSectionsState,
+  resolveSbtFilterOptionsVisibilityState,
+  resolveSbtFilterPanelDisplayState,
+  resolveSbtFilterSurfaceDisplayState,
+  scheduleMicrotask,
+  setBoundedSbtHolderMemoEntry,
+  shouldExpandMissingAddressItemsForSbtFilter,
+  shouldAppendSbtFilterSelection,
+  shouldApplySbtFilterOnDataReady,
+  shouldReapplySbtFilterAfterUpdate,
+  shouldPassThroughSbtFilter,
+  unifySbtFilterAggregatorWithAllLocalQuestions,
+} from './sbtFilterHelpers';
+import type {
+  SbtFilterQuestionEntry,
+  SbtFilterResponseByQuestion,
+  SbtFilterResponseEntry,
+  SbtFilterHolderFetchResult,
+  SbtFilterInitialState,
+  SbtFilterNetworkLike,
+  SbtFilterSbtOption,
+  SbtFilterSelectedSbtEntry,
+  SbtFilterSelectionState,
+  UnknownRecord,
+} from './sbtFilterHelpers';
 import contractScripts, { getSessionChainId, getSessionSlugByName, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilter, faSpinner, faTimes, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { createLogger } from '../../utilities/logging.js';
-import { peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
+import { writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 
 const sbtLog = createLogger('sbt');
 const QUICK_CHIP_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
+const writeCacheValue = writeCache as (namespace: string, slug: string, value: unknown) => Promise<unknown>;
 
-
-/**
- * Helper to unify an aggregator or a question array with all known questions from questionsCache,
- * so zero-response or standalone questions won't get dropped.
- * The logic is used when mode indicates question-based filtering.
- */
-const readQuestionsCacheBySlug = (slug: any) => peekCacheSync('questionsCache', slug || '', { clone: false }) || {};
-const readSbtCacheBySlug = (slug: any) => peekCacheSync('sbtCache', slug || '', { clone: false }) || {};
-
-const asCacheObject = (value: any) => ((value && typeof value === 'object') ? value : {});
-
-const readQuestionsNetBucketBySlug = (slug: any, netKey: any) => (
-  asCacheObject(asCacheObject(readQuestionsCacheBySlug(slug))[String(netKey || '')])
-);
-
-const normalizeIncomingFilterState = (state: any = {}) => ({
-  selectedSBTGroupsCreator: Array.isArray(state.selectedSBTGroupsCreator) ? state.selectedSBTGroupsCreator : [],
-  excludedSBTGroupsCreator: Array.isArray(state.excludedSBTGroupsCreator) ? state.excludedSBTGroupsCreator : [],
-  selectedSBTGroupsResponder: Array.isArray(state.selectedSBTGroupsResponder) ? state.selectedSBTGroupsResponder : [],
-  excludedSBTGroupsResponder: Array.isArray(state.excludedSBTGroupsResponder) ? state.excludedSBTGroupsResponder : [],
-  selectedSBTGroups: Array.isArray(state.selectedSBTGroups) ? state.selectedSBTGroups : [],
-  excludedSBTGroups: Array.isArray(state.excludedSBTGroups) ? state.excludedSBTGroups : [],
-  onlyVerifiedHumans: !!state.onlyVerifiedHumans,
-});
-
-const buildSbtEntrySignature = (entry: any) => {
-  if (!entry) return '';
-  if (typeof entry === 'string') return entry.trim().toLowerCase();
-  if (typeof entry !== 'object') return String(entry || '').trim().toLowerCase();
-  const addr = String(entry.address || entry.sbtAddress || '').trim().toLowerCase();
-  const slug = String(entry.sessionSlug || entry.slug || entry.group || '').trim().toLowerCase();
-  const chain = String(entry.chainId || entry.chainID || '').trim();
-  return `${addr}|${slug}|${chain}`;
+type SbtMintBurnCountsResult = UnknownRecord & {
+  burnedAddresses?: unknown;
+  burnedCountByAddress?: unknown;
+  mintedAddresses?: unknown;
+  mintedCountByAddress?: unknown;
+  ok?: unknown;
 };
-
-const buildSbtListSignature = (list: any) => (
-  Array.isArray(list)
-    ? list
-      .map(buildSbtEntrySignature)
-      .filter(Boolean)
-      .sort()
-      .join(',')
-    : ''
-);
-
-const buildSbtFilterStateSignature = (state: any = {}) => {
-  const normalized = normalizeIncomingFilterState(state);
-  return [
-    buildSbtListSignature(normalized.selectedSBTGroupsCreator),
-    buildSbtListSignature(normalized.excludedSBTGroupsCreator),
-    buildSbtListSignature(normalized.selectedSBTGroupsResponder),
-    buildSbtListSignature(normalized.excludedSBTGroupsResponder),
-    buildSbtListSignature(normalized.selectedSBTGroups),
-    buildSbtListSignature(normalized.excludedSBTGroups),
-    normalized.onlyVerifiedHumans ? '1' : '0',
-  ].join('|');
+type SbtFilterQuickSbtOption = {
+  address: string;
 };
-
-const ITEMS_SOURCE_SIG_MAX_DEPTH = 2;
-const ITEMS_SOURCE_SIG_HASH_SEED = 2166136261;
-const ITEMS_SOURCE_OBJECT_MAX_DEPTH = 4;
-
-const hashIdentityPart = (seed: any, value: any) => {
-  const input = String(value || '');
-  let hash = seed >>> 0;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 16777619) >>> 0;
-  }
-  return hash >>> 0;
+type SbtFilterCallback = (result: unknown, filterState: SbtFilterSelectionState) => unknown;
+type SbtFilterProps = UnknownRecord & {
+  onFilter?: SbtFilterCallback;
+  onFilterCreators?: SbtFilterCallback;
+  onFilterResponders?: SbtFilterCallback;
+  setFilterLoading?: (loading: boolean) => unknown;
 };
-
-const normalizeIdentityPrimitive = (value: any) => {
-  if (value == null) return '';
-  if (typeof value === 'string') return String(value);
-  if (typeof value === 'number') return Number.isFinite(value) ? String(value) : 'nan';
-  if (typeof value === 'boolean') return value ? '1' : '0';
-  if (Array.isArray(value)) return `arr:${value.length}`;
-  if (typeof value === 'object') return `obj:${Object.keys(value).length}`;
-  return String(value);
+type SbtFilterState = Omit<SbtFilterInitialState, 'lastAppliedFilterSnapshot'> & {
+  lastAppliedFilterSnapshot: unknown;
+  [key: string]: unknown;
 };
-
-const normalizeCappedIdentityValue = (value: any, trail: any = new WeakSet()): any => {
-  if (value === undefined) return '__undefined__';
-  if (value === null) return null;
-  if (typeof value === 'string') return String(value);
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 'nan';
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'bigint') return `__bigint:${value.toString(10)}`;
-  if (typeof value !== 'object') return String(value);
-  if (trail.has(value)) return '__circular__';
-  trail.add(value);
-  if (Array.isArray(value)) {
-    const normalizedArray = value.map((entry: any) => normalizeCappedIdentityValue(entry, trail));
-    trail.delete(value);
-    return normalizedArray;
-  }
-  const normalizedObject: Record<string, any> = {};
-  const entries = Object.entries(value)
-    .map(([key, nextValue]: any) => [String(key || '').trim().toLowerCase(), nextValue])
-    .sort(([a]: any, [b]: any) => (a < b ? -1 : a > b ? 1 : 0));
-  entries.forEach(([key, nextValue]: any) => {
-    normalizedObject[key] = normalizeCappedIdentityValue(nextValue, trail);
-  });
-  trail.delete(value);
-  return normalizedObject;
-};
-
-const buildCappedNestedHash = (value: any) => {
-  try {
-    const normalized = normalizeCappedIdentityValue(value);
-    return hashIdentityPart(ITEMS_SOURCE_SIG_HASH_SEED, JSON.stringify(normalized) || '');
-  } catch (_) {
-    return hashIdentityPart(ITEMS_SOURCE_SIG_HASH_SEED, String(value || ''));
-  }
-};
-
-const buildNestedIdentitySignature = (value: any, depth: any = 0) => {
-  if (value == null || typeof value !== 'object') {
-    return `p:${normalizeIdentityPrimitive(value)}`;
-  }
-
-  if (depth >= ITEMS_SOURCE_OBJECT_MAX_DEPTH) {
-    if (Array.isArray(value)) {
-      return `a:${value.length}:${buildCappedNestedHash(value) >>> 0}`;
-    }
-    return `o:${Object.keys(value).length}:${buildCappedNestedHash(value) >>> 0}`;
-  }
-
-  if (Array.isArray(value)) {
-    let hash = hashIdentityPart(ITEMS_SOURCE_SIG_HASH_SEED, `a:${value.length}`);
-    value.forEach((entry: any, index: any) => {
-      hash = hashIdentityPart(hash, String(index));
-      hash = hashIdentityPart(hash, buildNestedIdentitySignature(entry, depth + 1));
-    });
-    return `a:${value.length}:${hash >>> 0}`;
-  }
-
-  const entries = Object.entries(value)
-    .map(([key, nextValue]: any) => [String(key || '').trim().toLowerCase(), nextValue])
-    .sort(([a]: any, [b]: any) => (a < b ? -1 : a > b ? 1 : 0));
-  let hash = hashIdentityPart(ITEMS_SOURCE_SIG_HASH_SEED, `o:${entries.length}`);
-  entries.forEach(([key, nextValue]: any) => {
-    hash = hashIdentityPart(hash, key);
-    hash = hashIdentityPart(hash, buildNestedIdentitySignature(nextValue, depth + 1));
-  });
-  return `o:${entries.length}:${hash >>> 0}`;
-};
-
-const buildEntryResponseIdentityPayload = (entry: any) => {
-  if (!entry || typeof entry !== 'object') return null;
-  if (Object.prototype.hasOwnProperty.call(entry, 'response')) {
-    return entry.response;
-  }
-
-  const hasAnswerLikeFields = (
-    Object.prototype.hasOwnProperty.call(entry, 'answer') ||
-    Object.prototype.hasOwnProperty.call(entry, 'additional') ||
-    Object.prototype.hasOwnProperty.call(entry, 'additionalComment') ||
-    Object.prototype.hasOwnProperty.call(entry, 'additionalComments') ||
-    Object.prototype.hasOwnProperty.call(entry, 'importance') ||
-    Object.prototype.hasOwnProperty.call(entry, 'conviction')
-  );
-  if (hasAnswerLikeFields) {
-    return {
-      answer: Object.prototype.hasOwnProperty.call(entry, 'answer') ? entry.answer : null,
-      additional: Object.prototype.hasOwnProperty.call(entry, 'additional')
-        ? entry.additional
-        : Object.prototype.hasOwnProperty.call(entry, 'additionalComment')
-          ? entry.additionalComment
-          : Object.prototype.hasOwnProperty.call(entry, 'additionalComments')
-            ? entry.additionalComments
-            : null,
-      importance: Object.prototype.hasOwnProperty.call(entry, 'importance') ? entry.importance : null,
-      conviction: Object.prototype.hasOwnProperty.call(entry, 'conviction') ? entry.conviction : null,
-    };
-  }
-
-  if (Object.prototype.hasOwnProperty.call(entry, 'value')) {
-    return entry.value;
-  }
-  if (Object.prototype.hasOwnProperty.call(entry, 'responses')) {
-    return entry.responses;
-  }
-  return null;
-};
-
-const buildEntryIdentityToken = (entry: any) => {
-  if (entry == null || typeof entry !== 'object') return normalizeIdentityPrimitive(entry);
-  const id = normalizeIdentityPrimitive(entry.id || entry.questionId || entry.questionID);
-  const responder = normalizeIdentityPrimitive(entry.responder);
-  const creator = normalizeIdentityPrimitive(entry.creator);
-  const address = normalizeIdentityPrimitive(entry.address || entry.sbtAddress);
-  const slug = normalizeIdentityPrimitive(entry.sessionSlug || entry.slug || entry.group);
-  const chain = normalizeIdentityPrimitive(entry.chainId || entry.chainID);
-  const timestamp = normalizeIdentityPrimitive(
-    entry.timestamp ?? entry.timeStamp ?? ''
-  );
-  const responseLike = buildEntryResponseIdentityPayload(entry);
-  const responseSig = buildNestedIdentitySignature(responseLike);
-  const dense = [id, responder, creator, address, slug, chain, timestamp].filter(Boolean).join('|');
-  if (dense) return `${dense}|${responseSig}`;
-
-  const keys = Object.keys(entry).sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0));
-  const preview = keys
-    .slice(0, 6)
-    .map((key: any) => `${key}:${buildNestedIdentitySignature(entry[key])}`)
-    .join(',');
-  return `obj:${keys.length}:${preview}|${responseSig}`;
-};
-
-const buildAllIndexes = (size: any) => {
-  const total = Math.max(0, Number(size) || 0);
-  return Array.from({ length: total }, (_: any, i: any) => i);
-};
-
-const buildValueIdentitySignature = (value: any, depth: any = 0) => {
-  if (value == null || typeof value !== 'object') {
-    return `p:${normalizeIdentityPrimitive(value)}`;
-  }
-
-  if (depth >= ITEMS_SOURCE_SIG_MAX_DEPTH) {
-    return `d:${buildEntryIdentityToken(value)}`;
-  }
-
-  if (Array.isArray(value)) {
-    const indexes = buildAllIndexes(value.length);
-    let hash = ITEMS_SOURCE_SIG_HASH_SEED;
-    indexes.forEach((index: any) => {
-      hash = hashIdentityPart(hash, String(index));
-      hash = hashIdentityPart(hash, buildValueIdentitySignature(value[index], depth + 1));
-    });
-    return `a:${value.length}:${indexes.length}:${hash >>> 0}`;
-  }
-
-  const entries = Object.entries(value)
-    .map(([key, nextValue]: any) => [String(key || '').trim().toLowerCase(), nextValue])
-    .sort(([a]: any, [b]: any) => (a < b ? -1 : a > b ? 1 : 0));
-  const indexes = buildAllIndexes(entries.length);
-  let hash = ITEMS_SOURCE_SIG_HASH_SEED;
-  indexes.forEach((idx: any) => {
-    const [key, nextValue] = entries[idx];
-    hash = hashIdentityPart(hash, key);
-    hash = hashIdentityPart(hash, buildValueIdentitySignature(nextValue, depth + 1));
-  });
-  return `o:${entries.length}:${indexes.length}:${hash >>> 0}:${buildEntryIdentityToken(value)}`;
-};
-
-const buildItemsSourceSignature = (items: any) => buildValueIdentitySignature(items, 0);
-
-const scheduleMicrotask = (cb: any) => {
-  if (typeof cb !== 'function') return;
-  if (typeof queueMicrotask === 'function') {
-    queueMicrotask(cb);
-    return;
-  }
-  Promise.resolve().then(cb);
+const contractScriptsBoundary = contractScripts as {
+  getSbtMintBurnCountsByAddress: (...args: unknown[]) => Promise<SbtMintBurnCountsResult>;
 };
 
 const HOLDER_SET_MEMO_MAX_ENTRIES = 500;
 
-const normalizeAddressCountMap = (value: any = null) => {
-  const out: Record<string, any> = {};
-  Object.entries(value || {}).forEach(([addrRaw, countRaw]: any) => {
-    const addr = String(addrRaw || '').toLowerCase();
-    if (!addr) return;
-    const count = Math.max(0, Math.floor(Number(countRaw || 0)));
-    if (count <= 0) return;
-    out[addr] = count;
-  });
-  return out;
-};
+class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
+  _activeApplyFilterRunId: number;
+  _applyFilterRunSeq: number;
+  _applyFilterScheduled: boolean;
+  _holderSetInFlight: Map<string, Promise<SbtFilterHolderFetchResult>>;
+  _holderSetMemo: Map<string, Set<string>>;
+  _isMounted: boolean;
+  _lastExternalFilterStateSignature: string;
+  _lastScheduledApplyReason: string;
 
-const countMapFingerprint = (value: any = null) => {
-  const entries = Object.entries(normalizeAddressCountMap(value))
-    .sort(([a]: any, [b]: any) => (a < b ? -1 : a > b ? 1 : 0));
-  if (!entries.length) return 'nil';
-  let hash = 0;
-  entries.forEach(([addr, count]: any) => {
-    const token = `${addr}:${count}`;
-    for (let i = 0; i < token.length; i += 1) {
-      hash = ((hash * 31) + token.charCodeAt(i)) | 0;
-    }
-    hash = ((hash * 131) + 1) | 0;
-  });
-  return `${entries.length}:${hash}`;
-};
-
-const buildHistorySummaryFromCounts = ({
-  mintedCountByAddress = {},
-  burnedCountByAddress = {},
-  mintedEventCount = 0,
-  burnedEventCount = 0,
-}: any = {}) => {
-  const mintedMap = normalizeAddressCountMap(mintedCountByAddress);
-  const burnedMap = normalizeAddressCountMap(burnedCountByAddress);
-  const sumCounts = (value: any = {}) => Object.values(value).reduce((sum: any, count: any) => (
-    sum + Math.max(0, Math.floor(Number(count || 0)))
-  ), 0);
-  let activeSupply = 0;
-  let currentHolderCount = 0;
-  Object.keys(mintedMap).forEach((addr: any) => {
-    const minted = Math.max(0, Math.floor(Number(mintedMap[addr] || 0)));
-    const burned = Math.max(0, Math.floor(Number(burnedMap[addr] || 0)));
-    const net = Math.max(0, minted - burned);
-    if (net > 0) currentHolderCount += 1;
-    activeSupply += net;
-  });
-  return {
-    totalMinted: String(Math.max(0, Math.floor(Number(mintedEventCount || 0))) || sumCounts(mintedMap)),
-    totalBurned: String(Math.max(0, Math.floor(Number(burnedEventCount || 0))) || sumCounts(burnedMap)),
-    activeSupply: String(activeSupply),
-    currentHolderCount: String(currentHolderCount),
-    historicalHolderCount: String(Object.keys(mintedMap).length),
-  };
-};
-
-const buildNetHoldersSet = (mintedAddresses: any = [], burnedAddresses: any = []) => {
-  const burnedSet: any = new Set(
-    (Array.isArray(burnedAddresses) ? burnedAddresses : []).map((addr: any) => String(addr || '').toLowerCase())
-  );
-  const holders: any = new Set();
-  (Array.isArray(mintedAddresses) ? mintedAddresses : []).forEach((addr: any) => {
-    const lower = String(addr || '').toLowerCase();
-    if (!lower || burnedSet.has(lower)) return;
-    holders.add(lower);
-  });
-  return holders;
-};
-
-const buildNetHoldersSetFromCounts = (mintedCountByAddress: any = {}, burnedCountByAddress: any = {}) => {
-  const mintedMap = normalizeAddressCountMap(mintedCountByAddress);
-  const burnedMap = normalizeAddressCountMap(burnedCountByAddress);
-  const holders: any = new Set();
-  Object.keys(mintedMap).forEach((addr: any) => {
-    const minted = Math.max(0, Math.floor(Number(mintedMap[addr] || 0)));
-    const burned = Math.max(0, Math.floor(Number(burnedMap[addr] || 0)));
-    if ((minted - burned) > 0) {
-      holders.add(addr);
-    }
-  });
-  return holders;
-};
-
-function unifyAggregatorWithAllLocalQuestions(baseItems: any, networkID: any, mode: any, slug: any) {
-  const netKey = String(networkID || '');
-  if (!netKey) return baseItems;
-
-  const questionNetCache = readQuestionsNetBucketBySlug(slug, netKey);
-  if (!questionNetCache.questions) {
-    return baseItems;
-  }
-
-  const allKnownQIDs = Object.keys(questionNetCache.questions || {});
-
-  // If baseItems is an array of question objects, unify by adding missing from cache
-  // OR if baseItems is an aggregator object => questionID => array of responses, unify likewise
-  if (
-    mode === 'creatorAndResponder' ||
-    mode === 'creator' ||
-    mode === 'questions' ||
-    mode === 'questionResponses' ||
-    mode === 'responder'
-  ) {
-    if (Array.isArray(baseItems)) {
-      const existingIDs: any = new Set(baseItems.map((q: any) => (q.id || '').toLowerCase()));
-      const newArray = [...baseItems];
-      allKnownQIDs.forEach((qIdLower: any) => {
-        if (!existingIDs.has(qIdLower)) {
-          const qObj = questionNetCache.questions[qIdLower];
-          if (qObj) newArray.push({ ...qObj });
-        }
-      });
-      return newArray;
-    } else if (typeof baseItems === 'object' && baseItems !== null) {
-      const newObj = { ...baseItems };
-      allKnownQIDs.forEach((qIdLower: any) => {
-        if (!newObj[qIdLower]) {
-          newObj[qIdLower] = [];
-        }
-      });
-      return newObj;
-    }
-  }
-
-  return baseItems;
-}
-
-
-class SBTFilter extends React.Component<any, any> {
-  [key: string]: any;
-
-  constructor(props: any) {
+  constructor(props: SbtFilterProps) {
     super(props);
-    // We store all local filter states in one object. If parent passes `externalSBTFilterState`, restore them here.
-    this.state = {
-      selectedSBTGroupsCreator:
-        (props.externalSBTFilterState && props.externalSBTFilterState.selectedSBTGroupsCreator) ||
-        [],
-      excludedSBTGroupsCreator:
-        (props.externalSBTFilterState && props.externalSBTFilterState.excludedSBTGroupsCreator) ||
-        [],
-      selectedSBTGroupsResponder:
-        (props.externalSBTFilterState && props.externalSBTFilterState.selectedSBTGroupsResponder) ||
-        [],
-      excludedSBTGroupsResponder:
-        (props.externalSBTFilterState && props.externalSBTFilterState.excludedSBTGroupsResponder) ||
-        [],
-      selectedSBTGroups:
-        (props.externalSBTFilterState && props.externalSBTFilterState.selectedSBTGroups) || [],
-      excludedSBTGroups:
-        (props.externalSBTFilterState && props.externalSBTFilterState.excludedSBTGroups) || [],
-      onlyVerifiedHumans:
-        (props.externalSBTFilterState && props.externalSBTFilterState.onlyVerifiedHumans) || false,
-      showFilterOptions: props.autoExpand || false,
-      loading: false,
-      showAllSBTs: false,
-
-      // Snapshot to compare so we don't re-apply identical filters over and over
-      lastAppliedFilterSnapshot: null
-    };
+    this.state = buildSbtFilterInitialState({
+      autoExpand: props.autoExpand,
+      externalSBTFilterState: props.externalSBTFilterState,
+    });
     this._isMounted = false;
     this._applyFilterScheduled = false;
     this._applyFilterRunSeq = 0;
@@ -465,90 +177,61 @@ class SBTFilter extends React.Component<any, any> {
   }
 
 
-  componentDidUpdate(prevProps: any, prevState: any) {
+  componentDidUpdate(prevProps: UnknownRecord, prevState: UnknownRecord): void {
     // Determine readiness based on mode.
-    const prevNeedsQuestionCache = (
-      prevProps.mode === 'creator' ||
-      prevProps.mode === 'creatorAndResponder' ||
-      prevProps.mode === 'questions'
-    );
-    const prevSkipCacheGate = prevProps.mode === 'addresses';
-    const wasDataReady = prevSkipCacheGate
-      ? true
-      : ((prevProps.isSBTCacheReady === true) &&
-         (prevNeedsQuestionCache ? prevProps.isQuestionCacheReady === true : true));
-
-    const currNeedsQuestionCache = (
-      this.props.mode === 'creator' ||
-      this.props.mode === 'creatorAndResponder' ||
-      this.props.mode === 'questions'
-    );
-    const currSkipCacheGate = this.props.mode === 'addresses';
-    const isDataReady = currSkipCacheGate
-      ? true
-      : ((this.props.isSBTCacheReady === true) &&
-         (currNeedsQuestionCache ? this.props.isQuestionCacheReady === true : true));
+    const wasDataReady = isSbtFilterDataReady({
+      mode: prevProps.mode,
+      isSBTCacheReady: prevProps.isSBTCacheReady,
+      isQuestionCacheReady: prevProps.isQuestionCacheReady,
+    });
+    const isDataReady = isSbtFilterDataReady({
+      mode: this.props.mode,
+      isSBTCacheReady: this.props.isSBTCacheReady,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+    });
 
     // If data just became ready and a filter is active, apply the filter.
-    if (isDataReady && !wasDataReady && this.hasAnyFilterActive()) {
+    if (shouldApplySbtFilterOnDataReady({
+      hasActiveFilter: this.hasAnyFilterActive(),
+      isDataReady,
+      wasDataReady,
+    })) {
       this.scheduleApplyFilter('data-ready');
       return; // Filter applied; no further checks this cycle.
     }
 
     // 1. Handle External Prop Changes (SAFEGUARDED)
     // Keep a signature across updates so in-place mutations with stable refs are still detected.
-    const nextExternalSig = buildSbtFilterStateSignature(this.props.externalSBTFilterState || {});
-    const prevExternalSig = (
-      typeof this._lastExternalFilterStateSignature === 'string'
-        ? this._lastExternalFilterStateSignature
-        : buildSbtFilterStateSignature(prevProps.externalSBTFilterState || {})
-    );
-    if (prevExternalSig !== nextExternalSig) {
-      this._lastExternalFilterStateSignature = nextExternalSig;
-      const incomingStateNormalized = normalizeIncomingFilterState(this.props.externalSBTFilterState || {});
-      const incomingSig = buildSbtFilterStateSignature(incomingStateNormalized);
-      const currentLocalSig = this.getLocalFilterStateSignature();
+    const externalStateSync = resolveSbtFilterExternalStateSync({
+      currentExternalState: this.props.externalSBTFilterState || {},
+      currentLocalSignature: this.getLocalFilterStateSignature(),
+      lastExternalSignature: this._lastExternalFilterStateSignature,
+      prevExternalState: prevProps.externalSBTFilterState || {},
+    });
+    if (externalStateSync.hasExternalChanged) {
+      this._lastExternalFilterStateSignature = externalStateSync.nextExternalSig;
 
       // Only short-circuit when we actually sync local state from props.
       // If local state is already aligned, continue so normal reapply triggers
       // (e.g., changed items/mode/cache revision) still run in this update.
-      if (incomingSig !== currentLocalSig) {
-        this.setState({
-          ...incomingStateNormalized,
-          lastAppliedFilterSnapshot: null,
-        });
+      if (externalStateSync.shouldSyncLocalState) {
+        this.setState(buildSbtFilterExternalStateSyncPatch({
+          incomingStateNormalized: externalStateSync.incomingStateNormalized,
+        }));
         // Note: Removed direct applyFilter() call here. The state update triggers
         // componentDidUpdate again, which catches the change in step 2 below.
         return;
       }
     }
-    this._lastExternalFilterStateSignature = nextExternalSig;
+    this._lastExternalFilterStateSignature = externalStateSync.nextExternalSig;
 
     // 2. Handle Local State Changes
-    const fieldsToCheck = [
-      'selectedSBTGroupsCreator',
-      'excludedSBTGroupsCreator',
-      'selectedSBTGroupsResponder',
-      'excludedSBTGroupsResponder',
-      'selectedSBTGroups',
-      'excludedSBTGroups',
-      'onlyVerifiedHumans'
-    ];
-
-    let shouldReapply = false;
-    for (let f of fieldsToCheck) {
-      if (prevState[f] !== this.state[f]) {
-        shouldReapply = true;
-        break;
-      }
-    }
-
-    if (prevProps.items !== this.props.items || prevProps.mode !== this.props.mode) {
-      shouldReapply = true;
-    }
-    if (prevProps.sbtCacheRevision !== this.props.sbtCacheRevision) {
-      shouldReapply = true;
-    }
+    const shouldReapply = shouldReapplySbtFilterAfterUpdate({
+      nextProps: this.props,
+      nextState: this.state,
+      prevProps,
+      prevState,
+    });
 
     if (shouldReapply) {
       this.scheduleApplyFilter('state-change');
@@ -556,91 +239,53 @@ class SBTFilter extends React.Component<any, any> {
   }
 
 
-  hasAnyFilterActive() {
-    const {
-      selectedSBTGroupsCreator,
-      excludedSBTGroupsCreator,
-      selectedSBTGroupsResponder,
-      excludedSBTGroupsResponder,
-      selectedSBTGroups,
-      excludedSBTGroups,
-      onlyVerifiedHumans
-    } = this.state;
-
-    return (
-      selectedSBTGroupsCreator.length > 0 ||
-      excludedSBTGroupsCreator.length > 0 ||
-      selectedSBTGroupsResponder.length > 0 ||
-      excludedSBTGroupsResponder.length > 0 ||
-      selectedSBTGroups.length > 0 ||
-      excludedSBTGroups.length > 0 ||
-      onlyVerifiedHumans
-    );
+  hasAnyFilterActive(): boolean {
+    return hasActiveSbtFilterState(this.getLocalFilterState());
   }
 
-  getLocalFilterState() {
-    return {
-      selectedSBTGroupsCreator: this.state.selectedSBTGroupsCreator,
-      excludedSBTGroupsCreator: this.state.excludedSBTGroupsCreator,
-      selectedSBTGroupsResponder: this.state.selectedSBTGroupsResponder,
-      excludedSBTGroupsResponder: this.state.excludedSBTGroupsResponder,
-      selectedSBTGroups: this.state.selectedSBTGroups,
-      excludedSBTGroups: this.state.excludedSBTGroups,
-      onlyVerifiedHumans: this.state.onlyVerifiedHumans
-    };
+  getLocalFilterState(): SbtFilterSelectionState {
+    return buildSbtFilterSelectionStateFromState(this.state);
   }
 
-  getLocalFilterStateSignature() {
+  getLocalFilterStateSignature(): string {
     return buildSbtFilterStateSignature(this.getLocalFilterState());
   }
 
-  isLatestApplyRun: any = (runId: any) => (
-    Number(runId || 0) === Number(this._activeApplyFilterRunId || 0)
+  isLatestApplyRun = (runId: unknown): boolean => (
+    isLatestSbtFilterApplyRun({
+      activeApplyFilterRunId: this._activeApplyFilterRunId,
+      runId,
+    })
   );
 
-  getEffectiveNetwork: any = () => {
-    const raw = this.props.network;
-    const sessionChainId = Number(getSessionChainId(this.props.sessionSlug || '') || 0) || null;
-    const chainId = Number(
-      raw?.id ||
-      raw?.chainId ||
-      raw?.networkChainId ||
-      sessionChainId ||
-      0
-    ) || null;
-    if (raw && chainId && Number(raw.id || 0) !== chainId) {
-      return { ...raw, id: chainId };
-    }
-    if (raw) return raw;
-    if (!chainId) return null;
-    return { id: chainId, chainId };
+  getEffectiveNetwork = (): SbtFilterNetworkLike | null => {
+    return resolveEffectiveSbtFilterNetwork({
+      network: this.props.network,
+      sessionSlug: this.props.sessionSlug,
+      readSessionChainId: getSessionChainId,
+    });
   };
 
-  setFilterLoading: any = (loading: any) => {
-    const next = !!loading;
-    if (this._isMounted && this.state.loading !== next) {
-      this.setState({ loading: next });
+  setFilterLoading = (loading: unknown): void => {
+    const loadingUpdate = resolveSbtFilterLoadingUpdate({
+      currentLoading: this.state.loading,
+      isMounted: this._isMounted,
+      loading,
+      setFilterLoading: this.props.setFilterLoading,
+    });
+    if (loadingUpdate.shouldSetLocalLoading) {
+      this.setState(buildSbtFilterLoadingPatch({ loading: loadingUpdate.nextLoading }));
     }
-    if (typeof this.props.setFilterLoading === 'function') {
-      this.props.setFilterLoading(next);
+    if (loadingUpdate.shouldNotifyParent && this.props.setFilterLoading) {
+      this.props.setFilterLoading(loadingUpdate.nextLoading);
     }
   };
 
-  setHolderSetMemo: any = (key: any, value: any) => {
-    const memoKey = String(key || '');
-    if (!memoKey) return;
-    if (this._holderSetMemo.has(memoKey)) {
-      this._holderSetMemo.delete(memoKey);
-    }
-    while (this._holderSetMemo.size >= HOLDER_SET_MEMO_MAX_ENTRIES) {
-      const oldest = this._holderSetMemo.keys().next();
-      if (oldest.done) break;
-      this._holderSetMemo.delete(oldest.value);
-    }
-    this._holderSetMemo.set(memoKey, value);
+  setHolderSetMemo = (key: unknown, value: Set<string>): void => {
+    setBoundedSbtHolderMemoEntry(this._holderSetMemo, key, value, HOLDER_SET_MEMO_MAX_ENTRIES);
   };
 
-  scheduleApplyFilter: any = (reason: any = 'scheduled') => {
+  scheduleApplyFilter = (reason: unknown = 'scheduled'): void => {
     this._lastScheduledApplyReason = String(reason || 'scheduled');
     if (this._applyFilterScheduled) return;
     this._applyFilterScheduled = true;
@@ -651,7 +296,7 @@ class SBTFilter extends React.Component<any, any> {
     });
   };
 
-  runApplyFilter: any = async (reason: any = 'manual') => {
+  runApplyFilter = async (reason: unknown = 'manual'): Promise<unknown> => {
     const previousActiveRunId = Number(this._activeApplyFilterRunId || 0);
     const runId = Number(this._applyFilterRunSeq || 0) + 1;
     this._applyFilterRunSeq = runId;
@@ -663,7 +308,7 @@ class SBTFilter extends React.Component<any, any> {
     return result;
   };
 
-  applyFilter: any = async (runId: any, reason: any = 'manual') => {
+  applyFilter = async (runId: unknown, _reason: unknown = 'manual'): Promise<unknown> => {
     const effectiveRunId = runId != null
       ? Number(runId)
       : (Number(this._applyFilterRunSeq || 0) + 1);
@@ -680,16 +325,11 @@ class SBTFilter extends React.Component<any, any> {
       // Correct readiness gating per mode:
       // - SBT only: responder, questionResponses, addresses
       // - SBT + Questions: creator, creatorAndResponder, questions
-      const needsQuestionCache = (
-        mode === 'creator' ||
-        mode === 'creatorAndResponder' ||
-        mode === 'questions'
-      );
-      const skipCacheGate = mode === 'addresses';
-      const isDataReady = skipCacheGate
-        ? true
-        : ((isSBTCacheReady === true) &&
-           (needsQuestionCache ? isQuestionCacheReady === true : true));
+      const isDataReady = isSbtFilterDataReady({
+        mode,
+        isSBTCacheReady,
+        isQuestionCacheReady,
+      });
 
       if (!isDataReady) {
         sbtLog.warn("SBTFilter: Waiting for necessary caches to be ready. Aborting filter.", {
@@ -708,7 +348,7 @@ class SBTFilter extends React.Component<any, any> {
         selectedSBTGroups,
         excludedSBTGroups,
         onlyVerifiedHumans
-      } = this.state;
+      } = this.getLocalFilterState();
 
       const effectiveNetwork = this.getEffectiveNetwork();
       const networkID = String(
@@ -719,55 +359,36 @@ class SBTFilter extends React.Component<any, any> {
       );
       sbtLog.log('Network ID used in SBTFilter:', networkID);
 
-      const itemCount = Array.isArray(items)
-        ? items.length
-        : (items && typeof items === 'object')
-          ? Object.keys(items).length
-          : Number(items || 0);
+      const itemCount = getSbtFilterItemCount(items);
       const hasActiveFilter = this.hasAnyFilterActive();
-      const shouldExpandMissingAddressItems = (
-        mode === 'addresses' &&
-        this.props.expandToSbtHolders === true &&
-        selectedSBTGroups.length > 0
-      );
-      const shouldPassThrough = (
-        !hasActiveFilter ||
-        (!items && !shouldExpandMissingAddressItems)
-      );
-      const networkSnapshotKey = String(networkID || '__no-network__');
-      const snapshotPrefix = [
-        this.getLocalFilterStateSignature(),
-        String(mode || ''),
-        String(itemCount),
-        networkSnapshotKey,
-      ];
+      const shouldExpandMissingAddressItems = shouldExpandMissingAddressItemsForSbtFilter({
+        mode,
+        expandToSbtHolders: this.props.expandToSbtHolders,
+        selectedSBTGroups,
+      });
+      const shouldPassThrough = shouldPassThroughSbtFilter({
+        hasActiveFilter,
+        items,
+        shouldExpandMissingAddressItems,
+      });
       const itemsSourceSignature = buildItemsSourceSignature(items);
 
-      if (shouldPassThrough) {
-        newFilterSnapshot = [
-          ...snapshotPrefix,
-          itemsSourceSignature,
-          String(this.props.sbtCacheRevision || 0),
-          'passive',
-        ].join('|');
-        if (this.state.lastAppliedFilterSnapshot === newFilterSnapshot) {
-          // Means we already applied these exact filters; avoid re-render loops
-          return false;
-        }
-      } else {
-        newFilterSnapshot = [
-          ...snapshotPrefix,
-          itemsSourceSignature,
-          String(this.props.sbtCacheRevision || 0),
-        ].join('|');
-        if (this.state.lastAppliedFilterSnapshot === newFilterSnapshot) {
-          // Means we already applied these exact filters; avoid re-render loops
-          return false;
-        }
+      newFilterSnapshot = buildSbtFilterSnapshot({
+        filterStateSignature: this.getLocalFilterStateSignature(),
+        mode,
+        itemCount,
+        networkID,
+        itemsSourceSignature,
+        sbtCacheRevision: this.props.sbtCacheRevision,
+        passive: shouldPassThrough,
+      });
+      if (this.state.lastAppliedFilterSnapshot === newFilterSnapshot) {
+        // Means we already applied these exact filters; avoid re-render loops
+        return false;
       }
 
       if (this.isLatestApplyRun(effectiveRunId)) {
-        this.setState({ lastAppliedFilterSnapshot: newFilterSnapshot });
+        this.setState(buildSbtFilterLastAppliedSnapshotPatch({ snapshot: newFilterSnapshot }));
       }
 
       if (!networkID) {
@@ -786,169 +407,115 @@ class SBTFilter extends React.Component<any, any> {
         return;
       }
 
-      const allSbtEntries = [
-        ...selectedSBTGroupsCreator,
-        ...excludedSBTGroupsCreator,
-        ...selectedSBTGroupsResponder,
-        ...excludedSBTGroupsResponder,
-        ...selectedSBTGroups,
-        ...excludedSBTGroups
-      ].filter(Boolean);
-
-      const uniqueSbtEntries: any = new Map();
-      allSbtEntries.forEach((sbt: any) => {
-        const addr = (sbt?.address || '').toLowerCase();
-        if (!addr) return;
-        const existing = uniqueSbtEntries.get(addr);
-        if (!existing) {
-          uniqueSbtEntries.set(addr, sbt);
-          return;
-        }
-        if (!existing.sessionSlug && (sbt.sessionSlug || sbt.slug || sbt.sessionName)) {
-          uniqueSbtEntries.set(addr, {
-            ...existing,
-            sessionSlug: sbt.sessionSlug || sbt.slug || existing.sessionSlug,
-            sessionName: sbt.sessionName || existing.sessionName,
-            chainId: sbt.chainId || sbt.chainID || existing.chainId
-          });
-        }
+      const allSbtEntries = buildSbtFilterSelectedEntryList({
+        selectedSBTGroupsCreator,
+        excludedSBTGroupsCreator,
+        selectedSBTGroupsResponder,
+        excludedSBTGroupsResponder,
+        selectedSBTGroups,
+        excludedSBTGroups,
       });
 
-      const resolveGroupSlugForSbt = (sbt: any) => {
-        if (!sbt) return slug;
-        const direct = sbt.sessionSlug || sbt.slug || sbt.group;
-        if (direct != null && String(direct).trim() !== '') return normalizeSessionSlug(direct);
-        if (sbt.sessionName) {
-          const byName = getSessionSlugByName(String(sbt.sessionName).trim());
-          if (byName != null) return byName;
-        }
-        return slug;
-      };
+      const uniqueSbtEntries: Map<string, SbtFilterSelectedSbtEntry> = buildUniqueSbtEntries(allSbtEntries);
 
-      const resolveChainIdForSbt = (sbtSlug: any, sbt: any) => {
-        const fromEntry = sbt?.chainId || sbt?.chainID;
-        const chainId = getSessionChainId(sbtSlug) || fromEntry || networkID || null;
-        return chainId != null ? Number(chainId) : null;
-      };
-
-      const cacheBySlug: any = new Map();
-      const readRawCacheForSlug = (slugForCache: any) => {
-        const cacheKey = `dg:sbtCache:${slugForCache || ''}`;
-        if (cacheBySlug.has(cacheKey)) return cacheBySlug.get(cacheKey);
-        const parsed = asCacheObject(readSbtCacheBySlug(slugForCache));
-        cacheBySlug.set(cacheKey, parsed);
-        return parsed;
-      };
-
-      const readNetCacheForSlug = (slugForCache: any, netKeyForCache: any) => (
-        asCacheObject(asCacheObject(readRawCacheForSlug(slugForCache))[String(netKeyForCache || '')])
-      );
-
-      const writeSbtEntryForSlug = (slugForCache: any, netKeyForCache: any, sbtAddress: any, entryPatch: any = {}) => {
-        const cacheKey = `dg:sbtCache:${slugForCache || ''}`;
-        const netKey = String(netKeyForCache || '');
-        if (!netKey) return null;
-        const rawCache = asCacheObject(readRawCacheForSlug(slugForCache));
-        const netCache = asCacheObject(rawCache[netKey]);
-        const sbtList = asCacheObject(netCache.sbtList);
-        const currentEntry = asCacheObject(sbtList[sbtAddress]);
-        const nextCache = {
-          ...rawCache,
-          [netKey]: {
-            ...netCache,
-            sbtList: {
-              ...sbtList,
-              [sbtAddress]: {
-                ...currentEntry,
-                ...entryPatch,
-              },
-            },
-          },
-        };
-        void writeCache('sbtCache', slugForCache || '', nextCache);
+      const cacheBySlug: Map<string, UnknownRecord> = new Map();
+      const writeSbtEntryForSlug = (
+        slugForCache: unknown,
+        netKeyForCache: unknown,
+        sbtAddress: string,
+        entryPatch: UnknownRecord = {}
+      ): UnknownRecord | null => {
+        const cacheKey = buildSbtFilterSbtCacheMemoKey(slugForCache);
+        const rawCache = asCacheObject(readMemoizedSbtFilterSbtCacheBySlug({
+          cacheBySlug,
+          readSbtCacheBySlug: readSbtFilterSbtCacheBySlug,
+          slugForCache,
+        }));
+        const nextCache = buildSbtFilterSbtEntryCachePatch({
+          entryPatch,
+          netKey: netKeyForCache,
+          rawCache,
+          sbtAddress,
+        });
+        if (!nextCache) return null;
+        void writeCacheValue('sbtCache', String(slugForCache || ''), nextCache);
         cacheBySlug.set(cacheKey, nextCache);
         return nextCache;
       };
 
-      const computeHolderListFingerprint = (addresses: any) => {
-        if (!Array.isArray(addresses)) return 'nil';
-        let hash = 0;
-        for (let i = 0; i < addresses.length; i += 1) {
-          const normalized = String(addresses[i] || '').toLowerCase();
-          for (let j = 0; j < normalized.length; j += 1) {
-            hash = ((hash * 31) + normalized.charCodeAt(j)) | 0;
-          }
-          hash = ((hash * 131) + 1) | 0;
-        }
-        return `${addresses.length}:${hash}`;
-      };
-
       // Build a map of SBT -> set of minted holders (minus burned)
-      const sbtHoldersMap: Record<string, any> = {};
+      const sbtHoldersMap: Record<string, Set<string>> = {};
       for (const [sbtAddress, sbt] of uniqueSbtEntries.entries()) {
-        const sbtSlug = resolveGroupSlugForSbt(sbt);
-        const chainId = resolveChainIdForSbt(sbtSlug, sbt);
+        const sbtSlug = resolveSbtFilterGroupSlug({
+          fallbackSlug: slug,
+          getSessionSlugByName,
+          normalizeSessionSlug,
+          sbtInput: sbt,
+        });
+        const chainId = resolveSbtFilterChainId({
+          getSessionChainId,
+          networkID,
+          sbtInput: sbt,
+          sbtSlug,
+        });
         const netKey = String(chainId || networkID || '');
         if (!netKey) {
           sbtHoldersMap[sbtAddress] = new Set();
           continue;
         }
 
-        const sbtNetCache = readNetCacheForSlug(sbtSlug, netKey);
+        const sbtNetCache = readMemoizedSbtFilterSbtNetBucketBySlug({
+          cacheBySlug,
+          netKeyForCache: netKey,
+          readSbtCacheBySlug: readSbtFilterSbtCacheBySlug,
+          slugForCache: sbtSlug,
+        });
         const sbtListData = sbtNetCache.sbtList || {};
         const entry = sbtListData[sbtAddress] || {};
+        const entrySbtInfo = asCacheObject(entry.sbtInfo);
+        const sbtRecord = asCacheObject(sbt);
+        const sbtInfoRecord = asCacheObject(sbtRecord.sbtInfo);
         const entryMinted = Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : null;
         const entryBurned = Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : null;
         const rawEntryMintedCounts = entry?.mintedCountByAddress;
         const rawEntryBurnedCounts = entry?.burnedCountByAddress;
         const entryMintedCountMap = normalizeAddressCountMap(rawEntryMintedCounts);
         const entryBurnedCountMap = normalizeAddressCountMap(rawEntryBurnedCounts);
-        const checkpointBackedPartialCounts =
-          entry?.countsLoaded !== true &&
-          !!entry?.countsScanCheckpoint &&
-          typeof entry.countsScanCheckpoint === 'object';
-        const hasStructuredEntryCountMaps =
-          (
-            !!rawEntryMintedCounts &&
-            typeof rawEntryMintedCounts === 'object' &&
-            !Array.isArray(rawEntryMintedCounts)
-          ) || (
-            !!rawEntryBurnedCounts &&
-            typeof rawEntryBurnedCounts === 'object' &&
-            !Array.isArray(rawEntryBurnedCounts)
-          );
-        const hasAuthoritativeEntryCountMaps =
-          (
-            Object.keys(entryMintedCountMap).length > 0 ||
-            Object.keys(entryBurnedCountMap).length > 0 ||
-            (entry?.countsLoaded === true && hasStructuredEntryCountMaps && !entryMinted && !entryBurned)
-          );
-        const shouldUseEntryCountMaps =
-          !checkpointBackedPartialCounts &&
-          hasAuthoritativeEntryCountMaps;
+        const {
+          checkpointBackedPartialCounts,
+          shouldUseEntryCountMaps,
+        } = resolveSbtFilterEntryCountMapUsage({
+          entry,
+          entryBurned,
+          entryBurnedCountMap,
+          entryMinted,
+          entryMintedCountMap,
+          rawEntryBurnedCounts,
+          rawEntryMintedCounts,
+        });
         const entryMintedFingerprint = computeHolderListFingerprint(entryMinted);
         const entryBurnedFingerprint = computeHolderListFingerprint(entryBurned);
         const entryMintedCountFingerprint = countMapFingerprint(rawEntryMintedCounts);
         const entryBurnedCountFingerprint = countMapFingerprint(rawEntryBurnedCounts);
-        const holderRevisionKey = [
-          String(sbtSlug || ''),
-          String(netKey || ''),
-          String(sbtAddress || ''),
-          String(this.props.sbtCacheRevision || 0),
-          String(entry.countsLoaded === true ? 1 : 0),
-          String(shouldUseEntryCountMaps ? 1 : 0),
-          String(entryMintedCountFingerprint),
-          String(entryBurnedCountFingerprint),
-          String(entryMintedFingerprint),
-          String(entryBurnedFingerprint),
-          String(
-            entry.creationBlock ??
-            entry.sbtInfo?.creationBlock ??
-            sbt?.creationBlock ??
-            sbt?.sbtInfo?.creationBlock ??
-            ''
-          ),
-        ].join('|');
+        const rawCreationBlock = resolveSbtFilterCreationBlock({
+          entry,
+          entrySbtInfo,
+          sbtRecord,
+          sbtInfoRecord,
+        });
+        const holderRevisionKey = buildSbtFilterHolderRevisionKey({
+          sbtSlug,
+          netKey,
+          sbtAddress,
+          sbtCacheRevision: this.props.sbtCacheRevision,
+          countsLoaded: entry.countsLoaded === true,
+          shouldUseEntryCountMaps,
+          mintedCountFingerprint: entryMintedCountFingerprint,
+          burnedCountFingerprint: entryBurnedCountFingerprint,
+          mintedListFingerprint: entryMintedFingerprint,
+          burnedListFingerprint: entryBurnedFingerprint,
+          creationBlock: rawCreationBlock ?? '',
+        });
         const memoizedHolders = this._holderSetMemo.get(holderRevisionKey);
         if (memoizedHolders) {
           sbtHoldersMap[sbtAddress] = memoizedHolders;
@@ -958,7 +525,7 @@ class SBTFilter extends React.Component<any, any> {
         if (shouldUseEntryCountMaps) {
           const holdersSet = measureSync('ce.sbtFilter.computeNetHolderSet', () =>
             buildNetHoldersSetFromCounts(entryMintedCountMap, entryBurnedCountMap)
-          );
+          ) as Set<string>;
           this.setHolderSetMemo(holderRevisionKey, holdersSet);
           sbtHoldersMap[sbtAddress] = holdersSet;
           continue;
@@ -967,53 +534,36 @@ class SBTFilter extends React.Component<any, any> {
         if (!checkpointBackedPartialCounts && entry.countsLoaded === true && entryMinted && entryBurned) {
           const holdersSet = measureSync('ce.sbtFilter.computeNetHolderSet', () =>
             buildNetHoldersSet(entryMinted, entryBurned)
-          );
+          ) as Set<string>;
           this.setHolderSetMemo(holderRevisionKey, holdersSet);
           sbtHoldersMap[sbtAddress] = holdersSet;
           continue;
         }
 
         try {
-          const rawCreationBlock =
-            entry.creationBlock ??
-            entry.sbtInfo?.creationBlock ??
-            sbt?.creationBlock ??
-            sbt?.sbtInfo?.creationBlock;
-          const creationBlock = rawCreationBlock != null ? Number(rawCreationBlock) : NaN;
-          const fromBlock = Number.isFinite(creationBlock) && creationBlock >= 0 ? Math.floor(creationBlock) : 0;
-          const requestKey = [
-            String(sbtSlug || ''),
-            String(netKey || ''),
-            String(sbtAddress || ''),
-            String(fromBlock || 0),
-          ].join('|');
+          const fromBlock = resolveSbtFilterHolderScanFromBlock(rawCreationBlock);
+          const requestKey = buildSbtFilterHolderRequestKey({
+            sbtSlug,
+            netKey,
+            sbtAddress,
+            fromBlock,
+          });
 
           let inFlight = this._holderSetInFlight.get(requestKey);
           if (!inFlight) {
             inFlight = (async () => {
-              const counts = await contractScripts.getSbtMintBurnCountsByAddress('none', sbtAddress, fromBlock, 'latest', sbtSlug);
+              const counts = await contractScriptsBoundary.getSbtMintBurnCountsByAddress('none', sbtAddress, fromBlock, 'latest', sbtSlug);
               if (counts?.ok === false) {
                 throw new Error('SBT holder count scan failed');
               }
-              const mintedCountByAddress = normalizeAddressCountMap(counts?.mintedCountByAddress);
-              const burnedCountByAddress = normalizeAddressCountMap(counts?.burnedCountByAddress);
-              const mintedAddresses = Object.keys(mintedCountByAddress);
-              const burnedAddresses = Object.keys(burnedCountByAddress);
-              const holdersSet = measureSync('ce.sbtFilter.computeNetHolderSet', () =>
-                buildNetHoldersSetFromCounts(mintedCountByAddress, burnedCountByAddress)
-              );
-              return {
-                mintedAddresses,
-                burnedAddresses,
-                mintedCountByAddress,
-                burnedCountByAddress,
-                mintedEventCount: Math.max(0, Math.floor(Number(counts?.mintedEventCount || 0))),
-                burnedEventCount: Math.max(0, Math.floor(Number(counts?.burnedEventCount || 0))),
-                scannedToBlock: Number.isFinite(Number(counts?.scannedToBlock))
-                  ? Math.floor(Number(counts.scannedToBlock))
-                  : null,
-                holdersSet,
-              };
+              return buildSbtFilterHolderFetchResult({
+                counts,
+                resolveHoldersSet: (mintedCountByAddress, burnedCountByAddress) => (
+                  measureSync('ce.sbtFilter.computeNetHolderSet', () =>
+                    buildNetHoldersSetFromCounts(mintedCountByAddress, burnedCountByAddress)
+                  ) as Set<string>
+                ),
+              });
             })()
               .finally(() => {
                 this._holderSetInFlight.delete(requestKey);
@@ -1023,45 +573,23 @@ class SBTFilter extends React.Component<any, any> {
 
           const fetched = await inFlight;
           if (!this.isLatestApplyRun(effectiveRunId)) return;
-          const mintedAddresses = fetched?.mintedAddresses || [];
-          const burnedAddresses = fetched?.burnedAddresses || [];
-          const mintedCountByAddress = fetched?.mintedCountByAddress || {};
-          const burnedCountByAddress = fetched?.burnedCountByAddress || {};
           const holdersSet = fetched?.holdersSet || new Set();
           sbtHoldersMap[sbtAddress] = holdersSet;
 
-          writeSbtEntryForSlug(sbtSlug, netKey, sbtAddress, {
-            mintedAddresses,
-            burnedAddresses,
-            mintedCountByAddress,
-            burnedCountByAddress,
-            mintedEventCount: fetched?.mintedEventCount || 0,
-            burnedEventCount: fetched?.burnedEventCount || 0,
-            historySummary: buildHistorySummaryFromCounts({
-              mintedCountByAddress,
-              burnedCountByAddress,
-              mintedEventCount: fetched?.mintedEventCount || 0,
-              burnedEventCount: fetched?.burnedEventCount || 0,
-            }),
-            blockNumber: Number.isFinite(Number(fetched?.scannedToBlock))
-              ? Math.floor(Number(fetched.scannedToBlock))
-              : undefined,
-            countsLoaded: true,
-            countsScanCheckpoint: null,
+          writeSbtEntryForSlug(
+            sbtSlug,
+            netKey,
+            sbtAddress,
+            buildSbtFilterFetchedHolderCacheEntryPatch({ fetched })
+          );
+          const fetchedRevisionKey = buildSbtFilterFetchedHolderRevisionKey({
+            sbtSlug,
+            netKey,
+            sbtAddress,
+            sbtCacheRevision: this.props.sbtCacheRevision,
+            fromBlock,
+            fetched,
           });
-          const fetchedRevisionKey = [
-            String(sbtSlug || ''),
-            String(netKey || ''),
-            String(sbtAddress || ''),
-            String(this.props.sbtCacheRevision || 0),
-            '1',
-            '1',
-            String(countMapFingerprint(mintedCountByAddress)),
-            String(countMapFingerprint(burnedCountByAddress)),
-            String(computeHolderListFingerprint(mintedAddresses)),
-            String(computeHolderListFingerprint(burnedAddresses)),
-            String(fromBlock || 0),
-          ].join('|');
           this.setHolderSetMemo(fetchedRevisionKey, holdersSet);
         } catch (error) {
           sbtLog.error('Error fetching SBT holders:', error);
@@ -1072,108 +600,59 @@ class SBTFilter extends React.Component<any, any> {
       sbtLog.log('sbtHoldersMap:', sbtHoldersMap);
       if (!this.isLatestApplyRun(effectiveRunId)) return;
 
-      const buildHolderUnionSet = (sbtEntries: any = []) => {
-        const union: any = new Set();
-        (Array.isArray(sbtEntries) ? sbtEntries : []).forEach((sbt: any) => {
-          const sbtAddr = String(sbt?.address || '').toLowerCase();
-          if (!sbtAddr) return;
-          const holders = sbtHoldersMap[sbtAddr];
-          if (!holders || holders.size === 0) return;
-          holders.forEach((holder: any) => union.add(holder));
-        });
-        return union;
-      };
-
-      const selectedCreatorHolderSet = buildHolderUnionSet(selectedSBTGroupsCreator);
-      const excludedCreatorHolderSet = buildHolderUnionSet(excludedSBTGroupsCreator);
-      const selectedResponderHolderSet = buildHolderUnionSet(selectedSBTGroupsResponder);
-      const excludedResponderHolderSet = buildHolderUnionSet(excludedSBTGroupsResponder);
-      const selectedAddressHolderSet = buildHolderUnionSet(selectedSBTGroups);
-      const excludedAddressHolderSet = buildHolderUnionSet(excludedSBTGroups);
-
-      const doesAddressPassHolderSets = (address: any, includeSet: any, hasIncludeGroups: any, excludeSet: any) => {
-        if (!address) return true;
-        const lowerAddr = String(address || '').toLowerCase();
-        if (excludeSet && excludeSet.size > 0 && excludeSet.has(lowerAddr)) {
-          return false;
-        }
-        if (hasIncludeGroups && (!includeSet || !includeSet.has(lowerAddr))) {
-          return false;
-        }
-        return true;
-      };
+      const {
+        selectedCreatorHolderSet,
+        excludedCreatorHolderSet,
+        selectedResponderHolderSet,
+        excludedResponderHolderSet,
+        selectedAddressHolderSet,
+        excludedAddressHolderSet,
+      } = buildSbtFilterHolderSelectionSets({
+        selectedSBTGroupsCreator,
+        excludedSBTGroupsCreator,
+        selectedSBTGroupsResponder,
+        excludedSBTGroupsResponder,
+        selectedSBTGroups,
+        excludedSBTGroups,
+        sbtHoldersMap,
+      });
 
       // Helper to check address vs. include/exclude sets
-      const doesAddressPassFilters = (address: any, selectedSBTs: any, excludedSBTs: any) => {
-        if (selectedSBTs === selectedSBTGroupsCreator && excludedSBTs === excludedSBTGroupsCreator) {
-          return doesAddressPassHolderSets(
-            address,
-            selectedCreatorHolderSet,
-            selectedSBTGroupsCreator.length > 0,
-            excludedCreatorHolderSet
-          );
-        }
-        if (selectedSBTs === selectedSBTGroupsResponder && excludedSBTs === excludedSBTGroupsResponder) {
-          return doesAddressPassHolderSets(
-            address,
-            selectedResponderHolderSet,
-            selectedSBTGroupsResponder.length > 0,
-            excludedResponderHolderSet
-          );
-        }
-        if (selectedSBTs === selectedSBTGroups && excludedSBTs === excludedSBTGroups) {
-          return doesAddressPassHolderSets(
-            address,
-            selectedAddressHolderSet,
-            selectedSBTGroups.length > 0,
-            excludedAddressHolderSet
-          );
-        }
-        return doesAddressPassHolderSets(
+      const doesAddressPassFilters = (address: unknown, selectedSBTs: unknown, excludedSBTs: unknown): boolean => {
+        return doesSbtFilterAddressPassSelection({
           address,
-          buildHolderUnionSet(selectedSBTs),
-          Array.isArray(selectedSBTs) && selectedSBTs.length > 0,
-          buildHolderUnionSet(excludedSBTs)
-        );
+          excludedAddressHolderSet,
+          excludedCreatorHolderSet,
+          excludedResponderHolderSet,
+          excludedSBTGroups,
+          excludedSBTGroupsCreator,
+          excludedSBTGroupsResponder,
+          excludedSBTs,
+          sbtHoldersMap,
+          selectedAddressHolderSet,
+          selectedCreatorHolderSet,
+          selectedResponderHolderSet,
+          selectedSBTGroups,
+          selectedSBTGroupsCreator,
+          selectedSBTGroupsResponder,
+          selectedSBTs,
+        });
       };
 
-      // Short-circuit for responder-only modes when include list has no holders
-      if (
-        (mode === 'responder' || mode === 'questionResponses') &&
-        selectedSBTGroupsResponder.length > 0
-      ) {
-        if (selectedResponderHolderSet.size === 0) {
-          sbtLog.log('[SBTFilter] Responder include list has no holders. Returning empty result.');
-          if (this.props.onFilter) {
-            const result = Array.isArray(items) ? [] : {};
-            this.props.onFilter(result, this.getLocalFilterState());
-          }
-          return;
+      const emptyResponderShortCircuit = resolveSbtFilterEmptyResponderShortCircuit({
+        items,
+        mode,
+        selectedResponderHolderSet,
+        selectedSBTGroupsResponder,
+      });
+      if (emptyResponderShortCircuit.shouldShortCircuit) {
+        if (emptyResponderShortCircuit.logMessage) {
+          sbtLog.log(emptyResponderShortCircuit.logMessage);
         }
-      }
-
-      // Extend the same short-circuit to creatorAndResponder mode.
-      // When user includes responder SBT(s) but union of holders is empty, nothing should pass.
-      if (
-        mode === 'creatorAndResponder' &&
-        selectedSBTGroupsResponder.length > 0
-      ) {
-        if (selectedResponderHolderSet.size === 0) {
-          sbtLog.log('[SBTFilter] (creatorAndResponder) Responder include has 0 holders -> return empty.');
-          if (this.props.onFilter) {
-            if (Array.isArray(items)) {
-              this.props.onFilter(
-                { filteredQuestions: [], filteredResponsesByQuestion: {} },
-                this.getLocalFilterState()
-              );
-            } else if (items && typeof items === 'object') {
-              this.props.onFilter({}, this.getLocalFilterState());
-            } else {
-              this.props.onFilter([], this.getLocalFilterState());
-            }
-          }
-          return;
+        if (this.props.onFilter) {
+          this.props.onFilter(emptyResponderShortCircuit.result, this.getLocalFilterState());
         }
+        return;
       }
 
       // Creator and responder mode
@@ -1187,16 +666,17 @@ class SBTFilter extends React.Component<any, any> {
         }
 
         if (Array.isArray(items)) {
-          let filteredQuestions: any[] = [];
-          let filteredResponsesByQuestion: Record<string, any> = {};
+          const filteredQuestions: unknown[] = [];
+          const filteredResponsesByQuestion: SbtFilterResponseByQuestion = {};
 
           const networkIDLocal = String(networkID);
-          const questionNetCache = readQuestionsNetBucketBySlug(slug, networkIDLocal);
+          const questionNetCache = readSbtFilterQuestionsNetBucketBySlug(slug, networkIDLocal);
 
-          for (let questionObj of items) {
+          for (const questionObj of items) {
+            const questionRecord = asCacheObject(questionObj);
             if (
               doesAddressPassFilters(
-                questionObj.creator,
+                questionRecord.creator,
                 selectedSBTGroupsCreator,
                 excludedSBTGroupsCreator
               )
@@ -1206,19 +686,14 @@ class SBTFilter extends React.Component<any, any> {
           }
 
           // Build question->responses from cache
-          for (let qObj of filteredQuestions) {
-            const qID = qObj.id?.toLowerCase();
-            let qResponses: any[] = [];
-            if (
-              questionNetCache.questionResponses &&
-              questionNetCache.questionResponses[qID]
-            ) {
-              const addresses = Object.keys(
-                questionNetCache.questionResponses[qID]
-              );
-              for (let addr of addresses) {
-                const responseData =
-                  questionNetCache.questionResponses[qID][addr];
+          for (const qObj of filteredQuestions) {
+            const qID = String(asCacheObject(qObj).id || '').toLowerCase();
+            const qResponses: SbtFilterResponseEntry[] = [];
+            const responseMap = getCachedSbtFilterQuestionResponseMap(questionNetCache, qID);
+            if (Object.keys(responseMap).length > 0) {
+              const addresses = Object.keys(responseMap);
+              for (const addr of addresses) {
+                const responseData = responseMap[addr];
                 qResponses.push({
                   responder: addr,
                   questionId: qID,
@@ -1227,8 +702,8 @@ class SBTFilter extends React.Component<any, any> {
               }
             }
 
-          let finalFilteredResponses: any[] = [];
-          for (let resp of qResponses) {
+          const finalFilteredResponses: SbtFilterResponseEntry[] = [];
+          for (const resp of qResponses) {
             if (
               doesAddressPassFilters(
                 resp.responder,
@@ -1267,22 +742,22 @@ class SBTFilter extends React.Component<any, any> {
         }
         // Aggregator-object version
         else if (typeof items === 'object' && items !== null) {
-          const unifiedAgg = unifyAggregatorWithAllLocalQuestions(items, networkID, 'creatorAndResponder', slug);
+          const unifiedAgg = unifySbtFilterAggregatorWithAllLocalQuestions(
+            items,
+            networkID,
+            'creatorAndResponder',
+            slug
+          ) as Record<string, SbtFilterResponseEntry[]>;
 
-          let finalAggregator: Record<string, any> = {};
-          const questionNetCache = readQuestionsNetBucketBySlug(slug, networkID);
+          const finalAggregator: SbtFilterResponseByQuestion = {};
+          const questionNetCache = readSbtFilterQuestionsNetBucketBySlug(slug, networkID);
 
-          let filteredQuestions: any[] = [];
+          const filteredQuestions: SbtFilterQuestionEntry[] = [];
 
-          for (let qId of Object.keys(unifiedAgg)) {
+          for (const qId of Object.keys(unifiedAgg)) {
             const rawArray = unifiedAgg[qId] || [];
-            let questionCreator: any = null;
-            if (
-              questionNetCache.questions &&
-              questionNetCache.questions[qId]
-            ) {
-              questionCreator = questionNetCache.questions[qId].creator;
-            }
+            const cachedQuestion = getCachedSbtFilterQuestionEntry(questionNetCache, qId);
+            let questionCreator: unknown = cachedQuestion?.creator || null;
             let keepThisQuestion = true;
             if (questionCreator) {
               keepThisQuestion = doesAddressPassFilters(
@@ -1294,14 +769,11 @@ class SBTFilter extends React.Component<any, any> {
             if (!keepThisQuestion) {
               continue;
             }
-            if (
-              questionNetCache.questions &&
-              questionNetCache.questions[qId]
-            ) {
-              filteredQuestions.push(questionNetCache.questions[qId]);
+            if (cachedQuestion) {
+              filteredQuestions.push(cachedQuestion);
             }
 
-            const keptEntries = rawArray.filter((entryObj: any) => {
+            const keptEntries = normalizeAggregatorResponseEntries(rawArray).filter((entryObj) => {
               if (
                 entryObj.responder &&
                 !doesAddressPassFilters(
@@ -1327,7 +799,7 @@ class SBTFilter extends React.Component<any, any> {
             this.props.onFilterCreators(filteredQuestions, this.getLocalFilterState());
           }
           if (this.props.onFilterResponders) {
-            const byQuestion: Record<string, any> = {};
+            const byQuestion: SbtFilterResponseByQuestion = {};
             for (const qId of Object.keys(finalAggregator)) {
               byQuestion[qId] = finalAggregator[qId];
             }
@@ -1359,39 +831,27 @@ class SBTFilter extends React.Component<any, any> {
         items !== null &&
         !Array.isArray(items)
       ) {
-        const unifiedAgg = unifyAggregatorWithAllLocalQuestions(items, networkID, mode, slug);
+        const unifiedAgg = unifySbtFilterAggregatorWithAllLocalQuestions(
+          items,
+          networkID,
+          mode,
+          slug
+        ) as Record<string, unknown>;
 
-        let finalAggregator: Record<string, any> = {};
-        const questionNetCache = readQuestionsNetBucketBySlug(slug, networkID);
+        const finalAggregator: SbtFilterResponseByQuestion = {};
+        const questionNetCache = readSbtFilterQuestionsNetBucketBySlug(slug, networkID);
 
-        let filteredQuestions: any[] = [];
+        const filteredQuestions: SbtFilterQuestionEntry[] = [];
 
-        for (let qId of Object.keys(unifiedAgg)) {
-          let rawVal = unifiedAgg[qId];
-          let rawArray = Array.isArray(rawVal)
-            ? rawVal
-            : Object.keys(rawVal).map((respAddr: any) => {
-                const potentialObj = rawVal[respAddr];
-                if (potentialObj && typeof potentialObj === 'object' && potentialObj.responder) {
-                  return potentialObj;
-                } else {
-                  return {
-                    responder: respAddr,
-                    response: potentialObj
-                  };
-                }
-              });
+        for (const qId of Object.keys(unifiedAgg)) {
+          const rawVal = unifiedAgg[qId];
+          const rawArray = normalizeAggregatorResponseEntries(rawVal);
 
           // For "creator" or "questions" modes, check question creator
           let keepThisQuestion = true;
           if (mode === 'creator' || mode === 'questions') {
-            let questionCreator: any = null;
-            if (
-              questionNetCache.questions &&
-              questionNetCache.questions[qId]
-            ) {
-              questionCreator = questionNetCache.questions[qId].creator;
-            }
+            const cachedQuestion = getCachedSbtFilterQuestionEntry(questionNetCache, qId);
+            let questionCreator: unknown = cachedQuestion?.creator || null;
             if (questionCreator) {
               keepThisQuestion = doesAddressPassFilters(
                 questionCreator,
@@ -1406,16 +866,15 @@ class SBTFilter extends React.Component<any, any> {
 
           if (
             (mode === 'creator' || mode === 'questions') &&
-            questionNetCache.questions &&
-            questionNetCache.questions[qId]
+            getCachedSbtFilterQuestionEntry(questionNetCache, qId)
           ) {
-            filteredQuestions.push(questionNetCache.questions[qId]);
+            filteredQuestions.push(getCachedSbtFilterQuestionEntry(questionNetCache, qId) as SbtFilterQuestionEntry);
           }
 
           // For "responder" or "questionResponses", filter the array by entryObj.responder
           let keptEntries = rawArray;
           if (mode === 'responder' || mode === 'questionResponses') {
-            keptEntries = rawArray.filter((entryObj: any) => {
+            keptEntries = rawArray.filter((entryObj) => {
               if (
                 entryObj.responder &&
                 !doesAddressPassFilters(
@@ -1443,7 +902,7 @@ class SBTFilter extends React.Component<any, any> {
           this.props.onFilterCreators(filteredQuestions, this.getLocalFilterState());
         }
         if ((mode === 'responder' || mode === 'questionResponses') && this.props.onFilterResponders) {
-          const byQuestion: Record<string, any> = {};
+          const byQuestion: SbtFilterResponseByQuestion = {};
           for (const qId of Object.keys(finalAggregator)) {
             byQuestion[qId] = finalAggregator[qId];
           }
@@ -1471,34 +930,27 @@ class SBTFilter extends React.Component<any, any> {
           return;
         }
 
-        let itemsToFilter = items;
-        if (shouldExpandAddresses) {
-          const inputAddresses = Array.isArray(items) ? items : [];
-          const expanded: any = new Set();
-          inputAddresses.forEach((addr: any) => {
-            if (typeof addr === 'string' && addr.trim()) {
-              expanded.add(addr.toLowerCase());
-            }
-          });
-          selectedAddressHolderSet.forEach((holder: any) => expanded.add(holder));
-          itemsToFilter = Array.from(expanded);
-        }
+        const itemsToFilter = resolveSbtFilterAddressItemsToFilter({
+          items,
+          selectedAddressHolderSet,
+          shouldExpandAddresses,
+        });
 
-        const filterItem = (item: any) => {
+        const filterItem = (item: unknown): boolean => {
           if (!item) return false;
 
           if (mode === 'addresses') {
-            if (typeof item !== 'string') {
+            const addressDecision = resolveSbtFilterAddressItemDecision({
+              excludedAddressHolderSet,
+              hasSelectedGroups: selectedSBTGroups.length > 0,
+              item,
+              selectedAddressHolderSet,
+            });
+            if (addressDecision.shouldLogInvalidType) {
               sbtLog.error('Expected item to be a string in addresses mode, but got:', item);
               return false;
             }
-            const address = item.toLowerCase();
-            if (!doesAddressPassHolderSets(
-              address,
-              selectedAddressHolderSet,
-              selectedSBTGroups.length > 0,
-              excludedAddressHolderSet
-            )) {
+            if (!addressDecision.passes) {
               return false;
             }
             if (onlyVerifiedHumans) {
@@ -1507,15 +959,10 @@ class SBTFilter extends React.Component<any, any> {
             return true;
           } else {
             // question-based item or aggregator sub-item
-            let addressToCheckCreator: any = null;
-            let addressToCheckResponder: any = null;
-
-            if (item.creator) {
-              addressToCheckCreator = item.creator.toLowerCase();
-            }
-            if (item.responder) {
-              addressToCheckResponder = item.responder.toLowerCase();
-            }
+            const {
+              creator: addressToCheckCreator,
+              responder: addressToCheckResponder,
+            } = resolveSbtFilterItemParticipantAddresses(item);
 
             if (mode === 'creator' || mode === 'questions') {
               if (addressToCheckCreator) {
@@ -1550,31 +997,14 @@ class SBTFilter extends React.Component<any, any> {
           }
         };
 
-        let filteredResult;
+        let filteredResult: unknown;
         if (Array.isArray(itemsToFilter)) {
           filteredResult = measureSync('ce.sbtFilter.filter.array', () =>
             itemsToFilter.filter(filterItem)
           );
         } else if (typeof items === 'object') {
           filteredResult = measureSync('ce.sbtFilter.filter.object', () => {
-            const newObj: Record<string, any> = {};
-            for (const [key, val] of Object.entries(items)) {
-              if (Array.isArray(val)) {
-                const filteredArr = val.filter((subItem: any) => filterItem(subItem));
-                if (filteredArr.length > 0) newObj[key] = filteredArr;
-              } else {
-                const entries = Object.entries(val || {}) as Array<[string, any]>;
-                const filteredPairs = entries.filter(([resp, respVal]: any) => filterItem(respVal));
-                if (filteredPairs.length > 0) {
-                  const recon: Record<string, any> = {};
-                  for (let [k, v] of filteredPairs) {
-                    recon[k] = v;
-                  }
-                  newObj[key] = recon;
-                }
-              }
-            }
-            return newObj;
+            return filterSbtFilterObjectItems(items, filterItem);
           });
         } else {
           // Unexpected type
@@ -1596,163 +1026,142 @@ class SBTFilter extends React.Component<any, any> {
   };
 
   // Handlers for adding/removing SBT “include” or “exclude”
-  handleAddSBTIncludeCreator: any = (sbtObject: any) => {
-    const { address } = sbtObject;
-    if (!this.state.selectedSBTGroupsCreator.find((sbt: any) => sbt.address === address)) {
-      this.setState((prev: any) => ({
-        selectedSBTGroupsCreator: [...prev.selectedSBTGroupsCreator, sbtObject]
+  addSbtSelection = (stateKey: string, sbtObject: SbtFilterSbtOption): void => {
+    const address = readSbtOptionAddress(sbtObject);
+    if (shouldAppendSbtFilterSelection({ address, state: this.state, stateKey })) {
+      this.setState((prev: UnknownRecord) => buildSbtFilterSelectionAddPatch({
+        sbtObject,
+        state: prev,
+        stateKey,
       }));
     }
   };
-  handleRemoveSBTIncludeCreator: any = (address: any) => {
-    this.setState((prev: any) => ({
-      selectedSBTGroupsCreator: prev.selectedSBTGroupsCreator.filter((sbt: any) => sbt.address !== address)
+
+  removeSbtSelection = (stateKey: string, address: unknown): void => {
+    this.setState((prev: UnknownRecord) => buildSbtFilterSelectionRemovePatch({
+      address,
+      state: prev,
+      stateKey,
     }));
   };
 
-  handleAddSBTExcludeCreator: any = (sbtObject: any) => {
-    const { address } = sbtObject;
-    if (!this.state.excludedSBTGroupsCreator.find((sbt: any) => sbt.address === address)) {
-      this.setState((prev: any) => ({
-        excludedSBTGroupsCreator: [...prev.excludedSBTGroupsCreator, sbtObject]
-      }));
-    }
+  handleAddSBTIncludeCreator = (sbtObject: SbtFilterSbtOption): void => {
+    this.addSbtSelection('selectedSBTGroupsCreator', sbtObject);
   };
-  handleRemoveSBTExcludeCreator: any = (address: any) => {
-    this.setState((prev: any) => ({
-      excludedSBTGroupsCreator: prev.excludedSBTGroupsCreator.filter((sbt: any) => sbt.address !== address)
+  handleRemoveSBTIncludeCreator = (address: unknown): void => {
+    this.removeSbtSelection('selectedSBTGroupsCreator', address);
+  };
+
+  handleAddSBTExcludeCreator = (sbtObject: SbtFilterSbtOption): void => {
+    this.addSbtSelection('excludedSBTGroupsCreator', sbtObject);
+  };
+  handleRemoveSBTExcludeCreator = (address: unknown): void => {
+    this.removeSbtSelection('excludedSBTGroupsCreator', address);
+  };
+
+  handleAddSBTIncludeResponder = (sbtObject: SbtFilterSbtOption): void => {
+    this.addSbtSelection('selectedSBTGroupsResponder', sbtObject);
+  };
+  handleRemoveSBTIncludeResponder = (address: unknown): void => {
+    this.removeSbtSelection('selectedSBTGroupsResponder', address);
+  };
+
+  handleAddSBTExcludeResponder = (sbtObject: SbtFilterSbtOption): void => {
+    this.addSbtSelection('excludedSBTGroupsResponder', sbtObject);
+  };
+  handleRemoveSBTExcludeResponder = (address: unknown): void => {
+    this.removeSbtSelection('excludedSBTGroupsResponder', address);
+  };
+
+  handleAddSBTInclude = (sbtObject: SbtFilterSbtOption): void => {
+    this.addSbtSelection('selectedSBTGroups', sbtObject);
+  };
+  handleRemoveSBTInclude = (address: unknown): void => {
+    this.removeSbtSelection('selectedSBTGroups', address);
+  };
+
+  handleAddSBTExclude = (sbtObject: SbtFilterSbtOption): void => {
+    this.addSbtSelection('excludedSBTGroups', sbtObject);
+  };
+  handleRemoveSBTExclude = (address: unknown): void => {
+    this.removeSbtSelection('excludedSBTGroups', address);
+  };
+
+  toggleVerifiedHumans = (): void => {
+    this.setState((prev: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+      state: prev,
+      stateKey: 'onlyVerifiedHumans',
     }));
   };
 
-  handleAddSBTIncludeResponder: any = (sbtObject: any) => {
-    const { address } = sbtObject;
-    if (!this.state.selectedSBTGroupsResponder.find((sbt: any) => sbt.address === address)) {
-      this.setState((prev: any) => ({
-        selectedSBTGroupsResponder: [...prev.selectedSBTGroupsResponder, sbtObject]
-      }));
-    }
-  };
-  handleRemoveSBTIncludeResponder: any = (address: any) => {
-    this.setState((prev: any) => ({
-      selectedSBTGroupsResponder: prev.selectedSBTGroupsResponder.filter((sbt: any) => sbt.address !== address)
+  toggleFilterOptions = (): void => {
+    this.setState((prev: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+      state: prev,
+      stateKey: 'showFilterOptions',
     }));
   };
 
-  handleAddSBTExcludeResponder: any = (sbtObject: any) => {
-    const { address } = sbtObject;
-    if (!this.state.excludedSBTGroupsResponder.find((sbt: any) => sbt.address === address)) {
-      this.setState((prev: any) => ({
-        excludedSBTGroupsResponder: [...prev.excludedSBTGroupsResponder, sbtObject]
-      }));
-    }
-  };
-  handleRemoveSBTExcludeResponder: any = (address: any) => {
-    this.setState((prev: any) => ({
-      excludedSBTGroupsResponder: prev.excludedSBTGroupsResponder.filter((sbt: any) => sbt.address !== address)
-    }));
-  };
-
-  handleAddSBTInclude: any = (sbtObject: any) => {
-    const { address } = sbtObject;
-    if (!this.state.selectedSBTGroups.find((sbt: any) => sbt.address === address)) {
-      this.setState((prev: any) => ({
-        selectedSBTGroups: [...prev.selectedSBTGroups, sbtObject]
-      }));
-    }
-  };
-  handleRemoveSBTInclude: any = (address: any) => {
-    this.setState((prev: any) => ({
-      selectedSBTGroups: prev.selectedSBTGroups.filter((sbt: any) => sbt.address !== address)
-    }));
-  };
-
-  handleAddSBTExclude: any = (sbtObject: any) => {
-    const { address } = sbtObject;
-    if (!this.state.excludedSBTGroups.find((sbt: any) => sbt.address === address)) {
-      this.setState((prev: any) => ({
-        excludedSBTGroups: [...prev.excludedSBTGroups, sbtObject]
-      }));
-    }
-  };
-  handleRemoveSBTExclude: any = (address: any) => {
-    this.setState((prev: any) => ({
-      excludedSBTGroups: prev.excludedSBTGroups.filter((sbt: any) => sbt.address !== address)
-    }));
-  };
-
-  toggleVerifiedHumans: any = () => {
-    this.setState((prev: any) => ({
-      onlyVerifiedHumans: !prev.onlyVerifiedHumans
-    }));
-  };
-
-  toggleFilterOptions: any = () => {
-    this.setState((prev: any) => ({
-      showFilterOptions: !prev.showFilterOptions
-    }));
-  };
-
-  toggleShowAllSBTs: any = () => {
-    this.setState((prevState: any) => ({
-      showAllSBTs: !prevState.showAllSBTs
+  toggleShowAllSBTs = (): void => {
+    this.setState((prevState: UnknownRecord) => buildSbtFilterBooleanTogglePatch({
+      state: prevState,
+      stateKey: 'showAllSBTs',
     }));
     // No need to call applyFilter here, as this only affects the options in the dropdown
   }
 
-  renderQuickSelectChips: any = (selectedSBTs: any, onAddHandler: any, filterKey: any) => {
+  renderQuickSelectChips = (
+    selectedSBTs: unknown,
+    onAddHandler: (sbtObject: SbtFilterQuickSbtOption) => void,
+    filterKey: unknown
+  ): React.ReactNode => {
     const { defaultFeaturedSBTs, sessionSlug } = this.props;
-    if (!Array.isArray(defaultFeaturedSBTs) || defaultFeaturedSBTs.length === 0) {
+    if (!hasSbtFilterFeaturedOptions(defaultFeaturedSBTs)) {
       return null;
     }
 
-    const selectedSet: any = new Set(
-      (Array.isArray(selectedSBTs) ? selectedSBTs : [])
-        .map((entry: any) => String(entry?.address || '').trim().toLowerCase())
-        .filter(Boolean)
-    );
-
-    const shortenAddress = (address: any) => {
-      const text = String(address || '').trim();
-      if (!text) return '';
-      if (text.length <= 13) return text;
-      return `${text.slice(0, 6)}...${text.slice(-5)}`;
-    };
+    const selectedSet = buildSbtFilterQuickChipSelectedAddressSet(selectedSBTs);
 
     return (
       <div className={styles.quickSelectRow}>
-        {defaultFeaturedSBTs.map((featuredAddress: any, index: any) => {
+        {defaultFeaturedSBTs.map((featuredAddress, index) => {
           const address = String(featuredAddress || '').trim();
           if (!address) return null;
 
-          const addressLower = address.toLowerCase();
-          const isSelected = selectedSet.has(addressLower);
-          let resolvedLabel = '';
-          try {
-            resolvedLabel = resolveSbtDisplayLabel({
-              address,
-              preferredSlug: sessionSlug,
-              fallback: 'address',
-            });
-          } catch (_) {
-            resolvedLabel = '';
-          }
-          const chipLabel = resolvedLabel && resolvedLabel.toLowerCase() !== addressLower
-            ? resolvedLabel
-            : shortenAddress(address);
+          const {
+            chipLabel,
+            isDisabled,
+            isSelected,
+            key,
+            shouldUseSelectedClass,
+            style,
+            testId,
+          } = buildSbtFilterQuickChipDisplayState({
+            address,
+            filterKey,
+            gateColors: QUICK_CHIP_GATE_COLORS,
+            index,
+            resolveDisplayLabel: resolveSbtDisplayLabel,
+            selectedSet,
+            sessionSlug,
+          });
 
           return (
             <button
-              key={`${filterKey}-${addressLower}-${index}`}
+              key={key}
               type="button"
-              className={`${styles.quickChip} ${isSelected ? styles.quickChipSelected : ''}`.trim()}
-              style={{ backgroundColor: QUICK_CHIP_GATE_COLORS[index % QUICK_CHIP_GATE_COLORS.length] }}
+              className={buildSbtFilterQuickChipClassName({
+                baseClassName: styles.quickChip,
+                selectedClassName: styles.quickChipSelected,
+                shouldUseSelectedClass,
+              })}
+              style={style}
               onClick={() => {
                 if (isSelected) return;
                 onAddHandler({ address });
               }}
-              disabled={isSelected}
-              data-testid={`ce-sbt-quick-chip-${filterKey}-${address}`}
-              aria-disabled={isSelected}
+              disabled={isDisabled}
+              data-testid={testId}
+              aria-disabled={isDisabled}
             >
               {chipLabel}
             </button>
@@ -1780,65 +1189,62 @@ class SBTFilter extends React.Component<any, any> {
     const { mode, hideUI, defaultFeaturedSBTs } = this.props;
 
     // Determine if the featured SBTs prop is valid
-    const hasFeaturedSBTs = defaultFeaturedSBTs && Array.isArray(defaultFeaturedSBTs) && defaultFeaturedSBTs.length > 0;
+    const hasFeaturedSBTs = hasSbtFilterFeaturedOptions(defaultFeaturedSBTs);
+    const buttonText = resolveSbtFilterButtonText({ mode });
+    const panelDisplayState = resolveSbtFilterPanelDisplayState({
+      autoExpand: this.props.autoExpand,
+      hasFeaturedSBTs,
+      hideUI,
+    });
+    const filterOptionsVisibilityState = resolveSbtFilterOptionsVisibilityState({
+      autoExpand: this.props.autoExpand,
+      hideLoadingOverlay: this.props.hideLoadingOverlay,
+      loading,
+      showFilterOptions,
+    });
+    const modeSectionsState = resolveSbtFilterModeSectionsState({ mode });
+    const surfaceDisplayState = resolveSbtFilterSurfaceDisplayState({
+      buttonSurface: this.props.buttonSurface,
+    });
+    const surfaceClassNames = buildSbtFilterSurfaceClassNames({
+      filterButtonLightClassName: styles.filterButtonOnLight,
+      filterOptionsBaseClassName: styles.filterOptions,
+      filterOptionsLightClassName: styles.filterOptionsOnLight,
+      shouldUseLightSurface: surfaceDisplayState.shouldUseLightSurface,
+    });
+    const layoutDisplayState = resolveSbtFilterLayoutDisplayState();
 
-    let buttonText = 'Filter';
-    if (
-      mode === 'questions' ||
-      mode === 'questionResponses' ||
-      mode === 'creatorAndResponder'
-    ) {
-      buttonText = 'Response Filter';
-    }
-
-    if (hideUI) {
-      return <div style={{ display: 'none' }} />;
+    if (panelDisplayState.shouldRenderHiddenRoot) {
+      return <div style={layoutDisplayState.hiddenRootStyle} />;
     }
 
     return (
       <div className={styles.sbtFilter}>
         {/* If not autoExpand, show a settings/cog button to toggle filter options */}
-        {!this.props.autoExpand && (
+        {panelDisplayState.shouldRenderFilterToggleButton && (
           <Button
             onClick={this.toggleFilterOptions}
             id={styles.filterButton}
-            className={
-              this.props.buttonSurface === 'light' ? styles.filterButtonOnLight : undefined
-            }
+            className={surfaceClassNames.filterButtonClassName}
           >
             {buttonText} <FontAwesomeIcon icon={faFilter} id={styles.filterButtonIcon} />
           </Button>
         )}
 
         {/* If autoExpand is true, or the user toggled showFilterOptions, display the filter UI */}
-        {(this.props.autoExpand || showFilterOptions) && (
-          <div style={{ position: 'relative' }}>
-            {!this.props.hideLoadingOverlay && loading && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.6)',
-                zIndex: 10,
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderRadius: 'inherit'
-              }}>
+        {filterOptionsVisibilityState.shouldRenderFilterOptions && (
+          <div style={layoutDisplayState.filterOptionsFrameStyle}>
+            {filterOptionsVisibilityState.shouldRenderLoadingOverlay && (
+              <div style={layoutDisplayState.loadingOverlayStyle}>
                 <FontAwesomeIcon icon={faSpinner} spin size="2x" color="white" />
               </div>
             )}
             <div
-              className={[
-                styles.filterOptions,
-                this.props.buttonSurface === 'light' ? styles.filterOptionsOnLight : '',
-              ].filter(Boolean).join(' ')}
+              className={surfaceClassNames.filterOptionsClassName}
             >
 
               {/* Conditionally render the "Show All" checkbox */}
-              {hasFeaturedSBTs && (
+              {panelDisplayState.shouldRenderShowAllCheckbox && (
                 <FormGroup check className={styles.showAllCheckbox}>
                   <Label check>
                     <Input
@@ -1853,7 +1259,7 @@ class SBTFilter extends React.Component<any, any> {
 
 
               {/* Mode: 'responder' => filter by SBT group(s) of Survey Responder */}
-      {mode === 'responder' && (
+      {modeSectionsState.shouldRenderResponderFilter && (
                 <>
                   <h5>SBT Group(s) of Survey Responder</h5>
                   <SBTSelector
@@ -1898,7 +1304,7 @@ class SBTFilter extends React.Component<any, any> {
               )}
 
               {/* Mode: 'addresses' => filter addresses by SBT group(s) */}
-              {mode === 'addresses' && (
+              {modeSectionsState.shouldRenderAddressFilter && (
                 <>
                   <SBTSelector
                     id="includeAddresses"
@@ -1941,15 +1347,10 @@ class SBTFilter extends React.Component<any, any> {
               )}
 
               {/* Mode: 'creator', 'creatorAndResponder', 'questions', or 'questionResponses' => question-based filtering */}
-              {(mode === 'creator' ||
-                mode === 'creatorAndResponder' ||
-                mode === 'questions' ||
-                mode === 'questionResponses') && (
+              {modeSectionsState.shouldRenderQuestionFilter && (
                 <>
                   {/* If creator-based filtering is relevant */}
-                  {(mode === 'creator' ||
-                    mode === 'creatorAndResponder' ||
-                    mode === 'questions') && (
+                  {modeSectionsState.shouldRenderQuestionCreatorFilter && (
                     <>
                       <SBTSelector
                         id="includeCreator"
@@ -1992,9 +1393,7 @@ class SBTFilter extends React.Component<any, any> {
                   )}
 
                   {/* If responder-based filtering is relevant */}
-                  {(mode === 'responder' ||
-                    mode === 'creatorAndResponder' ||
-                    mode === 'questionResponses') && (
+                  {modeSectionsState.shouldRenderQuestionResponderFilter && (
                     <>
                       <h5>SBT Group(s) of Question Responder</h5>
                       <SBTSelector
