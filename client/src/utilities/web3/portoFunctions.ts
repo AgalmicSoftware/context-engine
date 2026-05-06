@@ -758,6 +758,14 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
       const session: any = JSON.parse(stored);
       const restoredSession = buildValidatedPortoSession(session);
       if (restoredSession) {
+        if (!requireSigner) {
+          const hydratedAddress = adoptHydratedPortoSession({
+            credentialId: restoredSession.credentialId,
+            address: restoredSession.address,
+          });
+          if (hydratedAddress) return hydratedAddress;
+        }
+
         try {
           await promptForPasskey(restoredSession.credentialId);
         } catch (e: any) {
@@ -810,6 +818,14 @@ export function setPortoSessionKeyEnabled(enabled: any): void {
 
 export function getPortoSessionKeyEnabled(): boolean {
   return sessionKeyEnabled;
+}
+
+export function hasPortoSessionSigner(): boolean {
+  return hasCurrentPortoSessionSigner();
+}
+
+export function isPortoAutoSignReady(): boolean {
+  return !!(sessionKeyEnabled && hasCurrentPortoSessionMetadata() && hasCurrentPortoSessionSigner());
 }
 
 export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {

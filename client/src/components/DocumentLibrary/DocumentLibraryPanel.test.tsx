@@ -5,6 +5,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const mockBuildSbtAccessControlConditions = jest.fn();
 const mockGetGlobalLitHooks = jest.fn();
+const mockGetUnsupportedLitContractAccessControlError = jest.fn();
 const mockListArweaveTransactionsByTags = jest.fn();
 const mockResolveDocLibraryProvider = jest.fn();
 const mockResolveArweaveGraphqlUrl = jest.fn();
@@ -34,7 +35,7 @@ jest.mock('../../utilities/docLibrary/config.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: (...args: any[]) => mockBuildSbtAccessControlConditions(...args),
-  getUnsupportedLitContractAccessControlError: jest.fn(() => ''),
+  getUnsupportedLitContractAccessControlError: (...args: any[]) => mockGetUnsupportedLitContractAccessControlError(...args),
   getGlobalLitHooks: (...args: any[]) => mockGetGlobalLitHooks(...args),
   litStorage: {
     buildLitArweaveUrl: (txId: string) => `https://lit.example.test/${txId}`,
@@ -117,6 +118,7 @@ describe('DocumentLibraryPanel photo docs', () => {
     });
     mockBuildSbtAccessControlConditions.mockReturnValue([{ contractAddress: '0xgate' }]);
     mockGetGlobalLitHooks.mockReturnValue(null);
+    mockGetUnsupportedLitContractAccessControlError.mockReturnValue('');
     mockUploadDocLibraryFile.mockResolvedValue({
       txId: 'Z'.repeat(43),
       tagMap: {},
@@ -278,6 +280,60 @@ describe('DocumentLibraryPanel photo docs', () => {
           enabled: true,
           accessControlConditions: [{ contractAddress: '0xgate' }],
           chainId: 84532,
+        }),
+      }));
+    });
+  });
+
+  it('uses scoped Lit hooks for OP Sepolia session-gate uploads when Chipotle credentials stay server-side', async () => {
+    mockResolveDocUploadsGate.mockReturnValue({
+      gate: { sbtAddresses: ['0x00000000000000000000000000000000000000bb'], chainId: 11155420, mode: 0 },
+      lookupStatus: 'ok',
+      sbtAddresses: ['0x00000000000000000000000000000000000000bb'],
+      chainId: 11155420,
+      mode: 'any',
+      hasRecipients: true,
+    });
+    mockGetUnsupportedLitContractAccessControlError.mockReturnValue(
+      'Lit does not currently support OP Sepolia for SBT-gated encryption.',
+    );
+    const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 11155420 }}
+        account="0x123"
+        litHooks={{ saveKey: scopedSaveKey }}
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={{
+          ...TEST_SESSION_CONFIG,
+          corsWorkerUrl: 'https://worker.example.test',
+        }}
+        mode="session"
+        sessionIdHex={`0x${'6'.repeat(32)}`}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.DOC_LOCK_TOGGLE)).toHaveAttribute('data-ce-locked', 'true');
+    });
+
+    const file = new File(['secret'], 'secret.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
+        file,
+        encryption: expect.objectContaining({
+          enabled: true,
+          chainId: 11155420,
+          saveKey: scopedSaveKey,
         }),
       }));
     });

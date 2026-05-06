@@ -1346,33 +1346,15 @@ const encryptField = async ({
 
 /* --------------------------- unwrap & decrypt ----------------------------- */
 
-const unwrapCekFromRecipients = async ({ env, account, chainId, providerLike, litOpts }) => {
+const unwrapCekFromRecipients = async ({ env, account, chainId, providerLike, litOpts, preferLitRecipients = false }) => {
   const contextHex = env?.aad?.context;
   assertBytes32Hex(contextHex);
   const contextBytes = getContextBytes(contextHex);
   let lastErr = null;
 
-  // Try self-eip712-v1 first
-  const self = (env.recipients || []).find((r) => r && r.type === 'self-eip712-v1');
-  if (self && typeof self.wrap_iv === 'string' && typeof self.wrapped_cek === 'string') {
-    try {
-      const nonce = self.nonce !== null && self.nonce !== undefined ? self.nonce : null;
-      const typed = buildEip712KeyWrap(account, chainId, contextHex, nonce);
-      const provider = _getProvider(providerLike);
-      const sig = await signEip712V4(provider, account, typed);
-      const kek = await deriveKekFromSig(sig, contextBytes);
-      const wrapIvBytes = b64decode(self.wrap_iv);
-      const wrappedBytes = b64decode(self.wrapped_cek);
-      const cekRaw = await aesGcmDecrypt(kek, wrapIvBytes, wrappedBytes, { aadBytes: contextBytes });
-      return new Uint8Array(cekRaw);
-    } catch (err) {
-      lastErr = err instanceof Error ? err : new Error(String(err));
-    }
-  }
-
-  // Lit fallback (optional)
   const litEntries = (env.recipients || []).filter((r) => r && r.type === 'lit-sbt-v1' && isObj(r.lit));
-  if (litEntries.length && isObj(litOpts) && typeof litOpts.getKey === 'function') {
+  const tryLitRecipients = async () => {
+    if (!litEntries.length || !isObj(litOpts) || typeof litOpts.getKey !== 'function') return null;
     for (const litEntry of litEntries) {
       const litData = litEntry.lit || {};
       try {
@@ -1397,6 +1379,38 @@ const unwrapCekFromRecipients = async ({ env, account, chainId, providerLike, li
         lastErr = err instanceof Error ? err : new Error(String(err));
       }
     }
+    return null;
+  };
+
+  const trySelfRecipient = async () => {
+    const self = (env.recipients || []).find((r) => r && r.type === 'self-eip712-v1');
+    if (!self || typeof self.wrap_iv !== 'string' || typeof self.wrapped_cek !== 'string') return null;
+    try {
+      const nonce = self.nonce !== null && self.nonce !== undefined ? self.nonce : null;
+      const typed = buildEip712KeyWrap(account, chainId, contextHex, nonce);
+      const provider = _getProvider(providerLike);
+      const sig = await signEip712V4(provider, account, typed);
+      const kek = await deriveKekFromSig(sig, contextBytes);
+      const wrapIvBytes = b64decode(self.wrap_iv);
+      const wrappedBytes = b64decode(self.wrapped_cek);
+      const cekRaw = await aesGcmDecrypt(kek, wrapIvBytes, wrappedBytes, { aadBytes: contextBytes });
+      return new Uint8Array(cekRaw);
+    } catch (err) {
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      return null;
+    }
+  };
+
+  if (preferLitRecipients) {
+    const litCek = await tryLitRecipients();
+    if (litCek) return litCek;
+    const selfCek = await trySelfRecipient();
+    if (selfCek) return selfCek;
+  } else {
+    const selfCek = await trySelfRecipient();
+    if (selfCek) return selfCek;
+    const litCek = await tryLitRecipients();
+    if (litCek) return litCek;
   }
 
   throw lastErr || new Error('Unable to unwrap CEK (self and lit paths failed).');
@@ -1445,14 +1459,14 @@ const decryptCacheLruSet = (key, entry) => {
   }
 };
 
-const buildDecryptEnvelopeCacheKey = ({ jsonStr, account, chainId, providerLike, litOpts }) => {
+const buildDecryptEnvelopeCacheKey = ({ jsonStr, account, chainId, providerLike, litOpts, preferLitRecipients = false }) => {
   const acct = String(account || '').trim().toLowerCase() || '<anon>';
   const ch = String(chainId ?? '');
   const providerKind = getProviderKind(providerLike);
   const litReady = !!(litOpts && typeof litOpts.getKey === 'function');
   const litNet = litOpts && litOpts.litNetwork ? String(litOpts.litNetwork) : '';
   const envHash = hashEnvelopeJson(jsonStr);
-  return [acct, ch, providerKind, litReady ? 'lit' : 'no-lit', litNet, envHash].join('|');
+  return [acct, ch, providerKind, litReady ? 'lit' : 'no-lit', litNet, preferLitRecipients ? 'lit-first' : 'self-first', envHash].join('|');
 };
 
 const decryptEnvelopeToValue = async ({
@@ -1461,6 +1475,7 @@ const decryptEnvelopeToValue = async ({
   chainId,
   providerLike,
   litOpts,
+  preferLitRecipients = false,
   expectedSurveyId,
   expectedQId,
 }) => {
@@ -1468,7 +1483,14 @@ const decryptEnvelopeToValue = async ({
   const jsonStr = normalizeEnvelopeJsonToString(envelopeJson);
   const env = parseEnvelope(jsonStr);
   validateEnvelopeBinding(env, { expectedSurveyId, expectedQId });
-  const cacheKey = buildDecryptEnvelopeCacheKey({ jsonStr, account, chainId, providerLike, litOpts });
+  const cacheKey = buildDecryptEnvelopeCacheKey({
+    jsonStr,
+    account,
+    chainId,
+    providerLike,
+    litOpts,
+    preferLitRecipients,
+  });
 
   const cached = decryptCacheLruGet(cacheKey);
   if (cached) {
@@ -1497,7 +1519,14 @@ const decryptEnvelopeToValue = async ({
   }
 
   const run = (async () => {
-    const cekRaw = await unwrapCekFromRecipients({ env, account, chainId, providerLike, litOpts });
+    const cekRaw = await unwrapCekFromRecipients({
+      env,
+      account,
+      chainId,
+      providerLike,
+      litOpts,
+      preferLitRecipients,
+    });
     if (!(cekRaw instanceof Uint8Array) || cekRaw.length !== 32) {
       throw new Error('Unwrapped CEK has invalid length.');
     }
@@ -1898,13 +1927,14 @@ const decryptWithPassword = async (encryptedData, password) => {
 const decryptEnvelopeValue = async (envelopeJson, opts = {}) => {
   const jsonStr =
     typeof envelopeJson === 'string' ? envelopeJson : JSON.stringify(envelopeJson || {});
-  const { account, chainId, providerLike, litOpts } = opts || {};
+  const { account, chainId, providerLike, litOpts, preferLitRecipients } = opts || {};
   const { value } = await decryptEnvelopeToValue({
     envelopeJson: jsonStr,
     account,
     chainId,
     providerLike,
     litOpts,
+    preferLitRecipients: !!preferLitRecipients,
   });
   return value;
 };

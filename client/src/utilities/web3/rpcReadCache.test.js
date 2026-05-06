@@ -101,4 +101,47 @@ describe('rpcReadCache evictExpiredEntries', () => {
 
     expect(originalSend).toHaveBeenCalledTimes(1);
   });
+
+  it('backs off an endpoint exponentially after HTTP 429s instead of issuing more sends', async () => {
+    let now = 10_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
+
+    let callCount = 0;
+    const { originalSend, provider } = createWrappedProvider(async () => {
+      callCount += 1;
+      if (callCount <= 2) {
+        throw Object.assign(new Error('Too Many Requests'), { status: 429 });
+      }
+      return '0x14a34';
+    });
+
+    await expect(provider.send('eth_blockNumber', [])).rejects.toMatchObject({ status: 429 });
+
+    let state = Array.from(getCache().rateLimits.values())[0];
+    expect(state.retryAfterMs).toBe(2000);
+
+    await expect(provider.send('eth_getBalance', [LOG_ADDRESS, 'latest'])).rejects.toMatchObject({
+      code: 'CE_RPC_RATE_LIMIT_BACKOFF',
+      status: 429,
+    });
+    expect(originalSend).toHaveBeenCalledTimes(1);
+
+    now += state.retryAfterMs + 1;
+    await expect(provider.send('eth_getBalance', [LOG_ADDRESS, 'latest'])).rejects.toMatchObject({ status: 429 });
+
+    state = Array.from(getCache().rateLimits.values())[0];
+    expect(state.retryAfterMs).toBe(4000);
+
+    await expect(provider.send('eth_chainId', [])).rejects.toMatchObject({
+      code: 'CE_RPC_RATE_LIMIT_BACKOFF',
+      status: 429,
+    });
+    expect(originalSend).toHaveBeenCalledTimes(2);
+
+    now += state.retryAfterMs + 1;
+    await expect(provider.send('eth_chainId', [])).resolves.toBe('0x14a34');
+
+    expect(originalSend).toHaveBeenCalledTimes(3);
+    expect(Array.from(getCache().rateLimits.values())).toEqual([]);
+  });
 });

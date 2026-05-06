@@ -118,6 +118,10 @@ type DocUploadsGateState = {
 type LitHooks = {
   getKey?: (...args: unknown[]) => unknown;
   saveKey?: (...args: unknown[]) => Promise<unknown>;
+  litNetwork?: string;
+  connectTimeout?: unknown;
+  providerLike?: unknown;
+  resourceAbilityRequests?: unknown;
 } | null;
 
 type EncryptAudience =
@@ -131,6 +135,10 @@ type EncryptAudience =
       accessControlConditions: unknown;
       litHooks: {
         saveKey: (...args: unknown[]) => Promise<unknown>;
+        litNetwork?: string;
+        connectTimeout?: unknown;
+        providerLike?: unknown;
+        resourceAbilityRequests?: unknown;
       };
     };
 
@@ -148,6 +156,7 @@ type DocumentLibraryPanelProps = {
   provider?: unknown;
   network?: NetworkLike;
   account?: string | null;
+  litHooks?: LitHooks;
   loginComplete?: boolean;
   toggleLoginModal?: (open?: boolean) => void;
   sessionSlug?: string;
@@ -340,6 +349,7 @@ type DocRowImagePreviewProps = {
   account?: string | null;
   chainId?: number | string | null;
   panelContextKey?: string;
+  litHooks?: LitHooks;
 };
 
 const DocRowImagePreview = ({
@@ -351,6 +361,7 @@ const DocRowImagePreview = ({
   account,
   chainId,
   panelContextKey,
+  litHooks: scopedLitHooks,
 }: DocRowImagePreviewProps) => {
   const [encryptedPreviewUrl, setEncryptedPreviewUrl] = useState('');
 
@@ -364,7 +375,10 @@ const DocRowImagePreview = ({
       return undefined;
     }
 
-    const litHooks = getGlobalLitHooks() as LitHooks;
+    const litHooks = (
+      (scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
+      getGlobalLitHooks()
+    ) as LitHooks;
     if (!litHooks || typeof litHooks.getKey !== 'function' || !provider || !toStr(account).trim()) {
       setEncryptedPreviewUrl('');
       return undefined;
@@ -442,6 +456,7 @@ export default function DocumentLibraryPanel({
   provider,
   network,
   account,
+  litHooks: scopedLitHooks,
   loginComplete,
   toggleLoginModal,
   sessionSlug,
@@ -456,6 +471,10 @@ export default function DocumentLibraryPanel({
   pageSize = 25,
   showUploadControls = true,
 }: DocumentLibraryPanelProps = {}) {
+  const getActiveLitHooks = useCallback(() => (
+    (scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
+    getGlobalLitHooks()
+  ) as LitHooks, [scopedLitHooks]);
   const normalizedSessionIdHex = useMemo(() => normalizeSessionIdHex(sessionIdHex), [sessionIdHex]);
   const normalizedSbtAddress = useMemo(() => normalizeSbtAddress(sbtAddress), [sbtAddress]);
   const normalizedSecondarySessionIdHex = useMemo(
@@ -513,13 +532,29 @@ export default function DocumentLibraryPanel({
       typeof sessionConfig.litCredentials === 'object' &&
       !Array.isArray(sessionConfig.litCredentials)
     ) ? sessionConfig.litCredentials as Record<string, unknown> : null;
-    return !!(
-      toStr(sessionConfig?.corsWorkerUrl).trim() &&
+    const hasCompleteLitCredentials = !!(
+      litCredentials &&
       toStr(litCredentials?.litApiBase).trim() &&
       toStr(litCredentials?.litActionCid).trim() &&
       toStr(litCredentials?.litPkpId).trim()
     );
-  }, [sessionConfig]);
+    const litConfig = (
+      sessionConfig &&
+      typeof sessionConfig === 'object' &&
+      sessionConfig.lit &&
+      typeof sessionConfig.lit === 'object' &&
+      !Array.isArray(sessionConfig.lit)
+    ) ? sessionConfig.lit as Record<string, unknown> : null;
+    const litNetworkHint = toStr(litConfig?.network || sessionConfig?.litNetwork).trim().toLowerCase();
+    return !!(
+      toStr(sessionConfig?.corsWorkerUrl).trim() &&
+      (
+        hasCompleteLitCredentials ||
+        litNetworkHint === 'chipotle' ||
+        docUploadsGate.hasRecipients
+      )
+    );
+  }, [docUploadsGate.hasRecipients, sessionConfig]);
   const sessionGateUnsupportedMessage = useMemo(() => (
     docUploadsGate.hasRecipients && !sessionHasLitChipotle
       ? getUnsupportedLitContractAccessControlErrorUntyped({
@@ -772,7 +807,7 @@ export default function DocumentLibraryPanel({
 
     try {
       if (isEncrypted) {
-        const litHooks = getGlobalLitHooks() as LitHooks;
+        const litHooks = getActiveLitHooks();
         if (!litHooks || typeof litHooks.getKey !== 'function') {
           throw new Error('Connect a wallet to decrypt this document.');
         }
@@ -852,7 +887,7 @@ export default function DocumentLibraryPanel({
       setViewerError(getErrorMessage(err, 'Failed to open document.'));
       setViewerTitle('Error');
     }
-  }, [provider, account, network?.id, panelContextKey]);
+  }, [provider, account, network?.id, panelContextKey, getActiveLitHooks]);
 
   useEffect(() => {
     if (!autoOpenDoc || !autoOpenDoc.txId) return;
@@ -864,7 +899,7 @@ export default function DocumentLibraryPanel({
     const wantsEncrypted = storage === 'lit-arweave' || storage === 'lit';
     if (wantsEncrypted && (!loginComplete || !toStr(account).trim() || !provider)) return;
     if (wantsEncrypted) {
-      const litHooks = getGlobalLitHooks() as LitHooks;
+      const litHooks = getActiveLitHooks();
       if (!litHooks || typeof litHooks.getKey !== 'function') return;
     }
 
@@ -879,7 +914,7 @@ export default function DocumentLibraryPanel({
       });
       window.history.replaceState({}, '', url.toString());
     } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
-  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
+  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc, getActiveLitHooks]);
 
   const addCustomSbt = useCallback((sbt: CustomSbtEntry) => {
     const addr = normalizeSbtAddress(sbt?.address);
@@ -945,11 +980,18 @@ export default function DocumentLibraryPanel({
 
   const resolveEncryptAudience = useCallback((): EncryptAudience => {
     if (!locked) return { ok: true, encrypted: false };
-    const litHooks = getGlobalLitHooks() as LitHooks;
+    const litHooks = getActiveLitHooks();
     const saveKey = litHooks?.saveKey;
     if (!litHooks || typeof saveKey !== 'function') {
       return { ok: false, error: 'Lit hooks not initialized; connect a wallet to encrypt.' };
     }
+    const litHookOptions = {
+      saveKey,
+      ...(litHooks.litNetwork ? { litNetwork: litHooks.litNetwork } : {}),
+      ...(litHooks.connectTimeout ? { connectTimeout: litHooks.connectTimeout } : {}),
+      ...(litHooks.providerLike ? { providerLike: litHooks.providerLike } : {}),
+      ...(litHooks.resourceAbilityRequests ? { resourceAbilityRequests: litHooks.resourceAbilityRequests } : {}),
+    };
 
     if (audienceMode === 'sessionGate') {
       if (!docUploadsGate.hasRecipients || sessionGateUnsupportedMessage) {
@@ -964,7 +1006,7 @@ export default function DocumentLibraryPanel({
         mode: docUploadsGate.mode || 'any',
       });
       if (!acc) return { ok: false, error: 'Session docUploads gate has no valid SBT addresses.' };
-      return { ok: true, encrypted: true, chainId, litChain, accessControlConditions: acc, litHooks: { saveKey } };
+      return { ok: true, encrypted: true, chainId, litChain, accessControlConditions: acc, litHooks: litHookOptions };
     }
 
     const list = (customSbtList || []).map((e) => e.address).filter(Boolean);
@@ -983,7 +1025,7 @@ export default function DocumentLibraryPanel({
       mode: customGateMode || 'any',
     });
     if (!acc) return { ok: false, error: 'Add at least one SBT address to encrypt.' };
-    return { ok: true, encrypted: true, chainId, litChain, accessControlConditions: acc, litHooks: { saveKey } };
+    return { ok: true, encrypted: true, chainId, litChain, accessControlConditions: acc, litHooks: litHookOptions };
   }, [
     locked,
     audienceMode,
@@ -997,6 +1039,7 @@ export default function DocumentLibraryPanel({
     sessionGateUnsupportedMessage,
     sessionHasLitChipotle,
     sbtChainId,
+    getActiveLitHooks,
   ]);
 
   const uploadFile = useCallback(async () => {
@@ -1069,6 +1112,10 @@ export default function DocumentLibraryPanel({
           accessControlConditions: audience.accessControlConditions,
           litChain: audience.litChain,
           chainId: audience.chainId,
+          ...(audience.litHooks.litNetwork ? { litNetwork: audience.litHooks.litNetwork } : {}),
+          ...(audience.litHooks.connectTimeout ? { connectTimeout: audience.litHooks.connectTimeout } : {}),
+          ...(audience.litHooks.providerLike ? { providerLike: audience.litHooks.providerLike } : {}),
+          ...(audience.litHooks.resourceAbilityRequests ? { resourceAbilityRequests: audience.litHooks.resourceAbilityRequests } : {}),
           contextLabel: `doc:${sessionSlug || ''}`,
         },
       });
@@ -1200,6 +1247,10 @@ export default function DocumentLibraryPanel({
           accessControlConditions: audience.accessControlConditions,
           litChain: audience.litChain,
           chainId: audience.chainId,
+          ...(audience.litHooks.litNetwork ? { litNetwork: audience.litHooks.litNetwork } : {}),
+          ...(audience.litHooks.connectTimeout ? { connectTimeout: audience.litHooks.connectTimeout } : {}),
+          ...(audience.litHooks.providerLike ? { providerLike: audience.litHooks.providerLike } : {}),
+          ...(audience.litHooks.resourceAbilityRequests ? { resourceAbilityRequests: audience.litHooks.resourceAbilityRequests } : {}),
           contextLabel: `doc-link:${sessionSlug || ''}`,
         },
       });
@@ -1643,6 +1694,7 @@ export default function DocumentLibraryPanel({
                     account={account}
                     chainId={network?.id || null}
                     panelContextKey={panelContextKey}
+                    litHooks={scopedLitHooks}
                   />
                 ) : null}
                 <div className={styles.docMeta}>

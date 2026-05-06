@@ -64,10 +64,10 @@ Notes:
   - If the request is to your app origin (for example `http://localhost:3000/<txId>`), some UI is rendering a bare txId as a relative URL.
     Normalize before rendering.
   - If the request is to an Arweave gateway (for example `https://ar-io.dev/<txId>` or `https://arweave.net/<txId>`), the content itself is missing (bad txId or still propagating).
-    Verify the tx exists (try multiple gateways) or fix the underlying metadata pointer. Also check
-    `https://ar-io.dev/tx/<txId>/data` in case the direct `<txId>` route is stale on an edge node.
-  - Runtime reads now prefer the configured gateway order (`https://ar-io.dev`, then `https://arweave.net`, then the remaining fallbacks),
-    trying `<gateway>/<txId>`, `<gateway>/raw/<txId>`, and `<gateway>/tx/<txId>/data` before moving to the next gateway.
+    Verify the tx exists on the configured gateway or fix the underlying metadata pointer.
+  - Runtime reads default to direct AR.IO-only routing (`https://ar-io.dev/<txId>`) and spend their retry budget there.
+    Legacy multi-gateway fanout (`https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes) is available only when
+    `REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO=false` or `window.CE_ARWEAVE_DIRECT_TO_AR_IO = false` is set intentionally.
 
 ```json
 {
