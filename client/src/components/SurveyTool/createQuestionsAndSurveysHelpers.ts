@@ -1,0 +1,928 @@
+type QuestionSelectionInput = {
+  singleSelect?: unknown;
+  oneSelectionOnly?: unknown;
+};
+
+type QuestionPromptInput = {
+  prompt?: unknown;
+};
+type CreateSurveyQuestionTagEntry = Record<string, unknown> & {
+  currentTagInputValue?: unknown;
+  tags?: unknown;
+};
+
+type CreateSurveyQuestionIdGenerator = (
+  type: unknown,
+  prompt: unknown,
+  options: unknown,
+  singleSelect: unknown
+) => unknown;
+type BuildCreateSurveyQuestionOptionListArgs = {
+  generateQuestionId?: CreateSurveyQuestionIdGenerator;
+  operation?: 'add' | 'change' | 'remove';
+  optionIndex?: unknown;
+  questionIndex?: unknown;
+  questions?: unknown;
+  value?: unknown;
+};
+type BuildCreateSurveyQuestionFieldUpdateListArgs = {
+  generateQuestionId?: CreateSurveyQuestionIdGenerator;
+  key?: unknown;
+  questionIndex?: unknown;
+  questions?: unknown;
+  value?: unknown;
+};
+type BuildCreateSurveyNewQuestionDraftArgs = {
+  addingQuestionType?: unknown;
+  generateQuestionId?: CreateSurveyQuestionIdGenerator;
+  isStandaloneQuestion?: unknown;
+  now?: () => number;
+  questionCount?: unknown;
+  random?: () => number;
+};
+type CreateSurveyNewQuestionDraft = {
+  question: Record<string, unknown>;
+  uiKey: string;
+};
+type CreateSurveyValidationInput = {
+  title?: unknown;
+  isStandaloneQuestion?: unknown;
+  questions?: unknown;
+};
+type CreateSurveyQuestionPatchEntry = {
+  id?: string;
+  uiKey?: string;
+  type?: string;
+  prompt?: string;
+  options?: string[];
+  singleSelect?: boolean;
+  oneSelectionOnly?: boolean;
+  associatedSurveyId?: string;
+  tags?: string[];
+  aiGeneratedTagsFromSource?: string[];
+  currentTagInputValue?: string;
+  isGeneratingTags?: boolean;
+  lockGateIds?: string[] | null;
+  [key: string]: unknown;
+};
+type CreateSurveyUploadedQuestionPatchEntry = {
+  questionId?: string;
+  arweaveTxId?: string;
+  id?: string;
+  [key: string]: unknown;
+};
+type CreateSurveySubmitSuccessResetPatch = {
+  title: string;
+  questions: CreateSurveyQuestionPatchEntry[];
+  documentURLs: string[];
+  docURLInput: string;
+  surveyHash: string;
+  submissionError: string;
+};
+type CreateSurveyQuestionsSubmitSuccessBasePatch = {
+  questionsAddedSuccessfully: boolean;
+  isSubmitting: boolean;
+  progress: number;
+  uploadedQuestions: CreateSurveyUploadedQuestionPatchEntry[];
+  submitStep: number;
+};
+type CreateSurveyQuestionsSubmitSuccessPatch =
+  | CreateSurveyQuestionsSubmitSuccessBasePatch
+  | (CreateSurveyQuestionsSubmitSuccessBasePatch & CreateSurveySubmitSuccessResetPatch);
+type CreateSurveySurveySubmitSuccessBasePatch = {
+  surveyAddedSuccessfully: boolean;
+  lastSubmittedSurveyId: string;
+  lastSubmittedSurveyArweaveTxId: string;
+  isSubmitting: boolean;
+  progress: number;
+  submitStep: number;
+};
+type CreateSurveySurveySubmitSuccessPatch =
+  | CreateSurveySurveySubmitSuccessBasePatch
+  | (CreateSurveySurveySubmitSuccessBasePatch & CreateSurveySubmitSuccessResetPatch & {
+    uploadedQuestions: CreateSurveyUploadedQuestionPatchEntry[];
+  });
+
+type LitRecipientInput = {
+  accessControlConditions?: unknown;
+  chain?: unknown;
+};
+
+type CreateSurveyEncryptionGateSbt = {
+  address?: string;
+  name?: string;
+  [key: string]: unknown;
+};
+
+type AiPromptModelConfig = {
+  provider?: unknown;
+  model?: unknown;
+};
+
+const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  openrouter: 'OpenRouter',
+  custom: 'Custom',
+  local: 'Local',
+});
+const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
+
+const normalizeCreateSurveyUploadedQuestions = (
+  uploadedQuestions: unknown
+): CreateSurveyUploadedQuestionPatchEntry[] => (
+  Array.isArray(uploadedQuestions) ? uploadedQuestions as CreateSurveyUploadedQuestionPatchEntry[] : []
+);
+
+const toOptionText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (value === null || value === undefined) return '';
+  return String(value);
+};
+
+export const isMultichoiceQuestionType = (questionType: unknown): boolean => (
+  String(questionType || '') === 'multichoice'
+);
+
+export const resolveQuestionSingleSelect = (question: QuestionSelectionInput = {}): boolean => (
+  !!(question.singleSelect || question.oneSelectionOnly)
+);
+
+export const normalizeAuthoringQuestionOptions = (
+  questionType: unknown,
+  options: unknown
+): string[] | undefined => {
+  if (!isMultichoiceQuestionType(questionType)) return undefined;
+  if (!Array.isArray(options)) return [];
+  return options.map(toOptionText);
+};
+
+export const normalizePayloadQuestionOptions = (
+  questionType: unknown,
+  options: unknown
+): string[] | undefined => {
+  if (!isMultichoiceQuestionType(questionType)) return undefined;
+  if (!Array.isArray(options)) return undefined;
+  const normalizedOptions: string[] = [];
+  options.forEach((option) => {
+    const text = toOptionText(option);
+    if (!text || text.trim() === '') return;
+    normalizedOptions.push(text);
+  });
+  return normalizedOptions;
+};
+
+export const resolvePayloadSingleSelect = (
+  questionType: unknown,
+  singleSelect: unknown
+): boolean | undefined => (
+  isMultichoiceQuestionType(questionType) ? !!singleSelect : undefined
+);
+
+export const buildCreateSurveyQuestionOptionList = ({
+  generateQuestionId = () => '',
+  operation = 'change',
+  optionIndex,
+  questionIndex,
+  questions = [],
+  value = '',
+}: BuildCreateSurveyQuestionOptionListArgs = {}) => {
+  const updatedQuestions = Array.isArray(questions) ? [...questions] : [];
+  const qIndex = questionIndex as number;
+  const questionToUpdate = {
+    ...(updatedQuestions[qIndex] as Record<string, unknown> | null | undefined),
+  };
+
+  let nextOptions: unknown[];
+  if (operation === 'add') {
+    if (!questionToUpdate.options) questionToUpdate.options = [];
+    nextOptions = [...(questionToUpdate.options as unknown[]), ''];
+  } else if (operation === 'remove') {
+    if (!Array.isArray(questionToUpdate.options)) questionToUpdate.options = [];
+    nextOptions = (questionToUpdate.options as unknown[]).filter((_, index) => index !== optionIndex);
+  } else {
+    if (!Array.isArray(questionToUpdate.options)) questionToUpdate.options = [];
+    nextOptions = [...(questionToUpdate.options as unknown[])];
+    nextOptions[optionIndex as number] = value;
+  }
+
+  questionToUpdate.options = nextOptions;
+  questionToUpdate.id = generateQuestionId(
+    questionToUpdate.type,
+    questionToUpdate.prompt,
+    questionToUpdate.options,
+    questionToUpdate.singleSelect
+  );
+  updatedQuestions[qIndex] = questionToUpdate;
+  return updatedQuestions;
+};
+
+export const buildCreateSurveyQuestionFieldUpdateList = ({
+  generateQuestionId = () => '',
+  key = '',
+  questionIndex,
+  questions = [],
+  value,
+}: BuildCreateSurveyQuestionFieldUpdateListArgs = {}) => {
+  const updatedQuestions = Array.isArray(questions) ? [...questions] : [];
+  const qIndex = questionIndex as number;
+  const questionToUpdate = {
+    ...(updatedQuestions[qIndex] as Record<string, unknown> | null | undefined),
+  };
+  const fieldKey = key as string;
+  questionToUpdate[fieldKey] = value;
+  if (fieldKey === 'prompt' || fieldKey === 'type' || fieldKey === 'singleSelect') {
+    questionToUpdate.id = generateQuestionId(
+      questionToUpdate.type,
+      questionToUpdate.prompt,
+      questionToUpdate.options || [],
+      questionToUpdate.singleSelect
+    );
+  }
+  updatedQuestions[qIndex] = questionToUpdate;
+  return updatedQuestions;
+};
+
+export const buildCreateSurveyNewQuestionDraft = ({
+  addingQuestionType = '',
+  generateQuestionId = () => '',
+  isStandaloneQuestion = false,
+  now = Date.now,
+  questionCount = 0,
+  random = Math.random,
+}: BuildCreateSurveyNewQuestionDraftArgs = {}): CreateSurveyNewQuestionDraft | null => {
+  const type = addingQuestionType;
+  if (!type || type === 'Question Type') return null;
+  const isMultichoice = isMultichoiceQuestionType(type);
+  const newQuestionId = generateQuestionId(type, '', [], false);
+  const count = Number(questionCount);
+  const safeCount = Number.isFinite(count) ? count : 0;
+  const randomSuffix = random().toString(36).substr(2, 9);
+  const uiKey = `new-${safeCount}-${now()}-${randomSuffix}`;
+  return {
+    uiKey,
+    question: {
+      id: newQuestionId,
+      uiKey,
+      type,
+      prompt: '',
+      options: isMultichoice ? [] : undefined,
+      singleSelect: isMultichoice ? false : undefined,
+      associatedSurveyId: '',
+      tags: [],
+      aiGeneratedTagsFromSource: [],
+      currentTagInputValue: '',
+      isGeneratingTags: false,
+      lockGateIds: isStandaloneQuestion ? [] : null,
+    },
+  };
+};
+
+export const buildCreateSurveyStandaloneToggleState = (prevState: unknown = {}) => {
+  const prev = prevState as {
+    isStandaloneQuestion?: unknown;
+    questions?: unknown;
+    surveyLockGateIds?: unknown;
+  };
+  const nextStandalone = !prev.isStandaloneQuestion;
+  const nextQuestions = (Array.isArray(prev.questions) ? prev.questions : []).map((question) => {
+    const current = (question || {}) as Record<string, unknown>;
+    const currentLock = current.lockGateIds;
+    if (nextStandalone) {
+      return {
+        ...current,
+        lockGateIds: currentLock === null ? [] : normalizeGateIds(currentLock),
+      };
+    }
+    const normalized = Array.isArray(currentLock) ? normalizeGateIds(currentLock) : [];
+    return {
+      ...current,
+      lockGateIds: normalized.length ? normalized : null,
+    };
+  });
+  return {
+    isStandaloneQuestion: nextStandalone,
+    surveyAddedSuccessfully: false,
+    questionsAddedSuccessfully: false,
+    submissionError: '',
+    lastSubmittedSurveyId: '',
+    lastSubmittedSurveyArweaveTxId: '',
+    openLockKey: '',
+    surveyLockGateIds: nextStandalone ? [] : normalizeGateIds(prev.surveyLockGateIds),
+    questions: nextQuestions,
+  };
+};
+
+export const removeDuplicateCreateSurveyQuestions = (
+  questions: Iterable<unknown> = [],
+) => {
+  const unique: unknown[] = [];
+  const setIds = new Set<unknown>();
+  for (const question of questions) {
+    const questionRecord = question as { id?: unknown };
+    if (!setIds.has(questionRecord.id)) {
+      unique.push(question);
+      setIds.add(questionRecord.id);
+    }
+  }
+  return unique;
+};
+
+export const buildAuthoringEncryptionPayload = ({
+  gates,
+  targets,
+}: {
+  gates?: unknown[] | null;
+  targets?: Record<string, unknown> | null;
+} = {}) => ({
+  enabled: true,
+  status: 'lit-v1',
+  gate: Array.isArray(gates) ? gates[0] || null : null,
+  ...(Array.isArray(gates) && gates.length ? { gates } : {}),
+  targets: targets || {},
+});
+
+export const isEncryptableFieldValueEmpty = (value: unknown): boolean => (
+  value === undefined ||
+  value === null ||
+  (typeof value === 'string' && value.trim() === '') ||
+  (Array.isArray(value) && value.length === 0)
+);
+
+export const combineLitRecipientAccessControlConditions = (
+  recipients: unknown
+): unknown[] => {
+  if (!Array.isArray(recipients)) return [];
+  const combinedAccessControlConditions: unknown[] = [];
+  recipients.forEach((recipient) => {
+    const recipientRecord = (
+      recipient && typeof recipient === 'object'
+        ? recipient as LitRecipientInput
+        : null
+    );
+    const conditions = recipientRecord?.accessControlConditions;
+    if (!Array.isArray(conditions) || conditions.length === 0) return;
+    if (combinedAccessControlConditions.length > 0) {
+      combinedAccessControlConditions.push({ operator: 'or' });
+    }
+    combinedAccessControlConditions.push(...conditions);
+  });
+  return combinedAccessControlConditions;
+};
+
+export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number => (
+  (Array.isArray(questions) ? questions : []).findIndex((question) => {
+    const questionRecord = (
+      question && typeof question === 'object'
+        ? question as QuestionPromptInput
+        : null
+    );
+    return String(questionRecord?.prompt || '').trim() === '';
+  })
+);
+
+export const getCreateSurveyValidationError = ({
+  title = '',
+  isStandaloneQuestion = false,
+  questions = [],
+}: CreateSurveyValidationInput = {}): string => {
+  if (!isStandaloneQuestion && String(title || '').trim() === '') {
+    return 'Please enter a survey title.';
+  }
+  const blankQuestionIndex = findFirstBlankQuestionPromptIndex(questions);
+  if (blankQuestionIndex !== -1) {
+    return `Question ${blankQuestionIndex + 1} prompt cannot be blank.`;
+  }
+  return '';
+};
+
+export const formatAiPromptModelLabel = (config: AiPromptModelConfig = {}) => {
+  const providerKey = String(config?.provider || '').trim().toLowerCase();
+  const model = String(config?.model || '').trim();
+  const provider =
+    AI_PROVIDER_LABELS[providerKey] ||
+    (providerKey ? `${providerKey.charAt(0).toUpperCase()}${providerKey.slice(1)}` : '');
+  if (provider && model) return `${provider} ${model}`;
+  return model || provider || 'Configured model';
+};
+
+export const buildCreateSurveyCopySuccessPatch = (
+  stateKey: unknown,
+  copied: unknown
+) => ({
+  [String(stateKey || '')]: !!copied,
+});
+
+export const buildCreateSurveyAiPromptModelLabelPatch = (aiPromptModelLabel: unknown) => ({
+  aiPromptModelLabel: String(aiPromptModelLabel || 'Configured model'),
+});
+
+export const buildCreateSurveyFocusTargetPatch = (focusTargetUiKey: unknown = null) => ({
+  focusTargetUiKey: typeof focusTargetUiKey === 'string' && focusTargetUiKey
+    ? focusTargetUiKey
+    : null,
+});
+
+export const buildCreateSurveyOpenLockKeyPatch = (openLockKey: unknown = '') => ({
+  openLockKey: String(openLockKey || ''),
+});
+
+export const buildCreateSurveyDocUrlInputPatch = (docURLInput: unknown) => ({
+  docURLInput: String(docURLInput ?? ''),
+  docURLError: '',
+});
+
+export const buildCreateSurveyDocUrlErrorPatch = (docURLError: unknown) => ({
+  docURLError: String(docURLError || ''),
+});
+
+export const buildCreateSurveyDocUrlClearPatch = () => ({
+  docURLInput: '',
+  docURLError: '',
+});
+
+export const buildCreateSurveyDocumentUrlsPatch = (documentURLs: unknown) => ({
+  documentURLs: Array.isArray(documentURLs) ? documentURLs.map((url) => String(url || '')) : [],
+});
+
+export const buildCreateSurveyTitleChangePatch = (title: unknown) => ({
+  title: String(title ?? ''),
+  formValidationError: '',
+});
+
+export const buildCreateSurveyAddingQuestionTypePatch = (addingQuestionType: unknown) => ({
+  addingQuestionType: String(addingQuestionType ?? ''),
+});
+
+export const buildCreateSurveyQuestionListPatch = (questions: unknown) => ({
+  questions: Array.isArray(questions) ? questions : [],
+});
+
+export const buildCreateSurveyQuestionListValidationPatch = (questions: unknown) => ({
+  questions: Array.isArray(questions) ? questions : [],
+  formValidationError: '',
+});
+
+export const buildCreateSurveyEncryptionGateSeedPatch = ({
+  addresses = [],
+  encryptionGateMode = 'any',
+}: {
+  addresses?: unknown;
+  encryptionGateMode?: unknown;
+} = {}) => ({
+  encryptionGateSBTs: (Array.isArray(addresses) ? addresses : []).map((addr) => ({
+    address: addr,
+    name: addr,
+  })),
+  encryptionGateMode: String(encryptionGateMode || 'any'),
+});
+
+export const addCreateSurveyEncryptionGateSbt = (
+  encryptionGateSBTs: Iterable<CreateSurveyEncryptionGateSbt> | null | undefined,
+  sbt: CreateSurveyEncryptionGateSbt
+) => [
+  ...((encryptionGateSBTs || []) as Iterable<CreateSurveyEncryptionGateSbt>),
+  sbt,
+];
+
+export const removeCreateSurveyEncryptionGateSbt = (
+  encryptionGateSBTs: CreateSurveyEncryptionGateSbt[] | null | undefined,
+  address: unknown
+) => {
+  const addrLower = String(address).toLowerCase();
+  return ((encryptionGateSBTs || []) as CreateSurveyEncryptionGateSbt[]).filter(
+    (sbt) => String(sbt.address || '').toLowerCase() !== addrLower
+  );
+};
+
+export const buildCreateSurveyEncryptionTogglePatch = ({
+  checked = false,
+  name = '',
+}: {
+  checked?: unknown;
+  name?: unknown;
+} = {}) => ({
+  [String(name || '')]: checked === true,
+});
+
+export const buildCreateSurveyEncryptionGateModePatch = (encryptionGateMode: unknown) => ({
+  encryptionGateMode: String(encryptionGateMode ?? ''),
+});
+
+export const buildCreateSurveyNetworkSwitchPatch = (needsNetworkSwitch: unknown) => ({
+  needsNetworkSwitch: !!needsNetworkSwitch,
+});
+
+export const buildCreateSurveyClearFormConfirmPatch = (showClearFormConfirm: unknown) => ({
+  showClearFormConfirm: !!showClearFormConfirm,
+});
+
+export const buildCreateSurveyValidationErrorPatch = (formValidationError: unknown) => ({
+  formValidationError: String(formValidationError || ''),
+});
+
+export const buildCreateSurveyAutoToolTogglePatch = (
+  state: { showAutoTool?: unknown } | null | undefined = {}
+) => ({
+  showAutoTool: !(state?.showAutoTool),
+});
+
+export const buildCreateSurveyCacheLoadedPatch = () => ({
+  cacheLoaded: true,
+  submitStep: 3,
+});
+
+export const buildCreateSurveySubmitResetPatch = () => ({
+  isSubmitting: false,
+  progress: 0,
+  showSubmitSteps: false,
+  submitStep: 0,
+});
+
+export const buildCreateSurveySubmitStartPatch = () => ({
+  isSubmitting: true,
+  progress: 0,
+  submissionError: '',
+  surveyAddedSuccessfully: false,
+  questionsAddedSuccessfully: false,
+  lastSubmittedSurveyId: '',
+  lastSubmittedSurveyArweaveTxId: '',
+  showSubmitSteps: true,
+  submitStep: 1,
+  cacheLoaded: false,
+});
+
+export const buildCreateSurveySubmitFailurePatch = (submissionError: unknown) => ({
+  isSubmitting: false,
+  progress: 0,
+  submissionError: String(submissionError || ''),
+  showSubmitSteps: false,
+  submitStep: 0,
+});
+
+export const buildCreateSurveySubmitBlockingErrorPatch = (submissionError: unknown) => ({
+  isSubmitting: false,
+  submissionError: String(submissionError || ''),
+  showSubmitSteps: false,
+  submitStep: 0,
+});
+
+export function buildCreateSurveyQuestionsSubmitSuccessPatch(args: {
+  resetDraft: true;
+  uploadedQuestions?: unknown;
+}): CreateSurveyQuestionsSubmitSuccessBasePatch & CreateSurveySubmitSuccessResetPatch;
+export function buildCreateSurveyQuestionsSubmitSuccessPatch(args?: {
+  resetDraft?: false | undefined;
+  uploadedQuestions?: unknown;
+}): CreateSurveyQuestionsSubmitSuccessBasePatch;
+export function buildCreateSurveyQuestionsSubmitSuccessPatch(args?: {
+  resetDraft?: unknown;
+  uploadedQuestions?: unknown;
+}): CreateSurveyQuestionsSubmitSuccessPatch {
+  const { resetDraft = false, uploadedQuestions = [] } = args || {};
+  const uploadedQuestionList = normalizeCreateSurveyUploadedQuestions(uploadedQuestions);
+  if (resetDraft === true) {
+    return {
+      title: '',
+      questions: [],
+      documentURLs: [],
+      docURLInput: '',
+      surveyHash: '',
+      submissionError: '',
+      questionsAddedSuccessfully: true,
+      isSubmitting: false,
+      progress: 100,
+      uploadedQuestions: uploadedQuestionList,
+      submitStep: 3,
+    };
+  }
+  return {
+    questionsAddedSuccessfully: true,
+    isSubmitting: false,
+    progress: 100,
+    uploadedQuestions: uploadedQuestionList,
+    submitStep: 3,
+  };
+}
+
+export function buildCreateSurveySurveySubmitSuccessPatch(args: {
+  resetDraft: true;
+  surveyArweaveTxId?: unknown;
+  surveyId?: unknown;
+}): CreateSurveySurveySubmitSuccessBasePatch & CreateSurveySubmitSuccessResetPatch & {
+  uploadedQuestions: CreateSurveyUploadedQuestionPatchEntry[];
+};
+export function buildCreateSurveySurveySubmitSuccessPatch(args?: {
+  resetDraft?: false | undefined;
+  surveyArweaveTxId?: unknown;
+  surveyId?: unknown;
+}): CreateSurveySurveySubmitSuccessBasePatch;
+export function buildCreateSurveySurveySubmitSuccessPatch(args?: {
+  resetDraft?: unknown;
+  surveyArweaveTxId?: unknown;
+  surveyId?: unknown;
+}): CreateSurveySurveySubmitSuccessPatch {
+  const { resetDraft = false, surveyArweaveTxId = '', surveyId = '' } = args || {};
+  if (resetDraft === true) {
+    return {
+      title: '',
+      questions: [],
+      documentURLs: [],
+      docURLInput: '',
+      surveyHash: '',
+      submissionError: '',
+      uploadedQuestions: [],
+      surveyAddedSuccessfully: true,
+      lastSubmittedSurveyId: String(surveyId || ''),
+      lastSubmittedSurveyArweaveTxId: String(surveyArweaveTxId || ''),
+      isSubmitting: false,
+      progress: 100,
+      submitStep: 3,
+    };
+  }
+  return {
+    surveyAddedSuccessfully: true,
+    lastSubmittedSurveyId: String(surveyId || ''),
+    lastSubmittedSurveyArweaveTxId: String(surveyArweaveTxId || ''),
+    isSubmitting: false,
+    progress: 100,
+    submitStep: 3,
+  };
+}
+
+export const buildCreateSurveySubmitCatchPatch = ({
+  errorMessage = 'An error occurred during submission.',
+  shouldResetSubmitProgress = false,
+  showSubmitSteps = false,
+  submitStep = 0,
+}: {
+  errorMessage?: unknown;
+  shouldResetSubmitProgress?: unknown;
+  showSubmitSteps?: unknown;
+  submitStep?: unknown;
+} = {}) => {
+  const reset = shouldResetSubmitProgress === true;
+  const currentStep = Number(submitStep || 0);
+  return {
+    isSubmitting: false,
+    progress: 0,
+    submissionError: String(errorMessage || 'An error occurred during submission.'),
+    showSubmitSteps: reset ? false : !!showSubmitSteps,
+    submitStep: reset ? 0 : (currentStep === 0 ? 1 : currentStep),
+  };
+};
+
+export const buildCreateSurveyAutoGeneratedDraftPatch = ({
+  documentURLs = [],
+  focusTargetUiKey = null,
+  questions = [],
+  title = '',
+}: {
+  documentURLs?: unknown;
+  focusTargetUiKey?: unknown;
+  questions?: unknown;
+  title?: unknown;
+} = {}) => ({
+  questions: Array.isArray(questions) ? questions : [],
+  documentURLs: Array.isArray(documentURLs) ? documentURLs.map((url) => String(url || '')) : [],
+  docURLInput: '',
+  docURLError: '',
+  formValidationError: '',
+  isStandaloneQuestion: !title,
+  title: String(title || ''),
+  showAutoTool: false,
+  surveyAddedSuccessfully: false,
+  questionsAddedSuccessfully: false,
+  submissionError: '',
+  lastSubmittedSurveyId: '',
+  lastSubmittedSurveyArweaveTxId: '',
+  focusTargetUiKey: typeof focusTargetUiKey === 'string' && focusTargetUiKey
+    ? focusTargetUiKey
+    : null,
+});
+
+export const buildCreateSurveySurveyLockGateIdsPatch = (surveyLockGateIds: unknown) => ({
+  surveyLockGateIds: Array.isArray(surveyLockGateIds) ? surveyLockGateIds : [],
+});
+
+export const buildCreateSurveyClearFormStatePatch = () => ({
+  title: '',
+  questions: [],
+  documentURLs: [],
+  docURLInput: '',
+  surveyHash: '',
+  isStandaloneQuestion: true,
+  surveyLockGateIds: [],
+  openLockKey: '',
+  surveyAddedSuccessfully: false,
+  questionsAddedSuccessfully: false,
+  isSubmitting: false,
+  submissionError: '',
+  lastSubmittedSurveyId: '',
+  lastSubmittedSurveyArweaveTxId: '',
+  showClearFormConfirm: false,
+  docURLError: '',
+  formValidationError: '',
+});
+
+export const buildCreateSurveyMountSubmitResetPatch = () => ({
+  isSubmitting: false,
+  progress: 0,
+  submissionError: '',
+});
+
+export const buildCreateSurveySubmitProgressPatch = ({
+  progress = 0,
+  submitStep = 0,
+}: {
+  progress?: unknown;
+  submitStep?: unknown;
+} = {}) => ({
+  progress: Number(progress || 0),
+  submitStep: Number(submitStep || 0),
+});
+
+export const buildCreateSurveyHashPatch = (surveyHash: unknown = '') => ({
+  surveyHash: String(surveyHash || ''),
+});
+
+const buildLowercaseBookmarkSet = (values: unknown = []) => new Set(
+  (Array.isArray(values) ? values : []).map((value) => String(value).toLowerCase())
+);
+
+export const buildCreateSurveyBookmarkSetsPatch = ({
+  surveys = [],
+  questions = [],
+}: {
+  surveys?: unknown;
+  questions?: unknown;
+} = {}) => ({
+  bookmarkedSurveysSet: buildLowercaseBookmarkSet(surveys),
+  bookmarkedQuestionsSet: buildLowercaseBookmarkSet(questions),
+});
+
+export const buildCreateSurveyBookmarkedQuestionsSetPatch = (bookmarkedQuestionsSet: unknown) => ({
+  bookmarkedQuestionsSet: bookmarkedQuestionsSet instanceof Set
+    ? new Set(bookmarkedQuestionsSet)
+    : buildLowercaseBookmarkSet(bookmarkedQuestionsSet),
+});
+
+export const buildCreateSurveyBookmarkedSurveysSetPatch = (bookmarkedSurveysSet: unknown) => ({
+  bookmarkedSurveysSet: bookmarkedSurveysSet instanceof Set
+    ? new Set(bookmarkedSurveysSet)
+    : buildLowercaseBookmarkSet(bookmarkedSurveysSet),
+});
+
+export const stableGateColor = (gateId: unknown) => {
+  const str = String(gateId || '');
+  let hash = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    hash = ((hash * 31) + str.charCodeAt(i)) >>> 0;
+  }
+  return ENCRYPTION_GATE_COLORS[hash % ENCRYPTION_GATE_COLORS.length];
+};
+
+export const normalizeGateIds = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.map((id) => String(id || '').trim()).filter(Boolean);
+  }
+  const raw = typeof value === 'string' ? value.trim() : '';
+  return raw ? [raw] : [];
+};
+
+export const normalizeGateText = (value: unknown) => {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (/^\[object\s+object\]$/i.test(text)) return '';
+  return text;
+};
+
+export const normalizeAddressList = (values: unknown[] = []) => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  (Array.isArray(values) ? values : []).forEach((value) => {
+    const address = String(value || '').trim();
+    if (!address) return;
+    const key = address.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(address);
+  });
+  return out;
+};
+
+export const normalizeTagList = (values: unknown = []) => (
+  (Array.isArray(values) ? values : [])
+    .filter((tag) => (
+      tag != null &&
+      (
+        typeof tag === 'string' ||
+        typeof tag === 'number' ||
+        typeof tag === 'boolean'
+      )
+    ))
+    .map((tag) => String(tag).trim())
+    .filter((tag) => tag && tag !== '[object Object]')
+);
+
+export const buildCreateSurveyQuestionTagRemovalList = <TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry>({
+  questions,
+  questionIndex,
+  tagIndexToRemove,
+}: {
+  questions?: Iterable<TQuestion> | null;
+  questionIndex?: unknown;
+  tagIndexToRemove?: unknown;
+} = {}): TQuestion[] => {
+  const updatedQuestions: TQuestion[] = [
+    ...((questions || []) as Iterable<TQuestion>)
+  ];
+  const qIndex = questionIndex as number;
+  const questionToUpdate: TQuestion & CreateSurveyQuestionTagEntry = { ...updatedQuestions[qIndex] };
+  const currentTags = normalizeTagList(questionToUpdate.tags);
+  questionToUpdate.tags = currentTags.filter((_: string, i: number) => i !== tagIndexToRemove);
+  updatedQuestions[qIndex] = questionToUpdate;
+  return updatedQuestions;
+};
+
+export const buildCreateSurveyQuestionTagInputValueList = <TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry>({
+  questions,
+  questionIndex,
+  value,
+}: {
+  questions?: Iterable<TQuestion> | null;
+  questionIndex?: unknown;
+  value?: unknown;
+} = {}): TQuestion[] => {
+  const updatedQuestions: TQuestion[] = [
+    ...((questions || []) as Iterable<TQuestion>)
+  ];
+  const qIndex = questionIndex as number;
+  updatedQuestions[qIndex] = {
+    ...updatedQuestions[qIndex],
+    currentTagInputValue: value,
+  } as TQuestion;
+  return updatedQuestions;
+};
+
+export const buildCreateSurveyQuestionTagCommitList = <TQuestion extends CreateSurveyQuestionTagEntry = CreateSurveyQuestionTagEntry>({
+  questions,
+  questionIndex,
+}: {
+  questions?: Iterable<TQuestion> | null;
+  questionIndex?: unknown;
+} = {}): TQuestion[] => {
+  const updatedQuestions: TQuestion[] = [
+    ...((questions || []) as Iterable<TQuestion>)
+  ];
+  const qIndex = questionIndex as number;
+  const questionToUpdate: TQuestion & CreateSurveyQuestionTagEntry = { ...updatedQuestions[qIndex] };
+  const currentTags = normalizeTagList(questionToUpdate.tags);
+  const newTag = ((questionToUpdate.currentTagInputValue || '') as { trim: () => string }).trim();
+  if (newTag && !currentTags.includes(newTag)) {
+    questionToUpdate.tags = [...currentTags, newTag];
+  } else {
+    questionToUpdate.tags = currentTags;
+  }
+  questionToUpdate.currentTagInputValue = '';
+  updatedQuestions[qIndex] = questionToUpdate;
+  return updatedQuestions;
+};
+
+export const generateSingleQuestionTagsPrompt = (
+  questionText: string,
+  questionType: string,
+  questionOptions: string[] = [],
+  defaultTagsList: string[] = [],
+) => {
+  let prompt = `Analyze the following survey question and generate 2-5 relevant tags.
+Question Prompt: "${questionText}"
+Question Type: "${questionType}"`;
+
+  if (questionType === 'multichoice' && questionOptions && questionOptions.length > 0) {
+    prompt += `\nQuestion Options: ${questionOptions.map((opt) => `"${opt}"`).join(', ')}`;
+  }
+
+  if (defaultTagsList && defaultTagsList.length > 0) {
+    prompt += `\n\nIf any of the following default tags are relevant, prioritize using them: [${defaultTagsList.map((tag) => `"${tag}"`).join(', ')}]. Otherwise, generate new appropriate tags.`;
+  } else {
+    prompt += `\n\nGenerate new appropriate tags.`;
+  }
+
+  prompt += `\n\nReturn the tags as a JSON object with a single key "tags" containing an array of strings. For example: {"tags": ["example tag 1", "another tag"]}`;
+  return prompt;
+};
+
+export const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    return typeof message === 'string' ? message : fallback;
+  }
+  return fallback;
+};
+
+export const getErrorCode = (error: unknown) => (
+  error && typeof error === 'object' && 'code' in error
+    ? (error as { code?: unknown }).code
+    : undefined
+);

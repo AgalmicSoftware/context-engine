@@ -133,6 +133,26 @@ describe('questionRouting helper regressions', () => {
     expect(downgraded.promptDecrypted).toBe(true);
   });
 
+  it('prefers fetched encrypted metadata over a pending route placeholder', () => {
+    const pending = {
+      id: 'q1',
+      type: 'freeform',
+      prompt: '[encrypted]',
+      __ceQuestionMetadataPending: true,
+    };
+    const fetched = {
+      id: 'q1',
+      type: 'binary',
+      prompt: '[encrypted]',
+      promptEncrypted: '{"ciphertext":"cipher"}',
+      arweaveTxId: 'tx1',
+    };
+
+    const picked = pickBetterQuestionPayload(pending, fetched);
+
+    expect(picked).toBe(fetched);
+  });
+
   it('does not treat unknown query slugs as pinnable', () => {
     const getSessionConfigBySlug = (slug: string | null): KnownSessionConfig | null => (
       slug === 'test-65'

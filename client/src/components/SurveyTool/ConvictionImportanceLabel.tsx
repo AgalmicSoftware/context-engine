@@ -12,6 +12,19 @@ type ConvictionImportanceLabelProps = {
   onSelectMode: (mode: SliderMode) => void;
 };
 
+export const buildConvictionImportanceToggleLineClassName = ({
+  activeClassName = '',
+  baseClassName = '',
+  isActive = false,
+}: {
+  activeClassName?: unknown;
+  baseClassName?: unknown;
+  isActive?: unknown;
+} = {}): string => ([
+  String(baseClassName || ''),
+  isActive ? String(activeClassName || '') : '',
+].filter(Boolean).join(' '));
+
 const ConvictionImportanceLabel = ({
   importanceToggleEnabled = false,
   sliderMode,
@@ -36,7 +49,11 @@ const ConvictionImportanceLabel = ({
       <span className={styles.convictionToggleStack}>
         <button
           type="button"
-          className={`${styles.convictionToggleLine} ${isConviction ? styles.convictionToggleButtonActive : ''}`}
+          className={buildConvictionImportanceToggleLineClassName({
+            activeClassName: styles.convictionToggleButtonActive,
+            baseClassName: styles.convictionToggleLine,
+            isActive: isConviction,
+          })}
           onClick={() => onSelectMode('conviction')}
         >
           <span className={styles.convictionToggleLabel}>Conviction</span>
@@ -45,7 +62,11 @@ const ConvictionImportanceLabel = ({
         {isExpanded ? (
           <button
             type="button"
-            className={`${styles.convictionToggleLine} ${!isConviction ? styles.convictionToggleButtonActive : ''}`}
+            className={buildConvictionImportanceToggleLineClassName({
+              activeClassName: styles.convictionToggleButtonActive,
+              baseClassName: styles.convictionToggleLine,
+              isActive: !isConviction,
+            })}
             onClick={() => onSelectMode('importance')}
           >
             <span className={styles.convictionToggleLabel}>Importance</span>
