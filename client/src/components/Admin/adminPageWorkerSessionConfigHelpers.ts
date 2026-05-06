@@ -27,12 +27,6 @@ export type WorkerSessionConfigPayload = AdminRecord & {
   adminAddress: string;
 };
 
-export type WorkerUrlResolutionDisplay = {
-  debug: string;
-  status: string;
-  url: string;
-};
-
 const asRecord = (value: unknown): AdminRecord => (
   value && typeof value === 'object'
     ? value as AdminRecord
@@ -63,51 +57,6 @@ export const pickFirstNonEmptyRpcUrlMap = (...candidates: unknown[]): RpcUrlMap 
   return Object.keys(sanitized).length > 0 ? sanitized : found;
 }, {});
 
-export const buildWorkerUrlResolutionDisplay = ({
-  resolved,
-  normalizeWorkerUrl,
-}: {
-  resolved?: unknown;
-  normalizeWorkerUrl: (value: unknown) => string;
-}): WorkerUrlResolutionDisplay => {
-  const resolvedRecord = asRecord(resolved);
-  const resolvedUrl = normalizeWorkerUrl(resolvedRecord.url || '');
-  const url = resolvedUrl || '';
-  const rawStatus = resolvedRecord.status;
-  const status = rawStatus || 'ok';
-  return {
-    url,
-    debug: `source=${resolvedRecord.source || 'unknown'} status=${toStr(status)} url=${resolvedUrl || '(none)'}`,
-    status: url
-      ? `Resolved (${toStr(status)})`
-      : rawStatus
-        ? `Missing (${toStr(rawStatus)})`
-        : 'Missing worker URL',
-  };
-};
-
-const mergeRpcUrlMaps = (...candidates: unknown[]): RpcUrlMap => candidates.reduce<RpcUrlMap>((merged, candidate) => {
-  const sanitized = sanitizeRpcUrlMap(candidate);
-  Object.entries(sanitized).forEach(([chainId, urls]) => {
-    if (!normalizeRpcUrlList(merged[chainId]).length && urls.length) {
-      merged[chainId] = urls;
-    }
-  });
-  return merged;
-}, {});
-
-const getRpcUrlsForChain = (rpcUrlsByChainId: RpcUrlMap, chainId: unknown): string[] => {
-  const numericChainId = Number(chainId || 0) || 0;
-  if (!numericChainId) return [];
-  return normalizeRpcUrlList(rpcUrlsByChainId[String(numericChainId)] || rpcUrlsByChainId[numericChainId]);
-};
-
-const getDefaultRpcForChain = (chainId: unknown, opts: AdminRecord = {}): string => {
-  const numericChainId = Number(chainId || 0) || 0;
-  if (!numericChainId) return '';
-  return toStr(getDefaultHttpRpc(numericChainId, opts) || getDefaultHttpRpc(numericChainId)).trim();
-};
-
 export const getSessionReadRpcConfig = ({
   sessionConfig,
   fallbackChainId,
@@ -125,13 +74,17 @@ export const getSessionReadRpcConfig = ({
     fallbackChainId ||
     0
   ) || 0;
-  const rpcUrlsByChainId = mergeRpcUrlMaps(
+  const rpcUrlsByChainId = pickFirstNonEmptyRpcUrlMap(
     pathProvider.rpcUrlsByChainId,
     rpcRoot.rpcUrlsByChainId,
     cfg.rpcUrlsByChainId
   );
-  const chainRpcUrl = getRpcUrlsForChain(rpcUrlsByChainId, chainId)[0] || '';
-  const defaultRpcUrl = getDefaultRpcForChain(chainId, { allowPath: false });
+  const chainRpcUrl = chainId
+    ? normalizeRpcUrlList(rpcUrlsByChainId[String(chainId)] || rpcUrlsByChainId[chainId])[0] || ''
+    : '';
+  const defaultRpcUrl = chainId
+    ? toStr(getDefaultHttpRpc(chainId, { allowPath: false }) || getDefaultHttpRpc(chainId)).trim()
+    : '';
   const rpcUrl = (
     normalizeRpcUrlList(faucetCfg.rpcUrl)[0] ||
     chainRpcUrl ||
@@ -176,36 +129,27 @@ export const buildWorkerSessionConfigPayload = ({
     0
   ) || 0;
   const faucetCfg = asRecord(cfg.faucet);
-  const genericRpcUrlFromConfig = (
+  const rpcUrlFromConfig = (
     normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
     normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
     normalizeRpcUrlList(cfg.rpcUrl)[0] ||
+    normalizeRpcUrlList(faucetCfg.rpcUrl)[0] ||
     ''
   );
-  const rpcUrlsByChainId = mergeRpcUrlMaps(
+  const rpcUrlsByChainId = pickFirstNonEmptyRpcUrlMap(
     pathProvider.rpcUrlsByChainId,
-    rpcRoot.rpcUrlsByChainId,
     cfg.rpcUrlsByChainId
   );
-  const sessionChainRpcUrl = getRpcUrlsForChain(rpcUrlsByChainId, inferredSessionChainId)[0] || '';
-  const defaultSessionRpcUrl = getDefaultRpcForChain(inferredSessionChainId);
-  const resolvedRpcUrl = sessionChainRpcUrl || genericRpcUrlFromConfig || defaultSessionRpcUrl;
+  const rpcUrlsForRegistryChain = normalizeRpcUrlList(
+    registryChainId ? (rpcUrlsByChainId[String(registryChainId)] || rpcUrlsByChainId[registryChainId]) : []
+  );
+  const defaultChainRpcUrl = registryChainId ? toStr(getDefaultHttpRpc(registryChainId)).trim() : '';
+  const resolvedRpcUrl = rpcUrlFromConfig || rpcUrlsForRegistryChain[0] || defaultChainRpcUrl;
   const resolvedRpcUrlsByChainId = { ...rpcUrlsByChainId };
-  if (inferredSessionChainId && resolvedRpcUrl) {
-    const key = String(inferredSessionChainId);
+  if (registryChainId && resolvedRpcUrl) {
+    const key = String(registryChainId);
     if (!normalizeRpcUrlList(resolvedRpcUrlsByChainId[key]).length) {
       resolvedRpcUrlsByChainId[key] = [resolvedRpcUrl];
-    }
-  }
-  if (registryChainId) {
-    const key = String(registryChainId);
-    const registryChainRpcUrl = getRpcUrlsForChain(resolvedRpcUrlsByChainId, registryChainId)[0] || '';
-    const fallbackRegistryRpcUrl =
-      registryChainRpcUrl ||
-      (registryChainId === inferredSessionChainId ? resolvedRpcUrl : '') ||
-      getDefaultRpcForChain(registryChainId);
-    if (fallbackRegistryRpcUrl && !normalizeRpcUrlList(resolvedRpcUrlsByChainId[key]).length) {
-      resolvedRpcUrlsByChainId[key] = [fallbackRegistryRpcUrl];
     }
   }
   const allowOriginsRaw = cfg.allowOrigins;
@@ -258,16 +202,7 @@ export const buildWorkerSessionConfigPayload = ({
   if (Object.keys(normalizedContracts).length) out.contracts = normalizedContracts;
 
   const faucet: AdminRecord = {};
-  const faucetChainId = Number(faucetCfg.chainId || faucetCfg.networkChainId || inferredSessionChainId || 0) || 0;
-  const faucetChainRpcUrl = getRpcUrlsForChain(resolvedRpcUrlsByChainId, faucetChainId)[0] || '';
-  const defaultFaucetRpcUrl = getDefaultRpcForChain(faucetChainId);
-  const faucetRpcUrl = (
-    normalizeRpcUrlList(faucetCfg.rpcUrl)[0] ||
-    faucetChainRpcUrl ||
-    (faucetChainId === inferredSessionChainId ? resolvedRpcUrl : '') ||
-    defaultFaucetRpcUrl ||
-    resolvedRpcUrl
-  );
+  const faucetRpcUrl = normalizeRpcUrlList(faucetCfg.rpcUrl)[0] || resolvedRpcUrl;
   const faucetAmountEth = toStr(faucetCfg.amountEth).trim();
   const faucetBalanceThresholdEth = toStr(faucetCfg.balanceThresholdEth).trim();
   if (faucetRpcUrl) faucet.rpcUrl = faucetRpcUrl;

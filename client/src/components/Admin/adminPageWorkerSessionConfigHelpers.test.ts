@@ -1,7 +1,6 @@
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 import {
-  buildWorkerUrlResolutionDisplay,
   buildWorkerSessionConfigPayload,
   getSessionReadRpcConfig,
   normalizeRpcUrlList,
@@ -36,55 +35,6 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
       { 8453: ['https://ignored.example'] },
     )).toEqual({
       8453: ['https://first.example'],
-    });
-  });
-
-  it('builds worker URL resolution display state without changing missing-url semantics', () => {
-    const normalizeWorkerUrl = (value: unknown) => String(value || '').trim().replace(/\/+$/, '');
-
-    expect(buildWorkerUrlResolutionDisplay({
-      resolved: {
-        url: ' https://worker.example.test/ ',
-        source: 'session-config',
-        status: 'ok',
-      },
-      normalizeWorkerUrl,
-    })).toEqual({
-      url: 'https://worker.example.test',
-      debug: 'source=session-config status=ok url=https://worker.example.test',
-      status: 'Resolved (ok)',
-    });
-    expect(buildWorkerUrlResolutionDisplay({
-      resolved: {
-        url: '',
-        source: 'registry',
-        status: 'not-found',
-      },
-      normalizeWorkerUrl,
-    })).toEqual({
-      url: '',
-      debug: 'source=registry status=not-found url=(none)',
-      status: 'Missing (not-found)',
-    });
-    expect(buildWorkerUrlResolutionDisplay({
-      resolved: {},
-      normalizeWorkerUrl,
-    })).toEqual({
-      url: '',
-      debug: 'source=unknown status=ok url=(none)',
-      status: 'Missing worker URL',
-    });
-    expect(buildWorkerUrlResolutionDisplay({
-      resolved: {
-        url: '',
-        source: 'registry',
-        status: 0,
-      },
-      normalizeWorkerUrl,
-    })).toEqual({
-      url: '',
-      debug: 'source=registry status=ok url=(none)',
-      status: 'Missing worker URL',
     });
   });
 
@@ -152,91 +102,6 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
     );
   });
 
-  it('uses session-chain RPCs for split registry/session worker payloads', () => {
-    const payload = buildWorkerSessionConfigPayload({
-      sessionConfig: {
-        slug: 'split-rpc-session',
-        networkChainId: 8453,
-        __registry: {
-          registryChainId: 84532,
-          address: '0x1111111111111111111111111111111111111111',
-          adminAddress: ACCOUNT,
-        },
-        rpcUrlsByChainId: {
-          8453: [' https://session-chain.example '],
-          84532: [' https://registry-chain.example '],
-        },
-        faucet: {
-          amountEth: '0.0001',
-        },
-      },
-      account: ACCOUNT,
-      fallbackChainId: 84532,
-    });
-
-    expect(payload.networkChainId).toBe(8453);
-    expect(payload.registryChainId).toBe(84532);
-    expect(payload.rpcUrl).toBe('https://session-chain.example');
-    expect(payload.rpcUrlsByChainId).toEqual({
-      8453: ['https://session-chain.example'],
-      84532: ['https://registry-chain.example'],
-    });
-    expect(payload.faucet).toEqual({
-      rpcUrl: 'https://session-chain.example',
-      amountEth: '0.0001',
-    });
-  });
-
-  it('does not promote registry-chain RPC maps to the root session RPC', () => {
-    const payload = buildWorkerSessionConfigPayload({
-      sessionConfig: {
-        slug: 'split-rpc-default-session',
-        networkChainId: 8453,
-        __registry: {
-          registryChainId: 84532,
-          address: '0x1111111111111111111111111111111111111111',
-          adminAddress: ACCOUNT,
-        },
-        rpcUrlsByChainId: {
-          84532: ['https://registry-chain.example'],
-        },
-      },
-      account: ACCOUNT,
-      fallbackChainId: 84532,
-    });
-
-    expect(payload.rpcUrl).toBe(getDefaultHttpRpc(8453));
-    expect(payload.rpcUrlsByChainId).toEqual({
-      8453: [getDefaultHttpRpc(8453)],
-      84532: ['https://registry-chain.example'],
-    });
-  });
-
-  it('backfills registry-chain RPC maps for split worker payloads', () => {
-    const payload = buildWorkerSessionConfigPayload({
-      sessionConfig: {
-        slug: 'split-rpc-missing-registry-map',
-        networkChainId: 8453,
-        __registry: {
-          registryChainId: 84532,
-          address: '0x1111111111111111111111111111111111111111',
-          adminAddress: ACCOUNT,
-        },
-        rpcUrlsByChainId: {
-          8453: ['https://session-chain.example'],
-        },
-      },
-      account: ACCOUNT,
-      fallbackChainId: 84532,
-    });
-
-    expect(payload.rpcUrl).toBe('https://session-chain.example');
-    expect(payload.rpcUrlsByChainId).toEqual({
-      8453: ['https://session-chain.example'],
-      84532: [getDefaultHttpRpc(84532)],
-    });
-  });
-
   it('preserves worker session config payload field normalization', () => {
     const payload = buildWorkerSessionConfigPayload({
       sessionConfig: {
@@ -289,7 +154,6 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
       sessionId: '0xabc123',
       rpcUrl: 'https://path-rpc.example',
       rpcUrlsByChainId: {
-        8453: ['https://path-rpc.example'],
         84532: ['https://path-registry.example'],
       },
       allowOrigins: ['https://app.example', 'https://admin.example'],
