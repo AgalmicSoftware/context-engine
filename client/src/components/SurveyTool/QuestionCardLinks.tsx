@@ -16,6 +16,28 @@ type QuestionCardLinksProps = {
   questionHref?: string;
 };
 
+export const buildQuestionCardBookmarkClassName = ({
+  activeClassName = '',
+  baseClassName = '',
+  bookmarkClassName = '',
+  isQuestionBookmarked = false,
+}: {
+  activeClassName?: unknown;
+  baseClassName?: unknown;
+  bookmarkClassName?: unknown;
+  isQuestionBookmarked?: unknown;
+} = {}): string => ([
+  String(baseClassName || ''),
+  String(bookmarkClassName || ''),
+  isQuestionBookmarked ? String(activeClassName || '') : '',
+].filter(Boolean).join(' '));
+
+export const resolveQuestionCardBookmarkIconStyle = (
+  isQuestionBookmarked: unknown = false
+): React.CSSProperties => ({
+  color: isQuestionBookmarked ? '#ffc107' : 'white',
+});
+
 const QuestionCardLinks = ({
   showResponseLookupSpinner = false,
   isQuestionBookmarked = false,
@@ -35,12 +57,17 @@ const QuestionCardLinks = ({
     )}
     <button
       onClick={onBookmarkToggle}
-      className={`${styles.cardLinkButton} ${styles.fullQuestionBookmarkButton} ${isQuestionBookmarked ? styles.fullQuestionBookmarkButtonActive : ''}`}
+      className={buildQuestionCardBookmarkClassName({
+        activeClassName: styles.fullQuestionBookmarkButtonActive,
+        baseClassName: styles.cardLinkButton,
+        bookmarkClassName: styles.fullQuestionBookmarkButton,
+        isQuestionBookmarked,
+      })}
       title={isQuestionBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
     >
       <FontAwesomeIcon
         icon={faBookmark}
-        style={{ color: isQuestionBookmarked ? '#ffc107' : 'white' }}
+        style={resolveQuestionCardBookmarkIconStyle(isQuestionBookmarked)}
       />
     </button>
     {arweaveHref ? (

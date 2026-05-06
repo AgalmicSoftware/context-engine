@@ -22,6 +22,7 @@ type QuestionRouteOptions = {
 };
 
 type QuestionPayload = {
+  __ceQuestionMetadataPending?: unknown;
   prompt?: unknown;
   options?: unknown;
   tags?: unknown;
@@ -156,6 +157,11 @@ export const pickBetterQuestionPayload = (
 ): QuestionPayload | null => {
   if (!incomingQuestion) return existingQuestion || null;
   if (!existingQuestion) return incomingQuestion;
+
+  const existingPending = existingQuestion.__ceQuestionMetadataPending === true;
+  const incomingPending = incomingQuestion.__ceQuestionMetadataPending === true;
+  if (existingPending && !incomingPending) return incomingQuestion;
+  if (incomingPending && !existingPending) return existingQuestion;
 
   const existingMasked = isMaskedQuestionPayload(existingQuestion);
   const incomingMasked = isMaskedQuestionPayload(incomingQuestion);

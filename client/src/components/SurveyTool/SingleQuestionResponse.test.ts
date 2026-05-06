@@ -1,4 +1,10 @@
-import SingleQuestionResponse from './SingleQuestionResponse';
+import SingleQuestionResponse, {
+  SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE,
+  buildSingleQuestionMiniPromptButtonClassName,
+  buildSingleQuestionReadOnlyBinaryClassName,
+  resolveSingleQuestionBookmarkIconStyle,
+  resolveSingleQuestionRatingBarStyle,
+} from './SingleQuestionResponse';
 import styles from './SingleQuestionResponse.module.scss';
 import GateTooltip from '../Gates/GateTooltip';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -45,6 +51,20 @@ const nodeHasClassName = (node: TreeNode, className: string): boolean => {
 };
 
 describe('SingleQuestionResponse style contracts', () => {
+  it('builds response display classes and inline styles', () => {
+    expect(resolveSingleQuestionBookmarkIconStyle(true, false)).toEqual({ color: 'lightgreen' });
+    expect(resolveSingleQuestionBookmarkIconStyle(false, true)).toEqual({ color: '#ffc107' });
+    expect(resolveSingleQuestionBookmarkIconStyle(false, false)).toEqual({ color: 'white' });
+    expect(buildSingleQuestionMiniPromptButtonClassName(styles)).toBe(
+      `${styles.miniPromptAbbrev} ${styles.maskedPromptActionButton}`
+    );
+    expect(buildSingleQuestionReadOnlyBinaryClassName(styles, 'agree')).toBe(
+      `${styles.readOnlyBinary} ${styles.agree}`
+    );
+    expect(SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE).toEqual({ width: '200px' });
+    expect(resolveSingleQuestionRatingBarStyle(60)).toEqual({ width: '60%' });
+  });
+
   it('keeps fullscreen response cards on the prior inherited font treatment', () => {
     const scssPath = path.join(__dirname, 'SingleQuestionResponse.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
@@ -545,6 +565,22 @@ describe('SingleQuestionResponse group slug resolution', () => {
     });
 
     expect(subject.resolveGroupSlug()).toBe('test-10');
+    window.history.replaceState({}, '', restorePath);
+  });
+
+  it('prefers question-specific source slug over stale profile page props', () => {
+    const restorePath = `${window.location.pathname}${window.location.search}${window.location.hash}` || '/';
+    window.history.replaceState({}, '', '/u/0x00000000000000000000000000000000000000aa');
+    const subject = createSubject({
+      sessionSlug: 'demo',
+      activeSessionSlug: 'demo',
+      question: {
+        id: 'q-demo-4',
+        sessionSlug: 'demo-4',
+      },
+    });
+
+    expect(subject.resolveGroupSlug()).toBe('demo-4');
     window.history.replaceState({}, '', restorePath);
   });
 });
