@@ -31,46 +31,15 @@ type SurveyToolCachedSurveyEntry = Record<string, unknown> & {
   surveyID?: unknown;
   title?: unknown;
 };
-type SurveyToolInitialCacheState = {
-  surveyIDs: unknown[];
-  questionIDs: unknown[];
-  questionResponses: Record<string, unknown>;
-  arweaveContent: Record<string, unknown>;
-};
-type SurveyCacheLookupResult = {
-  data: unknown;
-  foundSlug: string;
-};
-type SurveyToolResultsModalStatePatch = {
-  showResultsModal: boolean;
-};
-type SurveyToolQuestionsCacheNoncePatch = {
-  questionsCacheNonce: number;
-};
-type SurveyToolLoadingStatePatch = {
-  loading: boolean;
-};
-type SurveyToolPubKeyStatePatch = {
-  pubKey: string;
-};
-type SurveyToolSurveyListStatePatch = {
-  surveys: unknown[];
-  loading: boolean;
-};
-type SurveyToolHydratedFilterState = {
-  filterState: unknown;
-  cleanUrl: string | null;
-  error: unknown | null;
-};
 
-export const getInitialCacheState = (): SurveyToolInitialCacheState => ({
+export const getInitialCacheState = () => ({
   surveyIDs: [],
   questionIDs: [],
   questionResponses: {},
   arweaveContent: {},
 });
 
-export const getSurveyToolSessionPropFromProps = (props: SurveyToolPropsLike = {}): string | undefined => {
+export const getSurveyToolSessionPropFromProps = (props: SurveyToolPropsLike = {}) => {
   if (typeof props.sessionSlug === 'string') return normalizeSessionSlugValue(props.sessionSlug);
   return undefined;
 };
@@ -84,7 +53,7 @@ export const getResolvedSurveyToolPropsFromProps = <TProps extends SurveyToolPro
   };
 };
 
-export const getNormalizedSurveyIdFromPropsValue = (props: SurveyToolPropsLike = {}): string | null => {
+export const getNormalizedSurveyIdFromPropsValue = (props: SurveyToolPropsLike = {}) => {
   const { surveyId, surveyID } = props;
   const rawId = surveyId || surveyID;
   return rawId ? String(rawId).trim().toLowerCase() : null;
@@ -134,7 +103,7 @@ export const resolveSurveyToolSelectorRenderState = ({
 export const shouldRouteSurveyToolMountToQuestions = ({
   pathname = '',
   props = {},
-}: ShouldRouteSurveyToolMountToQuestionsArgs = {}): boolean => (
+}: ShouldRouteSurveyToolMountToQuestionsArgs = {}) => (
   typeof pathname === 'string' &&
   !pathname.includes('/survey/') &&
   !pathname.includes('/question/') &&
@@ -148,7 +117,7 @@ export const shouldRouteSurveyToolMountToQuestions = ({
 export const shouldFetchSurveyToolSurveysOnPropsChange = ({
   prevProps = {},
   props = {},
-}: SurveyToolPropsChangeArgs = {}): boolean => (
+}: SurveyToolPropsChangeArgs = {}) => (
   getNetworkIdFromPropsLike(prevProps) !== getNetworkIdFromPropsLike(props) ||
   (prevProps.isSurveyCacheReady !== props.isSurveyCacheReady && !!props.isSurveyCacheReady)
 );
@@ -157,14 +126,14 @@ export const shouldOpenSurveyToolResultsOnPropsChange = ({
   prevProps = {},
   props = {},
   showResultsModal = false,
-}: ShouldOpenSurveyToolResultsOnPropsChangeArgs = {}): boolean => (
+}: ShouldOpenSurveyToolResultsOnPropsChangeArgs = {}) => (
   !!props.autoOpenResults && !prevProps.autoOpenResults && !showResultsModal
 );
 
 export const shouldBumpSurveyToolQuestionsCacheNonce = ({
   prevProps = {},
   props = {},
-}: SurveyToolPropsChangeArgs = {}): boolean => {
+}: SurveyToolPropsChangeArgs = {}) => {
   const questionCacheReadyChanged = prevProps.isQuestionCacheReady !== props.isQuestionCacheReady;
   const responsesCacheReadyChanged = prevProps.isResponsesCacheReady !== props.isResponsesCacheReady;
   const questionResponsesNonceChanged = prevProps.questionResponsesNonce !== props.questionResponsesNonce;
@@ -266,7 +235,7 @@ type SurveyCacheNetworkBucket = {
 };
 type SurveyCacheByNetwork = Record<string, SurveyCacheNetworkBucket | undefined>;
 
-const getNetworkIdFromPropsLike = (props: SurveyToolPropsLike = {}): unknown | undefined => {
+const getNetworkIdFromPropsLike = (props: SurveyToolPropsLike = {}) => {
   const network = props.network;
   if (!network || typeof network !== 'object') return undefined;
   return network.id;
@@ -275,7 +244,7 @@ const getNetworkIdFromPropsLike = (props: SurveyToolPropsLike = {}): unknown | u
 export const findSurveyInSurveyCacheEntries = (
   surveyID: unknown,
   entries: SurveyCacheEntryLike[] = []
-): SurveyCacheLookupResult | null => {
+) => {
   if (!surveyID) return null;
   const sid = String(surveyID).toLowerCase();
 
@@ -297,39 +266,39 @@ export const findSurveyInSurveyCacheEntries = (
 export const findSurveyInAllSurveyCaches = (
   surveyID: unknown,
   listNamespaceEntries: SurveyCacheEntryReader
-): SurveyCacheLookupResult | null => {
+) => {
   const entries = listNamespaceEntries('surveysCache', { cloneValues: false });
   return findSurveyInSurveyCacheEntries(surveyID, Array.isArray(entries) ? entries : []);
 };
 
 export const buildSurveyToolResultsModalStatePatch = ({
   open = false,
-}: SurveyToolResultsModalStatePatchArgs = {}): SurveyToolResultsModalStatePatch => ({
+}: SurveyToolResultsModalStatePatchArgs = {}) => ({
   showResultsModal: open === true,
 });
 
 export const buildSurveyToolQuestionsCacheNoncePatch = (
   prevState: SurveyToolQuestionsCacheNonceStateLike = {}
-): SurveyToolQuestionsCacheNoncePatch => ({
+) => ({
   questionsCacheNonce: Number(prevState?.questionsCacheNonce || 0) + 1,
 });
 
 export const buildSurveyToolLoadingStatePatch = ({
   loading = false,
-}: SurveyToolLoadingStatePatchArgs = {}): SurveyToolLoadingStatePatch => ({
+}: SurveyToolLoadingStatePatchArgs = {}) => ({
   loading: loading === true,
 });
 
 export const buildSurveyToolPubKeyStatePatch = ({
   pubKey = '',
-}: SurveyToolPubKeyStatePatchArgs = {}): SurveyToolPubKeyStatePatch => ({
+}: SurveyToolPubKeyStatePatchArgs = {}) => ({
   pubKey: String(pubKey ?? ''),
 });
 
 export const buildSurveyToolSurveyListStatePatch = ({
   surveys = [],
   loading = false,
-}: SurveyToolSurveyListStatePatchArgs = {}): SurveyToolSurveyListStatePatch => ({
+}: SurveyToolSurveyListStatePatchArgs = {}) => ({
   surveys: Array.isArray(surveys) ? surveys : [],
   loading: loading === true,
 });
@@ -338,7 +307,7 @@ export const buildSurveyToolSurveyListStatePatch = ({
 export const buildSurveyToolHydratedFilterState = ({
   props = {},
   href = '',
-}: BuildSurveyToolHydratedFilterStateArgs = {}): SurveyToolHydratedFilterState => {
+}: BuildSurveyToolHydratedFilterStateArgs = {}) => {
   if (props.minifiedMode === 'pile' || isSurveyToolFilterStateActive(props.filterState)) {
     return { filterState: null, cleanUrl: null, error: null };
   }
@@ -361,7 +330,7 @@ export const buildSurveyToolHydratedFilterState = ({
   }
 };
 
-export const buildSurveyToolSurveyListFromBag = (surveyBag: unknown): SurveyToolCachedSurveyEntry[] => {
+export const buildSurveyToolSurveyListFromBag = (surveyBag: unknown) => {
   if (!surveyBag || typeof surveyBag !== 'object') return [];
 
   const next: SurveyToolCachedSurveyEntry[] = [];
@@ -389,7 +358,7 @@ export const buildSurveyToolSurveyListFromBag = (surveyBag: unknown): SurveyTool
 export const buildSurveyToolFilterStateUrlPath = (
   props: SurveyToolPropsLike = {},
   newFilterState: unknown
-): string => {
+) => {
   const serializedState = serializeSurveyToolFilterState(newFilterState);
   const normalizedSurveyId = getNormalizedSurveyIdFromPropsValue(props);
   const slug = resolveEffectiveSlug(getResolvedSurveyToolPropsFromProps(props)) || '';

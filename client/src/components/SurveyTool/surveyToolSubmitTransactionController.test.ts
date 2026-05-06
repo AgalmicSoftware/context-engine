@@ -7,8 +7,13 @@ import {
 
 const HASH_ZERO = `0x${'0'.repeat(64)}`;
 const TX_HASH = `0x${'a'.repeat(64)}`;
+type NormalizeSubmitOptions = Parameters<typeof normalizeSubmitReceipt>[1];
 
-const makeSubmitOpts = (overrides: Partial<any> = {}) => ({
+const deepCloneJson = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T;
+
+const makeSubmitOpts = (
+  overrides: Partial<NormalizeSubmitOptions> = {},
+): NormalizeSubmitOptions => ({
   questionResponses: [
     {
       questionID: 'q1',
@@ -26,7 +31,7 @@ const makeSubmitOpts = (overrides: Partial<any> = {}) => ({
   },
   surveyId: 'survey-1',
   submissionGroupKey: 'group-1',
-  deepClone: (obj: any) => JSON.parse(JSON.stringify(obj)),
+  deepClone: deepCloneJson,
   ...overrides,
 });
 
@@ -379,7 +384,7 @@ describe('surveyToolSubmitTransactionController', () => {
         surveyID: 'survey-1',
         responses: questionResponses,
       };
-      const deepClone = jest.fn((obj: any) => JSON.parse(JSON.stringify(obj)));
+      const deepClone = jest.fn(deepCloneJson);
 
       const result = await normalizeSubmitReceipt(TX_HASH, makeSubmitOpts({
         questionResponses,
@@ -396,8 +401,8 @@ describe('surveyToolSubmitTransactionController', () => {
       questionResponses[0].answer.value = 'mutated';
       surveyResponse.responses[0].answer.value = 'mutated-again';
 
-      expect(result.__ceQuestionResponses[0].answer.value).toBe('original');
-      expect(result.__ceSurveyResponse.responses[0].answer.value).toBe('original');
+      expect(result.__ceQuestionResponses[0].answer!.value).toBe('original');
+      expect(result.__ceSurveyResponse!.responses![0].answer!.value).toBe('original');
     });
   });
 });

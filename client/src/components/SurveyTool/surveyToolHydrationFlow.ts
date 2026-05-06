@@ -64,6 +64,29 @@ type BuildCacheHydrationSliceArgs = {
   parseValue?: ((value: unknown) => unknown) | null;
 };
 
+const hasOwn = (value: UnknownRecord, key: string): boolean => (
+  Object.prototype.hasOwnProperty.call(value, key)
+);
+
+const hasHydratableCachedField = (field: unknown): boolean => (
+  isRecord(field) &&
+  (
+    hasOwn(field, 'value') ||
+    hasOwn(field, 'encrypted') ||
+    hasOwn(field, 'encryptedPortion') ||
+    hasOwn(field, 'hash') ||
+    hasOwn(field, 'encryptionAudience') ||
+    hasOwn(field, 'audienceMode')
+  )
+);
+
+const hasHydratableCachedResponse = (response: ParsedCachedResponse): boolean => (
+  hasHydratableCachedField(response.answer) ||
+  hasHydratableCachedField(response.additional) ||
+  response.importance !== undefined ||
+  response.conviction !== undefined
+);
+
 type BuildPrefilledSurveyStateArgs = {
   surveyIndex?: unknown;
   prevSurveysResponseState?: unknown[] | null;
@@ -775,7 +798,7 @@ export const buildCacheHydrationSlice = ({
       : rawResponse;
     if (!isRecord(parsedResponse)) return;
     const hydratedResponse = parsedResponse as ParsedCachedResponse;
-    if (!hydratedResponse.answer || !hydratedResponse.additional) return;
+    if (!hasHydratableCachedResponse(hydratedResponse)) return;
 
     if (applyCachedResponseEntryToSlice({
       targetSlice: slice,

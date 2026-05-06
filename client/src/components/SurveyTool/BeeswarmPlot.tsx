@@ -19,7 +19,7 @@ type BeeswarmPoint = {
   unsure?: number;
   total?: number;
   extremity?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type TooltipVoteBreakdown = {
@@ -35,6 +35,14 @@ type TooltipLayout = {
   horizontal: 'right' | 'left';
   vertical: 'bottom' | 'top';
 };
+
+type BeeswarmTooltipEvent = {
+  clientX?: number;
+  clientY?: number;
+  currentTarget?: {
+    getBoundingClientRect?: () => Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
+  };
+} | null;
 
 type BeeswarmPlotProps = {
   points?: BeeswarmPoint[];
@@ -246,7 +254,7 @@ export default function BeeswarmPlot({
     : [];
   const tooltipSegments = tooltipVoteGroups.filter((segment) => segment.value > 0);
 
-  const updateTooltipPosition = (event: any, point: BeeswarmPoint | null = null) => {
+  const updateTooltipPosition = (event: BeeswarmTooltipEvent, point: BeeswarmPoint | null = null) => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
     const wrapperRect = wrapper.getBoundingClientRect();
@@ -302,7 +310,7 @@ export default function BeeswarmPlot({
     ));
   }, [activePoint, height, tooltipAnchor.x, tooltipAnchor.y, width]);
 
-  const handleHover = (point: BeeswarmPoint, index: number, event: any = null) => {
+  const handleHover = (point: BeeswarmPoint, index: number, event: BeeswarmTooltipEvent = null) => {
     setSinglePointDeselected(false);
     setHoveredIndex(index);
     updateTooltipPosition(event, point);

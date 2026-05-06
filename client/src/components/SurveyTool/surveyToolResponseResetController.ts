@@ -11,15 +11,66 @@ import {
   resolveRevertPendingBaselineSlice,
   shouldHandleStartFresh,
 } from './surveyToolHydrationFlow.js';
+import type { UnknownRecord } from './surveyToolTypes';
 
-type SurveyToolLikeProps = Record<string, any>;
-type SurveyToolLikeState = Record<string, any>;
-type SetStateUpdate = Record<string, unknown> | null | ((prevState: any) => Record<string, unknown> | null);
+type SurveyToolLikeProps = UnknownRecord & {
+  account?: unknown;
+  isStandalone?: boolean;
+  loginComplete?: unknown;
+  responderAddress?: unknown;
+  singleQuestionMode?: boolean;
+  surveyIndex?: number;
+  viewAddress?: unknown;
+};
+
+type SurveyToolLikeState = UnknownRecord & {
+  editBaseline?: unknown;
+  isDirty?: unknown;
+  parsedViewAddressAnswers?: unknown;
+  submittedSinceLastEdit?: boolean;
+  surveysResponseState?: unknown;
+  userAnswers?: unknown;
+  userHasResponse?: unknown;
+};
+
+type SetStateUpdate = Record<string, unknown> | null | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
 type SetState = (update: SetStateUpdate, callback?: () => void) => unknown;
+type ResetArgs = UnknownRecord;
 
 const resolveActiveSurveyIndex = (props: SurveyToolLikeProps = {}) => (
   props.isStandalone || props.singleQuestionMode ? 0 : (props.surveyIndex || 0)
 );
+
+export const buildSurveyStartFreshStatePatch = ({
+  cloneValue = (value: unknown) => value,
+  emptySlice = null,
+  nextSubmittedSinceLastEdit = false,
+  nextSurveysResponseState = [],
+}: {
+  cloneValue?: (value: unknown) => unknown;
+  emptySlice?: unknown;
+  nextSubmittedSinceLastEdit?: unknown;
+  nextSurveysResponseState?: unknown;
+} = {}) => ({
+  suppressPrefill: true,
+  startFresh: true,
+  surveysResponseState: nextSurveysResponseState,
+  editBaseline: cloneValue(emptySlice),
+  modifiedCount: 0,
+  hasEncryptedChanges: false,
+  isDirty: false,
+  submittedSinceLastEdit: nextSubmittedSinceLastEdit,
+});
+
+export const buildSurveyExitEditingFallbackPatch = ({
+  nextSubmittedSinceLastEdit = false,
+}: {
+  nextSubmittedSinceLastEdit?: unknown;
+} = {}) => ({
+  isEditing: false,
+  displayAnswerMode: true,
+  submittedSinceLastEdit: nextSubmittedSinceLastEdit,
+});
 
 export const executeSurveyFormStateReset = ({
   props = {},
@@ -30,7 +81,7 @@ export const executeSurveyFormStateReset = ({
   cloneValue = (value: unknown) => value,
   setState = () => {},
   callback = null,
-  updateSubmittedSinceLastEdit = (_current: boolean, _action: string) => false,
+  updateSubmittedSinceLastEdit = (_current: boolean | undefined, _action: string) => false,
   buildResetPatch = buildResetFormStatePatch,
   applyResetEffects = applyResetFormStateEffects,
   onPersistError = () => {},
@@ -44,9 +95,9 @@ export const executeSurveyFormStateReset = ({
   cloneValue?: (value: unknown) => unknown;
   setState?: SetState;
   callback?: (() => void) | null;
-  updateSubmittedSinceLastEdit?: (current: boolean, action: string) => boolean;
-  buildResetPatch?: (args?: any) => Record<string, unknown>;
-  applyResetEffects?: (args?: any) => void;
+  updateSubmittedSinceLastEdit?: (current: boolean | undefined, action: string) => boolean;
+  buildResetPatch?: (args?: ResetArgs) => Record<string, unknown>;
+  applyResetEffects?: (args?: ResetArgs) => void;
   onPersistError?: (error: unknown) => void;
   onCleanupError?: (error: unknown) => void;
 } = {}) => {
@@ -109,10 +160,10 @@ export const executeSurveyPendingRevert = ({
   clearDraft?: () => void;
   recalculateEditStats?: () => void;
   updateJsonPreview?: () => void;
-  resolveBaselineSlice?: (args?: any) => unknown;
-  buildRevertedSlice?: (args?: any) => unknown;
-  buildStatePatch?: (args?: any) => Record<string, unknown>;
-  applyRevertEffects?: (args?: any) => void;
+  resolveBaselineSlice?: (args?: ResetArgs) => unknown;
+  buildRevertedSlice?: (args?: ResetArgs) => unknown;
+  buildStatePatch?: (args?: ResetArgs) => Record<string, unknown>;
+  applyRevertEffects?: (args?: ResetArgs) => void;
   onFailure?: (error: unknown) => void;
 } = {}) => {
   try {
@@ -175,7 +226,7 @@ export const executeSurveyStartFresh = ({
   clearDraftFor = () => {},
   recalculateEditStats = () => {},
   persistDraftSafely = () => {},
-  updateSubmittedSinceLastEdit = (_current: boolean, _action: string) => false,
+  updateSubmittedSinceLastEdit = (_current: boolean | undefined, _action: string) => false,
   buildStartFreshState = buildStartFreshSurveyState,
   applyStartFreshStateEffects = applyStartFreshEffects,
 }: {
@@ -188,9 +239,9 @@ export const executeSurveyStartFresh = ({
   clearDraftFor?: (questionId: string) => void;
   recalculateEditStats?: () => void;
   persistDraftSafely?: (delayMs?: number) => void;
-  updateSubmittedSinceLastEdit?: (current: boolean, action: string) => boolean;
-  buildStartFreshState?: (args?: any) => { emptySlice?: unknown; nextSurveysResponseState?: unknown[] };
-  applyStartFreshStateEffects?: (args?: any) => void;
+  updateSubmittedSinceLastEdit?: (current: boolean | undefined, action: string) => boolean;
+  buildStartFreshState?: (args?: ResetArgs) => { emptySlice?: unknown; nextSurveysResponseState?: unknown[] };
+  applyStartFreshStateEffects?: (args?: ResetArgs) => void;
 } = {}) => {
   const nextProps = props || {};
   const nextState = state || {};
@@ -206,16 +257,12 @@ export const executeSurveyStartFresh = ({
     buildEmptyResponseFieldState,
   });
 
-  setState({
-    suppressPrefill: true,
-    startFresh: true,
-    surveysResponseState: nextSurveysResponseState,
-    editBaseline: cloneValue(emptySlice),
-    modifiedCount: 0,
-    hasEncryptedChanges: false,
-    isDirty: false,
-    submittedSinceLastEdit: updateSubmittedSinceLastEdit(nextState.submittedSinceLastEdit, 'reset'),
-  }, () => {
+  setState(buildSurveyStartFreshStatePatch({
+    cloneValue,
+    emptySlice,
+    nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit(nextState.submittedSinceLastEdit, 'reset'),
+    nextSurveysResponseState,
+  }), () => {
     applyStartFreshStateEffects({
       renderedQuestionIds,
       clearDraftFor,
@@ -240,7 +287,7 @@ export const shouldSurveyAutoStartFresh = ({
   props?: SurveyToolLikeProps | null;
   state?: SurveyToolLikeState | null;
   getRenderedQuestionIds?: () => unknown[];
-  shouldStartFresh?: (args?: any) => boolean;
+  shouldStartFresh?: (args?: ResetArgs) => boolean;
 } = {}) => {
   const nextProps = props || {};
   const nextState = state || {};
@@ -281,7 +328,7 @@ export const executeSurveyExitEditing = ({
   persistDraftSafely = () => {},
   updateJsonPreview = () => {},
   clearDraft = () => {},
-  updateSubmittedSinceLastEdit = (_current: boolean, _action: string) => false,
+  updateSubmittedSinceLastEdit = (_current: boolean | undefined, _action: string) => false,
   resolveBaselineSlice = resolveExitEditingBaselineSlice,
   buildStatePatch = buildExitEditingStatePatch,
   onFailure = () => {},
@@ -298,9 +345,9 @@ export const executeSurveyExitEditing = ({
   persistDraftSafely?: (delayMs?: number) => void;
   updateJsonPreview?: () => void;
   clearDraft?: () => void;
-  updateSubmittedSinceLastEdit?: (current: boolean, action: string) => boolean;
-  resolveBaselineSlice?: (args?: any) => unknown;
-  buildStatePatch?: (args?: any) => Record<string, unknown>;
+  updateSubmittedSinceLastEdit?: (current: boolean | undefined, action: string) => boolean;
+  resolveBaselineSlice?: (args?: ResetArgs) => unknown;
+  buildStatePatch?: (args?: ResetArgs) => Record<string, unknown>;
   onFailure?: (error: unknown) => void;
 } = {}) => {
   try {
@@ -339,11 +386,9 @@ export const executeSurveyExitEditing = ({
     };
   } catch (error) {
     onFailure(error);
-    setState({
-      isEditing: false,
-      displayAnswerMode: true,
-      submittedSinceLastEdit: updateSubmittedSinceLastEdit((state || {}).submittedSinceLastEdit, 'reset'),
-    }, () => {
+    setState(buildSurveyExitEditingFallbackPatch({
+      nextSubmittedSinceLastEdit: updateSubmittedSinceLastEdit((state || {}).submittedSinceLastEdit, 'reset'),
+    }), () => {
       recalculateEditStats();
     });
     return {

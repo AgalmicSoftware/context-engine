@@ -1,4 +1,6 @@
 import {
+  buildSurveyExitEditingFallbackPatch,
+  buildSurveyStartFreshStatePatch,
   executeSurveyExitEditing,
   executeSurveyFormStateReset,
   executeSurveyPendingRevert,
@@ -7,6 +9,36 @@ import {
 } from './surveyToolResponseResetController';
 
 describe('surveyToolResponseResetController', () => {
+  it('builds start-fresh and exit-editing fallback patches', () => {
+    const emptySlice = { answers: { q1: { value: '' } } };
+    const clonedSlice = { answers: { q1: { value: '' } } };
+    const responseState = [emptySlice];
+
+    expect(buildSurveyStartFreshStatePatch({
+      cloneValue: () => clonedSlice,
+      emptySlice,
+      nextSubmittedSinceLastEdit: false,
+      nextSurveysResponseState: responseState,
+    })).toEqual({
+      suppressPrefill: true,
+      startFresh: true,
+      surveysResponseState: responseState,
+      editBaseline: clonedSlice,
+      modifiedCount: 0,
+      hasEncryptedChanges: false,
+      isDirty: false,
+      submittedSinceLastEdit: false,
+    });
+
+    expect(buildSurveyExitEditingFallbackPatch({
+      nextSubmittedSinceLastEdit: true,
+    })).toEqual({
+      isEditing: false,
+      displayAnswerMode: true,
+      submittedSinceLastEdit: true,
+    });
+  });
+
   it('resets live form state through the shared reset plan and effects', () => {
     const persistDraft = jest.fn();
     const clearPersistTimer = jest.fn();

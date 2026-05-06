@@ -34,7 +34,7 @@ const makeDeps = (overrides: Partial<FieldEncryptionDeps> = {}): FieldEncryption
   }),
   resolveFieldEncryptionAudience: () => 'self',
   resolveFieldEncryptionGateId: () => 'gate-abc',
-  normalizeFieldAudienceMode: (value) => value,
+  normalizeFieldAudienceMode: (value) => String(value || ''),
   buildInheritedAdditionalFieldState: (additionalField, answerField) => ({
     ...additionalField,
     encrypted: answerField.encrypted,
@@ -42,7 +42,7 @@ const makeDeps = (overrides: Partial<FieldEncryptionDeps> = {}): FieldEncryption
     encryptionGateId: answerField.encryptionGateId,
     audienceMode: 'inherited',
   }),
-  normalizeResponseEncryptionAudience: (audience) => audience,
+  normalizeResponseEncryptionAudience: (audience) => String(audience || ''),
   ...overrides,
 });
 
@@ -138,7 +138,7 @@ describe('surveyToolFieldEncryptionController', () => {
           },
         }),
         makeDeps({
-          normalizeFieldAudienceMode: (value) => value,
+          normalizeFieldAudienceMode: (value) => String(value || ''),
         }),
       );
 

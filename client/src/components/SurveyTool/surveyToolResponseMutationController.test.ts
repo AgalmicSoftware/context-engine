@@ -2,9 +2,11 @@ import {
   buildAdditionalUpdatePlan,
   buildAnswerUpdatePlan,
   resolveFieldEncryptionDefaults,
+  type MutationDeps,
+  type ResponseFieldState,
 } from './surveyToolResponseMutationController';
 
-const defaultDeps = (overrides: Partial<any> = {}) => ({
+const defaultDeps = (overrides: Partial<MutationDeps> = {}): MutationDeps => ({
   buildEmptyResponseFieldState: (qid: string, fieldKey = 'answer') => ({
     value: '',
     encrypted: false,
@@ -18,13 +20,13 @@ const defaultDeps = (overrides: Partial<any> = {}) => ({
   resolveFieldEncryptionGateId: () => null,
   isQuestionLockedForResponse: () => false,
   getEffectiveRecipientsForQid: () => [],
-  normalizeFieldAudienceMode: (_val: any, _fk: string, _f: any) => 'inherit',
-  buildInheritedAdditionalFieldState: (add: any, ans: any) => ({
+  normalizeFieldAudienceMode: (_val: unknown, _fk: string, _f: ResponseFieldState) => 'inherit',
+  buildInheritedAdditionalFieldState: (add: ResponseFieldState, ans: ResponseFieldState) => ({
     ...add,
     encrypted: !!ans?.encrypted,
     audienceMode: 'inherit',
   }),
-  valuesEqual: (a: any, b: any) => a === b,
+  valuesEqual: (a: unknown, b: unknown) => a === b,
   getQuestionById: () => ({ type: 'freeform' }),
   computeHash: (val: string) => `hash-${val}`,
   ...overrides,

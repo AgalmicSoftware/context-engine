@@ -47,6 +47,7 @@ type DiscoveryRange = [number, number];
 interface QuestionInitOptions extends CacheRecord {
   background?: boolean;
   skipDiscoveryScan?: boolean;
+  forceDiscoveryRescan?: boolean;
 }
 
 interface RefreshEncryptedQuestionPayloadsOptions extends CacheRecord {
@@ -71,9 +72,15 @@ interface MetadataSessionCacheEnvelope extends CacheRecord {
 }
 
 interface QuestionMetadata extends CacheRecord {
+  __ceQuestionMetadataPending?: unknown;
   id?: string;
   creator?: string;
+  encryption?: unknown;
+  prompt?: unknown;
   sessionSlugExplicit?: unknown;
+  sessionName?: unknown;
+  tags?: unknown;
+  type?: unknown;
 }
 
 interface PendingQuestionMetadataEntry extends CacheRecord {
@@ -171,6 +178,30 @@ type ResolvedSessionWindowLike = {
   toBlock?: unknown;
 };
 
+interface QuestionCacheContractScripts {
+  getRelevantBlockWindowForFilter: (slug: string) => Promise<ResolvedSessionWindowLike>;
+  getQuestionData: (
+    providerName: string,
+    questionId: string,
+    slug: string,
+    opts?: CacheRecord
+  ) => Promise<QuestionMetadata | null>;
+  getAllQuestionIDsChunkedWithCallback: (
+    providerName: string,
+    fromBlock: number,
+    toBlock: number,
+    handleProgress: (progressInfo: ChunkProgressInfo) => void,
+    handlePartialData: (partialQIDs: unknown, chunkToBlock: unknown) => void,
+    slug: string,
+    opts?: CacheRecord
+  ) => Promise<string[]>;
+  decryptQuestionPayloadInPlace: (
+    questionData: QuestionMetadata,
+    slug: string,
+    opts?: { decryptContext?: QuestionDecryptContext }
+  ) => Promise<void>;
+}
+
 export interface SessionQuestionCacheHost {
   [key: string]: unknown;
   setState?: (updater: SetStateArg, cb?: () => void) => void;
@@ -218,18 +249,58 @@ export interface SessionQuestionCacheController {
   ) => Promise<void>;
   hasMaskedQuestionPayloadInCache: (slug: string) => boolean;
   buildQuestionDecryptContext: (slug: string) => QuestionDecryptContext;
-  refreshQuestionMetadataForGroup: (slug: string) => Promise<void>;
+  refreshQuestionMetadataForGroup: (slug: string, opts?: QuestionInitOptions) => Promise<void>;
   pruneMaskedQuestionDecryptBackoff: (nowIn?: number) => void;
   isInitInFlight: (slugIn?: string) => boolean;
   destroy: () => void;
 }
 
 const mainSiteLog = createLogger('mainSite');
-const contractScriptsAny = contractScripts as any;
+const questionCacheContractScripts = contractScripts as unknown as QuestionCacheContractScripts;
 
 const isRecord = (value: unknown): value is CacheRecord => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
+
+const isPendingQuestionMetadataPlaceholder = (value: unknown): boolean => (
+  isRecord(value) && value.__ceQuestionMetadataPending === true
+);
+
+const hasHydratedQuestionMetadata = (value: unknown): boolean => (
+  isRecord(value) && !isPendingQuestionMetadataPlaceholder(value)
+);
+
+const buildPendingQuestionMetadataPlaceholder = (
+  qid: unknown,
+  slug: unknown,
+  existing: unknown = null
+): QuestionMetadata | null => {
+  const id = String(qid || '').trim().toLowerCase();
+  if (!id) return null;
+
+  const existingQuestion = isRecord(existing) ? existing : {};
+  const sessionName = String(existingQuestion.sessionName || slug || '').trim();
+  const encryption = isRecord(existingQuestion.encryption)
+    ? existingQuestion.encryption
+    : {
+      enabled: true,
+      status: 'metadata-pending',
+      targets: {
+        questions: true,
+      },
+    };
+
+  return {
+    ...existingQuestion,
+    id,
+    type: String(existingQuestion.type || '').trim() || 'freeform',
+    prompt: '[encrypted]',
+    tags: Array.isArray(existingQuestion.tags) ? existingQuestion.tags : [],
+    ...(sessionName ? { sessionName } : {}),
+    encryption,
+    __ceQuestionMetadataPending: true,
+  };
+};
 
 const createEmptyQuestionNetworkCacheNode = (initialLastBlockQuestion: number): QuestionCacheNetworkNode => ({
   questionsLatestBlock: initialLastBlockQuestion,
@@ -264,18 +335,23 @@ const mergePendingQuestionInitOpts = (
 ): QuestionInitOptions => {
   const nextBackground = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.background === true);
   const nextSkipDiscoveryScan = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.skipDiscoveryScan === true);
+  const nextForceDiscoveryRescan = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.forceDiscoveryRescan === true);
   if (!prevOpts || typeof prevOpts !== 'object') {
     return {
       background: nextBackground,
       skipDiscoveryScan: nextSkipDiscoveryScan,
+      forceDiscoveryRescan: nextForceDiscoveryRescan,
     };
   }
   const prevBackground = !!(prevOpts.background === true);
   const prevSkipDiscoveryScan = !!(prevOpts.skipDiscoveryScan === true);
+  const prevForceDiscoveryRescan = !!(prevOpts.forceDiscoveryRescan === true);
   return {
     background: prevBackground && nextBackground,
     // If any queued caller needs a real discovery pass, do not keep skip mode.
     skipDiscoveryScan: prevSkipDiscoveryScan && nextSkipDiscoveryScan,
+    // If any queued caller detected a gated empty cache, recover the discovery window.
+    forceDiscoveryRescan: prevForceDiscoveryRescan || nextForceDiscoveryRescan,
   };
 };
 
@@ -444,6 +520,7 @@ export const createSessionQuestionCacheController = (
     const slug = normalizeSessionSlug(slugIn || '');
     const suppressUiState = !!(opts && opts.background === true);
     const skipDiscoveryScan = !!(opts && opts.skipDiscoveryScan === true);
+    const forceDiscoveryRescan = !skipDiscoveryScan && !!(opts && opts.forceDiscoveryRescan === true);
     const QUESTION_METADATA_BULK_ARWEAVE_RETRIES = 0;
     const QUESTION_METADATA_BULK_ARWEAVE_TIMEOUT_MS = 4500;
     const initRunKey = slug;
@@ -451,6 +528,7 @@ export const createSessionQuestionCacheController = (
       ...(opts && typeof opts === 'object' ? opts : {}),
       background: suppressUiState,
       skipDiscoveryScan,
+      forceDiscoveryRescan,
     };
     const setQuestionState = (nextState: SetStateArg, cb?: () => void): void => {
       if (suppressUiState || !isMounted()) return;
@@ -516,7 +594,7 @@ export const createSessionQuestionCacheController = (
       }
       let resolvedWindow: unknown = null;
       try {
-        resolvedWindow = await contractScriptsAny.getRelevantBlockWindowForFilter(slug);
+        resolvedWindow = await questionCacheContractScripts.getRelevantBlockWindowForFilter(slug);
       } catch (windowErr: unknown) {
         const windowError = isRecord(windowErr) ? windowErr : {};
         abortQuestionScan({
@@ -581,6 +659,13 @@ export const createSessionQuestionCacheController = (
       ensureQuestionArweaveCacheBranches(questionsCache[networkID]);
       if (!Number.isFinite(Number(questionsCache[networkID].questionsDiscoveryCheckpointBlock))) {
         questionsCache[networkID].questionsDiscoveryCheckpointBlock = Number(questionsCache[networkID].questionsLatestBlock) || initialLastBlockQuestion;
+      }
+      if (
+        forceDiscoveryRescan &&
+        Object.keys(questionsCache?.[networkID]?.questions || {}).length === 0
+      ) {
+        questionsCache[networkID].questionsLatestBlock = initialLastBlockQuestion;
+        questionsCache[networkID].questionsDiscoveryCheckpointBlock = initialLastBlockQuestion;
       }
       const rebucketedQuestionIds = new Set<string>();
 
@@ -736,9 +821,11 @@ export const createSessionQuestionCacheController = (
           if (!localNet.questions) localNet.questions = {};
           Object.keys(freshQs).forEach((qid) => {
             const qidLower = String(qid || '').toLowerCase();
+            if (!qidLower) return;
             if (qidLower && rebucketedQuestionIds.has(qidLower)) return;
-            if (!localNet.questions[qid]) {
-              localNet.questions[qid] = freshQs[qid];
+            const existingQuestion = localNet.questions[qidLower] || localNet.questions[qid];
+            if (!existingQuestion || isPendingQuestionMetadataPlaceholder(existingQuestion)) {
+              localNet.questions[qidLower] = freshQs[qid];
             }
           });
 
@@ -770,8 +857,8 @@ export const createSessionQuestionCacheController = (
             const qid = String(qidRaw || '').toLowerCase();
             if (!qid) return;
 
-            // If the question already exists in cache, any pending entry is stale; do not merge it.
-            if (localNet.questions && localNet.questions[qid]) {
+            // Hydrated question metadata makes pending retry rows stale; placeholders still need retries.
+            if (localNet.questions && hasHydratedQuestionMetadata(localNet.questions[qid])) {
               if (localPending[qid]) delete localPending[qid];
               return;
             }
@@ -783,9 +870,23 @@ export const createSessionQuestionCacheController = (
               localPending[qid] = { ...b };
               return;
             }
+            const aAttempts = Number(a.attempts || 0);
+            const bAttempts = Number(b.attempts || 0);
+            const aNextRetryAtMs = Number(a.nextRetryAtMs || 0);
+            const bNextRetryAtMs = Number(b.nextRetryAtMs || 0);
+            const preferred = (
+              aAttempts > bAttempts ||
+              (aAttempts === bAttempts && aNextRetryAtMs >= bNextRetryAtMs)
+            ) ? a : b;
+            const fallback = preferred === a ? b : a;
             localPending[qid] = {
-              attempts: Math.max(Number(a.attempts || 0), Number(b.attempts || 0)),
-              nextRetryAtMs: Math.max(Number(a.nextRetryAtMs || 0), Number(b.nextRetryAtMs || 0)),
+              ...fallback,
+              ...preferred,
+              attempts: Math.max(aAttempts, bAttempts),
+              nextRetryAtMs: Math.max(aNextRetryAtMs, bNextRetryAtMs),
+              state: preferred.state || fallback.state || 'transient',
+              lastStatus: preferred.lastStatus ?? fallback.lastStatus ?? null,
+              message: preferred.message || fallback.message || '',
             };
           });
 
@@ -793,7 +894,7 @@ export const createSessionQuestionCacheController = (
           try {
             const stale = Object.keys(localPending || {}).filter((qidRaw) => {
               const qid = String(qidRaw || '').toLowerCase();
-              return qid && localNet.questions && localNet.questions[qid];
+              return qid && localNet.questions && hasHydratedQuestionMetadata(localNet.questions[qid]);
             });
             stale.forEach((qidRaw) => {
               try { delete localPending[qidRaw]; } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
@@ -936,6 +1037,29 @@ export const createSessionQuestionCacheController = (
           }
         } catch (e: unknown) { mainSiteLog.warn('MainSite: fallback', e); }
       };
+      const seedPendingDiscoveredQuestionMetadata = (questionIds: string[]): number => {
+        if (!Array.isArray(questionIds) || questionIds.length === 0) return 0;
+        if (typeof questionsCache[networkID].pendingQuestionMetadata !== 'object' || !questionsCache[networkID].pendingQuestionMetadata) {
+          questionsCache[networkID].pendingQuestionMetadata = {};
+        }
+        const pending = questionsCache[networkID].pendingQuestionMetadata;
+        let seeded = 0;
+        questionIds.forEach((qidRaw) => {
+          const qid = String(qidRaw || '').trim().toLowerCase();
+          if (!qid) return;
+          if (hasHydratedQuestionMetadata(questionsCache?.[networkID]?.questions?.[qid])) return;
+          if (pending[qid]) return;
+          pending[qid] = {
+            attempts: 0,
+            nextRetryAtMs: 0,
+            state: 'discovered',
+            lastStatus: null,
+            message: 'Question metadata discovered; awaiting Arweave hydration.',
+          };
+          seeded += 1;
+        });
+        return seeded;
+      };
       const pruneLoadedPendingQuestionMetadata = (): number => {
         try {
           const pending = questionsCache?.[networkID]?.pendingQuestionMetadata;
@@ -947,7 +1071,7 @@ export const createSessionQuestionCacheController = (
           let removed = 0;
           Object.keys(pending).forEach((qidRaw) => {
             const qid = String(qidRaw || '').toLowerCase();
-            if (!qid || !cachedQuestions[qid]) return;
+            if (!qid || !hasHydratedQuestionMetadata(cachedQuestions[qid])) return;
             try {
               delete pending[qidRaw];
               removed += 1;
@@ -975,7 +1099,9 @@ export const createSessionQuestionCacheController = (
             .filter((row) => (
               row &&
               row.qid &&
-              !questionsCache?.[networkID]?.questions?.[String(row.qid || '').toLowerCase()] &&
+              !hasHydratedQuestionMetadata(
+                questionsCache?.[networkID]?.questions?.[String(row.qid || '').toLowerCase()]
+              ) &&
               Number(row.entry?.nextRetryAtMs || 0) <= now
             ))
             .sort((a, b) => (Number(a.entry?.nextRetryAtMs || 0) - Number(b.entry?.nextRetryAtMs || 0)))
@@ -990,7 +1116,7 @@ export const createSessionQuestionCacheController = (
             const results: PendingQuestionRetryResult[] = await Promise.all(batch.map(async ({ qid }) => {
               const lowered = String(qid || '').toLowerCase();
               if (!lowered) return { qid: lowered, questionData: null };
-              if (questionsCache?.[networkID]?.questions?.[lowered]) {
+              if (hasHydratedQuestionMetadata(questionsCache?.[networkID]?.questions?.[lowered])) {
                 return {
                   qid: lowered,
                   questionData: questionsCache[networkID].questions[lowered],
@@ -998,14 +1124,14 @@ export const createSessionQuestionCacheController = (
                 };
               }
               try {
-                const questionData = await contractScriptsAny.getQuestionData('none', lowered, slug, {
+                const questionData = await questionCacheContractScripts.getQuestionData('none', lowered, slug, {
                   decryptContext: buildQuestionDecryptContext(slug),
                   skipDecrypt: true,
                   throwOnFailure: true,
                   arweaveRetries: QUESTION_METADATA_BULK_ARWEAVE_RETRIES,
                   arweaveGatewayTimeoutMs: QUESTION_METADATA_BULK_ARWEAVE_TIMEOUT_MS,
                 });
-                return { qid: lowered, questionData: questionData as QuestionMetadata };
+                return { qid: lowered, questionData };
               } catch (err: unknown) {
                 return { qid: lowered, questionData: null, err };
               }
@@ -1382,7 +1508,7 @@ export const createSessionQuestionCacheController = (
       );
       let allDiscoveredQIDs: string[] | null = null;
       try {
-        allDiscoveredQIDs = await contractScriptsAny.getAllQuestionIDsChunkedWithCallback(
+        allDiscoveredQIDs = await questionCacheContractScripts.getAllQuestionIDsChunkedWithCallback(
           'none', // ensure read-only provider path
           fromBlockForDiscovery,
           latestBlock,
@@ -1437,10 +1563,6 @@ export const createSessionQuestionCacheController = (
         return;
       }
 
-      // Advance discovery watermark immediately once logs scan succeeds (even if Arweave metadata fetch fails).
-      // This prevents repeated eth_getLogs rescans due to transient off-chain errors.
-      finalizeDiscoveryWatermark(latestBlock);
-
       // We might get duplicates if question IDs were repeated in multiple events
       // so we’ll unify them here. Also ensure all are lowercased:
       let newQIDsSet = new Set<string>();
@@ -1448,6 +1570,13 @@ export const createSessionQuestionCacheController = (
         if (q) newQIDsSet.add(q.toLowerCase());
       });
       const newQIDsForDiscovery = Array.from(newQIDsSet);
+      seedPendingDiscoveredQuestionMetadata(newQIDsForDiscovery);
+
+      // Advance discovery watermark immediately once logs scan succeeds (even if Arweave metadata fetch fails).
+      // Persisting pending metadata rows first prevents refreshes from treating discovered-but-unhydrated
+      // questions as an empty ready cache while Arweave is still propagating.
+      finalizeDiscoveryWatermark(latestBlock);
+
       const cachedQuestionRefreshIds = (
         slug
           ? Object.values(questionsCache?.[networkID]?.questions || {})
@@ -1592,7 +1721,7 @@ export const createSessionQuestionCacheController = (
         const results: QuestionHydrationResult[] = await Promise.all(
           batch.map(async (qId: string) => {
             try {
-              const questionData = await contractScriptsAny.getQuestionData('none', qId, slug, {
+              const questionData = await questionCacheContractScripts.getQuestionData('none', qId, slug, {
                 decryptContext: buildQuestionDecryptContext(slug),
                 // Decrypting every encrypted prompt/options/tags during bulk cache hydration is very expensive.
                 // We decrypt lazily in small batches via refreshEncryptedQuestionPayloadsForGroup().
@@ -1601,7 +1730,7 @@ export const createSessionQuestionCacheController = (
                 arweaveRetries: QUESTION_METADATA_BULK_ARWEAVE_RETRIES,
                 arweaveGatewayTimeoutMs: QUESTION_METADATA_BULK_ARWEAVE_TIMEOUT_MS,
               });
-              return { qId, questionData: questionData as QuestionMetadata };
+              return { qId, questionData };
             } catch (err: unknown) {
               mainSiteLog.warn(`Error fetching question data for ID ${qId}:`, err);
               return { qId, questionData: null, err };
@@ -1648,6 +1777,18 @@ export const createSessionQuestionCacheController = (
           } else {
             failedFetchCount++;
             markPendingQuestion(lowered, { error: item.err });
+            const pendingMetadataEntry = questionsCache[networkID].pendingQuestionMetadata?.[lowered];
+            const existingQuestion = questionsCache[networkID].questions[lowered] || null;
+            if (pendingMetadataEntry && !hasHydratedQuestionMetadata(existingQuestion)) {
+              const placeholder = buildPendingQuestionMetadataPlaceholder(
+                lowered,
+                slug,
+                existingQuestion
+              );
+              if (placeholder) {
+                questionsCache[networkID].questions[lowered] = placeholder;
+              }
+            }
           }
         }
 
@@ -1864,7 +2005,7 @@ export const createSessionQuestionCacheController = (
             const key = backoffKey(id);
             const next: QuestionMetadata = { ...(prev || {}), id };
             try {
-              await contractScriptsAny.decryptQuestionPayloadInPlace(next, slug, { decryptContext });
+              await questionCacheContractScripts.decryptQuestionPayloadInPlace(next, slug, { decryptContext });
             } catch (err: unknown) {
               mainSiteLog.warn(`Failed to decrypt cached question payload for ${id}:`, err);
               const attemptTs = Date.now();
@@ -1932,13 +2073,16 @@ export const createSessionQuestionCacheController = (
     }
   }
 
-  async function refreshQuestionMetadataForGroup(slug: string): Promise<void> {
+  async function refreshQuestionMetadataForGroup(
+    slug: string,
+    opts: QuestionInitOptions = {}
+  ): Promise<void> {
     mainSiteLog.log("refreshQuestionMetadataForGroup() - invoked", { slug });
     if (!getSessionChainId(slug)) { mainSiteLog.warn("No group chainId for refreshQuestionMetadataForGroup"); return; }
     // Re-running initializeQuestionCacheForGroup will handle fetching new QIDs and their metadata
     // from the last known block.
     setReadinessStateIfChanged({ isQuestionCacheReady: false }); // Temporarily mark as not ready
-    await initializeQuestionCacheForGroup(slug);
+    await initializeQuestionCacheForGroup(slug, opts);
     checkAllCachesReady(); // Re-check global readiness
     mainSiteLog.log("refreshQuestionMetadataForGroup() - done");
   }

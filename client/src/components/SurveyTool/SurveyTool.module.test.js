@@ -27,6 +27,7 @@ import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import ConnectedSurveyResults from './SurveyResults';
 import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -96,6 +97,45 @@ describe('SurveyTool module', () => {
     const tree = shell.render();
 
     expect(tree.type).toBe(PileViewMode);
+  });
+
+  it('forwards scoped Lit hooks from SurveyTool into normal survey surfaces', () => {
+    const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
+    const lit = { getKey: jest.fn() };
+    const shell = new SurveyTool({
+      network: { id: 11155420 },
+      networkChainId: 11155420,
+      lit,
+      litHooks,
+    });
+
+    const tree = shell.render();
+    const selectorNode = findFirstNodeByType(tree, SurveySelector);
+    const resultsNode = findFirstNodeByType(tree, ConnectedSurveyResults);
+
+    expect(selectorNode?.props?.lit).toBe(lit);
+    expect(selectorNode?.props?.litHooks).toBe(litHooks);
+    expect(resultsNode?.props?.lit).toBe(lit);
+    expect(resultsNode?.props?.litHooks).toBe(litHooks);
+  });
+
+  it('forwards scoped Lit hooks from SurveyTool into single-question surfaces', () => {
+    const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
+    const lit = { getKey: jest.fn() };
+    const shell = new SurveyTool({
+      singleQuestionMode: true,
+      questionID: '0xquestion',
+      network: { id: 11155420 },
+      networkChainId: 11155420,
+      lit,
+      litHooks,
+    });
+
+    const tree = shell.render();
+    const questionsNode = findFirstNodeByType(tree, SurveyQuestions);
+
+    expect(questionsNode?.props?.lit).toBe(lit);
+    expect(questionsNode?.props?.litHooks).toBe(litHooks);
   });
 
   it('keeps extracted PileViewMode wired to the SurveyQuestions base class', () => {
@@ -990,6 +1030,141 @@ describe('SurveyTool module', () => {
     const tree = subject.render();
     expect(treeHasText(tree, 'No accessible questions. This session has gated content.')).toBe(false);
     expect(treeHasText(tree, 'Loading Metadata')).toBe(true);
+  });
+
+  it('shows gated empty state for default-gated pile questions while metadata is still unresolved', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        pendingQuestionMetadata: {},
+      },
+    });
+
+    const sessionConfig = {
+      slug: 'edge',
+      networkChainId: 84532,
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+            chainId: 84532,
+            mode: 'any',
+          },
+        },
+      },
+    };
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      loginComplete: false,
+      sessionSlug: 'edge',
+      sessionConfig,
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      questionResponsesNonce: 2,
+      questionsCacheNonce: 2,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'hydrate',
+        discoveredQuestions: 1,
+        hydratedQuestions: 0,
+        pendingMetadataCount: 0,
+        remainingBlocks: 0,
+      },
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      hasHiddenGatedQuestions: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      canDecryptOtherResponsesStatus: 'needs-wallet',
+    };
+
+    const tree = subject.render();
+    expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}.`)).toBe(true);
+    expect(treeHasText(tree, `These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`)).toBe(true);
+    expect(treeHasText(tree, 'No questions available.')).toBe(false);
+    expect(treeHasText(tree, 'Loading Metadata')).toBe(false);
+  });
+
+  it('keeps a default-gated empty pile fail-closed after the cache reports ready', () => {
+    const refreshQuestionMetadata = jest.fn(() => Promise.resolve());
+    const sessionConfig = {
+      slug: 'edge',
+      networkChainId: 84532,
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+            chainId: 84532,
+            mode: 'any',
+          },
+        },
+      },
+    };
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '0x2222222222222222222222222222222222222222',
+      loginComplete: true,
+      sessionSlug: 'edge',
+      sessionConfig,
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 2,
+      questionsCacheNonce: 2,
+      questionScanProgress: null,
+      refreshQuestionMetadata,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      hasHiddenGatedQuestions: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      canDecryptOtherResponsesStatus: 'granted',
+    };
+
+    expect(subject.maybeRecoverUnhydratedGatedPile()).toBe(true);
+    expect(refreshQuestionMetadata).toHaveBeenCalledWith({ forceDiscoveryRescan: true });
+    expect(subject.maybeRecoverUnhydratedGatedPile()).toBe(false);
+
+    const tree = subject.render();
+    expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}.`)).toBe(true);
+    expect(treeHasText(tree, 'No questions available.')).toBe(false);
   });
 
   it('prefers gated empty state once masked questions are cached even if cache-ready stays false', async () => {
@@ -6194,6 +6369,25 @@ describe('SurveyTool module', () => {
     expect(subject.clearAutoDecryptSweepScheduling).toHaveBeenCalledTimes(1);
   });
 
+  it('allows Porto auto-decrypt only after session-key auto-sign is ready', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: 'porto_passkey',
+    });
+
+    jest.spyOn(portoFunctions, 'isPortoAutoSignReady').mockReturnValue(false);
+    expect(subject.isAutoDecryptBlocked()).toBe(true);
+    expect(subject.shouldAttemptAutomaticPromptDecrypt()).toBe(false);
+
+    portoFunctions.isPortoAutoSignReady.mockReturnValue(true);
+    expect(subject.isAutoDecryptBlocked()).toBe(false);
+    expect(subject.shouldAttemptAutomaticPromptDecrypt()).toBe(true);
+  });
+
   it('clears blocked auto-decrypt sweep internals through the shared helper', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
@@ -6823,6 +7017,61 @@ describe('SurveyTool module', () => {
     expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
   });
 
+  it('rehydrates standalone prior responses when the response cache nonce ticks', async () => {
+    const questionPool = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      questionPool,
+      account: '0xabc',
+      loginComplete: true,
+      provider: 'porto_passkey',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      questionsCacheNonce: 3,
+      questionResponsesNonce: 8,
+    });
+
+    subject.state = {
+      ...subject.state,
+      questionPool,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      userAnswers: null,
+      isLoadingResponse: false,
+      modifiedCount: 0,
+      encryptedModifiedCount: 0,
+      isDirty: false,
+      autoDecryptEnabled: false,
+      showComments: {},
+      prefillQueuedAfterCache: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+    };
+
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn();
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.resetFormStateForAccountChange = jest.fn();
+    subject.maybeRefreshCanDecryptOtherResponses = jest.fn();
+    subject.emitPendingStats = jest.fn();
+    subject.hydrateGateSbtLabels = jest.fn();
+    subject.isAutoDecryptBlocked = () => false;
+
+    const prevProps = {
+      ...subject.props,
+      questionResponsesNonce: 7,
+    };
+    const prevState = { ...subject.state };
+
+    await subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledTimes(1);
+    expect(subject.resetFormStateForAccountChange).not.toHaveBeenCalled();
+  });
+
   it('keeps single-question metadata fetch scoped to pinned session slug', async () => {
     const getQuestionDataSpy = jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue(null);
     jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue(['edge', 'other']);
@@ -6869,6 +7118,113 @@ describe('SurveyTool module', () => {
     expect(
       getQuestionDataSpy.mock.calls.every((call) => String(call[2] || '').toLowerCase() === 'edge')
     ).toBe(true);
+  });
+
+  it('skips automatic single-question prompt decrypt for passive Porto sessions', async () => {
+    const getQuestionDataSpy = jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue({
+      id: 'q1',
+      type: 'binary',
+      prompt: '[encrypted]',
+      promptEncrypted: '{"recipients":[]}',
+      tags: [],
+      encryption: { enabled: true },
+    });
+    jest.spyOn(contractScripts, 'getResponse').mockResolvedValue(null);
+    jest.spyOn(contractScripts, 'getResponseHash').mockResolvedValue(null);
+    jest.spyOn(portoFunctions, 'isPortoAutoSignReady').mockReturnValue(false);
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'demo-4',
+      activeSessionSlug: 'demo-4',
+      sessionSlugPinned: true,
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      loginComplete: true,
+      provider: 'porto_passkey',
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    await subject.fetchSingleQuestionData();
+    subject.clearSingleQuestionBootstrapRetry();
+
+    expect(getQuestionDataSpy).toHaveBeenCalled();
+    expect(getQuestionDataSpy.mock.calls[0][3]).toEqual(
+      expect.objectContaining({ skipDecrypt: true })
+    );
+  });
+
+  it('auto-decrypts single-question prompts when Porto auto-sign is ready', async () => {
+    const getQuestionDataSpy = jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue({
+      id: 'q1',
+      type: 'binary',
+      prompt: 'Decrypted prompt',
+      tags: [],
+    });
+    jest.spyOn(contractScripts, 'getResponse').mockResolvedValue(null);
+    jest.spyOn(contractScripts, 'getResponseHash').mockResolvedValue(null);
+    jest.spyOn(portoFunctions, 'isPortoAutoSignReady').mockReturnValue(true);
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'demo-4',
+      activeSessionSlug: 'demo-4',
+      sessionSlugPinned: true,
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      loginComplete: true,
+      provider: 'porto_passkey',
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    await subject.fetchSingleQuestionData();
+    subject.clearSingleQuestionBootstrapRetry();
+
+    expect(getQuestionDataSpy).toHaveBeenCalled();
+    expect(getQuestionDataSpy.mock.calls[0][3]).not.toEqual(
+      expect.objectContaining({ skipDecrypt: true })
+    );
+    expect(subject.state.questionPool[0]).toEqual(
+      expect.objectContaining({ prompt: 'Decrypted prompt' })
+    );
   });
 
   it('falls back to known candidate slugs when pinned single-question slug is unresolved', async () => {
@@ -6989,6 +7345,65 @@ describe('SurveyTool module', () => {
     expect(getQuestionDataSpy).toHaveBeenCalled();
     expect(retrySpy).not.toHaveBeenCalled();
     expect(subject.state.questionPool[0].prompt).toBe('Recovered prompt');
+  });
+
+  it('renders a masked encrypted question placeholder while new Arweave metadata propagates', async () => {
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue(null);
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'demo-4',
+      activeSessionSlug: 'demo-4',
+      sessionSlugPinned: true,
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      surveysResponseState: [],
+      isLoadingResponse: true,
+    };
+    subject.setState = jest.fn((update, cb) => {
+      const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+    const retrySpy = jest.spyOn(subject, 'scheduleSingleQuestionBootstrapRetry').mockReturnValue(true);
+
+    await subject.fetchSingleQuestionData();
+
+    expect(retrySpy).toHaveBeenCalledWith(expect.objectContaining({
+      questionId: 'q1',
+      reason: 'question-fetch-unavailable',
+    }));
+    expect(subject.state.isLoadingResponse).toBe(false);
+    expect(subject.state.questionPool).toEqual([
+      expect.objectContaining({
+        id: 'q1',
+        prompt: '[encrypted]',
+        __ceQuestionMetadataPending: true,
+      }),
+    ]);
+    expect(subject.state.surveysResponseState.length).toBeGreaterThan(0);
   });
 
   it('preserves the current single-question metadata when a refetch loses cache state', async () => {
@@ -7808,6 +8223,67 @@ describe('SurveyTool module', () => {
     const written = await atomicSpy.mock.results[0].value;
     expect(written['84532'].questions.q2).toEqual(expect.objectContaining({ id: 'q2' }));
     expect(written['84532'].questions.q1).toEqual(expect.objectContaining({ id: 'q1' }));
+  });
+
+  it('uses global Lit hooks when ensureQuestionCached builds decrypt context without scoped props', async () => {
+    const litHooks = { getKey: jest.fn() };
+    const previousLitHooks = window.__litHooks;
+    window.__litHooks = litHooks;
+    const emptyQuestionsCache = {
+      '84532': {
+        questionsLatestBlock: 0,
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+        questionResponsesLatestBlock: 0,
+      },
+    };
+    jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace) => (
+      namespace === 'questionsCache' ? emptyQuestionsCache : null
+    ));
+    jest.spyOn(cacheScripts, 'updateCacheAtomic').mockImplementation(async (_namespace, _slug, updater) => (
+      updater(emptyQuestionsCache)
+    ));
+    const getQuestionDataSpy = jest.spyOn(contractScripts, 'getQuestionData').mockResolvedValue({
+      id: 'q1',
+      type: 'freeform',
+      prompt: 'Fetched question',
+      creator: '0xaaa',
+      tags: [],
+    });
+
+    const subject = new SurveyTool({
+      provider: {},
+      network: { id: 84532 },
+      networkChainId: 84532,
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+    });
+    syncClassSetState(subject);
+
+    try {
+      await subject.ensureQuestionCached('q1');
+
+      expect(getQuestionDataSpy).toHaveBeenCalledWith(
+        {},
+        'q1',
+        'edge',
+        {
+          decryptContext: expect.objectContaining({
+            chainId: 84532,
+            litHooks,
+            litOpts: { getKey: litHooks.getKey },
+          }),
+        }
+      );
+    } finally {
+      if (previousLitHooks === undefined) {
+        delete window.__litHooks;
+      } else {
+        window.__litHooks = previousLitHooks;
+      }
+    }
   });
 
   it('does not write ensureQuestionCached payloads into a borrowed general network cache when the slug is unresolved', async () => {
@@ -9844,6 +10320,36 @@ describe('SurveyTool module', () => {
 
     expect(button).toBeTruthy();
     expect(button.props.title).toBe('Decrypt gated prompt');
+  });
+
+  it('passes an explicit decrypt prompt action into gated prompt notices', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+    };
+    subject.handleReloadMaskedPrompt = jest.fn();
+
+    const tree = subject.renderGatedPromptNotice({
+      question: { id: 'Q1', prompt: '[encrypted]' },
+      tooltipIdSuffix: 'full',
+    });
+    const notice = findElement(tree, (node) => node?.type === GatedPromptNotice);
+
+    expect(notice).toBeTruthy();
+    expect(notice.props.actionTestId).toBe(E2E_TESTIDS.SURVEY_DECRYPT_PROMPT_NOTICE);
+    expect(notice.props.actionTitle).toBe('Decrypt gated prompt');
+
+    notice.props.onAction();
+
+    expect(subject.handleReloadMaskedPrompt).toHaveBeenCalledWith('q1');
   });
 
   it('does not render inline single-question tags in the prompt title block', () => {
