@@ -145,6 +145,7 @@ describe('litProtocol Chipotle hooks', () => {
 
     const keyBytes = new Uint8Array(32).fill(0x11);
     const wrapped = await hooks.saveKey(keyBytes, { accessControlConditions });
+    expect(mockFetchWorkerWithAuth.mock.calls[0][0]).toBe('https://worker.example.test/lit/chipotle-action');
     expect(wrapped).toEqual(expect.objectContaining({
       ciphertext: 'wrapped-cek',
     }));
@@ -169,6 +170,75 @@ describe('litProtocol Chipotle hooks', () => {
       gateMode: 'any',
       message: '0x' + '11'.repeat(32),
     }));
+  });
+
+  it('initializes worker-mediated Chipotle hooks when Lit credentials stay server-side', async () => {
+    const {
+      createLitHooks,
+    } = require('./litProtocol.js');
+
+    mockFetchWorkerWithAuth.mockImplementation(async (_url, options) => {
+      const body = JSON.parse(options.body);
+      expect(body.op).toBe('encrypt');
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          response: {
+            response: {
+              ok: true,
+              ciphertext: 'wrapped-server-side-runtime-cek',
+            },
+          },
+        }),
+      };
+    });
+
+    const accessControlConditions = [
+      {
+        contractAddress: '0x29563ff3aCC8AFb220D810F8022218095e25C1f6',
+        standardContractType: 'ERC721',
+        chain: 'optimismSepolia',
+        method: 'balanceOf',
+        parameters: [':userAddress'],
+        returnValueTest: { comparator: '>', value: '0' },
+      },
+    ];
+
+    const hooks = createLitHooks({
+      providerLike: 'wagmi',
+      account: '0x00000000000000000000000000000000000000aa',
+      chainId: 11155420,
+      accessControlConditions,
+      chipotle: {
+        workerUrl: 'https://worker.example.test',
+        sessionSlug: 'session-a',
+        sessionConfig: {
+          slug: 'session-a',
+          corsWorkerUrl: 'https://worker.example.test',
+        },
+      },
+    });
+
+    expect(hooks).toEqual(expect.objectContaining({
+      litNetwork: 'chipotle',
+      saveKey: expect.any(Function),
+    }));
+
+    const wrapped = await hooks.saveKey(new Uint8Array(32).fill(0x22), { accessControlConditions });
+    expect(mockFetchWorkerWithAuth.mock.calls[0][0]).toBe('https://worker.example.test/lit/chipotle-action');
+    expect(wrapped).toEqual(expect.objectContaining({
+      ciphertext: 'wrapped-server-side-runtime-cek',
+      dataToEncryptHash: expect.stringContaining('chipotle-v3:action:11155420:any:'),
+      chipotle: expect.objectContaining({
+        litActionCid: '',
+        litPkpId: '',
+        chainId: 11155420,
+        gateMode: 'any',
+      }),
+    }));
+    expect(mockFetchWorkerWithAuth).toHaveBeenCalledTimes(1);
   });
 
   it('round-trips encrypted document payloads through the Chipotle hooks used by lit-arweave docs', async () => {

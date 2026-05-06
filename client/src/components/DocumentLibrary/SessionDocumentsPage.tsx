@@ -24,6 +24,7 @@ type SessionDocumentsPageProps = {
     id?: number | string | null;
   } | null;
   account?: string;
+  litHooks?: unknown;
   loginComplete?: boolean;
   toggleLoginModal?: () => void;
   sessionToken?: string;

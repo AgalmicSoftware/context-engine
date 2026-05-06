@@ -68,9 +68,6 @@ the current wallet, client Survey contract reads use the session-sponsored
 `rpcUrl` / `rpcUrlsByChainId` before anonymous defaults. Restricted sponsored
 RPC still fails closed to the normal fallback stack until the wallet grant is
 verified.
-Session publish/deploy keeps uploaded Custom RPC worker secrets out of public
-registry fields. If browser reads need a sponsored RPC, configure an explicit
-browser-visible session `rpcUrl` / `rpcUrlsByChainId` value.
 
 Multi-tx flow:
 - `createSession(slug, sessionId, chainId, ...)` creates the session.
@@ -171,7 +168,7 @@ Notes:
   - `ar://<txId>`,
   - or a bare Arweave txId (`<txId>`, 43-char base64url).
   The client normalizes `ar://` and bare txIds to the preferred Arweave gateway via `normalizeArweaveUrl` (`client/src/utilities/arweaveUrls.js`):
-  `ARWEAVE_GATEWAY_URL` by default (`https://ar-io.dev`, with `https://arweave.net` next in the fallback list), or `CE_ARWEAVE_AR_IO_URL` when `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled. By default, Arweave reads stay ar.io-first but still fan out across the fallback gateways when the primary route is flaky. In the explicit troubleshooting mode, reads stay on ar.io for their retry budget instead of fanning out to other gateways.
+  `CE_ARWEAVE_AR_IO_URL` / `https://ar-io.dev` while `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, which is the default. Arweave reads stay on that AR.IO gateway for their retry budget instead of fanning out to legacy gateways. Set `CE_ARWEAVE_DIRECT_TO_AR_IO=false` only when a deployment intentionally wants fallback fanout through `ARWEAVE_GATEWAY_URL`, `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
   Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
   If you see console noise like `Failed to load resource ... (<txId>, line 0)`, check the Network tab for the request URL:
   - App origin (`http://localhost:3000/<txId>`): a UI path is still rendering a bare txId as a relative URL.
@@ -206,7 +203,7 @@ Wizard UX notes:
 - In `/session/new`, new session drafts seed OpenAI `gpt-5` for both fast/thinking models and set `ai.reasoningEffort` to `low`.
 - Session metadata now uses `sessionName`/`sessionInfo`/`sessionInfoEncrypted`/`sessionHeaderImg` as canonical keys; legacy `org*` aliases are not consumed in `/session/new`.
 - The wizard no longer invents default legacy Lit network metadata for new sessions; active Lit runtime now comes from worker-mediated Chipotle config.
-- In `/session/new`, worker secrets are configured before the deploy action. OpenAI key is required by default, Anthropic key appears (and becomes required) when any AI model provider is set to Anthropic, OpenRouter key is available as an optional worker secret, and Lit setup now centers on worker-mediated Chipotle inputs (`litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`) or disposable per-bundle `litAccountApiKey` authority that can mint a fresh group / PKP / usage key for each redeemed session.
+- In `/session/new`, worker secrets are configured before the deploy action. OpenAI key is required by default, Anthropic key appears (and becomes required) when any AI model provider is set to Anthropic, OpenRouter key is available as an optional worker secret, and manual Lit setup now centers on a single worker-mediated Chipotle authority key (`litAccountApiKey` / `LIT_ACCOUNT_API_KEY`) that can mint or refresh the scoped group / PKP / usage key after deploy.
 - In `/session/new`, the AI metadata block is collapsible; model provider options show OpenAI/Anthropic/OpenRouter/Custom, with OpenRouter and Custom currently disabled.
 - In `/session/new`, the Lit metadata block is collapsible and `arweave` / `litCredentials` metadata sections are hidden from the form. `litCredentials` reads are now intentionally fenced off so payer material does not flow through metadata.
 - The worker code preview in `/session/new` shows unbundled source only and is collapsed by default.

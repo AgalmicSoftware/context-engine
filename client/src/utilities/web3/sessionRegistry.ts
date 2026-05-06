@@ -358,33 +358,32 @@ const sendWithGasFallback = async ({
   return await send({ ...baseOverrides, gasLimit });
 };
 
-const collectErrorText = (err: unknown, depth = 0) => {
+const collectErrorText = (err, depth = 0) => {
   if (!err || depth > 4) return '';
-  const error = err as AnyRecord;
-  const parts: string[] = [];
-  const push = (value: unknown) => {
+  const parts = [];
+  const push = (value) => {
     const text = toStr(value).trim();
     if (text) parts.push(text);
   };
-  push(error?.shortMessage);
-  push(error?.message);
-  push(error?.details);
-  push(error?.cause?.shortMessage);
-  push(error?.cause?.message);
-  push(error?.cause?.details);
-  push(error?.data?.message);
-  if (error?.cause && error.cause !== err) {
-    push(collectErrorText(error.cause, depth + 1));
+  push(err?.shortMessage);
+  push(err?.message);
+  push(err?.details);
+  push(err?.cause?.shortMessage);
+  push(err?.cause?.message);
+  push(err?.cause?.details);
+  push(err?.data?.message);
+  if (err?.cause && err.cause !== err) {
+    push(collectErrorText(err.cause, depth + 1));
   }
   return parts.join('\n');
 };
 
-const isNonceError = (err: unknown) => {
+const isNonceError = (err) => {
   const msg = collectErrorText(err).toLowerCase();
   return msg.includes('nonce') && (msg.includes('too low') || msg.includes('already been used') || msg.includes('expired'));
 };
 
-const extractNextNonceFromError = (err: unknown) => {
+const extractNextNonceFromError = (err) => {
   const msg = collectErrorText(err);
   const nextNonceMatch = msg.match(/next nonce\s+(\d+)/i);
   if (nextNonceMatch) {
@@ -410,17 +409,6 @@ const sendWithNonceRetry = async ({
   txLabel = 'transaction',
   preferFallbackGasLimit = false,
   nonceTracker = null,
-}: {
-  estimate?: (() => Promise<ethers.BigNumberish>) | null;
-  send: (overrides: TxFeeOverrides) => Promise<TxLike>;
-  gasLimitOverride?: unknown;
-  signer?: AnyRecord | null;
-  txOverrides?: TxFeeOverrides | null;
-  fallbackGasLimit: ethers.BigNumberish;
-  feeFallbackChainId?: unknown;
-  txLabel?: string;
-  preferFallbackGasLimit?: boolean;
-  nonceTracker?: NonceTracker | null;
 }) => {
   let nonceOverride: number | null = null;
   const resolvePendingNonceOverride = async () => {
@@ -463,12 +451,10 @@ const sendWithNonceRetry = async ({
       if (
         nonceTracker &&
         typeof nonceTracker === 'object' &&
-        nonceOverride != null &&
         Number.isInteger(nonceOverride) &&
         nonceOverride >= 0
       ) {
-        const confirmedNonceOverride = Number(nonceOverride);
-        nonceTracker.nextNonce = Math.max(Number(nonceTracker.nextNonce || 0), confirmedNonceOverride + 1);
+        nonceTracker.nextNonce = Math.max(Number(nonceTracker.nextNonce || 0), nonceOverride + 1);
       }
       return tx;
     } catch (err) {
@@ -509,7 +495,7 @@ const sendWithNonceRetry = async ({
       const candidates = [
         nextNonceFromError,
         refreshedNonce,
-        previousNonceOverride != null && Number.isInteger(previousNonceOverride) ? previousNonceOverride + 1 : null,
+        Number.isInteger(previousNonceOverride) ? previousNonceOverride + 1 : null,
       ].filter((candidate) => Number.isInteger(candidate) && candidate >= 0);
       if (!candidates.length) {
         throw err;
@@ -1967,7 +1953,7 @@ export const registerSessionOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
-  const nonceTracker: NonceTracker = { nextNonce: null };
+  const nonceTracker = { nextNonce: null };
 
   // Observed Base Sepolia gas: createSession ~350k, setSessionFields ~275k; setResourceGates depends on gate count.
   // SessionRegistry requires a small creation fee to prevent spam session creation.
@@ -2177,7 +2163,7 @@ export const setSessionFieldsOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
-  const nonceTracker: NonceTracker = { nextNonce: null };
+  const nonceTracker = { nextNonce: null };
   const gasOverride = Number(gasLimitOverride || 0);
   const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
     ? Math.floor(gasOverride)
@@ -2336,7 +2322,7 @@ export const setResourceGatesOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
-  const nonceTracker: NonceTracker = { nextNonce: null };
+  const nonceTracker = { nextNonce: null };
   const gasOverride = Number(gasLimitOverride || 0);
   const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
     ? Math.floor(gasOverride)

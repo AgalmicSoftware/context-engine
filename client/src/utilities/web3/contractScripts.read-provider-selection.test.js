@@ -191,4 +191,61 @@ describe('contractScripts getReadProviderForGroup', () => {
     expect(urls[0]).toBe(CROSS_CHAIN_SESSION_RPC_URL);
     expect(urls).not.toContain(NESTED_OTHER_CHAIN_RPC_URL);
   });
+
+  it('uses open sponsored session RPC for survey hash and response reads', async () => {
+    try { globalThis.CE_PREFER_PATH_RPC = false; } catch (_) {}
+    const capturedProviders = [];
+    const getQuestionHash = jest.fn().mockResolvedValue(ethers.constants.HashZero);
+    const getResponse = jest.fn().mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(ethers, 'Contract').mockImplementation((_addr, _abi, provider) => {
+      capturedProviders.push(provider);
+      return {
+        getQuestionHash,
+        getResponse,
+      };
+    });
+
+    const cfg = buildGroupCfg({}, {
+      slug: 'provider-selection-open-sponsored-survey-reads',
+      rpcUrl: SESSION_RPC_URL,
+      sponsoredKeys: { rpc: true },
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          rpc: {
+            lookupStatus: 'ok',
+            sbtAddresses: [],
+            mode: 'any',
+            chainId: 84532,
+          },
+        },
+      },
+    });
+
+    await expect(contractScripts.getQuestionHash(
+      'none',
+      `0x${'11'.repeat(32)}`,
+      cfg
+    )).resolves.toBeNull();
+    await expect(contractScripts.getResponse(
+      'none',
+      '0x00000000000000000000000000000000000000aa',
+      `0x${'22'.repeat(32)}`,
+      cfg
+    )).resolves.toBeNull();
+
+    expect(capturedProviders).toHaveLength(2);
+    capturedProviders.forEach((provider) => {
+      const urls = Array.isArray(provider?.providerConfigs)
+        ? provider.providerConfigs.map((entry) => entry?.provider?.connection?.url).filter(Boolean)
+        : [];
+      expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
+        providerLabel: 'session',
+        sessionAccessStatus: 'open',
+        sessionRpcSource: 'root',
+        preferredUrls: expect.arrayContaining([SESSION_RPC_URL]),
+      }));
+      expect(urls[0]).toBe(SESSION_RPC_URL);
+    });
+  });
 });

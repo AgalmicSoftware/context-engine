@@ -1480,21 +1480,7 @@ const encryptField = async ({
 
 /* --------------------------- unwrap & decrypt ----------------------------- */
 
-const unwrapCekFromRecipients = async ({
-  env,
-  account,
-  chainId,
-  providerLike,
-  litOpts,
-  preferLitRecipients = false,
-}: {
-  env: Envelope;
-  account?: string;
-  chainId: ChainIdInput;
-  providerLike: ProviderLike;
-  litOpts?: LitOptions;
-  preferLitRecipients?: boolean;
-}) => {
+const unwrapCekFromRecipients = async ({ env, account, chainId, providerLike, litOpts, preferLitRecipients = false }) => {
   const contextHex = env?.aad?.context;
   assertBytes32Hex(contextHex);
   const contextBytes = getContextBytes(contextHex);
@@ -1503,7 +1489,6 @@ const unwrapCekFromRecipients = async ({
   const litEntries = (env.recipients || []).filter((r) => r && r.type === 'lit-sbt-v1' && isObj(r.lit));
   const tryLitRecipients = async () => {
     if (!litEntries.length || !isObj(litOpts) || typeof litOpts.getKey !== 'function') return null;
-    const getKey = litOpts.getKey as (opts?: UnknownRecord) => Promise<unknown> | unknown;
     for (const litEntry of litEntries) {
       const litData = litEntry.lit || {};
       try {
@@ -1536,9 +1521,9 @@ const unwrapCekFromRecipients = async ({
     if (!self || typeof self.wrap_iv !== 'string' || typeof self.wrapped_cek !== 'string') return null;
     try {
       const nonce = self.nonce !== null && self.nonce !== undefined ? self.nonce : null;
-      const typed = buildEip712KeyWrap(String(account || ''), chainId, contextHex, nonce);
+      const typed = buildEip712KeyWrap(account, chainId, contextHex, nonce);
       const provider = _getProvider(providerLike);
-      const sig = await signEip712V4(provider, String(account || ''), typed);
+      const sig = await signEip712V4(provider, account, typed);
       const kek = await deriveKekFromSig(sig, contextBytes);
       const wrapIvBytes = b64decode(self.wrap_iv);
       const wrappedBytes = b64decode(self.wrapped_cek);
@@ -1609,21 +1594,7 @@ const decryptCacheLruSet = (key: string, entry: DecryptCacheEntry) => {
   }
 };
 
-const buildDecryptEnvelopeCacheKey = ({
-  jsonStr,
-  account,
-  chainId,
-  providerLike,
-  litOpts,
-  preferLitRecipients = false,
-}: {
-  jsonStr: string;
-  account?: unknown;
-  chainId?: ChainIdInput;
-  providerLike?: ProviderLike;
-  litOpts?: LitOptions;
-  preferLitRecipients?: boolean;
-}) => {
+const buildDecryptEnvelopeCacheKey = ({ jsonStr, account, chainId, providerLike, litOpts, preferLitRecipients = false }) => {
   const acct = String(account || '').trim().toLowerCase() || '<anon>';
   const ch = String(chainId ?? '');
   const providerKind = getProviderKind(providerLike);
@@ -1657,7 +1628,7 @@ const decryptEnvelopeToValue = async ({
   perfDebugDecryptEnvelope('attempt');
   const jsonStr = normalizeEnvelopeJsonToString(envelopeJson);
   const env = parseEnvelope(jsonStr);
-  validateEnvelopeBinding(env, { expectedSurveyId, expectedQId, expectedFieldKey });
+  validateEnvelopeBinding(env, { expectedSurveyId, expectedQId });
   const cacheKey = buildDecryptEnvelopeCacheKey({
     jsonStr,
     account,

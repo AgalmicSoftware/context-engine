@@ -260,36 +260,6 @@ const buildEncryptedUploadArgs = ({
   })
 );
 
-const buildSelfRecipientUploadArgs = ({
-  data,
-  name,
-  mime,
-  tags,
-  sessionSlug,
-  sessionConfig,
-  account,
-  providerLike,
-  chainId,
-  encryption,
-} = {}) => (
-  uploadSelfRecipientEncryptedDocData({
-    data,
-    name,
-    mime,
-    ...(encryption?.arweaveJwk ? { arweaveJwk: encryption.arweaveJwk } : {}),
-    providerLike,
-    account,
-    chainId: encryption?.chainId || chainId || null,
-    contextLabel: encryption?.contextLabel || `doc-self:${sessionSlug || ''}`,
-    tags,
-    arweave: {
-      sessionSlug,
-      sessionConfig,
-      context: buildBaseUploadContext({ account, providerLike, chainId }),
-    },
-  })
-);
-
 export const uploadDocLibraryFile = async ({
   file,
   sessionSlug,

@@ -6,14 +6,6 @@ jest.mock('../web3/portoFunctions.js', () => ({
   createPortoProviderMock: (...args) => mockCreatePortoProvider(...args),
 }));
 
-const setWindowProvider = (key, value) => {
-  Object.defineProperty(window, key, {
-    configurable: true,
-    writable: true,
-    value,
-  });
-};
-
 describe('cryptoUtils Porto provider bootstrap', () => {
   beforeEach(() => {
     jest.clearAllMocks();

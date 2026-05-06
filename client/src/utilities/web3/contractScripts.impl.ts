@@ -539,11 +539,12 @@ export function getWeb3Context(groupKeyOrCfg: any) {
 }
 
 const SBT_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'sbtFactory' });
-const SURVEYS_READ_PROVIDER_OPTIONS = Object.freeze({
-  contractKey: 'surveys',
-  skipGlobalPathDefaults: true,
-  providerLabel: 'surveys-archive',
-});
+const SURVEYS_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'surveys' });
+
+const getSurveysReadProviderForSession = (groupKeyOrCfg, cfg, chainId) => (
+  getReadProviderForGroup(cfg || groupKeyOrCfg, SURVEYS_READ_PROVIDER_OPTIONS) ||
+  getReadProviderForChain(chainId)
+);
 
 const getSurveysReadProviderForSession = (groupKeyOrCfg: any, cfg: any, chainId: any) => (
   getReadProviderForGroup(cfg || groupKeyOrCfg, SURVEYS_READ_PROVIDER_OPTIONS) ||
@@ -659,7 +660,7 @@ const decryptEnvelopeCached = async (envelopeJson: any, ctx: any, meta: any = {}
   }
 };
 
-const shouldPreferLitRecipientsForPayload = (payload: any, ctx: any) => {
+const shouldPreferLitRecipientsForPayload = (payload, ctx) => {
   const accountLower = toLower(ctx?.account || '');
   const creatorLower = normalizeAddress(payload?.creator || payload?.creatorAddress || '');
   return !!(
@@ -1586,7 +1587,7 @@ const contractScripts: any = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const questionsAddedEventFilter = SurveyContract.filters.QuestionsAdded(null, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -1645,7 +1646,7 @@ const contractScripts: any = {
     }
 
     const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-    const contract = new ethers.Contract(addr, SURVEYS, provider as any);
+    const contract = new ethers.Contract(addr, SURVEYS, provider);
     const questionsAddedEventFilter = contract.filters.QuestionsAdded();
     const rpcDebugContext = normalizeRpcDebugContext(scanOptions?.rpcDebugContext) || null;
 
@@ -1755,7 +1756,7 @@ const contractScripts: any = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const responseSubmittedEventFilter = SurveyContract.filters.ResponsesSubmitted();
 
   // 🔐 Normalize
@@ -1987,7 +1988,7 @@ const contractScripts: any = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const responseSubmittedEventTopic = SurveyContract.filters.ResponsesSubmitted(userAddress, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -2021,7 +2022,7 @@ const contractScripts: any = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const contract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const contract = new ethers.Contract(addr, SURVEYS, provider);
   const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(null, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -2066,7 +2067,7 @@ const contractScripts: any = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const surveyCreatedEventTopic = SurveyContract.filters.SurveyAdded(userAddress, null);
 
   // Per-group base window + clamp caller overrides
@@ -2106,7 +2107,7 @@ const contractScripts: any = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const contract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const contract = new ethers.Contract(addr, SURVEYS, provider);
   const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(null, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -2325,7 +2326,7 @@ const contractScripts: any = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const questionsAddedEventFilter = SurveyContract.filters.QuestionsAdded(userAddress, null, null);
 
   // Per-group base window + clamp caller overrides
@@ -2369,7 +2370,7 @@ const contractScripts: any = {
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const responsesSubmittedEventFilter = SurveyContract.filters.ResponsesSubmitted(userAddress, null);
 
   // Per-group base window + clamp caller overrides
@@ -3196,7 +3197,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
   }
 
   const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
+  const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
 
   // 🔐 Normalize ID to bytes32
   const ensureHash = (v: any) => {
@@ -4664,7 +4665,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
           "function hasPasswordMint() view returns (bool)",
           "function mintMode() view returns (uint8)"
         ];
-        const c = new ethers.Contract(sbtAddress, FRAG, provider as any);
+        const c = new ethers.Contract(sbtAddress, FRAG, provider);
         const mintModeRead = typeof c.mintMode === 'function'
           ? c.mintMode().catch(() => null)
           : Promise.resolve(null);

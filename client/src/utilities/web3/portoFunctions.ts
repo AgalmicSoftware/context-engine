@@ -820,6 +820,14 @@ export function getPortoSessionKeyEnabled(): boolean {
   return sessionKeyEnabled;
 }
 
+export function hasPortoSessionSigner(): boolean {
+  return hasCurrentPortoSessionSigner();
+}
+
+export function isPortoAutoSignReady(): boolean {
+  return !!(sessionKeyEnabled && hasCurrentPortoSessionMetadata() && hasCurrentPortoSessionSigner());
+}
+
 export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {
   if (!viemWalletClient) {
     await restoreSession({ requireSigner: true });
