@@ -2,8 +2,31 @@
 import {
   buildCompareSbtImageMap,
   buildCompareSbtKeySets,
+  buildCompareClassName,
   buildNicknameByAddressMap,
   readDgObjectValues,
+  resolveCompareAddressBlockieStyle,
+  resolveCompareAddressPillContentStyle,
+  resolveCompareBookmarksHeaderStyle,
+  resolveCompareBookmarksListStyle,
+  resolveCompareClickableResultItemStyle,
+  resolveCompareCompassLegendStyle,
+  resolveCompareCompassLegendSwatchStyle,
+  resolveCompareCompassScrollStyle,
+  resolveCompareDrillBodyStyle,
+  resolveCompareErrorStyle,
+  resolveCompareLoadingTextStyle,
+  resolveCompareUnsureHeaderStyle,
+  resolveCompareUnsureMoreStyle,
+  resolveCompareUnsurePanelStyle,
+  resolveCompareVennNoteStyle,
+  resolveCompareVennSbtImageStyle,
+  resolveCompareVennSbtRowStyle,
+  resolveCompareVennTooltipHeaderStyle,
+  resolveCompareVennTooltipListStyle,
+  resolveCompareVennTooltipStyle,
+  resolveCompareVennWrapStyle,
+  resolveCompareVisualSectionStyle,
 } from './CompareAddresses';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
@@ -13,9 +36,9 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 const mockListNamespaceEntriesSync = cacheScripts.listNamespaceEntriesSync as jest.Mock;
-const buildNicknameMap = buildNicknameByAddressMap as (entries: any[]) => Map<string, string>;
-const buildSbtKeySets = buildCompareSbtKeySets as (entries: any[]) => Set<string>[];
-const buildSbtImageMap = buildCompareSbtImageMap as (entries: any[]) => Map<string, { name: string; image: string }>;
+const buildNicknameMap = buildNicknameByAddressMap as (entries: Array<Record<string, unknown>>) => Map<string, string>;
+const buildSbtKeySets = buildCompareSbtKeySets as (entries: Array<Record<string, unknown>>) => Set<string>[];
+const buildSbtImageMap = buildCompareSbtImageMap as (entries: Array<Record<string, unknown>>) => Map<string, { name: string; image: string | null }>;
 const readObjectValues = readDgObjectValues as (namespace: string) => unknown[];
 
 describe('CompareAddresses cache scan helpers', () => {
@@ -121,5 +144,111 @@ describe('CompareAddresses cache scan helpers', () => {
       ['0xsbt1', { name: '[encrypted]', image: 'https://img.test/1.png' }],
       ['0xsbt2', { name: '[encrypted]', image: 'https://img.test/2.png' }],
     ]);
+  });
+
+  it('resolves compare address pill styles consistently', () => {
+    expect(resolveCompareAddressPillContentStyle()).toEqual({
+      alignItems: 'center',
+      display: 'inline-flex',
+      gap: 8,
+    });
+    expect(resolveCompareAddressBlockieStyle()).toEqual({
+      borderRadius: 3,
+    });
+  });
+
+  it('builds compare class names without empty classes', () => {
+    expect(buildCompareClassName('base', '', null, 'active')).toBe('base active');
+    expect(buildCompareClassName(undefined, 'only')).toBe('only');
+  });
+
+  it('resolves compare unsure-overlap styles consistently', () => {
+    expect(resolveCompareUnsurePanelStyle()).toEqual({
+      marginTop: 8,
+    });
+    expect(resolveCompareUnsureHeaderStyle()).toEqual({
+      fontWeight: 700,
+      marginBottom: 6,
+    });
+    expect(resolveCompareUnsureMoreStyle()).toEqual({
+      fontSize: 12,
+      marginTop: 6,
+      opacity: 0.8,
+    });
+  });
+
+  it('resolves compare bookmark row styles consistently', () => {
+    expect(resolveCompareBookmarksHeaderStyle()).toEqual({
+      color: 'white',
+      fontWeight: '600',
+      marginBottom: '10px',
+    });
+    expect(resolveCompareBookmarksListStyle()).toEqual({
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 10,
+    });
+  });
+
+  it('resolves compare result area styles consistently', () => {
+    expect(resolveCompareErrorStyle()).toEqual({ marginTop: 8 });
+    expect(resolveCompareVisualSectionStyle()).toEqual({ padding: '6px 0' });
+    expect(resolveCompareLoadingTextStyle()).toEqual({ marginLeft: 6 });
+    expect(resolveCompareClickableResultItemStyle()).toEqual({ cursor: 'pointer' });
+    expect(resolveCompareDrillBodyStyle()).toEqual({ marginTop: 6 });
+  });
+
+  it('resolves compare Venn tooltip styles consistently', () => {
+    expect(resolveCompareVennWrapStyle()).toEqual({
+      overflowX: 'auto',
+      position: 'relative',
+    });
+    expect(resolveCompareVennTooltipStyle({ clientWidth: 500, x: 100, y: 20 })).toEqual({
+      left: 80,
+      top: 28,
+    });
+    expect(resolveCompareVennTooltipHeaderStyle()).toEqual({
+      fontWeight: 700,
+      marginBottom: 4,
+    });
+    expect(resolveCompareVennTooltipListStyle()).toEqual({
+      listStyle: 'none',
+      margin: 0,
+      padding: 0,
+    });
+    expect(resolveCompareVennSbtRowStyle()).toEqual({
+      alignItems: 'center',
+      display: 'flex',
+      gap: '8px',
+    });
+    expect(resolveCompareVennSbtImageStyle()).toEqual({
+      borderRadius: '4px',
+      flexShrink: 0,
+    });
+    expect(resolveCompareVennNoteStyle()).toEqual({
+      fontSize: 12,
+      marginTop: 4,
+      opacity: 0.75,
+    });
+  });
+
+  it('resolves compare compass styles consistently', () => {
+    expect(resolveCompareCompassLegendStyle()).toEqual({
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 8,
+    });
+    expect(resolveCompareCompassLegendSwatchStyle('red')).toEqual({
+      background: 'red',
+      borderRadius: 5,
+      display: 'inline-block',
+      height: 10,
+      marginRight: 6,
+      width: 10,
+    });
+    expect(resolveCompareCompassScrollStyle()).toEqual({
+      overflowX: 'auto',
+    });
   });
 });
