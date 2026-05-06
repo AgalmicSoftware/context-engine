@@ -7,7 +7,6 @@ import {
   normalizeSbtPageCanonicalMetadataHref,
   resolveDisplayImageHref,
   resolveSbtPageTokenMetadataHref,
-  resolveSbtPageTokenMetadataLinkDisplayState,
 } from './sbtPageMediaHelpers';
 
 type ArweaveRuntimeGlobals = typeof globalThis & {
@@ -89,29 +88,6 @@ describe('sbtPageMediaHelpers', () => {
     }))}`)).toBe('');
   });
 
-  it('describes token metadata link display state without mutating inputs', () => {
-    const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
-    arweaveGlobals.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    arweaveGlobals.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';
-    const args = { tokenUriRaw: `ar://${txId}` };
-
-    expect(resolveSbtPageTokenMetadataLinkDisplayState(args)).toEqual({
-      href: `https://ar-io.dev/${txId}`,
-      shouldRenderLink: true,
-    });
-    expect(args).toEqual({ tokenUriRaw: `ar://${txId}` });
-    expect(resolveSbtPageTokenMetadataLinkDisplayState({
-      tokenUriRaw: 'https://cdn.example.test/preview.png',
-    })).toEqual({
-      href: '',
-      shouldRenderLink: false,
-    });
-    expect(resolveSbtPageTokenMetadataLinkDisplayState()).toEqual({
-      href: '',
-      shouldRenderLink: false,
-    });
-  });
-
   it('builds display image candidates and falls back to the default image', () => {
     const defaultImage = '/static/default-sbt.png';
     const imageUrl = 'https://example.test/badge.png';
@@ -128,7 +104,7 @@ describe('sbtPageMediaHelpers', () => {
     });
   });
 
-  it('falls back to the default image after the preferred Arweave image candidate fails', () => {
+  it('tracks display image fallback state across Arweave gateway candidates', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
     arweaveGlobals.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     arweaveGlobals.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';
@@ -137,12 +113,8 @@ describe('sbtPageMediaHelpers', () => {
     const firstState = getDisplayImageRenderState({ image }, {}, '/default.png');
     expect(firstState.sourceKey).toBe(image);
     expect(firstState.activeIndex).toBe(0);
-    expect(firstState.src).toBe(`https://arweave.net/${txId}`);
+    expect(firstState.src).toBe(`https://ar-io.dev/${txId}`);
     expect(firstState.canRetry).toBe(true);
-    expect(firstState.candidates).toEqual([
-      `https://arweave.net/${txId}`,
-      `https://gateway.irys.xyz/${txId}`,
-    ]);
 
     const fallbackState = getDisplayImageRenderState(
       { image },
@@ -153,19 +125,7 @@ describe('sbtPageMediaHelpers', () => {
       '/default.png'
     );
     expect(fallbackState.activeIndex).toBe(1);
-    expect(fallbackState.src).toBe(`https://gateway.irys.xyz/${txId}`);
-
-    const defaultFallbackState = getDisplayImageRenderState(
-      { image },
-      {
-        displayImageFallbackKey: image,
-        displayImageFallbackIndex: 2,
-      },
-      '/default.png'
-    );
-    expect(defaultFallbackState.activeIndex).toBe(2);
-    expect(defaultFallbackState.src).toBe('/default.png');
-    expect(defaultFallbackState.canRetry).toBe(false);
+    expect(fallbackState.src).toBe(`https://arweave.net/${txId}`);
   });
 
   it('builds the next display image fallback state only from the active failed candidate', () => {

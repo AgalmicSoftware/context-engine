@@ -16,19 +16,12 @@ type SbtPageDisplayImageNextFallbackArgs = {
   maxIndex?: number;
   sourceKey?: string;
 };
-type ResolveSbtPageTokenMetadataLinkDisplayStateArgs = {
-  tokenUriRaw?: unknown;
-};
 export type SbtPageDisplayImageState = {
   sourceKey: string;
   candidates: string[];
   activeIndex: number;
   src: string;
   canRetry: boolean;
-};
-export type SbtPageTokenMetadataLinkDisplayState = {
-  href: string;
-  shouldRenderLink: boolean;
 };
 
 export const isSbtPageImageLikeUri = (uriRaw: unknown): boolean => {
@@ -57,33 +50,7 @@ export const getDisplayImageUrlCandidates = (
   sbtInfo: SbtPageInfoImageLike | null | undefined
 ): string[] => {
   const imageValue = sbtInfo?.image;
-  return buildArweaveGatewayUrlCandidates(imageValue, { gateway: 'https://arweave.net' })
-    .filter((candidate) => {
-      try {
-        const host = new URL(candidate).hostname.toLowerCase();
-        const isKnownArweaveGateway = (
-          host === 'ar-io.dev' ||
-          host.endsWith('.ar-io.dev') ||
-          host === 'arweave.net' ||
-          host.endsWith('.arweave.net') ||
-          host === 'gateway.irys.xyz' ||
-          host.endsWith('.gateway.irys.xyz') ||
-          host === 'permagate.io' ||
-          host.endsWith('.permagate.io') ||
-          host === 'g8way.io' ||
-          host.endsWith('.g8way.io')
-        );
-        if (!isKnownArweaveGateway) return true;
-        return (
-          host === 'arweave.net' ||
-          host.endsWith('.arweave.net') ||
-          host === 'gateway.irys.xyz' ||
-          host.endsWith('.gateway.irys.xyz')
-        );
-      } catch (_) {
-        return true;
-      }
-    });
+  return buildArweaveGatewayUrlCandidates(imageValue, { gateway: '' });
 };
 
 export const resolveDisplayImageHref = (
@@ -177,14 +144,4 @@ export const resolveSbtPageTokenMetadataHref = (tokenUriRaw: unknown): string =>
     if (normalized) return normalized;
   }
   return '';
-};
-
-export const resolveSbtPageTokenMetadataLinkDisplayState = ({
-  tokenUriRaw = '',
-}: ResolveSbtPageTokenMetadataLinkDisplayStateArgs = {}): SbtPageTokenMetadataLinkDisplayState => {
-  const href = resolveSbtPageTokenMetadataHref(tokenUriRaw);
-  return {
-    href,
-    shouldRenderLink: !!href,
-  };
 };
