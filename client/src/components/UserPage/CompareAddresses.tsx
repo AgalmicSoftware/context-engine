@@ -49,13 +49,17 @@ type CompareDrillTone = 'agree' | 'disagree' | 'unsure' | 'info' | 'muted';
 type CompareSectionKey = 'agree' | 'dis';
 type ComparisonTone = 'agreement' | 'disagreement';
 type VennRegionKey = 'a' | 'b' | 'c' | 'ab' | 'ac' | 'bc' | 'abc';
+type UnknownRecord = Record<string, unknown>;
+type CompareGlobalThis = typeof globalThis & {
+  CE_E2E_AI_MOCK?: boolean;
+};
 
 interface CompareBookmark {
   address?: string;
   addressLower?: string;
   nickname?: string;
   label?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface CompareSbt {
@@ -64,9 +68,9 @@ interface CompareSbt {
   imageUrl?: string | null;
   sbtInfo?: {
     image?: string | null;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface CompareQuestion {
@@ -78,10 +82,10 @@ interface CompareQuestion {
   title?: string;
   text?: string;
   type?: string;
-  answer?: any;
+  answer?: unknown;
   additionalComment?: string;
-  options?: any;
-  [key: string]: any;
+  options?: unknown;
+  [key: string]: unknown;
 }
 
 interface CompareUser {
@@ -90,8 +94,8 @@ interface CompareUser {
   label?: string;
   sbts?: CompareSbt[];
   questions?: CompareQuestion[];
-  surveys?: any[];
-  [key: string]: any;
+  surveys?: unknown[];
+  [key: string]: unknown;
 }
 
 interface CompareUserSummary {
@@ -106,7 +110,7 @@ interface CompareQuestionResponse {
   userIndex: number;
   label: string;
   address: string;
-  answer: any;
+  answer: unknown;
   comment: string | null;
 }
 
@@ -126,44 +130,44 @@ interface CompareCompassAxis {
   id?: string;
   label?: string;
   description?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface CompareCompassPoint {
   address?: string;
   x: number;
   y: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface CompareCompassData {
   axes?: CompareCompassAxis[];
   points?: CompareCompassPoint[];
   evidence?: {
-    x?: any;
-    y?: any;
-    [key: string]: any;
+    x?: unknown;
+    y?: unknown;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface CompareVennResult {
   counts: Partial<Record<VennRegionKey, number>>;
   semantics?: string | null;
-  evidenceMap?: Partial<Record<VennRegionKey, any[]>>;
-  [key: string]: any;
+  evidenceMap?: Partial<Record<VennRegionKey, unknown[]>>;
+  [key: string]: unknown;
 }
 
 interface CompareMatrixData {
   mode?: string;
   columns?: Array<{ key: string; label: string }>;
-  rows?: any[];
-  [key: string]: any;
+  rows?: unknown[];
+  [key: string]: unknown;
 }
 
 interface CompareDrillParticipant {
   label: string;
-  response?: any;
+  response?: unknown;
   responseFull?: string;
   comment?: string | null;
   commentFull?: string | null;
@@ -257,7 +261,7 @@ interface VennProps {
   labels?: string[];
   users?: CompareUser[] | null;
   preCounts?: Partial<Record<VennRegionKey, number>> | null;
-  evidence?: Partial<Record<VennRegionKey, any[]>> | null;
+  evidence?: Partial<Record<VennRegionKey, unknown[]>> | null;
   semantics?: string | null;
 }
 
@@ -278,10 +282,22 @@ interface OpinionCompassProps {
 
 
 
-export const readDgObjectValues = (name: string): Record<string, any>[] => {
+const isUnknownRecord = (value: unknown): value is UnknownRecord =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const toUnknownRecord = (value: unknown): UnknownRecord =>
+  isUnknownRecord(value) ? value : {};
+
+const readRecordProperty = (record: UnknownRecord, key: string): UnknownRecord =>
+  toUnknownRecord(record[key]);
+
+const getCompareSbtLabelTyped = getCompareSbtLabel as (entry?: unknown) => string;
+const getCompareSbtKeyTyped = getCompareSbtKey as (entry?: unknown) => string;
+
+export const readDgObjectValues = (name: string): UnknownRecord[] => {
   return listNamespaceEntriesSync(name, { cloneValues: false })
     .map((entry) => entry?.value)
-    .filter((value) => value && typeof value === 'object');
+    .filter(isUnknownRecord);
 };
 
 export const buildNicknameByAddressMap = (bookmarks: CompareBookmark[] = []): Map<string, string> => {
@@ -304,10 +320,10 @@ const getQuestionPrompt = (questionId: string): string => {
     for (const cacheObj of questionsCaches) {
       // Read all top-level keys (string or legacy numeric)
       for (const netKey of Object.keys(cacheObj || {})) {
-        const qMap = (cacheObj[netKey] && cacheObj[netKey].questions) || {};
+        const qMap = readRecordProperty(readRecordProperty(cacheObj, netKey), 'questions');
         const hit = qMap[qidLower] || qMap[String(qidLower)];
         if (hit && typeof hit === 'object') {
-          return hit.prompt || 'Unknown Question';
+          return String(toUnknownRecord(hit).prompt || 'Unknown Question');
         }
       }
     }
@@ -323,13 +339,13 @@ const getSbtDetails = (sbtName: string): { name: string; image: string | null } 
     const sbtCaches = readDgObjectValues('sbtCache');
     for (const cacheObj of sbtCaches) {
       for (const netKey of Object.keys(cacheObj || {})) {
-        const list = (cacheObj[netKey] && cacheObj[netKey].sbtList) || {};
+        const list = readRecordProperty(readRecordProperty(cacheObj, netKey), 'sbtList');
         for (const sbtAddrLower in list) {
-          const entry = list[sbtAddrLower] || {};
-          const info = entry.sbtInfo || {};
+          const entry = toUnknownRecord(list[sbtAddrLower]);
+          const info = toUnknownRecord(entry.sbtInfo);
           const displayName = String(getSbtDisplayName(info) || '').trim();
           if (displayName && displayName.toLowerCase() === nameLower) {
-            return { name: displayName, image: info.image || null };
+            return { name: displayName, image: typeof info.image === 'string' ? info.image : null };
           }
         }
       }
@@ -340,8 +356,8 @@ const getSbtDetails = (sbtName: string): { name: string; image: string | null } 
   return { name: sbtName, image: null };
 };
 
-const resolveSbtDisplayNameForCompareEntry = (entry: any = null): string => getCompareSbtLabel(entry as any);
-const resolveSbtCompareKeyForEntry = (entry: any = null): string => getCompareSbtKey(entry as any);
+const resolveSbtDisplayNameForCompareEntry = (entry: unknown = null): string => getCompareSbtLabelTyped(entry);
+const resolveSbtCompareKeyForEntry = (entry: unknown = null): string => getCompareSbtKeyTyped(entry);
 
 
 /* -----------------------------
@@ -418,8 +434,8 @@ const getCommonUnsureQuestions = (users: CompareUser[] = []): CompareUnsureQuest
 const MAX_DRILL_QUESTIONS = 6;
 const MAX_DRILL_OPTIONS = 6;
 
-const unwrapAnswerValue = (answer: any): any => {
-  if (answer && typeof answer === 'object' && 'value' in answer) return answer.value;
+const unwrapAnswerValue = (answer: unknown): unknown => {
+  if (isUnknownRecord(answer) && 'value' in answer) return answer.value;
   return answer;
 };
 
@@ -441,7 +457,7 @@ const toCleanText = (val: unknown): string => {
   return trimmed === '*' ? '' : trimmed;
 };
 
-const toAnswerArray = (value: any): string[] => {
+const toAnswerArray = (value: unknown): string[] => {
   const raw = unwrapAnswerValue(value);
   if (Array.isArray(raw)) {
     return raw.map((v) => toCleanText(v)).filter(Boolean);
@@ -532,6 +548,139 @@ export const buildCompareSbtImageMap = (users: CompareUser[] = []): Map<string, 
   return m;
 };
 
+export const resolveCompareAddressPillContentStyle = (): React.CSSProperties => ({
+  alignItems: 'center',
+  display: 'inline-flex',
+  gap: 8,
+});
+
+export const resolveCompareAddressBlockieStyle = (): React.CSSProperties => ({
+  borderRadius: 3,
+});
+
+export const buildCompareClassName = (...classNames: unknown[]): string => (
+  classNames
+    .map((className) => String(className || ''))
+    .filter(Boolean)
+    .join(' ')
+);
+
+export const resolveCompareUnsurePanelStyle = (): React.CSSProperties => ({
+  marginTop: 8,
+});
+
+export const resolveCompareUnsureHeaderStyle = (): React.CSSProperties => ({
+  fontWeight: 700,
+  marginBottom: 6,
+});
+
+export const resolveCompareUnsureMoreStyle = (): React.CSSProperties => ({
+  fontSize: 12,
+  marginTop: 6,
+  opacity: 0.8,
+});
+
+export const resolveCompareBookmarksHeaderStyle = (): React.CSSProperties => ({
+  color: 'white',
+  fontWeight: '600',
+  marginBottom: '10px',
+});
+
+export const resolveCompareBookmarksListStyle = (): React.CSSProperties => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 10,
+});
+
+export const resolveCompareErrorStyle = (): React.CSSProperties => ({
+  marginTop: 8,
+});
+
+export const resolveCompareVisualSectionStyle = (): React.CSSProperties => ({
+  padding: '6px 0',
+});
+
+export const resolveCompareLoadingTextStyle = (): React.CSSProperties => ({
+  marginLeft: 6,
+});
+
+export const resolveCompareClickableResultItemStyle = (): React.CSSProperties => ({
+  cursor: 'pointer',
+});
+
+export const resolveCompareDrillBodyStyle = (): React.CSSProperties => ({
+  marginTop: 6,
+});
+
+export const resolveCompareVennWrapStyle = (): React.CSSProperties => ({
+  overflowX: 'auto',
+  position: 'relative',
+});
+
+export const resolveCompareVennTooltipStyle = ({
+  clientWidth,
+  x = 0,
+  y = 0,
+}: {
+  clientWidth?: unknown;
+  x?: unknown;
+  y?: unknown;
+} = {}): React.CSSProperties => {
+  const width = Number(clientWidth || 420);
+  const left = Math.max(8, Math.min(Number(x || 0) + 6, width - 420));
+  return {
+    left,
+    top: Number(y || 0) + 8,
+  };
+};
+
+export const resolveCompareVennTooltipHeaderStyle = (): React.CSSProperties => ({
+  fontWeight: 700,
+  marginBottom: 4,
+});
+
+export const resolveCompareVennTooltipListStyle = (): React.CSSProperties => ({
+  listStyle: 'none',
+  margin: 0,
+  padding: 0,
+});
+
+export const resolveCompareVennSbtRowStyle = (): React.CSSProperties => ({
+  alignItems: 'center',
+  display: 'flex',
+  gap: '8px',
+});
+
+export const resolveCompareVennSbtImageStyle = (): React.CSSProperties => ({
+  borderRadius: '4px',
+  flexShrink: 0,
+});
+
+export const resolveCompareVennNoteStyle = (): React.CSSProperties => ({
+  fontSize: 12,
+  marginTop: 4,
+  opacity: 0.75,
+});
+
+export const resolveCompareCompassLegendStyle = (): React.CSSProperties => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 8,
+  marginBottom: 8,
+});
+
+export const resolveCompareCompassLegendSwatchStyle = (background: unknown): React.CSSProperties => ({
+  background: String(background || ''),
+  borderRadius: 5,
+  display: 'inline-block',
+  height: 10,
+  marginRight: 6,
+  width: 10,
+});
+
+export const resolveCompareCompassScrollStyle = (): React.CSSProperties => ({
+  overflowX: 'auto',
+});
 
 const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: CompareAddressProps) => {
   const [compareAddresses, setCompareAddresses] = useState<string[]>([]);
@@ -609,7 +758,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   const isE2eAutofillDisabled = React.useCallback(() => {
     try {
-      if (globalThis && (globalThis as any).CE_E2E_AI_MOCK === true) return true;
+      if (globalThis && (globalThis as CompareGlobalThis).CE_E2E_AI_MOCK === true) return true;
     } catch (e) { void e; /* fallback: agent/e2e mock detection. */ }
     try {
       const qp = new URLSearchParams(String(window?.location?.search || ''));
@@ -896,7 +1045,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
             const out: CompareVennResult = {
               counts: { ...ensure.counts, ...vennRaw.counts },
               semantics: vennRaw.semantics || ensure.semantics,
-              evidenceMap: { ...ensure.evidenceMap, ...(vennRaw.evidenceMap || {}) } as Partial<Record<VennRegionKey, any[]>>,
+              evidenceMap: { ...ensure.evidenceMap, ...(vennRaw.evidenceMap || {}) } as Partial<Record<VennRegionKey, unknown[]>>,
             };
             const vennKeys: VennRegionKey[] = ['a', 'b', 'c', 'ab', 'ac', 'bc', 'abc'];
             for (const k of vennKeys) {
@@ -958,13 +1107,13 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       const title = `You (${short})`;
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span style={resolveCompareAddressPillContentStyle()}>
             <img
               src={blockieUrl}
               alt=""
               width={18}
               height={18}
-              style={{ borderRadius: 3 }}
+              style={resolveCompareAddressBlockieStyle()}
               aria-hidden="true"
             />
             <span>You <span className={styles.pillAddress}>({short})</span></span>
@@ -990,13 +1139,13 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       const blockieUrl = generateBlockieDataUrl(String(address || '').toLowerCase(), 8, 4);
       return (
         <div className={styles.youPill} title={title} aria-label={title}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <span style={resolveCompareAddressPillContentStyle()}>
             <img
               src={blockieUrl}
               alt=""
               width={18}
               height={18}
-              style={{ borderRadius: 3 }}
+              style={resolveCompareAddressBlockieStyle()}
               aria-hidden="true"
             />
             <span>
@@ -1416,7 +1565,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
             const tone = typeof badge === 'string' ? null : badge?.tone;
             const toneClass = tone ? toneClassFor(tone) : '';
             return (
-              <span key={`${text}-${idx}`} className={`${styles.drillBadge} ${toneClass}`}>
+              <span key={`${text}-${idx}`} className={buildCompareClassName(styles.drillBadge, toneClass)}>
                 {text}
               </span>
             );
@@ -1473,7 +1622,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       const showLabel = labelText && !badgeTexts.includes(labelText.toLowerCase());
 
       return (
-        <li className={`${styles.drillNode} ${styles.drillConnector}`} key={path}>
+        <li className={buildCompareClassName(styles.drillNode, styles.drillConnector)} key={path}>
           <div className={styles.drillNodeHeader}>
             {hasChildren && (
               <button
@@ -1524,8 +1673,8 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     const limited = items.slice(0, 12);
     const more = Math.max(items.length - limited.length, 0);
     return (
-      <div className={styles.drillDownPanel} style={{ marginTop: 8 }}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>Unsure overlaps</div>
+      <div className={styles.drillDownPanel} style={resolveCompareUnsurePanelStyle()}>
+        <div style={resolveCompareUnsureHeaderStyle()}>Unsure overlaps</div>
         {limited.length === 0 ? (
           <div className={styles.placeholderNote}>No shared Unsure responses found in cached data.</div>
         ) : (
@@ -1539,7 +1688,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
               ))}
             </ul>
             {more > 0 && (
-              <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>...and {more} more</div>
+              <div style={resolveCompareUnsureMoreStyle()}>...and {more} more</div>
             )}
           </>
         )}
@@ -1564,16 +1713,10 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     <div className={styles.compareSection}>
       {bookmarks.length > 0 && (
         <div className={styles.bookmarkedUsersSection}>
-          <div
-            style={{
-              marginBottom: '10px',
-              color: 'white',
-              fontWeight: '600'
-            }}
-          >
+          <div style={resolveCompareBookmarksHeaderStyle()}>
             Bookmarked Users:
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          <div style={resolveCompareBookmarksListStyle()}>
             {bookmarks.map((b) => {
               const short = getShortenedAddress(b.address, false);
               const blockieUrl = generateBlockieDataUrl(String(b.addressLower || b.address || '').toLowerCase(), 8, 4);
@@ -1583,7 +1726,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                 <button
                   key={b.addressLower}
                   type="button"
-                  className={`${styles.resultBadge} ${styles.bookmarkPill}`}
+                  className={buildCompareClassName(styles.resultBadge, styles.bookmarkPill)}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1591,14 +1734,14 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                   }}
                   title={title}
                   aria-label={`Insert ${labelForTitle} (${short})`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                  style={resolveCompareAddressPillContentStyle()}
                 >
                   <img
                     src={blockieUrl}
                     alt=""
                     width={16}
                     height={16}
-                    style={{ borderRadius: 3 }}
+                    style={resolveCompareAddressBlockieStyle()}
                     aria-hidden="true"
                   />
                   <span>{b.label || short}</span>
@@ -1641,7 +1784,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       </button>
 
       {comparisonError && (
-        <div className={styles.comparisonError} role="alert" style={{ marginTop: 8 }}>
+        <div className={styles.comparisonError} role="alert" style={resolveCompareErrorStyle()}>
           {comparisonError}
         </div>
       )}
@@ -1705,7 +1848,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
           <div className={styles.compareSplit} aria-live="polite">
             {/* Left: Visuals (Compass → Venn (if 3) → optional Matrix) */}
             <div className={styles.visualCol}>
-              <div style={{ padding: '6px 0' }}>
+              <div style={resolveCompareVisualSectionStyle()}>
                 {compassLoading ? (
                   <div
                     className={styles.placeholderNote}
@@ -1731,7 +1874,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
               </div>
 
               {participantsCount === 2 && (
-                <div style={{ padding: '6px 0' }}>
+                <div style={resolveCompareVisualSectionStyle()}>
                   <Venn2
                     users={currentUsers.slice(0, 2)} /* NEW: pass users for prompt/image maps */
                     sets={sbtSetsMemo.slice(0, 2)}
@@ -1743,7 +1886,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                 </div>
               )}
               {participantsCount === 3 && (
-                <div style={{ padding: '6px 0' }}>
+                <div style={resolveCompareVisualSectionStyle()}>
                   <Venn3
                     users={currentUsers.slice(0, 3)} /* opinion-first fallback only */
                     sets={sbtSetsMemo.slice(0, 3)}   /* fallback only */
@@ -1774,7 +1917,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
               </div> */}
 
               {showMoreViz && canShowMatrix && !isNarrow && (
-                <div style={{ padding: '6px 0' }}>
+                <div style={resolveCompareVisualSectionStyle()}>
                   {/* <OverlapMatrix users={currentUsers} labels={userLabels} precomputed={matrixData} /> */}
                 </div>
               )}
@@ -1789,7 +1932,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                     {bulletsLoading ? (
                       <li className={styles.resultItem}>
                         <FontAwesomeIcon icon={faSpinner} spin />
-                        <span style={{ marginLeft: 6 }}>Loading...</span>
+                        <span style={resolveCompareLoadingTextStyle()}>Loading...</span>
                       </li>
                     ) : (comparisonResult?.agreements || []).length === 0 ? (
                       <li className={styles.resultEmpty}>No agreements found yet.</li>
@@ -1799,14 +1942,14 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                           key={`ag-${i}`}
                           className={styles.resultItem}
                           onClick={() => toggleDrillDown('agree', i, pt, 'agreement')}
-                          style={{ cursor: 'pointer' }}
+                          style={resolveCompareClickableResultItemStyle()}
                         >
                           <span className={styles.resultPlus} aria-hidden="true">
                             <FontAwesomeIcon icon={faPlus} />
                           </span>
                           <span className={styles.resultText}>{pt}</span>
                           {drillState[`agree-${i}`]?.open && (
-                            <div style={{ marginTop: 6 }}>
+                            <div style={resolveCompareDrillBodyStyle()}>
                               {drillState[`agree-${i}`]?.loading && (
                                 <span className={styles.drillSpinner}>Loading…</span>
                               )}
@@ -1837,7 +1980,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                     {bulletsLoading ? (
                       <li className={styles.resultItem}>
                         <FontAwesomeIcon icon={faSpinner} spin />
-                        <span style={{ marginLeft: 6 }}>Loading...</span>
+                        <span style={resolveCompareLoadingTextStyle()}>Loading...</span>
                       </li>
                     ) : (comparisonResult?.disagreements || []).length === 0 ? (
                       <li className={styles.resultEmpty}>No disagreements found yet.</li>
@@ -1847,14 +1990,14 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                           key={`dis-${i}`}
                           className={styles.resultItem}
                           onClick={() => toggleDrillDown('dis', i, pt, 'disagreement')}
-                          style={{ cursor: 'pointer' }}
+                          style={resolveCompareClickableResultItemStyle()}
                         >
                           <span className={styles.resultPlus} aria-hidden="true">
                             <FontAwesomeIcon icon={faPlus} />
                           </span>
                           <span className={styles.resultText}>{pt}</span>
                           {drillState[`dis-${i}`]?.open && (
-                            <div style={{ marginTop: 6 }}>
+                            <div style={resolveCompareDrillBodyStyle()}>
                               {drillState[`dis-${i}`]?.loading && (
                                 <span className={styles.drillSpinner}>Loading…</span>
                               )}
@@ -1915,10 +2058,9 @@ function Venn2({
         questionsCaches.forEach((cacheObj) => {
           if (!cacheObj || typeof cacheObj !== 'object') return;
           for (const netId in cacheObj) {
-            const net = cacheObj[netId];
-            const qs = net?.questions || {};
+            const qs = readRecordProperty(readRecordProperty(cacheObj, netId), 'questions');
             for (const id in qs) {
-              const q = qs[id];
+              const q = toUnknownRecord(qs[id]);
               const qid = String(q?.id || id || '').toLowerCase();
               const prompt = q?.prompt;
               if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
@@ -1960,8 +2102,8 @@ function Venn2({
   const ax = 140, ay = 100;
   const bx = 220, by = 100;
 
-  const ev = (evidence || {}) as Partial<Record<VennRegionKey, any[]>>;
-  const listFor = (key: VennRegionKey): any[] => (Array.isArray(ev[key]) ? ev[key] : []);
+  const ev = (evidence || {}) as Partial<Record<VennRegionKey, unknown[]>>;
+  const listFor = (key: VennRegionKey): unknown[] => (Array.isArray(ev[key]) ? ev[key] : []);
 
   const normalizeStance = (v: unknown): string => {
     if (v === null || v === undefined) return 'Unsure';
@@ -2137,7 +2279,7 @@ function Venn2({
   };
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', overflowX: 'auto' }}>
+    <div ref={wrapRef} style={resolveCompareVennWrapStyle()}>
       <svg width={width} height={height} role="img" aria-label="2-set Venn">
         <defs>
           <style>{`.vennText{font:12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;fill:#fff}`}</style>
@@ -2158,15 +2300,16 @@ function Venn2({
           id={tooltipIdRef.current}
           role="tooltip"
           className={styles.vennTooltip}
-          style={{
-            left: Math.max(8, Math.min(tip.x + 6, (wrapRef.current?.clientWidth || 420) - 420)),
-            top: tip.y + 8,
-          }}
+          style={resolveCompareVennTooltipStyle({
+            clientWidth: wrapRef.current?.clientWidth,
+            x: tip.x,
+            y: tip.y,
+          })}
           onMouseEnter={cancelCloseTip}
           onMouseLeave={scheduleCloseTip}
         >
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Intersection details</div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          <div style={resolveCompareVennTooltipHeaderStyle()}>Intersection details</div>
+          <ul style={resolveCompareVennTooltipListStyle()}>
             {tip.items.map((item, i) => {
               const userIndices = keyToIndices[(tip.key || 'a') as keyof typeof keyToIndices] || [];
               let votes: Array<number | null> = [];
@@ -2192,9 +2335,9 @@ function Venn2({
               return (
                 <li key={i}>
                   {item.type === 'sbt' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={resolveCompareVennSbtRowStyle()}>
                       {item.image && (
-                        <img src={normalizeArweaveUrl(item.image, { contextLabel: 'compare_sbt_image' })} alt="" width="24" height="24" style={{ borderRadius: '4px', flexShrink: 0 }} />
+                        <img src={normalizeArweaveUrl(item.image, { contextLabel: 'compare_sbt_image' })} alt="" width="24" height="24" style={resolveCompareVennSbtImageStyle()} />
                       )}
                       <span>{item.name}</span>
                     </div>
@@ -2203,7 +2346,7 @@ function Venn2({
                     <PolisQuestionHoverCard
                       label={label}
                       prompt={item.prompt}
-                      votes={votes as any}
+                      votes={votes}
                       metaLabel={metaLabel}
                     />
                   )}
@@ -2214,7 +2357,7 @@ function Venn2({
         </div>
       )}
 
-      <div style={{ opacity: 0.75, fontSize: 12, marginTop: 4 }}>
+      <div style={resolveCompareVennNoteStyle()}>
         {semantics
           ? semantics
           : (mode === 'opinion'
@@ -2253,10 +2396,9 @@ function Venn3({
         questionsCaches.forEach((cacheObj) => {
           if (!cacheObj || typeof cacheObj !== 'object') return;
           for (const netId in cacheObj) {
-            const net = cacheObj[netId];
-            const qs = net?.questions || {};
+            const qs = readRecordProperty(readRecordProperty(cacheObj, netId), 'questions');
             for (const id in qs) {
-              const q = qs[id];
+              const q = toUnknownRecord(qs[id]);
               const qid = String(q?.id || id || '').toLowerCase();
               const prompt = q?.prompt;
               if (qid && prompt && !m.has(qid)) m.set(qid, String(prompt));
@@ -2308,8 +2450,8 @@ function Venn3({
   const bx = 230, by = 110;
   const cx = 180, cy = 170;
 
-  const ev = (evidence || {}) as Partial<Record<VennRegionKey, any[]>>;
-  const listFor = (key: VennRegionKey): any[] => (Array.isArray(ev[key]) ? ev[key] : []);
+  const ev = (evidence || {}) as Partial<Record<VennRegionKey, unknown[]>>;
+  const listFor = (key: VennRegionKey): unknown[] => (Array.isArray(ev[key]) ? ev[key] : []);
 
   const normalizeStance = (v: unknown): string => {
     if (v === null || v === undefined) return 'Unsure';
@@ -2489,7 +2631,7 @@ function Venn3({
   };
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', overflowX: 'auto' }}>
+    <div ref={wrapRef} style={resolveCompareVennWrapStyle()}>
       <svg width={width} height={height} role="img" aria-label="3-set Venn">
         <defs>
           <style>
@@ -2518,15 +2660,16 @@ function Venn3({
           id={tooltipIdRef.current}
           role="tooltip"
           className={styles.vennTooltip}
-          style={{
-            left: Math.max(8, Math.min(tip.x + 6, (wrapRef.current?.clientWidth || 420) - 420)),
-            top: tip.y + 8,
-          }}
+          style={resolveCompareVennTooltipStyle({
+            clientWidth: wrapRef.current?.clientWidth,
+            x: tip.x,
+            y: tip.y,
+          })}
           onMouseEnter={cancelCloseTip}
           onMouseLeave={scheduleCloseTip}
         >
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>Intersection details</div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          <div style={resolveCompareVennTooltipHeaderStyle()}>Intersection details</div>
+          <ul style={resolveCompareVennTooltipListStyle()}>
             {tip.items.map((item, i) => {
               const userIndices = keyToIndices[(tip.key || 'a') as keyof typeof keyToIndices] || [];
               let votes: Array<number | null> = [];
@@ -2552,9 +2695,9 @@ function Venn3({
               return (
                 <li key={i}>
                   {item.type === 'sbt' && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={resolveCompareVennSbtRowStyle()}>
                       {item.image && (
-                        <img src={normalizeArweaveUrl(item.image, { contextLabel: 'compare_sbt_image' })} alt="" width="24" height="24" style={{ borderRadius: '4px', flexShrink: 0 }} />
+                        <img src={normalizeArweaveUrl(item.image, { contextLabel: 'compare_sbt_image' })} alt="" width="24" height="24" style={resolveCompareVennSbtImageStyle()} />
                       )}
                       <span>{item.name}</span>
                     </div>
@@ -2563,7 +2706,7 @@ function Venn3({
                     <PolisQuestionHoverCard
                       label={label}
                       prompt={item.prompt}
-                      votes={votes as any}
+                      votes={votes}
                       metaLabel={metaLabel}
                     />
                   )}
@@ -2574,7 +2717,7 @@ function Venn3({
         </div>
       )}
 
-      <div style={{ opacity: 0.75, fontSize: 12, marginTop: 4 }}>
+      <div style={resolveCompareVennNoteStyle()}>
         {semantics
           ? semantics
           : (mode === 'opinion'
@@ -2650,15 +2793,10 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
   return (
     <>
       {/* Keep ONLY the compass legend (no Venn legend elsewhere) */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+      <div style={resolveCompareCompassLegendStyle()}>
         {users.map((u, i) => (
           <div key={String(u?.address || i)} className={styles.resultBadge} aria-label={`Legend item for ${labels[i] || `User ${i+1}`}`}>
-            <span style={{
-              display: 'inline-block',
-              width: 10, height: 10, borderRadius: 5,
-              background: colorFor(i),
-              marginRight: 6
-            }} />
+            <span style={resolveCompareCompassLegendSwatchStyle(colorFor(i))} />
             {labels[i] || `User ${i + 1}`}
           </div>
         ))}
@@ -2674,7 +2812,7 @@ export function OpinionCompass2D({ users = [], labels = [], precomputed = null }
           <FontAwesomeIcon icon={faDownload} />
         </button>
 
-        <div style={{ overflowX: 'auto' }}>
+        <div style={resolveCompareCompassScrollStyle()}>
           <svg
             ref={svgRef}
             width={width}

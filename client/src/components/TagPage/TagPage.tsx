@@ -29,6 +29,7 @@ import {
   buildTagPagePath,
 } from '../SurveyTool/QuestionTagDropdown';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
+import type { RootState } from '../../reducers/index.js';
 import styles from './TagPage.module.scss';
 
 const buildTagInterpretationPromptUntyped = buildTagInterpretationPrompt as (args: {
@@ -46,9 +47,8 @@ type NetworkLike = {
 
 type SessionSelectionState = {
   selectedSessionScope?: string;
-  selectedSessionSlugs?: unknown[];
+  selectedSessionSlugs?: string[];
   primarySessionSlug?: string;
-  [key: string]: unknown;
 };
 
 type ScopeState = {
@@ -1519,10 +1519,7 @@ export const TagPageView = ({
   );
 };
 
-const mapStateToProps = (state: {
-  profile?: { network?: NetworkLike };
-  sessionState?: SessionSelectionState;
-}) => ({
+const mapStateToProps = (state: RootState) => ({
   network: state?.profile?.network || null,
   sessionState: state?.sessionState || {},
 });
