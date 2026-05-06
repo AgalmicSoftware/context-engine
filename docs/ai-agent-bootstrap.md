@@ -33,14 +33,39 @@ It does two things:
 - Local Claude Code companion:
   - `contextEngine-cc/README.md`
   - `contextEngine-cc/lib/routeInventory.mjs`
+- Canonical local agent HTTP contract:
+  - `docs/agent-native-contract.md`
+  - `GET /api/agent/me`
+  - `GET /api/agent/sessions`
+  - `GET /api/agent/questions?session=<slug>`
+  - `POST /api/agent/responses/draft`
+  - `POST /api/agent/responses/submit-request`
+  - `contextEngine-cc/lib/agent/mcpTools.mjs`
 
 ## Recommended Current Path
 
 1. Bootstrap against `AGENTS.md`, `README.md`, `ARCHITECTURE.md`, and `docs/run-modes.md` before making assumptions about runtime mode.
 2. Prefer the documented TestID API for deterministic browser interaction instead of ad hoc selectors.
 3. If you are driving the dev browser surface, inspect `window.__ceAgent.describe()` first so the supported actions and higher-level tools are explicit.
-4. If you are integrating through `contextEngine-cc`, treat `contextEngine-cc/lib/routeInventory.mjs` as the canonical local HTTP route inventory until the MCP surface lands.
+4. If you are integrating through `contextEngine-cc`, prefer canonical `/api/agent/*` routes. Treat `contextEngine-cc/lib/routeInventory.mjs` as route inventory, not the long-term agent contract.
 5. Keep live-vs-mock and chain-runtime intent explicit in E2E work; decide upfront whether a run is `onchain`, `local`, or today’s manual-fork workaround, and do not rely on silent fallback sessions, workers, or credentials.
+
+## OpenClaw And Telegram Runbook
+
+OpenClaw:
+
+- Use MCP when available; its tools must wrap `/api/agent/*`.
+- Direct HTTP fallback works and should be equivalent.
+- Surface `requestId` and `approvalUrl` to the user when submission requires approval.
+- Treat thread forwarding as an optional adapter, not a hard dependency.
+
+Telegram:
+
+- Prefer private DM and Mini App flows for v1.
+- Never put CE-CC JWTs, worker tokens, private keys, long-lived bearer tokens, or signing authority in chat state, callback data, CloudStorage, or Mini App handoff payloads.
+- Use opaque short callback action IDs.
+- Validate Mini App `initData` server-side before trusting Telegram identity.
+- Use SecureStorage only for short-lived scoped grants or refresh handles when feature-detected; use CloudStorage only for non-sensitive preferences.
 
 ## PRD Map
 
@@ -62,7 +87,8 @@ The current safe path is:
 
 - bootstrap from the canonical docs
 - automate through stable TestIDs or `window.__ceAgent`
-- use `contextEngine-cc` for local companion flows
+- use canonical `/api/agent/*` routes for local companion agent flows
+- use MCP as a thin wrapper over `/api/agent/*` when available
 - verify with explicit E2E mode choices
 
 The PRDs above are the roadmap for turning that into a fuller MCP + JSON + deterministic-local-verification platform.
