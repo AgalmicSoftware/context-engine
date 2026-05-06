@@ -1,10 +1,3 @@
-jest.mock('./contractScripts.js', () => ({
-  __esModule: true,
-  default: {
-    userHasSBT: jest.fn(),
-  },
-}));
-
 import store from '../../store.js';
 import contractScripts from './contractScripts.js';
 import {
@@ -13,6 +6,13 @@ import {
   resolveGroupPathRpcPreference,
 } from './rpcProviders.js';
 import { checkSponsoredAccess } from './sponsoredAccess.js';
+
+jest.mock('./contractScripts.js', () => ({
+  __esModule: true,
+  default: {
+    userHasSBT: jest.fn(),
+  },
+}));
 
 const ROOT_RPC_URL = 'https://session-sponsored.example/rpc';
 const FAILING_ROOT_RPC_URL = 'https://session-sponsored-failing.example/rpc';

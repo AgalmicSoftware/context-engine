@@ -24,6 +24,7 @@ type SessionDocumentsPageProps = {
     id?: number | string | null;
   } | null;
   account?: string;
+  litHooks?: unknown;
   loginComplete?: boolean;
   toggleLoginModal?: () => void;
   sessionToken?: string;
@@ -48,6 +49,7 @@ export default function SessionDocumentsPage({
   provider,
   network,
   account,
+  litHooks,
   loginComplete,
   toggleLoginModal,
   sessionToken,
@@ -79,6 +81,7 @@ export default function SessionDocumentsPage({
         provider={provider}
         network={network}
         account={account}
+        litHooks={litHooks}
         loginComplete={loginComplete}
         toggleLoginModal={toggleLoginModal}
         sessionSlug={sessionSlug}

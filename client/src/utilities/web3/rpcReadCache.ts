@@ -38,10 +38,18 @@ interface RpcCacheByMethod {
   eth_chainId: Map<string, RpcCacheEntry>;
 }
 
+interface RpcRateLimitState {
+  failures: number;
+  lastErrorAt: number;
+  nextRetryAt: number;
+  retryAfterMs: number;
+}
+
 interface RpcReadCacheState {
   v: number;
   inflight: Map<string, Promise<any>>;
   cacheByMethod: RpcCacheByMethod;
+  rateLimits: Map<string, RpcRateLimitState>;
 }
 
 interface ProviderDebugContext extends LooseObject {
@@ -103,6 +111,7 @@ const createGlobalCacheState = (): RpcReadCacheState => ({
   v: 1,
   inflight: new Map<string, Promise<any>>(),
   cacheByMethod: createCacheByMethod(),
+  rateLimits: new Map<string, RpcRateLimitState>(),
 });
 
 const getGlobalObject = (): RpcCacheGlobals => (
@@ -120,6 +129,8 @@ const normalizeDebugMethod = (value: unknown): string => {
 };
 
 const nowMs = (): number => Date.now();
+const RPC_RATE_LIMIT_BASE_BACKOFF_MS = 2_000;
+const RPC_RATE_LIMIT_MAX_BACKOFF_MS = 60_000;
 
 const isCacheDisabled = (): boolean => {
   try {
@@ -403,7 +414,158 @@ const getGlobalCache = (): RpcReadCacheState => {
   if (!g.__CE_RPC_READ_CACHE__ || typeof g.__CE_RPC_READ_CACHE__ !== 'object') {
     g.__CE_RPC_READ_CACHE__ = createGlobalCacheState();
   }
+  if (!(g.__CE_RPC_READ_CACHE__.rateLimits instanceof Map)) {
+    g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
+  }
   return g.__CE_RPC_READ_CACHE__;
+};
+
+const getNumericRpcErrorStatus = (err: unknown): number => {
+  const e = isObj(err) ? err : {};
+  const nestedError: LooseObject = isObj(e.error) ? e.error : {};
+  const response: LooseObject = isObj(e.response) ? e.response : {};
+  const info: LooseObject = isObj(e.info) ? e.info : {};
+  const candidates = [
+    e.status,
+    e.statusCode,
+    e.code,
+    nestedError.status,
+    nestedError.statusCode,
+    nestedError.code,
+    response.status,
+    response.statusCode,
+    info.responseStatus,
+    info.status,
+  ];
+  for (const candidate of candidates) {
+    const n = Number(candidate);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return 0;
+};
+
+const getRpcErrorText = (err: unknown): string => {
+  const parts: string[] = [];
+  const visit = (value: unknown, depth: number): void => {
+    if (value == null || depth > 3) return;
+    if (typeof value === 'string') {
+      parts.push(value);
+      return;
+    }
+    if (!isObj(value)) return;
+    const record = value as LooseObject;
+    ['message', 'reason', 'body', 'details', 'shortMessage', 'responseText'].forEach((key) => {
+      const item = record[key];
+      if (typeof item === 'string') parts.push(item);
+    });
+    visit(record.error, depth + 1);
+    visit(record.response, depth + 1);
+    visit(record.info, depth + 1);
+  };
+  visit(err, 0);
+  return parts.join(' ');
+};
+
+const isRpcRateLimitError = (err: unknown): boolean => {
+  if (getNumericRpcErrorStatus(err) === 429) return true;
+  return /\b429\b|too many requests|rate[-\s]?limit|throttl/i.test(getRpcErrorText(err));
+};
+
+const readHeaderValue = (headers: unknown, name: string): string => {
+  if (!headers) return '';
+  const lowerName = name.toLowerCase();
+  try {
+    const getter = (headers as any)?.get;
+    if (typeof getter === 'function') {
+      return toStr(getter.call(headers, name) || getter.call(headers, lowerName)).trim();
+    }
+  } catch (_) {
+    // fall through to object lookup
+  }
+  if (!isObj(headers)) return '';
+  return toStr(headers[name] || headers[lowerName]).trim();
+};
+
+const parseRetryAfterMs = (value: unknown): number => {
+  const raw = toStr(value).trim();
+  if (!raw) return 0;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.max(0, Math.floor(seconds * 1000));
+  const dateMs = Date.parse(raw);
+  if (!Number.isFinite(dateMs)) return 0;
+  return Math.max(0, dateMs - nowMs());
+};
+
+const getRetryAfterMsFromError = (err: unknown): number => {
+  if (!isObj(err)) return 0;
+  const e = err as LooseObject;
+  const response: LooseObject = isObj(e.response) ? e.response : {};
+  const headers = isObj(e.headers) ? e.headers : response.headers;
+  const directRetryAfterMs = Number(e.retryAfterMs);
+  return Math.max(
+    Number.isFinite(directRetryAfterMs) && directRetryAfterMs >= 0 ? directRetryAfterMs : 0,
+    parseRetryAfterMs(e.retryAfter),
+    parseRetryAfterMs(readHeaderValue(headers, 'retry-after')),
+  );
+};
+
+const getRpcRateLimitKey = (meta: ProviderSendMeta): string => {
+  const urlPart = toStr(meta.url || '').trim();
+  const providerPart = urlPart || toStr(meta.providerKey || '').trim();
+  if (!providerPart) return '';
+  return `${Number(meta.chainId || 0) || 'unknown'}|${providerPart}`;
+};
+
+const buildRpcRateLimitBackoffError = (
+  meta: ProviderSendMeta,
+  state: RpcRateLimitState,
+): Error & LooseObject => {
+  const retryAfterMs = Math.max(0, Math.ceil(Number(state.nextRetryAt || 0) - nowMs()));
+  const label = toStr(meta.providerLabel || meta.providerKey || meta.url || 'RPC endpoint').trim();
+  const err = new Error(`RPC endpoint is backing off after rate limiting (${label}); retry in ${Math.ceil(retryAfterMs / 1000)}s`) as Error & LooseObject;
+  err.name = 'RpcRateLimitBackoffError';
+  err.code = 'CE_RPC_RATE_LIMIT_BACKOFF';
+  err.status = 429;
+  err.retryAfterMs = retryAfterMs;
+  err.chainId = meta.chainId;
+  err.providerKey = meta.providerKey;
+  err.url = meta.url;
+  return err;
+};
+
+const getRpcRateLimitBackoffError = (key: string, meta: ProviderSendMeta): (Error & LooseObject) | null => {
+  if (!key) return null;
+  const state = getGlobalCache().rateLimits.get(key);
+  if (!state) return null;
+  if (Number(state.nextRetryAt || 0) <= nowMs()) return null;
+  return buildRpcRateLimitBackoffError(meta, state);
+};
+
+const recordRpcRateLimitSuccess = (key: string): void => {
+  if (!key) return;
+  getGlobalCache().rateLimits.delete(key);
+};
+
+const recordRpcRateLimitError = (key: string, err: unknown): void => {
+  if (!key || !isRpcRateLimitError(err)) return;
+  const cache = getGlobalCache();
+  const prev = cache.rateLimits.get(key);
+  const failures = Math.max(1, Number(prev?.failures || 0) + 1);
+  const exponentialMs = Math.min(
+    RPC_RATE_LIMIT_MAX_BACKOFF_MS,
+    RPC_RATE_LIMIT_BASE_BACKOFF_MS * Math.pow(2, Math.min(10, failures - 1)),
+  );
+  const retryAfterMs = Math.min(
+    RPC_RATE_LIMIT_MAX_BACKOFF_MS,
+    Math.max(exponentialMs, getRetryAfterMsFromError(err)),
+  );
+  const now = nowMs();
+  cache.rateLimits.set(key, {
+    failures,
+    lastErrorAt: now,
+    nextRetryAt: now + retryAfterMs,
+    retryAfterMs,
+  });
 };
 
 export const evictExpiredEntries = (): number => {
@@ -490,6 +652,8 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
   const providerKey = toStr(meta.providerKey || '').trim();
   const url = toStr(meta.url || '').trim();
   const providerLabel = toStr(meta.providerLabel || '').trim();
+  const sendMeta: ProviderSendMeta = { chainId, providerKey, providerLabel, url };
+  const rateLimitKey = getRpcRateLimitKey(sendMeta);
 
   const providerInstanceId = (() => {
     try {
@@ -539,7 +703,16 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
 
     // Fast path: if this method is not a target for dedupe/TTL caching, do nothing.
     if (!wantsDedupe && !wantsTtl && !debugOnly) {
-      return await originalSend(methodIn, paramsIn);
+      const backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
+      if (backoffError) throw backoffError;
+      try {
+        const result = await originalSend(methodIn, paramsIn);
+        recordRpcRateLimitSuccess(rateLimitKey);
+        return result;
+      } catch (err) {
+        recordRpcRateLimitError(rateLimitKey, err);
+        throw err;
+      }
     }
 
     const cacheOff = isCacheDisabled();
@@ -586,6 +759,26 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
     }
 
+    const backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
+    if (backoffError) {
+      if (isDebug) {
+        rpcDebugRecord({
+          chainId,
+          providerKey,
+          url,
+          method,
+          params,
+          fnTag: debugContext.fnTag,
+          scopeTag: debugContext.scopeTag,
+          outcome: 'error',
+          ms: nowMs() - t0,
+          stackSnippet,
+          keyHash,
+        });
+      }
+      throw backoffError;
+    }
+
     const globalCache = getGlobalCache();
     if (shouldDedupe) {
       const inflight = globalCache.inflight.get(keyHash);
@@ -618,6 +811,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
     try {
       const result = await run;
       const elapsed = nowMs() - t0;
+      recordRpcRateLimitSuccess(rateLimitKey);
       if (ttlMs > 0) {
         const cacheMap = getCacheMapForMethod(method);
         const limit = METHOD_CACHE_LIMITS[method as RpcCacheMethod] || 0;
@@ -642,6 +836,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
       return result;
     } catch (err) {
+      recordRpcRateLimitError(rateLimitKey, err);
       if (isDebug) {
         rpcDebugRecord({
           chainId,
@@ -668,7 +863,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
   // Small hint to make debugging easier (non-enumerable).
   try {
     Object.defineProperty(provider, '__CE_RPC_SEND_META', {
-      value: { chainId, providerKey, providerLabel, url },
+      value: sendMeta,
       enumerable: false,
     });
   } catch (e) { log.warn('rpcReadCache: fallback', e); }
@@ -682,6 +877,7 @@ export const __test__resetRpcReadCache = (): void => {
     try {
       g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<any>>();
       g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
+      g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
     } catch (e) { log.warn('rpcReadCache: fallback', e); }
   }
   if (evictionIntervalId != null) {
