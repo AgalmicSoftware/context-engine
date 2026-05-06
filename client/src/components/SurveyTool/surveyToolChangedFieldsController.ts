@@ -1,11 +1,22 @@
+import type { UnknownRecord } from './surveyToolTypes';
+
+export type ResponseFieldState = UnknownRecord & {
+  value?: unknown;
+  encrypted?: unknown;
+  encryptedPortion?: unknown;
+  encryptionAudience?: unknown;
+  audienceMode?: unknown;
+};
+
 export type ResponseSlice = {
-  answers: Record<string, any>;
-  importance: Record<string, any>;
-  conviction: Record<string, any>;
-  additionalComments: Record<string, any>;
+  answers: Record<string, ResponseFieldState>;
+  importance: Record<string, unknown>;
+  conviction: Record<string, unknown>;
+  additionalComments: Record<string, ResponseFieldState>;
 };
 
 export type IndexedKeyMap = Map<string, string[]>;
+type ChangedFieldMap = Record<string, Record<string, number>>;
 
 export interface ChangedFieldsOrchestrationParams {
   surveyIndex: number;
@@ -13,7 +24,7 @@ export interface ChangedFieldsOrchestrationParams {
   isLoggedIn: boolean;
   isLoadingResponse: boolean;
   scopedIds: Set<string>;
-  userAnswers: any;
+  userAnswers: unknown;
 }
 
 export interface ChangedFieldsDiffCache {
@@ -25,47 +36,47 @@ export interface ChangedFieldsDiffCache {
   allowLocalCache: boolean;
   idsScopeKey: string;
   idsScopeMode: string;
-  result: { changedQids: Set<string>; changedMap: Record<string, Record<string, number>> };
+  result: { changedQids: Set<string>; changedMap: ChangedFieldMap };
 }
 
 export interface ChangedFieldsOrchestrationDeps {
   resolveDiffBaselineSlice: (allowLocalCache: boolean) => ResponseSlice;
-  getIndexedQuestionEntryKeys: (source: Record<string, any> | null | undefined) => IndexedKeyMap | null;
-  getDefaultResponseEncryptionAudience: () => any;
-  normalizeResponseEncryptionAudience: (audience: any, qid: string) => any;
-  getDefaultResponseEncryptionAudienceForQid: (qid: string) => any;
-  resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => any;
-  normalizeFieldAudienceMode: (mode: any, fieldKey: string, field: any) => any;
+  getIndexedQuestionEntryKeys: (source: Record<string, unknown> | null | undefined) => IndexedKeyMap | null;
+  getDefaultResponseEncryptionAudience: () => unknown;
+  normalizeResponseEncryptionAudience: (audience: unknown, qid: string) => unknown;
+  getDefaultResponseEncryptionAudienceForQid: (qid: string) => unknown;
+  resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => unknown;
+  normalizeFieldAudienceMode: (mode: unknown, fieldKey: string, field: ResponseFieldState) => unknown;
   valuesEqual: (left: unknown, right: unknown) => boolean;
   buildSurveyResponseSliceSignature: (slice: ResponseSlice, opts?: { normalizedIdFilter?: Set<string> | null }) => string;
-  buildRatingEnvelopeQidSetFromUserAnswers: (userAnswers: any) => Set<string>;
-  hasMeaningfulFieldValue: (value: any) => boolean;
+  buildRatingEnvelopeQidSetFromUserAnswers: (userAnswers: unknown) => Set<string>;
+  hasMeaningfulFieldValue: (value: unknown) => boolean;
   bumpPerfCounter: (name: string) => void;
 }
 
 export interface ChangedFieldsOrchestrationResult {
-  result: { changedQids: Set<string>; changedMap: Record<string, Record<string, number>> };
+  result: { changedQids: Set<string>; changedMap: ChangedFieldMap };
   newCache: ChangedFieldsDiffCache;
 }
 
 export interface PendingEditStatsParams {
   idx: number;
   currentSlice: ResponseSlice;
-  userAnswers: any;
+  userAnswers: unknown;
   existingCache: PendingEditStatsCache | null;
-  diffCacheRef: any;
-  questionPool: any;
-  pileQuestions: any;
+  diffCacheRef: unknown;
+  questionPool: unknown;
+  pileQuestions: unknown;
   questionId: string | null | undefined;
 }
 
 export interface PendingEditStatsCache {
   idx: number;
-  diffCacheRef: any;
+  diffCacheRef: unknown;
   currentSlice: ResponseSlice;
-  userAnswers: any;
-  questionPool: any;
-  pileQuestions: any;
+  userAnswers: unknown;
+  questionPool: unknown;
+  pileQuestions: unknown;
   questionId: string | null | undefined;
   result: { total: number; encrypted: number };
 }
@@ -73,10 +84,10 @@ export interface PendingEditStatsCache {
 export interface PendingEditStatsDeps {
   getChangedQidsAndFields: (idx: number) => {
     changedQids: Set<string>;
-    changedMap: Record<string, Record<string, number>>;
+    changedMap: ChangedFieldMap;
   };
   isQuestionLockedForResponse: (qid: string) => boolean;
-  buildRatingEnvelopeQidSetFromUserAnswers: (userAnswers: any) => Set<string>;
+  buildRatingEnvelopeQidSetFromUserAnswers: (userAnswers: unknown) => Set<string>;
 }
 
 export interface PendingEditStatsResult {
@@ -85,7 +96,7 @@ export interface PendingEditStatsResult {
 }
 
 export const buildIndexedQuestionEntryKeys = (
-  source: Record<string, any> | null | undefined,
+  source: Record<string, unknown> | null | undefined,
   normalizeKey: (key: string) => string,
 ): IndexedKeyMap | null => {
   if (!source || typeof source !== 'object') return null;
@@ -177,7 +188,7 @@ export const orchestrateGetChangedQidsAndFields = (
 
   if (!hasScopedIds) {
     const idsFromSlices = new Set<string>();
-    const addNormalizedIds = (source: Record<string, any> | null | undefined) => {
+    const addNormalizedIds = (source: Record<string, unknown> | null | undefined) => {
       const indexed = deps.getIndexedQuestionEntryKeys(source);
       if (!indexed) return;
       indexed.forEach((_keys, normalizedQid) => {
@@ -341,7 +352,7 @@ export const computePendingEditStats = (
 };
 
 const getMatchingKeys = (
-  source: Record<string, any> | null,
+  source: Record<string, unknown> | null,
   indexed: IndexedKeyMap | null,
   qidLower: string,
 ): string[] => {
@@ -350,23 +361,23 @@ const getMatchingKeys = (
 };
 
 export const pickBestField = (
-  source: Record<string, any> | null,
+  source: Record<string, unknown> | null,
   indexed: IndexedKeyMap | null,
   qidLower: string,
-  hasMeaningfulFieldValue: (value: any) => boolean,
-): Record<string, any> => {
+  hasMeaningfulFieldValue: (value: unknown) => boolean,
+): ResponseFieldState => {
   const matchingKeys = getMatchingKeys(source, indexed, qidLower);
   if (matchingKeys.length === 0) return {};
   if (!source) return {};
 
-  let exactValue: Record<string, any> | undefined;
-  let firstMeaningfulValue: Record<string, any> | undefined;
-  let firstEncryptedValue: Record<string, any> | undefined;
-  let lastValue: Record<string, any> = {};
+  let exactValue: ResponseFieldState | undefined;
+  let firstMeaningfulValue: ResponseFieldState | undefined;
+  let firstEncryptedValue: ResponseFieldState | undefined;
+  let lastValue: ResponseFieldState = {};
   for (let i = 0; i < matchingKeys.length; i += 1) {
     const key = matchingKeys[i];
     const value = source[key];
-    const normalizedValue = (value || {}) as Record<string, any>;
+    const normalizedValue = (value || {}) as ResponseFieldState;
     lastValue = normalizedValue;
     if (key === qidLower && hasMeaningfulFieldValue(value)) return normalizedValue;
     if (typeof firstMeaningfulValue === 'undefined' && hasMeaningfulFieldValue(value)) {
@@ -378,7 +389,7 @@ export const pickBestField = (
     if (
       typeof firstEncryptedValue === 'undefined' &&
       value &&
-      (value.encrypted || value.encryptedPortion)
+      (normalizedValue.encrypted || normalizedValue.encryptedPortion)
     ) {
       firstEncryptedValue = normalizedValue;
     }
@@ -390,14 +401,14 @@ export const pickBestField = (
 };
 
 export const pickBestNumber = (
-  source: Record<string, any> | null,
+  source: Record<string, unknown> | null,
   indexed: IndexedKeyMap | null,
   qidLower: string,
 ): number | null => {
   const matchingKeys = getMatchingKeys(source, indexed, qidLower);
   if (matchingKeys.length === 0) return null;
   if (!source) return null;
-  const toNum = (v: any) => (
+  const toNum = (v: unknown) => (
     v === undefined || v === null || Number.isNaN(Number(v)) ? null : Number(v)
   );
   const exactKey = matchingKeys.find((key) => key === qidLower);
@@ -442,13 +453,13 @@ export const computeChangedQidsAndFields = ({
   currentConvictionKeys: IndexedKeyMap | null;
   ratingEnvelopeQids: Set<string>;
   valuesEqual: (left: unknown, right: unknown) => boolean;
-  hasMeaningfulFieldValue: (value: any) => boolean;
-  resolveAudience: (field: any, qid: string | null) => any;
-  resolveGateId: (field: any, qid: string | null, fieldKey: string) => any;
-  resolveAudienceMode: (field: any, fieldKey: string) => any;
-}): { changedQids: Set<string>; changedMap: Record<string, Record<string, number>> } => {
+  hasMeaningfulFieldValue: (value: unknown) => boolean;
+  resolveAudience: (field: ResponseFieldState, qid: string | null) => unknown;
+  resolveGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => unknown;
+  resolveAudienceMode: (field: ResponseFieldState, fieldKey: string) => unknown;
+}): { changedQids: Set<string>; changedMap: ChangedFieldMap } => {
   const changedQids = new Set<string>();
-  const changedMap: Record<string, Record<string, number>> = {};
+  const changedMap: ChangedFieldMap = {};
 
   ids.forEach((qId) => {
     const bAns = pickBestField(

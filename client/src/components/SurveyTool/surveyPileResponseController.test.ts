@@ -1,5 +1,6 @@
 import {
   buildPileCachePrefillStatePlan,
+  buildPileInitializeResponseStatePatch,
   executeEnsureVisiblePileResponseState,
   executePileInitializeResponseState,
   executePileQuestionSetHydration,
@@ -154,6 +155,27 @@ describe('surveyPileResponseController', () => {
     expect(nextState.surveysResponseState?.[0]?.answers?.q1?.value).toBe('cached-answer');
     expect(nextState).not.toHaveProperty('editBaseline');
     expect(nextState).not.toHaveProperty('baselineResponses');
+  });
+
+  it('builds pile response initialization state patches with a normalized baseline', () => {
+    const initialSlice = {
+      answers: { q1: { value: 'answer', encrypted: false } },
+      additionalComments: {},
+    };
+
+    const patch = buildPileInitializeResponseStatePatch({
+      cloneValue,
+      initialSlice,
+    });
+
+    expect(patch.surveysResponseState).toEqual([initialSlice]);
+    expect(patch.editBaseline).toEqual({
+      answers: { q1: { value: 'answer', encrypted: false } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
+    });
+    expect(patch.editBaseline).not.toBe(initialSlice);
   });
 
   it('skips duplicate pile response-window initialization while still invoking the completion callback', () => {

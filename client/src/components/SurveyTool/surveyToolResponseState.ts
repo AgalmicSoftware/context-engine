@@ -61,6 +61,22 @@ const hasPresentResponseValue = (value: unknown): boolean => (
   (Array.isArray(value) ? value.length > 0 : String(value).length > 0)
 );
 
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const hasHydratableFieldPayload = (field: unknown): field is UnknownRecord => {
+  if (!isRecord(field)) return false;
+  return (
+    Object.prototype.hasOwnProperty.call(field, 'value') ||
+    Object.prototype.hasOwnProperty.call(field, 'encrypted') ||
+    Object.prototype.hasOwnProperty.call(field, 'encryptedPortion') ||
+    Object.prototype.hasOwnProperty.call(field, 'hash') ||
+    Object.prototype.hasOwnProperty.call(field, 'encryptionAudience') ||
+    Object.prototype.hasOwnProperty.call(field, 'audienceMode')
+  );
+};
+
 export const toNumberOrNull = (value: unknown): number | null => {
   if (value === undefined || value === null) return null;
   const num = Number(value);
@@ -143,8 +159,10 @@ export const buildQuestionResponseHydrationPatch = ({
   }
 
   const qid = normalizeQuestionIdKey(questionId);
-  const ans = (response.answer && typeof response.answer === 'object') ? response.answer as UnknownRecord : {};
-  const add = (response.additional && typeof response.additional === 'object') ? response.additional as UnknownRecord : {};
+  const hasAnswerPayload = hasHydratableFieldPayload(response.answer);
+  const hasAdditionalPayload = hasHydratableFieldPayload(response.additional);
+  const ans = hasAnswerPayload ? response.answer as UnknownRecord : {};
+  const add = hasAdditionalPayload ? response.additional as UnknownRecord : {};
   const prevAns = (currentAnswer && typeof currentAnswer === 'object') ? currentAnswer : {};
   const prevAdd = (currentAdditional && typeof currentAdditional === 'object') ? currentAdditional : {};
   const parseValue = deps.parseValue;
@@ -175,7 +193,7 @@ export const buildQuestionResponseHydrationPatch = ({
   let importanceChanged = false;
   let convictionChanged = false;
 
-  if ((!hasPresentResponseValue(prevAns?.value) || allowOverwrite)) {
+  if (hasAnswerPayload && (!hasPresentResponseValue(prevAns?.value) || allowOverwrite)) {
     const answerAudience = typeof normalizeResponseEncryptionAudience === 'function'
       ? normalizeResponseEncryptionAudience(
           ans.encryptionAudience || (
@@ -225,7 +243,7 @@ export const buildQuestionResponseHydrationPatch = ({
     }
   }
 
-  if ((!hasPresentResponseValue(prevAdd?.value) || allowOverwrite)) {
+  if (hasAdditionalPayload && (!hasPresentResponseValue(prevAdd?.value) || allowOverwrite)) {
     const additionalAudienceMode = typeof normalizeFieldAudienceMode === 'function'
       ? normalizeFieldAudienceMode(add.audienceMode, 'additional', add)
       : add.audienceMode;
@@ -296,8 +314,10 @@ export const buildQuestionCacheHydrationPatch = ({
   }
 
   const qid = normalizeQuestionIdKey(questionId);
-  const ans = (response.answer && typeof response.answer === 'object') ? response.answer as UnknownRecord : {};
-  const add = (response.additional && typeof response.additional === 'object') ? response.additional as UnknownRecord : {};
+  const hasAnswerPayload = hasHydratableFieldPayload(response.answer);
+  const hasAdditionalPayload = hasHydratableFieldPayload(response.additional);
+  const ans = hasAnswerPayload ? response.answer as UnknownRecord : {};
+  const add = hasAdditionalPayload ? response.additional as UnknownRecord : {};
   const parseValue = deps.parseValue;
   const normalizeResponseEncryptionAudience = deps.normalizeResponseEncryptionAudience;
   const getDefaultResponseEncryptionAudienceForQid = deps.getDefaultResponseEncryptionAudienceForQid;
@@ -307,7 +327,7 @@ export const buildQuestionCacheHydrationPatch = ({
   const buildEmptyResponseFieldState = deps.buildEmptyResponseFieldState;
 
   const answerEncrypted = !!(ans.encrypted || ans.encryptedPortion);
-  const answerAudience = typeof normalizeResponseEncryptionAudience === 'function'
+  const answerAudience = hasAnswerPayload && typeof normalizeResponseEncryptionAudience === 'function'
     ? normalizeResponseEncryptionAudience(
         ans.encryptionAudience || (
           answerEncrypted
@@ -319,23 +339,25 @@ export const buildQuestionCacheHydrationPatch = ({
         qid,
       )
     : ans.encryptionAudience;
-  const answerState = {
-    value: answerEncrypted ? '*' : (typeof parseValue === 'function' ? parseValue(ans.value) : ans.value),
-    encrypted: answerEncrypted,
-    encryptionAudience: answerAudience,
-    encryptionGateId: answerAudience === 'gate' && typeof resolveFieldEncryptionGateId === 'function'
-      ? resolveFieldEncryptionGateId({ ...ans, encryptionAudience: answerAudience }, qid, 'answer')
-      : null,
-    audienceMode: 'explicit',
-    hash: ans.hash || '',
-    encryptedPortion: ans.encryptedPortion || '',
-  };
+  const answerState = hasAnswerPayload
+    ? {
+        value: answerEncrypted ? '*' : (typeof parseValue === 'function' ? parseValue(ans.value) : ans.value),
+        encrypted: answerEncrypted,
+        encryptionAudience: answerAudience,
+        encryptionGateId: answerAudience === 'gate' && typeof resolveFieldEncryptionGateId === 'function'
+          ? resolveFieldEncryptionGateId({ ...ans, encryptionAudience: answerAudience }, qid, 'answer')
+          : null,
+        audienceMode: 'explicit',
+        hash: ans.hash || '',
+        encryptedPortion: ans.encryptedPortion || '',
+      }
+    : undefined;
 
   const additionalEncrypted = !!(add.encrypted || add.encryptedPortion);
-  const additionalAudienceMode = typeof normalizeFieldAudienceMode === 'function'
+  const additionalAudienceMode = hasAdditionalPayload && typeof normalizeFieldAudienceMode === 'function'
     ? normalizeFieldAudienceMode(add.audienceMode, 'additional', add)
     : add.audienceMode;
-  const additionalAudience = typeof normalizeResponseEncryptionAudience === 'function'
+  const additionalAudience = hasAdditionalPayload && typeof normalizeResponseEncryptionAudience === 'function'
     ? normalizeResponseEncryptionAudience(
         add.encryptionAudience || (
           additionalEncrypted
@@ -347,18 +369,20 @@ export const buildQuestionCacheHydrationPatch = ({
         qid,
       )
     : add.encryptionAudience;
-  let additionalState: UnknownRecord = {
-    value: additionalEncrypted ? '*' : (typeof parseValue === 'function' ? parseValue(add.value) : add.value),
-    encrypted: additionalEncrypted,
-    encryptionAudience: additionalAudience,
-    encryptionGateId: additionalAudience === 'gate' && typeof resolveFieldEncryptionGateId === 'function'
-      ? resolveFieldEncryptionGateId({ ...add, encryptionAudience: additionalAudience }, qid, 'additional')
-      : null,
-    audienceMode: additionalAudienceMode,
-    hash: add.hash || '',
-    encryptedPortion: add.encryptedPortion || '',
-  };
-  if (additionalAudienceMode === 'inherit' && typeof buildInheritedAdditionalFieldState === 'function') {
+  let additionalState: UnknownRecord | undefined = hasAdditionalPayload
+    ? {
+        value: additionalEncrypted ? '*' : (typeof parseValue === 'function' ? parseValue(add.value) : add.value),
+        encrypted: additionalEncrypted,
+        encryptionAudience: additionalAudience,
+        encryptionGateId: additionalAudience === 'gate' && typeof resolveFieldEncryptionGateId === 'function'
+          ? resolveFieldEncryptionGateId({ ...add, encryptionAudience: additionalAudience }, qid, 'additional')
+          : null,
+        audienceMode: additionalAudienceMode,
+        hash: add.hash || '',
+        encryptedPortion: add.encryptedPortion || '',
+      }
+    : undefined;
+  if (additionalState && additionalAudienceMode === 'inherit' && typeof buildInheritedAdditionalFieldState === 'function') {
     additionalState = buildInheritedAdditionalFieldState(
       additionalState,
       answerState || (typeof buildEmptyResponseFieldState === 'function' ? buildEmptyResponseFieldState(qid) : {}),
@@ -372,7 +396,7 @@ export const buildQuestionCacheHydrationPatch = ({
   const importanceChanged = importanceValue !== null;
 
   return {
-    changed: true,
+    changed: !!(answerState || additionalState || importanceChanged || convictionChanged),
     answerState,
     additionalState,
     importanceChanged,

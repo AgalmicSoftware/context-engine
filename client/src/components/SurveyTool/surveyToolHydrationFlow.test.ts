@@ -507,6 +507,71 @@ describe('surveyToolHydrationFlow', () => {
     expect(applyCachedResponseEntryToSlice).toHaveBeenCalledTimes(2);
   });
 
+  it('hydrates partial encrypted cached responses without requiring comments', () => {
+    const applyCachedResponseEntryToSlice = jest.fn(({ targetSlice, questionId, response }) => {
+      if (response.answer) {
+        targetSlice.answers[questionId] = {
+          value: response.answer.encrypted ? '*' : response.answer.value,
+          encrypted: !!response.answer.encrypted,
+          encryptedPortion: response.answer.encryptedPortion || '',
+        };
+      }
+      if (response.additional) {
+        targetSlice.additionalComments[questionId] = { value: response.additional.value };
+      }
+      if (response.importance !== undefined) {
+        targetSlice.importance[questionId] = response.importance;
+      }
+      if (response.conviction !== undefined) {
+        targetSlice.conviction[questionId] = response.conviction;
+      }
+      return true;
+    });
+
+    expect(buildCacheHydrationSlice({
+      renderedQuestionIds: ['q1', 'q2', 'q3'],
+      mergedQuestionResponses: {
+        q1: {
+          '0xabc': {
+            answer: {
+              value: 'encrypted plaintext should stay masked',
+              encrypted: true,
+              encryptedPortion: 'answer-env',
+            },
+            importance: 4,
+          },
+        },
+        q2: {
+          '0xabc': {
+            additional: { value: 'notes-only' },
+            conviction: 6,
+          },
+        },
+        q3: {
+          '0xabc': {
+            answer: {},
+          },
+        },
+      },
+      account: '0xAbC',
+      applyCachedResponseEntryToSlice,
+    })).toEqual({
+      slice: {
+        answers: {
+          q1: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
+        },
+        importance: { q1: 4 },
+        conviction: { q2: 6 },
+        additionalComments: {
+          q2: { value: 'notes-only' },
+        },
+      },
+      changed: true,
+    });
+
+    expect(applyCachedResponseEntryToSlice).toHaveBeenCalledTimes(2);
+  });
+
   it('builds draft-aware cache hydration state for masked decrypted-empty carry-forward', () => {
     const areEnvelopesEquivalent = jest.fn((incomingEnvelope, currentEnvelope, incomingEncrypted, currentEncrypted) => (
       String(incomingEnvelope || '') === String(currentEnvelope || '') &&

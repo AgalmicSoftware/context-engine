@@ -850,12 +850,33 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .gatedPromptNotice {
   display: flex;
   align-items: center;
+  gap: 10px;
   padding: 12px 14px;
   border-radius: var(--ce-radius-12);
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(0, 0, 0, 0.22);
   color: rgba(255, 255, 255, 0.9);
   font-weight: 600;
+}
+
+.gatedPromptNoticeText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gatedPromptNoticeActionButton {
+  @extend %decryptCtaOutline;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: var(--ce-radius-pill);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .gatedPromptTooltipTrigger {

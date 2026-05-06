@@ -19,7 +19,7 @@ type BeeswarmPoint = {
   unsure?: number;
   total?: number;
   extremity?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type TooltipVoteBreakdown = {
@@ -35,6 +35,14 @@ type TooltipLayout = {
   horizontal: 'right' | 'left';
   vertical: 'bottom' | 'top';
 };
+
+type BeeswarmTooltipEvent = {
+  clientX?: number;
+  clientY?: number;
+  currentTarget?: {
+    getBoundingClientRect?: () => Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
+  };
+} | null;
 
 type BeeswarmPlotProps = {
   points?: BeeswarmPoint[];
@@ -167,6 +175,30 @@ export const resolveTooltipLayout = ({
   };
 };
 
+export const resolveTooltipPositionStyle = (
+  layout: Pick<TooltipLayout, 'left' | 'top'>
+): React.CSSProperties => ({
+  left: layout.left,
+  top: layout.top,
+});
+
+export const buildBeeswarmTooltipStatClassName = (
+  styleMap: Record<string, string>,
+  statClassName: string
+) => [styleMap.tooltipStat, styleMap[statClassName]].filter(Boolean).join(' ');
+
+export const buildBeeswarmTooltipSegmentClassName = (
+  styleMap: Record<string, string>,
+  segmentClassName: string
+) => [styleMap.tooltipResponseSegment, styleMap[segmentClassName]].filter(Boolean).join(' ');
+
+export const resolveTooltipResponseSegmentStyle = (
+  value: unknown,
+  total: unknown
+): React.CSSProperties => ({
+  width: `${((Number(value || 0) / Math.max(1, Number(total || 0))) * 100).toFixed(2)}%`,
+});
+
 export default function BeeswarmPlot({
   points = [],
   width = 700,
@@ -222,15 +254,17 @@ export default function BeeswarmPlot({
     : [];
   const tooltipSegments = tooltipVoteGroups.filter((segment) => segment.value > 0);
 
-  const updateTooltipPosition = (event: any, point: BeeswarmPoint | null = null) => {
+  const updateTooltipPosition = (event: BeeswarmTooltipEvent, point: BeeswarmPoint | null = null) => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
     const wrapperRect = wrapper.getBoundingClientRect();
 
-    if (Number.isFinite(event?.clientX) && Number.isFinite(event?.clientY)) {
+    const eventX = event?.clientX;
+    const eventY = event?.clientY;
+    if (Number.isFinite(eventX) && Number.isFinite(eventY)) {
       setTooltipAnchor({
-        x: event.clientX - wrapperRect.left,
-        y: event.clientY - wrapperRect.top,
+        x: Number(eventX) - wrapperRect.left,
+        y: Number(eventY) - wrapperRect.top,
       });
       return;
     }
@@ -276,7 +310,7 @@ export default function BeeswarmPlot({
     ));
   }, [activePoint, height, tooltipAnchor.x, tooltipAnchor.y, width]);
 
-  const handleHover = (point: BeeswarmPoint, index: number, event: any = null) => {
+  const handleHover = (point: BeeswarmPoint, index: number, event: BeeswarmTooltipEvent = null) => {
     setSinglePointDeselected(false);
     setHoveredIndex(index);
     updateTooltipPosition(event, point);
@@ -333,14 +367,14 @@ export default function BeeswarmPlot({
           className={styles.hoverTooltip}
           data-testid="ce-beeswarm-tooltip"
           data-placement={`${tooltipLayout.horizontal}-${tooltipLayout.vertical}`}
-          style={{ left: tooltipLayout.left, top: tooltipLayout.top }}
+          style={resolveTooltipPositionStyle(tooltipLayout)}
         >
           <p className={styles.tooltipPrompt}>{activePoint.label || '(No prompt)'}</p>
           <div className={styles.tooltipStats}>
             {tooltipVoteGroups.map((group) => (
               <span
                 key={group.key}
-                className={`${styles.tooltipStat} ${styles[group.statClassName]}`}
+                className={buildBeeswarmTooltipStatClassName(styles, group.statClassName)}
                 data-testid={group.statTestId}
               >
                 {group.label} {group.value}
@@ -352,9 +386,9 @@ export default function BeeswarmPlot({
               {tooltipSegments.map((segment) => (
                 <span
                   key={segment.key}
-                  className={`${styles.tooltipResponseSegment} ${styles[segment.segmentClassName]}`}
+                  className={buildBeeswarmTooltipSegmentClassName(styles, segment.segmentClassName)}
                   data-testid={segment.segmentTestId}
-                  style={{ width: `${((segment.value / Math.max(1, tooltipBreakdown?.total || 0)) * 100).toFixed(2)}%` }}
+                  style={resolveTooltipResponseSegmentStyle(segment.value, tooltipBreakdown?.total)}
                 />
               ))}
             </div>

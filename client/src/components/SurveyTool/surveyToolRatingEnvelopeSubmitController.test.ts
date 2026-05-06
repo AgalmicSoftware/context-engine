@@ -21,6 +21,17 @@ type TestSlice = {
   additionalComments?: Record<string, TestFieldState>;
 };
 
+type TestRatingResponse = Record<string, unknown> & {
+  additional?: TestFieldState;
+  answer?: TestFieldState;
+  conviction?: number | null;
+  convictionEncrypted?: string;
+  importance?: number | null;
+  importanceEncrypted?: string;
+  questionID?: string;
+  questionId?: string;
+};
+
 const buildMockDeps = (overrides: Partial<RatingEnvelopeDeps> = {}): RatingEnvelopeDeps => ({
   isQuestionLockedForResponse: () => false,
   resolveFieldEncryptionAudience: () => 'self',
@@ -29,8 +40,8 @@ const buildMockDeps = (overrides: Partial<RatingEnvelopeDeps> = {}): RatingEnvel
   getDefaultResponseEncryptionAudienceForQid: () => 'self',
   buildLitEncryptionOptionsForRecipients: () => ({ lit: true }),
   encryptEnvelopeValue: jest.fn(async (value) => `encrypted:${value}`),
-  getImportanceFromResponse: (r) => r?.importance ?? null,
-  getConvictionFromResponse: (r) => r?.conviction ?? null,
+  getImportanceFromResponse: (r) => (typeof r.importance === 'number' ? r.importance : null),
+  getConvictionFromResponse: (r) => (typeof r.conviction === 'number' ? r.conviction : null),
   ...overrides,
 });
 
@@ -344,7 +355,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
   describe('processRatingEnvelopesForSubmit', () => {
     it('skips questions with no qid', async () => {
       const encryptEnvelopeValue = jest.fn(async (value) => `encrypted:${value}`);
-      const questionResponses: Record<string, any>[] = [{ importance: 5, conviction: 2 }];
+      const questionResponses: TestRatingResponse[] = [{ importance: 5, conviction: 2 }];
 
       const result = await processRatingEnvelopesForSubmit(
         makeContext({ questionResponses }),
@@ -361,7 +372,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
 
     it('carries forward baseline envelopes on non-rating edits', async () => {
       const encryptEnvelopeValue = jest.fn(async (value) => `encrypted:${value}`);
-      const respObj: Record<string, any> = { questionID: 'Q1', importance: null, conviction: null };
+      const respObj: TestRatingResponse = { questionID: 'Q1', importance: null, conviction: null };
 
       await processRatingEnvelopesForSubmit(
         makeContext({
@@ -390,7 +401,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('preserves baseline plaintext values for non-changed fields', async () => {
-      const respObj: Record<string, any> = { questionID: 'Q1' };
+      const respObj: TestRatingResponse = { questionID: 'Q1' };
 
       const result = await processRatingEnvelopesForSubmit(
         makeContext({
@@ -420,7 +431,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
 
     it('clears stale envelopes for changed fields when not encrypting', async () => {
       const encryptEnvelopeValue = jest.fn(async (value) => `encrypted:${value}`);
-      const respObj: Record<string, any> = {
+      const respObj: TestRatingResponse = {
         questionID: 'Q1',
         importance: null,
         conviction: 3,
@@ -444,8 +455,11 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('encrypts importance and conviction when encryption is active', async () => {
-      const encryptEnvelopeValue = jest.fn(async (value: any, _opts?: any) => `encrypted:${value}`);
-      const respObj: Record<string, any> = {
+      const encryptEnvelopeValue = jest.fn(async (
+        value: unknown,
+        _opts?: Record<string, unknown>,
+      ) => `encrypted:${value}`);
+      const respObj: TestRatingResponse = {
         questionID: 'Q1',
         importance: 8,
         conviction: 5,
@@ -481,7 +495,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('sets plaintext to null after envelope encryption', async () => {
-      const respObj: Record<string, any> = {
+      const respObj: TestRatingResponse = {
         questionID: 'Q1',
         importance: 6,
         conviction: 4,
@@ -507,7 +521,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('throws when Lit recipients are missing for gated encryption', async () => {
-      const respObj: Record<string, any> = {
+      const respObj: TestRatingResponse = {
         questionID: 'Q1',
         importance: 6,
       };
@@ -534,7 +548,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('throws when Lit hooks are unavailable', async () => {
-      const respObj: Record<string, any> = {
+      const respObj: TestRatingResponse = {
         questionID: 'Q1',
         importance: 6,
       };
@@ -565,7 +579,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
       let inFlight = 0;
       let maxInFlight = 0;
       const callOrder: string[] = [];
-      const encryptEnvelopeValue = jest.fn(async (_value, opts: any) => {
+      const encryptEnvelopeValue = jest.fn(async (_value: unknown, opts?: Record<string, unknown>) => {
         inFlight += 1;
         maxInFlight = Math.max(maxInFlight, inFlight);
         callOrder.push(String(opts?.qId));
@@ -573,7 +587,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
         inFlight -= 1;
         return `encrypted:${opts?.qId}`;
       });
-      const respObj: Record<string, any> = {
+      const respObj: TestRatingResponse = {
         questionID: 'Q1',
         importance: 1,
         conviction: 2,
@@ -599,9 +613,9 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
     });
 
     it('returns correct counts in result', async () => {
-      const respOne: Record<string, any> = { questionID: 'Q1', importance: 3 };
-      const respTwo: Record<string, any> = { questionID: 'Q2', importance: 7 };
-      const respNoQid: Record<string, any> = { importance: 9 };
+      const respOne: TestRatingResponse = { questionID: 'Q1', importance: 3 };
+      const respTwo: TestRatingResponse = { questionID: 'Q2', importance: 7 };
+      const respNoQid: TestRatingResponse = { importance: 9 };
 
       const result = await processRatingEnvelopesForSubmit(
         makeContext({

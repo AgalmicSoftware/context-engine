@@ -1,5 +1,12 @@
 import {
   NO_PENDING_PILE_SUBMIT_TEXT,
+  buildPileFilterActivePatch,
+  buildPileLoadingElapsedPatch,
+  buildPileLoadingPatch,
+  buildPileNavCounterVisiblePatch,
+  buildPileShowLongLoadingPatch,
+  buildPileSubmissionCompletePatch,
+  buildPileSubmitTempTextPatch,
   buildPileWorkspaceViewState,
   buildNoPendingPileSubmitFeedbackPlan,
   buildPileSubmitRailViewState,
@@ -8,6 +15,19 @@ import {
 } from './surveyPileViewState.js';
 
 describe('surveyPileViewState', () => {
+  it('builds pile view state patches', () => {
+    expect(buildPileLoadingElapsedPatch('3')).toEqual({ loadingElapsedSec: 3 });
+    expect(buildPileLoadingElapsedPatch(null)).toEqual({ loadingElapsedSec: 0 });
+    expect(buildPileShowLongLoadingPatch(1)).toEqual({ showLongLoading: true });
+    expect(buildPileShowLongLoadingPatch('')).toEqual({ showLongLoading: false });
+    expect(buildPileLoadingPatch(true)).toEqual({ loading: true });
+    expect(buildPileNavCounterVisiblePatch(false)).toEqual({ navCounterVisible: false });
+    expect(buildPileSubmitTempTextPatch(null)).toEqual({ pileSubmitTempText: null });
+    expect(buildPileFilterActivePatch('active')).toEqual({ isFilterActive: true });
+    expect(buildPileSubmissionCompletePatch(1)).toEqual({ submissionComplete: true });
+    expect(buildPileSubmissionCompletePatch('')).toEqual({ submissionComplete: false });
+  });
+
   it('builds the pile submit success-badge presentation state', () => {
     expect(buildPileSubmitViewState({
       pendingStats: { total: 0 },
@@ -184,6 +204,57 @@ describe('surveyPileViewState', () => {
       hasScanOrHydrationWork: true,
       isStillLoading: false,
       showMiniBackgroundSpinner: true,
+    }));
+  });
+
+  it('fails closed to gated empty state when a gated session has unresolved question metadata', () => {
+    expect(buildPileWorkspaceViewState({
+      pileQuestions: [],
+      activePileIndex: 0,
+      loading: true,
+      hiddenMaskedQuestionIds: [],
+      hasHiddenGatedQuestions: false,
+      firstBoot: false,
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      recentRateLimit: false,
+      scanRemainingBlocks: 0,
+      hydrateDiscovered: 1,
+      hydrateDone: 0,
+      pendingMetadataCount: 0,
+      questionScanPhase: 'hydrate',
+      hasSessionQuestionGate: true,
+    })).toEqual(expect.objectContaining({
+      hasVisibleQuestions: false,
+      hasConcreteHiddenQuestions: false,
+      hasUnhydratedGatedQuestions: true,
+      showGatedEmptyState: true,
+      allowUnreadyEmptySettlement: true,
+      isStillLoading: false,
+    }));
+  });
+
+  it('keeps gated empty state after an empty gated cache reports ready', () => {
+    expect(buildPileWorkspaceViewState({
+      pileQuestions: [],
+      activePileIndex: 0,
+      loading: false,
+      hiddenMaskedQuestionIds: [],
+      hasHiddenGatedQuestions: false,
+      firstBoot: false,
+      cacheHasLoaded: true,
+      isQuestionCacheReady: true,
+      recentRateLimit: false,
+      scanRemainingBlocks: 0,
+      hydrateDiscovered: 0,
+      hydrateDone: 0,
+      pendingMetadataCount: 0,
+      questionScanPhase: '',
+      hasSessionQuestionGate: true,
+    })).toEqual(expect.objectContaining({
+      hasUnhydratedGatedQuestions: true,
+      showGatedEmptyState: true,
+      isStillLoading: false,
     }));
   });
 });

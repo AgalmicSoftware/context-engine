@@ -18,12 +18,18 @@ import {
   shouldSkipDraftHydrationRun,
 } from './surveyToolHydrationFlow.js';
 
-type SurveyToolLikeProps = Record<string, any>;
-type SurveyToolLikeState = Record<string, any>;
-type SetStateUpdate = Record<string, unknown> | null | ((prevState: any) => Record<string, unknown> | null);
+type SurveyToolLikeProps = Record<string, unknown>;
+type SurveyToolLikeState = Record<string, unknown>;
+type SetStateUpdate = Record<string, unknown> | null | ((prevState: SurveyToolLikeState) => Record<string, unknown> | null);
 type SetState = (update: SetStateUpdate, callback?: () => void) => unknown;
-type CloneValue = (value: any) => any;
-type PrefillStateUpdate = Record<string, unknown> | ((prevState: any) => Record<string, unknown>);
+type CloneValue = (value: unknown) => unknown;
+type PrefillStateUpdate = Record<string, unknown> | ((prevState: SurveyToolLikeState) => Record<string, unknown>);
+
+const readUserAnswerResponses = (userAnswers: unknown): unknown[] | null => {
+  if (!userAnswers || typeof userAnswers !== 'object') return null;
+  const responses = (userAnswers as { responses?: unknown }).responses;
+  return Array.isArray(responses) ? responses : null;
+};
 
 const buildSetStateApplyHandler = (
   setState: SetState = () => {},
@@ -78,7 +84,7 @@ export const buildSurveyLocalCacheSlice = ({
   parseResponse?: ((raw: unknown) => unknown) | null;
   applyCachedResponseEntryToSlice?: (args: Record<string, unknown>) => boolean;
   setLocalCacheMemo?: (nextMemo: { key: string; value: unknown; hasValue: boolean }) => void;
-  resolveLocalCacheSlice?: (args?: any) => {
+  resolveLocalCacheSlice?: (args?: Record<string, unknown>) => {
     scopeSlugs?: unknown[];
     networkIdStr?: unknown;
     renderedIds?: unknown[];
@@ -87,7 +93,7 @@ export const buildSurveyLocalCacheSlice = ({
     shouldUseMemo?: boolean;
     memoizedValue?: unknown;
   };
-  loadLocalCacheSlice?: (args?: any) => unknown;
+  loadLocalCacheSlice?: (args?: Record<string, unknown>) => unknown;
   onError?: (error: unknown) => void;
 } = {}) => {
   try {
@@ -168,7 +174,7 @@ export const resolveSurveyMissingRenderedResponseLookup = ({
   resolveScopeNetId?: ((slug: string, entryNetId: string, fallbackNetId: string) => string | null | undefined) | null;
   readQuestionsCacheAsync?: ((slug: string) => Promise<unknown>) | null;
   ensureQuestionsNet?: ((cache: unknown, netId: string) => unknown) | null;
-  resolveMissingLookup?: (args?: any) => Promise<unknown>;
+  resolveMissingLookup?: (args?: Record<string, unknown>) => Promise<unknown>;
 } = {}) => {
   const nextProps = props || {};
   return resolveMissingLookup({
@@ -207,21 +213,22 @@ export const executeSurveyResponsePrefill = ({
   setState?: SetState;
   updateJsonPreview?: () => void;
   recalculateEditStats?: () => void;
-  buildUpdatePlan?: (args?: any) => { updates?: Record<string, unknown> | null | undefined };
+  buildUpdatePlan?: (args?: Record<string, unknown>) => { updates?: Record<string, unknown> | null | undefined };
 } = {}) => {
-  if (!userAnswers || !Array.isArray((userAnswers as any)?.responses)) {
+  const responses = readUserAnswerResponses(userAnswers);
+  if (!responses) {
     return { applied: false, reason: 'skip' };
   }
 
   executeSurveyPrefillPlan({
-    updates: (prev: any) => {
+    updates: (prev: SurveyToolLikeState) => {
       const updatePlan = buildUpdatePlan({
         surveyIndex,
         prevSurveysResponseState: prev?.surveysResponseState,
         prevEditBaseline: prev?.editBaseline,
         isDirty: prev?.isDirty,
         submissionComplete: prev?.submissionComplete,
-        responses: (userAnswers as any).responses,
+        responses,
         applyResponseHydrationListToSlice,
         buildSliceFromUserAnswers,
       });
@@ -256,7 +263,7 @@ export const executeSurveySingleQuestionPrefill = ({
   setState?: SetState;
   updateJsonPreview?: () => void;
   recalculateEditStats?: () => void;
-  buildUpdatePlan?: (args?: any) => { updates?: Record<string, unknown> | null | undefined };
+  buildUpdatePlan?: (args?: Record<string, unknown>) => { updates?: Record<string, unknown> | null | undefined };
 } = {}) => {
   const normalizedQuestionId = String(questionId || '');
   if (!userAnswer || !normalizedQuestionId) {
@@ -264,7 +271,7 @@ export const executeSurveySingleQuestionPrefill = ({
   }
 
   executeSurveyPrefillPlan({
-    updates: (prev: any) => {
+    updates: (prev: SurveyToolLikeState) => {
       const updatePlan = buildUpdatePlan({
         surveyIndex: 0,
         questionId: normalizedQuestionId,
@@ -320,8 +327,8 @@ export const executeSurveyPriorResponseBackfill = ({
   onFailure?: (error: unknown) => void;
   getCurrentInFlight?: () => Promise<boolean> | null;
   setCurrentInFlight?: (value: Promise<boolean> | null) => void;
-  shouldBackfill?: (args?: any) => boolean;
-  runBackfillAttempt?: (args?: any) => Promise<boolean> | boolean;
+  shouldBackfill?: (args?: Record<string, unknown>) => boolean;
+  runBackfillAttempt?: (args?: Record<string, unknown>) => Promise<boolean> | boolean;
 } = {}): false | Promise<boolean> => {
   const nextProps = props || {};
   const nextState = state || {};
@@ -350,16 +357,16 @@ export const executeSurveyPriorResponseBackfill = ({
   let trackedPromise: Promise<boolean> | null = null;
   const runPromise = Promise.resolve().then(() => runBackfillAttempt({
     responderLower,
-    slug: slug as any,
+    slug,
     attemptedSet,
     loadMissingInfo: ({ responder, slug: nextSlug }: { responder: string; slug?: string | null }) => getMissingRenderedResponseIdsForAccount({
       responder,
       slug: nextSlug,
-    }) as Promise<any>,
+    }),
     setHydratingState,
     isMounted,
     refreshQuestionResponses: nextProps.refreshQuestionResponses,
-    readQuestionsCacheAsync: readQuestionsCacheAsync as any,
+    readQuestionsCacheAsync,
     onFailure,
     resetLocalCacheMemo,
     triggerRehydrate,
@@ -381,7 +388,7 @@ export const executeSurveyDraftHydration = ({
   getPendingEditStats = null,
   getHydrationQuestionIds = () => [],
   applyDraftHydrationEntryToSlice = () => false,
-  cloneBaseline = ((value: any) => value) as CloneValue,
+  cloneBaseline = ((value: unknown) => value) as CloneValue,
   setState = () => {},
   updateJsonPreview = () => {},
   onError = () => {},
@@ -400,10 +407,10 @@ export const executeSurveyDraftHydration = ({
   setState?: SetState;
   updateJsonPreview?: () => void;
   onError?: (error: unknown) => void;
-  skipDraftHydrationRun?: (args?: any) => boolean;
-  buildDraftSeedContext?: (args?: any) => { surveyIndex?: number; prevSlice?: any };
-  buildDraftRunPlan?: (args?: any) => { renderedQuestionIds?: string[]; updates?: Record<string, unknown> };
-  applyDraftEffects?: (args?: any) => void;
+  skipDraftHydrationRun?: (args?: Record<string, unknown>) => boolean;
+  buildDraftSeedContext?: (args?: Record<string, unknown>) => { surveyIndex?: number; prevSlice?: unknown };
+  buildDraftRunPlan?: (args?: Record<string, unknown>) => { renderedQuestionIds?: string[]; updates?: Record<string, unknown> };
+  applyDraftEffects?: (args?: Record<string, unknown>) => void;
 } = {}) => {
   try {
     const nextProps = props || {};
@@ -437,10 +444,10 @@ export const executeSurveyDraftHydration = ({
       submissionComplete: nextState.submissionComplete,
       prevSurveysResponseState: nextState.surveysResponseState,
       surveyIndex,
-      draft: draft as any,
+      draft,
       prevSlice,
       prevBaseline: nextState.editBaseline,
-      cloneBaseline: cloneBaseline as any,
+      cloneBaseline,
       applyDraftEntryToSlice: applyDraftHydrationEntryToSlice,
     });
     const renderedQuestionIds = Array.isArray(draftRunPlan.renderedQuestionIds)
@@ -485,7 +492,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
   setLastHydrationSig = () => {},
   loadDraft = () => null,
   buildDraftAnswersByQuestionId = null,
-  cloneBaseline = ((value: any) => value) as CloneValue,
+  cloneBaseline = ((value: unknown) => value) as CloneValue,
   buildDraftAwareCacheHydrationState = (args: Record<string, unknown>) => args,
   applyLocalCacheHydrationEntryToSlice = () => false,
   setState = () => {},
@@ -522,11 +529,11 @@ export const executeSurveyLocalCacheRehydrate = async ({
   bumpNoop?: () => void;
   onNoChange?: () => void;
   onError?: (error: unknown) => void;
-  prepareRehydrateRun?: (args?: any) => { shouldSkip?: boolean; shouldBumpNoop?: boolean; hydrationSig?: string; baseSlice?: any };
-  loadDraftAnswersByQid?: (args?: any) => Record<string, unknown>;
-  buildRehydrationUpdatePlan?: (args?: any) => { changed?: boolean; baselineChanged?: boolean; updates?: any };
-  applyRehydrateMissEffects?: (args?: any) => void;
-  applyRehydrateUpdatePlan?: (args?: any) => boolean;
+  prepareRehydrateRun?: (args?: Record<string, unknown>) => { shouldSkip?: boolean; shouldBumpNoop?: boolean; hydrationSig?: string; baseSlice?: unknown };
+  loadDraftAnswersByQid?: (args?: Record<string, unknown>) => Record<string, unknown>;
+  buildRehydrationUpdatePlan?: (args?: Record<string, unknown>) => { changed?: boolean; baselineChanged?: boolean; updates?: Record<string, unknown> };
+  applyRehydrateMissEffects?: (args?: Record<string, unknown>) => void;
+  applyRehydrateUpdatePlan?: (args?: Record<string, unknown>) => boolean;
 } = {}) => {
   try {
     const nextProps = props || {};
@@ -591,8 +598,8 @@ export const executeSurveyLocalCacheRehydrate = async ({
       prevBaseline: nextState.editBaseline,
       cacheSlice,
       draftAnswersByQuestionId,
-      cloneBaseline: cloneBaseline as any,
-      buildDraftAwareCacheHydrationState: buildDraftAwareCacheHydrationState as any,
+      cloneBaseline,
+      buildDraftAwareCacheHydrationState,
       applyLocalCacheHydrationEntryToSlice,
       debugLabel: '[Survey][rehydrateLocal]',
     });

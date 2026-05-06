@@ -20,13 +20,34 @@ type ResponseMetaSource = {
   txHash?: unknown;
   hash?: unknown;
 } & UnknownRecord;
-
 export type ResponseRecencyMeta = {
   bn: number;
   txi: number;
   li: number;
   ts: number;
   transactionHash: string;
+};
+export type SurveyCacheItem = UnknownRecord & {
+  id?: unknown;
+  surveyID?: unknown;
+  title?: unknown;
+  questionIDs?: unknown[];
+};
+export type SurveyResponseCacheItem = UnknownRecord & {
+  responses?: unknown[];
+};
+export type QuestionNetworkCache = UnknownRecord & {
+  questionsLatestBlock?: unknown;
+  questions: Record<string, UnknownRecord>;
+  questionResponses: Record<string, Record<string, unknown>>;
+  questionResponsesMeta: Record<string, Record<string, ResponseMetaSource>>;
+  questionResponsesLatestBlock?: unknown;
+};
+export type SurveyNetworkCache = UnknownRecord & {
+  surveysLatestBlock?: unknown;
+  surveys: Record<string, SurveyCacheItem>;
+  surveyResponses: Record<string, Record<string, SurveyResponseCacheItem>>;
+  surveyResponsesLatestBlock?: UnknownRecord;
 };
 
 const RECENT_QUESTION_PAYLOADS_KEY = 'dg:recentQuestionPayloads';
@@ -62,7 +83,11 @@ export function mergeQuestionResponses(target: UnknownRecord = {}, source: Unkno
 }
 
 export function writeQuestionsCache(slug: string, obj: unknown) {
-  return writeCacheOptimistic('questionsCache', slug, (obj || {}) as any);
+  return (writeCacheOptimistic as unknown as (
+    namespace: string,
+    slug: string,
+    value: unknown
+  ) => unknown)('questionsCache', slug, obj || {});
 }
 
 export function readSurveysCache(slug: string) {
@@ -79,7 +104,11 @@ export async function readSurveysCacheAsync(slug: string) {
 }
 
 export function writeSurveysCache(slug: string, obj: unknown) {
-  return writeCacheOptimistic('surveysCache', slug, (obj || {}) as any);
+  return (writeCacheOptimistic as unknown as (
+    namespace: string,
+    slug: string,
+    value: unknown
+  ) => unknown)('surveysCache', slug, obj || {});
 }
 
 export function readRecentQuestionPayload(questionId: unknown) {
@@ -125,7 +154,7 @@ export function areQuestionPayloadsEquivalent(a: unknown, b: unknown): boolean {
   }
 }
 
-export function ensureQuestionsNet(cache: UnknownRecord = {}, netIdStr: string): Record<string, any> {
+export function ensureQuestionsNet(cache: UnknownRecord = {}, netIdStr: string): Record<string, QuestionNetworkCache> {
   const nextCache = (cache && typeof cache === 'object') ? cache : {};
   if (!nextCache[netIdStr]) {
     nextCache[netIdStr] = {
@@ -135,10 +164,10 @@ export function ensureQuestionsNet(cache: UnknownRecord = {}, netIdStr: string):
       questionResponsesLatestBlock: 0,
     };
   }
-  return nextCache;
+  return nextCache as Record<string, QuestionNetworkCache>;
 }
 
-export function ensureSurveysNet(cache: UnknownRecord = {}, netIdStr: string): Record<string, any> {
+export function ensureSurveysNet(cache: UnknownRecord = {}, netIdStr: string): Record<string, SurveyNetworkCache> {
   const nextCache = (cache && typeof cache === 'object') ? cache : {};
   if (!nextCache[netIdStr]) {
     nextCache[netIdStr] = {
@@ -148,7 +177,7 @@ export function ensureSurveysNet(cache: UnknownRecord = {}, netIdStr: string): R
       surveyResponsesLatestBlock: {},
     };
   }
-  return nextCache;
+  return nextCache as Record<string, SurveyNetworkCache>;
 }
 
 export const toResponseRecencyMeta = (source: ResponseMetaSource | null = null): ResponseRecencyMeta => {
@@ -190,8 +219,8 @@ export const isIncomingResponseMetaNewer = (
   );
 };
 
-export const stampResponsePayloadWithMeta = (payload: unknown, meta: ResponseMetaSource | null = null) => {
-  if (!payload || typeof payload !== 'object') return payload;
+export const stampResponsePayloadWithMeta = (payload: unknown, meta: ResponseMetaSource | null = null): UnknownRecord => {
+  if (!payload || typeof payload !== 'object') return payload as UnknownRecord;
   const recency = toResponseRecencyMeta(meta);
   return {
     ...(payload as UnknownRecord),
@@ -203,10 +232,10 @@ export const stampResponsePayloadWithMeta = (payload: unknown, meta: ResponseMet
   };
 };
 
-export const mergeSurveyResponsePayloads = (existingPayload: unknown, incomingPayload: unknown) => {
+export const mergeSurveyResponsePayloads = (existingPayload: unknown, incomingPayload: unknown): UnknownRecord => {
   const existing = (existingPayload && typeof existingPayload === 'object') ? existingPayload as UnknownRecord : null;
   const incoming = (incomingPayload && typeof incomingPayload === 'object') ? incomingPayload as UnknownRecord : null;
-  if (!existing) return incoming;
+  if (!existing) return incoming as UnknownRecord;
   if (!incoming) return existing;
 
   const merged: UnknownRecord = { ...existing, ...incoming };

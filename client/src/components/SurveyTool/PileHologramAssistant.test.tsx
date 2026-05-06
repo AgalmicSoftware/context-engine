@@ -1,4 +1,6 @@
-import PileHologramAssistant from './PileHologramAssistant';
+import PileHologramAssistant, {
+  resolvePileHologramMeshLineStyle,
+} from './PileHologramAssistant';
 
 const nodeHasClassName = (node: any, className: string): boolean => {
   const value = node?.props?.className;
@@ -57,5 +59,10 @@ describe('PileHologramAssistant', () => {
     expect(findNodeByClassName(tree, 'pileHologramDepthShell')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileHologramDepthOutline')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileHologramFaceCore')).not.toBeNull();
+  });
+
+  it('resolves mesh line opacity styles', () => {
+    expect(resolvePileHologramMeshLineStyle(0.42)).toEqual({ opacity: 0.42 });
+    expect(resolvePileHologramMeshLineStyle(undefined)).toEqual({ opacity: 0 });
   });
 });

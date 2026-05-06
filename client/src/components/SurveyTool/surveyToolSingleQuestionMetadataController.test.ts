@@ -1,4 +1,5 @@
 import {
+  buildSingleQuestionEncryptedMetadataPlaceholder,
   fetchSingleQuestionMetadataCandidates,
   normalizeSingleQuestionMetadataForCache,
   resolveSingleQuestionCacheState,
@@ -22,7 +23,7 @@ describe('surveyToolSingleQuestionMetadataController', () => {
       questionId: 'q1',
       resolveQuestionBootstrapContext: jest.fn(() => ({ networkIdStr: '' })),
       readQuestionsCacheAsync: jest.fn().mockResolvedValue(cache),
-      ensureQuestionsNet: jest.fn((rawCache) => rawCache),
+      ensureQuestionsNet: jest.fn((rawCache) => rawCache as typeof cache),
     })).resolves.toEqual({
       netIdStr: '11155420',
       questionsCache: cache,
@@ -68,6 +69,27 @@ describe('surveyToolSingleQuestionMetadataController', () => {
         tags: [],
       },
       shouldWriteQuestionPayload: true,
+    });
+  });
+
+  it('builds a masked single-question placeholder while metadata is propagating', () => {
+    expect(buildSingleQuestionEncryptedMetadataPlaceholder({
+      questionId: 'Q1',
+      sessionSlug: 'demo-4',
+    })).toEqual({
+      id: 'q1',
+      type: 'freeform',
+      prompt: '[encrypted]',
+      tags: [],
+      sessionName: 'demo-4',
+      encryption: {
+        enabled: true,
+        status: 'metadata-pending',
+        targets: {
+          questions: true,
+        },
+      },
+      __ceQuestionMetadataPending: true,
     });
   });
 });

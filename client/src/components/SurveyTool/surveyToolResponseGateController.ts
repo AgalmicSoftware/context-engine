@@ -2,43 +2,95 @@ import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilitie
 import { normalizeGateLabelText as normalizeGateLabelTextCore } from './surveyToolAudienceDerivationController';
 import { normalizeQuestionIdKey as normalizeQuestionIdKeyCore } from './surveyToolSignatures';
 
+type CacheRecord = Record<string, unknown>;
+type GateConfig = CacheRecord & {
+  gateId?: unknown;
+  id?: unknown;
+  label?: unknown;
+  name?: unknown;
+  title?: unknown;
+  value?: unknown;
+  text?: unknown;
+  sbtAddress?: unknown;
+  sbtAddresses?: unknown;
+  chainId?: unknown;
+  litChain?: unknown;
+  chain?: unknown;
+  mode?: unknown;
+  resourceKey?: unknown;
+};
+type GatePolicyConfig = CacheRecord & {
+  gates?: unknown;
+  recipients?: unknown;
+  sponsored?: unknown;
+  encryption?: unknown;
+  lit?: unknown;
+  defaultGateSBTs?: unknown;
+};
+type GateAudienceSbtItem = {
+  address: string;
+  label: string;
+  meta: string;
+  href: string;
+};
+type GateRecipient = unknown;
+type GateOption = CacheRecord & {
+  gateId?: string;
+  label?: string;
+  sbtAddresses?: string[];
+  sbtItems?: GateAudienceSbtItem[];
+  sbtSummary?: string;
+  recipients?: GateRecipient[];
+};
+type QuestionRecord = CacheRecord & {
+  sessionSlug?: string;
+};
+
 type GateLabelArgs = {
-  gate?: any;
+  gate?: GateConfig;
   resourceKey?: string;
   sbtAddresses?: string[];
 };
 
 export type ResponseGateDeps = {
   resolveSessionChainId: () => number | null;
-  normalizeGateLabelText: (value: any) => string;
+  normalizeGateLabelText: (value: unknown) => string;
   normalizeQuestionIdKey: (value: unknown) => string;
   resolveSbtGateLabel: (address: string, preferredSlug?: string) => string;
   getShortenedAddress: (address: string, full: boolean) => string;
   t: (key: string) => string;
   buildSbtDetailPath: (address: string, sessionSlug: string) => string;
-  getQuestionById: (questionId: string) => any;
-  getQuestionEncryptionGates: (question: any) => any[];
-  buildRecipientsFromGates: (gates: any[]) => any[];
+  getQuestionById: (questionId: string) => QuestionRecord | null | undefined;
+  getQuestionEncryptionGates: (question: unknown) => GateConfig[];
+  buildRecipientsFromGates: (gates: GateConfig[]) => GateRecipient[];
   resolveConfiguredGateLabel: (opts?: GateLabelArgs) => string;
-  resolveGateDisplayLabel: (gate?: any, fallbackSbt?: string) => string;
-  buildGateAudienceSbtItems: (sbtAddresses?: any[], sessionSlug?: string) => any[];
-  getQuestionGateOptions: (questionId?: string | null) => any[];
-  getResponseGatePolicy: () => any;
+  resolveGateDisplayLabel: (gate?: GateConfig, fallbackSbt?: string) => string;
+  buildGateAudienceSbtItems: (sbtAddresses?: unknown[], sessionSlug?: string) => GateAudienceSbtItem[];
+  getQuestionGateOptions: (questionId?: string | null) => GateOption[];
+  getResponseGatePolicy: () => GatePolicyConfig;
   isQuestionLockedForResponse: (qid: string) => boolean;
   resolveLockAudienceSessionName: () => string;
-  getResponseGateOptions: (questionId?: string | null) => any[];
-  getResponseGateOptionById: (questionId?: string | null, gateId?: string) => any;
-  resolveFieldEncryptionAudience: (field: any, qid: string | null, fieldKey: string) => string;
-  resolveFieldEncryptionGateId: (field: any, questionId: string | null, fieldKey: string) => string | null;
-  getEffectiveRecipientsForQid: (qid: string) => any[];
+  getResponseGateOptions: (questionId?: string | null) => GateOption[];
+  getResponseGateOptionById: (questionId?: string | null, gateId?: string) => GateOption | null;
+  resolveFieldEncryptionAudience: (field: unknown, qid: string | null, fieldKey: string) => string;
+  resolveFieldEncryptionGateId: (field: unknown, questionId: string | null, fieldKey: string) => string | null;
+  getEffectiveRecipientsForQid: (qid: string) => GateRecipient[];
   getEffectiveDraftSlug: (() => string) | null;
   resolveEffectiveSlug: () => string;
-  resolveEffectiveResponseGateConfig: (slug: string) => any;
-  responseGatePolicyCacheCfg: (() => any) | any;
-  resolveSlugForIds: (opts: any) => string;
-  resolveLockAudienceSessionNameContext: (slug: string) => any;
-  props: any;
+  resolveEffectiveResponseGateConfig: (slug: string) => GatePolicyConfig;
+  responseGatePolicyCacheCfg: (() => GatePolicyConfig) | GatePolicyConfig;
+  resolveSlugForIds: (opts: CacheRecord) => string;
+  resolveLockAudienceSessionNameContext: (slug: string) => CacheRecord | null | undefined;
+  props: CacheRecord;
 };
+
+const isPlainObject = (value: unknown): value is CacheRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const asGateConfig = (value: unknown): GateConfig | null => (
+  isPlainObject(value) ? value as GateConfig : null
+);
 
 const normalizeQuestionId = (
   value: unknown,
@@ -50,7 +102,7 @@ const normalizeQuestionId = (
 );
 
 const normalizeGateLabel = (
-  value: any,
+  value: unknown,
   deps?: Partial<Pick<ResponseGateDeps, 'normalizeGateLabelText'>>,
 ): string => (
   typeof deps?.normalizeGateLabelText === 'function'
@@ -58,7 +110,7 @@ const normalizeGateLabel = (
     : normalizeGateLabelTextCore(value)
 );
 
-const collectUniqueSbtAddresses = (gate: any = {}): string[] => (
+const collectUniqueSbtAddresses = (gate: GateConfig | null | undefined = {}): string[] => (
   Array.from(new Set(
     [
       ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
@@ -90,22 +142,22 @@ const resolveResponseGateSessionSlug = (
 
 const resolveResponseGatePolicyCacheCfg = (
   deps: Pick<ResponseGateDeps, 'responseGatePolicyCacheCfg'>,
-): any => (
+): GatePolicyConfig => (
   typeof deps.responseGatePolicyCacheCfg === 'function'
     ? deps.responseGatePolicyCacheCfg()
     : deps.responseGatePolicyCacheCfg
 );
 
 export const buildRecipientsFromGates = (
-  gates: any[] = [],
+  gates: GateConfig[] = [],
   deps: Pick<ResponseGateDeps, 'resolveSessionChainId'>,
-): any[] => {
+): GateRecipient[] => {
   const list = Array.isArray(gates) ? gates : [];
-  const out: any[] = [];
+  const out: GateRecipient[] = [];
   const dedupe = new Set();
 
   list.forEach((gate) => {
-    if (!gate || typeof gate !== 'object') return;
+    if (!asGateConfig(gate)) return;
 
     const chainId = Number(
       gate.chainId ||
@@ -134,22 +186,23 @@ export const buildRecipientsFromGates = (
 };
 
 export const resolveGateDisplayLabel = (
-  gate: any = {},
+  gate: GateConfig = {},
   fallbackSbt = '',
   deps: Pick<ResponseGateDeps, 'normalizeGateLabelText' | 'resolveSbtGateLabel' | 'getShortenedAddress' | 't'>,
 ): string => {
-  const readText = (value: any) => normalizeGateLabel(value, deps);
-  const readAny = (value: any) => {
+  const readText = (value: unknown) => normalizeGateLabel(value, deps);
+  const readAny = (value: unknown) => {
     if (typeof value === 'string') return readText(value);
-    if (!value || typeof value !== 'object') return '';
+    const record = asGateConfig(value);
+    if (!record) return '';
     return (
-      readText(value.label) ||
-      readText(value.name) ||
-      readText(value.title) ||
-      readText(value.value) ||
-      readText(value.text) ||
-      readText(value.id) ||
-      readText(value.gateId)
+      readText(record.label) ||
+      readText(record.name) ||
+      readText(record.title) ||
+      readText(record.value) ||
+      readText(record.text) ||
+      readText(record.id) ||
+      readText(record.gateId)
     );
   };
 
@@ -176,7 +229,7 @@ export function resolveConfiguredGateLabel(
 ): string;
 export function resolveConfiguredGateLabel(
   opts: GateLabelArgs | undefined,
-  cfg: any,
+  cfg: unknown,
   deps: Pick<ResponseGateDeps, 'normalizeGateLabelText' | 'resolveGateDisplayLabel'>,
 ): string;
 export function resolveConfiguredGateLabel(
@@ -185,37 +238,37 @@ export function resolveConfiguredGateLabel(
     resourceKey = '',
     sbtAddresses = [],
   }: GateLabelArgs = {},
-  cfgOrDeps: any = {},
-  maybeDeps?: any,
+  cfgOrDeps: unknown = {},
+  maybeDeps?: Pick<ResponseGateDeps, 'normalizeGateLabelText' | 'resolveGateDisplayLabel'>,
 ): string {
   const deps = (maybeDeps || cfgOrDeps || {}) as Pick<
     ResponseGateDeps,
     'responseGatePolicyCacheCfg' | 'normalizeGateLabelText' | 'resolveGateDisplayLabel'
   >;
   const cfg = maybeDeps ? cfgOrDeps : resolveResponseGatePolicyCacheCfg(deps);
-  const safeCfg = cfg && typeof cfg === 'object' ? cfg : {};
-  const sponsored = (safeCfg?.sponsored && typeof safeCfg.sponsored === 'object') ? safeCfg.sponsored : {};
-  const resources = (sponsored?.resources && typeof sponsored.resources === 'object') ? sponsored.resources : {};
-  const gatesById = (sponsored?.gates && typeof sponsored.gates === 'object') ? sponsored.gates : {};
+  const safeCfg = isPlainObject(cfg) ? cfg : {};
+  const sponsored = isPlainObject(safeCfg.sponsored) ? safeCfg.sponsored : {};
+  const resources = isPlainObject(sponsored.resources) ? sponsored.resources : {};
+  const gatesById = isPlainObject(sponsored.gates) ? sponsored.gates : {};
 
-  const selectedResource = (resources?.[resourceKey] && typeof resources[resourceKey] === 'object')
+  const selectedResource = isPlainObject(resources[resourceKey])
     ? resources[resourceKey]
     : null;
-  const defaultResource = (resources?.default && typeof resources.default === 'object')
+  const defaultResource = isPlainObject(resources.default)
     ? resources.default
     : null;
 
   const resourceGateIds = Array.isArray(selectedResource?.gateIds)
-    ? selectedResource.gateIds.map((value: any) => normalizeGateLabel(value, deps)).filter(Boolean)
+    ? selectedResource.gateIds.map((value) => normalizeGateLabel(value, deps)).filter(Boolean)
     : [];
   if (resourceGateIds.length > 1) {
     const labels = resourceGateIds
       .map((gateId: string) => {
-        const configuredGate = gatesById?.[gateId];
-        if (!configuredGate || typeof configuredGate !== 'object') return '';
+        const configuredGate = asGateConfig(gatesById[gateId]);
+        if (!configuredGate) return '';
         return deps.resolveGateDisplayLabel(configuredGate, sbtAddresses[0] || '');
       })
-      .map((label: any) => normalizeGateLabel(label, deps))
+      .map((label) => normalizeGateLabel(label, deps))
       .filter((label: string) => label && label !== 'default gate');
     if (labels.length) return labels.join(' + ');
     return resourceGateIds.join(' + ');
@@ -230,8 +283,8 @@ export function resolveConfiguredGateLabel(
   ].map((value) => normalizeGateLabel(value, deps)).filter(Boolean);
 
   for (const gateId of candidateGateIds) {
-    const configuredGate = gatesById?.[gateId];
-    if (!configuredGate || typeof configuredGate !== 'object') continue;
+    const configuredGate = asGateConfig(gatesById[gateId]);
+    if (!configuredGate) continue;
     const label = deps.resolveGateDisplayLabel(configuredGate, sbtAddresses[0] || '');
     if (label && label !== 'default gate') return label;
   }
@@ -245,8 +298,8 @@ export function resolveConfiguredGateLabel(
   if (targetSbtKey) {
     const configuredGates = Object.values(gatesById || {});
     for (const configuredGate of configuredGates) {
-      if (!configuredGate || typeof configuredGate !== 'object') continue;
-      const cg = configuredGate as any;
+      const cg = asGateConfig(configuredGate);
+      if (!cg) continue;
       const configuredSbtKey = Array.from(new Set(
         [
           ...(Array.isArray(cg.sbtAddresses) ? cg.sbtAddresses : []),
@@ -265,10 +318,10 @@ export function resolveConfiguredGateLabel(
 }
 
 export const buildGateAudienceSbtItems = (
-  sbtAddresses: any[] = [],
+  sbtAddresses: unknown[] = [],
   sessionSlug = '',
   deps: Pick<ResponseGateDeps, 'resolveSbtGateLabel' | 'getShortenedAddress' | 'buildSbtDetailPath'>,
-): any[] => (
+): GateAudienceSbtItem[] => (
   Array.from(new Set(
     (Array.isArray(sbtAddresses) ? sbtAddresses : [])
       .map((address) => String(address || '').trim())
@@ -296,7 +349,7 @@ export const getQuestionGateOptions = (
     | 'getShortenedAddress'
     | 'normalizeQuestionIdKey'
   >,
-): any[] => {
+): GateOption[] => {
   const qid = normalizeQuestionId(questionId, deps);
   if (!qid) return [];
 
@@ -304,9 +357,9 @@ export const getQuestionGateOptions = (
   const gates = deps.getQuestionEncryptionGates(question);
   if (!gates.length) return [];
 
-  const out: any[] = [];
+  const out: GateOption[] = [];
   const dedupe = new Set();
-  gates.forEach((gate: any, gateIndex: number) => {
+  gates.forEach((gate: GateConfig, gateIndex: number) => {
     const recipients = deps.buildRecipientsFromGates([gate]);
     if (!Array.isArray(recipients) || recipients.length === 0) return;
 
@@ -321,7 +374,7 @@ export const getQuestionGateOptions = (
 
     const label = deps.resolveConfiguredGateLabel({
       gate,
-      resourceKey: gate?.resourceKey || '',
+      resourceKey: String(gate?.resourceKey || ''),
       sbtAddresses,
     }) || deps.resolveGateDisplayLabel(gate, sbtAddresses[0] || '');
 
@@ -357,7 +410,7 @@ export const getResponseGateOptions = (
     | 'getEffectiveDraftSlug'
     | 'resolveEffectiveSlug'
   >,
-): any[] => {
+): GateOption[] => {
   const qid = normalizeQuestionId(questionId, deps);
   if (qid && deps.isQuestionLockedForResponse(qid)) {
     return deps.getQuestionGateOptions(qid);
@@ -370,10 +423,10 @@ export const getResponseGateOptions = (
 
   const sessionLabel = deps.resolveLockAudienceSessionName();
   const responseGateSessionSlug = resolveResponseGateSessionSlug(deps);
-  const out: any[] = [];
+  const out: GateOption[] = [];
   const dedupe = new Set();
 
-  gates.forEach((gate: any, gateIndex: number) => {
+  gates.forEach((gate: GateConfig, gateIndex: number) => {
     const gateRecipients = recipients[gateIndex]
       ? [recipients[gateIndex]]
       : deps.buildRecipientsFromGates([gate]);
@@ -390,7 +443,7 @@ export const getResponseGateOptions = (
 
     const configuredLabel = deps.resolveConfiguredGateLabel({
       gate,
-      resourceKey: gate?.resourceKey || '',
+      resourceKey: String(gate?.resourceKey || ''),
       sbtAddresses,
     }) || deps.resolveGateDisplayLabel(gate, sbtAddresses[0] || '');
     const label = sessionLabel || configuredLabel;
@@ -412,7 +465,7 @@ export const getResponseGateOptionById = (
   questionId: string | null = null,
   gateId = '',
   deps: Pick<ResponseGateDeps, 'normalizeGateLabelText' | 'getResponseGateOptions'>,
-): any => {
+): GateOption | null => {
   const normalizedGateId = normalizeGateLabel(gateId, deps);
   const options = deps.getResponseGateOptions(questionId);
   if (!options.length) return null;
@@ -421,7 +474,7 @@ export const getResponseGateOptionById = (
 };
 
 export const resolveFieldEncryptionGateId = (
-  field: any = {},
+  field: unknown = {},
   questionId: string | null = null,
   fieldKey = 'answer',
   deps: Pick<
@@ -435,7 +488,8 @@ export const resolveFieldEncryptionGateId = (
   const audience = deps.resolveFieldEncryptionAudience(field, qid || null, fieldKey);
   if (audience !== 'gate') return null;
 
-  const explicitGateId = normalizeGateLabel(field?.encryptionGateId || '', deps);
+  const fieldRecord = isPlainObject(field) ? field : {};
+  const explicitGateId = normalizeGateLabel(fieldRecord.encryptionGateId || '', deps);
   const matchingOption = deps.getResponseGateOptionById(qid || null, explicitGateId);
   return matchingOption?.gateId || null;
 };
@@ -448,7 +502,7 @@ export const getEffectiveRecipientsForField = (
   }: {
     questionId?: string | null;
     fieldKey?: string;
-    field?: any;
+    field?: unknown;
   } = {},
   deps: Pick<
     ResponseGateDeps,
@@ -459,7 +513,7 @@ export const getEffectiveRecipientsForField = (
     | 'resolveFieldEncryptionGateId'
     | 'getResponseGateOptionById'
   >,
-): any[] => {
+): GateRecipient[] => {
   const qid = normalizeQuestionId(questionId, deps);
   if (!qid) return [];
 
@@ -478,7 +532,7 @@ export const getEffectiveRecipientsForField = (
 };
 
 export const resolveGatedPromptGateNames = (
-  question: any,
+  question: unknown,
   deps: Pick<
     ResponseGateDeps,
     | 'normalizeGateLabelText'
@@ -489,8 +543,8 @@ export const resolveGatedPromptGateNames = (
     | 'resolveEffectiveResponseGateConfig'
   >,
 ): string[] => {
-  const normalize = (value: any) => normalizeGateLabel(value, deps);
-  const readGateNames = (gateList: any[]): string[] => (
+  const normalize = (value: unknown) => normalizeGateLabel(value, deps);
+  const readGateNames = (gateList: GateConfig[]): string[] => (
     Array.from(new Set(
       (Array.isArray(gateList) ? gateList : [])
         .map((gate) => {
@@ -512,28 +566,30 @@ export const resolveGatedPromptGateNames = (
   const defaultGateSBTs = Array.isArray(cfg?.defaultGateSBTs) ? cfg.defaultGateSBTs : [];
   const fromDefaultGateSBTs = Array.from(new Set<string>(
     defaultGateSBTs
-      .map((entry: any) => {
+      .map((entry: unknown) => {
         if (typeof entry === 'string') return normalize(entry);
-        if (!entry || typeof entry !== 'object') return '';
+        if (!isPlainObject(entry)) return '';
         return normalize(entry.name || entry.label || entry.title || entry.address);
       })
       .filter(Boolean)
   ));
   if (fromDefaultGateSBTs.length) return fromDefaultGateSBTs;
 
-  const isPlainObject = (value: any) => !!value && typeof value === 'object' && !Array.isArray(value);
-  const encryptionGateMap = isPlainObject(cfg?.encryption?.gates) ? cfg.encryption.gates : null;
-  const sponsoredGateMap = isPlainObject(cfg?.sponsored?.gates) ? cfg.sponsored.gates : null;
+  const encryptionCfg = isPlainObject(cfg.encryption) ? cfg.encryption : {};
+  const sponsoredCfg = isPlainObject(cfg.sponsored) ? cfg.sponsored : {};
+  const litCfg = isPlainObject(cfg.lit) ? cfg.lit : {};
+  const encryptionGateMap = isPlainObject(encryptionCfg.gates) ? encryptionCfg.gates : null;
+  const sponsoredGateMap = isPlainObject(sponsoredCfg.gates) ? sponsoredCfg.gates : null;
   const gateMap = (encryptionGateMap && Object.keys(encryptionGateMap).length)
     ? encryptionGateMap
     : (sponsoredGateMap && Object.keys(sponsoredGateMap).length ? sponsoredGateMap : null);
   const gateIds = gateMap ? Object.keys(gateMap).filter(Boolean).sort() : [];
 
   const candidateDefaults = [
-    cfg?.lit?.defaultGateId,
-    cfg?.encryption?.defaultGateId,
-    cfg?.encryption?.primaryGateId,
-    cfg?.sponsored?.defaultGateId,
+    litCfg.defaultGateId,
+    encryptionCfg.defaultGateId,
+    encryptionCfg.primaryGateId,
+    sponsoredCfg.defaultGateId,
     gateIds[0],
   ]
     .map((value) => (typeof value === 'string' ? value.trim() : ''))
@@ -541,16 +597,20 @@ export const resolveGatedPromptGateNames = (
   const defaultGateId = candidateDefaults.find((gateId) => gateIds.includes(gateId)) || (gateIds[0] || '');
 
   if (defaultGateId && gateMap?.[defaultGateId] && typeof gateMap[defaultGateId] === 'object') {
-    const gate = gateMap[defaultGateId];
-    const fallbackLabel = normalize(gate?.label || gate?.name || gate?.title || defaultGateId);
-    const resolvedLabel = normalize(deps.resolveGateDisplayLabel({ ...gate, gateId: defaultGateId }, ''));
-    const best = resolvedLabel && resolvedLabel !== 'default gate' ? resolvedLabel : fallbackLabel;
-    if (best && best !== 'default gate') return [best];
+    const gate = asGateConfig(gateMap[defaultGateId]);
+    if (gate) {
+      const fallbackLabel = normalize(gate?.label || gate?.name || gate?.title || defaultGateId);
+      const resolvedLabel = normalize(deps.resolveGateDisplayLabel({ ...gate, gateId: defaultGateId }, ''));
+      const best = resolvedLabel && resolvedLabel !== 'default gate' ? resolvedLabel : fallbackLabel;
+      if (best && best !== 'default gate') return [best];
+    }
   }
 
-  const legacyGate = cfg?.encryption?.gate;
+  const legacyGate = encryptionCfg.gate;
   const fromLegacy = readGateNames(
-    legacyGate && typeof legacyGate === 'object' && !Array.isArray(legacyGate) ? [legacyGate] : []
+    legacyGate && typeof legacyGate === 'object' && !Array.isArray(legacyGate)
+      ? [legacyGate as GateConfig]
+      : []
   );
   if (fromLegacy.length) return fromLegacy;
 
