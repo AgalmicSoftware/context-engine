@@ -8,7 +8,7 @@ import styles from './AdminPage.module.scss';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
-import { getChainById, getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
+import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
 import {
   buildSiweMessage,
@@ -19,7 +19,7 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
-import { normalizeBaseUrl, normalizeOriginList } from '../../utilities/urlUtils.js';
+import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { buildWorkerAllowOrigins } from '../../utilities/worker/workerCorsOrigins.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -49,7 +49,7 @@ import {
   hasUsableSessionWorkerConfig,
 } from '../../utilities/session/sessionWorkerAvailability.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
-import { toStr, normalizeSlug as _canonicalizeSlug } from '../../utilities/shared/primitives.js';
+import { toStr } from '../../utilities/shared/primitives.js';
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
@@ -57,52 +57,18 @@ import { sanitizeSessionWizardMetadataPayload } from '../Sessions/sessionWizardW
 import CETooltip from '../Shared/CETooltip';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
+import {
+  buildTxExplorerUrl,
+  countSessionsForChain,
+  getChainName,
+  getErrorMessage,
+  inferAiProviderFromModel,
+  normalizeAiProvider,
+  normalizeSlug,
+  normalizeWorkerUrl,
+} from './adminPageHelpers';
 
 const log = createLogger('general');
-const getErrorMessage = (error: any, fallback = 'Unknown error') => (
-  typeof error?.message === 'string' && error.message.trim() ? error.message : fallback
-);
-
-const getChainName = (value: any) => {
-  const id = Number(value || 0);
-  if (!id) return '';
-  const chain = getChainById(id);
-  return toStr(chain?.name).trim();
-};
-
-const normalizeSlug = (raw: any) => {
-  const slug = _canonicalizeSlug(raw);
-  return slug === 'general' ? '' : slug;
-};
-
-const countSessionsForChain = (entries: any = [], chainId: any = null) => {
-  const list = Array.isArray(entries) ? entries : [];
-  if (!chainId) return list.length;
-  return list.filter(([, cfg]: any) => {
-    const cfgChainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
-    return cfgChainId === chainId;
-  }).length;
-};
-
-const normalizeWorkerUrl = (url: any) => normalizeBaseUrl(url);
-const normalizeAiProvider = (raw: any, fallback: any = 'openai') => {
-  const provider = toStr(raw).trim().toLowerCase();
-  if (['openai', 'anthropic', 'openrouter', 'custom'].includes(provider)) return provider;
-  return fallback;
-};
-const inferAiProviderFromModel = (modelRaw: any) => {
-  const model = toStr(modelRaw).trim().toLowerCase();
-  if (!model) return '';
-  if (model.startsWith('claude')) return 'anthropic';
-  if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return 'openai';
-  if (model.includes('/')) return 'openrouter';
-  return '';
-};
-const buildTxExplorerUrl = (hash: any, chainId: any) => {
-  const base = toStr(getChainById(chainId)?.blockExplorers?.default?.url).trim();
-  if (!base || !hash) return '';
-  return `${base.replace(/\/+$/, '')}/tx/${hash}`;
-};
 const buildSessionUrl = (slug: any, { allowGeneral = false }: any = {}) => {
   const hasExplicitSlug = slug !== undefined && slug !== null;
   const normalized = normalizeSlug(slug);
