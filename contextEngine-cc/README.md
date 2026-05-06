@@ -373,6 +373,28 @@ Server data is stored in `contextEngine-cc/.data/`:
 | POST | `/api/responses/submit-onchain` | Yes | Submit pending local responses on-chain |
 | POST | `/api/responses/mark-submitted` | Yes | Mark a local response as submitted and persist confirmed local state |
 
+## Agent-Native API
+
+Canonical agent routes live under `/api/agent/*` and are documented in
+[`docs/agent-native-contract.md`](../docs/agent-native-contract.md). They use
+the same local JWT auth as the legacy CE-CC API.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/agent/me` | Return local agent identity, auth mode, and capability metadata |
+| GET | `/api/agent/sessions` | List agent-visible sessions using the existing scan scope |
+| GET | `/api/agent/questions?session=` | Return the next question as `question` plus canonical `questions[]` |
+| GET | `/api/agent/inbox` | Return pending-response and approval-request summaries |
+| POST | `/api/agent/responses/draft` | Save a response draft locally without auto-submit |
+| GET | `/api/agent/responses/drafts?session=` | List authenticated-wallet local response drafts |
+| POST | `/api/agent/responses/submit-request` | Create an approval-required submit request instead of signing |
+| GET | `/api/agent/requests/:id` | Read approval request status by opaque request id |
+
+MCP descriptors in `lib/agent/mcpTools.mjs` are thin wrappers over these
+routes. Telegram and OpenClaw helpers in `lib/agent/` are pure contract helpers
+only; they do not add webhook deployment, bot-token storage, OpenClaw transport
+dependencies, or remote signing authority.
+
 ## Uninstall
 
 ```bash

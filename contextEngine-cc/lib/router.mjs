@@ -41,12 +41,26 @@ import {
   normalizeResponseAudienceSelections,
   isEncryptedAudience,
 } from './responseAudience.mjs';
+import { buildAgentCapabilities } from './agent/capabilities.mjs';
+import {
+  buildAgentOk,
+  normalizeAgentQuestionPayload,
+  redactAgentSensitiveFields,
+  summarizePendingResponseForAgent,
+  summarizeRequestForAgent,
+} from './agent/schemas.mjs';
+import {
+  buildApprovalRequiredResponse,
+  createApprovalRequestId,
+  isValidApprovalRequestId,
+} from './agent/approvalResponses.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(process.env.CE_CC_DATA_DIR || resolve(__dirname, '..', '.data'));
 const RESPONSES_DIR = resolve(DATA_DIR, 'responses');
 const WORKER_TOKENS_DIR = resolve(DATA_DIR, 'worker-tokens');
 const CONFIRMED_SUBMISSIONS_DIR = resolve(DATA_DIR, 'confirmed-submissions');
+const AGENT_REQUESTS_DIR = resolve(DATA_DIR, 'agent-requests');
 const SETTINGS_PATH = resolve(DATA_DIR, 'settings.json');
 const DEFAULT_HOOK_COOLDOWN_MS = 45_000;
 const MAX_HOOK_COOLDOWN_MS = 600_000;
@@ -318,6 +332,48 @@ function getResponseFilePath(slug, questionId) {
   return resolve(RESPONSES_DIR, slug, `${String(questionId || '').replace(/[^a-fA-F0-9x]/g, '_')}.json`);
 }
 
+function getAgentRequestFilePath(requestId) {
+  const id = String(requestId || '').trim();
+  if (!isValidApprovalRequestId(id)) return null;
+  return resolve(AGENT_REQUESTS_DIR, `${id}.json`);
+}
+
+function getServerUrlFromRequest(req = {}) {
+  const proto = String(req.headers?.['x-forwarded-proto'] || 'http').trim() || 'http';
+  const host = String(req.headers?.host || 'localhost:7391').trim() || 'localhost:7391';
+  return `${proto}://${host}`;
+}
+
+function saveAgentRequest(record = {}) {
+  const file = getAgentRequestFilePath(record.requestId);
+  if (!file) throw new Error('Invalid agent request id.');
+  mkdirSync(AGENT_REQUESTS_DIR, { recursive: true });
+  writeSecureFile(file, JSON.stringify(record, null, 2));
+  return record;
+}
+
+function loadAgentRequest(requestId) {
+  const file = getAgentRequestFilePath(requestId);
+  if (!file || !existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function loadAgentRequestsForWallet(walletAddress = '') {
+  if (!existsSync(AGENT_REQUESTS_DIR)) return [];
+  const wallet = normalizeAddressLower(walletAddress);
+  return readdirSync(AGENT_REQUESTS_DIR)
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => {
+      try { return JSON.parse(readFileSync(resolve(AGENT_REQUESTS_DIR, file), 'utf8')); }
+      catch { return null; }
+    })
+    .filter((entry) => entry && (!wallet || normalizeAddressLower(entry.requester) === wallet));
+}
+
 function buildPendingSubmissionLockKey(slug, response) {
   const normalizedSlug = String(slug ?? '').trim().toLowerCase();
   const questionId = String(response?.questionId || '').trim().toLowerCase();
@@ -431,6 +487,130 @@ export function filterPendingResponsesForSubmission(
   if (!ids.length) return filteredByRespondent;
   const idSet = new Set(ids);
   return filteredByRespondent.filter((entry) => idSet.has(String(entry?.questionId || '').toLowerCase()));
+}
+
+async function saveAgentResponseDraft({ body = {}, authPayload = {} } = {}) {
+  const {
+    questionId,
+    session,
+    answer,
+    questionType,
+    conviction,
+    importance,
+    additional,
+    encrypt,
+    encryptAdditional,
+    answerEncryptionAudience,
+    answerEncryptionGateId,
+    additionalEncryptionAudience,
+    additionalEncryptionGateId,
+  } = body || {};
+  const questionValidation = validateQuestionId(questionId);
+  if (!questionValidation.ok) {
+    return { ok: false, status: 400, payload: { error: questionValidation.error } };
+  }
+  const canonicalQuestionId = questionValidation.questionId;
+  const sessionValidation = validateSessionSlug(session, {
+    required: true,
+    allowExplicitEmpty: true,
+  });
+  if (!sessionValidation.ok) {
+    return { ok: false, status: 400, payload: { error: sessionValidation.error } };
+  }
+
+  const normalizedQuestionType = String(questionType || 'unknown').toLowerCase().trim();
+  let resolvedAnswer = answer;
+  if (normalizedQuestionType === 'rating' && answer != null) {
+    if (typeof answer === 'number') {
+      resolvedAnswer = answer;
+    } else {
+      const str = String(answer).trim();
+      const direct = Number(str);
+      if (Number.isFinite(direct)) {
+        resolvedAnswer = direct;
+      } else {
+        const match = str.match(/(\d+(?:\.\d+)?)/);
+        resolvedAnswer = match ? Number(match[1]) : answer;
+      }
+    }
+  }
+
+  const isEmptyAnswer = resolvedAnswer == null
+    || (typeof resolvedAnswer === 'string' && resolvedAnswer.trim() === '');
+  const isInvalidRating = normalizedQuestionType === 'rating'
+    && (resolvedAnswer == null || !Number.isFinite(Number(resolvedAnswer)) || Number(resolvedAnswer) < 0 || Number(resolvedAnswer) > 10);
+  if (isEmptyAnswer || isInvalidRating) {
+    return { ok: false, status: 400, payload: { error: 'questionId and answer are required.' } };
+  }
+
+  const storedAnswerResult = normalizeStoredResponseAnswer(answer, normalizedQuestionType, resolvedAnswer);
+  if (!storedAnswerResult.ok) {
+    return { ok: false, status: storedAnswerResult.status, payload: { error: storedAnswerResult.error } };
+  }
+
+  const slug = sessionValidation.slug;
+  const metadata = await getSessionMetadata(slug).catch(() => null);
+  const audienceContext = deriveResponseGateOptionsFromMetadata(metadata, { isQuestionResponseFlow: true });
+  const encryptionRequested = isEncryptionRequested(encrypt);
+  const hasAdditionalText = String(additional ?? '').trim() !== '';
+  const hasExplicitEncryptAdditional = Object.prototype.hasOwnProperty.call(body || {}, 'encryptAdditional');
+  const encryptionAdditionalRequested = hasExplicitEncryptAdditional
+    ? isEncryptionRequested(encryptAdditional)
+    : (encryptionRequested && hasAdditionalText);
+  const normalizedAudiences = normalizeResponseAudienceSelections({
+    answerAudience: answerEncryptionAudience,
+    answerGateId: answerEncryptionGateId,
+    additionalAudience: additionalEncryptionAudience,
+    additionalGateId: additionalEncryptionGateId,
+    encryptRequested: encryptionRequested,
+    encryptAdditionalRequested: hasExplicitEncryptAdditional ? encryptionAdditionalRequested : null,
+    hasAdditionalText,
+    gateOptions: audienceContext.gateOptions,
+  });
+
+  const dir = resolve(RESPONSES_DIR, slug);
+  const rel = relative(resolve(RESPONSES_DIR), dir);
+  if (rel.startsWith('..') || resolve(RESPONSES_DIR, rel) !== dir) {
+    return { ok: false, status: 400, payload: { error: 'Invalid session slug.' } };
+  }
+  mkdirSync(dir, { recursive: true });
+
+  const response = {
+    questionId: canonicalQuestionId,
+    answer: storedAnswerResult.storedAnswer,
+    conviction: conviction != null ? conviction : null,
+    importance: importance != null ? importance : null,
+    additional: additional || null,
+    encrypt: isEncryptedAudience(normalizedAudiences.answerEncryptionAudience),
+    encryptAdditional: hasAdditionalText
+      ? isEncryptedAudience(normalizedAudiences.additionalEncryptionAudience)
+      : false,
+    answerEncryptionAudience: normalizedAudiences.answerEncryptionAudience,
+    answerEncryptionGateId: normalizedAudiences.answerEncryptionGateId,
+    additionalEncryptionAudience: normalizedAudiences.additionalEncryptionAudience,
+    additionalEncryptionGateId: normalizedAudiences.additionalEncryptionGateId,
+    additionalAudienceMode: normalizedAudiences.additionalAudienceMode,
+    questionType: questionType || 'unknown',
+    respondent: authPayload.sub,
+    timestamp: new Date().toISOString(),
+    submitted: false,
+    agentDraft: true,
+    source: 'agent-http',
+  };
+  const file = resolve(dir, `${canonicalQuestionId.replace(/[^a-fA-F0-9x]/g, '_')}.json`);
+  writeSecureFile(file, JSON.stringify(response, null, 2));
+  clearServed(questionId);
+
+  return {
+    ok: true,
+    status: 200,
+    response,
+    payload: buildAgentOk({
+      stored: true,
+      submitted: false,
+      draft: summarizePendingResponseForAgent(response, { session: slug }),
+    }, { status: 'draft_saved' }),
+  };
 }
 
 function validateSessionSlug(value, { required = false, allowExplicitEmpty = false } = {}) {
@@ -1126,6 +1306,30 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
     return json(res, 200, auth.payload);
   }
 
+  if (path === '/api/agent/me' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const hookConfig = loadHookConfig();
+    const sessions = getConfiguredSessions(hookConfig);
+    const walletAddress = auth.payload?.sub || '';
+    const workerTokenSummary = summarizeWorkerTokenStatuses(sessions, walletAddress);
+    return json(res, 200, buildAgentOk({
+      identity: auth.payload,
+      wallet: walletAddress,
+      auth: {
+        type: 'local-jwt',
+        scope: auth.payload?.scope || null,
+      },
+      capabilities: buildAgentCapabilities({
+        wallet: walletAddress,
+        sessions,
+        workerTokenSummary,
+        settings: loadSettings(),
+        submitStatus: canSubmitImpl(),
+      }),
+    }));
+  }
+
   if (path === '/api/sessions' && method === 'GET') {
     const auth = requireAuth(req);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
@@ -1140,6 +1344,27 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         scope: CE_SESSION_SCAN_SCOPE,
         scopeSlugs: CE_SESSION_SCAN_SLUGS,
       });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/agent/sessions' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    try {
+      const { scoped, all } = await listScopedSessions();
+      for (const slug of scoped) {
+        warmQuestionCache(slug);
+      }
+      const hookConfig = loadHookConfig();
+      return json(res, 200, buildAgentOk({
+        sessions: scoped,
+        allSessions: all,
+        selectedSessions: getConfiguredSessions(hookConfig),
+        scope: CE_SESSION_SCAN_SCOPE,
+        scopeSlugs: CE_SESSION_SCAN_SLUGS,
+      }));
     } catch (err) {
       return json(res, 500, { error: err.message });
     }
@@ -1237,6 +1462,66 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         gateOptions: audienceContext.gateOptions,
         defaultGateId: audienceContext.defaultGateId || '',
       });
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/agent/questions' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(url.searchParams.get('session'));
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const slug = sessionValidation.slug;
+    const walletAddr = auth.payload?.sub || '';
+    try {
+      const hookConfig = loadHookConfig();
+      const allowReanswer = hookConfig.allowReanswer === true || hookConfig.allowReanswer === 'true';
+      const randomUnseen = await getRandomUnseenImpl(slug, { walletAddress: walletAddr, allowReanswer });
+      const question = randomUnseen?.question || null;
+      const metadata = await getSessionMetadata(slug).catch(() => null);
+      const audienceContext = deriveResponseGateOptionsFromMetadata(metadata, { isQuestionResponseFlow: true });
+      return json(res, 200, normalizeAgentQuestionPayload({
+        session: slug,
+        question,
+        fields: {
+          message: question ? undefined : 'No questions available.',
+          allowReanswer,
+          gateOptions: audienceContext.gateOptions,
+          defaultGateId: audienceContext.defaultGateId || '',
+        },
+      }));
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/agent/inbox' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(url.searchParams.get('session'), {
+      required: false,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    try {
+      const sessions = sessionValidation.slug
+        ? [sessionValidation.slug]
+        : getConfiguredSessions(loadHookConfig());
+      const pendingResponses = sessions.flatMap((slug) => filterResponsesByRespondent(
+        loadPendingResponses(slug),
+        auth.payload?.sub || '',
+      ).map((response) => summarizePendingResponseForAgent(response, { session: slug })));
+      const requests = loadAgentRequestsForWallet(auth.payload?.sub || '').map(summarizeRequestForAgent);
+      return json(res, 200, buildAgentOk({
+        inbox: [
+          ...pendingResponses,
+          ...requests,
+        ],
+        pendingResponses,
+        requests,
+        count: pendingResponses.length + requests.length,
+      }));
     } catch (err) {
       return json(res, 500, { error: err.message });
     }
@@ -1453,6 +1738,99 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   }
 
   // --- Response submission (store locally for later on-chain submission) ---
+
+  if (path === '/api/agent/responses/draft' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    try {
+      const result = await saveAgentResponseDraft({
+        body,
+        authPayload: auth.payload,
+      });
+      return json(res, result.status, result.payload);
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/agent/responses/drafts' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const sessionValidation = validateSessionSlug(url.searchParams.get('session'), {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    const slug = sessionValidation.slug;
+    try {
+      const drafts = filterResponsesByRespondent(
+        loadPendingResponses(slug),
+        auth.payload?.sub || '',
+      );
+      return json(res, 200, buildAgentOk({
+        session: slug,
+        drafts,
+        summaries: drafts.map((response) => summarizePendingResponseForAgent(response, { session: slug })),
+        count: drafts.length,
+      }));
+    } catch (err) {
+      return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/agent/responses/submit-request' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+
+    const { session, questionIds, questionId } = body || {};
+    const sessionValidation = validateSessionSlug(session, {
+      required: true,
+      allowExplicitEmpty: true,
+    });
+    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+
+    const rawQuestionIds = Array.isArray(questionIds)
+      ? questionIds
+      : (questionId ? [questionId] : []);
+    const normalizedQuestionIds = rawQuestionIds.map((value) => validateQuestionId(value));
+    if (!normalizedQuestionIds.length || normalizedQuestionIds.some((entry) => !entry.ok)) {
+      return json(res, 400, { error: 'questionIds must contain at least one 32-byte hex string.' });
+    }
+
+    const requestId = createApprovalRequestId();
+    const createdAt = new Date().toISOString();
+    const serverUrl = getServerUrlFromRequest(req);
+    const approval = buildApprovalRequiredResponse({
+      requestId,
+      serverUrl,
+      fields: {
+        capabilityMode: 'submit-request',
+      },
+    });
+    const record = saveAgentRequest({
+      type: 'response_submit_request',
+      requestId,
+      status: approval.status,
+      requiresApproval: true,
+      approvalUrl: approval.approvalUrl,
+      session: sessionValidation.slug,
+      questionIds: normalizedQuestionIds.map((entry) => entry.questionId),
+      requester: auth.payload?.sub || '',
+      createdAt,
+      updatedAt: createdAt,
+      source: 'agent-http',
+      payload: redactAgentSensitiveFields({
+        session: sessionValidation.slug,
+        questionIds: normalizedQuestionIds.map((entry) => entry.questionId),
+        agentContext: body?.agentContext || null,
+      }),
+    });
+
+    return json(res, 202, {
+      ...approval,
+      request: summarizeRequestForAgent(record),
+    });
+  }
 
   if (path === '/api/respond' && method === 'POST') {
     const auth = requireAuth(req);
@@ -1870,6 +2248,23 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
     } catch (err) {
       return json(res, 500, { error: err.message });
     }
+  }
+
+  if (path.startsWith('/api/agent/requests/') && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    const requestId = decodeURIComponent(path.slice('/api/agent/requests/'.length));
+    if (!isValidApprovalRequestId(requestId)) {
+      return json(res, 400, { error: 'Invalid agent request id.' });
+    }
+    const request = loadAgentRequest(requestId);
+    const walletAddress = normalizeAddressLower(auth.payload?.sub || '');
+    if (!request || (walletAddress && normalizeAddressLower(request.requester) !== walletAddress)) {
+      return json(res, 404, { error: 'Agent request not found.' });
+    }
+    return json(res, 200, buildAgentOk({
+      request: summarizeRequestForAgent(request),
+    }));
   }
 
   // --- Question creation (on-chain) ---

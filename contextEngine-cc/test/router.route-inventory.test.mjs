@@ -24,8 +24,23 @@ const extractExactRouterRoutes = () => {
   return routes;
 };
 
+const extractPrefixRouterRoutes = () => {
+  const routes = [];
+  const pattern = /if \(path\.startsWith\('([^']+)'\) && method === '([^']+)'\)/g;
+  let match = pattern.exec(ROUTER_SOURCE);
+  while (match) {
+    const prefix = match[1];
+    routes.push({ path: `${prefix}${prefix.endsWith('/') ? ':id' : '/:id'}`, method: match[2], match: 'prefix' });
+    match = pattern.exec(ROUTER_SOURCE);
+  }
+  return routes;
+};
+
 test('route inventory covers every exact route branch in router.mjs', () => {
-  const routerKeys = extractExactRouterRoutes().map(routeKey).sort();
+  const routerKeys = [
+    ...extractExactRouterRoutes(),
+    ...extractPrefixRouterRoutes(),
+  ].map(routeKey).sort();
   const inventoryKeys = ROUTE_INVENTORY.map(routeKey).sort();
 
   assert.deepEqual(inventoryKeys, routerKeys);
@@ -40,6 +55,7 @@ test('route inventory records auth requirement, owner, and response smoke shape'
     assert.equal(typeof route.path, 'string');
     assert.match(route.path, /^\/api\//);
     assert.match(route.method, /^(GET|POST)$/);
+    assert.ok(route.match === undefined || route.match === 'prefix', `unknown match mode for ${key}`);
     assert.ok(Object.values(ROUTE_AUTH).includes(route.auth), `unknown auth mode for ${key}`);
     assert.equal(typeof route.authHelper, 'string');
     assert.notEqual(route.authHelper.trim(), '');
