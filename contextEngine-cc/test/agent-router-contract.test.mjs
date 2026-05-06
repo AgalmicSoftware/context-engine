@@ -15,6 +15,14 @@ function extractBranch(path, method = 'GET') {
   return ROUTER_SOURCE.slice(start, next === -1 ? undefined : next);
 }
 
+function extractPrefixBranch(prefix, method = 'GET') {
+  const marker = `if (path.startsWith('${prefix}') && method === '${method}')`;
+  const start = ROUTER_SOURCE.indexOf(marker);
+  assert.notEqual(start, -1, `missing route branch ${method} ${prefix}:id`);
+  const next = ROUTER_SOURCE.indexOf('\n  if (path ', start + marker.length);
+  return ROUTER_SOURCE.slice(start, next === -1 ? undefined : next);
+}
+
 test('agent HTTP routes are present in router source', () => {
   [
     ['GET', '/api/agent/me'],
@@ -27,6 +35,24 @@ test('agent HTTP routes are present in router source', () => {
   ].forEach(([method, path]) => extractBranch(path, method));
 
   assert.match(ROUTER_SOURCE, /path\.startsWith\('\/api\/agent\/requests\/'\) && method === 'GET'/);
+});
+
+test('agent HTTP route branches require local JWT auth before work', () => {
+  const branches = [
+    extractBranch('/api/agent/me', 'GET'),
+    extractBranch('/api/agent/sessions', 'GET'),
+    extractBranch('/api/agent/questions', 'GET'),
+    extractBranch('/api/agent/inbox', 'GET'),
+    extractBranch('/api/agent/responses/draft', 'POST'),
+    extractBranch('/api/agent/responses/drafts', 'GET'),
+    extractBranch('/api/agent/responses/submit-request', 'POST'),
+    extractPrefixBranch('/api/agent/requests/', 'GET'),
+  ];
+
+  for (const branch of branches) {
+    assert.match(branch, /const auth = requireAuth\(req\);/);
+    assert.match(branch, /if \(!auth\.ok\) return json\(res, auth\.status, \{ error: auth\.error \}\);/);
+  }
 });
 
 test('agent submit-request route is approval-gated and does not submit on-chain', () => {
