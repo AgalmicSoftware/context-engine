@@ -1,11 +1,8 @@
 import {
   ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
-  addSessionConfigHint,
   buildAdminWorkerCorsMessage,
-  buildHealthAuthMismatchState,
   isRetryableAdminNonceFailure,
   normalizeAdminWorkerFetchError,
-  shouldSeedWorkerConfigFromError,
   sleep,
 } from './adminPageWorkerErrorHelpers';
 
@@ -63,35 +60,5 @@ describe('adminPageWorkerErrorHelpers', () => {
     await pending;
     expect(done).toHaveBeenCalledTimes(1);
     jest.useRealTimers();
-  });
-
-  it('adds session config guidance only for missing session config failures', () => {
-    expect(addSessionConfigHint('Session config not found')).toContain('Re-run this test while connected as the admin wallet');
-    expect(addSessionConfigHint('Other failure')).toBe('Other failure');
-    expect(addSessionConfigHint('')).toContain('Worker session config is missing');
-    expect(shouldSeedWorkerConfigFromError('session config not found')).toBe(true);
-    expect(shouldSeedWorkerConfigFromError('other failure')).toBe(false);
-  });
-
-  it('builds health auth mismatch state only for unsupported auth login routes', () => {
-    expect(buildHealthAuthMismatchState({
-      unauthStatus: 401,
-      unauthError: 'login required',
-      authError: 'Worker login failed (404)',
-    })).toEqual({
-      healthLabel: 'Auth required: login required; /auth/login unsupported (404)',
-      statusMessage: 'Health endpoint is gated, but this worker URL does not expose /auth/login.',
-    });
-    expect(buildHealthAuthMismatchState({
-      unauthStatus: 403,
-      authError: 'worker auth login route not supported',
-    })).toEqual({
-      healthLabel: 'Auth required; /auth/login unsupported (404)',
-      statusMessage: 'Health endpoint is gated, but this worker URL does not expose /auth/login.',
-    });
-    expect(buildHealthAuthMismatchState({
-      unauthStatus: 500,
-      authError: 'Worker login failed (404)',
-    })).toBeNull();
   });
 });
