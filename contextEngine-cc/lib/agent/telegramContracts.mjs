@@ -29,6 +29,9 @@ function hasSensitiveKeyOrValue(value, path = []) {
 }
 
 export function createTelegramCallbackAction({ actionId = randomUUID(), action = '', requestId = '', expiresAt = null } = {}) {
+  if (hasSensitiveKeyOrValue({ actionId, action, requestId })) {
+    throw new Error('Telegram callback action metadata must not contain secrets.');
+  }
   const id = `cecb_${String(actionId || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 48)}`;
   if (!CALLBACK_ACTION_RE.test(id)) {
     throw new Error('Invalid Telegram callback action id.');
@@ -89,6 +92,7 @@ function buildTelegramDataCheckString(params) {
 export function validateTelegramMiniAppInitData(initData, botToken, {
   nowMs = Date.now(),
   maxAgeSeconds = 24 * 60 * 60,
+  maxFutureSeconds = 300,
 } = {}) {
   const token = String(botToken || '').trim();
   if (!token) return { ok: false, error: 'botToken required.' };
@@ -101,6 +105,9 @@ export function validateTelegramMiniAppInitData(initData, botToken, {
     return { ok: false, error: 'auth_date missing.' };
   }
   const ageSeconds = Math.floor(nowMs / 1000) - authDate;
+  if (maxFutureSeconds >= 0 && ageSeconds < -maxFutureSeconds) {
+    return { ok: false, error: 'auth_date is too far in the future.' };
+  }
   if (maxAgeSeconds > 0 && ageSeconds > maxAgeSeconds) {
     return { ok: false, error: 'initData expired.' };
   }

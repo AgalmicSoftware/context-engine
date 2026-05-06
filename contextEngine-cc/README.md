@@ -397,7 +397,9 @@ pending approval request instead of creating duplicate work.
 MCP descriptors in `lib/agent/mcpTools.mjs` are thin wrappers over these
 routes. Telegram and OpenClaw helpers in `lib/agent/` are pure contract helpers
 only; they do not add webhook deployment, bot-token storage, OpenClaw transport
-dependencies, or remote signing authority.
+dependencies, or remote signing authority. Telegram callback data remains an
+opaque action id, Mini App `initData` is HMAC-validated with freshness checks,
+and OpenClaw envelopes must point back to canonical `/api/agent/*` routes.
 
 ## Uninstall
 

@@ -40,6 +40,30 @@ test('Telegram callback data uses only an opaque short action id', () => {
   });
 });
 
+test('Telegram callback action metadata rejects secret-shaped values', () => {
+  assert.throws(
+    () => createTelegramCallbackAction({
+      actionId: 'eyJhbGciOi.fake.sig',
+      action: 'approve',
+      requestId: 'agent_req_request123',
+    }),
+    /must not contain secrets/,
+  );
+  assert.throws(
+    () => createTelegramCallbackAction({
+      actionId: 'a1b2c3d4',
+      action: 'Bearer long-lived-token',
+      requestId: 'agent_req_request123',
+    }),
+    /must not contain secrets/,
+  );
+});
+
+test('Telegram callback parser rejects full payload-shaped callback data', () => {
+  assert.equal(parseTelegramCallbackActionId('{"requestId":"agent_req_abc12345"}').ok, false);
+  assert.equal(parseTelegramCallbackActionId('cecb_short').ok, false);
+});
+
 test('Telegram update normalization prefers private DM metadata for v1', () => {
   const normalized = normalizeTelegramUpdate({
     update_id: 7,
@@ -77,6 +101,24 @@ test('Telegram Mini App initData validation checks hash and auth_date freshness'
       maxAgeSeconds: 24 * 60 * 60,
     }).error,
     'initData expired.',
+  );
+  assert.equal(
+    validateTelegramMiniAppInitData(initData, 'wrong-token', { nowMs }).error,
+    'hash mismatch.',
+  );
+});
+
+test('Telegram Mini App initData validation rejects auth_date too far in the future', () => {
+  const botToken = '123456:ABCDEF';
+  const nowMs = Date.parse('2026-05-06T12:00:00.000Z');
+  const initData = signMiniAppInitData({
+    auth_date: String(Math.floor(nowMs / 1000) + 600),
+    query_id: 'query-future',
+  }, botToken);
+
+  assert.equal(
+    validateTelegramMiniAppInitData(initData, botToken, { nowMs, maxFutureSeconds: 300 }).error,
+    'auth_date is too far in the future.',
   );
 });
 

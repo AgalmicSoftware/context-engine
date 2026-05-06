@@ -5,6 +5,7 @@ import {
   buildOpenClawApprovalForward,
   buildOpenClawDraftForward,
   normalizeOpenClawThreadTarget,
+  validateOpenClawAdapterEnvelope,
 } from './openclawContracts.mjs';
 
 test('OpenClaw adapter contract is optional and transport-only', () => {
@@ -17,11 +18,13 @@ test('OpenClaw adapter contract is optional and transport-only', () => {
 });
 
 test('OpenClaw approval forwarding envelope points back to canonical request status', () => {
-  assert.deepEqual(buildOpenClawApprovalForward({
+  const envelope = buildOpenClawApprovalForward({
     threadId: 'thread-1',
     requestId: 'agent_req_abc12345',
     approvalUrl: 'http://localhost:7391/agent/requests/agent_req_abc12345',
-  }), {
+  });
+
+  assert.deepEqual(envelope, {
     adapter: 'OpenClawThreadAdapter',
     version: 'agent-contract-v1',
     event: 'approval_required',
@@ -34,6 +37,7 @@ test('OpenClaw approval forwarding envelope points back to canonical request sta
       path: '/api/agent/requests/agent_req_abc12345',
     },
   });
+  assert.deepEqual(validateOpenClawAdapterEnvelope(envelope), { ok: true });
 });
 
 test('OpenClaw draft forwarding envelope uses canonical draft listing', () => {
@@ -46,6 +50,7 @@ test('OpenClaw draft forwarding envelope uses canonical draft listing', () => {
 
   assert.equal(envelope.http.path, '/api/agent/responses/drafts?session=alpha');
   assert.equal(envelope.event, 'draft_saved');
+  assert.deepEqual(validateOpenClawAdapterEnvelope(envelope), { ok: true });
 });
 
 test('OpenClaw thread target normalization defaults to the adapter contract name', () => {
@@ -53,5 +58,21 @@ test('OpenClaw thread target normalization defaults to the adapter contract name
     enabled: true,
     threadId: 't-1',
     adapterName: 'OpenClawThreadAdapter',
+  });
+});
+
+test('OpenClaw adapter envelope validator rejects non-agent routes and DOM hooks', () => {
+  assert.deepEqual(validateOpenClawAdapterEnvelope({
+    http: { method: 'GET', path: '/api/questions' },
+  }), {
+    ok: false,
+    error: 'OpenClaw adapter envelopes must point to canonical /api/agent routes.',
+  });
+  assert.deepEqual(validateOpenClawAdapterEnvelope({
+    http: { method: 'GET', path: '/api/agent/questions' },
+    transportHint: 'document.querySelector(".question")',
+  }), {
+    ok: false,
+    error: 'OpenClaw adapter envelopes must not depend on browser DOM scraping.',
   });
 });

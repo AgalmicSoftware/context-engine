@@ -66,6 +66,7 @@ Telegram:
 - Never put CE-CC JWTs, worker tokens, private keys, long-lived bearer tokens, or signing authority in chat state, callback data, CloudStorage, or Mini App handoff payloads.
 - Use opaque short callback action IDs.
 - Validate Mini App `initData` server-side before trusting Telegram identity.
+- Reject callback payloads and storage helpers that carry secrets or full request payloads.
 - Use SecureStorage only for short-lived scoped grants or refresh handles when feature-detected; use CloudStorage only for non-sensitive preferences.
 
 ## PRD Map
