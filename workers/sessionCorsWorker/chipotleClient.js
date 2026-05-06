@@ -850,21 +850,25 @@ export const bootstrapLitChipotleSession = async ({
 } = {}) => {
   const litCredentials = isObj(config?.litCredentials) ? config.litCredentials : {};
   const secretAccountApiKey = toTrimmedString(secrets?.litAccountApiKey);
+  const requestBody = isObj(request) ? request : {};
+  const requestAccountApiKey = toTrimmedString(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString(env?.LIT_ACCOUNT_API_KEY);
-  const existingAccountApiKey = secretAccountApiKey || envAccountApiKey;
+  const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
   const existingAccountApiKeySource = secretAccountApiKey
     ? 'session-secret'
-    : envAccountApiKey
+    : requestAccountApiKey
+      ? 'admin-request'
+      : envAccountApiKey
       ? 'worker-env'
       : 'missing';
   const existingUsageApiKey = toTrimmedString(secrets?.litUsageApiKey);
   const existingGroupId = toTrimmedString(litCredentials?.litGroupId);
   const existingPkpId = toTrimmedString(litCredentials?.litPkpId);
   const existingActionCid = toTrimmedString(litCredentials?.litActionCid);
-  const requestBody = isObj(request) ? request : {};
   const litApiBase = normalizeLitChipotleApiBase(
     requestBody.litApiBase ||
     litCredentials.litApiBase ||
+    env?.LIT_API_BASE ||
     DEFAULT_LIT_API_BASE
   );
 
@@ -1015,7 +1019,9 @@ export const bootstrapLitChipotleSession = async ({
         litPkpId,
       },
       secretOutputs: {
-        ...(secretAccountApiKey ? { litAccountApiKey: existingAccountApiKey } : {}),
+        ...(secretAccountApiKey || requestAccountApiKey
+          ? { litAccountApiKey: existingAccountApiKey }
+          : {}),
         ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
       },
       steps: {
@@ -1166,14 +1172,23 @@ export const executeLitChipotleAction = async ({
     payload.js_params = actionRequest.js_params;
   }
 
-  const response = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litUsageApiKey,
-    path: '/lit_action',
-    method: 'POST',
-    body: payload,
-    fetchImpl,
-  });
+  let response;
+  try {
+    response = await fetchChipotleJson({
+      apiBase: runtime.litApiBase,
+      apiKey: runtime.litUsageApiKey,
+      path: '/lit_action',
+      method: 'POST',
+      body: payload,
+      fetchImpl,
+    });
+  } catch (error) {
+    const message = toTrimmedString(error?.message || error);
+    if (/not found/i.test(message)) {
+      throw new Error('Lit Chipotle action was not found or is not permitted for this session usage key. Re-run Lit Chipotle provisioning for this session worker.');
+    }
+    throw error;
+  }
 
   return {
     ok: true,
@@ -1270,7 +1285,9 @@ export const executeSessionLitChipotleAction = async ({
       litPkpId,
     },
     request: {
-      code: actionCode,
+      // Verify submitted source first, then execute the provisioned action CID
+      // that the session usage key/group is permitted to run.
+      ipfsId: litActionCid,
       jsParams,
     },
     fetchImpl,

@@ -13,6 +13,7 @@ import {
   getVisibleSessionWizardContractKeys,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
+import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
 import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
 import type {
   AnyRecord,
@@ -24,8 +25,8 @@ import type {
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const trimString = (value: unknown): string => toStr(value).trim();
-const cloneValue = (value: any): any => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
+const cloneValue = <T = unknown>(value: T): T => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
     return Object.keys(value).reduce<AnyRecord>((acc, key) => {
       acc[key] = cloneValue(value[key]);

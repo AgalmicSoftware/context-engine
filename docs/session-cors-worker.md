@@ -109,6 +109,7 @@ If you deploy via the Group Wizard and a deploy-helper:
   - `litAccountApiKey` is the per-bundle authority field backed by one disposable Lit account per bundle
   - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
   - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
+- The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
 - The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
@@ -193,7 +194,7 @@ Admin test panel:
 - The Session Admin page includes a Worker Tests panel to hit `/health`, run a basic AI call,
   upload a tiny JSON payload to Arweave, and record a short AudioInput transcription.
   Arweave and faucet test results include clickable tx links for quick verification.
-  Arweave links use the preferred gateway (`ARWEAVE_GATEWAY_URL`, now `https://ar-io.dev`, with `https://arweave.net` next in the fallback list). By default, reads stay ar.io-first but still fan out across the fallback gateways when the primary route is flaky. When `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, the client switches into explicit ar.io-only troubleshooting mode and uses `CE_ARWEAVE_AR_IO_URL` for links and Arweave read retries without fanning out to legacy gateways. Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
+  Arweave links use the preferred AR.IO gateway (`CE_ARWEAVE_AR_IO_URL` when set, otherwise `https://ar-io.dev`) while `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, which is the default. In this mode, read retries stay on AR.IO and do not fan out to legacy gateways. Set `CE_ARWEAVE_DIRECT_TO_AR_IO=false` only when a deployment intentionally wants fallback reads through `ARWEAVE_GATEWAY_URL`, `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes. Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
   Run these while signed in as a user who holds the sponsored SBT to confirm gating + secrets are wired correctly.
 - If tests fail with a browser network error like `Load failed` / `Failed to fetch`, the worker is often
   rejecting the browser origin via `allowOrigins` (CORS allowlist).

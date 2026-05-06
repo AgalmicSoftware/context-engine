@@ -515,7 +515,8 @@ const useSessionWizardWorkerDeploy = ({
             return bootstrapData;
           },
           ensureSessionConfig: ensureWorkerSessionConfig,
-          applyBootstrappedConfig: async ({ litActionCid, litGroupId, litPkpId }) => {
+          applyBootstrappedConfig: async ({ apiBase, litActionCid, litGroupId, litPkpId, result }) => {
+            const nextApiBase = toStr(apiBase || result?.apiBase || result?.litCredentials?.litApiBase).trim();
             const nextActionCid = toStr(litActionCid).trim();
             const nextGroupId = toStr(litGroupId).trim();
             const nextPkpId = toStr(litPkpId).trim();
@@ -526,6 +527,7 @@ const useSessionWizardWorkerDeploy = ({
                 ...((workerConfigPayload?.litCredentials && typeof workerConfigPayload.litCredentials === 'object')
                   ? workerConfigPayload.litCredentials
                   : {}),
+                ...(nextApiBase ? { litApiBase: nextApiBase } : {}),
                 litGroupId: nextGroupId,
                 litPkpId: nextPkpId,
                 litActionCid: nextActionCid,
@@ -533,12 +535,18 @@ const useSessionWizardWorkerDeploy = ({
             };
             currentWorkerSecrets = {
               ...currentWorkerSecrets,
+              litAccountApiKey: '',
+              litUsageApiKey: '',
+              ...(nextApiBase ? { litApiBase: nextApiBase } : {}),
               litGroupId: nextGroupId,
               litPkpId: nextPkpId,
               litActionCid: nextActionCid,
             };
             applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
               ...prev,
+              litAccountApiKey: '',
+              litUsageApiKey: '',
+              ...(nextApiBase ? { litApiBase: nextApiBase } : {}),
               litGroupId: nextGroupId,
               litPkpId: nextPkpId,
               litActionCid: nextActionCid,

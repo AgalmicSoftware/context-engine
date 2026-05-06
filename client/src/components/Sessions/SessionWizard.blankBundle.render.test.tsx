@@ -319,7 +319,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit account key, deploy access.'
       );
     });
 
@@ -399,7 +399,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit account key, deploy access.'
       );
     });
 

@@ -7,8 +7,8 @@
 - Component type: **React function component**
 - Hook inventory: **46 `useEffect` calls**, **34 `useMemo` calls**, **15 `useCallback` calls**
 - Summary: `SessionWizard` is the session-creation and publish orchestrator. It bootstraps editable session metadata, manages encryption gates and pending SBT drafts, handles sponsored-bundle overrides, deploys or verifies worker configuration, uploads session metadata, and finally registers the session on-chain.
-- Status note: the section ranges below are approximate current anchors; use the live file for exact line references.
-- Recent extraction note: bounded follow-up work extracted field descriptors, metadata/publish composition, worker panel sections, and narrow modal shells while keeping the top-level `SessionWizard` public surface and publish orchestration in place. The remaining high-risk seam is the publish path.
+- Status note: the section ranges below were captured from an earlier snapshot and need a fuller refresh; use the live file for exact line anchors.
+- Recent extraction note: bounded follow-up work extracted `CollapsibleFieldGroup.tsx`, `AiFieldSelect.tsx`, `sessionWizardNormalModeCards.ts`, `hooks/useSponsoredBundleLifecycle.ts`, and `hooks/useSessionWizardWorkerDeploy.ts`. The remaining high-risk seam is the publish path.
 
 ## Navigation Rules
 
@@ -34,17 +34,6 @@
 SessionWizard.tsx
   -> CollapsibleFieldGroup.tsx
   -> AiFieldSelect.tsx
-  -> sessionWizardFieldDescriptors.ts
-  -> SessionMetadataEditor.tsx
-  -> SessionPublishSummary.tsx
-  -> SessionWizardModals.tsx
-       -> SessionWizardCreateSbtModal.tsx
-       -> SessionWizardContractViewerModal.tsx
-       -> SessionHeaderPreviewModal.tsx
-  -> WorkerPanel.tsx
-       -> WorkerSecretsSection.tsx
-       -> WorkerDeploySection.tsx
-       -> WorkerConnectionSection.tsx
   -> sessionWizardNormalModeCards.ts
   -> hooks/useSponsoredBundleLifecycle.ts
   -> hooks/useSessionWizardWorkerDeploy.ts

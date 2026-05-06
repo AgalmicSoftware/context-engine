@@ -426,9 +426,9 @@ export const resolveSessionWizardChipotleHookConfig = ({
   draft = null,
 }: {
   workerSecretsEnabled?: boolean;
-  workerSecrets?: WorkerSecretsLike | AnyRecord;
+  workerSecrets?: WorkerSecretsLike | UnknownRecord;
   resolvedWorkerUrl?: string;
-  draft?: AnyRecord | null;
+  draft?: UnknownRecord | null;
 } = {}) => {
   if (!workerSecretsEnabled) return null;
   const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
@@ -4073,12 +4073,16 @@ const SessionWizard = ({
       !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
       !!toStr(secretsSnapshot?.litUsageApiKey).trim()
     );
+    const accountKeyOnlyChipotleConfig = !!toStr(secretsSnapshot?.litAccountApiKey).trim();
     const bootstrapOnlyChipotleConfig = (
-      !!toStr(secretsSnapshot?.litApiBase).trim() &&
-      !toStr(secretsSnapshot?.litGroupId).trim() &&
-      !toStr(secretsSnapshot?.litPkpId).trim() &&
-      !toStr(secretsSnapshot?.litActionCid).trim() &&
-      !toStr(secretsSnapshot?.litUsageApiKey).trim()
+      accountKeyOnlyChipotleConfig ||
+      (
+        !!toStr(secretsSnapshot?.litApiBase).trim() &&
+        !toStr(secretsSnapshot?.litGroupId).trim() &&
+        !toStr(secretsSnapshot?.litPkpId).trim() &&
+        !toStr(secretsSnapshot?.litActionCid).trim() &&
+        !toStr(secretsSnapshot?.litUsageApiKey).trim()
+      )
     );
     if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
       const requiredChipotleFields = [
@@ -4552,11 +4556,7 @@ const SessionWizard = ({
   const sponsoredBundleStatusTone = toStr(sponsoredBundleStatus?.tone).trim().toLowerCase();
   const hasNewSessionAiRequirementCovered = !!toStr(currentWorkerSecrets?.openaiKey).trim();
   const hasNewSessionArweaveRequirementCovered = !!toStr(currentWorkerSecrets?.arweaveJwk).trim();
-  const newSessionRequiresLitCredential = !cloudflareWorkerSbtGateMode;
-  const hasNewSessionLitRequirementCovered = (
-    !newSessionRequiresLitCredential ||
-    !!toStr(currentWorkerSecrets?.litAccountApiKey).trim()
-  );
+  const hasNewSessionLitRequirementCovered = !!toStr(currentWorkerSecrets?.litAccountApiKey).trim();
   const hasNewSessionFundingRequirementCovered = !!(
     toStr(currentWorkerSecrets?.faucetPrivateKey).trim() ||
     toStr(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
@@ -4925,19 +4925,15 @@ const SessionWizard = ({
                 {' '}for text and transcription
               </li>
               <li>
-                {newSessionRequiresLitCredential ? (
-                  <>
-                    <a
-                      href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={styles.newSessionBannerLink}
-                    >
-                      Lit API key
-                    </a>
-                    {' '}for encrypted access automation
-                  </>
-                ) : 'No Lit key is required for Cloudflare worker-enforced SBT access control'}
+                <a
+                  href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.newSessionBannerLink}
+                >
+                  Lit account API key
+                </a>
+                {' '}for encrypted access automation
               </li>
               <li>
                 <a

@@ -25,6 +25,46 @@ describe('sessionWizardChipotleLitSupport', () => {
     expect(result?.actionCode).toBe(SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.code);
   });
 
+  test('buildSessionWizardLitBootstrapRequest returns the default action payload when only Lit account authority is present', () => {
+    const result = buildSessionWizardLitBootstrapRequest({
+      litAccountApiKey: ' account-secret ',
+    }, {
+      sessionName: ' Session A ',
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      litAccountApiKey: 'account-secret',
+      sessionName: 'Session A',
+      actionName: SESSION_WIZARD_CHIPOTLE_ACTION_NAME,
+    }));
+    expect(result?.litApiBase).toBeUndefined();
+    expect(result?.actionCode).toBe(SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.code);
+  });
+
+  test('buildSessionWizardLitBootstrapRequest lets Lit account authority ignore stale hidden runtime fields', () => {
+    const result = buildSessionWizardLitBootstrapRequest({
+      litApiBase: ' https://stale-chipotle.example.test ',
+      litGroupId: ' stale-group ',
+      litPkpId: ' stale-pkp ',
+      litActionCid: ' stale-cid ',
+      litAccountApiKey: ' account-secret ',
+      litUsageApiKey: ' stale-usage ',
+    }, {
+      sessionName: ' Session A ',
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      litAccountApiKey: 'account-secret',
+      sessionName: 'Session A',
+      actionName: SESSION_WIZARD_CHIPOTLE_ACTION_NAME,
+    }));
+    expect(result?.litApiBase).toBeUndefined();
+    expect(result?.litGroupId).toBeUndefined();
+    expect(result?.litPkpId).toBeUndefined();
+    expect(result?.litActionCid).toBeUndefined();
+    expect(result?.litUsageApiKey).toBeUndefined();
+  });
+
   test('buildSessionWizardLitBootstrapRequest skips auto-bootstrap when an existing Lit account config is already being supplied', () => {
     expect(buildSessionWizardLitBootstrapRequest({
       litApiBase: 'https://api.chipotle.litprotocol.com',
@@ -114,6 +154,7 @@ describe('sessionWizardChipotleLitSupport', () => {
       .mockRejectedValueOnce(new Error('Session config not found.'))
       .mockResolvedValueOnce({
         ok: true,
+        apiBase: 'https://api.chipotle.litprotocol.com',
         litActionCid: 'QmAction123',
         litGroupId: '7',
         litPkpId: '0xpkp123',
@@ -137,6 +178,7 @@ describe('sessionWizardChipotleLitSupport', () => {
 
     expect(result).toEqual(expect.objectContaining({
       synced: true,
+      apiBase: 'https://api.chipotle.litprotocol.com',
       litActionCid: 'QmAction123',
       litGroupId: '7',
       litPkpId: '0xpkp123',
@@ -144,6 +186,7 @@ describe('sessionWizardChipotleLitSupport', () => {
     }));
     expect(ensureSessionConfig).toHaveBeenCalledTimes(1);
     expect(applyBootstrappedConfig).toHaveBeenCalledWith(expect.objectContaining({
+      apiBase: 'https://api.chipotle.litprotocol.com',
       litActionCid: 'QmAction123',
       litGroupId: '7',
       litPkpId: '0xpkp123',
@@ -151,6 +194,43 @@ describe('sessionWizardChipotleLitSupport', () => {
     expect(signAdminAction).toHaveBeenCalledWith(expect.objectContaining({
       action: 'lit-chipotle-bootstrap-session',
     }));
+  });
+
+  test('syncWorkerLitSessionBootstrapAfterDeploy retries transient auth reachability after deploy', async () => {
+    const signAdminAction = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Failed to reach worker auth endpoint (https://worker.example/auth/nonce). Check worker URL and allowOrigins includes http://localhost:3000.'))
+      .mockResolvedValueOnce({ signature: 'sig' });
+    const postBootstrap = jest.fn().mockResolvedValue({
+      ok: true,
+      apiBase: 'https://api.chipotle.litprotocol.com',
+      litActionCid: 'QmAction123',
+      litGroupId: '7',
+      litPkpId: '0xpkp123',
+    });
+    const wait = jest.fn(async () => {});
+
+    const result = await syncWorkerLitSessionBootstrapAfterDeploy({
+      workerUrl: 'https://worker.example',
+      account: '0xabc',
+      slug: 'session-a',
+      bootstrapRequest: {
+        litAccountApiKey: 'account-secret',
+        actionCode: 'async function main() { return { ok: true }; }',
+      },
+      signAdminAction,
+      postBootstrap,
+      retryDelaysMs: [25],
+      wait,
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      synced: true,
+      litActionCid: 'QmAction123',
+      note: 'Lit session account auto-created.',
+    }));
+    expect(signAdminAction).toHaveBeenCalledTimes(2);
+    expect(wait).toHaveBeenCalledWith(25);
   });
 
   test('withLitBootstrapSyncStatus appends note copy when bootstrap succeeds', () => {

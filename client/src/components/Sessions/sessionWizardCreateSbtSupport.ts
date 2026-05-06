@@ -2,11 +2,6 @@ import { toStr } from '../../utilities/shared/primitives.js';
 
 type SessionWizardCreateSbtGate = Record<string, unknown> & {
   id?: unknown;
-  gateId?: unknown;
-  label?: unknown;
-  mode?: unknown;
-  color?: unknown;
-  sbts?: unknown;
 };
 
 type SessionWizardCreateSbtLaunchOptions = Record<string, unknown> & {
@@ -21,36 +16,6 @@ type SessionWizardCreateSbtLaunchState = {
   gateId: string;
   sessionSlug: string;
   arweaveJwkOverride: string;
-};
-type SessionWizardNetworkLike = Record<string, unknown> & {
-  id?: unknown;
-  chainId?: unknown;
-  name?: unknown;
-};
-type SessionWizardSbtSelection = Record<string, unknown> & {
-  address?: unknown;
-};
-type BuildSessionWizardDeferredCreateSbtComponentPropsArgs = {
-  account?: unknown;
-  accountOverride?: unknown;
-  defaultGateId?: unknown;
-  draft?: Record<string, unknown> | null;
-  encryptionGates?: SessionWizardCreateSbtGate[];
-  getChainById?: (chainId: number | null) => SessionWizardNetworkLike | null | undefined;
-  getChainName?: (chainId: number | null) => string;
-  getEnabledWorkerArweaveJwk?: (secrets: unknown) => unknown;
-  network?: SessionWizardNetworkLike | null;
-  normalizeSbtSelection?: (value: unknown) => SessionWizardSbtSelection[];
-  normalizeWorkerAuthUrl?: (value: unknown) => string;
-  provider?: unknown;
-  registryChainId?: unknown;
-  resolvedActiveSessionSlug?: unknown;
-  resolvedWalletAccount?: unknown;
-  sessionSlugOverride?: unknown;
-  signAdminAction?: unknown;
-  toggleLoginModal?: unknown;
-  workerSecrets?: unknown;
-  workerUrlOverride?: unknown;
 };
 
 export const getSessionWizardGateById = (

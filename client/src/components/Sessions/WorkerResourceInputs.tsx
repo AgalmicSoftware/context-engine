@@ -83,55 +83,20 @@ const WorkerResourceInputs = ({
   }
 
   if (resourceKey === 'lit') {
-    const chipotleFields: ResourceSecretField[] = [
-      {
-        key: 'litApiBase',
-        label: 'Lit API base',
-        type: 'text',
-        placeholder: 'https://api.chipotle.litprotocol.com',
-      },
-      {
-        key: 'litGroupId',
-        label: 'Lit group ID',
-        type: 'text',
-        placeholder: 'group_...',
-      },
-      {
-        key: 'litPkpId',
-        label: 'Lit PKP ID',
-        type: 'text',
-        placeholder: 'pkp_...',
-      },
-      {
-        key: 'litActionCid',
-        label: 'Lit Action CID',
-        type: 'text',
-        placeholder: 'bafy...',
-      },
-      {
-        key: 'litAccountApiKey',
-        label: 'Lit account API key',
-        type: 'password',
-        placeholder: 'Paste account API key',
-      },
-      {
-        key: 'litUsageApiKey',
-        label: 'Lit usage API key',
-        type: 'password',
-        placeholder: 'Paste usage API key',
-      },
-    ];
+    const litAccountField: ResourceSecretField = {
+      key: 'litAccountApiKey',
+      label: 'Lit account API key',
+      type: 'password',
+      placeholder: 'Paste LIT_ACCOUNT_API_KEY',
+    };
 
     return (
       <div className={styles.resourceFields}>
         <div className={styles.resourceInputGrid}>
-          {chipotleFields.map(renderGenericField)}
+          {renderGenericField(litAccountField)}
         </div>
         <div className={styles.helperText}>
-          Enter `Lit API base` plus `Lit account API key` to let the worker bootstrap a fresh group, PKP, usage key, and CE action for this session after deploy. Or fill the group, PKP, action CID, and usage key fields to point at an existing scoped runtime instead.
-        </div>
-        <div className={styles.helperText}>
-          `Lit account API key` is authority. `Lit usage API key` is the scoped runtime credential. Leave the usage key blank when the worker should derive or rotate it server-side.
+          {/* Worker deploy derives the Lit group, PKP, usage key, and CE action from this account key. */}
         </div>
       </div>
     );

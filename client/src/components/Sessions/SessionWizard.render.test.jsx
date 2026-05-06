@@ -42,6 +42,7 @@ const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
+  litAccountApiKey: 'sponsored-lit-account-key',
   faucetGrantToken: 'sponsored-faucet-grant',
   deployGrantToken: 'sponsored-deploy-grant',
   meta: {
@@ -487,9 +488,23 @@ describe('SessionWizard rendered validation', () => {
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
 
-    expect(screen.getByText('An AI API key (OpenAI, Anthropic, or OpenRouter)')).toBeInTheDocument();
-    expect(screen.getByText('An Arweave wallet (JWK) for permanent storage')).toBeInTheDocument();
-    expect(screen.getByText('OP Sepolia ETH for on-chain registration')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'OpenAI API key' })).toHaveAttribute(
+      'href',
+      'https://platform.openai.com/api-keys'
+    );
+    expect(screen.getByText(/for text and transcription/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Lit account API key' })).toHaveAttribute(
+      'href',
+      'https://developer.litprotocol.com/management/api_keys'
+    );
+    expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toHaveAttribute(
+      'href',
+      'https://docs.arweave.org/developers/wallets/arweave-wallet'
+    );
+    expect(screen.getByRole('link', { name: 'OP Sepolia ETH for on-chain registration' })).toHaveAttribute(
+      'href',
+      'https://console.optimism.io/faucet'
+    );
     expect(screen.getByText('(Optional) A faucet private key for sponsoring user gas')).toBeInTheDocument();
     expect(screen.getByText('A turnkey tool for bundling these resources is in development.')).toBeInTheDocument();
     expect(
@@ -533,7 +548,7 @@ describe('SessionWizard rendered validation', () => {
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, deploy access.'
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key, deploy access.'
     );
     expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
@@ -551,7 +566,7 @@ describe('SessionWizard rendered validation', () => {
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding.'
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key.'
     );
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
@@ -1471,7 +1486,7 @@ describe('SessionWizard rendered validation', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, deploy access.'
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key, deploy access.'
         );
       });
 
@@ -1493,6 +1508,322 @@ describe('SessionWizard rendered validation', () => {
         ).toBe(true);
       });
       expect(screen.queryByText('Upload a worker bundle file before deploy.')).not.toBeInTheDocument();
+    } finally {
+      global.fetch = originalFetch;
+      if (originalUploadDataToArweave) {
+        arweaveScripts.uploadDataToArweave.mockImplementation(originalUploadDataToArweave);
+      } else {
+        arweaveScripts.uploadDataToArweave.mockReset();
+      }
+      if (originalRegisterSessionOnChain) {
+        mockRegisterSessionOnChain.mockImplementation(originalRegisterSessionOnChain);
+      } else {
+        mockRegisterSessionOnChain.mockReset();
+      }
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
+  });
+
+  it('retries sponsored publish with an uploaded fallback bundle file after a hosted-bundle fetch failure', async () => {
+    const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalUploadDataToArweave = arweaveScripts.uploadDataToArweave.getMockImplementation();
+    const originalRegisterSessionOnChain = mockRegisterSessionOnChain.getMockImplementation();
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const bundleFile = {
+      name: 'sessionCorsWorker.bundle.js',
+      type: 'text/javascript',
+      text: async () => 'export default { async fetch() { return new Response("publish-ok"); } };',
+    };
+    let resolveSponsoredBundle;
+    const sponsoredBundleReady = new Promise((resolve) => {
+      resolveSponsoredBundle = resolve;
+    });
+
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
+    workerAuth.buildSignedBootstrapAdminAuth.mockClear();
+    mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.bundleText).toBeUndefined();
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Failed to fetch bundle (404).' }),
+        };
+      }
+      if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.deployPayload.bundleUrl).toBeUndefined();
+        expect(payload.deployPayload.bundleText).toContain('new Response("publish-ok")');
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://sponsored-file-deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-config') || normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        draft: {
+          networkChainId: 84532,
+          blockLimits: {
+            start: mockSelectorSourceStartBlock,
+            end: null,
+          },
+          contracts: {
+            sbtFactory: {
+              address: mockSelectorSourceFactory,
+              chainId: 84532,
+            },
+          },
+          __registry: {
+            chainId: 84532,
+            registryChainId: 84532,
+          },
+        },
+      }));
+      renderLoggedInSessionWizard({
+        initialSponsoredBundleId: 'sponsor-tx-id',
+        initialSponsoredBundleKey: 'sponsor-secret',
+      });
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Sponsored Publish Bundle File Retry' },
+      });
+
+      selectNormalModeCard('Worker');
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-sponsored-file-retry' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"sponsored-file-retry"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
+      });
+
+      await act(async () => {
+        resolveSponsoredBundle(buildMockSponsoredBundle());
+        await sponsoredBundleReady;
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key, deploy access.'
+        );
+      });
+
+      selectNormalModeCard('Deploy Session');
+
+      const publishBundleClearButton = screen.getByTestId(E2E_TESTIDS.WIZARD_CLEAR_BUNDLE_FILE_PUBLISH);
+      expect(publishBundleClearButton).toBeDisabled();
+
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {
+        target: { files: [bundleFile] },
+      });
+
+      expect(publishBundleClearButton).not.toBeDisabled();
+
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(
+          global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
+        ).toBe(true);
+      });
+      await waitFor(() => {
+        expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalled();
+      });
+      expect(workerAuth.buildSignedBootstrapAdminAuth).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+      if (originalUploadDataToArweave) {
+        arweaveScripts.uploadDataToArweave.mockImplementation(originalUploadDataToArweave);
+      } else {
+        arweaveScripts.uploadDataToArweave.mockReset();
+      }
+      if (originalRegisterSessionOnChain) {
+        mockRegisterSessionOnChain.mockImplementation(originalRegisterSessionOnChain);
+      } else {
+        mockRegisterSessionOnChain.mockReset();
+      }
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+    }
+  });
+
+  it('retries sponsored publish with a manual bundle URL override after a hosted-bundle fetch failure', async () => {
+    const originalFetch = global.fetch;
+    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
+    const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalUploadDataToArweave = arweaveScripts.uploadDataToArweave.getMockImplementation();
+    const originalRegisterSessionOnChain = mockRegisterSessionOnChain.getMockImplementation();
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const manualBundleUrl = 'https://assets.example.test/sponsored-sessionCorsWorker.bundle.js';
+    let resolveSponsoredBundle;
+    const sponsoredBundleReady = new Promise((resolve) => {
+      resolveSponsoredBundle = resolve;
+    });
+
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    arweaveScripts.uploadDataToArweave.mockResolvedValue('a'.repeat(43));
+    workerAuth.buildSignedBootstrapAdminAuth.mockClear();
+    mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+
+    global.fetch = jest.fn(async (url, options = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.bundleUrl).toBe(WORKER_BUNDLE_URL);
+        expect(payload.bundleText).toBeUndefined();
+        return {
+          ok: false,
+          status: 502,
+          json: async () => ({ error: 'Failed to fetch bundle (404).' }),
+        };
+      }
+      if (normalizedUrl.endsWith('/sponsored/redeem-deploy')) {
+        const payload = JSON.parse(options.body);
+        expect(payload.deployPayload.bundleUrl).toBe(manualBundleUrl);
+        expect(payload.deployPayload.bundleText).toBeUndefined();
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://sponsored-deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-config') || normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        draft: {
+          networkChainId: 84532,
+          blockLimits: {
+            start: mockSelectorSourceStartBlock,
+            end: null,
+          },
+          contracts: {
+            sbtFactory: {
+              address: mockSelectorSourceFactory,
+              chainId: 84532,
+            },
+          },
+          __registry: {
+            chainId: 84532,
+            registryChainId: 84532,
+          },
+        },
+      }));
+      renderLoggedInSessionWizard({
+        initialSponsoredBundleId: 'sponsor-tx-id',
+        initialSponsoredBundleKey: 'sponsor-secret',
+      });
+
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+        target: { value: 'Sponsored Publish Manual URL Retry' },
+      });
+
+      selectNormalModeCard('Worker');
+
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-sponsored-url-retry' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"sponsored-url-retry"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
+      });
+
+      await act(async () => {
+        resolveSponsoredBundle(buildMockSponsoredBundle());
+        await sponsoredBundleReady;
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key, deploy access.'
+        );
+      });
+
+      selectNormalModeCard('Deploy Session');
+
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE), {
+        target: { value: manualBundleUrl },
+      });
+
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(
+          global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))
+        ).toBe(true);
+      });
+      await waitFor(() => {
+        expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalled();
+      });
+      expect(workerAuth.buildSignedBootstrapAdminAuth).not.toHaveBeenCalled();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE)).not.toBeInTheDocument();
     } finally {
       global.fetch = originalFetch;
       if (originalUploadDataToArweave) {
@@ -2809,19 +3140,19 @@ describe('SessionWizard rendered validation', () => {
     });
   });
 
-  it('renders Chipotle Lit account and runtime fields in the normal-mode worker secret view', async () => {
+  it('renders only the Chipotle Lit account key in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 
     selectNormalModeCard('Worker');
     const litCard = (await screen.findByText('LIT')).closest(`[data-testid="${E2E_TESTIDS.WIZARD_RESOURCE_CARD}"]`);
 
     expect(litCard).not.toBeNull();
-    expect(within(litCard).getByText('Lit API base')).toBeInTheDocument();
-    expect(within(litCard).getByText('Lit group ID')).toBeInTheDocument();
-    expect(within(litCard).getByText('Lit PKP ID')).toBeInTheDocument();
-    expect(within(litCard).getByText('Lit Action CID')).toBeInTheDocument();
     expect(within(litCard).getByText('Lit account API key')).toBeInTheDocument();
-    expect(within(litCard).getByText('Lit usage API key')).toBeInTheDocument();
+    expect(within(litCard).queryByText('Lit API base')).not.toBeInTheDocument();
+    expect(within(litCard).queryByText('Lit group ID')).not.toBeInTheDocument();
+    expect(within(litCard).queryByText('Lit PKP ID')).not.toBeInTheDocument();
+    expect(within(litCard).queryByText('Lit Action CID')).not.toBeInTheDocument();
+    expect(within(litCard).queryByText('Lit usage API key')).not.toBeInTheDocument();
     expect(within(litCard).queryByText('Private key')).not.toBeInTheDocument();
   });
 
@@ -2831,9 +3162,6 @@ describe('SessionWizard rendered validation', () => {
     renderSessionWizard();
     selectNormalModeCard('Worker');
 
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
-      target: { value: 'https://api.chipotle.litprotocol.com' },
-    });
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
       target: { value: 'account-secret' },
     });
@@ -2846,24 +3174,21 @@ describe('SessionWizard rendered validation', () => {
   it('waits for a worker URL before enabling Chipotle wizard hooks', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+      },
+    }));
 
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Worker');
-
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
-      target: { value: 'https://api.chipotle.litprotocol.com' },
-    });
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID), {
-      target: { value: 'group_123' },
-    });
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID), {
-      target: { value: 'pkp_123' },
-    });
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID), {
-      target: { value: 'bafy123' },
-    });
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(litProtocol.createLitHooks).not.toHaveBeenCalled();
@@ -2880,7 +3205,7 @@ describe('SessionWizard rendered validation', () => {
       const trigger = await screen.findByTestId('ce-wizard-resource-tooltip-lit');
       fireEvent.mouseOver(trigger);
       expect(await screen.findByText(
-        'Worker-mediated Lit Chipotle settings: either a bundle/session account API key for bootstrap, or a scoped usage API key plus the group, PKP, and Lit Action identifiers for this session.'
+        'Worker-mediated Lit Chipotle setup. Paste one Lit account API key; the worker derives the scoped group, PKP, usage key, and CE action after deploy.'
       )).toBeInTheDocument();
       fireEvent.mouseOut(trigger);
     } finally {
@@ -2900,11 +3225,11 @@ describe('SessionWizard rendered validation', () => {
       selectNormalModeCard('Worker');
 
       const tooltipCases = [
-        ['ai', 'Session-funded API keys used for AI inference and transcription.'],
+        ['ai', 'Session-funded OpenAI key used for text generation and transcription.'],
         ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
         ['arweave', 'Account used to pay for Arweave uploads and storage.'],
         ['txGas', 'Faucet signer used to send small testnet funding grants.'],
-        ['lit', 'Worker-mediated Lit Chipotle settings: either a bundle/session account API key for bootstrap, or a scoped usage API key plus the group, PKP, and Lit Action identifiers for this session.'],
+        ['lit', 'Worker-mediated Lit Chipotle setup. Paste one Lit account API key; the worker derives the scoped group, PKP, usage key, and CE action after deploy.'],
       ];
 
       for (const [resourceKey, copy] of tooltipCases) {
@@ -3038,7 +3363,8 @@ describe('SessionWizard rendered validation', () => {
     selectNormalModeCard('Worker');
 
     expect(screen.getByText('LIT')).toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-wizard-resource-tooltip-lit')).toBeInTheDocument();
 
@@ -3150,7 +3476,8 @@ describe('SessionWizard rendered validation', () => {
         target: { value: '{"kty":"RSA","n":"abc"}' },
       });
 
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
@@ -3279,9 +3606,6 @@ describe('SessionWizard rendered validation', () => {
       fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
         target: { value: '  {"kty":"RSA","n":"abc"}  ' },
       });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
-        target: { value: 'https://api.chipotle.litprotocol.com' },
-      });
       fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
         target: { value: ' account-secret ' },
       });
@@ -3401,6 +3725,15 @@ describe('SessionWizard rendered validation', () => {
     });
 
     try {
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        workerSecretsEnabled: true,
+        workerSecrets: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'ce-session-content-prod',
+          litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
+          litUsageApiKey: 'lit-usage-key',
+        },
+      }));
       renderSessionWizard({
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
@@ -3441,18 +3774,6 @@ describe('SessionWizard rendered validation', () => {
       fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
         target: { value: '{"kty":"RSA","n":"abc"}' },
       });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
-        target: { value: 'https://api.chipotle.litprotocol.com' },
-      });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID), {
-        target: { value: 'ce-session-content-prod' },
-      });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID), {
-        target: { value: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142' },
-      });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_USAGE_API_KEY), {
-        target: { value: 'lit-usage-key' },
-      });
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
@@ -3461,9 +3782,6 @@ describe('SessionWizard rendered validation', () => {
           'Lit provisioning note: Lit action auto-provisioned.'
         );
       });
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID)).toHaveValue(
-        'QmZPKjGtD4qLZhr17juP8XgUKV1A34Y9GtUUpeJNJ7f2vL'
-      );
 
       expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
         action: 'lit-chipotle-provision',
@@ -3491,10 +3809,12 @@ describe('SessionWizard rendered validation', () => {
     }
   });
 
-  it('auto-bootstraps a new per-session Lit account when only the Lit API base is configured', async () => {
+  it('auto-bootstraps Lit runtime from the Lit account API key and ignores stale hidden runtime fields', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const litProtocol = require('../../utilities/crypto/litProtocol.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    litProtocol.createLitHooks.mockClear();
     const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
       getSigner: () => ({
         getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
@@ -3529,6 +3849,7 @@ describe('SessionWizard rendered validation', () => {
           ok: true,
           json: async () => ({
             ok: true,
+            apiBase: 'https://api.chipotle.litprotocol.com',
             litActionCid: 'QmBootstrapAction123',
             litGroupId: '7',
             litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
@@ -3545,6 +3866,16 @@ describe('SessionWizard rendered validation', () => {
     });
 
     try {
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        workerSecretsEnabled: true,
+        workerSecrets: {
+          litApiBase: 'https://stale-chipotle.example.test',
+          litGroupId: 'stale-group',
+          litPkpId: 'stale-pkp',
+          litActionCid: 'stale-cid',
+          litUsageApiKey: 'stale-usage-key',
+        },
+      }));
       renderSessionWizard({
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
@@ -3585,8 +3916,8 @@ describe('SessionWizard rendered validation', () => {
       fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
         target: { value: '{"kty":"RSA","n":"abc"}' },
       });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE), {
-        target: { value: 'https://api.chipotle.litprotocol.com' },
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
+        target: { value: 'lit-account-key' },
       });
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
@@ -3597,21 +3928,43 @@ describe('SessionWizard rendered validation', () => {
         );
       });
 
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID)).toHaveValue('7');
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID)).toHaveValue(
-        '0x1e5ed88b177bde881bb5e68b338c26c675e8f142'
-      );
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID)).toHaveValue(
-        'QmBootstrapAction123'
-      );
+      const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.secrets).toEqual(expect.objectContaining({
+        litAccountApiKey: 'lit-account-key',
+      }));
+      expect(deployPayload.secrets.litUsageApiKey).toBeUndefined();
+      expect(deployPayload.secrets.litApiBase).toBeUndefined();
 
       expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
         action: 'lit-chipotle-bootstrap-session',
         body: expect.objectContaining({
-          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litAccountApiKey: 'lit-account-key',
           sessionName: 'Chipotle Bootstrap Session',
         }),
       }));
+      const bootstrapAuthCall = workerAuth.buildSignedAdminActionAuth.mock.calls.find(
+        ([arg]) => arg?.action === 'lit-chipotle-bootstrap-session'
+      );
+      expect(bootstrapAuthCall[0].body.litApiBase).toBeUndefined();
+      expect(bootstrapAuthCall[0].body.litUsageApiKey).toBeUndefined();
+      const bootstrapCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-chipotle-bootstrap-session'));
+      const bootstrapPayload = JSON.parse(bootstrapCall[1].body);
+      expect(bootstrapPayload.litAccountApiKey).toBe('lit-account-key');
+      expect(bootstrapPayload.litUsageApiKey).toBeUndefined();
+      expect(bootstrapPayload.litGroupId).toBeUndefined();
+      await waitFor(() => {
+        expect(litProtocol.createLitHooks).toHaveBeenCalledWith(expect.objectContaining({
+          chipotle: expect.objectContaining({
+            litCredentials: expect.objectContaining({
+              litApiBase: 'https://api.chipotle.litprotocol.com',
+              litGroupId: '7',
+              litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
+              litActionCid: 'QmBootstrapAction123',
+            }),
+          }),
+        }));
+      });
       expect(
         global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'))
       ).toBe(false);

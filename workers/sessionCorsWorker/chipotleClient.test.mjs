@@ -207,7 +207,27 @@ test('executeLitChipotleAction posts the configured Lit Action CID and js params
   assert.equal(calls[0][1].headers.Authorization, 'Bearer lit-secret');
 });
 
-test('executeSessionLitChipotleAction validates the configured action CID and injects session PKP + requester address', async () => {
+test('executeLitChipotleAction explains Chipotle action 404s as provisioning issues', async () => {
+  const fetchImpl = async () => jsonResponse({ message: 'Not found.' }, { ok: false, status: 404 });
+
+  await assert.rejects(
+    () => executeLitChipotleAction({
+      runtime: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litUsageApiKey: 'lit-secret',
+        apiKeySource: 'worker-env',
+        litActionCid: 'bafy123',
+      },
+      request: {
+        jsParams: { hello: 'world' },
+      },
+      fetchImpl,
+    }),
+    /not found or is not permitted.*re-run Lit Chipotle provisioning/i,
+  );
+});
+
+test('executeSessionLitChipotleAction validates source code and executes the configured action CID with session params', async () => {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     calls.push([String(url), options]);
@@ -253,7 +273,7 @@ test('executeSessionLitChipotleAction validates the configured action CID and in
   assert.equal(result.ok, true);
   assert.equal(calls[1][0], 'https://api.chipotle.litprotocol.com/core/v1/lit_action');
   assert.deepEqual(JSON.parse(calls[1][1].body), {
-    code: 'async function main() { return { ok: true }; }',
+    ipfs_id: 'QmAction123',
     js_params: {
       op: 'encrypt',
       pkpId: '0xpkp123',
@@ -342,7 +362,7 @@ test('executeSessionLitChipotleAction falls back to a default public RPC for the
 
   assert.equal(result.ok, true);
   assert.deepEqual(JSON.parse(calls[1][1].body), {
-    code: 'async function main() { return { ok: true }; }',
+    ipfs_id: 'QmAction123',
     js_params: {
       op: 'check',
       pkpId: '0xpkp123',
@@ -536,7 +556,7 @@ test('bootstrapLitChipotleSession creates a per-session account, group, wallet, 
   assert.equal(calls[0][1].headers.Authorization, undefined);
 });
 
-test('bootstrapLitChipotleSession reuses an existing account key to create missing group, PKP, usage key, and action wiring', async () => {
+test('bootstrapLitChipotleSession reuses a request account key to create missing group, PKP, usage key, and action wiring', async () => {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     calls.push([String(url), options]);
@@ -630,14 +650,13 @@ test('bootstrapLitChipotleSession reuses an existing account key to create missi
 
   const result = await bootstrapLitChipotleSession({
     env: {
-      LIT_ACCOUNT_API_KEY: 'account-key',
+      LIT_API_BASE: 'https://chipotle-env.example.test/core/v1/',
     },
     config: {
-      litCredentials: {
-        litApiBase: 'https://api.chipotle.litprotocol.com',
-      },
+      litCredentials: {},
     },
     request: {
+      litAccountApiKey: 'account-key',
       sessionName: 'Session A',
       actionCode: 'async function main() { return { ok: true }; }',
       actionName: 'ce-sbt-gated-crypto-v3',
@@ -651,7 +670,7 @@ test('bootstrapLitChipotleSession reuses an existing account key to create missi
     ok: true,
     bootstrapMode: 'existing-account',
     alreadyBootstrapped: false,
-    apiBase: 'https://api.chipotle.litprotocol.com',
+    apiBase: 'https://chipotle-env.example.test',
     litActionCid: 'QmAction123',
     litGroupId: '7',
     litPkpId: '0xpkp123',
@@ -660,12 +679,13 @@ test('bootstrapLitChipotleSession reuses an existing account key to create missi
       balance_display: '$0.00',
     },
     litCredentials: {
-      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litApiBase: 'https://chipotle-env.example.test',
       litActionCid: 'QmAction123',
       litGroupId: '7',
       litPkpId: '0xpkp123',
     },
     secretOutputs: {
+      litAccountApiKey: 'account-key',
       litUsageApiKey: 'usage-key',
     },
     steps: {
@@ -683,6 +703,7 @@ test('bootstrapLitChipotleSession reuses an existing account key to create missi
     calls.some(([url]) => url.endsWith('/core/v1/new_account')),
     false,
   );
+  assert.ok(calls.every(([url]) => url.startsWith('https://chipotle-env.example.test/core/v1/')));
   assert.equal(calls[0][1].headers.Authorization, 'Bearer account-key');
 });
 

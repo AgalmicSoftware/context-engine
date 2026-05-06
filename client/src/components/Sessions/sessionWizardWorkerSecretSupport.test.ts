@@ -47,15 +47,21 @@ describe('sessionWizardWorkerSecretSupport', () => {
     ]);
   });
 
-  it('normalizes worker secrets without dropping account-scoped Chipotle authority', () => {
+  it('normalizes worker secrets and strips hidden scoped Chipotle fields when account authority is present', () => {
     expect(sanitizeSessionWizardWorkerSecretsForLitMode({
       litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
       litAccountApiKey: ' account-secret ',
       litUsageApiKey: ' usage-secret ',
     })).toEqual(expect.objectContaining({
-      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litApiBase: '',
+      litGroupId: '',
+      litPkpId: '',
+      litActionCid: '',
       litAccountApiKey: 'account-secret',
-      litUsageApiKey: 'usage-secret',
+      litUsageApiKey: '',
     }));
   });
 
