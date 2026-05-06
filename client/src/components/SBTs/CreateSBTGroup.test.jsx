@@ -152,6 +152,71 @@ describe('CreateSBTGroup cache helpers', () => {
     }));
   });
 
+  it('skips recovery-code persistence when the SBT has no password mint path', () => {
+    localStorage.clear();
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+
+    const result = instance.persistCreatedSbtCodes({
+      sbtAddress: '0xABC0000000000000000000000000000000000000',
+      hasPasswordMintOnChain: false,
+      codesToStore: ['unused-code'],
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      status: 'empty-recovery-payload',
+    }));
+    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+  });
+
+  it('renders a QR SVG into a PNG blob for download and copy helpers', async () => {
+    const instance = makeInstance();
+    document.body.innerHTML = '<svg id="hidden-page-qr" xmlns="http://www.w3.org/2000/svg"></svg>';
+    const qrBlob = new Blob(['qr'], { type: 'image/png' });
+    const originalCreateElement = document.createElement.bind(document);
+    const originalImage = global.Image;
+    const canvasContext = {
+      fillStyle: '',
+      fillRect: jest.fn(),
+      drawImage: jest.fn(),
+    };
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      const element = originalCreateElement(tagName, options);
+      if (String(tagName).toLowerCase() === 'canvas') {
+        element.getContext = jest.fn(() => canvasContext);
+        element.toBlob = jest.fn((callback) => callback(qrBlob));
+      }
+      return element;
+    });
+    class MockImage {
+      constructor() {
+        this.width = 24;
+        this.height = 24;
+        this.onload = null;
+      }
+
+      set src(_value) {
+        setTimeout(() => {
+          if (this.onload) this.onload();
+        }, 0);
+      }
+    }
+
+    global.Image = MockImage;
+    try {
+      await expect(instance.processQrImage('hidden-page-qr')).resolves.toBe(qrBlob);
+      expect(canvasContext.fillRect).toHaveBeenCalledWith(0, 0, 24, 24);
+      expect(canvasContext.drawImage).toHaveBeenCalled();
+    } finally {
+      createElementSpy.mockRestore();
+      global.Image = originalImage;
+      document.body.innerHTML = '';
+    }
+  });
+
   it('loadFormCache restores tags and dates, then updates hash', () => {
     const instance = makeInstance({ network: { id: 84532, name: 'Base Sepolia' }, sessionSlug: 'test' });
     instance.updateGroupHash = jest.fn();
@@ -408,6 +473,38 @@ describe('CreateSBTGroup cache helpers', () => {
       maskedValue: '[encrypted]',
       recipients: [],
     })).rejects.toThrow('Selected access rule does not provide any Lit recipients.');
+  });
+
+  it('uses scoped Lit hooks for locked metadata encryption when global hooks are absent', async () => {
+    const scopedSaveKey = jest.fn();
+    const encryptSpy = jest.spyOn(cryptoUtils, 'encryptEnvelopeValue').mockResolvedValue({ encrypted: true });
+    const instance = makeInstance({
+      provider: 'mock-provider',
+      account: '0xCreator',
+      litHooks: { saveKey: scopedSaveKey },
+    });
+
+    await expect(instance.encryptValueWithRecipients({
+      value: 'secret',
+      maskedValue: '[encrypted]',
+      contextLabel: 'sbt:test:name',
+      chainIdFallback: 11155420,
+      recipients: [
+        {
+          chain: 'optimismSepolia',
+          accessControlConditions: [{ contractAddress: '0x00000000000000000000000000000000000000aa' }],
+        },
+      ],
+    })).resolves.toEqual({
+      value: '[encrypted]',
+      encrypted: { encrypted: true },
+    });
+
+    expect(encryptSpy).toHaveBeenCalledWith('secret', expect.objectContaining({
+      lit: expect.objectContaining({
+        saveKey: scopedSaveKey,
+      }),
+    }));
   });
 
   it('uses terminology-aware access rule errors when metadata locks reference missing gates', async () => {
@@ -2824,6 +2921,7 @@ describe('CreateSBTGroup cache helpers', () => {
       sbtAddress: freshPredictedAddress,
     });
     expect(payload.predictedAddress).toBe(freshPredictedAddress);
+    expect(payload.mintModeOnChain).toBe(2);
     expect(payload.finalGroupPasswordHash).toBe(`0x${'55'.repeat(32)}`);
   });
 
@@ -2865,6 +2963,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(payload).toEqual(expect.objectContaining({
       predictedAddress: '0x00000000000000000000000000000000000000d4',
       displayName: 'Deferred Group',
+      mintModeOnChain: 2,
       tokenURI: 'ar://metadata',
       finalGroupPasswordHash: `0x${'44'.repeat(32)}`,
       createOptions: {
