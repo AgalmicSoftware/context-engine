@@ -323,9 +323,44 @@ const sendWithGasFallback = async ({
   return await send({ ...baseOverrides, gasLimit });
 };
 
+const collectErrorText = (err, depth = 0) => {
+  if (!err || depth > 4) return '';
+  const parts = [];
+  const push = (value) => {
+    const text = toStr(value).trim();
+    if (text) parts.push(text);
+  };
+  push(err?.shortMessage);
+  push(err?.message);
+  push(err?.details);
+  push(err?.cause?.shortMessage);
+  push(err?.cause?.message);
+  push(err?.cause?.details);
+  push(err?.data?.message);
+  if (err?.cause && err.cause !== err) {
+    push(collectErrorText(err.cause, depth + 1));
+  }
+  return parts.join('\n');
+};
+
 const isNonceError = (err) => {
-  const msg = toStr(err?.shortMessage || err?.message || err?.cause?.details || err?.details).toLowerCase();
+  const msg = collectErrorText(err).toLowerCase();
   return msg.includes('nonce') && (msg.includes('too low') || msg.includes('already been used') || msg.includes('expired'));
+};
+
+const extractNextNonceFromError = (err) => {
+  const msg = collectErrorText(err);
+  const nextNonceMatch = msg.match(/next nonce\s+(\d+)/i);
+  if (nextNonceMatch) {
+    const parsed = Number(nextNonceMatch[1]);
+    if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+  }
+  const currentNonceMatch = msg.match(/current nonce(?: of the account)?[^\d]*(\d+)/i);
+  if (currentNonceMatch) {
+    const parsed = Number(currentNonceMatch[1]);
+    if (Number.isInteger(parsed) && parsed >= 0) return parsed;
+  }
+  return null;
 };
 
 const sendWithNonceRetry = async ({
@@ -338,9 +373,13 @@ const sendWithNonceRetry = async ({
   feeFallbackChainId,
   txLabel = 'transaction',
   preferFallbackGasLimit = false,
+  nonceTracker = null,
 }) => {
   let nonceOverride = null;
   const resolvePendingNonceOverride = async () => {
+    const rawTrackedNonce = nonceTracker?.nextNonce;
+    const trackedNonce = Number(rawTrackedNonce);
+    if (rawTrackedNonce != null && Number.isInteger(trackedNonce) && trackedNonce >= 0) return trackedNonce;
     if (!signer?.provider || typeof signer.getAddress !== 'function') return null;
     try {
       const address = await signer.getAddress();
@@ -362,7 +401,7 @@ const sendWithNonceRetry = async ({
   let lastErr;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
-      return await sendWithGasFallback({
+      const tx = await sendWithGasFallback({
         estimate,
         // eslint-disable-next-line no-loop-func
         send: (overrides) => send({
@@ -374,6 +413,15 @@ const sendWithNonceRetry = async ({
         fallbackGasLimit,
         preferFallbackGasLimit,
       });
+      if (
+        nonceTracker &&
+        typeof nonceTracker === 'object' &&
+        Number.isInteger(nonceOverride) &&
+        nonceOverride >= 0
+      ) {
+        nonceTracker.nextNonce = Math.max(Number(nonceTracker.nextNonce || 0), nonceOverride + 1);
+      }
+      return tx;
     } catch (err) {
       lastErr = err;
       if (isMalformedProviderValueError(err)) {
@@ -406,9 +454,20 @@ const sendWithNonceRetry = async ({
       if (!isNonceError(err) || !signer?.provider || typeof signer.getAddress !== 'function') {
         throw err;
       }
-      nonceOverride = await resolvePendingNonceOverride();
-      if (!Number.isInteger(nonceOverride) || nonceOverride < 0) {
+      const previousNonceOverride = nonceOverride;
+      const nextNonceFromError = extractNextNonceFromError(err);
+      const refreshedNonce = await resolvePendingNonceOverride();
+      const candidates = [
+        nextNonceFromError,
+        refreshedNonce,
+        Number.isInteger(previousNonceOverride) ? previousNonceOverride + 1 : null,
+      ].filter((candidate) => Number.isInteger(candidate) && candidate >= 0);
+      if (!candidates.length) {
         throw err;
+      }
+      nonceOverride = Math.max(...candidates);
+      if (nonceTracker && typeof nonceTracker === 'object') {
+        nonceTracker.nextNonce = nonceOverride;
       }
     }
   }
@@ -1646,6 +1705,7 @@ export const registerSessionOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
+  const nonceTracker = { nextNonce: null };
 
   // Observed Base Sepolia gas: createSession ~350k, setSessionFields ~275k; setResourceGates depends on gate count.
   // SessionRegistry requires a small creation fee to prevent spam session creation.
@@ -1693,6 +1753,7 @@ export const registerSessionOnChain = async ({
     feeFallbackChainId: writeChainId,
     txLabel: 'createSession',
     preferFallbackGasLimit: true,
+    nonceTracker,
   });
   recordTx('createSession', createTx);
   await createTx.wait();
@@ -1722,6 +1783,7 @@ export const registerSessionOnChain = async ({
         feeFallbackChainId: writeChainId,
         txLabel: 'setSessionFields',
         preferFallbackGasLimit: true,
+        nonceTracker,
       });
       recordTx('setSessionFields', tx);
       await tx.wait();
@@ -1748,6 +1810,7 @@ export const registerSessionOnChain = async ({
           feeFallbackChainId: writeChainId,
           txLabel: 'setSessionField',
           preferFallbackGasLimit: true,
+          nonceTracker,
         });
         recordTx('setSessionField', tx);
         await tx.wait();
@@ -1778,6 +1841,7 @@ export const registerSessionOnChain = async ({
         feeFallbackChainId: writeChainId,
         txLabel: 'setResourceGates',
         preferFallbackGasLimit: true,
+        nonceTracker,
       });
       recordTx('setResourceGates', tx);
       await tx.wait();
@@ -1811,6 +1875,7 @@ export const registerSessionOnChain = async ({
           feeFallbackChainId: writeChainId,
           txLabel: 'setResourceGate',
           preferFallbackGasLimit: true,
+          nonceTracker,
         });
         recordTx('setResourceGate', tx);
         await tx.wait();
@@ -1848,6 +1913,7 @@ export const setSessionFieldsOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
+  const nonceTracker = { nextNonce: null };
   const gasOverride = Number(gasLimitOverride || 0);
   const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
     ? Math.floor(gasOverride)
@@ -1882,6 +1948,7 @@ export const setSessionFieldsOnChain = async ({
       feeFallbackChainId: writeChainId,
       txLabel: 'setSessionFields',
       preferFallbackGasLimit: true,
+      nonceTracker,
     });
     await tx.wait();
     return { ok: true };
@@ -1912,6 +1979,7 @@ export const setSessionFieldsOnChain = async ({
       feeFallbackChainId: writeChainId,
       txLabel: 'setSessionField',
       preferFallbackGasLimit: true,
+      nonceTracker,
     });
     await tx.wait();
   }
@@ -2005,6 +2073,7 @@ export const setResourceGatesOnChain = async ({
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
   });
+  const nonceTracker = { nextNonce: null };
   const gasOverride = Number(gasLimitOverride || 0);
   const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
     ? Math.floor(gasOverride)
@@ -2048,6 +2117,7 @@ export const setResourceGatesOnChain = async ({
       feeFallbackChainId: writeChainId,
       txLabel: 'setResourceGates',
       preferFallbackGasLimit: true,
+      nonceTracker,
     });
     txs.push({ action: 'setResourceGates', hash: toStr(tx?.hash || tx?.transactionHash) });
     await tx.wait();
@@ -2083,6 +2153,7 @@ export const setResourceGatesOnChain = async ({
         feeFallbackChainId: writeChainId,
         txLabel: 'setResourceGate',
         preferFallbackGasLimit: true,
+        nonceTracker,
       });
       txs.push({ action: `setResourceGate:${gate.resourceKey}`, hash: toStr(tx?.hash || tx?.transactionHash) });
       await tx.wait();

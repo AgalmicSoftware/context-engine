@@ -119,6 +119,10 @@ const buildEncryptedUploadArgs = ({
       saveKey: encryption?.saveKey,
       accessControlConditions: encryption?.accessControlConditions,
       chain: encryption?.litChain || encryption?.chain || null,
+      ...(encryption?.litNetwork ? { litNetwork: encryption.litNetwork } : {}),
+      ...(encryption?.connectTimeout ? { connectTimeout: encryption.connectTimeout } : {}),
+      ...(encryption?.providerLike ? { providerLike: encryption.providerLike } : {}),
+      ...(encryption?.resourceAbilityRequests ? { resourceAbilityRequests: encryption.resourceAbilityRequests } : {}),
     },
   })
 );

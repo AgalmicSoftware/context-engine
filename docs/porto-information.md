@@ -185,6 +185,10 @@ Common env vars for the new CE E2E runners:
 - `PORTO_SESSION_KEY_ENABLED = true` allows silent signing after one
   verification (session key mode).
 - When disabled, the user must verify via passkey for each signing operation.
+- Automatic decrypt flows only treat Porto as non-interactive after session-key
+  mode has an in-memory signer. A passive page-load restore hydrates the
+  address for reads but does not unlock signing, so gated prompts stay masked
+  until the user explicitly decrypts or signs in with an unlocked session.
 
 ## Chain selection (Porto sidecar)
 

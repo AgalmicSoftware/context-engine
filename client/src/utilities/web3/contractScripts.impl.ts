@@ -49,6 +49,7 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { normalizeAddress } from './addressNormalization.js';
 import { createSbtEventScanProgressState } from './contractScripts.sbtProgressHelpers.js';
+import { hasPasswordMintForSbtMintMode } from '../sbt/sbtMintMode.js';
 import {
   normalizeHistorySummaryCount,
   normalizeSbtHistorySummary,
@@ -282,7 +283,8 @@ const buildDecryptContextTag = (ctx = {}) => {
   const providerLike = toLower(ctx?.providerLike || '');
   const chainId = Number(ctx?.chainId || 0) || 0;
   const hasLitGetKey = !!getLitGetKey(ctx);
-  return `${account}|${providerLike}|${chainId}|lit:${hasLitGetKey ? '1' : '0'}`;
+  const preferLitRecipients = ctx?.preferLitRecipients ? '1' : '0';
+  return `${account}|${providerLike}|${chainId}|lit:${hasLitGetKey ? '1' : '0'}|litFirst:${preferLitRecipients}`;
 };
 
 const resolveDefaultProviderLike = () => {
@@ -518,6 +520,12 @@ export function getWeb3Context(groupKeyOrCfg) {
 }
 
 const SBT_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'sbtFactory' });
+const SURVEYS_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'surveys' });
+
+const getSurveysReadProviderForSession = (groupKeyOrCfg, cfg, chainId) => (
+  getReadProviderForGroup(cfg || groupKeyOrCfg, SURVEYS_READ_PROVIDER_OPTIONS) ||
+  getReadProviderForChain(chainId)
+);
 
 const logDecryptFailure = (reason, err, meta = {}, ctx = {}) => {
   const key = `${reason}|${meta?.field || ''}|${meta?.slug || ''}|${meta?.questionId || ''}|${buildDecryptContextTag(ctx)}`;
@@ -611,6 +619,7 @@ const decryptEnvelopeCached = async (envelopeJson, ctx, meta = {}) => {
       chainId: ctx.chainId,
       providerLike: ctx.providerLike,
       litOpts: ctx.litOpts || undefined,
+      preferLitRecipients: !!ctx.preferLitRecipients,
     });
     if (_encryptedValueCache.size >= MAX_CACHE_SIZE) {
       const oldest = _encryptedValueCache.keys().next().value;
@@ -625,6 +634,17 @@ const decryptEnvelopeCached = async (envelopeJson, ctx, meta = {}) => {
     contractsLog.debug('decryptEnvelopeCached error:', err?.message || err);
     return buildDecryptFailureResult(reason, err);
   }
+};
+
+const shouldPreferLitRecipientsForPayload = (payload, ctx) => {
+  const accountLower = toLower(ctx?.account || '');
+  const creatorLower = normalizeAddress(payload?.creator || payload?.creatorAddress || '');
+  return !!(
+    accountLower &&
+    creatorLower &&
+    accountLower !== creatorLower &&
+    getLitGetKey(ctx)
+  );
 };
 
 /* ------------------------------------------------------------------ */
@@ -889,20 +909,23 @@ const maybeDecryptSurveyPayload = async (surveyData, groupKeyOrCfg, opts = {}) =
 
   const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
   const ctx = getDecryptContext(cfg, opts.decryptContext || null);
+  const decryptCtx = shouldPreferLitRecipientsForPayload(surveyData, ctx)
+    ? { ...ctx, preferLitRecipients: true }
+    : ctx;
 
   const shouldAttempt = await shouldAttemptGateDecrypt({
     payload: surveyData,
     encryptedFields: [encryptedTitle, encryptedDocs],
-    ctx,
+    ctx: decryptCtx,
     groupKeyOrCfg: cfg,
   });
   if (!shouldAttempt) {
-    logDecryptFailure('acc-failed', null, { field: 'survey', slug: cfg?.slug || '', surveyId: surveyData?.id || '' }, ctx);
+    logDecryptFailure('acc-failed', null, { field: 'survey', slug: cfg?.slug || '', surveyId: surveyData?.id || '' }, decryptCtx);
     return surveyData;
   }
 
   if (encryptedTitle) {
-    const result = await decryptEnvelopeCached(encryptedTitle, ctx, {
+    const result = await decryptEnvelopeCached(encryptedTitle, decryptCtx, {
       field: 'title',
       slug: cfg?.slug || '',
       surveyId: surveyData?.id || '',
@@ -916,7 +939,7 @@ const maybeDecryptSurveyPayload = async (surveyData, groupKeyOrCfg, opts = {}) =
   }
 
   if (encryptedDocs) {
-    const result = await decryptEnvelopeCached(encryptedDocs, ctx, {
+    const result = await decryptEnvelopeCached(encryptedDocs, decryptCtx, {
       field: 'documentURLs',
       slug: cfg?.slug || '',
       surveyId: surveyData?.id || '',
@@ -944,20 +967,23 @@ const maybeDecryptQuestionPayload = async (questionData, groupKeyOrCfg, opts = {
 
   const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
   const ctx = getDecryptContext(cfg, opts.decryptContext || null);
+  const decryptCtx = shouldPreferLitRecipientsForPayload(questionData, ctx)
+    ? { ...ctx, preferLitRecipients: true }
+    : ctx;
 
   const shouldAttempt = await shouldAttemptGateDecrypt({
     payload: questionData,
     encryptedFields: [encryptedPrompt, encryptedOptions, encryptedTags],
-    ctx,
+    ctx: decryptCtx,
     groupKeyOrCfg: cfg,
   });
   if (!shouldAttempt) {
-    logDecryptFailure('acc-failed', null, { field: 'question', slug: cfg?.slug || '', questionId: questionData?.id || '' }, ctx);
+    logDecryptFailure('acc-failed', null, { field: 'question', slug: cfg?.slug || '', questionId: questionData?.id || '' }, decryptCtx);
     return questionData;
   }
 
   if (encryptedPrompt) {
-    const result = await decryptEnvelopeCached(encryptedPrompt, ctx, {
+    const result = await decryptEnvelopeCached(encryptedPrompt, decryptCtx, {
       field: 'prompt',
       slug: cfg?.slug || '',
       questionId: questionData?.id || '',
@@ -971,7 +997,7 @@ const maybeDecryptQuestionPayload = async (questionData, groupKeyOrCfg, opts = {
   }
 
   if (encryptedOptions) {
-    const result = await decryptEnvelopeCached(encryptedOptions, ctx, {
+    const result = await decryptEnvelopeCached(encryptedOptions, decryptCtx, {
       field: 'options',
       slug: cfg?.slug || '',
       questionId: questionData?.id || '',
@@ -988,7 +1014,7 @@ const maybeDecryptQuestionPayload = async (questionData, groupKeyOrCfg, opts = {
   }
 
   if (encryptedTags) {
-    const result = await decryptEnvelopeCached(encryptedTags, ctx, {
+    const result = await decryptEnvelopeCached(encryptedTags, decryptCtx, {
       field: 'tags',
       slug: cfg?.slug || '',
       questionId: questionData?.id || '',
@@ -1392,9 +1418,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider =
-    getReadProviderForGroup(groupKeyOrCfg, { contractKey: 'surveys' }) ||
-    getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const questionsAddedEventFilter = SurveyContract.filters.QuestionsAdded(null, null, null);
 
@@ -1453,7 +1477,7 @@ const contractScripts = {
       return [];
     }
 
-    const provider = getReadProviderForChain(chId);
+    const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
     const contract = new ethers.Contract(addr, SURVEYS, provider);
     const questionsAddedEventFilter = contract.filters.QuestionsAdded();
     const rpcDebugContext = normalizeRpcDebugContext(scanOptions?.rpcDebugContext) || null;
@@ -1563,7 +1587,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const responseSubmittedEventFilter = SurveyContract.filters.ResponsesSubmitted();
 
@@ -1795,7 +1819,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const responseSubmittedEventTopic = SurveyContract.filters.ResponsesSubmitted(userAddress, null, null);
 
@@ -1829,7 +1853,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const contract = new ethers.Contract(addr, SURVEYS, provider);
   const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(null, null, null);
 
@@ -1874,7 +1898,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const surveyCreatedEventTopic = SurveyContract.filters.SurveyAdded(userAddress, null);
 
@@ -1914,7 +1938,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const contract = new ethers.Contract(addr, SURVEYS, provider);
   const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(null, null, null);
 
@@ -2003,7 +2027,7 @@ const contractScripts = {
       return;
     }
 
-    const provider = getReadProviderForChain(chId);
+    const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
 
     const contract = new ethers.Contract(addr, SURVEYS, provider);
     const responsesSubmittedEventFilter = contract.filters.ResponsesSubmitted(null, null, null);
@@ -2131,7 +2155,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const questionsAddedEventFilter = SurveyContract.filters.QuestionsAdded(userAddress, null, null);
 
@@ -2175,7 +2199,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
   const responsesSubmittedEventFilter = SurveyContract.filters.ResponsesSubmitted(userAddress, null);
 
@@ -2257,7 +2281,7 @@ const contractScripts = {
     }
 
     // Provider resolution: group → chain provider; otherwise defaultProvider/Infura (no signer)
-    const provider = getReadProviderForChain(chId);
+    const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
 
     const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
     const surveyAddedEventFilter = SurveyContract.filters.SurveyAdded(null, null);
@@ -2305,7 +2329,7 @@ const contractScripts = {
   const addr   = (gAddrs.surveys?.address);
   const chId   = (gAddrs.surveys?.chainId) || (cfg?.networkChainId) || undefined;
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
 
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
 
@@ -2945,7 +2969,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return null;
   }
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
 
   // 🔐 Normalize ID to bytes32
@@ -3009,7 +3033,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return null;
   }
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
 
   const SurveyContract = new ethers.Contract(addr, SURVEYS, provider);
 
@@ -3135,7 +3159,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return null;
   }
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   if (!provider) {
     if (throwOnError) throw new Error(`Missing read provider for question hash lookup (chainId=${String(chId || '') || 'unknown'}).`);
     return null;
@@ -3217,7 +3241,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return null;
   }
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   if (!provider) {
     if (throwOnError) throw new Error(`Missing read provider for survey hash lookup (chainId=${String(chId || '') || 'unknown'}).`);
     return null;
@@ -3293,7 +3317,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     return null;
   }
 
-  const provider = getReadProviderForChain(chId);
+  const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
   if (!provider) {
     return null;
   }
@@ -4356,20 +4380,30 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           "function maxTokens() view returns (uint256)",
           "function collectionBurnAuth() view returns (uint8)",
           "function mintingEndTime() view returns (uint256)",
-          "function hasPasswordMint() view returns (bool)"
+          "function hasPasswordMint() view returns (bool)",
+          "function mintMode() view returns (uint8)"
         ];
         const c = new ethers.Contract(sbtAddress, FRAG, provider);
-        const [max, burn, end, hasPw] = await Promise.all([
+        const mintModeRead = typeof c.mintMode === 'function'
+          ? c.mintMode().catch(() => null)
+          : Promise.resolve(null);
+        const [max, burn, end, hasPw, mintMode] = await Promise.all([
           c.maxTokens().catch(() => null),
           c.collectionBurnAuth().catch(() => null),
           c.mintingEndTime().catch(() => null),
-          c.hasPasswordMint().catch(() => null)
+          c.hasPasswordMint().catch(() => null),
+          mintModeRead
         ]);
 
         if (max  != null) out.maxTokens      = ethers.BigNumber.isBigNumber(max)  ? max.toString() : String(max);
         if (burn != null) out.burnAuth       = Number(ethers.BigNumber.isBigNumber(burn) ? burn.toNumber() : burn);
         if (end  != null) out.mintingEndTime = toSeconds(ethers.BigNumber.isBigNumber(end) ? end.toNumber() : Number(end));
-        if (hasPw!= null) out.hasPasswordMint= !!hasPw;
+        if (mintMode != null) {
+          out.mintMode = Number(ethers.BigNumber.isBigNumber(mintMode) ? mintMode.toNumber() : mintMode);
+          out.hasPasswordMint = hasPasswordMintForSbtMintMode(out.mintMode);
+        } else if (hasPw != null) {
+          out.hasPasswordMint = !!hasPw;
+        }
       }
 
       // Final guard: ensure mintingEndTime is normalized to seconds if present

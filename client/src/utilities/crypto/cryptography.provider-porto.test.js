@@ -1,10 +1,10 @@
+import { cryptoUtils } from './cryptography.js';
+
 const mockCreatePortoProvider = jest.fn();
 
 jest.mock('../web3/portoFunctions.js', () => ({
   createPortoProviderMock: (...args) => mockCreatePortoProvider(...args),
 }));
-
-import { cryptoUtils } from './cryptography.js';
 
 describe('cryptoUtils Porto provider bootstrap', () => {
   beforeEach(() => {

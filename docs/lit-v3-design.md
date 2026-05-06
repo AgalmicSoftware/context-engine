@@ -212,7 +212,7 @@ The SBT gate itself still belongs in the Lit Action logic and request params, no
 
 Session Wizard now has two Chipotle automation paths:
 
-1. **Per-session account bootstrap**: when the wizard only has `litApiBase`, it can call worker admin `lit-chipotle-bootstrap-session` after deploy. The worker then:
+1. **Per-session account bootstrap**: when the wizard has only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`, it can call worker admin `lit-chipotle-bootstrap-session` after deploy. The worker uses the default Chipotle API base unless worker config/env overrides it, then:
    - creates a new Lit account
    - stores `litAccountApiKey` and `litUsageApiKey` as session secrets
    - creates the default group

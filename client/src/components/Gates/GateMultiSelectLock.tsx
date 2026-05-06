@@ -1,7 +1,7 @@
 /** @file GateMultiSelectLock.tsx */
 import React, { useEffect, useMemo, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faLock, faLockOpen } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faExternalLinkAlt, faLock, faLockOpen } from '@fortawesome/free-solid-svg-icons';
 import styles from './GateMultiSelectLock.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { resolveSbtDisplayLabel } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -233,6 +233,7 @@ const GateMultiSelectLock = ({
                 className={`${styles.row}${checked ? ` ${styles.rowActive}` : ''}`}
                 data-testid={E2E_TESTIDS.GATE_LOCK_ROW}
                 data-ce-gate-id={gateId}
+                aria-current={checked ? 'true' : undefined}
               >
                 <label className={styles.rowMain}>
                   <input
@@ -241,6 +242,12 @@ const GateMultiSelectLock = ({
                     checked={checked}
                     onChange={() => toggleGate(gateId)}
                   />
+                  <span
+                    className={`${styles.selectionMark}${checked ? ` ${styles.selectionMarkActive}` : ''}`}
+                    aria-hidden="true"
+                  >
+                    {checked ? <FontAwesomeIcon icon={faCheck} /> : null}
+                  </span>
                   <span
                     className={styles.dotLarge}
                     style={{ backgroundColor: color, borderColor: color }}
