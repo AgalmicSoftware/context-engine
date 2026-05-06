@@ -65,6 +65,7 @@ import {
   normalizeLitMetadataNetwork,
   normalizeSessionNaming,
 } from '../../utilities/session/sessionMetadata.js';
+import type { UnknownRecord } from '../../utilities/session/sessionTypes.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
@@ -118,6 +119,10 @@ import useSessionSlugState from './hooks/useSessionSlugState.js';
 import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardModals from './SessionWizardModals';
 import SessionPublishSummary from './SessionPublishSummary';
+import {
+  buildNormalModeCards,
+  buildNormalModePublishSummary,
+} from './sessionWizardNormalModeCards';
 import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
   buildSessionWizardPublishPlan,
@@ -248,7 +253,6 @@ import {
 import {
   RESOURCE_LABELS,
   RESOURCE_SECTION_TOOLTIPS,
-  resolveSessionWizardAiModelProviders,
   resolveSessionWizardResourceSecretFields,
 } from './sessionWizardResourceConfig';
 import {
@@ -301,7 +305,6 @@ import {
   splitSessionWizardDraftEntries,
 } from './sessionWizardFieldDescriptors';
 import type {
-  AnyRecord,
   ChainIdLike,
   NetworkLike,
   SessionConfigLike,
@@ -416,9 +419,9 @@ export const resolveSessionWizardChipotleHookConfig = ({
   draft = null,
 }: {
   workerSecretsEnabled?: boolean;
-  workerSecrets?: WorkerSecretsLike | AnyRecord;
+  workerSecrets?: WorkerSecretsLike | UnknownRecord;
   resolvedWorkerUrl?: string;
-  draft?: AnyRecord | null;
+  draft?: UnknownRecord | null;
 } = {}) => {
   if (!workerSecretsEnabled) return null;
   const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
@@ -449,19 +452,19 @@ type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   bundleUrl?: string;
 };
 
-type DraftState = AnyRecord & NonNullable<WorkerPanelProps['draft']> & {
+type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   sessionName?: string;
   sessionInfo?: string;
   sessionHeader?: string;
   sessionHeaderImg?: string;
   slug?: string;
   networkChainId?: ChainIdLike;
-  blockLimits?: AnyRecord;
+  blockLimits?: UnknownRecord;
   contracts?: SessionContractsLike;
-  featuredSBTs?: AnyRecord[];
-  faucet?: AnyRecord;
-  ai?: AnyRecord;
-  lit?: AnyRecord;
+  featuredSBTs?: UnknownRecord[];
+  faucet?: UnknownRecord;
+  ai?: UnknownRecord;
+  lit?: UnknownRecord;
 };
 
 type TooltipRenderOptions = {
@@ -474,7 +477,7 @@ type TooltipRenderOptions = {
 
 type SessionWizardProps = {
   account?: string;
-  provider?: AnyRecord | null;
+  provider?: UnknownRecord | null;
   network?: NetworkLike;
   activeSessionSlug?: string;
   ensureLightSbtUniverse?: (() => unknown) | null;
@@ -486,7 +489,7 @@ type SessionWizardProps = {
   initialRegistryChainId?: ChainIdLike;
   initialSponsoredBundleId?: string | null;
   initialSponsoredBundleKey?: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type CreateSbtModalState = {
@@ -520,6 +523,12 @@ type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploa
 
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
+const NEW_SESSION_RESOURCE_LINKS = Object.freeze({
+  openaiApiKey: 'https://platform.openai.com/api-keys',
+  litApiKeys: 'https://developer.litprotocol.com/management/api_keys',
+  arweaveWallet: 'https://docs.arweave.org/developers/wallets/arweave-wallet',
+  optimismSepoliaFaucet: 'https://console.optimism.io/faucet',
+});
 
 const pathKey = (path: string[]): string => path.join('.');
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
@@ -628,7 +637,7 @@ const SessionWizard = ({
   const [isSessionIdRegenerating, setIsSessionIdRegenerating] = useState(false);
   const [privateSlugMode, setPrivateSlugMode] = useState(() => !!cachedWizard?.privateSlugMode);
   const lastManualSlugRef = useRef(toStr(cachedWizard?.lastManualSlug).trim());
-  const [encryptedFieldGates, setEncryptedFieldGates] = useState<AnyRecord>(() => (
+  const [encryptedFieldGates, setEncryptedFieldGates] = useState<UnknownRecord>(() => (
     cachedWizard?.encryptedFieldGates && typeof cachedWizard.encryptedFieldGates === 'object'
       ? cachedWizard.encryptedFieldGates
       : {}
@@ -651,8 +660,8 @@ const SessionWizard = ({
   const [manualMaxPriorityFeePerGasGwei, setManualMaxPriorityFeePerGasGwei] = useState(() => (
     toStr(cachedWizard?.manualMaxPriorityFeePerGasGwei || '').trim()
   ));
-  const [registerTxs, setRegisterTxs] = useState<AnyRecord[]>([]);
-  const [pendingOnChainFields, setPendingOnChainFields] = useState<AnyRecord>({});
+  const [registerTxs, setRegisterTxs] = useState<UnknownRecord[]>([]);
+  const [pendingOnChainFields, setPendingOnChainFields] = useState<UnknownRecord>({});
   const [status, setStatus] = useState('');
   const [sessionUrl, setSessionUrl] = useState('');
   const [adminUrl, setAdminUrl] = useState('');
@@ -710,7 +719,7 @@ const SessionWizard = ({
     open: false,
     contractKey: '',
   }));
-  const [pendingCreateSbtLaunch, setPendingCreateSbtLaunch] = useState<AnyRecord | null>(null);
+  const [pendingCreateSbtLaunch, setPendingCreateSbtLaunch] = useState<UnknownRecord | null>(null);
   const hasPrivateSbtName = useMemo(() => {
     const gates = Array.isArray(encryptionGates) ? encryptionGates : [];
     return gates.some((gate) => normalizeSbtSelection(gate?.sbts || []).some((sbt) => (
@@ -718,7 +727,7 @@ const SessionWizard = ({
     )));
   }, [encryptionGates]);
   const lastHasPrivateSbtNameRef = useRef(false);
-  const [gateSelections, setGateSelections] = useState<AnyRecord>(() => initialGateSelections);
+  const [gateSelections, setGateSelections] = useState<UnknownRecord>(() => initialGateSelections);
   const [defaultGateId, setDefaultGateId] = useState(() => initialDefaultGateId || initialGateRef.current.id);
   const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(
     () => initialDefaultGateId || initialGateRef.current?.id || ''
@@ -848,7 +857,7 @@ const SessionWizard = ({
   const [deployInFlight, setDeployInFlight] = useState(false);
   const [deployComplete, setDeployComplete] = useState(() => !!cachedWizard?.deployComplete);
   const [deployWorkerUrl, setDeployWorkerUrl] = useState(() => normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
-  const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<AnyRecord>(() => ({
+  const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<UnknownRecord>(() => ({
     ...buildEmptyProvisionedSponsoredContext(),
     sessionSlug: sessionRegistryUtils.normalizeSlug(cachedWizard?.provisionedSponsoredContext?.sessionSlug),
     workerUrl: normalizeWorkerAuthUrl(toStr(cachedWizard?.provisionedSponsoredContext?.workerUrl).trim()),
@@ -1112,6 +1121,9 @@ const SessionWizard = ({
     const chainSymbol = toStr(newSessionFundingChain?.nativeCurrency?.symbol).trim() || 'ETH';
     return `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`;
   }, [newSessionFundingChain]);
+  const newSessionFundingRequirementHref = Number(newSessionFundingChain?.id || 0) === 11155420
+    ? NEW_SESSION_RESOURCE_LINKS.optimismSepoliaFaucet
+    : '';
 
   const buildWorkerName = (rawName) => {
     const base = toStr(rawName)
@@ -3948,15 +3960,8 @@ const SessionWizard = ({
 
   const getMissingWorkerSecretsForDeploy = (secretsSnapshot = getCurrentWorkerSecrets()) => {
     const missing = [];
-    const { fastProvider, thinkingProvider } = resolveSessionWizardAiModelProviders(draft?.ai);
-    if ((fastProvider === 'openai' || thinkingProvider === 'openai') && !toStr(secretsSnapshot.openaiKey).trim()) {
+    if (!toStr(secretsSnapshot.openaiKey).trim()) {
       missing.push('OpenAI key');
-    }
-    if ((fastProvider === 'anthropic' || thinkingProvider === 'anthropic') && !toStr(secretsSnapshot.anthropicKey).trim()) {
-      missing.push('Anthropic key');
-    }
-    if ((fastProvider === 'openrouter' || thinkingProvider === 'openrouter') && !toStr(secretsSnapshot.openrouterKey).trim()) {
-      missing.push('OpenRouter key');
     }
     if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
     const rpcUrl = resolveWorkerRpcUrl();
@@ -3966,12 +3971,16 @@ const SessionWizard = ({
       !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
       !!toStr(secretsSnapshot?.litUsageApiKey).trim()
     );
+    const accountKeyOnlyChipotleConfig = !!toStr(secretsSnapshot?.litAccountApiKey).trim();
     const bootstrapOnlyChipotleConfig = (
-      !!toStr(secretsSnapshot?.litApiBase).trim() &&
-      !toStr(secretsSnapshot?.litGroupId).trim() &&
-      !toStr(secretsSnapshot?.litPkpId).trim() &&
-      !toStr(secretsSnapshot?.litActionCid).trim() &&
-      !toStr(secretsSnapshot?.litUsageApiKey).trim()
+      accountKeyOnlyChipotleConfig ||
+      (
+        !!toStr(secretsSnapshot?.litApiBase).trim() &&
+        !toStr(secretsSnapshot?.litGroupId).trim() &&
+        !toStr(secretsSnapshot?.litPkpId).trim() &&
+        !toStr(secretsSnapshot?.litActionCid).trim() &&
+        !toStr(secretsSnapshot?.litUsageApiKey).trim()
+      )
     );
     if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
       const requiredChipotleFields = [
@@ -4438,12 +4447,9 @@ const SessionWizard = ({
     sponsoredBundleAppliedBundleRef.current
   );
   const sponsoredBundleStatusTone = toStr(sponsoredBundleStatus?.tone).trim().toLowerCase();
-  const hasNewSessionAiRequirementCovered = !!(
-    toStr(currentWorkerSecrets?.openaiKey).trim() ||
-    toStr(currentWorkerSecrets?.anthropicKey).trim() ||
-    toStr(currentWorkerSecrets?.openrouterKey).trim()
-  );
+  const hasNewSessionAiRequirementCovered = !!toStr(currentWorkerSecrets?.openaiKey).trim();
   const hasNewSessionArweaveRequirementCovered = !!toStr(currentWorkerSecrets?.arweaveJwk).trim();
+  const hasNewSessionLitRequirementCovered = !!toStr(currentWorkerSecrets?.litAccountApiKey).trim();
   const hasNewSessionFundingRequirementCovered = !!(
     toStr(currentWorkerSecrets?.faucetPrivateKey).trim() ||
     toStr(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
@@ -4455,6 +4461,7 @@ const SessionWizard = ({
     sponsoredBundleStatusTone === 'success' &&
     hasNewSessionAiRequirementCovered &&
     hasNewSessionArweaveRequirementCovered &&
+    hasNewSessionLitRequirementCovered &&
     hasNewSessionFundingRequirementCovered &&
     hasNewSessionDeployRequirementCovered
   );
@@ -4501,82 +4508,35 @@ const SessionWizard = ({
   const configuredPrivateGateCount = encryptionGates.filter(
     (gate) => normalizeSbtSelection(gate?.sbts || []).length > 0
   ).length;
-  const normalModeCards = [
-    {
-      key: 'metadata',
-      title: 'Session Details',
-      summary: toStr(draft?.sessionName).trim()
-        ? toStr(draft.sessionName).trim()
-        : '',
-      tone: sessionDetailsComplete ? 'ready' : 'pending',
-    },
-    {
-      key: 'encryption',
-      title: 'Privacy',
-      summary: configuredPrivateGateCount
-        ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
-        : (privateSlugMode ? 'Private URL enabled' : 'Open link by default'),
-      tone: configuredPrivateGateCount || privateSlugMode ? 'ready' : 'neutral',
-    },
-    ...(showNormalModeWorkerStep ? [{
-      key: 'worker',
-      title: 'Worker',
-      summary: normalModeRequiresCustomWorker
-        ? (resolvedWorkerBaseUrl
-          ? 'Your worker URL is configured.'
-          : 'Deploy or paste your own worker URL.')
-        : workerMode === 'default'
-          ? 'Using the shared default worker.'
-          : (deployVerifiedInUi ? 'Custom worker deployed in this run.' : 'Custom worker setup is available here.'),
-      tone: normalModeRequiresCustomWorker
-        ? (resolvedWorkerBaseUrl ? 'ready' : 'pending')
-        : (workerMode === 'default' || deployVerifiedInUi ? 'ready' : 'neutral'),
-    }] : []),
-    {
-      key: 'publish',
-      title: 'Deploy Session',
-      summary: canPublishNow
-        ? (canUseSponsoredAutoDeployNow
-          ? 'Publish will deploy the sponsored worker before uploading metadata.'
-          : 'Review the setup and deploy when ready.')
-        : uploadBlockedReason,
-      tone: canPublishNow ? 'ready' : 'pending',
-    },
-  ].map((card, index) => ({
-    ...card,
-    stepNumber: index + 1,
-  }));
+  const normalModeCards = buildNormalModeCards({
+    sessionName: toStr(draft?.sessionName),
+    sessionDetailsComplete,
+    configuredPrivateGateCount,
+    privateSlugMode,
+    showNormalModeWorkerStep,
+    normalModeRequiresCustomWorker,
+    resolvedWorkerBaseUrl,
+    workerMode,
+    deployVerifiedInUi,
+    canPublishNow,
+    canUseSponsoredAutoDeployNow,
+    uploadBlockedReason,
+    t,
+  });
   const activeNormalModeIndex = normalModeCards.findIndex((card) => collapsedSections[card.key] === false);
-  const normalModePublishSummary = [
-    {
-      label: 'Session',
-      value: toStr(draft?.sessionName).trim() || 'Add a session name',
-    },
-    {
-      label: 'Privacy',
-      value: configuredPrivateGateCount
-        ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? t('gate') : t('gates')} configured`
-        : (privateSlugMode ? 'Private URL mode' : 'Open access'),
-    },
-    {
-      label: 'Worker',
-      value: canUseSponsoredAutoDeployNow
-        ? 'Sponsored auto-deploy on Publish'
-        : shouldUseSponsoredAutoDeployFlow
-        ? 'Sponsored auto-deploy waiting for the hosted bundle URL'
-        : normalModeRequiresCustomWorker
-        ? (resolvedWorkerBaseUrl ? 'Custom worker ready' : 'Bring your own worker')
-        : workerMode === 'default'
-          ? 'Shared hosted worker'
-          : (deployVerifiedInUi ? 'Custom worker deployed' : 'Custom worker setup'),
-    },
-    {
-      label: `Pending ${t('sbts')}`,
-      value: pendingDraftCount
-        ? `${pendingDraftCount} draft${pendingDraftCount === 1 ? '' : 's'} ready`
-        : 'None',
-    },
-  ];
+  const normalModePublishSummary = buildNormalModePublishSummary({
+    sessionName: toStr(draft?.sessionName),
+    configuredPrivateGateCount,
+    privateSlugMode,
+    canUseSponsoredAutoDeployNow,
+    shouldUseSponsoredAutoDeployFlow,
+    normalModeRequiresCustomWorker,
+    resolvedWorkerBaseUrl,
+    workerMode,
+    deployVerifiedInUi,
+    pendingDraftCount,
+    t,
+  });
   useEffect(() => {
     if (!isNormalMode) return;
     const visibleSectionOrder = showNormalModeWorkerStep
@@ -4846,9 +4806,51 @@ const SessionWizard = ({
           </div>
           <div className={styles.newSessionBannerBody}>
             <ul className={styles.newSessionBannerList}>
-              <li>An AI API key (OpenAI, Anthropic, or OpenRouter)</li>
-              <li>An Arweave wallet (JWK) for permanent storage</li>
-              <li>{newSessionFundingRequirementLabel}</li>
+              <li>
+                <a
+                  href={NEW_SESSION_RESOURCE_LINKS.openaiApiKey}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.newSessionBannerLink}
+                >
+                  OpenAI API key
+                </a>
+                {' '}for text and transcription
+              </li>
+              <li>
+                <a
+                  href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.newSessionBannerLink}
+                >
+                  Lit account API key
+                </a>
+                {' '}for encrypted access automation
+              </li>
+              <li>
+                <a
+                  href={NEW_SESSION_RESOURCE_LINKS.arweaveWallet}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.newSessionBannerLink}
+                >
+                  Arweave wallet (JWK)
+                </a>
+                {' '}for permanent storage
+              </li>
+              <li>
+                {newSessionFundingRequirementHref ? (
+                  <a
+                    href={newSessionFundingRequirementHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.newSessionBannerLink}
+                  >
+                    {newSessionFundingRequirementLabel}
+                  </a>
+                ) : newSessionFundingRequirementLabel}
+              </li>
               <li>(Optional) A faucet private key for sponsoring user gas</li>
             </ul>
             <p className={styles.newSessionBannerCopy}>

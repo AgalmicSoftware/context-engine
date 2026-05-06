@@ -1,3 +1,12 @@
+import {
+  defaultCorsProxyAllowDemoFallback,
+  defaultStrictAllowDemoFallback,
+  defaultWorkerAuthAllowDemoFallback,
+  resolveWorkerAllowDemoFallback,
+  resolveWorkerSessionConfigBySlug,
+  resolveWorkerSessionContext,
+} from './workerSessionResolution.js';
+
 const mockGetState = jest.fn();
 const mockGetRegistrySessionConfig = jest.fn();
 
@@ -28,15 +37,6 @@ jest.mock('../../variables/demo/demo_sessions.json', () => ({
     corsWorkerUrl: 'https://demo-edge.example',
   },
 }));
-
-import {
-  defaultCorsProxyAllowDemoFallback,
-  defaultStrictAllowDemoFallback,
-  defaultWorkerAuthAllowDemoFallback,
-  resolveWorkerAllowDemoFallback,
-  resolveWorkerSessionConfigBySlug,
-  resolveWorkerSessionContext,
-} from './workerSessionResolution.js';
 
 describe('workerSessionResolution', () => {
   beforeEach(() => {

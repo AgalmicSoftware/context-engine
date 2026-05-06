@@ -1,6 +1,5 @@
 import { t } from '../../utilities/ui/terminology.js';
 import { normalizeAiProvider } from './sessionWizardAiConfig';
-import type { AnyRecord } from '../shellTypes';
 
 type SessionWizardSecretField = {
   key: string;
@@ -9,6 +8,19 @@ type SessionWizardSecretField = {
   placeholder?: string;
   required?: boolean;
   rows?: number;
+};
+
+type SessionWizardResourceRecord = Record<string, unknown>;
+
+const isResourceRecord = (value: unknown): value is SessionWizardResourceRecord => (
+  value !== null && typeof value === 'object'
+);
+
+const readAiModelProvider = (ai: unknown, modelKey: string): string => {
+  const aiRecord = isResourceRecord(ai) ? ai : {};
+  const models = isResourceRecord(aiRecord.models) ? aiRecord.models : {};
+  const model = isResourceRecord(models[modelKey]) ? models[modelKey] : {};
+  return normalizeAiProvider(model.provider || 'openai');
 };
 
 export const RESOURCE_LABELS = {
@@ -25,11 +37,11 @@ export const RESOURCE_LABELS = {
 };
 
 export const RESOURCE_SECTION_TOOLTIPS = Object.freeze({
-  ai: 'Session-funded API keys used for AI inference and transcription.',
+  ai: 'Session-funded OpenAI key used for text generation and transcription.',
   rpc: 'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
   arweave: `${t('wallet')} used to pay for Arweave uploads and storage.`,
   txGas: 'Faucet signer used to send small testnet funding grants.',
-  lit: 'Worker-mediated Lit Chipotle settings: either a bundle/session account API key for bootstrap, or a scoped usage API key plus the group, PKP, and Lit Action identifiers for this session.',
+  lit: 'Worker-mediated Lit Chipotle setup. Paste one Lit account API key; the worker derives the scoped group, PKP, usage key, and CE action after deploy.',
 });
 
 const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Object.freeze({
@@ -50,39 +62,23 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   default: [],
   lit: [
     { key: 'litAccountApiKey', label: 'Lit account API key', type: 'password' },
-    { key: 'litUsageApiKey', label: 'Lit usage API key', type: 'password' },
   ],
 });
 
-const ANTHROPIC_AI_SECRET_FIELD: SessionWizardSecretField = {
-  key: 'anthropicKey',
-  label: 'Anthropic key',
-  type: 'password',
-  required: true,
-};
-const OPENROUTER_AI_SECRET_FIELD: SessionWizardSecretField = {
-  key: 'openrouterKey',
-  label: 'OpenRouter key',
-  type: 'password',
-};
-
-export const resolveSessionWizardAiModelProviders = (ai: AnyRecord | null | undefined): {
+export const resolveSessionWizardAiModelProviders = (ai: unknown): {
   fastProvider: string;
   thinkingProvider: string;
 } => {
-  const fastProvider = normalizeAiProvider(ai?.models?.fast?.provider || 'openai');
-  const thinkingProvider = normalizeAiProvider(ai?.models?.thinking?.provider || 'openai');
+  const fastProvider = readAiModelProvider(ai, 'fast');
+  const thinkingProvider = readAiModelProvider(ai, 'thinking');
   return { fastProvider, thinkingProvider };
 };
 
 export const resolveSessionWizardResourceSecretFields = (
   resourceKey: string,
-  ai: AnyRecord | null | undefined,
+  ai: unknown,
 ): SessionWizardSecretField[] => {
+  void ai;
   if (resourceKey !== 'ai') return [...(RESOURCE_SECRET_FIELDS[resourceKey] || [])];
-  const { fastProvider, thinkingProvider } = resolveSessionWizardAiModelProviders(ai);
-  const fields = [...RESOURCE_SECRET_FIELDS.ai];
-  if (fastProvider === 'anthropic' || thinkingProvider === 'anthropic') fields.push(ANTHROPIC_AI_SECRET_FIELD);
-  if (fastProvider === 'openrouter' || thinkingProvider === 'openrouter') fields.push(OPENROUTER_AI_SECRET_FIELD);
-  return fields;
+  return [...RESOURCE_SECRET_FIELDS.ai];
 };

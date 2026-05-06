@@ -1,6 +1,5 @@
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import type { AnyRecord } from '../shellTypes';
 
 const SESSION_HEADER_IMAGE_MIME_TO_EXT = Object.freeze({
   'image/png': 'png',
@@ -9,14 +8,33 @@ const SESSION_HEADER_IMAGE_MIME_TO_EXT = Object.freeze({
   'image/gif': 'gif',
 });
 
-export const readSessionWizardTooltipsEnabled = (
-  reduxStore: AnyRecord | null | undefined
-): boolean => (
-  reduxStore?.getState?.()?.sessionState?.tooltipsEnabled !== false
+type SessionWizardUiRecord = Record<string, unknown>;
+
+type SessionWizardReduxStoreLike = SessionWizardUiRecord & {
+  getState?: () => unknown;
+};
+
+type SessionWizardFileLike = SessionWizardUiRecord & {
+  name?: unknown;
+  type?: unknown;
+};
+
+const isUiRecord = (value: unknown): value is SessionWizardUiRecord => (
+  value !== null && typeof value === 'object'
 );
 
+export const readSessionWizardTooltipsEnabled = (
+  reduxStore: unknown
+): boolean => {
+  const store = isUiRecord(reduxStore) ? reduxStore as SessionWizardReduxStoreLike : null;
+  const rawState = store?.getState?.();
+  const state = isUiRecord(rawState) ? rawState : {};
+  const sessionState = isUiRecord(state.sessionState) ? state.sessionState : {};
+  return sessionState.tooltipsEnabled !== false;
+};
+
 export const resolveSessionHeaderImageFormat = (
-  fileLike: AnyRecord | File | null | undefined
+  fileLike: SessionWizardFileLike | File | null | undefined
 ): string => {
   const fileName = toStr(fileLike?.name).trim().toLowerCase();
   const fromName = fileName.split('.').pop()?.trim() || '';

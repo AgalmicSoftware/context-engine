@@ -91,7 +91,16 @@ export const buildWorkerLitCredentialsConfig = (
 
 export const sanitizeSessionWizardWorkerSecretsForLitMode = (
   value: WorkerSecretsLike | AnyRecord = {},
-): WorkerSecretsLike => normalizeWorkerSecrets(value);
+): WorkerSecretsLike => {
+  const next = normalizeWorkerSecrets(value);
+  if (toStr(next.litAccountApiKey).trim()) {
+    CHIPOTLE_LIT_CONFIG_FIELDS.forEach((key) => {
+      next[key] = '';
+    });
+    next.litUsageApiKey = '';
+  }
+  return next;
+};
 
 export const sanitizeSessionWizardSponsoredFieldSnapshotForLitMode = (
   value: AnyRecord = {},

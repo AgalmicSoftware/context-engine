@@ -13,6 +13,7 @@ import {
   getVisibleSessionWizardContractKeys,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
+import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
 import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
 import type {
   AnyRecord,
@@ -24,15 +25,15 @@ import type {
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const trimString = (value: unknown): string => toStr(value).trim();
-const cloneValue = (value: any): any => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
+const cloneValue = <T = unknown>(value: T): T => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
     return Object.keys(value).reduce<AnyRecord>((acc, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
-    }, {});
+    }, {}) as T;
   }
-  return typeof value === 'string' ? value.trim() : value;
+  return (typeof value === 'string' ? value.trim() : value) as T;
 };
 
 const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
@@ -43,11 +44,7 @@ const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
   'deployHelperEnabled',
 ]);
 
-// Stage-A compatibility mirror: worker URL reads have not fully migrated to Worker KV yet,
-// so new sessions keep an explicit registry mirror while metadata stops claiming authority.
-export const SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS = Object.freeze({
-  corsWorkerUrl: ['corsWorkerUrl'],
-});
+export { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS };
 
 const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
   if (!isObj(metadata)) return metadata;
