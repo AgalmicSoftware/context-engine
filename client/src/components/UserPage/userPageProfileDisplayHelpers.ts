@@ -37,12 +37,6 @@ export type ResolveUserPageBlockieSeedArgs = {
   username?: unknown;
 };
 
-export type ResolveUserPageHeaderPassiveDisplayStateArgs = BuildUserPageProfileEditVisibilityArgs & {
-  explorerUrl?: unknown;
-  isSimulated?: unknown;
-  propViewAddress?: unknown;
-};
-
 export type UserPageProfileEditVisibility = {
   hasNickForThis: boolean;
   isOwner: boolean;
@@ -67,11 +61,6 @@ export type UserPageAddressDisplayState = {
   pendingNicknameForThis: string;
   profileUrl: string;
   shouldLinkAddressLabel: boolean;
-};
-
-export type UserPageHeaderPassiveDisplayState = {
-  headerActionVisibility: UserPageHeaderActionVisibility;
-  profileEditVisibility: UserPageProfileEditVisibility;
 };
 
 export const buildUserPageProfileEditVisibility = ({
@@ -112,42 +101,6 @@ export const resolveUserPageHeaderActionVisibility = ({
   showNicknameEditor: !!notOwnPage && !!isEditingNickname,
   showSimulatedBadge: !!isSimulated,
 });
-
-export const resolveUserPageHeaderPassiveDisplayState = ({
-  account = '',
-  cachedNickname = '',
-  explorerUrl = '',
-  isEditingNickname = false,
-  isEditingUsername = false,
-  isSimulated = false,
-  minimized = false,
-  pendingNickname = '',
-  propViewAddress = '',
-  viewAddress = '',
-}: ResolveUserPageHeaderPassiveDisplayStateArgs = {}): UserPageHeaderPassiveDisplayState => {
-  const profileEditVisibility = buildUserPageProfileEditVisibility({
-    account,
-    cachedNickname,
-    isEditingNickname,
-    isEditingUsername,
-    minimized,
-    pendingNickname,
-    viewAddress,
-  });
-
-  return {
-    headerActionVisibility: resolveUserPageHeaderActionVisibility({
-      explorerUrl,
-      isEditingNickname,
-      isOwner: profileEditVisibility.isOwner,
-      isSimulated,
-      minimized,
-      notOwnPage: profileEditVisibility.notOwnPage,
-      propViewAddress,
-    }),
-    profileEditVisibility,
-  };
-};
 
 export const resolveUserPageAddressDisplayState = ({
   bookmarked = false,

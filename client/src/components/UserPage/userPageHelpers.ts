@@ -157,6 +157,21 @@ export type {
   UserPageDecryptableResponseField,
   UserPageResponseDecryptSurveyBindings,
 } from './userPageGateHelpers';
+export {
+  buildUserPageProfileEditVisibility,
+  resolveUserPageAddressDisplayState,
+  resolveUserPageBlockieSeed,
+  resolveUserPageHeaderActionVisibility,
+} from './userPageProfileDisplayHelpers';
+export type {
+  BuildUserPageProfileEditVisibilityArgs,
+  ResolveUserPageAddressDisplayStateArgs,
+  ResolveUserPageBlockieSeedArgs,
+  ResolveUserPageHeaderActionVisibilityArgs,
+  UserPageAddressDisplayState,
+  UserPageHeaderActionVisibility,
+  UserPageProfileEditVisibility,
+} from './userPageProfileDisplayHelpers';
 export type UserPageAnalysisFingerprintInput = {
   address?: unknown;
   model?: unknown;
@@ -340,24 +355,6 @@ type UserPageSectionToggleDisplayState = {
   shouldRenderClosedIcon: boolean;
   shouldRenderOpenIcon: boolean;
 };
-type BuildUserPageProfileEditVisibilityArgs = {
-  account?: unknown;
-  cachedNickname?: unknown;
-  isEditingNickname?: unknown;
-  isEditingUsername?: unknown;
-  minimized?: unknown;
-  pendingNickname?: unknown;
-  viewAddress?: unknown;
-};
-type ResolveUserPageHeaderActionVisibilityArgs = {
-  explorerUrl?: unknown;
-  isEditingNickname?: unknown;
-  isOwner?: unknown;
-  isSimulated?: unknown;
-  minimized?: unknown;
-  notOwnPage?: unknown;
-  propViewAddress?: unknown;
-};
 type ResolveUserPageSurveyCreatedCardStateArgs = {
   survey?: unknown;
 };
@@ -393,38 +390,6 @@ type ResolveUserPageSbtDisplayStateArgs = {
   loadingSBTs?: unknown;
   sbtList?: unknown;
   sbtSectionLoadingEmpty?: unknown;
-};
-type ResolveUserPageAddressDisplayStateArgs = {
-  bookmarked?: unknown;
-  cachedNickname?: unknown;
-  explorerUrl?: unknown;
-  getShortenedAddress?: ((address: unknown, compact?: boolean) => unknown) | null;
-  isEditingNickname?: unknown;
-  isSimulated?: unknown;
-  minimized?: unknown;
-  nicknameInput?: unknown;
-  propViewAddress?: unknown;
-  stateViewAddress?: unknown;
-  username?: unknown;
-};
-type ResolveUserPageBlockieSeedArgs = {
-  propViewAddress?: unknown;
-  username?: unknown;
-};
-type UserPageProfileEditVisibility = {
-  hasNickForThis: boolean;
-  isOwner: boolean;
-  notOwnPage: boolean;
-  showPen: boolean;
-  showUsernamePen: boolean;
-};
-type UserPageHeaderActionVisibility = {
-  showBookmarkButton: boolean;
-  showBookmarksLink: boolean;
-  showCopyAddressButton: boolean;
-  showExplorerLink: boolean;
-  showNicknameEditor: boolean;
-  showSimulatedBadge: boolean;
 };
 type ResolveUserPageAnalysisModalDisplayStateArgs = {
   analysisDetails?: unknown;
@@ -504,14 +469,6 @@ type UserPageSbtDisplayState = {
   shouldRenderMainEmptyText: boolean;
   shouldRenderModalEmptyText: boolean;
   shouldRenderModalSpinner: boolean;
-};
-type UserPageAddressDisplayState = {
-  addressHref: string;
-  addressLabel: string;
-  nicknameToUse: string;
-  pendingNicknameForThis: string;
-  profileUrl: string;
-  shouldLinkAddressLabel: boolean;
 };
 type UserPageSessionConfigReader = (slug: string) => unknown;
 type UserPageSessionSlugByNameReader = (sessionName: unknown) => unknown;
@@ -2711,92 +2668,3 @@ export const buildUserPageUserStatsMergePatch = ({
   const previous = isPlainAnalysisObject(prevUserStats) ? prevUserStats : {};
   return { ...previous, ...patch };
 };
-
-export const buildUserPageProfileEditVisibility = ({
-  account = '',
-  cachedNickname = '',
-  isEditingNickname = false,
-  isEditingUsername = false,
-  minimized = false,
-  pendingNickname = '',
-  viewAddress = '',
-}: BuildUserPageProfileEditVisibilityArgs = {}): UserPageProfileEditVisibility => {
-  const accountLower = String(account || '').toLowerCase();
-  const viewAddressLower = String(viewAddress || '').toLowerCase();
-  const isOwner = !!(accountLower && viewAddressLower && accountLower === viewAddressLower);
-  const notOwnPage = !isOwner;
-  return {
-    hasNickForThis: Boolean(cachedNickname || pendingNickname),
-    isOwner,
-    notOwnPage,
-    showPen: !minimized && notOwnPage && !isEditingNickname,
-    showUsernamePen: !minimized && isOwner && !isEditingUsername,
-  };
-};
-
-export const resolveUserPageHeaderActionVisibility = ({
-  explorerUrl = '',
-  isEditingNickname = false,
-  isOwner = false,
-  isSimulated = false,
-  minimized = false,
-  notOwnPage = false,
-  propViewAddress = '',
-}: ResolveUserPageHeaderActionVisibilityArgs = {}): UserPageHeaderActionVisibility => ({
-  showBookmarkButton: !isSimulated && !!propViewAddress && !isOwner,
-  showBookmarksLink: !!isOwner && !minimized,
-  showCopyAddressButton: !isSimulated && !!propViewAddress,
-  showExplorerLink: !!minimized && !!explorerUrl,
-  showNicknameEditor: !!notOwnPage && !!isEditingNickname,
-  showSimulatedBadge: !!isSimulated,
-});
-
-export const resolveUserPageAddressDisplayState = ({
-  bookmarked = false,
-  cachedNickname = '',
-  explorerUrl = '',
-  getShortenedAddress = null,
-  isEditingNickname = false,
-  isSimulated = false,
-  minimized = false,
-  nicknameInput = '',
-  propViewAddress = '',
-  stateViewAddress = '',
-  username = '',
-}: ResolveUserPageAddressDisplayStateArgs = {}): UserPageAddressDisplayState => {
-  const currentLower = String(propViewAddress || '').toLowerCase();
-  const pendingNick = String(nicknameInput || '').trim();
-  const stateViewLower = String(stateViewAddress || '').toLowerCase();
-  const pendingNicknameForThis = (
-    stateViewLower === currentLower &&
-    (isEditingNickname || bookmarked)
-  ) ? pendingNick : '';
-  const nicknameToUse = String(cachedNickname || '') || pendingNicknameForThis;
-  const profileUrl = propViewAddress ? `/u/${propViewAddress}` : '';
-  const usernameText = String(username || '');
-  const shortAddress = propViewAddress
-    ? String(typeof getShortenedAddress === 'function'
-      ? getShortenedAddress(propViewAddress, false)
-      : propViewAddress)
-    : '';
-  const addressLabel = nicknameToUse ||
-    (isSimulated && usernameText ? usernameText : '') ||
-    (usernameText && !isSimulated ? usernameText : '') ||
-    shortAddress;
-  const addressHref = minimized ? profileUrl : String(explorerUrl || '');
-  return {
-    addressHref,
-    addressLabel,
-    nicknameToUse,
-    pendingNicknameForThis,
-    profileUrl,
-    shouldLinkAddressLabel: !!addressHref,
-  };
-};
-
-export const resolveUserPageBlockieSeed = ({
-  propViewAddress = '',
-  username = '',
-}: ResolveUserPageBlockieSeedArgs = {}): string => (
-  String(propViewAddress || '') || (username ? String(username) : 'contextengine-default-seed')
-);

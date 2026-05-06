@@ -3,7 +3,6 @@ import {
   resolveUserPageAddressDisplayState,
   resolveUserPageBlockieSeed,
   resolveUserPageHeaderActionVisibility,
-  resolveUserPageHeaderPassiveDisplayState,
 } from './userPageProfileDisplayHelpers';
 
 describe('userPageProfileDisplayHelpers', () => {
@@ -64,37 +63,6 @@ describe('userPageProfileDisplayHelpers', () => {
       showBookmarkButton: false,
       showCopyAddressButton: false,
       showSimulatedBadge: true,
-    });
-  });
-
-  it('bundles passive header edit and action display state', () => {
-    expect(resolveUserPageHeaderPassiveDisplayState({
-      account: '0xABC',
-      cachedNickname: '',
-      explorerUrl: 'https://explorer.test/address/0xdef',
-      isEditingNickname: true,
-      isEditingUsername: false,
-      isSimulated: false,
-      minimized: false,
-      pendingNickname: 'Pending',
-      propViewAddress: '0xDEF',
-      viewAddress: '0xDEF',
-    })).toEqual({
-      profileEditVisibility: {
-        hasNickForThis: true,
-        isOwner: false,
-        notOwnPage: true,
-        showPen: false,
-        showUsernamePen: false,
-      },
-      headerActionVisibility: {
-        showBookmarkButton: true,
-        showBookmarksLink: false,
-        showCopyAddressButton: true,
-        showExplorerLink: false,
-        showNicknameEditor: true,
-        showSimulatedBadge: false,
-      },
     });
   });
 
