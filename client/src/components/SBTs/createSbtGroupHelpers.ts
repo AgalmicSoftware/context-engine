@@ -10,6 +10,39 @@ import {
   SPONSORED_GATE_STATES,
 } from '../../utilities/web3/sponsoredAccess.js';
 export {
+  buildCreateSbtAuthoringChainSyncPatch,
+  buildCreateSbtAuthoringChainSyncStatePatch,
+  buildCreateSbtAuthoringContractRefs,
+  contractRefMatchesChain,
+  getConfiguredContractAddress,
+  hasUsableCreateSbtFactoryForChain,
+  normalizePositiveChainId,
+  normalizeSessionContractRef,
+  resolveCreateSbtAuthoringChainOptions,
+  resolveCreateSbtAuthoringChainState,
+  resolveCreateSbtCachedDistributionChainId,
+  resolveCreateSbtPreferredAuthoringChainId,
+  selectPreferredChainId,
+  shouldHideCreateSbtNetworkSelector,
+} from './createSbtGroupAuthoringChainHelpers';
+export type {
+  BuildCreateSbtAuthoringChainSyncPatchArgs,
+  BuildCreateSbtAuthoringChainSyncStatePatchArgs,
+  BuildCreateSbtAuthoringContractRefsArgs,
+  CreateSbtAuthoringChainOption,
+  CreateSbtAuthoringChainState,
+  NormalizedSessionContractRef,
+  ResolveCreateSbtAuthoringChainOptionsArgs,
+  ResolveCreateSbtPreferredAuthoringChainIdArgs,
+} from './createSbtGroupAuthoringChainHelpers';
+import type {
+  CreateSbtAuthoringChainOption,
+  CreateSbtAuthoringChainState,
+} from './createSbtGroupAuthoringChainHelpers';
+import {
+  normalizePositiveChainId,
+} from './createSbtGroupAuthoringChainHelpers';
+export {
   buildCreateSbtDeferredDraftCreate2Salt,
   buildCreateSbtInviteLinks,
   buildCreateSbtPasswordExportFile,
@@ -165,11 +198,6 @@ export type {
 
 const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
 
-export type NormalizedSessionContractRef = {
-  address?: string;
-  chainId?: number;
-};
-
 export type CreateSbtLitGateChainId = number | string | null;
 export type CreateSbtGateBoundary = NonNullable<Parameters<typeof normalizeGateMode>[0]> & Record<string, unknown> & {
   badgeLabel?: unknown;
@@ -288,14 +316,6 @@ export type CreateSbtFormCachePayload = Record<string, unknown> & {
   _imageDataUrl?: string;
   sbtDistribution: Record<string, unknown>;
 };
-export type CreateSbtAuthoringChainOption = Record<string, unknown> & {
-  id?: string | number;
-  name?: string;
-};
-export type CreateSbtAuthoringChainState = {
-  chainId: number | null;
-  chain: CreateSbtAuthoringChainOption | 'not connected';
-};
 type ResolveCreateSbtErrorBannerStateArgs = {
   error?: unknown;
 };
@@ -305,13 +325,6 @@ type CreateSbtErrorBannerState = {
   style: Record<string, string | number>;
 };
 type CreateSbtAutoJoinUrlBuilder = (sbtAddress: unknown) => unknown;
-type CreateSbtSessionContractsResolver = (chainId: unknown) => unknown;
-type CreateSbtSessionRegistryChainsResolver = () => unknown;
-type CreateSbtAuthoringChainUsabilityChecker = (chainId: unknown) => boolean;
-type CreateSbtSessionContractRefResolver = (args: {
-  contractKey: string;
-  sessionConfig?: Record<string, unknown> | null;
-}) => unknown;
 type BuildCreateSbtJsonPreviewDataArgs = {
   authoringChain?: CreateSbtAuthoringChainOption | null;
   autoJoinUrl?: unknown;
@@ -323,21 +336,11 @@ type BuildCreateSbtJsonPreviewDataArgs = {
   shareableUrl?: unknown;
   tokenURI?: unknown;
 };
-type ShouldHideCreateSbtNetworkSelectorArgs = {
-  deferredDeploy?: unknown;
-  hideNetworkSelector?: unknown;
-};
 type ResolveCreateSbtMetadataSessionSlugArgs = {
   deferredDeployMode?: unknown;
   effectiveSessionSlug?: unknown;
   sbtLabel?: unknown;
   sessionConfigSlug?: unknown;
-};
-type BuildCreateSbtAuthoringContractRefsArgs = {
-  getSessionContractsForChain?: CreateSbtSessionContractsResolver | null;
-  networkId?: unknown;
-  resolveSessionContractRef?: CreateSbtSessionContractRefResolver | null;
-  sessionConfig?: Record<string, unknown> | null;
 };
 type BuildCreateSbtGateOptionsFromConfigArgs = {
   chainIdFallback?: unknown;
@@ -379,17 +382,9 @@ type BuildCreateSbtGateOptionsFromSessionSourcesArgs = {
   preferredSessionSlug?: unknown;
   sessionSources?: unknown[];
 };
-type ResolveCreateSbtAuthoringChainOptionsArgs = {
-  getSessionRegistryChains?: CreateSbtSessionRegistryChainsResolver | null;
-  hasUsableSbtFactoryForChain?: CreateSbtAuthoringChainUsabilityChecker | null;
-};
 type BuildCreateSbtDefaultDistributionStateArgs = {
   account?: unknown;
   authoringChain?: Partial<CreateSbtAuthoringChainState> | null;
-};
-type BuildCreateSbtAuthoringChainSyncStatePatchArgs = {
-  currentDistribution?: unknown;
-  syncPatch?: { network?: unknown; sbtDistributionNetwork?: unknown } | null;
 };
 type BuildCreateSbtResetFormStateArgs = BuildCreateSbtDefaultDistributionStateArgs & {
   deferredCreate2SaltBuilder?: (() => unknown) | null;
@@ -428,13 +423,6 @@ type BuildCreateSbtTokenInfoMetaCardClassNameArgs = {
 };
 type CreateSbtHiddenQrDisplayState = {
   hiddenStyle: Record<string, string | number>;
-};
-type ResolveCreateSbtPreferredAuthoringChainIdArgs = {
-  availableChainIds?: unknown[];
-  network?: unknown;
-  resolvedSessionConfig?: Record<string, unknown> | null;
-  selectedChainId?: unknown;
-  sessionConfigOverride?: Record<string, unknown> | null;
 };
 type CreateSbtCollapseHeaderDisplayState = {
   ariaExpanded: boolean;
@@ -597,72 +585,6 @@ export const resolveCreateSbtMetadataSessionSlug = ({
     throw new Error(`Set the session URL before adding this ${String(sbtLabel || 'SBT')} to the session.`);
   }
   return metadataSessionSlug;
-};
-
-export const normalizePositiveChainId = (value: unknown): number | null => {
-  const id = Number(value || 0);
-  return Number.isFinite(id) && id > 0 ? id : null;
-};
-
-export const resolveCreateSbtCachedDistributionChainId = (distributionPayload: unknown = {}): number | null => {
-  const distribution = isPlainObject(distributionPayload) ? distributionPayload : {};
-  const cachedNetwork = distribution.network;
-  const cachedNetworkRecord = isPlainObject(cachedNetwork) ? cachedNetwork : {};
-  return normalizePositiveChainId(
-    cachedNetworkRecord.id ||
-    cachedNetworkRecord.chainId ||
-    cachedNetwork
-  );
-};
-
-export const buildCreateSbtAuthoringChainSyncPatch = ({
-  currentDistributionNetwork = null,
-  currentNetwork = '',
-  syncedAuthoringChain = {},
-}: {
-  currentDistributionNetwork?: unknown;
-  currentNetwork?: unknown;
-  syncedAuthoringChain?: unknown;
-} = {}): { network: unknown; sbtDistributionNetwork: unknown } | null => {
-  const syncedChain = isPlainObject(syncedAuthoringChain) ? syncedAuthoringChain : {};
-  const syncedChainId = syncedChain.chainId;
-  const distributionNetwork = isPlainObject(currentDistributionNetwork)
-    ? currentDistributionNetwork
-    : {};
-  const currentDistributionChainId = normalizePositiveChainId(
-    distributionNetwork.id ||
-    distributionNetwork.chainId ||
-    currentDistributionNetwork
-  );
-  const nextDistributionNetwork = syncedChain.chain;
-  const syncedChainName = isPlainObject(nextDistributionNetwork)
-    ? nextDistributionNetwork.name
-    : undefined;
-  if (
-    (currentNetwork || '') !== (syncedChainId || '') ||
-    currentDistributionChainId !== syncedChainId ||
-    distributionNetwork.name !== syncedChainName
-  ) {
-    return {
-      network: syncedChainId || '',
-      sbtDistributionNetwork: nextDistributionNetwork,
-    };
-  }
-  return null;
-};
-
-export const buildCreateSbtAuthoringChainSyncStatePatch = ({
-  currentDistribution = {},
-  syncPatch = null,
-}: BuildCreateSbtAuthoringChainSyncStatePatchArgs = {}): Record<string, unknown> | null => {
-  if (!syncPatch) return null;
-  return {
-    network: syncPatch.network,
-    sbtDistribution: {
-      ...(currentDistribution as Record<string, unknown>),
-      network: syncPatch.sbtDistributionNetwork,
-    },
-  };
 };
 
 export const buildCreateSbtRestoredDistributionState = ({
@@ -982,76 +904,6 @@ export const stableGateColor = (gateId: unknown): string => {
   return ENCRYPTION_GATE_COLORS[hash % ENCRYPTION_GATE_COLORS.length];
 };
 
-export const getConfiguredContractAddress = (value: unknown): string => (
-  normalizeGateText(isPlainObject(value) ? value.address : value)
-);
-
-export const hasUsableCreateSbtFactoryForChain = ({
-  chainId = null,
-  getSessionContractsForChain = null,
-}: {
-  chainId?: unknown;
-  getSessionContractsForChain?: CreateSbtSessionContractsResolver | null;
-} = {}): boolean => {
-  const chainContracts = typeof getSessionContractsForChain === 'function'
-    ? getSessionContractsForChain(chainId)
-    : null;
-  const contracts = isPlainObject(chainContracts) ? chainContracts : {};
-  return getConfiguredContractAddress(contracts.sbtFactory) !== '';
-};
-
-export const shouldHideCreateSbtNetworkSelector = ({
-  deferredDeploy = false,
-  hideNetworkSelector = false,
-}: ShouldHideCreateSbtNetworkSelectorArgs = {}): boolean => (
-  !!hideNetworkSelector || !!deferredDeploy
-);
-
-export const selectPreferredChainId = (
-  candidateIds?: unknown[],
-  availableChainIds?: unknown[]
-): number | null => {
-  const normalizedCandidates = (candidateIds === undefined ? [] : candidateIds)
-    .map((value: unknown) => normalizePositiveChainId(value))
-    .filter((id): id is number => id !== null);
-  const allowedIds = new Set<number>(
-    (Array.isArray(availableChainIds) ? availableChainIds : [])
-      .map((value: unknown) => normalizePositiveChainId(value))
-      .filter((id): id is number => id !== null)
-  );
-  if (allowedIds.size > 0) {
-    const allowedMatch = normalizedCandidates.find((id) => allowedIds.has(id));
-    if (allowedMatch) return allowedMatch;
-  }
-  return normalizedCandidates[0] || null;
-};
-
-export const resolveCreateSbtAuthoringChainState = ({
-  chainId = null,
-  chainOptions = [],
-  getChainById: getChainByIdFn = null,
-}: {
-  chainId?: number | null;
-  chainOptions?: unknown;
-  getChainById?: ((chainId: number) => unknown) | null;
-} = {}): CreateSbtAuthoringChainState => {
-  const selectedChain = (
-    (Array.isArray(chainOptions) ? chainOptions : []).find((option) => (
-      isPlainObject(option) && option.id === chainId
-    )) ||
-    (typeof getChainByIdFn === 'function' ? getChainByIdFn(chainId || 0) : null)
-  );
-  return {
-    chainId,
-    chain: chainId
-      ? (
-          (isPlainObject(selectedChain) ? selectedChain as CreateSbtAuthoringChainOption : null) ||
-          { id: chainId, name: `Chain ${chainId}` }
-        )
-      : 'not connected',
-  };
-};
-
 export const buildCreateSbtDefaultDistributionState = ({
   account = '',
   authoringChain = null,
@@ -1157,139 +1009,6 @@ export const buildCreateSbtInitialState = ({
     copyIdSuccess: false,
     bookmarkedSbtsSet: new Set(),
   };
-};
-
-export const resolveCreateSbtAuthoringChainOptions = ({
-  getSessionRegistryChains = null,
-  hasUsableSbtFactoryForChain = null,
-}: ResolveCreateSbtAuthoringChainOptionsArgs = {}): CreateSbtAuthoringChainOption[] => {
-  const chains = typeof getSessionRegistryChains === 'function' ? getSessionRegistryChains() : [];
-  return (Array.isArray(chains) ? chains : [])
-    .filter((chain: unknown): chain is CreateSbtAuthoringChainOption => (
-      isPlainObject(chain) &&
-      typeof hasUsableSbtFactoryForChain === 'function' &&
-      hasUsableSbtFactoryForChain(chain.id)
-    ));
-};
-
-export const resolveCreateSbtPreferredAuthoringChainId = ({
-  availableChainIds = [],
-  network = null,
-  resolvedSessionConfig = null,
-  selectedChainId = null,
-  sessionConfigOverride = null,
-}: ResolveCreateSbtPreferredAuthoringChainIdArgs = {}): number | null => {
-  const networkRecord = isPlainObject(network) ? network : {};
-  // Regression guard: authoring follows the form/session chain first and only
-  // consults the connected wallet as a last-resort fallback.
-  return selectPreferredChainId(
-    [
-      selectedChainId,
-      sessionConfigOverride?.networkChainId,
-      resolvedSessionConfig?.networkChainId,
-      networkRecord.id,
-      networkRecord.chainId,
-    ],
-    availableChainIds
-  );
-};
-
-export const normalizeSessionContractRef = (
-  value: unknown,
-  fallbackChainId?: unknown
-): NormalizedSessionContractRef | null => {
-  const contractRef = isPlainObject(value) ? { ...value } : {};
-  const address = getConfiguredContractAddress(value);
-  const chainId = normalizePositiveChainId(
-    contractRef.chainId ||
-    contractRef.chainID ||
-    contractRef.networkChainId ||
-    contractRef.chain ||
-    fallbackChainId
-  );
-  if (!address && !chainId) return null;
-  return {
-    ...(address ? { address } : {}),
-    ...(chainId ? { chainId } : {}),
-  };
-};
-
-export const contractRefMatchesChain = (
-  contractRef: Record<string, unknown> | null | undefined,
-  targetChainId: number | null,
-  fallbackChainId?: unknown
-): boolean => {
-  if (!contractRef?.address) return false;
-  const effectiveChainId = normalizePositiveChainId(contractRef.chainId || fallbackChainId);
-  if (!effectiveChainId) return true;
-  return effectiveChainId === targetChainId;
-};
-
-const CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS = Object.freeze(['surveys', 'sbtFactory']);
-
-export const buildCreateSbtAuthoringContractRefs = ({
-  getSessionContractsForChain = null,
-  networkId = null,
-  resolveSessionContractRef = null,
-  sessionConfig = null,
-}: BuildCreateSbtAuthoringContractRefsArgs = {}): Record<string, NormalizedSessionContractRef> => {
-  const selectedChainId = normalizePositiveChainId(networkId);
-  if (!selectedChainId) return {};
-
-  const normalizedSessionConfig = isPlainObject(sessionConfig) ? sessionConfig : {};
-  const baseContracts: Record<string, unknown> = isPlainObject(normalizedSessionConfig.contracts)
-    ? normalizedSessionConfig.contracts
-    : {};
-  const sessionChainId = normalizePositiveChainId(normalizedSessionConfig.networkChainId);
-  const rawChainDefaultContracts = typeof getSessionContractsForChain === 'function'
-    ? getSessionContractsForChain(selectedChainId)
-    : null;
-  const chainDefaultContracts: Record<string, unknown> = isPlainObject(rawChainDefaultContracts)
-    ? rawChainDefaultContracts
-    : {};
-  const contractKeys = new Set<string>([
-    ...Object.keys(baseContracts),
-    ...Object.keys(chainDefaultContracts),
-    ...CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS,
-  ]);
-  const contracts: Record<string, NormalizedSessionContractRef> = {};
-
-  contractKeys.forEach((key) => {
-    const sessionResolvedRef = (
-      CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS.includes(key) &&
-      typeof resolveSessionContractRef === 'function'
-    )
-      ? resolveSessionContractRef({ sessionConfig: normalizedSessionConfig, contractKey: key })
-      : null;
-    const sessionResolvedRefRecord = isPlainObject(sessionResolvedRef) ? sessionResolvedRef : {};
-    const explicitSessionContractRef = normalizeSessionContractRef(baseContracts[key], sessionChainId);
-    const aliasSessionContractRef = normalizeSessionContractRef(
-      (sessionResolvedRefRecord.address || sessionResolvedRefRecord.chainId) ? sessionResolvedRefRecord : null,
-      sessionChainId
-    );
-    const sessionContractRef = explicitSessionContractRef || aliasSessionContractRef;
-    const chainDefaultRef = normalizeSessionContractRef(chainDefaultContracts[key], selectedChainId);
-
-    // Regression guard: when the authoring chain changes, keep only session-specific
-    // contracts that already belong to that chain; otherwise swap to that chain's defaults.
-    const resolvedRef = (
-      chainDefaultRef?.address &&
-      !contractRefMatchesChain(sessionContractRef, selectedChainId, sessionChainId)
-    )
-      ? chainDefaultRef
-      : (sessionContractRef || chainDefaultRef);
-
-    if (!resolvedRef) return;
-    const resolvedChainId = normalizePositiveChainId(resolvedRef.chainId || selectedChainId);
-    contracts[key] = {
-      ...resolvedRef,
-      ...(resolvedChainId
-        ? { chainId: resolvedChainId }
-        : {}),
-    };
-  });
-
-  return contracts;
 };
 
 export const normalizeAddressList = (values?: unknown[]): string[] => {
