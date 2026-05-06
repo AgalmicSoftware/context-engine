@@ -1,251 +1,23 @@
 import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
 import { isPublishUploadBootstrapReachabilityError } from '../../utilities/arweave/publishUploadAuth.js';
 import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
+import { normalizeTagList } from '../../utilities/defaultTags.js';
 import {
   getGateSbtAddresses,
   normalizeGateMode,
   resolveSponsoredGateStateForResource,
   SPONSORED_GATE_STATES,
 } from '../../utilities/web3/sponsoredAccess.js';
-import {
-  normalizePositiveChainId,
-} from './createSbtGroupAuthoringChainHelpers';
-import type {
-  CreateSbtAuthoringChainOption,
-} from './createSbtGroupAuthoringChainHelpers';
-import {
-  resolveCreateSbtEncryptedFieldGateValue,
-} from './createSbtGroupMetadataLockHelpers';
-export {
-  buildCreateSbtAuthoringChainSyncPatch,
-  buildCreateSbtAuthoringChainSyncStatePatch,
-  buildCreateSbtAuthoringContractRefs,
-  contractRefMatchesChain,
-  getConfiguredContractAddress,
-  hasUsableCreateSbtFactoryForChain,
-  normalizePositiveChainId,
-  normalizeSessionContractRef,
-  resolveCreateSbtAuthoringChainOptions,
-  resolveCreateSbtAuthoringChainState,
-  resolveCreateSbtCachedDistributionChainId,
-  resolveCreateSbtPreferredAuthoringChainId,
-  selectPreferredChainId,
-  shouldHideCreateSbtNetworkSelector,
-} from './createSbtGroupAuthoringChainHelpers';
-export type {
-  BuildCreateSbtAuthoringChainSyncPatchArgs,
-  BuildCreateSbtAuthoringChainSyncStatePatchArgs,
-  BuildCreateSbtAuthoringContractRefsArgs,
-  CreateSbtAuthoringChainOption,
-  CreateSbtAuthoringChainState,
-  NormalizedSessionContractRef,
-  ResolveCreateSbtAuthoringChainOptionsArgs,
-  ResolveCreateSbtPreferredAuthoringChainIdArgs,
-} from './createSbtGroupAuthoringChainHelpers';
-export {
-  buildCreateSbtAutoJoinUrl,
-  buildSessionRoutePath,
-  resolveCreateSbtEffectiveSessionSlug,
-  resolveCreateSbtMetadataSessionSlug,
-  resolveCreateSbtOpenMintAutoJoinUrl,
-} from './createSbtGroupRouteHelpers';
-export {
-  buildCreateSbtFormCachePayload,
-} from './createSbtGroupFormCachePayloadHelpers';
-export type {
-  CreateSbtFormCachePayload,
-} from './createSbtGroupFormCachePayloadHelpers';
-export {
-  buildCreateSbtDefaultDistributionState,
-  buildCreateSbtGroupPasswordPredictableEntryPatch,
-  buildCreateSbtGroupPasswordPredictableExitPatch,
-  buildCreateSbtInitialState,
-  buildCreateSbtResetFormState,
-  buildCreateSbtRestoredCollapseState,
-  buildCreateSbtRestoredDistributionState,
-  buildCreateSbtRestoredScalarState,
-  resolveCreateSbtRestoredDeferredCreate2Salt,
-  resolveCreateSbtRestoredPredictableAddressEnabled,
-} from './createSbtGroupFormStateHelpers';
-export type {
-  BuildCreateSbtDefaultDistributionStateArgs,
-  BuildCreateSbtInitialStateArgs,
-  BuildCreateSbtResetFormStateArgs,
-} from './createSbtGroupFormStateHelpers';
-export {
-  buildCreateSbtDeferredDraftCreate2Salt,
-  buildCreateSbtInviteLinks,
-  buildCreateSbtPasswordExportFile,
-  generateCreateSbtInviteNonces,
-  generateCreateSbtRandomHexString,
-  resolveCreateSbtInviteCodeList,
-  resolveCreateSbtPasswordGenerationCount,
-  resolveCreateSbtPredictablePasswordListDecision,
-} from './createSbtGroupPasswordHelpers';
-export type {
-  CreateSbtPasswordExportFile,
-} from './createSbtGroupPasswordHelpers';
-export {
-  areMetadataLockGateMapsEqual,
-  areStringArraysEqual,
-  buildCreateSbtMetadataLockSelectionState,
-  createEmptyMetadataLockGateIds,
-  getCreateSbtValidGateIds,
-  getMetadataFieldLockGateIds,
-  METADATA_LOCK_FIELDS,
-  normalizeCreateSbtMetadataLockGateIdsForValidGates,
-  normalizeMetadataLockGateIds,
-  resolveCreateSbtEncryptedFieldGateValue,
-  resolveCreateSbtLegacyDescriptionLockGateIds,
-  resolveCreateSbtMetadataFieldGateIds,
-  resolveCreateSbtRestoredMetadataLockGateIds,
-  writeCreateSbtEncryptedFieldGate,
-} from './createSbtGroupMetadataLockHelpers';
-export {
-  buildCreateSbtImageChooserStatusPatch,
-  buildCreateSbtImageFileClearPatch,
-  buildCreateSbtImageFilePatch,
-  buildCreateSbtImageLoadErrorPatch,
-  buildCreateSbtImageLoadReadyPatch,
-  buildCreateSbtImagePreviewState,
-  buildCreateSbtImageResetPatch,
-  buildCreateSbtImageUploadMethodPatch,
-  buildCreateSbtSelectedImageFilePatch,
-  getCanonicalCreateSbtMetadataImageUrl,
-  getFetchableCreateSbtImageUrl,
-  resolveCreateSbtMemoizedImageDataUrl,
-  resolveCreateSbtMetadataImageSource,
-} from './createSbtGroupImageHelpers';
-export {
-  buildCreateSbtProgressIndicatorState,
-  buildCreateSbtProgressStepClassName,
-  buildCreateSbtRenderState,
-  resolveCreateSbtActionDisplayState,
-  resolveCreateSbtBookmarkActionDisplayState,
-  resolveCreateSbtClearFormButtonState,
-  resolveCreateSbtCopyActionDisplayState,
-  resolveCreateSbtInfoDisplayState,
-  resolveCreateSbtMintOptionsDisplayState,
-  resolveCreateSbtPrimaryActionLabel,
-  resolveCreateSbtPrimaryButtonState,
-  resolveCreateSbtSuccessDisplayState,
-} from './createSbtGroupRenderStateHelpers';
-export {
-  buildCreateSbtActiveClassName,
-  buildCreateSbtActionLinkClassName,
-  buildCreateSbtCollapseHeaderClassName,
-  buildCreateSbtCollapseTogglePatch,
-  buildCreateSbtInlineFieldLockClassName,
-  buildCreateSbtTokenInfoMetaCardClassName,
-  resolveCreateSbtActionIconStyle,
-  resolveCreateSbtCollapseHeaderDisplayState,
-  resolveCreateSbtFailureIconStyle,
-  resolveCreateSbtHiddenQrDisplayState,
-  resolveCreateSbtShareableTooltipIconStyle,
-  resolveCreateSbtTooltipIconStyle,
-} from './createSbtGroupDisplayHelpers';
-export type {
-  BuildCreateSbtActionLinkClassNameArgs,
-  BuildCreateSbtActiveClassNameArgs,
-  BuildCreateSbtCollapseHeaderClassNameArgs,
-  BuildCreateSbtCollapseTogglePatchArgs,
-  BuildCreateSbtInlineFieldLockClassNameArgs,
-  BuildCreateSbtTokenInfoMetaCardClassNameArgs,
-  CreateSbtCollapseHeaderDisplayState,
-  CreateSbtHiddenQrDisplayState,
-  ResolveCreateSbtCollapseHeaderDisplayStateArgs,
-} from './createSbtGroupDisplayHelpers';
-export {
-  buildCreateSbtAccountDistributionSyncPatch,
-  buildCreateSbtAccountDistributionSyncStatePatch,
-  buildCreateSbtBooleanTogglePatch,
-  buildCreateSbtBookmarkedSbtsSetPatch,
-  buildCreateSbtCopiedLinkIndexPatch,
-  buildCreateSbtCopySuccessPatch,
-  buildCreateSbtCountdownStartPatch,
-  buildCreateSbtCountdownTickPatch,
-  buildCreateSbtDeferredSaveCompletePatch,
-  buildCreateSbtDeferredUploadFallbackPatch,
-  buildCreateSbtDistributionFieldPatch,
-  buildCreateSbtEditResetPatch,
-  buildCreateSbtErrorPatch,
-  buildCreateSbtExportFormatPatch,
-  buildCreateSbtGroupHashPatch,
-  buildCreateSbtInputChangePatch,
-  buildCreateSbtInviteLinksBackupPatch,
-  buildCreateSbtMetadataLockFallbackPatch,
-  buildCreateSbtMetadataLockGateIdsPatch,
-  buildCreateSbtMetadataLockSelectionPatch,
-  buildCreateSbtMintResetFailurePatch,
-  buildCreateSbtMintStartPatch,
-  buildCreateSbtMintSuccessPatch,
-  buildCreateSbtMintValidationFailurePatch,
-  buildCreateSbtNetworkChangePatch,
-  buildCreateSbtNumInviteLinksPatch,
-  buildCreateSbtOpenLockKeyPatch,
-  buildCreateSbtPasswordListPatch,
-  buildCreateSbtPredictedAddressBusyPatch,
-  buildCreateSbtPredictedAddressPatch,
-  buildCreateSbtShareableUrlPatch,
-  buildCreateSbtSymbolPatch,
-  normalizeComparableAddress,
-} from './createSbtGroupStatePatchHelpers';
-export {
-  buildCreateSbtAutoCreate2SaltSource,
-  buildCreateSbtDeterministicSymbol,
-  buildCreateSbtPredictableDeploySignature,
-  resolveCreateSbtPredictedAddressCacheHit,
-  resolveCreateSbtPredictedAddressDisplayText,
-  resolveCreateSbtPredictableAddressActive,
-  resolveCreateSbtPredictableDeployBaseState,
-} from './createSbtGroupPredictableDeployHelpers';
-export {
-  buildCreateSbtCurrentTagInputPatch,
-  buildCreateSbtDocumentIdHashList,
-  buildCreateSbtDocumentUrlAdditionPatch,
-  buildCreateSbtDocumentUrlRemovalPatch,
-  buildCreateSbtMetadataPreviewTagList,
-  buildCreateSbtRelevantDefaultTagSyncPatch,
-  buildCreateSbtRelevantDefaultTagSyncState,
-  buildCreateSbtTagAdditionState,
-  buildCreateSbtTagRemovalState,
-  buildCreateSbtTokenTagList,
-  buildEffectiveCreateSbtDocumentUrls,
-  buildUniqueTagList,
-  normalizeCreateSbtDocumentUrlDraft,
-  normalizeCreateSbtRestoredTags,
-  parseDefaultSbtTags,
-  removeCreateSbtDocumentUrlAtIndex,
-  resolveCreateSbtDocumentUrlInputState,
-  resolveCreateSbtTagInputState,
-} from './createSbtGroupContentAuthoringHelpers';
-export type {
-  BuildCreateSbtDocumentUrlAdditionPatchArgs,
-  BuildCreateSbtDocumentUrlRemovalPatchArgs,
-  CreateSbtDocumentUrlInputState,
-  CreateSbtRelevantDefaultTagSyncState,
-  CreateSbtTagAdditionState,
-  CreateSbtTagInputState,
-  CreateSbtTagRemovalState,
-  ResolveCreateSbtDocumentUrlInputStateArgs,
-  ResolveCreateSbtTagInputStateArgs,
-} from './createSbtGroupContentAuthoringHelpers';
-export type {
-  BuildCreateSbtAutoCreate2SaltSourceArgs,
-  BuildCreateSbtDeterministicSymbolArgs,
-  BuildCreateSbtPredictableDeploySignatureArgs,
-  CreateSbtDigestFn,
-  CreateSbtPredictableDeployBaseState,
-  CreateSbtPredictedAddressCacheHit,
-  ResolveCreateSbtPredictedAddressCacheHitArgs,
-  ResolveCreateSbtPredictedAddressDisplayTextArgs,
-  ResolveCreateSbtPredictableAddressActiveArgs,
-  ResolveCreateSbtPredictableDeployBaseStateArgs,
-} from './createSbtGroupPredictableDeployHelpers';
 
 const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
+export const METADATA_LOCK_FIELDS = Object.freeze(['name', 'description', 'tags', 'documentURLs', 'image']);
+
+export type NormalizedSessionContractRef = {
+  address?: string;
+  chainId?: number;
+};
 
 export type CreateSbtLitGateChainId = number | string | null;
 export type CreateSbtGateBoundary = NonNullable<Parameters<typeof normalizeGateMode>[0]> & Record<string, unknown> & {
@@ -361,6 +133,33 @@ export type CreateSbtGateOptionsResult = {
   gateMap: Record<string, CreateSbtMetadataLockGate>;
   gateOptions: CreateSbtMetadataLockGateOption[];
 };
+export type CreateSbtFormCachePayload = Record<string, unknown> & {
+  _imageDataUrl?: string;
+  sbtDistribution: Record<string, unknown>;
+};
+export type CreateSbtAuthoringChainOption = Record<string, unknown> & {
+  id?: string | number;
+  name?: string;
+};
+export type CreateSbtAuthoringChainState = {
+  chainId: number | null;
+  chain: CreateSbtAuthoringChainOption | 'not connected';
+};
+export type CreateSbtTagRemovalState = {
+  autoAppliedDefaultTags: unknown[];
+  dismissedDefaultTags: unknown[];
+  tags: unknown[];
+};
+export type CreateSbtTagAdditionState = CreateSbtTagRemovalState & {
+  currentTagInput: string;
+  showTagsInput: boolean;
+};
+type ResolveCreateSbtTagInputStateArgs = {
+  currentTagInput?: unknown;
+};
+type CreateSbtTagInputState = {
+  shouldShowAddTagButton: boolean;
+};
 type ResolveCreateSbtErrorBannerStateArgs = {
   error?: unknown;
 };
@@ -369,6 +168,31 @@ type CreateSbtErrorBannerState = {
   shouldRenderErrorBanner: boolean;
   style: Record<string, string | number>;
 };
+export type CreateSbtRelevantDefaultTagSyncState = {
+  autoAppliedDefaultTags: string[];
+  dismissedDefaultTags: unknown;
+  shouldUpdate: boolean;
+  showTagsInput: boolean;
+  tags: string[];
+};
+export type CreateSbtPasswordExportFile = {
+  content: string;
+  fileName: string;
+  mimeType: string;
+};
+type CreateSbtGroupPasswordEncoder = (code: unknown) => unknown;
+type CreateSbtAutoJoinUrlBuilder = (sbtAddress: unknown) => unknown;
+type CreateSbtGetRandomValues = (array: Uint8Array) => Uint8Array | number[];
+type CreateSbtRandomBytes = (length: number) => Uint8Array | number[];
+type CreateSbtBytesToNonce = (bytes: Uint8Array | number[]) => string;
+type CreateSbtDigestFn = (value: string) => string;
+type CreateSbtSessionContractsResolver = (chainId: unknown) => unknown;
+type CreateSbtSessionRegistryChainsResolver = () => unknown;
+type CreateSbtAuthoringChainUsabilityChecker = (chainId: unknown) => boolean;
+type CreateSbtSessionContractRefResolver = (args: {
+  contractKey: string;
+  sessionConfig?: Record<string, unknown> | null;
+}) => unknown;
 type BuildCreateSbtJsonPreviewDataArgs = {
   authoringChain?: CreateSbtAuthoringChainOption | null;
   autoJoinUrl?: unknown;
@@ -379,6 +203,48 @@ type BuildCreateSbtJsonPreviewDataArgs = {
   sbtName?: unknown;
   shareableUrl?: unknown;
   tokenURI?: unknown;
+};
+type BuildCreateSbtMetadataLockSelectionStateArgs = {
+  gateOptions?: unknown;
+  metadataLockGateIds?: unknown;
+};
+type CreateSbtMetadataLockSelectionState = {
+  descriptionSelectedGateIds: string[];
+  docsSelectedGateIds: string[];
+  imageSelectedGateIds: string[];
+  nameSelectedGateIds: string[];
+  tagsSelectedGateIds: string[];
+  validGateIds: unknown[];
+};
+type BuildCreateSbtImagePreviewStateArgs = {
+  imageChooserStatusText?: string;
+  imageChooserStatusTone?: CreateSbtImageStatusTone;
+  imageLoadError?: unknown;
+  sbtImageFile?: unknown;
+  sbtImageUrl?: unknown;
+  useImageUrl?: unknown;
+};
+type ShouldHideCreateSbtNetworkSelectorArgs = {
+  deferredDeploy?: unknown;
+  hideNetworkSelector?: unknown;
+};
+type ResolveCreateSbtMetadataImageSourceArgs = {
+  defaultImageUrl?: unknown;
+  getCanonicalMetadataImageUrl?: ((value: unknown) => string) | null;
+  sbtImageUrl?: unknown;
+  useImageUrl?: unknown;
+};
+type ResolveCreateSbtMetadataSessionSlugArgs = {
+  deferredDeployMode?: unknown;
+  effectiveSessionSlug?: unknown;
+  sbtLabel?: unknown;
+  sessionConfigSlug?: unknown;
+};
+type BuildCreateSbtAuthoringContractRefsArgs = {
+  getSessionContractsForChain?: CreateSbtSessionContractsResolver | null;
+  networkId?: unknown;
+  resolveSessionContractRef?: CreateSbtSessionContractRefResolver | null;
+  sessionConfig?: Record<string, unknown> | null;
 };
 type BuildCreateSbtGateOptionsFromConfigArgs = {
   chainIdFallback?: unknown;
@@ -419,6 +285,433 @@ type BuildCreateSbtGateOptionsFromSessionSourcesArgs = {
   chainIdFallback?: unknown;
   preferredSessionSlug?: unknown;
   sessionSources?: unknown[];
+};
+type ResolveCreateSbtAuthoringChainOptionsArgs = {
+  getSessionRegistryChains?: CreateSbtSessionRegistryChainsResolver | null;
+  hasUsableSbtFactoryForChain?: CreateSbtAuthoringChainUsabilityChecker | null;
+};
+type BuildCreateSbtDefaultDistributionStateArgs = {
+  account?: unknown;
+  authoringChain?: Partial<CreateSbtAuthoringChainState> | null;
+};
+type BuildCreateSbtAccountDistributionSyncStatePatchArgs = {
+  currentDistribution?: unknown;
+  syncPatch?: unknown;
+};
+type BuildCreateSbtAuthoringChainSyncStatePatchArgs = {
+  currentDistribution?: unknown;
+  syncPatch?: { network?: unknown; sbtDistributionNetwork?: unknown } | null;
+};
+type BuildCreateSbtResetFormStateArgs = BuildCreateSbtDefaultDistributionStateArgs & {
+  deferredCreate2SaltBuilder?: (() => unknown) | null;
+  deferredDeploy?: unknown;
+};
+type BuildCreateSbtInitialStateArgs = BuildCreateSbtResetFormStateArgs;
+type BuildCreateSbtCollapseTogglePatchArgs = {
+  section?: unknown;
+  state?: unknown;
+};
+type ResolveCreateSbtCollapseHeaderDisplayStateArgs = {
+  isCollapsed?: unknown;
+  title?: unknown;
+};
+type BuildCreateSbtCollapseHeaderClassNameArgs = {
+  baseClassName?: unknown;
+  openClassName?: unknown;
+  shouldUseOpenClass?: unknown;
+};
+type BuildCreateSbtActiveClassNameArgs = {
+  activeClassName?: unknown;
+  baseClassNames?: unknown;
+  shouldUseActiveClass?: unknown;
+};
+type BuildCreateSbtActionLinkClassNameArgs = {
+  actionClassName?: unknown;
+  linkClassName?: unknown;
+};
+type BuildCreateSbtInlineFieldLockClassNameArgs = {
+  baseClassName?: unknown;
+  inlineClassName?: unknown;
+};
+type BuildCreateSbtTokenInfoMetaCardClassNameArgs = {
+  fieldSectionClassName?: unknown;
+  metaCardClassName?: unknown;
+};
+type CreateSbtHiddenQrDisplayState = {
+  hiddenStyle: Record<string, string | number>;
+};
+type BuildCreateSbtDistributionFieldPatchArgs = {
+  fieldKey?: unknown;
+  fieldValue?: unknown;
+  state?: unknown;
+};
+type BuildCreateSbtDocumentUrlAdditionPatchArgs = {
+  documentURLs?: unknown;
+  documentUrl?: unknown;
+};
+type ResolveCreateSbtDocumentUrlInputStateArgs = {
+  documentURLs?: unknown;
+  documentUrl?: unknown;
+  maxDocumentUrls?: number;
+};
+type CreateSbtDocumentUrlInputState = {
+  canAddDocumentUrl: boolean;
+  documentUrlCount: number;
+};
+type BuildCreateSbtDocumentUrlRemovalPatchArgs = {
+  documentURLs?: unknown;
+  index?: unknown;
+};
+type BuildCreateSbtBooleanTogglePatchArgs = {
+  state?: unknown;
+  stateKey?: unknown;
+};
+type BuildCreateSbtCopySuccessPatchArgs = {
+  copied?: unknown;
+  stateKey?: unknown;
+};
+type BuildCreateSbtCopiedLinkIndexPatchArgs = {
+  index?: unknown;
+};
+type BuildCreateSbtOpenLockKeyPatchArgs = {
+  lockKey?: unknown;
+};
+type BuildCreateSbtGroupHashPatchArgs = {
+  groupHash?: unknown;
+};
+type BuildCreateSbtPasswordListPatchArgs = {
+  passwordList?: unknown;
+};
+type BuildCreateSbtBookmarkedSbtsSetPatchArgs = {
+  bookmarkedSbtsSet?: unknown;
+};
+type BuildCreateSbtPredictedAddressPatchArgs = {
+  predictedAddress?: unknown;
+  predictedAddressBusy?: unknown;
+  predictedAddressStatus?: unknown;
+};
+type BuildCreateSbtMintFailurePatchArgs = {
+  error?: unknown;
+};
+type BuildCreateSbtMintSuccessPatchArgs = {
+  passwordList?: unknown;
+  sbtAddress?: unknown;
+};
+type BuildCreateSbtEditResetPatchArgs = {
+  resetUploadState?: unknown;
+};
+type BuildCreateSbtErrorPatchArgs = {
+  error?: unknown;
+};
+type BuildCreateSbtMetadataLockGateIdsPatchArgs = {
+  metadataLockGateIds?: unknown;
+};
+type BuildCreateSbtMetadataLockSelectionPatchArgs = {
+  fieldKey?: unknown;
+  metadataLockGateIds?: unknown;
+  openLockKey?: unknown;
+  selectedGateIds?: unknown;
+  validGateIds?: unknown[];
+};
+type BuildCreateSbtMetadataLockFallbackPatchArgs = {
+  fallbackGateIds?: unknown;
+  fieldKey?: unknown;
+  lockKey?: unknown;
+  metadataLockGateIds?: unknown;
+};
+type BuildCreateSbtSymbolPatchArgs = {
+  sbtSymbol?: unknown;
+};
+type BuildCreateSbtShareableUrlPatchArgs = {
+  autoJoinUrl?: unknown;
+};
+type BuildCreateSbtInviteLinksBackupPatchArgs = {
+  sbtInviteBackupDate?: unknown;
+  sbtInviteLinks?: unknown;
+};
+type BuildCreateSbtNumInviteLinksPatchArgs = {
+  numInviteLinks?: unknown;
+};
+type BuildCreateSbtExportFormatPatchArgs = {
+  exportFormat?: unknown;
+};
+type BuildCreateSbtImageUploadMethodPatchArgs = {
+  useImageUrl?: unknown;
+};
+type BuildCreateSbtImageFilePatchArgs = {
+  clearLockedAsset?: unknown;
+  file?: unknown;
+};
+type BuildCreateSbtImageLoadErrorPatchArgs = {
+  clearFile?: unknown;
+  clearLockedAsset?: unknown;
+};
+type BuildCreateSbtInputChangePatchArgs = {
+  name?: string;
+  value?: unknown;
+};
+type BuildCreateSbtImageFileClearPatchArgs = {
+  clearLockedAsset?: unknown;
+};
+type BuildCreateSbtSelectedImageFilePatchArgs = {
+  file?: unknown;
+  sbtImageUrl?: unknown;
+  statusText?: unknown;
+  statusTone?: CreateSbtImageStatusTone;
+  useImageUrl?: unknown;
+};
+type BuildCreateSbtImageChooserStatusPatchArgs = {
+  statusText?: unknown;
+  statusTone?: CreateSbtImageStatusTone;
+};
+type BuildCreateSbtCountdownTickPatchArgs = {
+  state?: unknown;
+};
+type ResolveCreateSbtPreferredAuthoringChainIdArgs = {
+  availableChainIds?: unknown[];
+  network?: unknown;
+  resolvedSessionConfig?: Record<string, unknown> | null;
+  selectedChainId?: unknown;
+  sessionConfigOverride?: Record<string, unknown> | null;
+};
+type ResolveCreateSbtMetadataFieldGateIdsArgs = {
+  fieldKey?: string;
+  gatesLowerLabel?: unknown;
+  lockMap?: Record<string, unknown>;
+  validGateIds?: unknown[];
+};
+type ResolveCreateSbtEncryptedFieldGateValueArgs = {
+  selectedGateIds?: unknown;
+  validGateIds?: unknown[];
+};
+type WriteCreateSbtEncryptedFieldGateArgs = ResolveCreateSbtEncryptedFieldGateValueArgs & {
+  fieldKey?: unknown;
+  target?: Record<string, unknown> | null;
+};
+type CreateSbtImageStatusTone = 'default' | 'error' | 'loading';
+type CreateSbtImagePreviewState = {
+  effectiveImageStatusText: string;
+  effectiveImageStatusTone: CreateSbtImageStatusTone;
+  hasImagePreview: boolean;
+  hasPendingImagePreview: boolean;
+  previewFile: Blob | null;
+  showImagePreviewError: boolean;
+};
+type BuildCreateSbtAutoCreate2SaltSourceArgs = {
+  groupHash?: unknown;
+  sbtName?: unknown;
+  sessionSlug?: unknown;
+};
+type BuildCreateSbtDeterministicSymbolArgs = {
+  digest?: CreateSbtDigestFn;
+  saltSource?: unknown;
+};
+type ResolveCreateSbtPredictedAddressDisplayTextArgs = {
+  predictedAddress?: unknown;
+  predictedAddressBusy?: unknown;
+  unavailableReason?: unknown;
+  walletLowerLabel?: unknown;
+};
+type ResolveCreateSbtPredictableAddressActiveArgs = {
+  create2Salt?: unknown;
+  deferredDeployMode?: unknown;
+  predictableAddressEnabled?: unknown;
+};
+type ResolveCreateSbtPredictableDeployBaseStateArgs = {
+  account?: unknown;
+  burnAdmin?: unknown;
+  isLimited?: unknown;
+  limitedNumber?: unknown;
+  sbtName?: unknown;
+  walletLowerLabel?: unknown;
+};
+type CreateSbtPredictableDeployBaseState = {
+  adminAddress: string;
+  limitedCount: number;
+  sbtNameTrimmed: string;
+  unavailableReason: string;
+};
+type ResolveCreateSbtPredictedAddressCacheHitArgs = {
+  allowCached?: unknown;
+  cachedShapeSignature?: unknown;
+  predictedAddress?: unknown;
+  predictionSignature?: unknown;
+};
+type CreateSbtPredictedAddressCacheHit = {
+  predictedAddress: string;
+  predictionSignature: string;
+};
+type BuildCreateSbtPredictableDeploySignatureArgs = {
+  network?: unknown;
+  predictionShape?: unknown;
+  selectedAuthoringChainId?: unknown;
+};
+type CreateSbtDistributionOptionConfig = Record<string, unknown> & {
+  shouldUseActiveClass?: boolean;
+  selected?: boolean;
+  value?: unknown;
+};
+type BuildCreateSbtRenderStateArgs = {
+  create2Salt?: unknown;
+  deferredDeployMode?: unknown;
+  deferredSurfaceBg?: unknown;
+  descriptionSelectedGateIds?: unknown;
+  distributionConfigs?: unknown;
+  distributionOption?: unknown;
+  docsSelectedGateIds?: unknown;
+  documentURLs?: unknown;
+  documentUrl?: unknown;
+  imageSelectedGateIds?: unknown;
+  isLimited?: unknown;
+  nameSelectedGateIds?: unknown;
+  normalizeDocumentUrlDraft?: ((documentUrl: unknown) => unknown) | null;
+  sbtDescription?: unknown;
+  sbtImageFile?: unknown;
+  sbtImageUrl?: unknown;
+  sbtName?: unknown;
+  tags?: unknown;
+  tagsSelectedGateIds?: unknown;
+};
+type ResolveCreateSbtInfoDisplayStateArgs = {
+  documentURLs?: unknown;
+  imageSelectedGateIds?: unknown;
+  nameSelectedGateIds?: unknown;
+  tags?: unknown;
+};
+type ResolveCreateSbtMintOptionsDisplayStateArgs = {
+  hideNetworkSelector?: unknown;
+  isLimited?: unknown;
+  isTimeLimited?: unknown;
+  predictableAddressActive?: unknown;
+  predictedAddressBusy?: unknown;
+};
+type ResolveCreateSbtActionDisplayStateArgs = {
+  currentStep?: unknown;
+  distributionOption?: unknown;
+  mintingFailed?: unknown;
+  sbtMinted?: unknown;
+  startedMinting?: unknown;
+};
+type ResolveCreateSbtPrimaryActionLabelArgs = {
+  createActionLabel?: unknown;
+  currentStep?: unknown;
+  deferredDeployMode?: unknown;
+  mintedLabel?: unknown;
+  mintingLabel?: unknown;
+  sbtMinted?: unknown;
+};
+type ResolveCreateSbtPrimaryButtonStateArgs = {
+  sbtMinted?: unknown;
+  startedMinting?: unknown;
+};
+type CreateSbtPrimaryButtonState = {
+  disabled: boolean;
+};
+type ResolveCreateSbtClearFormButtonStateArgs = {
+  isDirty?: unknown;
+  sbtMinted?: unknown;
+};
+type CreateSbtClearFormButtonState = {
+  shouldShowClearFormButton: boolean;
+};
+type BuildCreateSbtProgressIndicatorStateArgs = {
+  currentStep?: unknown;
+  sbtMinted?: unknown;
+};
+type BuildCreateSbtProgressStepClassNameArgs = {
+  completed?: unknown;
+  completedClassName?: unknown;
+  pendingClassName?: unknown;
+};
+type CreateSbtProgressStepState = {
+  completed: boolean;
+  iconState: 'attention' | 'check' | 'spinner';
+  spin: boolean;
+};
+type CreateSbtProgressIndicatorState = {
+  imageUploadStep: CreateSbtProgressStepState;
+  mintStep: CreateSbtProgressStepState;
+  tokenUriUploadStep: CreateSbtProgressStepState;
+};
+type ResolveCreateSbtSuccessDisplayStateArgs = {
+  distributionOption?: unknown;
+  openMintAutoJoinUrl?: unknown;
+  passwordList?: unknown;
+  sbtInviteLinks?: unknown;
+  sbtMinted?: unknown;
+  showJson?: unknown;
+  startedMinting?: unknown;
+  tokenURI?: unknown;
+};
+type ResolveCreateSbtCopyActionDisplayStateArgs = {
+  copied?: unknown;
+  copiedLabel?: unknown;
+  defaultLabel?: unknown;
+};
+type ResolveCreateSbtBookmarkActionDisplayStateArgs = {
+  bookmarkedColor?: unknown;
+  bookmarkedSbtsSet?: unknown;
+  sbtAddress?: unknown;
+};
+type CreateSbtSuccessDisplayState = {
+  shouldRenderContractAddress: boolean;
+  shouldRenderGroupPasswordAutoJoin: boolean;
+  shouldRenderInviteLinks: boolean;
+  shouldRenderJsonPanel: boolean;
+  shouldRenderOpenMintAutoJoin: boolean;
+  shouldRenderPasswordRecovery: boolean;
+  shouldRenderSuccessPanel: boolean;
+  shouldRenderTokenUriLink: boolean;
+};
+type CreateSbtCopyActionDisplayState = {
+  label: string;
+  shouldRenderCopiedIcon: boolean;
+  shouldRenderDefaultIcon: boolean;
+};
+type CreateSbtBookmarkActionDisplayState = {
+  iconStyle: Record<string, string | undefined>;
+  isBookmarked: boolean;
+};
+type CreateSbtCollapseHeaderDisplayState = {
+  ariaExpanded: boolean;
+  ariaLabel: string;
+  shouldRenderCollapsedTitle: boolean;
+  shouldRenderClosedIcon: boolean;
+  shouldRenderOpenIcon: boolean;
+  shouldUseOpenClass: boolean;
+};
+type CreateSbtRenderState = {
+  createActionLabel: string;
+  distributionOptions: CreateSbtDistributionOptionConfig[];
+  headerTitle: string;
+  isDirty: boolean;
+  isLimitedWithPasswords: boolean;
+  isPasswordDistribution: boolean;
+  predictableAddressLocked: boolean;
+  rootSurfaceStyle?: Record<string, string>;
+};
+type CreateSbtInfoDisplayState = {
+  shouldRenderDocumentUrlList: boolean;
+  shouldRenderImageLockHelp: boolean;
+  shouldRenderNameLockHelp: boolean;
+  shouldRenderTagPills: boolean;
+};
+type CreateSbtMintOptionsDisplayState = {
+  shouldRenderLimitedNumberInput: boolean;
+  shouldRenderNetworkReadonly: boolean;
+  shouldRenderNetworkSelector: boolean;
+  shouldRenderPredictableAddressBusy: boolean;
+  shouldRenderPredictableAddressDetails: boolean;
+  shouldRenderTimeLimitedInput: boolean;
+  shouldUseLimitedOptionActiveClass: boolean;
+  shouldUsePredictableAddressActiveClass: boolean;
+  shouldUseTimeLimitedOptionActiveClass: boolean;
+};
+type CreateSbtActionDisplayState = {
+  shouldRenderGroupPasswordInput: boolean;
+  shouldRenderMintingFailureIcon: boolean;
+  shouldRenderProgressIndicator: boolean;
+  shouldRenderStartFreshButton: boolean;
 };
 
 export const isPlainObject = (value: unknown): value is Record<string, unknown> => (
@@ -498,6 +791,939 @@ export const shouldFallbackCreateSbtDeferredDraftUpload = (error: unknown): bool
     message === 'invalid address' ||
     message === 'invalid address.'
   );
+};
+
+export const buildSessionRoutePath = (slugRaw?: string, basePath?: string): string => {
+  const slug = normalizeSessionSlug(slugRaw || '');
+  const normalizedBasePath = String(basePath || '').replace(/\/+$/, '');
+  return normalizedBasePath + (slug ? `/session/${encodeURIComponent(slug)}` : '/session');
+};
+
+export const buildCreateSbtAutoJoinUrl = ({
+  basePath = '',
+  origin = '',
+  sbtAddress = '',
+  sessionSlug = '',
+}: {
+  basePath?: unknown;
+  origin?: unknown;
+  sbtAddress?: unknown;
+  sessionSlug?: unknown;
+} = {}): string => {
+  const normalizedOrigin = String(origin || '').replace(/\/+$/, '');
+  const normalizedAddress = String(sbtAddress || '').trim();
+  if (!normalizedOrigin || !normalizedAddress) return '';
+  const sessionPath = buildSessionRoutePath(String(sessionSlug || ''), String(basePath || ''));
+  return `${normalizedOrigin}${sessionPath}?sbt=${encodeURIComponent(normalizedAddress)}&auto=1`;
+};
+
+export const resolveCreateSbtOpenMintAutoJoinUrl = ({
+  autoJoinUrl = '',
+  buildSessionAutoJoinUrl = null,
+  distributionOption = '',
+  sbtAddress = '',
+}: {
+  autoJoinUrl?: unknown;
+  buildSessionAutoJoinUrl?: CreateSbtAutoJoinUrlBuilder | null;
+  distributionOption?: unknown;
+  sbtAddress?: unknown;
+} = {}): string => {
+  if (distributionOption !== 'anyoneCanMint') return '';
+  const cached = String(autoJoinUrl || '');
+  if (cached) return cached;
+  return typeof buildSessionAutoJoinUrl === 'function'
+    ? String(buildSessionAutoJoinUrl(sbtAddress) || '')
+    : '';
+};
+
+export const buildCreateSbtAutoCreate2SaltSource = ({
+  groupHash = '',
+  sbtName = '',
+  sessionSlug = '',
+}: BuildCreateSbtAutoCreate2SaltSourceArgs = {}): string => {
+  const normalizedSessionSlug = normalizeSessionSlug(sessionSlug || '') || 'general';
+  const rawName = String(sbtName || '').trim().toLowerCase();
+  const nameSlug = rawName
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  if (nameSlug) return `${normalizedSessionSlug}/${nameSlug}`;
+  const hashSuffix = String(groupHash || '').replace(/^0x/i, '').slice(0, 10) || 'draft';
+  return `${normalizedSessionSlug}/group-${hashSuffix}`;
+};
+
+export const buildCreateSbtDeterministicSymbol = ({
+  digest = () => '',
+  saltSource = '',
+}: BuildCreateSbtDeterministicSymbolArgs = {}): string => {
+  const source = String(saltSource || 'context-engine-sbt');
+  const digestValue = String(digest(source) || '').replace(/^0x/i, '');
+  return `CE-SBT-${digestValue.slice(0, 6).toUpperCase()}`;
+};
+
+export const resolveCreateSbtPredictedAddressDisplayText = ({
+  predictedAddress = '',
+  predictedAddressBusy = false,
+  unavailableReason = '',
+  walletLowerLabel = 'wallet',
+}: ResolveCreateSbtPredictedAddressDisplayTextArgs = {}): string => {
+  const resolvedAddress = String(predictedAddress || '').trim();
+  if (resolvedAddress) return resolvedAddress;
+  if (predictedAddressBusy) return 'Pending…';
+
+  const reason = String(unavailableReason || '').trim();
+  if (reason === 'Enter a group name to preview the address.') {
+    return 'Pending group name…';
+  }
+  const walletLower = String(walletLowerLabel || 'wallet').trim() || 'wallet';
+  if (reason === `Connect a ${walletLower} to preview the address.`) {
+    return 'Pending admin account…';
+  }
+
+  return 'Pending…';
+};
+
+export const resolveCreateSbtPredictableAddressActive = ({
+  create2Salt = '',
+  deferredDeployMode = false,
+  predictableAddressEnabled = false,
+}: ResolveCreateSbtPredictableAddressActiveArgs = {}): boolean => (
+  !!deferredDeployMode ||
+  !!predictableAddressEnabled ||
+  !!String(create2Salt || '').trim()
+);
+
+export const resolveCreateSbtPredictableDeployBaseState = ({
+  account = '',
+  burnAdmin = '',
+  isLimited = false,
+  limitedNumber = 0,
+  sbtName = '',
+  walletLowerLabel = 'wallet',
+}: ResolveCreateSbtPredictableDeployBaseStateArgs = {}): CreateSbtPredictableDeployBaseState => {
+  const sbtNameTrimmed = String(sbtName || '').trim();
+  const adminAddress = String(burnAdmin || account || '').trim();
+  const limitedCountRaw = isLimited ? Number(limitedNumber) : 0;
+  const limitedCount = Number.isFinite(limitedCountRaw) ? Math.floor(limitedCountRaw) : 0;
+  const walletLower = String(walletLowerLabel || 'wallet').trim() || 'wallet';
+  let unavailableReason = '';
+  if (!sbtNameTrimmed) {
+    unavailableReason = 'Enter a group name to preview the address.';
+  } else if (!adminAddress) {
+    unavailableReason = `Connect a ${walletLower} to preview the address.`;
+  } else if (isLimited && limitedCount <= 0) {
+    unavailableReason = 'Set a positive mint limit to preview the address.';
+  }
+  return {
+    adminAddress,
+    limitedCount,
+    sbtNameTrimmed,
+    unavailableReason,
+  };
+};
+
+export const resolveCreateSbtPredictedAddressCacheHit = ({
+  allowCached = false,
+  cachedShapeSignature = '',
+  predictedAddress = '',
+  predictionSignature = '',
+}: ResolveCreateSbtPredictedAddressCacheHitArgs = {}): CreateSbtPredictedAddressCacheHit | null => {
+  const signature = String(predictionSignature || '');
+  const cachedSignature = String(cachedShapeSignature || '');
+  const cachedPredictedAddress = String(predictedAddress || '').trim();
+  if (allowCached !== true || !signature || signature !== cachedSignature || !cachedPredictedAddress) {
+    return null;
+  }
+  return {
+    predictedAddress: cachedPredictedAddress,
+    predictionSignature: signature,
+  };
+};
+
+export const buildCreateSbtPredictableDeploySignature = ({
+  network = null,
+  predictionShape = null,
+  selectedAuthoringChainId = null,
+}: BuildCreateSbtPredictableDeploySignatureArgs = {}): string => {
+  if (!isPlainObject(predictionShape)) return '';
+  const groupCfg = isPlainObject(predictionShape.groupCfg)
+    ? predictionShape.groupCfg
+    : {};
+  const contracts = isPlainObject(groupCfg.contracts) ? groupCfg.contracts : {};
+  const sbtFactory = isPlainObject(contracts.sbtFactory) ? contracts.sbtFactory : {};
+  const networkRecord = isPlainObject(network) ? network : {};
+  const sbtFactoryAddress = String(
+    sbtFactory.address ||
+    groupCfg.sbtFactoryAddress ||
+    ''
+  ).trim().toLowerCase();
+  const networkChainId = Number(
+    groupCfg.networkChainId ||
+    sbtFactory.chainId ||
+    selectedAuthoringChainId ||
+    networkRecord.id ||
+    networkRecord.chainId ||
+    0
+  ) || 0;
+
+  return JSON.stringify({
+    contractName: String(predictionShape.contractName || '').trim(),
+    symbol: String(predictionShape.symbol || '').trim(),
+    limitedNumber: Number(predictionShape.limitedNumber || 0) || 0,
+    adminAddress: String(predictionShape.adminAddress || '').trim().toLowerCase(),
+    mintingEndTimeUnix: Number(predictionShape.mintingEndTimeUnix || 0) || 0,
+    mintModeOnChain: Number(predictionShape.mintModeOnChain ?? 0) || 0,
+    hasPasswordMintOnChain: predictionShape.hasPasswordMintOnChain === true,
+    burnAuthEnum: Number(predictionShape.burnAuthEnum || 0) || 0,
+    hashedPasswords: Array.isArray(predictionShape.hashedPasswords) ? predictionShape.hashedPasswords : [],
+    create2Salt: String(predictionShape.create2Salt || '').trim(),
+    initializeGroupPasswordHash: predictionShape.initializeGroupPasswordHash === true,
+    sbtFactoryAddress,
+    networkChainId,
+  });
+};
+
+export const resolveCreateSbtEffectiveSessionSlug = ({
+  pathname = '',
+  props = {},
+}: {
+  pathname?: unknown;
+  props?: unknown;
+} = {}): string => {
+  const propsRecord = isPlainObject(props) ? props : {};
+  const slugFromProps = propsRecord.sessionSlug || propsRecord.slug || '';
+  if (slugFromProps) return String(slugFromProps);
+  const path = String(pathname || '');
+  const parts = path.split('/').filter(Boolean);
+  if (parts[0] === 'demo' && parts[1]) return parts[1];
+  if (parts[0] === 'sbts' && parts[1] && parts[1] !== 'new') return parts[1];
+  return '';
+};
+
+export const resolveCreateSbtMetadataSessionSlug = ({
+  deferredDeployMode = false,
+  effectiveSessionSlug = '',
+  sbtLabel = 'SBT',
+  sessionConfigSlug = '',
+}: ResolveCreateSbtMetadataSessionSlugArgs = {}): string => {
+  const metadataSessionSlug = normalizeSessionSlug(
+    effectiveSessionSlug || sessionConfigSlug || ''
+  );
+  if (deferredDeployMode && !metadataSessionSlug) {
+    throw new Error(`Set the session URL before adding this ${String(sbtLabel || 'SBT')} to the session.`);
+  }
+  return metadataSessionSlug;
+};
+
+export const normalizePositiveChainId = (value: unknown): number | null => {
+  const id = Number(value || 0);
+  return Number.isFinite(id) && id > 0 ? id : null;
+};
+
+export const resolveCreateSbtCachedDistributionChainId = (distributionPayload: unknown = {}): number | null => {
+  const distribution = isPlainObject(distributionPayload) ? distributionPayload : {};
+  const cachedNetwork = distribution.network;
+  const cachedNetworkRecord = isPlainObject(cachedNetwork) ? cachedNetwork : {};
+  return normalizePositiveChainId(
+    cachedNetworkRecord.id ||
+    cachedNetworkRecord.chainId ||
+    cachedNetwork
+  );
+};
+
+export const buildCreateSbtAuthoringChainSyncPatch = ({
+  currentDistributionNetwork = null,
+  currentNetwork = '',
+  syncedAuthoringChain = {},
+}: {
+  currentDistributionNetwork?: unknown;
+  currentNetwork?: unknown;
+  syncedAuthoringChain?: unknown;
+} = {}): { network: unknown; sbtDistributionNetwork: unknown } | null => {
+  const syncedChain = isPlainObject(syncedAuthoringChain) ? syncedAuthoringChain : {};
+  const syncedChainId = syncedChain.chainId;
+  const distributionNetwork = isPlainObject(currentDistributionNetwork)
+    ? currentDistributionNetwork
+    : {};
+  const currentDistributionChainId = normalizePositiveChainId(
+    distributionNetwork.id ||
+    distributionNetwork.chainId ||
+    currentDistributionNetwork
+  );
+  const nextDistributionNetwork = syncedChain.chain;
+  const syncedChainName = isPlainObject(nextDistributionNetwork)
+    ? nextDistributionNetwork.name
+    : undefined;
+  if (
+    (currentNetwork || '') !== (syncedChainId || '') ||
+    currentDistributionChainId !== syncedChainId ||
+    distributionNetwork.name !== syncedChainName
+  ) {
+    return {
+      network: syncedChainId || '',
+      sbtDistributionNetwork: nextDistributionNetwork,
+    };
+  }
+  return null;
+};
+
+export const buildCreateSbtAuthoringChainSyncStatePatch = ({
+  currentDistribution = {},
+  syncPatch = null,
+}: BuildCreateSbtAuthoringChainSyncStatePatchArgs = {}): Record<string, unknown> | null => {
+  if (!syncPatch) return null;
+  return {
+    network: syncPatch.network,
+    sbtDistribution: {
+      ...(currentDistribution as Record<string, unknown>),
+      network: syncPatch.sbtDistributionNetwork,
+    },
+  };
+};
+
+export const buildCreateSbtRestoredDistributionState = ({
+  currentDistribution = {},
+  distributionPayload = {},
+  restoredAuthoringChain = {},
+}: {
+  currentDistribution?: unknown;
+  distributionPayload?: unknown;
+  restoredAuthoringChain?: unknown;
+} = {}): Record<string, unknown> => {
+  const current = isPlainObject(currentDistribution) ? currentDistribution : {};
+  const payload = isPlainObject(distributionPayload) ? distributionPayload : {};
+  const chainState = isPlainObject(restoredAuthoringChain) ? restoredAuthoringChain : {};
+  const nextDistribution = {
+    ...current,
+    ...payload,
+  };
+  const rawMintingEndTime = payload.mintingEndTime;
+  nextDistribution.mintingEndTime = rawMintingEndTime
+    ? new Date(rawMintingEndTime as string | number | Date)
+    : null;
+  nextDistribution.network = chainState.chain;
+  return nextDistribution;
+};
+
+export const resolveCreateSbtRestoredDeferredCreate2Salt = (
+  value: unknown = '',
+  fallbackValue: unknown = ''
+): unknown => (
+  typeof value === 'string' && value.trim()
+    ? value
+    : fallbackValue
+);
+
+export const resolveCreateSbtRestoredPredictableAddressEnabled = (
+  value: unknown = null,
+  fallbackValue: unknown = false
+): boolean => (
+  typeof value === 'boolean' ? value : !!fallbackValue
+);
+
+export const buildCreateSbtGroupPasswordPredictableExitPatch = ({
+  autoCreate2SaltForGroupPassword = false,
+  nextDistributionOption = '',
+  prevDistributionOption = '',
+}: {
+  autoCreate2SaltForGroupPassword?: unknown;
+  nextDistributionOption?: unknown;
+  prevDistributionOption?: unknown;
+} = {}): Record<string, unknown> | null => {
+  if (
+    prevDistributionOption !== 'groupPassword' ||
+    nextDistributionOption === 'groupPassword' ||
+    !autoCreate2SaltForGroupPassword
+  ) {
+    return null;
+  }
+
+  return {
+    create2Salt: '',
+    predictableAddressEnabled: false,
+  };
+};
+
+export const buildCreateSbtGroupPasswordPredictableEntryPatch = ({
+  autoSalt = '',
+  isDeferredDeployMode = false,
+  isPredictableAddressEnabled = false,
+  nextDistributionOption = '',
+  prevDistributionOption = '',
+}: {
+  autoSalt?: unknown;
+  isDeferredDeployMode?: unknown;
+  isPredictableAddressEnabled?: unknown;
+  nextDistributionOption?: unknown;
+  prevDistributionOption?: unknown;
+} = {}): Record<string, unknown> | null => {
+  if (
+    nextDistributionOption !== 'groupPassword' ||
+    prevDistributionOption === 'groupPassword' ||
+    isDeferredDeployMode ||
+    isPredictableAddressEnabled ||
+    !autoSalt
+  ) {
+    return null;
+  }
+
+  return {
+    create2Salt: autoSalt,
+    predictableAddressEnabled: true,
+  };
+};
+
+export const buildCreateSbtRestoredScalarState = ({
+  currentExportFormat = '',
+  currentNumInviteLinks = 0,
+  parsed = {},
+}: {
+  currentExportFormat?: unknown;
+  currentNumInviteLinks?: unknown;
+  parsed?: unknown;
+} = {}): Record<string, unknown> => {
+  const source = isPlainObject(parsed) ? parsed : {};
+  return {
+    sbtName: source.sbtName || '',
+    sbtDescription: source.sbtDescription || '',
+    sbtImageUrl: source.sbtImageUrl || '',
+    useImageUrl: !!source.useImageUrl,
+    documentIDHashes: source.documentIDHashes || '',
+    documentURLs: Array.isArray(source.documentURLs) ? source.documentURLs : [],
+    groupPassword: source.groupPassword || '',
+    autoAppliedDefaultTags: Array.isArray(source.autoAppliedDefaultTags) ? source.autoAppliedDefaultTags : [],
+    dismissedDefaultTags: Array.isArray(source.dismissedDefaultTags) ? source.dismissedDefaultTags : [],
+    numInviteLinks: typeof source.numInviteLinks === 'number' ? source.numInviteLinks : currentNumInviteLinks,
+    exportFormat: source.exportFormat || currentExportFormat,
+    create2Salt: source.create2Salt || '',
+  };
+};
+
+export const buildCreateSbtRestoredCollapseState = ({
+  currentDistributionOptionsCollapsed = false,
+  currentMintOptionsCollapsed = false,
+  shouldExpandSections = false,
+}: {
+  currentDistributionOptionsCollapsed?: unknown;
+  currentMintOptionsCollapsed?: unknown;
+  shouldExpandSections?: unknown;
+} = {}): Record<string, boolean> => ({
+  tokenInfoCollapsed: false,
+  mintOptionsCollapsed: shouldExpandSections ? false : !!currentMintOptionsCollapsed,
+  distributionOptionsCollapsed: shouldExpandSections ? false : !!currentDistributionOptionsCollapsed,
+});
+
+export const buildCreateSbtCollapseTogglePatch = ({
+  section = '',
+  state = {},
+}: BuildCreateSbtCollapseTogglePatchArgs = {}): Record<string, boolean> => {
+  const sectionKey = String(section || '');
+  const source = isPlainObject(state) ? state : {};
+  return {
+    [sectionKey]: !source[sectionKey],
+  };
+};
+
+export const resolveCreateSbtCollapseHeaderDisplayState = ({
+  isCollapsed = false,
+  title = '',
+}: ResolveCreateSbtCollapseHeaderDisplayStateArgs = {}): CreateSbtCollapseHeaderDisplayState => {
+  const collapsed = !!isCollapsed;
+  const normalizedTitle = String(title || '');
+  return {
+    ariaExpanded: !collapsed,
+    ariaLabel: `${collapsed ? 'Expand' : 'Collapse'} ${normalizedTitle}`,
+    shouldRenderCollapsedTitle: collapsed,
+    shouldRenderClosedIcon: collapsed,
+    shouldRenderOpenIcon: !collapsed,
+    shouldUseOpenClass: !collapsed,
+  };
+};
+
+export const buildCreateSbtCollapseHeaderClassName = ({
+  baseClassName = '',
+  openClassName = '',
+  shouldUseOpenClass = false,
+}: BuildCreateSbtCollapseHeaderClassNameArgs = {}): string => ([
+  String(baseClassName || ''),
+  shouldUseOpenClass ? String(openClassName || '') : '',
+].filter(Boolean).join(' '));
+
+export const buildCreateSbtActiveClassName = ({
+  activeClassName = '',
+  baseClassNames = [],
+  shouldUseActiveClass = false,
+}: BuildCreateSbtActiveClassNameArgs = {}): string => {
+  const baseNames = Array.isArray(baseClassNames) ? baseClassNames : [baseClassNames];
+  return [
+    ...baseNames.map((className) => String(className || '')),
+    shouldUseActiveClass ? String(activeClassName || '') : '',
+  ].filter(Boolean).join(' ');
+};
+
+export const resolveCreateSbtTooltipIconStyle = (): Record<string, number> => ({
+  opacity: 0.5,
+});
+
+export const resolveCreateSbtActionIconStyle = (): Record<string, string> => ({
+  marginRight: '5px',
+});
+
+export const resolveCreateSbtFailureIconStyle = (): Record<string, string> => ({
+  color: 'red',
+});
+
+export const resolveCreateSbtShareableTooltipIconStyle = (): Record<string, string | number> => ({
+  opacity: 0.5,
+  marginLeft: '8px',
+  fontSize: '0.8em',
+});
+
+export const buildCreateSbtActionLinkClassName = ({
+  actionClassName = '',
+  linkClassName = '',
+}: BuildCreateSbtActionLinkClassNameArgs = {}): string => ([
+  String(actionClassName || ''),
+  String(linkClassName || ''),
+].filter(Boolean).join(' '));
+
+export const buildCreateSbtInlineFieldLockClassName = ({
+  baseClassName = '',
+  inlineClassName = '',
+}: BuildCreateSbtInlineFieldLockClassNameArgs = {}): string => ([
+  String(baseClassName || ''),
+  String(inlineClassName || ''),
+].filter(Boolean).join(' '));
+
+export const buildCreateSbtTokenInfoMetaCardClassName = ({
+  fieldSectionClassName = '',
+  metaCardClassName = '',
+}: BuildCreateSbtTokenInfoMetaCardClassNameArgs = {}): string => ([
+  String(fieldSectionClassName || ''),
+  String(metaCardClassName || ''),
+].filter(Boolean).join(' '));
+
+export const resolveCreateSbtHiddenQrDisplayState = (): CreateSbtHiddenQrDisplayState => ({
+  hiddenStyle: {
+    position: 'absolute',
+    opacity: 0,
+    pointerEvents: 'none',
+    zIndex: -1,
+    width: '1px',
+    height: '1px',
+    overflow: 'hidden',
+  },
+});
+
+export const buildCreateSbtDistributionFieldPatch = ({
+  fieldKey = '',
+  fieldValue = null,
+  state = {},
+}: BuildCreateSbtDistributionFieldPatchArgs = {}): Record<string, unknown> => {
+  const stateRecord = isPlainObject(state) ? state : {};
+  const distributionSource = stateRecord.sbtDistribution;
+  const previousDistribution = distributionSource !== null && typeof distributionSource === 'object'
+    ? distributionSource as Record<string, unknown>
+    : {};
+  return {
+    sbtDistribution: {
+      ...previousDistribution,
+      [String(fieldKey || '')]: fieldValue,
+    },
+  };
+};
+
+export const buildCreateSbtNetworkChangePatch = ({
+  chain = null,
+  currentDistribution = {},
+  network = '',
+}: {
+  chain?: unknown;
+  currentDistribution?: unknown;
+  network?: unknown;
+} = {}): Record<string, unknown> => {
+  const distribution = isPlainObject(currentDistribution) ? currentDistribution : {};
+  return {
+    network,
+    sbtDistribution: {
+      ...distribution,
+      network: chain,
+    },
+  };
+};
+
+export const buildCreateSbtBooleanTogglePatch = ({
+  state = {},
+  stateKey = '',
+}: BuildCreateSbtBooleanTogglePatchArgs = {}): Record<string, boolean> => {
+  const key = String(stateKey || '');
+  const source = isPlainObject(state) ? state : {};
+  return {
+    [key]: !source[key],
+  };
+};
+
+export const buildCreateSbtCopySuccessPatch = ({
+  copied = true,
+  stateKey = 'copyLinkSuccess',
+}: BuildCreateSbtCopySuccessPatchArgs = {}): Record<string, boolean> => {
+  const key = String(stateKey || 'copyLinkSuccess');
+  return {
+    [key]: copied === true,
+  };
+};
+
+export const buildCreateSbtCopiedLinkIndexPatch = ({
+  index = null,
+}: BuildCreateSbtCopiedLinkIndexPatchArgs = {}): Record<string, unknown> => ({
+  copiedLinkIndex: index,
+});
+
+export const buildCreateSbtOpenLockKeyPatch = ({
+  lockKey = '',
+}: BuildCreateSbtOpenLockKeyPatchArgs = {}): Record<string, string> => ({
+  openLockKey: String(lockKey ?? ''),
+});
+
+export const buildCreateSbtGroupHashPatch = ({
+  groupHash = '',
+}: BuildCreateSbtGroupHashPatchArgs = {}): Record<string, string> => ({
+  groupHash: String(groupHash ?? ''),
+});
+
+export const buildCreateSbtPasswordListPatch = ({
+  passwordList = [],
+}: BuildCreateSbtPasswordListPatchArgs = {}): Record<string, unknown[]> => ({
+  passwordList: Array.isArray(passwordList) ? passwordList : [],
+});
+
+export const buildCreateSbtBookmarkedSbtsSetPatch = ({
+  bookmarkedSbtsSet = new Set<string>(),
+}: BuildCreateSbtBookmarkedSbtsSetPatchArgs = {}): Record<string, Set<string>> => ({
+  bookmarkedSbtsSet: bookmarkedSbtsSet instanceof Set
+    ? bookmarkedSbtsSet as Set<string>
+    : new Set<string>(),
+});
+
+export const buildCreateSbtPredictedAddressBusyPatch = (): Record<string, unknown> => ({
+  predictedAddressBusy: true,
+  predictedAddressStatus: 'Calculating address…',
+});
+
+export const buildCreateSbtPredictedAddressPatch = ({
+  predictedAddress = '',
+  predictedAddressBusy = false,
+  predictedAddressStatus = '',
+}: BuildCreateSbtPredictedAddressPatchArgs = {}): Record<string, unknown> => ({
+  predictedAddress: String(predictedAddress ?? ''),
+  predictedAddressStatus: String(predictedAddressStatus ?? ''),
+  predictedAddressBusy: predictedAddressBusy === true,
+});
+
+export const buildCreateSbtMintResetFailurePatch = ({
+  error = '',
+}: BuildCreateSbtMintFailurePatchArgs = {}): Record<string, unknown> => ({
+  mintingFailed: true,
+  startedMinting: false,
+  currentStep: 0,
+  error,
+});
+
+export const buildCreateSbtDeferredSaveCompletePatch = (): Record<string, unknown> => ({
+  startedMinting: false,
+  mintingFailed: false,
+  currentStep: 0,
+  error: '',
+});
+
+export const buildCreateSbtDeferredUploadFallbackPatch = (): Record<string, unknown> => ({
+  tokenURI: '',
+  tokenUriUploaded: false,
+  ...buildCreateSbtDeferredSaveCompletePatch(),
+});
+
+export const buildCreateSbtMintValidationFailurePatch = ({
+  error = '',
+}: BuildCreateSbtMintFailurePatchArgs = {}): Record<string, unknown> => ({
+  mintingFailed: true,
+  error,
+});
+
+export const buildCreateSbtMintSuccessPatch = ({
+  passwordList = [],
+  sbtAddress = '',
+}: BuildCreateSbtMintSuccessPatchArgs = {}): Record<string, unknown> => ({
+  sbtMinted: true,
+  sbtAddress,
+  currentStep: 3,
+  passwordList: Array.isArray(passwordList) ? passwordList : [],
+});
+
+export const buildCreateSbtEditResetPatch = ({
+  resetUploadState = true,
+}: BuildCreateSbtEditResetPatchArgs = {}): Record<string, unknown> => ({
+  sbtMinted: false,
+  sbtAddress: '',
+  currentStep: 0,
+  startedMinting: false,
+  mintingFailed: false,
+  error: '',
+  ...(resetUploadState === true
+    ? {
+      imageUploaded: false,
+      tokenUriUploaded: false,
+    }
+    : {}),
+});
+
+export const buildCreateSbtErrorPatch = ({
+  error = '',
+}: BuildCreateSbtErrorPatchArgs = {}): Record<string, unknown> => ({
+  error,
+});
+
+export const buildCreateSbtMintStartPatch = (): Record<string, unknown> => ({
+  startedMinting: true,
+  mintingFailed: false,
+  error: '',
+});
+
+export const buildCreateSbtMetadataLockGateIdsPatch = ({
+  metadataLockGateIds = {},
+}: BuildCreateSbtMetadataLockGateIdsPatchArgs = {}): Record<string, unknown> => ({
+  metadataLockGateIds,
+});
+
+export const buildCreateSbtMetadataLockSelectionPatch = ({
+  fieldKey = '',
+  metadataLockGateIds = {},
+  openLockKey = '',
+  selectedGateIds = [],
+  validGateIds = [],
+}: BuildCreateSbtMetadataLockSelectionPatchArgs = {}): Record<string, unknown> => {
+  const normalized = normalizeCreateSbtSelectedGateIds(selectedGateIds, validGateIds);
+  return {
+    metadataLockGateIds: {
+      ...normalizeMetadataLockGateIds(metadataLockGateIds),
+      [String(fieldKey || '')]: normalized,
+    },
+    openLockKey: normalized.length ? openLockKey : '',
+  };
+};
+
+export const buildCreateSbtMetadataLockFallbackPatch = ({
+  fallbackGateIds = [],
+  fieldKey = '',
+  lockKey = '',
+  metadataLockGateIds = {},
+}: BuildCreateSbtMetadataLockFallbackPatchArgs = {}): Record<string, unknown> => ({
+  metadataLockGateIds: {
+    ...normalizeMetadataLockGateIds(metadataLockGateIds),
+    [String(fieldKey || '')]: Array.isArray(fallbackGateIds) ? fallbackGateIds : [],
+  },
+  openLockKey: lockKey,
+});
+
+export const buildCreateSbtCountdownStartPatch = (): Record<string, unknown> => ({
+  countdownActive: true,
+  countdown: 12,
+});
+
+export const buildCreateSbtSymbolPatch = ({
+  sbtSymbol = '',
+}: BuildCreateSbtSymbolPatchArgs = {}): Record<string, unknown> => ({
+  sbtSymbol: String(sbtSymbol ?? ''),
+});
+
+export const buildCreateSbtShareableUrlPatch = ({
+  autoJoinUrl = '',
+}: BuildCreateSbtShareableUrlPatchArgs = {}): Record<string, unknown> => {
+  const url = String(autoJoinUrl ?? '');
+  return {
+    shareableUrl: url,
+    autoJoinUrl: url,
+  };
+};
+
+export const buildCreateSbtInviteLinksBackupPatch = ({
+  sbtInviteBackupDate = '',
+  sbtInviteLinks = [],
+}: BuildCreateSbtInviteLinksBackupPatchArgs = {}): Record<string, unknown> => ({
+  sbtInviteLinks,
+  sbtInviteBackupDate,
+});
+
+export const buildCreateSbtNumInviteLinksPatch = ({
+  numInviteLinks = '',
+}: BuildCreateSbtNumInviteLinksPatchArgs = {}): Record<string, unknown> => ({
+  numInviteLinks,
+});
+
+export const buildCreateSbtExportFormatPatch = ({
+  exportFormat = '',
+}: BuildCreateSbtExportFormatPatchArgs = {}): Record<string, string> => ({
+  exportFormat: String(exportFormat ?? ''),
+});
+
+export const buildCreateSbtImageUploadMethodPatch = ({
+  useImageUrl = false,
+}: BuildCreateSbtImageUploadMethodPatchArgs = {}): Record<string, unknown> => ({
+  useImageUrl: !!useImageUrl,
+  sbtImageFile: null,
+  sbtImageUrl: '',
+  imageLoadError: false,
+  imageChooserStatusText: '',
+  imageChooserStatusTone: 'default',
+  lockedImageAsset: null,
+});
+
+export const buildCreateSbtImageResetPatch = (): Record<string, unknown> => ({
+  ...buildCreateSbtImageUploadMethodPatch({ useImageUrl: false }),
+});
+
+export const buildCreateSbtImageFilePatch = ({
+  clearLockedAsset = false,
+  file = null,
+}: BuildCreateSbtImageFilePatchArgs = {}): Record<string, unknown> => ({
+  sbtImageFile: file,
+  imageLoadError: false,
+  ...(clearLockedAsset === true ? { lockedImageAsset: null } : {}),
+});
+
+export const buildCreateSbtImageLoadErrorPatch = ({
+  clearFile = true,
+  clearLockedAsset = false,
+}: BuildCreateSbtImageLoadErrorPatchArgs = {}): Record<string, unknown> => ({
+  imageLoadError: true,
+  ...(clearFile === true ? { sbtImageFile: null } : {}),
+  ...(clearLockedAsset === true ? { lockedImageAsset: null } : {}),
+});
+
+export const buildCreateSbtImageLoadReadyPatch = (): Record<string, unknown> => ({
+  imageLoadError: false,
+});
+
+export const buildCreateSbtInputChangePatch = ({
+  name = '',
+  value = '',
+}: BuildCreateSbtInputChangePatchArgs = {}): Record<string, unknown> => ({
+  [name]: value,
+  ...(name === 'sbtImageUrl' ? { lockedImageAsset: null } : {}),
+  ...(name === 'sbtImageUrl'
+    ? { imageChooserStatusText: '', imageChooserStatusTone: 'default' }
+    : {}),
+});
+
+export const buildCreateSbtImageFileClearPatch = ({
+  clearLockedAsset = false,
+}: BuildCreateSbtImageFileClearPatchArgs = {}): Record<string, unknown> => ({
+  sbtImageFile: null,
+  ...(clearLockedAsset === true ? { lockedImageAsset: null } : {}),
+});
+
+export const buildCreateSbtSelectedImageFilePatch = ({
+  file = null,
+  sbtImageUrl = '',
+  statusText = '',
+  statusTone = 'default',
+  useImageUrl = false,
+}: BuildCreateSbtSelectedImageFilePatchArgs = {}): Record<string, unknown> => {
+  const text = String(statusText ?? '');
+  return {
+    useImageUrl: !!useImageUrl,
+    sbtImageFile: file,
+    sbtImageUrl: String(sbtImageUrl ?? ''),
+    imageLoadError: false,
+    imageChooserStatusText: text,
+    imageChooserStatusTone: text ? statusTone : 'default',
+    lockedImageAsset: null,
+  };
+};
+
+export const buildCreateSbtImageChooserStatusPatch = ({
+  statusText = '',
+  statusTone = 'default',
+}: BuildCreateSbtImageChooserStatusPatchArgs = {}): Record<string, unknown> => ({
+  imageChooserStatusText: String(statusText ?? ''),
+  imageChooserStatusTone: statusTone,
+});
+
+export const buildCreateSbtCountdownTickPatch = ({
+  state = {},
+}: BuildCreateSbtCountdownTickPatchArgs = {}): Record<string, unknown> => {
+  const source = isPlainObject(state) ? state : {};
+  const nextCountdown = Math.max(0, Number(source.countdown || 0) - 1);
+  return {
+    countdown: nextCountdown,
+    ...(nextCountdown === 0 ? { countdownActive: false } : null),
+  };
+};
+
+export const resolveCreateSbtMemoizedImageDataUrl = ({
+  imageFile = null,
+  memoizedImageDataUrl = null,
+  memoizedImageFileRef = null,
+}: {
+  imageFile?: unknown;
+  memoizedImageDataUrl?: unknown;
+  memoizedImageFileRef?: unknown;
+} = {}): string | null => (
+  imageFile &&
+  imageFile === memoizedImageFileRef &&
+  typeof memoizedImageDataUrl === 'string' &&
+  memoizedImageDataUrl
+    ? memoizedImageDataUrl
+    : null
+);
+
+export const normalizeComparableAddress = (value: unknown): string => (
+  toStr(value).trim().toLowerCase()
+);
+
+export const buildCreateSbtAccountDistributionSyncPatch = ({
+  currentDistribution = {},
+  nextAccount = '',
+  prevAccount = '',
+}: {
+  currentDistribution?: unknown;
+  nextAccount?: unknown;
+  prevAccount?: unknown;
+} = {}): Record<string, string> | null => {
+  const prevAccountAddress = normalizeComparableAddress(prevAccount);
+  const nextAccountAddress = normalizeComparableAddress(nextAccount);
+  if (prevAccountAddress === nextAccountAddress) return null;
+
+  const source = isPlainObject(currentDistribution) ? currentDistribution : {};
+  const currentBurnAdmin = toStr(source.burnAdmin).trim();
+  const currentAdminAddress = toStr(source.adminAddress).trim();
+  const shouldSyncBurnAdmin = (
+    !currentBurnAdmin ||
+    normalizeComparableAddress(currentBurnAdmin) === prevAccountAddress
+  );
+  const shouldSyncAdminAddress = (
+    !currentAdminAddress ||
+    normalizeComparableAddress(currentAdminAddress) === prevAccountAddress
+  );
+  if (!shouldSyncBurnAdmin && !shouldSyncAdminAddress) return null;
+
+  const nextAccountText = toStr(nextAccount).trim();
+  return {
+    ...(shouldSyncBurnAdmin ? { burnAdmin: nextAccountText } : {}),
+    ...(shouldSyncAdminAddress ? { adminAddress: nextAccountText } : {}),
+  };
+};
+
+export const buildCreateSbtAccountDistributionSyncStatePatch = ({
+  currentDistribution = {},
+  syncPatch = null,
+}: BuildCreateSbtAccountDistributionSyncStatePatchArgs = {}): Record<string, unknown> | null => {
+  if (!syncPatch || !isPlainObject(syncPatch)) return null;
+  return {
+    sbtDistribution: {
+      ...(currentDistribution as Record<string, unknown>),
+      ...syncPatch,
+    },
+  };
 };
 
 export const normalizeGateIds = (value: unknown): string[] => {
@@ -583,6 +1809,316 @@ export const stableGateColor = (gateId: unknown): string => {
   return ENCRYPTION_GATE_COLORS[hash % ENCRYPTION_GATE_COLORS.length];
 };
 
+export const getConfiguredContractAddress = (value: unknown): string => (
+  normalizeGateText(isPlainObject(value) ? value.address : value)
+);
+
+export const hasUsableCreateSbtFactoryForChain = ({
+  chainId = null,
+  getSessionContractsForChain = null,
+}: {
+  chainId?: unknown;
+  getSessionContractsForChain?: CreateSbtSessionContractsResolver | null;
+} = {}): boolean => {
+  const chainContracts = typeof getSessionContractsForChain === 'function'
+    ? getSessionContractsForChain(chainId)
+    : null;
+  const contracts = isPlainObject(chainContracts) ? chainContracts : {};
+  return getConfiguredContractAddress(contracts.sbtFactory) !== '';
+};
+
+export const shouldHideCreateSbtNetworkSelector = ({
+  deferredDeploy = false,
+  hideNetworkSelector = false,
+}: ShouldHideCreateSbtNetworkSelectorArgs = {}): boolean => (
+  !!hideNetworkSelector || !!deferredDeploy
+);
+
+export const selectPreferredChainId = (
+  candidateIds?: unknown[],
+  availableChainIds?: unknown[]
+): number | null => {
+  const normalizedCandidates = (candidateIds === undefined ? [] : candidateIds)
+    .map((value: unknown) => normalizePositiveChainId(value))
+    .filter((id): id is number => id !== null);
+  const allowedIds = new Set<number>(
+    (Array.isArray(availableChainIds) ? availableChainIds : [])
+      .map((value: unknown) => normalizePositiveChainId(value))
+      .filter((id): id is number => id !== null)
+  );
+  if (allowedIds.size > 0) {
+    const allowedMatch = normalizedCandidates.find((id) => allowedIds.has(id));
+    if (allowedMatch) return allowedMatch;
+  }
+  return normalizedCandidates[0] || null;
+};
+
+export const resolveCreateSbtAuthoringChainState = ({
+  chainId = null,
+  chainOptions = [],
+  getChainById: getChainByIdFn = null,
+}: {
+  chainId?: number | null;
+  chainOptions?: unknown;
+  getChainById?: ((chainId: number) => unknown) | null;
+} = {}): CreateSbtAuthoringChainState => {
+  const selectedChain = (
+    (Array.isArray(chainOptions) ? chainOptions : []).find((option) => (
+      isPlainObject(option) && option.id === chainId
+    )) ||
+    (typeof getChainByIdFn === 'function' ? getChainByIdFn(chainId || 0) : null)
+  );
+  return {
+    chainId,
+    chain: chainId
+      ? (
+          (isPlainObject(selectedChain) ? selectedChain as CreateSbtAuthoringChainOption : null) ||
+          { id: chainId, name: `Chain ${chainId}` }
+        )
+      : 'not connected',
+  };
+};
+
+export const buildCreateSbtDefaultDistributionState = ({
+  account = '',
+  authoringChain = null,
+}: BuildCreateSbtDefaultDistributionStateArgs = {}): Record<string, unknown> => ({
+  isLimited: false,
+  limitedNumber: 0,
+  hasAdmin: false,
+  adminAddress: account || '',
+  isRevocable: false,
+  isTimeLimited: false,
+  mintingEndTime: null,
+  distributionOption: 'anyoneCanMint',
+  burnAuth: 'AdminOnly',
+  burnAdmin: account || '',
+  network: authoringChain?.chain,
+  unlisted: false,
+});
+
+export const buildCreateSbtResetFormState = ({
+  account = '',
+  authoringChain = null,
+  deferredCreate2SaltBuilder = null,
+  deferredDeploy = false,
+}: BuildCreateSbtResetFormStateArgs = {}): Record<string, unknown> => ({
+  sbtName: '',
+  sbtDescription: '',
+  sbtImageFile: null,
+  sbtImageUrl: '',
+  useImageUrl: false,
+  sbtDistribution: buildCreateSbtDefaultDistributionState({ account, authoringChain }),
+  tags: [],
+  currentTagInput: '',
+  autoAppliedDefaultTags: [],
+  dismissedDefaultTags: [],
+  documentURLs: [],
+  documentUrl: '',
+  groupPassword: '',
+  openLockKey: '',
+  metadataLockGateIds: createEmptyMetadataLockGateIds(),
+  lockedImageAsset: null,
+  create2Salt: '',
+  deferredCreate2Salt: deferredDeploy && typeof deferredCreate2SaltBuilder === 'function'
+    ? deferredCreate2SaltBuilder()
+    : '',
+  predictableAddressEnabled: !!deferredDeploy,
+  predictedAddress: '',
+  predictedAddressStatus: '',
+  predictedAddressBusy: false,
+  sbtMinted: false,
+  sbtAddress: '',
+  currentStep: 0,
+  startedMinting: false,
+  mintingFailed: false,
+  error: '',
+  network: authoringChain?.chainId || '',
+  imageUploaded: false,
+  tokenUriUploaded: false,
+  tokenURI: '',
+  showJson: false,
+  showTagsInput: false,
+  imageChooserStatusText: '',
+  imageChooserStatusTone: 'default',
+});
+
+export const buildCreateSbtInitialState = ({
+  account = '',
+  authoringChain = null,
+  deferredCreate2SaltBuilder = null,
+  deferredDeploy = false,
+}: BuildCreateSbtInitialStateArgs = {}): Record<string, unknown> => {
+  const autoExpandAllSections = !!deferredDeploy;
+  return {
+    ...buildCreateSbtResetFormState({
+      account,
+      authoringChain,
+      deferredCreate2SaltBuilder,
+      deferredDeploy,
+    }),
+    sbtCodes: [],
+    groupSubmitted: false,
+    groupHash: '',
+    passwordList: [],
+    sbtInviteLinks: [],
+    sbtInviteBackupDate: '',
+    textToUpload: '',
+    csvAddresses: '',
+    estimatedMintCost: '0',
+    tokenInfoCollapsed: false,
+    mintOptionsCollapsed: !autoExpandAllSections,
+    distributionOptionsCollapsed: !autoExpandAllSections,
+    numInviteLinks: 10,
+    copiedLinkIndex: null,
+    exportFormat: 'json',
+    countdown: 12,
+    countdownActive: false,
+    sbtSymbol: '',
+    documentIDHashes: '',
+    arweaveTxId: '',
+    shareableUrl: '',
+    autoJoinUrl: '',
+    copyJsonSuccess: false,
+    copyLinkSuccess: false,
+    copyIdSuccess: false,
+    bookmarkedSbtsSet: new Set(),
+  };
+};
+
+export const resolveCreateSbtAuthoringChainOptions = ({
+  getSessionRegistryChains = null,
+  hasUsableSbtFactoryForChain = null,
+}: ResolveCreateSbtAuthoringChainOptionsArgs = {}): CreateSbtAuthoringChainOption[] => {
+  const chains = typeof getSessionRegistryChains === 'function' ? getSessionRegistryChains() : [];
+  return (Array.isArray(chains) ? chains : [])
+    .filter((chain: unknown): chain is CreateSbtAuthoringChainOption => (
+      isPlainObject(chain) &&
+      typeof hasUsableSbtFactoryForChain === 'function' &&
+      hasUsableSbtFactoryForChain(chain.id)
+    ));
+};
+
+export const resolveCreateSbtPreferredAuthoringChainId = ({
+  availableChainIds = [],
+  network = null,
+  resolvedSessionConfig = null,
+  selectedChainId = null,
+  sessionConfigOverride = null,
+}: ResolveCreateSbtPreferredAuthoringChainIdArgs = {}): number | null => {
+  const networkRecord = isPlainObject(network) ? network : {};
+  // Regression guard: authoring follows the form/session chain first and only
+  // consults the connected wallet as a last-resort fallback.
+  return selectPreferredChainId(
+    [
+      selectedChainId,
+      sessionConfigOverride?.networkChainId,
+      resolvedSessionConfig?.networkChainId,
+      networkRecord.id,
+      networkRecord.chainId,
+    ],
+    availableChainIds
+  );
+};
+
+export const normalizeSessionContractRef = (
+  value: unknown,
+  fallbackChainId?: unknown
+): NormalizedSessionContractRef | null => {
+  const contractRef = isPlainObject(value) ? { ...value } : {};
+  const address = getConfiguredContractAddress(value);
+  const chainId = normalizePositiveChainId(
+    contractRef.chainId ||
+    contractRef.chainID ||
+    contractRef.networkChainId ||
+    contractRef.chain ||
+    fallbackChainId
+  );
+  if (!address && !chainId) return null;
+  return {
+    ...(address ? { address } : {}),
+    ...(chainId ? { chainId } : {}),
+  };
+};
+
+export const contractRefMatchesChain = (
+  contractRef: Record<string, unknown> | null | undefined,
+  targetChainId: number | null,
+  fallbackChainId?: unknown
+): boolean => {
+  if (!contractRef?.address) return false;
+  const effectiveChainId = normalizePositiveChainId(contractRef.chainId || fallbackChainId);
+  if (!effectiveChainId) return true;
+  return effectiveChainId === targetChainId;
+};
+
+const CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS = Object.freeze(['surveys', 'sbtFactory']);
+
+export const buildCreateSbtAuthoringContractRefs = ({
+  getSessionContractsForChain = null,
+  networkId = null,
+  resolveSessionContractRef = null,
+  sessionConfig = null,
+}: BuildCreateSbtAuthoringContractRefsArgs = {}): Record<string, NormalizedSessionContractRef> => {
+  const selectedChainId = normalizePositiveChainId(networkId);
+  if (!selectedChainId) return {};
+
+  const normalizedSessionConfig = isPlainObject(sessionConfig) ? sessionConfig : {};
+  const baseContracts: Record<string, unknown> = isPlainObject(normalizedSessionConfig.contracts)
+    ? normalizedSessionConfig.contracts
+    : {};
+  const sessionChainId = normalizePositiveChainId(normalizedSessionConfig.networkChainId);
+  const rawChainDefaultContracts = typeof getSessionContractsForChain === 'function'
+    ? getSessionContractsForChain(selectedChainId)
+    : null;
+  const chainDefaultContracts: Record<string, unknown> = isPlainObject(rawChainDefaultContracts)
+    ? rawChainDefaultContracts
+    : {};
+  const contractKeys = new Set<string>([
+    ...Object.keys(baseContracts),
+    ...Object.keys(chainDefaultContracts),
+    ...CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS,
+  ]);
+  const contracts: Record<string, NormalizedSessionContractRef> = {};
+
+  contractKeys.forEach((key) => {
+    const sessionResolvedRef = (
+      CREATE_SBT_AUTHORING_CHAIN_CONTRACT_KEYS.includes(key) &&
+      typeof resolveSessionContractRef === 'function'
+    )
+      ? resolveSessionContractRef({ sessionConfig: normalizedSessionConfig, contractKey: key })
+      : null;
+    const sessionResolvedRefRecord = isPlainObject(sessionResolvedRef) ? sessionResolvedRef : {};
+    const explicitSessionContractRef = normalizeSessionContractRef(baseContracts[key], sessionChainId);
+    const aliasSessionContractRef = normalizeSessionContractRef(
+      (sessionResolvedRefRecord.address || sessionResolvedRefRecord.chainId) ? sessionResolvedRefRecord : null,
+      sessionChainId
+    );
+    const sessionContractRef = explicitSessionContractRef || aliasSessionContractRef;
+    const chainDefaultRef = normalizeSessionContractRef(chainDefaultContracts[key], selectedChainId);
+
+    // Regression guard: when the authoring chain changes, keep only session-specific
+    // contracts that already belong to that chain; otherwise swap to that chain's defaults.
+    const resolvedRef = (
+      chainDefaultRef?.address &&
+      !contractRefMatchesChain(sessionContractRef, selectedChainId, sessionChainId)
+    )
+      ? chainDefaultRef
+      : (sessionContractRef || chainDefaultRef);
+
+    if (!resolvedRef) return;
+    const resolvedChainId = normalizePositiveChainId(resolvedRef.chainId || selectedChainId);
+    contracts[key] = {
+      ...resolvedRef,
+      ...(resolvedChainId
+        ? { chainId: resolvedChainId }
+        : {}),
+    };
+  });
+
+  return contracts;
+};
+
 export const normalizeAddressList = (values?: unknown[]): string[] => {
   const out: string[] = [];
   const seen = new Set<string>();
@@ -597,6 +2133,273 @@ export const normalizeAddressList = (values?: unknown[]): string[] => {
   return out;
 };
 
+export const buildUniqueTagList = (rawTags: unknown = []): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  (Array.isArray(rawTags) ? rawTags : []).forEach((raw: unknown) => {
+    const trimmed = String(raw ?? '').trim();
+    const normalized = trimmed.toLowerCase();
+    if (!trimmed || seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(trimmed);
+  });
+  return out;
+};
+
+export const parseDefaultSbtTags = (value: unknown): string[] => {
+  if (typeof value !== 'string' || value.trim().length === 0) return [];
+  return value.split(',').map((tag: string) => tag.trim()).filter(Boolean);
+};
+
+export const normalizeCreateSbtRestoredTags = (tags: unknown = []): unknown[] => {
+  if (Array.isArray(tags)) return tags;
+  return parseDefaultSbtTags(tags);
+};
+
+export const buildCreateSbtTokenTagList = (tags: string[] = []): string[] => (
+  tags.filter((tag) => tag.trim().length > 0)
+);
+
+export const buildCreateSbtMetadataPreviewTagList = (tags: unknown = []): unknown[] => (
+  (Array.isArray(tags) ? tags : []).filter((tag: unknown) => String(tag || '').trim().length > 0)
+);
+
+export const buildCreateSbtDocumentIdHashList = (documentIdHashesDraft = ''): string[] => (
+  documentIdHashesDraft.trim().length > 0
+    ? documentIdHashesDraft.split(',').map((docIdHash) => docIdHash.trim())
+    : []
+);
+
+export const buildCreateSbtCurrentTagInputPatch = ({
+  value = '',
+}: {
+  value?: unknown;
+} = {}): Record<string, string> => ({
+  currentTagInput: String(value ?? ''),
+});
+
+export const resolveCreateSbtMetadataImageSource = ({
+  defaultImageUrl = '',
+  getCanonicalMetadataImageUrl = null,
+  sbtImageUrl = '',
+  useImageUrl = false,
+}: ResolveCreateSbtMetadataImageSourceArgs = {}): string => {
+  const normalizeImage = typeof getCanonicalMetadataImageUrl === 'function'
+    ? getCanonicalMetadataImageUrl
+    : (value: unknown) => String(value || '');
+  const explicit = normalizeImage(sbtImageUrl);
+  if (useImageUrl && explicit) return explicit;
+  if (explicit) return explicit;
+  return normalizeImage(defaultImageUrl);
+};
+
+export const buildCreateSbtTagAdditionState = ({
+  autoAppliedDefaultTags = [],
+  dismissedDefaultTags = [],
+  tagValue = '',
+  tags = [],
+}: {
+  autoAppliedDefaultTags?: unknown;
+  dismissedDefaultTags?: unknown;
+  tagValue?: unknown;
+  tags?: unknown;
+} = {}): CreateSbtTagAdditionState => {
+  const nextTag = String(tagValue || '').trim();
+  const nextTagLower = nextTag.toLowerCase();
+  return {
+    tags: [...(Array.isArray(tags) ? tags : []), nextTag],
+    currentTagInput: '',
+    autoAppliedDefaultTags: (Array.isArray(autoAppliedDefaultTags) ? autoAppliedDefaultTags : []).filter(
+      (tag: unknown) => String(tag || '').trim().toLowerCase() !== nextTagLower
+    ),
+    dismissedDefaultTags: (Array.isArray(dismissedDefaultTags) ? dismissedDefaultTags : []).filter(
+      (tag: unknown) => String(tag || '').trim().toLowerCase() !== nextTagLower
+    ),
+    showTagsInput: true,
+  };
+};
+
+export const buildCreateSbtTagRemovalState = ({
+  autoAppliedDefaultTags = [],
+  defaultTags = [],
+  dismissedDefaultTags = [],
+  indexToRemove = 0,
+  removedTag = '',
+  tags = [],
+}: {
+  autoAppliedDefaultTags?: unknown;
+  defaultTags?: unknown;
+  dismissedDefaultTags?: unknown;
+  indexToRemove?: unknown;
+  removedTag?: unknown;
+  tags?: unknown;
+} = {}): CreateSbtTagRemovalState => {
+  const removeIndex = Number(indexToRemove);
+  const removedTagLower = String(removedTag || '').trim().toLowerCase();
+  const defaultTagLowerSet = new Set<string>(normalizeTagList(defaultTags));
+  const currentDismissed = Array.isArray(dismissedDefaultTags) ? dismissedDefaultTags : [];
+  return {
+    tags: (Array.isArray(tags) ? tags : []).filter((_: unknown, i: number) => i !== removeIndex),
+    autoAppliedDefaultTags: (Array.isArray(autoAppliedDefaultTags) ? autoAppliedDefaultTags : []).filter(
+      (tag: unknown) => String(tag || '').trim().toLowerCase() !== removedTagLower
+    ),
+    dismissedDefaultTags: defaultTagLowerSet.has(removedTagLower)
+      ? buildUniqueTagList([...currentDismissed, removedTag])
+      : currentDismissed,
+  };
+};
+
+export const resolveCreateSbtTagInputState = ({
+  currentTagInput = '',
+}: ResolveCreateSbtTagInputStateArgs = {}): CreateSbtTagInputState => ({
+  shouldShowAddTagButton: String(currentTagInput || '').trim().length > 0,
+});
+
+const normalizedTagListsEqual = (left: unknown, right: unknown): boolean => {
+  const leftNormalized = normalizeTagList(left);
+  const rightNormalized = normalizeTagList(right);
+  return (
+    leftNormalized.length === rightNormalized.length &&
+    leftNormalized.every((tag: string, index: number) => tag === rightNormalized[index])
+  );
+};
+
+export const buildCreateSbtRelevantDefaultTagSyncState = ({
+  autoAppliedDefaultTags = [],
+  currentShowTagsInput = false,
+  dismissedDefaultTags = [],
+  relevantDefaults = [],
+  resetDismissed = false,
+  tags = [],
+}: {
+  autoAppliedDefaultTags?: unknown;
+  currentShowTagsInput?: unknown;
+  dismissedDefaultTags?: unknown;
+  relevantDefaults?: unknown;
+  resetDismissed?: unknown;
+  tags?: unknown;
+} = {}): CreateSbtRelevantDefaultTagSyncState => {
+  const prevAutoLower = new Set<string>(normalizeTagList(autoAppliedDefaultTags));
+  const nextDismissed = resetDismissed ? [] : (dismissedDefaultTags || []);
+  const dismissedLower = new Set<string>(normalizeTagList(nextDismissed));
+  const currentTags = Array.isArray(tags) ? tags : [];
+  const baseTags = currentTags.filter(
+    (tag: unknown) => !prevAutoLower.has(String(tag || '').trim().toLowerCase())
+  );
+  const nextTags = buildUniqueTagList(baseTags);
+  const currentTagLower = new Set<string>(normalizeTagList(nextTags));
+  const nextAuto: string[] = [];
+  const nextAutoLower = new Set<string>();
+
+  (Array.isArray(relevantDefaults) ? relevantDefaults : []).forEach((tag: unknown) => {
+    const tagString = String(tag || '').trim();
+    const lower = tagString.toLowerCase();
+    if (!lower || dismissedLower.has(lower) || nextAutoLower.has(lower)) return;
+    if (currentTagLower.has(lower)) return;
+    currentTagLower.add(lower);
+    nextAuto.push(tagString);
+    nextAutoLower.add(lower);
+    nextTags.push(tagString);
+  });
+
+  const showTagsInput = nextTags.length > 0;
+  const shouldUpdate = !(
+    normalizedTagListsEqual(currentTags, nextTags) &&
+    normalizedTagListsEqual(autoAppliedDefaultTags, nextAuto) &&
+    normalizedTagListsEqual(dismissedDefaultTags, nextDismissed) &&
+    !!currentShowTagsInput === showTagsInput
+  );
+
+  return {
+    tags: nextTags,
+    autoAppliedDefaultTags: nextAuto,
+    dismissedDefaultTags: nextDismissed,
+    showTagsInput,
+    shouldUpdate,
+  };
+};
+
+export const buildCreateSbtRelevantDefaultTagSyncPatch = ({
+  autoAppliedDefaultTags = [],
+  dismissedDefaultTags = [],
+  showTagsInput = false,
+  tags = [],
+}: {
+  autoAppliedDefaultTags?: unknown;
+  dismissedDefaultTags?: unknown;
+  showTagsInput?: unknown;
+  tags?: unknown;
+} = {}): Record<string, unknown> => ({
+  tags,
+  autoAppliedDefaultTags,
+  dismissedDefaultTags,
+  showTagsInput,
+});
+
+export const normalizeCreateSbtDocumentUrlDraft = (value: unknown = ''): string => (
+  String(value || '').trim()
+);
+
+export const buildEffectiveCreateSbtDocumentUrls = ({
+  documentURLs = [],
+  documentUrl = '',
+  maxDocumentUrls = 10,
+}: {
+  documentURLs?: unknown;
+  documentUrl?: unknown;
+  maxDocumentUrls?: number;
+} = {}): string[] => {
+  const nextDocumentUrls = Array.isArray(documentURLs)
+    ? documentURLs.map((url: unknown) => String(url || '').trim()).filter(Boolean)
+    : [];
+  const pendingDocumentUrl = normalizeCreateSbtDocumentUrlDraft(documentUrl);
+  if (pendingDocumentUrl && nextDocumentUrls.length < maxDocumentUrls) {
+    nextDocumentUrls.push(pendingDocumentUrl);
+  }
+  return nextDocumentUrls;
+};
+
+export const resolveCreateSbtDocumentUrlInputState = ({
+  documentURLs = [],
+  documentUrl = '',
+  maxDocumentUrls = 10,
+}: ResolveCreateSbtDocumentUrlInputStateArgs = {}): CreateSbtDocumentUrlInputState => {
+  const documentUrlCount = Array.isArray(documentURLs) ? documentURLs.length : 0;
+  return {
+    canAddDocumentUrl: normalizeCreateSbtDocumentUrlDraft(documentUrl) !== '' && documentUrlCount < maxDocumentUrls,
+    documentUrlCount,
+  };
+};
+
+export const removeCreateSbtDocumentUrlAtIndex = (
+  documentURLs: unknown = [],
+  indexToRemove: unknown = 0
+): string[] => {
+  const nextDocumentUrls = Array.isArray(documentURLs)
+    ? [...documentURLs]
+    : [];
+  nextDocumentUrls.splice(Number(indexToRemove), 1);
+  return nextDocumentUrls as string[];
+};
+
+export const buildCreateSbtDocumentUrlAdditionPatch = ({
+  documentURLs = [],
+  documentUrl = '',
+}: BuildCreateSbtDocumentUrlAdditionPatchArgs = {}): Record<string, unknown> => ({
+  documentURLs: [
+    ...(Array.isArray(documentURLs) ? documentURLs : []),
+    String(documentUrl || ''),
+  ],
+  documentUrl: '',
+});
+
+export const buildCreateSbtDocumentUrlRemovalPatch = ({
+  documentURLs = [],
+  index = 0,
+}: BuildCreateSbtDocumentUrlRemovalPatchArgs = {}): Record<string, unknown> => ({
+  documentURLs: removeCreateSbtDocumentUrlAtIndex(documentURLs, index),
+});
+
 export const getCreateSbtBurnAuthEnum = (burnAuth: unknown): number => {
   switch (burnAuth) {
     case 'AdminOnly': return 0;
@@ -605,6 +2408,67 @@ export const getCreateSbtBurnAuthEnum = (burnAuth: unknown): number => {
     case 'Neither': return 3;
     default: throw new Error(`Unsupported burnAuth value: ${burnAuth}`);
   }
+};
+
+export const buildCreateSbtPasswordExportFile = ({
+  autoJoinUrl = '',
+  date = '',
+  exportFormat = '',
+  passwordList = [],
+  sbtDistribution = {},
+  sbtInviteLinks = [],
+  sbtName = '',
+  sbtSymbol = '',
+}: {
+  autoJoinUrl?: unknown;
+  date?: unknown;
+  exportFormat?: unknown;
+  passwordList?: unknown;
+  sbtDistribution?: unknown;
+  sbtInviteLinks?: unknown;
+  sbtName?: unknown;
+  sbtSymbol?: unknown;
+} = {}): CreateSbtPasswordExportFile => {
+  let content = '';
+  let fileName = '';
+  const distribution = isPlainObject(sbtDistribution) ? sbtDistribution : {};
+  const isInvite = !!(
+    distribution.isLimited &&
+    distribution.distributionOption === 'groupPassword'
+  );
+  const codeLabel = isInvite ? 'groupPassword' : 'password';
+  const fileLabel = isInvite ? 'group-passwords' : 'passwords';
+  const codes = Array.isArray(passwordList)
+    ? passwordList.map((code: unknown) => String(code || ''))
+    : [];
+  const links = Array.isArray(sbtInviteLinks)
+    ? sbtInviteLinks.map((link: unknown) => String(link || ''))
+    : [];
+  const fallbackLink = String(autoJoinUrl || '');
+  const symbolText = String(sbtSymbol || '');
+  const nameText = String(sbtName || '');
+  const dateText = String(date || '');
+
+  if (exportFormat === 'json') {
+    content = JSON.stringify(codes.map((code, index) => ({
+      index,
+      [codeLabel]: code,
+      inviteLink: links[index] || fallbackLink,
+    })), null, 2);
+    fileName = `${symbolText}_${nameText}_${fileLabel}_${dateText}.json`;
+  } else if (exportFormat === 'csv') {
+    content = `index,${codeLabel},inviteLink\n` +
+      codes.map((code, index) =>
+        `${index},${code},${links[index] || fallbackLink}`
+      ).join('\n');
+    fileName = `${symbolText}_${nameText}_${fileLabel}_${dateText}.csv`;
+  }
+
+  return {
+    content,
+    fileName,
+    mimeType: exportFormat === 'json' ? 'application/json' : 'text/csv',
+  };
 };
 
 export const buildCreateSbtJsonPreviewData = ({
@@ -627,6 +2491,207 @@ export const buildCreateSbtJsonPreviewData = ({
   autoJoinUrl,
   shareableUrl,
 });
+
+export const buildCreateSbtInviteLinks = ({
+  base = '',
+  demoPath = '',
+  detailPath = '',
+  encodeGroupPassword = (code: unknown) => code,
+  isInvite = false,
+  passwordList = [],
+  sbtAddress = '',
+}: {
+  base?: unknown;
+  demoPath?: unknown;
+  detailPath?: unknown;
+  encodeGroupPassword?: CreateSbtGroupPasswordEncoder | null;
+  isInvite?: unknown;
+  passwordList?: unknown;
+  sbtAddress?: unknown;
+} = {}): string[] => {
+  const codes = Array.isArray(passwordList)
+    ? passwordList.map((code: unknown) => String(code || ''))
+    : [];
+  const origin = String(base || '');
+  const routePath = String(demoPath || '');
+  const sbtAddressText = String(sbtAddress || '');
+  const [detailPathname, detailQuery = ''] = String(detailPath || '').split('?');
+  const detailQuerySuffix = detailQuery ? `?${detailQuery}` : '';
+  const encoder = typeof encodeGroupPassword === 'function'
+    ? encodeGroupPassword
+    : (code: unknown) => code;
+
+  return codes.map((code) => (
+    isInvite
+      ? `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(sbtAddressText)}&gp=${encodeURIComponent(String(encoder(code)))}`
+      : `${origin}${detailPathname}/${encodeURIComponent(code)}${detailQuerySuffix}`
+  ));
+};
+
+export const resolveCreateSbtInviteCodeList = ({
+  listOverride = null,
+  passwordList = [],
+}: {
+  listOverride?: unknown;
+  passwordList?: unknown;
+} = {}): string[] => {
+  const source = Array.isArray(listOverride) && listOverride.length > 0
+    ? listOverride
+    : (Array.isArray(passwordList) ? passwordList : []);
+  return source.map((code: unknown) => String(code || ''));
+};
+
+export const resolveCreateSbtPasswordGenerationCount = ({
+  numInviteLinks = 0,
+  sbtDistribution = {},
+}: {
+  numInviteLinks?: unknown;
+  sbtDistribution?: unknown;
+} = {}): number => {
+  const distribution = isPlainObject(sbtDistribution) ? sbtDistribution : {};
+  const rawCount = distribution.isLimited && Number(distribution.limitedNumber || 0) > 0
+    ? distribution.limitedNumber
+    : numInviteLinks;
+  return Math.max(0, Math.floor(Number(rawCount || 0) || 0));
+};
+
+export const resolveCreateSbtPredictablePasswordListDecision = ({
+  allowStateMutation = true,
+  generatePassword = null,
+  passwordList = [],
+  targetCount = 0,
+  usesClaimCodes = false,
+}: {
+  allowStateMutation?: unknown;
+  generatePassword?: ((length: number) => string) | null;
+  passwordList?: unknown;
+  targetCount?: unknown;
+  usesClaimCodes?: unknown;
+} = {}): {
+  passwordListPatch: string[] | null;
+  returnValue: string[] | null;
+  shouldUpdatePasswordList: boolean;
+} => {
+  if (!usesClaimCodes) {
+    return {
+      passwordListPatch: null,
+      returnValue: [],
+      shouldUpdatePasswordList: false,
+    };
+  }
+
+  const desiredCount = Math.max(0, Math.floor(Number(targetCount || 0) || 0));
+  const current = Array.isArray(passwordList)
+    ? passwordList.filter((entry: unknown) => String(entry || '').trim()) as string[]
+    : [];
+  if (desiredCount > 0 && current.length === desiredCount) {
+    return {
+      passwordListPatch: null,
+      returnValue: current,
+      shouldUpdatePasswordList: false,
+    };
+  }
+
+  const generator = typeof generatePassword === 'function'
+    ? generatePassword
+    : () => '';
+  const next = Array.from({ length: desiredCount }, () => generator(32));
+  const shouldUpdatePasswordList = allowStateMutation === true;
+  return {
+    passwordListPatch: shouldUpdatePasswordList ? next : null,
+    returnValue: null,
+    shouldUpdatePasswordList,
+  };
+};
+
+export const generateCreateSbtRandomHexString = ({
+  getRandomValues = null,
+  length = 0,
+  randomBytes = null,
+}: {
+  getRandomValues?: CreateSbtGetRandomValues | null;
+  length?: unknown;
+  randomBytes?: CreateSbtRandomBytes | null;
+} = {}): string => {
+  const targetLength = Math.max(0, Math.floor(Number(length || 0) || 0));
+  const byteCount = Math.ceil(targetLength / 2);
+  let arr: Uint8Array | number[];
+  if (typeof getRandomValues === 'function') {
+    const bytes = new Uint8Array(byteCount);
+    arr = getRandomValues(bytes);
+  } else if (typeof randomBytes === 'function') {
+    arr = randomBytes(byteCount);
+  } else {
+    arr = new Uint8Array(byteCount);
+  }
+  const hex = Array.from(arr).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hex.slice(0, targetLength);
+};
+
+export const buildCreateSbtDeferredDraftCreate2Salt = ({
+  prefix = 'draft/',
+  randomBytes = null,
+}: {
+  prefix?: unknown;
+  randomBytes?: CreateSbtRandomBytes | null;
+} = {}): string => (
+  `${String(prefix || '')}${generateCreateSbtRandomHexString({
+    length: 32,
+    randomBytes,
+  })}`
+);
+
+export const generateCreateSbtInviteNonces = ({
+  bytesToNonce = (bytes: Uint8Array | number[]) => (
+    Array.from(bytes).map((byte) => String(byte)).join('')
+  ),
+  count = 0,
+  getRandomValues = null,
+  randomBytes = null,
+}: {
+  bytesToNonce?: CreateSbtBytesToNonce;
+  count?: unknown;
+  getRandomValues?: CreateSbtGetRandomValues | null;
+  randomBytes?: CreateSbtRandomBytes | null;
+} = {}): string[] => {
+  const raw = Number(count || 0);
+  const target = Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+  const nonces = new Set<string>();
+  while (nonces.size < target) {
+    let bytes: Uint8Array | number[];
+    if (typeof getRandomValues === 'function') {
+      const nextBytes = new Uint8Array(12);
+      bytes = getRandomValues(nextBytes);
+    } else if (typeof randomBytes === 'function') {
+      bytes = randomBytes(12);
+    } else {
+      bytes = new Uint8Array(12);
+    }
+    nonces.add(String(bytesToNonce(bytes)));
+  }
+  return Array.from(nonces);
+};
+
+export const getFetchableCreateSbtImageUrl = (value: unknown): string => {
+  const normalizedValue = normalizeArweaveUrl(String(value || '').trim());
+  if (!normalizedValue) return '';
+  try {
+    const urlObj = new URL(normalizedValue);
+    return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') ? normalizedValue : '';
+  } catch (_) {
+    return '';
+  }
+};
+
+export const getCanonicalCreateSbtMetadataImageUrl = (value: unknown): string => {
+  const trimmedValue = String(value || '').trim();
+  if (!trimmedValue) return '';
+  const txId = parseArweaveTxId(trimmedValue);
+  if (txId && txId === trimmedValue) {
+    return `ar://${txId}`;
+  }
+  return trimmedValue;
+};
 
 export const normalizeCreateSbtLitGateChainIdFallback = (value: unknown): CreateSbtLitGateChainId => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -1106,3 +3171,518 @@ export const buildCreateSbtGateOptionsFromSessionSources = ({
     defaultGateId: preferredGateId || (gateOptions[0]?.id || ''),
   };
 };
+
+export const areStringArraysEqual = (a?: unknown[], b?: unknown[]): boolean => {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (String(a[i] || '') !== String(b[i] || '')) return false;
+  }
+  return true;
+};
+
+export const createEmptyMetadataLockGateIds = (): Record<string, string[]> => ({
+  name: [],
+  description: [],
+  tags: [],
+  documentURLs: [],
+  image: [],
+});
+
+export const normalizeMetadataLockGateIds = (value?: unknown): Record<string, string[]> => {
+  const source = isPlainObject(value) ? value : {};
+  const next = createEmptyMetadataLockGateIds();
+  METADATA_LOCK_FIELDS.forEach((fieldKey) => {
+    next[fieldKey] = normalizeGateIds(source[fieldKey]);
+  });
+  return next;
+};
+
+const normalizeCreateSbtSelectedGateIds = (value: unknown, validGateIds: unknown[] = []): string[] => {
+  const normalized = normalizeGateIds(value);
+  if (!Array.isArray(validGateIds) || validGateIds.length === 0) return normalized;
+  const validGateSet = new Set<unknown>(validGateIds);
+  return normalized.filter((gateId) => validGateSet.has(gateId));
+};
+
+export const normalizeCreateSbtMetadataLockGateIdsForValidGates = (
+  metadataLockGateIds: unknown = {},
+  validGateIds: unknown[] = []
+): Record<string, string[]> => {
+  const normalizedMetadataLocks = normalizeMetadataLockGateIds(metadataLockGateIds);
+  return METADATA_LOCK_FIELDS.reduce<Record<string, string[]>>((acc, fieldKey) => {
+    acc[fieldKey] = normalizeCreateSbtSelectedGateIds(normalizedMetadataLocks[fieldKey], validGateIds);
+    return acc;
+  }, createEmptyMetadataLockGateIds());
+};
+
+export const buildCreateSbtMetadataLockSelectionState = ({
+  gateOptions = [],
+  metadataLockGateIds = {},
+}: BuildCreateSbtMetadataLockSelectionStateArgs = {}): CreateSbtMetadataLockSelectionState => {
+  const validGateIds = getCreateSbtValidGateIds(gateOptions);
+  const normalizedMetadataLocks = normalizeMetadataLockGateIds(metadataLockGateIds);
+  return {
+    validGateIds,
+    nameSelectedGateIds: normalizeCreateSbtSelectedGateIds(normalizedMetadataLocks.name, validGateIds),
+    descriptionSelectedGateIds: normalizeCreateSbtSelectedGateIds(normalizedMetadataLocks.description, validGateIds),
+    tagsSelectedGateIds: normalizeCreateSbtSelectedGateIds(normalizedMetadataLocks.tags, validGateIds),
+    docsSelectedGateIds: normalizeCreateSbtSelectedGateIds(normalizedMetadataLocks.documentURLs, validGateIds),
+    imageSelectedGateIds: normalizeCreateSbtSelectedGateIds(normalizedMetadataLocks.image, validGateIds),
+  };
+};
+
+export const resolveCreateSbtEncryptedFieldGateValue = ({
+  selectedGateIds = [],
+  validGateIds = [],
+}: ResolveCreateSbtEncryptedFieldGateValueArgs = {}): string | string[] | null => {
+  const normalized = normalizeCreateSbtSelectedGateIds(selectedGateIds, validGateIds);
+  if (!normalized.length) return null;
+  return normalized.length === 1 ? normalized[0] : normalized;
+};
+
+export const writeCreateSbtEncryptedFieldGate = ({
+  fieldKey = '',
+  selectedGateIds = [],
+  target = null,
+  validGateIds = [],
+}: WriteCreateSbtEncryptedFieldGateArgs = {}): boolean => {
+  const fieldGateValue = resolveCreateSbtEncryptedFieldGateValue({ selectedGateIds, validGateIds });
+  if (!fieldGateValue || !target || typeof target !== 'object') return false;
+  target[String(fieldKey || '')] = fieldGateValue;
+  return true;
+};
+
+export const buildCreateSbtImagePreviewState = ({
+  imageChooserStatusText = '',
+  imageChooserStatusTone = 'default',
+  imageLoadError = false,
+  sbtImageFile = null,
+  sbtImageUrl = '',
+  useImageUrl = false,
+}: BuildCreateSbtImagePreviewStateArgs = {}): CreateSbtImagePreviewState => {
+  const trimmedImageUrl = String(sbtImageUrl || '').trim();
+  const hasImagePreview = !!(sbtImageFile && !imageLoadError);
+  const hasPendingImagePreview = Boolean(useImageUrl && trimmedImageUrl.length > 0 && !hasImagePreview && !imageLoadError);
+  const showImagePreviewError = Boolean(useImageUrl && trimmedImageUrl.length > 0 && imageLoadError);
+  const effectiveImageStatusText = imageChooserStatusText || (
+    hasPendingImagePreview
+      ? 'Loading preview...'
+      : showImagePreviewError
+        ? 'Image preview unavailable.'
+        : ''
+  );
+  const effectiveImageStatusTone = imageChooserStatusText
+    ? imageChooserStatusTone
+    : hasPendingImagePreview
+      ? 'loading'
+      : showImagePreviewError
+        ? 'error'
+        : 'default';
+
+  return {
+    effectiveImageStatusText,
+    effectiveImageStatusTone,
+    hasImagePreview,
+    hasPendingImagePreview,
+    previewFile: hasImagePreview ? sbtImageFile as Blob : null,
+    showImagePreviewError,
+  };
+};
+
+const hasCreateSbtTextValue = (value: unknown): boolean => (
+  String(value || '').trim().length > 0
+);
+
+const hasCreateSbtLength = (value: unknown): boolean => (
+  Array.isArray(value) ? value.length > 0 : false
+);
+
+const hasCreateSbtDisplayLength = (value: unknown): boolean => (
+  Number((value as { length?: unknown })?.length || 0) > 0
+);
+
+export const resolveCreateSbtInfoDisplayState = ({
+  documentURLs = [],
+  imageSelectedGateIds = [],
+  nameSelectedGateIds = [],
+  tags = [],
+}: ResolveCreateSbtInfoDisplayStateArgs = {}): CreateSbtInfoDisplayState => ({
+  shouldRenderDocumentUrlList: hasCreateSbtDisplayLength(documentURLs),
+  shouldRenderImageLockHelp: hasCreateSbtDisplayLength(imageSelectedGateIds),
+  shouldRenderNameLockHelp: hasCreateSbtDisplayLength(nameSelectedGateIds),
+  shouldRenderTagPills: hasCreateSbtDisplayLength(tags),
+});
+
+export const resolveCreateSbtMintOptionsDisplayState = ({
+  hideNetworkSelector = false,
+  isLimited = false,
+  isTimeLimited = false,
+  predictableAddressActive = false,
+  predictedAddressBusy = false,
+}: ResolveCreateSbtMintOptionsDisplayStateArgs = {}): CreateSbtMintOptionsDisplayState => ({
+  shouldRenderLimitedNumberInput: !!isLimited,
+  shouldRenderNetworkReadonly: !!hideNetworkSelector,
+  shouldRenderNetworkSelector: !hideNetworkSelector,
+  shouldRenderPredictableAddressBusy: !!predictableAddressActive && !!predictedAddressBusy,
+  shouldRenderPredictableAddressDetails: !!predictableAddressActive,
+  shouldRenderTimeLimitedInput: !!isTimeLimited,
+  shouldUseLimitedOptionActiveClass: !!isLimited,
+  shouldUsePredictableAddressActiveClass: !!predictableAddressActive,
+  shouldUseTimeLimitedOptionActiveClass: !!isTimeLimited,
+});
+
+export const resolveCreateSbtActionDisplayState = ({
+  currentStep = 0,
+  distributionOption = '',
+  mintingFailed = false,
+  sbtMinted = false,
+  startedMinting = false,
+}: ResolveCreateSbtActionDisplayStateArgs = {}): CreateSbtActionDisplayState => {
+  const step = Number(currentStep || 0);
+  return {
+    shouldRenderGroupPasswordInput: String(distributionOption || '') === 'groupPassword',
+    shouldRenderMintingFailureIcon: !!mintingFailed && step > 0,
+    shouldRenderProgressIndicator: !!startedMinting,
+    shouldRenderStartFreshButton: !!sbtMinted,
+  };
+};
+
+export const buildCreateSbtRenderState = ({
+  create2Salt = '',
+  deferredDeployMode = false,
+  deferredSurfaceBg = '',
+  descriptionSelectedGateIds = [],
+  distributionConfigs = [],
+  distributionOption = '',
+  docsSelectedGateIds = [],
+  documentURLs = [],
+  documentUrl = '',
+  imageSelectedGateIds = [],
+  isLimited = false,
+  nameSelectedGateIds = [],
+  normalizeDocumentUrlDraft = null,
+  sbtDescription = '',
+  sbtImageFile = null,
+  sbtImageUrl = '',
+  sbtName = '',
+  tags = [],
+  tagsSelectedGateIds = [],
+}: BuildCreateSbtRenderStateArgs = {}): CreateSbtRenderState => {
+  const normalizedDocumentUrlDraft = typeof normalizeDocumentUrlDraft === 'function'
+    ? normalizeDocumentUrlDraft(documentUrl)
+    : [];
+  const hasDocumentUrlDraft = Array.isArray(normalizedDocumentUrlDraft)
+    ? normalizedDocumentUrlDraft.length > 0
+    : hasCreateSbtTextValue(normalizedDocumentUrlDraft);
+  const isDeferredDeployMode = !!deferredDeployMode;
+  const resolvedDistributionOption = String(distributionOption || '');
+  const isPasswordDistribution =
+    resolvedDistributionOption === 'hasPasswords' ||
+    resolvedDistributionOption === 'groupPassword';
+
+  return {
+    createActionLabel: isDeferredDeployMode ? 'Add to Session' : 'Create',
+    distributionOptions: (Array.isArray(distributionConfigs) ? distributionConfigs : [])
+      .map((optionInput: unknown) => {
+        const option = isPlainObject(optionInput) ? optionInput as CreateSbtDistributionOptionConfig : {};
+        return {
+          ...option,
+          selected: option.value === distributionOption,
+          shouldUseActiveClass: option.value === distributionOption,
+        };
+      }),
+    headerTitle: isDeferredDeployMode ? 'Add to Session' : 'Create',
+    isLimitedWithPasswords: !!isLimited && isPasswordDistribution,
+    isPasswordDistribution,
+    isDirty: (
+      hasCreateSbtTextValue(sbtName) ||
+      hasCreateSbtTextValue(sbtDescription) ||
+      !!sbtImageFile ||
+      hasCreateSbtTextValue(sbtImageUrl) ||
+      hasDocumentUrlDraft ||
+      hasCreateSbtLength(documentURLs) ||
+      hasCreateSbtLength(nameSelectedGateIds) ||
+      hasCreateSbtLength(descriptionSelectedGateIds) ||
+      hasCreateSbtLength(tagsSelectedGateIds) ||
+      hasCreateSbtLength(docsSelectedGateIds) ||
+      hasCreateSbtLength(imageSelectedGateIds) ||
+      hasCreateSbtTextValue(create2Salt) ||
+      hasCreateSbtLength(tags)
+    ),
+    predictableAddressLocked: isDeferredDeployMode || resolvedDistributionOption === 'groupPassword',
+    ...(isDeferredDeployMode
+      ? { rootSurfaceStyle: { '--ce-create-group-surface-bg': String(deferredSurfaceBg || '') } }
+      : {}),
+  };
+};
+
+export const resolveCreateSbtPrimaryActionLabel = ({
+  createActionLabel = 'Create',
+  currentStep = 0,
+  deferredDeployMode = false,
+  mintedLabel = 'Minted',
+  mintingLabel = 'Minting',
+  sbtMinted = false,
+}: ResolveCreateSbtPrimaryActionLabelArgs = {}): string => {
+  const actionLabel = String(createActionLabel || '');
+  const mintingText = String(mintingLabel || '');
+  if (sbtMinted) return `${String(mintedLabel || '')}!`;
+  if (currentStep === 0) return actionLabel;
+  if (currentStep === 1) return 'Uploading Image...';
+  if (currentStep === 2) return 'Uploading URI...';
+  if (currentStep === 3) return deferredDeployMode ? 'Saving Draft...' : `${mintingText}...`;
+  return actionLabel;
+};
+
+export const resolveCreateSbtPrimaryButtonState = ({
+  sbtMinted = false,
+  startedMinting = false,
+}: ResolveCreateSbtPrimaryButtonStateArgs = {}): CreateSbtPrimaryButtonState => ({
+  disabled: !!sbtMinted || !!startedMinting,
+});
+
+export const resolveCreateSbtClearFormButtonState = ({
+  isDirty = false,
+  sbtMinted = false,
+}: ResolveCreateSbtClearFormButtonStateArgs = {}): CreateSbtClearFormButtonState => ({
+  shouldShowClearFormButton: !!isDirty && !sbtMinted,
+});
+
+export const buildCreateSbtProgressIndicatorState = ({
+  currentStep = 0,
+  sbtMinted = false,
+}: BuildCreateSbtProgressIndicatorStateArgs = {}): CreateSbtProgressIndicatorState => {
+  const step = currentStep as number;
+  return {
+    imageUploadStep: {
+      completed: step >= 1,
+      iconState: step === 1 ? 'spinner' : step > 1 ? 'check' : 'attention',
+      spin: step === 1,
+    },
+    tokenUriUploadStep: {
+      completed: step >= 2,
+      iconState: step === 2 ? 'spinner' : step > 2 ? 'check' : 'attention',
+      spin: step === 2,
+    },
+    mintStep: {
+      completed: step >= 3,
+      iconState: step === 3 && !sbtMinted ? 'spinner' : step >= 3 ? 'check' : 'attention',
+      spin: step === 3 && !sbtMinted,
+    },
+  };
+};
+
+export const buildCreateSbtProgressStepClassName = ({
+  completed = false,
+  completedClassName = '',
+  pendingClassName = '',
+}: BuildCreateSbtProgressStepClassNameArgs = {}): string => (
+  String((completed ? completedClassName : pendingClassName) || '')
+);
+
+export const resolveCreateSbtSuccessDisplayState = ({
+  distributionOption = '',
+  openMintAutoJoinUrl = '',
+  passwordList = [],
+  sbtInviteLinks = [],
+  sbtMinted = false,
+  showJson = false,
+  startedMinting = false,
+  tokenURI = '',
+}: ResolveCreateSbtSuccessDisplayStateArgs = {}): CreateSbtSuccessDisplayState => {
+  const isMinted = !!sbtMinted;
+  const option = String(distributionOption || '');
+  const inviteLinkCount = Number((sbtInviteLinks as { length?: unknown })?.length || 0);
+  return {
+    shouldRenderContractAddress: !!startedMinting,
+    shouldRenderGroupPasswordAutoJoin: option === 'groupPassword',
+    shouldRenderInviteLinks: isMinted && option === 'hasPasswords' && inviteLinkCount > 0,
+    shouldRenderJsonPanel: !!showJson && isMinted,
+    shouldRenderOpenMintAutoJoin: !!openMintAutoJoinUrl,
+    shouldRenderPasswordRecovery: (
+      isMinted &&
+      option !== 'hasPasswords' &&
+      Array.isArray(passwordList) &&
+      passwordList.length > 0
+    ),
+    shouldRenderSuccessPanel: isMinted,
+    shouldRenderTokenUriLink: !!tokenURI,
+  };
+};
+
+export const resolveCreateSbtCopyActionDisplayState = ({
+  copied = false,
+  copiedLabel = '',
+  defaultLabel = '',
+}: ResolveCreateSbtCopyActionDisplayStateArgs = {}): CreateSbtCopyActionDisplayState => {
+  const isCopied = !!copied;
+  const fallbackLabel = String(defaultLabel || '');
+  const copiedText = String(copiedLabel || fallbackLabel);
+  return {
+    label: isCopied ? copiedText : fallbackLabel,
+    shouldRenderCopiedIcon: isCopied,
+    shouldRenderDefaultIcon: !isCopied,
+  };
+};
+
+export const resolveCreateSbtBookmarkActionDisplayState = ({
+  bookmarkedColor = '#ffe082',
+  bookmarkedSbtsSet = null,
+  sbtAddress = '',
+}: ResolveCreateSbtBookmarkActionDisplayStateArgs = {}): CreateSbtBookmarkActionDisplayState => {
+  const normalizedAddress = String(sbtAddress).toLowerCase();
+  const isBookmarked = bookmarkedSbtsSet instanceof Set && bookmarkedSbtsSet.has(normalizedAddress);
+  return {
+    iconStyle: {
+      color: isBookmarked ? String(bookmarkedColor || '#ffe082') : undefined,
+    },
+    isBookmarked,
+  };
+};
+
+export const buildCreateSbtFormCachePayload = ({
+  state = {},
+  selectedAuthoringChainId = null,
+  effectiveSessionSlug = '',
+}: {
+  state?: Record<string, unknown>;
+  selectedAuthoringChainId?: unknown;
+  effectiveSessionSlug?: unknown;
+} = {}): CreateSbtFormCachePayload => {
+  const {
+    sbtName, sbtDescription, sbtImageUrl, useImageUrl, sbtDistribution,
+    tags, documentIDHashes, documentURLs, documentUrl, groupPassword, numInviteLinks,
+    exportFormat, metadataLockGateIds, create2Salt, predictableAddressEnabled,
+    deferredCreate2Salt, autoAppliedDefaultTags, dismissedDefaultTags,
+  } = state;
+
+  const safeDist: Record<string, unknown> = { ...Object(sbtDistribution || {}) };
+  const rawMintingEndTime = safeDist.mintingEndTime;
+  safeDist.mintingEndTime = rawMintingEndTime
+    ? new Date(rawMintingEndTime as string | number | Date).toISOString()
+    : null;
+  safeDist.network = selectedAuthoringChainId || 'not connected';
+
+  return {
+    sbtName: ((sbtName as string) || '').trim(),
+    sbtDescription: ((sbtDescription as string) || '').trim(),
+    sbtImageUrl,
+    useImageUrl,
+    sbtDistribution: safeDist,
+    tags,
+    documentIDHashes,
+    documentURLs,
+    documentUrl: normalizeCreateSbtDocumentUrlDraft(documentUrl),
+    groupPassword,
+    metadataLockGateIds: normalizeMetadataLockGateIds(metadataLockGateIds),
+    predictableAddressEnabled: !!predictableAddressEnabled,
+    autoAppliedDefaultTags: Array.isArray(autoAppliedDefaultTags) ? autoAppliedDefaultTags : [],
+    dismissedDefaultTags: Array.isArray(dismissedDefaultTags) ? dismissedDefaultTags : [],
+    numInviteLinks,
+    exportFormat,
+    create2Salt,
+    deferredCreate2Salt,
+    _sessionSlug: effectiveSessionSlug || '',
+  };
+};
+
+export const getCreateSbtValidGateIds = (gateOptions: unknown): unknown[] => (
+  (Array.isArray(gateOptions) ? gateOptions : [])
+    .map((opt: unknown) => (isPlainObject(opt) ? opt.id : null))
+    .filter(Boolean)
+);
+
+export const resolveCreateSbtLegacyDescriptionLockGateIds = ({
+  parsed = {},
+  gateOptions = [],
+}: {
+  parsed?: unknown;
+  gateOptions?: unknown;
+} = {}): unknown[] => {
+  const parsedRecord = isPlainObject(parsed) ? parsed : {};
+  const legacyDescriptionAddresses = new Set<string>(
+    (Array.isArray(parsedRecord.descriptionGateSBTs) ? parsedRecord.descriptionGateSBTs : [])
+      .map((entry: unknown) => (
+        String((isPlainObject(entry) ? entry.address : entry) || '').trim().toLowerCase()
+      ))
+      .filter(Boolean)
+  );
+  if (legacyDescriptionAddresses.size === 0) return [];
+  return (Array.isArray(gateOptions) ? gateOptions : [])
+    .filter((gate: unknown) => {
+      const gateRecord = isPlainObject(gate) ? gate : {};
+      const sbtAddresses = Array.isArray(gateRecord.sbtAddresses) ? gateRecord.sbtAddresses : [];
+      if (sbtAddresses.length !== 1) return false;
+      return legacyDescriptionAddresses.has(String(sbtAddresses[0] || '').toLowerCase());
+    })
+    .map((gate: unknown) => (isPlainObject(gate) ? gate.id : null))
+    .filter(Boolean);
+};
+
+export const resolveCreateSbtRestoredMetadataLockGateIds = ({
+  parsed = {},
+  gateOptions = [],
+}: {
+  parsed?: unknown;
+  gateOptions?: unknown;
+} = {}): Record<string, string[]> => {
+  const parsedRecord = isPlainObject(parsed) ? parsed : {};
+  const cachedMetadataLockGateIds = normalizeMetadataLockGateIds(parsedRecord.metadataLockGateIds);
+  const legacyDescriptionLockGateIds = resolveCreateSbtLegacyDescriptionLockGateIds({
+    parsed: parsedRecord,
+    gateOptions,
+  });
+  return normalizeMetadataLockGateIds({
+    ...cachedMetadataLockGateIds,
+    description: normalizeGateIds(cachedMetadataLockGateIds.description).length > 0
+      ? cachedMetadataLockGateIds.description
+      : (
+        normalizeGateIds(parsedRecord.descriptionLockGateIds).length > 0
+          ? parsedRecord.descriptionLockGateIds
+          : legacyDescriptionLockGateIds
+      ),
+    tags: normalizeGateIds(cachedMetadataLockGateIds.tags).length > 0
+      ? cachedMetadataLockGateIds.tags
+      : parsedRecord.tagsLockGateIds,
+    documentURLs: normalizeGateIds(cachedMetadataLockGateIds.documentURLs).length > 0
+      ? cachedMetadataLockGateIds.documentURLs
+      : parsedRecord.docsLockGateIds,
+  });
+};
+
+export const getMetadataFieldLockGateIds = (
+  lockMap?: Record<string, unknown>,
+  fieldKey = ''
+): string[] => (
+  normalizeGateIds(lockMap?.[fieldKey])
+);
+
+export const resolveCreateSbtMetadataFieldGateIds = ({
+  fieldKey = '',
+  gatesLowerLabel = 'gates',
+  lockMap = {},
+  validGateIds = [],
+}: ResolveCreateSbtMetadataFieldGateIdsArgs = {}): string[] => {
+  const rawGateIds = getMetadataFieldLockGateIds(lockMap, fieldKey);
+  const knownGateIds = new Set<unknown>(Array.isArray(validGateIds) ? validGateIds : []);
+  const selectedGateIds = rawGateIds.filter((gateId) => knownGateIds.has(gateId));
+  if (rawGateIds.length > 0 && selectedGateIds.length !== rawGateIds.length) {
+    const gatesLower = String(gatesLowerLabel || 'gates');
+    throw new Error(`${fieldKey} encryption ${gatesLower} could not be resolved. Please reselect the lock or configure valid ${gatesLower}.`);
+  }
+  return selectedGateIds;
+};
+
+export const areMetadataLockGateMapsEqual = (
+  a?: Record<string, unknown>,
+  b?: Record<string, unknown>
+): boolean => (
+  METADATA_LOCK_FIELDS.every((fieldKey) => (
+    areStringArraysEqual(
+      getMetadataFieldLockGateIds(a, fieldKey),
+      getMetadataFieldLockGateIds(b, fieldKey)
+    )
+  ))
+);
