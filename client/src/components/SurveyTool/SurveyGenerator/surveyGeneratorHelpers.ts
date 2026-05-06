@@ -219,7 +219,6 @@ export type GeneratedSurveyStatementsInput = {
   questionTypes: QuestionTypeSelection;
   count: number;
   fallbackTitle?: unknown;
-  generateQuestionId?: (type: string, prompt: string, options?: string[]) => string;
 };
 
 export type GeneratedSurveyStatementsResult = {
@@ -550,7 +549,6 @@ export const buildGeneratedSurveyStatements = ({
   questionTypes,
   count,
   fallbackTitle = '',
-  generateQuestionId = generateSharedQuestionId,
 }: GeneratedSurveyStatementsInput): GeneratedSurveyStatementsResult => {
   const wantedTypes = getSelectedQuestionTypes(questionTypes);
   const questions = aiData.questions
@@ -560,7 +558,7 @@ export const buildGeneratedSurveyStatements = ({
   questions.forEach((question) => { question.tags = question.tags || []; });
 
   const statements = questions.map((question) => ({
-    id: generateQuestionId(question.questionType, question.prompt, question.options || []),
+    id: generateSharedQuestionId(question.questionType, question.prompt, question.options || []),
     type: question.questionType,
     prompt: question.prompt,
     options: question.questionType === 'multichoice' ? question.options : undefined,
@@ -595,15 +593,14 @@ export const buildSingleGenerationPrompt = ({
     (transcriptMode ? 'transcript' : 'text');
 
   const multiSpeakerHint = overrides.multiSpeakerHintOverride || 'unknown';
-  const literalReplacement = (value: unknown) => () => toStr(value);
 
   return promptTemplate
-    .replace('<SourceDocContent>', literalReplacement(sourceDocContent))
+    .replace('<SourceDocContent>', toStr(sourceDocContent))
     .replace('<NumSeedStatements>', String(count))
     .replace('<Types>', typesStr)
-    .replace(/<DefaultTags>/g, literalReplacement(defaultTagsStr))
-    .replace(/<SourceType>/g, literalReplacement(sourceType))
+    .replace(/<DefaultTags>/g, defaultTagsStr)
+    .replace('<SourceType>', toStr(sourceType))
     .replace('<MultiSpeakerHint>', toStr(multiSpeakerHint))
-    .replace('<GroupCustomInstructions>', literalReplacement(sessionInstructions))
+    .replace('<GroupCustomInstructions>', toStr(sessionInstructions))
     .replace('<ClipDurationMinutes>', '');
 };

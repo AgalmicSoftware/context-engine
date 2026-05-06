@@ -47,7 +47,6 @@ import {
   extractSingleQuestionOptionsFromCandidate,
   findSingleQuestionEntryAcrossGroups,
   getLatestAnsweredResponses,
-  responseHasLitSbtRecipient,
   isEnvelopeAesGcm256,
   resolveSingleQuestionMapFromCacheValue,
   resolvePromptGateTooltipProps,
@@ -55,61 +54,166 @@ import {
 
 const questionLog = createLogger('questions');
 
-const normalizeText = (value: any) => String(value || '').trim();
-const joinClassNames = (...parts: any[]) => parts.filter(Boolean).join(' ');
-
-const collectGateAddresses = (gates: any = [], directAddresses: any = []) => {
-  const out: any[] = [];
-  const seen: any = new Set();
-  const push = (value: any) => {
-    const address = normalizeText(value);
-    if (!address) return;
-    const key = address.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push(address);
+type SingleQuestionRecord = Record<string, unknown>;
+type SingleQuestionNetworkLike = SingleQuestionRecord & {
+  id?: unknown;
+  chainId?: unknown;
+};
+type SingleQuestionAnswerLike = SingleQuestionRecord & {
+  encrypted?: unknown;
+  encryptedPortion?: unknown;
+  value?: unknown;
+};
+type SingleQuestionGateLike = SingleQuestionRecord & {
+  gateId?: unknown;
+  id?: unknown;
+  mode?: unknown;
+  operator?: unknown;
+  gateMode?: unknown;
+  requireAll?: boolean;
+  sbtAddress?: unknown;
+  sbtAddresses?: unknown;
+};
+type SingleQuestionQuestionLike = SingleQuestionRecord & {
+  _id?: unknown;
+  arweaveTxId?: unknown;
+  encryption?: SingleQuestionRecord & {
+    gate?: SingleQuestionGateLike | null;
+    gateId?: unknown;
+    gates?: unknown;
+    mode?: unknown;
+    sbtAddresses?: unknown;
   };
-
-  (Array.isArray(directAddresses) ? directAddresses : []).forEach(push);
-  (Array.isArray(gates) ? gates : []).forEach((gate: any) => {
-    (Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []).forEach(push);
-    push(gate?.sbtAddress);
-  });
-
-  return out;
+  gate?: SingleQuestionGateLike | null;
+  gateConfig?: SingleQuestionGateLike | null;
+  gateId?: unknown;
+  gateMode?: unknown;
+  gates?: unknown;
+  id?: unknown;
+  key?: unknown;
+  options?: unknown;
+  prompt?: React.ReactNode;
+  questionId?: unknown;
+  sbtAddresses?: unknown;
+  sessionSlug?: unknown;
+  slug?: unknown;
+  type?: unknown;
+  uuid?: unknown;
+};
+type SingleQuestionResponseLike = SingleQuestionRecord & {
+  additional?: SingleQuestionAnswerLike | null;
+  answer?: SingleQuestionAnswerLike | null;
+  arweaveTxId?: unknown;
+  conviction?: unknown;
+  importance?: unknown;
+};
+type SingleQuestionAggregatorQuestion = SingleQuestionQuestionLike & {
+  options?: unknown;
+  type?: unknown;
+};
+type SingleQuestionResponseProps = SingleQuestionRecord & {
+  activeSessionSlug?: unknown;
+  aggregatorContainerClassName?: string;
+  aggregatorFreeformAnswerClassName?: string;
+  aggregatorParagraphClassName?: string;
+  aggregatorResponseMode?: unknown;
+  aggregatorTextClassName?: string;
+  allResponses?: unknown;
+  bodyClassName?: string;
+  cacheNonce?: unknown;
+  cacheRevision?: unknown;
+  cache?: SingleQuestionRecord | null;
+  canDecryptOtherResponses?: unknown;
+  compactEncryptedAnswerCta?: boolean;
+  containerClassName?: string;
+  entities?: SingleQuestionRecord | null;
+  gateConfig?: SingleQuestionGateLike | null;
+  gateId?: unknown;
+  gateMode?: unknown;
+  getQuestionFromCache?: (questionId: unknown) => unknown;
+  iconButtonClassName?: string;
+  isOwnResponse?: unknown;
+  linksContainerClassName?: string;
+  mode?: string;
+  network?: SingleQuestionNetworkLike | null;
+  networkChainId?: unknown;
+  onDecryptQuestion?: (...args: unknown[]) => unknown;
+  onReloadQuestionPrompt?: (questionId: unknown) => unknown;
+  promptReloading?: unknown;
+  question?: SingleQuestionQuestionLike | null;
+  questionCache?: SingleQuestionRecord | null;
+  questionOnly?: unknown;
+  questionPromptClassName?: string;
+  questionPromptTestId?: string;
+  questionsById?: SingleQuestionRecord | null;
+  questionsCacheNonce?: unknown;
+  questionsCache?: SingleQuestionRecord | null;
+  responderAddress?: string;
+  response?: SingleQuestionResponseLike | null;
+  sbtAddresses?: unknown;
+  selectQuestionById?: (questionId: unknown) => unknown;
+  sessionSlug?: unknown;
+  showImportance?: unknown;
+  stackCompactDecryptCta?: boolean;
+  storeCache?: SingleQuestionRecord | null;
+  userHeldSBTs?: unknown;
+};
+type SingleQuestionResponseState = {
+  bookmarkSuccess?: boolean;
+  isBookmarked?: boolean;
+  miniExpanded?: boolean;
+};
+type SingleQuestionQuestionsMapMemo = {
+  key: string;
+  value: SingleQuestionQuestionCacheMap;
+};
+type SingleQuestionAggregatorAnsweredMemo = {
+  responsesRef: unknown;
+  signature: string;
+  value: unknown[];
+};
+type SingleQuestionMemoMap<Key = unknown> = {
+  size: number;
+  keys: () => IterableIterator<Key>;
+  delete: (key: Key) => boolean;
+};
+type SingleQuestionBookmarkCache = SingleQuestionRecord & {
+  questions: unknown[];
+  surveys: unknown[];
+};
+type SingleQuestionCacheEntry = SingleQuestionRecord & {
+  slug?: unknown;
+  value?: unknown;
+};
+type SingleQuestionQuestionCacheMap = Record<string, unknown>;
+type SingleQuestionAggregatorClassNames = {
+  aggregatorContainerClassName: string;
+  aggregatorParagraphClassName: string;
+  aggregatorFreeformAnswerClassName: string;
+};
+type SingleQuestionWriteCache = (
+  namespace: string,
+  slug: string | undefined,
+  value: unknown
+) => Promise<unknown>;
+type SingleQuestionGlobalCacheWindow = Window & {
+  __APP_CACHE__?: Record<string, unknown>;
+  __QUESTION_CACHE__?: Record<string, unknown>;
+  __SURVEY_CACHE__?: Record<string, unknown>;
 };
 
-const normalizeGateMode = (gate: any = null, fallbackMode: any = '') => {
-  const raw = normalizeText(fallbackMode || gate?.mode || gate?.operator || gate?.gateMode).toLowerCase();
-  if (gate?.requireAll === true || raw === 'all' || raw === 'and') return 'all';
-  return raw === 'any' || !raw ? 'any' : raw;
+const joinClassNames = (...parts: unknown[]) => parts.filter(Boolean).join(' ');
+
+export const SINGLE_QUESTION_IMPORTANCE_SLIDER_STYLE: React.CSSProperties = {
+  width: '200px',
 };
 
-const resolvePromptGateTooltipProps = ({
-  question = null,
-  gateId = '',
-  gateConfig = null,
-  gateMode = '',
-  sbtAddresses = [],
-  userHeldSBTs = [],
-}: any = {}) => {
-  const questionGateList = Array.isArray(question?.encryption?.gates)
-    ? question.encryption.gates
-    : Array.isArray(question?.gates)
-      ? question.gates
-      : [];
-  const resolvedGateConfig =
-    gateConfig ||
-    question?.gateConfig ||
-    question?.encryption?.gate ||
-    question?.gate ||
-    questionGateList[0] ||
-    null;
-  const resolvedAddresses = collectGateAddresses(questionGateList, [
-    ...(Array.isArray(sbtAddresses) ? sbtAddresses : []),
-    ...(Array.isArray(question?.sbtAddresses) ? question.sbtAddresses : []),
-    ...(Array.isArray(question?.encryption?.sbtAddresses) ? question.encryption.sbtAddresses : []),
-  ]);
+export const resolveSingleQuestionBookmarkIconStyle = (
+  bookmarkSuccess: unknown,
+  isBookmarked: unknown
+): React.CSSProperties => ({
+  color: bookmarkSuccess ? 'lightgreen' : isBookmarked ? '#ffc107' : 'white',
+});
 
 export const buildSingleQuestionMiniPromptButtonClassName = (
   styleMap: Record<string, string>
@@ -158,10 +262,14 @@ export const resolveSingleQuestionRatingBarStyle = (
  * SCSS is in SingleQuestionResponse.module.scss
  */
 
-class SingleQuestionResponse extends Component<any, any> {
-  [key: string]: any;
+class SingleQuestionResponse extends Component<SingleQuestionResponseProps, SingleQuestionResponseState> {
+  private _bookmarkSuccessTimer: ReturnType<typeof setTimeout> | null;
+  private _questionsMapMemo: SingleQuestionQuestionsMapMemo;
+  private _crossGroupQuestionMemo: Map<string, unknown | null>;
+  private _multichoiceOptionsMemo: Map<string, string[]>;
+  private _aggregatorAnsweredMemo: SingleQuestionAggregatorAnsweredMemo;
 
-  constructor(props: any) {
+  constructor(props: SingleQuestionResponseProps) {
     super(props);
     this.state = {
       miniExpanded: false, // used only if mode="mini"
@@ -187,7 +295,7 @@ class SingleQuestionResponse extends Component<any, any> {
     this.clearQuestionLookupMemo();
   }
 
-  componentDidUpdate(prevProps: any) {
+  componentDidUpdate(prevProps: SingleQuestionResponseProps) {
     if (this.props.question?.id !== prevProps.question?.id) {
       this.checkBookmarkStatus();
     }
@@ -204,13 +312,13 @@ class SingleQuestionResponse extends Component<any, any> {
     }
   }
 
-  clearQuestionLookupMemo: any = () => {
+  clearQuestionLookupMemo = (): void => {
     this._questionsMapMemo = { key: '', value: {} };
     this._crossGroupQuestionMemo.clear();
     this._multichoiceOptionsMemo.clear();
   };
 
-  trimMemoMap: any = (map: any, maxEntries: any = 128) => {
+  trimMemoMap = <Key,>(map: SingleQuestionMemoMap<Key> | null | undefined, maxEntries = 128): void => {
     if (!map || typeof map.size !== 'number') return;
     while (map.size > maxEntries) {
       const firstKey = map.keys().next().value;
@@ -218,7 +326,7 @@ class SingleQuestionResponse extends Component<any, any> {
     }
   };
 
-  getQuestionLookupContextKey: any = () => {
+  getQuestionLookupContextKey = (): string => {
     const slug = this.resolveGroupSlug();
     const netIdStr = String(
       this.props?.network?.id ??
@@ -231,26 +339,16 @@ class SingleQuestionResponse extends Component<any, any> {
       this.props?.cacheNonce,
       this.props?.cacheRevision,
     ]
-      .map((part: any) => (part == null ? '' : String(part)))
+      .map((part: unknown) => (part == null ? '' : String(part)))
       .join(':');
     return `${slug}|${netIdStr}|${nonceParts}`;
   };
 
-  buildAggregatorResponseSignature: any = (allResponses: any = []) => {
-    const total = Array.isArray(allResponses) ? allResponses.length : 0;
-    if (total <= 0) return '0';
-    const first = allResponses[0] || {};
-    const last = allResponses[total - 1] || {};
-    return [
-      total,
-      String(first.responder || ''),
-      String(first.timestamp || ''),
-      String(last.responder || ''),
-      String(last.timestamp || ''),
-    ].join('|');
+  buildAggregatorResponseSignature = (allResponses: unknown = []): string => {
+    return buildAggregatorResponseSignature(allResponses);
   };
 
-  getLatestAnsweredResponses: any = (allResponses: any = []) => {
+  getLatestAnsweredResponses = (allResponses: unknown = []): unknown[] => {
     if (!Array.isArray(allResponses) || allResponses.length === 0) {
       return [];
     }
@@ -260,22 +358,12 @@ class SingleQuestionResponse extends Component<any, any> {
       return memo.value;
     }
 
-    const responderMap: any = new Map();
-    allResponses.forEach((r: any) => {
-      const existing = responderMap.get(r.responder);
-      const existingTs = existing ? parseInt(existing.timestamp, 10) : 0;
-      const newTs = parseInt(r.timestamp, 10);
-      if (!existing || existingTs < newTs) {
-        responderMap.set(r.responder, r);
-      }
-    });
-    const uniqueResps = Array.from(responderMap.values()).map((r: any) => r.response);
-    const answered = uniqueResps.filter(Boolean);
+    const answered = getLatestAnsweredResponses(allResponses);
     this._aggregatorAnsweredMemo = { responsesRef: allResponses, signature, value: answered };
     return answered;
   };
 
-  checkBookmarkStatus: any = () => {
+  checkBookmarkStatus = (): void => {
     const { question } = this.props;
     if (!question || !question.id) return;
 
@@ -295,7 +383,7 @@ class SingleQuestionResponse extends Component<any, any> {
     }
   };
 
-  handleBookmarkClick: any = () => {
+  handleBookmarkClick = (): void => {
     const { question } = this.props;
     if (!question || !question.id) return;
 
@@ -341,13 +429,13 @@ class SingleQuestionResponse extends Component<any, any> {
       this.setState(buildSingleQuestionBookmarkSuccessPatch(false));
     }, 1500); // Feedback for 1.5s
 
-    void writeCache('bookmarksCache', slug, bookmarksCache).catch((error: any) => {
+    void (writeCache as SingleQuestionWriteCache)('bookmarksCache', slug, bookmarksCache).catch((error: unknown) => {
       questionLog.error('[SingleQuestionResponse] Error saving bookmarksCache:', error);
     });
   };
 
   // For aggregator mode (allResponses array). We compute summary stats & display them.
-  renderAggregatorByType: any = () => {
+  renderAggregatorByType = (): React.ReactNode => {
     const { question, allResponses } = this.props;
 
     // If question is missing, we provide a fallback so we don't just show "Loading question/response..."
@@ -388,7 +476,7 @@ class SingleQuestionResponse extends Component<any, any> {
     }
   };
 
-  getAggregatorClassNames: any = () => ({
+  getAggregatorClassNames = (): SingleQuestionAggregatorClassNames => ({
     aggregatorContainerClassName: joinClassNames(
       styles.aggregatorContainer,
       this.props.aggregatorContainerClassName,
@@ -413,7 +501,7 @@ class SingleQuestionResponse extends Component<any, any> {
    * - Summarizes them in one line, e.g. "2 total responses. 0 encrypted responses not shown, 1 blank not shown."
    * - Displays non-empty, unencrypted answers in a simple list
    */
-  renderFreeformAggregator: any = (parsedResponses: any) => {
+  renderFreeformAggregator = (parsedResponses: unknown[]): React.ReactNode => {
     const {
       aggregatorContainerClassName,
       aggregatorParagraphClassName,
@@ -428,44 +516,12 @@ class SingleQuestionResponse extends Component<any, any> {
       );
     }
 
-    let encryptedCount = 0;
-    let blankCount = 0;
-    let displayedResponses: any[] = [];
-
-    parsedResponses.forEach((respObj: any) => {
-      if (!respObj || !respObj.answer) return;
-      const val = respObj.answer.value;
-
-      if (respObj.answer.encrypted && val === '*') {
-        encryptedCount++;
-      } else if (isFreeformBlankAnswer('freeform', respObj)) {
-        blankCount++;
-      } else {
-        displayedResponses.push(val);
-      }
-    });
-
-    const nonBlankTotal = Math.max(total - blankCount, 0);
-
-    // Build a summary line
-    // e.g. "2 total responses. 1 encrypted not shown, 1 blank not shown."
-    // but omit the piece if it's zero
-    const parts = [`${nonBlankTotal} total responses.`];
-    if (encryptedCount > 0) {
-      parts.push(`${encryptedCount} encrypted responses not shown.`);
-    } else {
-      parts.push(`0 encrypted responses not shown.`);
-    }
-    if (blankCount > 0) {
-      parts.push(`${blankCount} blank not shown.`);
-    }
-
     return (
       <div className={aggregatorContainerClassName}>
         <p className={aggregatorParagraphClassName}>{freeformSummary.summaryParts.join(' ')}</p>
         {freeformSummary.displayedResponses.length > 0 && (
           <div className={styles.freeformAggregatorList}>
-            {displayedResponses.map((val: any, index: any) => (
+            {freeformSummary.displayedResponses.map((val: unknown, index: number) => (
               <div key={index} className={aggregatorFreeformAnswerClassName}>
                 {typeof val === 'string' ? val : JSON.stringify(val)}
               </div>
@@ -477,27 +533,17 @@ class SingleQuestionResponse extends Component<any, any> {
   };
 
   // For aggregator binary
-  renderBinaryAggregator: any = (parsedResponses: any) => {
+  renderBinaryAggregator = (parsedResponses: unknown[]): React.ReactNode => {
     const { aggregatorContainerClassName, aggregatorParagraphClassName } = this.getAggregatorClassNames();
-    let counts: Record<string, number> = { Agree: 0, Unsure: 0, Disagree: 0 };
-    let total = 0;
-    parsedResponses.forEach((resp: any) => {
-      if (resp && resp.answer && resp.answer.value) {
-        const val = resp.answer.value;
-        if (['Agree', 'Unsure', 'Disagree'].includes(val)) {
-          counts[val] = counts[val] + 1;
-          total++;
-        }
-      }
-    });
-    if (total === 0) {
+    const binarySummary = buildBinaryAggregatorSummary(parsedResponses);
+    if (binarySummary.total === 0) {
       return (
         <div className={aggregatorContainerClassName}>
           <p className={aggregatorParagraphClassName}>No binary responses available.</p>
         </div>
       );
     }
-    const percent = (num: any) => ((num / total) * 100).toFixed(2);
+    const percent = (num: number) => ((num / binarySummary.total) * 100).toFixed(2);
 
     return (
       <div className={aggregatorContainerClassName}>
@@ -525,29 +571,15 @@ class SingleQuestionResponse extends Component<any, any> {
   };
 
   // For aggregator rating
-  renderRatingAggregator: any = (parsedResponses: any) => {
+  renderRatingAggregator = (parsedResponses: unknown[]): React.ReactNode => {
     const { aggregatorContainerClassName, aggregatorParagraphClassName } = this.getAggregatorClassNames();
-    const values: any[] = [];
-    parsedResponses.forEach((resp: any) => {
-      const ratingValue = normalizeRatingValue(resp?.answer?.value, null);
-      if (ratingValue !== null) values.push(ratingValue);
-    });
-    if (values.length === 0) {
+    const ratingSummary = buildRatingAggregatorSummary(parsedResponses);
+    if (ratingSummary.total === 0) {
       return (
         <div className={aggregatorContainerClassName}>
           <p className={aggregatorParagraphClassName}>No rating responses available.</p>
         </div>
       );
-    }
-    const sum = values.reduce((acc: any, v: any) => acc + v, 0);
-    const avg = sum / values.length;
-    const sorted = [...values].sort((a: any, b: any) => a - b);
-    let median = 0;
-    const mid = Math.floor(sorted.length / 2);
-    if (sorted.length % 2 === 0) {
-      median = (sorted[mid - 1] + sorted[mid]) / 2;
-    } else {
-      median = sorted[mid];
     }
 
     return (
@@ -563,7 +595,10 @@ class SingleQuestionResponse extends Component<any, any> {
   };
 
   // For aggregator multichoice (UPDATED: robust option detection + group-aware cache)
-  renderMultichoiceAggregator: any = (parsedResponses: any, aggregatorQuestion: any) => {
+  renderMultichoiceAggregator = (
+    parsedResponses: unknown[],
+    aggregatorQuestion: SingleQuestionAggregatorQuestion
+  ): React.ReactNode => {
     const { aggregatorContainerClassName, aggregatorParagraphClassName } = this.getAggregatorClassNames();
     // Prefer options on the object; otherwise consult caches
     let allOptions = this.extractOptionsFromCandidate(aggregatorQuestion);
@@ -571,22 +606,7 @@ class SingleQuestionResponse extends Component<any, any> {
       allOptions = this.getMultichoiceOptions(aggregatorQuestion);
     }
 
-    // If still no options, derive them from the answers so we can show *something*
-    if (!allOptions.length) {
-      const deriveLabel = (choice: any) => {
-        if (typeof choice === 'string') return choice;
-        if (!choice || typeof choice !== 'object') return '';
-        return choice.label ?? choice.text ?? choice.name ?? choice.value ?? '';
-      };
-      const bag: any = new Set();
-      (parsedResponses || []).forEach((resp: any) => {
-        if (!resp?.answer || resp.answer.encrypted) return;
-        const v = resp.answer.value;
-        const arr = Array.isArray(v) ? v : (v != null ? [v] : []);
-        arr.map(deriveLabel).map((s: any) => String(s).trim()).filter(Boolean).forEach((s: any) => bag.add(s));
-      });
-      allOptions = Array.from(bag);
-    }
+    const multichoiceSummary = buildMultichoiceAggregatorSummary(parsedResponses, allOptions);
 
     if (!multichoiceSummary.options.length) {
       return (
@@ -598,67 +618,21 @@ class SingleQuestionResponse extends Component<any, any> {
       );
     }
 
-    // Canonicalize labels for case-insensitive matching while preserving display casing
-    const canon = (s: any) => String(s).trim().toLowerCase();
-    const displayByKey: Record<string, any> = {};
-    allOptions.forEach((opt: any) => {
-      const label = String(opt || '').trim();
-      if (!label) return;
-      const k = canon(label);
-      if (!(k in displayByKey)) displayByKey[k] = label; // first one wins
-    });
-
-    const counts: Record<string, any> = {};
-    Object.values(displayByKey).forEach((label: any) => { counts[label] = 0; });
-
-    const labelFromChoice = (x: any) => {
-      if (typeof x === 'string') return x;
-      if (!x || typeof x !== 'object') return '';
-      return x.label ?? x.text ?? x.name ?? x.value ?? '';
-    };
-
-    let totalResponders = 0;
-
-    (parsedResponses || []).forEach((resp: any) => {
-      if (!resp?.answer || resp.answer.encrypted) return;
-      const v = resp.answer.value;
-
-      // Collect this responder’s unique picks (no double-counting same label)
-      const picks: any = new Set();
-      const addPick = (raw: any) => {
-        const lbl = String(labelFromChoice(raw)).trim();
-        if (!lbl) return;
-        const key = canon(lbl);
-        if (displayByKey[key]) picks.add(displayByKey[key]); // only count known options
-      };
-
-      if (Array.isArray(v)) {
-        v.forEach(addPick);
-      } else if (v != null) {
-        addPick(v);
-      }
-
-      if (picks.size > 0) {
-        totalResponders += 1;
-        picks.forEach((disp: any) => { counts[disp] += 1; });
-      }
-    });
-
-    if (totalResponders === 0) {
+    if (multichoiceSummary.totalResponders === 0) {
       return (
         <div className={aggregatorContainerClassName}>
           <p className={aggregatorParagraphClassName}>No multichoice responses available.</p>
         </div>
       );
     }
-    const percent = (num: any) => ((num / totalResponders) * 100).toFixed(2);
+    const percent = (num: number) => ((num / multichoiceSummary.totalResponders) * 100).toFixed(2);
 
     return (
       <div className={aggregatorContainerClassName}>
         <p className={aggregatorParagraphClassName}>
           {multichoiceSummary.totalResponders} total responders to this multichoice question.
         </p>
-        {Object.values(displayByKey).map((label: any) => (
+        {multichoiceSummary.options.map((label: string) => (
           <div key={label} className={styles.multiChoiceOption}>
             <span className={styles.optionLabel}>{label}</span>
             <span className={styles.optionStats}>
@@ -671,15 +645,8 @@ class SingleQuestionResponse extends Component<any, any> {
   };
 
   /* Tiny helper: accept string or object; return true only for CEK envelope */
-  isEnvelopeAesGcm256: any = (encryptedPortion: any) => {
-    try {
-      const env = typeof encryptedPortion === 'string'
-        ? JSON.parse(encryptedPortion)
-        : (encryptedPortion || {});
-      return Number(env?.v) === 2 && String(env?.cipher).toLowerCase() === 'aes-gcm-256';
-    } catch {
-      return false; // parse failed -> treat as incompatible legacy/unknown
-    }
+  isEnvelopeAesGcm256 = (encryptedPortion: unknown): boolean => {
+    return isEnvelopeAesGcm256(encryptedPortion);
   };
 
   /**
@@ -687,7 +654,7 @@ class SingleQuestionResponse extends Component<any, any> {
    * delegate to the parent onDecryptQuestion(question.id, field). For mini/profile views,
    * redirect to the full question page instead of decrypting in-place.
    */
-  handleDecryptClick: any = (field: any) => {
+  handleDecryptClick = (field: string): void => {
     const {
       question,
       response,
@@ -733,7 +700,7 @@ class SingleQuestionResponse extends Component<any, any> {
     } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
   };
 
-  handlePromptReloadClick: any = () => {
+  handlePromptReloadClick = (): void => {
     const { question, onReloadQuestionPrompt } = this.props;
     if (!question?.id || typeof onReloadQuestionPrompt !== 'function') return;
     try {
@@ -742,16 +709,18 @@ class SingleQuestionResponse extends Component<any, any> {
   };
 
 
-  toggleMiniExpand: any = () => {
-    this.setState((prev: any) => ({ miniExpanded: !prev.miniExpanded }));
+  toggleMiniExpand = (): void => {
+    this.setState((prev: SingleQuestionResponseState) => ({ miniExpanded: !prev.miniExpanded }));
   };
 
   /** Pick a stable id for cache lookups */
-  getQuestionId: any = (q: any) =>
-    q?.id ?? q?._id ?? q?.questionId ?? q?.uuid ?? q?.key ?? q?.slug ?? '';
+  getQuestionId = (q: unknown = {}): string => {
+    const question = q && typeof q === 'object' ? q as SingleQuestionRecord : {};
+    return String(question?.id ?? question?._id ?? question?.questionId ?? question?.uuid ?? question?.key ?? question?.slug ?? '');
+  };
 
   /** Resolve active session slug ('' = general) from canonical session props. */
-  resolveGroupSlug: any = () => {
+  resolveGroupSlug = (): string => {
     const fromPath = resolveSessionSlugFromPathname(
       (typeof window !== 'undefined' && window.location?.pathname) ? window.location.pathname : ''
     );
@@ -771,7 +740,7 @@ class SingleQuestionResponse extends Component<any, any> {
   };
 
   /** Read the per-group questions map from cache mirror using the canonical string network ID. */
-  readQuestionsMapFromGroupCache: any = () => {
+  readQuestionsMapFromGroupCache = (): SingleQuestionQuestionCacheMap => {
     const memoKey = `group:${this.getQuestionLookupContextKey()}`;
     if (this._questionsMapMemo.key === memoKey && this._questionsMapMemo.value) {
       return this._questionsMapMemo.value;
@@ -787,69 +756,23 @@ class SingleQuestionResponse extends Component<any, any> {
     let parsed = peekCacheSync('questionsCache', slug, { clone: false });
     if (!parsed || typeof parsed !== 'object') {
       const generalEntry = listNamespaceEntriesSync('questionsCache', { cloneValues: false })
-        .find((entry: any) => String(entry?.slug || '') === '');
+        .find((entry: SingleQuestionCacheEntry) => String(entry?.slug || '') === '');
       parsed = (generalEntry && typeof generalEntry.value === 'object') ? generalEntry.value : null;
       if (!parsed || typeof parsed !== 'object') return {};
     }
 
-    // Prefer exact network; otherwise fall back to the first network that has questions
-    let bag = (netIdStr && parsed?.[netIdStr]?.questions) ? parsed[netIdStr].questions : null;
-    if (!bag) {
-      const firstKey = Object.keys(parsed || {}).find((k: any) => parsed[k]?.questions);
-      bag = firstKey ? parsed[firstKey].questions : null;
-    }
-    const result = bag || {};
+    const result = resolveSingleQuestionMapFromCacheValue(parsed, netIdStr);
     this._questionsMapMemo = { key: memoKey, value: result };
     return result;
   };
 
   /** Normalize any "options" shape into a string array (deduped, trimmed) */
-  extractOptionsFromCandidate: any = (candidate: any) => {
-    if (!candidate) return [];
-
-    const raw =
-      candidate.options ??
-      candidate.choices ??
-      candidate.answers ??
-      candidate.choiceOptions ??
-      candidate.config?.options ??
-      candidate.config?.choices ??
-      candidate.payload?.options ??
-      candidate.data?.options ??
-      candidate.optionsMap ??
-      candidate.options_by_id;
-
-    const toLabel = (x: any) => {
-      if (typeof x === 'string') return x;
-      if (!x || typeof x !== 'object') return '';
-      return (
-        x.label ??
-        x.text ??
-        x.name ??
-        x.value ??
-        x.id ??
-        ''
-      );
-    };
-
-    let arr: any[] = [];
-    if (Array.isArray(raw)) {
-      arr = raw.map(toLabel);
-    } else if (raw && typeof raw === 'object') {
-      // Object bag keyed by id -> {label,...}
-      arr = Object.values(raw).map(toLabel);
-    }
-
-    const seen: any = new Set();
-    return arr
-      .map(String)
-      .map((s: any) => s.trim())
-      .filter(Boolean)
-      .filter((s: any) => (seen.has(s) ? false : (seen.add(s), true)));
+  extractOptionsFromCandidate = (candidate: unknown): string[] => {
+    return extractSingleQuestionOptionsFromCandidate(candidate);
   };
 
   /** Search ALL `dg:questionsCache:<slug>` caches for a question entry by id (lowercased); return first hit. */
-  readQuestionEntryAcrossAllGroups: any = (idLower: any) => {
+  readQuestionEntryAcrossAllGroups = (idLower: unknown): unknown | null => {
     if (!idLower) return null;
     const memoKey = `cross:${idLower}|${this.getQuestionLookupContextKey()}`;
     if (this._crossGroupQuestionMemo.has(memoKey)) {
@@ -862,7 +785,7 @@ class SingleQuestionResponse extends Component<any, any> {
       this.props?.networkChainId ??
       ''
     );
-    const remember = (value: any) => {
+    const remember = (value: unknown): unknown | null => {
       this._crossGroupQuestionMemo.set(memoKey, value || null);
       this.trimMemoMap(this._crossGroupQuestionMemo, 256);
       return value || null;
@@ -870,35 +793,14 @@ class SingleQuestionResponse extends Component<any, any> {
 
     try {
       const entries = listNamespaceEntriesSync('questionsCache', { cloneValues: false });
-      for (let i = 0; i < entries.length; i++) {
-        const parsed = (entries[i] && typeof entries[i].value === 'object') ? entries[i].value : null;
-        if (!parsed || typeof parsed !== 'object') continue;
-
-        let netObj: any = null;
-        if (netIdStr) {
-          netObj = parsed[netIdStr] || null;
-        }
-        if (!netObj) {
-          const firstKey = Object.keys(parsed)[0];
-          netObj = firstKey ? parsed[firstKey] : null;
-        }
-        if (!netObj || typeof netObj !== 'object') continue;
-
-        const qMap = netObj.questions || {};
-        const direct = qMap[idLower] || qMap[String(idLower)];
-        if (direct) return remember(direct);
-
-        // Defensive: tolerate unexpected casing by scanning keys
-        const hitKey = Object.keys(qMap).find((qk: any) => String(qk || '').toLowerCase() === idLower);
-        if (hitKey) return remember(qMap[hitKey]);
-      }
+      return remember(findSingleQuestionEntryAcrossGroups({ entries, idLower, netIdStr }));
     } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
 
     return remember(null);
   };
 
   /** Resolve multichoice options by checking inline, then caches, then storage (group-aware questions cache), and finally across all groups. */
-  getMultichoiceOptions: any = (question: any) => {
+  getMultichoiceOptions = (question: unknown): string[] => {
     const id = String(this.getQuestionId(question) || '').toLowerCase();
     if (!id) return [];
 
@@ -908,9 +810,9 @@ class SingleQuestionResponse extends Component<any, any> {
 
     const memoKey = `options:${id}|${this.getQuestionLookupContextKey()}`;
     const memoHit = this._multichoiceOptionsMemo.get(memoKey);
-    if (memoHit) return memoHit;
-    const remember = (options: any) => {
-      const normalized = Array.isArray(options) ? options : [];
+    if (Array.isArray(memoHit)) return memoHit as string[];
+    const remember = (options: unknown): string[] => {
+      const normalized = Array.isArray(options) ? options as string[] : [];
       this._multichoiceOptionsMemo.set(memoKey, normalized);
       this.trimMemoMap(this._multichoiceOptionsMemo, 256);
       return normalized;
@@ -954,7 +856,9 @@ class SingleQuestionResponse extends Component<any, any> {
     }
 
     // 4) Global runtime caches that might be hydrated elsewhere
-    const w: any = typeof window !== 'undefined' ? window : undefined;
+    const w = typeof window !== 'undefined'
+      ? window as SingleQuestionGlobalCacheWindow
+      : undefined;
     const globals = [
       w?.__SURVEY_CACHE__?.questionsById,
       w?.__SURVEY_CACHE__,
@@ -994,13 +898,13 @@ class SingleQuestionResponse extends Component<any, any> {
       questionPromptClassName,
       questionPromptTestId,
     } = this.props;
+    const questionRecord = question || {};
 
     // Stable id + URL
     const qid = this.getQuestionId(questionRecord);
     const url = qid ? buildQuestionRoutePath(qid, { sessionSlug: this.resolveGroupSlug() }) : '/questions';
-    const questionArweaveTxId = getLegacyArweaveTxId(questionRecord);
-    const arweaveUrl = questionArweaveTxId
-      ? normalizeArweaveUrl(questionArweaveTxId, { contextLabel: 'single_question_response_link' })
+    const arweaveUrl = questionRecord?.arweaveTxId
+      ? normalizeArweaveUrl(questionRecord.arweaveTxId, { contextLabel: 'single_question_response_link' })
       : '';
     const hasCardActions = Boolean(qid || arweaveUrl);
     const isFullscreen = mode === 'fullscreen';
@@ -1031,7 +935,7 @@ class SingleQuestionResponse extends Component<any, any> {
       } catch (e) { questionLog.warn('SingleQuestionResponse: fallback', e); }
     };
 
-    const onKeyDown = (e: any) => {
+    const onKeyDown = (e: React.KeyboardEvent) => {
       const k = e?.key;
       if (k === 'Enter' || k === ' ' || k === 'Spacebar') {
         e.preventDefault();
@@ -1039,14 +943,14 @@ class SingleQuestionResponse extends Component<any, any> {
       }
     };
 
-    const stopCardNavigation = (e: any) => {
+    const stopCardNavigation = (e: React.SyntheticEvent) => {
       e.stopPropagation();
     };
 
     const type = String(questionRecord.type || '').toLowerCase();
 
     // Non-interactive affordance by type
-    let affordance: any = null;
+    let affordance: React.ReactNode = null;
 
     if (type === 'binary') {
       // For binary, we render the row of pills inside the card
@@ -1062,7 +966,7 @@ class SingleQuestionResponse extends Component<any, any> {
       const options = this.getMultichoiceOptions(questionRecord) || [];
       affordance = options.length ? (
         <div className={styles.readOnlyMultichoice} aria-hidden="true">
-          {options.map((opt: any, idx: any) => (
+          {options.map((opt: string, idx: number) => (
             <span key={`${opt}-${idx}`} className={styles.choiceItem}>{opt}</span>
           ))}
         </div>
@@ -1128,7 +1032,7 @@ class SingleQuestionResponse extends Component<any, any> {
             className={questionPromptClassNames}
             data-testid={questionPromptTestId}
           >
-            {question?.prompt || 'Untitled question'}
+            {questionRecord?.prompt || 'Untitled question'}
           </div>
 
           {/* Read-only affordance */}
@@ -1143,7 +1047,7 @@ class SingleQuestionResponse extends Component<any, any> {
   }
 
 
-  renderSinglePersonView: any = () => {
+  renderSinglePersonView = (): React.ReactNode => {
     const {
       question,
       response,
@@ -1209,7 +1113,7 @@ class SingleQuestionResponse extends Component<any, any> {
       userHeldSBTs: this.props.userHeldSBTs,
     });
     const decryptCtaClassName = styles.decryptCta;
-    const wrapCompactDecryptCta = (buttonNode: any, field: any = '') => {
+    const wrapCompactDecryptCta = (buttonNode: React.ReactNode, field = ''): React.ReactNode => {
       if (!compactEncryptedAnswerCta || !stackCompactDecryptCta) return buttonNode;
       return (
         <div className={styles.compactDecryptCtaStack} data-ce-decrypt-field={field}>
@@ -1278,7 +1182,7 @@ class SingleQuestionResponse extends Component<any, any> {
       );
     };
 
-    const wrapMaskedPromptLabel = (content: any) => {
+    const wrapMaskedPromptLabel = (content: React.ReactNode): React.ReactNode => {
       if (!isPromptMasked) return content;
       return (
         <GateTooltip
@@ -1308,7 +1212,7 @@ class SingleQuestionResponse extends Component<any, any> {
 
     const showFullDetail = mode === 'fullscreen' || miniExpanded;
 
-    let externalLink: any = null;
+    let externalLink: string | null = null;
     if (responderAddress && id) {
       externalLink = buildQuestionRoutePath(id, {
         responderAddress,
@@ -1511,7 +1415,7 @@ class SingleQuestionResponse extends Component<any, any> {
     if (aggregatorResponseMode) {
       const aggregatorQuestion = question || {};
       const aggregatorQuestionId = aggregatorQuestion.id;
-      const aggregatorQuestionArweaveTxId = getLegacyArweaveTxId(aggregatorQuestion);
+      const aggregatorQuestionArweaveTxId = aggregatorQuestion.arweaveTxId;
       const containerClassName = joinClassNames(styles.fullscreenQuestionContainer, this.props.containerClassName);
       const hasCardActions = Boolean(aggregatorQuestionId || aggregatorQuestionArweaveTxId);
       const questionBodyClassName = joinClassNames(
@@ -1578,27 +1482,27 @@ class SingleQuestionResponse extends Component<any, any> {
   }
 
   // For single-person display: renders the answer portion by question type (UPDATED for multichoice)
-  renderAnswerByType: any = (type: any, value: any) => {
+  renderAnswerByType = (type: unknown, value: unknown): React.ReactNode => {
     if (value === null || value === undefined || value === '') {
       return <div className={styles.freeformAnswer}>No answer provided.</div>;
     }
 
     switch (type) {
       case 'multichoice': {
-        const toLabel = (x: any) => {
+        const toLabel = (x: unknown) => {
           if (typeof x === 'string') return x;
           if (!x || typeof x !== 'object') return '';
           const option = x as SingleQuestionRecord;
           return option.label ?? option.text ?? option.name ?? option.value ?? '';
         };
         const raw = Array.isArray(value) ? value : (value != null ? [value] : []);
-        const labels = raw.map(toLabel).map((s: any) => String(s).trim()).filter(Boolean);
+        const labels = raw.map(toLabel).map((s: unknown) => String(s).trim()).filter(Boolean);
         if (!labels.length) {
           return <div className={styles.freeformAnswer}>No answer provided.</div>;
         }
         return (
           <div className={styles.readOnlyMultichoice}>
-            {labels.map((option: any, idx: any) => (
+            {labels.map((option: string, idx: number) => (
               <div key={`${option}-${idx}`} className={styles.choiceItem}>
                 {option}
               </div>

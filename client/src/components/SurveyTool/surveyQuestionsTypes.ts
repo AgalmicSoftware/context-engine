@@ -26,13 +26,166 @@ export type SurveyAutoDecryptDisabledStatePatch = {
   decryptingByKey: Record<string, unknown>;
 };
 
+export type SurveyClearedDecryptingByKeyStatePatch = {
+  decryptingByKey: Record<string, unknown>;
+};
+
 export type SurveyCanDecryptOtherResponsesStatePatch = {
   canDecryptOtherResponses: boolean;
   canDecryptOtherResponsesStatus: string;
 };
 
+export type SurveyHasherStatePatch = {
+  hasher: unknown;
+};
+
+export type SurveyJsonPreviewStatePatch = {
+  jsonPreview: unknown;
+};
+
+export type SurveyShowJsonStatePatch = {
+  showJson: boolean;
+};
+
+export type SurveyDecryptEditStartStatePatch = {
+  isDecrypting: boolean;
+  submissionError: string;
+  suppressPrefill: boolean;
+};
+
+export type SurveyDecryptEditFailureStatePatch = {
+  isDecrypting: boolean;
+  submissionError: string;
+};
+
+export type SurveyResponseEditCompleteStatePatch = {
+  isEditing: boolean;
+  userHasResponse: boolean;
+  userResponseEncrypted: boolean;
+};
+
+export type SurveyParsedViewAddressAnswersStatePatch = {
+  parsedViewAddressAnswers: unknown;
+};
+
+export type SurveyDisplayAnswerModeStatePatch = {
+  displayAnswerMode: unknown;
+};
+
+export type SurveyResponseModeStatePatch = {
+  displayAnswerMode: boolean;
+  isEditing: boolean;
+};
+
+export type SurveySubmissionErrorStatePatch = {
+  submissionError: unknown;
+};
+
+export type SurveyResponseLoadingResetStatePatch = {
+  isLoadingResponse: boolean;
+  submissionError: string;
+  submissionComplete: boolean;
+  submittedSinceLastEdit: unknown;
+};
+
+export type SurveyChangedResetStatePatch = {
+  userHasResponse: boolean;
+  userAnswers: null;
+  parsedViewAddressAnswers: null;
+  noResponse: boolean;
+  questionPool: unknown[];
+  questionPoolExpectedIds: string[];
+  questionPoolPendingIds: string[];
+  isEditing: boolean;
+  surveysResponseState: unknown[];
+  jsonPreview: string;
+  submissionError: string;
+  submissionComplete: boolean;
+  submittedSinceLastEdit: unknown;
+};
+
+export type SurveyAccountViewResetStatePatch = {
+  isLoadingResponse: boolean;
+  userHasResponse: boolean;
+  userAnswers: null;
+  isEditing: boolean;
+  parsedViewAddressAnswers: unknown;
+  noResponse: unknown;
+  submissionError: string;
+  submissionComplete: boolean;
+  submittedSinceLastEdit: unknown;
+};
+
+export type SurveyStandaloneAuthResetStatePatch = {
+  isEditing: boolean;
+  submissionError: string;
+  submissionComplete: boolean;
+  submittedSinceLastEdit: unknown;
+};
+
+export type SurveySubmitStartStatePatch = {
+  isSubmitting: boolean;
+  submitProgress: number;
+  currentStep: number;
+  submissionError: string;
+};
+
+export type SurveySubmitPreparationErrorStatePatch = {
+  isSubmitting: boolean;
+  submitProgress: number;
+  submissionError: string;
+};
+
+export type SurveySubmitSuccessStatePatch = {
+  isSubmitting: boolean;
+  submitProgress: number;
+  submissionComplete: boolean;
+  submittedSinceLastEdit: unknown;
+  currentStep: number;
+  suppressPrefill: boolean;
+  responseUrl: unknown;
+  surveysResponseState: unknown;
+  editBaseline: unknown;
+  userAnswers: unknown;
+  userHasResponse: boolean;
+  userResponseEncrypted: boolean;
+  isDirty: boolean;
+  modifiedCount: number;
+  pileDiscardedEdits: boolean;
+  hasEncryptedChanges: boolean;
+};
+
+export type SurveySubmitFailureStatePatch = {
+  isSubmitting: boolean;
+  submitProgress: number;
+  submissionComplete: boolean;
+  submittedSinceLastEdit: unknown;
+  submissionError: string;
+};
+
+export type SurveyCurrentStepStatePatch = {
+  currentStep: number;
+};
+
+export type SurveyResponseStatePatch = {
+  surveysResponseState: unknown;
+};
+
+export type SurveyUserEditResponseStatePatch = SurveyResponseStatePatch & {
+  isEditing: boolean;
+  submittedSinceLastEdit: unknown;
+};
+
 export type SurveyBookmarkedQuestionsStatePatch = {
   bookmarkedQuestions: Set<string>;
+};
+
+export type SurveyPrefillQueuedAfterCacheStatePatch = {
+  prefillQueuedAfterCache: boolean;
+};
+
+export type SurveyHydratingPriorResponsesStatePatch = {
+  isHydratingPriorResponses: boolean;
 };
 
 export type SurveyQuestionsState = UnknownRecord & {
@@ -140,6 +293,10 @@ export const buildAutoDecryptDisabledState = (): SurveyAutoDecryptDisabledStateP
   decryptingByKey: {},
 });
 
+export const buildClearedDecryptingByKeyState = (): SurveyClearedDecryptingByKeyStatePatch => ({
+  decryptingByKey: {},
+});
+
 export const buildCanDecryptOtherResponsesState = ({
   canDecrypt = false,
   status = 'unknown',
@@ -151,12 +308,309 @@ export const buildCanDecryptOtherResponsesState = ({
   canDecryptOtherResponsesStatus: String(status || 'unknown'),
 });
 
+export const buildHasherState = (hasher: unknown): SurveyHasherStatePatch => ({
+  hasher,
+});
+
+export const buildJsonPreviewState = (jsonPreview: unknown): SurveyJsonPreviewStatePatch => ({
+  jsonPreview,
+});
+
+export const buildShowJsonState = (showJson: unknown): SurveyShowJsonStatePatch => ({
+  showJson: !!showJson,
+});
+
+export const toggleShowJsonState = (
+  prevState: { showJson?: unknown } = {}
+): SurveyShowJsonStatePatch => ({
+  showJson: !prevState.showJson,
+});
+
+export const buildDecryptEditStartState = (): SurveyDecryptEditStartStatePatch => ({
+  isDecrypting: true,
+  submissionError: '',
+  suppressPrefill: true,
+});
+
+export const buildDecryptEditFailureState = (
+  submissionError: unknown = 'Decryption failed.'
+): SurveyDecryptEditFailureStatePatch => ({
+  isDecrypting: false,
+  submissionError: String(submissionError || 'Decryption failed.'),
+});
+
+export const buildResponseEditCompleteState = (): SurveyResponseEditCompleteStatePatch => ({
+  isEditing: false,
+  userHasResponse: true,
+  userResponseEncrypted: true,
+});
+
+export const buildParsedViewAddressAnswersState = (
+  parsedViewAddressAnswers: unknown = null
+): SurveyParsedViewAddressAnswersStatePatch => ({
+  parsedViewAddressAnswers,
+});
+
+export const buildDisplayAnswerModeState = (
+  displayAnswerMode: unknown
+): SurveyDisplayAnswerModeStatePatch => ({
+  displayAnswerMode,
+});
+
+export const buildViewingResponseModeState = (): SurveyResponseModeStatePatch => ({
+  displayAnswerMode: true,
+  isEditing: false,
+});
+
+export const buildEditingResponseModeState = (): SurveyResponseModeStatePatch => ({
+  displayAnswerMode: false,
+  isEditing: true,
+});
+
+export const buildSubmissionErrorState = (
+  submissionError: unknown
+): SurveySubmissionErrorStatePatch => ({
+  submissionError,
+});
+
+export const buildResponseLoadingResetState = (
+  submittedSinceLastEdit: unknown
+): SurveyResponseLoadingResetStatePatch => ({
+  isLoadingResponse: true,
+  submissionError: '',
+  submissionComplete: false,
+  submittedSinceLastEdit,
+});
+
+export const buildSurveyChangedResetState = (
+  submittedSinceLastEdit: unknown
+): SurveyChangedResetStatePatch => ({
+  userHasResponse: false,
+  userAnswers: null,
+  parsedViewAddressAnswers: null,
+  noResponse: false,
+  questionPool: [],
+  questionPoolExpectedIds: [],
+  questionPoolPendingIds: [],
+  isEditing: false,
+  surveysResponseState: [],
+  jsonPreview: '',
+  submissionError: '',
+  submissionComplete: false,
+  submittedSinceLastEdit,
+});
+
+export const buildSurveyAccountViewResetState = ({
+  noResponse = false,
+  parsedViewAddressAnswers = null,
+  submittedSinceLastEdit = false,
+}: {
+  noResponse?: unknown;
+  parsedViewAddressAnswers?: unknown;
+  submittedSinceLastEdit?: unknown;
+} = {}): SurveyAccountViewResetStatePatch => ({
+  isLoadingResponse: true,
+  userHasResponse: false,
+  userAnswers: null,
+  isEditing: false,
+  parsedViewAddressAnswers,
+  noResponse,
+  submissionError: '',
+  submissionComplete: false,
+  submittedSinceLastEdit,
+});
+
+export const buildStandaloneAuthResetState = (
+  submittedSinceLastEdit: unknown
+): SurveyStandaloneAuthResetStatePatch => ({
+  isEditing: false,
+  submissionError: '',
+  submissionComplete: false,
+  submittedSinceLastEdit,
+});
+
+export const buildSubmitStartState = (): SurveySubmitStartStatePatch => ({
+  isSubmitting: true,
+  submitProgress: 0,
+  currentStep: 1,
+  submissionError: '',
+});
+
+export const buildSubmitPreparationErrorState = (
+  submissionError: unknown = 'No new or changed responses to submit.'
+): SurveySubmitPreparationErrorStatePatch => ({
+  isSubmitting: false,
+  submitProgress: 0,
+  submissionError: String(submissionError || 'No new or changed responses to submit.'),
+});
+
+// Regression guard: keep optimistic response state, baseline, and completion flag aligned;
+// cache refreshers use submissionComplete to avoid overwriting the just-submitted draft.
+export const buildSubmitSuccessState = ({
+  editBaseline = null,
+  hasEncrypted = false,
+  responseUrl = '',
+  submittedSinceLastEdit = false,
+  surveysResponseState = [],
+  userAnswers = null,
+}: {
+  editBaseline?: unknown;
+  hasEncrypted?: unknown;
+  responseUrl?: unknown;
+  submittedSinceLastEdit?: unknown;
+  surveysResponseState?: unknown;
+  userAnswers?: unknown;
+} = {}): SurveySubmitSuccessStatePatch => ({
+  isSubmitting: false,
+  submitProgress: 100,
+  submissionComplete: true,
+  submittedSinceLastEdit,
+  currentStep: 3,
+  suppressPrefill: false,
+  responseUrl,
+  surveysResponseState,
+  editBaseline,
+  userAnswers,
+  userHasResponse: true,
+  userResponseEncrypted: !!hasEncrypted,
+  isDirty: false,
+  modifiedCount: 0,
+  pileDiscardedEdits: false,
+  hasEncryptedChanges: false,
+});
+
+export const buildSubmitFailureState = ({
+  submittedSinceLastEdit = false,
+  submissionError = 'Submission failed.',
+}: {
+  submittedSinceLastEdit?: unknown;
+  submissionError?: unknown;
+} = {}): SurveySubmitFailureStatePatch => ({
+  isSubmitting: false,
+  submitProgress: 0,
+  submissionComplete: false,
+  submittedSinceLastEdit,
+  submissionError: String(submissionError || 'Submission failed.'),
+});
+
+export const buildCurrentStepState = (currentStep: unknown): SurveyCurrentStepStatePatch => ({
+  currentStep: Number(currentStep || 0),
+});
+
+export const buildSurveysResponseStatePatch = (
+  surveysResponseState: unknown
+): SurveyResponseStatePatch => ({
+  surveysResponseState,
+});
+
+export const buildSurveyUserEditResponseStatePatch = (
+  surveysResponseState: unknown,
+  submittedSinceLastEdit: unknown
+): SurveyUserEditResponseStatePatch => ({
+  surveysResponseState,
+  isEditing: true,
+  submittedSinceLastEdit,
+});
+
+export const buildPrefillQueuedAfterCacheState = (
+  prefillQueuedAfterCache: unknown
+): SurveyPrefillQueuedAfterCacheStatePatch => ({
+  prefillQueuedAfterCache: !!prefillQueuedAfterCache,
+});
+
+export const buildHydratingPriorResponsesState = (
+  isHydratingPriorResponses: unknown
+): SurveyHydratingPriorResponsesStatePatch => ({
+  isHydratingPriorResponses: !!isHydratingPriorResponses,
+});
+
 export const buildBookmarkedQuestionsState = (
   questions: unknown[] | null | undefined = []
 ): SurveyBookmarkedQuestionsStatePatch => ({
   bookmarkedQuestions: new Set(
     (Array.isArray(questions) ? questions : []).map((questionId) => String(questionId))
   ),
+});
+
+export const buildBulkPromptReloadingState = (bulkPromptReloading: unknown) => ({
+  bulkPromptReloading: !!bulkPromptReloading,
+});
+
+export const buildActiveTagModalState = (activeTagModalTag: unknown = '') => ({
+  activeTagModalTag: String(activeTagModalTag || '').trim(),
+});
+
+export const buildSurveyQuestionsJsonTreeItemStyle = (level: unknown) => ({
+  marginLeft: `${Number(level) * 20}px`,
+});
+
+export const buildSurveyQuestionsLockAudienceGateClassName = (
+  styleMap: Record<string, string>,
+  active: unknown
+) => `${styleMap.convictionToggleLine} ${styleMap.lockAudienceGateButton} ${active ? styleMap.convictionToggleButtonActive : ''}`;
+
+export const buildSurveyQuestionsLockAudiencePopoverClassName = (
+  styleMap: Record<string, string>,
+  isPileVisualContext: unknown
+) => `${styleMap.lockAudiencePopover} ${isPileVisualContext ? styleMap.pileLockAudiencePopover : ''}`;
+
+export const buildSurveyQuestionsLockAudienceToggleClassName = (
+  styleMap: Record<string, string>,
+  active: unknown
+) => `${styleMap.convictionToggleLine} ${active ? styleMap.convictionToggleButtonActive : ''}`;
+
+export const resolveSurveyQuestionsIconGlowClassName = (
+  styleMap: Record<string, string>,
+  showGlow: unknown
+) => showGlow ? styleMap.iconGlow : undefined;
+
+export const SURVEY_QUESTIONS_SUBMIT_ICON_STYLE = {
+  marginRight: '10px',
+};
+
+export const SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: 'red',
+};
+
+export const buildSurveyQuestionsFullLoadingProgressFillStyle = ({
+  hydrateDiscovered = 0,
+  hydrateDone = 0,
+  isHydrating = false,
+  scanPercent = 0,
+}: {
+  hydrateDiscovered?: unknown;
+  hydrateDone?: unknown;
+  isHydrating?: unknown;
+  scanPercent?: unknown;
+} = {}) => ({
+  width: `${isHydrating
+    ? (Number(hydrateDiscovered) > 0
+      ? Math.round((Math.min(Number(hydrateDone), Number(hydrateDiscovered)) / Number(hydrateDiscovered)) * 100)
+      : 0)
+    : scanPercent}%`,
+});
+
+export const buildSurveyQuestionsSubmitAuxIconClassName = (
+  styleMap: Record<string, string>,
+  isSingleQuestionView: unknown
+) => {
+  const className = `${styleMap.iconButton} ${isSingleQuestionView ? styleMap.singleQuestionSubmitIconButton : ''}`.trim();
+  return className || undefined;
+};
+
+export const buildCopiedQuestionsJsonState = (copiedQuestionsJson: unknown) => ({
+  copiedQuestionsJson: !!copiedQuestionsJson,
+});
+
+export const buildCopiedResponseJsonState = (copiedResponseJson: unknown) => ({
+  copiedResponseJson: !!copiedResponseJson,
+});
+
+export const buildCopiedSurveyJsonState = (copiedSurveyJson: unknown) => ({
+  copiedSurveyJson: !!copiedSurveyJson,
 });
 
 export const buildInitialSurveyQuestionsState = (

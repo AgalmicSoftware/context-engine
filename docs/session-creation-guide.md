@@ -23,13 +23,13 @@ Use this as the quick checklist for a production-style session created from `/ne
 | Arweave JWK | Pays for session metadata and other Arweave uploads | Yes for publish/upload flows | Yes |
 | RPC URL | Used by the worker for chain reads and related operations | Yes for a deploy-ready worker | Yes |
 | Faucet private key | Lets the session sponsor small OP Sepolia ETH grants for onboarding/publish support | Optional | Yes |
-| Lit credentials for gated fields | Needed only when the session uses worker-mediated Lit/Chipotle encryption. Current scoped-runtime setup uses `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`. The next hard-cut sponsorship mode uses a per-bundle `litAccountApiKey` so `/new` can mint a fresh group, PKP, and usage key for each redeemed session. | Optional | Yes |
+| Lit credentials for gated fields | Needed only when the session uses worker-mediated Lit/Chipotle encryption. The manual `/new` setup asks only for `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; the worker derives `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid` after deploy. | Optional | Yes |
 
 Important:
 
 - The worker secret minimum for the normal deploy-ready path is: AI key(s) matching the selected provider, Arweave JWK, and RPC URL.
 - The faucet private key is not required to create a session. It is only needed if you want the session to sponsor testnet gas for users or bootstrap publish funding.
-- Lit-sponsored setup is optional. Today the deploy-ready flow expects scoped runtime values for worker-mediated Chipotle execution; the agreed next sponsorship model is one disposable `litAccountApiKey` per sponsored bundle so each `/new` redemption can derive a fresh group / PKP / usage key inside that bundle-owned account.
+- Lit-sponsored setup is optional. Today the manual deploy-ready flow centers on one `litAccountApiKey`; sponsored bundles can still carry either that authority key or already scoped runtime values when an admin intentionally prepares them.
 - Secrets live in worker secrets or sponsored bundles, not in public Arweave session metadata.
 
 ## Sponsored Bundles: Skip Manual Config
@@ -50,8 +50,8 @@ What the sponsored bundle can supply to the recipient:
 - Arweave JWK
 - custom RPC URL
 - faucet private key or faucet grant token
-- current scoped Lit runtime values: `litApiBase`, `litGroupId`, `litPkpId`, `litActionCid`, `litUsageApiKey`
-- agreed next Lit authority-bundle mode: `litAccountApiKey` for one disposable Lit account per bundle, so `/new` can create a fresh group / PKP / usage key for each new session
+- Lit authority-bundle mode: `litAccountApiKey` for one disposable Lit account per bundle, so `/new` can create a fresh group / PKP / usage key for each new session
+- scoped Lit runtime values when intentionally pre-provisioned: `litApiBase`, `litGroupId`, `litPkpId`, `litActionCid`, `litUsageApiKey`
 - bootstrap worker URL and deploy grant token for grant-backed worker deploys
 
 What it does not send directly:

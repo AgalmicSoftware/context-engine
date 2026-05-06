@@ -1,5 +1,31 @@
 import { render, screen, within } from '@testing-library/react';
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
+import CreateQuestionsAndSurveys, {
+  CREATE_SURVEY_ACTION_ICON_STYLE,
+  CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE,
+  CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE,
+  CREATE_SURVEY_FREEFORM_PREVIEW_STYLE,
+  CREATE_SURVEY_HEADER_ICON_STYLE,
+  CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE,
+  CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE,
+  CREATE_SURVEY_SUBMIT_ICON_STYLE,
+  CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE,
+  CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE,
+  CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE,
+  CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE,
+  buildCreateSurveyActionLinkClassName,
+  buildCreateSurveyAiPromptCopyClassName,
+  buildCreateSurveyContainerClassName,
+  buildCreateSurveyProgressStepClassName,
+  buildCreateSurveySubmitButtonClassName,
+  buildCreateSurveyTypePillClassName,
+  resolveCreateSurveyBookmarkSurveyStyle,
+  resolveCreateSurveyProgressFillStyle,
+  resolveCreateSurveyQuestionBookmarkStyle,
+  resolveCreateSurveyToggleKnobStyle,
+} from './CreateQuestionsAndSurveys';
 import gateLockStyles from '../Gates/GateMultiSelectLock.module.scss';
 import surveyStyles from './CreateQuestionsAndSurveys.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -26,6 +52,101 @@ const makeInstance = (props: Record<string, unknown> = {}) => {
 describe('CreateQuestionsAndSurveys lock UI', () => {
   afterEach(() => {
     jest.clearAllMocks();
+  });
+
+  it('builds question type preview styles and pill classes', () => {
+    expect(CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE).toEqual({
+      border: '1px dashed #b0c4ff',
+      padding: 10,
+      borderRadius: 6,
+      marginTop: 6,
+      background: '#f6f8ff',
+    });
+    expect(CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE).toEqual({
+      display: 'inline-block',
+      padding: '3px 8px',
+      border: '1px solid #ccd',
+      borderRadius: 12,
+      marginRight: 6,
+      marginTop: 4,
+    });
+    expect(CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE).toEqual({
+      fontWeight: 600,
+      marginBottom: 6,
+    });
+    expect(CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE).toEqual({
+      height: 6,
+      background: '#d9e1ff',
+      borderRadius: 4,
+      width: 240,
+    });
+    expect(CREATE_SURVEY_FREEFORM_PREVIEW_STYLE).toEqual({
+      height: 34,
+      border: '1px solid #ccd',
+      background: '#fff',
+      borderRadius: 4,
+    });
+    expect(buildCreateSurveyTypePillClassName(surveyStyles, 'agree')).toBe(
+      `${surveyStyles.pill} ${surveyStyles.pillAgree}`
+    );
+    expect(buildCreateSurveyTypePillClassName(surveyStyles, 'unsure')).toBe(
+      `${surveyStyles.pill} ${surveyStyles.pillUnsure}`
+    );
+    expect(buildCreateSurveyTypePillClassName(surveyStyles, 'disagree')).toBe(
+      `${surveyStyles.pill} ${surveyStyles.pillDisagree}`
+    );
+    expect(CREATE_SURVEY_SUBMIT_ICON_STYLE).toEqual({ marginRight: 8 });
+    expect(CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE).toEqual({
+      marginLeft: '10px',
+      marginRight: '5px',
+      textDecoration: 'none',
+      color: '#007bff',
+    });
+    expect(CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE).toEqual({ padding: '0 5px' });
+    expect(CREATE_SURVEY_ACTION_ICON_STYLE).toEqual({ marginRight: '5px' });
+    expect(buildCreateSurveySubmitButtonClassName(surveyStyles, true, false)).toBe(
+      `${surveyStyles.createSurveyButton} ${surveyStyles.submitSurveyBtn} ${surveyStyles.submittingButton} `
+    );
+    expect(buildCreateSurveySubmitButtonClassName(surveyStyles, false, true)).toBe(
+      `${surveyStyles.createSurveyButton} ${surveyStyles.submitSurveyBtn}  ${surveyStyles.errorButton}`
+    );
+    expect(resolveCreateSurveyProgressFillStyle(120)).toEqual({ width: '100%' });
+    expect(resolveCreateSurveyProgressFillStyle(-20)).toEqual({ width: '0%' });
+    expect(resolveCreateSurveyQuestionBookmarkStyle(true)).toEqual({ color: '#ffc107' });
+    expect(resolveCreateSurveyQuestionBookmarkStyle(false)).toEqual({ color: undefined });
+    expect(resolveCreateSurveyBookmarkSurveyStyle(true)).toEqual({ color: '#ffe082' });
+    expect(resolveCreateSurveyBookmarkSurveyStyle(false)).toEqual({ color: undefined });
+    expect(buildCreateSurveyActionLinkClassName(surveyStyles)).toBe(
+      `${surveyStyles.actionBtn} ${surveyStyles.actionLink}`
+    );
+    expect(CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE).toEqual({
+      left: '31px',
+      backgroundColor: '#4caf50',
+    });
+    expect(CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE).toEqual({
+      left: '1px',
+      backgroundColor: '#fff',
+    });
+    expect(CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE).toEqual({ marginLeft: '10px' });
+    expect(CREATE_SURVEY_HEADER_ICON_STYLE).toEqual({ marginRight: '6px' });
+    expect(CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE).toEqual({ marginLeft: 'auto' });
+    expect(CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE).toEqual({ marginTop: '20px' });
+    expect(buildCreateSurveyProgressStepClassName(surveyStyles, 2, 1)).toBe(surveyStyles.stepCompleted);
+    expect(buildCreateSurveyProgressStepClassName(surveyStyles, 2, 3)).toBe(surveyStyles.step);
+    expect(buildCreateSurveyAiPromptCopyClassName(surveyStyles, true)).toBe(
+      `${surveyStyles.aiPromptCopyCorner} ${surveyStyles.aiPromptCopyCornerSuccess}`
+    );
+    expect(buildCreateSurveyAiPromptCopyClassName(surveyStyles, false)).toBe(
+      `${surveyStyles.aiPromptCopyCorner} `
+    );
+    expect(buildCreateSurveyContainerClassName(surveyStyles, true)).toBe(
+      `${surveyStyles.createSurveyContainer} ${surveyStyles.miniaturized}`
+    );
+    expect(buildCreateSurveyContainerClassName(surveyStyles, false)).toBe(
+      `${surveyStyles.createSurveyContainer} `
+    );
+    expect(resolveCreateSurveyToggleKnobStyle(true)).toBe(CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE);
+    expect(resolveCreateSurveyToggleKnobStyle(false)).toBe(CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE);
   });
 
   it('renders the survey title lock without SBT badge text or inline gate dots', () => {

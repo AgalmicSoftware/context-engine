@@ -258,10 +258,218 @@ import {
   resolveAuthoritativeQuestionPoolScope,
 } from './surveyAuthoritativeQuestionPool';
 
-export class SurveySelector extends Component<any, any> {
-  [key: string]: any;
+export const SURVEY_SELECTOR_ACTIVE_FILTER_COLOR = '#11c4dcff';
 
-  constructor(props: any) {
+export const SURVEY_SELECTOR_CREATE_BUTTON_STYLE: React.CSSProperties = {
+  marginLeft: '10px',
+};
+
+export const SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE: React.CSSProperties = {
+  marginLeft: 8,
+};
+
+export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
+  isFilterActive
+    ? {
+      color: SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,
+      borderColor: SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,
+    }
+    : {}
+);
+
+export const resolveSurveySelectorFilterIconStyle = (isFilterActive: unknown): React.CSSProperties => (
+  isFilterActive ? { color: SURVEY_SELECTOR_ACTIVE_FILTER_COLOR } : {}
+);
+
+export const buildSurveySelectorDropdownItemClassName = (
+  styleMap: Record<string, string>,
+  variant?: 'questions' | 'survey'
+) => {
+  const variantClassName = variant === 'questions'
+    ? styleMap.questionsItem
+    : variant === 'survey'
+      ? styleMap.surveyItem
+      : '';
+  return [styleMap.dropdownItem, variantClassName].filter(Boolean).join(' ');
+};
+
+export const buildSurveySelectorHeaderSubmitButtonClassName = (
+  styleMap: Record<string, string>
+) => [styleMap.headerSubmitButton, styleMap.submitGlow].filter(Boolean).join(' ');
+
+type SurveySelectorRecord = Record<string, unknown>;
+type SurveySelectorNetworkLike = SurveySelectorRecord & {
+  chainId?: unknown;
+  id?: unknown;
+};
+type SurveySelectorLifecycleProps = SurveySelectorRecord & {
+  activeSessionSlug?: unknown;
+  autoOpenResults?: unknown;
+  filterState?: unknown;
+  isQuestionCacheReady?: unknown;
+  isSurveyCacheReady?: unknown;
+  network?: SurveySelectorNetworkLike | null;
+  networkChainId?: unknown;
+  questionResponsesNonce?: unknown;
+  questionsCacheNonce?: unknown;
+  sessionSlug?: unknown;
+  sessionSlugPinned?: boolean;
+  singleQuestionMode?: boolean;
+  surveyID?: unknown;
+  surveyId?: unknown;
+};
+type SurveySelectorToggleState = {
+  createSurveyMode?: boolean;
+  filterModalOpen?: boolean;
+  selectorDropdownOpen?: boolean;
+};
+type SurveySelectorViewMode = 'questions' | 'survey';
+type SurveySelectorQuestionCountContext = {
+  slug: unknown;
+  networkID: string;
+  readSlugs: string[];
+  contextKey: string;
+};
+type SurveySelectorQuestionCountCommitOptions = {
+  propsIn?: SurveySelectorLifecycleProps;
+  rememberStable?: boolean;
+  ignoreTransientZero?: boolean;
+};
+type SurveySelectorDisplayedQuestionCountArgs = SurveySelectorQuestionCountCommitOptions & {
+  loadingActive?: unknown;
+  count?: unknown;
+  encryptedCount?: unknown;
+};
+type SurveySelectorDisplayedQuestionCountResult = {
+  count: number;
+  encryptedCount: number;
+};
+type SurveySelectorQuestionCountStatePatch = Partial<{
+  encryptedQuestionCount: number;
+  filteredQuestionCount: number;
+  filterState: unknown;
+  showLongLoading: boolean;
+  showResults: boolean;
+  viewMode: SurveySelectorViewMode;
+}>;
+type SurveySelectorQuestionCacheRow = SurveySelectorRecord & {
+  id?: unknown;
+  prompt?: unknown;
+};
+type SurveySelectorQuestionsCacheByNet = Record<string, {
+  questions?: Record<string, SurveySelectorQuestionCacheRow | null | undefined>;
+} | null | undefined>;
+type SurveySelectorSurveyEntry = SurveySelectorRecord & {
+  id?: unknown;
+  surveyID?: unknown;
+};
+type SurveySelectorSurveySummary = SurveySelectorSurveyEntry & {
+  documentURLs?: unknown;
+  questionIDs?: unknown;
+  title?: unknown;
+};
+type SurveySelectorSurveyState = SurveySelectorRecord & {
+  selectedSurveyIndex?: number | null;
+  surveys?: SurveySelectorSurveyEntry[];
+};
+type SurveySelectorPrimarySubmitTarget = {
+  handlePrimarySubmitClick?: () => void;
+  state?: {
+    isSubmitting?: unknown;
+  };
+};
+type SurveySelectorStoppableEvent = {
+  stopPropagation: () => void;
+};
+type SurveySelectorRenderQuestionsCache = Record<string, {
+  questions?: Record<string, unknown>;
+} | null | undefined> | null;
+type SurveySelectorQuestionSelectorLabelArgs = {
+  count?: number;
+  encryptedCount?: number;
+  encryptedCountTestId?: string;
+  prefixLabel?: string;
+  showCacheError?: boolean;
+  showEncryptedCount?: boolean;
+  showSpinner?: boolean;
+};
+type SurveySelectorEncryptedBadgeProps = {
+  'data-ce-encrypted-question-count'?: string;
+  'data-testid'?: string;
+};
+type QuestionsDashboardLifecycleProps = SurveySelectorRecord & {
+  activeSessionSlug?: unknown;
+  isQuestionCacheReady?: unknown;
+  network?: SurveySelectorNetworkLike | null;
+  questionResponsesNonce?: unknown;
+  questionsCacheNonce?: unknown;
+  sessionSlug?: unknown;
+};
+type QuestionsDashboardQuestionRow = SurveySelectorRecord & {
+  creator?: unknown;
+  id?: unknown;
+  prompt?: unknown;
+  sessionSlug?: unknown;
+  tags?: unknown;
+};
+type QuestionsDashboardQuestionCacheByNet = Record<string, {
+  questionResponses?: Record<string, unknown>;
+  questions?: Record<string, QuestionsDashboardQuestionRow>;
+} | null | undefined>;
+type QuestionsDashboardExtraSlugsMemo = {
+  key: string;
+  extraQuestions: QuestionsDashboardQuestionRow[];
+  extraQuestionResponses: Record<string, unknown>;
+};
+type QuestionsDashboardLoadOptions = {
+  resetFilteredQuestions?: boolean;
+};
+type QuestionsDashboardProgress = SurveySelectorRecord & {
+  discoveredQuestions?: unknown;
+  hydratedQuestions?: unknown;
+  pendingMetadataCount?: unknown;
+  phase?: unknown;
+  slug?: unknown;
+};
+type SurveySelectorQuestionFilterHandle = {
+  handleApplyFilters: (usePendingState?: unknown) => void;
+  handleClearFilters: () => void;
+};
+type SurveySelectorQuestionCountSnapshot = {
+  hasValue: boolean;
+  contextKey: string;
+  count: number;
+  encryptedCount: number;
+};
+type SurveyQuestionsComponentType = React.ComponentType<SurveySelectorRecord>;
+type SurveyQuestionsComponentHost = {
+  SurveyQuestionsComponent?: SurveyQuestionsComponentType;
+};
+
+const getStaticSurveyQuestionsComponent = (
+  instance: { constructor: unknown },
+): SurveyQuestionsComponentType | undefined => (
+  (instance.constructor as SurveyQuestionsComponentHost).SurveyQuestionsComponent
+);
+
+export class SurveySelector extends Component<any, any> {
+  questionFilterRef: React.RefObject<SurveySelectorQuestionFilterHandle>;
+  surveyQuestionsRef: React.RefObject<unknown>;
+  loadingTimeout: ReturnType<typeof setTimeout> | null;
+  _copySurveyIdTimer: ReturnType<typeof setTimeout> | null;
+  _renderQuestionsCacheMemoKey: string;
+  _renderQuestionsCacheMemoValue: SurveySelectorRenderQuestionsCache;
+  _isMounted: boolean;
+  _questionCountStateContextKey: string;
+  _stickyQuestionCountSnapshot: SurveySelectorQuestionCountSnapshot;
+  _filterStateSig: string;
+  _filteredQuestionCountEpoch: number = 0;
+  _surveySelectorFetchEpoch: number = 0;
+  _lastFetchSurveysSlug: string = '';
+  _lastFetchSurveysNetId: string = '';
+  _userSurveySelectionPending: boolean = false;
+
+  constructor(props: SurveySelectorLifecycleProps) {
     super(props);
     this.state = {
       surveys: [],
@@ -301,7 +509,9 @@ export class SurveySelector extends Component<any, any> {
     this._filterStateSig = serializeSurveyToolFilterState(this.state.filterState || {});
 	  }
 
-  getQuestionCountContext: any = (propsIn: any = this.props) => {
+  getQuestionCountContext = (
+    propsIn: SurveySelectorLifecycleProps = this.props
+  ): SurveySelectorQuestionCountContext => {
     const slug = resolveEffectiveSlug(propsIn);
     const context = resolveQuestionCountContext(propsIn, slug);
     const networkID = context.networkIdStr || '';
@@ -321,7 +531,7 @@ export class SurveySelector extends Component<any, any> {
     };
   };
 
-  clearStickyQuestionCountSnapshot: any = () => {
+  clearStickyQuestionCountSnapshot: () => void = () => {
     this._questionCountStateContextKey = '';
     this._stickyQuestionCountSnapshot = {
       hasValue: false,
@@ -331,15 +541,15 @@ export class SurveySelector extends Component<any, any> {
     };
   };
 
-  commitQuestionCountState: any = (
-    count: any,
-    encryptedCount: any,
+  commitQuestionCountState = (
+    count: unknown,
+    encryptedCount: unknown,
     {
       propsIn = this.props,
       rememberStable = true,
       ignoreTransientZero = false,
-    }: any = {}
-  ) => {
+    }: SurveySelectorQuestionCountCommitOptions = {}
+  ): boolean => {
     const numericCount = Math.max(0, Number(count || 0));
     const numericEncryptedCount = Number.isFinite(Number(encryptedCount))
       ? Math.max(0, Number(encryptedCount))
@@ -383,12 +593,12 @@ export class SurveySelector extends Component<any, any> {
     return true;
   };
 
-  getDisplayedQuestionCounts: any = ({
+  getDisplayedQuestionCounts = ({
     loadingActive = false,
     count = this.state.filteredQuestionCount,
     encryptedCount = this.state.encryptedQuestionCount,
     propsIn = this.props,
-  }: any = {}) => {
+  }: SurveySelectorDisplayedQuestionCountArgs = {}): SurveySelectorDisplayedQuestionCountResult => {
     const liveCount = Math.max(0, Number(count || 0));
     const liveEncryptedCount = Number.isFinite(Number(encryptedCount))
       ? Math.max(0, Number(encryptedCount))
@@ -451,7 +661,7 @@ export class SurveySelector extends Component<any, any> {
     }
   }
 
-	  componentDidUpdate(prevProps: any, prevState: any) {
+	  componentDidUpdate(prevProps: SurveySelectorLifecycleProps, prevState: SurveySelectorRecord) {
       const prevQuestionCountContext = this.getQuestionCountContext(prevProps);
       const nextQuestionCountContext = this.getQuestionCountContext(this.props);
       const sessionChanged =
@@ -484,7 +694,7 @@ export class SurveySelector extends Component<any, any> {
         this.computeFilteredQuestionCount();
       }
 
-    const statePatch: Record<string, any> = {};
+    const statePatch: SurveySelectorQuestionCountStatePatch = {};
     let hasStatePatch = false;
 
 	    if (this.props.autoOpenResults && !prevProps.autoOpenResults && !this.state.showResults) {
@@ -530,14 +740,14 @@ export class SurveySelector extends Component<any, any> {
     }
 	  }
 
-  handleClearFilters: any = (e: any) => {
+  handleClearFilters = (e: SurveySelectorStoppableEvent): void => {
     e.stopPropagation();
     if (this.questionFilterRef.current) {
       this.questionFilterRef.current.handleClearFilters();
     }
   };
 
-  computeFilteredQuestionCount: any = async () => {
+  computeFilteredQuestionCount: () => Promise<void> = async () => {
 
     // When in 'questions' mode, the QuestionFilter child component is active and
     // applying complex filters (tags, types, SBTs). It drives the count via callback.
@@ -564,12 +774,12 @@ export class SurveySelector extends Component<any, any> {
         ? readSlugs
         : [slug]
     );
-    const seenQuestionIds: any = new Set();
+    const seenQuestionIds = new Set<string>();
     let encryptedCount = 0;
     let nextCount = 0;
 
     for (const readSlug of scopedReadSlugs) {
-      let localQuestionsCache: Record<string, any> = {};
+      let localQuestionsCache: SurveySelectorQuestionsCacheByNet = {};
       try {
         localQuestionsCache = ensureQuestionsNet(
           await readQuestionsCacheAsync(readSlug),
@@ -580,7 +790,7 @@ export class SurveySelector extends Component<any, any> {
       }
 
       const networkCache = localQuestionsCache[netIdStr] || { questions: {} };
-      const questionsData: Record<string, any> = networkCache.questions || {};
+      const questionsData: Record<string, SurveySelectorQuestionCacheRow | null | undefined> = networkCache.questions || {};
       const BLOCKED_QUESTION_IDS_SET = getBlockedQuestionIdsSet(readSlug);
       for (const q of Object.values(questionsData)) {
         if (!q || !q.id) continue;
@@ -605,18 +815,18 @@ export class SurveySelector extends Component<any, any> {
     });
   };
 
-  handleUrlChange: any = () => {
+  handleUrlChange: () => void = () => {
     this.handleUrlBasedView();
   };
 
-  handleUrlBasedView: any = () => {
+  handleUrlBasedView: () => void = () => {
     const path = window.location.pathname || '';
     const params = new URLSearchParams(window.location.search || '');
     const urlRequestsResults = params.get('results') === 'true';
     const isQuestions = /^\/questions(\/|$)/.test(path);
     const isSurveysList = path === "/surveys";
     const isValidSurveyRoute = /^\/survey\/(0x[0-9a-fA-F]{64})(?:\/.*)?$/.test(path);
-    let nextViewMode: any = null;
+    let nextViewMode: SurveySelectorViewMode | null = null;
     if (isQuestions) {
       nextViewMode = "questions";
     } else if (isSurveysList || isValidSurveyRoute) {
@@ -624,7 +834,7 @@ export class SurveySelector extends Component<any, any> {
     } else if (path.startsWith("/survey/")) {
       nextViewMode = "questions";
     }
-    const statePatch: Record<string, any> = {};
+    const statePatch: SurveySelectorQuestionCountStatePatch = {};
     if (nextViewMode && nextViewMode !== this.state.viewMode) {
       statePatch.viewMode = nextViewMode;
     }
@@ -637,7 +847,7 @@ export class SurveySelector extends Component<any, any> {
   };
 
 
-	  handleFilteredQuestionsWithState: any = (filteredQuestions: any, filterState: any) => {
+	  handleFilteredQuestionsWithState = (_filteredQuestions: unknown, filterState: unknown): void => {
     const nextFilterState = normalizeSurveyToolFilterState(filterState);
     const serializedState = serializeSurveyToolFilterState(nextFilterState);
     if (serializedState !== this._filterStateSig) {
@@ -688,23 +898,7 @@ export class SurveySelector extends Component<any, any> {
 	    const surveyBag = surveysCache?.[netIdStr]?.surveys || {};
 
 	    // 3. Build List from Cache
-	    const userSubmittedSurveys: any[] = [];
-	    const seen: any = new Set();
-
-	    for (const sid of Object.keys(surveyBag)) {
-	      const sData = surveyBag[sid];
-        if (!sData || !sData.title || !Array.isArray(sData.questionIDs)) continue;
-
-	      const qids = (sData.questionIDs || []).map((q: any) => String(q || '').toLowerCase());
-	      if (qids.length === 0) continue;
-
-	      if (!sData.id) sData.id = sData.surveyID || sid;
-	      const lowered = String(sData.id || sid).toLowerCase();
-	      if (!seen.has(lowered)) {
-	        seen.add(lowered);
-	        userSubmittedSurveys.push(sData);
-	      }
-	    }
+	    const userSubmittedSurveys = buildSurveySelectorSubmittedSurveyList(surveyBag);
 
 	    // 4. Handle Cache Warmup State (Prevent flashing empty during transient re-fetches)
 	    // Keep previous list when re-fetch produces empty AND context (slug+network) hasn't changed.
@@ -731,37 +925,21 @@ export class SurveySelector extends Component<any, any> {
       );
     }
 
-  updateSelectedSurvey: any = () => {
+  updateSelectedSurvey: () => void = () => {
     // Skip if user just clicked a survey and URL push hasn't fired yet
     if (this._userSurveySelectionPending) return;
     this.setState(
-      (prevState: any) => {
+      (prevState: SurveySelectorSurveyState) => {
         const { surveys } = prevState;
         const path = window.location.pathname;
-
-        if (path === '/surveys') {
-          return { selectedSurveyIndex: null };
-        }
-
-        let surveyIdFromUrl: any = null;
-        const match = path.match(/^\/survey\/(0x[0-9a-fA-F]{64})(?:\/.*)?$/);
-        if (match && match[1]) {
-          surveyIdFromUrl = match[1].toLowerCase();
-        }
-
-        const propId = this.props.surveyId ? this.props.surveyId.toLowerCase() : null;
-        const targetId = surveyIdFromUrl || propId;
-
-        if (!targetId) {
-          return { selectedSurveyIndex: null };
-        }
-
-        const idx = surveys.findIndex((s: any) => (s.id ? s.id.toLowerCase() : '') === targetId);
-        if (idx !== -1) {
-          return { selectedSurveyIndex: idx };
-        }
-
-        return { selectedSurveyIndex: prevState.selectedSurveyIndex };
+        return {
+          selectedSurveyIndex: resolveSelectedSurveyIndex({
+            surveys,
+            path,
+            surveyId: this.props.surveyId,
+            previousSelectedSurveyIndex: prevState.selectedSurveyIndex,
+          }),
+        };
       },
       () => {
         const { selectedSurveyIndex } = this.state as SurveySelectorSurveyState;
@@ -781,7 +959,7 @@ export class SurveySelector extends Component<any, any> {
    * Select a survey (by index) and (normally) push a URL like /survey/:id.
    * When preventUrlChange is true, we only update component state.
    */
-  selectSurvey: any = (selectedSurveyIndex: any) => {
+  selectSurvey = (selectedSurveyIndex: number): void => {
     const survey =
       this.state.surveys && this.state.surveys[selectedSurveyIndex]
         ? this.state.surveys[selectedSurveyIndex]
@@ -809,7 +987,7 @@ export class SurveySelector extends Component<any, any> {
   };
 
 
-  updateURL: any = (surveyId: any) => {
+  updateURL = (surveyId: unknown): void => {
     const idL = String(surveyId).trim().toLowerCase();
     const slug = normalizeSessionSlugValue(resolveEffectiveSlug(this.props)) || '';
     const query = slug ? `?session=${encodeURIComponent(slug)}` : '';
@@ -828,8 +1006,8 @@ export class SurveySelector extends Component<any, any> {
    * Switches between "questions" and "survey" views and (normally) updates the URL.
    * When preventUrlChange is true, we skip the pushState calls.
    */
-  selectOption: any = (option: any) => {
-    this.setState({ viewMode: option, pendingSubmitStats: { total: 0, encrypted: 0, submittedSinceLastEdit: false, isSubmitting: false } }, () => {
+  selectOption = (option: SurveySelectorViewMode): void => {
+    this.setState(buildSurveySelectorViewModePatch(option), () => {
       if (this.props.preventUrlChange) return;
 
       let path = '/questions';
@@ -848,17 +1026,17 @@ export class SurveySelector extends Component<any, any> {
   };
 
 
-  toggleFilterModal: any = () => {
-    this.setState((prevState: any) => ({ filterModalOpen: !prevState.filterModalOpen }));
+  toggleFilterModal: () => void = () => {
+    this.setState((prevState: SurveySelectorToggleState) => ({ filterModalOpen: !prevState.filterModalOpen }));
   };
 
-  toggleCreateMode: any = () => {
-    this.setState((prevState: any) => ({
+  toggleCreateMode: () => void = () => {
+    this.setState((prevState: SurveySelectorToggleState) => ({
       createSurveyMode: !prevState.createSurveyMode
     }));
   };
 
-  toggleShowResults: any = () => {
+  toggleShowResults: () => void = () => {
     const newShowResults = !this.state.showResults;
     const selectedSurvey =
       this.state.selectedSurveyIndex !== null && this.state.surveys[this.state.selectedSurveyIndex]
@@ -910,7 +1088,7 @@ export class SurveySelector extends Component<any, any> {
     this.setState(buildSurveySelectorShowResultsPatch(newShowResults));
   };
 
-  closeShowResults: any = () => {
+  closeShowResults: () => void = () => {
     if (!this.state.showResults) return;
     const selectedSurvey =
       this.state.selectedSurveyIndex !== null && this.state.surveys[this.state.selectedSurveyIndex]
@@ -937,14 +1115,14 @@ export class SurveySelector extends Component<any, any> {
     this.setState(buildSurveySelectorShowResultsPatch(false));
   };
 
-  handleHeaderSubmitClick: any = () => {
-    const target = this.surveyQuestionsRef?.current;
+  handleHeaderSubmitClick: () => void = () => {
+    const target = this.surveyQuestionsRef?.current as SurveySelectorPrimarySubmitTarget | null;
     if (!target || typeof target.handlePrimarySubmitClick !== 'function') return;
     if (target.state?.isSubmitting) return;
     target.handlePrimarySubmitClick();
   };
 
-  handlePendingStatsChange: any = (stats: any) => {
+  handlePendingStatsChange = (stats: unknown): void => {
     if (!stats || typeof stats !== 'object') return;
     const patch = buildSurveySelectorPendingSubmitStatsPatch(stats);
     const { total, encrypted, submittedSinceLastEdit, isSubmitting } = patch.pendingSubmitStats;
@@ -958,7 +1136,7 @@ export class SurveySelector extends Component<any, any> {
     this.setState(patch);
   };
 
-	  handleFilterChangeForUrl: any = (newFilterStateFromResults: any) => {
+	  handleFilterChangeForUrl = (newFilterStateFromResults: unknown): void => {
 	    // Requirement: Internal Updates: Update local state WITHOUT modifying the URL.
 	    const nextFilterState = normalizeSurveyToolFilterState(newFilterStateFromResults);
     const nextFilterSig = serializeSurveyToolFilterState(nextFilterState);
@@ -967,7 +1145,7 @@ export class SurveySelector extends Component<any, any> {
 		    this.setState(buildSurveySelectorFilterStatePatch(nextFilterState));
 		  };
 
-  handleFilteredQuestionCountUpdate: any = (count: any, encryptedCount: any) => {
+  handleFilteredQuestionCountUpdate = (count: unknown, encryptedCount: unknown): void => {
     // Keep UI stable while cache warms or if a transient 0 arrives.
     const hasFallbackQuestionPool = Array.isArray(this.props.questionPool) && this.props.questionPool.length > 0;
     if (!this.props.isQuestionCacheReady && !hasFallbackQuestionPool) return;
@@ -977,26 +1155,26 @@ export class SurveySelector extends Component<any, any> {
     });
   };
 
-  handleFilterActivityChange: any = (isActive: any) => {
+  handleFilterActivityChange = (isActive: unknown): void => {
     const nextActive = !!isActive;
     if (nextActive === !!this.state.isFilterActive) return;
     this.setState(buildSurveySelectorFilterActivePatch(nextActive));
   };
 
-  toggleSelectorDropdown: any = () => {
-    this.setState((prevState: any) => ({ selectorDropdownOpen: !prevState.selectorDropdownOpen }));
+  toggleSelectorDropdown: () => void = () => {
+    this.setState((prevState: SurveySelectorToggleState) => ({ selectorDropdownOpen: !prevState.selectorDropdownOpen }));
   };
 
-  handlePubKeyUpdate: any = (pk: any) => {
+  handlePubKeyUpdate = (pk: unknown): void => {
     if (pk === this.state.pubKey) return;
     this.setState(buildSurveySelectorPubKeyPatch(pk));
   };
 
-  handleUpdateSelectedTypes: any = (selectedTypes: any) => {
-    this.setState({ selectedTypes });
+  handleUpdateSelectedTypes = (selectedTypes: unknown): void => {
+    this.setState(buildSurveySelectorSelectedTypesPatch(selectedTypes));
   };
 
-  copySurveyIdToClipboard: any = (surveyID: any = null) => {
+  copySurveyIdToClipboard = (surveyID: unknown = null): void => {
     const { surveys, selectedSurveyIndex } = this.state;
     const idToCopy = resolveSurveyIdToCopy({
       surveyID,
@@ -1020,7 +1198,7 @@ export class SurveySelector extends Component<any, any> {
             this.setState(buildSurveySelectorCopySuccessPatch(false));
           }, 2000);
         })
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           surveyLog.error('Could not copy survey ID:', err);
         });
     } else {
@@ -1028,14 +1206,17 @@ export class SurveySelector extends Component<any, any> {
     }
   };
 
-  getParsedQuestionsCacheForRender: any = (slug: any, networkID: any) => {
+  getParsedQuestionsCacheForRender = (
+    slug: unknown,
+    networkID: unknown
+  ): SurveySelectorRenderQuestionsCache => {
     const nonce = Number(this.props.questionsCacheNonce || 0);
     const memoKey = `${String(slug || '')}|${String(networkID || '')}|${nonce}`;
     if (this._renderQuestionsCacheMemoKey === memoKey && this._renderQuestionsCacheMemoValue) {
       return this._renderQuestionsCacheMemoValue;
     }
 
-    let parsedQuestionsCache: any = null;
+    let parsedQuestionsCache: SurveySelectorRenderQuestionsCache = null;
     try {
       parsedQuestionsCache = readQuestionsCacheRef(String(slug || '')) || {};
     } catch (e: unknown) {
@@ -1048,45 +1229,23 @@ export class SurveySelector extends Component<any, any> {
   };
 
   // Helper function to check if all questions for a specific survey are loaded in cache
-  areSurveySpecificQuestionsLoaded: any = (survey: any, networkId: any, parsedQuestionsCache: any) => {
-    if (!survey || !Array.isArray(survey.questionIDs) || survey.questionIDs.length === 0) {
-      return true; // nothing to check
-    }
-    if (!networkId) {
-      return true; // cannot verify; avoid spinner lock
-    }
-
-    try {
-      const netKey = String(networkId);
-      const netBucket = parsedQuestionsCache?.[netKey] || null;
-      if (!netBucket || !netBucket.questions) return false;
-
-      const cachedQuestionMap = netBucket.questions;
-      for (const surveyQID of survey.questionIDs) {
-        if (!cachedQuestionMap[String(surveyQID).toLowerCase()]) {
-          return false; // at least one question missing in cache
-        }
-      }
-      return true;
-    } catch (error) {
-      surveyLog.error("SurveySelector.areSurveySpecificQuestionsLoaded: error", error);
-      return false;
-    }
+  areSurveySpecificQuestionsLoaded = (
+    survey: SurveySelectorSurveySummary | null,
+    networkId: unknown,
+    parsedQuestionsCache: SurveySelectorRenderQuestionsCache
+  ): boolean => {
+    return areSurveySpecificQuestionsLoaded(survey, networkId, parsedQuestionsCache);
   };
 
-  getSurveyDocumentUrls: any = (survey: any = null) => (
-    (Array.isArray(survey?.documentURLs) ? survey.documentURLs : [])
-      .map((value: any) => (typeof value === 'string' ? value.trim() : ''))
-      .filter(Boolean)
+  getSurveyDocumentUrls = (survey: SurveySelectorSurveySummary | null = null): string[] => (
+    getSurveyDocumentUrls(survey)
   );
 
-  getSurveyDocumentLinkTitle: any = (survey: any = null) => {
-    const documentURLs = this.getSurveyDocumentUrls(survey);
-    if (documentURLs.length <= 0) return '';
-    return documentURLs.length > 1 ? `${documentURLs.length} documents` : documentURLs[0];
-  };
+  getSurveyDocumentLinkTitle = (survey: SurveySelectorSurveySummary | null = null): string => (
+    getSurveyDocumentLinkTitle(survey)
+  );
 
-  renderQuestionSelectorLabel: any = ({
+  renderQuestionSelectorLabel = ({
     prefixLabel = 'Questions',
     count = 0,
     encryptedCount = 0,
@@ -1094,8 +1253,8 @@ export class SurveySelector extends Component<any, any> {
     showSpinner = false,
     showCacheError = false,
     encryptedCountTestId = '',
-  }: any = {}) => {
-    const encryptedBadgeProps: Record<string, any> = {};
+  }: SurveySelectorQuestionSelectorLabelArgs = {}): React.ReactNode => {
+    const encryptedBadgeProps: SurveySelectorEncryptedBadgeProps = {};
     if (showEncryptedCount && encryptedCountTestId) {
       encryptedBadgeProps['data-testid'] = encryptedCountTestId;
       encryptedBadgeProps['data-ce-encrypted-question-count'] = String(Math.max(0, Number(encryptedCount || 0)));
@@ -1144,7 +1303,7 @@ export class SurveySelector extends Component<any, any> {
     const activeSessionSlug = getActiveSessionSlugFromProps(this.props);
     const hasCacheError = !!this.props.cacheInitializationError;
       const SurveyQuestionsComponent =
-      this.props.SurveyQuestionsComponent || (this.constructor as any).SurveyQuestionsComponent;
+      this.props.SurveyQuestionsComponent || getStaticSurveyQuestionsComponent(this);
 
     const selectedSurvey =
       selectedSurveyIndex !== null && surveys[selectedSurveyIndex]
@@ -1216,7 +1375,7 @@ export class SurveySelector extends Component<any, any> {
                 href={surveyDocumentURLs[0]}
                 target='_blank'
                 rel='noopener noreferrer'
-                onClick={(e: any) => e.stopPropagation()}
+                onClick={(e: SurveySelectorStoppableEvent) => e.stopPropagation()}
                 className={styles.selectedSurveyDocLink}
                 title={this.getSurveyDocumentLinkTitle(selectedSurvey)}
               >
@@ -1301,7 +1460,7 @@ export class SurveySelector extends Component<any, any> {
 
                     {this.props.isSurveyCacheReady ? (
                       <>
-                        {surveys.map((survey: any, index: any) => {
+                        {surveys.map((survey: SurveySelectorSurveySummary, index: number) => {
                           const surveyQuestionsLoaded = this.areSurveySpecificQuestionsLoaded(survey, networkID, parsedQuestionsCache);
                           const surveyDocumentURLs = this.getSurveyDocumentUrls(survey);
                           const hasDocUrls = surveyDocumentURLs.length > 0;
@@ -1326,7 +1485,7 @@ export class SurveySelector extends Component<any, any> {
                                       target='_blank'
                                       rel='noopener noreferrer'
                                       className={styles.surveyItemDocLink}
-                                      onClick={(e: any) => e.stopPropagation()}
+                                      onClick={(e: SurveySelectorStoppableEvent) => e.stopPropagation()}
                                       title={this.getSurveyDocumentLinkTitle(survey)}
                                     >
                                       <FontAwesomeIcon icon={faExternalLinkAlt} />
@@ -1421,96 +1580,88 @@ export class SurveySelector extends Component<any, any> {
 
         {/* Survey / questions views */}
         {viewMode !== 'questions' && selectedSurvey && SurveyQuestionsComponent && (
-          <React.Suspense fallback={<LazyFallback label="Loading Questions..." minHeight="160px" />}>
-            <SurveyQuestionsComponent
-              ref={this.surveyQuestionsRef}
-              useHeaderSubmit={true}
-              onPendingStatsChange={this.handlePendingStatsChange}
-              displayAnswerMode={this.props.displayAnswerMode}
-              viewAddress={this.props.viewAddress}
-              account={this.props.account}
-              network={this.props.network}
-              provider={this.props.provider}
-              lit={this.props.lit}
-              litHooks={this.props.litHooks}
-              toggleLoginModal={this.props.toggleLoginModal}
-              surveys={surveys}
-              loginComplete={this.props.loginComplete}
-              pubKey={this.state.pubKey}
-              updatePubKey={this.handlePubKeyUpdate}
-              surveyIndex={this.state.selectedSurveyIndex}
-              surveyId={selectedSurvey.id}
-              cache={this.props.cache}
-              updateCache={this.props.updateCache}
-              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-              refreshQuestionResponses={this.props.refreshQuestionResponses}
-              defaultTags={this.props.defaultTags}
-              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-              isQuestionCacheReady={this.props.isQuestionCacheReady}
-              isResponsesCacheReady={this.props.isResponsesCacheReady}
-              isSurveyCacheReady={this.props.isSurveyCacheReady}
-              questionsCacheNonce={this.props.questionsCacheNonce}
-              questionResponsesNonce={this.props.questionResponsesNonce}
-              ensureQuestionCached={this.props.ensureQuestionCached}
-              computeSubmitLabel={this.props.computeSubmitLabel}
-              cacheInitializationError={this.props.cacheInitializationError}
-              questionScanProgress={this.props.questionScanProgress}
-              hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
-              sessionSlug={this.props.sessionSlug}
-              sessionConfig={sessionConfig}
-              networkChainId={this.props.networkChainId}
-            />
-          </React.Suspense>
+          <SurveyQuestionsComponent
+            ref={this.surveyQuestionsRef}
+            useHeaderSubmit={true}
+            onPendingStatsChange={this.handlePendingStatsChange}
+            displayAnswerMode={this.props.displayAnswerMode}
+            viewAddress={this.props.viewAddress}
+            account={this.props.account}
+            network={this.props.network}
+            provider={this.props.provider}
+            lit={this.props.lit}
+            litHooks={this.props.litHooks}
+            toggleLoginModal={this.props.toggleLoginModal}
+            surveys={surveys}
+            loginComplete={this.props.loginComplete}
+            pubKey={this.state.pubKey}
+            updatePubKey={this.handlePubKeyUpdate}
+            surveyIndex={this.state.selectedSurveyIndex}
+            surveyId={selectedSurvey.id}
+            cache={this.props.cache}
+            updateCache={this.props.updateCache}
+            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+            refreshQuestionResponses={this.props.refreshQuestionResponses}
+            defaultTags={this.props.defaultTags}
+            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+            isQuestionCacheReady={this.props.isQuestionCacheReady}
+            isResponsesCacheReady={this.props.isResponsesCacheReady}
+            isSurveyCacheReady={this.props.isSurveyCacheReady}
+            questionsCacheNonce={this.props.questionsCacheNonce}
+            questionResponsesNonce={this.props.questionResponsesNonce}
+            ensureQuestionCached={this.props.ensureQuestionCached}
+            computeSubmitLabel={this.props.computeSubmitLabel}
+            cacheInitializationError={this.props.cacheInitializationError}
+            questionScanProgress={this.props.questionScanProgress}
+            hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
+            sessionSlug={this.props.sessionSlug}
+          />
         )}
 
         {showResults && (
-          <React.Suspense fallback={<LazyFallback label="Loading Results..." minHeight="160px" />}>
-            <LazySurveyResults
-              isOpen={showResults}
-              onClose={this.closeShowResults}
-              provider={this.props.provider}
-              network={this.props.network}
-              networkChainId={this.props.networkChainId}
-              lit={this.props.lit}
-              litHooks={this.props.litHooks}
-              sbtCacheRevision={this.props.sbtCacheRevision}
-              surveyId={viewMode === 'questions' ? null : selectedSurvey?.id}
-              cache={this.props.cache}
-              updateCache={this.props.updateCache}
-              viewMode={viewMode}
-              filterState={this.state.filterState}
-              questionResponsesNonce={this.props.questionResponsesNonce}
-              questionsCacheNonce={this.props.questionsCacheNonce}
-              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-              refreshQuestionResponses={this.props.refreshQuestionResponses}
-              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-              defaultTags={this.props.defaultTags}
-              sessionInfo={this.props.sessionInfo}
-              sessionName={this.props.sessionName}
-              isQuestionCacheReady={this.props.isQuestionCacheReady}
-              isResponsesCacheReady={this.props.isResponsesCacheReady}
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              isSurveyCacheReady={this.props.isSurveyCacheReady}
-              // Props for URL updates
-              currentSurveyIdForUrl={surveyForUrl}
-              currentViewModeForUrl={this.state.viewMode}
-              onFilterStateChangeForUrlUpdate={this.handleFilterChangeForUrl}
-              // Props for unified count
-              filteredQuestionsCount={this.state.filteredQuestionCount}
-              onCountUpdate={this.handleFilteredQuestionCountUpdate}
-              onFilterChange={this.props.onFilterChange}
-              preventUrlChange={this.props.preventUrlChange}
-              sessionSlug={this.props.sessionSlug}
-              activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-              sessionConfig={this.props.sessionConfig}
-              ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
-              // Do not drop the pin at the results layer; otherwise /session pages
-              // silently fan out to broader scan scope when opening results.
-              sessionSlugPinned={this.props.sessionSlugPinned}
-            />
-          </React.Suspense>
+          <SurveyResults
+            isOpen={showResults}
+            onClose={this.closeShowResults}
+            provider={this.props.provider}
+            network={this.props.network}
+            networkChainId={this.props.networkChainId}
+            lit={this.props.lit}
+            litHooks={this.props.litHooks}
+            sbtCacheRevision={this.props.sbtCacheRevision}
+            surveyId={viewMode === 'questions' ? null : selectedSurvey?.id}
+            cache={this.props.cache}
+            updateCache={this.props.updateCache}
+            viewMode={viewMode}
+            filterState={this.state.filterState}
+            questionResponsesNonce={this.props.questionResponsesNonce}
+            questionsCacheNonce={this.props.questionsCacheNonce}
+            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+            refreshQuestionResponses={this.props.refreshQuestionResponses}
+            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+            defaultTags={this.props.defaultTags}
+            sessionInfo={this.props.sessionInfo}
+            sessionName={this.props.sessionName}
+            isQuestionCacheReady={this.props.isQuestionCacheReady}
+            isResponsesCacheReady={this.props.isResponsesCacheReady}
+            isSBTCacheReady={this.props.isSBTCacheReady}
+            isSurveyCacheReady={this.props.isSurveyCacheReady}
+            // Props for URL updates
+	            currentSurveyIdForUrl={surveyForUrl}
+	            currentViewModeForUrl={this.state.viewMode}
+	            onFilterStateChangeForUrlUpdate={this.handleFilterChangeForUrl}
+	            // Props for unified count
+	            filteredQuestionsCount={this.state.filteredQuestionCount}
+	            onCountUpdate={this.handleFilteredQuestionCountUpdate}
+            onFilterChange={this.props.onFilterChange}
+            preventUrlChange={this.props.preventUrlChange}
+            sessionSlug={this.props.sessionSlug}
+            activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+            // Do not drop the pin at the results layer; otherwise /session pages
+            // silently fan out to broader scan scope when opening results.
+            sessionSlugPinned={this.props.sessionSlugPinned}
+          />
         )}
 
 
@@ -1576,9 +1727,9 @@ export class SurveySelector extends Component<any, any> {
 
 
 export class QuestionsDashboard extends Component<any, any> {
-  [key: string]: any;
+  _lastLoadContextSignature: string;
 
-  constructor(props: any) {
+  constructor(props: QuestionsDashboardLifecycleProps) {
     super(props);
     this.state = {
       questions: [],
@@ -1590,13 +1741,13 @@ export class QuestionsDashboard extends Component<any, any> {
     this._lastLoadContextSignature = '';
   }
 
-  _lastExtraSlugsQuestionsMemo: any = { key: '', extraQuestions: [], extraQuestionResponses: {} };
+  _lastExtraSlugsQuestionsMemo: QuestionsDashboardExtraSlugsMemo = { key: '', extraQuestions: [], extraQuestionResponses: {} };
 
   componentDidMount() {
     this.loadQuestions({ resetFilteredQuestions: true });
   }
 
-  componentDidUpdate(prevProps: any) {
+  componentDidUpdate(prevProps: QuestionsDashboardLifecycleProps) {
     const sessionChanged =
       prevProps.activeSessionSlug !== this.props.activeSessionSlug ||
       prevProps.sessionSlug !== this.props.sessionSlug;
@@ -1608,7 +1759,7 @@ export class QuestionsDashboard extends Component<any, any> {
     const responsesNonceTick = prevProps.questionResponsesNonce !== this.props.questionResponsesNonce;
     const fallbackQuestionPoolChanged = prevProps.questionPool !== this.props.questionPool;
     const progressSlug = normalizeQuestionProgressSlug(resolveEffectiveSlug(this.props));
-    const pickScopedQuestionProgress = (progressIn: any) => {
+    const pickScopedQuestionProgress = (progressIn: unknown): QuestionsDashboardProgress | null => {
       if (!progressIn || typeof progressIn !== 'object') return null;
       const progress = progressIn as QuestionsDashboardProgress;
       if (!doesQuestionProgressMatchSlug(String(progress.slug || ''), progressSlug)) return null;
@@ -1648,14 +1799,14 @@ export class QuestionsDashboard extends Component<any, any> {
     }
   }
 
-  applyDefaultTagsFilter: any = (list: any) => {
+  applyDefaultTagsFilter = <T,>(list: T[] | unknown): T[] => {
     // Sessions handle scoping. Tags are for organization and user-driven filtering.
     return Array.isArray(list) ? list : [];
   };
 
-  loadQuestions: any = ({
+  loadQuestions = ({
     resetFilteredQuestions = false,
-  }: any = {}) => {
+  }: QuestionsDashboardLoadOptions = {}): void => {
     surveyLog.log('QuestionsDashboard: loadQuestions - Reading from cache mirror');
     const slug = resolveEffectiveSlug(this.props);
     const loadContext = resolveQuestionsDashboardLoadContext(this.props, slug);
@@ -1663,7 +1814,7 @@ export class QuestionsDashboard extends Component<any, any> {
     const netIdStr = loadContext.networkIdStr;
     const loadContextSignature = buildQuestionDashboardLoadContextSignature({
       effectiveSlug,
-      scopedSessionSlugs: loadContext.scopedSessionSlugs as any,
+      scopedSessionSlugs: loadContext.scopedSessionSlugs as unknown[],
       networkID: netIdStr,
     });
     const contextChanged = this._lastLoadContextSignature !== loadContextSignature;
@@ -1682,9 +1833,9 @@ export class QuestionsDashboard extends Component<any, any> {
       return;
     }
 
-    let localQuestionsCache: Record<string, any> = {};
-    try { localQuestionsCache = readQuestionsCacheRef(effectiveSlug) || {}; }
-    catch (e) {
+    let localQuestionsCache: QuestionsDashboardQuestionCacheByNet = {};
+    try { localQuestionsCache = readQuestionsCacheRef(effectiveSlug) as QuestionsDashboardQuestionCacheByNet || {}; }
+    catch (e: unknown) {
       surveyLog.error('QuestionsDashboard: Error reading questionsCache from mirror:', e);
       localQuestionsCache = {};
     }
@@ -1692,7 +1843,7 @@ export class QuestionsDashboard extends Component<any, any> {
     const networkCache = localQuestionsCache?.[netIdStr] || { questions: {}, questionResponses: {} };
     const questionsData = (networkCache.questions || {}) as Record<string, QuestionsDashboardQuestionRow>;
     const questionResponses = mergeQuestionResponses({}, networkCache.questionResponses || {});
-    let questions = Object.keys(questionsData).map((qId: any) => {
+    let questions: QuestionsDashboardQuestionRow[] = Object.keys(questionsData).map((qId: string) => {
       const q = questionsData[qId];
       return {
         id: qId,
@@ -1703,9 +1854,9 @@ export class QuestionsDashboard extends Component<any, any> {
       };
     });
 
-    const seenQuestionIds: any = new Set();
+    const seenQuestionIds = new Set<string>();
     const BLOCKED_QUESTION_IDS_SET = getBlockedQuestionIdsSet(effectiveSlug);
-    questions = questions.filter((q: any) => {
+    questions = questions.filter((q: QuestionsDashboardQuestionRow) => {
       if (!q || !q.id) return false;
       const questionIdLower = String(q.id).toLowerCase();
       if (BLOCKED_QUESTION_IDS_SET.has(questionIdLower)) return false;
@@ -1717,7 +1868,7 @@ export class QuestionsDashboard extends Component<any, any> {
     const extraSlugs = (
       Array.isArray(loadContext.scopedSessionSlugs) && loadContext.scopedSessionSlugs.length > 0
         ? loadContext.scopedSessionSlugs.filter(
-          (extraSlug: any) => normalizeSessionSlugValue(extraSlug) !== normalizeSessionSlugValue(effectiveSlug)
+          (extraSlug: unknown) => normalizeSessionSlugValue(extraSlug) !== normalizeSessionSlugValue(effectiveSlug)
         )
         : getExtraQuestionReadSlugs(this.props, effectiveSlug)
     );
@@ -1726,18 +1877,18 @@ export class QuestionsDashboard extends Component<any, any> {
       ? [...extraSlugs].sort().join(',') + '|' + netIdStr + '|' + String(this.props.questionsCacheNonce || 0) + '|' + String(this.props.questionResponsesNonce || 0) + '|' + String(this.props.sbtCacheRevision || 0)
       : '';
 
-    let extraQuestions: any[] = [];
-    let extraQuestionResponses: Record<string, any> = {};
+    let extraQuestions: QuestionsDashboardQuestionRow[] = [];
+    let extraQuestionResponses: Record<string, unknown> = {};
     if (extraSlugsMemoKey && this._lastExtraSlugsQuestionsMemo.key === extraSlugsMemoKey) {
       extraQuestions = this._lastExtraSlugsQuestionsMemo.extraQuestions;
       extraQuestionResponses = this._lastExtraSlugsQuestionsMemo.extraQuestionResponses || {};
     } else if (extraSlugs.length > 0) {
-      const extraDedup: any = new Set();
-      const nextExtraQuestionResponses: Record<string, any> = {};
+      const extraDedup = new Set<string>();
+      const nextExtraQuestionResponses: Record<string, unknown> = {};
       for (const extraSlug of extraSlugs) {
-        let extraQuestionsCache: Record<string, any> = {};
-        try { extraQuestionsCache = readQuestionsCacheRef(extraSlug) || {}; }
-        catch (e) {
+        let extraQuestionsCache: QuestionsDashboardQuestionCacheByNet = {};
+        try { extraQuestionsCache = readQuestionsCacheRef(String(extraSlug || '')) as QuestionsDashboardQuestionCacheByNet || {}; }
+        catch (e: unknown) {
           surveyLog.error('QuestionsDashboard: Error reading questionsCache from mirror for slug "' + extraSlug + '":', e);
           extraQuestionsCache = {};
         }
@@ -1745,7 +1896,7 @@ export class QuestionsDashboard extends Component<any, any> {
         const extraQuestionsData = (extraNetworkCache.questions || {}) as Record<string, QuestionsDashboardQuestionRow>;
         mergeQuestionResponses(nextExtraQuestionResponses, extraNetworkCache.questionResponses || {});
         const BLOCKED_EXTRA_QUESTION_IDS_SET = getBlockedQuestionIdsSet(extraSlug);
-        Object.keys(extraQuestionsData).forEach((qId: any) => {
+        Object.keys(extraQuestionsData).forEach((qId: string) => {
           const q = extraQuestionsData[qId];
           const questionIdRaw = (q && q.id != null && String(q.id) !== '') ? q.id : qId;
           if (!questionIdRaw) return;
@@ -1807,9 +1958,9 @@ export class QuestionsDashboard extends Component<any, any> {
 
     questions = this.applyDefaultTagsFilter(questions);
     const encryptedQuestionCount = questions.filter(
-      (question: any) => String(question?.prompt || '').trim() === '[encrypted]'
+      (question: QuestionsDashboardQuestionRow) => String(question?.prompt || '').trim() === '[encrypted]'
     ).length;
-    const nextState: any = {
+    const nextState: Record<string, unknown> = {
       questions,
       initialLoadComplete: true,
       questionResponses,
@@ -1824,7 +1975,7 @@ export class QuestionsDashboard extends Component<any, any> {
     });
   };
 
-  handleFilteredQuestions: any = (filteredQuestions: any, filterState: any) => {
+  handleFilteredQuestions = (filteredQuestions: unknown, filterState: unknown): void => {
     const next = this.applyDefaultTagsFilter(filteredQuestions);
 
     this.setState(buildQuestionsDashboardFilteredQuestionsPatch(next), () => {
@@ -1834,14 +1985,14 @@ export class QuestionsDashboard extends Component<any, any> {
     });
   };
 
-  setFilterLoading: any = (loading: any) => {
-    this.setState({ filterLoading: loading });
+  setFilterLoading = (loading: unknown): void => {
+    this.setState(buildQuestionsDashboardFilterLoadingPatch(loading));
   };
 
   render() {
     const { filteredQuestions, filterLoading } = this.state;
     const SurveyQuestionsComponent =
-      this.props.SurveyQuestionsComponent || (this.constructor as any).SurveyQuestionsComponent;
+      this.props.SurveyQuestionsComponent || getStaticSurveyQuestionsComponent(this);
 
     return (
       <div className={styles.questionsDashboard}>
@@ -1885,40 +2036,38 @@ export class QuestionsDashboard extends Component<any, any> {
             <p>Applying filter...</p>
           </div>
         ) : SurveyQuestionsComponent ? (
-          <React.Suspense fallback={<LazyFallback label="Loading Questions..." minHeight="160px" />}>
-            <SurveyQuestionsComponent
-              ref={this.props.surveyQuestionsRef}
-              account={this.props.account}
-              provider={this.props.provider}
-              lit={this.props.lit}
-              litHooks={this.props.litHooks}
-              toggleLoginModal={this.props.toggleLoginModal}
-              loginComplete={this.props.loginComplete}
-              cache={this.props.cache}
-              updateCache={this.props.updateCache}
-              questionPool={filteredQuestions}
-              isStandalone={true}
-              useHeaderSubmit={this.props.useHeaderSubmit}
-              pubKey={this.props.pubKey}
-              updatePubKey={this.props.updatePubKey}
-              network={this.props.network}
-              activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-              sessionSlug={this.props.sessionSlug}
-              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-              refreshQuestionResponses={this.props.refreshQuestionResponses}
-              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-              isQuestionCacheReady={this.props.isQuestionCacheReady}
-              isResponsesCacheReady={this.props.isResponsesCacheReady}
-              isSurveyCacheReady={this.props.isSurveyCacheReady}
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              ensureQuestionCached={this.props.ensureQuestionCached}
-              computeSubmitLabel={this.props.computeSubmitLabel}
-              onPendingStatsChange={this.props.onPendingStatsChange}
-              questionScanProgress={this.props.questionScanProgress}
-              hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
-            />
-          </React.Suspense>
+          <SurveyQuestionsComponent
+            ref={this.props.surveyQuestionsRef}
+            account={this.props.account}
+            provider={this.props.provider}
+            lit={this.props.lit}
+            litHooks={this.props.litHooks}
+            toggleLoginModal={this.props.toggleLoginModal}
+            loginComplete={this.props.loginComplete}
+            cache={this.props.cache}
+            updateCache={this.props.updateCache}
+            questionPool={filteredQuestions}
+            isStandalone={true}
+            useHeaderSubmit={this.props.useHeaderSubmit}
+            pubKey={this.props.pubKey}
+            updatePubKey={this.props.updatePubKey}
+            network={this.props.network}
+            activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+            sessionSlug={this.props.sessionSlug}
+            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+            refreshQuestionResponses={this.props.refreshQuestionResponses}
+            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+            isQuestionCacheReady={this.props.isQuestionCacheReady}
+            isResponsesCacheReady={this.props.isResponsesCacheReady}
+            isSurveyCacheReady={this.props.isSurveyCacheReady}
+            isSBTCacheReady={this.props.isSBTCacheReady}
+            ensureQuestionCached={this.props.ensureQuestionCached}
+            computeSubmitLabel={this.props.computeSubmitLabel}
+            onPendingStatsChange={this.props.onPendingStatsChange}
+            questionScanProgress={this.props.questionScanProgress}
+            hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
+          />
         ) : null}
       </div>
     );

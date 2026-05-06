@@ -1,4 +1,26 @@
-import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
+import {
+  QUESTION_FILTER_ACTIONS_STYLE,
+  QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
+  QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
+  QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE,
+  QUESTION_FILTER_MODAL_HEADER_ROW_STYLE,
+  QUESTION_FILTER_MODAL_TITLE_ROW_STYLE,
+  QUESTION_FILTER_SBT_SPINNER_STYLE,
+  QuestionFilter as QuestionFilterComponent,
+  buildQuestionFilterAiCombineRowClassName,
+  buildQuestionFilterDisabledSectionClassName,
+  buildQuestionFilterSectionIconClassName,
+  buildQuestionFilterTagBubbleClassName,
+  buildQuestionFilterTypeButtonClassName,
+  buildQuestionFilterTypePillClassName,
+  resolveQuestionFilterBookmarkIconStyle,
+  resolveQuestionFilterClearIconStyle,
+  resolveQuestionFilterCopyIconStyle,
+  resolveQuestionFilterEncryptedCountBadgeStyle,
+  resolveQuestionFilterInlineVisibilityStyle,
+  resolveQuestionFilterSectionBodyStyle,
+  resolveQuestionFilterSectionHeaderStyle,
+} from './QuestionFilter';
 import GateTooltip from '../Gates/GateTooltip';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import { serializeFilterState as serializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
@@ -8,6 +30,7 @@ import * as aiSettings from '../../utilities/ai/aiSettings.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
+import styles from './QuestionFilter.module.scss';
 
 jest.mock('../SBTs/SBTFilter', () => () => null);
 jest.mock('../Shared/AudioInput/AudioInput', () => () => null);
@@ -95,6 +118,114 @@ describe('isFreeformBlankAnswer', () => {
         answer: { value: 'response' },
       })
     ).toBe(false);
+  });
+
+  it('returns false for malformed response payloads', () => {
+    expect(isFreeformBlankAnswer('freeform', null)).toBe(false);
+    expect(isFreeformBlankAnswer('freeform', 'response')).toBe(false);
+    expect(isFreeformBlankAnswer('freeform', { answer: '   ' })).toBe(false);
+    expect(isFreeformBlankAnswer('freeform', { answer: { value: 0 } })).toBe(false);
+  });
+});
+
+describe('QuestionFilter display helpers', () => {
+  it('builds section and action icon display state', () => {
+    expect(QUESTION_FILTER_ACTIONS_STYLE).toEqual({
+      marginLeft: 'auto',
+      paddingLeft: '15px',
+      display: 'flex',
+      alignItems: 'center',
+    });
+    expect(QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE).toEqual({
+      color: 'goldenrod',
+      fontSize: '0.85em',
+      fontStyle: 'italic',
+    });
+    expect(QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE).toEqual({
+      marginRight: '3px',
+      fontSize: '0.85em',
+    });
+    expect(QUESTION_FILTER_SBT_SPINNER_STYLE).toEqual({ marginLeft: '8px' });
+    expect(QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE).toEqual({ marginBottom: '10px' });
+    expect(QUESTION_FILTER_MODAL_HEADER_ROW_STYLE).toEqual({
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      width: '100%',
+    });
+    expect(QUESTION_FILTER_MODAL_TITLE_ROW_STYLE).toEqual({
+      display: 'flex',
+      alignItems: 'center',
+    });
+    expect(resolveQuestionFilterSectionHeaderStyle({
+      clickable: true,
+      disabled: false,
+    })).toEqual({ cursor: 'pointer', opacity: 1 });
+    expect(resolveQuestionFilterSectionHeaderStyle({
+      clickable: false,
+      disabled: true,
+    })).toEqual({ cursor: 'not-allowed', opacity: 0.5 });
+    expect(buildQuestionFilterSectionIconClassName(styles, true)).toBe(
+      `${styles.icon} ${styles.expanded}`
+    );
+    expect(buildQuestionFilterSectionIconClassName(styles, false)).toBe(`${styles.icon} `);
+    expect(resolveQuestionFilterSectionBodyStyle(true, false)).toEqual({ display: 'block' });
+    expect(resolveQuestionFilterSectionBodyStyle(true, true)).toEqual({ display: 'none' });
+    expect(resolveQuestionFilterClearIconStyle(true)).toEqual({
+      cursor: 'not-allowed',
+      marginRight: '12px',
+    });
+    expect(resolveQuestionFilterClearIconStyle(false)).toEqual({
+      cursor: 'pointer',
+      marginRight: '12px',
+    });
+    expect(resolveQuestionFilterCopyIconStyle(false, true)).toEqual({
+      cursor: 'not-allowed',
+      color: 'green',
+      fontSize: '1.1em',
+      marginRight: '15px',
+    });
+    expect(resolveQuestionFilterCopyIconStyle(true, false)).toEqual({
+      cursor: 'not-allowed',
+      color: '#cccccc',
+      fontSize: '1.1em',
+      marginRight: '15px',
+    });
+    expect(resolveQuestionFilterBookmarkIconStyle(false, true, false)).toEqual({
+      cursor: 'pointer',
+      color: 'gold',
+      fontSize: '1.1em',
+      marginRight: '8px',
+    });
+    expect(resolveQuestionFilterBookmarkIconStyle(true, false, false)).toEqual({
+      cursor: 'not-allowed',
+      color: '#cccccc',
+      fontSize: '1.1em',
+      marginRight: '8px',
+    });
+    expect(resolveQuestionFilterEncryptedCountBadgeStyle('12px')).toEqual({
+      marginLeft: '12px',
+      opacity: 0.7,
+    });
+    expect(buildQuestionFilterTagBubbleClassName(styles, true)).toBe(
+      `${styles.tagBubble} ${styles.tagBubbleSelected}`
+    );
+    expect(buildQuestionFilterTagBubbleClassName(styles, false)).toBe(styles.tagBubble);
+    expect(buildQuestionFilterTypeButtonClassName(styles, true)).toBe(
+      `${styles.typeButton} ${styles.typeButtonActive}`
+    );
+    expect(buildQuestionFilterTypeButtonClassName(styles, false)).toBe(styles.typeButton);
+    expect(buildQuestionFilterTypePillClassName(styles, 'agree')).toBe(
+      `${styles.typePill} ${styles.typePillAgree}`
+    );
+    expect(buildQuestionFilterTypePillClassName(styles)).toBe(styles.typePill);
+    expect(buildQuestionFilterAiCombineRowClassName(styles)).toBe(
+      `${styles.filterOption} ${styles.aiCombineRow}`
+    );
+    expect(buildQuestionFilterDisabledSectionClassName(styles, true)).toBe(styles.disabledSection);
+    expect(buildQuestionFilterDisabledSectionClassName(styles, false)).toBe('');
+    expect(resolveQuestionFilterInlineVisibilityStyle(true)).toEqual({ display: 'block' });
+    expect(resolveQuestionFilterInlineVisibilityStyle(false)).toEqual({ display: 'none' });
   });
 });
 
