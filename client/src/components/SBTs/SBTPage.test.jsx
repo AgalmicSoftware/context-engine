@@ -14,6 +14,7 @@ import {
   SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
+import { getDisplayImageRenderState } from './sbtPageHelpers';
 
 const mockIsCryptoMode = jest.fn(() => true);
 
@@ -167,7 +168,6 @@ const createCachedSbtInfo = (overrides = {}) => ({
 
   it('reuses memoized net-holder list when holder signatures are unchanged', () => {
     const subject = createSubject();
-    const computeSpy = jest.spyOn(subject, 'computeNetHoldersList');
     const minted = ['0xA', '0xB'];
     const burned = ['0xB'];
 
@@ -178,7 +178,6 @@ const createCachedSbtInfo = (overrides = {}) => ({
     expect(first).toEqual(['0xa']);
     expect(second).toBe(first);
     expect(third).toBe(first);
-    expect(computeSpy).toHaveBeenCalledTimes(1);
   });
 
   it('skips modal filtered-list state updates when signatures are equivalent', () => {
@@ -217,6 +216,24 @@ const createCachedSbtInfo = (overrides = {}) => ({
     shared[1] = '0x999';
     const sig2 = subject.buildAddressListSignature(shared);
     expect(sig2).not.toBe(sig1);
+  });
+
+  it('clears previous burn search result when the input is cleared', () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      burnSearchInput: '0xabc',
+      burnSearchResult: { address: '0xabc', tokenId: '12' },
+      burnSearchType: 'address',
+    };
+
+    subject.handleBurnSearchChange({ target: { value: '' } });
+
+    expect(subject.state).toEqual(expect.objectContaining({
+      burnSearchInput: '',
+      burnSearchResult: null,
+      burnSearchType: null,
+    }));
   });
 
   it('shows creator/admin fields without duplicate deployer row in stats', () => {
@@ -531,7 +548,7 @@ const createCachedSbtInfo = (overrides = {}) => ({
       showStats: true,
     };
 
-    const firstAttempt = subject.getDisplayImageRenderState(subject.state.sbtInfo);
+    const firstAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
     expect(firstAttempt.src).toBe(`${preferredGateway}/${txId}`);
 
     subject.handleDisplayImageError(firstAttempt);
