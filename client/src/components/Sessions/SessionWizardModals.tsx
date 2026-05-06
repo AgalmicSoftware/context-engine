@@ -5,7 +5,7 @@ import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
 import CreateSBTGroup from '../SBTs/CreateSBTGroup';
-import ContractViewer from '../ContractPage/ContractViewer';
+import ContractViewer, { type ContractViewerContract } from '../ContractPage/ContractViewer';
 import { WIZARD_CONTRACT_MODAL_TESTID } from '../ContractPage/contractMetadata.js';
 
 type GateLike = {
@@ -24,6 +24,11 @@ type CreateSbtModalState = {
   open?: boolean;
 };
 
+type WizardDraftLike = Record<string, unknown> & {
+  contracts?: Record<string, unknown>;
+  defaultSbtTags?: string;
+};
+
 type SessionWizardModalsProps = {
   account?: string;
   provider?: unknown;
@@ -32,16 +37,16 @@ type SessionWizardModalsProps = {
   createSbtModalNetwork: unknown;
   toggleLoginModal?: (() => void) | null;
   createSbtModalSessionSlug: string;
-  draft: Record<string, any>;
+  draft: WizardDraftLike;
   createSbtModalChainId: number | null;
   createSbtModalArweaveJwkOverride: string;
   encryptionGates: GateLike[];
   normalizeSbtSelection: (value: unknown[]) => Array<{ address?: string }>;
   defaultGateId: string;
-  signBootstrapAdminAction: (...args: any[]) => unknown;
-  handleSavePendingSbtDraft: (...args: any[]) => unknown;
+  signBootstrapAdminAction: (input: Record<string, unknown>) => unknown;
+  handleSavePendingSbtDraft: (draftPayload: unknown) => unknown;
   contractViewerModalState: ContractViewerModalState;
-  selectedWizardContract: any;
+  selectedWizardContract: ContractViewerContract | null;
   closeContractViewerModal: () => void;
   selectedWizardContractHref: string;
   sessionHeaderPreviewModalOpen: boolean;

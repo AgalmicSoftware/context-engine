@@ -143,12 +143,22 @@ SPA fallback concept, but their redirect config syntax differs.
 - If a sponsored bundle intentionally carries `litAccountApiKey`, treat that as an explicit authority transfer rather than an ordinary config convenience. The durable OSS-friendly version of that pattern is one disposable Lit account per bundle, not one long-lived deployment account copied into many bundles.
 - Current public prod/dev Chipotle environments both report Base mainnet, so environment isolation should come from separate Chipotle accounts, usage keys, groups, and PKPs rather than from shipping different public chain IDs alone.
 - The default CE automation path is now one new Lit account per session. Groups are reserved for internal trust boundaries or future action families inside that session account rather than as the primary cross-session isolation primitive.
-- There is no longer a client-side Lit payer-wallet feature gate in `/new`; Chipotle account/usage-key fields are the active path.
+- There is no longer a client-side Lit payer-wallet feature gate in `/new`; the manual `/new` Lit card asks only for `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`, and the worker derives the scoped runtime fields after deploy.
 
 ## RPC Defaults
 
 - Canonical anonymous RPC defaults now live in `client/src/variables/rpcDefaults.js`.
   That manifest is shared by the client runtime, Node scripts, and worker fallbacks.
+- Session-sponsored RPC is not an anonymous default. For Survey contract reads,
+  browser-visible session `rpcUrl` / `rpcUrlsByChainId` values are used only
+  when the on-chain `rpc` gate is open or the current wallet already has a
+  verified restricted grant.
+- OP Sepolia browser fallbacks intentionally avoid leading with
+  `https://sepolia.optimism.io`; it remains available later in the list, but the
+  wallet/RainbowKit primary URL should prefer less rate-limited public mirrors
+  when PATH or a paid runtime RPC is not active.
+- Ethers read providers apply endpoint-level exponential backoff after RPC 429
+  responses before retrying that same URL.
 - Optional paid testnet read RPCs are env/runtime-only and are no longer
   committed in source.
   - `REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP`
@@ -182,6 +192,11 @@ SPA fallback concept, but their redirect config syntax differs.
   - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
 
 ## Arweave Read Policy Toggles
+
+- `REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO=true`
+  - Controls whether browser Arweave payload reads stay on the configured AR.IO gateway for their retry budget.
+  - Default `true` uses `REACT_APP_CE_ARWEAVE_AR_IO_URL` / `window.CE_ARWEAVE_AR_IO_URL` when provided, otherwise `https://ar-io.dev`.
+  - Set `false` only when a deployment intentionally wants legacy fallback fanout through `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
 
 - `REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA=false`
   - Controls GraphQL tx-existence precheck for session metadata reads.
@@ -219,5 +234,5 @@ SPA fallback concept, but their redirect config syntax differs.
   - Allows off-list question activity discovery in `UserPage` / compare deep scans when enabled.
 
 - `litActionCid` can be omitted during session setup.
-  - If the wizard only has `litApiBase`, the worker can now auto-bootstrap a new Lit account for that session and create the default group, PKP, usage key, and CE action.
+  - If the wizard only has `litAccountApiKey`, the worker can now auto-bootstrap the default group, PKP, usage key, and CE action for that session, using the default Chipotle API base unless worker config/env overrides it.
   - If the wizard already has `litGroupId` and `litPkpId`, the worker can still auto-provision the default CE Lit action into an existing account and write the returned CID back into worker config after deploy.

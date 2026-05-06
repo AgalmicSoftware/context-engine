@@ -38,6 +38,7 @@ const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
+  litAccountApiKey: 'sponsored-lit-account-key',
   faucetGrantToken: 'sponsored-faucet-grant',
   customRpcUrl: 'https://sponsored-rpc.example.test',
   deployGrantToken: 'sponsored-deploy-grant',
@@ -317,7 +318,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit account key, deploy access.'
       );
     });
 
@@ -397,7 +398,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit account key, deploy access.'
       );
     });
 

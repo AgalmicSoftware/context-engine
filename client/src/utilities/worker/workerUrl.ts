@@ -11,6 +11,7 @@ export const WORKER_ENDPOINT_SUFFIXES = Object.freeze([
   '/transcribe',
   '/ai',
   '/arweave/upload',
+  '/lit/chipotle-action',
   '/fetch_url',
   '/fetch_image',
   '/fetch',
