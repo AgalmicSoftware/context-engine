@@ -20,7 +20,7 @@ import {
 } from './globalSessionState.js';
 import { getDemoSessionMap } from './sessionDemoCompat.js';
 
-type DemoSessionMap = Record<string, Record<string, any>>;
+type DemoSessionMap = Record<string, Record<string, unknown>>;
 type SessionScanScope = 'active' | 'all' | 'general' | 'list';
 type SessionScanSlugOptions = {
   allowEmpty?: boolean;
@@ -64,7 +64,7 @@ type ValidatedSessionScanWindowSuccess = {
 type ValidatedSessionScanWindowResult =
   | ValidatedSessionScanWindowFailure
   | ValidatedSessionScanWindowSuccess;
-type GlobalSessionSelection = Record<string, any> & {
+type GlobalSessionSelection = Record<string, unknown> & {
   selectedSessionScope?: unknown;
   selectedSessionSlugs?: unknown;
 };
@@ -265,7 +265,7 @@ const normalizeSessionScanListSlug = (
   const slug = normalizeSessionScanSlug(raw, { allowEmpty });
   if (slug == null) return null;
   if (!readResolveDemoAliasToggle()) return slug;
-  return (resolveSessionSlugAliasFromDemoSessions as any)({
+  return resolveSessionSlugAliasFromDemoSessions({
     sessionSlug: slug,
     demoSessions: DEMO_SESSION_MAP,
     allowSessionName: true,
@@ -468,12 +468,12 @@ export const writeSessionScanScope = (scopeIn: unknown): SessionScanScope => {
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   try {
-    const selection = (normalizeGlobalSessionSelection as any)({
+    const selection = normalizeGlobalSessionSelection({
       ...(readStoredGlobalSessionSelection() as GlobalSessionSelection | null),
       selectedSessionScope: scope,
     });
-    (persistGlobalSessionSelection as any)(selection);
-    (dispatchGlobalSessionSelectionUpdatedEvent as any)(selection);
+    persistGlobalSessionSelection(selection);
+    dispatchGlobalSessionSelectionUpdatedEvent(selection);
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   return scope;
@@ -493,12 +493,12 @@ export const writeSessionScanSlugs = (slugsIn: unknown): string[] => {
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   try {
-    const selection = (normalizeGlobalSessionSelection as any)({
+    const selection = normalizeGlobalSessionSelection({
       ...(readStoredGlobalSessionSelection() as GlobalSessionSelection | null),
       selectedSessionSlugs: slugs,
     });
-    (persistGlobalSessionSelection as any)(selection);
-    (dispatchGlobalSessionSelectionUpdatedEvent as any)(selection);
+    persistGlobalSessionSelection(selection);
+    dispatchGlobalSessionSelectionUpdatedEvent(selection);
   } catch (e) { log.warn('sessionScanScope: fallback', e); }
 
   return slugs;

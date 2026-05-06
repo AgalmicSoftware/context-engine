@@ -18,14 +18,19 @@ import {
 } from './sessionParsers.js';
 import { canonicalizeLegacySessionAlias } from './sessionDemoCompat.js';
 import { SESSION_WORKER_METADATA_ALIAS_KEYS } from './sessionWorkerUrlCompatibility.js';
+import type {
+  LocalResourceOverrides,
+  SessionConfig,
+  SessionIdentity,
+  SessionMetadata,
+  SessionWorkerConfig,
+  UnknownRecord,
+} from './sessionTypes.js';
 
-type AnyRecord = Record<string, any>;
 type ParsedSessionIdentity = ReturnType<typeof parseSessionIdentity>;
 type ParsedSessionMetadata = ReturnType<typeof parseSessionMetadata>;
 type ParsedWorkerConfig = ReturnType<typeof parseWorkerConfig>;
 type ParsedLocalResourceOverrides = ReturnType<typeof parseLocalResourceOverrides>;
-type WorkerConfig = ParsedWorkerConfig['config'];
-type LocalResourceOverrides = ParsedLocalResourceOverrides['overrides'];
 type ResolveSessionConfigFromSourcesOptions = {
   sessionSlug?: unknown;
   getRegistrySessionConfig?: ((slug: string) => unknown) | null;
@@ -35,7 +40,7 @@ type ResolveSessionConfigFromSourcesOptions = {
 };
 type SessionConfigResolution = {
   sessionSlug: string;
-  sessionConfig: AnyRecord | null;
+  sessionConfig: SessionConfig | null;
   sessionConfigSource: string;
   warnings: string[];
 };
@@ -50,7 +55,7 @@ type CanonicalSessionConfigResolution = {
   activeSessionSlug: string;
   requestedSessionSlug: string;
   sessionSlug: string;
-  sessionConfig: AnyRecord | null;
+  sessionConfig: SessionConfig | null;
   sessionConfigSource: string;
   warnings: string[];
   ok: boolean;
@@ -78,16 +83,11 @@ type ResolveCanonicalSessionContextOptions = {
 type CanonicalSessionContextResult = {
   ok: boolean;
   context: {
-    identity: {
-      slug: string;
-      sessionId: string;
-      metadataURI: string;
-      chainId: number | null;
-    };
-    metadata: AnyRecord;
-    worker: WorkerConfig;
+    identity: SessionIdentity;
+    metadata: SessionMetadata;
+    worker: SessionWorkerConfig;
     local: LocalResourceOverrides;
-    effective: AnyRecord;
+    effective: UnknownRecord;
   };
   provenance: {
     identity: string;
@@ -108,18 +108,18 @@ const EMPTY_IDENTITY: ParsedSessionIdentity = {
   errors: [],
 };
 
-const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const cloneValue = <T>(value: T): T => {
   if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
-    return Object.keys(value).reduce((acc: AnyRecord, key) => {
+    return Object.keys(value).reduce((acc: UnknownRecord, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
     }, {}) as T;
   }
   return value;
 };
-const buildEmptyWorkerConfig = (): WorkerConfig => ({
+const buildEmptyWorkerConfig = (): SessionWorkerConfig => ({
   corsWorkerUrl: '',
   allowOrigins: [],
   limits: {},
@@ -130,7 +130,7 @@ const buildEmptyLocalOverrides = (): LocalResourceOverrides => ({
   arweave: { useLocal: false, jwk: '' },
   faucet: { useLocal: false, privateKey: '' },
 });
-const hasOwnKeys = (value: unknown): value is AnyRecord => isObj(value) && Object.keys(value).length > 0;
+const hasOwnKeys = (value: unknown): value is UnknownRecord => isObj(value) && Object.keys(value).length > 0;
 const readTrimmedSessionSlug = (raw: unknown): string => toStr(raw).trim();
 const normalizeSessionAliasToken = (raw: unknown): string => normalizeBaseSlug(readTrimmedSessionSlug(raw));
 const RESERVED_SESSION_SLUG_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
@@ -139,7 +139,7 @@ export const isReservedSessionSlugKey = (rawSlug: unknown): boolean => (
 );
 // chainId alone is not sufficient — a partial/malformed registry record with only
 // chainId should not suppress the route identity or mark resolution as authoritative.
-const hasIdentityValue = (identity: ParsedSessionIdentity | AnyRecord | null | undefined): boolean => !!(
+const hasIdentityValue = (identity: ParsedSessionIdentity | UnknownRecord | null | undefined): boolean => !!(
   identity &&
   (
     identity.slug ||
@@ -152,7 +152,7 @@ const collectPrefixedErrors = (target: string[], prefix: string, entries: string
     target.push(`${prefix}: ${entry}`);
   });
 };
-const buildRouteIdentityInput = (requestedSlug: unknown, routeContext: unknown): AnyRecord => {
+const buildRouteIdentityInput = (requestedSlug: unknown, routeContext: unknown): UnknownRecord => {
   const route = isObj(routeContext) ? routeContext : {};
   return {
     slug: requestedSlug !== undefined
@@ -168,7 +168,7 @@ const buildRouteIdentityInput = (requestedSlug: unknown, routeContext: unknown):
     chainId: route.chainId ?? route.networkChainId,
   };
 };
-const buildRegistryIdentityInput = (registrySession: unknown): AnyRecord => {
+const buildRegistryIdentityInput = (registrySession: unknown): UnknownRecord => {
   const registry = isObj(registrySession) ? registrySession : {};
   const registryMeta = isObj(registry.__registry) ? registry.__registry : {};
   return {
@@ -191,7 +191,7 @@ const buildRegistryIdentityInput = (registrySession: unknown): AnyRecord => {
     ),
   };
 };
-const buildDemoIdentityInput = (requestedSlug: unknown, demoSession: unknown): AnyRecord => {
+const buildDemoIdentityInput = (requestedSlug: unknown, demoSession: unknown): UnknownRecord => {
   const demo = isObj(demoSession) ? demoSession : {};
   return {
     slug: demo.slug ?? requestedSlug,
@@ -215,7 +215,7 @@ const EFFECTIVE_METADATA_STRIP_KEYS = Array.from(new Set([
   ...SESSION_WORKER_METADATA_ALIAS_KEYS,
   'faucetKey',
 ]));
-const stripEffectiveMetadataOverrides = (metadata: unknown): AnyRecord => {
+const stripEffectiveMetadataOverrides = (metadata: unknown): UnknownRecord => {
   if (!isObj(metadata)) return {};
   const next = cloneValue(metadata);
   EFFECTIVE_METADATA_STRIP_KEYS.forEach((key) => {
@@ -233,35 +233,35 @@ export const canonicalizeSessionSlug = (rawSlug: unknown): string => {
   return canonicalSlug;
 };
 
-const findDemoSessionConfigBySlug = (demoSessions: unknown, slugIn: unknown = ''): AnyRecord | null => {
+const findDemoSessionConfigBySlug = (demoSessions: unknown, slugIn: unknown = ''): SessionConfig | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
-  if (!slug) return isObj(demo.general) ? demo.general : null;
+  if (!slug) return isObj(demo.general) ? demo.general as SessionConfig : null;
   const byKey = demo[slug];
-  if (isObj(byKey) && canonicalizeSessionSlug(byKey.slug || slug) === slug) return byKey;
+  if (isObj(byKey) && canonicalizeSessionSlug(byKey.slug || slug) === slug) return byKey as SessionConfig;
   const bySlug = Object.values(demo).find((entry) => (
     isObj(entry) && canonicalizeSessionSlug(entry.slug || '') === slug
   ));
-  return isObj(bySlug) ? bySlug : null;
+  return isObj(bySlug) ? bySlug as SessionConfig : null;
 };
 
 const findDemoSessionConfigByAlias = (
   demoSessions: unknown,
   slugIn: unknown = '',
   { allowSessionName = false }: { allowSessionName?: boolean } = {}
-): AnyRecord | null => {
+): SessionConfig | null => {
   const demo = isObj(demoSessions) ? demoSessions : {};
   const slug = canonicalizeSessionSlug(slugIn);
   const aliasToken = normalizeSessionAliasToken(slugIn);
   const entries = Object.entries(demo);
   for (const [key, entry] of entries) {
     if (!isObj(entry)) continue;
-    if (slug && canonicalizeSessionSlug(key) === slug) return entry;
-    if (slug && canonicalizeSessionSlug(entry.slug || '') === slug) return entry;
-    if (allowSessionName && slug && canonicalizeSessionSlug(entry.sessionName || '') === slug) return entry;
-    if (aliasToken && normalizeSessionAliasToken(key) === aliasToken) return entry;
-    if (aliasToken && normalizeSessionAliasToken(entry.slug || '') === aliasToken) return entry;
-    if (allowSessionName && aliasToken && normalizeSessionAliasToken(entry.sessionName || '') === aliasToken) return entry;
+    if (slug && canonicalizeSessionSlug(key) === slug) return entry as SessionConfig;
+    if (slug && canonicalizeSessionSlug(entry.slug || '') === slug) return entry as SessionConfig;
+    if (allowSessionName && slug && canonicalizeSessionSlug(entry.sessionName || '') === slug) return entry as SessionConfig;
+    if (aliasToken && normalizeSessionAliasToken(key) === aliasToken) return entry as SessionConfig;
+    if (aliasToken && normalizeSessionAliasToken(entry.slug || '') === aliasToken) return entry as SessionConfig;
+    if (allowSessionName && aliasToken && normalizeSessionAliasToken(entry.sessionName || '') === aliasToken) return entry as SessionConfig;
   }
   return null;
 };
@@ -299,7 +299,7 @@ export const resolveSessionConfigFromSources = ({
     if (isObj(cached)) {
       return {
         sessionSlug: slug,
-        sessionConfig: cached,
+        sessionConfig: cached as SessionConfig,
         sessionConfigSource: 'registry',
         warnings: [],
       };
@@ -349,8 +349,8 @@ export const resolveCanonicalSessionConfig = ({
   );
 
   let sessionConfig =
-    (isObj(sourceObj.sessionConfig) ? sourceObj.sessionConfig : null) ||
-    (isObj(defaultsObj.sessionConfig) ? defaultsObj.sessionConfig : null);
+    (isObj(sourceObj.sessionConfig) ? sourceObj.sessionConfig as SessionConfig : null) ||
+    (isObj(defaultsObj.sessionConfig) ? defaultsObj.sessionConfig as SessionConfig : null);
   let sessionConfigSource = isObj(sourceObj.sessionConfig)
     ? 'provided'
     : (isObj(defaultsObj.sessionConfig) ? 'default' : 'missing');
@@ -359,13 +359,13 @@ export const resolveCanonicalSessionConfig = ({
   if (!sessionConfig && typeof resolveBySlug === 'function') {
     const resolved = resolveBySlug(requestedSlug);
     if (isObj(resolved)) {
-      sessionConfig = resolved;
+      sessionConfig = resolved as SessionConfig;
       sessionConfigSource = 'resolved';
     }
   }
 
   if (!sessionConfig && isObj(fallbackConfig)) {
-    sessionConfig = fallbackConfig;
+    sessionConfig = fallbackConfig as SessionConfig;
     sessionConfigSource = 'fallback';
   }
 
@@ -482,7 +482,7 @@ export const resolveCanonicalSessionContext = ({
     collectPrefixedErrors(errors, 'demo metadata', demoMetadataParsed.errors);
   }
 
-  let effectiveMetadata: AnyRecord = {};
+  let effectiveMetadata: SessionMetadata = {};
   let metadataProvenance = 'cache';
   if (metadataProvided && !metadataIsCache && isObj(metadata)) {
     effectiveMetadata = cloneValue(metadataParsed.metadata);

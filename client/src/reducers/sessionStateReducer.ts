@@ -20,7 +20,27 @@ import {
 } from '../utilities/session/globalSessionState.js';
 import { DEFAULT_DEMO_SURFACE_MODE } from '../variables/appConfig.js';
 
-type SessionState = Record<string, any>;
+export interface SessionState {
+  primarySessionSlug: string;
+  primarySessionExplicit: boolean | undefined;
+  activeSessionSlug: string;
+  selectedSessionScope: string;
+  selectedSessionSlugs: string[];
+  metricsOptIn: boolean;
+  focusedTab: number;
+  loginInProgress: boolean;
+  loginComplete: boolean;
+  explorerHistory: unknown[];
+  ETHUSDToggle: boolean;
+  explainerMode: boolean;
+  demoMode: Record<string, boolean>;
+  demoSurfaceMode: boolean;
+  loginModalToggled: boolean;
+  afterLoginModalToggled: boolean;
+  onboardingStep: number | null;
+  tooltipsEnabled: boolean;
+}
+
 type ReducerAction = { type?: string; payload?: any };
 
 const readStoredTooltipsEnabled = () => {

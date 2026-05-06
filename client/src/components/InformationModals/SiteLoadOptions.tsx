@@ -3,6 +3,7 @@ import React, { Component } from "react";
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { fetchSessionState } from '../../actions/sessionStateActions.js';
+import type { RootState } from '../../reducers/index.js';
 
 // CSS and images
 import "assets/css/contextEngine.scss";
@@ -38,13 +39,6 @@ type SiteLoadOptionsState = {
   sidebarNotClosed: boolean;
   userOptsOutMetrics: boolean;
   metricsDetailsSelected: boolean;
-};
-
-type RootState = {
-  profile: {
-    account?: string | null;
-    provider?: string | null;
-  };
 };
 
 class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsState> {

@@ -7,7 +7,8 @@ import { overlayCachedSessionWorkerConfig } from './sessionWorkerConfigCache.js'
 import { parseWorkerConfig } from './sessionParsers.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 
-type SessionConfigLike = Record<string, any>;
+type SessionConfigLike = Record<string, unknown>;
+type WorkerConfigInput = Parameters<typeof parseWorkerConfig>[0];
 
 type SessionWorkerAvailabilityOptions = {
   slug?: unknown;
@@ -20,7 +21,7 @@ const isObj = (value: unknown): value is SessionConfigLike => (
 );
 
 export const getConfiguredSessionWorkerUrlFromConfig = (sessionConfig: unknown = null): string => {
-  const parsed = parseWorkerConfig(sessionConfig as any);
+  const parsed = parseWorkerConfig(sessionConfig as WorkerConfigInput);
   const canonicalUrl = normalizeWorkerUrl(parsed?.config?.corsWorkerUrl || '');
   return canonicalUrl;
 };

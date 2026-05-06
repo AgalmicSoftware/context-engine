@@ -6,10 +6,28 @@ import { createLogger } from 'utilities/logging.js';
 
 const mainSiteLog = createLogger('mainSite');
 
-export function isProfileScanTelemetryEnabled(this: any): boolean {
+type RuntimeGlobals = typeof globalThis & Record<string, unknown> & {
+  location?: {
+    pathname?: unknown;
+  };
+};
+
+type ProfileScanTelemetryContext = {
+  readBoolishRuntimeFlag: (raw: unknown, fallback?: boolean) => boolean;
+  _profileScanTelemetrySeq?: number;
+  isProfileScanTelemetryEnabled: () => boolean;
+  isProfileScanColdDiagEnabled: () => boolean;
+  emitProfileScanTelemetry: (event: string, payload?: Record<string, unknown>) => unknown;
+};
+
+const isTelemetryRecord = (value: unknown): value is Record<string, unknown> => (
+  value !== null && typeof value === 'object'
+);
+
+export function isProfileScanTelemetryEnabled(this: ProfileScanTelemetryContext): boolean {
   try {
     if (typeof globalThis === 'undefined') return false;
-    const runtimeGlobals = globalThis as Record<string, any>;
+    const runtimeGlobals = globalThis as RuntimeGlobals;
     if (typeof runtimeGlobals.CE_PROFILE_SCAN_TELEMETRY !== 'undefined') {
       return this.readBoolishRuntimeFlag(runtimeGlobals.CE_PROFILE_SCAN_TELEMETRY, true);
     }
@@ -20,11 +38,15 @@ export function isProfileScanTelemetryEnabled(this: any): boolean {
   }
 }
 
-export function emitProfileScanTelemetry(this: any, event: any, payload: any = {}): void {
+export function emitProfileScanTelemetry(
+  this: ProfileScanTelemetryContext,
+  event: string,
+  payload: unknown = {}
+): void {
   if (!this.isProfileScanTelemetryEnabled()) return;
   try {
     const safeEvent = String(event || '').trim() || 'unknown';
-    const safePayload = (payload && typeof payload === 'object')
+    const safePayload = isTelemetryRecord(payload)
       ? payload
       : { value: payload };
     const seq = Number(this._profileScanTelemetrySeq || 0) + 1;
@@ -37,8 +59,10 @@ export function emitProfileScanTelemetry(this: any, event: any, payload: any = {
       ...safePayload,
     };
     const key = '__CE_PROFILE_SCAN_TELEMETRY__';
-    const runtimeGlobals = globalThis as Record<string, any>;
-    const bucket = Array.isArray(runtimeGlobals[key]) ? runtimeGlobals[key] : [];
+    const runtimeGlobals = globalThis as RuntimeGlobals;
+    const bucket = Array.isArray(runtimeGlobals[key])
+      ? runtimeGlobals[key] as Array<Record<string, unknown>>
+      : [];
     bucket.push(entry);
     if (bucket.length > 800) bucket.splice(0, bucket.length - 800);
     runtimeGlobals[key] = bucket;
@@ -46,10 +70,10 @@ export function emitProfileScanTelemetry(this: any, event: any, payload: any = {
   } catch (e) { mainSiteLog.warn('MainSite: telemetry', e); }
 }
 
-export function isProfileScanColdDiagEnabled(this: any): boolean {
+export function isProfileScanColdDiagEnabled(this: ProfileScanTelemetryContext): boolean {
   try {
     if (typeof globalThis === 'undefined') return false;
-    const runtimeGlobals = globalThis as Record<string, any>;
+    const runtimeGlobals = globalThis as RuntimeGlobals;
     if (typeof runtimeGlobals.CE_PROFILE_SCAN_COLD_DIAG !== 'undefined') {
       return this.readBoolishRuntimeFlag(runtimeGlobals.CE_PROFILE_SCAN_COLD_DIAG, false);
     }
@@ -57,8 +81,13 @@ export function isProfileScanColdDiagEnabled(this: any): boolean {
   return false;
 }
 
-export function emitProfileScanColdDiag(this: any, event: any, payload: any = {}): void {
+export function emitProfileScanColdDiag(
+  this: ProfileScanTelemetryContext,
+  event: string,
+  payload: unknown = {}
+): void {
   if (!this.isProfileScanColdDiagEnabled()) return;
   const name = String(event || '').trim().toLowerCase() || 'unknown';
-  this.emitProfileScanTelemetry(`cold-diag:${name}`, payload);
+  const safePayload = isTelemetryRecord(payload) ? payload : { value: payload };
+  this.emitProfileScanTelemetry(`cold-diag:${name}`, safePayload);
 }

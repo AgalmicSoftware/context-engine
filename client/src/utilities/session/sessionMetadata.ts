@@ -5,20 +5,7 @@
  *
  * Key exports: stripAuthoritativeSessionGateFields, normalizeSessionNaming, normalizeLitMetadataNetwork
  */
-
-export type SessionMetadata = Record<string, any> & {
-  gates?: Array<Record<string, any>> | Record<string, any>;
-  lit?: Record<string, any> | null;
-  litNetwork?: string;
-  orgInfo?: string;
-  orgInfoEncrypted?: string | Record<string, any> | null;
-  orgName?: string;
-  sessionInfo?: string;
-  sessionInfoEncrypted?: string | Record<string, any> | null;
-  sessionName?: string;
-  sponsored?: boolean | Record<string, any>;
-  sponsoredSbtAddress?: string;
-};
+import type { SessionMetadata, UnknownRecord } from './sessionTypes.js';
 
 const DEFAULT_LIT_NETWORK = 'chipotle';
 const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
@@ -113,7 +100,7 @@ export const normalizeLitMetadataNetwork = (metadata: unknown): unknown => {
   const hasLitSection = !!litObj || !!legacyLitNetwork;
   if (!hasLitSection) return next;
 
-  const nextLit = litObj ? { ...litObj } : {};
+  const nextLit: UnknownRecord = litObj ? { ...litObj } : {};
   nextLit.network = resolveCanonicalLitNetwork(litNetwork || legacyLitNetwork || DEFAULT_LIT_NETWORK);
   next.lit = nextLit;
   delete next.litNetwork;

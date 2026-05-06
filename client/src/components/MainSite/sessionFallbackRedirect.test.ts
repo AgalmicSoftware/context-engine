@@ -1,0 +1,196 @@
+import {
+  consumeSessionFallbackRedirect,
+  getFirstVisitRootRedirectTarget,
+  getSessionFallbackPreferredTarget,
+  getSessionFallbackRedirectStorageKey,
+  getSessionFallbackScopeSlugs,
+  hasConsumedSessionFallbackRedirect,
+  isFirstVisitRootRedirectEnabled,
+} from './sessionFallbackRedirect.js';
+
+const GLOBAL_FIRST_VISIT_REDIRECT_KEY = 'CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED';
+const runtimeGlobals = globalThis as typeof globalThis & Record<string, unknown>;
+
+const normalizeSessionSlug = (value: unknown): string => (
+  String(value || '').trim().toLowerCase()
+);
+
+describe('sessionFallbackRedirect', () => {
+  beforeEach(() => {
+    delete runtimeGlobals[GLOBAL_FIRST_VISIT_REDIRECT_KEY];
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    delete runtimeGlobals[GLOBAL_FIRST_VISIT_REDIRECT_KEY];
+    window.sessionStorage.clear();
+  });
+
+  describe('getSessionFallbackScopeSlugs', () => {
+    it('deduplicates normalized slugs in list mode', () => {
+      expect(getSessionFallbackScopeSlugs({
+        readSessionScanScope: () => ' list ',
+        readSessionScanSlugs: () => [' Alpha ', 'alpha', 'beta', 'BETA'],
+        sessionRegistryStore: {
+          getAllSessionEntries: jest.fn(() => []),
+        },
+        normalizeSessionSlug,
+      })).toEqual(['alpha', 'beta']);
+    });
+
+    it('returns empty outside list mode', () => {
+      const readSessionScanSlugs = jest.fn(() => ['alpha']);
+
+      expect(getSessionFallbackScopeSlugs({
+        readSessionScanScope: () => 'active',
+        readSessionScanSlugs,
+        sessionRegistryStore: {
+          getAllSessionEntries: jest.fn(() => []),
+        },
+        normalizeSessionSlug,
+      })).toEqual([]);
+      expect(readSessionScanSlugs).not.toHaveBeenCalled();
+    });
+
+    it('falls back to registry entries when the runtime list is empty', () => {
+      expect(getSessionFallbackScopeSlugs({
+        readSessionScanScope: () => 'list',
+        readSessionScanSlugs: () => [],
+        sessionRegistryStore: {
+          getAllSessionEntries: jest.fn(() => [
+            ['alpha-key', { slug: ' Alpha ' }],
+            { sessionSlug: 'Beta' },
+            ['duplicate-alpha-key', { slug: 'alpha' }],
+          ]),
+        },
+        normalizeSessionSlug,
+      })).toEqual(['alpha', 'beta']);
+    });
+  });
+
+  describe('getSessionFallbackPreferredTarget', () => {
+    it('returns the first non-general scoped slug', () => {
+      expect(getSessionFallbackPreferredTarget(['alpha', 'beta'], {
+        DEFAULT_SESSION_SLUG_ALIAS: 'general',
+      })).toEqual({
+        slug: 'alpha',
+        path: '/session/alpha',
+      });
+    });
+
+    it('returns null when general is first', () => {
+      expect(getSessionFallbackPreferredTarget(['general', 'alpha'], {
+        DEFAULT_SESSION_SLUG_ALIAS: 'general',
+      })).toBeNull();
+    });
+
+    it('returns null when no slugs are scoped', () => {
+      expect(getSessionFallbackPreferredTarget([], {
+        DEFAULT_SESSION_SLUG_ALIAS: 'general',
+      })).toBeNull();
+    });
+  });
+
+  describe('isFirstVisitRootRedirectEnabled', () => {
+    it('uses the globalThis override when present', () => {
+      runtimeGlobals[GLOBAL_FIRST_VISIT_REDIRECT_KEY] = 'yes';
+      const readBoolishRuntimeFlag = jest.fn(() => true);
+
+      expect(isFirstVisitRootRedirectEnabled({
+        readBoolishRuntimeFlag,
+        CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED: false,
+      })).toBe(true);
+      expect(readBoolishRuntimeFlag).toHaveBeenCalledWith('yes', false);
+    });
+
+    it('falls back to the build-time constant', () => {
+      const readBoolishRuntimeFlag = jest.fn(() => false);
+
+      expect(isFirstVisitRootRedirectEnabled({
+        readBoolishRuntimeFlag,
+        CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED: true,
+      })).toBe(true);
+      expect(readBoolishRuntimeFlag).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getFirstVisitRootRedirectTarget', () => {
+    it('uses the derived primary slug in list mode', () => {
+      const derivePrimarySessionSlugFromList = jest.fn(() => 'edge');
+      const getSessionFallbackScopeSlugs = jest.fn(() => ['', 'edge', 'alpha']);
+
+      expect(getFirstVisitRootRedirectTarget({
+        isFirstVisitRootRedirectEnabled: () => true,
+        readSessionScanScope: () => 'list',
+        getSessionFallbackScopeSlugs,
+        derivePrimarySessionSlugFromList,
+      })).toEqual({
+        slug: 'edge',
+        path: '/session/edge',
+      });
+      expect(derivePrimarySessionSlugFromList).toHaveBeenCalledWith(['', 'edge', 'alpha']);
+    });
+
+    it('returns null when disabled', () => {
+      const readSessionScanScope = jest.fn(() => 'list');
+
+      expect(getFirstVisitRootRedirectTarget({
+        isFirstVisitRootRedirectEnabled: () => false,
+        readSessionScanScope,
+        getSessionFallbackScopeSlugs: jest.fn(() => ['edge']),
+        derivePrimarySessionSlugFromList: jest.fn(() => 'edge'),
+      })).toBeNull();
+      expect(readSessionScanScope).not.toHaveBeenCalled();
+    });
+
+    it('defaults to demo outside list mode', () => {
+      expect(getFirstVisitRootRedirectTarget({
+        isFirstVisitRootRedirectEnabled: () => true,
+        readSessionScanScope: () => 'active',
+        getSessionFallbackScopeSlugs: jest.fn(() => ['edge']),
+        derivePrimarySessionSlugFromList: jest.fn(() => 'edge'),
+      })).toEqual({
+        slug: 'demo',
+        path: '/session/demo',
+      });
+    });
+  });
+
+  describe('getSessionFallbackRedirectStorageKey', () => {
+    it('builds a scoped storage key with a slug', () => {
+      expect(getSessionFallbackRedirectStorageKey(' Edge ', {
+        normalizeSessionSlug,
+        DEFAULT_SESSION_SLUG_ALIAS: 'general',
+        SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX: 'seen:',
+      })).toBe('seen:edge');
+    });
+
+    it('uses the default alias without a slug', () => {
+      expect(getSessionFallbackRedirectStorageKey('', {
+        normalizeSessionSlug,
+        DEFAULT_SESSION_SLUG_ALIAS: 'general',
+        SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX: 'seen:',
+      })).toBe('seen:general');
+    });
+  });
+
+  describe('session fallback redirect consumption', () => {
+    it('reads and writes consumed targets from sessionStorage', () => {
+      const target = { slug: 'edge', path: '/session/edge' };
+      const getStorageKey = jest.fn((slug: unknown) => `seen:${slug || 'general'}`);
+
+      expect(hasConsumedSessionFallbackRedirect(target, { getStorageKey })).toBe(false);
+      expect(consumeSessionFallbackRedirect(target, { getStorageKey })).toBe(true);
+      expect(window.sessionStorage.getItem('seen:edge')).toBe('true');
+      expect(hasConsumedSessionFallbackRedirect(target, { getStorageKey })).toBe(true);
+    });
+
+    it('ignores null targets', () => {
+      const getStorageKey = jest.fn((slug: unknown) => `seen:${slug || 'general'}`);
+
+      expect(hasConsumedSessionFallbackRedirect(null, { getStorageKey })).toBe(false);
+      expect(consumeSessionFallbackRedirect(null, { getStorageKey })).toBe(false);
+      expect(getStorageKey).not.toHaveBeenCalled();
+    });
+  });
+});
