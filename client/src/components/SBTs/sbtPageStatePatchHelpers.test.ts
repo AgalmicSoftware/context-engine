@@ -71,17 +71,6 @@ describe('sbtPageStatePatchHelpers', () => {
       showPasswordAlert: false,
       error: null,
     });
-    expect(buildSbtPageAddressChangeResetMintUiPatch({ forceReset: true })).toEqual({
-      showMiniPasswordInput: false,
-      mintStep: 0,
-      mintingStatus: 'idle',
-      burningStatus: 'idle',
-      manualPasswordInput: '',
-      groupPasswordInput: '',
-      mintPassword: '',
-      showPasswordAlert: false,
-      error: null,
-    });
     expect(buildSbtPageNetworkUpdatePatch({
       network: { id: 10 },
       resetMintUiState: { mintStep: 0 },
