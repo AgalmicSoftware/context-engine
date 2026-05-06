@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
 import contractScripts from '../../utilities/web3/contractScripts.js';
+import { hasPasswordMintForSbtMintMode } from '../../utilities/sbt/sbtMintMode.js';
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -9,6 +10,47 @@ import type {
   ChainIdLike,
 } from '../shellTypes';
 import type { PendingSbtDraftLike } from './sessionWizardSbtSelections';
+
+type PendingSbtCreateOptions = {
+  useConfiguredDeterministic?: boolean;
+  initializeGroupPasswordHash?: boolean;
+  [key: string]: unknown;
+};
+
+export type PendingSbtDeployReceipt = {
+  transactionHash?: string;
+  events?: unknown[];
+  logs?: unknown[];
+  receipt?: {
+    logs?: unknown[];
+    [key: string]: unknown;
+  } | null;
+  [key: string]: unknown;
+} | null | undefined;
+
+type CreateSbtForPendingDraft = (
+  providerLike: unknown,
+  contractName: unknown,
+  symbol: unknown,
+  limitedNumber: number,
+  adminAddress: unknown,
+  mintingEndTimeUnix: number,
+  hasPasswordMintOnChain: boolean,
+  burnAuthEnum: number,
+  hashedPasswords: unknown[],
+  tokenURI: string,
+  finalGroupPasswordHash: string,
+  sessionConfigForDeploy: AnyRecord,
+  create2Salt: string,
+  createOptions: PendingSbtCreateOptions
+) => Promise<PendingSbtDeployReceipt>;
+
+type DeploySessionWizardPendingSbtDraftResult = {
+  finalizedDraft: PendingSbtDraftLike;
+  receipt: PendingSbtDeployReceipt;
+};
+
+const createSessionWizardPendingDraftSbt = contractScripts.createSBT as unknown as CreateSbtForPendingDraft;
 
 export const FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID = 'gate-1';
 export const FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE = 'defaultFeaturedSBTs';
@@ -108,7 +150,7 @@ export const deploySessionWizardPendingSbtDraft = async ({
   workerUrlOverride = '',
   createSbtComponentProps = {},
   finalizePendingDraft = finalizeSessionWizardPendingSbtDraft,
-  createSBT = contractScripts.createSBT,
+  createSBT = createSessionWizardPendingDraftSbt,
 }: {
   sbtDraft?: PendingSbtDraftLike;
   providerLike?: unknown;
@@ -116,13 +158,15 @@ export const deploySessionWizardPendingSbtDraft = async ({
   workerUrlOverride?: string;
   createSbtComponentProps?: AnyRecord;
   finalizePendingDraft?: (args?: AnyRecord) => Promise<PendingSbtDraftLike>;
-  createSBT?: (...args: any[]) => Promise<any>;
-} = {}) => {
+  createSBT?: CreateSbtForPendingDraft;
+} = {}): Promise<DeploySessionWizardPendingSbtDraftResult> => {
   const finalizedDraft = await finalizePendingDraft({
     draftEntry: sbtDraft,
     workerUrlOverride,
     createSbtComponentProps,
   });
+  const hasPasswordMintOnChain = finalizedDraft.hasPasswordMintOnChain === true
+    || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
   const receipt = await createSBT(
     providerLike,
     finalizedDraft.contractName,
@@ -130,7 +174,7 @@ export const deploySessionWizardPendingSbtDraft = async ({
     Number(finalizedDraft.limitedNumber || 0) || 0,
     finalizedDraft.adminAddress,
     Number(finalizedDraft.mintingEndTimeUnix || 0) || 0,
-    finalizedDraft.hasPasswordMintOnChain === true,
+    hasPasswordMintOnChain,
     Number(finalizedDraft.burnAuthEnum || 0),
     Array.isArray(finalizedDraft.hashedPasswords) ? finalizedDraft.hashedPasswords : [],
     toStr(finalizedDraft.tokenURI).trim(),
@@ -161,8 +205,10 @@ export const persistSessionWizardSbtRecoveryCodes = ({
     ? [toStr(finalizedDraft.groupPassword).trim()].filter(Boolean)
     : (Array.isArray(finalizedDraft.passwordList) ? finalizedDraft.passwordList : [])
       .filter((value) => toStr(value).trim());
+  const hasPasswordMintOnChain = finalizedDraft.hasPasswordMintOnChain === true
+    || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
 
-  if (finalizedDraft.hasPasswordMintOnChain !== true || codesToStore.length === 0) {
+  if (!hasPasswordMintOnChain || codesToStore.length === 0) {
     return {
       ok: false,
       status: 'empty-recovery-payload',

@@ -30,6 +30,7 @@ export type PendingSbtDraftLike = AnyRecord & {
   limitedNumber?: number | string;
   adminAddress?: string;
   mintingEndTimeUnix?: number | string;
+  mintModeOnChain?: number | string;
   hasPasswordMintOnChain?: boolean;
   burnAuthEnum?: number | string;
   hashedPasswords?: string[];

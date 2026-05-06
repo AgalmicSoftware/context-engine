@@ -9,7 +9,7 @@
 - Named export count before default export: **39**
 - Summary: `SessionWizard` is the session-creation and publish orchestrator. It bootstraps editable session metadata, manages encryption gates and pending SBT drafts, handles sponsored-bundle overrides, deploys or verifies worker configuration, uploads session metadata, and finally registers the session on-chain.
 - Status note: the section ranges below were captured from an earlier snapshot and need a fuller refresh; use the live file for exact line anchors.
-- Recent extraction note: bounded follow-up work extracted `CollapsibleFieldGroup.tsx`, `AiFieldSelect.tsx`, `hooks/useSponsoredBundleLifecycle.ts`, and `hooks/useSessionWizardWorkerDeploy.ts`. The remaining high-risk seam is the publish path.
+- Recent extraction note: bounded follow-up work extracted `CollapsibleFieldGroup.tsx`, `AiFieldSelect.tsx`, `sessionWizardNormalModeCards.ts`, `hooks/useSponsoredBundleLifecycle.ts`, and `hooks/useSessionWizardWorkerDeploy.ts`. The remaining high-risk seam is the publish path.
 
 ## Navigation Rules
 
@@ -18,6 +18,7 @@
 - Start in `AiFieldSelect.tsx` for AI/gate select field rendering and its option/placeholder behavior.
 - Start in `hooks/useSponsoredBundleLifecycle.ts` for sponsored-bundle loading, apply/restore, and baseline override behavior.
 - Start in `hooks/useSessionWizardWorkerDeploy.ts` for deploy-button orchestration, worker verification, and deploy helper lifecycle.
+- Start in `sessionWizardNormalModeCards.ts` for normal-mode card and publish-summary view-model builders.
 - Start in `sessionWizardContracts.js` for contract defaults, visible contract keys, or registry-address resolution.
 - Start in `sessionWizardSecrets.ts` for post-deploy worker config sync, secrets sync, or deploy warning/status handling.
 - Start in `sessionWizardWriteNormalization.ts` for worker payload normalization, on-chain compatibility fields, or metadata serialization rules.
@@ -29,6 +30,7 @@
 SessionWizard.tsx
   -> CollapsibleFieldGroup.tsx
   -> AiFieldSelect.tsx
+  -> sessionWizardNormalModeCards.ts
   -> hooks/useSponsoredBundleLifecycle.ts
   -> hooks/useSessionWizardWorkerDeploy.ts
   -> sessionWizardContracts.js

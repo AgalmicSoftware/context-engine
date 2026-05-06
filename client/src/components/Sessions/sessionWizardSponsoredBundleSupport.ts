@@ -26,8 +26,6 @@ export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: Sponso
   const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as SponsoredBundleLike;
   const appliedLabels = [];
   if (toStr(normalizedBundle?.openaiKey).trim()) appliedLabels.push('OpenAI key');
-  if (toStr(normalizedBundle?.anthropicKey).trim()) appliedLabels.push('Anthropic key');
-  if (toStr(normalizedBundle?.openrouterKey).trim()) appliedLabels.push('OpenRouter key');
   if (toStr(normalizedBundle?.arweaveJwk).trim()) appliedLabels.push('Arweave wallet');
   if (
     toStr(normalizedBundle?.faucetPrivateKey).trim() ||
