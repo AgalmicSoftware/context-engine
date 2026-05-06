@@ -1,3 +1,17 @@
+import { emitForcedLog } from 'utilities/logging.js';
+import {
+  readBoolishDebugFlag,
+  isForcedSbtSelectorDebugEnabled,
+  emitMainSiteSbtDebug,
+  buildMainSiteCacheManagerReadyStatePatch,
+  buildMainSiteLitHooksStatePatch,
+  isRouteResponderAddress,
+  hasCoreSbtMetadata,
+  isMainSitePerfCountersEnabled,
+  bumpMainSitePerfCounter,
+  getMainSitePerfNow,
+} from './mainSiteUtils';
+
 jest.mock('utilities/logging.js', () => {
   const mockLogger = {
     log: jest.fn(),
@@ -22,18 +36,6 @@ jest.mock('ethers', () => ({
     },
   },
 }), { virtual: true });
-
-import { emitForcedLog } from 'utilities/logging.js';
-import {
-  readBoolishDebugFlag,
-  isForcedSbtSelectorDebugEnabled,
-  emitMainSiteSbtDebug,
-  isRouteResponderAddress,
-  hasCoreSbtMetadata,
-  isMainSitePerfCountersEnabled,
-  bumpMainSitePerfCounter,
-  getMainSitePerfNow,
-} from './mainSiteUtils';
 
 type MainSiteTestGlobals = typeof globalThis & {
   CE_SBT_SELECTOR_DEBUG?: unknown;
@@ -215,6 +217,36 @@ describe('hasCoreSbtMetadata', () => {
 
   it('returns true when all required fields are present', () => {
     expect(hasCoreSbtMetadata(validMetadata)).toBe(true);
+  });
+});
+
+describe('main site state patch helpers', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    clearMainSiteTestState();
+  });
+
+  it('builds the Lit hooks state patch without altering the hooks value', () => {
+    const hooks = { getKey: jest.fn(), network: 'test' };
+
+    expect(buildMainSiteLitHooksStatePatch(hooks)).toEqual({
+      litHooks: hooks,
+    });
+    expect(buildMainSiteLitHooksStatePatch(null)).toEqual({
+      litHooks: null,
+    });
+  });
+
+  it('builds cache-manager readiness patches with boolean-only semantics', () => {
+    expect(buildMainSiteCacheManagerReadyStatePatch()).toEqual({
+      isCacheManagerReady: true,
+    });
+    expect(buildMainSiteCacheManagerReadyStatePatch({ ready: false })).toEqual({
+      isCacheManagerReady: false,
+    });
+    expect(buildMainSiteCacheManagerReadyStatePatch({ ready: 'true' })).toEqual({
+      isCacheManagerReady: false,
+    });
   });
 });
 

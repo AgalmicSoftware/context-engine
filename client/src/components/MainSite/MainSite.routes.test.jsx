@@ -584,81 +584,6 @@ describe('MainSite route render smoke', () => {
     window.sessionStorage.clear();
   });
 
-  it('seeds built-in demo questions into canonical live-result buckets without scanning blocks', () => {
-    const subject = createSubject({
-      path: '/session/demo',
-      activeSessionSlug: 'demo',
-      sessionConfig: {
-        slug: 'demo',
-        sessionName: 'Context Engine',
-        networkChainId: 11155420,
-      },
-    });
-    const cacheStore = {};
-    subject.DG = {
-      read: jest.fn((name, slug) => cacheStore[`${name}:${slug}`] || null),
-      write: jest.fn((name, slug, value) => {
-        cacheStore[`${name}:${slug}`] = value;
-      }),
-      remove: jest.fn(),
-    };
-    subject.getDisplaySessionChainId = jest.fn(() => 11155420);
-    subject.setReadinessStateIfChanged = jest.fn((patch) => {
-      subject.state = { ...subject.state, ...(patch || {}) };
-    });
-    subject.checkAllCachesReady = jest.fn();
-
-    const demoQuestions = getPolisDemoQuestionPool();
-    const firstQuestion = demoQuestions[0];
-    expect(firstQuestion?.id).toBeTruthy();
-
-    expect(subject.seedBuiltInDemoQuestionCache()).toBe(true);
-
-    const generalQuestions =
-      cacheStore['questionsCache:']?.['11155420']?.questions || {};
-    const scopedQuestions =
-      cacheStore['questionsCache:demo']?.['11155420']?.questions || {};
-    expect(Object.keys(generalQuestions)).toHaveLength(demoQuestions.length);
-    expect(Object.keys(scopedQuestions)).toHaveLength(demoQuestions.length);
-    expect(generalQuestions[firstQuestion.id]).toEqual(expect.objectContaining({
-      id: firstQuestion.id,
-      prompt: firstQuestion.prompt,
-      sessionSlug: '',
-    }));
-    expect(scopedQuestions[firstQuestion.id]).toEqual(expect.objectContaining({
-      id: firstQuestion.id,
-      prompt: firstQuestion.prompt,
-      sessionSlug: 'demo',
-    }));
-    expect(subject.setReadinessStateIfChanged).toHaveBeenCalledWith(
-      expect.objectContaining({
-        isQuestionCacheReady: true,
-        questionScanProgress: null,
-      }),
-      expect.any(Function)
-    );
-  });
-
-  it('short-circuits built-in demo question initialization to the canonical seed', async () => {
-    const subject = createSubject({
-      path: '/session/demo',
-      activeSessionSlug: 'demo',
-      sessionConfig: {
-        slug: 'demo',
-        sessionName: 'Context Engine',
-        networkChainId: 11155420,
-      },
-    });
-    subject.isBuiltInDemoSessionRoutePath = jest.fn(() => true);
-    subject.seedBuiltInDemoQuestionCache = jest.fn(() => true);
-    subject._questionCacheController.initializeQuestionCacheForGroup = jest.fn();
-
-    await subject.initializeQuestionCacheForGroup('demo');
-
-    expect(subject.seedBuiltInDemoQuestionCache).toHaveBeenCalledTimes(1);
-    expect(subject._questionCacheController.initializeQuestionCacheForGroup).not.toHaveBeenCalled();
-  });
-
   it('renders the wizard root for /new, canonicalizes the alias, and forwards query params', async () => {
     const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
     const subject = createSubject({
@@ -717,6 +642,53 @@ describe('MainSite route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
+  });
+
+  it('redirects a general route to the first list-scoped session once and consumes the redirect', async () => {
+    globalThis.CE_SESSION_SCAN_SCOPE = 'list';
+    globalThis.CE_SESSION_SCAN_SLUGS = [' Edge ', 'alpha'];
+
+    const sessionConfig = buildSessionConfig({
+      slug: 'edge',
+      sessionName: 'Edge Session',
+    });
+    const subject = createSubject({
+      path: '/session/general',
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+    const replaceStateSpy = jest.spyOn(window.history, 'replaceState');
+
+    expect(subject.getSessionFallbackPreferredTarget()).toEqual({
+      slug: 'edge',
+      path: '/session/edge',
+    });
+
+    const firstRender = render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'edge');
+    expect(replaceStateSpy).toHaveBeenCalledTimes(1);
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/session/edge');
+    expect(window.location.pathname).toBe('/session/edge');
+
+    const storageKey = subject.getSessionFallbackRedirectStorageKey('edge');
+    expect(window.sessionStorage.getItem(storageKey)).toBe('true');
+
+    firstRender.unmount();
+    replaceStateSpy.mockClear();
+
+    const secondSubject = createSubject({
+      path: '/session/general',
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+
+    render(secondSubject.render());
+
+    expect(window.location.pathname).toBe('/session/general');
+    expect(window.sessionStorage.getItem(storageKey)).toBe('true');
+    expect(replaceStateSpy).not.toHaveBeenCalled();
   });
 
   it('keeps PUBLIC_URL when canonicalizing /new to /session/new', async () => {

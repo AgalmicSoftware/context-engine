@@ -12,7 +12,7 @@ export interface SessionCachePersistenceHost {
   getActiveSlug?: () => string;
   setState?: (
     updater: (prev: Record<string, unknown>) => Record<string, unknown> | null,
-    callback?: unknown
+    callback?: () => void
   ) => void;
 }
 

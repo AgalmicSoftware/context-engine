@@ -45,11 +45,11 @@ declare global {
   }
 }
 
-export function WagmiHooksHOC(Component: React.ComponentType<any>) {
-    return function WrappedComponent(props: Record<string, any>) {
+export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P>) {
+    return function WrappedComponent(props: Omit<P, WagmiManagedPropKeys> & WagmiBridgeRuntimeProps) {
         // wagmi hooks
         const { address, isConnecting, isDisconnected } = useAccount({
-          onConnect({ address }: any) {
+          onConnect({ address }: { address?: string }) {
             accountLog.log("Connected – address: " + address)
           },
           onDisconnect() {

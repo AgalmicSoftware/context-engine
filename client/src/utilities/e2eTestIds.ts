@@ -180,6 +180,7 @@ export const E2E_TESTIDS = Object.freeze({
 
   // SurveyTool (answering/responding)
   SURVEY_DECRYPT_PROMPT: 'ce-survey-decrypt-prompt',
+  SURVEY_DECRYPT_PROMPT_NOTICE: 'ce-survey-decrypt-prompt-notice',
   SURVEY_GATED_PROMPT_NOTICE: 'ce-survey-gated-prompt-notice',
   SURVEY_LOCKED_BANNER: 'ce-survey-locked-banner',
   SURVEY_LOCKED_BANNER_CARET: 'ce-survey-locked-banner-caret',

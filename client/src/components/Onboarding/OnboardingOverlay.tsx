@@ -2,16 +2,11 @@ import React from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faArrowRight } from '@fortawesome/free-solid-svg-icons';
+import type { RootState } from '../../reducers/index.js';
 import 'assets/css/contextEngine.scss';
 import styles from './OnboardingOverlay.module.scss';
 import { WELCOME_SLIDES, getWelcomeSlide } from '../MainContent/welcomeSlides.js';
 import { ONBOARDING_COMPLETE_STORAGE_KEY } from './onboardingConfig.js';
-
-type RootState = {
-  sessionState: {
-    onboardingStep?: number | null;
-  };
-};
 
 const IMAGE_CLASS_BY_SLIDE_KEY: Record<string, string> = {
   intro: styles.mediaImageIntro,

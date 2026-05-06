@@ -28,16 +28,6 @@ type AccountSectionProps = {
   toggleDemoMode?: (demoModeOn: boolean) => void;
 };
 
-type RootState = {
-  sessionState: {
-    loginModalToggled?: boolean;
-    loginComplete?: boolean;
-  };
-  profile: {
-    userImageURL?: string | null;
-  };
-};
-
 const LoginButton = LoginButtonRaw as React.ComponentType<any>;
 const LoginAndSettingsModal = LoginAndSettingsModalRaw as React.ComponentType<any>;
 

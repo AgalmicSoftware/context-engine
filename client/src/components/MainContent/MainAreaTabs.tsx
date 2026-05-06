@@ -54,6 +54,7 @@ type MainAreaTabsProps = {
   provider?: unknown;
   network?: unknown;
   account?: string;
+  litHooks?: unknown;
   activeSessionSlug?: string;
   loginComplete?: boolean;
   loginInProgress?: boolean;

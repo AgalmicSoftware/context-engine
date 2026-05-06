@@ -1,37 +1,45 @@
 import type { QuestionScanProgressLike } from './progressHelpers.ts';
 
-export type AnyRecord = Record<string, any>;
+export type MainSiteRecord = Record<string, unknown>;
+export type MainSiteCallback = (...args: unknown[]) => void;
+export type MainSiteNetworkLike = MainSiteRecord & {
+  id?: number | null;
+  chainId?: number | null;
+};
+export type MainSiteLitHooksLike = MainSiteRecord & {
+  getKey?: unknown;
+};
 
 export type MainSiteProps = {
-  fetchSessionState: (...args: any[]) => any;
-  fetchAccount: (...args: any[]) => any;
-  changeFocusedTab: (...args: any[]) => any;
-  toggleLoginModal: (...args: any[]) => any;
-  updateLoginInfo: (...args: any[]) => any;
-  toggleDemoMode: (...args: any[]) => any;
-  changeActiveSessionSlug: (...args: any[]) => any;
-  profile?: AnyRecord;
+  fetchSessionState: MainSiteCallback;
+  fetchAccount: MainSiteCallback;
+  changeFocusedTab: MainSiteCallback;
+  toggleLoginModal: MainSiteCallback;
+  updateLoginInfo: MainSiteCallback;
+  toggleDemoMode: MainSiteCallback;
+  changeActiveSessionSlug: MainSiteCallback;
+  profile?: MainSiteRecord;
   account?: string;
   provider?: string;
-  network?: AnyRecord;
-  sessionState?: AnyRecord;
+  network?: MainSiteNetworkLike;
+  sessionState?: MainSiteRecord;
   focusedTab?: number;
   loginComplete?: boolean;
   loginInProgress?: boolean;
-  demoMode?: AnyRecord;
+  demoMode?: MainSiteRecord;
   demoSurfaceMode?: boolean | null;
   activeSessionSlug?: string;
-  wagmiChainOptions?: any[];
+  wagmiChainOptions?: unknown[];
   wagmiBlocknumber?: number;
-  urlExtension?: AnyRecord;
+  urlExtension?: MainSiteRecord;
   path?: string;
   nftCode?: string;
   urlPath?: string;
   firstVisit?: boolean;
-  socket?: any;
+  socket?: unknown;
   matchesContractAddress?: string;
   viewAddress?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export type MainSiteState = {
@@ -45,8 +53,8 @@ export type MainSiteState = {
   cacheHasLoaded: boolean;
   sbtCacheRevision: number;
   sbtScanTick: number;
-  sbtScanProgressBySlug: AnyRecord;
-  sbtRealtimeCoverageBySlug: AnyRecord;
+  sbtScanProgressBySlug: MainSiteRecord;
+  sbtRealtimeCoverageBySlug: MainSiteRecord;
   questionResponsesNonce: number;
   sessionRegistryRevision: number;
   questionScanProgress: QuestionScanProgressLike | null;
@@ -56,12 +64,13 @@ export type MainSiteState = {
   scanErrorMessage: string;
   sbtDetailGroupSlug: string | null;
   sbtDetailAddress: string | null;
-  litHooks: any | null;
-  sessionInfoOverrides: AnyRecord;
-  sessionNameOverrides: AnyRecord;
-  sessionHeaderOverrides: AnyRecord;
-  groupCredentials: AnyRecord;
+  latestBlockNumber?: number;
+  litHooks: MainSiteLitHooksLike | null;
+  sessionInfoOverrides: MainSiteRecord;
+  sessionNameOverrides: MainSiteRecord;
+  sessionHeaderOverrides: MainSiteRecord;
+  groupCredentials: MainSiteRecord;
   sessionPathResolutionNonce: number;
   isCacheManagerReady: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };

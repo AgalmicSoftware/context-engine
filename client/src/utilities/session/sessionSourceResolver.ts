@@ -7,7 +7,10 @@ import { normalizeSessionNaming } from './sessionMetadata.js';
 import { getDemoSessionMap } from './sessionDemoCompat.js';
 import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability.js';
 
-type SessionConfigLike = Record<string, any>;
+type SessionConfigLike = Record<string, unknown>;
+type ResolveSessionSlugAliasOptions = NonNullable<
+  Parameters<typeof resolveSessionSlugAliasFromDemoSessions>[0]
+>;
 
 const DEMO_SESSION_MAP = getDemoSessionMap() as Record<string, SessionConfigLike>;
 
@@ -34,17 +37,21 @@ const findDemoSessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLike | 
   return isObj(bySlug) ? bySlug : null;
 };
 
-export const resolveSessionSlugAlias = (sessionSlug: unknown, opts: Record<string, any> = {}) => (
-  (resolveSessionSlugAliasFromDemoSessions as any)({
+export const resolveSessionSlugAlias = (
+  sessionSlug: unknown,
+  opts: Partial<ResolveSessionSlugAliasOptions> = {}
+) => (
+  resolveSessionSlugAliasFromDemoSessions({
     sessionSlug,
     demoSessions: DEMO_SESSION_MAP,
     ...(opts || {}),
   })
 );
 
-export const getDemoSessionConfigForDisplay = (slug: unknown) => (
-  normalizeSessionNaming(findDemoSessionConfigBySlug(slug))
-);
+export const getDemoSessionConfigForDisplay = (slug: unknown): SessionConfigLike | null => {
+  const normalized = normalizeSessionNaming(findDemoSessionConfigBySlug(slug));
+  return isObj(normalized) ? normalized : null;
+};
 
 export const getDefaultSessionConfig = () => (
   getDemoSessionConfigForDisplay('')
@@ -60,16 +67,13 @@ export const getAllDemoSessionConfigs = (): Array<[string, SessionConfigLike]> =
 export const findDemoSessionByWorkerUrl = (url: unknown = '') => {
   const normalizedTargetUrl = normalizeBaseUrl(url);
   for (const [, cfg] of getAllDemoSessionConfigs()) {
-    const sessionConfig = (cfg && typeof cfg === 'object' && !Array.isArray(cfg))
-      ? cfg as SessionConfigLike
-      : null;
     const normalizedWorkerUrl = normalizeBaseUrl(getUsableSessionWorkerUrl({
-      slug: sessionConfig?.slug || '',
-      sessionConfig,
+      slug: cfg.slug || '',
+      sessionConfig: cfg,
       allowSharedFallback: true,
     }));
     if (!normalizedWorkerUrl) continue;
-    if (!normalizedTargetUrl || normalizedWorkerUrl === normalizedTargetUrl) return sessionConfig;
+    if (!normalizedTargetUrl || normalizedWorkerUrl === normalizedTargetUrl) return cfg;
   }
   return null;
 };

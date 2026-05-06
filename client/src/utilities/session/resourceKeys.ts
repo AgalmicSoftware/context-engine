@@ -91,77 +91,12 @@ type EffectiveFaucetConfigResult = {
   encryptedAvailable: boolean;
 };
 
-type AnyRecord = Record<string, any>;
-type ResourceKeyProviderLike = string | AnyRecord | null | undefined;
-type FaucetConfig = {
-  useLocal: boolean;
-  privateKey: string;
-  rpcUrl: string;
-  amountEth: string;
-  balanceThresholdEth: string;
-};
-type ResourceKeys = {
-  rpc: { useLocal: boolean; apiKey: string };
-  arweave: { useLocal: boolean; jwk: string };
-  faucet: FaucetConfig;
-};
-type ResourceKeyStore = {
-  v: number;
-  bySession: Record<string, ResourceKeys>;
-  byGroup: Record<string, ResourceKeys>;
-};
-type ResourceKeyResolutionContext = {
-  account?: string;
-  chainId?: number | string | null;
-  providerLike?: ResourceKeyProviderLike;
-  lit?: AnyRecord;
-};
-type EffectiveResourceKeyOptions = {
-  sessionSlug?: string;
-  sessionConfig?: AnyRecord | null;
-  preferLocal?: boolean;
-  context?: ResourceKeyResolutionContext;
-};
-type EffectiveRpcKeyResult = {
-  apiKey: string;
-  source: 'session' | 'local';
-  sessionConfigSource: string;
-  status: string;
-  preferLocal: boolean;
-  sessionStatus: string;
-  groupStatus: string;
-  localStatus: string;
-};
-type EffectiveArweaveKeyResult = {
-  arweaveJwk: string;
-  source: 'session' | 'local';
-  sessionConfigSource: string;
-  status: string;
-  preferLocal: boolean;
-  sessionStatus: string;
-  groupStatus: string;
-  localStatus: string;
-};
-type EffectiveFaucetConfigResult = {
-  privateKey: string;
-  source: 'session' | 'local';
-  sessionConfigSource: string;
-  status: string;
-  preferLocal: boolean;
-  sessionStatus: string;
-  groupStatus: string;
-  localStatus: string;
-  rpcUrl: string;
-  amountEth: string;
-  balanceThresholdEth: string;
-  encryptedAvailable: boolean;
-};
-
 const log = createLogger('resourceKeys');
 
 
 const STORAGE_KEY = 'ce:resourceKeys:v1';
 const RESERVED_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
+const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 
 const DEFAULT_SETTINGS = Object.freeze<ResourceKeys>({
   rpc: { useLocal: false, apiKey: '' },
@@ -171,7 +106,7 @@ const DEFAULT_SETTINGS = Object.freeze<ResourceKeys>({
 
 const buildWorkerKeyMeta = <TKey extends 'apiKey' | 'jwk' | 'privateKey'>(
   keyName: TKey
-): Record<TKey, string> & { status: string; encryptedAvailable: boolean } => ({
+): WorkerKeyMeta<TKey> => ({
   [keyName]: '',
   status: 'worker',
   encryptedAvailable: false,
@@ -190,10 +125,10 @@ const normalizeJwkValue = (value: unknown): string => {
 };
 
 const normalizeSettings = (raw: unknown = {}): ResourceKeys => {
-  const obj: AnyRecord = raw && typeof raw === 'object' ? raw as AnyRecord : {};
-  const rpc = obj.rpc && typeof obj.rpc === 'object' ? obj.rpc : {};
-  const arweave = obj.arweave && typeof obj.arweave === 'object' ? obj.arweave : {};
-  const faucet = obj.faucet && typeof obj.faucet === 'object' ? obj.faucet : {};
+  const obj = isObj(raw) ? raw : {};
+  const rpc = isObj(obj.rpc) ? obj.rpc : {};
+  const arweave = isObj(obj.arweave) ? obj.arweave : {};
+  const faucet = isObj(obj.faucet) ? obj.faucet : {};
   return {
     rpc: {
       useLocal: !!rpc.useLocal,
@@ -214,11 +149,11 @@ const normalizeSettings = (raw: unknown = {}): ResourceKeys => {
 };
 
 const normalizeStore = (raw: unknown = null): ResourceKeyStore => {
-  const obj: AnyRecord = raw && typeof raw === 'object' ? raw as AnyRecord : {};
+  const obj = isObj(raw) ? raw : {};
   const bySessionRaw =
     isObj(obj.bySession)
       ? obj.bySession
-      : (obj.byGroup && typeof obj.byGroup === 'object' ? obj.byGroup : {});
+      : (isObj(obj.byGroup) ? obj.byGroup : {});
   const bySession: Record<string, ResourceKeys> = {};
   Object.entries(bySessionRaw).forEach(([slug, entry]) => {
     const key = normalizeSlug(slug);
@@ -283,7 +218,7 @@ export const saveLocalSessionResourceKeys = saveLocalResourceKeys;
 /** @type {typeof clearLocalResourceKeys} */
 export const clearLocalSessionResourceKeys = clearLocalResourceKeys;
 
-const resolveSessionConfig = (slugIn = ''): AnyRecord | null => {
+const resolveSessionConfig = (slugIn = ''): SessionConfig | null => {
   const normalizedSlug = canonicalizeSessionSlug(slugIn);
   const allowDemoFallback = normalizedSlug === '' ? true : defaultStrictAllowDemoFallback();
   const resolved = resolveSessionConfigFromSources({
@@ -293,7 +228,8 @@ const resolveSessionConfig = (slugIn = ''): AnyRecord | null => {
     allowDemoFallback: false,
   });
   if (resolved.sessionConfig || !allowDemoFallback) return resolved.sessionConfig;
-  return getDemoSessionConfigForDisplay(resolved.sessionSlug) as AnyRecord | null;
+  const demoConfig = getDemoSessionConfigForDisplay(resolved.sessionSlug);
+  return isObj(demoConfig) ? demoConfig as SessionConfig : null;
 };
 
 // Legacy alias removed — function is now resolveSessionConfig directly.
@@ -328,7 +264,7 @@ const getWalletContext = (
   }
 };
 
-const getLitHooks = (override: ResourceKeyResolutionContext = {}): AnyRecord => {
+const getLitHooks = (override: ResourceKeyResolutionContext = {}): UnknownRecord | null => {
   if (override.lit) return override.lit;
   const hooks = getGlobalLitHooks();
   return isObj(hooks) ? hooks : null;
@@ -374,27 +310,27 @@ const resolveEncryptedValue = async (
 };
 
 const resolveSessionRpcKey = async (
-  sessionCfg: AnyRecord | null,
+  sessionCfg: SessionConfig | null,
   context: ResourceKeyResolutionContext = {}
-): Promise<AnyRecord> => {
+): Promise<WorkerKeyMeta<'apiKey'>> => {
   void sessionCfg;
   void context;
   return buildWorkerKeyMeta('apiKey');
 };
 
 const resolveSessionArweaveKey = async (
-  sessionCfg: AnyRecord | null,
+  sessionCfg: SessionConfig | null,
   context: ResourceKeyResolutionContext = {}
-): Promise<AnyRecord> => {
+): Promise<WorkerKeyMeta<'jwk'>> => {
   void sessionCfg;
   void context;
   return buildWorkerKeyMeta('jwk');
 };
 
 const resolveSessionFaucetKey = async (
-  sessionCfg: AnyRecord | null,
+  sessionCfg: SessionConfig | null,
   context: ResourceKeyResolutionContext = {}
-): Promise<AnyRecord> => {
+): Promise<WorkerKeyMeta<'privateKey'>> => {
   void sessionCfg;
   void context;
   return buildWorkerKeyMeta('privateKey');

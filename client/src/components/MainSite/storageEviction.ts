@@ -7,7 +7,31 @@ import { createLogger } from 'utilities/logging.js';
 const mainSiteLog = createLogger('mainSite');
 const DG_META_STORAGE_KEY = 'dg_meta_v1';
 
-export function trimLargeArrays(obj: any, max = 500, seen?: Set<any>): void {
+type StorageRecord = Record<string, unknown>;
+
+const isStorageRecord = (value: unknown): value is StorageRecord => (
+  value !== null && typeof value === 'object'
+);
+
+const readDgMeta = (): StorageRecord => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DG_META_STORAGE_KEY) || '{}');
+    return isStorageRecord(parsed) ? parsed : {};
+  } catch (e) {
+    mainSiteLog.warn('MainSite: fallback', e);
+    return {};
+  }
+};
+
+const writeDgMeta = (meta: StorageRecord): void => {
+  try {
+    localStorage.setItem(DG_META_STORAGE_KEY, JSON.stringify(meta));
+  } catch (e) {
+    mainSiteLog.warn('MainSite: fallback', e);
+  }
+};
+
+export function trimLargeArrays(obj: unknown, max = 500, seen?: Set<unknown>): void {
   if (!obj || typeof obj !== 'object') return;
   if (!seen) seen = new Set();
   if (seen.has(obj)) return;
@@ -17,12 +41,12 @@ export function trimLargeArrays(obj: any, max = 500, seen?: Set<any>): void {
     obj.forEach(item => trimLargeArrays(item, max, seen));
     return;
   }
-  Object.keys(obj).forEach(k => trimLargeArrays(obj[k], max, seen));
+  const record = obj as StorageRecord;
+  Object.keys(record).forEach(k => trimLargeArrays(record[k], max, seen));
 }
 
 export function evictOldDgEntries(maxAgeMs = 7 * 24 * 60 * 60 * 1000): number {
-  let meta: Record<string, any> = {};
-  try { meta = JSON.parse(localStorage.getItem(DG_META_STORAGE_KEY) || '{}'); } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
+  const meta = readDgMeta();
   const threshold = Date.now() - maxAgeMs;
   let deleted = 0;
   Object.keys(meta).forEach(key => {
@@ -31,26 +55,24 @@ export function evictOldDgEntries(maxAgeMs = 7 * 24 * 60 * 60 * 1000): number {
     try { localStorage.removeItem(key); deleted++; } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
     delete meta[key];
   });
-  try { localStorage.setItem(DG_META_STORAGE_KEY, JSON.stringify(meta)); } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
+  writeDgMeta(meta);
   return deleted;
 }
 
 export function updateDgMetaTimestamp(storageKey: string): void {
   try {
-    let meta: Record<string, any> = {};
-    try { meta = JSON.parse(localStorage.getItem(DG_META_STORAGE_KEY) || '{}'); } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
+    const meta = readDgMeta();
     meta[storageKey] = Date.now();
-    localStorage.setItem(DG_META_STORAGE_KEY, JSON.stringify(meta));
+    writeDgMeta(meta);
   } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
 }
 
 export function removeDgMetaTimestamp(storageKey: string): void {
   try {
-    let meta: Record<string, any> = {};
-    try { meta = JSON.parse(localStorage.getItem(DG_META_STORAGE_KEY) || '{}'); } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
+    const meta = readDgMeta();
     if (meta[storageKey] !== undefined) {
       delete meta[storageKey];
-      localStorage.setItem(DG_META_STORAGE_KEY, JSON.stringify(meta));
+      writeDgMeta(meta);
     }
   } catch (e) { mainSiteLog.warn('MainSite: fallback', e); }
 }
