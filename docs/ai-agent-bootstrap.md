@@ -57,6 +57,7 @@ OpenClaw:
 - Use MCP when available; its tools must wrap `/api/agent/*`.
 - Direct HTTP fallback works and should be equivalent.
 - Surface `requestId` and `approvalUrl` to the user when submission requires approval.
+- Reuse idempotency keys for retried submit requests so the same authenticated wallet sees the same pending request instead of duplicate approval work.
 - Treat thread forwarding as an optional adapter, not a hard dependency.
 
 Telegram:
