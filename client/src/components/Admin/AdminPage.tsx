@@ -83,15 +83,14 @@ import {
   parseDefaultFilterStateDraft,
   parseDelimitedDraftList,
 } from './adminPageDraftFormattingHelpers';
+import {
+  buildSessionUrl,
+  collectEncryptedEntries,
+  getAdminSessionDisplayUrl,
+  shortAddress,
+} from './adminPageSessionDisplayHelpers';
 
 const log = createLogger('general');
-const buildSessionUrl = (slug: any, { allowGeneral = false }: any = {}) => {
-  const hasExplicitSlug = slug !== undefined && slug !== null;
-  const normalized = normalizeSlug(slug);
-  const base = typeof window !== 'undefined' && window.location ? window.location.origin : '';
-  if (!normalized) return allowGeneral && hasExplicitSlug ? `${base}/session` : '';
-  return `${base}/session/${encodeURIComponent(normalized)}`;
-};
 const renderTestResult = (entry: any) => {
   if (!entry) return 'Not run';
   if (typeof entry === 'string') return entry;
@@ -107,57 +106,7 @@ const renderTestResult = (entry: any) => {
   return label || 'OK';
 };
 
-const shortAddress = (addr: any) => {
-  const s = toStr(addr);
-  if (!s) return '';
-  return `${s.slice(0, 6)}…${s.slice(-4)}`;
-};
 const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
-
-const getAdminSessionDisplayUrl = ({ selectedSlug, selectedConfig, groupMetadata }: any = {}) => {
-  if (!selectedConfig && !groupMetadata) return '';
-  const resolvedSlug = selectedConfig?.slug ?? groupMetadata?.slug ?? selectedSlug;
-  return buildSessionUrl(resolvedSlug, { allowGeneral: true });
-};
-
-const collectEncryptedEntries = (metadata: any) => {
-  const entries: Record<string, any> = {};
-  if (!metadata || typeof metadata !== 'object') return entries;
-  const fields = metadata.encryptedFields;
-  if (fields && typeof fields === 'object') {
-    Object.entries(fields).forEach(([key, value]: any) => {
-      if (value == null || value === '') return;
-      entries[key] = value;
-    });
-  }
-  const sessionInfoEncrypted = metadata.sessionInfoEncrypted;
-  if (sessionInfoEncrypted) {
-    entries.sessionInfo = sessionInfoEncrypted;
-  }
-  const aiProviders = metadata.ai?.providers;
-  if (aiProviders && typeof aiProviders === 'object') {
-    Object.entries(aiProviders).forEach(([key, cfg]: any) => {
-      const encrypted = cfg?.encryptedApiKey;
-      if (!encrypted) return;
-      const path = `ai.providers.${key}.apiKey`;
-      if (!entries[path]) entries[path] = encrypted;
-    });
-  }
-  const rpcProviders = metadata.rpc?.providers;
-  if (rpcProviders && typeof rpcProviders === 'object') {
-    Object.entries(rpcProviders).forEach(([key, cfg]: any) => {
-      const encrypted = cfg?.encryptedApiKey;
-      if (!encrypted) return;
-      const path = `rpc.providers.${key}.apiKey`;
-      if (!entries[path]) entries[path] = encrypted;
-    });
-  }
-  const arweaveEncrypted = metadata.arweave?.encryptedJwk;
-  if (arweaveEncrypted && !entries['arweave.jwk']) entries['arweave.jwk'] = arweaveEncrypted;
-  const faucetEncrypted = metadata.faucet?.encryptedPrivateKey;
-  if (faucetEncrypted && !entries['faucet.privateKey']) entries['faucet.privateKey'] = faucetEncrypted;
-  return entries;
-};
 
 const ADMIN_DEFAULT_AI_MODELS = Object.freeze({
   fast: 'gpt-5',

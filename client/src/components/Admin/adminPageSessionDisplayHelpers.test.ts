@@ -1,13 +1,9 @@
 import {
-  areAdminEncryptedEntriesEquivalent,
-  buildAdminChainRegistryDisplay,
-  buildAdminEncryptedEntrySignature,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
-import { getChainName } from './adminPageHelpers';
 
 describe('adminPageSessionDisplayHelpers', () => {
   it('builds session URLs using normalized slugs and general-session fallback', () => {
@@ -33,20 +29,6 @@ describe('adminPageSessionDisplayHelpers', () => {
   it('formats short addresses consistently', () => {
     expect(shortAddress('0x1234567890abcdef')).toBe('0x1234…cdef');
     expect(shortAddress('')).toBe('');
-  });
-
-  it('formats chain and registry labels without changing same-chain or split-chain display', () => {
-    const baseSepoliaName = getChainName(84532);
-    const opSepoliaName = getChainName(11155420);
-
-    expect(buildAdminChainRegistryDisplay({ chainId: 84532 })).toBe(`${baseSepoliaName} (84532)`);
-    expect(buildAdminChainRegistryDisplay({ chainId: 84532, registryChainId: '84532' })).toBe(
-      `${baseSepoliaName} (84532)`
-    );
-    expect(buildAdminChainRegistryDisplay({ chainId: 11155420, registryChainId: 84532 })).toBe(
-      `${opSepoliaName} (11155420) / ${baseSepoliaName} (84532)`
-    );
-    expect(buildAdminChainRegistryDisplay()).toBe('\u2014');
   });
 
   it('collects encrypted metadata entries from legacy and provider locations', () => {
@@ -77,26 +59,5 @@ describe('adminPageSessionDisplayHelpers', () => {
       'faucet.privateKey': 'cipher-faucet',
     });
     expect(collectEncryptedEntries(null)).toEqual({});
-  });
-
-  it('builds stable encrypted entry signatures for cloned envelopes', () => {
-    const first = {
-      b: 'ciphertext',
-      a: {
-        z: ['one', { c: true, b: false }],
-        y: 2,
-      },
-    };
-    const second = {
-      a: {
-        y: 2,
-        z: ['one', { b: false, c: true }],
-      },
-      b: 'ciphertext',
-    };
-
-    expect(buildAdminEncryptedEntrySignature(first)).toBe(buildAdminEncryptedEntrySignature(second));
-    expect(areAdminEncryptedEntriesEquivalent(first, second)).toBe(true);
-    expect(areAdminEncryptedEntriesEquivalent(first, { ...second, b: 'other' })).toBe(false);
   });
 });

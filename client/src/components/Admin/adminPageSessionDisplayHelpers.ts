@@ -1,5 +1,4 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import { getChainName } from './adminPageHelpers';
 import { normalizeSlug } from './adminPageHelpers';
 
 type SessionDisplayUrlArgs = {
@@ -14,38 +13,10 @@ type BuildSessionUrlOptions = {
 
 type AdminEncryptedEntry = string | Record<string, unknown>;
 
-type AdminChainRegistryDisplayArgs = {
-  chainId?: unknown;
-  registryChainId?: unknown;
-};
-
 const asRecord = (value: unknown): Record<string, unknown> => (
   value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {}
-);
-
-const buildStableComparableValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(buildStableComparableValue);
-  if (!value || typeof value !== 'object') return value;
-  return Object.keys(value as Record<string, unknown>).sort().reduce<Record<string, unknown>>((acc, key) => {
-    acc[key] = buildStableComparableValue((value as Record<string, unknown>)[key]);
-    return acc;
-  }, {});
-};
-
-export const buildAdminEncryptedEntrySignature = (entry: unknown): string => {
-  if (entry == null) return '';
-  if (typeof entry === 'string') return entry;
-  try {
-    return JSON.stringify(buildStableComparableValue(entry)) || '';
-  } catch {
-    return toStr(entry);
-  }
-};
-
-export const areAdminEncryptedEntriesEquivalent = (a: unknown, b: unknown): boolean => (
-  buildAdminEncryptedEntrySignature(a) === buildAdminEncryptedEntrySignature(b)
 );
 
 export const buildSessionUrl = (slug: unknown, { allowGeneral = false }: BuildSessionUrlOptions = {}): string => {
@@ -70,25 +41,6 @@ export const getAdminSessionDisplayUrl = ({
   if (!selectedConfig && !groupMetadata) return '';
   const resolvedSlug = selectedConfig?.slug ?? groupMetadata?.slug ?? selectedSlug;
   return buildSessionUrl(resolvedSlug, { allowGeneral: true });
-};
-
-export const buildAdminChainRegistryDisplay = ({
-  chainId: chainIdRaw,
-  registryChainId: registryChainIdRaw,
-}: AdminChainRegistryDisplayArgs = {}): string => {
-  const chainId = toStr(chainIdRaw).trim();
-  const chainName = getChainName(chainId);
-  const registryChainId = toStr(registryChainIdRaw).trim();
-  const chainDisplay = chainName ? `${chainName} (${chainId})` : (chainId || '\u2014');
-  const chainNum = Number(chainId);
-  const registryNum = Number(registryChainId);
-  const sameChain = chainId && registryChainId && Number.isFinite(chainNum) && Number.isFinite(registryNum)
-    ? chainNum === registryNum
-    : registryChainId === chainId;
-  if (!registryChainId || sameChain) return chainDisplay;
-  const registryName = getChainName(registryChainId);
-  const registryDisplay = registryName ? `${registryName} (${registryChainId})` : registryChainId;
-  return `${chainDisplay} / ${registryDisplay}`;
 };
 
 export const collectEncryptedEntries = (metadata: unknown): Record<string, AdminEncryptedEntry> => {
