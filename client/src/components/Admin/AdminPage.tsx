@@ -67,6 +67,12 @@ import {
   normalizeSlug,
   normalizeWorkerUrl,
 } from './adminPageHelpers';
+import {
+  ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
+  isRetryableAdminNonceFailure,
+  normalizeAdminWorkerFetchError,
+  sleep,
+} from './adminPageWorkerErrorHelpers';
 
 const log = createLogger('general');
 const buildSessionUrl = (slug: any, { allowGeneral = false }: any = {}) => {
@@ -96,44 +102,6 @@ const shortAddress = (addr: any) => {
   if (!s) return '';
   return `${s.slice(0, 6)}…${s.slice(-4)}`;
 };
-const getCurrentOrigin = () => {
-  try {
-    return typeof window !== 'undefined' ? toStr(window.location?.origin).trim() : '';
-  } catch (_) {
-    return '';
-  }
-};
-const buildAdminWorkerCorsMessage = (workerBase: any, detail: any = '') => {
-  const origin = getCurrentOrigin() || '<current-origin>';
-  const worker = toStr(workerBase).trim() || 'session worker';
-  const suffix = detail ? ` (${detail})` : '';
-  return `Worker request could not reach ${worker}${suffix}. This is usually CORS or worker availability; ensure ${origin} is in that worker session's allowOrigins. If this session still resolves an older worker URL, finish deploy/config sync or edit the worker URL override first.`;
-};
-const normalizeAdminWorkerFetchError = ({ error, workerBase, responseStatus = 0, responseError = '' }: any = {}) => {
-  const raw = toStr(error?.message || error).trim();
-  const lowered = raw.toLowerCase();
-  const detail = toStr(responseError).trim();
-  const detailLower = detail.toLowerCase();
-  if ((Number(responseStatus || 0) === 403 && detailLower.includes('origin')) || detailLower.includes('origin not allowed')) {
-    return buildAdminWorkerCorsMessage(workerBase, detail || 'Origin not allowed');
-  }
-  if (lowered.includes('origin not allowed')) {
-    return buildAdminWorkerCorsMessage(workerBase, raw);
-  }
-  if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
-    return buildAdminWorkerCorsMessage(workerBase);
-  }
-  return raw || 'Failed to update worker allowOrigins.';
-};
-const ADMIN_ACTION_NONCE_RETRY_ATTEMPTS = 3;
-const isRetryableAdminNonceFailure = ({ responseStatus = 0, responseError = '' }: any = {}) => {
-  const status = Number(responseStatus || 0);
-  const detail = toStr(responseError).trim().toLowerCase();
-  if (status !== 400 || !detail) return false;
-  return detail.includes('nonce mismatch or expired') || detail.includes('nonce already used');
-};
-const sleep = (ms: any) => new Promise((resolve: any) => setTimeout(resolve, ms));
-
 const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
 
 const getAdminSessionDisplayUrl = ({ selectedSlug, selectedConfig, groupMetadata }: any = {}) => {
