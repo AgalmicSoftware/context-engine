@@ -1,7 +1,24 @@
 import { isFreeformBlankAnswer } from '../../utilities/survey/freeformAnswerUtils.js';
-import { normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
 
 type UnknownRecord = Record<string, unknown>;
+type BuildSurveyResultsBooleanTogglePatchArgs = {
+  prevState?: unknown;
+  stateKey?: unknown;
+};
+type BuildSurveyResultsKeyedTogglePatchArgs = {
+  forceValue?: unknown;
+  itemKey?: unknown;
+  mapKey?: unknown;
+  prevState?: unknown;
+};
+type BuildSurveyResultsQuestionIdSortPatchArgs = {
+  column?: unknown;
+  prevState?: unknown;
+};
+type BuildSurveyResultsDemoViewSelectPatchArgs = {
+  nextView?: unknown;
+  prevState?: unknown;
+};
 type BuildSurveyResultsFilterLoadingUpdateArgs = {
   loading?: unknown;
   pendingValue?: unknown;
@@ -16,62 +33,6 @@ type BuildSurveyResultsQuestionFilterCountPatchArgs = {
   props?: unknown;
   state?: unknown;
 };
-type BuildSurveyResultsCommittedFilterStatePatchArgs = {
-  filterState?: unknown;
-  statePatch?: unknown;
-};
-type BuildSurveyResultsQuestionFilterPatchArgs = {
-  filteredQuestions?: unknown;
-  filteredResponsesByQuestion?: unknown;
-  isSurveyAggregate?: unknown;
-  isSurveyIndividuals?: unknown;
-  networkQuestions?: unknown;
-  sourceMap?: unknown;
-  totalResponsesCount?: unknown;
-};
-type BuildSurveyResultsFilteredResponsesPatchArgs = {
-  filteredResponses?: unknown;
-  networkQuestions?: unknown;
-  surveyViewMode?: unknown;
-  totalResponsesCount?: unknown;
-  viewMode?: unknown;
-};
-export type SurveyResultsFilteredResponsesPatchPlan = {
-  patch: UnknownRecord | null;
-  status: 'apply' | 'invalid-aggregator' | 'invalid-array';
-};
-type BuildSurveyResultsLocalStoragePollPatchArgs = {
-  cachedQuestionsCount?: unknown;
-  cachedSurveyResponsesCount?: unknown;
-  networkLatestBlock?: unknown;
-  questionLocalBlock?: unknown;
-  responseLocalBlock?: unknown;
-  surveyLocalBlock?: unknown;
-};
-type BuildSurveyResultsRefreshStatusWritePlanArgs = {
-  isMounted?: unknown;
-  latestBlock?: unknown;
-  writeNetworkLatestBlock?: unknown;
-};
-type BuildSurveyResultsViewModeResetPatchArgs = {
-  questionResultsHydrated?: unknown;
-  surveyId?: unknown;
-  surveyResultsHydrated?: unknown;
-  viewMode?: unknown;
-};
-type BuildSurveyResultsRefreshStatusSequencePlanArgs = BuildSurveyResultsRefreshStatusWritePlanArgs & {
-  followUpEffects?: readonly unknown[] | unknown;
-};
-export type SurveyResultsRefreshStatusSequenceEffect =
-  | {
-    kind: 'state-patch';
-    keys: string[];
-    target: { latestBlock?: unknown };
-  }
-  | {
-    kind: 'follow-up';
-    effect: string;
-  };
 
 export type SurveyResultsResponseField = UnknownRecord & {
   value?: unknown;
@@ -111,16 +72,8 @@ export type SurveyResultsAggregateRow = UnknownRecord & {
 };
 
 export type SurveyResultsAggregator = Record<string, SurveyResultsAggregateRow[] | unknown>;
-export type SurveyResultsIndividualAggregator = Record<string, SurveyResultsAggregateRow[]>;
 export type SurveyResultsQuestionLookupEntry = UnknownRecord & { type?: unknown };
 export type SurveyResultsQuestionLookup = Record<string, SurveyResultsQuestionLookupEntry | undefined>;
-export type SurveyResultsStringifiedAggregator = Record<string, Record<string, unknown>[]>;
-export type SurveyResultsFilterQuestionRecord = UnknownRecord & {
-  creator?: unknown;
-  id?: unknown;
-  prompt?: unknown;
-  type?: unknown;
-};
 
 type SurveyQuestionResponseCandidate = {
   index: number;
@@ -137,29 +90,22 @@ type SurveyResponseNormalizationEntry = {
 
 type SurveyResponseLatestEntry = SurveyResponseNormalizationEntry & SurveyQuestionResponseCandidate;
 
-export {
-  buildSurveyResultsAlertMessagePatch,
-  buildSurveyResultsBookmarkFeedbackPatch,
-  buildSurveyResultsBookmarkedQuestionIdsPatch,
-  buildSurveyResultsBookmarkedSurveyIdsPatch,
-  buildSurveyResultsBooleanTogglePatch,
-  buildSurveyResultsCsvFileNamePatch,
-  buildSurveyResultsDemoAtlasNodePatch,
-  buildSurveyResultsDemoAtlasOpenPatch,
-  buildSurveyResultsDemoViewSelectPatch,
-  buildSurveyResultsExportTypePatch,
-  buildSurveyResultsFilterActivePatch,
-  buildSurveyResultsKeyedTogglePatch,
-  buildSurveyResultsQuestionIdSortPatch,
-  buildSurveyResultsSurveyViewModePatch,
-  buildSurveyResultsViewStatePatch,
-} from './surveyResultsDisplayPatchHelpers';
-export type {
-  BuildSurveyResultsBooleanTogglePatchArgs,
-  BuildSurveyResultsDemoViewSelectPatchArgs,
-  BuildSurveyResultsKeyedTogglePatchArgs,
-  BuildSurveyResultsQuestionIdSortPatchArgs,
-} from './surveyResultsDisplayPatchHelpers';
+export const buildSurveyResultsAlertMessagePatch = (alertMessage: unknown) => ({
+  alertMessage: String(alertMessage ?? ''),
+});
+
+export const buildSurveyResultsCsvFileNamePatch = (csvFileName: unknown) => ({
+  csvFileName,
+});
+
+export const buildSurveyResultsExportTypePatch = (exportType: unknown) => ({
+  exportType,
+  alertMessage: '',
+});
+
+export const buildSurveyResultsFilterActivePatch = (isFilterActive: unknown) => ({
+  isFilterActive,
+});
 
 export const buildSurveyResultsFilterLoadingUpdate = ({
   loading = false,
@@ -187,40 +133,6 @@ export const buildSurveyResultsFilterLoadingStatePatch = ({
   return stateRecord.filterLoading === normalizedNextLoading
     ? null
     : { filterLoading: normalizedNextLoading };
-};
-
-export const stringifySurveyResultsAggregatorResponses = (
-  aggregatorObj: unknown
-): SurveyResultsStringifiedAggregator => {
-  const out: SurveyResultsStringifiedAggregator = {};
-  if (!aggregatorObj || typeof aggregatorObj !== 'object') return out;
-  const aggregatorRecord = aggregatorObj as Record<string, unknown>;
-  Object.keys(aggregatorRecord).forEach((questionId) => {
-    const rows = Array.isArray(aggregatorRecord[questionId]) ? aggregatorRecord[questionId] : [];
-    out[questionId] = rows.map((item) => ({
-      ...(item as Record<string, unknown>),
-      response:
-        typeof (item as Record<string, unknown>).response === 'string'
-          ? (item as Record<string, unknown>).response
-          : JSON.stringify((item as Record<string, unknown>).response),
-    }));
-  });
-  return out;
-};
-
-export const buildSurveyResultsQuestionFilterQuestions = ({
-  networkQuestionsById = {},
-  questionResponses = {},
-}: {
-  networkQuestionsById?: Record<string, SurveyResultsFilterQuestionRecord>;
-  questionResponses?: unknown;
-} = {}): SurveyResultsFilterQuestionRecord[] => {
-  const responseRecord = Object(questionResponses || {}) as Record<string, unknown>;
-  return Object.keys(responseRecord).map((questionId) => {
-    const lowerQuestionId = String(questionId || '').toLowerCase();
-    const questionData = networkQuestionsById[lowerQuestionId];
-    return questionData || { id: lowerQuestionId || questionId, creator: '', type: '', prompt: '' };
-  });
 };
 
 export const buildSurveyResultsQuestionFilterCountPatch = ({
@@ -259,158 +171,95 @@ export const buildSurveyResultsQuestionFilterCountPatch = ({
   return buildSurveyResultsFilteredQuestionsCountPatch(count);
 };
 
-export const buildSurveyResultsQuestionScopeResetPatch = () => ({
-  questionResponses: {},
-  aggregatorQuestionResponses: {},
-  sbtFilteredAggregatorQuestionResponses: {},
-  totalQuestionsCount: 0,
-  totalResponsesCount: 0,
-  filteredResponsesCount: 0,
-  filteredQuestionsCount: 0,
-  questionResultsHydrated: false,
-});
-
-const toSurveyResultsHelperRecord = (value: unknown): UnknownRecord => (
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as UnknownRecord
-    : {}
-);
-
-const pruneSurveyResultsResponseAggregator = (value: unknown): UnknownRecord => {
-  const pruned: UnknownRecord = {};
-  Object.entries(toSurveyResultsHelperRecord(value)).forEach(([key, rows]) => {
-    if (Array.isArray(rows) && rows.length > 0) pruned[key] = rows;
-  });
-  return pruned;
+export const buildSurveyResultsBooleanTogglePatch = ({
+  prevState = {},
+  stateKey = '',
+}: BuildSurveyResultsBooleanTogglePatchArgs = {}): Record<string, boolean> => {
+  const key = String(stateKey || '');
+  if (!key) return {};
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  return { [key]: !stateRecord[key] };
 };
 
-const countSurveyResultsDistinctResponders = (aggregator: unknown): number => {
-  const responders = new Set<string>();
-  Object.values(toSurveyResultsHelperRecord(aggregator)).forEach((rows) => {
-    if (!Array.isArray(rows)) return;
-    rows.forEach((row) => {
-      const responder = toSurveyResultsHelperRecord(row).responder;
-      if (typeof responder === 'string' && responder) responders.add(responder.toLowerCase());
-    });
-  });
-  return responders.size;
-};
-
-export const buildSurveyResultsCommittedFilterStatePatch = ({
-  filterState = {},
-  statePatch = {},
-}: BuildSurveyResultsCommittedFilterStatePatchArgs = {}): UnknownRecord => ({
-  ...toSurveyResultsHelperRecord(statePatch),
-  filterState,
-});
-
-export const buildSurveyResultsQuestionFilterPatch = ({
-  filteredQuestions = [],
-  filteredResponsesByQuestion = null,
-  isSurveyAggregate = false,
-  isSurveyIndividuals = false,
-  networkQuestions = {},
-  sourceMap = {},
-  totalResponsesCount = 0,
-}: BuildSurveyResultsQuestionFilterPatchArgs = {}): UnknownRecord => {
-  const questionList = Array.isArray(filteredQuestions) ? filteredQuestions : [];
-  const finalFilteredQCount = questionList.length;
-  const statePatch: UnknownRecord = {
-    filteredQuestionsCount: finalFilteredQCount,
-  };
-
-  if (isSurveyIndividuals) return statePatch;
-
-  const sourceRecord = toSurveyResultsHelperRecord(sourceMap);
-  const filteredResponseRecord = toSurveyResultsHelperRecord(filteredResponsesByQuestion);
-  const allowedIds = new Set<string>(
-    questionList.map((question) => (
-      String(toSurveyResultsHelperRecord(question).id || '').toLowerCase()
-    ))
-  );
-  const nextFilteredAggregator: UnknownRecord = {};
-
-  Object.keys(sourceRecord).forEach((questionId) => {
-    if (!allowedIds.has(String(questionId || '').toLowerCase())) return;
-    if (filteredResponsesByQuestion && Object.prototype.hasOwnProperty.call(filteredResponseRecord, questionId)) {
-      const rows = filteredResponseRecord[questionId] || [];
-      if (Array.isArray(rows) && rows.length > 0) nextFilteredAggregator[questionId] = rows;
-      return;
-    }
-    nextFilteredAggregator[questionId] = sourceRecord[questionId];
-  });
-
-  statePatch.sbtFilteredAggregatorQuestionResponses = nextFilteredAggregator;
-  const maxResponseCount = Number(totalResponsesCount) || 0;
-  if (isSurveyAggregate) {
-    statePatch.filteredResponsesCount = Math.min(
-      countSurveyResultsDistinctResponders(nextFilteredAggregator),
-      maxResponseCount
-    );
-  } else {
-    statePatch.filteredResponsesCount = Math.min(
-      countQuestionModeResponses(
-        nextFilteredAggregator,
-        toSurveyResultsHelperRecord(networkQuestions) as SurveyResultsQuestionLookup
-      ),
-      maxResponseCount
-    );
-  }
-  return statePatch;
-};
-
-export const buildSurveyResultsFilteredResponsesPatchPlan = ({
-  filteredResponses = null,
-  networkQuestions = {},
-  surveyViewMode = '',
-  totalResponsesCount = 0,
-  viewMode = '',
-}: BuildSurveyResultsFilteredResponsesPatchArgs = {}): SurveyResultsFilteredResponsesPatchPlan => {
-  const isSurveyMode = viewMode === 'survey';
-  const isSurveyIndividuals = isSurveyMode && surveyViewMode === 'individuals';
-  if (isSurveyIndividuals) {
-    if (!Array.isArray(filteredResponses)) {
-      return {
-        patch: { sbtFilteredResponses: [], filteredResponsesCount: 0 },
-        status: 'invalid-array',
-      };
-    }
-    return {
-      patch: {
-        sbtFilteredResponses: filteredResponses,
-        filteredResponsesCount: filteredResponses.length,
-      },
-      status: 'apply',
-    };
-  }
-
-  if (!filteredResponses || typeof filteredResponses !== 'object') {
-    return {
-      patch: null,
-      status: 'invalid-aggregator',
-    };
-  }
-
-  const pruned = pruneSurveyResultsResponseAggregator(filteredResponses);
-  const maxResponseCount = Number(totalResponsesCount) || 0;
-  const filteredResponsesCount = isSurveyMode
-    ? Math.min(countSurveyResultsDistinctResponders(pruned), maxResponseCount)
-    : Math.min(
-      countQuestionModeResponses(
-        pruned,
-        toSurveyResultsHelperRecord(networkQuestions) as SurveyResultsQuestionLookup
-      ),
-      maxResponseCount
-    );
-
+export const buildSurveyResultsKeyedTogglePatch = ({
+  forceValue,
+  itemKey,
+  mapKey = '',
+  prevState = {},
+}: BuildSurveyResultsKeyedTogglePatchArgs = {}): Record<string, UnknownRecord> => {
+  const mapName = String(mapKey || '');
+  if (!mapName) return {};
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  const currentMap = (stateRecord[mapName] && typeof stateRecord[mapName] === 'object')
+    ? stateRecord[mapName] as UnknownRecord
+    : {};
+  const key = String(itemKey);
+  const nextValue = typeof forceValue === 'boolean' ? forceValue : !currentMap[key];
   return {
-    patch: {
-      sbtFilteredAggregatorQuestionResponses: pruned,
-      filteredResponsesCount,
+    [mapName]: {
+      ...currentMap,
+      [key]: nextValue,
     },
-    status: 'apply',
   };
 };
+
+export const buildSurveyResultsQuestionIdSortPatch = ({
+  column = '',
+  prevState = {},
+}: BuildSurveyResultsQuestionIdSortPatchArgs = {}): {
+  questionIdSortAsc: boolean;
+  questionIdSortBy: unknown;
+} => {
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  const nextAsc = stateRecord.questionIdSortBy === column
+    ? !stateRecord.questionIdSortAsc
+    : true;
+  return {
+    questionIdSortBy: column,
+    questionIdSortAsc: nextAsc,
+  };
+};
+
+export const buildSurveyResultsDemoAtlasNodePatch = (demoResultsAtlasNodeId: unknown = null) => ({
+  demoResultsAtlasNodeId,
+});
+
+export const buildSurveyResultsDemoAtlasOpenPatch = (nodeId: unknown = '') => {
+  const normalizedNodeId = String(nodeId || '').trim();
+  return {
+    demoResultsViewMode: 'atlas',
+    demoResultsAtlasNodeId: normalizedNodeId || null,
+  };
+};
+
+export const buildSurveyResultsDemoViewSelectPatch = ({
+  nextView = 'report',
+  prevState = {},
+}: BuildSurveyResultsDemoViewSelectPatchArgs = {}) => {
+  const allowedViews = new Set(['report', 'breakdown', 'atlas', 'riskMatrix']);
+  const normalizedView = allowedViews.has(String(nextView)) ? String(nextView) : 'report';
+  const stateRecord = (prevState && typeof prevState === 'object')
+    ? prevState as UnknownRecord
+    : {};
+  return {
+    demoResultsViewMode: stateRecord.demoResultsViewMode === normalizedView ? 'raw' : normalizedView,
+    demoResultsAtlasNodeId: normalizedView === 'atlas' ? stateRecord.demoResultsAtlasNodeId : null,
+  };
+};
+
+export const buildSurveyResultsViewStatePatch = (
+  viewMode: unknown,
+  surveyId: unknown
+) => ({
+  viewMode,
+  surveyId,
+});
 
 export const buildSurveyResultsEmptySurveyModePatch = () => ({
   responses: [],
@@ -421,7 +270,6 @@ export const buildSurveyResultsEmptySurveyModePatch = () => ({
   surveyDocumentURLs: [],
   totalQuestionsCount: 0,
   totalResponsesCount: 0,
-  filteredQuestionsCount: 0,
   filteredResponsesCount: 0,
   surveyResultsHydrated: true,
 });
@@ -454,7 +302,6 @@ export const buildSurveyResultsSurveyModeHydratedPatch = ({
   surveyDocumentURLs,
   totalQuestionsCount,
   totalResponsesCount,
-  filteredQuestionsCount: totalQuestionsCount,
   responses,
   filteredResponsesCount,
   surveyResultsHydrated: true,
@@ -520,147 +367,27 @@ export const buildSurveyResultsUnfilteredQuestionModeHydratedPatch = ({
 });
 
 export const buildSurveyResultsNetworkLatestBlockPatch = (networkLatestBlock: unknown) => ({
-  networkLatestBlock: normalizeSurveyResultsBlockNumber(networkLatestBlock),
+  networkLatestBlock: Number(networkLatestBlock || 0),
 });
-
-export const buildSurveyResultsViewModeResetPatch = ({
-  questionResultsHydrated = false,
-  surveyId = '',
-  surveyResultsHydrated = false,
-  viewMode = '',
-}: BuildSurveyResultsViewModeResetPatchArgs = {}) => ({
-  questionLocalBlock: 0,
-  responseLocalBlock: 0,
-  surveyLocalBlock: 0,
-  refreshTargetQuestionBlock: 0,
-  refreshTargetResponseBlock: 0,
-  refreshTargetSurveyBlock: 0,
-  questionResultsHydrated: viewMode === 'questions' ? false : questionResultsHydrated,
-  surveyResultsHydrated: viewMode === 'survey' ? false : surveyResultsHydrated,
-  demoResultsViewMode: 'raw',
-  demoResultsAtlasNodeId: null,
-  surveyId: viewMode === 'questions' ? '' : surveyId,
-});
-
-export const buildSurveyResultsSurveyIdPropChangePatch = (surveyId: unknown) => ({
-  surveyId,
-  viewMode: 'survey',
-  surveyLocalBlock: 0,
-  refreshTargetSurveyBlock: 0,
-  surveyResultsHydrated: false,
-  demoResultsViewMode: 'raw',
-  demoResultsAtlasNodeId: null,
-});
-
-export const buildSurveyResultsSurveyIdStateChangePatch = () => ({
-  surveyLocalBlock: 0,
-  refreshTargetSurveyBlock: 0,
-  surveyResultsHydrated: false,
-  demoResultsViewMode: 'raw',
-  demoResultsAtlasNodeId: null,
-});
-
-export const buildSurveyResultsLocalStoragePollPatch = ({
-  cachedQuestionsCount = 0,
-  cachedSurveyResponsesCount = 0,
-  networkLatestBlock = 0,
-  questionLocalBlock = 0,
-  responseLocalBlock = 0,
-  surveyLocalBlock = 0,
-}: BuildSurveyResultsLocalStoragePollPatchArgs = {}) => ({
-  questionLocalBlock,
-  responseLocalBlock,
-  surveyLocalBlock,
-  cachedQuestionsCount,
-  cachedSurveyResponsesCount,
-  networkLatestBlock,
-});
-
-export const buildSurveyResultsRefreshTargetBlocksPatch = (latestBlock: unknown) => ({
-  refreshTargetQuestionBlock: latestBlock,
-  refreshTargetResponseBlock: latestBlock,
-  refreshTargetSurveyBlock: latestBlock,
-});
-
-const normalizeRefreshStatusFollowUpEffects = (followUpEffects: readonly unknown[] | unknown = []): string[] => {
-  if (!Array.isArray(followUpEffects)) return [];
-  return followUpEffects
-    .map((effect) => String(effect || '').trim())
-    .filter(Boolean);
-};
-
-export const buildSurveyResultsRefreshStatusSequencePlan = ({
-  isMounted = true,
-  latestBlock,
-  writeNetworkLatestBlock = false,
-  followUpEffects = [],
-}: BuildSurveyResultsRefreshStatusSequencePlanArgs = {}) => {
-  const target = {
-    latestBlock,
-  };
-
-  if (isMounted === false) {
-    return {
-      blockedReason: 'unmounted' as const,
-      dispatchEligibility: 'blocked' as const,
-      orderedEffects: [] as SurveyResultsRefreshStatusSequenceEffect[],
-      shouldDispatchFollowUp: false,
-      shouldWrite: false,
-      statePatch: null,
-      target,
-    };
-  }
-
-  const refreshTargetPatch = buildSurveyResultsRefreshTargetBlocksPatch(latestBlock);
-  const statePatch = writeNetworkLatestBlock === true
-    ? {
-      ...buildSurveyResultsNetworkLatestBlockPatch(latestBlock),
-      ...refreshTargetPatch,
-    }
-    : refreshTargetPatch;
-  const orderedEffects: SurveyResultsRefreshStatusSequenceEffect[] = [
-    {
-      kind: 'state-patch',
-      keys: Object.keys(statePatch),
-      target,
-    },
-    ...normalizeRefreshStatusFollowUpEffects(followUpEffects).map((effect) => ({
-      kind: 'follow-up' as const,
-      effect,
-    })),
-  ];
-
-  return {
-    blockedReason: '' as const,
-    dispatchEligibility: 'eligible' as const,
-    orderedEffects,
-    shouldDispatchFollowUp: true,
-    shouldWrite: true,
-    statePatch,
-    target,
-  };
-};
-
-export const buildSurveyResultsRefreshStatusWritePlan = (
-  args: BuildSurveyResultsRefreshStatusWritePlanArgs = {}
-) => {
-  const {
-    blockedReason,
-    shouldWrite,
-    statePatch,
-    target,
-  } = buildSurveyResultsRefreshStatusSequencePlan(args);
-
-  return {
-    blockedReason,
-    shouldWrite,
-    statePatch,
-    target,
-  };
-};
 
 export const buildSurveyResultsFilteredQuestionsCountPatch = (filteredQuestionsCount: unknown) => ({
   filteredQuestionsCount,
+});
+
+export const buildSurveyResultsSurveyViewModePatch = (surveyViewMode: unknown) => ({
+  surveyViewMode,
+});
+
+export const buildSurveyResultsBookmarkFeedbackPatch = (filterBookmarkedFeedback: unknown) => ({
+  filterBookmarkedFeedback: !!filterBookmarkedFeedback,
+});
+
+export const buildSurveyResultsBookmarkedSurveyIdsPatch = (bookmarkedSurveyIDs: unknown = []) => ({
+  bookmarkedSurveyIDs: Array.isArray(bookmarkedSurveyIDs) ? [...bookmarkedSurveyIDs] : [],
+});
+
+export const buildSurveyResultsBookmarkedQuestionIdsPatch = (bookmarkedQuestionIDs: unknown = []) => ({
+  bookmarkedQuestionIDs: Array.isArray(bookmarkedQuestionIDs) ? [...bookmarkedQuestionIDs] : [],
 });
 
 export const buildSurveyResultsLockedResponsesDecryptingPatch = (
@@ -936,42 +663,6 @@ export const normalizeSurveyResponsePayloadByQuestionId = (payload: unknown): un
     ...source,
     responses: normalizedResponses,
   };
-};
-
-export const buildSurveyResultsIndividualResponseAggregator = (
-  individualResponses: unknown
-): SurveyResultsIndividualAggregator => {
-  const responseRows = Array.isArray(individualResponses)
-    ? individualResponses as SurveyResultsAggregateRow[]
-    : [];
-  if (responseRows.length === 0) return {};
-
-  const aggregator: SurveyResultsIndividualAggregator = {};
-
-  responseRows.forEach((response) => {
-    const parsedResponse = normalizeSurveyResponsePayloadByQuestionId(
-      response.response
-    ) as SurveyResultsSurveyResponsePayload | null;
-    if (!parsedResponse || !Array.isArray(parsedResponse.responses)) return;
-
-    parsedResponse.responses.forEach((answerItem) => {
-      const questionId = getSurveyResponseQuestionId(answerItem);
-      if (!questionId) return;
-
-      if (!aggregator[questionId]) {
-        aggregator[questionId] = [];
-      }
-
-      aggregator[questionId].push({
-        responder: String(response.responder || '').toLowerCase(),
-        questionId,
-        response: answerItem,
-        timestamp: getSurveyResponseAggregateTimestampMs(answerItem, parsedResponse),
-      });
-    });
-  });
-
-  return aggregator;
 };
 
 const normalizeTsToMs = (val: unknown): number => {
