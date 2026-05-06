@@ -89,6 +89,11 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
+import {
+  dedupeSbtSelections,
+  normalizeGateMode,
+  resolveDefaultGateFromConfig,
+} from './adminPageSbtGateSelectionHelpers';
 
 const log = createLogger('general');
 const renderTestResult = (entry: any) => {
@@ -314,55 +319,6 @@ const shouldShowInlineResourceSummary = (resource: any = {}) => {
   if (['Invalid JWK', 'Invalid key', 'Unable to load balance', 'RPC unavailable'].includes(display)) return true;
   const amount = parseResourceDisplayAmount(display);
   return amount != null && amount > 0;
-};
-
-const normalizeSbtSelection = (value: any) => {
-  if (Array.isArray(value)) {
-    return value
-      .map((entry: any) => {
-        if (!entry) return null;
-        if (typeof entry === 'string') {
-          const address = entry.trim();
-          if (!address) return null;
-          return { address, name: address };
-        }
-        if (typeof entry === 'object') {
-          const address = toStr(entry.address || entry.sbtAddress || entry.value).trim();
-          if (!address) return null;
-          return { ...entry, address, name: entry.name || entry.label || address };
-        }
-        return null;
-      })
-      .filter(Boolean);
-  }
-  if (typeof value === 'string' && value.trim()) {
-    return value
-      .split(/[\n,]+/)
-      .map((addr: any) => addr.trim())
-      .filter(Boolean)
-      .map((addr: any) => ({ address: addr, name: addr }));
-  }
-  return [];
-};
-
-const dedupeSbtSelections = (value: any) => {
-  const out: any[] = [];
-  const seen: any = new Set();
-  normalizeSbtSelection(value).forEach((entry: any) => {
-    if (!ethers.utils.isAddress(entry.address)) return;
-    const checksum = ethers.utils.getAddress(entry.address);
-    const lower = checksum.toLowerCase();
-    if (seen.has(lower)) return;
-    seen.add(lower);
-    out.push({ ...entry, address: checksum, name: entry.name || checksum });
-  });
-  return out;
-};
-
-const normalizeGateMode = (raw: any) => {
-  const mode = toStr(raw).trim().toLowerCase();
-  if (mode === 'all' || mode === 'and') return 'all';
-  return 'any';
 };
 
 const parseChainIdInput = (raw: any) => {
@@ -640,32 +596,6 @@ export const __adminPageTestUtils = {
   buildHealthAuthMismatchState,
   getAdminSessionDisplayUrl,
   getSessionReadRpcConfig,
-};
-
-const resolveDefaultGateFromConfig = (cfg: any = {}) => {
-  const sponsored = cfg?.sponsored && typeof cfg.sponsored === 'object' ? cfg.sponsored : {};
-  const gates = sponsored.gates && typeof sponsored.gates === 'object' ? sponsored.gates : {};
-  const defaultGateId = toStr(sponsored.defaultGateId || sponsored.defaultGate).trim();
-  const gate = defaultGateId ? gates[defaultGateId] : null;
-  const rawAddresses: any[] = [];
-  if (Array.isArray(gate?.sbtAddresses)) rawAddresses.push(...gate.sbtAddresses);
-  if (gate?.sbtAddress) rawAddresses.push(gate.sbtAddress);
-  if (!rawAddresses.length && Array.isArray(sponsored?.sbtAddresses)) rawAddresses.push(...sponsored.sbtAddresses);
-  if (!rawAddresses.length && sponsored?.sbtAddress) rawAddresses.push(sponsored.sbtAddress);
-  const sbtAddresses = dedupeSbtSelections(rawAddresses).map((entry: any) => entry.address);
-  const chainId = Number(
-    gate?.chainId ||
-    sponsored?.chainId ||
-    cfg?.networkChainId ||
-    cfg?.__registry?.chainId ||
-    0
-  ) || null;
-  return {
-    gateId: defaultGateId || '',
-    sbtAddresses,
-    mode: normalizeGateMode(gate?.mode || sponsored?.mode),
-    chainId,
-  };
 };
 
 const AdminPage = ({
