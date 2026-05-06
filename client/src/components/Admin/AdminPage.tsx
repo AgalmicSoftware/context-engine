@@ -73,6 +73,16 @@ import {
   normalizeAdminWorkerFetchError,
   sleep,
 } from './adminPageWorkerErrorHelpers';
+import {
+  buildUserPageUrl,
+  formatAllowOriginsDraft,
+  formatDefaultFilterStateDraft,
+  formatDelimitedDraftList,
+  formatPreviewValue,
+  parseAllowOriginsDraft,
+  parseDefaultFilterStateDraft,
+  parseDelimitedDraftList,
+} from './adminPageDraftFormattingHelpers';
 
 const log = createLogger('general');
 const buildSessionUrl = (slug: any, { allowGeneral = false }: any = {}) => {
@@ -149,13 +159,6 @@ const collectEncryptedEntries = (metadata: any) => {
   return entries;
 };
 
-const formatPreviewValue = (value: any, limit: any = 180) => {
-  const raw = toStr(value);
-  if (!raw) return '';
-  if (raw.length <= limit) return raw;
-  return `${raw.slice(0, limit)}…`;
-};
-
 const ADMIN_DEFAULT_AI_MODELS = Object.freeze({
   fast: 'gpt-5',
   thinking: 'gpt-5',
@@ -167,80 +170,6 @@ const ADMIN_AI_PROVIDER_OPTIONS = Object.freeze([
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'custom', label: 'Custom RPC' },
 ]);
-
-const dedupeTrimmedList = (values: any = []) => {
-  const out: any[] = [];
-  const seen: any = new Set();
-  (Array.isArray(values) ? values : []).forEach((value: any) => {
-    const trimmed = toStr(value).trim();
-    if (!trimmed) return;
-    const lower = trimmed.toLowerCase();
-    if (seen.has(lower)) return;
-    seen.add(lower);
-    out.push(trimmed);
-  });
-  return out;
-};
-
-const formatDelimitedDraftList = (value: any) => (
-  Array.isArray(value) ? dedupeTrimmedList(value).join('\n') : ''
-);
-
-const parseDelimitedDraftList = (raw: any) => {
-  if (Array.isArray(raw)) return dedupeTrimmedList(raw);
-  const trimmed = toStr(raw).trim();
-  if (!trimmed) return [];
-  if (trimmed.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) return dedupeTrimmedList(parsed);
-    } catch (_) {}
-  }
-  return dedupeTrimmedList(trimmed.split(/[\n,]+/));
-};
-
-const splitAllowOriginsInput = (value: any): any[] => {
-  if (Array.isArray(value)) {
-    return value.flatMap((entry: any) => splitAllowOriginsInput(entry));
-  }
-  return toStr(value)
-    .split(/[\n,]+/)
-    .map((entry: any) => entry.trim())
-    .filter(Boolean);
-};
-
-const parseAllowOriginsDraft = (raw: any) => normalizeOriginList(splitAllowOriginsInput(raw));
-
-const formatAllowOriginsDraft = (value: any) => parseAllowOriginsDraft(value).join('\n');
-
-const formatDefaultFilterStateDraft = (value: any) => {
-  if (value == null || value === '') return '';
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch (_) {
-    return String(value);
-  }
-};
-
-const parseDefaultFilterStateDraft = (raw: any) => {
-  const trimmed = toStr(raw).trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      return JSON.parse(trimmed);
-    } catch (error) {
-      throw new Error('Default filter state must be valid JSON or a plain query string.');
-    }
-  }
-  return trimmed;
-};
-
-const buildUserPageUrl = (address: any) => {
-  const trimmed = toStr(address).trim();
-  if (!trimmed) return '';
-  return `/u/${encodeURIComponent(trimmed)}`;
-};
 
 const ADMIN_EDITABLE_CONTRACT_FIELDS = Object.freeze([
   { contractKey: 'surveys', draftKey: 'contractSurveysAddress', label: 'Surveys contract' },
