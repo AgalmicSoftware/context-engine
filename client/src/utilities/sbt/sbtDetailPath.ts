@@ -1,7 +1,7 @@
 import { normalizeSessionSlug } from '../session/sessionNaming.js';
 import { sbtBasePath } from '../ui/terminology.js';
 
-export const buildSbtDetailPath = (sbtAddress: any, sessionSlugRaw = ''): string => {
+export const buildSbtDetailPath = (sbtAddress: unknown, sessionSlugRaw = ''): string => {
   const address = String(sbtAddress || '').trim();
   if (!address) return '#';
 
