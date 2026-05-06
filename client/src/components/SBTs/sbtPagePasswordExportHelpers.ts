@@ -1,7 +1,5 @@
 import { ethers } from 'ethers';
 
-import { escapeSbtCsvField } from './sbtCsvExportHelpers';
-
 type ResolveSbtPagePasswordExportSelectionArgs = {
   adminGeneratedPasswords?: unknown;
   cachedPasswords?: unknown;
@@ -256,10 +254,8 @@ export const buildSbtPagePasswordExportFile = ({
   }
 
   return {
-    content: `index,${escapeSbtCsvField(label)},inviteLink\n` +
-      exportRows.map((item, index) =>
-        `${index},${escapeSbtCsvField(item[label])},${escapeSbtCsvField(item.inviteLink)}`
-      ).join('\n'),
+    content: `index,${label},inviteLink\n` +
+      exportRows.map((item, index) => `${index},${item[label]},${item.inviteLink}`).join('\n'),
     fileName: `${fileNameBase}_${fileSuffix}_${datePart}.csv`,
     mimeType: 'text/csv',
   };
