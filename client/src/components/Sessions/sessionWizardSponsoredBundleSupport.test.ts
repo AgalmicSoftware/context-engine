@@ -12,6 +12,8 @@ describe('sessionWizardSponsoredBundleSupport', () => {
 
     expect(buildSponsoredBundleAppliedStatusMessage({
       openaiKey: 'sk-openai',
+      anthropicKey: 'sk-anthropic',
+      openrouterKey: 'sk-openrouter',
       arweaveJwk: '{"kty":"RSA"}',
       litApiBase: 'https://api.chipotle.litprotocol.com',
       litAccountApiKey: 'account-secret',

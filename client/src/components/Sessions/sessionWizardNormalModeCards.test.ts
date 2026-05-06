@@ -24,11 +24,9 @@ const baseCardsInput: NormalModeCardsInput = {
   resolvedWorkerBaseUrl: 'https://worker.example',
   workerMode: 'default',
   deployVerifiedInUi: false,
+  canPublishNow: false,
   canUseSponsoredAutoDeployNow: false,
-  publishReadiness: {
-    canPublishNow: false,
-    uploadBlockedReason: 'Upload is blocked.',
-  },
+  uploadBlockedReason: 'Upload is blocked.',
   t,
 };
 
@@ -72,10 +70,7 @@ describe('sessionWizardNormalModeCards', () => {
     it('marks publish ready when publishing is available', () => {
       const publishCard = buildNormalModeCards({
         ...baseCardsInput,
-        publishReadiness: {
-          ...baseCardsInput.publishReadiness,
-          canPublishNow: true,
-        },
+        canPublishNow: true,
       }).find((card) => card.key === 'publish');
 
       expect(publishCard).toEqual(expect.objectContaining({

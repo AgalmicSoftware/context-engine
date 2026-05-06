@@ -1,10 +1,27 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import type { AnyRecord } from '../shellTypes';
+
+type SessionWizardCreateSbtGate = Record<string, unknown> & {
+  id?: unknown;
+};
+
+type SessionWizardCreateSbtLaunchOptions = Record<string, unknown> & {
+  targetType?: unknown;
+  gateId?: unknown;
+  sessionSlug?: unknown;
+  arweaveJwkOverride?: unknown;
+};
+
+type SessionWizardCreateSbtLaunchState = {
+  targetType: unknown;
+  gateId: string;
+  sessionSlug: string;
+  arweaveJwkOverride: string;
+};
 
 export const getSessionWizardGateById = (
-  gates: AnyRecord[] = [],
+  gates: SessionWizardCreateSbtGate[] = [],
   gateId: unknown,
-): AnyRecord | null => (
+): SessionWizardCreateSbtGate | null => (
   gates.find((gate) => toStr(gate?.id).trim() === toStr(gateId).trim()) || null
 );
 
@@ -13,7 +30,7 @@ export const resolveSessionWizardCreateSbtTargetGateId = ({
   defaultGateId = '',
   requestedGateId = '',
 }: {
-  allEncryptionGates?: AnyRecord[];
+  allEncryptionGates?: SessionWizardCreateSbtGate[];
   defaultGateId?: unknown;
   requestedGateId?: unknown;
 } = {}): string => {
@@ -34,12 +51,12 @@ export const buildSessionWizardCreateSbtModalLaunchState = ({
   currentDraftSlug = '',
   currentArweaveJwk = '',
 }: {
-  options?: AnyRecord;
-  allEncryptionGates?: AnyRecord[];
+  options?: SessionWizardCreateSbtLaunchOptions;
+  allEncryptionGates?: SessionWizardCreateSbtGate[];
   defaultGateId?: unknown;
   currentDraftSlug?: unknown;
   currentArweaveJwk?: unknown;
-} = {}): AnyRecord => ({
+} = {}): SessionWizardCreateSbtLaunchState => ({
   targetType: options?.targetType || 'gate',
   gateId: resolveSessionWizardCreateSbtTargetGateId({
     allEncryptionGates,

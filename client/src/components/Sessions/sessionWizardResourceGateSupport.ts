@@ -1,8 +1,40 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeSbtSelection } from './sessionWizardSbtSelections';
-import type { AnyRecord } from '../shellTypes';
 
-export const buildSessionWizardGateOptions = (gates: AnyRecord[] = []): AnyRecord[] => (
+type SessionWizardResourceGate = Record<string, unknown> & {
+  id?: unknown;
+  label?: unknown;
+  color?: unknown;
+  mode?: unknown;
+  chainId?: unknown;
+  perMemberLimit?: unknown;
+  sbts?: unknown;
+};
+
+type SessionWizardGateOption = {
+  id: unknown;
+  label: unknown;
+  color: unknown;
+};
+
+type SessionWizardResolvedResourceGate = {
+  gateId: string;
+  gateIds: string[];
+  sbts: Array<{ address: string; name: string }>;
+  mode: 'all' | 'any';
+  chainId: number | null;
+  perMemberLimit: number;
+  hasConflicts: boolean;
+  conflictSummary: {
+    modeConflicts: boolean;
+    chainIdConflicts: boolean;
+    perMemberLimitConflicts: boolean;
+  };
+};
+
+export const buildSessionWizardGateOptions = (
+  gates: SessionWizardResourceGate[] = []
+): SessionWizardGateOption[] => (
   gates.map((gate) => ({
     id: gate.id,
     label: gate.label,
@@ -21,7 +53,7 @@ export const normalizeSessionWizardGateIds = (value: unknown): string[] => {
 export const resolveSessionWizardResourceGateIds = (
   value: unknown,
   fallbackGateId: unknown,
-  encryptionGates: AnyRecord[] = [],
+  encryptionGates: SessionWizardResourceGate[] = [],
 ): string[] => {
   const availableGateIds = encryptionGates.map((gate) => toStr(gate?.id).trim()).filter(Boolean);
   const requestedGateIds = normalizeSessionWizardGateIds(value).filter((id) => availableGateIds.includes(id));
@@ -34,11 +66,11 @@ export const resolveSessionWizardResourceGateIds = (
 export const resolveSessionWizardResourceGate = (
   value: unknown,
   fallbackGateId: unknown,
-  encryptionGates: AnyRecord[] = [],
-): AnyRecord | null => {
+  encryptionGates: SessionWizardResourceGate[] = [],
+): SessionWizardResolvedResourceGate | null => {
   const gateIds = resolveSessionWizardResourceGateIds(value, fallbackGateId, encryptionGates);
   if (!gateIds.length) return null;
-  const gatesById = new Map<string, AnyRecord>();
+  const gatesById = new Map<string, SessionWizardResourceGate>();
   gateIds.forEach((gateId) => {
     const gate = encryptionGates.find((entry) => toStr(entry?.id).trim() === gateId);
     if (!gate) return;
