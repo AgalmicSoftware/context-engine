@@ -1,0 +1,63 @@
+import {
+  buildSessionUrl,
+  collectEncryptedEntries,
+  getAdminSessionDisplayUrl,
+  shortAddress,
+} from './adminPageSessionDisplayHelpers';
+
+describe('adminPageSessionDisplayHelpers', () => {
+  it('builds session URLs using normalized slugs and general-session fallback', () => {
+    expect(buildSessionUrl(' Edge Session ')).toBe(`${window.location.origin}/session/edgesession`);
+    expect(buildSessionUrl('general')).toBe('');
+    expect(buildSessionUrl('general', { allowGeneral: true })).toBe(`${window.location.origin}/session`);
+    expect(buildSessionUrl(null, { allowGeneral: true })).toBe('');
+  });
+
+  it('resolves admin session display URLs by config, metadata, then selected slug', () => {
+    expect(getAdminSessionDisplayUrl()).toBe('');
+    expect(getAdminSessionDisplayUrl({
+      selectedSlug: 'selected',
+      selectedConfig: { slug: 'config-slug' },
+      groupMetadata: { slug: 'metadata-slug' },
+    })).toBe(`${window.location.origin}/session/config-slug`);
+    expect(getAdminSessionDisplayUrl({
+      selectedSlug: 'selected',
+      groupMetadata: { slug: 'metadata-slug' },
+    })).toBe(`${window.location.origin}/session/metadata-slug`);
+  });
+
+  it('formats short addresses consistently', () => {
+    expect(shortAddress('0x1234567890abcdef')).toBe('0x1234…cdef');
+    expect(shortAddress('')).toBe('');
+  });
+
+  it('collects encrypted metadata entries from legacy and provider locations', () => {
+    expect(collectEncryptedEntries({
+      encryptedFields: {
+        prompt: 'cipher-a',
+        empty: '',
+      },
+      sessionInfoEncrypted: 'cipher-session',
+      ai: {
+        providers: {
+          openai: { encryptedApiKey: 'cipher-openai' },
+        },
+      },
+      rpc: {
+        providers: {
+          '84532': { encryptedApiKey: 'cipher-rpc' },
+        },
+      },
+      arweave: { encryptedJwk: 'cipher-arweave' },
+      faucet: { encryptedPrivateKey: 'cipher-faucet' },
+    })).toEqual({
+      prompt: 'cipher-a',
+      sessionInfo: 'cipher-session',
+      'ai.providers.openai.apiKey': 'cipher-openai',
+      'rpc.providers.84532.apiKey': 'cipher-rpc',
+      'arweave.jwk': 'cipher-arweave',
+      'faucet.privateKey': 'cipher-faucet',
+    });
+    expect(collectEncryptedEntries(null)).toEqual({});
+  });
+});
