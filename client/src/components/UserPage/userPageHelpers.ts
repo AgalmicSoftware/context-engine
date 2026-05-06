@@ -172,6 +172,38 @@ export type {
   UserPageHeaderActionVisibility,
   UserPageProfileEditVisibility,
 } from './userPageProfileDisplayHelpers';
+export {
+  buildUserPageRenderLoadingState,
+  buildUserPageSectionLoadingEmptyState,
+  buildUserPageUncertainEmptyText,
+  buildUserPageUncertaintyLoadingFlags,
+  buildUserPageUserStatsMergePatch,
+  resolveUserPageAiActionAvailability,
+  resolveUserPageAnalyzeButtonDisplayState,
+  resolveUserPageCompareButtonDisplayState,
+  resolveUserPageSectionToggleDisplayState,
+  shouldRetryUserPageQuestionData,
+} from './userPageLoadingStateHelpers';
+export type {
+  BuildUserPageRenderLoadingStateArgs,
+  BuildUserPageSectionLoadingEmptyStateArgs,
+  BuildUserPageUncertainEmptyTextArgs,
+  BuildUserPageUncertaintyLoadingFlagsArgs,
+  BuildUserPageUserStatsMergePatchArgs,
+  ResolveUserPageAiActionAvailabilityArgs,
+  ResolveUserPageAnalyzeButtonDisplayStateArgs,
+  ResolveUserPageCompareButtonDisplayStateArgs,
+  ResolveUserPageSectionToggleDisplayStateArgs,
+  ShouldRetryUserPageQuestionDataArgs,
+  UserPageAiActionAvailability,
+  UserPageAnalyzeButtonDisplayState,
+  UserPageCompareButtonDisplayState,
+  UserPageRenderLoadingState,
+  UserPageSectionLoadingEmptyState,
+  UserPageSectionToggleDisplayState,
+  UserPageUncertainEmptyText,
+  UserPageUncertaintyLoadingFlags,
+} from './userPageLoadingStateHelpers';
 export type UserPageAnalysisFingerprintInput = {
   address?: unknown;
   model?: unknown;
@@ -231,129 +263,6 @@ export type UserPageCacheSourceSnapshot = UserPageCacheSourcePresence & {
 };
 type UserPageLengthLike = {
   length: number;
-};
-type BuildUserPageSectionLoadingEmptyStateArgs = {
-  isQuestionLoadingAny?: unknown;
-  isSbtLoadingAny?: unknown;
-  isSurveyLoadingAny?: unknown;
-  isSurveyReady?: unknown;
-  isQuestionReady?: unknown;
-  loadingQuestions?: unknown;
-  loadingSurveys?: unknown;
-  questionCreationInfo?: UserPageLengthLike;
-  questionDeepScanLoadingActive?: unknown;
-  questionResponseInfo?: UserPageLengthLike;
-  sbtList?: UserPageLengthLike;
-  surveyCreationInfo?: UserPageLengthLike;
-  surveyDeepScanLoadingActive?: unknown;
-  surveyResponseInfo?: UserPageLengthLike;
-};
-type BuildUserPageUncertainEmptyTextArgs = {
-  hasUncertainSbtData?: unknown;
-  hasUncertainUserData?: unknown;
-  sbtLabel?: unknown;
-  sbtsLowerLabel?: unknown;
-};
-type ShouldRetryUserPageQuestionDataArgs = {
-  hasUncertainUserData?: unknown;
-  holdQuestionLoading?: unknown;
-  questionSection?: unknown;
-};
-type BuildUserPageUncertaintyLoadingFlagsArgs = {
-  hasQuestionSources?: unknown;
-  hasSbtSources?: unknown;
-  hasSurveySources?: unknown;
-  keepQuestionLoadingDuringDeepScan?: unknown;
-  keepSurveyLoadingDuringDeepScan?: unknown;
-  prevState?: unknown;
-  uncertainResources?: unknown;
-};
-type UserPageUncertaintyLoadingFlags = {
-  hasGateUncertainty: boolean;
-  hasQuestionGateUncertainty: boolean;
-  hasSurveyGateUncertainty: boolean;
-  keepQuestionLoadingDuringDeepScan: boolean;
-  keepQuestionLoadingFromUserUncertainty: boolean;
-  keepSbtLoadingFromUserUncertainty: boolean;
-  keepSurveyLoadingDuringDeepScan: boolean;
-  keepSurveyLoadingFromUserUncertainty: boolean;
-  preserveUserDataUncertainty: boolean;
-};
-type BuildUserPageUserStatsMergePatchArgs = {
-  prevUserStats?: unknown;
-  userStatsPatch?: unknown;
-};
-type BuildUserPageRenderLoadingStateArgs = {
-  isDeepScanLoadingEnabledForSection?: ((section?: unknown) => unknown) | null;
-  isDeepScanning?: unknown;
-  isQuestionCacheReady?: unknown;
-  isResponsesCacheReady?: unknown;
-  isSBTCacheReady?: unknown;
-  isSurveyCacheReady?: unknown;
-  loadingQuestions?: unknown;
-  loadingSBTs?: unknown;
-  loadingSurveys?: unknown;
-};
-type ResolveUserPageAiActionAvailabilityArgs = {
-  aiAvailable?: unknown;
-  disabledByCache?: unknown;
-  walletLabel?: unknown;
-};
-type ResolveUserPageAnalyzeButtonDisplayStateArgs = {
-  aiActionAvailability?: Partial<UserPageAiActionAvailability> | null;
-  analyzing?: unknown;
-};
-type ResolveUserPageCompareButtonDisplayStateArgs = {
-  aiActionAvailability?: Partial<UserPageAiActionAvailability> | null;
-  collapseOpen?: unknown;
-};
-type ResolveUserPageSectionToggleDisplayStateArgs = {
-  open?: unknown;
-};
-type UserPageSectionLoadingEmptyState = {
-  questionResponsesLoadingEmpty: boolean;
-  questionsCreatedLoadingEmpty: boolean;
-  sbtSectionLoadingEmpty: boolean;
-  surveyResponsesLoadingEmpty: boolean;
-  surveysCreatedLoadingEmpty: boolean;
-};
-type UserPageUncertainEmptyText = {
-  questionResponsesEmptyText: string;
-  sbtEmptyText: string;
-};
-type UserPageRenderLoadingState = {
-  disabledByCache: boolean;
-  isQuestionLoadingAny: boolean;
-  isQuestionReady: boolean;
-  isResponsesReady: boolean;
-  isSBTReady: boolean;
-  isSbtLoadingAny: boolean;
-  isSurveyLoadingAny: boolean;
-  isSurveyReady: boolean;
-  questionDeepScanLoadingActive: boolean;
-  surveyDeepScanLoadingActive: boolean;
-};
-type UserPageAiActionAvailability = {
-  disabled: boolean;
-  title?: string;
-};
-type UserPageAnalyzeButtonDisplayState = {
-  ariaBusy: 'false' | 'true';
-  disabled: boolean;
-  label: string;
-  shouldRenderAnalyzing: boolean;
-  title?: string;
-};
-type UserPageCompareButtonDisplayState = {
-  disabled: boolean;
-  shouldRenderCollapseClosedIcon: boolean;
-  shouldRenderCollapseOpenIcon: boolean;
-  title?: string;
-};
-type UserPageSectionToggleDisplayState = {
-  isOpen: boolean;
-  shouldRenderClosedIcon: boolean;
-  shouldRenderOpenIcon: boolean;
 };
 type ResolveUserPageSurveyCreatedCardStateArgs = {
   survey?: unknown;
@@ -2468,203 +2377,4 @@ export const extractUserPageAnalysisImportance = (value: unknown): unknown => {
     candidate === '*' ||
     (candidate && typeof candidate === 'object' && candidateRecord.encrypted === true)
   ) ? undefined : candidate;
-};
-
-export const buildUserPageRenderLoadingState = ({
-  isDeepScanLoadingEnabledForSection = null,
-  isDeepScanning = false,
-  isQuestionCacheReady = false,
-  isResponsesCacheReady = false,
-  isSBTCacheReady = false,
-  isSurveyCacheReady = false,
-  loadingQuestions = false,
-  loadingSBTs = false,
-  loadingSurveys = false,
-}: BuildUserPageRenderLoadingStateArgs = {}): UserPageRenderLoadingState => {
-  const isSBTReady = !!isSBTCacheReady;
-  const isSurveyReady = !!isSurveyCacheReady;
-  const isQuestionReady = !!isQuestionCacheReady;
-  const isResponsesReady = !!isResponsesCacheReady;
-  const deepScanActive = !!isDeepScanning;
-  const sectionEnabled = typeof isDeepScanLoadingEnabledForSection === 'function'
-    ? isDeepScanLoadingEnabledForSection
-    : () => false;
-  const surveyDeepScanLoadingActive = !!(sectionEnabled('surveys') && deepScanActive);
-  const questionDeepScanLoadingActive = !!(sectionEnabled('questions') && deepScanActive);
-  return {
-    disabledByCache: !(isSBTReady && isSurveyReady && isQuestionReady && isResponsesReady),
-    isQuestionLoadingAny: !!loadingQuestions || !isQuestionReady || !isResponsesReady || questionDeepScanLoadingActive,
-    isQuestionReady,
-    isResponsesReady,
-    isSBTReady,
-    isSbtLoadingAny: !!loadingSBTs || !isSBTReady || deepScanActive,
-    isSurveyLoadingAny: !!loadingSurveys || !isSurveyReady || !isResponsesReady || surveyDeepScanLoadingActive,
-    isSurveyReady,
-    questionDeepScanLoadingActive,
-    surveyDeepScanLoadingActive,
-  };
-};
-
-export const resolveUserPageAiActionAvailability = ({
-  aiAvailable = null,
-  disabledByCache = false,
-  walletLabel = 'wallet',
-}: ResolveUserPageAiActionAvailabilityArgs = {}): UserPageAiActionAvailability => {
-  if (aiAvailable === false) {
-    return {
-      disabled: true,
-      title: `AI not available — connect a ${String(walletLabel || 'wallet')} or use a session with sponsored AI`,
-    };
-  }
-  if (disabledByCache) {
-    return {
-      disabled: true,
-      title: 'Available when the user page fully loads.',
-    };
-  }
-  return {
-    disabled: false,
-    title: undefined,
-  };
-};
-
-export const resolveUserPageAnalyzeButtonDisplayState = ({
-  aiActionAvailability = null,
-  analyzing = false,
-}: ResolveUserPageAnalyzeButtonDisplayStateArgs = {}): UserPageAnalyzeButtonDisplayState => {
-  const shouldRenderAnalyzing = !!analyzing;
-  return {
-    ariaBusy: shouldRenderAnalyzing ? 'true' : 'false',
-    disabled: shouldRenderAnalyzing || !!aiActionAvailability?.disabled,
-    label: shouldRenderAnalyzing ? 'Analyzing' : 'Analyze',
-    shouldRenderAnalyzing,
-    title: aiActionAvailability?.title,
-  };
-};
-
-export const resolveUserPageCompareButtonDisplayState = ({
-  aiActionAvailability = null,
-  collapseOpen = false,
-}: ResolveUserPageCompareButtonDisplayStateArgs = {}): UserPageCompareButtonDisplayState => {
-  const shouldRenderCollapseOpenIcon = !!collapseOpen;
-  return {
-    disabled: !!aiActionAvailability?.disabled,
-    shouldRenderCollapseClosedIcon: !shouldRenderCollapseOpenIcon,
-    shouldRenderCollapseOpenIcon,
-    title: aiActionAvailability?.title,
-  };
-};
-
-export const resolveUserPageSectionToggleDisplayState = ({
-  open = false,
-}: ResolveUserPageSectionToggleDisplayStateArgs = {}): UserPageSectionToggleDisplayState => {
-  const isOpen = !!open;
-  return {
-    isOpen,
-    shouldRenderClosedIcon: !isOpen,
-    shouldRenderOpenIcon: isOpen,
-  };
-};
-
-export const buildUserPageSectionLoadingEmptyState = ({
-  isQuestionLoadingAny = false,
-  isQuestionReady = false,
-  isSbtLoadingAny = false,
-  isSurveyLoadingAny = false,
-  isSurveyReady = false,
-  loadingQuestions = false,
-  loadingSurveys = false,
-  questionCreationInfo = [],
-  questionDeepScanLoadingActive = false,
-  questionResponseInfo = [],
-  sbtList = [],
-  surveyCreationInfo = [],
-  surveyDeepScanLoadingActive = false,
-  surveyResponseInfo = [],
-}: BuildUserPageSectionLoadingEmptyStateArgs = {}): UserPageSectionLoadingEmptyState => ({
-  sbtSectionLoadingEmpty: Boolean(isSbtLoadingAny && sbtList.length === 0),
-  surveyResponsesLoadingEmpty: Boolean(isSurveyLoadingAny && surveyResponseInfo.length === 0),
-  surveysCreatedLoadingEmpty: Boolean((
-    loadingSurveys ||
-    !isSurveyReady ||
-    surveyDeepScanLoadingActive
-  ) && surveyCreationInfo.length === 0),
-  questionResponsesLoadingEmpty: Boolean(isQuestionLoadingAny && questionResponseInfo.length === 0),
-  questionsCreatedLoadingEmpty: Boolean((
-    loadingQuestions ||
-    !isQuestionReady ||
-    questionDeepScanLoadingActive
-  ) && questionCreationInfo.length === 0),
-});
-
-export const buildUserPageUncertainEmptyText = ({
-  hasUncertainSbtData = false,
-  hasUncertainUserData = false,
-  sbtLabel = 'SBT',
-  sbtsLowerLabel = 'SBTs',
-}: BuildUserPageUncertainEmptyTextArgs = {}): UserPageUncertainEmptyText => ({
-  questionResponsesEmptyText: hasUncertainUserData
-    ? 'Question responses may be incomplete due scan/RPC issues. Try refresh.'
-    : 'No question responses found.',
-  sbtEmptyText: hasUncertainSbtData
-    ? `${String(sbtLabel)} results may be incomplete due scan/RPC issues. Try refresh.`
-    : `No ${String(sbtsLowerLabel)} found.`,
-});
-
-export const shouldRetryUserPageQuestionData = ({
-  hasUncertainUserData = false,
-  holdQuestionLoading = false,
-  questionSection = null,
-}: ShouldRetryUserPageQuestionDataArgs = {}): boolean => {
-  if (!hasUncertainUserData) return false;
-  if (holdQuestionLoading || !questionSection) return true;
-  const section = isPlainAnalysisObject(questionSection) ? questionSection : {};
-  const questionResponseInfo = section.questionResponseInfo;
-  return !Array.isArray(questionResponseInfo) || questionResponseInfo.length === 0;
-};
-
-export const buildUserPageUncertaintyLoadingFlags = ({
-  hasQuestionSources = false,
-  hasSbtSources = false,
-  hasSurveySources = false,
-  keepQuestionLoadingDuringDeepScan = false,
-  keepSurveyLoadingDuringDeepScan = false,
-  prevState = null,
-  uncertainResources = null,
-}: BuildUserPageUncertaintyLoadingFlagsArgs = {}): UserPageUncertaintyLoadingFlags => {
-  const prev = isPlainAnalysisObject(prevState) ? prevState : {};
-  const resources = uncertainResources instanceof Set ? uncertainResources : new Set<string>();
-  const preserveUserDataUncertainty = !!prev.hasUncertainUserData;
-  const hasSurveyGateUncertainty = resources.has('surveyResponses');
-  const hasQuestionGateUncertainty = resources.has('questionResponses');
-  return {
-    hasGateUncertainty: hasSurveyGateUncertainty || hasQuestionGateUncertainty,
-    hasQuestionGateUncertainty,
-    hasSurveyGateUncertainty,
-    keepQuestionLoadingDuringDeepScan: !!keepQuestionLoadingDuringDeepScan,
-    keepQuestionLoadingFromUserUncertainty: preserveUserDataUncertainty && (
-      !!prev.isDeepScanning ||
-      !hasQuestionSources
-    ),
-    keepSbtLoadingFromUserUncertainty: preserveUserDataUncertainty && (
-      !!prev.isDeepScanning ||
-      !hasSbtSources
-    ),
-    keepSurveyLoadingDuringDeepScan: !!keepSurveyLoadingDuringDeepScan,
-    keepSurveyLoadingFromUserUncertainty: preserveUserDataUncertainty && (
-      !!prev.isDeepScanning ||
-      !hasSurveySources
-    ),
-    preserveUserDataUncertainty,
-  };
-};
-
-export const buildUserPageUserStatsMergePatch = ({
-  prevUserStats = {},
-  userStatsPatch = {},
-}: BuildUserPageUserStatsMergePatchArgs = {}): UserPageUnknownRecord | null => {
-  const patch = isPlainAnalysisObject(userStatsPatch) ? userStatsPatch : {};
-  if (Object.keys(patch).length === 0) return null;
-  const previous = isPlainAnalysisObject(prevUserStats) ? prevUserStats : {};
-  return { ...previous, ...patch };
 };
