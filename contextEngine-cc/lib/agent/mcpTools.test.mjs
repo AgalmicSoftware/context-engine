@@ -5,6 +5,8 @@ import {
   buildAgentMcpHttpRequest,
   createAgentMcpToolHandlers,
 } from './mcpTools.mjs';
+import { AGENT_CANONICAL_ROUTES, routeKey as agentRouteKey } from './routeEquivalence.mjs';
+import { ROUTE_INVENTORY_BY_KEY, routeKey as inventoryRouteKey } from '../routeInventory.mjs';
 
 test('MCP tool descriptors cover the planned agent tool names', () => {
   assert.deepEqual(AGENT_MCP_TOOL_DEFINITIONS.map((tool) => tool.name), [
@@ -50,6 +52,20 @@ test('MCP request builder maps tools to canonical agent HTTP paths', () => {
       answer: 'yes',
     },
   });
+  assert.deepEqual(buildAgentMcpHttpRequest('submit_response_request', {
+    session: 'alpha',
+    questionIds: ['0xabc'],
+    idempotencyKey: 'submit:alpha.0001',
+  }), {
+    method: 'POST',
+    path: '/api/agent/responses/submit-request',
+    implemented: true,
+    body: {
+      session: 'alpha',
+      questionIds: ['0xabc'],
+      idempotencyKey: 'submit:alpha.0001',
+    },
+  });
 });
 
 test('MCP handlers mirror HTTP JSON responses without adding business logic', async () => {
@@ -80,4 +96,14 @@ test('MCP handlers mirror HTTP JSON responses without adding business logic', as
   });
   assert.equal(calls[0].init.headers.Authorization, 'Bearer local.jwt');
   assert.equal(calls[0].init.body, '{"session":"alpha","questionIds":["0xabc"]}');
+});
+
+test('implemented MCP tools map only to inventoried canonical agent HTTP routes', () => {
+  const canonicalKeys = new Set(AGENT_CANONICAL_ROUTES.map(agentRouteKey));
+  for (const tool of AGENT_MCP_TOOL_DEFINITIONS.filter((entry) => entry.implemented)) {
+    const path = tool.path.includes(':id') ? tool.path : tool.path;
+    const key = inventoryRouteKey({ method: tool.method, path });
+    assert.ok(ROUTE_INVENTORY_BY_KEY[key], `${tool.name} route is missing from route inventory`);
+    assert.ok(canonicalKeys.has(key), `${tool.name} route is missing from route equivalence`);
+  }
 });

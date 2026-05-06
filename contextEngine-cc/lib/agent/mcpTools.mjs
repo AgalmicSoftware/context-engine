@@ -91,6 +91,7 @@ export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
     inputSchema: jsonSchema({
       session: stringProp('Session slug.'),
       questionIds: arrayOfStringsProp('32-byte hex question ids to submit after approval.'),
+      idempotencyKey: stringProp('Optional client-provided idempotency key.'),
     }, ['session', 'questionIds']),
   },
   {

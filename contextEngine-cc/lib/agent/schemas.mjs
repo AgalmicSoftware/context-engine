@@ -1,4 +1,5 @@
 export const AGENT_API_PREFIX = '/api/agent';
+export const AGENT_CONTRACT_VERSION = 'agent-contract-v1';
 
 export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
   {
@@ -39,6 +40,17 @@ export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
 
 export const AGENT_SENSITIVE_FIELD_RE = /(?:privatekey|private_key|worker.?token|bearer|jwt|authorization|secret|signature|mnemonic|seed|password)/i;
 
+export const AGENT_DRAFT_RESPONSE_STATUS = Object.freeze({
+  DRAFT: 'draft',
+  SUBMITTED: 'submitted',
+});
+
+export const AGENT_GRANT_STATUS = Object.freeze({
+  ACTIVE: 'active',
+  REVOKED: 'revoked',
+  EXPIRED: 'expired',
+});
+
 export function buildAgentOk(data = {}, { status = 'ok' } = {}) {
   return {
     ok: true,
@@ -71,6 +83,63 @@ export function normalizeAgentQuestionPayload({ session = '', question = null, f
     count: questions.length,
     ...fields,
   });
+}
+
+export function normalizeAgentQuestion(question = {}, { session = '' } = {}) {
+  if (!question || typeof question !== 'object') return null;
+  return {
+    type: 'agent_question',
+    version: AGENT_CONTRACT_VERSION,
+    session: String(session || question.session || '').trim(),
+    questionId: String(question.questionId || question.id || '').trim(),
+    id: String(question.id || question.questionId || '').trim(),
+    questionType: String(question.questionType || question.type || 'unknown').trim() || 'unknown',
+    prompt: String(question.prompt || '').trim(),
+    options: Array.isArray(question.options) ? question.options.slice() : [],
+    tags: Array.isArray(question.tags) ? question.tags.slice() : [],
+    associatedSurveyId: question.associatedSurveyId || null,
+    arweaveTxId: question.arweaveTxId || null,
+  };
+}
+
+export function normalizeAgentDraftResponse(response = {}, { session = '', includeAnswer = false } = {}) {
+  const draft = {
+    type: 'agent_draft_response',
+    version: AGENT_CONTRACT_VERSION,
+    session: String(session || response.session || '').trim(),
+    questionId: String(response.questionId || '').trim(),
+    questionType: String(response.questionType || 'unknown').trim() || 'unknown',
+    respondent: String(response.respondent || '').trim(),
+    status: response.submitted ? AGENT_DRAFT_RESPONSE_STATUS.SUBMITTED : AGENT_DRAFT_RESPONSE_STATUS.DRAFT,
+    submitted: !!response.submitted,
+    timestamp: response.timestamp || null,
+    submittedAt: response.submittedAt || null,
+    txHash: response.txHash || null,
+    source: response.source || null,
+  };
+  if (includeAnswer) {
+    draft.answer = response.answer ?? null;
+    draft.additional = response.additional ?? null;
+  }
+  return draft;
+}
+
+export function normalizeAgentGrant(grant = {}) {
+  return {
+    type: 'agent_grant',
+    version: AGENT_CONTRACT_VERSION,
+    grantId: String(grant.grantId || '').trim(),
+    subject: String(grant.subject || '').trim(),
+    scope: String(grant.scope || '').trim(),
+    status: Object.values(AGENT_GRANT_STATUS).includes(grant.status)
+      ? grant.status
+      : AGENT_GRANT_STATUS.ACTIVE,
+    expiresAt: grant.expiresAt || null,
+    createdAt: grant.createdAt || null,
+    revokedAt: grant.revokedAt || null,
+    signingAuthority: false,
+    workerTokenAuthority: false,
+  };
 }
 
 export function summarizePendingResponseForAgent(response = {}, { session = '' } = {}) {

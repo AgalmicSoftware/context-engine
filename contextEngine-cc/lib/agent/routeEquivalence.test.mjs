@@ -7,6 +7,7 @@ import {
   getAgentRoutesForLegacy,
   routeKey,
 } from './routeEquivalence.mjs';
+import { ROUTE_INVENTORY, ROUTE_INVENTORY_BY_KEY, routeKey as inventoryRouteKey } from '../routeInventory.mjs';
 
 test('agent route equivalence table covers the v1 canonical routes', () => {
   const canonicalKeys = AGENT_CANONICAL_ROUTES.map(routeKey).sort();
@@ -33,4 +34,18 @@ test('canonical lookup returns relation metadata', () => {
   assert.equal(entry.relation, 'agent-native');
   assert.equal(entry.legacy, null);
   assert.equal(AGENT_ROUTE_EQUIVALENCE.every((route) => route.notes), true);
+});
+
+test('route equivalence and inventory stay aligned for every /api/agent route', () => {
+  const equivalenceKeys = new Set(AGENT_CANONICAL_ROUTES.map(routeKey));
+  const inventoryAgentKeys = ROUTE_INVENTORY
+    .filter((entry) => entry.path.startsWith('/api/agent/'))
+    .map(inventoryRouteKey);
+
+  assert.deepEqual([...equivalenceKeys].sort(), inventoryAgentKeys.sort());
+  for (const route of AGENT_CANONICAL_ROUTES) {
+    const inventoryRoute = ROUTE_INVENTORY_BY_KEY[routeKey(route)];
+    assert.equal(inventoryRoute.owner, 'agent');
+    assert.equal(inventoryRoute.auth, 'local-jwt');
+  }
 });

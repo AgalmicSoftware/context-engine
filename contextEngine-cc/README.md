@@ -390,6 +390,10 @@ the same local JWT auth as the legacy CE-CC API.
 | POST | `/api/agent/responses/submit-request` | Create an approval-required submit request instead of signing |
 | GET | `/api/agent/requests/:id` | Read approval request status by opaque request id |
 
+Submit requests may include an optional `idempotencyKey`. The key is normalized
+inside the authenticated wallet scope so safe retries return the existing
+pending approval request instead of creating duplicate work.
+
 MCP descriptors in `lib/agent/mcpTools.mjs` are thin wrappers over these
 routes. Telegram and OpenClaw helpers in `lib/agent/` are pure contract helpers
 only; they do not add webhook deployment, bot-token storage, OpenClaw transport

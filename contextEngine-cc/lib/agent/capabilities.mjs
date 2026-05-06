@@ -2,8 +2,54 @@ export const AGENT_CAPABILITY_MODES = Object.freeze({
   READ: 'read',
   DRAFT: 'draft',
   SUBMIT_REQUEST: 'submit-request',
+  CREATE_QUESTION_REQUEST: 'create-question-request',
+  DECRYPT_REQUEST: 'decrypt-request',
+  REVOKE_GRANT_REQUEST: 'revoke-grant-request',
   HUMAN_APPROVAL: 'human-approval',
   TRUSTED_LOCAL_AUTO_SUBMIT: 'trusted-local-auto-submit',
+});
+
+export const AGENT_CAPABILITY_MODE_METADATA = Object.freeze({
+  [AGENT_CAPABILITY_MODES.READ]: Object.freeze({
+    risky: false,
+    requiresApproval: false,
+    remoteAllowed: true,
+  }),
+  [AGENT_CAPABILITY_MODES.DRAFT]: Object.freeze({
+    risky: false,
+    requiresApproval: false,
+    remoteAllowed: true,
+  }),
+  [AGENT_CAPABILITY_MODES.SUBMIT_REQUEST]: Object.freeze({
+    risky: true,
+    requiresApproval: true,
+    remoteAllowed: true,
+  }),
+  [AGENT_CAPABILITY_MODES.CREATE_QUESTION_REQUEST]: Object.freeze({
+    risky: true,
+    requiresApproval: true,
+    remoteAllowed: true,
+  }),
+  [AGENT_CAPABILITY_MODES.DECRYPT_REQUEST]: Object.freeze({
+    risky: true,
+    requiresApproval: true,
+    remoteAllowed: true,
+  }),
+  [AGENT_CAPABILITY_MODES.REVOKE_GRANT_REQUEST]: Object.freeze({
+    risky: true,
+    requiresApproval: true,
+    remoteAllowed: true,
+  }),
+  [AGENT_CAPABILITY_MODES.HUMAN_APPROVAL]: Object.freeze({
+    risky: true,
+    requiresApproval: false,
+    remoteAllowed: false,
+  }),
+  [AGENT_CAPABILITY_MODES.TRUSTED_LOCAL_AUTO_SUBMIT]: Object.freeze({
+    risky: true,
+    requiresApproval: false,
+    remoteAllowed: false,
+  }),
 });
 
 export const AGENT_TRUST_TIERS = Object.freeze({
@@ -34,9 +80,13 @@ export function buildAgentCapabilities({
       [AGENT_CAPABILITY_MODES.READ]: true,
       [AGENT_CAPABILITY_MODES.DRAFT]: true,
       [AGENT_CAPABILITY_MODES.SUBMIT_REQUEST]: true,
+      [AGENT_CAPABILITY_MODES.CREATE_QUESTION_REQUEST]: false,
+      [AGENT_CAPABILITY_MODES.DECRYPT_REQUEST]: false,
+      [AGENT_CAPABILITY_MODES.REVOKE_GRANT_REQUEST]: false,
       [AGENT_CAPABILITY_MODES.HUMAN_APPROVAL]: true,
       [AGENT_CAPABILITY_MODES.TRUSTED_LOCAL_AUTO_SUBMIT]: autoSubmitResponses && localSubmitReady,
     },
+    modeMetadata: AGENT_CAPABILITY_MODE_METADATA,
     submission: {
       remoteAutoSubmit: false,
       submitRequestsRequireApproval: true,
@@ -55,4 +105,9 @@ export function buildAgentCapabilities({
 export function hasAgentCapability(capabilities, mode) {
   const normalizedMode = String(mode || '').trim();
   return !!capabilities?.modes?.[normalizedMode];
+}
+
+export function isRemoteAgentCapabilityMode(mode) {
+  const normalizedMode = String(mode || '').trim();
+  return AGENT_CAPABILITY_MODE_METADATA[normalizedMode]?.remoteAllowed === true;
 }

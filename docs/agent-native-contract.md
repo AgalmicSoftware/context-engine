@@ -21,6 +21,25 @@ Legacy routes remain supported. The canonical routes require the same local JWT
 auth as their CE-CC equivalents and do not weaken worker-token or trusted-local
 checks.
 
+## Contract Shapes
+
+Agent contract helpers under `contextEngine-cc/lib/agent/` define stable
+versioned shapes for:
+
+- `AgentQuestion`: canonical question ids, question type, prompt, options, tags,
+  and provenance fields.
+- `AgentDraftResponse`: local draft metadata. Answer text is omitted from summary
+  shapes unless an explicit local caller asks for it.
+- `AgentRequest`: approval-gated request records with status, request id,
+  approval URL, requester, session, question ids, optional idempotency key, and
+  stable fingerprint.
+- `AgentGrant`: scoped grant metadata that never grants signing authority or
+  worker-token authority.
+
+Request ids use opaque `agent_req_...` values. Client-supplied idempotency keys
+are optional, lowercased, bounded, and matched only inside the authenticated
+wallet scope.
+
 ## Draft vs Submit Request
 
 Agents may draft locally through `POST /api/agent/responses/draft`. This stores
@@ -68,6 +87,9 @@ descriptors and HTTP wrapper functions. Implemented tools call only
 Planned descriptors are present for `create_question_request`,
 `request_decrypt`, and `revoke_agent_grant`, but no SDK dependency or second
 runtime path has been added.
+
+Drift guards assert that every implemented MCP tool maps to an inventoried
+canonical `/api/agent/*` route and to the route-equivalence table.
 
 ## OpenClaw Compatibility
 

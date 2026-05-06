@@ -4,6 +4,9 @@ import {
   AGENT_ENDPOINT_FAMILIES,
   buildAgentError,
   buildAgentOk,
+  normalizeAgentDraftResponse,
+  normalizeAgentGrant,
+  normalizeAgentQuestion,
   normalizeAgentQuestionPayload,
   redactAgentSensitiveFields,
   summarizePendingResponseForAgent,
@@ -62,6 +65,71 @@ test('pending response summaries omit answer text by default', () => {
     txHash: null,
   });
   assert.equal(Object.hasOwn(summary, 'answer'), false);
+});
+
+test('agent question shape is versioned and keeps canonical ids explicit', () => {
+  assert.deepEqual(normalizeAgentQuestion({
+    id: '0xabc',
+    type: 'freeform',
+    prompt: 'Explain?',
+    options: ['a'],
+    tags: ['tag'],
+  }, { session: 'alpha' }), {
+    type: 'agent_question',
+    version: 'agent-contract-v1',
+    session: 'alpha',
+    questionId: '0xabc',
+    id: '0xabc',
+    questionType: 'freeform',
+    prompt: 'Explain?',
+    options: ['a'],
+    tags: ['tag'],
+    associatedSurveyId: null,
+    arweaveTxId: null,
+  });
+});
+
+test('agent draft response shape withholds answer text unless requested', () => {
+  const input = {
+    questionId: '0xabc',
+    questionType: 'freeform',
+    answer: 'local answer',
+    additional: 'local comment',
+    respondent: '0xwallet',
+    timestamp: '2026-05-06T00:00:00.000Z',
+    source: 'agent-http',
+  };
+
+  const summary = normalizeAgentDraftResponse(input, { session: 'alpha' });
+  assert.equal(Object.hasOwn(summary, 'answer'), false);
+  assert.equal(summary.status, 'draft');
+  assert.equal(summary.version, 'agent-contract-v1');
+
+  const full = normalizeAgentDraftResponse(input, { session: 'alpha', includeAnswer: true });
+  assert.equal(full.answer, 'local answer');
+  assert.equal(full.additional, 'local comment');
+});
+
+test('agent grant shape never grants signing or worker-token authority', () => {
+  assert.deepEqual(normalizeAgentGrant({
+    grantId: 'grant-1',
+    subject: 'telegram:123',
+    scope: 'agent:draft',
+    status: 'active',
+    expiresAt: '2026-05-06T01:00:00.000Z',
+  }), {
+    type: 'agent_grant',
+    version: 'agent-contract-v1',
+    grantId: 'grant-1',
+    subject: 'telegram:123',
+    scope: 'agent:draft',
+    status: 'active',
+    expiresAt: '2026-05-06T01:00:00.000Z',
+    createdAt: null,
+    revokedAt: null,
+    signingAuthority: false,
+    workerTokenAuthority: false,
+  });
 });
 
 test('sensitive fields are redacted recursively', () => {

@@ -50,9 +50,12 @@ import {
   summarizeRequestForAgent,
 } from './agent/schemas.mjs';
 import {
+  AGENT_REQUEST_TYPES,
   buildApprovalRequiredResponse,
+  buildAgentRequestRecord,
   createApprovalRequestId,
   isValidApprovalRequestId,
+  normalizeAgentIdempotencyKey,
 } from './agent/approvalResponses.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -372,6 +375,13 @@ function loadAgentRequestsForWallet(walletAddress = '') {
       catch { return null; }
     })
     .filter((entry) => entry && (!wallet || normalizeAddressLower(entry.requester) === wallet));
+}
+
+function loadAgentRequestByIdempotencyKey(walletAddress = '', idempotencyKey = '') {
+  const normalizedKey = normalizeAgentIdempotencyKey(idempotencyKey);
+  if (!normalizedKey) return null;
+  return loadAgentRequestsForWallet(walletAddress)
+    .find((entry) => normalizeAgentIdempotencyKey(entry?.idempotencyKey) === normalizedKey) || null;
 }
 
 function buildPendingSubmissionLockKey(slug, response) {
@@ -1797,6 +1807,24 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       return json(res, 400, { error: 'questionIds must contain at least one 32-byte hex string.' });
     }
 
+    const idempotencyKey = normalizeAgentIdempotencyKey(body?.idempotencyKey);
+    const existingRequest = loadAgentRequestByIdempotencyKey(auth.payload?.sub || '', idempotencyKey);
+    if (existingRequest) {
+      const existingApproval = buildApprovalRequiredResponse({
+        requestId: existingRequest.requestId,
+        approvalUrl: existingRequest.approvalUrl,
+        serverUrl: getServerUrlFromRequest(req),
+        fields: {
+          capabilityMode: 'submit-request',
+          idempotent: true,
+        },
+      });
+      return json(res, 202, {
+        ...existingApproval,
+        request: summarizeRequestForAgent(existingRequest),
+      });
+    }
+
     const requestId = createApprovalRequestId();
     const createdAt = new Date().toISOString();
     const serverUrl = getServerUrlFromRequest(req);
@@ -1807,8 +1835,8 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         capabilityMode: 'submit-request',
       },
     });
-    const record = saveAgentRequest({
-      type: 'response_submit_request',
+    const record = saveAgentRequest(buildAgentRequestRecord({
+      type: AGENT_REQUEST_TYPES.RESPONSE_SUBMIT,
       requestId,
       status: approval.status,
       requiresApproval: true,
@@ -1816,6 +1844,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       session: sessionValidation.slug,
       questionIds: normalizedQuestionIds.map((entry) => entry.questionId),
       requester: auth.payload?.sub || '',
+      idempotencyKey,
       createdAt,
       updatedAt: createdAt,
       source: 'agent-http',
@@ -1824,7 +1853,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         questionIds: normalizedQuestionIds.map((entry) => entry.questionId),
         agentContext: body?.agentContext || null,
       }),
-    });
+    }));
 
     return json(res, 202, {
       ...approval,
