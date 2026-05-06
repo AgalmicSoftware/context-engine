@@ -166,6 +166,8 @@ describe('AudioSurveyGenerator', () => {
     sessionName = 'Edge Session',
     sessionIdHex = `0x${'2'.repeat(32)}`,
     sessionId = '',
+    corsWorkerUrl = '',
+    lit = undefined,
     docUploadsGate = {
       lookupStatus: 'ok',
       sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
@@ -175,6 +177,8 @@ describe('AudioSurveyGenerator', () => {
   } = {}) => ({
     slug,
     sessionName,
+    ...(corsWorkerUrl ? { corsWorkerUrl } : {}),
+    ...(lit ? { lit } : {}),
     __registry: {
       ...(sessionId ? { sessionId } : {}),
       ...(sessionIdHex ? { sessionIdHex } : {}),
@@ -1436,6 +1440,70 @@ describe('AudioSurveyGenerator', () => {
     expect(onQuestionsGenerated.mock.calls[0][1][0].startsWith('/session/0xSessionToken/docs?')).toBe(true);
     expect(onQuestionsGenerated.mock.calls[0][1][0]).toContain(`__ceDocTx=${'A'.repeat(43)}`);
     expect(onQuestionsGenerated.mock.calls[0][1][0]).not.toBe('https://example.com/to-save');
+  });
+
+  it('uses scoped Lit hooks for OP Sepolia doc-library saves when Chipotle credentials stay server-side', async () => {
+    delete window.__litHooks;
+    const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
+    const onQuestionsGenerated = jest.fn();
+    mockProcessAdditionalSources.mockResolvedValue(
+      'This additional source content is long enough to drive question generation on its own.'
+    );
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Worker Runtime Survey',
+      questions: [
+        {
+          prompt: 'Can server-side Lit runtime save session-gated context?',
+          questionType: 'binary',
+          tags: ['docs'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 11155420 }}
+        account="0x123"
+        litHooks={{ saveKey: scopedSaveKey }}
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionId: '0xSessionToken',
+          sessionIdHex: `0x${'7'.repeat(32)}`,
+          corsWorkerUrl: 'https://worker.example.test',
+          docUploadsGate: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+            chainId: 11155420,
+            mode: 0,
+          },
+        })}
+        onQuestionsGenerated={onQuestionsGenerated}
+      />
+    );
+
+    await addAdditionalUrl('https://example.com/to-save-with-worker-runtime');
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
+
+    expect(
+      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).textContent
+    ).toContain('Edge Session');
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
+      encryption: expect.objectContaining({
+        enabled: true,
+        saveKey: scopedSaveKey,
+        chainId: 11155420,
+      }),
+    }));
+    expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
   });
 
   it('keeps raw extra-source URLs when doc-library saving is not enabled', async () => {

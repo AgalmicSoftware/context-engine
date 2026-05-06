@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import MultichoiceQuestionInput from './MultichoiceQuestionInput';
+import MultichoiceQuestionInput, {
+  buildMultichoiceOptionClassName,
+} from './MultichoiceQuestionInput';
 
 describe('MultichoiceQuestionInput', () => {
   it('adds and removes values for multi-select questions', () => {
@@ -45,5 +47,18 @@ describe('MultichoiceQuestionInput', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Beta' }));
 
     expect(onChange).toHaveBeenCalledWith(['Beta']);
+  });
+
+  it('builds multichoice option classes', () => {
+    expect(buildMultichoiceOptionClassName({
+      baseClassName: 'option',
+      isSelected: true,
+      selectedClassName: 'selected',
+    })).toBe('option selected');
+    expect(buildMultichoiceOptionClassName({
+      baseClassName: 'option',
+      isSelected: false,
+      selectedClassName: 'selected',
+    })).toBe('option');
   });
 });
