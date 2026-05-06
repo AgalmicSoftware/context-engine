@@ -4,6 +4,9 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
+import CorpusViewer from './CorpusViewer';
+import PolicyGlobe from './PolicyGlobe';
+
 const mockTagPage = jest.fn();
 
 jest.mock('../TagPage/TagPage', () => ({
@@ -37,9 +40,6 @@ jest.mock('react-simple-maps', () => ({
   Sphere: () => null,
   Graticule: () => null,
 }));
-
-import CorpusViewer from './CorpusViewer';
-import PolicyGlobe from './PolicyGlobe';
 
 const originalMatchMedia = window.matchMedia;
 const originalFetch = global.fetch;
