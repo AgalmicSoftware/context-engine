@@ -28,9 +28,9 @@
         "internalType": "uint256"
       },
       {
-        "name": "_hasPasswordMint",
-        "type": "bool",
-        "internalType": "bool"
+        "name": "_mintMode",
+        "type": "uint8",
+        "internalType": "enum MySBT.MintMode"
       },
       {
         "name": "_burnAuth",
@@ -484,6 +484,19 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "mintMode",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum MySBT.MintMode"
       }
     ],
     "stateMutability": "view"

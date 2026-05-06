@@ -36,6 +36,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     address public immutable deployingFactory;
     uint256 public immutable mintingEndTime;
     bool public immutable hasPasswordMint;
+    MintMode public immutable mintMode;
     bool public tokenURIInitAllowed;
     bool public groupPasswordHashInitAllowed;
     mapping(bytes32 => bool) private _validHashedPasswords;
@@ -68,6 +69,13 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         Neither
     }
 
+    enum MintMode {
+        PublicClaim,
+        PasswordCommitReveal,
+        UnlimitedGroupSignature,
+        LimitedInviteSignature
+    }
+
     BurnAuth private immutable _collectionBurnAuth;
 
     modifier onlyAdmin() {
@@ -91,7 +99,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         uint256 _limitedNumber,
         address _adminAddress,
         uint256 _mintingEndTime,
-        bool _hasPasswordMint,
+        MintMode _mintMode,
         BurnAuth _burnAuth,
         bytes32[] memory hashedPasswords,
         string memory tokenURI_,
@@ -99,11 +107,16 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         bool _allowTokenURIInit,
         bool _allowGroupPasswordHashInit
     ) ERC721(name, symbol) Ownable(_adminAddress != address(0) ? _adminAddress : msg.sender) {
+        _validateMintModeConfig(
+            _mintMode, _limitedNumber, hashedPasswords, _groupPasswordHash, _allowGroupPasswordHashInit
+        );
         maxTokens = _limitedNumber;
         admin = _adminAddress != address(0) ? _adminAddress : msg.sender;
         deployingFactory = msg.sender;
         mintingEndTime = _mintingEndTime;
-        hasPasswordMint = _hasPasswordMint;
+        mintMode = _mintMode;
+        hasPasswordMint =
+            _mintMode == MintMode.PasswordCommitReveal || _mintMode == MintMode.LimitedInviteSignature;
         _collectionBurnAuth = _burnAuth;
         _tokenURI = tokenURI_;
         groupPasswordHash = _groupPasswordHash;
@@ -111,6 +124,45 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
         groupPasswordHashInitAllowed = _allowGroupPasswordHashInit;
 
         _addHashedPasswords(hashedPasswords);
+    }
+
+    function _validateMintModeConfig(
+        MintMode _mintMode,
+        uint256 _limitedNumber,
+        bytes32[] memory hashedPasswords,
+        bytes32 _groupPasswordHash,
+        bool _allowGroupPasswordHashInit
+    ) internal pure {
+        bool hasHashedPasswords = hashedPasswords.length > 0;
+        bool hasGroupSignerHash = _groupPasswordHash != bytes32(0);
+
+        if (_allowGroupPasswordHashInit) {
+            require(!hasGroupSignerHash, "Deferred group signer hash must start empty");
+        }
+
+        if (_mintMode == MintMode.PublicClaim) {
+            require(!hasHashedPasswords, "Public claim cannot preload passwords");
+            require(!hasGroupSignerHash, "Public claim cannot preload signer hash");
+            require(!_allowGroupPasswordHashInit, "Public claim cannot defer signer hash");
+            return;
+        }
+
+        if (_mintMode == MintMode.PasswordCommitReveal) {
+            require(hasHashedPasswords, "Password mint requires hashes");
+            require(!hasGroupSignerHash, "Password mint cannot preload signer hash");
+            require(!_allowGroupPasswordHashInit, "Password mint cannot defer signer hash");
+            return;
+        }
+
+        if (_mintMode == MintMode.UnlimitedGroupSignature) {
+            require(!hasHashedPasswords, "Group signature mint cannot preload passwords");
+            require(hasGroupSignerHash || _allowGroupPasswordHashInit, "Group signature mint requires signer hash");
+            return;
+        }
+
+        require(_limitedNumber > 0, "Invite mint requires positive max tokens");
+        require(!hasHashedPasswords, "Invite mint cannot preload passwords");
+        require(hasGroupSignerHash || _allowGroupPasswordHashInit, "Invite mint requires signer hash");
     }
 
     /// @notice Sets the collection-wide token URI after deployment when deferred initialization is enabled.
@@ -155,7 +207,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     /// @dev The commitment must be `keccak256(abi.encodePacked(password, msg.sender))`.
     /// @param userCommit The caller-specific password commitment used during `claimWithPassword`.
     function startClaim(bytes32 userCommit) public {
-        require(hasPasswordMint, "Password mint not enabled");
+        require(mintMode == MintMode.PasswordCommitReveal, "Password mint not enabled");
         _commitments[msg.sender] = userCommit;
         _claimStartTime[msg.sender] = block.timestamp;
     }
@@ -164,6 +216,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     /// @dev Reuses the commitment stored by `startClaim` and consumes the password on success.
     /// @param password The plain-text password that hashes to an available claim slot.
     function claimWithPassword(string memory password) public nonReentrant {
+        require(mintMode == MintMode.PasswordCommitReveal, "Password mint not enabled");
         require(_claimStartTime[msg.sender] != 0, "Claim not started");
         // 5-second wait from startClaim (front-run protection)
         require(block.timestamp >= _claimStartTime[msg.sender] + 5, "Wait 5 seconds");
@@ -186,6 +239,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     /// @dev The signature must be an EIP-191 signature over `keccak256(abi.encodePacked(address(this), msg.sender))`.
     /// @param signature The signed authorization proving the invite signer approved the caller.
     function mintWithGroupSignature(bytes calldata signature) external mintingActive nonReentrant {
+        require(mintMode == MintMode.UnlimitedGroupSignature, "Group signature mint not enabled");
         require(groupPasswordHash != bytes32(0), "No group password set");
         require(maxTokens == 0 || mintedTokens < maxTokens, "Max tokens reached");
         require(_userTokens[msg.sender] == 0, "Address already owns an SBT");
@@ -205,6 +259,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     /// @param nonce The expected invite nonce for this mint, which must equal `mintedTokens + 1`.
     /// @param signature The EIP-191 signature over `keccak256(abi.encodePacked(address(this), nonce))`.
     function claimWithInvite(uint256 nonce, bytes calldata signature) external mintingActive nonReentrant {
+        require(mintMode == MintMode.LimitedInviteSignature, "Invite mint not enabled");
         if (groupPasswordHash == bytes32(0)) {
             revert NoGroupPassword();
         }
@@ -236,7 +291,7 @@ contract MySBT is ERC721, ERC721Burnable, Ownable, ReentrancyGuard {
     /// @notice Mints an SBT through the public claim path when password minting is disabled.
     /// @dev This path is available only for collections configured without password-based minting.
     function claim() public nonReentrant {
-        require(!hasPasswordMint, "Password mint enabled");
+        require(mintMode == MintMode.PublicClaim, "Public claim not enabled");
         _mintSoulbound(msg.sender);
     }
 
