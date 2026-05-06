@@ -8,7 +8,7 @@ import styles from './AdminPage.module.scss';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
-import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
+import { getDefaultHttpRpc } from '../../variables/chains.js';
 import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
 import {
   buildSiweMessage,
@@ -97,6 +97,10 @@ import {
   normalizeGateMode,
   resolveDefaultGateFromConfig,
 } from './adminPageSbtGateSelectionHelpers';
+import {
+  buildWorkerSessionConfigPayload,
+  getSessionReadRpcConfig,
+} from './adminPageWorkerSessionConfigHelpers';
 
 const log = createLogger('general');
 const renderTestResult = (entry: any) => {
@@ -328,178 +332,6 @@ const parseChainIdInput = (raw: any) => {
   const matches = toStr(raw).match(/\d+/g);
   if (!matches || !matches.length) return 0;
   return Number(matches[matches.length - 1]) || 0;
-};
-const normalizeRpcUrlList = (value: any) => {
-  if (Array.isArray(value)) {
-    return value.map((entry: any) => toStr(entry).trim()).filter(Boolean);
-  }
-  const trimmed = toStr(value).trim();
-  return trimmed ? [trimmed] : [];
-};
-const sanitizeRpcUrlMap = (value: any) => {
-  if (!value || typeof value !== 'object') return {};
-  const out: Record<string, any> = {};
-  Object.entries(value).forEach(([chainKey, urls]: any) => {
-    const normalized = normalizeRpcUrlList(urls);
-    if (normalized.length) out[String(chainKey)] = normalized;
-  });
-  return out;
-};
-const pickFirstNonEmptyRpcUrlMap = (...candidates: any[]) => candidates.reduce((found: any, candidate: any) => {
-  if (found && Object.keys(found).length > 0) return found;
-  const sanitized = sanitizeRpcUrlMap(candidate);
-  return Object.keys(sanitized).length > 0 ? sanitized : found;
-}, {});
-const getSessionReadRpcConfig = ({
-  sessionConfig,
-  fallbackChainId,
-}: any = {}) => {
-  const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
-  const rpcRoot = cfg.rpc && typeof cfg.rpc === 'object' ? cfg.rpc : {};
-  const rpcProviders = rpcRoot.providers && typeof rpcRoot.providers === 'object' ? rpcRoot.providers : {};
-  const pathProvider = rpcProviders.path && typeof rpcProviders.path === 'object' ? rpcProviders.path : {};
-  const faucetCfg = cfg.faucet && typeof cfg.faucet === 'object' ? cfg.faucet : {};
-  const chainId = Number(
-    cfg.networkChainId ||
-    cfg.__registry?.chainId ||
-    cfg.__registry?.registryChainId ||
-    fallbackChainId ||
-    0
-  ) || 0;
-  const rpcUrlsByChainId = pickFirstNonEmptyRpcUrlMap(
-    pathProvider.rpcUrlsByChainId,
-    rpcRoot.rpcUrlsByChainId,
-    cfg.rpcUrlsByChainId
-  );
-  const chainRpcUrl = chainId
-    ? normalizeRpcUrlList(rpcUrlsByChainId[String(chainId)] || rpcUrlsByChainId[chainId])[0] || ''
-    : '';
-  const defaultRpcUrl = chainId
-    ? toStr(getDefaultHttpRpc(chainId, { allowPath: false }) || getDefaultHttpRpc(chainId)).trim()
-    : '';
-  const rpcUrl = (
-    normalizeRpcUrlList(faucetCfg.rpcUrl)[0] ||
-    chainRpcUrl ||
-    normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
-    normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
-    normalizeRpcUrlList(cfg.rpcUrl)[0] ||
-    defaultRpcUrl
-  );
-  return {
-    chainId,
-    rpcUrl: toStr(rpcUrl).trim(),
-  };
-};
-const buildWorkerSessionConfigPayload = ({
-  sessionConfig,
-  account,
-  fallbackChainId,
-}: any = {}) => {
-  const normalizeContractEntry = (entry: any, chainIdFallback: any) => {
-    if (!entry || typeof entry !== 'object') return null;
-    const address = toStr(entry.address || entry.contractAddress || '').trim();
-    const chainId = Number(entry.chainId || entry.networkChainId || chainIdFallback || 0) || 0;
-    if (!address) return null;
-    return {
-      address,
-      ...(chainId ? { chainId } : {}),
-    };
-  };
-  const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
-  const registry = cfg.__registry && typeof cfg.__registry === 'object' ? cfg.__registry : {};
-  const rpcRoot = cfg.rpc && typeof cfg.rpc === 'object' ? cfg.rpc : {};
-  const rpcProviders = rpcRoot.providers && typeof rpcRoot.providers === 'object' ? rpcRoot.providers : {};
-  const pathProvider = rpcProviders.path && typeof rpcProviders.path === 'object' ? rpcProviders.path : {};
-  const inferredSessionChainId = Number(cfg.networkChainId || fallbackChainId || 0) || 0;
-  const registryChainId = Number(
-    registry.registryChainId ||
-    registry.chainId ||
-    inferredSessionChainId ||
-    0
-  ) || 0;
-  const rpcUrlFromConfig = (
-    normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
-    normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
-    normalizeRpcUrlList(cfg.rpcUrl)[0] ||
-    normalizeRpcUrlList(cfg.faucet?.rpcUrl)[0] ||
-    ''
-  );
-  const rpcUrlsByChainId = pickFirstNonEmptyRpcUrlMap(
-    pathProvider.rpcUrlsByChainId,
-    cfg.rpcUrlsByChainId
-  );
-  const rpcUrlsForRegistryChain = normalizeRpcUrlList(
-    registryChainId ? (rpcUrlsByChainId[String(registryChainId)] || rpcUrlsByChainId[registryChainId]) : []
-  );
-  const defaultChainRpcUrl = registryChainId ? toStr(getDefaultHttpRpc(registryChainId)).trim() : '';
-  const resolvedRpcUrl = rpcUrlFromConfig || rpcUrlsForRegistryChain[0] || defaultChainRpcUrl;
-  const resolvedRpcUrlsByChainId = { ...rpcUrlsByChainId };
-  if (registryChainId && resolvedRpcUrl) {
-    const key = String(registryChainId);
-    if (!normalizeRpcUrlList(resolvedRpcUrlsByChainId[key]).length) {
-      resolvedRpcUrlsByChainId[key] = [resolvedRpcUrl];
-    }
-  }
-  const allowOriginsRaw = cfg.allowOrigins;
-  const allowOrigins = Array.isArray(allowOriginsRaw)
-    ? allowOriginsRaw.map((entry: any) => toStr(entry).trim()).filter(Boolean)
-    : toStr(allowOriginsRaw)
-      .split(/[\n,]+/)
-      .map((entry: any) => entry.trim())
-      .filter(Boolean);
-  const limits = cfg.limits && typeof cfg.limits === 'object' ? cfg.limits : {};
-  const scopes = cfg.scopes && typeof cfg.scopes === 'object' ? cfg.scopes : {};
-  const faucetCfg = cfg.faucet && typeof cfg.faucet === 'object' ? cfg.faucet : {};
-
-  const out: any = {
-    adminAddress: toStr(registry.adminAddress || cfg.adminAddress || account).trim(),
-  };
-  const slug = normalizeSlug(cfg.slug || '');
-  const registryAddress = toStr(registry.registryAddress || registry.address || '').trim();
-  const resolvedRegistryAddress = registryAddress || toStr(
-    registryChainId
-      ? (getSessionRegistryAddress(registryChainId) || sessionRegistryUtils.resolveRegistryAddress(registryChainId))
-      : ''
-  ).trim();
-  const hatsAddress = toStr(registry.hatsAddress || cfg.hatsAddress || '').trim();
-  const adminHatId = toStr(registry.adminHatId || cfg.adminHatId || '').trim();
-  if (slug || slug === '') out.slug = slug;
-  if (resolvedRegistryAddress) out.registryAddress = resolvedRegistryAddress;
-  if (registryChainId) out.registryChainId = registryChainId;
-  if (hatsAddress) out.hatsAddress = hatsAddress;
-  if (adminHatId) out.adminHatId = adminHatId;
-  if (inferredSessionChainId) {
-    out.networkChainId = inferredSessionChainId;
-  }
-  const sessionId = toStr(registry.sessionId || registry.sessionIdHex || cfg.sessionId || '').trim();
-  if (sessionId) out.sessionId = sessionId;
-  if (resolvedRpcUrl) out.rpcUrl = resolvedRpcUrl;
-  if (Object.keys(resolvedRpcUrlsByChainId).length) out.rpcUrlsByChainId = resolvedRpcUrlsByChainId;
-  if (allowOrigins.length) out.allowOrigins = allowOrigins;
-  if (Object.keys(limits).length) out.limits = limits;
-  if (Object.keys(scopes).length) out.scopes = scopes;
-  const blockLimits = normalizeBlockLimitsForConfig(cfg.blockLimits);
-  if (blockLimits) out.blockLimits = blockLimits;
-
-  const contractsObj = cfg.contracts && typeof cfg.contracts === 'object' ? cfg.contracts : {};
-  const normalizedContracts: Record<string, any> = {};
-  Object.entries(contractsObj).forEach(([key, value]: any) => {
-    const normalized = normalizeContractEntry(value, cfg.networkChainId || fallbackChainId);
-    if (!normalized) return;
-    normalizedContracts[key] = normalized;
-  });
-  if (Object.keys(normalizedContracts).length) out.contracts = normalizedContracts;
-
-  const faucet: Record<string, any> = {};
-  const faucetRpcUrl = normalizeRpcUrlList(faucetCfg.rpcUrl)[0] || resolvedRpcUrl;
-  const faucetAmountEth = toStr(faucetCfg.amountEth).trim();
-  const faucetBalanceThresholdEth = toStr(faucetCfg.balanceThresholdEth).trim();
-  if (faucetRpcUrl) faucet.rpcUrl = faucetRpcUrl;
-  if (faucetAmountEth) faucet.amountEth = faucetAmountEth;
-  if (faucetBalanceThresholdEth) faucet.balanceThresholdEth = faucetBalanceThresholdEth;
-  if (Object.keys(faucet).length) out.faucet = faucet;
-
-  return out;
 };
 
 const resolveAutoFeatureBySessionSlug = (metadata: any) => (

@@ -1,0 +1,176 @@
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
+import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
+import {
+  buildWorkerSessionConfigPayload,
+  getSessionReadRpcConfig,
+  normalizeRpcUrlList,
+  pickFirstNonEmptyRpcUrlMap,
+  sanitizeRpcUrlMap,
+} from './adminPageWorkerSessionConfigHelpers';
+
+const ACCOUNT = '0x7384f81c5505Cb11F69607e3b293AD7AAf1b1119';
+
+describe('adminPageWorkerSessionConfigHelpers', () => {
+  it('normalizes RPC URL lists and maps without changing precedence semantics', () => {
+    expect(normalizeRpcUrlList([' https://a.example ', '', null, 'https://b.example'])).toEqual([
+      'https://a.example',
+      'https://b.example',
+    ]);
+    expect(normalizeRpcUrlList(' https://single.example ')).toEqual(['https://single.example']);
+    expect(normalizeRpcUrlList('   ')).toEqual([]);
+
+    expect(sanitizeRpcUrlMap({
+      8453: [' https://base.example ', ''],
+      empty: ['   '],
+      84532: ' https://base-sepolia.example ',
+    })).toEqual({
+      8453: ['https://base.example'],
+      84532: ['https://base-sepolia.example'],
+    });
+
+    expect(pickFirstNonEmptyRpcUrlMap(
+      null,
+      { 8453: ['  '] },
+      { 8453: ['https://first.example'] },
+      { 8453: ['https://ignored.example'] },
+    )).toEqual({
+      8453: ['https://first.example'],
+    });
+  });
+
+  it('resolves the session read RPC from the session chain instead of the registry chain', () => {
+    const rpcConfig = getSessionReadRpcConfig({
+      sessionConfig: {
+        slug: 'test-resource-rpc',
+        networkChainId: 8453,
+        __registry: {
+          chainId: 84532,
+          registryChainId: 84532,
+        },
+        rpcUrlsByChainId: {
+          8453: ['https://base-mainnet.example'],
+          84532: ['https://base-sepolia.example'],
+        },
+      },
+      fallbackChainId: 84532,
+    });
+
+    expect(rpcConfig).toEqual({
+      chainId: 8453,
+      rpcUrl: 'https://base-mainnet.example',
+    });
+  });
+
+  it('uses the first non-empty RPC map and preserves faucet RPC priority for reads', () => {
+    expect(getSessionReadRpcConfig({
+      sessionConfig: {
+        networkChainId: 8453,
+        faucet: { rpcUrl: ' https://faucet.example ' },
+        rpc: {
+          providers: { path: { rpcUrlsByChainId: {} } },
+          rpcUrlsByChainId: { 8453: ['https://root.example'] },
+        },
+        rpcUrlsByChainId: { 8453: ['https://config.example'] },
+      },
+      fallbackChainId: 84532,
+    })).toEqual({
+      chainId: 8453,
+      rpcUrl: 'https://faucet.example',
+    });
+  });
+
+  it('builds worker config payload with registry and RPC fallbacks from chain defaults', () => {
+    const payload = buildWorkerSessionConfigPayload({
+      sessionConfig: {
+        slug: 'test-3',
+        networkChainId: DEFAULT_CHAIN_ID,
+        __registry: {
+          chainId: DEFAULT_CHAIN_ID,
+          adminAddress: ACCOUNT,
+        },
+      },
+      account: ACCOUNT,
+      fallbackChainId: DEFAULT_CHAIN_ID,
+    });
+
+    expect(payload.registryAddress).toBe(getSessionRegistryAddress(DEFAULT_CHAIN_ID));
+    expect(payload.rpcUrl).toBe(getDefaultHttpRpc(DEFAULT_CHAIN_ID));
+    expect(payload.rpcUrlsByChainId).toEqual(
+      expect.objectContaining({
+        [String(DEFAULT_CHAIN_ID)]: [getDefaultHttpRpc(DEFAULT_CHAIN_ID)],
+      })
+    );
+  });
+
+  it('preserves worker session config payload field normalization', () => {
+    const payload = buildWorkerSessionConfigPayload({
+      sessionConfig: {
+        slug: ' session-admin ',
+        networkChainId: 8453,
+        __registry: {
+          registryChainId: 84532,
+          address: '0x1111111111111111111111111111111111111111',
+          adminAddress: ACCOUNT,
+          hatsAddress: '0x3333333333333333333333333333333333333333',
+          adminHatId: '42',
+          sessionIdHex: '0xabc123',
+        },
+        rpc: {
+          providers: {
+            path: {
+              rpcUrl: ' https://path-rpc.example ',
+              rpcUrlsByChainId: {
+                84532: [' https://path-registry.example '],
+              },
+            },
+          },
+          rpcUrl: 'https://root-rpc.example',
+        },
+        allowOrigins: ' https://app.example,\nhttps://admin.example ',
+        limits: { requestsPerMinute: 10 },
+        scopes: { ai: true },
+        blockLimits: { start: '12345', end: '13000' },
+        contracts: {
+          surveys: { contractAddress: '0x2222222222222222222222222222222222222222' },
+          empty: {},
+        },
+        faucet: {
+          amountEth: '0.0001',
+          balanceThresholdEth: '0.001',
+        },
+      },
+      account: ACCOUNT,
+      fallbackChainId: 84532,
+    });
+
+    expect(payload).toEqual(expect.objectContaining({
+      adminAddress: ACCOUNT,
+      slug: 'session-admin',
+      registryAddress: '0x1111111111111111111111111111111111111111',
+      registryChainId: 84532,
+      networkChainId: 8453,
+      hatsAddress: '0x3333333333333333333333333333333333333333',
+      adminHatId: '42',
+      sessionId: '0xabc123',
+      rpcUrl: 'https://path-rpc.example',
+      rpcUrlsByChainId: {
+        84532: ['https://path-registry.example'],
+      },
+      allowOrigins: ['https://app.example', 'https://admin.example'],
+      limits: { requestsPerMinute: 10 },
+      scopes: { ai: true },
+      blockLimits: { start: 12345, end: 13000 },
+      contracts: {
+        surveys: {
+          address: '0x2222222222222222222222222222222222222222',
+          chainId: 8453,
+        },
+      },
+      faucet: {
+        rpcUrl: 'https://path-rpc.example',
+        amountEth: '0.0001',
+        balanceThresholdEth: '0.001',
+      },
+    }));
+  });
+});
