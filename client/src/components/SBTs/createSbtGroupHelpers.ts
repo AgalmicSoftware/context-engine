@@ -41,7 +41,6 @@ export {
 } from './createSbtGroupMetadataLockHelpers';
 import {
   createEmptyMetadataLockGateIds,
-  normalizeCreateSbtSelectedGateIds,
   normalizeMetadataLockGateIds,
   resolveCreateSbtEncryptedFieldGateValue,
 } from './createSbtGroupMetadataLockHelpers';
@@ -60,6 +59,55 @@ export {
   resolveCreateSbtMemoizedImageDataUrl,
   resolveCreateSbtMetadataImageSource,
 } from './createSbtGroupImageHelpers';
+export {
+  buildCreateSbtProgressIndicatorState,
+  buildCreateSbtProgressStepClassName,
+  buildCreateSbtRenderState,
+  resolveCreateSbtActionDisplayState,
+  resolveCreateSbtBookmarkActionDisplayState,
+  resolveCreateSbtClearFormButtonState,
+  resolveCreateSbtCopyActionDisplayState,
+  resolveCreateSbtInfoDisplayState,
+  resolveCreateSbtMintOptionsDisplayState,
+  resolveCreateSbtPrimaryActionLabel,
+  resolveCreateSbtPrimaryButtonState,
+  resolveCreateSbtSuccessDisplayState,
+} from './createSbtGroupRenderStateHelpers';
+export {
+  buildCreateSbtAccountDistributionSyncPatch,
+  buildCreateSbtAccountDistributionSyncStatePatch,
+  buildCreateSbtBooleanTogglePatch,
+  buildCreateSbtBookmarkedSbtsSetPatch,
+  buildCreateSbtCopiedLinkIndexPatch,
+  buildCreateSbtCopySuccessPatch,
+  buildCreateSbtCountdownStartPatch,
+  buildCreateSbtCountdownTickPatch,
+  buildCreateSbtDeferredSaveCompletePatch,
+  buildCreateSbtDeferredUploadFallbackPatch,
+  buildCreateSbtDistributionFieldPatch,
+  buildCreateSbtEditResetPatch,
+  buildCreateSbtErrorPatch,
+  buildCreateSbtExportFormatPatch,
+  buildCreateSbtGroupHashPatch,
+  buildCreateSbtInputChangePatch,
+  buildCreateSbtInviteLinksBackupPatch,
+  buildCreateSbtMetadataLockFallbackPatch,
+  buildCreateSbtMetadataLockGateIdsPatch,
+  buildCreateSbtMetadataLockSelectionPatch,
+  buildCreateSbtMintResetFailurePatch,
+  buildCreateSbtMintStartPatch,
+  buildCreateSbtMintSuccessPatch,
+  buildCreateSbtMintValidationFailurePatch,
+  buildCreateSbtNetworkChangePatch,
+  buildCreateSbtNumInviteLinksPatch,
+  buildCreateSbtOpenLockKeyPatch,
+  buildCreateSbtPasswordListPatch,
+  buildCreateSbtPredictedAddressBusyPatch,
+  buildCreateSbtPredictedAddressPatch,
+  buildCreateSbtShareableUrlPatch,
+  buildCreateSbtSymbolPatch,
+  normalizeComparableAddress,
+} from './createSbtGroupStatePatchHelpers';
 
 const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
 
@@ -308,10 +356,6 @@ type BuildCreateSbtDefaultDistributionStateArgs = {
   account?: unknown;
   authoringChain?: Partial<CreateSbtAuthoringChainState> | null;
 };
-type BuildCreateSbtAccountDistributionSyncStatePatchArgs = {
-  currentDistribution?: unknown;
-  syncPatch?: unknown;
-};
 type BuildCreateSbtAuthoringChainSyncStatePatchArgs = {
   currentDistribution?: unknown;
   syncPatch?: { network?: unknown; sbtDistributionNetwork?: unknown } | null;
@@ -354,11 +398,6 @@ type BuildCreateSbtTokenInfoMetaCardClassNameArgs = {
 type CreateSbtHiddenQrDisplayState = {
   hiddenStyle: Record<string, string | number>;
 };
-type BuildCreateSbtDistributionFieldPatchArgs = {
-  fieldKey?: unknown;
-  fieldValue?: unknown;
-  state?: unknown;
-};
 type BuildCreateSbtDocumentUrlAdditionPatchArgs = {
   documentURLs?: unknown;
   documentUrl?: unknown;
@@ -375,86 +414,6 @@ type CreateSbtDocumentUrlInputState = {
 type BuildCreateSbtDocumentUrlRemovalPatchArgs = {
   documentURLs?: unknown;
   index?: unknown;
-};
-type BuildCreateSbtBooleanTogglePatchArgs = {
-  state?: unknown;
-  stateKey?: unknown;
-};
-type BuildCreateSbtCopySuccessPatchArgs = {
-  copied?: unknown;
-  stateKey?: unknown;
-};
-type BuildCreateSbtCopiedLinkIndexPatchArgs = {
-  index?: unknown;
-};
-type BuildCreateSbtOpenLockKeyPatchArgs = {
-  lockKey?: unknown;
-};
-type BuildCreateSbtGroupHashPatchArgs = {
-  groupHash?: unknown;
-};
-type BuildCreateSbtPasswordListPatchArgs = {
-  passwordList?: unknown;
-};
-type BuildCreateSbtBookmarkedSbtsSetPatchArgs = {
-  bookmarkedSbtsSet?: unknown;
-};
-type BuildCreateSbtPredictedAddressPatchArgs = {
-  predictedAddress?: unknown;
-  predictedAddressBusy?: unknown;
-  predictedAddressStatus?: unknown;
-};
-type BuildCreateSbtMintFailurePatchArgs = {
-  error?: unknown;
-};
-type BuildCreateSbtMintSuccessPatchArgs = {
-  passwordList?: unknown;
-  sbtAddress?: unknown;
-};
-type BuildCreateSbtEditResetPatchArgs = {
-  resetUploadState?: unknown;
-};
-type BuildCreateSbtErrorPatchArgs = {
-  error?: unknown;
-};
-type BuildCreateSbtMetadataLockGateIdsPatchArgs = {
-  metadataLockGateIds?: unknown;
-};
-type BuildCreateSbtMetadataLockSelectionPatchArgs = {
-  fieldKey?: unknown;
-  metadataLockGateIds?: unknown;
-  openLockKey?: unknown;
-  selectedGateIds?: unknown;
-  validGateIds?: unknown[];
-};
-type BuildCreateSbtMetadataLockFallbackPatchArgs = {
-  fallbackGateIds?: unknown;
-  fieldKey?: unknown;
-  lockKey?: unknown;
-  metadataLockGateIds?: unknown;
-};
-type BuildCreateSbtSymbolPatchArgs = {
-  sbtSymbol?: unknown;
-};
-type BuildCreateSbtShareableUrlPatchArgs = {
-  autoJoinUrl?: unknown;
-};
-type BuildCreateSbtInviteLinksBackupPatchArgs = {
-  sbtInviteBackupDate?: unknown;
-  sbtInviteLinks?: unknown;
-};
-type BuildCreateSbtNumInviteLinksPatchArgs = {
-  numInviteLinks?: unknown;
-};
-type BuildCreateSbtExportFormatPatchArgs = {
-  exportFormat?: unknown;
-};
-type BuildCreateSbtInputChangePatchArgs = {
-  name?: string;
-  value?: unknown;
-};
-type BuildCreateSbtCountdownTickPatchArgs = {
-  state?: unknown;
 };
 type ResolveCreateSbtPreferredAuthoringChainIdArgs = {
   availableChainIds?: unknown[];
@@ -512,132 +471,6 @@ type BuildCreateSbtPredictableDeploySignatureArgs = {
   predictionShape?: unknown;
   selectedAuthoringChainId?: unknown;
 };
-type CreateSbtDistributionOptionConfig = Record<string, unknown> & {
-  shouldUseActiveClass?: boolean;
-  selected?: boolean;
-  value?: unknown;
-};
-type BuildCreateSbtRenderStateArgs = {
-  create2Salt?: unknown;
-  deferredDeployMode?: unknown;
-  deferredSurfaceBg?: unknown;
-  descriptionSelectedGateIds?: unknown;
-  distributionConfigs?: unknown;
-  distributionOption?: unknown;
-  docsSelectedGateIds?: unknown;
-  documentURLs?: unknown;
-  documentUrl?: unknown;
-  imageSelectedGateIds?: unknown;
-  isLimited?: unknown;
-  nameSelectedGateIds?: unknown;
-  normalizeDocumentUrlDraft?: ((documentUrl: unknown) => unknown) | null;
-  sbtDescription?: unknown;
-  sbtImageFile?: unknown;
-  sbtImageUrl?: unknown;
-  sbtName?: unknown;
-  tags?: unknown;
-  tagsSelectedGateIds?: unknown;
-};
-type ResolveCreateSbtInfoDisplayStateArgs = {
-  documentURLs?: unknown;
-  imageSelectedGateIds?: unknown;
-  nameSelectedGateIds?: unknown;
-  tags?: unknown;
-};
-type ResolveCreateSbtMintOptionsDisplayStateArgs = {
-  hideNetworkSelector?: unknown;
-  isLimited?: unknown;
-  isTimeLimited?: unknown;
-  predictableAddressActive?: unknown;
-  predictedAddressBusy?: unknown;
-};
-type ResolveCreateSbtActionDisplayStateArgs = {
-  currentStep?: unknown;
-  distributionOption?: unknown;
-  mintingFailed?: unknown;
-  sbtMinted?: unknown;
-  startedMinting?: unknown;
-};
-type ResolveCreateSbtPrimaryActionLabelArgs = {
-  createActionLabel?: unknown;
-  currentStep?: unknown;
-  deferredDeployMode?: unknown;
-  mintedLabel?: unknown;
-  mintingLabel?: unknown;
-  sbtMinted?: unknown;
-};
-type ResolveCreateSbtPrimaryButtonStateArgs = {
-  sbtMinted?: unknown;
-  startedMinting?: unknown;
-};
-type CreateSbtPrimaryButtonState = {
-  disabled: boolean;
-};
-type ResolveCreateSbtClearFormButtonStateArgs = {
-  isDirty?: unknown;
-  sbtMinted?: unknown;
-};
-type CreateSbtClearFormButtonState = {
-  shouldShowClearFormButton: boolean;
-};
-type BuildCreateSbtProgressIndicatorStateArgs = {
-  currentStep?: unknown;
-  sbtMinted?: unknown;
-};
-type BuildCreateSbtProgressStepClassNameArgs = {
-  completed?: unknown;
-  completedClassName?: unknown;
-  pendingClassName?: unknown;
-};
-type CreateSbtProgressStepState = {
-  completed: boolean;
-  iconState: 'attention' | 'check' | 'spinner';
-  spin: boolean;
-};
-type CreateSbtProgressIndicatorState = {
-  imageUploadStep: CreateSbtProgressStepState;
-  mintStep: CreateSbtProgressStepState;
-  tokenUriUploadStep: CreateSbtProgressStepState;
-};
-type ResolveCreateSbtSuccessDisplayStateArgs = {
-  distributionOption?: unknown;
-  openMintAutoJoinUrl?: unknown;
-  passwordList?: unknown;
-  sbtInviteLinks?: unknown;
-  sbtMinted?: unknown;
-  showJson?: unknown;
-  startedMinting?: unknown;
-  tokenURI?: unknown;
-};
-type ResolveCreateSbtCopyActionDisplayStateArgs = {
-  copied?: unknown;
-  copiedLabel?: unknown;
-  defaultLabel?: unknown;
-};
-type ResolveCreateSbtBookmarkActionDisplayStateArgs = {
-  bookmarkedColor?: unknown;
-  bookmarkedSbtsSet?: unknown;
-  sbtAddress?: unknown;
-};
-type CreateSbtSuccessDisplayState = {
-  shouldRenderContractAddress: boolean;
-  shouldRenderGroupPasswordAutoJoin: boolean;
-  shouldRenderInviteLinks: boolean;
-  shouldRenderJsonPanel: boolean;
-  shouldRenderOpenMintAutoJoin: boolean;
-  shouldRenderPasswordRecovery: boolean;
-  shouldRenderSuccessPanel: boolean;
-  shouldRenderTokenUriLink: boolean;
-};
-type CreateSbtCopyActionDisplayState = {
-  label: string;
-  shouldRenderCopiedIcon: boolean;
-  shouldRenderDefaultIcon: boolean;
-};
-type CreateSbtBookmarkActionDisplayState = {
-  iconStyle: Record<string, string | undefined>;
-  isBookmarked: boolean;
-};
 type CreateSbtCollapseHeaderDisplayState = {
   ariaExpanded: boolean;
   ariaLabel: string;
@@ -645,39 +478,6 @@ type CreateSbtCollapseHeaderDisplayState = {
   shouldRenderClosedIcon: boolean;
   shouldRenderOpenIcon: boolean;
   shouldUseOpenClass: boolean;
-};
-type CreateSbtRenderState = {
-  createActionLabel: string;
-  distributionOptions: CreateSbtDistributionOptionConfig[];
-  headerTitle: string;
-  isDirty: boolean;
-  isLimitedWithPasswords: boolean;
-  isPasswordDistribution: boolean;
-  predictableAddressLocked: boolean;
-  rootSurfaceStyle?: Record<string, string>;
-};
-type CreateSbtInfoDisplayState = {
-  shouldRenderDocumentUrlList: boolean;
-  shouldRenderImageLockHelp: boolean;
-  shouldRenderNameLockHelp: boolean;
-  shouldRenderTagPills: boolean;
-};
-type CreateSbtMintOptionsDisplayState = {
-  shouldRenderLimitedNumberInput: boolean;
-  shouldRenderNetworkReadonly: boolean;
-  shouldRenderNetworkSelector: boolean;
-  shouldRenderPredictableAddressBusy: boolean;
-  shouldRenderPredictableAddressDetails: boolean;
-  shouldRenderTimeLimitedInput: boolean;
-  shouldUseLimitedOptionActiveClass: boolean;
-  shouldUsePredictableAddressActiveClass: boolean;
-  shouldUseTimeLimitedOptionActiveClass: boolean;
-};
-type CreateSbtActionDisplayState = {
-  shouldRenderGroupPasswordInput: boolean;
-  shouldRenderMintingFailureIcon: boolean;
-  shouldRenderProgressIndicator: boolean;
-  shouldRenderStartFreshButton: boolean;
 };
 
 export const isPlainObject = (value: unknown): value is Record<string, unknown> => (
@@ -1280,328 +1080,6 @@ export const resolveCreateSbtHiddenQrDisplayState = (): CreateSbtHiddenQrDisplay
     overflow: 'hidden',
   },
 });
-
-export const buildCreateSbtDistributionFieldPatch = ({
-  fieldKey = '',
-  fieldValue = null,
-  state = {},
-}: BuildCreateSbtDistributionFieldPatchArgs = {}): Record<string, unknown> => {
-  const stateRecord = isPlainObject(state) ? state : {};
-  const distributionSource = stateRecord.sbtDistribution;
-  const previousDistribution = distributionSource !== null && typeof distributionSource === 'object'
-    ? distributionSource as Record<string, unknown>
-    : {};
-  return {
-    sbtDistribution: {
-      ...previousDistribution,
-      [String(fieldKey || '')]: fieldValue,
-    },
-  };
-};
-
-export const buildCreateSbtNetworkChangePatch = ({
-  chain = null,
-  currentDistribution = {},
-  network = '',
-}: {
-  chain?: unknown;
-  currentDistribution?: unknown;
-  network?: unknown;
-} = {}): Record<string, unknown> => {
-  const distribution = isPlainObject(currentDistribution) ? currentDistribution : {};
-  return {
-    network,
-    sbtDistribution: {
-      ...distribution,
-      network: chain,
-    },
-  };
-};
-
-export const buildCreateSbtBooleanTogglePatch = ({
-  state = {},
-  stateKey = '',
-}: BuildCreateSbtBooleanTogglePatchArgs = {}): Record<string, boolean> => {
-  const key = String(stateKey || '');
-  const source = isPlainObject(state) ? state : {};
-  return {
-    [key]: !source[key],
-  };
-};
-
-export const buildCreateSbtCopySuccessPatch = ({
-  copied = true,
-  stateKey = 'copyLinkSuccess',
-}: BuildCreateSbtCopySuccessPatchArgs = {}): Record<string, boolean> => {
-  const key = String(stateKey || 'copyLinkSuccess');
-  return {
-    [key]: copied === true,
-  };
-};
-
-export const buildCreateSbtCopiedLinkIndexPatch = ({
-  index = null,
-}: BuildCreateSbtCopiedLinkIndexPatchArgs = {}): Record<string, unknown> => ({
-  copiedLinkIndex: index,
-});
-
-export const buildCreateSbtOpenLockKeyPatch = ({
-  lockKey = '',
-}: BuildCreateSbtOpenLockKeyPatchArgs = {}): Record<string, string> => ({
-  openLockKey: String(lockKey ?? ''),
-});
-
-export const buildCreateSbtGroupHashPatch = ({
-  groupHash = '',
-}: BuildCreateSbtGroupHashPatchArgs = {}): Record<string, string> => ({
-  groupHash: String(groupHash ?? ''),
-});
-
-export const buildCreateSbtPasswordListPatch = ({
-  passwordList = [],
-}: BuildCreateSbtPasswordListPatchArgs = {}): Record<string, unknown[]> => ({
-  passwordList: Array.isArray(passwordList) ? passwordList : [],
-});
-
-export const buildCreateSbtBookmarkedSbtsSetPatch = ({
-  bookmarkedSbtsSet = new Set<string>(),
-}: BuildCreateSbtBookmarkedSbtsSetPatchArgs = {}): Record<string, Set<string>> => ({
-  bookmarkedSbtsSet: bookmarkedSbtsSet instanceof Set
-    ? bookmarkedSbtsSet as Set<string>
-    : new Set<string>(),
-});
-
-export const buildCreateSbtPredictedAddressBusyPatch = (): Record<string, unknown> => ({
-  predictedAddressBusy: true,
-  predictedAddressStatus: 'Calculating address…',
-});
-
-export const buildCreateSbtPredictedAddressPatch = ({
-  predictedAddress = '',
-  predictedAddressBusy = false,
-  predictedAddressStatus = '',
-}: BuildCreateSbtPredictedAddressPatchArgs = {}): Record<string, unknown> => ({
-  predictedAddress: String(predictedAddress ?? ''),
-  predictedAddressStatus: String(predictedAddressStatus ?? ''),
-  predictedAddressBusy: predictedAddressBusy === true,
-});
-
-export const buildCreateSbtMintResetFailurePatch = ({
-  error = '',
-}: BuildCreateSbtMintFailurePatchArgs = {}): Record<string, unknown> => ({
-  mintingFailed: true,
-  startedMinting: false,
-  currentStep: 0,
-  error,
-});
-
-export const buildCreateSbtDeferredSaveCompletePatch = (): Record<string, unknown> => ({
-  startedMinting: false,
-  mintingFailed: false,
-  currentStep: 0,
-  error: '',
-});
-
-export const buildCreateSbtDeferredUploadFallbackPatch = (): Record<string, unknown> => ({
-  tokenURI: '',
-  tokenUriUploaded: false,
-  ...buildCreateSbtDeferredSaveCompletePatch(),
-});
-
-export const buildCreateSbtMintValidationFailurePatch = ({
-  error = '',
-}: BuildCreateSbtMintFailurePatchArgs = {}): Record<string, unknown> => ({
-  mintingFailed: true,
-  error,
-});
-
-export const buildCreateSbtMintSuccessPatch = ({
-  passwordList = [],
-  sbtAddress = '',
-}: BuildCreateSbtMintSuccessPatchArgs = {}): Record<string, unknown> => ({
-  sbtMinted: true,
-  sbtAddress,
-  currentStep: 3,
-  passwordList: Array.isArray(passwordList) ? passwordList : [],
-});
-
-export const buildCreateSbtEditResetPatch = ({
-  resetUploadState = true,
-}: BuildCreateSbtEditResetPatchArgs = {}): Record<string, unknown> => ({
-  sbtMinted: false,
-  sbtAddress: '',
-  currentStep: 0,
-  startedMinting: false,
-  mintingFailed: false,
-  error: '',
-  ...(resetUploadState === true
-    ? {
-      imageUploaded: false,
-      tokenUriUploaded: false,
-    }
-    : {}),
-});
-
-export const buildCreateSbtErrorPatch = ({
-  error = '',
-}: BuildCreateSbtErrorPatchArgs = {}): Record<string, unknown> => ({
-  error,
-});
-
-export const buildCreateSbtMintStartPatch = (): Record<string, unknown> => ({
-  startedMinting: true,
-  mintingFailed: false,
-  error: '',
-});
-
-export const buildCreateSbtMetadataLockGateIdsPatch = ({
-  metadataLockGateIds = {},
-}: BuildCreateSbtMetadataLockGateIdsPatchArgs = {}): Record<string, unknown> => ({
-  metadataLockGateIds,
-});
-
-export const buildCreateSbtMetadataLockSelectionPatch = ({
-  fieldKey = '',
-  metadataLockGateIds = {},
-  openLockKey = '',
-  selectedGateIds = [],
-  validGateIds = [],
-}: BuildCreateSbtMetadataLockSelectionPatchArgs = {}): Record<string, unknown> => {
-  const normalized = normalizeCreateSbtSelectedGateIds(selectedGateIds, validGateIds);
-  return {
-    metadataLockGateIds: {
-      ...normalizeMetadataLockGateIds(metadataLockGateIds),
-      [String(fieldKey || '')]: normalized,
-    },
-    openLockKey: normalized.length ? openLockKey : '',
-  };
-};
-
-export const buildCreateSbtMetadataLockFallbackPatch = ({
-  fallbackGateIds = [],
-  fieldKey = '',
-  lockKey = '',
-  metadataLockGateIds = {},
-}: BuildCreateSbtMetadataLockFallbackPatchArgs = {}): Record<string, unknown> => ({
-  metadataLockGateIds: {
-    ...normalizeMetadataLockGateIds(metadataLockGateIds),
-    [String(fieldKey || '')]: Array.isArray(fallbackGateIds) ? fallbackGateIds : [],
-  },
-  openLockKey: lockKey,
-});
-
-export const buildCreateSbtCountdownStartPatch = (): Record<string, unknown> => ({
-  countdownActive: true,
-  countdown: 12,
-});
-
-export const buildCreateSbtSymbolPatch = ({
-  sbtSymbol = '',
-}: BuildCreateSbtSymbolPatchArgs = {}): Record<string, unknown> => ({
-  sbtSymbol: String(sbtSymbol ?? ''),
-});
-
-export const buildCreateSbtShareableUrlPatch = ({
-  autoJoinUrl = '',
-}: BuildCreateSbtShareableUrlPatchArgs = {}): Record<string, unknown> => {
-  const url = String(autoJoinUrl ?? '');
-  return {
-    shareableUrl: url,
-    autoJoinUrl: url,
-  };
-};
-
-export const buildCreateSbtInviteLinksBackupPatch = ({
-  sbtInviteBackupDate = '',
-  sbtInviteLinks = [],
-}: BuildCreateSbtInviteLinksBackupPatchArgs = {}): Record<string, unknown> => ({
-  sbtInviteLinks,
-  sbtInviteBackupDate,
-});
-
-export const buildCreateSbtNumInviteLinksPatch = ({
-  numInviteLinks = '',
-}: BuildCreateSbtNumInviteLinksPatchArgs = {}): Record<string, unknown> => ({
-  numInviteLinks,
-});
-
-export const buildCreateSbtExportFormatPatch = ({
-  exportFormat = '',
-}: BuildCreateSbtExportFormatPatchArgs = {}): Record<string, string> => ({
-  exportFormat: String(exportFormat ?? ''),
-});
-
-export const buildCreateSbtInputChangePatch = ({
-  name = '',
-  value = '',
-}: BuildCreateSbtInputChangePatchArgs = {}): Record<string, unknown> => ({
-  [name]: value,
-  ...(name === 'sbtImageUrl' ? { lockedImageAsset: null } : {}),
-  ...(name === 'sbtImageUrl'
-    ? { imageChooserStatusText: '', imageChooserStatusTone: 'default' }
-    : {}),
-});
-
-export const buildCreateSbtCountdownTickPatch = ({
-  state = {},
-}: BuildCreateSbtCountdownTickPatchArgs = {}): Record<string, unknown> => {
-  const source = isPlainObject(state) ? state : {};
-  const nextCountdown = Math.max(0, Number(source.countdown || 0) - 1);
-  return {
-    countdown: nextCountdown,
-    ...(nextCountdown === 0 ? { countdownActive: false } : null),
-  };
-};
-
-export const normalizeComparableAddress = (value: unknown): string => (
-  toStr(value).trim().toLowerCase()
-);
-
-export const buildCreateSbtAccountDistributionSyncPatch = ({
-  currentDistribution = {},
-  nextAccount = '',
-  prevAccount = '',
-}: {
-  currentDistribution?: unknown;
-  nextAccount?: unknown;
-  prevAccount?: unknown;
-} = {}): Record<string, string> | null => {
-  const prevAccountAddress = normalizeComparableAddress(prevAccount);
-  const nextAccountAddress = normalizeComparableAddress(nextAccount);
-  if (prevAccountAddress === nextAccountAddress) return null;
-
-  const source = isPlainObject(currentDistribution) ? currentDistribution : {};
-  const currentBurnAdmin = toStr(source.burnAdmin).trim();
-  const currentAdminAddress = toStr(source.adminAddress).trim();
-  const shouldSyncBurnAdmin = (
-    !currentBurnAdmin ||
-    normalizeComparableAddress(currentBurnAdmin) === prevAccountAddress
-  );
-  const shouldSyncAdminAddress = (
-    !currentAdminAddress ||
-    normalizeComparableAddress(currentAdminAddress) === prevAccountAddress
-  );
-  if (!shouldSyncBurnAdmin && !shouldSyncAdminAddress) return null;
-
-  const nextAccountText = toStr(nextAccount).trim();
-  return {
-    ...(shouldSyncBurnAdmin ? { burnAdmin: nextAccountText } : {}),
-    ...(shouldSyncAdminAddress ? { adminAddress: nextAccountText } : {}),
-  };
-};
-
-export const buildCreateSbtAccountDistributionSyncStatePatch = ({
-  currentDistribution = {},
-  syncPatch = null,
-}: BuildCreateSbtAccountDistributionSyncStatePatchArgs = {}): Record<string, unknown> | null => {
-  if (!syncPatch || !isPlainObject(syncPatch)) return null;
-  return {
-    sbtDistribution: {
-      ...(currentDistribution as Record<string, unknown>),
-      ...syncPatch,
-    },
-  };
-};
 
 export const normalizeGateIds = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -2769,257 +2247,6 @@ export const buildCreateSbtGateOptionsFromSessionSources = ({
     gateMap,
     gateOptions,
     defaultGateId: preferredGateId || (gateOptions[0]?.id || ''),
-  };
-};
-
-const hasCreateSbtTextValue = (value: unknown): boolean => (
-  String(value || '').trim().length > 0
-);
-
-const hasCreateSbtLength = (value: unknown): boolean => (
-  Array.isArray(value) ? value.length > 0 : false
-);
-
-const hasCreateSbtDisplayLength = (value: unknown): boolean => (
-  Number((value as { length?: unknown })?.length || 0) > 0
-);
-
-export const resolveCreateSbtInfoDisplayState = ({
-  documentURLs = [],
-  imageSelectedGateIds = [],
-  nameSelectedGateIds = [],
-  tags = [],
-}: ResolveCreateSbtInfoDisplayStateArgs = {}): CreateSbtInfoDisplayState => ({
-  shouldRenderDocumentUrlList: hasCreateSbtDisplayLength(documentURLs),
-  shouldRenderImageLockHelp: hasCreateSbtDisplayLength(imageSelectedGateIds),
-  shouldRenderNameLockHelp: hasCreateSbtDisplayLength(nameSelectedGateIds),
-  shouldRenderTagPills: hasCreateSbtDisplayLength(tags),
-});
-
-export const resolveCreateSbtMintOptionsDisplayState = ({
-  hideNetworkSelector = false,
-  isLimited = false,
-  isTimeLimited = false,
-  predictableAddressActive = false,
-  predictedAddressBusy = false,
-}: ResolveCreateSbtMintOptionsDisplayStateArgs = {}): CreateSbtMintOptionsDisplayState => ({
-  shouldRenderLimitedNumberInput: !!isLimited,
-  shouldRenderNetworkReadonly: !!hideNetworkSelector,
-  shouldRenderNetworkSelector: !hideNetworkSelector,
-  shouldRenderPredictableAddressBusy: !!predictableAddressActive && !!predictedAddressBusy,
-  shouldRenderPredictableAddressDetails: !!predictableAddressActive,
-  shouldRenderTimeLimitedInput: !!isTimeLimited,
-  shouldUseLimitedOptionActiveClass: !!isLimited,
-  shouldUsePredictableAddressActiveClass: !!predictableAddressActive,
-  shouldUseTimeLimitedOptionActiveClass: !!isTimeLimited,
-});
-
-export const resolveCreateSbtActionDisplayState = ({
-  currentStep = 0,
-  distributionOption = '',
-  mintingFailed = false,
-  sbtMinted = false,
-  startedMinting = false,
-}: ResolveCreateSbtActionDisplayStateArgs = {}): CreateSbtActionDisplayState => {
-  const step = Number(currentStep || 0);
-  return {
-    shouldRenderGroupPasswordInput: String(distributionOption || '') === 'groupPassword',
-    shouldRenderMintingFailureIcon: !!mintingFailed && step > 0,
-    shouldRenderProgressIndicator: !!startedMinting,
-    shouldRenderStartFreshButton: !!sbtMinted,
-  };
-};
-
-export const buildCreateSbtRenderState = ({
-  create2Salt = '',
-  deferredDeployMode = false,
-  deferredSurfaceBg = '',
-  descriptionSelectedGateIds = [],
-  distributionConfigs = [],
-  distributionOption = '',
-  docsSelectedGateIds = [],
-  documentURLs = [],
-  documentUrl = '',
-  imageSelectedGateIds = [],
-  isLimited = false,
-  nameSelectedGateIds = [],
-  normalizeDocumentUrlDraft = null,
-  sbtDescription = '',
-  sbtImageFile = null,
-  sbtImageUrl = '',
-  sbtName = '',
-  tags = [],
-  tagsSelectedGateIds = [],
-}: BuildCreateSbtRenderStateArgs = {}): CreateSbtRenderState => {
-  const normalizedDocumentUrlDraft = typeof normalizeDocumentUrlDraft === 'function'
-    ? normalizeDocumentUrlDraft(documentUrl)
-    : [];
-  const hasDocumentUrlDraft = Array.isArray(normalizedDocumentUrlDraft)
-    ? normalizedDocumentUrlDraft.length > 0
-    : hasCreateSbtTextValue(normalizedDocumentUrlDraft);
-  const isDeferredDeployMode = !!deferredDeployMode;
-  const resolvedDistributionOption = String(distributionOption || '');
-  const isPasswordDistribution =
-    resolvedDistributionOption === 'hasPasswords' ||
-    resolvedDistributionOption === 'groupPassword';
-
-  return {
-    createActionLabel: isDeferredDeployMode ? 'Add to Session' : 'Create',
-    distributionOptions: (Array.isArray(distributionConfigs) ? distributionConfigs : [])
-      .map((optionInput: unknown) => {
-        const option = isPlainObject(optionInput) ? optionInput as CreateSbtDistributionOptionConfig : {};
-        return {
-          ...option,
-          selected: option.value === distributionOption,
-          shouldUseActiveClass: option.value === distributionOption,
-        };
-      }),
-    headerTitle: isDeferredDeployMode ? 'Add to Session' : 'Create',
-    isLimitedWithPasswords: !!isLimited && isPasswordDistribution,
-    isPasswordDistribution,
-    isDirty: (
-      hasCreateSbtTextValue(sbtName) ||
-      hasCreateSbtTextValue(sbtDescription) ||
-      !!sbtImageFile ||
-      hasCreateSbtTextValue(sbtImageUrl) ||
-      hasDocumentUrlDraft ||
-      hasCreateSbtLength(documentURLs) ||
-      hasCreateSbtLength(nameSelectedGateIds) ||
-      hasCreateSbtLength(descriptionSelectedGateIds) ||
-      hasCreateSbtLength(tagsSelectedGateIds) ||
-      hasCreateSbtLength(docsSelectedGateIds) ||
-      hasCreateSbtLength(imageSelectedGateIds) ||
-      hasCreateSbtTextValue(create2Salt) ||
-      hasCreateSbtLength(tags)
-    ),
-    predictableAddressLocked: isDeferredDeployMode || resolvedDistributionOption === 'groupPassword',
-    ...(isDeferredDeployMode
-      ? { rootSurfaceStyle: { '--ce-create-group-surface-bg': String(deferredSurfaceBg || '') } }
-      : {}),
-  };
-};
-
-export const resolveCreateSbtPrimaryActionLabel = ({
-  createActionLabel = 'Create',
-  currentStep = 0,
-  deferredDeployMode = false,
-  mintedLabel = 'Minted',
-  mintingLabel = 'Minting',
-  sbtMinted = false,
-}: ResolveCreateSbtPrimaryActionLabelArgs = {}): string => {
-  const actionLabel = String(createActionLabel || '');
-  const mintingText = String(mintingLabel || '');
-  if (sbtMinted) return `${String(mintedLabel || '')}!`;
-  if (currentStep === 0) return actionLabel;
-  if (currentStep === 1) return 'Uploading Image...';
-  if (currentStep === 2) return 'Uploading URI...';
-  if (currentStep === 3) return deferredDeployMode ? 'Saving Draft...' : `${mintingText}...`;
-  return actionLabel;
-};
-
-export const resolveCreateSbtPrimaryButtonState = ({
-  sbtMinted = false,
-  startedMinting = false,
-}: ResolveCreateSbtPrimaryButtonStateArgs = {}): CreateSbtPrimaryButtonState => ({
-  disabled: !!sbtMinted || !!startedMinting,
-});
-
-export const resolveCreateSbtClearFormButtonState = ({
-  isDirty = false,
-  sbtMinted = false,
-}: ResolveCreateSbtClearFormButtonStateArgs = {}): CreateSbtClearFormButtonState => ({
-  shouldShowClearFormButton: !!isDirty && !sbtMinted,
-});
-
-export const buildCreateSbtProgressIndicatorState = ({
-  currentStep = 0,
-  sbtMinted = false,
-}: BuildCreateSbtProgressIndicatorStateArgs = {}): CreateSbtProgressIndicatorState => {
-  const step = currentStep as number;
-  return {
-    imageUploadStep: {
-      completed: step >= 1,
-      iconState: step === 1 ? 'spinner' : step > 1 ? 'check' : 'attention',
-      spin: step === 1,
-    },
-    tokenUriUploadStep: {
-      completed: step >= 2,
-      iconState: step === 2 ? 'spinner' : step > 2 ? 'check' : 'attention',
-      spin: step === 2,
-    },
-    mintStep: {
-      completed: step >= 3,
-      iconState: step === 3 && !sbtMinted ? 'spinner' : step >= 3 ? 'check' : 'attention',
-      spin: step === 3 && !sbtMinted,
-    },
-  };
-};
-
-export const buildCreateSbtProgressStepClassName = ({
-  completed = false,
-  completedClassName = '',
-  pendingClassName = '',
-}: BuildCreateSbtProgressStepClassNameArgs = {}): string => (
-  String((completed ? completedClassName : pendingClassName) || '')
-);
-
-export const resolveCreateSbtSuccessDisplayState = ({
-  distributionOption = '',
-  openMintAutoJoinUrl = '',
-  passwordList = [],
-  sbtInviteLinks = [],
-  sbtMinted = false,
-  showJson = false,
-  startedMinting = false,
-  tokenURI = '',
-}: ResolveCreateSbtSuccessDisplayStateArgs = {}): CreateSbtSuccessDisplayState => {
-  const isMinted = !!sbtMinted;
-  const option = String(distributionOption || '');
-  const inviteLinkCount = Number((sbtInviteLinks as { length?: unknown })?.length || 0);
-  return {
-    shouldRenderContractAddress: !!startedMinting,
-    shouldRenderGroupPasswordAutoJoin: option === 'groupPassword',
-    shouldRenderInviteLinks: isMinted && option === 'hasPasswords' && inviteLinkCount > 0,
-    shouldRenderJsonPanel: !!showJson && isMinted,
-    shouldRenderOpenMintAutoJoin: !!openMintAutoJoinUrl,
-    shouldRenderPasswordRecovery: (
-      isMinted &&
-      option !== 'hasPasswords' &&
-      Array.isArray(passwordList) &&
-      passwordList.length > 0
-    ),
-    shouldRenderSuccessPanel: isMinted,
-    shouldRenderTokenUriLink: !!tokenURI,
-  };
-};
-
-export const resolveCreateSbtCopyActionDisplayState = ({
-  copied = false,
-  copiedLabel = '',
-  defaultLabel = '',
-}: ResolveCreateSbtCopyActionDisplayStateArgs = {}): CreateSbtCopyActionDisplayState => {
-  const isCopied = !!copied;
-  const fallbackLabel = String(defaultLabel || '');
-  const copiedText = String(copiedLabel || fallbackLabel);
-  return {
-    label: isCopied ? copiedText : fallbackLabel,
-    shouldRenderCopiedIcon: isCopied,
-    shouldRenderDefaultIcon: !isCopied,
-  };
-};
-
-export const resolveCreateSbtBookmarkActionDisplayState = ({
-  bookmarkedColor = '#ffe082',
-  bookmarkedSbtsSet = null,
-  sbtAddress = '',
-}: ResolveCreateSbtBookmarkActionDisplayStateArgs = {}): CreateSbtBookmarkActionDisplayState => {
-  const normalizedAddress = String(sbtAddress).toLowerCase();
-  const isBookmarked = bookmarkedSbtsSet instanceof Set && bookmarkedSbtsSet.has(normalizedAddress);
-  return {
-    iconStyle: {
-      color: isBookmarked ? String(bookmarkedColor || '#ffe082') : undefined,
-    },
-    isBookmarked,
   };
 };
 
