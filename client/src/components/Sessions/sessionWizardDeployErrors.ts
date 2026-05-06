@@ -1,21 +1,14 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import { CLOUDFLARE_MISSING_HANDLER_ERROR, DEPLOY_HELPER_BUNDLE_FETCH_ERROR } from './sessionWizardPublishFlow';
+import {
+  CLOUDFLARE_MISSING_HANDLER_ERROR,
+  DEPLOY_HELPER_BUNDLE_FETCH_ERROR,
+} from './sessionWizardPublishFlow';
 
 type SessionWizardDeployRecord = Record<string, unknown>;
-type ResolveSessionWizardDeployStatusDisplayStateArgs = {
-  deployInFlight?: unknown;
-  deployStatus?: unknown;
-  deployVerifiedInUi?: unknown;
-  workerCanonicalPublishCompleted?: unknown;
-};
-export type SessionWizardDeployStatusDisplayState = {
-  deployButtonDisabled: boolean;
-  deployStatusText: string;
-  isError: boolean;
-};
 
-const asDeployRecord = (value: unknown): SessionWizardDeployRecord =>
-  value !== null && typeof value === 'object' ? (value as SessionWizardDeployRecord) : {};
+const asDeployRecord = (value: unknown): SessionWizardDeployRecord => (
+  value !== null && typeof value === 'object' ? value as SessionWizardDeployRecord : {}
+);
 
 const resolveCurrentOrigin = (value: unknown = undefined): string => {
   const override = toStr(value).trim();
@@ -38,7 +31,9 @@ export const buildSessionWizardDeployHelperCorsMessage = ({
   return `Deploy-helper rejected browser origin ${origin}${suffix}. Add this origin to the deploy-helper allowlist at ${helper} and retry.`;
 };
 
-export const buildSessionWizardDeployHelperWorkersDevStatusMessage = (deployResponse: unknown = {}): string => {
+export const buildSessionWizardDeployHelperWorkersDevStatusMessage = (
+  deployResponse: unknown = {}
+): string => {
   const response = asDeployRecord(deployResponse);
   const subdomain = toStr(response?.subdomain).trim();
   const subdomainStatus = toStr(response?.subdomainStatus).trim();
@@ -78,27 +73,14 @@ export const buildSessionWizardDeployHelperWorkersDevStatusMessage = (deployResp
   return summary ? `workers.dev status: ${summary}.` : '';
 };
 
-export const withSessionWizardDeployHelperWorkersDevStatus = (message = '', deployResponse: unknown = {}): string => {
+export const withSessionWizardDeployHelperWorkersDevStatus = (
+  message = '',
+  deployResponse: unknown = {}
+): string => {
   const base = toStr(message).trim();
   const workersDevStatus = buildSessionWizardDeployHelperWorkersDevStatusMessage(deployResponse);
   if (!workersDevStatus) return base;
   return base ? `${base} ${workersDevStatus}` : workersDevStatus;
-};
-
-export const resolveSessionWizardDeployStatusDisplayState = ({
-  deployInFlight = false,
-  deployStatus = '',
-  deployVerifiedInUi = false,
-  workerCanonicalPublishCompleted = false,
-}: ResolveSessionWizardDeployStatusDisplayStateArgs = {}): SessionWizardDeployStatusDisplayState => {
-  const deployStatusText = toStr(deployStatus);
-  const deployStatusLower = deployStatusText.toLowerCase();
-  return {
-    deployButtonDisabled: !!deployInFlight || !!workerCanonicalPublishCompleted,
-    deployStatusText,
-    isError:
-      !!deployStatusText && !deployInFlight && !deployVerifiedInUi && !deployStatusLower.includes('worker deployed'),
-  };
 };
 
 export const formatSessionWizardDeployBundleDiagnostics = (bundleDiagnostics: unknown = {}): string => {
@@ -193,7 +175,10 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   currentOrigin?: unknown;
 } = {}): string => {
   const error = asDeployRecord(err);
-  const raw = toStr(error?.message || (typeof err === 'string' || typeof err === 'number' ? err : '')).trim();
+  const raw = toStr(
+    error?.message ||
+    (typeof err === 'string' || typeof err === 'number' ? err : '')
+  ).trim();
   const lowered = raw.toLowerCase();
   const statusCode = Number(error?.statusCode || 0);
   const responseError = toStr(error?.responseError).trim();

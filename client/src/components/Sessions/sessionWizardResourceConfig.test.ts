@@ -21,19 +21,13 @@ describe('sessionWizardResourceConfig', () => {
     });
   });
 
-  it('returns the default OpenAI secret field when no model providers are selected', () => {
-    expect(resolveSessionWizardResourceSecretFields('ai', null).map((field) => field.key)).toEqual(['openaiKey']);
-  });
-
-  it('returns the secret fields selected by the AI models', () => {
-    expect(
-      resolveSessionWizardResourceSecretFields('ai', {
-        models: {
-          fast: { provider: 'anthropic' },
-          thinking: { provider: 'openrouter' },
-        },
-      }).map((field) => field.key),
-    ).toEqual(['anthropicKey', 'openrouterKey', 'openaiKey']);
+  it('returns only the OpenAI secret field for ai resources', () => {
+    expect(resolveSessionWizardResourceSecretFields('ai', {
+      models: {
+        fast: { provider: 'anthropic' },
+        thinking: { provider: 'openrouter' },
+      },
+    }).map((field) => field.key)).toEqual(['openaiKey']);
   });
 
   it('returns non-ai secret fields without mutation', () => {
@@ -51,8 +45,8 @@ describe('sessionWizardResourceConfig', () => {
 
   it('exposes resource labels and tooltips', () => {
     expect(RESOURCE_LABELS.ai).toBe('AI');
-    expect(RESOURCE_SECTION_TOOLTIPS.ai).toMatch(/provider key/i);
+    expect(RESOURCE_SECTION_TOOLTIPS.ai).toMatch(/OpenAI key/i);
     expect(RESOURCE_SECTION_TOOLTIPS.rpc).toMatch(/Authenticated RPC endpoint/i);
-    expect(RESOURCE_SECTION_TOOLTIPS.lit).toMatch(/Paste one Lit API key/i);
+    expect(RESOURCE_SECTION_TOOLTIPS.lit).toMatch(/Paste one Lit account API key/i);
   });
 });

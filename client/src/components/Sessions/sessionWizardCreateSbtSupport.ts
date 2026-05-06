@@ -1,81 +1,29 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 
-export type SessionWizardCreateSbtGate = Record<string, unknown> & {
+type SessionWizardCreateSbtGate = Record<string, unknown> & {
   id?: unknown;
-  gateId?: unknown;
-  label?: unknown;
-  mode?: unknown;
-  color?: unknown;
-  sbts?: unknown;
 };
 
-export type SessionWizardCreateSbtLaunchOptions = Record<string, unknown> & {
+type SessionWizardCreateSbtLaunchOptions = Record<string, unknown> & {
   targetType?: unknown;
   gateId?: unknown;
   sessionSlug?: unknown;
   arweaveJwkOverride?: unknown;
 };
 
-export type SessionWizardCreateSbtLaunchState = {
-  targetType: string;
+type SessionWizardCreateSbtLaunchState = {
+  targetType: unknown;
   gateId: string;
   sessionSlug: string;
   arweaveJwkOverride: string;
-};
-type SessionWizardNetworkLike = Record<string, unknown> & {
-  id?: unknown;
-  chainId?: unknown;
-  name?: unknown;
-};
-type SessionWizardSbtSelection = Record<string, unknown> & {
-  address?: unknown;
-};
-type BuildSessionWizardDeferredCreateSbtComponentPropsArgs = {
-  account?: unknown;
-  accountOverride?: unknown;
-  defaultGateId?: unknown;
-  draft?: Record<string, unknown> | null;
-  encryptionGates?: SessionWizardCreateSbtGate[];
-  getChainById?: (chainId: number | null) => SessionWizardNetworkLike | null | undefined;
-  getChainName?: (chainId: number | null) => string;
-  getEnabledWorkerArweaveJwk?: (secrets: unknown) => unknown;
-  network?: SessionWizardNetworkLike | null;
-  normalizeSbtSelection?: (value: unknown) => SessionWizardSbtSelection[];
-  normalizeWorkerAuthUrl?: (value: unknown) => string;
-  provider?: unknown;
-  registryChainId?: unknown;
-  resolvedActiveSessionSlug?: unknown;
-  resolvedWalletAccount?: unknown;
-  sessionSlugOverride?: unknown;
-  signAdminAction?: unknown;
-  toggleLoginModal?: unknown;
-  workerSecrets?: unknown;
-  workerUrlOverride?: unknown;
-};
-
-type ResolveSessionWizardCreateSbtModalPlanArgs = {
-  createSbtModalState?: Record<string, unknown> | null;
-  draft?: Record<string, unknown> | null;
-  getChainById?: (chainId: number | null) => SessionWizardNetworkLike | null | undefined;
-  getChainName?: (chainId: number | null) => string;
-  getEnabledWorkerArweaveJwk?: () => unknown;
-  network?: SessionWizardNetworkLike | null;
-  registryChainId?: unknown;
-  resolvedActiveSessionSlug?: unknown;
-  workerSecretsEnabled?: boolean;
-};
-
-type SessionWizardCreateSbtModalPlan = {
-  arweaveJwkOverride: string;
-  chainId: number | null;
-  network: SessionWizardNetworkLike;
-  sessionSlug: string;
 };
 
 export const getSessionWizardGateById = (
   gates: SessionWizardCreateSbtGate[] = [],
   gateId: unknown,
-): SessionWizardCreateSbtGate | null => gates.find((gate) => toStr(gate?.id).trim() === toStr(gateId).trim()) || null;
+): SessionWizardCreateSbtGate | null => (
+  gates.find((gate) => toStr(gate?.id).trim() === toStr(gateId).trim()) || null
+);
 
 export const resolveSessionWizardCreateSbtTargetGateId = ({
   allEncryptionGates = [],
@@ -107,7 +55,7 @@ export const buildSessionWizardCreateSbtModalLaunchState = ({
   currentDraftSlug?: unknown;
   currentArweaveJwk?: unknown;
 } = {}): SessionWizardCreateSbtLaunchState => ({
-  targetType: toStr(options?.targetType || 'gate').trim() || 'gate',
+  targetType: options?.targetType || 'gate',
   gateId: resolveSessionWizardCreateSbtTargetGateId({
     allEncryptionGates,
     defaultGateId,

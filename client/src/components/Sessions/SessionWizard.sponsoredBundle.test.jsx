@@ -787,12 +787,12 @@ describe('SessionWizard sponsored bundle flow', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
-    expect(getFieldInputByLabel('Anthropic key *')).toHaveValue('sponsored-anthropic');
-    expect(getFieldInputByLabel('OpenRouter key *')).toHaveValue('sponsored-openrouter');
+    expect(screen.queryByText('Anthropic key *')).not.toBeInTheDocument();
+    expect(screen.queryByText('OpenRouter key')).not.toBeInTheDocument();
     expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('{"kty":"RSA"}');
     expect(getFieldInputByLabel('Faucet private key')).toHaveValue('0xsponsoredfaucet');
     expect(getFieldInputByLabel('Lit account API key')).toHaveValue('lit-account-secret');
-    expect(getFieldInputByLabel('Lit usage API key')).toHaveValue('');
+    expect(screen.queryByText('Lit usage API key')).not.toBeInTheDocument();
     expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example.test');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
     expect(screen.queryByText('Dev: keep secrets on refresh')).not.toBeInTheDocument();

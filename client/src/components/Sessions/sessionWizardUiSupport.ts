@@ -19,10 +19,14 @@ type SessionWizardFileLike = SessionWizardUiRecord & {
   type?: unknown;
 };
 
-const isUiRecord = (value: unknown): value is SessionWizardUiRecord => value !== null && typeof value === 'object';
+const isUiRecord = (value: unknown): value is SessionWizardUiRecord => (
+  value !== null && typeof value === 'object'
+);
 
-export const readSessionWizardTooltipsEnabled = (reduxStore: unknown): boolean => {
-  const store = isUiRecord(reduxStore) ? (reduxStore as SessionWizardReduxStoreLike) : null;
+export const readSessionWizardTooltipsEnabled = (
+  reduxStore: unknown
+): boolean => {
+  const store = isUiRecord(reduxStore) ? reduxStore as SessionWizardReduxStoreLike : null;
   const rawState = store?.getState?.();
   const state = isUiRecord(rawState) ? rawState : {};
   const sessionState = isUiRecord(state.sessionState) ? state.sessionState : {};
@@ -30,7 +34,7 @@ export const readSessionWizardTooltipsEnabled = (reduxStore: unknown): boolean =
 };
 
 export const resolveSessionHeaderImageFormat = (
-  fileLike: SessionWizardFileLike | File | Blob | null | undefined,
+  fileLike: SessionWizardFileLike | File | null | undefined
 ): string => {
   const fileRecord = isUiRecord(fileLike) ? (fileLike as SessionWizardFileLike) : {};
   const fileName = toStr(fileRecord.name).trim().toLowerCase();

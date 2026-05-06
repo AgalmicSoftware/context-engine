@@ -14,8 +14,9 @@ export type SessionWizardSecretField = {
 
 type SessionWizardResourceRecord = Record<string, unknown>;
 
-const isResourceRecord = (value: unknown): value is SessionWizardResourceRecord =>
-  value !== null && typeof value === 'object';
+const isResourceRecord = (value: unknown): value is SessionWizardResourceRecord => (
+  value !== null && typeof value === 'object'
+);
 
 const readAiModelProvider = (ai: unknown, modelKey: string): string => {
   const aiRecord = isResourceRecord(ai) ? ai : {};
@@ -24,7 +25,7 @@ const readAiModelProvider = (ai: unknown, modelKey: string): string => {
   return normalizeAiProvider(model.provider || 'openai');
 };
 
-export const RESOURCE_LABELS: Record<string, string> = {
+export const RESOURCE_LABELS = {
   default: 'DEFAULT',
   questionResponses: 'QUESTION RESPONSES',
   surveyResponses: 'SURVEY RESPONSES',
@@ -37,12 +38,12 @@ export const RESOURCE_LABELS: Record<string, string> = {
   lit: 'LIT',
 };
 
-export const RESOURCE_SECTION_TOOLTIPS: Readonly<Record<string, string>> = Object.freeze({
-  ai: 'Session-funded provider key used by the selected AI models.',
+export const RESOURCE_SECTION_TOOLTIPS = Object.freeze({
+  ai: 'Session-funded OpenAI key used for text generation and transcription.',
   rpc: 'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
   arweave: `${t('wallet')} used to pay for Arweave uploads and storage.`,
   txGas: 'Faucet signer used to send small testnet funding grants.',
-  lit: 'Worker-mediated Lit Chipotle settings: either a bundle/session account API key for bootstrap, or a scoped usage API key plus the group, PKP, and Lit Action identifiers for this session.',
+  lit: 'Worker-mediated Lit Chipotle setup. Paste one Lit account API key; the worker derives the scoped group, PKP, usage key, and CE action after deploy.',
 });
 
 const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Object.freeze({
@@ -57,37 +58,24 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   default: [],
   lit: [
     { key: 'litAccountApiKey', label: 'Lit account API key', type: 'password' },
-    { key: 'litUsageApiKey', label: 'Lit usage API key', type: 'password' },
   ],
 });
 
-const AI_PROVIDER_SECRET_FIELDS: Readonly<Record<string, SessionWizardSecretField>> = Object.freeze({
-  openai: { key: 'openaiKey', label: 'OpenAI key', type: 'password', required: true },
-  anthropic: { key: 'anthropicKey', label: 'Anthropic key', type: 'password', required: true },
-  openrouter: { key: 'openrouterKey', label: 'OpenRouter key', type: 'password', required: true },
-});
-
-export const resolveSessionWizardAiModelProviders = (
-  ai: unknown,
-): {
+export const resolveSessionWizardAiModelProviders = (ai: unknown): {
   fastProvider: string;
   thinkingProvider: string;
   transcriptionProvider: string;
 } => {
   const fastProvider = readAiModelProvider(ai, 'fast');
   const thinkingProvider = readAiModelProvider(ai, 'thinking');
-  const transcriptionProvider = readAiModelProvider(ai, 'transcription');
-  return { fastProvider, thinkingProvider, transcriptionProvider };
+  return { fastProvider, thinkingProvider };
 };
 
 export const resolveSessionWizardResourceSecretFields = (
   resourceKey: string,
   ai: unknown,
 ): SessionWizardSecretField[] => {
+  void ai;
   if (resourceKey !== 'ai') return [...(RESOURCE_SECRET_FIELDS[resourceKey] || [])];
-  const providers = resolveSessionWizardAiModelProviders(ai);
-  return [...new Set([providers.fastProvider, providers.thinkingProvider, providers.transcriptionProvider])]
-    .map((provider) => AI_PROVIDER_SECRET_FIELDS[provider])
-    .filter((field): field is SessionWizardSecretField => !!field)
-    .map((field) => ({ ...field }));
+  return [...RESOURCE_SECRET_FIELDS.ai];
 };

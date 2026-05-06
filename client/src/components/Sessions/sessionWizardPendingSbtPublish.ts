@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
 import { finalizeDeferredCreateSbtDraftUpload } from '../SBTs/CreateSBTGroup';
-import contractScripts from '../../utilities/web3/chainGateway.js';
+import contractScripts from '../../utilities/web3/contractScripts.js';
 import { hasPasswordMintForSbtMintMode } from '../../utilities/sbt/sbtMintMode.js';
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
@@ -14,19 +14,16 @@ type PendingSbtCreateOptions = {
   [key: string]: unknown;
 };
 
-export type PendingSbtDeployReceipt =
-  | {
-      transactionHash?: string;
-      events?: unknown[];
-      logs?: unknown[];
-      receipt?: {
-        logs?: unknown[];
-        [key: string]: unknown;
-      } | null;
-      [key: string]: unknown;
-    }
-  | null
-  | undefined;
+export type PendingSbtDeployReceipt = {
+  transactionHash?: string;
+  events?: unknown[];
+  logs?: unknown[];
+  receipt?: {
+    logs?: unknown[];
+    [key: string]: unknown;
+  } | null;
+  [key: string]: unknown;
+} | null | undefined;
 
 type CreateSbtForPendingDraft = (
   providerLike: unknown,
@@ -42,7 +39,7 @@ type CreateSbtForPendingDraft = (
   finalGroupPasswordHash: string,
   sessionConfigForDeploy: AnyRecord,
   create2Salt: string,
-  createOptions: PendingSbtCreateOptions,
+  createOptions: PendingSbtCreateOptions
 ) => Promise<PendingSbtDeployReceipt>;
 
 type DeploySessionWizardPendingSbtDraftResult = {
@@ -50,7 +47,7 @@ type DeploySessionWizardPendingSbtDraftResult = {
   receipt: PendingSbtDeployReceipt;
 };
 
-const createSessionWizardPendingDraftSbt = contractScripts.createSBT as CreateSbtForPendingDraft;
+const createSessionWizardPendingDraftSbt = contractScripts.createSBT as unknown as CreateSbtForPendingDraft;
 
 export const FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID = 'gate-1';
 export const FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE = 'defaultFeaturedSBTs';
@@ -159,8 +156,8 @@ export const deploySessionWizardPendingSbtDraft = async ({
     workerUrlOverride,
     createSbtComponentProps,
   });
-  const hasPasswordMintOnChain =
-    finalizedDraft.hasPasswordMintOnChain === true || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
+  const hasPasswordMintOnChain = finalizedDraft.hasPasswordMintOnChain === true
+    || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
   const receipt = await createSBT(
     providerLike,
     finalizedDraft.contractName,
@@ -197,11 +194,10 @@ export const persistSessionWizardSbtRecoveryCodes = ({
 } = {}) => {
   const codesToStore = finalizedDraft.usesInviteCodes
     ? [toStr(finalizedDraft.groupPassword).trim()].filter(Boolean)
-    : (Array.isArray(finalizedDraft.passwordList) ? finalizedDraft.passwordList : []).filter((value) =>
-        toStr(value).trim(),
-      );
-  const hasPasswordMintOnChain =
-    finalizedDraft.hasPasswordMintOnChain === true || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
+    : (Array.isArray(finalizedDraft.passwordList) ? finalizedDraft.passwordList : [])
+      .filter((value) => toStr(value).trim());
+  const hasPasswordMintOnChain = finalizedDraft.hasPasswordMintOnChain === true
+    || hasPasswordMintForSbtMintMode(finalizedDraft.mintModeOnChain);
 
   if (!hasPasswordMintOnChain || codesToStore.length === 0) {
     return {
