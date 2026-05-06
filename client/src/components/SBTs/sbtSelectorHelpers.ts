@@ -9,6 +9,15 @@ import {
   hasSbtDisplayName,
   isSbtFieldLocked,
 } from '../../utilities/sbt/sbtDisplayNames.js';
+import {
+  canRetryNameLookup as canRetryNameLookupImpl,
+  clearNameLookupFailure as clearNameLookupFailureImpl,
+  ensureNameLookupState as ensureNameLookupStateImpl,
+  markNameLookupFailure as markNameLookupFailureImpl,
+} from './sbtSelectorNameLookupHelpers';
+import type {
+  SbtNameLookupState,
+} from './sbtSelectorNameLookupHelpers';
 export {
   buildSbtSelectorCustomAddressClearPatch,
   buildSbtSelectorCustomAddressInputPatch,
@@ -38,10 +47,18 @@ export {
   resolveSbtSelectorSelectedAddressesState,
   resolveSbtSelectorVariantDisplayState,
 } from './sbtSelectorUiStateHelpers';
+export {
+  canRetryNameLookup,
+  clearNameLookupFailure,
+  ensureNameLookupState,
+  getNameLookupDelayMs,
+  markNameLookupFailure,
+} from './sbtSelectorNameLookupHelpers';
+export type {
+  SbtNameLookupEntry,
+  SbtNameLookupState,
+} from './sbtSelectorNameLookupHelpers';
 
-const NAME_LOOKUP_BASE_DELAY_MS = 30 * 1000;
-const NAME_LOOKUP_MAX_DELAY_MS = 60 * 60 * 1000;
-const NAME_LOOKUP_MAX_EXPONENT = 8;
 export const SBT_SELECTOR_DEBUG_STORAGE_KEY = 'ce:sbtSelectorDebug';
 export const SBT_SELECTOR_DEBUG_QUERY_KEY = 'ceSbtSelectorDebug';
 
@@ -406,12 +423,6 @@ type ResolveSbtSelectorNoOptionsMessageArgs = {
   isLoading?: unknown;
   pluralLabel?: unknown;
 };
-export type SbtNameLookupEntry = Record<string, unknown> & {
-  attempts?: unknown;
-  lastFailureAt?: unknown;
-  nextRetryAt?: unknown;
-};
-export type SbtNameLookupState = Record<string, SbtNameLookupEntry>;
 export type SbtCacheNetNode = Record<string, unknown> & {
   nameLookupState?: SbtNameLookupState;
   sbtList?: Record<string, unknown>;
@@ -720,12 +731,6 @@ export const shouldAutoSearchOtherSbtSelectorSessions = (
   return !!fallback;
 };
 
-export const getNameLookupDelayMs = (attempts: unknown): number => {
-  const safeAttempts = Number(attempts || 0);
-  const exponent = Math.min(Math.max(safeAttempts - 1, 0), NAME_LOOKUP_MAX_EXPONENT);
-  return Math.min(NAME_LOOKUP_BASE_DELAY_MS * (2 ** exponent), NAME_LOOKUP_MAX_DELAY_MS);
-};
-
 export const buildSelectedSbtHydrationAddresses = (selectedSBTs: unknown): string[] => {
   const selected = Array.isArray(selectedSBTs) ? selectedSBTs : [];
   return Array.from(new Set(
@@ -884,52 +889,6 @@ export const resolveSbtSelectorUpdateEffects = ({
     shouldLoadOptions: optionsScopeChanged,
     shouldWarmRegistryCache: universeScopeChanged && !!shouldWarmRegistryCache,
   };
-};
-
-export const ensureNameLookupState = (
-  sbtCache: Record<string, unknown>,
-  netKey: unknown
-): SbtNameLookupState => {
-  const key = String(netKey || '');
-  if (!isRecord(sbtCache[key])) {
-    sbtCache[key] = { sbtList: {}, nameLookupState: {} };
-  }
-  const node = sbtCache[key] as SbtCacheNetNode;
-  if (!isRecord(node.nameLookupState)) {
-    node.nameLookupState = {};
-  }
-  return node.nameLookupState as SbtNameLookupState;
-};
-
-export const canRetryNameLookup = (
-  nameLookupState: SbtNameLookupState,
-  addressLower: unknown,
-  now: unknown = Date.now()
-): boolean => {
-  const retryAt = Number(nameLookupState?.[String(addressLower || '')]?.nextRetryAt || 0);
-  return !Number.isFinite(retryAt) || retryAt <= Number(now);
-};
-
-export const markNameLookupFailure = (
-  nameLookupState: SbtNameLookupState,
-  addressLower: unknown,
-  now: unknown = Date.now()
-): void => {
-  const addressKey = String(addressLower || '');
-  const timestamp = Number(now);
-  const prevAttempts = Number(nameLookupState?.[addressKey]?.attempts || 0) || 0;
-  const attempts = prevAttempts + 1;
-  const delayMs = getNameLookupDelayMs(attempts);
-  nameLookupState[addressKey] = {
-    attempts,
-    nextRetryAt: timestamp + delayMs,
-    lastFailureAt: timestamp,
-  };
-};
-
-export const clearNameLookupFailure = (nameLookupState: SbtNameLookupState, addressLower: unknown): void => {
-  if (!nameLookupState || !addressLower) return;
-  delete nameLookupState[String(addressLower || '')];
 };
 
 export const normalizeAddressListForSig = (addresses: unknown): string[] => (
@@ -1415,7 +1374,7 @@ export const readSbtSelectorScopedCacheContexts = async ({
     const netNode = cache[netKey] || { sbtList: {} };
     cache[netKey] = netNode;
     const sbtList = { ...(netNode.sbtList || {}) } as SbtSelectorScopedEntryMap;
-    const nameLookupState = ensureNameLookupState(cache, netKey);
+    const nameLookupState = ensureNameLookupStateImpl(cache, netKey);
     netNode.sbtList = sbtList;
     netNode.nameLookupState = nameLookupState;
     const context: SbtSelectorCacheContext = {
@@ -1472,9 +1431,9 @@ export const applySbtSelectorHydrationResults = ({
       slug: pickNormalizedSessionSlug(result.slug, context.slug),
     };
     if (hasSbtDisplayName(resolvedInfo)) {
-      clearNameLookupFailure(context.nameLookupState, lower);
+      clearNameLookupFailureImpl(context.nameLookupState, lower);
     } else {
-      markNameLookupFailure(context.nameLookupState, lower, now);
+      markNameLookupFailureImpl(context.nameLookupState, lower, now);
     }
     aggregatedList[aggregatedKey] = mergeScopedSbtEntry(
       aggregatedList[aggregatedKey],
@@ -2185,9 +2144,9 @@ export const applySbtSelectorAddressHydrationResultsToList = ({
       resolvedSlug
     );
     if (hasSbtDisplayName(resolvedInfo)) {
-      clearNameLookupFailure(lookupState, lower);
+      clearNameLookupFailureImpl(lookupState, lower);
     } else {
-      markNameLookupFailure(lookupState, lower, timestamp);
+      markNameLookupFailureImpl(lookupState, lower, timestamp);
     }
   });
   return { nameLookupState: lookupState, sbtList: list };
@@ -2218,7 +2177,7 @@ export const mergeSbtSelectorLatestCacheState = ({
     );
   });
   const nextNameLookupState = {
-    ...ensureNameLookupState(cache, key),
+    ...ensureNameLookupStateImpl(cache, key),
     ...(isRecord(nameLookupState) ? nameLookupState as SbtNameLookupState : {}),
   };
   cache[key].sbtList = currentList;
@@ -2268,10 +2227,10 @@ export const buildSbtSelectorNameLookupFetchList = ({
     const lower = address.toLowerCase();
     const entry = list[lower] || null;
     if (hasSbtDisplayName(entry?.sbtInfo || null)) {
-      clearNameLookupFailure(lookupState, lower);
+      clearNameLookupFailureImpl(lookupState, lower);
       return false;
     }
-    return canRetryNameLookup(lookupState, lower, lookupNow);
+    return canRetryNameLookupImpl(lookupState, lower, lookupNow);
   });
   return { addresses: fetchAddresses, nameLookupState: lookupState };
 };
