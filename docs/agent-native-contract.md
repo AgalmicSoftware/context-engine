@@ -41,12 +41,23 @@ versioned shapes for:
   stable fingerprint.
 - `AgentGrant`: scoped grant metadata that never grants signing authority or
   worker-token authority.
+- `AgentConnectRequest`: future connect/approval handoff metadata for scoped
+  grants. Connect requests can request read, draft, submit-request, create
+  question, decrypt, or revoke-grant scopes, but still do not carry signing
+  authority or worker-token authority.
 
 Request ids use opaque `agent_req_...` values. Client-supplied idempotency keys
 are optional, lowercased, bounded, and matched only inside the authenticated
 wallet scope. A repeated key is treated as a retry only when the stored request
 fingerprint also matches the current request; a different session or question
 set with the same key returns a conflict instead of the older approval request.
+
+Grant and request lifecycle helpers keep denial reasons explicit. Expired and
+revoked grants are denied before scope/session checks; mismatched scopes and
+sessions are reported as `scope_mismatch` or `session_mismatch`. Request
+lifecycle checks treat `expired`, `revoked`, and `rejected` as terminal states
+for remote agents. These helpers are pure contract guards only; wiring them to
+real connect or approval UI remains deferred.
 
 ## Draft vs Submit Request
 

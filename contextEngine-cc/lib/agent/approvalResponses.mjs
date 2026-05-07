@@ -7,6 +7,7 @@ export const AGENT_REQUEST_STATUS = Object.freeze({
   PENDING_APPROVAL: 'pending_approval',
   APPROVED: 'approved',
   REJECTED: 'rejected',
+  REVOKED: 'revoked',
   EXPIRED: 'expired',
   SUBMITTED: 'submitted',
 });
