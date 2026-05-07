@@ -5,6 +5,7 @@ import {
   AGENT_CAPABILITY_MODES,
   AGENT_CAPABILITY_MODE_METADATA,
   buildAgentCapabilities,
+  evaluateAgentCapabilityRequest,
   hasAgentCapability,
   isRemoteAgentCapabilityMode,
 } from './capabilities.mjs';
@@ -45,4 +46,53 @@ test('capability metadata marks risky remote modes as approval-gated', () => {
   assert.equal(AGENT_CAPABILITY_MODE_METADATA[AGENT_CAPABILITY_MODES.DECRYPT_REQUEST].requiresApproval, true);
   assert.equal(isRemoteAgentCapabilityMode(AGENT_CAPABILITY_MODES.SUBMIT_REQUEST), true);
   assert.equal(isRemoteAgentCapabilityMode(AGENT_CAPABILITY_MODES.TRUSTED_LOCAL_AUTO_SUBMIT), false);
+});
+
+test('capability decisions keep risky and local-only modes explicit', () => {
+  const capabilities = buildAgentCapabilities({
+    sessions: ['alpha'],
+    workerTokenSummary: { ready: true },
+    settings: { autoSubmitResponses: true },
+    submitStatus: { ready: true },
+  });
+
+  assert.deepEqual(evaluateAgentCapabilityRequest({
+    capabilities,
+    mode: AGENT_CAPABILITY_MODES.SUBMIT_REQUEST,
+  }), {
+    ok: true,
+    status: 'approval_required',
+    reason: 'human_approval_required',
+    mode: AGENT_CAPABILITY_MODES.SUBMIT_REQUEST,
+    requiresApproval: true,
+    risky: true,
+    remoteAllowed: true,
+  });
+  assert.deepEqual(evaluateAgentCapabilityRequest({
+    capabilities,
+    mode: AGENT_CAPABILITY_MODES.TRUSTED_LOCAL_AUTO_SUBMIT,
+  }), {
+    ok: false,
+    status: 'denied',
+    reason: 'local_only_capability',
+    mode: AGENT_CAPABILITY_MODES.TRUSTED_LOCAL_AUTO_SUBMIT,
+  });
+  assert.deepEqual(evaluateAgentCapabilityRequest({
+    capabilities,
+    mode: AGENT_CAPABILITY_MODES.CREATE_QUESTION_REQUEST,
+  }), {
+    ok: false,
+    status: 'denied',
+    reason: 'capability_disabled',
+    mode: AGENT_CAPABILITY_MODES.CREATE_QUESTION_REQUEST,
+  });
+  assert.deepEqual(evaluateAgentCapabilityRequest({
+    capabilities,
+    mode: 'agent:sign',
+  }), {
+    ok: false,
+    status: 'denied',
+    reason: 'unknown_capability',
+    mode: 'agent:sign',
+  });
 });

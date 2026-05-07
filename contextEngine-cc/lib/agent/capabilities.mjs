@@ -111,3 +111,30 @@ export function isRemoteAgentCapabilityMode(mode) {
   const normalizedMode = String(mode || '').trim();
   return AGENT_CAPABILITY_MODE_METADATA[normalizedMode]?.remoteAllowed === true;
 }
+
+export function evaluateAgentCapabilityRequest({
+  capabilities = {},
+  mode = '',
+  trustTier = AGENT_TRUST_TIERS.REMOTE_AGENT,
+} = {}) {
+  const normalizedMode = String(mode || '').trim();
+  const metadata = AGENT_CAPABILITY_MODE_METADATA[normalizedMode] || null;
+  if (!metadata) {
+    return { ok: false, status: 'denied', reason: 'unknown_capability', mode: normalizedMode };
+  }
+  if (!hasAgentCapability(capabilities, normalizedMode)) {
+    return { ok: false, status: 'denied', reason: 'capability_disabled', mode: normalizedMode };
+  }
+  if (trustTier === AGENT_TRUST_TIERS.REMOTE_AGENT && metadata.remoteAllowed !== true) {
+    return { ok: false, status: 'denied', reason: 'local_only_capability', mode: normalizedMode };
+  }
+  return {
+    ok: true,
+    status: metadata.requiresApproval ? 'approval_required' : 'allowed',
+    reason: metadata.requiresApproval ? 'human_approval_required' : 'capability_allowed',
+    mode: normalizedMode,
+    requiresApproval: metadata.requiresApproval,
+    risky: metadata.risky,
+    remoteAllowed: metadata.remoteAllowed,
+  };
+}
