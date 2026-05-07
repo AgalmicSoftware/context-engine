@@ -15,6 +15,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const CC_ROOT = resolve(__dirname, '..');
 const ROUTER_SOURCE_PATH = resolve(CC_ROOT, 'lib', 'router.mjs');
 const QUESTION_ID = `0x${'11'.repeat(32)}`;
+const SECOND_QUESTION_ID = `0x${'22'.repeat(32)}`;
 const WALLET_ADDRESS = `0x${'12'.repeat(20)}`;
 const SECOND_WALLET_ADDRESS = `0x${'34'.repeat(20)}`;
 
@@ -282,12 +283,22 @@ test('agent read adapters return canonical identity, sessions, and questions', a
   assert.deepEqual(sessions.payload.sessions, ['alpha', 'beta']);
   assert.deepEqual(sessions.payload.selectedSessions, ['alpha', 'beta']);
 
+  const missingSessionQuestions = await callRoute(handleRoute, { path: '/api/agent/questions' });
+  assert.equal(missingSessionQuestions.status, 400);
+
+  const emptySessionQuestions = await callRoute(handleRoute, { path: '/api/agent/questions?session=' });
+  assert.equal(emptySessionQuestions.status, 400);
+
   const questions = await callRoute(handleRoute, { path: '/api/agent/questions?session=alpha' });
   assert.equal(questions.status, 200);
   assert.equal(questions.payload.ok, true);
   assert.equal(questions.payload.session, 'alpha');
   assert.equal(questions.payload.question.id, QUESTION_ID);
   assert.equal(questions.payload.questions.length, 1);
+
+  const generalQuestions = await callRoute(handleRoute, { path: '/api/agent/questions?session=general' });
+  assert.equal(generalQuestions.status, 200);
+  assert.equal(generalQuestions.payload.session, 'general');
 
   const emptyQuestions = await callRoute(handleRoute, { path: '/api/agent/questions?session=empty' });
   assert.equal(emptyQuestions.status, 200);
@@ -348,6 +359,74 @@ test('agent question and draft routes validate payloads and expose local drafts'
   assert.equal(inbox.payload.inbox[0].type, 'response_draft');
 });
 
+test('agent response routes require explicit public session slugs', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const emptyDraft = await callRoute(handleRoute, {
+    path: '/api/agent/responses/draft',
+    method: 'POST',
+    body: {
+      session: '',
+      questionId: QUESTION_ID,
+      questionType: 'freeform',
+      answer: 'This must not write into the empty-session bucket.',
+    },
+  });
+  assert.equal(emptyDraft.status, 400);
+
+  const missingDraft = await callRoute(handleRoute, {
+    path: '/api/agent/responses/draft',
+    method: 'POST',
+    body: {
+      questionId: QUESTION_ID,
+      questionType: 'freeform',
+      answer: 'Missing session should be invalid.',
+    },
+  });
+  assert.equal(missingDraft.status, 400);
+
+  const emptyDrafts = await callRoute(handleRoute, {
+    path: '/api/agent/responses/drafts?session=',
+  });
+  assert.equal(emptyDrafts.status, 400);
+
+  const emptyInbox = await callRoute(handleRoute, {
+    path: '/api/agent/inbox?session=',
+  });
+  assert.equal(emptyInbox.status, 400);
+
+  const emptySubmitRequest = await callRoute(handleRoute, {
+    path: '/api/agent/responses/submit-request',
+    method: 'POST',
+    body: {
+      session: '',
+      questionIds: [QUESTION_ID],
+    },
+  });
+  assert.equal(emptySubmitRequest.status, 400);
+
+  const generalDraft = await callRoute(handleRoute, {
+    path: '/api/agent/responses/draft',
+    method: 'POST',
+    body: {
+      session: 'general',
+      questionId: QUESTION_ID,
+      questionType: 'freeform',
+      answer: 'Use the explicit public general session.',
+    },
+  });
+  assert.equal(generalDraft.status, 200);
+  assert.equal(generalDraft.payload.draft.session, 'general');
+
+  const generalDrafts = await callRoute(handleRoute, {
+    path: '/api/agent/responses/drafts?session=general',
+  });
+  assert.equal(generalDrafts.status, 200);
+  assert.equal(generalDrafts.payload.session, 'general');
+  assert.equal(generalDrafts.payload.count, 1);
+});
+
 test('agent submit-request creates approval records and idempotent retries', async (t) => {
   const harness = setupRouterHarness(t);
   const { handleRoute } = await import(harness.routerUrl);
@@ -400,6 +479,19 @@ test('agent submit-request creates approval records and idempotent retries', asy
   assert.equal(retry.payload.requestId, first.payload.requestId);
   assert.equal(retry.payload.idempotent, true);
 
+  const conflict = await callRoute(handleRoute, {
+    path: '/api/agent/responses/submit-request',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionIds: [SECOND_QUESTION_ID],
+      idempotencyKey: 'submit:alpha.0001',
+    },
+  });
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.payload.ok, false);
+  assert.equal(conflict.payload.code, 'idempotency_key_conflict');
+
   const status = await callRoute(handleRoute, {
     path: `/api/agent/requests/${encodeURIComponent(first.payload.requestId)}`,
   });
@@ -412,6 +504,27 @@ test('agent submit-request creates approval records and idempotent retries', asy
   assert.equal(inbox.status, 200);
   assert.equal(inbox.payload.requests.length, 1);
   assert.equal(inbox.payload.requests[0].requestId, first.payload.requestId);
+
+  const betaRequest = await callRoute(handleRoute, {
+    path: '/api/agent/responses/submit-request',
+    method: 'POST',
+    body: {
+      session: 'beta',
+      questionIds: [QUESTION_ID],
+    },
+  });
+  assert.equal(betaRequest.status, 202);
+
+  const alphaInbox = await callRoute(handleRoute, { path: '/api/agent/inbox?session=alpha' });
+  assert.equal(alphaInbox.status, 200);
+  assert.deepEqual(alphaInbox.payload.requests.map((request) => request.requestId), [first.payload.requestId]);
+
+  const allSessionInbox = await callRoute(handleRoute, { path: '/api/agent/inbox' });
+  assert.equal(allSessionInbox.status, 200);
+  assert.deepEqual(
+    allSessionInbox.payload.requests.map((request) => request.requestId).sort(),
+    [first.payload.requestId, betaRequest.payload.requestId].sort()
+  );
 
   const invalidStatus = await callRoute(handleRoute, {
     path: '/api/agent/requests/not-a-request-id',

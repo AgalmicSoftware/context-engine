@@ -21,6 +21,12 @@ Legacy routes remain supported. The canonical routes require the same local JWT
 auth as their CE-CC equivalents and do not weaken worker-token or trusted-local
 checks.
 
+Session identity is explicit on the public agent contract. Browser/client
+internals may still use an empty string for the general/default session, but
+`/api/agent/*` callers must send `general` for that public session name. Empty
+agent session values such as `session: ""` or `?session=` are invalid and return
+`400`.
+
 ## Contract Shapes
 
 Agent contract helpers under `contextEngine-cc/lib/agent/` define stable
@@ -38,7 +44,9 @@ versioned shapes for:
 
 Request ids use opaque `agent_req_...` values. Client-supplied idempotency keys
 are optional, lowercased, bounded, and matched only inside the authenticated
-wallet scope.
+wallet scope. A repeated key is treated as a retry only when the stored request
+fingerprint also matches the current request; a different session or question
+set with the same key returns a conflict instead of the older approval request.
 
 ## Draft vs Submit Request
 

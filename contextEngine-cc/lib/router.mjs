@@ -43,6 +43,7 @@ import {
 } from './responseAudience.mjs';
 import { buildAgentCapabilities } from './agent/capabilities.mjs';
 import {
+  buildAgentError,
   buildAgentOk,
   normalizeAgentQuestionPayload,
   redactAgentSensitiveFields,
@@ -52,6 +53,7 @@ import {
 import {
   AGENT_REQUEST_TYPES,
   buildApprovalRequiredResponse,
+  buildAgentRequestFingerprint,
   buildAgentRequestRecord,
   createApprovalRequestId,
   isValidApprovalRequestId,
@@ -520,9 +522,8 @@ async function saveAgentResponseDraft({ body = {}, authPayload = {} } = {}) {
     return { ok: false, status: 400, payload: { error: questionValidation.error } };
   }
   const canonicalQuestionId = questionValidation.questionId;
-  const sessionValidation = validateSessionSlug(session, {
+  const sessionValidation = validateAgentSessionSlug(session, {
     required: true,
-    allowExplicitEmpty: true,
   });
   if (!sessionValidation.ok) {
     return { ok: false, status: 400, payload: { error: sessionValidation.error } };
@@ -638,6 +639,20 @@ function validateSessionSlug(value, { required = false, allowExplicitEmpty = fal
     return { ok: false, error: 'Invalid session slug.' };
   }
   return { ok: true, slug };
+}
+
+function validateAgentSessionSlug(value, { required = false } = {}) {
+  const raw = value == null ? null : String(value).trim();
+  if (raw === '') {
+    return {
+      ok: false,
+      error: 'session must be a non-empty agent session slug; use "general" for the general session.',
+    };
+  }
+  return validateSessionSlug(value, {
+    required,
+    allowExplicitEmpty: false,
+  });
 }
 
 function validateConfigSessionSlug(value, fieldName, { allowEmpty = false } = {}) {
@@ -1480,7 +1495,9 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   if (path === '/api/agent/questions' && method === 'GET') {
     const auth = requireAuth(req);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
-    const sessionValidation = validateSessionSlug(url.searchParams.get('session'));
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
+      required: true,
+    });
     if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
     const slug = sessionValidation.slug;
     const walletAddr = auth.payload?.sub || '';
@@ -1509,9 +1526,8 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   if (path === '/api/agent/inbox' && method === 'GET') {
     const auth = requireAuth(req);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
-    const sessionValidation = validateSessionSlug(url.searchParams.get('session'), {
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
       required: false,
-      allowExplicitEmpty: true,
     });
     if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
     try {
@@ -1522,7 +1538,12 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         loadPendingResponses(slug),
         auth.payload?.sub || '',
       ).map((response) => summarizePendingResponseForAgent(response, { session: slug })));
-      const requests = loadAgentRequestsForWallet(auth.payload?.sub || '').map(summarizeRequestForAgent);
+      const requests = loadAgentRequestsForWallet(auth.payload?.sub || '')
+        .filter((request) => (
+          !sessionValidation.slug
+          || String(request?.session || '').trim().toLowerCase() === sessionValidation.slug.toLowerCase()
+        ))
+        .map(summarizeRequestForAgent);
       return json(res, 200, buildAgentOk({
         inbox: [
           ...pendingResponses,
@@ -1766,9 +1787,8 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   if (path === '/api/agent/responses/drafts' && method === 'GET') {
     const auth = requireAuth(req);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
-    const sessionValidation = validateSessionSlug(url.searchParams.get('session'), {
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
       required: true,
-      allowExplicitEmpty: true,
     });
     if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
     const slug = sessionValidation.slug;
@@ -1793,9 +1813,8 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
 
     const { session, questionIds, questionId } = body || {};
-    const sessionValidation = validateSessionSlug(session, {
+    const sessionValidation = validateAgentSessionSlug(session, {
       required: true,
-      allowExplicitEmpty: true,
     });
     if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
 
@@ -1807,9 +1826,24 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       return json(res, 400, { error: 'questionIds must contain at least one 32-byte hex string.' });
     }
 
+    const requester = auth.payload?.sub || '';
+    const requestQuestionIds = normalizedQuestionIds.map((entry) => entry.questionId);
+    const requestFingerprint = buildAgentRequestFingerprint({
+      type: AGENT_REQUEST_TYPES.RESPONSE_SUBMIT,
+      requester,
+      session: sessionValidation.slug,
+      questionIds: requestQuestionIds,
+    });
     const idempotencyKey = normalizeAgentIdempotencyKey(body?.idempotencyKey);
     const existingRequest = loadAgentRequestByIdempotencyKey(auth.payload?.sub || '', idempotencyKey);
     if (existingRequest) {
+      const existingFingerprint = existingRequest.fingerprint || buildAgentRequestFingerprint(existingRequest);
+      if (existingFingerprint !== requestFingerprint) {
+        return json(res, 409, buildAgentError('idempotencyKey conflicts with an existing agent request.', {
+          status: 'idempotency_conflict',
+          code: 'idempotency_key_conflict',
+        }));
+      }
       const existingApproval = buildApprovalRequiredResponse({
         requestId: existingRequest.requestId,
         approvalUrl: existingRequest.approvalUrl,
@@ -1843,7 +1877,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       approvalUrl: approval.approvalUrl,
       session: sessionValidation.slug,
       questionIds: normalizedQuestionIds.map((entry) => entry.questionId),
-      requester: auth.payload?.sub || '',
+      requester,
       idempotencyKey,
       createdAt,
       updatedAt: createdAt,

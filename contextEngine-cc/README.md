@@ -379,6 +379,11 @@ Canonical agent routes live under `/api/agent/*` and are documented in
 [`docs/agent-native-contract.md`](../docs/agent-native-contract.md). They use
 the same local JWT auth as the legacy CE-CC API.
 
+Agent routes require explicit public session identity. Use `general` for the
+general/default session; empty values such as `session: ""` or `?session=` are
+rejected even though older browser/client internals may still use an empty
+string for that local convention.
+
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/agent/me` | Return local agent identity, auth mode, and capability metadata |
@@ -391,8 +396,9 @@ the same local JWT auth as the legacy CE-CC API.
 | GET | `/api/agent/requests/:id` | Read approval request status by opaque request id |
 
 Submit requests may include an optional `idempotencyKey`. The key is normalized
-inside the authenticated wallet scope so safe retries return the existing
-pending approval request instead of creating duplicate work.
+inside the authenticated wallet scope so same-payload retries return the
+existing pending approval request instead of creating duplicate work. Reusing a
+key for a different session or question set returns a conflict.
 
 MCP descriptors in `lib/agent/mcpTools.mjs` are thin wrappers over these
 routes. Telegram and OpenClaw helpers in `lib/agent/` are pure contract helpers

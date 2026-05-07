@@ -61,6 +61,8 @@ test('agent submit-request route is approval-gated and does not submit on-chain'
   assert.match(branch, /saveAgentRequest/);
   assert.match(branch, /idempotencyKey/);
   assert.match(branch, /loadAgentRequestByIdempotencyKey/);
+  assert.match(branch, /buildAgentRequestFingerprint/);
+  assert.match(branch, /idempotency_key_conflict/);
   assert.doesNotMatch(branch, /submitOnChainImpl/);
   assert.doesNotMatch(branch, /ensureWorkerToken/);
 });
