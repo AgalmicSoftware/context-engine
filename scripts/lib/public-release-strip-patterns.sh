@@ -36,6 +36,7 @@ EOF
 
 ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
+contextEngine-cc
 CLAUDE.md
 .claude
 docs/agent-native*.md
