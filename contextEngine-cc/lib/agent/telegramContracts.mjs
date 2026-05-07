@@ -157,10 +157,18 @@ export function buildTelegramSecureStorageGrant({
   return payload;
 }
 
+function normalizePublicAgentSession(session) {
+  const normalized = String(session || '').trim();
+  if (!normalized) {
+    throw new Error('Telegram agent drafts require an explicit session; use "general" for the general session.');
+  }
+  return normalized;
+}
+
 export function telegramInputToAgentDraft({ update = {}, session = '', questionId = '', questionType = 'freeform' } = {}) {
   const normalized = normalizeTelegramUpdate(update);
   return {
-    session,
+    session: normalizePublicAgentSession(session),
     questionId,
     questionType,
     answer: normalized.text || '',

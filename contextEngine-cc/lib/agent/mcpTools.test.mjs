@@ -98,6 +98,33 @@ test('MCP handlers mirror HTTP JSON responses without adding business logic', as
   assert.equal(calls[0].init.body, '{"session":"alpha","questionIds":["0xabc"]}');
 });
 
+test('MCP submit wrapper preserves approval-required HTTP responses exactly', async () => {
+  const approvalResponse = {
+    ok: false,
+    requiresApproval: true,
+    requestId: 'agent_req_abc12345',
+    approvalUrl: 'http://localhost:7391/agent/requests/agent_req_abc12345',
+    status: 'pending_approval',
+    request: {
+      requestId: 'agent_req_abc12345',
+      session: 'general',
+    },
+  };
+  const handlers = createAgentMcpToolHandlers({
+    fetchImpl: async () => ({
+      async json() {
+        return approvalResponse;
+      },
+    }),
+  });
+
+  assert.deepEqual(await handlers.submit_response_request({
+    session: 'general',
+    questionIds: ['0xabc'],
+    idempotencyKey: 'submit:general.0001',
+  }), approvalResponse);
+});
+
 test('implemented MCP tools map only to inventoried canonical agent HTTP routes', () => {
   const canonicalKeys = new Set(AGENT_CANONICAL_ROUTES.map(agentRouteKey));
   for (const tool of AGENT_MCP_TOOL_DEFINITIONS.filter((entry) => entry.implemented)) {

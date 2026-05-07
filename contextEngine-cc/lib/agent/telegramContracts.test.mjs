@@ -172,3 +172,22 @@ test('Telegram text input normalizes into canonical agent draft shape', () => {
     privateDm: true,
   });
 });
+
+test('Telegram draft normalization preserves general and rejects empty public session', () => {
+  const update = {
+    message: {
+      chat: { id: 1, type: 'private' },
+      text: 'answer from general',
+    },
+  };
+
+  assert.equal(telegramInputToAgentDraft({
+    session: ' general ',
+    questionId: '0xabc',
+    update,
+  }).session, 'general');
+  assert.throws(
+    () => telegramInputToAgentDraft({ session: '', questionId: '0xabc', update }),
+    /use "general"/,
+  );
+});

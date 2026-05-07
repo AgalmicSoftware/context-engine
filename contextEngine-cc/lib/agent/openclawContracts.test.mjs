@@ -53,6 +53,21 @@ test('OpenClaw draft forwarding envelope uses canonical draft listing', () => {
   assert.deepEqual(validateOpenClawAdapterEnvelope(envelope), { ok: true });
 });
 
+test('OpenClaw draft forwarding requires explicit public session names', () => {
+  const envelope = buildOpenClawDraftForward({
+    session: ' general ',
+    questionId: '0xabc',
+    draft: { questionId: '0xabc' },
+  });
+
+  assert.equal(envelope.session, 'general');
+  assert.equal(envelope.http.path, '/api/agent/responses/drafts?session=general');
+  assert.throws(
+    () => buildOpenClawDraftForward({ session: '', questionId: '0xabc' }),
+    /use "general"/,
+  );
+});
+
 test('OpenClaw thread target normalization defaults to the adapter contract name', () => {
   assert.deepEqual(normalizeOpenClawThreadTarget({ enabled: true, threadId: 't-1' }), {
     enabled: true,

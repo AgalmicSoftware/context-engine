@@ -36,23 +36,32 @@ export function buildOpenClawApprovalForward({
   };
 }
 
+function normalizePublicAgentSession(session) {
+  const normalized = String(session || '').trim();
+  if (!normalized) {
+    throw new Error('OpenClaw draft forwarding requires an explicit session; use "general" for the general session.');
+  }
+  return normalized;
+}
+
 export function buildOpenClawDraftForward({
   threadId = '',
   session = '',
   questionId = '',
   draft = {},
 } = {}) {
+  const normalizedSession = normalizePublicAgentSession(session);
   return {
     adapter: OPENCLAW_THREAD_ADAPTER_CONTRACT.name,
     version: OPENCLAW_THREAD_ADAPTER_CONTRACT.version,
     event: 'draft_saved',
     threadId: String(threadId || '').trim() || null,
-    session: String(session || '').trim(),
+    session: normalizedSession,
     questionId: String(questionId || '').trim(),
     draft,
     http: {
       method: 'GET',
-      path: `/api/agent/responses/drafts?session=${encodeURIComponent(String(session || '').trim())}`,
+      path: `/api/agent/responses/drafts?session=${encodeURIComponent(normalizedSession)}`,
     },
   };
 }
