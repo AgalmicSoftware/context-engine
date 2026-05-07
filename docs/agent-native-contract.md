@@ -15,7 +15,7 @@ business-logic paths.
 | Draft responses | `POST /api/agent/responses/draft` | `POST /api/respond` | Draft-only local save |
 | Draft listing | `GET /api/agent/responses/drafts?session=<slug>` | `GET /api/responses/pending?session=<slug>` | Pending-response adapter |
 | Submit request | `POST /api/agent/responses/submit-request` | `POST /api/responses/submit-onchain` | Approval-gated request |
-| Request status | `GET /api/agent/requests/:id` | None | Agent-native request read |
+| Request status | `GET /api/agent/requests/:id[?session=<slug>]` | None | Agent-native request read |
 
 Legacy routes remain supported. The canonical routes require the same local JWT
 auth as their CE-CC equivalents and do not weaken worker-token or trusted-local
@@ -26,6 +26,9 @@ internals may still use an empty string for the general/default session, but
 `/api/agent/*` callers must send `general` for that public session name. Empty
 agent session values such as `session: ""` or `?session=` are invalid and return
 `400`.
+Request status reads are wallet-scoped by the local JWT. When a `session` query
+is provided, the request must also belong to that public session slug or the
+route returns the same not-found envelope used for unknown request ids.
 
 ## Contract Shapes
 
