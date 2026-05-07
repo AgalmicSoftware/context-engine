@@ -1,3 +1,5 @@
+import { normalizeAgentIdempotencyKey } from './approvalResponses.mjs';
+
 export const OPENCLAW_THREAD_ADAPTER_CONTRACT = Object.freeze({
   name: 'OpenClawThreadAdapter',
   version: 'agent-contract-v1',
@@ -14,6 +16,17 @@ export const OPENCLAW_THREAD_ADAPTER_CONTRACT = Object.freeze({
     'Thread forwarding is optional and must not scrape browser DOM.',
   ]),
 });
+
+export const OPENCLAW_THREAD_EVENT_STATES = Object.freeze([
+  'delivered',
+  'drafted',
+  'submit_requested',
+  'approved',
+  'submitted',
+  'failed',
+]);
+
+const OPENCLAW_THREAD_EVENT_STATE_SET = new Set(OPENCLAW_THREAD_EVENT_STATES);
 
 export function buildOpenClawApprovalForward({
   threadId = '',
@@ -32,6 +45,51 @@ export function buildOpenClawApprovalForward({
     http: {
       method: 'GET',
       path: requestId ? `/api/agent/requests/${encodeURIComponent(requestId)}` : '/api/agent/requests/:id',
+    },
+  };
+}
+
+export function buildOpenClawThreadEventEnvelope({
+  event = '',
+  threadId = '',
+  requestId = '',
+  approvalUrl = '',
+  status = '',
+  session = '',
+  questionId = '',
+  idempotencyKey = '',
+  payload = {},
+  http = {},
+} = {}) {
+  const normalizedEvent = String(event || '').trim();
+  if (!OPENCLAW_THREAD_EVENT_STATE_SET.has(normalizedEvent)) {
+    throw new Error('Invalid OpenClaw thread event state.');
+  }
+  const normalizedIdempotencyKey = normalizeAgentIdempotencyKey(idempotencyKey);
+  if (idempotencyKey && !normalizedIdempotencyKey) {
+    throw new Error('OpenClaw idempotency keys must be stable and non-secret.');
+  }
+  const normalizedRequestId = String(requestId || '').trim();
+  const path = String(http.path || '').trim()
+    || (normalizedRequestId
+      ? `/api/agent/requests/${encodeURIComponent(normalizedRequestId)}`
+      : '/api/agent/inbox');
+
+  return {
+    adapter: OPENCLAW_THREAD_ADAPTER_CONTRACT.name,
+    version: OPENCLAW_THREAD_ADAPTER_CONTRACT.version,
+    event: normalizedEvent,
+    threadId: String(threadId || '').trim() || null,
+    requestId: normalizedRequestId || null,
+    approvalUrl: String(approvalUrl || '').trim() || null,
+    status: String(status || normalizedEvent).trim(),
+    session: String(session || '').trim() || null,
+    questionId: String(questionId || '').trim() || null,
+    idempotencyKey: normalizedIdempotencyKey || null,
+    payload,
+    http: {
+      method: String(http.method || 'GET').trim().toUpperCase(),
+      path,
     },
   };
 }

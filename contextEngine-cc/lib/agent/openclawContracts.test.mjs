@@ -3,8 +3,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   OPENCLAW_THREAD_ADAPTER_CONTRACT,
+  OPENCLAW_THREAD_EVENT_STATES,
   buildOpenClawApprovalForward,
   buildOpenClawDraftForward,
+  buildOpenClawThreadEventEnvelope,
   normalizeOpenClawThreadTarget,
   validateOpenClawAdapterEnvelope,
 } from './openclawContracts.mjs';
@@ -15,6 +17,59 @@ test('OpenClaw adapter contract is optional and transport-only', () => {
   assert.equal(
     OPENCLAW_THREAD_ADAPTER_CONTRACT.constraints.includes('Direct HTTP must work without OpenClaw.'),
     true,
+  );
+});
+
+test('OpenClaw thread event states cover delivery and request lifecycle', () => {
+  assert.deepEqual(OPENCLAW_THREAD_EVENT_STATES, [
+    'delivered',
+    'drafted',
+    'submit_requested',
+    'approved',
+    'submitted',
+    'failed',
+  ]);
+
+  for (const event of OPENCLAW_THREAD_EVENT_STATES) {
+    const envelope = buildOpenClawThreadEventEnvelope({ event, threadId: 'thread-1' });
+    assert.equal(envelope.event, event);
+    assert.equal(envelope.http.path, '/api/agent/inbox');
+    assert.deepEqual(validateOpenClawAdapterEnvelope(envelope), { ok: true });
+  }
+});
+
+test('OpenClaw submit-request event preserves approval handoff fields', () => {
+  const envelope = buildOpenClawThreadEventEnvelope({
+    event: 'submit_requested',
+    threadId: 'thread-1',
+    requestId: 'agent_req_abc12345',
+    approvalUrl: 'http://localhost:7391/agent/requests/agent_req_abc12345',
+    status: 'pending_approval',
+    session: 'general',
+    questionId: '0xabc',
+    idempotencyKey: 'OpenClaw:Req.0001',
+  });
+
+  assert.equal(envelope.requestId, 'agent_req_abc12345');
+  assert.equal(envelope.approvalUrl, 'http://localhost:7391/agent/requests/agent_req_abc12345');
+  assert.equal(envelope.status, 'pending_approval');
+  assert.equal(envelope.session, 'general');
+  assert.equal(envelope.idempotencyKey, 'openclaw:req.0001');
+  assert.equal(envelope.http.path, '/api/agent/requests/agent_req_abc12345');
+  assert.deepEqual(validateOpenClawAdapterEnvelope(envelope), { ok: true });
+});
+
+test('OpenClaw thread events reject invalid states and secret-shaped idempotency keys', () => {
+  assert.throws(
+    () => buildOpenClawThreadEventEnvelope({ event: 'scrape_dom' }),
+    /Invalid OpenClaw thread event state/,
+  );
+  assert.throws(
+    () => buildOpenClawThreadEventEnvelope({
+      event: 'submit_requested',
+      idempotencyKey: 'Bearer long-lived-token',
+    }),
+    /stable and non-secret/,
   );
 });
 

@@ -125,6 +125,10 @@ OpenClaw compatibility means:
 envelopes for approval and draft forwarding.
 Envelope validation requires canonical `/api/agent/*` HTTP paths and rejects DOM
 scraping hints such as `document.querySelector`.
+Thread event envelopes cover `delivered`, `drafted`, `submit_requested`,
+`approved`, `submitted`, and `failed` states. Submit-request envelopes preserve
+the canonical `requestId`, `approvalUrl`, status, and non-secret idempotency key
+so OpenClaw can forward state without becoming a second authority boundary.
 
 ## Telegram Compatibility
 
