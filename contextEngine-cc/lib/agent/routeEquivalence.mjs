@@ -54,6 +54,30 @@ export const AGENT_ROUTE_EQUIVALENCE = Object.freeze([
     notes: 'Reads approval request status by opaque request id.',
   },
   {
+    canonical: { method: 'POST', path: '/api/agent/connect-requests' },
+    legacy: null,
+    relation: 'agent-native',
+    notes: 'Creates a side-effect-free scoped grant request that still requires local human approval.',
+  },
+  {
+    canonical: { method: 'GET', path: '/api/agent/connect-requests/:id' },
+    legacy: null,
+    relation: 'agent-native',
+    notes: 'Reads scoped grant connect request status without approving or creating a grant.',
+  },
+  {
+    canonical: { method: 'POST', path: '/api/agent/connect-requests/approve' },
+    legacy: null,
+    relation: 'agent-native',
+    notes: 'Transitions a pending connect request to an active scoped grant after local human auth.',
+  },
+  {
+    canonical: { method: 'POST', path: '/api/agent/connect-requests/deny' },
+    legacy: null,
+    relation: 'agent-native',
+    notes: 'Denies a pending connect request after local human auth without creating a grant.',
+  },
+  {
     canonical: { method: 'GET', path: '/api/agent/grants' },
     legacy: null,
     relation: 'agent-native',

@@ -20,7 +20,7 @@ test('agent action inventory covers private web UX action families', () => {
   }
 
   const families = new Set(AGENT_ACTION_INVENTORY.map((entry) => entry.family));
-  for (const family of ['read', 'response', 'decrypt', 'grant', 'question', 'survey', 'sbt_group', 'session', 'deliberation']) {
+  for (const family of ['read', 'response', 'decrypt', 'grant', 'account', 'question', 'survey', 'sbt_group', 'session', 'deliberation']) {
     assert.equal(families.has(family), true, `missing family: ${family}`);
   }
 
@@ -29,6 +29,9 @@ test('agent action inventory covers private web UX action families', () => {
   assert.deepEqual(getAgentAction(AGENT_ACTION_IDS.RESPONSE_DELEGATED_EXECUTE).requiredScopes, [
     AGENT_GRANT_SCOPES.DELEGATED_EXECUTE,
   ]);
+  assert.equal(getAgentAction(AGENT_ACTION_IDS.ACCOUNT_CREATE).status, AGENT_ACTION_STATUS.CONTRACT_ONLY);
+  assert.equal(getAgentAction(AGENT_ACTION_IDS.ACCOUNT_CREATE).route.path, '/api/agent/accounts/create');
+  assert.equal(getAgentAction(AGENT_ACTION_IDS.ACCOUNT_LINK_REQUEST).route.path, '/api/agent/accounts/link-request');
 });
 
 test('agent action inventory exposes only canonical agent routes and no remote authority', () => {
@@ -62,8 +65,12 @@ test('implemented action routes are the current canonical agent surface', () => 
 
   assert.deepEqual(implementedRoutes, [
     'GET /api/agent/me',
+    'GET /api/agent/connect-requests/:id',
     'GET /api/agent/questions',
     'GET /api/agent/sessions',
+    'POST /api/agent/connect-requests',
+    'POST /api/agent/connect-requests/approve',
+    'POST /api/agent/connect-requests/deny',
     'POST /api/agent/grants/revoke',
     'POST /api/agent/responses/draft',
     'POST /api/agent/responses/submit-request',

@@ -1,4 +1,8 @@
-import { AGENT_REQUEST_STATUS } from './approvalResponses.mjs';
+import {
+  AGENT_REQUEST_STATUS,
+  AGENT_REQUEST_TYPES,
+  normalizeAgentIdempotencyKey,
+} from './approvalResponses.mjs';
 import {
   AGENT_CONTRACT_VERSION,
   AGENT_GRANT_STATUS,
@@ -78,6 +82,13 @@ function riskAllowed({ requestedRisk = AGENT_RISK_LEVELS.LOW, riskCeiling = AGEN
   return RISK_RANK[normalizeRiskLevel(requestedRisk)] <= RISK_RANK[normalizeRiskLevel(riskCeiling)];
 }
 
+function sortedUniqueLower(values = []) {
+  return unique(toArray(values)
+    .map((entry) => String(entry || '').trim().toLowerCase())
+    .filter(Boolean))
+    .sort();
+}
+
 function parseTimestampState(value, { nowMs = Date.now() } = {}) {
   if (!value) return { state: 'none' };
   const time = Date.parse(String(value));
@@ -129,6 +140,30 @@ export function normalizeAgentPublicSessions(value = []) {
     .map((entry) => entry.session));
 }
 
+export function buildAgentConnectRequestFingerprint(request = {}) {
+  const requestedScopes = normalizeAgentGrantScopes(
+    request.requestedScopes ?? request.scopes ?? request.scope,
+  );
+  const requestedSessions = normalizeAgentPublicSessions(
+    request.requestedSessions ?? request.sessions ?? request.session,
+  );
+  const requestedActions = normalizeAgentGrantAllowedActions(
+    request.requestedActions ?? request.allowedActions ?? request.action,
+  );
+  return [
+    AGENT_REQUEST_TYPES.CONNECT_GRANT,
+    normalizeComparableIdentity(request.humanPrincipal ?? request.requester ?? request.principal),
+    normalizeComparableIdentity(request.agentId ?? request.subject),
+    ...sortedUniqueLower(requestedScopes).map((entry) => `scope:${entry}`),
+    ...sortedUniqueLower(requestedSessions).map((entry) => `session:${entry}`),
+    ...sortedUniqueLower(requestedActions).map((entry) => `action:${entry}`),
+    `risk:${normalizeAgentGrantRiskCeiling(request.riskCeiling)}`,
+    `policy:${normalizeAgentGrantExecutionPolicy(request.executionPolicy)}`,
+    `audit:${request.auditRequired === false ? 'optional' : 'required'}`,
+    `expires:${String(request.expiresAt || '').trim()}`,
+  ].join('|');
+}
+
 export function normalizeAgentConnectRequest(request = {}) {
   const requestedScopes = normalizeAgentGrantScopes(
     request.requestedScopes ?? request.scopes ?? request.scope,
@@ -139,10 +174,12 @@ export function normalizeAgentConnectRequest(request = {}) {
   const status = String(request.status || AGENT_CONNECT_REQUEST_STATUS.PENDING_APPROVAL).trim();
 
   return {
-    type: 'agent_connect_request',
+    type: AGENT_REQUEST_TYPES.CONNECT_GRANT,
     version: AGENT_CONTRACT_VERSION,
     requestId: String(request.requestId || '').trim(),
-    subject: String(request.subject || '').trim(),
+    humanPrincipal: String(request.humanPrincipal || request.requester || request.principal || '').trim().toLowerCase(),
+    agentId: String(request.agentId || request.subject || '').trim(),
+    subject: String(request.subject || request.agentId || '').trim(),
     status: CONNECT_STATUS_SET.has(status) ? status : AGENT_CONNECT_REQUEST_STATUS.PENDING_APPROVAL,
     requestedScopes,
     requestedSessions,
@@ -152,12 +189,207 @@ export function normalizeAgentConnectRequest(request = {}) {
     riskCeiling: normalizeAgentGrantRiskCeiling(request.riskCeiling),
     executionPolicy: normalizeAgentGrantExecutionPolicy(request.executionPolicy),
     auditRequired: request.auditRequired !== false,
+    idempotencyKey: normalizeAgentIdempotencyKey(request.idempotencyKey),
+    fingerprint: String(request.fingerprint || buildAgentConnectRequestFingerprint(request)).trim(),
     approvalUrl: request.approvalUrl || null,
     createdAt: request.createdAt || null,
+    updatedAt: request.updatedAt || null,
+    approvedAt: request.approvedAt || null,
+    deniedAt: request.deniedAt || null,
+    grantId: request.grantId || null,
     expiresAt: request.expiresAt || null,
     signingAuthority: false,
     workerTokenAuthority: false,
+    privateKeyAuthority: false,
+    longLivedBearerAuthority: false,
   };
+}
+
+export function validateAgentConnectRequestForCreation(input = {}, {
+  humanPrincipal = input.humanPrincipal || input.requester || input.principal || '',
+  nowMs = Date.now(),
+} = {}) {
+  const request = normalizeAgentConnectRequest({
+    ...input,
+    humanPrincipal,
+  });
+  const rawScopes = toArray(input.requestedScopes ?? input.scopes ?? input.scope)
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean);
+  const rawSessions = toArray(input.requestedSessions ?? input.sessions ?? input.session)
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean);
+  const rawActions = toArray(input.requestedActions ?? input.allowedActions ?? input.action)
+    .map((entry) => String(entry || '').trim())
+    .filter(Boolean);
+  const rawRisk = String(input.riskCeiling || '').trim().toLowerCase();
+  const rawPolicy = String(input.executionPolicy || '').trim().toLowerCase();
+  const expiry = parseTimestampState(request.expiresAt, { nowMs });
+
+  if (!request.humanPrincipal) {
+    return { ok: false, reason: 'human_principal_required', request };
+  }
+  if (!request.agentId) {
+    return { ok: false, reason: 'agent_identity_required', request };
+  }
+  if (!rawScopes.length) {
+    return { ok: false, reason: 'requested_scopes_required', request };
+  }
+  if (request.requestedScopes.length !== sortedUniqueLower(rawScopes).length) {
+    return { ok: false, reason: 'invalid_requested_scopes', request };
+  }
+  if (!rawSessions.length) {
+    return { ok: false, reason: 'requested_sessions_required', request };
+  }
+  if (request.requestedSessions.length !== sortedUniqueLower(rawSessions).length) {
+    return { ok: false, reason: 'invalid_requested_sessions', request };
+  }
+  if (!rawActions.length) {
+    return { ok: false, reason: 'requested_actions_required', request };
+  }
+  if (request.requestedActions.length !== sortedUniqueLower(rawActions).length) {
+    return { ok: false, reason: 'invalid_requested_actions', request };
+  }
+  if (!rawRisk) {
+    return { ok: false, reason: 'risk_ceiling_required', request };
+  }
+  if (!Object.hasOwn(RISK_RANK, rawRisk)) {
+    return { ok: false, reason: 'invalid_risk_ceiling', request };
+  }
+  if (!rawPolicy) {
+    return { ok: false, reason: 'execution_policy_required', request };
+  }
+  if (!EXECUTION_POLICY_SET.has(rawPolicy)) {
+    return { ok: false, reason: 'invalid_execution_policy', request };
+  }
+  if (request.executionPolicy === AGENT_EXECUTION_POLICIES.TRUSTED_LOCAL_AUTO_SUBMIT) {
+    return { ok: false, reason: 'trusted_local_auto_submit_local_only', request };
+  }
+  if (!request.expiresAt) {
+    return { ok: false, reason: 'expires_at_required', request };
+  }
+  if (expiry.state === 'invalid') {
+    return { ok: false, reason: 'invalid_expiration', request };
+  }
+  if (expiry.state === 'expired') {
+    return { ok: false, reason: 'request_expired', request };
+  }
+  if (!request.idempotencyKey) {
+    return { ok: false, reason: 'invalid_idempotency_key', request };
+  }
+  if (
+    input.signingAuthority
+    || input.workerTokenAuthority
+    || input.privateKeyAuthority
+    || input.longLivedBearerAuthority
+  ) {
+    return { ok: false, reason: 'remote_signing_authority_denied', request };
+  }
+  if (
+    request.requestedActions.includes('agent.response.delegated_execute')
+    && !request.requestedScopes.includes(AGENT_GRANT_SCOPES.DELEGATED_EXECUTE)
+  ) {
+    return { ok: false, reason: 'action_scope_mismatch', request };
+  }
+  if (
+    request.executionPolicy === AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE
+    && !request.requestedScopes.includes(AGENT_GRANT_SCOPES.DELEGATED_EXECUTE)
+  ) {
+    return { ok: false, reason: 'delegated_execute_scope_required', request };
+  }
+
+  return {
+    ok: true,
+    reason: 'connect_request_valid',
+    request: {
+      ...request,
+      fingerprint: buildAgentConnectRequestFingerprint(request),
+    },
+  };
+}
+
+export function evaluateAgentConnectRequestApproval(request = {}, {
+  humanPrincipal = '',
+  agentId = '',
+  session = '',
+  actionId = '',
+  riskLevel = '',
+  nowMs = Date.now(),
+} = {}) {
+  const normalized = normalizeAgentConnectRequest(request);
+  const lifecycle = evaluateAgentRequestLifecycle(normalized, { nowMs });
+  if (!lifecycle.ok) {
+    return { ...lifecycle, request: normalized };
+  }
+  if (normalized.status !== AGENT_CONNECT_REQUEST_STATUS.PENDING_APPROVAL) {
+    return { ok: false, status: normalized.status, reason: 'connect_request_not_pending', request: normalized };
+  }
+  if (normalized.fingerprint !== buildAgentConnectRequestFingerprint(normalized)) {
+    return { ok: false, status: 'denied', reason: 'connect_request_fingerprint_mismatch', request: normalized };
+  }
+  const requestedHuman = normalizeComparableIdentity(humanPrincipal);
+  if (normalized.humanPrincipal && requestedHuman && normalizeComparableIdentity(normalized.humanPrincipal) !== requestedHuman) {
+    return { ok: false, status: 'denied', reason: 'human_principal_mismatch', request: normalized };
+  }
+  const requestedAgent = normalizeComparableIdentity(agentId);
+  if (normalized.agentId && requestedAgent && normalizeComparableIdentity(normalized.agentId) !== requestedAgent) {
+    return { ok: false, status: 'denied', reason: 'agent_identity_mismatch', request: normalized };
+  }
+  const requestedSession = String(session || '').trim();
+  if (requestedSession) {
+    const sessionResult = normalizeAgentPublicSessionSlug(requestedSession);
+    if (!sessionResult.ok) {
+      return { ok: false, status: 'denied', reason: 'invalid_session', request: normalized };
+    }
+    if (!normalized.requestedSessions.includes(sessionResult.session)) {
+      return { ok: false, status: 'denied', reason: 'session_mismatch', request: normalized };
+    }
+  }
+  const normalizedActionId = normalizeActionId(actionId);
+  if (normalizedActionId && !normalized.requestedActions.includes(normalizedActionId)) {
+    return { ok: false, status: 'denied', reason: 'action_mismatch', request: normalized };
+  }
+  if (riskLevel && !riskAllowed({ requestedRisk: riskLevel, riskCeiling: normalized.riskCeiling })) {
+    return { ok: false, status: 'denied', reason: 'risk_ceiling_exceeded', request: normalized };
+  }
+  if (
+    normalized.signingAuthority
+    || normalized.workerTokenAuthority
+    || normalized.privateKeyAuthority
+    || normalized.longLivedBearerAuthority
+  ) {
+    return { ok: false, status: 'denied', reason: 'remote_signing_authority_denied', request: normalized };
+  }
+  return { ok: true, status: normalized.status, reason: 'connect_request_approvable', request: normalized };
+}
+
+export function buildAgentGrantFromConnectRequest(request = {}, {
+  grantId = '',
+  approvedAt = new Date().toISOString(),
+} = {}) {
+  const normalized = normalizeAgentConnectRequest(request);
+  return normalizeAgentGrantLifecycle({
+    grantId,
+    humanPrincipal: normalized.humanPrincipal,
+    agentId: normalized.agentId,
+    subject: normalized.agentId,
+    scopes: normalized.requestedScopes,
+    sessions: normalized.requestedSessions,
+    allowedActions: normalized.requestedActions,
+    riskCeiling: normalized.riskCeiling,
+    executionPolicy: normalized.executionPolicy,
+    auditRequired: normalized.auditRequired,
+    status: AGENT_GRANT_STATUS.ACTIVE,
+    expiresAt: normalized.expiresAt,
+    createdAt: approvedAt,
+    updatedAt: approvedAt,
+    revokedAt: null,
+    connectRequestId: normalized.requestId,
+    signingAuthority: false,
+    workerTokenAuthority: false,
+    privateKeyAuthority: false,
+    longLivedBearerAuthority: false,
+  });
 }
 
 export function normalizeAgentGrantLifecycle(grant = {}) {

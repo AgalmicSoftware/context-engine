@@ -17,7 +17,7 @@ import {
 
 test('agent endpoint families enumerate canonical route groups', () => {
   const families = AGENT_ENDPOINT_FAMILIES.map((entry) => entry.family);
-  assert.deepEqual(families, ['identity', 'sessions', 'questions', 'inbox', 'responses', 'requests', 'grants']);
+  assert.deepEqual(families, ['identity', 'sessions', 'questions', 'inbox', 'responses', 'requests', 'connect-requests', 'grants']);
   assert.equal(
     AGENT_ENDPOINT_FAMILIES.some((entry) => entry.routes.includes('POST /api/agent/responses/submit-request')),
     true,
@@ -28,6 +28,10 @@ test('agent endpoint families enumerate canonical route groups', () => {
   );
   assert.equal(
     AGENT_ENDPOINT_FAMILIES.some((entry) => entry.routes.includes('POST /api/agent/grants/revoke')),
+    true,
+  );
+  assert.equal(
+    AGENT_ENDPOINT_FAMILIES.some((entry) => entry.routes.includes('POST /api/agent/connect-requests')),
     true,
   );
 });

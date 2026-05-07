@@ -38,6 +38,16 @@ export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
     purpose: 'Inspect approval-gated request state by opaque request id.',
   },
   {
+    family: 'connect-requests',
+    routes: Object.freeze([
+      'POST /api/agent/connect-requests',
+      'GET /api/agent/connect-requests/:id',
+      'POST /api/agent/connect-requests/approve',
+      'POST /api/agent/connect-requests/deny',
+    ]),
+    purpose: 'Create and review human-approved scoped grant requests without giving remote agents authority.',
+  },
+  {
     family: 'grants',
     routes: Object.freeze([
       'GET /api/agent/grants',

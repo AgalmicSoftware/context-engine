@@ -329,6 +329,31 @@ test('agent routes use stable auth error envelopes before route-specific work', 
       path: '/api/agent/responses/delegated-execute',
       body: { session: 'alpha', questionIds: [QUESTION_ID], grantId: GRANT_ID, agentId: AGENT_ID },
     },
+    {
+      method: 'POST',
+      path: '/api/agent/connect-requests',
+      body: {
+        agentId: AGENT_ID,
+        requestedScopes: ['agent:delegated-execute'],
+        requestedSessions: ['alpha'],
+        requestedActions: ['agent.response.delegated_execute'],
+        riskCeiling: 'medium',
+        executionPolicy: 'scoped_delegated_execute',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        idempotencyKey: 'connect:alpha.0001',
+      },
+    },
+    { method: 'GET', path: '/api/agent/connect-requests/agent_req_missing123' },
+    {
+      method: 'POST',
+      path: '/api/agent/connect-requests/approve',
+      body: { requestId: 'agent_req_missing123' },
+    },
+    {
+      method: 'POST',
+      path: '/api/agent/connect-requests/deny',
+      body: { requestId: 'agent_req_missing123' },
+    },
     { method: 'GET', path: '/api/agent/grants' },
     { method: 'GET', path: `/api/agent/grants/${GRANT_ID}` },
     {
@@ -900,6 +925,216 @@ test('agent grant routes list read and revoke wallet-scoped delegated grants', a
   assert.equal(revoked.status, 200);
   assert.equal(revoked.payload.status, 'grant_revoked');
   assert.equal(revoked.payload.grant.status, 'revoked');
+});
+
+test('agent connect request routes create human-approved scoped grants without leaking secrets', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+  const requestBody = {
+    agentId: AGENT_ID,
+    requestedScopes: ['agent:delegated-execute'],
+    requestedSessions: ['alpha'],
+    requestedActions: ['agent.response.delegated_execute'],
+    riskCeiling: 'medium',
+    executionPolicy: 'scoped_delegated_execute',
+    auditRequired: true,
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    idempotencyKey: 'connect:alpha.0001',
+    signingAuthority: false,
+    agentContext: {
+      workerToken: 'must-redact',
+      note: 'Bearer long-lived-token',
+    },
+  };
+
+  const malformed = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests',
+    method: 'POST',
+    body: {
+      ...requestBody,
+      requestedScopes: ['agent:delegated-execute', 'agent:sign'],
+      idempotencyKey: 'connect:alpha.bad1',
+    },
+  });
+  assert.equal(malformed.status, 400);
+  assert.equal(malformed.payload.code, 'invalid_connect_request');
+  assert.equal(malformed.payload.reason, 'invalid_requested_scopes');
+
+  const created = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests',
+    method: 'POST',
+    body: requestBody,
+  });
+  assert.equal(created.status, 202);
+  assert.equal(created.payload.ok, false);
+  assert.equal(created.payload.requiresApproval, true);
+  assert.equal(created.payload.connectRequest.status, 'pending_approval');
+  assert.equal(created.payload.connectRequest.humanPrincipal, WALLET_ADDRESS.toLowerCase());
+  assert.equal(created.payload.connectRequest.agentId, AGENT_ID);
+  assert.deepEqual(created.payload.connectRequest.requestedSessions, ['alpha']);
+  assert.deepEqual(created.payload.connectRequest.requestedActions, ['agent.response.delegated_execute']);
+  assert.match(created.payload.connectRequest.fingerprint, /^connect_grant_request\|/);
+  assert.equal(created.payload.connectRequest.signingAuthority, false);
+  assert.equal(created.payload.connectRequest.workerTokenAuthority, false);
+
+  const requestFile = resolve(harness.dataDir, 'agent-requests', `${created.payload.requestId}.json`);
+  assert.equal(existsSync(requestFile), true);
+  const stored = JSON.parse(readFileSync(requestFile, 'utf8'));
+  assert.equal(stored.payload.agentContext.workerToken, '[redacted]');
+  assert.equal(stored.payload.agentContext.note, '[redacted]');
+
+  const read = await callRoute(handleRoute, {
+    path: `/api/agent/connect-requests/${created.payload.requestId}`,
+  });
+  assert.equal(read.status, 200);
+  assert.equal(read.payload.connectRequest.requestId, created.payload.requestId);
+  assert.equal(read.payload.connectRequest.requiresApproval, true);
+  assert.equal(read.payload.connectRequest.grantId, null);
+
+  const replay = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests',
+    method: 'POST',
+    body: requestBody,
+  });
+  assert.equal(replay.status, 202);
+  assert.equal(replay.payload.idempotent, true);
+  assert.equal(replay.payload.requestId, created.payload.requestId);
+
+  const conflict = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests',
+    method: 'POST',
+    body: {
+      ...requestBody,
+      requestedSessions: ['beta'],
+    },
+  });
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.payload.code, 'idempotency_key_conflict');
+
+  const widening = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests/approve',
+    method: 'POST',
+    body: {
+      requestId: created.payload.requestId,
+      requestedSessions: ['alpha', 'beta'],
+    },
+  });
+  assert.equal(widening.status, 400);
+  assert.equal(widening.payload.code, 'connect_request_scope_override_denied');
+
+  const approved = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests/approve',
+    method: 'POST',
+    body: {
+      requestId: created.payload.requestId,
+    },
+  });
+  assert.equal(approved.status, 200);
+  assert.equal(approved.payload.status, 'connect_request_approved');
+  assert.equal(approved.payload.grant.humanPrincipal, WALLET_ADDRESS.toLowerCase());
+  assert.deepEqual(approved.payload.grant.sessions, ['alpha']);
+  assert.deepEqual(approved.payload.grant.allowedActions, ['agent.response.delegated_execute']);
+  assert.equal(approved.payload.grant.signingAuthority, false);
+  assert.equal(approved.payload.grant.workerTokenAuthority, false);
+
+  const grantFile = resolve(harness.dataDir, 'agent-grants', `${approved.payload.grant.grantId}.json`);
+  assert.equal(existsSync(grantFile), true);
+
+  const repeatApproval = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests/approve',
+    method: 'POST',
+    body: {
+      requestId: created.payload.requestId,
+    },
+  });
+  assert.equal(repeatApproval.status, 409);
+  assert.equal(repeatApproval.payload.reason, 'connect_request_not_pending');
+
+  const mismatchedDelegatedExecute = await callRoute(handleRoute, {
+    path: '/api/agent/responses/delegated-execute',
+    method: 'POST',
+    body: {
+      session: 'beta',
+      questionIds: [QUESTION_ID],
+      grantId: approved.payload.grant.grantId,
+      agentId: AGENT_ID,
+    },
+  });
+  assert.equal(mismatchedDelegatedExecute.status, 403);
+  assert.equal(mismatchedDelegatedExecute.payload.reason, 'session_mismatch');
+
+  const expiredRequestId = 'agent_req_expiredconnect';
+  const expiredRecord = {
+    ...stored,
+    requestId: expiredRequestId,
+    idempotencyKey: 'connect:alpha.expired1',
+    expiresAt: '2000-01-01T00:00:00.000Z',
+    status: 'pending_approval',
+    requiresApproval: true,
+  };
+  writeFileSync(resolve(harness.dataDir, 'agent-requests', `${expiredRequestId}.json`), JSON.stringify(expiredRecord, null, 2));
+  const expiredApproval = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests/approve',
+    method: 'POST',
+    body: {
+      requestId: expiredRequestId,
+    },
+  });
+  assert.equal(expiredApproval.status, 409);
+  assert.equal(expiredApproval.payload.reason, 'request_expired');
+});
+
+test('agent connect request denial transitions only pending human-scoped requests', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const created = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests',
+    method: 'POST',
+    body: {
+      agentId: AGENT_ID,
+      requestedScopes: ['agent:delegated-execute'],
+      requestedSessions: ['alpha'],
+      requestedActions: ['agent.response.delegated_execute'],
+      riskCeiling: 'medium',
+      executionPolicy: 'scoped_delegated_execute',
+      auditRequired: true,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      idempotencyKey: 'connect:alpha.deny1',
+    },
+  });
+  assert.equal(created.status, 202);
+
+  const denied = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests/deny',
+    method: 'POST',
+    body: {
+      requestId: created.payload.requestId,
+      reason: 'not now',
+    },
+  });
+  assert.equal(denied.status, 200);
+  assert.equal(denied.payload.status, 'connect_request_denied');
+  assert.equal(denied.payload.connectRequest.status, 'rejected');
+  assert.equal(denied.payload.connectRequest.requiresApproval, false);
+
+  const replay = await callRoute(handleRoute, {
+    path: '/api/agent/connect-requests',
+    method: 'POST',
+    body: {
+      agentId: AGENT_ID,
+      requestedScopes: ['agent:delegated-execute'],
+      requestedSessions: ['alpha'],
+      requestedActions: ['agent.response.delegated_execute'],
+      riskCeiling: 'medium',
+      executionPolicy: 'scoped_delegated_execute',
+      auditRequired: true,
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      idempotencyKey: 'connect:alpha.deny1',
+    },
+  });
+  assert.equal(replay.status, 409);
+  assert.equal(replay.payload.code, 'idempotency_key_not_pending_approval');
 });
 
 test('agent delegated response execution validates grant scope and writes a contract-only audit record', async (t) => {

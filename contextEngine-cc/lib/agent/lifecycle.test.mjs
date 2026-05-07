@@ -6,6 +6,9 @@ import {
   AGENT_EXECUTION_POLICIES,
   AGENT_GRANT_SCOPES,
   AGENT_RISK_LEVELS,
+  buildAgentConnectRequestFingerprint,
+  buildAgentGrantFromConnectRequest,
+  evaluateAgentConnectRequestApproval,
   evaluateAgentGrantForRequest,
   evaluateAgentRequestLifecycle,
   evaluateScopedDelegatedExecutionGrant,
@@ -17,6 +20,7 @@ import {
   normalizeAgentGrantScopes,
   normalizeAgentPublicSessionSlug,
   normalizeAgentPublicSessions,
+  validateAgentConnectRequestForCreation,
 } from './lifecycle.mjs';
 
 const NOW_MS = Date.parse('2026-05-06T00:00:00.000Z');
@@ -54,6 +58,121 @@ test('agent connect requests normalize scopes and sessions without authority gra
   assert.equal(request.status, AGENT_CONNECT_REQUEST_STATUS.APPROVED);
   assert.equal(request.signingAuthority, false);
   assert.equal(request.workerTokenAuthority, false);
+});
+
+test('agent connect request creation requires bounded scoped grant fields and fingerprints them', () => {
+  const valid = validateAgentConnectRequestForCreation({
+    requestId: 'agent_req_connect123',
+    humanPrincipal: '0xABC',
+    agentId: 'telegram:agent-1',
+    requestedScopes: [AGENT_GRANT_SCOPES.DELEGATED_EXECUTE],
+    requestedSessions: ['alpha'],
+    requestedActions: ['agent.response.delegated_execute'],
+    riskCeiling: 'medium',
+    executionPolicy: AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE,
+    auditRequired: true,
+    expiresAt: '2026-05-06T00:10:00.000Z',
+    idempotencyKey: 'telegram:alpha.0001',
+  }, { nowMs: NOW_MS });
+
+  assert.equal(valid.ok, true);
+  assert.equal(valid.request.humanPrincipal, '0xabc');
+  assert.equal(valid.request.agentId, 'telegram:agent-1');
+  assert.equal(valid.request.idempotencyKey, 'telegram:alpha.0001');
+  assert.equal(
+    valid.request.fingerprint,
+    buildAgentConnectRequestFingerprint(valid.request),
+  );
+  assert.match(valid.request.fingerprint, /^connect_grant_request\|0xabc\|telegram:agent-1\|/);
+  assert.equal(valid.request.signingAuthority, false);
+  assert.equal(valid.request.workerTokenAuthority, false);
+
+  for (const [reason, patch] of [
+    ['agent_identity_required', { agentId: '', subject: '' }],
+    ['invalid_requested_scopes', { requestedScopes: ['agent:delegated-execute', 'agent:sign'] }],
+    ['invalid_requested_sessions', { requestedSessions: ['alpha', '../bad'] }],
+    ['invalid_requested_actions', { requestedActions: ['agent.response.delegated_execute', '../bad'] }],
+    ['risk_ceiling_required', { riskCeiling: '' }],
+    ['invalid_execution_policy', { executionPolicy: 'remote_auto_submit' }],
+    ['trusted_local_auto_submit_local_only', { executionPolicy: AGENT_EXECUTION_POLICIES.TRUSTED_LOCAL_AUTO_SUBMIT }],
+    ['request_expired', { expiresAt: '2026-05-05T23:59:00.000Z' }],
+    ['invalid_idempotency_key', { idempotencyKey: 'short' }],
+    ['remote_signing_authority_denied', { signingAuthority: true }],
+    ['action_scope_mismatch', { requestedScopes: [AGENT_GRANT_SCOPES.DRAFT] }],
+  ]) {
+    const result = validateAgentConnectRequestForCreation({
+      ...valid.request,
+      ...patch,
+    }, { nowMs: NOW_MS });
+    assert.equal(result.reason, reason);
+  }
+});
+
+test('agent connect request approval denies replay and scope mismatch attempts', () => {
+  const connectRequest = validateAgentConnectRequestForCreation({
+    requestId: 'agent_req_connect456',
+    humanPrincipal: '0xABC',
+    agentId: 'telegram:agent-1',
+    requestedScopes: [AGENT_GRANT_SCOPES.DELEGATED_EXECUTE],
+    requestedSessions: ['alpha'],
+    requestedActions: ['agent.response.delegated_execute'],
+    riskCeiling: 'medium',
+    executionPolicy: AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE,
+    auditRequired: true,
+    expiresAt: '2026-05-06T00:10:00.000Z',
+    idempotencyKey: 'telegram:alpha.0002',
+  }, { nowMs: NOW_MS }).request;
+
+  const baseApproval = {
+    humanPrincipal: '0xabc',
+    agentId: 'telegram:agent-1',
+    session: 'alpha',
+    actionId: 'agent.response.delegated_execute',
+    riskLevel: AGENT_RISK_LEVELS.MEDIUM,
+    nowMs: NOW_MS,
+  };
+  assert.equal(evaluateAgentConnectRequestApproval(connectRequest, baseApproval).reason, 'connect_request_approvable');
+  assert.equal(evaluateAgentConnectRequestApproval(connectRequest, {
+    ...baseApproval,
+    humanPrincipal: '0x9999',
+  }).reason, 'human_principal_mismatch');
+  assert.equal(evaluateAgentConnectRequestApproval(connectRequest, {
+    ...baseApproval,
+    agentId: 'openclaw:other',
+  }).reason, 'agent_identity_mismatch');
+  assert.equal(evaluateAgentConnectRequestApproval(connectRequest, {
+    ...baseApproval,
+    session: 'beta',
+  }).reason, 'session_mismatch');
+  assert.equal(evaluateAgentConnectRequestApproval(connectRequest, {
+    ...baseApproval,
+    actionId: 'agent.response.submit_request',
+  }).reason, 'action_mismatch');
+  assert.equal(evaluateAgentConnectRequestApproval(connectRequest, {
+    ...baseApproval,
+    riskLevel: AGENT_RISK_LEVELS.HIGH,
+  }).reason, 'risk_ceiling_exceeded');
+  assert.equal(evaluateAgentConnectRequestApproval({
+    ...connectRequest,
+    status: AGENT_CONNECT_REQUEST_STATUS.APPROVED,
+  }, baseApproval).reason, 'connect_request_not_pending');
+  assert.equal(evaluateAgentConnectRequestApproval({
+    ...connectRequest,
+    fingerprint: 'tampered',
+  }, baseApproval).reason, 'connect_request_fingerprint_mismatch');
+
+  const grant = buildAgentGrantFromConnectRequest(connectRequest, {
+    grantId: 'agent_grant_connect456',
+    approvedAt: '2026-05-06T00:01:00.000Z',
+  });
+  assert.equal(grant.grantId, 'agent_grant_connect456');
+  assert.equal(grant.humanPrincipal, '0xabc');
+  assert.equal(grant.agentId, 'telegram:agent-1');
+  assert.deepEqual(grant.sessions, ['alpha']);
+  assert.deepEqual(grant.allowedActions, ['agent.response.delegated_execute']);
+  assert.equal(grant.executionPolicy, AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE);
+  assert.equal(grant.signingAuthority, false);
+  assert.equal(grant.workerTokenAuthority, false);
 });
 
 test('agent grant lifecycle keeps explicit scopes and public sessions', () => {

@@ -21,9 +21,11 @@ test('MCP tool descriptors cover the planned agent tool names', () => {
     'draft_response',
     'submit_response_request',
     'delegated_response_execute',
+    'create_connect_request',
     'create_question_request',
     'get_inbox',
     'get_request_status',
+    'get_connect_request',
     'request_decrypt',
     'revoke_agent_grant',
   ]);
@@ -90,6 +92,35 @@ test('MCP request builder maps tools to canonical agent HTTP paths', () => {
       agentId: 'telegram:agent-1',
       idempotencyKey: 'delegated:alpha.0001',
     },
+  });
+  assert.deepEqual(buildAgentMcpHttpRequest('create_connect_request', {
+    agentId: 'telegram:agent-1',
+    requestedScopes: ['agent:delegated-execute'],
+    requestedSessions: ['alpha'],
+    requestedActions: ['agent.response.delegated_execute'],
+    riskCeiling: 'medium',
+    executionPolicy: 'scoped_delegated_execute',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    idempotencyKey: 'connect:alpha.0001',
+  }), {
+    method: 'POST',
+    path: '/api/agent/connect-requests',
+    implemented: true,
+    body: {
+      agentId: 'telegram:agent-1',
+      requestedScopes: ['agent:delegated-execute'],
+      requestedSessions: ['alpha'],
+      requestedActions: ['agent.response.delegated_execute'],
+      riskCeiling: 'medium',
+      executionPolicy: 'scoped_delegated_execute',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      idempotencyKey: 'connect:alpha.0001',
+    },
+  });
+  assert.deepEqual(buildAgentMcpHttpRequest('get_connect_request', { requestId: 'agent_req_connect123' }), {
+    method: 'GET',
+    path: '/api/agent/connect-requests/agent_req_connect123',
+    implemented: true,
   });
   assert.deepEqual(buildAgentMcpHttpRequest('revoke_agent_grant', {
     grantId: 'agent_grant_abc12345',
@@ -215,6 +246,10 @@ test('MCP handlers reject invalid inputs before HTTP', async () => {
     () => handlers.get_request_status({}),
     /requires requestId/,
   );
+  await assert.rejects(
+    () => handlers.get_connect_request({}),
+    /requires requestId/,
+  );
   assert.equal(fetchCalls, 0);
 });
 
@@ -260,6 +295,8 @@ test('MCP handler factory only exposes implemented tools', async () => {
 
   assert.equal(typeof handlers.submit_response_request, 'function');
   assert.equal(typeof handlers.delegated_response_execute, 'function');
+  assert.equal(typeof handlers.create_connect_request, 'function');
+  assert.equal(typeof handlers.get_connect_request, 'function');
   assert.equal(typeof handlers.revoke_agent_grant, 'function');
   assert.equal(Object.hasOwn(handlers, 'create_question_request'), false);
   assert.equal(Object.hasOwn(handlers, 'request_decrypt'), false);

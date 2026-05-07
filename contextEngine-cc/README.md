@@ -215,17 +215,37 @@ to a specific agent for a specific session, action id, risk ceiling, expiry, and
 audit requirement. `trusted_local_auto_submit` remains local-only and stronger
 than scoped remote delegation.
 
-Current grant management routes are read/revoke only:
+Current grant management routes are connect-request create/read/approve/deny
+plus grant read/revoke:
 
+- `POST /api/agent/connect-requests`
+- `GET /api/agent/connect-requests/:id`
+- `POST /api/agent/connect-requests/approve`
+- `POST /api/agent/connect-requests/deny`
 - `GET /api/agent/grants`
 - `GET /api/agent/grants/:id`
 - `POST /api/agent/grants/revoke`
+
+Connect requests are the only current grant-creation path. They bind the human
+principal, delegated agent, explicit session slugs, allowed action ids, risk
+ceiling, expiry, execution policy, audit requirement, idempotency key, and
+fingerprint. Reads are side-effect free. Approval requires local human auth and
+creates only scoped grant metadata; denial closes the request without creating a
+grant. Approval rejects body fields that would widen scope.
 
 `POST /api/agent/responses/delegated-execute` validates a scoped grant and
 writes an audit lifecycle record, but it is contract-only right now:
 `executed:false` with `contract_only_deferred`. Actual signing or
 worker-mediated execution still requires an approved CE-owned execution path and
 a product/security decision.
+
+The private `agentBridgeWorker` primitives under `lib/agent/bridgePrimitives.mjs`
+are contract-only: principal summaries, preference profiles, opaque action
+records, idempotency records, safe bridge events, grant cache summaries, and
+agent-created account metadata. V1 agent-created accounts are modeled as managed
+testnet/account-runtime metadata only; Durable Object isolated signer is the
+preferred future signer boundary, and no raw keys, seeds, JWTs, worker tokens,
+or signing authority are returned.
 
 See [Agent Native Contract](../docs/agent-native-contract.md) for the scoped
 grant fields, action inventory, and current web UX parity gaps.

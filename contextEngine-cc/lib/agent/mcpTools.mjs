@@ -119,6 +119,23 @@ export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
     }, ['session', 'questionIds', 'grantId', 'agentId']),
   },
   {
+    name: 'create_connect_request',
+    description: 'Create a human-approval-required scoped grant connect request.',
+    method: 'POST',
+    path: '/api/agent/connect-requests',
+    implemented: true,
+    inputSchema: jsonSchema({
+      agentId: stringProp('Delegated agent identity requesting the scoped grant.'),
+      requestedScopes: arrayOfStringsProp('Requested agent grant scopes.'),
+      requestedSessions: arrayOfStringsProp('Explicit public session slugs.'),
+      requestedActions: arrayOfStringsProp('Canonical agent action ids allowed by the grant.'),
+      riskCeiling: stringProp('Maximum allowed risk level.'),
+      executionPolicy: stringProp('Requested execution policy.'),
+      expiresAt: stringProp('Grant request expiration timestamp.'),
+      idempotencyKey: stringProp('Client-provided idempotency key.'),
+    }, ['agentId', 'requestedScopes', 'requestedSessions', 'requestedActions', 'riskCeiling', 'executionPolicy', 'expiresAt', 'idempotencyKey']),
+  },
+  {
     name: 'create_question_request',
     description: 'Future approval-gated question creation request.',
     method: 'POST',
@@ -143,6 +160,14 @@ export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
     path: '/api/agent/requests/:id',
     implemented: true,
     inputSchema: jsonSchema({ requestId: stringProp('Opaque agent request id.') }, ['requestId']),
+  },
+  {
+    name: 'get_connect_request',
+    description: 'Read scoped grant connect request status by opaque request id.',
+    method: 'GET',
+    path: '/api/agent/connect-requests/:id',
+    implemented: true,
+    inputSchema: jsonSchema({ requestId: stringProp('Opaque agent connect request id.') }, ['requestId']),
   },
   {
     name: 'request_decrypt',

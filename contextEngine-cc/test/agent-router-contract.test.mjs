@@ -34,11 +34,15 @@ test('agent HTTP routes are present in router source', () => {
     ['GET', '/api/agent/responses/drafts'],
     ['POST', '/api/agent/responses/submit-request'],
     ['POST', '/api/agent/responses/delegated-execute'],
+    ['POST', '/api/agent/connect-requests'],
+    ['POST', '/api/agent/connect-requests/approve'],
+    ['POST', '/api/agent/connect-requests/deny'],
     ['GET', '/api/agent/grants'],
     ['POST', '/api/agent/grants/revoke'],
   ].forEach(([method, path]) => extractBranch(path, method));
 
   assert.match(ROUTER_SOURCE, /path\.startsWith\('\/api\/agent\/requests\/'\) && method === 'GET'/);
+  assert.match(ROUTER_SOURCE, /path\.startsWith\('\/api\/agent\/connect-requests\/'\) && method === 'GET'/);
   assert.match(ROUTER_SOURCE, /path\.startsWith\('\/api\/agent\/grants\/'\) && method === 'GET'/);
 });
 
@@ -52,9 +56,13 @@ test('agent HTTP route branches require local JWT auth before work', () => {
     extractBranch('/api/agent/responses/drafts', 'GET'),
     extractBranch('/api/agent/responses/submit-request', 'POST'),
     extractBranch('/api/agent/responses/delegated-execute', 'POST'),
+    extractBranch('/api/agent/connect-requests', 'POST'),
+    extractBranch('/api/agent/connect-requests/approve', 'POST'),
+    extractBranch('/api/agent/connect-requests/deny', 'POST'),
     extractBranch('/api/agent/grants', 'GET'),
     extractBranch('/api/agent/grants/revoke', 'POST'),
     extractPrefixBranch('/api/agent/requests/', 'GET'),
+    extractPrefixBranch('/api/agent/connect-requests/', 'GET'),
     extractPrefixBranch('/api/agent/grants/', 'GET'),
   ];
 
@@ -62,6 +70,28 @@ test('agent HTTP route branches require local JWT auth before work', () => {
     assert.match(branch, /const auth = requireAuth\(req\);/);
     assert.match(branch, /if \(!auth\.ok\) return agentAuthError\(res, auth\);/);
   }
+});
+
+test('agent connect request routes require human approval and do not leak authority', () => {
+  const createBranch = extractBranch('/api/agent/connect-requests', 'POST');
+  const readBranch = extractPrefixBranch('/api/agent/connect-requests/', 'GET');
+  const approveBranch = extractBranch('/api/agent/connect-requests/approve', 'POST');
+  const denyBranch = extractBranch('/api/agent/connect-requests/deny', 'POST');
+
+  assert.match(createBranch, /validateAgentConnectRequestForCreation/);
+  assert.match(createBranch, /buildApprovalRequiredResponse/);
+  assert.match(createBranch, /idempotencyKey/);
+  assert.match(createBranch, /fingerprint/);
+  assert.match(readBranch, /summarizeAgentConnectRequestForRead/);
+  assert.match(approveBranch, /evaluateAgentConnectRequestApproval/);
+  assert.match(approveBranch, /buildAgentGrantFromConnectRequest/);
+  assert.match(approveBranch, /saveAgentGrant/);
+  assert.match(denyBranch, /AGENT_REQUEST_STATUS\.REJECTED/);
+  assert.match(`${approveBranch}\n${denyBranch}`, /isAgentConnectApprovalOverrideAttempt/);
+  assert.doesNotMatch(`${createBranch}\n${readBranch}\n${approveBranch}\n${denyBranch}`, /submitOnChainImpl/);
+  assert.doesNotMatch(`${createBranch}\n${readBranch}\n${approveBranch}\n${denyBranch}`, /ensureWorkerToken/);
+  assert.doesNotMatch(`${createBranch}\n${readBranch}\n${approveBranch}\n${denyBranch}`, /signingAuthority: true/);
+  assert.doesNotMatch(`${createBranch}\n${readBranch}\n${approveBranch}\n${denyBranch}`, /workerTokenAuthority: true/);
 });
 
 test('agent delegated execution route validates grants and stays contract-only', () => {

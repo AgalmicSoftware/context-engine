@@ -140,6 +140,31 @@ test('agent HTTP routes reject missing bearer auth at the app-server boundary', 
         path: '/api/agent/responses/delegated-execute',
         body: { session: 'alpha', questionIds: [QUESTION_ID], grantId: GRANT_ID, agentId: AGENT_ID },
       },
+      {
+        method: 'POST',
+        path: '/api/agent/connect-requests',
+        body: {
+          agentId: AGENT_ID,
+          requestedScopes: ['agent:delegated-execute'],
+          requestedSessions: ['alpha'],
+          requestedActions: ['agent.response.delegated_execute'],
+          riskCeiling: 'medium',
+          executionPolicy: 'scoped_delegated_execute',
+          expiresAt: '2099-01-01T00:00:00.000Z',
+          idempotencyKey: 'connect:alpha.0001',
+        },
+      },
+      { method: 'GET', path: '/api/agent/connect-requests/agent_req_missing123' },
+      {
+        method: 'POST',
+        path: '/api/agent/connect-requests/approve',
+        body: { requestId: 'agent_req_missing123' },
+      },
+      {
+        method: 'POST',
+        path: '/api/agent/connect-requests/deny',
+        body: { requestId: 'agent_req_missing123' },
+      },
       { method: 'GET', path: '/api/agent/grants' },
       { method: 'GET', path: `/api/agent/grants/${GRANT_ID}` },
       {
@@ -323,6 +348,96 @@ test('agent HTTP grant routes list read and revoke scoped grants by wallet', asy
     assert.equal(revoked.payload.status, 'grant_revoked');
     assert.equal(revoked.payload.grant.status, 'revoked');
     assert.equal(revoked.payload.grant.revokedAt.length > 0, true);
+  });
+});
+
+test('agent HTTP connect request routes approve scoped grants only after local auth', async () => {
+  resetRuntimeState();
+
+  await withServer(async (port) => {
+    const malformed = await requestJson(port, {
+      path: '/api/agent/connect-requests',
+      method: 'POST',
+      body: {
+        agentId: AGENT_ID,
+        requestedScopes: ['agent:sign'],
+        requestedSessions: ['alpha'],
+        requestedActions: ['agent.response.delegated_execute'],
+        riskCeiling: 'medium',
+        executionPolicy: 'scoped_delegated_execute',
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        idempotencyKey: 'connect:server.bad1',
+      },
+    });
+    assert.equal(malformed.status, 400);
+    assert.equal(malformed.payload.code, 'invalid_connect_request');
+
+    const created = await requestJson(port, {
+      path: '/api/agent/connect-requests',
+      method: 'POST',
+      body: {
+        agentId: AGENT_ID,
+        requestedScopes: ['agent:delegated-execute'],
+        requestedSessions: ['alpha'],
+        requestedActions: ['agent.response.delegated_execute'],
+        riskCeiling: 'medium',
+        executionPolicy: 'scoped_delegated_execute',
+        auditRequired: true,
+        expiresAt: '2099-01-01T00:00:00.000Z',
+        idempotencyKey: 'connect:server.0001',
+        agentContext: {
+          workerToken: 'must-redact',
+        },
+      },
+    });
+    assert.equal(created.status, 202);
+    assert.equal(created.payload.requiresApproval, true);
+    assert.equal(created.payload.connectRequest.status, 'pending_approval');
+    assert.equal(created.payload.connectRequest.signingAuthority, false);
+    assert.equal(created.payload.connectRequest.workerTokenAuthority, false);
+
+    const read = await requestJson(port, {
+      path: `/api/agent/connect-requests/${created.payload.requestId}`,
+    });
+    assert.equal(read.status, 200);
+    assert.equal(read.payload.connectRequest.requestId, created.payload.requestId);
+    assert.equal(read.payload.connectRequest.grantId, null);
+
+    const override = await requestJson(port, {
+      path: '/api/agent/connect-requests/approve',
+      method: 'POST',
+      body: {
+        requestId: created.payload.requestId,
+        requestedActions: ['agent.response.delegated_execute', 'agent.session.create_request'],
+      },
+    });
+    assert.equal(override.status, 400);
+    assert.equal(override.payload.code, 'connect_request_scope_override_denied');
+
+    const approved = await requestJson(port, {
+      path: '/api/agent/connect-requests/approve',
+      method: 'POST',
+      body: {
+        requestId: created.payload.requestId,
+      },
+    });
+    assert.equal(approved.status, 200);
+    assert.equal(approved.payload.status, 'connect_request_approved');
+    assert.equal(approved.payload.grant.status, 'active');
+    assert.deepEqual(approved.payload.grant.sessions, ['alpha']);
+    assert.deepEqual(approved.payload.grant.allowedActions, ['agent.response.delegated_execute']);
+    assert.equal(approved.payload.grant.signingAuthority, false);
+    assert.equal(approved.payload.grant.workerTokenAuthority, false);
+
+    const replay = await requestJson(port, {
+      path: '/api/agent/connect-requests/approve',
+      method: 'POST',
+      body: {
+        requestId: created.payload.requestId,
+      },
+    });
+    assert.equal(replay.status, 409);
+    assert.equal(replay.payload.reason, 'connect_request_not_pending');
   });
 });
 
