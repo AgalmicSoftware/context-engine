@@ -145,6 +145,41 @@ test('MCP handlers pass HTTP error payloads through unchanged', async () => {
   assert.deepEqual(await handlers.list_questions({ session: 'general' }), errorPayload);
 });
 
+test('MCP handlers reject invalid inputs before HTTP', async () => {
+  let fetchCalls = 0;
+  const handlers = createAgentMcpToolHandlers({
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return {
+        async json() {
+          return { ok: true };
+        },
+      };
+    },
+  });
+
+  await assert.rejects(
+    () => handlers.draft_response({
+      session: '',
+      questionId: '0x1',
+      answer: 'yes',
+    }),
+    /explicit session/,
+  );
+  await assert.rejects(
+    () => handlers.submit_response_request({
+      session: '../outside',
+      questionIds: ['0xabc'],
+    }),
+    /Invalid agent MCP session slug/,
+  );
+  await assert.rejects(
+    () => handlers.get_request_status({}),
+    /requires requestId/,
+  );
+  assert.equal(fetchCalls, 0);
+});
+
 test('MCP submit wrapper preserves approval-required HTTP responses exactly', async () => {
   const approvalResponse = {
     ok: false,
