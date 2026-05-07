@@ -34,6 +34,11 @@ test('MCP request builder maps tools to canonical agent HTTP paths', () => {
     path: '/api/agent/questions?session=alpha',
     implemented: true,
   });
+  assert.deepEqual(buildAgentMcpHttpRequest('list_questions', { session: ' general ' }), {
+    method: 'GET',
+    path: '/api/agent/questions?session=general',
+    implemented: true,
+  });
   assert.deepEqual(buildAgentMcpHttpRequest('get_request_status', { requestId: 'agent_req_abc12345' }), {
     method: 'GET',
     path: '/api/agent/requests/agent_req_abc12345',
@@ -69,6 +74,29 @@ test('MCP request builder maps tools to canonical agent HTTP paths', () => {
   });
 });
 
+test('MCP request builder rejects empty public sessions before HTTP', () => {
+  assert.throws(
+    () => buildAgentMcpHttpRequest('list_questions', { session: '' }),
+    /explicit session/,
+  );
+  assert.throws(
+    () => buildAgentMcpHttpRequest('draft_response', {
+      session: ' ',
+      questionId: '0x1',
+      answer: 'yes',
+    }),
+    /explicit session/,
+  );
+  assert.throws(
+    () => buildAgentMcpHttpRequest('get_inbox', { session: '' }),
+    /explicit session/,
+  );
+  assert.throws(
+    () => buildAgentMcpHttpRequest('list_questions', { session: '../bad' }),
+    /Invalid agent MCP session slug/,
+  );
+});
+
 test('MCP handlers mirror HTTP JSON responses without adding business logic', async () => {
   const calls = [];
   const handlers = createAgentMcpToolHandlers({
@@ -97,6 +125,24 @@ test('MCP handlers mirror HTTP JSON responses without adding business logic', as
   });
   assert.equal(calls[0].init.headers.Authorization, 'Bearer local.jwt');
   assert.equal(calls[0].init.body, '{"session":"alpha","questionIds":["0xabc"]}');
+});
+
+test('MCP handlers pass HTTP error payloads through unchanged', async () => {
+  const errorPayload = {
+    ok: false,
+    status: 'error',
+    code: 'bad_request',
+    error: 'session required.',
+  };
+  const handlers = createAgentMcpToolHandlers({
+    fetchImpl: async () => ({
+      async json() {
+        return errorPayload;
+      },
+    }),
+  });
+
+  assert.deepEqual(await handlers.list_questions({ session: 'general' }), errorPayload);
 });
 
 test('MCP submit wrapper preserves approval-required HTTP responses exactly', async () => {

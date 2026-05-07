@@ -11,6 +11,15 @@ const arrayOfStringsProp = (description) => Object.freeze({
   items: Object.freeze({ type: 'string' }),
   description,
 });
+const SESSION_SLUG_RE = /^[a-z0-9_-]+$/i;
+const MAX_SESSION_SLUG_LENGTH = 128;
+const REQUIRED_SESSION_TOOLS = new Set([
+  'list_questions',
+  'resolve_questions',
+  'next_question',
+  'draft_response',
+  'submit_response_request',
+]);
 
 export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
   {
@@ -153,6 +162,25 @@ function appendQuery(path, params = {}) {
   return `${path}?${query.toString()}`;
 }
 
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+function normalizeAgentMcpSessionArg(toolName, args = {}) {
+  const hasSession = hasOwn(args, 'session');
+  const session = hasSession ? String(args.session ?? '').trim() : '';
+  if (!session) {
+    if (REQUIRED_SESSION_TOOLS.has(toolName) || hasSession) {
+      throw new Error('Agent MCP tools require an explicit session; use "general" for the general session.');
+    }
+    return '';
+  }
+  if (session.length > MAX_SESSION_SLUG_LENGTH || !SESSION_SLUG_RE.test(session)) {
+    throw new Error('Invalid agent MCP session slug.');
+  }
+  return session;
+}
+
 export function buildAgentMcpHttpRequest(toolName, args = {}) {
   const tool = AGENT_MCP_TOOLS_BY_NAME[String(toolName || '').trim()];
   if (!tool) throw new Error(`Unknown agent MCP tool: ${toolName}`);
@@ -160,13 +188,14 @@ export function buildAgentMcpHttpRequest(toolName, args = {}) {
 
   let path = tool.path;
   const query = {};
+  const session = normalizeAgentMcpSessionArg(tool.name, args);
   if (path.includes(':id')) {
     const requestId = String(args.requestId || '').trim();
     if (!requestId) throw new Error(`${tool.name} requires requestId.`);
     path = path.replace(':id', encodeURIComponent(requestId));
   }
-  if (tool.method === 'GET' && args.session) {
-    query.session = args.session;
+  if (tool.method === 'GET' && session) {
+    query.session = session;
   }
 
   const request = {
@@ -176,6 +205,7 @@ export function buildAgentMcpHttpRequest(toolName, args = {}) {
   };
   if (tool.method !== 'GET') {
     request.body = { ...args };
+    if (session) request.body.session = session;
   }
   return request;
 }
