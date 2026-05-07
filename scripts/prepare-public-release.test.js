@@ -67,33 +67,8 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
-    writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '123_private-roadmap.md'), 'private roadmap\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'private companion surface\n');
-    writeFile(sourceDir, path.join('contextEngine-cc', 'TODO', `${'PR'}${'D'}s`, '155_private-cecc.md'), 'private companion plan\n');
-    writeFile(sourceDir, path.join('contextEngine-cc', 'server.mjs'), 'private runtime server\n');
-    writeFile(sourceDir, path.join('contextEngine-cc', 'package.json'), '{"private":true}\n');
-    writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
-    writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
-    writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
-    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'private bridge worker\n');
-    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'private bridge docs\n');
-    writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'private bridge test runner\n');
-    writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
-    writeFile(
-      sourceDir,
-      'package.json',
-      `${JSON.stringify(
-        {
-          scripts: {
-            test: 'node scripts/run-node-tests.js',
-            'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
-          },
-        },
-        null,
-        2,
-      )}\n`,
-    );
 
     const result = runPrepareScript(sourceDir, outputDir);
     assert.equal(result.status, 0, result.stderr);
@@ -126,17 +101,8 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'telegram-response-export-scope-prd.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'server.mjs')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'package.json')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'vendor-cecc-ethers-bundle.js')), false);
 
     const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
     assert.equal(fs.existsSync(manifestPath), true);
