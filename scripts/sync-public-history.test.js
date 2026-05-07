@@ -111,6 +111,9 @@ function setupSourceRepo() {
     });
 
     writeFile(sourceDir, path.join('contextEngine-cc', 'agent', 'contract.md'), 'private agent contract\n');
+    writeFile(sourceDir, path.join('contextEngine-cc', 'server.mjs'), 'private runtime server\n');
+    writeFile(sourceDir, path.join('contextEngine-cc', 'package.json'), '{"private":true}\n');
+    writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent doc\n');
     commitAll(sourceDir, 'Private agent-only commit', {
       authorDate: '2025-01-03T06:07:08Z',
@@ -255,6 +258,9 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assertNoPrivatePlanningPaths(trackedPaths);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/server\.mjs$/m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/package\.json$/m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
@@ -373,6 +379,9 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assertNoPrivatePlanningPaths(trackedPaths);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/server\.mjs$/m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/package\.json$/m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
@@ -445,6 +454,9 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     assertNoPrivatePlanningPaths(trackedPaths);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/server\.mjs$/m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/package\.json$/m);
+    assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
