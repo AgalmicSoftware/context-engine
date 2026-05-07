@@ -1,0 +1,398 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const CC_ROOT = resolve(__dirname, '..');
+const ROUTER_SOURCE_PATH = resolve(CC_ROOT, 'lib', 'router.mjs');
+const QUESTION_ID = `0x${'11'.repeat(32)}`;
+const WALLET_ADDRESS = `0x${'12'.repeat(20)}`;
+
+function writeModule(path, source) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, source);
+}
+
+function makeMockRes() {
+  return {
+    statusCode: 0,
+    headers: {},
+    body: '',
+    writeHead(statusCode, headers) {
+      this.statusCode = statusCode;
+      this.headers = headers || {};
+    },
+    end(chunk) {
+      this.body += chunk ? String(chunk) : '';
+    },
+  };
+}
+
+function makeReq({ token = 'valid-agent-jwt' } = {}) {
+  const headers = { host: 'localhost:7391' };
+  if (token) headers.authorization = `Bearer ${token}`;
+  return {
+    headers,
+    socket: { remoteAddress: '127.0.0.1' },
+  };
+}
+
+async function callRoute(handleRoute, {
+  path,
+  method = 'GET',
+  body = {},
+  token = 'valid-agent-jwt',
+} = {}) {
+  const res = makeMockRes();
+  await handleRoute(makeReq({ token }), res, {
+    url: new URL(path, 'http://localhost:7391'),
+    method,
+    body,
+  });
+  return {
+    status: res.statusCode,
+    payload: JSON.parse(res.body || '{}'),
+  };
+}
+
+function setupRouterHarness(t) {
+  const root = mkdtempSync(resolve(tmpdir(), 'ce-agent-router-integration-'));
+  const libDir = resolve(root, 'lib');
+  const dataDir = resolve(root, 'data');
+  const hookStateDir = resolve(root, 'hook-state');
+  mkdirSync(libDir, { recursive: true });
+  mkdirSync(dataDir, { recursive: true });
+  mkdirSync(hookStateDir, { recursive: true });
+  writeFileSync(
+    resolve(hookStateDir, 'config.json'),
+    JSON.stringify({
+      serverUrl: 'http://localhost:7391',
+      selectedSessions: ['alpha', 'beta'],
+      defaultSession: 'alpha',
+    }, null, 2),
+  );
+
+  writeModule(resolve(root, 'node_modules', 'ethers', 'package.json'), JSON.stringify({
+    type: 'module',
+    main: 'index.js',
+  }));
+  writeModule(resolve(root, 'node_modules', 'ethers', 'index.js'), `
+    class BigNumberish {
+      lt() { return false; }
+    }
+    export const ethers = {
+      constants: { HashZero: '0x${'00'.repeat(32)}' },
+      utils: {
+        parseEther() { return new BigNumberish(); },
+        formatEther() { return '0.0'; },
+        isAddress(value) { return /^0x[0-9a-fA-F]{40}$/.test(String(value || '')); },
+        isHexString(value, length) {
+          const raw = String(value || '');
+          return /^0x[0-9a-fA-F]*$/.test(raw) && (!length || raw.length === 2 + Number(length) * 2);
+        },
+      },
+      providers: { JsonRpcProvider: class {} },
+      Contract: class {},
+      Wallet: class {
+        constructor(privateKey) {
+          this.privateKey = privateKey;
+          this.address = '${WALLET_ADDRESS}';
+        }
+        async signMessage() { return '0xsig'; }
+      },
+    };
+  `);
+
+  writeModule(resolve(libDir, 'jwt.mjs'), `
+    export function decodeTokenPayload() { return {}; }
+    export function verifyJwt(token) {
+      return token === 'valid-agent-jwt'
+        ? { ok: true, payload: { sub: '${WALLET_ADDRESS}', scope: 'agent-test' } }
+        : { ok: false, error: 'Invalid token.' };
+    }
+    export function signJwt(payload) { return 'valid-agent-jwt'; }
+  `);
+  writeModule(resolve(libDir, 'log.mjs'), `
+    export function debug() {}
+    export function warn() {}
+    export function error() {}
+  `);
+  writeModule(resolve(libDir, 'keyEncryption.mjs'), `
+    import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+    import { dirname } from 'node:path';
+    export function decryptFromFile(path) { return Buffer.from(readFileSync(path, 'utf8')); }
+    export function encryptToFile(path, value) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value); }
+    export function isEncryptedFile() { return false; }
+    export function migrateToEncrypted() {}
+    export function writeSecureFile(path, value) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, value); }
+  `);
+  writeModule(resolve(libDir, 'localAuth.mjs'), `
+    export function requireLocalJwtAuth(req = {}) {
+      const token = String(req.headers?.authorization || '').replace(/^Bearer\\s+/i, '');
+      return token === 'valid-agent-jwt'
+        ? { ok: true, payload: { sub: '${WALLET_ADDRESS}', scope: 'agent-test' } }
+        : { ok: false, status: 401, error: token ? 'Invalid token.' : 'Missing Authorization header.' };
+    }
+  `);
+  writeModule(resolve(libDir, 'sessions.mjs'), `
+    export async function listScopedSessions() {
+      return { scoped: ['alpha', 'beta'], all: ['alpha', 'beta', 'gamma'] };
+    }
+    export async function getCorsWorkerUrl(slug) { return 'http://worker.example/' + slug; }
+    export async function getSessionMetadata(slug) { return { slug, gates: [] }; }
+  `);
+  writeModule(resolve(libDir, 'constants.mjs'), `
+    export const CE_SESSION_SCAN_SCOPE = 'configured';
+    export const CE_SESSION_SCAN_SLUGS = ['alpha', 'beta'];
+    export const DEFAULT_CHAIN_ID = 11155420;
+    export const DEFAULT_CHAIN_METADATA = { name: 'OP Sepolia', txExplorerTxBaseUrl: 'https://explorer.example/tx/' };
+    export function resolveRpcUrlsForChain() { return ['http://127.0.0.1:8545']; }
+  `);
+  writeModule(resolve(libDir, 'questions.mjs'), `
+    export async function fetchQuestionIds() { return ['${QUESTION_ID}']; }
+    export async function getRandomUnseen(slug) {
+      if (slug === 'empty') return { question: null, totalCount: 0, answeredCount: 0 };
+      return {
+        question: {
+          id: '${QUESTION_ID}',
+          type: 'freeform',
+          prompt: 'What should this agent do next?',
+          options: [],
+          tags: ['agent'],
+        },
+        totalCount: 1,
+        answeredCount: 0,
+      };
+    }
+    export async function getMergedAnsweredQuestionIds() { return new Set(); }
+    export function formatQuestionForTerminal(question) { return question.prompt; }
+    export function warmQuestionCache() {}
+    export function clearServed() {}
+  `);
+  writeModule(resolve(libDir, 'submit.mjs'), `
+    export async function submitResponses() { return { ok: true, txHash: '0xtx' }; }
+    export async function submitQuestions() { return { ok: true }; }
+    export function canSubmit() { return { ready: true, hasKey: true, hasContract: true }; }
+  `);
+  writeModule(resolve(libDir, 'localRequest.mjs'), `
+    export function isTrustedLocalRequest() { return { ok: true }; }
+  `);
+  writeModule(resolve(libDir, 'submissionState.mjs'), `
+    export function recordConfirmedSubmission() {}
+  `);
+  writeModule(resolve(root, 'public', 'js', 'sessionSlugs.mjs'), `
+    export function normalizeConfiguredSessions({ selectedSessions, defaultSession } = {}) {
+      const selected = Array.isArray(selectedSessions) ? selectedSessions.filter(Boolean) : [];
+      if (selected.length) return selected;
+      return defaultSession ? [defaultSession] : [];
+    }
+  `);
+  writeModule(resolve(libDir, 'responseAudience.mjs'), `
+    export function deriveResponseGateOptionsFromMetadata() {
+      return { gateOptions: [], defaultGateId: '' };
+    }
+    export function normalizeResponseAudienceSelections({
+      answerAudience,
+      answerGateId,
+      additionalAudience,
+      additionalGateId,
+      encryptRequested,
+      encryptAdditionalRequested,
+      hasAdditionalText,
+    } = {}) {
+      const answerEncryptionAudience = answerAudience || (encryptRequested ? 'self' : 'none');
+      const additionalEncryptionAudience = additionalAudience || (hasAdditionalText && encryptAdditionalRequested ? 'self' : 'none');
+      return {
+        answerEncryptionAudience,
+        answerEncryptionGateId: answerGateId || null,
+        additionalEncryptionAudience,
+        additionalEncryptionGateId: additionalGateId || null,
+        additionalAudienceMode: additionalEncryptionAudience,
+      };
+    }
+    export function isEncryptedAudience(value) {
+      return value === 'self' || value === 'gate';
+    }
+  `);
+
+  ['capabilities', 'schemas', 'approvalResponses'].forEach((moduleName) => {
+    const href = pathToFileURL(resolve(CC_ROOT, 'lib', 'agent', `${moduleName}.mjs`)).href;
+    writeModule(resolve(libDir, 'agent', `${moduleName}.mjs`), `export * from ${JSON.stringify(href)};\n`);
+  });
+  writeFileSync(resolve(libDir, 'router.mjs'), readFileSync(ROUTER_SOURCE_PATH, 'utf8'));
+
+  const previousDataDir = process.env.CE_CC_DATA_DIR;
+  const previousHookStateDir = process.env.CE_CC_HOOK_STATE_DIR;
+  process.env.CE_CC_DATA_DIR = dataDir;
+  process.env.CE_CC_HOOK_STATE_DIR = hookStateDir;
+  t.after(() => {
+    if (previousDataDir == null) delete process.env.CE_CC_DATA_DIR;
+    else process.env.CE_CC_DATA_DIR = previousDataDir;
+    if (previousHookStateDir == null) delete process.env.CE_CC_HOOK_STATE_DIR;
+    else process.env.CE_CC_HOOK_STATE_DIR = previousHookStateDir;
+  });
+
+  return {
+    root,
+    dataDir,
+    routerUrl: `${pathToFileURL(resolve(libDir, 'router.mjs')).href}?t=${Date.now()}-${Math.random()}`,
+  };
+}
+
+test('agent routes reject missing auth before returning adapter payloads', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const result = await callRoute(handleRoute, {
+    path: '/api/agent/me',
+    token: '',
+  });
+
+  assert.equal(result.status, 401);
+  assert.deepEqual(result.payload, { error: 'Missing Authorization header.' });
+});
+
+test('agent read adapters return canonical identity, sessions, and questions', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const me = await callRoute(handleRoute, { path: '/api/agent/me' });
+  assert.equal(me.status, 200);
+  assert.equal(me.payload.ok, true);
+  assert.equal(me.payload.wallet, WALLET_ADDRESS);
+  assert.equal(me.payload.auth.type, 'local-jwt');
+  assert.equal(me.payload.capabilities.submission.remoteAutoSubmit, false);
+
+  const sessions = await callRoute(handleRoute, { path: '/api/agent/sessions' });
+  assert.equal(sessions.status, 200);
+  assert.deepEqual(sessions.payload.sessions, ['alpha', 'beta']);
+  assert.deepEqual(sessions.payload.selectedSessions, ['alpha', 'beta']);
+
+  const questions = await callRoute(handleRoute, { path: '/api/agent/questions?session=alpha' });
+  assert.equal(questions.status, 200);
+  assert.equal(questions.payload.ok, true);
+  assert.equal(questions.payload.session, 'alpha');
+  assert.equal(questions.payload.question.id, QUESTION_ID);
+  assert.equal(questions.payload.questions.length, 1);
+});
+
+test('agent question and draft routes validate payloads and expose local drafts', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const invalidSession = await callRoute(handleRoute, {
+    path: '/api/agent/questions?session=..%2Foutside',
+  });
+  assert.equal(invalidSession.status, 400);
+  assert.deepEqual(invalidSession.payload, { error: 'Invalid session slug.' });
+
+  const invalidDraft = await callRoute(handleRoute, {
+    path: '/api/agent/responses/draft',
+    method: 'POST',
+    body: { session: 'alpha', questionId: 'not-a-question-id', answer: 'yes' },
+  });
+  assert.equal(invalidDraft.status, 400);
+  assert.deepEqual(invalidDraft.payload, { error: 'questionId must be a 32-byte hex string.' });
+
+  const draft = await callRoute(handleRoute, {
+    path: '/api/agent/responses/draft',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionId: QUESTION_ID,
+      questionType: 'freeform',
+      answer: 'Use the canonical HTTP contract.',
+      additional: 'Keep MCP thin.',
+    },
+  });
+  assert.equal(draft.status, 200);
+  assert.equal(draft.payload.ok, true);
+  assert.equal(draft.payload.status, 'draft_saved');
+  assert.equal(draft.payload.submitted, false);
+  assert.equal(draft.payload.draft.questionId, QUESTION_ID);
+
+  const drafts = await callRoute(handleRoute, {
+    path: '/api/agent/responses/drafts?session=alpha',
+  });
+  assert.equal(drafts.status, 200);
+  assert.equal(drafts.payload.count, 1);
+  assert.equal(drafts.payload.drafts[0].answer, 'Use the canonical HTTP contract.');
+  assert.equal(Object.hasOwn(drafts.payload.summaries[0], 'answer'), false);
+
+  const inbox = await callRoute(handleRoute, {
+    path: '/api/agent/inbox?session=alpha',
+  });
+  assert.equal(inbox.status, 200);
+  assert.equal(inbox.payload.pendingResponses.length, 1);
+  assert.equal(inbox.payload.inbox[0].type, 'response_draft');
+});
+
+test('agent submit-request creates approval records and idempotent retries', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const invalid = await callRoute(handleRoute, {
+    path: '/api/agent/responses/submit-request',
+    method: 'POST',
+    body: { session: 'alpha', questionIds: [] },
+  });
+  assert.equal(invalid.status, 400);
+  assert.deepEqual(invalid.payload, { error: 'questionIds must contain at least one 32-byte hex string.' });
+
+  const first = await callRoute(handleRoute, {
+    path: '/api/agent/responses/submit-request',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      idempotencyKey: 'submit:alpha.0001',
+      agentContext: {
+        source: 'integration-test',
+        workerToken: 'must-redact',
+      },
+    },
+  });
+  assert.equal(first.status, 202);
+  assert.equal(first.payload.ok, false);
+  assert.equal(first.payload.requiresApproval, true);
+  assert.equal(first.payload.status, 'pending_approval');
+  assert.match(first.payload.requestId, /^agent_req_/);
+  assert.match(first.payload.approvalUrl, /\/agent\/requests\/agent_req_/);
+  assert.equal(first.payload.request.questionIds[0], QUESTION_ID);
+
+  const requestFile = resolve(harness.dataDir, 'agent-requests', `${first.payload.requestId}.json`);
+  assert.equal(existsSync(requestFile), true);
+  const stored = JSON.parse(readFileSync(requestFile, 'utf8'));
+  assert.equal(stored.payload.agentContext.workerToken, '[redacted]');
+  assert.equal(stored.idempotencyKey, 'submit:alpha.0001');
+
+  const retry = await callRoute(handleRoute, {
+    path: '/api/agent/responses/submit-request',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      idempotencyKey: 'submit:alpha.0001',
+    },
+  });
+  assert.equal(retry.status, 202);
+  assert.equal(retry.payload.requestId, first.payload.requestId);
+  assert.equal(retry.payload.idempotent, true);
+
+  const status = await callRoute(handleRoute, {
+    path: `/api/agent/requests/${encodeURIComponent(first.payload.requestId)}`,
+  });
+  assert.equal(status.status, 200);
+  assert.equal(status.payload.ok, true);
+  assert.equal(status.payload.request.requestId, first.payload.requestId);
+  assert.equal(status.payload.request.status, 'pending_approval');
+});
