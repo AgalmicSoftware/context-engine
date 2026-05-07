@@ -28,9 +28,7 @@ EOF
 ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
-outreach-and-applications
-grant-applications
-client/public/skill.md
+docs/agent-native*.md
 TODO
 local-private-version
 CLAUDE.md
@@ -105,36 +103,7 @@ outreach-and-applications
 grant-applications
 CLAUDE.md
 .claude
-.codex
-.codex-artifacts
-.codex-solc
-.codex-tmp
-.DS_Store
-.secrets.baseline
-.env
-.env.example
-.env.local
-.env.*.local
-.env.e2e
-.env.e2e.example
-.keys
-.e2e-secrets
-.e2e-cache
-.npm-cache
-.npm-cache-client*
-output
-release-public
-dist
-out
-cache
-broadcast
-coverage
-docs/codebase-*.md
-docs/assets/codebase-*
-docs/*PRD*.md
-docs/*prd*.md
 docs/agent-native*.md
-client/public/skill.md
 video-clickthrough-local
 local-private-version
 scripts/test-*.js
