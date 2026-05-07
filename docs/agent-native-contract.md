@@ -62,6 +62,8 @@ reads normalize expired and revoked records before summarizing them. Terminal
 request states are not reported as approval-required, so adapters cannot confuse
 stale records with actionable approval prompts. These helpers are pure contract
 guards only; wiring them to real connect or approval UI remains deferred.
+Inbox responses include request status counts across pending, approved, denied,
+expired, revoked, submitted, and failed records after lifecycle normalization.
 
 ## Draft vs Submit Request
 
