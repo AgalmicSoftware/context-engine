@@ -134,6 +134,9 @@ test('prepare-public-release strips private surfaces without publishing an inven
     );
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'private companion surface\n');
+    writeFile(sourceDir, path.join('contextEngine-cc', 'server.mjs'), 'private runtime server\n');
+    writeFile(sourceDir, path.join('contextEngine-cc', 'package.json'), '{"private":true}\n');
+    writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
 
     const result = runPrepareScript(sourceDir, outputDir);
@@ -206,6 +209,8 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'server.mjs')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'package.json')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
 
     const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
