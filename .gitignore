@@ -138,8 +138,21 @@ broadcast/
 /TODO/
 /docs/internal-prds/
 /local-private-version/
-contextEngine-cc/
 CLAUDE.md
+
+# Private local companion state, secrets, dependencies, and generated artifacts.
+contextEngine-cc/.data/
+contextEngine-cc/.state/
+contextEngine-cc/node_modules/
+contextEngine-cc/.env
+contextEngine-cc/.env.*
+contextEngine-cc/**/*.jwt
+contextEngine-cc/**/*.key
+contextEngine-cc/**/*.pem
+contextEngine-cc/**/*.log
+contextEngine-cc/.cache/
+contextEngine-cc/cache/
+contextEngine-cc/tmp/
 
 # E2E test layer (stripped from public release)
 scripts/test-*.js
