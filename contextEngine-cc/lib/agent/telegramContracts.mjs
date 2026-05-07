@@ -1,6 +1,8 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 const CALLBACK_ACTION_RE = /^cecb_[a-z0-9_-]{8,48}$/;
+const PUBLIC_SESSION_RE = /^[a-z0-9_-]+$/i;
+const MAX_PUBLIC_SESSION_LENGTH = 128;
 const SENSITIVE_KEY_RE = /(?:jwt|token|private|secret|signature|bearer|authorization|mnemonic|seed|password)/i;
 const SENSITIVE_VALUE_RE = /(?:bearer\s+[a-z0-9._-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64})/i;
 const TELEGRAM_SECURE_GRANT_SCOPE_RE = /^agent:(read|draft|submit-request|create-question-request|decrypt-request|revoke-grant)$/;
@@ -173,6 +175,9 @@ function normalizePublicAgentSession(session) {
   const normalized = String(session || '').trim();
   if (!normalized) {
     throw new Error('Telegram agent drafts require an explicit session; use "general" for the general session.');
+  }
+  if (normalized.length > MAX_PUBLIC_SESSION_LENGTH || !PUBLIC_SESSION_RE.test(normalized)) {
+    throw new Error('Invalid Telegram agent public session slug.');
   }
   return normalized;
 }

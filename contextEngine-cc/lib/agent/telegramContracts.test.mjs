@@ -229,4 +229,8 @@ test('Telegram draft normalization preserves general and rejects empty public se
     () => telegramInputToAgentDraft({ session: '', questionId: '0xabc', update }),
     /use "general"/,
   );
+  assert.throws(
+    () => telegramInputToAgentDraft({ session: '../outside', questionId: '0xabc', update }),
+    /Invalid Telegram agent public session slug/,
+  );
 });
