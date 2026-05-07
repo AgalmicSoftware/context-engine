@@ -6,6 +6,7 @@
 ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
+docs/agent-native*.md
 TODO
 local-private-version
 CLAUDE.md
@@ -37,6 +38,7 @@ ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 CLAUDE.md
 .claude
+docs/agent-native*.md
 video-clickthrough-local
 local-private-version
 scripts/test-*.js
