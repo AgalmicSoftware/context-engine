@@ -713,6 +713,29 @@ test('agent submit-request creates approval records and idempotent retries', asy
   assert.equal(status.payload.request.requestId, first.payload.requestId);
   assert.equal(status.payload.request.status, 'pending_approval');
 
+  const scopedStatus = await callRoute(handleRoute, {
+    path: `/api/agent/requests/${encodeURIComponent(first.payload.requestId)}?session=alpha`,
+  });
+  assert.equal(scopedStatus.status, 200);
+  assert.equal(scopedStatus.payload.request.requestId, first.payload.requestId);
+
+  const wrongSessionStatus = await callRoute(handleRoute, {
+    path: `/api/agent/requests/${encodeURIComponent(first.payload.requestId)}?session=beta`,
+  });
+  assert.equal(wrongSessionStatus.status, 404);
+  assert.equal(wrongSessionStatus.payload.code, 'agent_request_not_found');
+
+  const invalidSessionStatus = await callRoute(handleRoute, {
+    path: `/api/agent/requests/${encodeURIComponent(first.payload.requestId)}?session=`,
+  });
+  assert.equal(invalidSessionStatus.status, 400);
+  assert.deepEqual(invalidSessionStatus.payload, {
+    ok: false,
+    status: 'bad_request',
+    code: 'invalid_session',
+    error: 'session must be a non-empty agent session slug; use "general" for the general session.',
+  });
+
   const inbox = await callRoute(handleRoute, { path: '/api/agent/inbox?session=alpha' });
   assert.equal(inbox.status, 200);
   assert.equal(inbox.payload.requests.length, 1);

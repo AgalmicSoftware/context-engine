@@ -2426,6 +2426,15 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   if (path.startsWith('/api/agent/requests/') && method === 'GET') {
     const auth = requireAuth(req);
     if (!auth.ok) return agentAuthError(res, auth);
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
+      required: false,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
     const requestId = decodeURIComponent(path.slice('/api/agent/requests/'.length));
     if (!isValidApprovalRequestId(requestId)) {
       return agentRouteError(res, 400, 'Invalid agent request id.', {
@@ -2435,7 +2444,12 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
     }
     const request = loadAgentRequest(requestId);
     const walletAddress = normalizeAddressLower(auth.payload?.sub || '');
-    if (!request || (walletAddress && normalizeAddressLower(request.requester) !== walletAddress)) {
+    const requestedSession = sessionValidation.slug.toLowerCase();
+    if (
+      !request
+      || (walletAddress && normalizeAddressLower(request.requester) !== walletAddress)
+      || (requestedSession && String(request.session || '').trim().toLowerCase() !== requestedSession)
+    ) {
       return agentRouteError(res, 404, 'Agent request not found.', {
         code: 'agent_request_not_found',
         agentStatus: 'not_found',
