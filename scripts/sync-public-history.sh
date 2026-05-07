@@ -51,6 +51,16 @@ while IFS= read -r pattern; do
   STRIP_PATTERNS+=("$pattern")
 done < <(ce_public_release_strip_patterns)
 
+PRIVATE_REPLAY_MESSAGE_TOKENS=(
+  "contextEngine-cc"
+  "docs/agent-native"
+  "agent-native"
+  "OpenClaw"
+  "Telegram bridge"
+  "TODO/"
+  "PRD"
+)
+
 TMP_ROOT=""
 TEMP_CLONE=""
 TARGET_BRANCH="$DEFAULT_BRANCH_NAME"
@@ -104,6 +114,34 @@ commit_is_empty_after_strip() {
   done < <(git -C "$REPO_ROOT" diff-tree --no-commit-id --name-only -r --root "$commit_sha")
 
   return 0
+}
+
+private_replay_message_token() {
+  local message_file="$1"
+  local token
+
+  for token in "${PRIVATE_REPLAY_MESSAGE_TOKENS[@]}"; do
+    if grep -Fq -- "$token" "$message_file"; then
+      printf '%s\n' "$token"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+ensure_public_replay_message() {
+  local commit_sha="$1"
+  local subject="$2"
+  local message_file="$3"
+  local token
+
+  if token=$(private_replay_message_token "$message_file"); then
+    log_error "Refusing to replay $commit_sha | $subject"
+    log_error "Commit message mentions private release token: $token"
+    log_error "Split the private-only changes into a stripped commit or rewrite the replayed public commit message."
+    exit 2
+  fi
 }
 
 strip_private_paths_from_clone() {
@@ -321,6 +359,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
       SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
       log_info "DRY RUN skip  $commit_sha | $subject"
     else
+      message_file="$TMP_ROOT/commit-message.txt"
+      git -C "$REPO_ROOT" log -1 --format='%B' "$commit_sha" > "$message_file"
+      ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
       REPLAYED_COUNT=$((REPLAYED_COUNT + 1))
       log_info "DRY RUN replay $commit_sha | $subject"
     fi
@@ -358,6 +399,8 @@ for commit_sha in "${COMMITS[@]}"; do
     reset_clone_to_branch_head
     continue
   fi
+
+  ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
 
   GIT_AUTHOR_NAME="$PUBLIC_GIT_NAME" \
   GIT_AUTHOR_EMAIL="$PUBLIC_GIT_EMAIL" \
