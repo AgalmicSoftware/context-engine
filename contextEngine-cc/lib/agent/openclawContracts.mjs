@@ -152,6 +152,15 @@ export function validateOpenClawAdapterEnvelope(envelope = {}) {
   if (!path.startsWith('/api/agent/')) {
     return { ok: false, error: 'OpenClaw adapter envelopes must point to canonical /api/agent routes.' };
   }
+  let decodedPath = path;
+  try {
+    decodedPath = decodeURIComponent(path);
+  } catch {
+    return { ok: false, error: 'OpenClaw adapter envelopes must use valid canonical agent paths.' };
+  }
+  if (decodedPath.includes('..') || decodedPath.includes('\\')) {
+    return { ok: false, error: 'OpenClaw adapter envelopes must use canonical agent paths without traversal.' };
+  }
   const serialized = JSON.stringify(envelope).toLowerCase();
   if (serialized.includes('queryselector') || serialized.includes('document.') || serialized.includes('dom')) {
     return { ok: false, error: 'OpenClaw adapter envelopes must not depend on browser DOM scraping.' };

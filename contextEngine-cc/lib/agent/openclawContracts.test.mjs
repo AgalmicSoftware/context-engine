@@ -167,4 +167,16 @@ test('OpenClaw adapter envelope validator rejects non-agent routes and DOM hooks
     ok: false,
     error: 'OpenClaw adapter envelopes must not depend on browser DOM scraping.',
   });
+  assert.deepEqual(validateOpenClawAdapterEnvelope({
+    http: { method: 'GET', path: '/api/agent/../questions' },
+  }), {
+    ok: false,
+    error: 'OpenClaw adapter envelopes must use canonical agent paths without traversal.',
+  });
+  assert.deepEqual(validateOpenClawAdapterEnvelope({
+    http: { method: 'GET', path: '/api/agent/%2e%2e/questions' },
+  }), {
+    ok: false,
+    error: 'OpenClaw adapter envelopes must use canonical agent paths without traversal.',
+  });
 });
