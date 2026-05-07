@@ -266,7 +266,12 @@ test('agent routes reject missing auth before returning adapter payloads', async
   });
 
   assert.equal(result.status, 401);
-  assert.deepEqual(result.payload, { error: 'Missing Authorization header.' });
+  assert.deepEqual(result.payload, {
+    ok: false,
+    status: 'auth_error',
+    code: 'agent_auth_required',
+    error: 'Missing Authorization header.',
+  });
 });
 
 test('agent read adapters return canonical identity, sessions, and questions', async (t) => {
@@ -287,9 +292,11 @@ test('agent read adapters return canonical identity, sessions, and questions', a
 
   const missingSessionQuestions = await callRoute(handleRoute, { path: '/api/agent/questions' });
   assert.equal(missingSessionQuestions.status, 400);
+  assert.equal(missingSessionQuestions.payload.code, 'invalid_session');
 
   const emptySessionQuestions = await callRoute(handleRoute, { path: '/api/agent/questions?session=' });
   assert.equal(emptySessionQuestions.status, 400);
+  assert.equal(emptySessionQuestions.payload.code, 'invalid_session');
 
   const questions = await callRoute(handleRoute, { path: '/api/agent/questions?session=alpha' });
   assert.equal(questions.status, 200);
@@ -322,7 +329,9 @@ test('agent question and draft routes validate payloads and expose local drafts'
     path: '/api/agent/questions?session=..%2Foutside',
   });
   assert.equal(invalidSession.status, 400);
-  assert.deepEqual(invalidSession.payload, { error: 'Invalid session slug.' });
+  assert.equal(invalidSession.payload.ok, false);
+  assert.equal(invalidSession.payload.code, 'invalid_session');
+  assert.equal(invalidSession.payload.error, 'Invalid session slug.');
 
   const invalidDraft = await callRoute(handleRoute, {
     path: '/api/agent/responses/draft',
@@ -330,7 +339,9 @@ test('agent question and draft routes validate payloads and expose local drafts'
     body: { session: 'alpha', questionId: 'not-a-question-id', answer: 'yes' },
   });
   assert.equal(invalidDraft.status, 400);
-  assert.deepEqual(invalidDraft.payload, { error: 'questionId must be a 32-byte hex string.' });
+  assert.equal(invalidDraft.payload.ok, false);
+  assert.equal(invalidDraft.payload.code, 'invalid_question_id');
+  assert.equal(invalidDraft.payload.error, 'questionId must be a 32-byte hex string.');
 
   const draft = await callRoute(handleRoute, {
     path: '/api/agent/responses/draft',
@@ -380,6 +391,7 @@ test('agent response routes require explicit public session slugs', async (t) =>
     },
   });
   assert.equal(emptyDraft.status, 400);
+  assert.equal(emptyDraft.payload.code, 'invalid_session');
 
   const missingDraft = await callRoute(handleRoute, {
     path: '/api/agent/responses/draft',
@@ -391,16 +403,19 @@ test('agent response routes require explicit public session slugs', async (t) =>
     },
   });
   assert.equal(missingDraft.status, 400);
+  assert.equal(missingDraft.payload.code, 'invalid_session');
 
   const emptyDrafts = await callRoute(handleRoute, {
     path: '/api/agent/responses/drafts?session=',
   });
   assert.equal(emptyDrafts.status, 400);
+  assert.equal(emptyDrafts.payload.code, 'invalid_session');
 
   const emptyInbox = await callRoute(handleRoute, {
     path: '/api/agent/inbox?session=',
   });
   assert.equal(emptyInbox.status, 400);
+  assert.equal(emptyInbox.payload.code, 'invalid_session');
 
   const emptySubmitRequest = await callRoute(handleRoute, {
     path: '/api/agent/responses/submit-request',
@@ -411,6 +426,7 @@ test('agent response routes require explicit public session slugs', async (t) =>
     },
   });
   assert.equal(emptySubmitRequest.status, 400);
+  assert.equal(emptySubmitRequest.payload.code, 'invalid_session');
 
   const generalDraft = await callRoute(handleRoute, {
     path: '/api/agent/responses/draft',
@@ -443,7 +459,12 @@ test('agent submit-request creates approval records and idempotent retries', asy
     body: { session: 'alpha', questionIds: [] },
   });
   assert.equal(invalid.status, 400);
-  assert.deepEqual(invalid.payload, { error: 'questionIds must contain at least one 32-byte hex string.' });
+  assert.deepEqual(invalid.payload, {
+    ok: false,
+    status: 'bad_request',
+    code: 'invalid_question_ids',
+    error: 'questionIds must contain at least one 32-byte hex string.',
+  });
 
   const first = await callRoute(handleRoute, {
     path: '/api/agent/responses/submit-request',
@@ -565,20 +586,30 @@ test('agent submit-request creates approval records and idempotent retries', asy
     path: '/api/agent/requests/not-a-request-id',
   });
   assert.equal(invalidStatus.status, 400);
-  assert.deepEqual(invalidStatus.payload, { error: 'Invalid agent request id.' });
+  assert.deepEqual(invalidStatus.payload, {
+    ok: false,
+    status: 'bad_request',
+    code: 'invalid_request_id',
+    error: 'Invalid agent request id.',
+  });
 
   const missingStatus = await callRoute(handleRoute, {
     path: '/api/agent/requests/agent_req_missing123',
   });
   assert.equal(missingStatus.status, 404);
-  assert.deepEqual(missingStatus.payload, { error: 'Agent request not found.' });
+  assert.deepEqual(missingStatus.payload, {
+    ok: false,
+    status: 'not_found',
+    code: 'agent_request_not_found',
+    error: 'Agent request not found.',
+  });
 
   const otherWalletStatus = await callRoute(handleRoute, {
     path: `/api/agent/requests/${encodeURIComponent(first.payload.requestId)}`,
     token: 'second-agent-jwt',
   });
   assert.equal(otherWalletStatus.status, 404);
-  assert.deepEqual(otherWalletStatus.payload, { error: 'Agent request not found.' });
+  assert.equal(otherWalletStatus.payload.code, 'agent_request_not_found');
 });
 
 test('agent request reads normalize expired and revoked lifecycle states', async (t) => {

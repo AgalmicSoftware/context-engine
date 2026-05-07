@@ -52,7 +52,7 @@ test('agent HTTP route branches require local JWT auth before work', () => {
 
   for (const branch of branches) {
     assert.match(branch, /const auth = requireAuth\(req\);/);
-    assert.match(branch, /if \(!auth\.ok\) return json\(res, auth\.status, \{ error: auth\.error \}\);/);
+    assert.match(branch, /if \(!auth\.ok\) return agentAuthError\(res, auth\);/);
   }
 });
 

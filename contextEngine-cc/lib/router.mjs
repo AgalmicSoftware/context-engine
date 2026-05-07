@@ -401,6 +401,25 @@ function summarizeAgentRequestForRead(request = {}) {
   };
 }
 
+function agentRouteError(res, httpStatus, errorMessage, {
+  code = 'agent_error',
+  agentStatus = 'error',
+} = {}) {
+  return json(res, httpStatus, buildAgentError(errorMessage, {
+    status: agentStatus,
+    code,
+  }));
+}
+
+function agentAuthError(res, auth = {}) {
+  const message = auth.error || 'Agent authorization failed.';
+  const code = /missing/i.test(message) ? 'agent_auth_required' : 'agent_auth_failed';
+  return agentRouteError(res, auth.status || 401, message, {
+    code,
+    agentStatus: 'auth_error',
+  });
+}
+
 function buildPendingSubmissionLockKey(slug, response) {
   const normalizedSlug = String(slug ?? '').trim().toLowerCase();
   const questionId = String(response?.questionId || '').trim().toLowerCase();
@@ -534,14 +553,28 @@ async function saveAgentResponseDraft({ body = {}, authPayload = {} } = {}) {
   } = body || {};
   const questionValidation = validateQuestionId(questionId);
   if (!questionValidation.ok) {
-    return { ok: false, status: 400, payload: { error: questionValidation.error } };
+    return {
+      ok: false,
+      status: 400,
+      payload: buildAgentError(questionValidation.error, {
+        status: 'bad_request',
+        code: 'invalid_question_id',
+      }),
+    };
   }
   const canonicalQuestionId = questionValidation.questionId;
   const sessionValidation = validateAgentSessionSlug(session, {
     required: true,
   });
   if (!sessionValidation.ok) {
-    return { ok: false, status: 400, payload: { error: sessionValidation.error } };
+    return {
+      ok: false,
+      status: 400,
+      payload: buildAgentError(sessionValidation.error, {
+        status: 'bad_request',
+        code: 'invalid_session',
+      }),
+    };
   }
 
   const normalizedQuestionType = String(questionType || 'unknown').toLowerCase().trim();
@@ -566,12 +599,26 @@ async function saveAgentResponseDraft({ body = {}, authPayload = {} } = {}) {
   const isInvalidRating = normalizedQuestionType === 'rating'
     && (resolvedAnswer == null || !Number.isFinite(Number(resolvedAnswer)) || Number(resolvedAnswer) < 0 || Number(resolvedAnswer) > 10);
   if (isEmptyAnswer || isInvalidRating) {
-    return { ok: false, status: 400, payload: { error: 'questionId and answer are required.' } };
+    return {
+      ok: false,
+      status: 400,
+      payload: buildAgentError('questionId and answer are required.', {
+        status: 'bad_request',
+        code: 'invalid_response_draft',
+      }),
+    };
   }
 
   const storedAnswerResult = normalizeStoredResponseAnswer(answer, normalizedQuestionType, resolvedAnswer);
   if (!storedAnswerResult.ok) {
-    return { ok: false, status: storedAnswerResult.status, payload: { error: storedAnswerResult.error } };
+    return {
+      ok: false,
+      status: storedAnswerResult.status,
+      payload: buildAgentError(storedAnswerResult.error, {
+        status: 'bad_request',
+        code: 'invalid_answer',
+      }),
+    };
   }
 
   const slug = sessionValidation.slug;
@@ -597,7 +644,14 @@ async function saveAgentResponseDraft({ body = {}, authPayload = {} } = {}) {
   const dir = resolve(RESPONSES_DIR, slug);
   const rel = relative(resolve(RESPONSES_DIR), dir);
   if (rel.startsWith('..') || resolve(RESPONSES_DIR, rel) !== dir) {
-    return { ok: false, status: 400, payload: { error: 'Invalid session slug.' } };
+    return {
+      ok: false,
+      status: 400,
+      payload: buildAgentError('Invalid session slug.', {
+        status: 'bad_request',
+        code: 'invalid_session',
+      }),
+    };
   }
   mkdirSync(dir, { recursive: true });
 
@@ -1348,7 +1402,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
   if (path === '/api/agent/me' && method === 'GET') {
     const auth = requireAuth(req);
-    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!auth.ok) return agentAuthError(res, auth);
     const hookConfig = loadHookConfig();
     const sessions = getConfiguredSessions(hookConfig);
     const walletAddress = auth.payload?.sub || '';
@@ -1391,7 +1445,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
   if (path === '/api/agent/sessions' && method === 'GET') {
     const auth = requireAuth(req);
-    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!auth.ok) return agentAuthError(res, auth);
     try {
       const { scoped, all } = await listScopedSessions();
       for (const slug of scoped) {
@@ -1509,11 +1563,16 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
   if (path === '/api/agent/questions' && method === 'GET') {
     const auth = requireAuth(req);
-    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!auth.ok) return agentAuthError(res, auth);
     const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
       required: true,
     });
-    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
     const slug = sessionValidation.slug;
     const walletAddr = auth.payload?.sub || '';
     try {
@@ -1540,11 +1599,16 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
   if (path === '/api/agent/inbox' && method === 'GET') {
     const auth = requireAuth(req);
-    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!auth.ok) return agentAuthError(res, auth);
     const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
       required: false,
     });
-    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
     try {
       const sessions = sessionValidation.slug
         ? [sessionValidation.slug]
@@ -1789,7 +1853,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
   if (path === '/api/agent/responses/draft' && method === 'POST') {
     const auth = requireAuth(req);
-    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!auth.ok) return agentAuthError(res, auth);
     try {
       const result = await saveAgentResponseDraft({
         body,
@@ -1803,11 +1867,16 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
   if (path === '/api/agent/responses/drafts' && method === 'GET') {
     const auth = requireAuth(req);
-    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!auth.ok) return agentAuthError(res, auth);
     const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
       required: true,
     });
-    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
     const slug = sessionValidation.slug;
     try {
       const drafts = filterResponsesByRespondent(
@@ -1827,20 +1896,28 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
   if (path === '/api/agent/responses/submit-request' && method === 'POST') {
     const auth = requireAuth(req);
-    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!auth.ok) return agentAuthError(res, auth);
 
     const { session, questionIds, questionId } = body || {};
     const sessionValidation = validateAgentSessionSlug(session, {
       required: true,
     });
-    if (!sessionValidation.ok) return json(res, 400, { error: sessionValidation.error });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
 
     const rawQuestionIds = Array.isArray(questionIds)
       ? questionIds
       : (questionId ? [questionId] : []);
     const normalizedQuestionIds = rawQuestionIds.map((value) => validateQuestionId(value));
     if (!normalizedQuestionIds.length || normalizedQuestionIds.some((entry) => !entry.ok)) {
-      return json(res, 400, { error: 'questionIds must contain at least one 32-byte hex string.' });
+      return agentRouteError(res, 400, 'questionIds must contain at least one 32-byte hex string.', {
+        code: 'invalid_question_ids',
+        agentStatus: 'bad_request',
+      });
     }
 
     const requester = auth.payload?.sub || '';
@@ -2348,15 +2425,21 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
   if (path.startsWith('/api/agent/requests/') && method === 'GET') {
     const auth = requireAuth(req);
-    if (!auth.ok) return json(res, auth.status, { error: auth.error });
+    if (!auth.ok) return agentAuthError(res, auth);
     const requestId = decodeURIComponent(path.slice('/api/agent/requests/'.length));
     if (!isValidApprovalRequestId(requestId)) {
-      return json(res, 400, { error: 'Invalid agent request id.' });
+      return agentRouteError(res, 400, 'Invalid agent request id.', {
+        code: 'invalid_request_id',
+        agentStatus: 'bad_request',
+      });
     }
     const request = loadAgentRequest(requestId);
     const walletAddress = normalizeAddressLower(auth.payload?.sub || '');
     if (!request || (walletAddress && normalizeAddressLower(request.requester) !== walletAddress)) {
-      return json(res, 404, { error: 'Agent request not found.' });
+      return agentRouteError(res, 404, 'Agent request not found.', {
+        code: 'agent_request_not_found',
+        agentStatus: 'not_found',
+      });
     }
     const requestRead = summarizeAgentRequestForRead(request);
     return json(res, 200, buildAgentOk({
