@@ -6,9 +6,11 @@ export const AGENT_IDEMPOTENCY_KEY_RE = /^[a-z0-9][a-z0-9._:-]{7,127}$/;
 export const AGENT_REQUEST_STATUS = Object.freeze({
   PENDING_APPROVAL: 'pending_approval',
   APPROVED: 'approved',
+  DENIED: 'denied',
   REJECTED: 'rejected',
   REVOKED: 'revoked',
   EXPIRED: 'expired',
+  FAILED: 'failed',
   SUBMITTED: 'submitted',
 });
 

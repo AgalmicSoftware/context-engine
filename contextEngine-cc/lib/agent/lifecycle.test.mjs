@@ -145,4 +145,18 @@ test('agent request lifecycle keeps approval states explicit', () => {
     status: 'rejected',
     reason: 'request_rejected',
   });
+  assert.deepEqual(evaluateAgentRequestLifecycle({
+    status: 'denied',
+  }, { nowMs: NOW_MS }), {
+    ok: false,
+    status: 'denied',
+    reason: 'request_denied',
+  });
+  assert.deepEqual(evaluateAgentRequestLifecycle({
+    status: 'failed',
+  }, { nowMs: NOW_MS }), {
+    ok: false,
+    status: 'failed',
+    reason: 'request_failed',
+  });
 });

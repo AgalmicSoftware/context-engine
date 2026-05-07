@@ -159,5 +159,11 @@ export function evaluateAgentRequestLifecycle(request = {}, { nowMs = Date.now()
   if (status === AGENT_REQUEST_STATUS.REJECTED) {
     return { ok: false, status, reason: 'request_rejected' };
   }
+  if (status === AGENT_REQUEST_STATUS.DENIED) {
+    return { ok: false, status, reason: 'request_denied' };
+  }
+  if (status === AGENT_REQUEST_STATUS.FAILED) {
+    return { ok: false, status, reason: 'request_failed' };
+  }
   return { ok: true, status, reason: 'request_active' };
 }

@@ -10,6 +10,7 @@ import {
   normalizeAgentQuestion,
   normalizeAgentQuestionPayload,
   redactAgentSensitiveFields,
+  summarizeAgentRequestStatusCounts,
   summarizePendingResponseForAgent,
   summarizeRequestForAgent,
 } from './schemas.mjs';
@@ -175,6 +176,27 @@ test('agent request summaries mark only pending approval as approval-required', 
     assert.equal(summary.requiresApproval, false);
     assert.equal(summary.terminal, true);
   }
+});
+
+test('agent request status counts summarize normalized request lists', () => {
+  assert.deepEqual(summarizeAgentRequestStatusCounts([
+    { status: 'pending_approval' },
+    { status: 'approved' },
+    { status: 'denied' },
+    { status: 'expired' },
+    { status: 'revoked' },
+    { status: 'submitted' },
+    { status: 'failed' },
+    { status: 'failed' },
+  ]), {
+    pending_approval: 1,
+    approved: 1,
+    denied: 1,
+    expired: 1,
+    revoked: 1,
+    submitted: 1,
+    failed: 2,
+  });
 });
 
 test('sensitive fields are redacted recursively', () => {

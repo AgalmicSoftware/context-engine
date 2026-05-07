@@ -47,6 +47,7 @@ import {
   buildAgentOk,
   normalizeAgentQuestionPayload,
   redactAgentSensitiveFields,
+  summarizeAgentRequestStatusCounts,
   summarizePendingResponseForAgent,
   summarizeRequestForAgent,
 } from './agent/schemas.mjs';
@@ -1558,6 +1559,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
           || String(request?.session || '').trim().toLowerCase() === sessionValidation.slug.toLowerCase()
         ))
         .map((request) => summarizeAgentRequestForRead(request).summary);
+      const requestStatusCounts = summarizeAgentRequestStatusCounts(requests);
       return json(res, 200, buildAgentOk({
         inbox: [
           ...pendingResponses,
@@ -1565,6 +1567,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         ],
         pendingResponses,
         requests,
+        requestStatusCounts,
         count: pendingResponses.length + requests.length,
       }));
     } catch (err) {

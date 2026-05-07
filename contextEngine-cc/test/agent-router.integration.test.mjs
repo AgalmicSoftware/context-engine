@@ -593,6 +593,11 @@ test('agent request reads normalize expired and revoked lifecycle states', async
     status: 'revoked',
     revokedAt: '2026-05-06T00:01:00.000Z',
   });
+  writeRequest({ requestId: 'agent_req_pending123' });
+  writeRequest({ requestId: 'agent_req_approved123', status: 'approved' });
+  writeRequest({ requestId: 'agent_req_denied123', status: 'denied' });
+  writeRequest({ requestId: 'agent_req_submitted123', status: 'submitted' });
+  writeRequest({ requestId: 'agent_req_failed123', status: 'failed' });
 
   const expired = await callRoute(handleRoute, {
     path: '/api/agent/requests/agent_req_expired123',
@@ -619,6 +624,15 @@ test('agent request reads normalize expired and revoked lifecycle states', async
   assert.equal(byId.agent_req_expired123.requiresApproval, false);
   assert.equal(byId.agent_req_revoked123.status, 'revoked');
   assert.equal(byId.agent_req_revoked123.requiresApproval, false);
+  assert.deepEqual(inbox.payload.requestStatusCounts, {
+    expired: 1,
+    revoked: 1,
+    pending_approval: 1,
+    approved: 1,
+    denied: 1,
+    submitted: 1,
+    failed: 1,
+  });
 
   const retryExpired = await callRoute(handleRoute, {
     path: '/api/agent/responses/submit-request',

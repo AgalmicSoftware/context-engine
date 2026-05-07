@@ -185,6 +185,15 @@ export function summarizeRequestForAgent(request = {}) {
   };
 }
 
+export function summarizeAgentRequestStatusCounts(requests = []) {
+  const counts = {};
+  for (const request of Array.isArray(requests) ? requests : []) {
+    const status = String(request?.status || 'pending_approval').trim();
+    counts[status] = (counts[status] || 0) + 1;
+  }
+  return counts;
+}
+
 export function redactAgentSensitiveFields(value) {
   if (Array.isArray(value)) {
     return value.map((entry) => redactAgentSensitiveFields(entry));
