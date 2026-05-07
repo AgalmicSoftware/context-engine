@@ -420,6 +420,13 @@ function agentAuthError(res, auth = {}) {
   });
 }
 
+function agentServerError(res, err = {}) {
+  return agentRouteError(res, 500, err?.message || 'Agent route failed.', {
+    code: 'agent_internal_error',
+    agentStatus: 'server_error',
+  });
+}
+
 function buildPendingSubmissionLockKey(slug, response) {
   const normalizedSlug = String(slug ?? '').trim().toLowerCase();
   const questionId = String(response?.questionId || '').trim().toLowerCase();
@@ -1460,7 +1467,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         scopeSlugs: CE_SESSION_SCAN_SLUGS,
       }));
     } catch (err) {
-      return json(res, 500, { error: err.message });
+      return agentServerError(res, err);
     }
   }
 
@@ -1593,7 +1600,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         },
       }));
     } catch (err) {
-      return json(res, 500, { error: err.message });
+      return agentServerError(res, err);
     }
   }
 
@@ -1635,7 +1642,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         count: pendingResponses.length + requests.length,
       }));
     } catch (err) {
-      return json(res, 500, { error: err.message });
+      return agentServerError(res, err);
     }
   }
 
@@ -1861,7 +1868,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       });
       return json(res, result.status, result.payload);
     } catch (err) {
-      return json(res, 500, { error: err.message });
+      return agentServerError(res, err);
     }
   }
 
@@ -1890,7 +1897,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         count: drafts.length,
       }));
     } catch (err) {
-      return json(res, 500, { error: err.message });
+      return agentServerError(res, err);
     }
   }
 

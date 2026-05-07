@@ -55,13 +55,14 @@ async function callRoute(handleRoute, {
   body = {},
   token = 'valid-agent-jwt',
   headers = {},
+  deps = {},
 } = {}) {
   const res = makeMockRes();
   await handleRoute(makeReq({ token, headers }), res, {
     url: new URL(path, 'http://localhost:7391'),
     method,
     body,
-  });
+  }, deps);
   return {
     status: res.statusCode,
     payload: JSON.parse(res.body || '{}'),
@@ -311,6 +312,28 @@ test('agent routes use stable auth error envelopes before route-specific work', 
       error: 'Missing Authorization header.',
     });
   }
+});
+
+test('agent routes use stable server error envelopes', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const result = await callRoute(handleRoute, {
+    path: '/api/agent/questions?session=alpha',
+    deps: {
+      async getRandomUnseen() {
+        throw new Error('question cache unavailable');
+      },
+    },
+  });
+
+  assert.equal(result.status, 500);
+  assert.deepEqual(result.payload, {
+    ok: false,
+    status: 'server_error',
+    code: 'agent_internal_error',
+    error: 'question cache unavailable',
+  });
 });
 
 test('agent read adapters return canonical identity, sessions, and questions', async (t) => {

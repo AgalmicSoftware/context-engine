@@ -78,7 +78,7 @@ Agent route errors use JSON-first envelopes with `ok: false`, `status`, `code`,
 and `error`. Current route-level codes include `agent_auth_required`,
 `agent_auth_failed`, `invalid_session`, `invalid_question_id`,
 `invalid_question_ids`, `invalid_response_draft`, `invalid_answer`,
-`invalid_request_id`, and `agent_request_not_found`.
+`invalid_request_id`, `agent_request_not_found`, and `agent_internal_error`.
 
 ## Draft vs Submit Request
 
