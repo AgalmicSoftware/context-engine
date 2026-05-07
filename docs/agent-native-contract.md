@@ -169,6 +169,9 @@ Rules:
 normalization, callback action, Mini App validation, storage payload, and draft
 payload helpers. It does not implement webhooks, deployment config, bot token
 storage, or production secrets.
+Telegram draft helpers preserve the public `general` session alias and reject
+empty or malformed public session slugs before constructing canonical draft
+payloads.
 SecureStorage grant helpers require an explicit `agent:*` scope and a bounded
 future expiration. CloudStorage helpers reject nested secret-shaped keys and
 values and remain limited to non-sensitive preferences.
