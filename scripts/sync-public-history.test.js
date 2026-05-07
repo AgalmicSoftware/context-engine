@@ -251,6 +251,28 @@ test('sync-public-history replays public commits, skips private-only commits, an
   });
 });
 
+test('sync-public-history rejects replayed commit messages that mention private tokens', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, 'public-leak.txt', 'public change\n');
+    writeFile(sourceDir, path.join('docs', 'agent-native-leak.md'), 'private doc\n');
+    commitAll(sourceDir, 'Public change\n\nReferences agent-native PRD details.\n', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const dryRun = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+    assert.equal(dryRun.status, 2);
+    assert.match(dryRun.stderr, /Commit message mentions private release token: agent-native/);
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Refusing to replay .*Public change/);
+    assert.match(result.stderr, /Commit message mentions private release token: agent-native/);
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
 test('sync-public-history refreshes an existing remote PR branch safely without requiring --force-with-lease', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['push', '--quiet', 'origin', 'main:release-staging']);
