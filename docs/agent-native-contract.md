@@ -64,6 +64,9 @@ stale records with actionable approval prompts. These helpers are pure contract
 guards only; wiring them to real connect or approval UI remains deferred.
 Inbox responses include request status counts across pending, approved, denied,
 expired, revoked, submitted, and failed records after lifecycle normalization.
+Capability decisions keep risky remote modes, such as submit requests, in the
+approval-required state. Trusted local auto-submit remains local-only even when
+local worker readiness is true.
 
 ## Draft vs Submit Request
 
