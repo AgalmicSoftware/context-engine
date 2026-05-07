@@ -17,6 +17,10 @@ business-logic paths.
 | Submit request | `POST /api/agent/responses/submit-request` | `POST /api/responses/submit-onchain` | Approval-gated request |
 | Delegated response execution | `POST /api/agent/responses/delegated-execute` | `POST /api/responses/submit-onchain` | Scoped-grant validation and audit record only |
 | Request status | `GET /api/agent/requests/:id[?session=<slug>]` | None | Agent-native request read |
+| Connect request | `POST /api/agent/connect-requests` | None | Approval-required scoped grant request |
+| Connect request read | `GET /api/agent/connect-requests/:id` | None | Side-effect-free scoped grant request read |
+| Connect request approve | `POST /api/agent/connect-requests/approve` | None | Local human approval creates the scoped grant |
+| Connect request deny | `POST /api/agent/connect-requests/deny` | None | Local human denial closes the request |
 | Grant list | `GET /api/agent/grants[?session=<slug>]` | None | Wallet-scoped grant read |
 | Grant read | `GET /api/agent/grants/:id[?session=<slug>]` | None | Wallet-scoped grant read |
 | Grant revoke | `POST /api/agent/grants/revoke` | None | Wallet-scoped grant revocation |
@@ -48,10 +52,15 @@ versioned shapes for:
   stable fingerprint.
 - `AgentGrant`: scoped grant metadata that never grants signing authority or
   worker-token authority.
-- `AgentConnectRequest`: future connect/approval handoff metadata for scoped
-  grants. Connect requests can request read, draft, submit-request, create
-  question, decrypt, or revoke-grant scopes, but still do not carry signing
-  authority or worker-token authority.
+- `AgentConnectRequest`: human-approved connect/approval handoff metadata for
+  scoped grants. Connect requests bind the human principal, agent identity,
+  explicit session slugs, requested scopes, allowed action ids, risk ceiling,
+  expiry, execution policy, audit requirement, idempotency key, and stable
+  fingerprint. They still do not carry signing authority or worker-token
+  authority.
+- `AgentBridgeWorker` primitives: contract-only principal summaries,
+  preference profiles, opaque action records, idempotency records, bridge
+  events, grant cache summaries, and agent-created account metadata.
 
 `AgentGrant` is the private contract for explicit delegation. A grant must be
 bound to all of:
@@ -94,7 +103,7 @@ sessions are reported as `scope_mismatch` or `session_mismatch`. Request status
 reads normalize expired and revoked records before summarizing them. Terminal
 request states are not reported as approval-required, so adapters cannot confuse
 stale records with actionable approval prompts. These helpers are pure contract
-guards only; wiring them to real connect or approval UI remains deferred.
+guards only; wiring them to a richer client approval UI remains deferred.
 Inbox responses include request status counts across pending, approved, denied,
 expired, revoked, submitted, and failed records after lifecycle normalization.
 Capability decisions keep risky remote modes, such as submit requests, in the
@@ -170,13 +179,54 @@ long-lived bearer token, private deployment config, or equivalent authority.
 
 Grant management is intentionally low risk in this phase:
 
+- `POST /api/agent/connect-requests` creates a pending scoped grant request.
+- `GET /api/agent/connect-requests/:id` reads that request without side effects.
+- `POST /api/agent/connect-requests/approve` creates an active scoped grant only
+  after local human JWT auth and only from the stored request fields.
+- `POST /api/agent/connect-requests/deny` closes the pending request without
+  creating a grant.
 - `GET /api/agent/grants` lists grants for the authenticated wallet.
 - `GET /api/agent/grants/:id` reads one wallet-scoped grant.
 - `POST /api/agent/grants/revoke` revokes an existing grant.
 
-Grant create/update routes are not exposed. They should be added only as
-side-effect-free approval/connect requests that cannot bypass human
-authorization.
+Connect request approval rejects scope-widening body fields. Reading a request
+does not approve, deny, refresh, or create anything. Approval creates only grant
+metadata; it does not execute a response, sign a transaction, mint an account,
+store a worker token, or expose a private key.
+
+Grant update routes are still not exposed. Any future grant expansion must go
+through a fresh connect request and local human approval.
+
+## AgentBridgeWorker Primitives
+
+`contextEngine-cc/lib/agent/bridgePrimitives.mjs` models the private
+agentBridgeWorker contract without real Telegram/OpenClaw transport:
+
+- `AgentPrincipal`, `TelegramPrincipal`, and `OpenClawPrincipal` are safe
+  summaries only.
+- `AgentPreferenceProfile` supports by-value entries and by-ref preference
+  bundle refs. Merging is additive; conflicting values become suggestions for
+  human review, not silent overwrites.
+- `AgentActionRecord` uses opaque `agent_action_...` ids and payload refs
+  instead of embedding prompts, answers, callback data, tokens, or secrets.
+- `AgentIdempotencyRecord` is scoped by CE account/principal, agent principal,
+  integration principal, session, and grant; the same key with a different
+  fingerprint is a conflict.
+- `AgentBridgeEvent` supports question delivered, response suggested, draft
+  saved, submit requested, delegated-execute deferred/executed, approved,
+  submitted, failed, and grant revoked events. Events contain safe summaries and
+  refs only.
+- Grant cache summaries strip CE-CC JWTs, worker tokens, private keys,
+  long-lived bearer tokens, and signing authority.
+- Agent-created account metadata models V1 as a managed
+  testnet/account-runtime identity. Outputs are metadata only. Durable Object
+  isolated signer remains the preferred V1 signer boundary if real signing is
+  later implemented.
+
+The bridge primitives are private-by-default and scoped by CE account/principal,
+integration principal, session, and grant. They do not implement webhooks, bot
+tokens, OpenClaw transport, real signing, delegated session keys, or worker
+authority.
 
 ## Action Inventory
 
@@ -187,7 +237,9 @@ behavior, signing/worker authority requirements, and whether Telegram/OpenClaw
 may call the route directly.
 
 Implemented or contract-only families cover read identity/session/question,
-draft response, submit request, delegated response execution, and grant revoke.
+draft response, submit request, delegated response execution, connect request
+create/read/approve/deny, grant revoke, and contract-only account create/link
+request metadata.
 Deferred families cover decrypt request, question generation, survey/question
 authoring, SBT group draft/create/share/claim requests, session
 create/configure requests, and PRD 557 deliberative statement
@@ -202,17 +254,10 @@ configuration, decrypt flows, or deliberative statement workflows.
 This private lane tracks CE-CC source under private version control while public
 release and public-history tooling continue to strip `contextEngine-cc/**`.
 It uses dependency-free pure contract tests and router-level agent harness tests.
-In the current checkout, `contextEngine-cc/server.mjs`,
-`contextEngine-cc/package.json`, and
-`contextEngine-cc/public/js/sessionSlugs.mjs` are absent from this branch and
-local `dev` history. Do not recreate them just to gain app-server HTTP coverage;
-restore or generate them only through an intentional CE-CC runtime packaging
-workflow.
-
-From the repo root, `npm run test:cc` is meaningful: when the runtime files are
-absent, it runs marked private fallback tests for `contextEngine-cc/lib/agent/*`
-and the router contract harness. True app-server HTTP tests for `/api/agent/*`
-wait for an intentional CE-CC runtime packaging decision.
+The current private branch includes the local runtime files needed for
+app-server `/api/agent/*` tests. From the repo root, `npm run test:cc` runs the
+private agent contract, route inventory, router harness, and runtime tests that
+are meaningful for this package shape.
 
 Private implementation and contract details stay under public-release strip
 patterns: `contextEngine-cc/**` and `docs/agent-native*.md`. CE-CC local state,
@@ -235,6 +280,8 @@ descriptors and HTTP wrapper functions. Implemented tools call only
 - `draft_response`
 - `submit_response_request`
 - `delegated_response_execute`
+- `create_connect_request`
+- `get_connect_request`
 - `get_inbox`
 - `get_request_status`
 - `revoke_agent_grant`
