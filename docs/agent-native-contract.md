@@ -49,15 +49,19 @@ versioned shapes for:
 Request ids use opaque `agent_req_...` values. Client-supplied idempotency keys
 are optional, lowercased, bounded, and matched only inside the authenticated
 wallet scope. A repeated key is treated as a retry only when the stored request
-fingerprint also matches the current request; a different session or question
-set with the same key returns a conflict instead of the older approval request.
+fingerprint also matches the current request and the stored request is still
+pending approval. A different session or question set with the same key returns
+a conflict instead of the older approval request. A matching key for an expired,
+revoked, rejected, submitted, denied, or failed request returns a conflict with
+the normalized request summary instead of a new approval-required response.
 
 Grant and request lifecycle helpers keep denial reasons explicit. Expired and
 revoked grants are denied before scope/session checks; mismatched scopes and
-sessions are reported as `scope_mismatch` or `session_mismatch`. Request
-lifecycle checks treat `expired`, `revoked`, and `rejected` as terminal states
-for remote agents. These helpers are pure contract guards only; wiring them to
-real connect or approval UI remains deferred.
+sessions are reported as `scope_mismatch` or `session_mismatch`. Request status
+reads normalize expired and revoked records before summarizing them. Terminal
+request states are not reported as approval-required, so adapters cannot confuse
+stale records with actionable approval prompts. These helpers are pure contract
+guards only; wiring them to real connect or approval UI remains deferred.
 
 ## Draft vs Submit Request
 
