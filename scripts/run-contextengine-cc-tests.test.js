@@ -7,7 +7,9 @@ const os = require('node:os');
 const path = require('node:path');
 
 const {
+  collectContextEngineCcFallbackTestFiles,
   collectContextEngineCcTestFiles,
+  FALLBACK_CONTEXTENGINE_CC_TEST_FILES,
   hasRunnableContextEngineCc,
   REQUIRED_CONTEXTENGINE_CC_FILES,
 } = require('./run-contextengine-cc-tests');
@@ -45,6 +47,22 @@ test('collectContextEngineCcTestFiles finds nested CE-CC tests without package m
 test('collectContextEngineCcTestFiles returns an empty list when CE-CC tests are absent', () => {
   withTempRepo((rootDir) => {
     assert.deepEqual(collectContextEngineCcTestFiles(rootDir), []);
+  });
+});
+
+test('collectContextEngineCcFallbackTestFiles keeps only runnable agent fallback tests', () => {
+  withTempRepo((rootDir) => {
+    writeFile(rootDir, 'contextEngine-cc/test/server.static-assets.test.mjs');
+    writeFile(rootDir, 'contextEngine-cc/test/agent-router.integration.test.mjs');
+    writeFile(rootDir, 'contextEngine-cc/lib/agent/schemas.test.mjs');
+
+    assert.deepEqual(collectContextEngineCcFallbackTestFiles(rootDir), [
+      path.join('contextEngine-cc', 'lib', 'agent', 'schemas.test.mjs'),
+      path.join('contextEngine-cc', 'test', 'agent-router.integration.test.mjs'),
+    ]);
+    assert.ok(
+      FALLBACK_CONTEXTENGINE_CC_TEST_FILES.includes(path.join('contextEngine-cc', 'test', 'router.route-inventory.test.mjs'))
+    );
   });
 });
 
