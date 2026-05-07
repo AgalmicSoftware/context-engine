@@ -145,7 +145,9 @@ OpenClaw compatibility means:
 `contextEngine-cc/lib/agent/openclawContracts.mjs` contains only pure adapter
 envelopes for approval and draft forwarding.
 Envelope validation requires canonical `/api/agent/*` HTTP paths and rejects DOM
-scraping hints such as `document.querySelector`.
+scraping hints such as `document.querySelector`. It also rejects traversal-shaped
+agent paths so adapter envelopes cannot smuggle a non-canonical endpoint behind
+the public prefix.
 Thread event envelopes cover `delivered`, `drafted`, `submit_requested`,
 `approved`, `submitted`, and `failed` states. Submit-request envelopes preserve
 the canonical `requestId`, `approvalUrl`, status, and non-secret idempotency key
