@@ -488,6 +488,124 @@ test('agent response routes require explicit public session slugs', async (t) =>
   assert.equal(generalDrafts.payload.count, 1);
 });
 
+test('agent routes reject invalid public session slugs with stable envelopes', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+  const cases = [
+    {
+      label: 'questions missing session',
+      path: '/api/agent/questions',
+      error: 'session required.',
+    },
+    {
+      label: 'questions empty session',
+      path: '/api/agent/questions?session=',
+      error: 'session must be a non-empty agent session slug; use "general" for the general session.',
+    },
+    {
+      label: 'questions path-like session',
+      path: '/api/agent/questions?session=..%2Foutside',
+      error: 'Invalid session slug.',
+    },
+    {
+      label: 'draft missing session',
+      path: '/api/agent/responses/draft',
+      method: 'POST',
+      body: {
+        questionId: QUESTION_ID,
+        questionType: 'freeform',
+        answer: 'Missing session should be invalid.',
+      },
+      error: 'session required.',
+    },
+    {
+      label: 'draft empty session',
+      path: '/api/agent/responses/draft',
+      method: 'POST',
+      body: {
+        session: '',
+        questionId: QUESTION_ID,
+        questionType: 'freeform',
+        answer: 'Empty session should be invalid.',
+      },
+      error: 'session must be a non-empty agent session slug; use "general" for the general session.',
+    },
+    {
+      label: 'draft path-like session',
+      path: '/api/agent/responses/draft',
+      method: 'POST',
+      body: {
+        session: '../outside',
+        questionId: QUESTION_ID,
+        questionType: 'freeform',
+        answer: 'Path-like session should be invalid.',
+      },
+      error: 'Invalid session slug.',
+    },
+    {
+      label: 'drafts missing session',
+      path: '/api/agent/responses/drafts',
+      error: 'session required.',
+    },
+    {
+      label: 'drafts empty session',
+      path: '/api/agent/responses/drafts?session=',
+      error: 'session must be a non-empty agent session slug; use "general" for the general session.',
+    },
+    {
+      label: 'drafts path-like session',
+      path: '/api/agent/responses/drafts?session=..%2Foutside',
+      error: 'Invalid session slug.',
+    },
+    {
+      label: 'inbox empty session',
+      path: '/api/agent/inbox?session=',
+      error: 'session must be a non-empty agent session slug; use "general" for the general session.',
+    },
+    {
+      label: 'inbox path-like session',
+      path: '/api/agent/inbox?session=..%2Foutside',
+      error: 'Invalid session slug.',
+    },
+    {
+      label: 'submit-request missing session',
+      path: '/api/agent/responses/submit-request',
+      method: 'POST',
+      body: { questionIds: [QUESTION_ID] },
+      error: 'session required.',
+    },
+    {
+      label: 'submit-request empty session',
+      path: '/api/agent/responses/submit-request',
+      method: 'POST',
+      body: { session: '', questionIds: [QUESTION_ID] },
+      error: 'session must be a non-empty agent session slug; use "general" for the general session.',
+    },
+    {
+      label: 'submit-request path-like session',
+      path: '/api/agent/responses/submit-request',
+      method: 'POST',
+      body: { session: '../outside', questionIds: [QUESTION_ID] },
+      error: 'Invalid session slug.',
+    },
+  ];
+
+  for (const testCase of cases) {
+    const result = await callRoute(handleRoute, {
+      path: testCase.path,
+      method: testCase.method || 'GET',
+      body: testCase.body || {},
+    });
+    assert.equal(result.status, 400, testCase.label);
+    assert.deepEqual(result.payload, {
+      ok: false,
+      status: 'bad_request',
+      code: 'invalid_session',
+      error: testCase.error,
+    }, testCase.label);
+  }
+});
+
 test('agent submit-request creates approval records and idempotent retries', async (t) => {
   const harness = setupRouterHarness(t);
   const { handleRoute } = await import(harness.routerUrl);
