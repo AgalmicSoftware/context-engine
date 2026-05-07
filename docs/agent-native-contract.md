@@ -15,7 +15,11 @@ business-logic paths.
 | Draft responses | `POST /api/agent/responses/draft` | `POST /api/respond` | Draft-only local save |
 | Draft listing | `GET /api/agent/responses/drafts?session=<slug>` | `GET /api/responses/pending?session=<slug>` | Pending-response adapter |
 | Submit request | `POST /api/agent/responses/submit-request` | `POST /api/responses/submit-onchain` | Approval-gated request |
+| Delegated response execution | `POST /api/agent/responses/delegated-execute` | `POST /api/responses/submit-onchain` | Scoped-grant validation and audit record only |
 | Request status | `GET /api/agent/requests/:id[?session=<slug>]` | None | Agent-native request read |
+| Grant list | `GET /api/agent/grants[?session=<slug>]` | None | Wallet-scoped grant read |
+| Grant read | `GET /api/agent/grants/:id[?session=<slug>]` | None | Wallet-scoped grant read |
+| Grant revoke | `POST /api/agent/grants/revoke` | None | Wallet-scoped grant revocation |
 
 Legacy routes remain supported. The canonical routes require the same local JWT
 auth as their CE-CC equivalents and do not weaken worker-token or trusted-local
@@ -49,6 +53,29 @@ versioned shapes for:
   question, decrypt, or revoke-grant scopes, but still do not carry signing
   authority or worker-token authority.
 
+`AgentGrant` is the private contract for explicit delegation. A grant must be
+bound to all of:
+
+- `humanPrincipal`: the human wallet/principal that owns the grant.
+- `agentId`: the delegated agent identity.
+- `sessions`: explicit public session slugs; `general` is the public general
+  session alias.
+- `allowedActions`: canonical agent action ids such as
+  `agent.response.delegated_execute`.
+- `riskCeiling`: one of `read`, `low`, `medium`, `high`, or `critical`.
+- `executionPolicy`: `approval_required`, `scoped_delegated_execute`, or
+  `trusted_local_auto_submit`.
+- `expiresAt`, `status`, and `revokedAt`: expiry and revocation state.
+- `auditRequired`: whether CE must record an audit lifecycle record before the
+  action is considered accepted.
+
+`scoped_delegated_execute` is the only remote delegation mode that can allow a
+risky action without a fresh human approval prompt. It is still narrower than
+`trusted_local_auto_submit`: the grant must match the authenticated wallet,
+agent identity, session, action id, risk ceiling, expiry, and revocation state.
+It does not carry private keys, CE-CC JWTs, worker tokens, long-lived bearer
+tokens, deployment secrets, or any equivalent signing authority.
+
 Agent request payload snapshots redact sensitive keys and secret-shaped values
 recursively before local storage.
 
@@ -73,12 +100,16 @@ expired, revoked, submitted, and failed records after lifecycle normalization.
 Capability decisions keep risky remote modes, such as submit requests, in the
 approval-required state. Trusted local auto-submit remains local-only even when
 local worker readiness is true.
+`scoped_delegated_execute` is advertised as grant-required and is disabled by
+default in the general capability response until a route validates an explicit
+grant for the exact action.
 
 Agent route errors use JSON-first envelopes with `ok: false`, `status`, `code`,
 and `error`. Current route-level codes include `agent_auth_required`,
 `agent_auth_failed`, `invalid_session`, `invalid_question_id`,
 `invalid_question_ids`, `invalid_response_draft`, `invalid_answer`,
-`invalid_request_id`, `agent_request_not_found`, and `agent_internal_error`.
+`invalid_request_id`, `invalid_grant_id`, `agent_request_not_found`,
+`agent_grant_not_found`, `agent_grant_denied`, and `agent_internal_error`.
 
 ## Draft vs Submit Request
 
@@ -105,6 +136,66 @@ Approval-required responses use this shape:
 
 The local approval URL is a stable handoff target for human-facing surfaces.
 Adding a real client approval route is a separate product decision.
+
+## Scoped Delegated Execution
+
+Delegated execution is opt-in and scoped. Remote agents may execute only by
+calling canonical CE `/api/agent/*` routes with a valid grant; Telegram,
+OpenClaw, and MCP are adapter clients, not grant stores or authority stores.
+
+`POST /api/agent/responses/delegated-execute` currently validates the scoped
+grant and writes an auditable lifecycle record, but it does not perform on-chain
+submission. The success envelope is intentionally contract-only:
+
+```json
+{
+  "ok": true,
+  "status": "delegated_execution_deferred",
+  "executed": false,
+  "execution": {
+    "status": "contract_only_deferred",
+    "reason": "delegated_execution_validated",
+    "productDecisionRequired": true
+  }
+}
+```
+
+Actual signing or worker-mediated execution remains a product/security decision.
+When enabled later, CE must validate the grant at execution time and execute only
+through an approved CE-owned path such as local trusted execution,
+worker-mediated execution, managed testnet infrastructure, passkey,
+account-abstraction, or a future delegated session-key mechanism. The remote
+agent still must not receive or store the private key, CE-CC JWT, worker token,
+long-lived bearer token, private deployment config, or equivalent authority.
+
+Grant management is intentionally low risk in this phase:
+
+- `GET /api/agent/grants` lists grants for the authenticated wallet.
+- `GET /api/agent/grants/:id` reads one wallet-scoped grant.
+- `POST /api/agent/grants/revoke` revokes an existing grant.
+
+Grant create/update routes are not exposed. They should be added only as
+side-effect-free approval/connect requests that cannot bypass human
+authorization.
+
+## Action Inventory
+
+`contextEngine-cc/lib/agent/actionInventory.mjs` is the canonical private action
+inventory. It maps web UX action families to `/api/agent/*` implemented or
+planned routes, required grant scopes, risk levels, approval/delegation
+behavior, signing/worker authority requirements, and whether Telegram/OpenClaw
+may call the route directly.
+
+Implemented or contract-only families cover read identity/session/question,
+draft response, submit request, delegated response execution, and grant revoke.
+Deferred families cover decrypt request, question generation, survey/question
+authoring, SBT group draft/create/share/claim requests, session
+create/configure requests, and PRD 557 deliberative statement
+signal/proposal/ranking requests.
+
+Parity with the web UX is not complete. The agent API does not yet expose every
+web action for survey authoring, SBT lifecycle management, session creation and
+configuration, decrypt flows, or deliberative statement workflows.
 
 ## Verification Status
 
@@ -143,12 +234,14 @@ descriptors and HTTP wrapper functions. Implemented tools call only
 - `next_question`
 - `draft_response`
 - `submit_response_request`
+- `delegated_response_execute`
 - `get_inbox`
 - `get_request_status`
+- `revoke_agent_grant`
 
 Planned descriptors are present for `create_question_request`,
-`request_decrypt`, and `revoke_agent_grant`, but no SDK dependency or second
-runtime path has been added.
+and `request_decrypt`, but no SDK dependency or second runtime path has been
+added.
 
 Drift guards assert that every implemented MCP tool maps to an inventoried
 canonical `/api/agent/*` route and to the route-equivalence table.
