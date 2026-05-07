@@ -108,11 +108,15 @@ Adding a real client approval route is a separate product decision.
 
 ## Verification Status
 
-This private lane uses dependency-free pure contract tests and router-level
-agent harness tests. In the current checkout, `contextEngine-cc/server.mjs`,
+This private lane tracks CE-CC source under private version control while public
+release and public-history tooling continue to strip `contextEngine-cc/**`.
+It uses dependency-free pure contract tests and router-level agent harness tests.
+In the current checkout, `contextEngine-cc/server.mjs`,
 `contextEngine-cc/package.json`, and
-`contextEngine-cc/public/js/sessionSlugs.mjs` remain intentionally untracked or
-absent. Do not force-add or recreate them just to gain app-server HTTP coverage.
+`contextEngine-cc/public/js/sessionSlugs.mjs` are absent from this branch and
+local `dev` history. Do not recreate them just to gain app-server HTTP coverage;
+restore or generate them only through an intentional CE-CC runtime packaging
+workflow.
 
 From the repo root, `npm run test:cc` is meaningful: when the runtime files are
 absent, it runs marked private fallback tests for `contextEngine-cc/lib/agent/*`
@@ -120,7 +124,9 @@ and the router contract harness. True app-server HTTP tests for `/api/agent/*`
 wait for an intentional CE-CC runtime packaging decision.
 
 Private implementation and contract details stay under public-release strip
-patterns: `contextEngine-cc/**` and `docs/agent-native*.md`.
+patterns: `contextEngine-cc/**` and `docs/agent-native*.md`. CE-CC local state,
+secrets, dependency installs, logs, and caches remain ignored even though source
+files are private-tracked.
 
 ## MCP Wrapper Status
 
