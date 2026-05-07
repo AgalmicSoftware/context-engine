@@ -16,6 +16,7 @@ export const AGENT_REQUEST_STATUS = Object.freeze({
 
 export const AGENT_REQUEST_TYPES = Object.freeze({
   RESPONSE_SUBMIT: 'response_submit_request',
+  RESPONSE_DELEGATED_EXECUTE: 'response_delegated_execute',
   QUESTION_CREATE: 'question_create_request',
   DECRYPT: 'decrypt_request',
   GRANT_REVOKE: 'grant_revoke_request',
@@ -81,16 +82,21 @@ export function buildAgentRequestFingerprint({
   requester = '',
   session = '',
   questionIds = [],
+  actionId = '',
+  grantId = '',
 } = {}) {
   const ids = Array.isArray(questionIds)
     ? [...new Set(questionIds.map((id) => String(id || '').trim().toLowerCase()).filter(Boolean))].sort()
     : [];
-  return [
+  const fingerprintParts = [
     String(type || '').trim(),
     String(requester || '').trim().toLowerCase(),
     String(session || '').trim().toLowerCase(),
-    ...ids,
-  ].join('|');
+  ];
+  if (actionId) fingerprintParts.push(String(actionId || '').trim().toLowerCase());
+  if (grantId) fingerprintParts.push(String(grantId || '').trim().toLowerCase());
+  fingerprintParts.push(...ids);
+  return fingerprintParts.join('|');
 }
 
 export function buildAgentRequestRecord({
@@ -102,6 +108,8 @@ export function buildAgentRequestRecord({
   session = '',
   questionIds = [],
   requester = '',
+  actionId = '',
+  grantId = '',
   idempotencyKey = '',
   createdAt = new Date().toISOString(),
   updatedAt = createdAt,
@@ -120,11 +128,15 @@ export function buildAgentRequestRecord({
     session: String(session || '').trim(),
     questionIds: normalizedQuestionIds,
     requester: String(requester || '').trim().toLowerCase(),
+    actionId: String(actionId || '').trim().toLowerCase(),
+    grantId: String(grantId || '').trim(),
     idempotencyKey: normalizeAgentIdempotencyKey(idempotencyKey),
     fingerprint: buildAgentRequestFingerprint({
       type,
       requester,
       session,
+      actionId,
+      grantId,
       questionIds: normalizedQuestionIds,
     }),
     createdAt,

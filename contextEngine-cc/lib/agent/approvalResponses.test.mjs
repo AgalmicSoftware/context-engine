@@ -83,3 +83,25 @@ test('agent request records normalize approval and idempotency metadata', () => 
   assert.equal(record.idempotencyKey, 'submit:alpha.0001');
   assert.equal(record.fingerprint, 'response_submit_request|0xabc|alpha|0xq');
 });
+
+test('delegated execution fingerprints include grant and action boundaries', () => {
+  const record = buildAgentRequestRecord({
+    type: AGENT_REQUEST_TYPES.RESPONSE_DELEGATED_EXECUTE,
+    requestId: 'agent_req_delegate1',
+    status: AGENT_REQUEST_STATUS.APPROVED,
+    requiresApproval: false,
+    session: 'Alpha',
+    requester: '0xABC',
+    actionId: 'agent.response.delegated_execute',
+    grantId: 'agent_grant_abcdef12',
+    questionIds: ['0x2', '0x1'],
+  });
+
+  assert.equal(record.requiresApproval, false);
+  assert.equal(record.actionId, 'agent.response.delegated_execute');
+  assert.equal(record.grantId, 'agent_grant_abcdef12');
+  assert.equal(
+    record.fingerprint,
+    'response_delegated_execute|0xabc|alpha|agent.response.delegated_execute|agent_grant_abcdef12|0x1|0x2',
+  );
+});

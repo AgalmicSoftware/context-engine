@@ -23,9 +23,11 @@ test('agent capabilities allow read draft and submit-request but not remote auto
   assert.equal(hasAgentCapability(capabilities, AGENT_CAPABILITY_MODES.READ), true);
   assert.equal(hasAgentCapability(capabilities, AGENT_CAPABILITY_MODES.DRAFT), true);
   assert.equal(hasAgentCapability(capabilities, AGENT_CAPABILITY_MODES.SUBMIT_REQUEST), true);
+  assert.equal(hasAgentCapability(capabilities, AGENT_CAPABILITY_MODES.SCOPED_DELEGATED_EXECUTE), false);
   assert.equal(hasAgentCapability(capabilities, AGENT_CAPABILITY_MODES.CREATE_QUESTION_REQUEST), false);
   assert.equal(capabilities.submission.remoteAutoSubmit, false);
   assert.equal(capabilities.submission.submitRequestsRequireApproval, true);
+  assert.equal(capabilities.submission.scopedDelegatedExecuteRequiresGrant, true);
   assert.equal(capabilities.submission.trustedLocalAutoSubmit, true);
 });
 
@@ -43,8 +45,11 @@ test('trusted local auto-submit is false without worker readiness', () => {
 
 test('capability metadata marks risky remote modes as approval-gated', () => {
   assert.equal(AGENT_CAPABILITY_MODE_METADATA[AGENT_CAPABILITY_MODES.SUBMIT_REQUEST].requiresApproval, true);
+  assert.equal(AGENT_CAPABILITY_MODE_METADATA[AGENT_CAPABILITY_MODES.SCOPED_DELEGATED_EXECUTE].grantRequired, true);
+  assert.equal(AGENT_CAPABILITY_MODE_METADATA[AGENT_CAPABILITY_MODES.SCOPED_DELEGATED_EXECUTE].requiresApproval, false);
   assert.equal(AGENT_CAPABILITY_MODE_METADATA[AGENT_CAPABILITY_MODES.DECRYPT_REQUEST].requiresApproval, true);
   assert.equal(isRemoteAgentCapabilityMode(AGENT_CAPABILITY_MODES.SUBMIT_REQUEST), true);
+  assert.equal(isRemoteAgentCapabilityMode(AGENT_CAPABILITY_MODES.SCOPED_DELEGATED_EXECUTE), true);
   assert.equal(isRemoteAgentCapabilityMode(AGENT_CAPABILITY_MODES.TRUSTED_LOCAL_AUTO_SUBMIT), false);
 });
 
@@ -67,6 +72,15 @@ test('capability decisions keep risky and local-only modes explicit', () => {
     requiresApproval: true,
     risky: true,
     remoteAllowed: true,
+  });
+  assert.deepEqual(evaluateAgentCapabilityRequest({
+    capabilities,
+    mode: AGENT_CAPABILITY_MODES.SCOPED_DELEGATED_EXECUTE,
+  }), {
+    ok: false,
+    status: 'denied',
+    reason: 'capability_disabled',
+    mode: AGENT_CAPABILITY_MODES.SCOPED_DELEGATED_EXECUTE,
   });
   assert.deepEqual(evaluateAgentCapabilityRequest({
     capabilities,

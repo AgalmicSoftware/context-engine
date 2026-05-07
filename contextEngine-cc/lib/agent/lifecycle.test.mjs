@@ -3,11 +3,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   AGENT_CONNECT_REQUEST_STATUS,
+  AGENT_EXECUTION_POLICIES,
   AGENT_GRANT_SCOPES,
+  AGENT_RISK_LEVELS,
   evaluateAgentGrantForRequest,
   evaluateAgentRequestLifecycle,
+  evaluateScopedDelegatedExecutionGrant,
   normalizeAgentConnectRequest,
+  normalizeAgentGrantAllowedActions,
+  normalizeAgentGrantExecutionPolicy,
   normalizeAgentGrantLifecycle,
+  normalizeAgentGrantRiskCeiling,
   normalizeAgentGrantScopes,
   normalizeAgentPublicSessionSlug,
   normalizeAgentPublicSessions,
@@ -22,10 +28,14 @@ test('agent connect requests normalize scopes and sessions without authority gra
     requestedScopes: [
       AGENT_GRANT_SCOPES.DRAFT,
       AGENT_GRANT_SCOPES.SUBMIT_REQUEST,
+      AGENT_GRANT_SCOPES.DELEGATED_EXECUTE,
       'agent:sign',
       AGENT_GRANT_SCOPES.DRAFT,
     ],
     requestedSessions: [' general ', 'alpha', '', '../bad'],
+    requestedActions: ['agent.response.delegated_execute', 'bad action', 'agent.response.delegated_execute'],
+    riskCeiling: 'medium',
+    executionPolicy: AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE,
     status: AGENT_CONNECT_REQUEST_STATUS.APPROVED,
     signingAuthority: true,
     workerTokenAuthority: true,
@@ -34,8 +44,13 @@ test('agent connect requests normalize scopes and sessions without authority gra
   assert.deepEqual(request.requestedScopes, [
     AGENT_GRANT_SCOPES.DRAFT,
     AGENT_GRANT_SCOPES.SUBMIT_REQUEST,
+    AGENT_GRANT_SCOPES.DELEGATED_EXECUTE,
   ]);
   assert.deepEqual(request.requestedSessions, ['general', 'alpha']);
+  assert.deepEqual(request.requestedActions, ['agent.response.delegated_execute']);
+  assert.equal(request.riskCeiling, AGENT_RISK_LEVELS.MEDIUM);
+  assert.equal(request.executionPolicy, AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE);
+  assert.equal(request.auditRequired, true);
   assert.equal(request.status, AGENT_CONNECT_REQUEST_STATUS.APPROVED);
   assert.equal(request.signingAuthority, false);
   assert.equal(request.workerTokenAuthority, false);
@@ -44,29 +59,52 @@ test('agent connect requests normalize scopes and sessions without authority gra
 test('agent grant lifecycle keeps explicit scopes and public sessions', () => {
   assert.deepEqual(normalizeAgentGrantScopes([
     ' AGENT:DRAFT ',
+    AGENT_GRANT_SCOPES.DELEGATED_EXECUTE,
     AGENT_GRANT_SCOPES.DECRYPT_REQUEST,
     'agent:unknown',
   ]), [
     AGENT_GRANT_SCOPES.DRAFT,
+    AGENT_GRANT_SCOPES.DELEGATED_EXECUTE,
     AGENT_GRANT_SCOPES.DECRYPT_REQUEST,
   ]);
+  assert.deepEqual(normalizeAgentGrantAllowedActions([
+    ' Agent.Response.Delegated_Execute ',
+    '../bad',
+    'agent.response.delegated_execute',
+  ]), ['agent.response.delegated_execute']);
+  assert.equal(normalizeAgentGrantRiskCeiling('HIGH'), AGENT_RISK_LEVELS.HIGH);
+  assert.equal(normalizeAgentGrantRiskCeiling('unknown'), AGENT_RISK_LEVELS.LOW);
+  assert.equal(
+    normalizeAgentGrantExecutionPolicy('scoped_delegated_execute'),
+    AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE,
+  );
   assert.equal(normalizeAgentPublicSessionSlug(' general ').session, 'general');
   assert.equal(normalizeAgentPublicSessionSlug('').ok, false);
   assert.deepEqual(normalizeAgentPublicSessions(['alpha', 'general', 'alpha', '..']), ['alpha', 'general']);
 
   const grant = normalizeAgentGrantLifecycle({
     grantId: 'grant-1',
-    subject: 'telegram:123',
-    scopes: [AGENT_GRANT_SCOPES.DRAFT, AGENT_GRANT_SCOPES.SUBMIT_REQUEST],
+    humanPrincipal: '0xABC',
+    agentId: 'telegram:123',
+    scopes: [AGENT_GRANT_SCOPES.DRAFT, AGENT_GRANT_SCOPES.DELEGATED_EXECUTE],
     sessions: ['general', 'alpha'],
+    allowedActions: ['agent.response.delegated_execute'],
+    riskCeiling: 'medium',
+    executionPolicy: AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE,
     expiresAt: '2026-05-06T00:10:00.000Z',
     signingAuthority: true,
     workerTokenAuthority: true,
   });
 
   assert.equal(grant.scope, AGENT_GRANT_SCOPES.DRAFT);
-  assert.deepEqual(grant.scopes, [AGENT_GRANT_SCOPES.DRAFT, AGENT_GRANT_SCOPES.SUBMIT_REQUEST]);
+  assert.equal(grant.humanPrincipal, '0xabc');
+  assert.equal(grant.agentId, 'telegram:123');
+  assert.deepEqual(grant.scopes, [AGENT_GRANT_SCOPES.DRAFT, AGENT_GRANT_SCOPES.DELEGATED_EXECUTE]);
   assert.deepEqual(grant.sessions, ['general', 'alpha']);
+  assert.deepEqual(grant.allowedActions, ['agent.response.delegated_execute']);
+  assert.equal(grant.riskCeiling, AGENT_RISK_LEVELS.MEDIUM);
+  assert.equal(grant.executionPolicy, AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE);
+  assert.equal(grant.auditRequired, true);
   assert.equal(grant.signingAuthority, false);
   assert.equal(grant.workerTokenAuthority, false);
 });
@@ -111,6 +149,78 @@ test('agent grant access denies expired revoked scope and session mismatches', (
     session: 'alpha',
     nowMs: NOW_MS,
   }).reason, 'session_mismatch');
+});
+
+test('scoped delegated execution decisions enforce action risk identity audit and authority boundaries', () => {
+  const grant = {
+    grantId: 'agent_grant_valid123',
+    humanPrincipal: '0x1234',
+    agentId: 'telegram:agent-1',
+    scopes: [AGENT_GRANT_SCOPES.DELEGATED_EXECUTE],
+    sessions: ['alpha'],
+    allowedActions: ['agent.response.delegated_execute'],
+    riskCeiling: AGENT_RISK_LEVELS.MEDIUM,
+    executionPolicy: AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE,
+    auditRequired: true,
+    expiresAt: '2026-05-06T00:10:00.000Z',
+  };
+  const baseRequest = {
+    requiredScope: AGENT_GRANT_SCOPES.DELEGATED_EXECUTE,
+    session: 'alpha',
+    actionId: 'agent.response.delegated_execute',
+    riskLevel: AGENT_RISK_LEVELS.MEDIUM,
+    humanPrincipal: '0x1234',
+    agentId: 'telegram:agent-1',
+    nowMs: NOW_MS,
+    auditWillBeRecorded: true,
+  };
+
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, baseRequest).reason, 'delegated_execution_allowed');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    session: 'beta',
+  }).reason, 'session_mismatch');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    actionId: 'agent.response.other',
+  }).reason, 'action_mismatch');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    riskLevel: AGENT_RISK_LEVELS.HIGH,
+  }).reason, 'risk_ceiling_exceeded');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    humanPrincipal: '0x9999',
+  }).reason, 'human_principal_mismatch');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    agentId: 'openclaw:other',
+  }).reason, 'agent_identity_mismatch');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    auditWillBeRecorded: false,
+  }).reason, 'audit_required');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    exposesRemoteSigningAuthority: true,
+  }).reason, 'remote_signing_authority_denied');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    requiresSigningAuthority: true,
+  }).reason, 'ce_owned_execution_required');
+  assert.equal(evaluateScopedDelegatedExecutionGrant(grant, {
+    ...baseRequest,
+    requiresSigningAuthority: true,
+    ceOwnedExecution: true,
+  }).reason, 'delegated_execution_allowed');
+  assert.equal(evaluateScopedDelegatedExecutionGrant({
+    ...grant,
+    executionPolicy: AGENT_EXECUTION_POLICIES.APPROVAL_REQUIRED,
+  }, baseRequest).reason, 'approval_required');
+  assert.equal(evaluateScopedDelegatedExecutionGrant({
+    ...grant,
+    executionPolicy: AGENT_EXECUTION_POLICIES.TRUSTED_LOCAL_AUTO_SUBMIT,
+  }, baseRequest).reason, 'trusted_local_auto_submit_local_only');
 });
 
 test('agent request lifecycle keeps approval states explicit', () => {

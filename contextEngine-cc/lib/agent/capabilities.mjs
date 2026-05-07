@@ -2,6 +2,7 @@ export const AGENT_CAPABILITY_MODES = Object.freeze({
   READ: 'read',
   DRAFT: 'draft',
   SUBMIT_REQUEST: 'submit-request',
+  SCOPED_DELEGATED_EXECUTE: 'scoped_delegated_execute',
   CREATE_QUESTION_REQUEST: 'create-question-request',
   DECRYPT_REQUEST: 'decrypt-request',
   REVOKE_GRANT_REQUEST: 'revoke-grant-request',
@@ -24,6 +25,12 @@ export const AGENT_CAPABILITY_MODE_METADATA = Object.freeze({
     risky: true,
     requiresApproval: true,
     remoteAllowed: true,
+  }),
+  [AGENT_CAPABILITY_MODES.SCOPED_DELEGATED_EXECUTE]: Object.freeze({
+    risky: true,
+    requiresApproval: false,
+    remoteAllowed: true,
+    grantRequired: true,
   }),
   [AGENT_CAPABILITY_MODES.CREATE_QUESTION_REQUEST]: Object.freeze({
     risky: true,
@@ -80,6 +87,7 @@ export function buildAgentCapabilities({
       [AGENT_CAPABILITY_MODES.READ]: true,
       [AGENT_CAPABILITY_MODES.DRAFT]: true,
       [AGENT_CAPABILITY_MODES.SUBMIT_REQUEST]: true,
+      [AGENT_CAPABILITY_MODES.SCOPED_DELEGATED_EXECUTE]: false,
       [AGENT_CAPABILITY_MODES.CREATE_QUESTION_REQUEST]: false,
       [AGENT_CAPABILITY_MODES.DECRYPT_REQUEST]: false,
       [AGENT_CAPABILITY_MODES.REVOKE_GRANT_REQUEST]: false,
@@ -90,12 +98,14 @@ export function buildAgentCapabilities({
     submission: {
       remoteAutoSubmit: false,
       submitRequestsRequireApproval: true,
+      scopedDelegatedExecuteRequiresGrant: true,
       trustedLocalAutoSubmit: autoSubmitResponses && localSubmitReady,
       workerTokenReady: workerTokenSummary?.ready === true,
       selectedSessionCount: selectedSessions.length,
     },
     constraints: [
       'Remote agents may draft responses but must request human approval for submission.',
+      'Remote scoped delegated execution is disabled unless a valid scoped grant allows the exact action.',
       'Local JWT auth is not a worker token and does not grant signing authority.',
       'Telegram and OpenClaw adapters must forward through this HTTP contract or its MCP wrapper.',
     ],

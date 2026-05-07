@@ -17,9 +17,17 @@ import {
 
 test('agent endpoint families enumerate canonical route groups', () => {
   const families = AGENT_ENDPOINT_FAMILIES.map((entry) => entry.family);
-  assert.deepEqual(families, ['identity', 'sessions', 'questions', 'inbox', 'responses', 'requests']);
+  assert.deepEqual(families, ['identity', 'sessions', 'questions', 'inbox', 'responses', 'requests', 'grants']);
   assert.equal(
     AGENT_ENDPOINT_FAMILIES.some((entry) => entry.routes.includes('POST /api/agent/responses/submit-request')),
+    true,
+  );
+  assert.equal(
+    AGENT_ENDPOINT_FAMILIES.some((entry) => entry.routes.includes('POST /api/agent/responses/delegated-execute')),
+    true,
+  );
+  assert.equal(
+    AGENT_ENDPOINT_FAMILIES.some((entry) => entry.routes.includes('POST /api/agent/grants/revoke')),
     true,
   );
 });
@@ -128,23 +136,38 @@ test('agent draft response shape withholds answer text unless requested', () => 
 
 test('agent grant shape never grants signing or worker-token authority', () => {
   assert.deepEqual(normalizeAgentGrant({
-    grantId: 'grant-1',
-    subject: 'telegram:123',
+    grantId: 'agent_grant_test123',
+    humanPrincipal: '0xABC',
+    agentId: 'telegram:123',
     scope: 'agent:draft',
+    allowedActions: ['agent.response.draft'],
+    riskCeiling: 'medium',
+    executionPolicy: 'scoped_delegated_execute',
+    auditRequired: true,
     status: 'active',
     expiresAt: '2026-05-06T01:00:00.000Z',
   }), {
     type: 'agent_grant',
     version: 'agent-contract-v1',
-    grantId: 'grant-1',
+    grantId: 'agent_grant_test123',
+    humanPrincipal: '0xabc',
+    agentId: 'telegram:123',
     subject: 'telegram:123',
     scope: 'agent:draft',
+    action: '',
+    allowedActions: ['agent.response.draft'],
+    riskCeiling: 'medium',
+    executionPolicy: 'scoped_delegated_execute',
+    auditRequired: true,
     status: 'active',
     expiresAt: '2026-05-06T01:00:00.000Z',
     createdAt: null,
     revokedAt: null,
+    updatedAt: null,
     signingAuthority: false,
     workerTokenAuthority: false,
+    privateKeyAuthority: false,
+    longLivedBearerAuthority: false,
   });
 });
 

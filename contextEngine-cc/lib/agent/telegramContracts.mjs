@@ -5,7 +5,7 @@ const PUBLIC_SESSION_RE = /^[a-z0-9_-]+$/i;
 const MAX_PUBLIC_SESSION_LENGTH = 128;
 const SENSITIVE_KEY_RE = /(?:jwt|token|private|secret|signature|bearer|authorization|mnemonic|seed|password)/i;
 const SENSITIVE_VALUE_RE = /(?:bearer\s+[a-z0-9._-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64})/i;
-const TELEGRAM_SECURE_GRANT_SCOPE_RE = /^agent:(read|draft|submit-request|create-question-request|decrypt-request|revoke-grant)$/;
+const TELEGRAM_SECURE_GRANT_SCOPE_RE = /^agent:(read|draft|submit-request|delegated-execute|create-question-request|decrypt-request|revoke-grant)$/;
 const TELEGRAM_SECURE_GRANT_MAX_TTL_SECONDS = 24 * 60 * 60;
 
 function parseJsonMaybe(value) {

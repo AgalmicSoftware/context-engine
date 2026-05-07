@@ -28,6 +28,7 @@ export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
       'POST /api/agent/responses/draft',
       'GET /api/agent/responses/drafts',
       'POST /api/agent/responses/submit-request',
+      'POST /api/agent/responses/delegated-execute',
     ]),
     purpose: 'Split draft storage from submit requests so remote agents do not gain signing authority.',
   },
@@ -35,6 +36,15 @@ export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
     family: 'requests',
     routes: Object.freeze(['GET /api/agent/requests/:id']),
     purpose: 'Inspect approval-gated request state by opaque request id.',
+  },
+  {
+    family: 'grants',
+    routes: Object.freeze([
+      'GET /api/agent/grants',
+      'GET /api/agent/grants/:id',
+      'POST /api/agent/grants/revoke',
+    ]),
+    purpose: 'Read and revoke scoped delegated grants without creating authority from remote payloads.',
   },
 ]);
 
@@ -60,6 +70,8 @@ export const AGENT_GRANT_STATUS = Object.freeze({
   REVOKED: 'revoked',
   EXPIRED: 'expired',
 });
+
+export const AGENT_GRANT_ID_RE = /^agent_grant_[a-z0-9-]{8,96}$/;
 
 export function buildAgentOk(data = {}, { status = 'ok' } = {}) {
   return {
@@ -136,21 +148,36 @@ export function normalizeAgentDraftResponse(response = {}, { session = '', inclu
 }
 
 export function normalizeAgentGrant(grant = {}) {
+  const subject = String(grant.subject || grant.agentId || '').trim();
   return {
     type: 'agent_grant',
     version: AGENT_CONTRACT_VERSION,
     grantId: String(grant.grantId || '').trim(),
-    subject: String(grant.subject || '').trim(),
+    humanPrincipal: String(grant.humanPrincipal || grant.wallet || grant.principal || '').trim().toLowerCase(),
+    agentId: String(grant.agentId || subject).trim(),
+    subject,
     scope: String(grant.scope || '').trim(),
+    action: String(grant.action || '').trim(),
+    allowedActions: Array.isArray(grant.allowedActions) ? grant.allowedActions.slice() : [],
+    riskCeiling: String(grant.riskCeiling || 'low').trim().toLowerCase(),
+    executionPolicy: String(grant.executionPolicy || 'approval_required').trim().toLowerCase(),
+    auditRequired: grant.auditRequired !== false,
     status: Object.values(AGENT_GRANT_STATUS).includes(grant.status)
       ? grant.status
       : AGENT_GRANT_STATUS.ACTIVE,
     expiresAt: grant.expiresAt || null,
     createdAt: grant.createdAt || null,
     revokedAt: grant.revokedAt || null,
+    updatedAt: grant.updatedAt || null,
     signingAuthority: false,
     workerTokenAuthority: false,
+    privateKeyAuthority: false,
+    longLivedBearerAuthority: false,
   };
+}
+
+export function isValidAgentGrantId(grantId) {
+  return AGENT_GRANT_ID_RE.test(String(grantId || '').trim());
 }
 
 export function summarizePendingResponseForAgent(response = {}, { session = '' } = {}) {
