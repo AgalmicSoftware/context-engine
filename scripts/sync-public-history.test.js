@@ -273,6 +273,21 @@ test('sync-public-history rejects replayed commit messages that mention private 
   });
 });
 
+test('sync-public-history rejects private replay tokens case-insensitively', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, 'public-lowercase-leak.txt', 'public change\n');
+    commitAll(sourceDir, 'Public lowercase leak\n\nmentions openclaw handoff details.\n', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Commit message mentions private release token: OpenClaw/);
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
 test('sync-public-history refreshes an existing remote PR branch safely without requiring --force-with-lease', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['push', '--quiet', 'origin', 'main:release-staging']);
