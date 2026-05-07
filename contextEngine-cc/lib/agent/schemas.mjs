@@ -45,6 +45,15 @@ export const AGENT_DRAFT_RESPONSE_STATUS = Object.freeze({
   SUBMITTED: 'submitted',
 });
 
+const TERMINAL_AGENT_REQUEST_STATUSES = new Set([
+  'denied',
+  'expired',
+  'failed',
+  'rejected',
+  'revoked',
+  'submitted',
+]);
+
 export const AGENT_GRANT_STATUS = Object.freeze({
   ACTIVE: 'active',
   REVOKED: 'revoked',
@@ -159,11 +168,14 @@ export function summarizePendingResponseForAgent(response = {}, { session = '' }
 }
 
 export function summarizeRequestForAgent(request = {}) {
+  const status = String(request.status || 'pending_approval').trim();
+  const terminal = TERMINAL_AGENT_REQUEST_STATUSES.has(status);
   return {
     type: String(request.type || 'agent_request'),
     requestId: String(request.requestId || '').trim(),
-    status: String(request.status || 'pending_approval').trim(),
-    requiresApproval: request.requiresApproval !== false,
+    status,
+    requiresApproval: status === 'pending_approval' && request.requiresApproval !== false,
+    terminal,
     approvalUrl: request.approvalUrl || null,
     session: request.session || null,
     questionIds: Array.isArray(request.questionIds) ? request.questionIds.slice() : [],

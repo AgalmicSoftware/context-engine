@@ -59,6 +59,7 @@ import {
   isValidApprovalRequestId,
   normalizeAgentIdempotencyKey,
 } from './agent/approvalResponses.mjs';
+import { evaluateAgentRequestLifecycle } from './agent/lifecycle.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(process.env.CE_CC_DATA_DIR || resolve(__dirname, '..', '.data'));
@@ -384,6 +385,19 @@ function loadAgentRequestByIdempotencyKey(walletAddress = '', idempotencyKey = '
   if (!normalizedKey) return null;
   return loadAgentRequestsForWallet(walletAddress)
     .find((entry) => normalizeAgentIdempotencyKey(entry?.idempotencyKey) === normalizedKey) || null;
+}
+
+function summarizeAgentRequestForRead(request = {}) {
+  const lifecycle = evaluateAgentRequestLifecycle(request);
+  const normalized = { ...request };
+  if (lifecycle.status) normalized.status = lifecycle.status;
+  if (lifecycle.ok !== true || normalized.status !== 'pending_approval') {
+    normalized.requiresApproval = false;
+  }
+  return {
+    summary: summarizeRequestForAgent(normalized),
+    lifecycle,
+  };
 }
 
 function buildPendingSubmissionLockKey(slug, response) {
@@ -1543,7 +1557,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
           !sessionValidation.slug
           || String(request?.session || '').trim().toLowerCase() === sessionValidation.slug.toLowerCase()
         ))
-        .map(summarizeRequestForAgent);
+        .map((request) => summarizeAgentRequestForRead(request).summary);
       return json(res, 200, buildAgentOk({
         inbox: [
           ...pendingResponses,
@@ -1844,6 +1858,20 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
           code: 'idempotency_key_conflict',
         }));
       }
+      const existingRead = summarizeAgentRequestForRead(existingRequest);
+      if (existingRead.summary.requiresApproval !== true) {
+        return json(res, 409, buildAgentError(
+          'idempotencyKey refers to an agent request that is not pending approval.',
+          {
+            status: 'request_not_pending_approval',
+            code: 'idempotency_key_not_pending_approval',
+            fields: {
+              request: existingRead.summary,
+              lifecycle: existingRead.lifecycle,
+            },
+          },
+        ));
+      }
       const existingApproval = buildApprovalRequiredResponse({
         requestId: existingRequest.requestId,
         serverUrl: getTrustedAgentServerUrl(),
@@ -1854,10 +1882,10 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       });
       return json(res, 202, {
         ...existingApproval,
-        request: summarizeRequestForAgent({
+        request: summarizeAgentRequestForRead({
           ...existingRequest,
           approvalUrl: existingApproval.approvalUrl,
-        }),
+        }).summary,
       });
     }
 
@@ -1893,7 +1921,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
     return json(res, 202, {
       ...approval,
-      request: summarizeRequestForAgent(record),
+      request: summarizeAgentRequestForRead(record).summary,
     });
   }
 
@@ -2327,8 +2355,10 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
     if (!request || (walletAddress && normalizeAddressLower(request.requester) !== walletAddress)) {
       return json(res, 404, { error: 'Agent request not found.' });
     }
+    const requestRead = summarizeAgentRequestForRead(request);
     return json(res, 200, buildAgentOk({
-      request: summarizeRequestForAgent(request),
+      request: requestRead.summary,
+      lifecycle: requestRead.lifecycle,
     }));
   }
 

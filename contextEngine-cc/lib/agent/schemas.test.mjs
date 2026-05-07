@@ -11,6 +11,7 @@ import {
   normalizeAgentQuestionPayload,
   redactAgentSensitiveFields,
   summarizePendingResponseForAgent,
+  summarizeRequestForAgent,
 } from './schemas.mjs';
 
 test('agent endpoint families enumerate canonical route groups', () => {
@@ -144,6 +145,36 @@ test('agent grant shape never grants signing or worker-token authority', () => {
     signingAuthority: false,
     workerTokenAuthority: false,
   });
+});
+
+test('agent request summaries mark only pending approval as approval-required', () => {
+  assert.deepEqual(summarizeRequestForAgent({
+    requestId: 'agent_req_pending1',
+    status: 'pending_approval',
+    requiresApproval: true,
+  }), {
+    type: 'agent_request',
+    requestId: 'agent_req_pending1',
+    status: 'pending_approval',
+    requiresApproval: true,
+    terminal: false,
+    approvalUrl: null,
+    session: null,
+    questionIds: [],
+    requester: null,
+    createdAt: null,
+    updatedAt: null,
+  });
+
+  for (const status of ['expired', 'revoked', 'rejected', 'denied', 'submitted', 'failed']) {
+    const summary = summarizeRequestForAgent({
+      requestId: `agent_req_${status}1`,
+      status,
+      requiresApproval: true,
+    });
+    assert.equal(summary.requiresApproval, false);
+    assert.equal(summary.terminal, true);
+  }
 });
 
 test('sensitive fields are redacted recursively', () => {

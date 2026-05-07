@@ -232,7 +232,7 @@ function setupRouterHarness(t) {
     }
   `);
 
-  ['capabilities', 'schemas', 'approvalResponses'].forEach((moduleName) => {
+  ['capabilities', 'schemas', 'approvalResponses', 'lifecycle'].forEach((moduleName) => {
     const href = pathToFileURL(resolve(CC_ROOT, 'lib', 'agent', `${moduleName}.mjs`)).href;
     writeModule(resolve(libDir, 'agent', `${moduleName}.mjs`), `export * from ${JSON.stringify(href)};\n`);
   });
@@ -556,4 +556,81 @@ test('agent submit-request creates approval records and idempotent retries', asy
   });
   assert.equal(otherWalletStatus.status, 404);
   assert.deepEqual(otherWalletStatus.payload, { error: 'Agent request not found.' });
+});
+
+test('agent request reads normalize expired and revoked lifecycle states', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+  const requestDir = resolve(harness.dataDir, 'agent-requests');
+  mkdirSync(requestDir, { recursive: true });
+
+  function writeRequest(record) {
+    writeFileSync(resolve(requestDir, `${record.requestId}.json`), JSON.stringify({
+      type: 'response_submit_request',
+      requestId: record.requestId,
+      status: 'pending_approval',
+      requiresApproval: true,
+      approvalUrl: `http://localhost:7391/agent/requests/${record.requestId}`,
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      requester: WALLET_ADDRESS,
+      idempotencyKey: '',
+      fingerprint: '',
+      createdAt: '2026-05-06T00:00:00.000Z',
+      updatedAt: '2026-05-06T00:00:00.000Z',
+      ...record,
+    }, null, 2));
+  }
+
+  writeRequest({
+    requestId: 'agent_req_expired123',
+    expiresAt: '2000-01-01T00:00:00.000Z',
+    idempotencyKey: 'submit:alpha.expired1',
+    fingerprint: `response_submit_request|${WALLET_ADDRESS.toLowerCase()}|alpha|${QUESTION_ID.toLowerCase()}`,
+  });
+  writeRequest({
+    requestId: 'agent_req_revoked123',
+    status: 'revoked',
+    revokedAt: '2026-05-06T00:01:00.000Z',
+  });
+
+  const expired = await callRoute(handleRoute, {
+    path: '/api/agent/requests/agent_req_expired123',
+  });
+  assert.equal(expired.status, 200);
+  assert.equal(expired.payload.request.status, 'expired');
+  assert.equal(expired.payload.request.requiresApproval, false);
+  assert.equal(expired.payload.request.terminal, true);
+  assert.equal(expired.payload.lifecycle.reason, 'request_expired');
+
+  const revoked = await callRoute(handleRoute, {
+    path: '/api/agent/requests/agent_req_revoked123',
+  });
+  assert.equal(revoked.status, 200);
+  assert.equal(revoked.payload.request.status, 'revoked');
+  assert.equal(revoked.payload.request.requiresApproval, false);
+  assert.equal(revoked.payload.request.terminal, true);
+  assert.equal(revoked.payload.lifecycle.reason, 'request_revoked');
+
+  const inbox = await callRoute(handleRoute, { path: '/api/agent/inbox?session=alpha' });
+  assert.equal(inbox.status, 200);
+  const byId = Object.fromEntries(inbox.payload.requests.map((request) => [request.requestId, request]));
+  assert.equal(byId.agent_req_expired123.status, 'expired');
+  assert.equal(byId.agent_req_expired123.requiresApproval, false);
+  assert.equal(byId.agent_req_revoked123.status, 'revoked');
+  assert.equal(byId.agent_req_revoked123.requiresApproval, false);
+
+  const retryExpired = await callRoute(handleRoute, {
+    path: '/api/agent/responses/submit-request',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      idempotencyKey: 'submit:alpha.expired1',
+    },
+  });
+  assert.equal(retryExpired.status, 409);
+  assert.equal(retryExpired.payload.code, 'idempotency_key_not_pending_approval');
+  assert.equal(retryExpired.payload.request.status, 'expired');
+  assert.equal(retryExpired.payload.request.requiresApproval, false);
 });
