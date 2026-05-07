@@ -140,7 +140,7 @@ describe('singleQuestionResponseHelpers aggregator responses', () => {
       { answer: { value: 'Unsure' } },
       { answer: { value: 'Disagree' } },
       { answer: { value: 'agree' } },
-      { answer: { value: new String('Agree') } },
+      { answer: { value: Object('Agree') } },
       { answer: { value: '' } },
     ])).toEqual({
       counts: {

@@ -90,6 +90,7 @@ import type {
 } from '../../../utilities/session/sessionTypes';
 import { createLogger } from 'utilities/logging.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
+import { generateQuestionId as generateSharedQuestionId } from '../../../utilities/shared/questionUtils.mjs';
 import { notify } from '../../../utilities/ui/notify.js';
 import { fetchImageFromURL } from '../../../utilities/ui/imageScripts.js';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
@@ -152,6 +153,13 @@ export {
 const cacheLog = createLogger('cache');
 const DEFAULT_QUESTION_COUNT = 10;
 const QUESTION_COUNT_STEP = 5;
+const generateSurveyGeneratorQuestionId = (
+  type: string,
+  prompt: string,
+  options: string[] = [],
+): string => {
+  return generateSharedQuestionId(type, prompt, options);
+};
 type SurveyGeneratorQuestionTypeKey = 'binary' | 'multichoice' | 'rating' | 'freeform';
 type SurveyGeneratorGateMode = 'any' | 'all';
 type SurveyGeneratorNetwork = UnknownRecord & {
@@ -869,6 +877,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       questionTypes,
       count,
       fallbackTitle,
+      generateQuestionId: generateSurveyGeneratorQuestionId,
     });
     setStatementsToUpload(statements);
     setSurveyTitle(surveyTitle);

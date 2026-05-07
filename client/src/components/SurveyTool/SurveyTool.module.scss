@@ -454,8 +454,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18),
     $hover-box-shadow: 0 10px 28px rgba(0, 0, 0, 0.24)
   );
-  text-transform: uppercase;
-  opacity: 1;
+  & {
+    text-transform: uppercase;
+    opacity: 1;
+  }
 }
 
 #submitSurveyButton.singleQuestionSubmitButton {
@@ -3638,10 +3640,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     $box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1),
     $hover-box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15)
   );
-  --pile-submit-button-radius: var(--ce-radius-8);
-  white-space: nowrap;
-  max-width: 300px;
-  overflow: visible;
+  & {
+    --pile-submit-button-radius: var(--ce-radius-8);
+    white-space: nowrap;
+    max-width: 300px;
+    overflow: visible;
+  }
 }
 
 .pileFooter .pileSubmitButton {
