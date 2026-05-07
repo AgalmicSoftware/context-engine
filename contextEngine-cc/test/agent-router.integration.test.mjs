@@ -16,6 +16,7 @@ const CC_ROOT = resolve(__dirname, '..');
 const ROUTER_SOURCE_PATH = resolve(CC_ROOT, 'lib', 'router.mjs');
 const QUESTION_ID = `0x${'11'.repeat(32)}`;
 const WALLET_ADDRESS = `0x${'12'.repeat(20)}`;
+const SECOND_WALLET_ADDRESS = `0x${'34'.repeat(20)}`;
 
 function writeModule(path, source) {
   mkdirSync(dirname(path), { recursive: true });
@@ -138,9 +139,13 @@ function setupRouterHarness(t) {
   writeModule(resolve(libDir, 'localAuth.mjs'), `
     export function requireLocalJwtAuth(req = {}) {
       const token = String(req.headers?.authorization || '').replace(/^Bearer\\s+/i, '');
-      return token === 'valid-agent-jwt'
-        ? { ok: true, payload: { sub: '${WALLET_ADDRESS}', scope: 'agent-test' } }
-        : { ok: false, status: 401, error: token ? 'Invalid token.' : 'Missing Authorization header.' };
+      if (token === 'valid-agent-jwt') {
+        return { ok: true, payload: { sub: '${WALLET_ADDRESS}', scope: 'agent-test' } };
+      }
+      if (token === 'second-agent-jwt') {
+        return { ok: true, payload: { sub: '${SECOND_WALLET_ADDRESS}', scope: 'agent-test' } };
+      }
+      return { ok: false, status: 401, error: token ? 'Invalid token.' : 'Missing Authorization header.' };
     }
   `);
   writeModule(resolve(libDir, 'sessions.mjs'), `
@@ -283,6 +288,13 @@ test('agent read adapters return canonical identity, sessions, and questions', a
   assert.equal(questions.payload.session, 'alpha');
   assert.equal(questions.payload.question.id, QUESTION_ID);
   assert.equal(questions.payload.questions.length, 1);
+
+  const emptyQuestions = await callRoute(handleRoute, { path: '/api/agent/questions?session=empty' });
+  assert.equal(emptyQuestions.status, 200);
+  assert.equal(emptyQuestions.payload.ok, true);
+  assert.equal(emptyQuestions.payload.question, null);
+  assert.equal(emptyQuestions.payload.count, 0);
+  assert.equal(emptyQuestions.payload.message, 'No questions available.');
 });
 
 test('agent question and draft routes validate payloads and expose local drafts', async (t) => {
@@ -395,4 +407,28 @@ test('agent submit-request creates approval records and idempotent retries', asy
   assert.equal(status.payload.ok, true);
   assert.equal(status.payload.request.requestId, first.payload.requestId);
   assert.equal(status.payload.request.status, 'pending_approval');
+
+  const inbox = await callRoute(handleRoute, { path: '/api/agent/inbox?session=alpha' });
+  assert.equal(inbox.status, 200);
+  assert.equal(inbox.payload.requests.length, 1);
+  assert.equal(inbox.payload.requests[0].requestId, first.payload.requestId);
+
+  const invalidStatus = await callRoute(handleRoute, {
+    path: '/api/agent/requests/not-a-request-id',
+  });
+  assert.equal(invalidStatus.status, 400);
+  assert.deepEqual(invalidStatus.payload, { error: 'Invalid agent request id.' });
+
+  const missingStatus = await callRoute(handleRoute, {
+    path: '/api/agent/requests/agent_req_missing123',
+  });
+  assert.equal(missingStatus.status, 404);
+  assert.deepEqual(missingStatus.payload, { error: 'Agent request not found.' });
+
+  const otherWalletStatus = await callRoute(handleRoute, {
+    path: `/api/agent/requests/${encodeURIComponent(first.payload.requestId)}`,
+    token: 'second-agent-jwt',
+  });
+  assert.equal(otherWalletStatus.status, 404);
+  assert.deepEqual(otherWalletStatus.payload, { error: 'Agent request not found.' });
 });
