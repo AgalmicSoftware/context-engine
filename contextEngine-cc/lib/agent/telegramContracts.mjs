@@ -3,6 +3,8 @@ import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 const CALLBACK_ACTION_RE = /^cecb_[a-z0-9_-]{8,48}$/;
 const SENSITIVE_KEY_RE = /(?:jwt|token|private|secret|signature|bearer|authorization|mnemonic|seed|password)/i;
 const SENSITIVE_VALUE_RE = /(?:bearer\s+[a-z0-9._-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64})/i;
+const TELEGRAM_SECURE_GRANT_SCOPE_RE = /^agent:(read|draft|submit-request|create-question-request|decrypt-request|revoke-grant)$/;
+const TELEGRAM_SECURE_GRANT_MAX_TTL_SECONDS = 24 * 60 * 60;
 
 function parseJsonMaybe(value) {
   if (typeof value !== 'string') return value;
@@ -143,6 +145,8 @@ export function buildTelegramSecureStorageGrant({
   scope = '',
   refreshHandle = '',
   expiresAt = '',
+  nowMs = Date.now(),
+  maxTtlSeconds = TELEGRAM_SECURE_GRANT_MAX_TTL_SECONDS,
 } = {}) {
   const payload = {
     kind: 'ce_telegram_scoped_grant_v1',
@@ -151,6 +155,14 @@ export function buildTelegramSecureStorageGrant({
     refreshHandle: String(refreshHandle || '').trim(),
     expiresAt: String(expiresAt || '').trim(),
   };
+  if (!TELEGRAM_SECURE_GRANT_SCOPE_RE.test(payload.scope)) {
+    throw new Error('Telegram SecureStorage grants must use a scoped agent grant.');
+  }
+  const expiryMs = Date.parse(payload.expiresAt);
+  const maxTtlMs = Math.max(0, Number(maxTtlSeconds) || 0) * 1000;
+  if (!Number.isFinite(expiryMs) || expiryMs <= nowMs || (maxTtlMs > 0 && expiryMs - nowMs > maxTtlMs)) {
+    throw new Error('Telegram SecureStorage grants must be short-lived and unexpired.');
+  }
   if (hasSensitiveKeyOrValue(payload)) {
     throw new Error('Telegram SecureStorage grant must be scoped and must not contain signing or bearer secrets.');
   }

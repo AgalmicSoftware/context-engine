@@ -154,3 +154,6 @@ Rules:
 normalization, callback action, Mini App validation, storage payload, and draft
 payload helpers. It does not implement webhooks, deployment config, bot token
 storage, or production secrets.
+SecureStorage grant helpers require an explicit `agent:*` scope and a bounded
+future expiration. CloudStorage helpers reject nested secret-shaped keys and
+values and remain limited to non-sensitive preferences.

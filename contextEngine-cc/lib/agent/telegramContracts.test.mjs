@@ -124,6 +124,7 @@ test('Telegram Mini App initData validation rejects auth_date too far in the fut
 });
 
 test('Telegram storage helpers reject secrets in CloudStorage and scoped grant payloads', () => {
+  const nowMs = Date.parse('2026-05-06T12:00:00.000Z');
   assert.deepEqual(buildTelegramCloudStoragePayload({ theme: 'dark', lastSession: 'alpha' }), {
     kind: 'ce_telegram_preferences_v1',
     preferences: { theme: 'dark', lastSession: 'alpha' },
@@ -132,11 +133,16 @@ test('Telegram storage helpers reject secrets in CloudStorage and scoped grant p
     () => buildTelegramCloudStoragePayload({ jwt: 'eyJhbGciOi.fake.sig' }),
     /must not contain secrets/,
   );
+  assert.throws(
+    () => buildTelegramCloudStoragePayload({ nested: { workerToken: 'local-token' } }),
+    /must not contain secrets/,
+  );
   assert.deepEqual(buildTelegramSecureStorageGrant({
     grantId: 'grant-short',
     scope: 'agent:draft',
     refreshHandle: 'refresh-handle-short',
     expiresAt: '2026-05-06T13:00:00.000Z',
+    nowMs,
   }), {
     kind: 'ce_telegram_scoped_grant_v1',
     grantId: 'grant-short',
@@ -145,7 +151,39 @@ test('Telegram storage helpers reject secrets in CloudStorage and scoped grant p
     expiresAt: '2026-05-06T13:00:00.000Z',
   });
   assert.throws(
-    () => buildTelegramSecureStorageGrant({ refreshHandle: 'Bearer long-lived-token' }),
+    () => buildTelegramSecureStorageGrant({
+      scope: 'agent:sign',
+      refreshHandle: 'refresh-handle-short',
+      expiresAt: '2026-05-06T13:00:00.000Z',
+      nowMs,
+    }),
+    /scoped agent grant/,
+  );
+  assert.throws(
+    () => buildTelegramSecureStorageGrant({
+      scope: 'agent:draft',
+      refreshHandle: 'refresh-handle-short',
+      expiresAt: '2026-05-06T11:59:00.000Z',
+      nowMs,
+    }),
+    /short-lived and unexpired/,
+  );
+  assert.throws(
+    () => buildTelegramSecureStorageGrant({
+      scope: 'agent:draft',
+      refreshHandle: 'refresh-handle-short',
+      expiresAt: '2026-05-08T12:00:00.000Z',
+      nowMs,
+    }),
+    /short-lived and unexpired/,
+  );
+  assert.throws(
+    () => buildTelegramSecureStorageGrant({
+      scope: 'agent:draft',
+      refreshHandle: 'Bearer long-lived-token',
+      expiresAt: '2026-05-06T13:00:00.000Z',
+      nowMs,
+    }),
     /must not contain signing or bearer secrets/,
   );
 });
