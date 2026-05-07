@@ -9,6 +9,19 @@ import {
   resolveSponsoredGateStateForResource,
   SPONSORED_GATE_STATES,
 } from '../../utilities/web3/sponsoredAccess.js';
+import {
+  normalizePositiveChainId,
+} from './createSbtGroupAuthoringChainHelpers';
+import type {
+  CreateSbtAuthoringChainOption,
+} from './createSbtGroupAuthoringChainHelpers';
+import {
+  normalizeCreateSbtDocumentUrlDraft,
+} from './createSbtGroupContentAuthoringHelpers';
+import {
+  normalizeMetadataLockGateIds,
+  resolveCreateSbtEncryptedFieldGateValue,
+} from './createSbtGroupMetadataLockHelpers';
 export {
   buildCreateSbtAuthoringChainSyncPatch,
   buildCreateSbtAuthoringChainSyncStatePatch,
@@ -34,12 +47,6 @@ export type {
   NormalizedSessionContractRef,
   ResolveCreateSbtAuthoringChainOptionsArgs,
   ResolveCreateSbtPreferredAuthoringChainIdArgs,
-} from './createSbtGroupAuthoringChainHelpers';
-import type {
-  CreateSbtAuthoringChainOption,
-} from './createSbtGroupAuthoringChainHelpers';
-import {
-  normalizePositiveChainId,
 } from './createSbtGroupAuthoringChainHelpers';
 export {
   buildCreateSbtDefaultDistributionState,
@@ -86,10 +93,6 @@ export {
   resolveCreateSbtMetadataFieldGateIds,
   resolveCreateSbtRestoredMetadataLockGateIds,
   writeCreateSbtEncryptedFieldGate,
-} from './createSbtGroupMetadataLockHelpers';
-import {
-  normalizeMetadataLockGateIds,
-  resolveCreateSbtEncryptedFieldGateValue,
 } from './createSbtGroupMetadataLockHelpers';
 export {
   buildCreateSbtImageChooserStatusPatch,
@@ -194,9 +197,6 @@ export type {
   CreateSbtTagRemovalState,
   ResolveCreateSbtDocumentUrlInputStateArgs,
   ResolveCreateSbtTagInputStateArgs,
-} from './createSbtGroupContentAuthoringHelpers';
-import {
-  normalizeCreateSbtDocumentUrlDraft,
 } from './createSbtGroupContentAuthoringHelpers';
 export type {
   BuildCreateSbtAutoCreate2SaltSourceArgs,

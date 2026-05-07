@@ -143,12 +143,6 @@ type CreateSurveySha256Digest = {
   toString: () => string;
 };
 type CreateSurveySha256 = (value: unknown) => CreateSurveySha256Digest;
-type GenerateSharedQuestionIdForCreateSurvey = (
-  type: unknown,
-  prompt: unknown,
-  options?: unknown,
-  singleSelect?: unknown,
-) => string;
 type GetEffectiveAiConfigForCreateSurveyArgs = {
   sessionSlug?: string;
   context?: CreateSurveyAiRequestOptions['context'];
@@ -161,7 +155,6 @@ type EffectiveAiConfigForCreateSurvey = {
 };
 
 const sha256 = require('crypto-js/sha256') as CreateSurveySha256;
-const generateSharedQuestionIdForCreateSurvey = generateSharedQuestionId as GenerateSharedQuestionIdForCreateSurvey;
 const getEffectiveAiConfigForCreateSurvey = getEffectiveAiConfig as (
   args?: GetEffectiveAiConfigForCreateSurveyArgs,
 ) => Promise<EffectiveAiConfigForCreateSurvey>;
@@ -1619,10 +1612,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   generateQuestionId = (
     type: unknown,
     prompt: unknown,
-    options: unknown = [],
-    singleSelect: unknown = false
+    options: any = [],
+    singleSelect: any = false
   ): string => {
-    return generateSharedQuestionIdForCreateSurvey(type, prompt, options, singleSelect);
+    return generateSharedQuestionId(type, prompt, options, singleSelect);
   };
 
   handleTitleChange = (event: CreateSurveyInputValueEvent): void => {

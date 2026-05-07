@@ -219,6 +219,7 @@ export type GeneratedSurveyStatementsInput = {
   questionTypes: QuestionTypeSelection;
   count: number;
   fallbackTitle?: unknown;
+  generateQuestionId?: (type: string, prompt: string, options?: string[]) => string;
 };
 
 export type GeneratedSurveyStatementsResult = {
@@ -549,6 +550,7 @@ export const buildGeneratedSurveyStatements = ({
   questionTypes,
   count,
   fallbackTitle = '',
+  generateQuestionId = generateSharedQuestionId,
 }: GeneratedSurveyStatementsInput): GeneratedSurveyStatementsResult => {
   const wantedTypes = getSelectedQuestionTypes(questionTypes);
   const questions = aiData.questions
@@ -558,7 +560,7 @@ export const buildGeneratedSurveyStatements = ({
   questions.forEach((question) => { question.tags = question.tags || []; });
 
   const statements = questions.map((question) => ({
-    id: generateSharedQuestionId(question.questionType, question.prompt, question.options || []),
+    id: generateQuestionId(question.questionType, question.prompt, question.options || []),
     type: question.questionType,
     prompt: question.prompt,
     options: question.questionType === 'multichoice' ? question.options : undefined,
