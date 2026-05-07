@@ -1,4 +1,13 @@
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
+import {
+  asSelectedSbtEntry,
+  buildSbtFilterStateSignature,
+  normalizeIncomingFilterState,
+} from './sbtFilterSelectionHelpers';
+import type {
+  SbtFilterSelectedSbtEntry,
+  SbtFilterSelectionState,
+} from './sbtFilterSelectionHelpers';
 export {
   appendSbtFilterOption,
   asSelectedSbtEntry,
@@ -27,15 +36,6 @@ export type {
   SbtFilterSelectionPatchArgs,
   SbtFilterSelectionState,
   SbtFilterSnapshotArgs,
-} from './sbtFilterSelectionHelpers';
-import {
-  asSelectedSbtEntry,
-  buildSbtFilterStateSignature,
-  normalizeIncomingFilterState,
-} from './sbtFilterSelectionHelpers';
-import type {
-  SbtFilterSelectedSbtEntry,
-  SbtFilterSelectionState,
 } from './sbtFilterSelectionHelpers';
 export {
   buildSbtFilterBooleanTogglePatch,
