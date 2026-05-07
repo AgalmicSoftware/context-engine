@@ -46,6 +46,8 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
+    writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'private companion surface\n');
+    writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
 
     const result = runPrepareScript(sourceDir, outputDir);
     assert.equal(result.status, 0, result.stderr);
@@ -54,6 +56,8 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'), 'keep\n');
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
 
     const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
     assert.equal(fs.existsSync(manifestPath), true);

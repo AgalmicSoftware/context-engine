@@ -109,10 +109,18 @@ function setupSourceRepo() {
       committerDate: '2025-01-03T04:05:06Z',
     });
 
+    writeFile(sourceDir, path.join('contextEngine-cc', 'agent', 'contract.md'), 'private agent contract\n');
+    writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent doc\n');
+    commitAll(sourceDir, 'Private agent-only commit', {
+      authorDate: '2025-01-03T06:07:08Z',
+      committerDate: '2025-01-03T06:07:08Z',
+    });
+
     writeFile(sourceDir, 'public.txt', 'public one\npublic two\n');
     writeFile(sourceDir, 'private-pack.manifest.json', '{"generated":"local-only"}\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review-snapshot.js'), 'temp review snapshot\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'internal\n');
+    writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
     commitAll(sourceDir, 'Mixed commit', {
       authorDate: '2025-01-04T05:06:07Z',
       committerDate: '2025-01-04T05:06:07Z',
@@ -150,10 +158,11 @@ test('sync-public-history dry run reports replayed and skipped commits without c
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Dry run complete\./);
     assert.match(result.stdout, /Would replay: 2/);
-    assert.match(result.stdout, /Would skip: 1/);
+    assert.match(result.stdout, /Would skip: 2/);
     assert.match(result.stdout, /Branch name: release-candidate/);
     assert.match(result.stderr, /DRY RUN replay .*Public commit title/);
     assert.match(result.stderr, /DRY RUN skip .*Private-only commit/);
+    assert.match(result.stderr, /DRY RUN skip .*Private agent-only commit/);
     assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
   });
 });
@@ -199,7 +208,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.match(result.stdout, /Replay complete\./);
     assert.match(result.stdout, /Branch name: release-staging/);
     assert.match(result.stdout, /Replayed commits: 2/);
-    assert.match(result.stdout, /Skipped commits: 1/);
+    assert.match(result.stdout, /Skipped commits: 2/);
     assert.match(result.stdout, /To push: git push -u origin release-staging/);
 
     const tempDir = parseSummaryValue(result.stdout, 'Temp dir');
@@ -233,6 +242,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
@@ -251,7 +261,7 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assert.match(result.stderr, /Remote branch origin\/release-staging already exists and will be refreshed automatically with --force-with-lease\./);
     assert.match(result.stdout, /Branch name: release-staging/);
     assert.match(result.stdout, /Replayed commits: 2/);
-    assert.match(result.stdout, /Skipped commits: 1/);
+    assert.match(result.stdout, /Skipped commits: 2/);
     assert.match(result.stdout, /Pushed: yes/);
 
     const historySubjects = git(sourceDir, [
@@ -268,6 +278,7 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
   });
@@ -316,7 +327,7 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     assert.match(refreshPush.stderr, /Local branch release-staging already exists and will be refreshed with --force-with-lease\./);
     assert.match(refreshPush.stdout, /Branch name: release-staging/);
     assert.match(refreshPush.stdout, /Replayed commits: 3/);
-    assert.match(refreshPush.stdout, /Skipped commits: 1/);
+    assert.match(refreshPush.stdout, /Skipped commits: 2/);
     assert.match(refreshPush.stdout, /Pushed: yes/);
 
     const historySubjects = git(sourceDir, [
@@ -334,6 +345,7 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
+    assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
