@@ -39,6 +39,7 @@ export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
 ]);
 
 export const AGENT_SENSITIVE_FIELD_RE = /(?:privatekey|private_key|worker.?token|bearer|jwt|authorization|secret|signature|mnemonic|seed|password)/i;
+export const AGENT_SENSITIVE_VALUE_RE = /(?:bearer\s+[a-z0-9._:-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64})/i;
 
 export const AGENT_DRAFT_RESPONSE_STATUS = Object.freeze({
   DRAFT: 'draft',
@@ -197,6 +198,9 @@ export function summarizeAgentRequestStatusCounts(requests = []) {
 export function redactAgentSensitiveFields(value) {
   if (Array.isArray(value)) {
     return value.map((entry) => redactAgentSensitiveFields(entry));
+  }
+  if (typeof value === 'string' && AGENT_SENSITIVE_VALUE_RE.test(value)) {
+    return '[redacted]';
   }
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(Object.entries(value).map(([key, entry]) => {

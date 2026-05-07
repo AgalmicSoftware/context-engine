@@ -637,6 +637,7 @@ test('agent submit-request creates approval records and idempotent retries', asy
       agentContext: {
         source: 'integration-test',
         workerToken: 'must-redact',
+        note: 'Bearer long-lived-token',
       },
     },
   });
@@ -654,6 +655,7 @@ test('agent submit-request creates approval records and idempotent retries', asy
   assert.equal(existsSync(requestFile), true);
   const stored = JSON.parse(readFileSync(requestFile, 'utf8'));
   assert.equal(stored.payload.agentContext.workerToken, '[redacted]');
+  assert.equal(stored.payload.agentContext.note, '[redacted]');
   assert.equal(stored.idempotencyKey, 'submit:alpha.0001');
 
   const retry = await callRoute(handleRoute, {

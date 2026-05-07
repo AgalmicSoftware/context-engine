@@ -49,6 +49,9 @@ versioned shapes for:
   question, decrypt, or revoke-grant scopes, but still do not carry signing
   authority or worker-token authority.
 
+Agent request payload snapshots redact sensitive keys and secret-shaped values
+recursively before local storage.
+
 Request ids use opaque `agent_req_...` values. Client-supplied idempotency keys
 are optional, lowercased, bounded, and matched only inside the authenticated
 wallet scope. A repeated key is treated as a retry only when the stored request

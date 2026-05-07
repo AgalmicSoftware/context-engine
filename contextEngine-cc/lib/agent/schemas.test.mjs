@@ -204,13 +204,15 @@ test('sensitive fields are redacted recursively', () => {
     nested: {
       workerToken: 'worker.jwt',
       ok: true,
+      note: 'Bearer long-lived-token',
     },
-    list: [{ privateKey: '0xabc' }],
+    list: [{ privateKey: '0xabc' }, 'eyJhbGciOi.fake.sig'],
   }), {
     nested: {
       workerToken: '[redacted]',
       ok: true,
+      note: '[redacted]',
     },
-    list: [{ privateKey: '[redacted]' }],
+    list: [{ privateKey: '[redacted]' }, '[redacted]'],
   });
 });
