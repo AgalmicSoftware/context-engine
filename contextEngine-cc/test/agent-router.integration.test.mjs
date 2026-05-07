@@ -39,8 +39,8 @@ function makeMockRes() {
   };
 }
 
-function makeReq({ token = 'valid-agent-jwt' } = {}) {
-  const headers = { host: 'localhost:7391' };
+function makeReq({ token = 'valid-agent-jwt', headers: headerOverrides = {} } = {}) {
+  const headers = { host: 'localhost:7391', ...headerOverrides };
   if (token) headers.authorization = `Bearer ${token}`;
   return {
     headers,
@@ -53,9 +53,10 @@ async function callRoute(handleRoute, {
   method = 'GET',
   body = {},
   token = 'valid-agent-jwt',
+  headers = {},
 } = {}) {
   const res = makeMockRes();
-  await handleRoute(makeReq({ token }), res, {
+  await handleRoute(makeReq({ token, headers }), res, {
     url: new URL(path, 'http://localhost:7391'),
     method,
     body,
@@ -293,8 +294,12 @@ test('agent read adapters return canonical identity, sessions, and questions', a
   assert.equal(questions.status, 200);
   assert.equal(questions.payload.ok, true);
   assert.equal(questions.payload.session, 'alpha');
+  assert.equal(questions.payload.question.version, 'agent-contract-v1');
+  assert.equal(questions.payload.question.session, 'alpha');
+  assert.equal(questions.payload.question.questionId, QUESTION_ID);
+  assert.equal(questions.payload.question.questionType, 'freeform');
   assert.equal(questions.payload.question.id, QUESTION_ID);
-  assert.equal(questions.payload.questions.length, 1);
+  assert.deepEqual(questions.payload.questions, [questions.payload.question]);
 
   const generalQuestions = await callRoute(handleRoute, { path: '/api/agent/questions?session=general' });
   assert.equal(generalQuestions.status, 200);
@@ -442,6 +447,10 @@ test('agent submit-request creates approval records and idempotent retries', asy
   const first = await callRoute(handleRoute, {
     path: '/api/agent/responses/submit-request',
     method: 'POST',
+    headers: {
+      host: 'attacker.example',
+      'x-forwarded-proto': 'https',
+    },
     body: {
       session: 'alpha',
       questionIds: [QUESTION_ID],
@@ -458,6 +467,8 @@ test('agent submit-request creates approval records and idempotent retries', asy
   assert.equal(first.payload.status, 'pending_approval');
   assert.match(first.payload.requestId, /^agent_req_/);
   assert.match(first.payload.approvalUrl, /\/agent\/requests\/agent_req_/);
+  assert.match(first.payload.approvalUrl, /^http:\/\/localhost:7391\/agent\/requests\/agent_req_/);
+  assert.equal(first.payload.approvalUrl.includes('attacker.example'), false);
   assert.equal(first.payload.request.questionIds[0], QUESTION_ID);
 
   const requestFile = resolve(harness.dataDir, 'agent-requests', `${first.payload.requestId}.json`);

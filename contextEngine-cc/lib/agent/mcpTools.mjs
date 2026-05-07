@@ -156,6 +156,7 @@ function appendQuery(path, params = {}) {
 export function buildAgentMcpHttpRequest(toolName, args = {}) {
   const tool = AGENT_MCP_TOOLS_BY_NAME[String(toolName || '').trim()];
   if (!tool) throw new Error(`Unknown agent MCP tool: ${toolName}`);
+  if (!tool.implemented) throw new Error(`Agent MCP tool is not implemented: ${tool.name}`);
 
   let path = tool.path;
   const query = {};
@@ -189,7 +190,7 @@ export function createAgentMcpToolHandlers({
   }
   const base = String(baseUrl || 'http://localhost:7391').replace(/\/+$/, '');
 
-  return Object.fromEntries(AGENT_MCP_TOOL_DEFINITIONS.map((tool) => [
+  return Object.fromEntries(AGENT_MCP_TOOL_DEFINITIONS.filter((tool) => tool.implemented).map((tool) => [
     tool.name,
     async (args = {}) => {
       const request = buildAgentMcpHttpRequest(tool.name, args);

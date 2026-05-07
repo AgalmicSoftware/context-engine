@@ -75,10 +75,11 @@ export function buildAgentError(error, {
 
 export function normalizeAgentQuestionPayload({ session = '', question = null, fields = {} } = {}) {
   const normalizedSession = String(session || '').trim();
-  const questions = question ? [question] : [];
+  const normalizedQuestion = normalizeAgentQuestion(question, { session: normalizedSession });
+  const questions = normalizedQuestion ? [normalizedQuestion] : [];
   return buildAgentOk({
     session: normalizedSession,
-    question,
+    question: normalizedQuestion,
     questions,
     count: questions.length,
     ...fields,

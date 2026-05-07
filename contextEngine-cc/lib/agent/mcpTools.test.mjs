@@ -125,6 +125,30 @@ test('MCP submit wrapper preserves approval-required HTTP responses exactly', as
   }), approvalResponse);
 });
 
+test('MCP handler factory only exposes implemented tools', async () => {
+  let fetchCalls = 0;
+  const handlers = createAgentMcpToolHandlers({
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      return {
+        async json() {
+          return { ok: true };
+        },
+      };
+    },
+  });
+
+  assert.equal(typeof handlers.submit_response_request, 'function');
+  assert.equal(Object.hasOwn(handlers, 'create_question_request'), false);
+  assert.equal(Object.hasOwn(handlers, 'request_decrypt'), false);
+  assert.equal(Object.hasOwn(handlers, 'revoke_agent_grant'), false);
+  assert.throws(
+    () => buildAgentMcpHttpRequest('create_question_request', { session: 'general' }),
+    /not implemented/,
+  );
+  assert.equal(fetchCalls, 0);
+});
+
 test('implemented MCP tools map only to inventoried canonical agent HTTP routes', () => {
   const canonicalKeys = new Set(AGENT_CANONICAL_ROUTES.map(agentRouteKey));
   for (const tool of AGENT_MCP_TOOL_DEFINITIONS.filter((entry) => entry.implemented)) {

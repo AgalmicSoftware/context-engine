@@ -32,13 +32,26 @@ test('agent envelopes keep JSON-first ok and error shapes explicit', () => {
 });
 
 test('question payload normalizes a single legacy question into canonical array form', () => {
-  const question = { id: 'q1', prompt: 'Prompt?' };
+  const question = { id: 'q1', type: 'freeform', prompt: 'Prompt?' };
+  const normalizedQuestion = {
+    type: 'agent_question',
+    version: 'agent-contract-v1',
+    session: 'alpha',
+    questionId: 'q1',
+    id: 'q1',
+    questionType: 'freeform',
+    prompt: 'Prompt?',
+    options: [],
+    tags: [],
+    associatedSurveyId: null,
+    arweaveTxId: null,
+  };
   assert.deepEqual(normalizeAgentQuestionPayload({ session: 'alpha', question }), {
     ok: true,
     status: 'ok',
     session: 'alpha',
-    question,
-    questions: [question],
+    question: normalizedQuestion,
+    questions: [normalizedQuestion],
     count: 1,
   });
 });

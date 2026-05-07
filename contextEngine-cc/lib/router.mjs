@@ -343,10 +343,10 @@ function getAgentRequestFilePath(requestId) {
   return resolve(AGENT_REQUESTS_DIR, `${id}.json`);
 }
 
-function getServerUrlFromRequest(req = {}) {
-  const proto = String(req.headers?.['x-forwarded-proto'] || 'http').trim() || 'http';
-  const host = String(req.headers?.host || 'localhost:7391').trim() || 'localhost:7391';
-  return `${proto}://${host}`;
+function getTrustedAgentServerUrl() {
+  const configured = loadHookConfig().serverUrl;
+  const validation = validateLoopbackServerUrl(configured);
+  return validation.ok ? validation.serverUrl : LOCAL_AUTH_ORIGIN;
 }
 
 function saveAgentRequest(record = {}) {
@@ -1846,8 +1846,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       }
       const existingApproval = buildApprovalRequiredResponse({
         requestId: existingRequest.requestId,
-        approvalUrl: existingRequest.approvalUrl,
-        serverUrl: getServerUrlFromRequest(req),
+        serverUrl: getTrustedAgentServerUrl(),
         fields: {
           capabilityMode: 'submit-request',
           idempotent: true,
@@ -1855,13 +1854,16 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       });
       return json(res, 202, {
         ...existingApproval,
-        request: summarizeRequestForAgent(existingRequest),
+        request: summarizeRequestForAgent({
+          ...existingRequest,
+          approvalUrl: existingApproval.approvalUrl,
+        }),
       });
     }
 
     const requestId = createApprovalRequestId();
     const createdAt = new Date().toISOString();
-    const serverUrl = getServerUrlFromRequest(req);
+    const serverUrl = getTrustedAgentServerUrl();
     const approval = buildApprovalRequiredResponse({
       requestId,
       serverUrl,
