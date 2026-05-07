@@ -106,6 +106,22 @@ Approval-required responses use this shape:
 The local approval URL is a stable handoff target for human-facing surfaces.
 Adding a real client approval route is a separate product decision.
 
+## Verification Status
+
+This private lane uses dependency-free pure contract tests and router-level
+agent harness tests. In the current checkout, `contextEngine-cc/server.mjs`,
+`contextEngine-cc/package.json`, and
+`contextEngine-cc/public/js/sessionSlugs.mjs` remain intentionally untracked or
+absent. Do not force-add or recreate them just to gain app-server HTTP coverage.
+
+From the repo root, `npm run test:cc` is meaningful: when the runtime files are
+absent, it runs marked private fallback tests for `contextEngine-cc/lib/agent/*`
+and the router contract harness. True app-server HTTP tests for `/api/agent/*`
+wait for an intentional CE-CC runtime packaging decision.
+
+Private implementation and contract details stay under public-release strip
+patterns: `contextEngine-cc/**` and `docs/agent-native*.md`.
+
 ## MCP Wrapper Status
 
 `contextEngine-cc/lib/agent/mcpTools.mjs` defines dependency-free MCP tool
