@@ -41,6 +41,7 @@ It does two things:
   - `POST /api/agent/responses/draft`
   - `POST /api/agent/responses/submit-request`
   - `contextEngine-cc/lib/agent/mcpTools.mjs`
+  - public agent session identity is explicit: use `general` for the general/default session, never an empty `session` value
 
 ## Recommended Current Path
 
