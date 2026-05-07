@@ -49,7 +49,13 @@ test('CreateQuestionsAndSurveys and SurveyGenerator both route question IDs thro
   );
   assert.match(
     surveyGeneratorHelpers,
-    /id:\s*generateSharedQuestionId\(question\.questionType,\s*question\.prompt,\s*question\.options\s*\|\|\s*\[\]\)/,
+    /generateQuestionId\s*=\s*generateSharedQuestionId,/,
   );
+  assert.match(
+    surveyGeneratorHelpers,
+    /id:\s*generateQuestionId\(question\.questionType,\s*question\.prompt,\s*question\.options\s*\|\|\s*\[\]\)/,
+  );
+  assert.match(audioSurveyGenerator, /return\s+generateSharedQuestionId\(type,\s*prompt,\s*options\);/);
   assert.match(audioSurveyGenerator, /buildGeneratedSurveyStatements\(\{/);
+  assert.match(audioSurveyGenerator, /generateQuestionId:\s*generateSurveyGeneratorQuestionId,/);
 });
