@@ -388,7 +388,7 @@ function mergeSnapshot(base, overlay) {
   };
 }
 
-async function main() {
+export async function main() {
   const statusInput = readStdinJson();
   const localSnapshot = buildLocalSnapshot();
   const cached = loadJson(CACHE_PATH, null);
