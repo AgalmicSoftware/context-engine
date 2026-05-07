@@ -10,7 +10,18 @@ const REQUIRED_CONTEXTENGINE_CC_FILES = Object.freeze([
   path.join('contextEngine-cc', 'lib', 'router.mjs'),
   path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'),
 ]);
-const FALLBACK_CONTEXTENGINE_CC_TEST_MARKER = '@contextengine-cc-fallback-test';
+const FALLBACK_CONTEXTENGINE_CC_TEST_FILES = Object.freeze([
+  path.join('contextEngine-cc', 'lib', 'agent', 'approvalResponses.test.mjs'),
+  path.join('contextEngine-cc', 'lib', 'agent', 'capabilities.test.mjs'),
+  path.join('contextEngine-cc', 'lib', 'agent', 'mcpTools.test.mjs'),
+  path.join('contextEngine-cc', 'lib', 'agent', 'openclawContracts.test.mjs'),
+  path.join('contextEngine-cc', 'lib', 'agent', 'routeEquivalence.test.mjs'),
+  path.join('contextEngine-cc', 'lib', 'agent', 'schemas.test.mjs'),
+  path.join('contextEngine-cc', 'lib', 'agent', 'telegramContracts.test.mjs'),
+  path.join('contextEngine-cc', 'test', 'agent-router-contract.test.mjs'),
+  path.join('contextEngine-cc', 'test', 'agent-router.integration.test.mjs'),
+  path.join('contextEngine-cc', 'test', 'router.route-inventory.test.mjs'),
+]);
 
 function walkDir(absoluteDir) {
   if (!fs.existsSync(absoluteDir) || !fs.statSync(absoluteDir).isDirectory()) {
@@ -33,6 +44,12 @@ function collectContextEngineCcTestFiles(rootDir = path.resolve(__dirname, '..')
   return walkDir(ccRoot).map((absolutePath) => path.relative(rootDir, absolutePath));
 }
 
+function collectContextEngineCcFallbackTestFiles(rootDir = path.resolve(__dirname, '..')) {
+  return FALLBACK_CONTEXTENGINE_CC_TEST_FILES.filter((relativePath) =>
+    fs.existsSync(path.join(rootDir, relativePath))
+  );
+}
+
 function getMissingContextEngineCcFiles(rootDir = path.resolve(__dirname, '..')) {
   return REQUIRED_CONTEXTENGINE_CC_FILES.filter((relativePath) =>
     !fs.existsSync(path.join(rootDir, relativePath))
@@ -46,10 +63,8 @@ function hasRunnableContextEngineCc(rootDir = path.resolve(__dirname, '..')) {
 function runContextEngineCcTests(rootDir = path.resolve(__dirname, '..'), nodeArgs = []) {
   const files = collectContextEngineCcTestFiles(rootDir);
   const missingFiles = getMissingContextEngineCcFiles(rootDir);
-  if (!files.length || missingFiles.length) {
-    const reason = !files.length
-      ? 'no contextEngine-cc test files found'
-      : `missing runtime files: ${missingFiles.join(', ')}`;
+  if (!files.length) {
+    const reason = 'no contextEngine-cc test files found';
     console.log(`contextEngine-cc runtime or tests unavailable in this checkout; skipping test:cc (${reason})`);
     return 0;
   }
@@ -62,7 +77,7 @@ function runContextEngineCcTests(rootDir = path.resolve(__dirname, '..'), nodeAr
       console.log(`contextEngine-cc runtime files missing and no fallback tests found; skipping test:cc (${missingFiles.join(', ')})`);
       return 0;
     }
-    console.log(`contextEngine-cc runtime files missing; running marked fallback tests (${missingFiles.join(', ')})`);
+    console.log(`contextEngine-cc runtime files missing; running fallback agent contract tests (${missingFiles.join(', ')})`);
   }
 
   const result = spawnSync(process.execPath, [...nodeArgs, '--test', ...runnableFiles], {
@@ -84,6 +99,7 @@ if (require.main === module) {
 module.exports = {
   collectContextEngineCcFallbackTestFiles,
   collectContextEngineCcTestFiles,
+  FALLBACK_CONTEXTENGINE_CC_TEST_FILES,
   getMissingContextEngineCcFiles,
   hasRunnableContextEngineCc,
   REQUIRED_CONTEXTENGINE_CC_FILES,
