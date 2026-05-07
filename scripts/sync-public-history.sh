@@ -121,7 +121,7 @@ private_replay_message_token() {
   local token
 
   for token in "${PRIVATE_REPLAY_MESSAGE_TOKENS[@]}"; do
-    if grep -Fq -- "$token" "$message_file"; then
+    if grep -Fiq -- "$token" "$message_file"; then
       printf '%s\n' "$token"
       return 0
     fi
