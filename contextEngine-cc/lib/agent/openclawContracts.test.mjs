@@ -59,6 +59,23 @@ test('OpenClaw submit-request event preserves approval handoff fields', () => {
   assert.deepEqual(validateOpenClawAdapterEnvelope(envelope), { ok: true });
 });
 
+test('OpenClaw thread events validate optional public session slugs', () => {
+  assert.equal(buildOpenClawThreadEventEnvelope({
+    event: 'delivered',
+    session: ' general ',
+  }).session, 'general');
+  assert.equal(buildOpenClawThreadEventEnvelope({
+    event: 'delivered',
+  }).session, null);
+  assert.throws(
+    () => buildOpenClawThreadEventEnvelope({
+      event: 'delivered',
+      session: '../outside',
+    }),
+    /Invalid OpenClaw public session slug/,
+  );
+});
+
 test('OpenClaw thread events reject invalid states and secret-shaped idempotency keys', () => {
   assert.throws(
     () => buildOpenClawThreadEventEnvelope({ event: 'scrape_dom' }),
@@ -121,6 +138,10 @@ test('OpenClaw draft forwarding requires explicit public session names', () => {
   assert.throws(
     () => buildOpenClawDraftForward({ session: '', questionId: '0xabc' }),
     /use "general"/,
+  );
+  assert.throws(
+    () => buildOpenClawDraftForward({ session: '../outside', questionId: '0xabc' }),
+    /Invalid OpenClaw public session slug/,
   );
 });
 

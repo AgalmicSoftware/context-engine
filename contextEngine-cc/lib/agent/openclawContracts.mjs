@@ -27,6 +27,25 @@ export const OPENCLAW_THREAD_EVENT_STATES = Object.freeze([
 ]);
 
 const OPENCLAW_THREAD_EVENT_STATE_SET = new Set(OPENCLAW_THREAD_EVENT_STATES);
+const PUBLIC_SESSION_RE = /^[a-z0-9_-]+$/i;
+const MAX_PUBLIC_SESSION_LENGTH = 128;
+
+function normalizePublicAgentSession(session, {
+  required = false,
+  context = 'OpenClaw forwarding',
+} = {}) {
+  const normalized = String(session || '').trim();
+  if (!normalized) {
+    if (required) {
+      throw new Error(`${context} requires an explicit session; use "general" for the general session.`);
+    }
+    return '';
+  }
+  if (normalized.length > MAX_PUBLIC_SESSION_LENGTH || !PUBLIC_SESSION_RE.test(normalized)) {
+    throw new Error('Invalid OpenClaw public session slug.');
+  }
+  return normalized;
+}
 
 export function buildOpenClawApprovalForward({
   threadId = '',
@@ -70,6 +89,7 @@ export function buildOpenClawThreadEventEnvelope({
     throw new Error('OpenClaw idempotency keys must be stable and non-secret.');
   }
   const normalizedRequestId = String(requestId || '').trim();
+  const normalizedSession = normalizePublicAgentSession(session);
   const path = String(http.path || '').trim()
     || (normalizedRequestId
       ? `/api/agent/requests/${encodeURIComponent(normalizedRequestId)}`
@@ -83,7 +103,7 @@ export function buildOpenClawThreadEventEnvelope({
     requestId: normalizedRequestId || null,
     approvalUrl: String(approvalUrl || '').trim() || null,
     status: String(status || normalizedEvent).trim(),
-    session: String(session || '').trim() || null,
+    session: normalizedSession || null,
     questionId: String(questionId || '').trim() || null,
     idempotencyKey: normalizedIdempotencyKey || null,
     payload,
@@ -94,21 +114,16 @@ export function buildOpenClawThreadEventEnvelope({
   };
 }
 
-function normalizePublicAgentSession(session) {
-  const normalized = String(session || '').trim();
-  if (!normalized) {
-    throw new Error('OpenClaw draft forwarding requires an explicit session; use "general" for the general session.');
-  }
-  return normalized;
-}
-
 export function buildOpenClawDraftForward({
   threadId = '',
   session = '',
   questionId = '',
   draft = {},
 } = {}) {
-  const normalizedSession = normalizePublicAgentSession(session);
+  const normalizedSession = normalizePublicAgentSession(session, {
+    required: true,
+    context: 'OpenClaw draft forwarding',
+  });
   return {
     adapter: OPENCLAW_THREAD_ADAPTER_CONTRACT.name,
     version: OPENCLAW_THREAD_ADAPTER_CONTRACT.version,

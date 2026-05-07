@@ -144,6 +144,8 @@ Thread event envelopes cover `delivered`, `drafted`, `submit_requested`,
 `approved`, `submitted`, and `failed` states. Submit-request envelopes preserve
 the canonical `requestId`, `approvalUrl`, status, and non-secret idempotency key
 so OpenClaw can forward state without becoming a second authority boundary.
+OpenClaw draft and event helpers preserve the public `general` session alias and
+reject malformed public session slugs when a session is present.
 
 ## Telegram Compatibility
 
