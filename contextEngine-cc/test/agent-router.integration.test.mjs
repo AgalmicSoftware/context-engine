@@ -274,6 +274,45 @@ test('agent routes reject missing auth before returning adapter payloads', async
   });
 });
 
+test('agent routes use stable auth error envelopes before route-specific work', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+  const routes = [
+    { method: 'GET', path: '/api/agent/me' },
+    { method: 'GET', path: '/api/agent/sessions' },
+    { method: 'GET', path: '/api/agent/questions?session=alpha' },
+    { method: 'GET', path: '/api/agent/inbox' },
+    {
+      method: 'POST',
+      path: '/api/agent/responses/draft',
+      body: { session: 'alpha', questionId: QUESTION_ID, answer: 'draft answer' },
+    },
+    { method: 'GET', path: '/api/agent/responses/drafts?session=alpha' },
+    {
+      method: 'POST',
+      path: '/api/agent/responses/submit-request',
+      body: { session: 'alpha', questionIds: [QUESTION_ID] },
+    },
+    { method: 'GET', path: '/api/agent/requests/agent_req_missing123' },
+  ];
+
+  for (const route of routes) {
+    const result = await callRoute(handleRoute, {
+      path: route.path,
+      method: route.method,
+      body: route.body || {},
+      token: '',
+    });
+    assert.equal(result.status, 401, `${route.method} ${route.path}`);
+    assert.deepEqual(result.payload, {
+      ok: false,
+      status: 'auth_error',
+      code: 'agent_auth_required',
+      error: 'Missing Authorization header.',
+    });
+  }
+});
+
 test('agent read adapters return canonical identity, sessions, and questions', async (t) => {
   const harness = setupRouterHarness(t);
   const { handleRoute } = await import(harness.routerUrl);
