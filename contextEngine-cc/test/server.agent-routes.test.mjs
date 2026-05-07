@@ -12,6 +12,8 @@ import test, { after } from 'node:test';
 
 const WALLET_ADDRESS = `0x${'12'.repeat(20)}`;
 const QUESTION_ID = `0x${'11'.repeat(32)}`;
+const AGENT_ID = 'telegram:agent-1';
+const GRANT_ID = 'agent_grant_route123';
 const TEST_ROOT = mkdtempSync(resolve(tmpdir(), 'ce-server-agent-routes-'));
 const DATA_DIR = resolve(TEST_ROOT, 'data');
 const HOOK_STATE_DIR = resolve(TEST_ROOT, 'hook-state');
@@ -84,6 +86,35 @@ async function requestJson(port, {
 function resetRuntimeState() {
   rmSync(resolve(DATA_DIR, 'responses'), { recursive: true, force: true });
   rmSync(resolve(DATA_DIR, 'agent-requests'), { recursive: true, force: true });
+  rmSync(resolve(DATA_DIR, 'agent-grants'), { recursive: true, force: true });
+}
+
+function writeGrant(record = {}) {
+  const grantDir = resolve(DATA_DIR, 'agent-grants');
+  mkdirSync(grantDir, { recursive: true });
+  const grant = {
+    type: 'agent_grant',
+    version: 'agent-contract-v1',
+    grantId: GRANT_ID,
+    humanPrincipal: WALLET_ADDRESS,
+    agentId: AGENT_ID,
+    subject: AGENT_ID,
+    scopes: ['agent:delegated-execute', 'agent:revoke-grant'],
+    sessions: ['alpha'],
+    allowedActions: ['agent.response.delegated_execute'],
+    riskCeiling: 'medium',
+    executionPolicy: 'scoped_delegated_execute',
+    auditRequired: true,
+    status: 'active',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    createdAt: '2026-05-07T00:00:00.000Z',
+    revokedAt: null,
+    signingAuthority: false,
+    workerTokenAuthority: false,
+    ...record,
+  };
+  writeFileSync(resolve(grantDir, `${grant.grantId}.json`), JSON.stringify(grant, null, 2));
+  return grant;
 }
 
 test('agent HTTP routes reject missing bearer auth at the app-server boundary', async () => {
@@ -103,6 +134,18 @@ test('agent HTTP routes reject missing bearer auth at the app-server boundary', 
         method: 'POST',
         path: '/api/agent/responses/submit-request',
         body: { session: 'alpha', questionIds: [QUESTION_ID] },
+      },
+      {
+        method: 'POST',
+        path: '/api/agent/responses/delegated-execute',
+        body: { session: 'alpha', questionIds: [QUESTION_ID], grantId: GRANT_ID, agentId: AGENT_ID },
+      },
+      { method: 'GET', path: '/api/agent/grants' },
+      { method: 'GET', path: `/api/agent/grants/${GRANT_ID}` },
+      {
+        method: 'POST',
+        path: '/api/agent/grants/revoke',
+        body: { grantId: GRANT_ID },
       },
       { method: 'GET', path: '/api/agent/requests/agent_req_missing123' },
     ];
@@ -242,5 +285,105 @@ test('agent HTTP routes require explicit public session slugs', async () => {
     });
     assert.equal(generalDraft.status, 200);
     assert.equal(generalDraft.payload.draft.session, 'general');
+  });
+});
+
+test('agent HTTP grant routes list read and revoke scoped grants by wallet', async () => {
+  resetRuntimeState();
+  writeGrant();
+  writeGrant({
+    grantId: 'agent_grant_otherwallet',
+    humanPrincipal: `0x${'34'.repeat(20)}`,
+  });
+
+  await withServer(async (port) => {
+    const list = await requestJson(port, { path: '/api/agent/grants?session=alpha' });
+    assert.equal(list.status, 200);
+    assert.equal(list.payload.ok, true);
+    assert.equal(list.payload.count, 1);
+    assert.equal(list.payload.grants[0].grantId, GRANT_ID);
+    assert.equal(list.payload.grants[0].signingAuthority, false);
+    assert.equal(list.payload.grants[0].workerTokenAuthority, false);
+
+    const read = await requestJson(port, { path: `/api/agent/grants/${GRANT_ID}?session=alpha` });
+    assert.equal(read.status, 200);
+    assert.equal(read.payload.grant.agentId, AGENT_ID);
+    assert.deepEqual(read.payload.grant.allowedActions, ['agent.response.delegated_execute']);
+
+    const wrongSession = await requestJson(port, { path: `/api/agent/grants/${GRANT_ID}?session=beta` });
+    assert.equal(wrongSession.status, 404);
+    assert.equal(wrongSession.payload.code, 'agent_grant_not_found');
+
+    const revoked = await requestJson(port, {
+      path: '/api/agent/grants/revoke',
+      method: 'POST',
+      body: { grantId: GRANT_ID },
+    });
+    assert.equal(revoked.status, 200);
+    assert.equal(revoked.payload.status, 'grant_revoked');
+    assert.equal(revoked.payload.grant.status, 'revoked');
+    assert.equal(revoked.payload.grant.revokedAt.length > 0, true);
+  });
+});
+
+test('agent HTTP delegated execution validates scoped grants and records audit without signing', async () => {
+  resetRuntimeState();
+  writeGrant();
+
+  await withServer(async (port) => {
+    const delegated = await requestJson(port, {
+      path: '/api/agent/responses/delegated-execute',
+      method: 'POST',
+      body: {
+        session: 'alpha',
+        questionIds: [QUESTION_ID],
+        grantId: GRANT_ID,
+        agentId: AGENT_ID,
+        idempotencyKey: 'delegated:alpha.0001',
+        agentContext: {
+          source: 'server-test',
+          workerToken: 'must-redact',
+          note: 'Bearer long-lived-token',
+        },
+      },
+    });
+    assert.equal(delegated.status, 202);
+    assert.equal(delegated.payload.ok, true);
+    assert.equal(delegated.payload.executed, false);
+    assert.equal(delegated.payload.execution.status, 'contract_only_deferred');
+    assert.equal(delegated.payload.execution.productDecisionRequired, true);
+    assert.equal(delegated.payload.request.status, 'approved');
+    assert.equal(delegated.payload.request.requiresApproval, false);
+    assert.equal(delegated.payload.grant.signingAuthority, false);
+    assert.equal(delegated.payload.grant.workerTokenAuthority, false);
+
+    const retry = await requestJson(port, {
+      path: '/api/agent/responses/delegated-execute',
+      method: 'POST',
+      body: {
+        session: 'alpha',
+        questionIds: [QUESTION_ID],
+        grantId: GRANT_ID,
+        agentId: AGENT_ID,
+        idempotencyKey: 'delegated:alpha.0001',
+      },
+    });
+    assert.equal(retry.status, 202);
+    assert.equal(retry.payload.idempotent, true);
+    assert.equal(retry.payload.request.requestId, delegated.payload.request.requestId);
+
+    const denied = await requestJson(port, {
+      path: '/api/agent/responses/delegated-execute',
+      method: 'POST',
+      body: {
+        session: 'beta',
+        questionIds: [QUESTION_ID],
+        grantId: GRANT_ID,
+        agentId: AGENT_ID,
+      },
+    });
+    assert.equal(denied.status, 403);
+    assert.equal(denied.payload.code, 'agent_grant_denied');
+    assert.equal(denied.payload.reason, 'session_mismatch');
   });
 });

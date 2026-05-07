@@ -19,6 +19,8 @@ const QUESTION_ID = `0x${'11'.repeat(32)}`;
 const SECOND_QUESTION_ID = `0x${'22'.repeat(32)}`;
 const WALLET_ADDRESS = `0x${'12'.repeat(20)}`;
 const SECOND_WALLET_ADDRESS = `0x${'34'.repeat(20)}`;
+const AGENT_ID = 'telegram:agent-1';
+const GRANT_ID = 'agent_grant_router01';
 
 function writeModule(path, source) {
   mkdirSync(dirname(path), { recursive: true });
@@ -47,6 +49,34 @@ function makeReq({ token = 'valid-agent-jwt', headers: headerOverrides = {} } = 
     headers,
     socket: { remoteAddress: '127.0.0.1' },
   };
+}
+
+function writeHarnessGrant(dataDir, record = {}) {
+  const grantDir = resolve(dataDir, 'agent-grants');
+  mkdirSync(grantDir, { recursive: true });
+  const grant = {
+    type: 'agent_grant',
+    version: 'agent-contract-v1',
+    grantId: GRANT_ID,
+    humanPrincipal: WALLET_ADDRESS,
+    agentId: AGENT_ID,
+    subject: AGENT_ID,
+    scopes: ['agent:delegated-execute', 'agent:revoke-grant'],
+    sessions: ['alpha'],
+    allowedActions: ['agent.response.delegated_execute'],
+    riskCeiling: 'medium',
+    executionPolicy: 'scoped_delegated_execute',
+    auditRequired: true,
+    status: 'active',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    createdAt: '2026-05-07T00:00:00.000Z',
+    revokedAt: null,
+    signingAuthority: false,
+    workerTokenAuthority: false,
+    ...record,
+  };
+  writeFileSync(resolve(grantDir, `${grant.grantId}.json`), JSON.stringify(grant, null, 2));
+  return grant;
 }
 
 async function callRoute(handleRoute, {
@@ -233,7 +263,7 @@ function setupRouterHarness(t) {
     }
   `);
 
-  ['capabilities', 'schemas', 'approvalResponses', 'lifecycle'].forEach((moduleName) => {
+  ['capabilities', 'schemas', 'approvalResponses', 'lifecycle', 'actionInventory'].forEach((moduleName) => {
     const href = pathToFileURL(resolve(CC_ROOT, 'lib', 'agent', `${moduleName}.mjs`)).href;
     writeModule(resolve(libDir, 'agent', `${moduleName}.mjs`), `export * from ${JSON.stringify(href)};\n`);
   });
@@ -293,6 +323,18 @@ test('agent routes use stable auth error envelopes before route-specific work', 
       method: 'POST',
       path: '/api/agent/responses/submit-request',
       body: { session: 'alpha', questionIds: [QUESTION_ID] },
+    },
+    {
+      method: 'POST',
+      path: '/api/agent/responses/delegated-execute',
+      body: { session: 'alpha', questionIds: [QUESTION_ID], grantId: GRANT_ID, agentId: AGENT_ID },
+    },
+    { method: 'GET', path: '/api/agent/grants' },
+    { method: 'GET', path: `/api/agent/grants/${GRANT_ID}` },
+    {
+      method: 'POST',
+      path: '/api/agent/grants/revoke',
+      body: { grantId: GRANT_ID },
     },
     { method: 'GET', path: '/api/agent/requests/agent_req_missing123' },
   ];
@@ -815,6 +857,148 @@ test('agent submit-request creates approval records and idempotent retries', asy
   });
   assert.equal(otherWalletStatus.status, 404);
   assert.equal(otherWalletStatus.payload.code, 'agent_request_not_found');
+});
+
+test('agent grant routes list read and revoke wallet-scoped delegated grants', async (t) => {
+  const harness = setupRouterHarness(t);
+  writeHarnessGrant(harness.dataDir);
+  writeHarnessGrant(harness.dataDir, {
+    grantId: 'agent_grant_other123',
+    humanPrincipal: SECOND_WALLET_ADDRESS,
+  });
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const list = await callRoute(handleRoute, { path: '/api/agent/grants?session=alpha' });
+  assert.equal(list.status, 200);
+  assert.equal(list.payload.count, 1);
+  assert.equal(list.payload.grants[0].grantId, GRANT_ID);
+  assert.equal(list.payload.grants[0].humanPrincipal, WALLET_ADDRESS.toLowerCase());
+  assert.equal(list.payload.grants[0].signingAuthority, false);
+  assert.equal(list.payload.grants[0].workerTokenAuthority, false);
+
+  const read = await callRoute(handleRoute, { path: `/api/agent/grants/${GRANT_ID}?session=alpha` });
+  assert.equal(read.status, 200);
+  assert.equal(read.payload.grant.agentId, AGENT_ID);
+  assert.deepEqual(read.payload.grant.allowedActions, ['agent.response.delegated_execute']);
+
+  const otherWallet = await callRoute(handleRoute, {
+    path: `/api/agent/grants/${GRANT_ID}`,
+    token: 'second-agent-jwt',
+  });
+  assert.equal(otherWallet.status, 404);
+  assert.equal(otherWallet.payload.code, 'agent_grant_not_found');
+
+  const invalid = await callRoute(handleRoute, { path: '/api/agent/grants/not-a-grant' });
+  assert.equal(invalid.status, 400);
+  assert.equal(invalid.payload.code, 'invalid_grant_id');
+
+  const revoked = await callRoute(handleRoute, {
+    path: '/api/agent/grants/revoke',
+    method: 'POST',
+    body: { grantId: GRANT_ID },
+  });
+  assert.equal(revoked.status, 200);
+  assert.equal(revoked.payload.status, 'grant_revoked');
+  assert.equal(revoked.payload.grant.status, 'revoked');
+});
+
+test('agent delegated response execution validates grant scope and writes a contract-only audit record', async (t) => {
+  const harness = setupRouterHarness(t);
+  writeHarnessGrant(harness.dataDir);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const invalidGrant = await callRoute(handleRoute, {
+    path: '/api/agent/responses/delegated-execute',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      grantId: 'not-a-grant',
+      agentId: AGENT_ID,
+    },
+  });
+  assert.equal(invalidGrant.status, 400);
+  assert.equal(invalidGrant.payload.code, 'invalid_grant_id');
+
+  const success = await callRoute(handleRoute, {
+    path: '/api/agent/responses/delegated-execute',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      grantId: GRANT_ID,
+      agentId: AGENT_ID,
+      idempotencyKey: 'delegated:alpha.0001',
+      agentContext: {
+        workerToken: 'must-redact',
+        note: 'Bearer long-lived-token',
+      },
+    },
+  });
+  assert.equal(success.status, 202);
+  assert.equal(success.payload.ok, true);
+  assert.equal(success.payload.executed, false);
+  assert.equal(success.payload.execution.status, 'contract_only_deferred');
+  assert.equal(success.payload.execution.productDecisionRequired, true);
+  assert.equal(success.payload.request.status, 'approved');
+  assert.equal(success.payload.request.requiresApproval, false);
+  assert.equal(success.payload.grant.signingAuthority, false);
+  assert.equal(success.payload.grant.workerTokenAuthority, false);
+
+  const requestFile = resolve(harness.dataDir, 'agent-requests', `${success.payload.request.requestId}.json`);
+  assert.equal(existsSync(requestFile), true);
+  const stored = JSON.parse(readFileSync(requestFile, 'utf8'));
+  assert.equal(stored.type, 'response_delegated_execute');
+  assert.equal(stored.payload.agentContext.workerToken, '[redacted]');
+  assert.equal(stored.payload.agentContext.note, '[redacted]');
+  assert.equal(stored.grantId, GRANT_ID);
+  assert.equal(stored.actionId, 'agent.response.delegated_execute');
+
+  const retry = await callRoute(handleRoute, {
+    path: '/api/agent/responses/delegated-execute',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      grantId: GRANT_ID,
+      agentId: AGENT_ID,
+      idempotencyKey: 'delegated:alpha.0001',
+    },
+  });
+  assert.equal(retry.status, 202);
+  assert.equal(retry.payload.idempotent, true);
+  assert.equal(retry.payload.request.requestId, success.payload.request.requestId);
+
+  const wrongSession = await callRoute(handleRoute, {
+    path: '/api/agent/responses/delegated-execute',
+    method: 'POST',
+    body: {
+      session: 'beta',
+      questionIds: [QUESTION_ID],
+      grantId: GRANT_ID,
+      agentId: AGENT_ID,
+    },
+  });
+  assert.equal(wrongSession.status, 403);
+  assert.equal(wrongSession.payload.code, 'agent_grant_denied');
+  assert.equal(wrongSession.payload.reason, 'session_mismatch');
+
+  writeHarnessGrant(harness.dataDir, {
+    grantId: 'agent_grant_highrisk',
+    riskCeiling: 'low',
+  });
+  const highRisk = await callRoute(handleRoute, {
+    path: '/api/agent/responses/delegated-execute',
+    method: 'POST',
+    body: {
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      grantId: 'agent_grant_highrisk',
+      agentId: AGENT_ID,
+    },
+  });
+  assert.equal(highRisk.status, 403);
+  assert.equal(highRisk.payload.reason, 'risk_ceiling_exceeded');
 });
 
 test('agent request reads normalize expired and revoked lifecycle states', async (t) => {

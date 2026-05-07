@@ -42,10 +42,34 @@ export const AGENT_ROUTE_EQUIVALENCE = Object.freeze([
     notes: 'Creates an approval request instead of signing or submitting.',
   },
   {
+    canonical: { method: 'POST', path: '/api/agent/responses/delegated-execute' },
+    legacy: { method: 'POST', path: '/api/responses/submit-onchain' },
+    relation: 'scoped-delegation-contract',
+    notes: 'Validates scoped grants and records an audit entry without remote signing authority.',
+  },
+  {
     canonical: { method: 'GET', path: '/api/agent/requests/:id' },
     legacy: null,
     relation: 'agent-native',
     notes: 'Reads approval request status by opaque request id.',
+  },
+  {
+    canonical: { method: 'GET', path: '/api/agent/grants' },
+    legacy: null,
+    relation: 'agent-native',
+    notes: 'Lists authenticated-wallet scoped delegated grants.',
+  },
+  {
+    canonical: { method: 'GET', path: '/api/agent/grants/:id' },
+    legacy: null,
+    relation: 'agent-native',
+    notes: 'Reads a scoped delegated grant by id inside the authenticated wallet scope.',
+  },
+  {
+    canonical: { method: 'POST', path: '/api/agent/grants/revoke' },
+    legacy: null,
+    relation: 'agent-native',
+    notes: 'Revokes a scoped delegated grant without creating or expanding authority.',
   },
 ]);
 

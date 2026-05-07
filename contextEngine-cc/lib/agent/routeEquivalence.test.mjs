@@ -13,12 +13,16 @@ import { ROUTE_INVENTORY, ROUTE_INVENTORY_BY_KEY, routeKey as inventoryRouteKey 
 test('agent route equivalence table covers the v1 canonical routes', () => {
   const canonicalKeys = AGENT_CANONICAL_ROUTES.map(routeKey).sort();
   assert.deepEqual(canonicalKeys, [
+    'GET /api/agent/grants',
+    'GET /api/agent/grants/:id',
     'GET /api/agent/inbox',
     'GET /api/agent/me',
     'GET /api/agent/questions',
     'GET /api/agent/requests/:id',
     'GET /api/agent/responses/drafts',
     'GET /api/agent/sessions',
+    'POST /api/agent/grants/revoke',
+    'POST /api/agent/responses/delegated-execute',
     'POST /api/agent/responses/draft',
     'POST /api/agent/responses/submit-request',
   ]);

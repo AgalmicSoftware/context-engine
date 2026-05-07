@@ -20,6 +20,7 @@ test('MCP tool descriptors cover the planned agent tool names', () => {
     'next_question',
     'draft_response',
     'submit_response_request',
+    'delegated_response_execute',
     'create_question_request',
     'get_inbox',
     'get_request_status',
@@ -70,6 +71,34 @@ test('MCP request builder maps tools to canonical agent HTTP paths', () => {
       session: 'alpha',
       questionIds: ['0xabc'],
       idempotencyKey: 'submit:alpha.0001',
+    },
+  });
+  assert.deepEqual(buildAgentMcpHttpRequest('delegated_response_execute', {
+    session: 'alpha',
+    questionIds: ['0xabc'],
+    grantId: 'agent_grant_abc12345',
+    agentId: 'telegram:agent-1',
+    idempotencyKey: 'delegated:alpha.0001',
+  }), {
+    method: 'POST',
+    path: '/api/agent/responses/delegated-execute',
+    implemented: true,
+    body: {
+      session: 'alpha',
+      questionIds: ['0xabc'],
+      grantId: 'agent_grant_abc12345',
+      agentId: 'telegram:agent-1',
+      idempotencyKey: 'delegated:alpha.0001',
+    },
+  });
+  assert.deepEqual(buildAgentMcpHttpRequest('revoke_agent_grant', {
+    grantId: 'agent_grant_abc12345',
+  }), {
+    method: 'POST',
+    path: '/api/agent/grants/revoke',
+    implemented: true,
+    body: {
+      grantId: 'agent_grant_abc12345',
     },
   });
 });
@@ -174,6 +203,15 @@ test('MCP handlers reject invalid inputs before HTTP', async () => {
     /Invalid agent MCP session slug/,
   );
   await assert.rejects(
+    () => handlers.delegated_response_execute({
+      session: '',
+      questionIds: ['0xabc'],
+      grantId: 'agent_grant_abc12345',
+      agentId: 'telegram:agent-1',
+    }),
+    /explicit session/,
+  );
+  await assert.rejects(
     () => handlers.get_request_status({}),
     /requires requestId/,
   );
@@ -221,9 +259,10 @@ test('MCP handler factory only exposes implemented tools', async () => {
   });
 
   assert.equal(typeof handlers.submit_response_request, 'function');
+  assert.equal(typeof handlers.delegated_response_execute, 'function');
+  assert.equal(typeof handlers.revoke_agent_grant, 'function');
   assert.equal(Object.hasOwn(handlers, 'create_question_request'), false);
   assert.equal(Object.hasOwn(handlers, 'request_decrypt'), false);
-  assert.equal(Object.hasOwn(handlers, 'revoke_agent_grant'), false);
   assert.throws(
     () => buildAgentMcpHttpRequest('create_question_request', { session: 'general' }),
     /not implemented/,

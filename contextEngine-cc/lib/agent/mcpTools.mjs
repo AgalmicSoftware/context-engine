@@ -19,6 +19,7 @@ const REQUIRED_SESSION_TOOLS = new Set([
   'next_question',
   'draft_response',
   'submit_response_request',
+  'delegated_response_execute',
 ]);
 
 export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
@@ -104,6 +105,20 @@ export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
     }, ['session', 'questionIds']),
   },
   {
+    name: 'delegated_response_execute',
+    description: 'Validate a scoped delegated response execution grant and record the contract-only audit envelope.',
+    method: 'POST',
+    path: '/api/agent/responses/delegated-execute',
+    implemented: true,
+    inputSchema: jsonSchema({
+      session: stringProp('Session slug.'),
+      questionIds: arrayOfStringsProp('32-byte hex question ids to execute under a scoped grant.'),
+      grantId: stringProp('Scoped delegated grant id.'),
+      agentId: stringProp('Delegated agent identity bound to the grant.'),
+      idempotencyKey: stringProp('Optional client-provided idempotency key.'),
+    }, ['session', 'questionIds', 'grantId', 'agentId']),
+  },
+  {
     name: 'create_question_request',
     description: 'Future approval-gated question creation request.',
     method: 'POST',
@@ -142,10 +157,10 @@ export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
   },
   {
     name: 'revoke_agent_grant',
-    description: 'Future agent grant revocation route.',
+    description: 'Revoke an existing scoped agent grant by id.',
     method: 'POST',
     path: '/api/agent/grants/revoke',
-    implemented: false,
+    implemented: true,
     inputSchema: jsonSchema({ grantId: stringProp('Grant id to revoke.') }, ['grantId']),
   },
 ]);
