@@ -504,6 +504,29 @@ test('agent submit-request creates approval records and idempotent retries', asy
   assert.equal(conflict.payload.ok, false);
   assert.equal(conflict.payload.code, 'idempotency_key_conflict');
 
+  const secondWalletSameKey = await callRoute(handleRoute, {
+    path: '/api/agent/responses/submit-request',
+    method: 'POST',
+    token: 'second-agent-jwt',
+    body: {
+      session: 'alpha',
+      questionIds: [QUESTION_ID],
+      idempotencyKey: 'submit:alpha.0001',
+    },
+  });
+  assert.equal(secondWalletSameKey.status, 202);
+  assert.notEqual(secondWalletSameKey.payload.requestId, first.payload.requestId);
+  assert.equal(secondWalletSameKey.payload.request.requester, SECOND_WALLET_ADDRESS.toLowerCase());
+
+  const secondWalletInbox = await callRoute(handleRoute, {
+    path: '/api/agent/inbox?session=alpha',
+    token: 'second-agent-jwt',
+  });
+  assert.deepEqual(
+    secondWalletInbox.payload.requests.map((request) => request.requestId),
+    [secondWalletSameKey.payload.requestId],
+  );
+
   const status = await callRoute(handleRoute, {
     path: `/api/agent/requests/${encodeURIComponent(first.payload.requestId)}`,
   });
