@@ -108,7 +108,9 @@ Cloudflare storage is for CE payloads such as session context, docs, media,
 questions, surveys, responses, and generated artifacts; it is not Telegram,
 user preference, or profile storage. Agent and Telegram-facing records should
 prefer `storageRef` and keep `arweaveTxId` only as an Arweave compatibility
-alias.
+alias. If a Cloudflare-backed session needs to publish a Surveys contract
+pointer, the normal session worker returns the opaque bytes32-compatible storage
+ID; the bridge does not mint its own canonical payload IDs or own those bytes.
 The bridge exposes no Cloudflare credentials, bucket names, long-lived signed
 URLs, worker tokens, or raw storage paths. `/new` Advanced owns the selected
 storage profile. `/worker-setup` may display that profile but does not edit

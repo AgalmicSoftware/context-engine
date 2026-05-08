@@ -290,8 +290,11 @@ should accept/return `storageRef` while preserving legacy `arweaveTxId` fields.
 Cloudflare storage is CE payload storage for session context, docs, media,
 questions, surveys, responses, and generated artifacts; it is not user
 preference/profile storage. Readers should resolve `storageRef` first and only
-fall back to `arweaveTxId` when no storage ref is present. Future naming
-migration is tracked in
+fall back to `arweaveTxId` when no storage ref is present. When a Cloudflare
+session writes through legacy Surveys contract pointer fields, the pointer is an
+opaque bytes32-compatible Cloudflare storage ID, not an Arweave tx id. Storage
+backend is selected during `/new` session creation; mutation/migration is not in
+scope for this lane. Future naming migration is tracked in
 [`TODO/PRDs/510_storage-ref-canonical-payload-pointer-migration.md`](../TODO/PRDs/510_storage-ref-canonical-payload-pointer-migration.md):
 `storageRef` becomes the canonical top-level pointer and `arweaveTxId` becomes a
 deprecated Arweave compatibility alias after readers are storageRef-aware.
