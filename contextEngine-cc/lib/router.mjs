@@ -631,7 +631,7 @@ function buildAutoSubmitStatus(kind, fields = {}) {
       return {
         status: 'worker-auth-required',
         alert: 'warning',
-        message: 'Worker auth is required before auto-submit can run.',
+        message: 'Session sign-in is required before auto-submit can run.',
         ...fields,
       };
     case 'pending':
@@ -656,6 +656,17 @@ function buildAutoSubmitStatus(kind, fields = {}) {
         message: 'Auto-submit is disabled; the response was saved locally.',
         ...fields,
       };
+  }
+}
+
+function buildTxExplorerUrl(txHash, baseUrl = DEFAULT_CHAIN_METADATA.txExplorerTxBaseUrl) {
+  const safeHash = String(txHash || '').trim();
+  const safeBaseUrl = String(baseUrl || '').trim();
+  if (!safeHash || !safeBaseUrl) return '';
+  try {
+    return new URL(safeHash, safeBaseUrl).toString();
+  } catch {
+    return '';
   }
 }
 
@@ -980,21 +991,28 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
 
     const hookConfig = loadHookConfig();
     const shouldAutoInstall = hookConfig.autoCli !== false;
+    let autoInstalled = false;
+    let autoInstallPath = resolve(HOOK_STATE_DIR, 'token.jwt');
+    let autoInstallError = null;
 
     // Auto-install token to plugin state dir when enabled.
     if (shouldAutoInstall) {
       try {
         mkdirSync(HOOK_STATE_DIR, { recursive: true });
-        const tokenPath = resolve(HOOK_STATE_DIR, 'token.jwt');
-        writeSecureFile(tokenPath, token);
-        debug(`[auth] Auto-installed JWT to ${tokenPath}`);
+        writeSecureFile(autoInstallPath, token);
+        autoInstalled = true;
+        debug(`[auth] Auto-installed JWT to ${autoInstallPath}`);
       } catch (err) {
+        autoInstallError = err.message;
         error(`[auth] Failed to auto-install JWT:`, err.message);
       }
     }
     json(res, 200, {
       token,
-      autoInstalled: shouldAutoInstall,
+      autoInstallConfigured: shouldAutoInstall,
+      autoInstalled,
+      autoInstallPath,
+      autoInstallError,
       walletAddress,
       privateKeyStored: !!privateKeyInput,
     });
@@ -1202,7 +1220,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
     try {
       const workerToken = await ensureWorkerToken(slug, recipientAddress, deps);
       if (!workerToken) {
-        return json(res, 401, { error: 'No worker token stored. Re-authenticate via PWA.' });
+        return json(res, 401, { error: 'Session sign-in is missing. Re-authenticate in the local Context Engine UI.' });
       }
       const faucetRequest = await requestFaucetWorkerTransfer({
         slug,
@@ -1647,9 +1665,11 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         // background `stored.submitted = true` write still happens.
 
         if (outcome.kind === 'submitted') {
+          const txExplorerUrl = buildTxExplorerUrl(outcome.txHash);
           const autoSubmit = buildAutoSubmitStatus('submitted', {
             txHash: outcome.txHash,
             blockNumber: outcome.blockNumber,
+            ...(txExplorerUrl ? { txExplorerUrl } : {}),
           });
           return json(res, 200, {
             ok: true,
@@ -1657,6 +1677,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
             submitted: true,
             txHash: outcome.txHash,
             blockNumber: outcome.blockNumber,
+            ...(txExplorerUrl ? { txExplorerUrl } : {}),
             requiresWorkerAuth: false,
             autoSubmit,
             acknowledgement: 'Submitted securely. Auto-submit succeeded.',
@@ -1671,9 +1692,9 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
             submitted: false,
             requiresWorkerAuth: true,
             autoSubmit,
-            acknowledgement: 'Saved locally. Worker auth is required before auto-submit can run.',
+            acknowledgement: 'Saved locally. Session sign-in is required before auto-submit can run.',
             message:
-              'Worker auth is required for this session before auto-submit can run; complete worker auth at http://localhost:7391.',
+              'Session sign-in is required for this session before auto-submit can run; complete session sign-in at http://localhost:7391.',
           });
         }
         if (outcome.kind === 'timeout') {
@@ -1766,7 +1787,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         const walletAddress = String(auth.payload?.sub || '').trim().toLowerCase();
         const workerToken = await ensureWorkerToken(normalizedSession, walletAddress, deps);
         if (!workerToken) {
-          return json(res, 401, { error: 'No worker token stored. Re-authenticate via PWA.' });
+          return json(res, 401, { error: 'Session sign-in is missing. Re-authenticate in the local Context Engine UI.' });
         }
         const result = await submitOnChainImpl(pendingToSubmit, normalizedSession, workerToken);
 
@@ -1905,7 +1926,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       const walletAddress = String(auth.payload?.sub || '').trim().toLowerCase();
       const workerToken = await ensureWorkerToken(normalizedSession, walletAddress, deps);
       if (!workerToken) {
-        return json(res, 401, { error: 'No worker token stored. Re-authenticate via PWA.' });
+        return json(res, 401, { error: 'Session sign-in is missing. Re-authenticate in the local Context Engine UI.' });
       }
       const result = await submitQuestions(questions, normalizedSession, workerToken);
       return json(res, result.ok ? 200 : 500, result);

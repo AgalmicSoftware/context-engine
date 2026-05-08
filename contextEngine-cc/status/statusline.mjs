@@ -21,11 +21,13 @@ const DEFAULT_COOLDOWN_MS = 45_000;
 const CACHE_TTL_MS = 4_000;
 const REQUEST_TIMEOUT_MS = 1_500;
 const BAR_WIDTH = 12;
+const COMPACT_BAR_WIDTH = 8;
 
 const ANSI = {
   reset: '\x1b[0m',
   bold: '\x1b[1m',
   dim: '\x1b[2m',
+  blue: '\x1b[34m',
   cyan: '\x1b[36m',
   green: '\x1b[32m',
   yellow: '\x1b[33m',
@@ -41,8 +43,6 @@ const SYMBOLS = {
   wallet: '◉',
   sessions: '▪',
   cooldown: '⏱',
-  submitReady: '✔',
-  localOnly: '✗',
 };
 
 function loadJson(path, fallback) {
@@ -71,6 +71,10 @@ function withAnsi(code, text) {
 
 function bold(text) {
   return withAnsi(ANSI.bold, text);
+}
+
+function blue(text) {
+  return withAnsi(ANSI.blue, text);
 }
 
 function dim(text) {
@@ -160,6 +164,11 @@ function getConfiguredSessions(config = {}) {
     selectedSessions: config.selectedSessions,
     defaultSession: config.defaultSession,
   });
+}
+
+function normalizeQuestionSurfacingMode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return ['manual', 'idle', 'ambient'].includes(normalized) ? normalized : 'manual';
 }
 
 function buildLocalSnapshot() {
@@ -277,59 +286,55 @@ export function renderStatusLine(snapshot, statusInput = null) {
   const safeAnswered = clamp(Number.isFinite(answered) ? answered : 0, 0, total > 0 ? total : 0);
   const cooldown = snapshot.cooldown || {};
   const project = deriveProjectLabel(statusInput);
+  const brandLabel = 'context-engine';
   const line1Separator = dim(SYMBOLS.line1Separator);
-  const line2Separator = dim(SYMBOLS.line2Separator);
   const line1Leader = `${dim(SYMBOLS.line1Leader)} `;
-  const line2Leader = `${dim(SYMBOLS.line2Leader)} `;
 
   const line1 = [];
-  line1.push(bold(cyan('CE')));
-  if (project) line1.push(dim(project));
+  line1.push(bold(blue(brandLabel)));
+  if (project && String(project).trim().toLowerCase() !== brandLabel) {
+    line1.push(dim(project));
+  }
 
   if (!hasToken) {
     line1.push(red('auth required'));
-    line1.push(dim(serverUrl));
-    const line2 = sessionCount > 0
-      ? `${pluralize(sessionCount, 'session')} selected${SYMBOLS.line2Separator}sign in to load progress`
-      : `Open ${serverUrl} to authenticate and select a session`;
-    return `${line1Leader}${line1.join(line1Separator)}\n${line2Leader}${dim(line2)}`;
+    if (sessionCount > 0) line1.push(dim(`${pluralize(sessionCount, 'session')} selected`));
+    line1.push(dim(`Open ${serverUrl} to authenticate and select a session`));
+    return `${line1Leader}${line1.join(line1Separator)}`;
   }
 
   if (wallet) line1.push(green(`${SYMBOLS.wallet} ${shortAddress(wallet)}`));
   if (sessionCount === 0) {
     line1.push(yellow('no sessions selected'));
-    return `${line1Leader}${line1.join(line1Separator)}\n${line2Leader}${dim(`Open ${serverUrl} to choose sessions for Context Engine.`)}`;
+    line1.push(dim(`Open ${serverUrl} to choose sessions for Context Engine.`));
+    return `${line1Leader}${line1.join(line1Separator)}`;
   }
 
   line1.push(dim(`${SYMBOLS.sessions} ${pluralize(sessionCount, 'session')}`));
-  line1.push(yellow(`${pending} pending`));
-  if (snapshot.submit) {
-    line1.push(snapshot.submit.ready
-      ? green(`${SYMBOLS.submitReady} submit ready`)
-      : dim(`${SYMBOLS.localOnly} local only`));
-    if (snapshot.submit.ready && snapshot.submit.workerTokens?.ready === false) {
-      line1.push(yellow('worker auth needed'));
-    }
+  if (total > 0) {
+    line1.push(`${buildProgressBar(safeAnswered, total, COMPACT_BAR_WIDTH)} ${safeAnswered}/${total}`);
+  } else {
+    line1.push(dim('stats syncing'));
   }
-  if (snapshot.offline) line1.push(red(snapshot.stale ? 'offline, showing cache' : 'offline'));
-  else if (snapshot.stale) line1.push(yellow('stale'));
-
-  const progress = total > 0
-    ? `${buildProgressBar(safeAnswered, total)} ${clamp(Math.floor((safeAnswered / total) * 100), 0, 100)}% (${safeAnswered}/${total})`
-    : 'question stats syncing';
-  const cooldownLabel = cooldown.active
-    ? `${SYMBOLS.cooldown} ${formatDuration(cooldown.remainingMs)}`
-    : `${SYMBOLS.cooldown} ready`;
-
-  const line2Parts = [progress, cooldownLabel];
-  const showPhase = snapshot.config?.showPhaseSummary === true
-    || (snapshot.config?.statuslineQuestionHints !== false && snapshot.dashboard?.phase === 'question-ready');
+  if (pending > 0) {
+    line1.push(yellow(`${pending} pending`));
+  }
+  if (snapshot.submit?.ready && snapshot.submit.workerTokens?.ready === false) {
+    line1.push(yellow('session sign-in needed'));
+  }
+  if (cooldown.active) {
+    line1.push(dim(`${SYMBOLS.cooldown} ${formatDuration(cooldown.remainingMs)}`));
+  }
+  const showPhase = snapshot.config?.showPhaseSummary === true;
   if (showPhase) {
     const phaseSummary = snapshot.dashboard ? getPhaseSummary(snapshot) : '';
-    if (phaseSummary) line2Parts.push(dim(truncate(phaseSummary, 76)));
+    if (phaseSummary) line1.push(dim(truncate(phaseSummary, 48)));
+  }
+  if (normalizeQuestionSurfacingMode(snapshot.config?.questionSurfacingMode) === 'manual') {
+    line1.push(cyan('press q for question'));
   }
 
-  return `${line1Leader}${line1.join(line1Separator)}\n${line2Leader}${line2Parts.join(line2Separator)}`;
+  return `${line1Leader}${line1.join(line1Separator)}`;
 }
 
 async function fetchRemoteSnapshot(localSnapshot) {
@@ -388,7 +393,7 @@ function mergeSnapshot(base, overlay) {
   };
 }
 
-async function main() {
+export async function main() {
   const statusInput = readStdinJson();
   const localSnapshot = buildLocalSnapshot();
   const cached = loadJson(CACHE_PATH, null);

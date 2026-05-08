@@ -27,7 +27,7 @@
       <div id="auth-status" class="status"></div>
     </div>
 
-    <!-- Session Select Screen (after passkey, before SIWE) -->
+    <!-- Session Select Screen (after passkey, before session sign-in) -->
     <div id="screen-session-select" class="screen">
       <h1>Sessions <span id="session-count" class="session-count"></span></h1>
       <p class="subtitle"><span id="wallet-preview" class="wallet-addr"></span><button id="btn-wrong-wallet" class="wrong-wallet-btn">Wrong wallet? Sign in again</button></p>
@@ -35,10 +35,10 @@
         <div id="session-list" class="session-list">
           <div class="session-item session-item-placeholder"><span class="session-name">Loading sessions...</span></div>
         </div>
-        <button class="btn-primary" id="btn-siwe">Sign In to Workers (SIWE)</button>
-        <div id="siwe-status" class="status"></div>
+        <button class="btn-primary" id="btn-session-auth">Sign Into Sessions</button>
+        <div id="session-auth-status" class="status"></div>
       </div>
-      <button class="btn-secondary btn-small" id="btn-skip-siwe">Skip (use local JWT only)</button>
+      <button class="btn-secondary btn-small" id="btn-skip-session-auth">Continue without session sign-in</button>
     </div>
 
     <!-- Token Link Screen -->
@@ -101,7 +101,7 @@
         </label>
         <label class="settings-option">
           <input type="checkbox" id="set-auto-submit-login" checked />
-          Auto-submit pending responses after worker auth
+          Auto-submit pending responses after session sign-in
         </label>
       </div>
 
