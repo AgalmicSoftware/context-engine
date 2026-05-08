@@ -6,23 +6,28 @@ jest.mock('../../variables/appConfig.js', () => {
   };
 });
 
-jest.mock('../arweave/arweaveScripts.js', () => {
-  const base64urlToHex = (value) => (
-    String(value || '').startsWith('A')
-      ? `0x${'11'.repeat(32)}`
-      : `0x${'22'.repeat(32)}`
-  );
+const mockBase64urlToHex = (value) => (
+  String(value || '').startsWith('A')
+    ? `0x${'11'.repeat(32)}`
+    : `0x${'22'.repeat(32)}`
+);
 
+jest.mock('../arweave/arweaveScripts.js', () => {
   return {
     arweaveScripts: {
       uploadDataToArweave: jest.fn(),
-      base64urlToHex: jest.fn(base64urlToHex),
+      base64urlToHex: jest.fn(mockBase64urlToHex),
       hexToBase64url: jest.fn(),
       base64DecodeURL: jest.fn(),
       base64urlToBase64: jest.fn(),
     },
   };
 });
+
+jest.mock('../storage/storageClient.js', () => ({
+  uploadDataToSessionStorage: jest.fn(),
+  readSessionStorageBlob: jest.fn(),
+}));
 
 jest.mock('../logging.js', () => ({
   createLogger: () => ({
@@ -82,6 +87,7 @@ jest.mock('ethers', () => {
 
 const { ethers } = require('ethers');
 const { arweaveScripts } = require('../arweave/arweaveScripts.js');
+const { uploadDataToSessionStorage, readSessionStorageBlob } = require('../storage/storageClient.js');
 const contractScriptsBarrel = require('./contractScripts');
 
 const contractScripts = contractScriptsBarrel.default;
@@ -95,6 +101,9 @@ const SURVEY_ID = ethers.utils.id('survey-error-path');
 const QUESTION_ID = ethers.utils.id('question-error-path');
 const SURVEY_TX_ID = 'A'.repeat(43);
 const QUESTION_TX_ID = 'B'.repeat(43);
+const CF_SURVEY_ID = 'C'.repeat(43);
+const CF_QUESTION_ID = 'D'.repeat(43);
+const CF_RESPONSE_ID = 'E'.repeat(43);
 const GROUP_CFG = {
   slug: 'error-path-session',
   networkChainId: 84532,
@@ -107,6 +116,12 @@ const GROUP_CFG = {
       address: '0x2222222222222222222222222222222222222222',
       chainId: 84532,
     },
+  },
+};
+const CLOUDFLARE_GROUP_CFG = {
+  ...GROUP_CFG,
+  storageProfile: {
+    backend: 'cloudflare',
   },
 };
 
@@ -149,6 +164,9 @@ describe('error paths', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     arweaveScripts.uploadDataToArweave.mockReset();
+    arweaveScripts.base64urlToHex.mockImplementation(mockBase64urlToHex);
+    uploadDataToSessionStorage.mockReset();
+    readSessionStorageBlob.mockReset();
     delete window.ethereum;
     delete window.web3authProvider;
   });
@@ -768,6 +786,131 @@ describe('error paths', () => {
     expect(sendCalls).toHaveLength(2);
     expect(sendCalls[0][0].params[0].gas).toBe(ethers.BigNumber.from('280000').toHexString());
     expect(sendCalls[1][0].params[0].gas).toBe(ethers.BigNumber.from('230000').toHexString());
+  });
+
+  it('routes Cloudflare survey and question payload writes through session storage with bytes32-compatible pointers', async () => {
+    const rpcProvider = makeRpcProvider();
+    window.ethereum = rpcProvider;
+
+    const mockSurveyContract = makeWriteContractMock({
+      address: GROUP_CFG.contracts.surveys.address,
+      methods: ['addSurvey'],
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockSurveyContract;
+    });
+    uploadDataToSessionStorage
+      .mockResolvedValueOnce({
+        storageRef: { backend: 'cloudflare', id: CF_SURVEY_ID, resource: 'surveys' },
+      })
+      .mockResolvedValueOnce({
+        storageRef: { backend: 'cloudflare', id: CF_QUESTION_ID, resource: 'questions' },
+      });
+
+    const result = await addSurvey(
+      'wagmi',
+      SURVEY_ID,
+      { title: 'Cloudflare survey' },
+      [QUESTION_ID],
+      [{ id: QUESTION_ID, prompt: 'Where should this live?' }],
+      CLOUDFLARE_GROUP_CFG,
+    );
+
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(2);
+    expect(uploadDataToSessionStorage.mock.calls.map((call) => call[2].resource)).toEqual(['surveys', 'questions']);
+    expect(mockSurveyContract.interface.encodeFunctionData).toHaveBeenCalledWith('addSurvey', [
+      expect.any(String),
+      `0x${'22'.repeat(32)}`,
+      [expect.any(String)],
+      [`0x${'22'.repeat(32)}`],
+    ]);
+    expect(result.surveyArweaveTxId).toBeUndefined();
+    expect(result.surveyStorageRef).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      id: CF_SURVEY_ID,
+      resource: 'surveys',
+    }));
+    expect(result.uploadedQuestions[0].arweaveTxId).toBe('');
+    expect(result.uploadedQuestions[0].storageRef).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      id: CF_QUESTION_ID,
+      resource: 'questions',
+    }));
+  });
+
+  it('routes Cloudflare response payload writes through session storage before submitResponses', async () => {
+    const rpcProvider = makeRpcProvider();
+    window.ethereum = rpcProvider;
+    const mockSurveyContract = makeWriteContractMock({
+      address: GROUP_CFG.contracts.surveys.address,
+      methods: ['submitResponses'],
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockSurveyContract;
+    });
+    uploadDataToSessionStorage
+      .mockResolvedValueOnce({
+        storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' },
+      })
+      .mockResolvedValueOnce({
+        storageRef: { backend: 'cloudflare', id: CF_RESPONSE_ID, resource: 'responses' },
+      });
+
+    await submitResponses(
+      'wagmi',
+      [QUESTION_ID],
+      [{ answer: 'yes' }],
+      SURVEY_ID,
+      { complete: true },
+      CLOUDFLARE_GROUP_CFG,
+    );
+
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(2);
+    expect(uploadDataToSessionStorage.mock.calls.every((call) => call[2].resource === 'responses')).toBe(true);
+    expect(mockSurveyContract.interface.encodeFunctionData).toHaveBeenCalledWith('submitResponses', [
+      [expect.any(String)],
+      [`0x${'22'.repeat(32)}`],
+      expect.any(String),
+      `0x${'22'.repeat(32)}`,
+    ]);
+  });
+
+  it('resolves Cloudflare question pointers through session storage before Arweave fallback', async () => {
+    arweaveScripts.hexToBase64url.mockReturnValue(CF_QUESTION_ID);
+    readSessionStorageBlob.mockResolvedValue(new Response(JSON.stringify({
+      id: QUESTION_ID,
+      prompt: 'Loaded from Cloudflare storage',
+      questionType: 'freeform',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    const mockSurveyContract = {
+      getQuestionHash: jest.fn(async () => `0x${'22'.repeat(32)}`),
+    };
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockSurveyContract;
+    });
+
+    const result = await contractScripts.getQuestionData(
+      'none',
+      QUESTION_ID,
+      CLOUDFLARE_GROUP_CFG,
+      { skipDecrypt: true },
+    );
+
+    expect(readSessionStorageBlob).toHaveBeenCalledTimes(1);
+    expect(readSessionStorageBlob.mock.calls[0][0].storageRef).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      id: CF_QUESTION_ID,
+      resource: 'questions',
+    }));
+    expect(result.prompt).toBe('Loaded from Cloudflare storage');
+    expect(result.storageRef).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      id: CF_QUESTION_ID,
+      resource: 'questions',
+    }));
+    expect(result.arweaveTxId).toBeUndefined();
   });
 
   it('broadcasts SBT writes by tx hash instead of relying on ethers transaction response formatting', async () => {

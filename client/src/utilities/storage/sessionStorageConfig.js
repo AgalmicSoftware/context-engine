@@ -20,15 +20,18 @@ export const normalizeSessionStorageConfig = (sessionConfig = null) => {
     : (isObj(cfg.sessionStorageConfig) ? cfg.sessionStorageConfig : {});
   const backend = normalizeStorageBackend(raw.backend || cfg.storageBackend || cfg.docLibrary?.provider);
   const resources = isObj(raw.resources) ? raw.resources : {};
+  const defaultCanonicalStage = backend === STORAGE_BACKENDS.CLOUDFLARE
+    ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
+    : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
   return {
     backend,
     resources: {
       docsContext: toStr(resources.docsContext || '').trim().toLowerCase() || SESSION_STORAGE_RESOURCE_STAGES.ACTIVE,
-      questions: toStr(resources.questions || '').trim().toLowerCase() || SESSION_STORAGE_RESOURCE_STAGES.STAGED,
-      surveys: toStr(resources.surveys || '').trim().toLowerCase() || SESSION_STORAGE_RESOURCE_STAGES.STAGED,
-      responses: toStr(resources.responses || '').trim().toLowerCase() || SESSION_STORAGE_RESOURCE_STAGES.STAGED,
-      generatedArtifacts: toStr(resources.generatedArtifacts || '').trim().toLowerCase() || SESSION_STORAGE_RESOURCE_STAGES.STAGED,
-      media: toStr(resources.media || '').trim().toLowerCase() || SESSION_STORAGE_RESOURCE_STAGES.STAGED,
+      questions: toStr(resources.questions || '').trim().toLowerCase() || defaultCanonicalStage,
+      surveys: toStr(resources.surveys || '').trim().toLowerCase() || defaultCanonicalStage,
+      responses: toStr(resources.responses || '').trim().toLowerCase() || defaultCanonicalStage,
+      generatedArtifacts: toStr(resources.generatedArtifacts || '').trim().toLowerCase() || defaultCanonicalStage,
+      media: toStr(resources.media || '').trim().toLowerCase() || defaultCanonicalStage,
     },
   };
 };

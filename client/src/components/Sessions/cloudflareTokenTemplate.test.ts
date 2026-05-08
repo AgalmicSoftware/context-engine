@@ -1,5 +1,6 @@
 import {
   buildCloudflareTokenTemplateUrl,
+  CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
   CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
 } from './cloudflareTokenTemplate.js';
 
@@ -38,6 +39,13 @@ describe('cloudflareTokenTemplate', () => {
       'containers',
       'tail',
     ]));
+  });
+
+  test('documents least-privilege storage resource responsibilities', () => {
+    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.r2).toMatch(/questions, surveys, and responses/);
+    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.d1).toMatch(/metadata and index/);
+    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv).toMatch(/metadata indexes/);
+    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.durableObjects).toMatch(/not ordinary payload blob storage/);
   });
 
   test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {

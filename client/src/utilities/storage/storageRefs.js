@@ -19,7 +19,7 @@ export const STORAGE_RESOURCE_KEYS = Object.freeze({
 
 const ARWEAVE_TX_ID_RE = /^[a-z0-9_-]{43}$/i;
 const CLOUDFLARE_REF_ID_RE = /^[a-z0-9][a-z0-9._:-]{5,160}$/i;
-const CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|bucket|account|token|secret|private|\/|\\|https?:\/\/)/i;
+const CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|\/|\\|https?:\/\/)/i;
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
