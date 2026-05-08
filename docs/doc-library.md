@@ -56,8 +56,8 @@ Session metadata can select a backend-owned session storage profile. This is sto
 ```
 
 Defaults:
-- If missing, `storageProfile.backend` defaults to `arweave`; worker storage routes also accept legacy `docLibrary.provider = "cloudflare"` as a Cloudflare routing signal when no storage profile backend is present.
-- `lit-arweave` remains available and represents encrypted Arweave envelope payloads. Selecting it for session docs forces encrypted Doc Library uploads.
+- If missing, `storageProfile.backend` defaults to `arweave`.
+- `lit-arweave` remains available and represents encrypted Arweave payloads. Selecting it for session docs forces encrypted Doc Library uploads.
 - `cloudflare` routes plaintext session docs/context through the session worker `/storage/*` routes and keeps Cloudflare object identifiers private. Lit-encrypted Cloudflare document upload/read is intentionally blocked until the encrypted-envelope path is implemented.
 - `ipfs` and `local` `docLibrary.provider` values remain stubbed (UI disables list/upload with a “not implemented” notice).
 
@@ -117,7 +117,7 @@ Arweave and Lit-Arweave listing is client-side via Arweave GraphQL:
 
 The client paginates via cursors and inserts newly uploaded txIds optimistically (to hide indexing lag).
 
-Cloudflare listing is session-scoped and worker-mediated via `GET /storage/list?resource=docsContext`. Each request returns at most 100 raw index rows before per-item authorization filtering, plus an opaque `cursor` and `listComplete`. A filtered page can therefore contain no visible items and still require continuation; the document library keeps **Load more** available for that cursor and labels the page as having no accessible documents instead of silently draining later pages. Returned items carry safe `storageRef` objects and tag-like metadata; raw R2 keys and bucket/account identifiers are not returned to the browser.
+Cloudflare listing is session-scoped and worker-mediated via `GET /storage/list?resource=docsContext`. The returned items carry safe `storageRef` objects and tag-like metadata; raw R2 keys and bucket/account identifiers are not returned to the browser.
 
 ## Encryption UX Rules (No Gate Fallback)
 
