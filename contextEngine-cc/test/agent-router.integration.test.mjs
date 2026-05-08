@@ -267,6 +267,7 @@ function setupRouterHarness(t) {
     const href = pathToFileURL(resolve(CC_ROOT, 'lib', 'agent', `${moduleName}.mjs`)).href;
     writeModule(resolve(libDir, 'agent', `${moduleName}.mjs`), `export * from ${JSON.stringify(href)};\n`);
   });
+  writeFileSync(resolve(libDir, 'storageRefs.mjs'), readFileSync(resolve(CC_ROOT, 'lib', 'storageRefs.mjs'), 'utf8'));
   writeFileSync(resolve(libDir, 'router.mjs'), readFileSync(ROUTER_SOURCE_PATH, 'utf8'));
 
   const previousDataDir = process.env.CE_CC_DATA_DIR;
