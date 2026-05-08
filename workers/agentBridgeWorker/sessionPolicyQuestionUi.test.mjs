@@ -4,10 +4,23 @@ import { TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
 import {
   TELEGRAM_SCREEN_IDS,
   assertQuestionCardParity,
+  buildSessionStorageAccessContract,
+  buildTelegramCreateSbtGroupState,
+  buildTelegramGeneratedQuestionCandidatesState,
   buildTelegramGroupSessionCardState,
+  buildTelegramJoinPasswordSbtState,
+  buildTelegramJoinPublicSbtState,
+  buildTelegramMyAccountState,
+  buildTelegramPoseQuestionState,
+  buildTelegramPrivateQuestionReadState,
+  buildTelegramQuestionAccessState,
   buildTelegramQuestionCard,
   buildTelegramQuestionControls,
+  buildTelegramQuestionListState,
+  buildTelegramSbtGroupCardState,
   buildTelegramScreenState,
+  buildTelegramSubmitResponseState,
+  createTelegramPrivateQuestionDecryptRequest,
   listTelegramScreenLaunchContracts,
 } from './questionUi.mjs';
 import {
@@ -189,7 +202,7 @@ test('screen states expose launch commands and current UX copy', () => {
   const states = TELEGRAM_SCREEN_IDS.map((screen) => buildTelegramScreenState(screen, { status: 'ready' }));
   const launches = listTelegramScreenLaunchContracts();
 
-  assert.equal(states.length, 19);
+  assert.equal(states.length, 31);
   assert.equal(states.every((state) => state.type === 'telegram_screen_state'), true);
   assert.deepEqual(states.map((state) => state.screen), TELEGRAM_SCREEN_IDS);
   assert.deepEqual(launches.map((entry) => entry.screen), TELEGRAM_SCREEN_IDS);
@@ -213,6 +226,16 @@ test('screen states expose launch commands and current UX copy', () => {
 
   const accountCreated = states.find((state) => state.screen === 'account_created');
   assert.equal(JSON.stringify(accountCreated).includes('Open in CE'), false);
+
+  const poseQuestion = states.find((state) => state.screen === 'pose_question');
+  assert.equal(poseQuestion.title, 'Pose Question');
+  assert.equal(poseQuestion.launch.command, '/ce_pose_question');
+  assert.deepEqual(poseQuestion.launch.aliases, ['/q']);
+  assert.deepEqual(poseQuestion.launch.deprecatedAliases, ['/ce_drop_question']);
+  assert.equal(poseQuestion.launch.callback, 'callback:<pose_question_action>');
+
+  const submitResponse = states.find((state) => state.screen === 'submit_response');
+  assert.equal(submitResponse.title, 'Submit Response');
 
   const confirmation = states.find((state) => state.screen === 'confirmation_signing');
   assert.equal(confirmation.text, 'Submit this response?');
@@ -242,4 +265,249 @@ test('group session card uses safe public copy and required lobby buttons', () =
     TELEGRAM_BRIDGE_ACTIONS.ADD_QUESTION,
     TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION,
   ]);
+});
+
+test('question list pulls existing session questions and pose action is group-safe', () => {
+  const questions = [
+    {
+      questionId: 'q-public',
+      questionType: 'freeform',
+      prompt: 'What should the group discuss next?',
+      options: [],
+    },
+    {
+      questionId: 'q-private',
+      questionType: 'freeform',
+      prompt: 'Private prompt must stay out of group summaries',
+      visibility: 'sbt_gated',
+    },
+  ];
+  const list = buildTelegramQuestionListState({
+    sessionSlug: 'alpha',
+    questions,
+  });
+  const posed = buildTelegramPoseQuestionState({
+    sessionSlug: 'alpha',
+    question: questions[0],
+  });
+  const locked = buildTelegramPoseQuestionState({
+    sessionSlug: 'alpha',
+    question: questions[1],
+  });
+
+  assert.equal(list.source, 'canonical_agent_questions');
+  assert.equal(list.canonicalApiRequest.path, '/api/agent/questions');
+  assert.deepEqual(list.questions.map((question) => question.title), [
+    'What should the group discuss next?',
+    'Locked question',
+  ]);
+  assert.equal(posed.action.action, TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION);
+  assert.equal(posed.action.command, '/ce_pose_question');
+  assert.deepEqual(posed.action.aliases, ['/q']);
+  assert.equal(posed.groupSafeOutput.questionText, 'What should the group discuss next?');
+  assert.equal(locked.groupSafeOutput.questionText, null);
+  assert.equal(JSON.stringify(locked).includes('Private prompt must stay out of group summaries'), false);
+});
+
+test('SBT group screens support public/password joins and account summaries without private leaks', () => {
+  const sbt = {
+    sbtAddress: '0xabc123',
+    name: 'Alpha Contributors',
+    description: 'Public group card',
+    joinMode: 'public',
+    sessionSlug: 'alpha',
+    holderAddresses: ['0xshould-not-leak'],
+  };
+  const account = {
+    accountAddress: '0x1111111111111111111111111111111111111111',
+    privateKey: `0x${'22'.repeat(32)}`,
+  };
+  const publicJoin = buildTelegramJoinPublicSbtState({
+    sbt,
+    session: { sessionSlug: 'alpha', sbtJoinModes: ['public'] },
+    account,
+  });
+  const passwordRequired = buildTelegramJoinPasswordSbtState({
+    sbt,
+    session: { sessionSlug: 'alpha', sbtJoinModes: ['password'] },
+    account,
+  });
+  const passwordEntered = buildTelegramJoinPasswordSbtState({
+    sbt,
+    session: { sessionSlug: 'alpha', sbtJoinModes: ['password'] },
+    account,
+    credentialEntered: true,
+  });
+  const card = buildTelegramSbtGroupCardState({ sbt });
+  const accountState = buildTelegramMyAccountState({
+    account,
+    joinedSessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha' }],
+    joinedSbts: [sbt],
+  });
+
+  assert.deepEqual(card.buttons.map((button) => button.label), ['Join SBT', 'Details', 'My Account']);
+  assert.equal(card.privateHolderMetadataIncluded, false);
+  assert.equal(JSON.stringify(card).includes('holderAddresses'), false);
+  assert.equal(publicJoin.joinAvailable, true);
+  assert.equal(publicJoin.canonicalApiRequest.path, '/api/agent/sbt-groups/claim-request');
+  assert.equal(passwordRequired.credentialRequired, true);
+  assert.equal(passwordRequired.joinAvailable, false);
+  assert.equal(passwordRequired.canonicalApiRequest, null);
+  assert.equal(passwordEntered.joinAvailable, true);
+  assert.equal(passwordEntered.canonicalApiRequest.body.credentialRef, 'telegram_private_input_ref');
+  assert.equal(JSON.stringify(passwordEntered).includes('provided-by-private-input'), false);
+  assert.equal(accountState.managedAddress, account.accountAddress);
+  assert.deepEqual(accountState.joinedSbts.map((entry) => entry.name), ['Alpha Contributors']);
+  assert.equal(JSON.stringify(accountState).includes(account.privateKey), false);
+});
+
+test('create SBT group uses planned canonical agent contract and Mini App fields', () => {
+  const state = buildTelegramCreateSbtGroupState({
+    sessionSlug: 'alpha',
+    fields: {
+      name: 'Review Crew',
+      description: 'Session reviewers',
+      image: 'https://example.test/review.png',
+      visibility: 'public',
+      joinMode: 'password',
+      credentialConfigured: true,
+    },
+  });
+
+  assert.equal(state.preferredLane, 'telegram_mini_app');
+  assert.equal(state.fields.name, 'Review Crew');
+  assert.equal(state.fields.credentialConfigured, true);
+  assert.equal(state.canonicalApiRequest.path, '/api/agent/sbt-groups/create-request');
+  assert.equal(state.canonicalApiRequest.status, 'planned_contract_only');
+  assert.equal(state.contractOnlyPlaceholder, true);
+});
+
+test('private question states keep group locked and request decrypt only through canonical API', () => {
+  const privateQuestion = {
+    questionId: 'q-private',
+    questionType: 'freeform',
+    prompt: 'Encrypted prompt visible only to eligible accounts',
+    context: 'Encrypted context visible only privately',
+    visibility: 'lit_encrypted',
+  };
+  const lockedGroup = buildTelegramQuestionAccessState({
+    sessionSlug: 'alpha',
+    question: privateQuestion,
+    eligible: false,
+  });
+  const eligibleRequest = createTelegramPrivateQuestionDecryptRequest({
+    sessionSlug: 'alpha',
+    question: privateQuestion,
+    account: {
+      accountId: 'acct-1',
+      accountAddress: '0x1111111111111111111111111111111111111111',
+    },
+    eligible: true,
+  });
+  const ineligibleRequest = createTelegramPrivateQuestionDecryptRequest({
+    sessionSlug: 'alpha',
+    question: privateQuestion,
+    eligible: false,
+  });
+  const lockedPose = buildTelegramPoseQuestionState({
+    sessionSlug: 'alpha',
+    question: privateQuestion,
+  });
+  const privateRead = buildTelegramPrivateQuestionReadState({
+    sessionSlug: 'alpha',
+    question: privateQuestion,
+    decrypted: {
+      prompt: privateQuestion.prompt,
+      context: privateQuestion.context,
+    },
+    lane: 'telegram_group_lobby',
+    eligible: true,
+  });
+
+  assert.equal(lockedGroup.screen, 'locked_private_question');
+  assert.equal(lockedGroup.groupSafeOutput.questionText, null);
+  assert.equal(JSON.stringify(lockedGroup).includes(privateQuestion.prompt), false);
+  assert.equal(JSON.stringify(lockedPose.action).includes(privateQuestion.prompt), false);
+  assert.equal(lockedPose.action.callback.includes(privateQuestion.prompt), false);
+  assert.equal(Object.hasOwn(lockedPose.action, 'deepLink'), false);
+  assert.equal(eligibleRequest.ok, true);
+  assert.equal(eligibleRequest.canonicalApiRequest.path, '/api/agent/decrypt/request');
+  assert.equal(eligibleRequest.telegramDecryptImplemented, false);
+  assert.equal(ineligibleRequest.ok, false);
+  assert.equal(ineligibleRequest.status, 'locked_unavailable');
+  assert.equal(privateRead.targetLane, 'telegram_private_account');
+  assert.equal(privateRead.decryptedPrompt, privateQuestion.prompt);
+  assert.equal(JSON.stringify({
+    summary: lockedGroup.groupSafeOutput,
+    refs: { requestId: eligibleRequest.requestId },
+  }).includes(privateQuestion.prompt), false);
+  assert.equal(JSON.stringify(lockedGroup).includes(privateQuestion.context), false);
+  assert.equal(JSON.stringify(eligibleRequest).includes(privateQuestion.prompt), false);
+});
+
+test('Cloudflare storage access is session-config selected and does not require Lit unless payload encrypted', () => {
+  const cloudflareAccess = buildSessionStorageAccessContract({
+    sessionSlug: 'alpha',
+    storageProfile: 'cloudflare',
+    resource: 'docs',
+    gate: {
+      mode: 'Any',
+      sbtAddresses: ['0xabc123'],
+    },
+    payloadEncrypted: false,
+  });
+  const encryptedAccess = buildSessionStorageAccessContract({
+    sessionSlug: 'alpha',
+    storageProfile: 'cloudflare',
+    resource: 'docs',
+    gate: {
+      mode: 'Any',
+      sbtAddresses: ['0xabc123'],
+    },
+    payloadEncrypted: true,
+  });
+
+  assert.equal(cloudflareAccess.storageProfile, 'cloudflare');
+  assert.equal(cloudflareAccess.defaultProfile, 'arweave');
+  assert.equal(cloudflareAccess.telegramSelectedStorage, false);
+  assert.equal(cloudflareAccess.sbtGated, true);
+  assert.equal(cloudflareAccess.litRequired, false);
+  assert.equal(encryptedAccess.litRequired, true);
+  assert.equal(cloudflareAccess.exposesCloudflareCredential, false);
+  assert.equal(cloudflareAccess.exposesBucketName, false);
+  assert.equal(cloudflareAccess.exposesRawStoragePath, false);
+  assert.equal(cloudflareAccess.exposesLongLivedUrl, false);
+});
+
+test('generated candidates can be saved or posed and submit response waits for answers', () => {
+  const candidates = buildTelegramGeneratedQuestionCandidatesState({
+    sessionSlug: 'alpha',
+    selectedDocIds: ['doc-1'],
+    candidates: [{
+      candidateId: 'cand-1',
+      questionType: 'freeform',
+      prompt: 'What question should come from the selected docs?',
+    }],
+  });
+  const unavailableSubmit = buildTelegramSubmitResponseState({
+    sessionSlug: 'alpha',
+    questionId: 'q-1',
+  });
+  const readySubmit = buildTelegramSubmitResponseState({
+    sessionSlug: 'alpha',
+    questionId: 'q-1',
+    answer: {
+      answerLabel: 'Agree',
+      contentHash: `0x${'33'.repeat(32)}`,
+    },
+  });
+
+  assert.equal(candidates.screen, 'generated_question_candidates');
+  assert.equal(candidates.splitFromSubmitResponse, true);
+  assert.equal(candidates.candidates[0].poseAction.action, TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION);
+  assert.equal(candidates.candidates[0].poseAction.source, 'generated_candidate');
+  assert.equal(unavailableSubmit.submitAvailable, false);
+  assert.equal(unavailableSubmit.status, 'answer_required');
+  assert.equal(readySubmit.submitAvailable, true);
+  assert.equal(readySubmit.status, 'ready_to_submit');
 });

@@ -7,6 +7,7 @@ import {
   TELEGRAM_CHAT_LANES,
 } from './constants.mjs';
 import {
+  buildDocumentStorageAccessRequest,
   createDocSelectionAction,
   createQuestionGenerationRequestFromDocs,
   listDocumentsForSession,
@@ -21,6 +22,7 @@ const DOCS = [
     title: 'Public notes',
     fileType: 'md',
     visibility: DOC_VISIBILITY.PUBLIC,
+    storageProfile: 'cloudflare',
     contentPreview: 'Public summary only',
     privateContentRef: 'r2://private/public-notes.md',
   },
@@ -30,6 +32,7 @@ const DOCS = [
     title: 'Gated brief',
     fileType: 'pdf',
     visibility: DOC_VISIBILITY.SBT_GATED,
+    storageProfile: 'cloudflare',
     contentPreview: 'Private gated contents must not leak',
     privateContentRef: 'r2://private/gated.pdf',
   },
@@ -123,6 +126,44 @@ test('group-safe doc summaries represent visibility without leaking private or g
   assert.equal(gatedSummary.summary.visibility, DOC_VISIBILITY.SBT_GATED);
   assert.equal(gatedSummary.summary.contentPreview, null);
   assert.equal(gatedSummary.summary.gatedContentHidden, true);
+  assert.equal(gatedSummary.summary.storageProfile, 'cloudflare');
   assert.equal(JSON.stringify(gatedSummary).includes('Private gated contents'), false);
   assert.equal(JSON.stringify(gatedSummary).includes('r2://private'), false);
+});
+
+test('Cloudflare storage access requests use session worker gates without exposing storage internals', () => {
+  const access = buildDocumentStorageAccessRequest({
+    sessionSlug: 'alpha',
+    doc: {
+      ...DOCS[1],
+      r2: {
+        bucket: 'private-bucket-name',
+        objectKey: 'raw/private/path.pdf',
+      },
+    },
+    account: {
+      accountAddress: '0x1111111111111111111111111111111111111111',
+    },
+    operation: 'download',
+    payloadEncrypted: false,
+  });
+  const encrypted = buildDocumentStorageAccessRequest({
+    sessionSlug: 'alpha',
+    doc: DOCS[1],
+    operation: 'download',
+    payloadEncrypted: true,
+  });
+
+  assert.equal(access.ok, true);
+  assert.equal(access.request.storageProfile, 'cloudflare');
+  assert.equal(access.request.sbtGated, true);
+  assert.equal(access.request.litRequired, false);
+  assert.equal(access.request.gateAuthority, 'session_worker_sbt_gate');
+  assert.equal(access.request.canonicalApiRequest.path, '/api/agent/session-storage/access-request');
+  assert.equal(access.request.exposesBucketName, false);
+  assert.equal(access.request.exposesRawStoragePath, false);
+  assert.equal(access.request.exposesLongLivedUrl, false);
+  assert.equal(JSON.stringify(access).includes('private-bucket-name'), false);
+  assert.equal(JSON.stringify(access).includes('raw/private/path.pdf'), false);
+  assert.equal(encrypted.request.litRequired, true);
 });
