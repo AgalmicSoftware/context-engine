@@ -1,0 +1,163 @@
+import {
+  AGENT_BRIDGE_WORKER_VERSION,
+  DOC_VISIBILITY,
+  SUPPORTED_DOC_TYPES,
+  TELEGRAM_BRIDGE_ACTIONS,
+} from './constants.mjs';
+import { buildOpaqueActionId } from './opaqueActions.mjs';
+import { assertNoSecretShape, sanitizeForGroup } from './redaction.mjs';
+
+const VISIBILITY_SET = new Set(Object.values(DOC_VISIBILITY));
+const TYPE_SET = new Set(SUPPORTED_DOC_TYPES);
+
+function safeString(value) {
+  return String(value || '').trim();
+}
+
+function fileExtension(value = '') {
+  const clean = safeString(value).toLowerCase();
+  const last = clean.split('?')[0].split('#')[0].split('.').pop();
+  return last || '';
+}
+
+export function normalizeDocFileType(input = {}) {
+  const raw = safeString(input.fileType || input.type || input.mimeType || fileExtension(input.name || input.title || input.objectKey));
+  const normalized = raw.includes('/') ? raw.split('/').pop().replace('jpeg', 'jpg') : raw.replace(/^\./, '');
+  const extension = normalized === 'markdown' ? 'md' : normalized;
+  if (extension === 'jpg' && raw.includes('jpeg')) return 'jpeg';
+  return TYPE_SET.has(extension) ? extension : '';
+}
+
+export function normalizeDocumentRecord(input = {}) {
+  const fileType = normalizeDocFileType(input);
+  if (!fileType) {
+    return {
+      ok: false,
+      reason: 'unsupported_doc_type',
+      supportedTypes: SUPPORTED_DOC_TYPES,
+    };
+  }
+  const visibility = VISIBILITY_SET.has(input.visibility) ? input.visibility : DOC_VISIBILITY.SESSION;
+  const record = {
+    type: 'agent_bridge_document_record',
+    version: AGENT_BRIDGE_WORKER_VERSION,
+    docId: safeString(input.docId || input.id || buildOpaqueActionId(input.objectKey || input.title || fileType)),
+    sessionSlug: safeString(input.sessionSlug || input.session),
+    title: safeString(input.title || input.name) || 'Untitled document',
+    fileType,
+    visibility,
+    r2: {
+      bucket: safeString(input.r2?.bucket || input.bucket) || null,
+      objectKey: safeString(input.r2?.objectKey || input.objectKey) || null,
+      byteLength: Number.isFinite(Number(input.r2?.byteLength ?? input.byteLength))
+        ? Number(input.r2?.byteLength ?? input.byteLength)
+        : null,
+    },
+    d1: {
+      recordId: safeString(input.d1?.recordId || input.recordId) || null,
+      indexStatus: safeString(input.d1?.indexStatus || input.indexStatus || 'not_indexed'),
+    },
+    kv: {
+      shortLivedActionPrefix: 'doc_action:',
+      storesBytes: false,
+    },
+    contentPreview: visibility === DOC_VISIBILITY.PUBLIC ? safeString(input.contentPreview || input.summary) : null,
+    privateContentRef: safeString(input.privateContentRef || input.contentRef) || null,
+    createdAt: input.createdAt || null,
+  };
+  assertNoSecretShape(record, 'Document records must not serialize secrets.');
+  return { ok: true, record };
+}
+
+export function listDocumentsForSession(docs = [], {
+  sessionSlug = '',
+  includeGated = true,
+} = {}) {
+  const normalized = [];
+  for (const doc of Array.isArray(docs) ? docs : []) {
+    const result = normalizeDocumentRecord(doc);
+    if (!result.ok) continue;
+    if (sessionSlug && result.record.sessionSlug !== sessionSlug) continue;
+    if (!includeGated && result.record.visibility === DOC_VISIBILITY.SBT_GATED) continue;
+    normalized.push(result.record);
+  }
+  return {
+    type: 'agent_bridge_doc_list',
+    version: AGENT_BRIDGE_WORKER_VERSION,
+    sessionSlug,
+    docs: normalized,
+    count: normalized.length,
+  };
+}
+
+export function summarizeDocumentForGroup(doc = {}) {
+  const result = normalizeDocumentRecord(doc);
+  if (!result.ok) return result;
+  const { record } = result;
+  return {
+    ok: true,
+    summary: sanitizeForGroup({
+      type: 'telegram_group_doc_summary',
+      docId: record.docId,
+      sessionSlug: record.sessionSlug,
+      docTitle: record.title,
+      fileType: record.fileType,
+      visibility: record.visibility,
+      indexStatus: record.d1.indexStatus,
+      contentPreview: record.visibility === DOC_VISIBILITY.PUBLIC ? record.contentPreview : null,
+      gatedContentHidden: record.visibility !== DOC_VISIBILITY.PUBLIC,
+    }),
+  };
+}
+
+export function createDocSelectionAction({
+  sessionSlug = '',
+  docIds = [],
+  createdAt = null,
+} = {}) {
+  const selectedDocIds = [...new Set((Array.isArray(docIds) ? docIds : [])
+    .map(safeString)
+    .filter(Boolean))];
+  return {
+    type: 'agent_bridge_doc_selection',
+    version: AGENT_BRIDGE_WORKER_VERSION,
+    actionId: buildOpaqueActionId(`select_docs|${sessionSlug}|${selectedDocIds.join('|')}`),
+    action: TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS,
+    sessionSlug: safeString(sessionSlug),
+    selectedDocIds,
+    createdAt,
+  };
+}
+
+export function createQuestionGenerationRequestFromDocs({
+  sessionSlug = '',
+  docs = [],
+  selectedDocIds = [],
+  policy = {},
+  createdAt = null,
+} = {}) {
+  if (policy.allowQuestionGeneration !== true) {
+    return { ok: false, reason: 'question_generation_not_allowed' };
+  }
+  const selected = new Set(selectedDocIds);
+  const normalizedDocs = listDocumentsForSession(docs, { sessionSlug }).docs
+    .filter((doc) => selected.has(doc.docId));
+  if (!normalizedDocs.length) {
+    return { ok: false, reason: 'selected_docs_required' };
+  }
+  const request = {
+    type: 'agent_bridge_question_generation_request',
+    version: AGENT_BRIDGE_WORKER_VERSION,
+    requestId: buildOpaqueActionId(`generate_questions|${sessionSlug}|${normalizedDocs.map((doc) => doc.docId).join('|')}`),
+    action: TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION,
+    sessionSlug: safeString(sessionSlug),
+    selectedDocIds: normalizedDocs.map((doc) => doc.docId),
+    selectedDocTypes: [...new Set(normalizedDocs.map((doc) => doc.fileType))],
+    visibility: [...new Set(normalizedDocs.map((doc) => doc.visibility))],
+    status: 'mocked_contract_only',
+    aiRoute: policy.safeAiRoute || null,
+    createdAt,
+  };
+  assertNoSecretShape(request, 'Question-generation requests must not serialize secrets.');
+  return { ok: true, request };
+}

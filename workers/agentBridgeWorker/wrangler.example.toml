@@ -1,0 +1,40 @@
+# Copy this file to wrangler.toml for private demo deployment.
+
+name = "ce-agent-bridge-worker"
+main = "worker.js"
+compatibility_date = "2024-09-02"
+compatibility_flags = ["nodejs_compat"]
+
+# Replace with a private Cloudflare account ID before deploy.
+account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+
+durable_objects.bindings = [
+  { name = "MANAGED_DEMO_SIGNER", class_name = "ManagedDemoSignerDurableObject" },
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ManagedDemoSignerDurableObject"]
+
+kv_namespaces = [
+  { binding = "AGENT_ACTION_KV", id = "YOUR_SHORT_LIVED_ACTION_KV_NAMESPACE_ID" },
+]
+
+[[d1_databases]]
+binding = "AGENT_DOCS_D1"
+database_name = "ce-agent-docs-private"
+database_id = "YOUR_D1_DATABASE_ID"
+
+[[r2_buckets]]
+binding = "AGENT_DOCS_R2"
+bucket_name = "ce-agent-docs-private"
+
+[vars]
+AGENT_BRIDGE_DEPLOYMENT_ID = "local-demo"
+TELEGRAM_BRIDGE_ENABLED = "false"
+BROADCAST_ENABLED = "false"
+
+# Set secrets with Wrangler, never in this file:
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN
+#   npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
+#   npx wrangler secret put DEMO_SIGNER_ROOT_SECRET
