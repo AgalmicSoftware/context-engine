@@ -29,7 +29,7 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | `pose_question` | `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, or `callback:<pose_question_action>` |
 | `generated_question_candidates` | `/ce_generate_questions` |
 | `my_account`, `joined_sbts` | `/ce_account` |
-| SBT join/create states | `/ce_sbt`, `/ce_sbt_join`, `/ce_sbt_create` |
+| SBT join/create states | `/ce_sbt <sbt-address-or-group-id-or-link>`, `/ce_join_sbt <sbt-address-or-invite-code-or-link>`, `/ce_create_sbt_group [session-slug]` |
 | `onboarding` | `/ce_onboarding` |
 | question cards | `/ce_questions` |
 | `doc_library`, `doc_detail` | `/ce_docs` |
@@ -37,7 +37,7 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | `account_recovered` | `/ce_recover_key` |
 | confirmation, submitted, draft, retry states | opaque callback actions |
 
-The group session-linked card says `Context Engine session linked: <session>` and exposes `Join Session`, `View Questions`, and `View / Add Docs`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
+The group session-linked card says `Context Engine session linked: <session>` and exposes `Join Session`, `View Questions`, `View / Add Docs`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
 
 `View Questions` reads the linked session through `GET /api/agent/questions`.
 `Pose Question` uses `/ce_pose_question` or `/q` to pose one existing or
@@ -60,6 +60,19 @@ managed Telegram account to join. Password SBT joins collect the credential only
 in private chat or Mini App and pass an opaque private-input ref to the planned
 canonical request shape. Create SBT Group is Mini App first and targets the
 planned `POST /api/agent/sbt-groups/create-request` contract.
+
+SBT commands accept explicit public targets: `/ce_sbt <sbt-address-or-group-id-or-link>`,
+`/ce_join_sbt <sbt-address-or-invite-code-or-link>`, and
+`/ce_create_sbt_group [session-slug]`. Public SBT addresses, group ids, and share
+links can appear in group commands. Passwords, invite credentials, wallet proofs,
+and private eligibility checks stay in private chat or Mini App and are represented
+only by opaque private-input refs.
+
+When `Join Session` encounters required SBT gates, the session-gate screen lists
+the required SBT groups, prompts public/open joins through the managed Telegram
+account when eligible, routes password/invite collection to private chat or Mini
+App, routes wallet/passkey/non-public gates to full CE account linking, and exposes
+`Retry Join Session` after the required gate is satisfied.
 
 `My Account` shows the managed address, joined sessions, joined SBT summaries,
 and private-only export/restore controls.

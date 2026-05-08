@@ -295,15 +295,17 @@ paths, or long-lived signed URLs.
 Telegram screen/message helpers expose launch metadata on every
 `telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`,
 `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`,
-`/ce_generate_questions`, `/ce_account`, `/ce_sbt`, `/ce_sbt_join`,
-`/ce_sbt_create`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`,
+`/ce_generate_questions`, `/ce_account`,
+`/ce_sbt <sbt-address-or-group-id-or-link>`,
+`/ce_join_sbt <sbt-address-or-invite-code-or-link>`,
+`/ce_create_sbt_group [session-slug]`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`,
 opaque callback actions, `callback:<pose_question_action>`, or the
 `t.me/<bot>?start=<opaque-action-id>` template. The group session-linked card
 uses the safe public copy `Context Engine session linked: <session>` and the
-buttons `Join Session`, `View Questions`, and `View / Add Docs`. It does not
-include a default `Answer Privately` action. `View Questions` is the group-lobby
-default, while `Join Session` opens private chat and routes participants without
-a configured account to private account setup.
+buttons `Join Session`, `View Questions`, `View / Add Docs`, and policy-allowed
+`Pose Question`. It does not include a default `Answer Privately` action. `View
+Questions` is the group-lobby default, while `Join Session` opens private chat
+and routes participants without a configured account to private account setup.
 
 `View Questions` pulls existing session questions through
 `GET /api/agent/questions`. `Pose Question` lets an allowed user choose one
@@ -325,8 +327,18 @@ Telegram SBT screens are transport contracts over canonical CE SBT actions:
   visibility, join mode, optional credential-present flag, and session
   association. Until a real agent SBT create API is exposed, it remains a
   planned `POST /api/agent/sbt-groups/create-request` contract.
+- `Join Session` with required SBT gates: the bridge lists required SBT group
+  summaries, prompts public/open joins through the managed Telegram account when
+  eligible, routes password/invite collection to private chat or Mini App,
+  routes wallet/passkey/non-public gates to full CE account linking, and exposes
+  `Retry Join Session` after the gate is satisfied.
 - `My Account` and `Joined SBTs`: show managed address, joined sessions, joined
   SBT summaries, and private export/restore controls.
+
+Public SBT addresses, group ids, and share links may appear in group commands.
+Passwords, invite credentials, wallet proofs, and private eligibility checks are
+private chat or Mini App only; group command parsing turns credential-shaped input
+into a private collection prompt and never serializes the raw value.
 
 Telegram question-card helpers guard CE client parity for the demo lane:
 binary/agree-style questions use `Agree`, `Unsure`, and `Disagree`; rating
