@@ -55,7 +55,7 @@ test('buildCloudflareTokenTemplateUrl adds Account Settings only for workers.dev
   }), CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS);
 });
 
-test('buildCloudflareTokenTemplateUrl can omit R2/D1 for default demo smoke deploy', () => {
+test('buildCloudflareTokenTemplateUrl can omit R2/D1 for default Telegram smoke deploy', () => {
   const url = new URL(buildCloudflareTokenTemplateUrl({
     slug: 'alpha-session',
     includeDocStorage: false,

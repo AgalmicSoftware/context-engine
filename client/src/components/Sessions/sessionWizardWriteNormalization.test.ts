@@ -17,6 +17,7 @@ import {
   buildSessionWizardWorkerConfigPayload,
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
+import { resolveSessionWizardEnabledWorkerSecrets } from './sessionWizardWorkerSecretSupport';
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
@@ -96,7 +97,7 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields does not mirror uploaded custom RPC secrets into public fields', () => {
+  test('buildSessionWizardRegistrySessionFields keeps worker-private RPC out of public registry fields', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {
         rpcUrl: 'https://draft-rpc.example',
@@ -110,7 +111,7 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields ignores worker-secret RPC values', () => {
+  test('buildSessionWizardRegistrySessionFields omits RPC when no public registry field exists', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {},
     })).toEqual({});
@@ -123,6 +124,25 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
+  test('buildSessionWizardRegistrySessionFields ignores uploaded custom RPC secrets', () => {
+    const enabledSecrets = resolveSessionWizardEnabledWorkerSecrets({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        customRpcUrl: ' https://uploaded-rpc.example ',
+      },
+    });
+
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {},
+      sponsoredFields: {
+        sponsored_rpc: '0',
+      },
+    })).toEqual({
+      sponsored_rpc: '0',
+    });
+    expect(enabledSecrets.customRpcUrl).toBe('https://uploaded-rpc.example');
+  });
+
   test('buildSessionWizardRegistrySessionFields preserves empty worker URL clears for registry writes', async () => {
     const walletProvider = {
       request: jest.fn(async ({ method }) => (method === 'eth_sendTransaction' ? '0xtxhash' : null)),
@@ -130,6 +150,7 @@ describe('sessionWizardWriteNormalization', () => {
     const signer = {
       provider: null,
       getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
+      getChainId: jest.fn().mockResolvedValue(DEFAULT_CONFIG_CHAIN_ID),
     };
     const contractMock = {
       address: getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID),
@@ -269,7 +290,7 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(metadata.storageProfile.backend).toBe('cloudflare');
     expect(metadata.storageProfile.sessionOwned).toBe(true);
-    expect(metadata.storageProfile.demoOwned).toBe(false);
+    expect(metadata.storageProfile.telegramOwned).toBe(false);
     expect(metadata.storageProfile.resources.docsContext).toBe('active');
     expect(metadata.storageProfile.resources.questions).toBe('active');
     expect(metadata.storageProfile.resources.surveys).toBe('active');
@@ -293,7 +314,7 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(workerPayload.storageProfile.backend).toBe('cloudflare');
     expect(workerPayload.storageProfile.sessionOwned).toBe(true);
-    expect(workerPayload.storageProfile.demoOwned).toBe(false);
+    expect(workerPayload.storageProfile.telegramOwned).toBe(false);
     expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
     expect(workerPayload.litCredentials).toEqual({});
   });

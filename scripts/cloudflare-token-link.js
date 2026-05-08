@@ -129,12 +129,12 @@ const printUsage = () => {
     '  --account-id <id|*>      Optional Cloudflare account ID (defaults to *)',
     '  --include-workers-dev-subdomain-setup',
     '                           Add Account Settings: Edit when the helper must create/change the account-level workers.dev subdomain',
-    '  --no-doc-storage         Omit R2/D1 scopes for the default demo smoke deploy',
+    '  --no-doc-storage         Omit R2/D1 scopes for the default Telegram smoke deploy',
     '  --help                   Show this help text',
     '',
     'Output:',
     '  Prints the same prefilled Cloudflare API token template URL used by the wizard UX.',
-    '  Scope covers Workers, KV, R2, D1, and Durable Objects by default; --no-doc-storage narrows this to the default demo smoke deploy.',
+    '  Scope covers Workers, KV, R2, D1, and Durable Objects by default; --no-doc-storage narrows this to the default Telegram smoke deploy.',
     '  Account Settings: Edit is added only with --include-workers-dev-subdomain-setup.',
   ].join('\n'));
 };
