@@ -17,8 +17,23 @@ describe('sessionWizardStorageProfile', () => {
       questions: 'staged',
       surveys: 'staged',
       responses: 'staged',
+      generatedArtifacts: 'staged',
+      media: 'staged',
       images: 'staged',
     });
+    expect(profile.sbtGatedAccess.litRequired).toBe('payload_encrypted_only');
+    expect(profile.cloudflare).toBeNull();
+  });
+
+
+
+  test('keeps lit-arweave available as a per-session storage backend', () => {
+    const profile = normalizeSessionStorageProfileConfig({ backend: 'lit-arweave' });
+
+    expect(profile.backend).toBe(SESSION_STORAGE_BACKENDS.LIT_ARWEAVE);
+    expect(profile.resources.docsContext).toBe('active');
+    expect(profile.resources.media).toBe('staged');
+    expect(profile.resources.generatedArtifacts).toBe('staged');
     expect(profile.sbtGatedAccess.litRequired).toBe('payload_encrypted_only');
     expect(profile.cloudflare).toBeNull();
   });

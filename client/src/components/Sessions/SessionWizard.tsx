@@ -2709,6 +2709,7 @@ const SessionWizard = ({
               >
                 {[
                   { backend: SESSION_STORAGE_BACKENDS.ARWEAVE, label: 'Arweave' },
+                  { backend: SESSION_STORAGE_BACKENDS.LIT_ARWEAVE, label: 'Lit-Arweave' },
                   { backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE, label: 'Cloudflare' },
                 ].map((option) => {
                   const selected = storageProfile.backend === option.backend;
@@ -2726,9 +2727,14 @@ const SessionWizard = ({
                   );
                 })}
               </div>
+              {storageProfile.backend === SESSION_STORAGE_BACKENDS.LIT_ARWEAVE ? (
+                <div className={styles.helperText}>
+                  Lit-Arweave stores encrypted Arweave payloads for session documents and context.
+                </div>
+              ) : null}
               {storageProfile.backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE ? (
                 <div className={styles.helperText}>
-                  Cloudflare profile uses R2, D1, KV, and Durable Objects through the session worker.
+                  Cloudflare storage config uses R2, D1, KV, and Durable Objects through the session worker.
                 </div>
               ) : null}
             </>
