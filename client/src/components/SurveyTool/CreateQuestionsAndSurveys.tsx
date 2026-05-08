@@ -47,12 +47,7 @@ import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
-import {
-  attachStorageRefCompatibilityFields,
-  getLegacyArweaveTxId,
-  resolvePayloadStorageRef,
-} from '../../utilities/storage/storageRefs.js';
-import { usesCloudflareSessionStorage } from '../../utilities/storage/sessionStorageConfig.js';
+import { storageRefFromLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
 import { mergeSessionContractMaps, resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
   claimsWorkerCanonicalAuthority,
@@ -1671,12 +1666,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           const qid = uploadedQid || fallbackQid;
           if (!qid) return null;
           const uploaded = uploadedById.get(qid) || uploadedByIndex || null;
-          const compatible = attachStorageRefCompatibilityFields({
+          const arweaveTxId = String(uploaded?.arweaveTxId || row?.arweaveTxId || '').trim();
+          const storageRef = uploaded?.storageRef || row?.storageRef || storageRefFromLegacyArweaveTxId(arweaveTxId);
+          return {
             ...row,
             ...(uploaded || {}),
             id: qid,
-          });
-          return compatible as CreateQuestionsSeededQuestionRow;
+            ...(arweaveTxId ? { arweaveTxId } : {}),
+            ...(storageRef ? { storageRef } : {}),
+          };
         })
         .filter((row): row is CreateQuestionsSeededQuestionRow => !!row);
       if (!normalizedRows.length) return false;
