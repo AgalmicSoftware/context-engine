@@ -1,7 +1,10 @@
 /** @file config.ts */
 import { toStr } from '../shared/primitives.js';
+import { STORAGE_BACKENDS, normalizeStorageBackend } from '../storage/storageRefs.js';
 
 type SessionConfigLike = {
+  storageProfile?: { backend?: unknown } | null;
+  storageBackend?: unknown;
   docLibrary?: {
     provider?: unknown;
     arweave?: {
@@ -32,8 +35,11 @@ const normalizeGraphqlUrl = (raw: unknown = ''): string => {
 
 export const resolveDocLibraryProvider = (sessionConfig: SessionConfigLike): string => {
   const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
+  const storageBackend = normalizeStorageBackend(cfg?.storageProfile?.backend || cfg?.storageBackend || '');
+  if (storageBackend === STORAGE_BACKENDS.CLOUDFLARE) return STORAGE_BACKENDS.CLOUDFLARE;
+  if (storageBackend === STORAGE_BACKENDS.LIT_ARWEAVE) return STORAGE_BACKENDS.LIT_ARWEAVE;
   const provider = toStr(cfg?.docLibrary?.provider || '').trim().toLowerCase();
-  return provider || 'arweave';
+  return provider || STORAGE_BACKENDS.ARWEAVE;
 };
 
 export const resolveArweaveGraphqlUrls = (sessionConfig: SessionConfigLike): string[] => {

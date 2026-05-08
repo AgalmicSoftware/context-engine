@@ -4,7 +4,6 @@ import { Buffer } from 'buffer';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { uploadDataToSessionStorage } from '../storage/storageClient.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../storage/storageRefs.js';
-import { cryptoUtils } from '../crypto/cryptography.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { toStr } from '../shared/primitives.js';
 import { buildPublicUrlPath } from '../ui/publicUrl.js';
@@ -317,13 +316,16 @@ export const uploadDocLibraryFile = async ({
     contentType,
     resource: 'docsContext',
   });
-  const txId = resolveDocUploadResultId(result);
-  const storage = resolveDocUploadResultStorage(result);
+  const txId = toStr(result?.arweaveTxId || result?.txId || result?.id).trim();
+  const storage = toStr(result?.storageRef?.backend || result?.storage || STORAGE_BACKENDS.ARWEAVE).trim() || STORAGE_BACKENDS.ARWEAVE;
 
   return {
     txId,
-    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
-    storage: 'arweave',
+    url: storage === STORAGE_BACKENDS.CLOUDFLARE
+      ? toStr(result?.storageRef?.uri).trim()
+      : (txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : ''),
+    storage,
+    storageRef: result?.storageRef || null,
     kind: 'file',
     tagMap: buildTagMap(normalizedTags),
     data: { size: file.size || null, type: file.type || null },
@@ -391,13 +393,16 @@ export const uploadDocLibraryUrlRecord = async ({
     contentType: 'application/json',
     resource: 'docsContext',
   });
-  const txId = resolveDocUploadResultId(result);
-  const storage = resolveDocUploadResultStorage(result);
+  const txId = toStr(result?.arweaveTxId || result?.txId || result?.id).trim();
+  const storage = toStr(result?.storageRef?.backend || result?.storage || STORAGE_BACKENDS.ARWEAVE).trim() || STORAGE_BACKENDS.ARWEAVE;
 
   return {
     txId,
-    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
-    storage: 'arweave',
+    url: storage === STORAGE_BACKENDS.CLOUDFLARE
+      ? toStr(result?.storageRef?.uri).trim()
+      : (txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : ''),
+    storage,
+    storageRef: result?.storageRef || null,
     kind: 'link',
     tagMap: buildTagMap(normalizedTags),
     data: { size: null, type: 'application/json' },
