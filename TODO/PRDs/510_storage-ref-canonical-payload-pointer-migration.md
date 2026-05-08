@@ -5,6 +5,11 @@
 Planned. This PRD records the follow-up naming migration after the dual-field
 storage routing lane stabilizes.
 
+Current slice note, 2026-05-08: Cloudflare-backed session payload storage now
+uses `storageRef` compatibility for docs/context, questions, surveys,
+responses, generated artifacts, media, and images while preserving legacy
+Arweave pointer fields where the existing contract ABI requires them.
+
 ## Problem
 
 Context Engine payload records still expose Arweave-specific top-level pointer

@@ -298,19 +298,27 @@ scope for this lane. Future naming migration is tracked in
 [`TODO/PRDs/510_storage-ref-canonical-payload-pointer-migration.md`](../TODO/PRDs/510_storage-ref-canonical-payload-pointer-migration.md):
 `storageRef` becomes the canonical top-level pointer and `arweaveTxId` becomes a
 deprecated Arweave compatibility alias after readers are storageRef-aware.
-For Cloudflare docs/context, the session/general worker enforces SBT gates
-directly before upload, list, read, snippet, or download bytes are exposed. Lit
-remains required only when the payload itself is intentionally Lit-encrypted or
-client-side encrypted. Telegram, OpenClaw, CE-CC, and MCP call canonical CE
-agent/session APIs and receive only safe metadata, snippets, permission states,
-or opaque request refs. They must not receive Cloudflare credentials, bucket
-names, worker tokens, raw private storage paths, or long-lived signed URLs.
+For Cloudflare docs/context and other canonical payload resources, `/new`
+stores `storageProfile.payloadAccessControl.mode`. `worker_sbt_gate` is the
+default for Telegram/demo Cloudflare sessions: the session/general worker
+checks the requester's configured resource SBT gate on the gate chain/RPC before
+upload, list, read, snippet, or download bytes are exposed. This is
+worker-enforced access control, not end-to-end encryption. `lit_encrypted` is
+the stronger scaffolded mode where Cloudflare stores encrypted payload envelopes
+and Lit governs decrypt; plaintext Cloudflare uploads are rejected until the Lit
+envelope path supplies encrypted payloads. Telegram, OpenClaw, CE-CC, and MCP
+call canonical CE agent/session APIs and receive only safe metadata, snippets,
+permission states, or opaque request refs. They must not receive Cloudflare
+credentials, bucket names, worker tokens, raw private storage paths, or
+long-lived signed URLs.
 `/new` Advanced stores the session-owned storage profile: docs/context is
-active first, while questions, surveys, responses, generated artifacts, and
-media remain staged behind Arweave-compatible contract paths until the contract
-interface changes. The Cloudflare token helper requests only the deploy/storage
-resources needed for Workers, KV, R2, D1, Durable Objects, and account settings;
-it does not embed account ids, bucket names, or tokens.
+active by default, and Cloudflare profiles make questions, surveys, responses,
+generated artifacts, media, and images active canonical session-worker payload
+resources. Existing Surveys contract `bytes32` pointer fields carry opaque
+Cloudflare storage IDs for compatibility without a contract interface change.
+The Cloudflare token helper requests only the deploy/storage resources needed
+for Workers, KV, R2, D1, Durable Objects, and account settings; it does not
+embed account ids, bucket names, or tokens.
 
 Telegram screen/message helpers expose launch metadata on every
 `telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`,
