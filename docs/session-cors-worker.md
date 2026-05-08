@@ -447,11 +447,11 @@ Admin test panel:
 
 Authenticated clients can use the worker as the session storage boundary:
 
-- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings, returning only an opaque Cloudflare `storageRef`.
+- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings, returning an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
 - `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the existing authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare` and never exposes raw object keys.
 - `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects and tag metadata.
 
-Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"`. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
 SBT gating is enforced by the same authenticated worker preflight used for protected Arweave routes. Lit is required only when the payload is intentionally Lit/client encrypted; plaintext Cloudflare docs/context rely on worker-enforced access.
 
@@ -460,44 +460,12 @@ SBT gating is enforced by the same authenticated worker preflight used for prote
 KV:
 
 - `GROUP_KV`
-- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) for all Cloudflare payload storage: it holds authoritative R2 per-item authorization metadata and the KV-only payload fallback. R2 uploads require both `get` and `put`, and R2 reads never fall back to custom object metadata. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
-- `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows.
-- `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses the storage index KV aliases. Membership rows remain separate from group records. D1-only configuration is not a group store and fails as unconfigured.
+- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows.
 
-R2 / Durable Objects:
-
-- `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs. One-click deploys bind this only when the request supplies an existing R2 bucket name.
-- `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
-  class for direct/sponsored deploy idempotency, one-shot sponsored faucet
-  receipts, atomic wrapped session-key selection, and versioned public session
-  config mutation. It is also the required cross-isolate authority for Worker
-  Group mutation ordering and capacity, auth nonce issue/consume, and nonce,
-  authenticated, anonymous, and faucet route counters. One-click deploy metadata installs migration tag
-  `ce-session-write-coordinator-v1`; a repeated upload retries without
-  reapplying an already-installed migration. Coordinator state contains only
-  credential-redacted deploy/faucet records, normalized public session config,
-  revisions, wrapped session-key records, short-lived random nonces, and numeric
-  counter windows, plus Worker Group ids, occupancy counts, and hashed member
-  reservation tokens. Auth object names are derived from SHA-256 identity digests;
-  their stored records omit slugs, wallet/anonymous identifiers, and route
-  names. It never stores deployment
-  credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
-  worker bundle bytes, or ordinary session payload blobs. The binding serializes
-  first-use key selection with signed Admin config mutations. Once its authority
-  record exists, that record is canonical and KV is its readable projection;
-  manual KV edits are not imported and may be overwritten by the next
-  coordinated write. Use signed Admin routes for runtime config changes. The
-  deploy helper may seed a new isolated KV namespace before the Worker can run
-  and before coordinator authority exists, but it does not whole-replace a
-  compatible live config during resume. Payload-plus-index uploads intentionally
-  retain at-least-once retry semantics: success means both writes completed, while
-  a failed or response-lost attempt may leave an invisible orphan or a readable
-  duplicate. There is no upload receipt journal or key-rotation state machine.
-- `CE_WORKER_GROUP_COORDINATOR` optionally binds an independently migrated
-  `WorkerGroupWriteCoordinator` namespace. When present, Worker Group routes
-  use it while authorization, deployment, and session-key coordination remain
-  on `CE_SESSION_COORDINATOR`. Deployments without it retain the
-  single-coordinator behavior.
+R2/D1:
+- `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for Cloudflare payload blobs.
+- D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
+- Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
 
 Vars:
 
@@ -623,12 +591,7 @@ Runtime:
   resources (`docsContext`, `questions`, `surveys`, `responses`, media, and
   generated artifacts) to `"active"` unless an advanced draft explicitly stages
   a resource for legacy fallback.
-  - `workerAuthority.version: 1` is required for worker-canonical login and
-    anonymous scope evaluation. Session existence is the presence of this
-    persisted canonical config; it does not require a registry record.
-  - `registryAddress`, chain/RPC, `blockLimits`, contract, Hats, and faucet
-    fields remain supported for legacy/decentralized or explicitly chain-backed
-    profiles, but the default worker-canonical config omits them.
+  - `hatsAddress` / `adminHatId` are optional; leave blank/zero to use `adminAddress` only.
   - Worker KV config is normalized on read/write:
     - `authzEpoch` is server-managed. New deployments start at `1`; effective
       signed `set-config` writes increment it, while rejected and idempotent

@@ -177,9 +177,19 @@ Operational notes:
 
 ### Advanced only: OP Sepolia ETH
 
-The default worker-canonical publish uses no transaction and needs no gas. You
-need OP Sepolia ETH only when the selected profile registers the session
-on-chain or deploys an SBT during publish.
+The session worker handles auth, AI proxying, Arweave uploads, fetch helpers, and the optional faucet. A free Cloudflare account is enough for small sessions.
+
+You need:
+
+- A Cloudflare account: <https://dash.cloudflare.com/>
+- An API token with Workers-related permissions. The wizard expects the same scope used by the deploy-helper flow described in [session-cors-worker.md](session-cors-worker.md).
+- Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/reference/template/>
+
+In practice, the deploy flow needs least-privilege permission to manage Workers scripts, Workers KV, R2 buckets/objects for CE payload blobs, D1 or KV metadata/index resources where configured, Durable Objects only for signer/runtime coordination, and the account-level settings needed to enable a `workers.dev` subdomain. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
+
+### 3. OP Sepolia ETH
+
+You need OP Sepolia ETH in the connected browser wallet to register the session on-chain and to pay gas for any optional SBT deployment done during publish.
 
 Useful links:
 
