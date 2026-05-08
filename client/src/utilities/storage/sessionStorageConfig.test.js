@@ -1,12 +1,9 @@
 import {
-  SESSION_STORAGE_PAYLOAD_ACCESS_GATES,
-  SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES,
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
   normalizeSessionStorageConfig,
   requiresLitForSessionStorage,
   resolveSessionStorageBackend,
   usesCloudflareSessionStorage,
-  usesPublicReadCloudflareStorage,
   usesWorkerSbtGateCloudflareStorage,
 } from './sessionStorageConfig.js';
 import { STORAGE_BACKENDS } from './storageRefs.js';
@@ -33,15 +30,21 @@ describe('sessionStorageConfig', () => {
     expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(usesCloudflareSessionStorage(sessionConfig)).toBe(true);
     expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(true);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(
-      SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
-    );
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl).toEqual({
-      gate: SESSION_STORAGE_PAYLOAD_ACCESS_GATES.SBT_GATE,
-      encryption: SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE,
-      mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
-    });
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
     expect(requiresLitForSessionStorage(sessionConfig, { encrypted: true })).toBe(false);
+  });
+
+  test('marks Cloudflare lit_encrypted mode as Lit-required while retaining Cloudflare routing', () => {
+    const sessionConfig = {
+      storageProfile: {
+        backend: 'cloudflare',
+        payloadAccessControl: { mode: 'lit_encrypted' },
+      },
+    };
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
+    expect(requiresLitForSessionStorage(sessionConfig, { resource: 'responses' })).toBe(true);
+    expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
+    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED);
   });
 
   test('keeps explicitly staged Cloudflare resources on legacy Arweave fallback', () => {
