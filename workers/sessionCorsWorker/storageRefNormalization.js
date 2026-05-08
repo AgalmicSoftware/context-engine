@@ -5,7 +5,7 @@ const STORAGE_BACKENDS = Object.freeze({
 });
 
 const CLOUDFLARE_REF_ID_RE = /^[a-z0-9][a-z0-9._:-]{5,160}$/i;
-const CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|\/|\\|https?:\/\/)/i;
+const CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|bucket|account|token|secret|private|\/|\\|https?:\/\/)/i;
 
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -44,12 +44,9 @@ export const assertNoCloudflarePrivateMaterial = (value) => {
 const normalizeCloudflareStorageUri = (id) => `/storage/read?id=${encodeURIComponent(id)}`;
 
 export const normalizeStorageRef = (input = {}, opts = {}) => {
-  const raw = isObj(input)
-    ? input
-    : (trim(input) ? { id: trim(input) } : {});
+  const raw = isObj(input) ? input : {};
   const backend = normalizeStorageBackend(raw.backend || raw.storage, opts.fallbackBackend);
-  const legacyTxId = trim(raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId);
-  const id = trim(raw.id || raw.key || legacyTxId);
+  const id = trim(raw.id || raw.txId || raw.arweaveTxId);
   if (!id) return null;
   if (backend === STORAGE_BACKENDS.CLOUDFLARE && !isSafeCloudflareStorageRefId(id)) return null;
   const ref = { backend, id };
@@ -69,61 +66,4 @@ export const normalizeStorageRef = (input = {}, opts = {}) => {
   if (createdAt) ref.createdAt = createdAt;
   if (backend === STORAGE_BACKENDS.CLOUDFLARE) assertNoCloudflarePrivateMaterial(ref);
   return ref;
-};
-
-export const deriveStorageRefFromLegacyArweaveTxId = (arweaveTxId, opts = {}) => {
-  const txId = trim(arweaveTxId);
-  if (!txId) return null;
-  return normalizeStorageRef({
-    backend: opts.backend || (opts.encrypted ? STORAGE_BACKENDS.LIT_ARWEAVE : STORAGE_BACKENDS.ARWEAVE),
-    id: txId,
-    contentType: opts.contentType,
-    gate: opts.gate,
-    resource: opts.resource,
-  }, opts);
-};
-
-export const resolvePayloadStorageRef = (record, opts = {}) => {
-  const raw = isObj(record) ? record : {};
-  // Regression guard: storageRef is the canonical read path; legacy Arweave ids
-  // are fallback-only and must not override Cloudflare refs.
-  const ref = raw.storageRef
-    ? normalizeStorageRef(raw.storageRef, {
-      ...opts,
-      legacyArweaveTxId: raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId,
-    })
-    : null;
-  if (ref) return ref;
-  return deriveStorageRefFromLegacyArweaveTxId(raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId, {
-    ...opts,
-    contentType: raw.contentType || raw.mime || opts.contentType,
-    encrypted: opts.encrypted ?? raw.encrypted ?? raw.payloadEncrypted,
-    backend: raw.backend || raw.storage || raw.profile || opts.backend,
-    gate: raw.gate || raw.gateResource || raw.resourceGate || opts.gate,
-    resource: raw.resource || opts.resource,
-  });
-};
-
-export const getLegacyArweaveTxId = (record, opts = {}) => {
-  if (!isObj(record)) return trim(record);
-  const storageRef = record.storageRef
-    ? normalizeStorageRef(record.storageRef, {
-      ...opts,
-      legacyArweaveTxId: record.arweaveTxId || record.txId || opts.legacyArweaveTxId,
-    })
-    : null;
-  if (storageRef) return isArweaveStorageBackend(storageRef.backend) ? storageRef.id : '';
-  return trim(record.arweaveTxId || record.txId || opts.legacyArweaveTxId);
-};
-
-export const attachStorageRefCompatibilityFields = (record, opts = {}) => {
-  const source = isObj(record) ? { ...record } : {};
-  const storageRef = resolvePayloadStorageRef(source, opts);
-  if (!storageRef) return source;
-  source.storageRef = storageRef;
-  const arweaveTxId = getLegacyArweaveTxId(source, opts);
-  if (arweaveTxId && isArweaveStorageBackend(storageRef.backend)) {
-    source.arweaveTxId = arweaveTxId;
-  }
-  return source;
 };
