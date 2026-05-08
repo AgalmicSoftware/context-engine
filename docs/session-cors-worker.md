@@ -4,6 +4,8 @@ This Worker handles AI proxying, transcription, Arweave uploads, fetch helpers, 
 Secrets live in Worker KV by default; when a user enables a local override, the client may send per-request credentials
 (`apiKey`, `rpcUrl`, `arweaveJwk`) and the worker will use them instead of KV secrets.
 
+It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, and `GET|POST /storage/list`. `/arweave/upload` remains supported for compatibility.
+
 ## OSS worker model
 
 - The project hosts one worker for the demo session; it can sponsor new sessions and includes the embedded deploy-helper path.
@@ -211,6 +213,18 @@ Admin test panel:
 - The faucet test sends a micro transfer (0.0000001) to a fresh random address; it does not fund the connected wallet.
 - The SBT gate negative tests expect a 403 on login when you connect a wallet without the sponsored SBT.
 
+## Session Storage Routes
+
+Authenticated clients can use the worker as the session storage boundary:
+
+- `POST /storage/upload`: accepts JSON or multipart payloads. `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings, returning only an opaque Cloudflare `storageRef`.
+- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the existing authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare` and never exposes raw object keys.
+- `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects and tag metadata.
+
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"`. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+
+SBT gating is enforced by the same authenticated worker preflight used for protected Arweave routes. Lit is required only when the payload is intentionally Lit/client encrypted; plaintext Cloudflare docs/context rely on worker-enforced access.
+
 ## Required bindings
 
 KV:
@@ -233,6 +247,10 @@ Runtime:
 - `session:{slug}:config` JSON:
   ```json
   {
+    "storageProfile": {
+      "backend": "arweave",
+      "resources": { "docsContext": "active", "questions": "staged", "surveys": "staged", "responses": "staged" }
+    },
     "slug": "test-72",
     "networkChainId": 11155420,
     "registryAddress": "0x...",

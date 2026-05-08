@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+
+## 2026-05-08
+
+### Completed TODOs
+
+- Added the session storage routing layer with normalized `storageRef` compatibility, worker `/storage/upload`, `/storage/read`, and `/storage/list` contract tests, Cloudflare-safe opaque refs backed by mocked R2/KV contracts, Lit-Arweave document enforcement, and Document Library routing for Arweave, Lit-Arweave, and plaintext Cloudflare docs/context while preserving legacy `/arweave/upload` and `arweaveTxId` behavior.
+- Threaded `storageRef` compatibility into client question/survey/response reads and CE-CC agent question/response summaries where legacy Arweave tx ids are still the contract source of truth.
+
+### Remaining TODOs
+
+- Questions, surveys, and responses still write on-chain Arweave tx-id bytes and only derive `storageRef` compatibility refs; routing those payload families to Cloudflare requires a non-destructive contract/interface migration plan.
+- Lit-encrypted Cloudflare document upload/read remains blocked until the encrypted envelope can be produced independently of Arweave upload and read back through the worker safely.
+
 ## 2026-05-04
 
 ### Completed TODOs
