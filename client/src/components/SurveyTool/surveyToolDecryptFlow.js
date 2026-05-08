@@ -184,6 +184,7 @@ export const normalizeSingleQuestionViewedResponse = (rawResponse = null) => {
     additionalFallback !== undefined ||
     base.importance !== undefined ||
     base.conviction !== undefined ||
+    base.storageRef ||
     base.arweaveTxId ||
     base.transactionHash ||
     base.txHash ||
