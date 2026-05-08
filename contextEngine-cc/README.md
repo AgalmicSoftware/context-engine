@@ -218,6 +218,11 @@ than scoped remote delegation.
 Current grant management routes are connect-request create/read/approve/deny
 plus grant read/revoke:
 
+Private Telegram demo worker note: `workers/agentBridgeWorker/` now carries the
+isolated bridge worker skeleton for the group-lobby/private-account lane. It is
+not part of CE-CC runtime, does not modify `workers/sessionCorsWorker/`, and is
+stripped from public release/public-history exports while private.
+
 - `POST /api/agent/connect-requests`
 - `GET /api/agent/connect-requests/:id`
 - `POST /api/agent/connect-requests/approve`
