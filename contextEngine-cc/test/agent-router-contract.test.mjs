@@ -37,6 +37,8 @@ test('agent HTTP routes are present in router source', () => {
     ['POST', '/api/agent/connect-requests'],
     ['POST', '/api/agent/connect-requests/approve'],
     ['POST', '/api/agent/connect-requests/deny'],
+    ['POST', '/api/agent/accounts/create'],
+    ['POST', '/api/agent/accounts/link-request'],
     ['GET', '/api/agent/grants'],
     ['POST', '/api/agent/grants/revoke'],
   ].forEach(([method, path]) => extractBranch(path, method));
@@ -59,6 +61,8 @@ test('agent HTTP route branches require local JWT auth before work', () => {
     extractBranch('/api/agent/connect-requests', 'POST'),
     extractBranch('/api/agent/connect-requests/approve', 'POST'),
     extractBranch('/api/agent/connect-requests/deny', 'POST'),
+    extractBranch('/api/agent/accounts/create', 'POST'),
+    extractBranch('/api/agent/accounts/link-request', 'POST'),
     extractBranch('/api/agent/grants', 'GET'),
     extractBranch('/api/agent/grants/revoke', 'POST'),
     extractPrefixBranch('/api/agent/requests/', 'GET'),
@@ -117,6 +121,25 @@ test('agent grant routes do not create or expand scoped grants', () => {
   assert.doesNotMatch(`${listBranch}\n${readBranch}\n${revokeBranch}`, /createApprovalRequestId/);
   assert.doesNotMatch(`${listBranch}\n${readBranch}\n${revokeBranch}`, /signingAuthority: true/);
   assert.doesNotMatch(`${listBranch}\n${readBranch}\n${revokeBranch}`, /workerTokenAuthority: true/);
+});
+
+test('agent account routes return metadata only without signing authority', () => {
+  const createBranch = extractBranch('/api/agent/accounts/create', 'POST');
+  const linkBranch = extractBranch('/api/agent/accounts/link-request', 'POST');
+
+  assert.match(createBranch, /normalizeManagedAgentAccountContract/);
+  assert.match(createBranch, /ACCOUNT_CREATED/);
+  assert.match(createBranch, /ACCOUNT_RECOVERED/);
+  assert.match(createBranch, /signingEnabled: false/);
+  assert.match(linkBranch, /AGENT_REQUEST_TYPES\.ACCOUNT_LINK/);
+  assert.match(linkBranch, /buildApprovalRequiredResponse/);
+  assert.match(linkBranch, /LINK_REQUESTED/);
+  assert.match(linkBranch, /linked: false/);
+  assert.doesNotMatch(`${createBranch}\n${linkBranch}`, /new ethers\.Wallet/);
+  assert.doesNotMatch(`${createBranch}\n${linkBranch}`, /submitOnChainImpl/);
+  assert.doesNotMatch(`${createBranch}\n${linkBranch}`, /ensureWorkerToken/);
+  assert.doesNotMatch(`${createBranch}\n${linkBranch}`, /privateKey\s*:/);
+  assert.doesNotMatch(`${createBranch}\n${linkBranch}`, /seedPhrase\s*:/);
 });
 
 test('agent submit-request route is approval-gated and does not submit on-chain', () => {

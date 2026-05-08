@@ -87,6 +87,8 @@ function resetRuntimeState() {
   rmSync(resolve(DATA_DIR, 'responses'), { recursive: true, force: true });
   rmSync(resolve(DATA_DIR, 'agent-requests'), { recursive: true, force: true });
   rmSync(resolve(DATA_DIR, 'agent-grants'), { recursive: true, force: true });
+  rmSync(resolve(DATA_DIR, 'agent-accounts'), { recursive: true, force: true });
+  rmSync(resolve(DATA_DIR, 'agent-events'), { recursive: true, force: true });
 }
 
 function writeGrant(record = {}) {
@@ -164,6 +166,16 @@ test('agent HTTP routes reject missing bearer auth at the app-server boundary', 
         method: 'POST',
         path: '/api/agent/connect-requests/deny',
         body: { requestId: 'agent_req_missing123' },
+      },
+      {
+        method: 'POST',
+        path: '/api/agent/accounts/create',
+        body: { telegramUserId: '555', workerDeploymentId: 'worker-demo-1' },
+      },
+      {
+        method: 'POST',
+        path: '/api/agent/accounts/link-request',
+        body: { accountId: 'agent_account_missing12345678' },
       },
       { method: 'GET', path: '/api/agent/grants' },
       { method: 'GET', path: `/api/agent/grants/${GRANT_ID}` },
@@ -438,6 +450,61 @@ test('agent HTTP connect request routes approve scoped grants only after local a
     });
     assert.equal(replay.status, 409);
     assert.equal(replay.payload.reason, 'connect_request_not_pending');
+  });
+});
+
+test('agent HTTP managed account routes stay metadata-only', async () => {
+  resetRuntimeState();
+
+  await withServer(async (port) => {
+    const created = await requestJson(port, {
+      path: '/api/agent/accounts/create',
+      method: 'POST',
+      body: {
+        telegramUserId: '555',
+        workerDeploymentId: 'worker-demo-1',
+        session: 'alpha',
+      },
+    });
+    assert.equal(created.status, 201);
+    assert.equal(created.payload.status, 'account_created');
+    assert.equal(created.payload.account.principalId, 'telegram:555');
+    assert.match(created.payload.account.accountAddress, /^0x[0-9a-f]{40}$/);
+    assert.equal(created.payload.account.signingAuthority, false);
+    assert.equal(created.payload.account.workerTokenAuthority, false);
+    assert.equal(created.payload.account.privateKeyAuthority, false);
+    assert.equal(created.payload.account.rawKeyMaterialExportable, false);
+    assert.equal(created.payload.signingEnabled, false);
+    assert.equal(created.payload.event.eventType, 'account_created');
+
+    const recovered = await requestJson(port, {
+      path: '/api/agent/accounts/create',
+      method: 'POST',
+      body: {
+        telegramUserId: '555',
+        workerDeploymentId: 'worker-demo-1',
+        session: 'alpha',
+      },
+    });
+    assert.equal(recovered.status, 200);
+    assert.equal(recovered.payload.status, 'account_recovered');
+    assert.equal(recovered.payload.account.accountId, created.payload.account.accountId);
+    assert.equal(recovered.payload.event.eventType, 'account_recovered');
+
+    const linkRequest = await requestJson(port, {
+      path: '/api/agent/accounts/link-request',
+      method: 'POST',
+      body: {
+        accountId: created.payload.account.accountId,
+        targetPrincipal: { wallet: WALLET_ADDRESS },
+        idempotencyKey: 'account:server.0001',
+      },
+    });
+    assert.equal(linkRequest.status, 202);
+    assert.equal(linkRequest.payload.requiresApproval, true);
+    assert.equal(linkRequest.payload.linked, false);
+    assert.equal(linkRequest.payload.request.type, 'account_link_request');
+    assert.equal(linkRequest.payload.event.eventType, 'link_requested');
   });
 });
 

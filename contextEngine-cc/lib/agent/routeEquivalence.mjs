@@ -95,6 +95,18 @@ export const AGENT_ROUTE_EQUIVALENCE = Object.freeze([
     relation: 'agent-native',
     notes: 'Revokes a scoped delegated grant without creating or expanding authority.',
   },
+  {
+    canonical: { method: 'POST', path: '/api/agent/accounts/create' },
+    legacy: null,
+    relation: 'managed-account-contract',
+    notes: 'Creates or recovers managed demo account metadata without exporting key material or signing authority.',
+  },
+  {
+    canonical: { method: 'POST', path: '/api/agent/accounts/link-request' },
+    legacy: null,
+    relation: 'approval-gated-request',
+    notes: 'Records a human-approval-required account link request without linking or signing remotely.',
+  },
 ]);
 
 export function routeKey(route = {}) {

@@ -56,6 +56,14 @@ export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
     ]),
     purpose: 'Read and revoke scoped delegated grants without creating authority from remote payloads.',
   },
+  {
+    family: 'accounts',
+    routes: Object.freeze([
+      'POST /api/agent/accounts/create',
+      'POST /api/agent/accounts/link-request',
+    ]),
+    purpose: 'Create/recover managed demo account metadata and request account links without exporting secrets.',
+  },
 ]);
 
 export const AGENT_SENSITIVE_FIELD_RE = /(?:privatekey|private_key|worker.?token|bearer|jwt|authorization|secret|signature|mnemonic|seed|password)/i;

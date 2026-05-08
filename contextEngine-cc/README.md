@@ -225,6 +225,8 @@ plus grant read/revoke:
 - `GET /api/agent/grants`
 - `GET /api/agent/grants/:id`
 - `POST /api/agent/grants/revoke`
+- `POST /api/agent/accounts/create`
+- `POST /api/agent/accounts/link-request`
 
 Connect requests are the only current grant-creation path. They bind the human
 principal, delegated agent, explicit session slugs, allowed action ids, risk
@@ -246,6 +248,16 @@ agent-created account metadata. V1 agent-created accounts are modeled as managed
 testnet/account-runtime metadata only; Durable Object isolated signer is the
 preferred future signer boundary, and no raw keys, seeds, JWTs, worker tokens,
 or signing authority are returned.
+
+Telegram group-to-private helpers in `lib/agent/telegramContracts.mjs` are also
+contract-only. Group deep links carry opaque action ids, private chat resolves
+group/session/question context server-side, unknown participants route to
+managed account setup, and group-safe summaries omit private account state and
+answers.
+
+`lib/agent/workerSetupContracts.mjs` defines the private `/worker-setup`
+planning surface and default-off onboarding config. The contextengine.sh domain
+cutover is planned separately and is not implemented here.
 
 See [Agent Native Contract](../docs/agent-native-contract.md) for the scoped
 grant fields, action inventory, and current web UX parity gaps.
@@ -448,6 +460,8 @@ string for that local convention.
 | POST | `/api/agent/responses/draft` | Save a response draft locally without auto-submit |
 | GET | `/api/agent/responses/drafts?session=` | List authenticated-wallet local response drafts |
 | POST | `/api/agent/responses/submit-request` | Create an approval-required submit request instead of signing |
+| POST | `/api/agent/accounts/create` | Create or recover managed demo account metadata only |
+| POST | `/api/agent/accounts/link-request` | Create an approval-required account link request |
 | GET | `/api/agent/requests/:id` | Read approval request status by opaque request id |
 
 Submit requests may include an optional `idempotencyKey`. The key is normalized

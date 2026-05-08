@@ -1,4 +1,5 @@
 import { setTimeout as nativeSetTimeout, clearTimeout as nativeClearTimeout } from 'node:timers';
+import { createHash } from 'node:crypto';
 import { readFileSync, mkdirSync, existsSync, readdirSync, rmSync } from 'fs';
 import { resolve, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
@@ -64,6 +65,12 @@ import {
   normalizeAgentIdempotencyKey,
 } from './agent/approvalResponses.mjs';
 import {
+  AGENT_ACCOUNT_SIGNER_BOUNDARIES,
+  AGENT_BRIDGE_EVENT_TYPES,
+  normalizeAgentBridgeEvent,
+  normalizeAgentCreatedAccountMetadata,
+} from './agent/bridgePrimitives.mjs';
+import {
   AGENT_EXECUTION_POLICIES,
   AGENT_GRANT_SCOPES,
   AGENT_RISK_LEVELS,
@@ -84,6 +91,8 @@ const WORKER_TOKENS_DIR = resolve(DATA_DIR, 'worker-tokens');
 const CONFIRMED_SUBMISSIONS_DIR = resolve(DATA_DIR, 'confirmed-submissions');
 const AGENT_REQUESTS_DIR = resolve(DATA_DIR, 'agent-requests');
 const AGENT_GRANTS_DIR = resolve(DATA_DIR, 'agent-grants');
+const AGENT_ACCOUNTS_DIR = resolve(DATA_DIR, 'agent-accounts');
+const AGENT_EVENTS_DIR = resolve(DATA_DIR, 'agent-events');
 const SETTINGS_PATH = resolve(DATA_DIR, 'settings.json');
 const DEFAULT_HOOK_COOLDOWN_MS = 45_000;
 const MAX_HOOK_COOLDOWN_MS = 600_000;
@@ -534,6 +543,146 @@ function isAgentConnectApprovalOverrideAttempt(body = {}) {
     'longLivedBearerAuthority',
   ];
   return forbiddenFields.some((field) => Object.prototype.hasOwnProperty.call(body || {}, field));
+}
+
+function stableAgentHash(value, length = 16) {
+  return createHash('sha256').update(String(value || '')).digest('hex').slice(0, length);
+}
+
+function bodyContainsAgentSensitiveMaterial(value = {}) {
+  return JSON.stringify(redactAgentSensitiveFields(value)) !== JSON.stringify(value);
+}
+
+function normalizeAgentWorkerDeploymentId(value) {
+  const id = String(value || 'local-worker').trim().toLowerCase().replace(/[^a-z0-9._:-]/g, '-');
+  return id.slice(0, 96) || 'local-worker';
+}
+
+function normalizeManagedTelegramPrincipal(body = {}) {
+  const raw = String(
+    body.principalId
+    || body.integrationPrincipalId
+    || body.telegramPrincipalId
+    || (body.telegramUserId ? `telegram:${body.telegramUserId}` : '')
+  ).trim().toLowerCase();
+  const principalId = raw.startsWith('telegram:') ? raw : (raw ? `telegram:${raw}` : '');
+  if (!/^telegram:[a-z0-9._:@-]{1,96}$/.test(principalId)) {
+    return { ok: false, error: 'telegram principalId or telegramUserId is required.' };
+  }
+  return {
+    ok: true,
+    principalId,
+    principalKind: 'telegram',
+  };
+}
+
+function getAgentAccountFilePath(accountId) {
+  const id = String(accountId || '').trim();
+  if (!/^agent_account_[a-z0-9]{16,48}$/.test(id)) return null;
+  return resolve(AGENT_ACCOUNTS_DIR, `${id}.json`);
+}
+
+function normalizeManagedAgentAccountContract({
+  body = {},
+  authPayload = {},
+  createdAt = new Date().toISOString(),
+  lifecycle = 'account_created',
+} = {}) {
+  const principal = normalizeManagedTelegramPrincipal(body);
+  if (!principal.ok) return principal;
+  const workerDeploymentId = normalizeAgentWorkerDeploymentId(body.workerDeploymentId);
+  const accountKey = `${workerDeploymentId}|${principal.principalId}`;
+  const accountId = `agent_account_${stableAgentHash(accountKey, 20)}`;
+  const accountAddress = `0x${stableAgentHash(`managed-demo-account|${accountKey}`, 40)}`;
+  const sessionValidation = validateAgentSessionSlug(body.session || 'general', {
+    required: true,
+  });
+  if (!sessionValidation.ok) return { ok: false, error: sessionValidation.error };
+  const metadata = normalizeAgentCreatedAccountMetadata({
+    accountId,
+    accountAddress,
+    accountKind: 'managed_testnet_account_runtime',
+    chainScope: body.chainScope || 'testnet',
+    createdByAgentPrincipal: {
+      kind: 'agent',
+      principalId: 'context-engine-agent',
+    },
+    integrationPrincipal: {
+      kind: principal.principalKind,
+      principalId: principal.principalId,
+    },
+    session: sessionValidation.slug,
+    signerBoundary: AGENT_ACCOUNT_SIGNER_BOUNDARIES.MANAGED_TESTNET_ACCOUNT_RUNTIME,
+    createdAt,
+  });
+  return {
+    ok: true,
+    account: {
+      ...metadata,
+      workerDeploymentId,
+      principalId: principal.principalId,
+      humanPrincipal: normalizeAddressLower(authPayload?.sub || ''),
+      lifecycle,
+      recoveredAt: lifecycle === 'account_recovered' ? createdAt : null,
+      updatedAt: createdAt,
+      contractOnly: true,
+      signingEnabled: false,
+    },
+  };
+}
+
+function saveAgentAccount(record = {}) {
+  const file = getAgentAccountFilePath(record.accountId);
+  if (!file) throw new Error('Invalid managed agent account id.');
+  mkdirSync(AGENT_ACCOUNTS_DIR, { recursive: true });
+  writeSecureFile(file, JSON.stringify(record, null, 2));
+  return record;
+}
+
+function loadAgentAccount(accountId) {
+  const file = getAgentAccountFilePath(accountId);
+  if (!file || !existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveAgentBridgeEvent(event = {}) {
+  mkdirSync(AGENT_EVENTS_DIR, { recursive: true });
+  const eventId = String(event.eventId || `agent_event_${stableAgentHash(JSON.stringify(event), 18)}`).trim();
+  const file = resolve(AGENT_EVENTS_DIR, `${eventId.replace(/[^a-z0-9._:-]/gi, '-')}.json`);
+  writeSecureFile(file, JSON.stringify(event, null, 2));
+  return event;
+}
+
+function buildAgentAccountEvent({ eventType, account = {}, request = null, createdAt = new Date().toISOString() } = {}) {
+  return normalizeAgentBridgeEvent({
+    eventType,
+    accountPrincipal: {
+      kind: 'ce_wallet',
+      principalId: account.humanPrincipal,
+    },
+    agentPrincipal: {
+      kind: 'agent',
+      principalId: 'context-engine-agent',
+    },
+    integrationPrincipal: account.integrationPrincipal,
+    session: account.session || 'general',
+    actionRecordId: request?.requestId || account.accountId,
+    summary: {
+      accountId: account.accountId,
+      accountAddress: account.accountAddress,
+      accountKind: account.accountKind,
+      lifecycle: account.lifecycle,
+      workerDeploymentId: account.workerDeploymentId,
+      requestId: request?.requestId || null,
+      contractOnly: true,
+      signingEnabled: false,
+    },
+    createdAt,
+  });
 }
 
 function agentRouteError(res, httpStatus, errorMessage, {
@@ -2532,6 +2681,167 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       });
     }
     return json(res, 200, buildAgentOk(summarizeAgentConnectRequestForRead(request)));
+  }
+
+  if (path === '/api/agent/accounts/create' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    if (bodyContainsAgentSensitiveMaterial(body)) {
+      return json(res, 400, buildAgentError('Managed account requests must not include secrets or signing material.', {
+        status: 'bad_request',
+        code: 'account_secret_material_denied',
+      }));
+    }
+
+    const createdAt = new Date().toISOString();
+    const prepared = normalizeManagedAgentAccountContract({
+      body,
+      authPayload: auth.payload,
+      createdAt,
+      lifecycle: 'account_created',
+    });
+    if (!prepared.ok) {
+      return json(res, 400, buildAgentError(prepared.error || 'Invalid managed account request.', {
+        status: 'bad_request',
+        code: 'invalid_managed_account_request',
+      }));
+    }
+
+    const existing = loadAgentAccount(prepared.account.accountId);
+    const account = existing
+      ? {
+        ...existing,
+        lifecycle: 'account_recovered',
+        recoveredAt: createdAt,
+        updatedAt: createdAt,
+        signingAuthority: false,
+        workerTokenAuthority: false,
+        privateKeyAuthority: false,
+        longLivedBearerAuthority: false,
+        rawKeyMaterialExportable: false,
+        signingEnabled: false,
+        contractOnly: true,
+      }
+      : prepared.account;
+    const saved = saveAgentAccount(account);
+    const eventType = existing
+      ? AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED
+      : AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED;
+    const event = saveAgentBridgeEvent(buildAgentAccountEvent({
+      eventType,
+      account: saved,
+      createdAt,
+    }));
+    return json(res, existing ? 200 : 201, buildAgentOk({
+      account: saved,
+      event,
+      events: [event],
+      signingEnabled: false,
+      contractOnly: true,
+    }, {
+      status: existing ? 'account_recovered' : 'account_created',
+    }));
+  }
+
+  if (path === '/api/agent/accounts/link-request' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    if (bodyContainsAgentSensitiveMaterial(body)) {
+      return json(res, 400, buildAgentError('Account link requests must not include secrets or signing material.', {
+        status: 'bad_request',
+        code: 'account_secret_material_denied',
+      }));
+    }
+
+    const accountId = String(body?.accountId || body?.managedAccountId || '').trim();
+    const account = loadAgentAccount(accountId);
+    const requester = normalizeAddressLower(auth.payload?.sub || '');
+    if (!account || normalizeAddressLower(account.humanPrincipal) !== requester) {
+      return agentRouteError(res, 404, 'Managed agent account not found.', {
+        code: 'managed_agent_account_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+
+    const idempotencyKey = normalizeAgentIdempotencyKey(body?.idempotencyKey);
+    const requestFingerprint = buildAgentRequestFingerprint({
+      type: AGENT_REQUEST_TYPES.ACCOUNT_LINK,
+      requester,
+      session: account.session || 'general',
+      actionId: AGENT_ACTION_IDS.ACCOUNT_LINK_REQUEST,
+      grantId: account.accountId,
+    });
+    const existingRequest = loadAgentRequestByIdempotencyKey(requester, idempotencyKey);
+    if (existingRequest) {
+      const existingFingerprint = existingRequest.fingerprint || buildAgentRequestFingerprint(existingRequest);
+      if (existingFingerprint !== requestFingerprint) {
+        return json(res, 409, buildAgentError('idempotencyKey conflicts with an existing account link request.', {
+          status: 'idempotency_conflict',
+          code: 'idempotency_key_conflict',
+        }));
+      }
+      const existingRead = summarizeAgentRequestForRead(existingRequest);
+      return json(res, 202, buildAgentOk({
+        request: existingRead.summary,
+        lifecycle: existingRead.lifecycle,
+        account,
+        idempotent: true,
+        linked: false,
+        signingEnabled: false,
+        contractOnly: true,
+      }, { status: 'account_link_requested' }));
+    }
+
+    const requestId = createApprovalRequestId();
+    const createdAt = new Date().toISOString();
+    const approval = buildApprovalRequiredResponse({
+      requestId,
+      serverUrl: getTrustedAgentServerUrl(),
+      reason: 'account_link_approval_required',
+      message: 'Human approval is required before this managed account can be linked.',
+      fields: {
+        capabilityMode: 'account-link-request',
+      },
+    });
+    const request = saveAgentRequest(buildAgentRequestRecord({
+      type: AGENT_REQUEST_TYPES.ACCOUNT_LINK,
+      requestId,
+      status: approval.status,
+      requiresApproval: true,
+      approvalUrl: approval.approvalUrl,
+      session: account.session || 'general',
+      requester,
+      actionId: AGENT_ACTION_IDS.ACCOUNT_LINK_REQUEST,
+      grantId: account.accountId,
+      idempotencyKey,
+      createdAt,
+      updatedAt: createdAt,
+      source: 'agent-http',
+      payload: redactAgentSensitiveFields({
+        accountId: account.accountId,
+        accountAddress: account.accountAddress,
+        targetPrincipal: body?.targetPrincipal || null,
+        agentContext: body?.agentContext || null,
+      }),
+    }));
+    const requestRead = summarizeAgentRequestForRead(request);
+    const event = saveAgentBridgeEvent(buildAgentAccountEvent({
+      eventType: AGENT_BRIDGE_EVENT_TYPES.LINK_REQUESTED,
+      account,
+      request,
+      createdAt,
+    }));
+    return json(res, 202, {
+      ...approval,
+      account,
+      request: requestRead.summary,
+      lifecycle: requestRead.lifecycle,
+      event,
+      events: [event],
+      linked: false,
+      signingEnabled: false,
+      contractOnly: true,
+    });
   }
 
   if (path === '/api/agent/grants' && method === 'GET') {

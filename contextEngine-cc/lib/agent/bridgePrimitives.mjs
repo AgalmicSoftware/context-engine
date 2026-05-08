@@ -1,8 +1,14 @@
 export const AGENT_BRIDGE_CONTRACT_VERSION = 'agent-bridge-worker-contract-v1';
 
 export const AGENT_BRIDGE_EVENT_TYPES = Object.freeze({
+  GROUP_CARD_POSTED: 'group_card_posted',
+  PRIVATE_START_OPENED: 'private_start_opened',
+  ACCOUNT_CREATED: 'account_created',
+  ACCOUNT_RECOVERED: 'account_recovered',
+  LINK_REQUESTED: 'link_requested',
   QUESTION_DELIVERED: 'question_delivered',
   RESPONSE_SUGGESTED: 'response_suggested',
+  RESPONSE_ACTION_CREATED: 'response_action_created',
   DRAFT_SAVED: 'draft_saved',
   SUBMIT_REQUESTED: 'submit_requested',
   DELEGATED_EXECUTE_DEFERRED: 'delegated_execute_deferred',
@@ -20,6 +26,7 @@ export const AGENT_ACCOUNT_SIGNER_BOUNDARIES = Object.freeze({
 
 const SECRET_FIELD_RE = /(?:privatekey|private_key|worker.?token|bearer|jwt|authorization|secret|signature|mnemonic|seed|password|signingauthority)/i;
 const SECRET_VALUE_RE = /(?:bearer\s+[a-z0-9._:-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64})/i;
+const SAFE_HASH_VALUE_KEYS = new Set(['questionid', 'contenthash', 'hash', 'txhash']);
 const SAFE_ID_RE = /^[a-z0-9][a-z0-9._:@-]{0,127}$/i;
 const SESSION_RE = /^[a-z0-9_-]{1,128}$/i;
 
@@ -40,13 +47,16 @@ function stableHash(value = '') {
   return (hash >>> 0).toString(36).padStart(7, '0');
 }
 
-export function redactAgentBridgeSecrets(value) {
-  if (Array.isArray(value)) return value.map((entry) => redactAgentBridgeSecrets(entry));
-  if (typeof value === 'string') return SECRET_VALUE_RE.test(value.toLowerCase()) ? '[redacted]' : value;
+export function redactAgentBridgeSecrets(value, path = []) {
+  if (Array.isArray(value)) return value.map((entry, index) => redactAgentBridgeSecrets(entry, [...path, String(index)]));
+  if (typeof value === 'string') {
+    const key = lower(path[path.length - 1]);
+    return !SAFE_HASH_VALUE_KEYS.has(key) && SECRET_VALUE_RE.test(value.toLowerCase()) ? '[redacted]' : value;
+  }
   if (!value || typeof value !== 'object') return value;
   return Object.fromEntries(Object.entries(value).map(([key, entry]) => {
     if (SECRET_FIELD_RE.test(key)) return [key, '[redacted]'];
-    return [key, redactAgentBridgeSecrets(entry)];
+    return [key, redactAgentBridgeSecrets(entry, [...path, key])];
   }));
 }
 

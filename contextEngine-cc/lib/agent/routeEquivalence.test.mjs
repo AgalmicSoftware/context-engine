@@ -22,6 +22,8 @@ test('agent route equivalence table covers the v1 canonical routes', () => {
     'GET /api/agent/requests/:id',
     'GET /api/agent/responses/drafts',
     'GET /api/agent/sessions',
+    'POST /api/agent/accounts/create',
+    'POST /api/agent/accounts/link-request',
     'POST /api/agent/connect-requests',
     'POST /api/agent/connect-requests/approve',
     'POST /api/agent/connect-requests/deny',

@@ -263,7 +263,7 @@ function setupRouterHarness(t) {
     }
   `);
 
-  ['capabilities', 'schemas', 'approvalResponses', 'lifecycle', 'actionInventory'].forEach((moduleName) => {
+  ['capabilities', 'schemas', 'approvalResponses', 'lifecycle', 'actionInventory', 'bridgePrimitives'].forEach((moduleName) => {
     const href = pathToFileURL(resolve(CC_ROOT, 'lib', 'agent', `${moduleName}.mjs`)).href;
     writeModule(resolve(libDir, 'agent', `${moduleName}.mjs`), `export * from ${JSON.stringify(href)};\n`);
   });
@@ -353,6 +353,16 @@ test('agent routes use stable auth error envelopes before route-specific work', 
       method: 'POST',
       path: '/api/agent/connect-requests/deny',
       body: { requestId: 'agent_req_missing123' },
+    },
+    {
+      method: 'POST',
+      path: '/api/agent/accounts/create',
+      body: { telegramUserId: '555', workerDeploymentId: 'worker-demo-1' },
+    },
+    {
+      method: 'POST',
+      path: '/api/agent/accounts/link-request',
+      body: { accountId: 'agent_account_missing12345678' },
     },
     { method: 'GET', path: '/api/agent/grants' },
     { method: 'GET', path: `/api/agent/grants/${GRANT_ID}` },
@@ -1135,6 +1145,107 @@ test('agent connect request denial transitions only pending human-scoped request
   });
   assert.equal(replay.status, 409);
   assert.equal(replay.payload.code, 'idempotency_key_not_pending_approval');
+});
+
+test('agent managed account routes create metadata and approval-only link requests', async (t) => {
+  const harness = setupRouterHarness(t);
+  const { handleRoute } = await import(harness.routerUrl);
+
+  const rejectedSecret = await callRoute(handleRoute, {
+    path: '/api/agent/accounts/create',
+    method: 'POST',
+    body: {
+      telegramUserId: '555',
+      workerDeploymentId: 'worker-demo-1',
+      privateKey: `0x${'99'.repeat(32)}`,
+    },
+  });
+  assert.equal(rejectedSecret.status, 400);
+  assert.equal(rejectedSecret.payload.code, 'account_secret_material_denied');
+
+  const created = await callRoute(handleRoute, {
+    path: '/api/agent/accounts/create',
+    method: 'POST',
+    body: {
+      telegramUserId: '555',
+      workerDeploymentId: 'worker-demo-1',
+      session: 'alpha',
+    },
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.payload.status, 'account_created');
+  assert.equal(created.payload.account.principalId, 'telegram:555');
+  assert.equal(created.payload.account.humanPrincipal, WALLET_ADDRESS.toLowerCase());
+  assert.match(created.payload.account.accountId, /^agent_account_[a-z0-9]{20}$/);
+  assert.match(created.payload.account.accountAddress, /^0x[0-9a-f]{40}$/);
+  assert.equal(created.payload.account.signingAuthority, false);
+  assert.equal(created.payload.account.workerTokenAuthority, false);
+  assert.equal(created.payload.account.privateKeyAuthority, false);
+  assert.equal(created.payload.account.rawKeyMaterialExportable, false);
+  assert.equal(created.payload.signingEnabled, false);
+  assert.equal(created.payload.contractOnly, true);
+  assert.equal(created.payload.event.eventType, 'account_created');
+  assert.equal(JSON.stringify(created.payload).includes('privateKey'), true);
+  assert.equal(JSON.stringify(created.payload).includes(`0x${'99'.repeat(32)}`), false);
+
+  const recovered = await callRoute(handleRoute, {
+    path: '/api/agent/accounts/create',
+    method: 'POST',
+    body: {
+      telegramUserId: '555',
+      workerDeploymentId: 'worker-demo-1',
+      session: 'alpha',
+    },
+  });
+  assert.equal(recovered.status, 200);
+  assert.equal(recovered.payload.status, 'account_recovered');
+  assert.equal(recovered.payload.account.accountId, created.payload.account.accountId);
+  assert.equal(recovered.payload.event.eventType, 'account_recovered');
+
+  const rejectedLinkSecret = await callRoute(handleRoute, {
+    path: '/api/agent/accounts/link-request',
+    method: 'POST',
+    body: {
+      accountId: created.payload.account.accountId,
+      targetPrincipal: { wallet: WALLET_ADDRESS },
+      idempotencyKey: 'account:link.0001',
+      agentContext: {
+        workerToken: 'must-redact',
+      },
+    },
+  });
+  assert.equal(rejectedLinkSecret.status, 400);
+  assert.equal(rejectedLinkSecret.payload.code, 'account_secret_material_denied');
+
+  const linkRequest = await callRoute(handleRoute, {
+    path: '/api/agent/accounts/link-request',
+    method: 'POST',
+    body: {
+      accountId: created.payload.account.accountId,
+      targetPrincipal: { wallet: WALLET_ADDRESS },
+      idempotencyKey: 'account:link.0001',
+    },
+  });
+  assert.equal(linkRequest.status, 202);
+  assert.equal(linkRequest.payload.requiresApproval, true);
+  assert.equal(linkRequest.payload.linked, false);
+  assert.equal(linkRequest.payload.signingEnabled, false);
+  assert.equal(linkRequest.payload.contractOnly, true);
+  assert.equal(linkRequest.payload.request.type, 'account_link_request');
+  assert.equal(linkRequest.payload.event.eventType, 'link_requested');
+
+  const replay = await callRoute(handleRoute, {
+    path: '/api/agent/accounts/link-request',
+    method: 'POST',
+    body: {
+      accountId: created.payload.account.accountId,
+      targetPrincipal: { wallet: WALLET_ADDRESS },
+      idempotencyKey: 'account:link.0001',
+    },
+  });
+  assert.equal(replay.status, 202);
+  assert.equal(replay.payload.idempotent, true);
+  assert.equal(replay.payload.request.requestId, linkRequest.payload.request.requestId);
 });
 
 test('agent delegated response execution validates grant scope and writes a contract-only audit record', async (t) => {

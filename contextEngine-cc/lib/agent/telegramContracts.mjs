@@ -1,12 +1,24 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 
 const CALLBACK_ACTION_RE = /^cecb_[a-z0-9_-]{8,48}$/;
+const PRIVATE_START_ACTION_RE = /^cetg_[a-z0-9_-]{8,48}$/;
 const PUBLIC_SESSION_RE = /^[a-z0-9_-]+$/i;
 const MAX_PUBLIC_SESSION_LENGTH = 128;
-const SENSITIVE_KEY_RE = /(?:jwt|token|private|secret|signature|bearer|authorization|mnemonic|seed|password)/i;
+const SENSITIVE_KEY_RE = /(?:privatekey|private_key|jwt|token|secret|signature|bearer|authorization|mnemonic|seed|password)/i;
 const SENSITIVE_VALUE_RE = /(?:bearer\s+[a-z0-9._-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64})/i;
+const SAFE_HASH_VALUE_KEYS = new Set(['questionid', 'contenthash', 'hash', 'txhash']);
+const SAFE_FALSE_AUTHORITY_KEYS = new Set([
+  'privatekeyauthority',
+  'workertokenauthority',
+  'longlivedbearerauthority',
+]);
 const TELEGRAM_SECURE_GRANT_SCOPE_RE = /^agent:(read|draft|submit-request|delegated-execute|create-question-request|decrypt-request|revoke-grant)$/;
 const TELEGRAM_SECURE_GRANT_MAX_TTL_SECONDS = 24 * 60 * 60;
+const TELEGRAM_BRIDGE_CONTRACT_VERSION = 'ce-telegram-bridge-contract-v1';
+const TELEGRAM_START_PAYLOAD_MAX_BYTES = 64;
+
+const safeString = (value) => String(value || '').trim();
+const lower = (value) => safeString(value).toLowerCase();
 
 function parseJsonMaybe(value) {
   if (typeof value !== 'string') return value;
@@ -23,23 +35,87 @@ function hasSensitiveKeyOrValue(value, path = []) {
   }
   if (value && typeof value === 'object') {
     return Object.entries(value).some(([key, entry]) => (
-      SENSITIVE_KEY_RE.test(key) || hasSensitiveKeyOrValue(entry, [...path, key])
+      (SENSITIVE_KEY_RE.test(key) && !(SAFE_FALSE_AUTHORITY_KEYS.has(lower(key)) && entry === false))
+      || hasSensitiveKeyOrValue(entry, [...path, key])
     ));
   }
   if (typeof value === 'string') {
-    return SENSITIVE_VALUE_RE.test(value);
+    const key = lower(path[path.length - 1]);
+    return !SAFE_HASH_VALUE_KEYS.has(key) && SENSITIVE_VALUE_RE.test(value);
   }
   return false;
+}
+
+function normalizeTelegramOpaqueId(value, {
+  prefix,
+  pattern,
+  fallback = randomUUID(),
+} = {}) {
+  const suffix = String(value || fallback)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '')
+    .slice(0, 48);
+  const id = `${prefix}${suffix}`;
+  if (!pattern.test(id)) {
+    throw new Error('Invalid Telegram opaque action id.');
+  }
+  return id;
+}
+
+function normalizeTelegramSession(session) {
+  return normalizePublicAgentSession(session);
+}
+
+function normalizeTelegramQuestionId(questionId) {
+  return safeString(questionId);
+}
+
+function normalizeTelegramPrincipalSummary(principal = {}) {
+  const update = principal.update ? normalizeTelegramUpdate(principal.update) : null;
+  const user = principal.user || update?.user || principal;
+  const userId = safeString(user.telegramUserId || user.userId || user.id);
+  return {
+    type: 'telegram_principal_summary',
+    version: TELEGRAM_BRIDGE_CONTRACT_VERSION,
+    principalKind: 'telegram',
+    principalId: userId ? `telegram:${userId}` : 'telegram:unknown',
+    username: safeString(user.username || user.handle) || null,
+    languageCode: safeString(user.languageCode || user.language_code) || null,
+  };
+}
+
+function normalizeTelegramGroupChat(group = {}) {
+  const update = group.update ? normalizeTelegramUpdate(group.update) : null;
+  const chat = group.chat || update?.chat || group;
+  return {
+    type: 'telegram_group_summary',
+    version: TELEGRAM_BRIDGE_CONTRACT_VERSION,
+    groupChatId: safeString(chat.groupChatId || chat.chatId || chat.id),
+    chatType: safeString(chat.chatType || chat.type) || 'group',
+    title: safeString(chat.title) || null,
+  };
+}
+
+function normalizeTelegramAccountAddress(address) {
+  return safeString(address);
+}
+
+function assertTelegramBridgeRecordSafe(record) {
+  if (hasSensitiveKeyOrValue(record)) {
+    throw new Error('Telegram bridge records must not serialize secrets or bearer credentials.');
+  }
+  return record;
 }
 
 export function createTelegramCallbackAction({ actionId = randomUUID(), action = '', requestId = '', expiresAt = null } = {}) {
   if (hasSensitiveKeyOrValue({ actionId, action, requestId })) {
     throw new Error('Telegram callback action metadata must not contain secrets.');
   }
-  const id = `cecb_${String(actionId || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 48)}`;
-  if (!CALLBACK_ACTION_RE.test(id)) {
-    throw new Error('Invalid Telegram callback action id.');
-  }
+  const id = normalizeTelegramOpaqueId(actionId, {
+    prefix: 'cecb_',
+    pattern: CALLBACK_ACTION_RE,
+  });
   return {
     callbackData: id,
     record: {
@@ -51,12 +127,212 @@ export function createTelegramCallbackAction({ actionId = randomUUID(), action =
   };
 }
 
+export function createTelegramPrivateStartPayload(actionId = randomUUID()) {
+  const payload = normalizeTelegramOpaqueId(actionId, {
+    prefix: 'cetg_',
+    pattern: PRIVATE_START_ACTION_RE,
+  });
+  if (Buffer.byteLength(payload, 'utf8') > TELEGRAM_START_PAYLOAD_MAX_BYTES) {
+    throw new Error('Telegram private start payload exceeds Telegram start-parameter constraints.');
+  }
+  return payload;
+}
+
 export function parseTelegramCallbackActionId(callbackData) {
   const actionId = String(callbackData || '').trim();
   if (!CALLBACK_ACTION_RE.test(actionId)) {
     return { ok: false, error: 'Invalid Telegram callback action id.' };
   }
   return { ok: true, actionId };
+}
+
+export function parseTelegramPrivateStartPayload(payload) {
+  const actionId = safeString(payload);
+  if (!PRIVATE_START_ACTION_RE.test(actionId)) {
+    return { ok: false, error: 'Invalid Telegram private start action id.' };
+  }
+  return { ok: true, actionId };
+}
+
+export function buildTelegramGroupBinding({
+  bindingId = '',
+  group = {},
+  session = '',
+  questionId = '',
+  workerDeploymentId = '',
+  createdAt = null,
+} = {}) {
+  const normalizedSession = normalizeTelegramSession(session);
+  const groupSummary = normalizeTelegramGroupChat(group);
+  const normalizedQuestionId = normalizeTelegramQuestionId(questionId);
+  const record = {
+    type: 'TelegramGroupBinding',
+    version: TELEGRAM_BRIDGE_CONTRACT_VERSION,
+    bindingId: safeString(bindingId) || createTelegramPrivateStartPayload(`${groupSummary.groupChatId}_${normalizedSession}_${normalizedQuestionId}`),
+    group: groupSummary,
+    session: normalizedSession,
+    questionId: normalizedQuestionId,
+    workerDeploymentId: safeString(workerDeploymentId) || null,
+    publicLobby: true,
+    createdAt,
+  };
+  return assertTelegramBridgeRecordSafe(record);
+}
+
+export function createTelegramPrivateStartAction({
+  actionId = randomUUID(),
+  groupBinding = {},
+  botUsername = '',
+  action = 'answer_question',
+  expiresAt = null,
+  createdAt = null,
+} = {}) {
+  const binding = buildTelegramGroupBinding(groupBinding);
+  const payload = createTelegramPrivateStartPayload(actionId);
+  const username = safeString(botUsername).replace(/^@/, '');
+  const record = {
+    type: 'TelegramPrivateStartAction',
+    version: TELEGRAM_BRIDGE_CONTRACT_VERSION,
+    actionId: payload,
+    action: safeString(action) || 'answer_question',
+    deepLinkPayload: payload,
+    deepLinkUrl: username ? `https://t.me/${encodeURIComponent(username)}?start=${encodeURIComponent(payload)}` : null,
+    groupBindingId: binding.bindingId,
+    serverContextRef: {
+      groupBindingId: binding.bindingId,
+      actionId: payload,
+    },
+    createdAt,
+    expiresAt,
+  };
+  return assertTelegramBridgeRecordSafe(record);
+}
+
+export function resolveTelegramPrivateStartAction({
+  startAction = {},
+  groupBinding = {},
+  participant = {},
+  knownParticipant = false,
+  resolvedAt = null,
+} = {}) {
+  const actionId = safeString(startAction.actionId || startAction.deepLinkPayload || startAction);
+  const parsed = parseTelegramPrivateStartPayload(actionId);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
+  const binding = buildTelegramGroupBinding(groupBinding);
+  const principal = normalizeTelegramPrincipalSummary(participant);
+  const record = {
+    type: 'TelegramActionResolution',
+    version: TELEGRAM_BRIDGE_CONTRACT_VERSION,
+    actionId: parsed.actionId,
+    groupBindingId: binding.bindingId,
+    telegramPrincipal: principal,
+    serverResolvedContext: {
+      group: binding.group,
+      session: binding.session,
+      questionId: binding.questionId,
+      workerDeploymentId: binding.workerDeploymentId,
+    },
+    knownParticipant: knownParticipant === true,
+    requiresPrivateAccountSetup: knownParticipant !== true,
+    nextStep: knownParticipant === true ? 'answer_question' : 'private_account_setup',
+    resolvedAt,
+  };
+  return { ok: true, resolution: assertTelegramBridgeRecordSafe(record) };
+}
+
+export function buildTelegramManagedAccountSummary({
+  participant = {},
+  accountAddress = '',
+  accountId = '',
+  workerDeploymentId = '',
+  accountKind = 'managed_testnet_account',
+  chainScope = 'testnet',
+  lifecycle = 'account_created',
+  createdAt = null,
+  recoveredAt = null,
+} = {}) {
+  const record = {
+    type: 'TelegramManagedAccountSummary',
+    version: TELEGRAM_BRIDGE_CONTRACT_VERSION,
+    telegramPrincipal: normalizeTelegramPrincipalSummary(participant),
+    accountId: safeString(accountId) || lower(normalizeTelegramAccountAddress(accountAddress)),
+    accountAddress: normalizeTelegramAccountAddress(accountAddress) || null,
+    accountKind: lower(accountKind) || 'managed_testnet_account',
+    chainScope: safeString(chainScope) || 'testnet',
+    workerDeploymentId: safeString(workerDeploymentId) || null,
+    lifecycle: lifecycle === 'account_recovered' ? 'account_recovered' : 'account_created',
+    signerBoundary: 'managed_demo_account_contract_only',
+    rawKeyMaterialExportable: false,
+    signingAuthority: false,
+    workerTokenAuthority: false,
+    privateKeyAuthority: false,
+    longLivedBearerAuthority: false,
+    createdAt,
+    recoveredAt,
+  };
+  return assertTelegramBridgeRecordSafe(record);
+}
+
+export function buildTelegramAnswerAction({
+  resolution = {},
+  managedAccount = {},
+  actionId = '',
+  answerRef = null,
+  draftRequestId = '',
+  submitRequestId = '',
+  status = 'draft_ready',
+  createdAt = null,
+} = {}) {
+  const resolved = resolution.type === 'TelegramActionResolution'
+    ? resolution
+    : resolveTelegramPrivateStartAction(resolution).resolution;
+  const account = managedAccount.type === 'TelegramManagedAccountSummary'
+    ? managedAccount
+    : buildTelegramManagedAccountSummary(managedAccount);
+  const record = {
+    type: 'TelegramAnswerAction',
+    version: TELEGRAM_BRIDGE_CONTRACT_VERSION,
+    actionId: safeString(actionId) || resolved?.actionId || createTelegramPrivateStartPayload(),
+    telegramPrincipal: resolved?.telegramPrincipal || account.telegramPrincipal,
+    account: {
+      accountId: account.accountId,
+      accountAddress: account.accountAddress,
+      accountKind: account.accountKind,
+      chainScope: account.chainScope,
+      workerDeploymentId: account.workerDeploymentId,
+      rawKeyMaterialExportable: false,
+      signingAuthority: false,
+      workerTokenAuthority: false,
+      privateKeyAuthority: false,
+      longLivedBearerAuthority: false,
+    },
+    session: resolved?.serverResolvedContext?.session || '',
+    questionId: resolved?.serverResolvedContext?.questionId || '',
+    answerRef: answerRef ? {
+      refId: safeString(answerRef.refId || answerRef.id || answerRef),
+      contentHash: safeString(answerRef.contentHash || answerRef.hash) || null,
+    } : null,
+    draftRequestId: safeString(draftRequestId) || null,
+    submitRequestId: safeString(submitRequestId) || null,
+    status: safeString(status) || 'draft_ready',
+    createdAt,
+  };
+  return assertTelegramBridgeRecordSafe(record);
+}
+
+export function summarizeTelegramGroupSafeAction(record = {}) {
+  const action = record.resolution || record;
+  return assertTelegramBridgeRecordSafe({
+    type: 'TelegramGroupSafeSummary',
+    version: TELEGRAM_BRIDGE_CONTRACT_VERSION,
+    actionId: safeString(action.actionId),
+    groupBindingId: safeString(action.groupBindingId),
+    session: safeString(action.serverResolvedContext?.session || action.session),
+    questionId: safeString(action.serverResolvedContext?.questionId || action.questionId),
+    status: safeString(action.status || action.nextStep || 'recorded'),
+    publicLobby: true,
+  });
 }
 
 export function normalizeTelegramUpdate(update = {}) {

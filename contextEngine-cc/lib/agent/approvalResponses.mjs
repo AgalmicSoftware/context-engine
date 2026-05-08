@@ -18,6 +18,7 @@ export const AGENT_REQUEST_TYPES = Object.freeze({
   RESPONSE_SUBMIT: 'response_submit_request',
   RESPONSE_DELEGATED_EXECUTE: 'response_delegated_execute',
   CONNECT_GRANT: 'connect_grant_request',
+  ACCOUNT_LINK: 'account_link_request',
   QUESTION_CREATE: 'question_create_request',
   DECRYPT: 'decrypt_request',
   GRANT_REVOKE: 'grant_revoke_request',

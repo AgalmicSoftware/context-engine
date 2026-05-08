@@ -218,6 +218,20 @@ const ROUTE_INVENTORY_ENTRIES = [
   },
   {
     method: 'POST',
+    path: '/api/agent/accounts/create',
+    auth: ROUTE_AUTH.LOCAL_JWT,
+    owner: 'agent',
+    responseShape: 'managed demo account metadata creation or recovery result',
+  },
+  {
+    method: 'POST',
+    path: '/api/agent/accounts/link-request',
+    auth: ROUTE_AUTH.LOCAL_JWT,
+    owner: 'agent',
+    responseShape: 'approval-required account link request metadata',
+  },
+  {
+    method: 'POST',
     path: '/api/responses/submit-onchain',
     auth: ROUTE_AUTH.LOCAL_JWT,
     owner: 'response',

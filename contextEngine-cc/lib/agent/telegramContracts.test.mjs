@@ -3,11 +3,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import {
+  buildTelegramAnswerAction,
   buildTelegramCloudStoragePayload,
+  buildTelegramGroupBinding,
+  buildTelegramManagedAccountSummary,
   buildTelegramSecureStorageGrant,
+  createTelegramPrivateStartAction,
   createTelegramCallbackAction,
   normalizeTelegramUpdate,
   parseTelegramCallbackActionId,
+  parseTelegramPrivateStartPayload,
+  resolveTelegramPrivateStartAction,
+  summarizeTelegramGroupSafeAction,
   telegramInputToAgentDraft,
   validateTelegramMiniAppInitData,
 } from './telegramContracts.mjs';
@@ -39,6 +46,165 @@ test('Telegram callback data uses only an opaque short action id', () => {
     ok: true,
     actionId: 'cecb_a1b2c3d4',
   });
+});
+
+test('Telegram group-to-private bridge uses opaque deep-link payloads only', () => {
+  const questionId = `0x${'11'.repeat(32)}`;
+  const groupBinding = buildTelegramGroupBinding({
+    bindingId: 'cetg_groupalpha1',
+    group: { id: '-100123', type: 'supergroup', title: 'Alpha lobby' },
+    session: 'alpha',
+    questionId,
+    workerDeploymentId: 'worker-demo-1',
+    createdAt: '2026-05-07T00:00:00.000Z',
+  });
+  const startAction = createTelegramPrivateStartAction({
+    actionId: 'privateanswer1',
+    groupBinding,
+    botUsername: 'ce_demo_bot',
+    createdAt: '2026-05-07T00:01:00.000Z',
+  });
+
+  assert.equal(startAction.deepLinkPayload, 'cetg_privateanswer1');
+  assert.equal(Buffer.byteLength(startAction.deepLinkPayload, 'utf8') <= 64, true);
+  assert.equal(startAction.deepLinkPayload.includes('alpha'), false);
+  assert.equal(startAction.deepLinkPayload.includes(questionId), false);
+  assert.equal(startAction.deepLinkUrl, 'https://t.me/ce_demo_bot?start=cetg_privateanswer1');
+  assert.deepEqual(parseTelegramPrivateStartPayload(startAction.deepLinkPayload), {
+    ok: true,
+    actionId: 'cetg_privateanswer1',
+  });
+});
+
+test('Telegram private start resolves group context server-side and routes unknown participants to setup', () => {
+  const questionId = `0x${'22'.repeat(32)}`;
+  const groupBinding = buildTelegramGroupBinding({
+    bindingId: 'cetg_groupalpha2',
+    group: { id: '-100456', type: 'group', title: 'Alpha lobby' },
+    session: 'alpha',
+    questionId,
+    workerDeploymentId: 'worker-demo-1',
+  });
+  const startAction = createTelegramPrivateStartAction({
+    actionId: 'recoverctx2',
+    groupBinding,
+  });
+
+  const unknown = resolveTelegramPrivateStartAction({
+    startAction,
+    groupBinding,
+    participant: { id: 555, username: 'new_user' },
+    knownParticipant: false,
+  });
+  assert.equal(unknown.ok, true);
+  assert.equal(unknown.resolution.requiresPrivateAccountSetup, true);
+  assert.equal(unknown.resolution.nextStep, 'private_account_setup');
+  assert.equal(unknown.resolution.serverResolvedContext.session, 'alpha');
+  assert.equal(unknown.resolution.serverResolvedContext.questionId, questionId);
+  assert.equal(unknown.resolution.telegramPrincipal.principalId, 'telegram:555');
+
+  const known = resolveTelegramPrivateStartAction({
+    startAction,
+    groupBinding,
+    participant: { id: 555, username: 'new_user' },
+    knownParticipant: true,
+  });
+  assert.equal(known.resolution.requiresPrivateAccountSetup, false);
+  assert.equal(known.resolution.nextStep, 'answer_question');
+});
+
+test('Telegram group-safe summaries omit account state and answers', () => {
+  const questionId = `0x${'33'.repeat(32)}`;
+  const groupBinding = buildTelegramGroupBinding({
+    bindingId: 'cetg_groupsafe3',
+    group: { id: '-100789', type: 'supergroup' },
+    session: 'alpha',
+    questionId,
+  });
+  const startAction = createTelegramPrivateStartAction({ actionId: 'safeanswer3', groupBinding });
+  const resolution = resolveTelegramPrivateStartAction({
+    startAction,
+    groupBinding,
+    participant: { id: 777 },
+    knownParticipant: true,
+  }).resolution;
+  const account = buildTelegramManagedAccountSummary({
+    participant: { id: 777 },
+    accountAddress: '0xabc123',
+    privateKey: `0x${'44'.repeat(32)}`,
+    workerToken: 'Bearer local-token',
+    lifecycle: 'account_created',
+  });
+  const answerAction = buildTelegramAnswerAction({
+    resolution,
+    managedAccount: account,
+    answerRef: {
+      refId: 'answer-ref-1',
+      contentHash: `0x${'55'.repeat(32)}`,
+    },
+    draftRequestId: 'agent_req_draft1234',
+    submitRequestId: 'agent_req_submit1234',
+    answer: 'full answer text must not serialize',
+  });
+  const summary = summarizeTelegramGroupSafeAction(answerAction);
+
+  assert.equal(Object.hasOwn(summary, 'account'), false);
+  assert.equal(JSON.stringify(summary).includes('0xabc123'), false);
+  assert.equal(JSON.stringify(summary).includes('full answer text'), false);
+  assert.equal(Object.hasOwn(answerAction, 'answer'), false);
+  assert.equal(answerAction.account.signingAuthority, false);
+  assert.equal(answerAction.account.privateKeyAuthority, false);
+  assert.equal(JSON.stringify(answerAction).includes('Bearer local-token'), false);
+});
+
+test('Telegram duplicate callbacks resolve idempotently by opaque action id', () => {
+  const groupBinding = buildTelegramGroupBinding({
+    bindingId: 'cetg_groupidem4',
+    group: { id: '-100888', type: 'group' },
+    session: 'alpha',
+    questionId: `0x${'66'.repeat(32)}`,
+  });
+  const startAction = createTelegramPrivateStartAction({ actionId: 'idemanswer4', groupBinding });
+  const first = resolveTelegramPrivateStartAction({
+    startAction,
+    groupBinding,
+    participant: { id: 888 },
+    knownParticipant: true,
+  }).resolution;
+  const second = resolveTelegramPrivateStartAction({
+    startAction,
+    groupBinding,
+    participant: { id: 888 },
+    knownParticipant: true,
+  }).resolution;
+
+  assert.equal(first.actionId, second.actionId);
+  assert.deepEqual(first.serverResolvedContext, second.serverResolvedContext);
+  assert.equal(first.telegramPrincipal.principalId, second.telegramPrincipal.principalId);
+});
+
+test('Telegram bridge records reject serializable secret material', () => {
+  assert.throws(
+    () => buildTelegramGroupBinding({
+      group: { id: '-100999', title: 'Bearer local-token' },
+      session: 'alpha',
+      questionId: `0x${'77'.repeat(32)}`,
+      workerDeploymentId: 'worker-demo-1',
+    }),
+    /must not serialize secrets/,
+  );
+  assert.throws(
+    () => createTelegramPrivateStartAction({
+      actionId: 'secretcase1',
+      action: 'Bearer local-token',
+      groupBinding: {
+        group: { id: '-100999' },
+        session: 'alpha',
+        questionId: `0x${'88'.repeat(32)}`,
+      },
+    }),
+    /must not serialize secrets/,
+  );
 });
 
 test('Telegram callback action metadata rejects secret-shaped values', () => {
