@@ -16,6 +16,7 @@ import {
 import { buildSanitizedEnvelope, groupSafeQuestionSummary } from './sanitizedEnvelopes.mjs';
 import {
   evaluateResponseActionPolicy,
+  evaluateTelegramNormalSessionSubmit,
   normalizeSessionPolicy,
   resolveSessionInvocation,
 } from './sessionPolicy.mjs';
@@ -38,8 +39,15 @@ function nowIso(value, offsetMs = 0) {
   return new Date(base + offsetMs).toISOString();
 }
 
-function defaultPolicy(sessionSlug = 'general') {
-  return normalizeSessionPolicy({
+function questionMatchesSearch(question = {}, search = '') {
+  const needle = String(search || '').trim().toLowerCase();
+  if (!needle) return false;
+  return [question.questionId, question.id, question.title, question.prompt, question.questionText]
+    .map((value) => String(value || '').trim().toLowerCase())
+    .some((value) => value.includes(needle));
+}
+
+function defaultPolicy(sessionSlug = 'general') {  return normalizeSessionPolicy({
     defaultSessionSlug: sessionSlug,
     riskCeiling: RISK_CEILINGS.SUBMIT,
     allowQuestionGeneration: true,
@@ -72,6 +80,7 @@ export class MockTelegramTransportHarness {
     this.questions = Array.isArray(questions) && questions.length ? questions : [DEFAULT_QUESTION];
     this.rootSecret = rootSecret;
     this.actions = new Map();
+    this.responseActions = new Map();
     this.events = [];
   }
 
@@ -261,15 +270,17 @@ export class MockTelegramTransportHarness {
   poseQuestion({
     sessionSlug = this.sessionPolicy.defaultSessionSlug,
     questionId = '',
+    questionSearch = '',
     question = null,
     source = 'existing_session_question',
+    participant = {},
     createdAt = null,
   } = {}) {
     const resolved = resolveSessionInvocation(this.sessionPolicy, sessionSlug);
     if (!resolved.ok) return resolved;
     const selected = question || this.questions.find((entry) => (
       String(entry.questionId || entry.id || '').trim() === String(questionId || '').trim()
-    ));
+    )) || this.questions.find((entry) => questionMatchesSearch(entry, questionSearch));
     if (!selected) return { ok: false, reason: 'question_not_found' };
     const state = buildTelegramPoseQuestionState({
       sessionSlug: resolved.session.sessionSlug,
@@ -285,6 +296,7 @@ export class MockTelegramTransportHarness {
       summary: {
         action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
         source,
+        participantRole: String(participant.role || 'group_participant'),
         groupSafeOutput: state.groupSafeOutput,
       },
       refs: {
@@ -306,26 +318,44 @@ export class MockTelegramTransportHarness {
     answer = {},
     action = TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE,
     grant = {},
+    joinedSbtIds = [],
+    idempotencyKey = '',
     createdAt = null,
   } = {}) {
     const resolved = resolveSessionInvocation(this.sessionPolicy, answer.sessionSlug || this.sessionPolicy.defaultSessionSlug);
     if (!resolved.ok) return resolved;
-    const policy = evaluateResponseActionPolicy({
-      account,
-      grant,
-      session: resolved.session,
-      action,
-    });
+    const policy = action === TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE
+      ? evaluateTelegramNormalSessionSubmit({
+        account,
+        grant,
+        session: resolved.session,
+        action,
+        joinedSbtIds,
+      })
+      : evaluateResponseActionPolicy({
+        account,
+        grant,
+        session: resolved.session,
+        action,
+      });
     if (!policy.ok) return policy;
+    const effectiveAction = policy.effectiveAction || action;
+    const replayKey = String(idempotencyKey || '').trim().toLowerCase();
+    if (replayKey && this.responseActions.has(replayKey)) {
+      return {
+        ...this.responseActions.get(replayKey),
+        idempotentReplay: true,
+      };
+    }
     const eventType = {
       [TELEGRAM_BRIDGE_ACTIONS.SUGGEST_RESPONSE]: AGENT_BRIDGE_EVENT_TYPES.RESPONSE_SUGGESTED,
       [TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE]: AGENT_BRIDGE_EVENT_TYPES.DRAFT_SAVED,
       [TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE]: AGENT_BRIDGE_EVENT_TYPES.SUBMIT_REQUESTED,
       [TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE]: AGENT_BRIDGE_EVENT_TYPES.DIRECT_SUBMITTED,
-    }[action] || AGENT_BRIDGE_EVENT_TYPES.FAILED;
+    }[effectiveAction] || AGENT_BRIDGE_EVENT_TYPES.FAILED;
     const actionRecord = createOpaqueActionRecord({
-      seed: `${action}|${account.accountId}|${question.questionId}|${createdAt || ''}`,
-      action,
+      seed: `${effectiveAction}|${account.accountId}|${question.questionId}|${replayKey || createdAt || ''}`,
+      action: effectiveAction,
       lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
       serverContextRef: {
         accountId: account.accountId,
@@ -342,17 +372,20 @@ export class MockTelegramTransportHarness {
       sessionSlug: resolved.session.sessionSlug,
       questionId: question.questionId,
       summary: {
-        action,
+        action: effectiveAction,
+        directSubmitAllowed: policy.directSubmitAllowed === true,
+        fallbackCreated: policy.fallbackCreated === true,
         persisted: policy.persisted === true,
         requiresApproval: policy.requiresApproval === true,
         answerLabel: answer.answerLabel || null,
       },
       refs: {
         actionId: actionRecord.actionId,
+        idempotencyKey: replayKey || null,
       },
       createdAt,
     });
-    return {
+    const result = {
       ok: true,
       policy,
       actionRecord,
@@ -363,8 +396,9 @@ export class MockTelegramTransportHarness {
         status: eventType,
       },
     };
+    if (replayKey) this.responseActions.set(replayKey, result);
+    return result;
   }
-
   eventLogSummary() {
     return summarizeEventLog(this.events);
   }
