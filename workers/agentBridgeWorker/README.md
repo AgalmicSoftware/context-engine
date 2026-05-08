@@ -41,7 +41,9 @@ The group session-linked card says `Context Engine session linked: <session>` an
 
 `View Questions` reads the linked session through `GET /api/agent/questions`.
 `Pose Question` uses `/ce_pose_question` or `/q` to pose one existing or
-generated question to the group. The old `/ce_drop_question` command is only a
+generated question to the group. Anyone in the linked group may pose a question;
+the worker still enforces session linkage, opaque action ids, idempotent action
+refs, and public-safe output. The old `/ce_drop_question` command is only a
 deprecated compatibility alias. Private or gated question text is never posed to
 the group; group output shows a locked state and routes eligible accounts to
 private chat or Mini App.
@@ -103,7 +105,27 @@ storage profile where the session/general worker can enforce SBT gates before
 issuing upload permissions, snippets, short-lived reads, or download bytes. Lit
 is required only when the payload itself is intentionally Lit/client encrypted.
 The bridge exposes no Cloudflare credentials, bucket names, long-lived signed
-URLs, worker tokens, or raw storage paths.
+URLs, worker tokens, or raw storage paths. `/new` Advanced owns the selected
+storage profile. `/worker-setup` may display that profile but does not edit
+storage policy. Cloudflare profiles use R2 for bytes, D1 for queryable metadata
+and audit/index records, KV for short-lived action/replay/start refs, and Durable
+Objects for managed signer runtime and coordination locks.
+
+## Normal Session Submit
+
+Managed Telegram demo accounts can submit to normal CE sessions when the linked
+session is available, ordinary join/SBT gates pass, session policy allows
+managed demo submit, and the scoped grant includes `direct_submit_response`. If
+that direct path is denied, the worker creates a canonical submit request or
+draft. Group summaries include only status/count refs; response text and account
+state stay private.
+
+## Mock OpenClaw Forwarding
+
+`openclawForwarding.mjs` models contract-only forwarding for delivered questions,
+drafts, submit requests, approvals, failures, and final status. Envelopes contain
+safe summaries, opaque refs, and canonical `/api/agent/*` routes only. Real
+OpenClaw HTTP/MCP transport is deferred.
 
 ## Question Cards
 
