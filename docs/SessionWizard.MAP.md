@@ -22,6 +22,7 @@
 - Start in `sessionWizardContracts.js` for contract defaults, visible contract keys, or registry-address resolution.
 - Start in `sessionWizardSecrets.ts` for post-deploy worker config sync, secrets sync, or deploy warning/status handling.
 - Start in `sessionWizardWriteNormalization.ts` for worker payload normalization, on-chain compatibility fields, or metadata serialization rules.
+- Start in `sessionWizardStorageProfile.ts` for `/new` Advanced session storage profile defaults and Cloudflare primitive metadata.
 - Start in `CreateSBTGroup.tsx` only when the issue is inside the deferred SBT authoring modal itself; `SessionWizard.tsx` mainly launches and reconciles that flow.
 
 ## Practical Hierarchy
@@ -36,6 +37,7 @@ SessionWizard.tsx
   -> sessionWizardContracts.js
   -> sessionWizardSecrets.ts
   -> sessionWizardWriteNormalization.ts
+  -> sessionWizardStorageProfile.ts
   -> CreateSBTGroup.tsx
   -> ContractViewer.tsx
 ```
@@ -104,6 +106,7 @@ bundle link / imported bundle
 | `encryptionGates` | Session-level gate definitions | Drives lock UI, sponsored resource gates, and Lit defaults |
 | `pendingSbtDrafts` | Deferred SBT drafts waiting for publish-time finalize/deploy | Pins slug-sensitive state and injects deploy work into publish flow |
 | `workerSecrets` / `workerSecretsEnabled` | Worker-side secrets and whether the wizard should manage them | Controls deploy validation and post-deploy secret sync |
+| `draft.storageProfile` | Advanced-mode session-owned storage profile | Defaults to Arweave; Cloudflare mode records worker-enforced R2/D1/KV/Durable Object primitives without making `/worker-setup` own storage policy |
 | `deployForm` / `deployWorkerUrl` / `deployComplete` | Worker deploy input and result state | Drives worker verification UI and publish readiness |
 | `publishStep` / `publishBusy` | Publish progress state | Feeds progress UI and controls which step label is shown |
 | `slugAvailability` | Async slug-check result | Blocks invalid publish/deploy attempts early |
