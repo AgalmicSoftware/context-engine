@@ -20,6 +20,8 @@ const CACHE_DIR = resolve(DATA_DIR, 'question-cache');
 const RESPONSES_DIR = resolve(DATA_DIR, 'responses');
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const QUESTION_SCAN_TIMEOUT_MS = 3_000;
+const ON_CHAIN_ANSWERED_TIMEOUT_MS = 2_500;
 const questionIdCache = new Map(); // slug → { ids: Set, ts }
 const questionDataCache = new Map(); // questionId → questionPayload
 // key includes slug + wallet + chain + surveys + question-id fingerprint -> { ids: Set<string>, ts: number }
@@ -35,6 +37,27 @@ function normalizePositiveBlockNumber(value) {
   const raw = Number(value);
   if (!Number.isFinite(raw) || raw <= 0) return null;
   return Math.floor(raw);
+}
+
+function normalizeTimeoutMs(value, fallbackMs) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return fallbackMs;
+  return Math.floor(raw);
+}
+
+async function withTimeout(promise, timeoutMs, label) {
+  const effectiveTimeoutMs = normalizeTimeoutMs(timeoutMs, QUESTION_SCAN_TIMEOUT_MS);
+  let timeoutId = null;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${effectiveTimeoutMs}ms`));
+    }, effectiveTimeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
 function simpleHash(str) {
@@ -241,6 +264,10 @@ export async function fetchQuestionIds(slug, deps = {}) {
   const scanQuestionIdsImpl = typeof deps.scanQuestionIds === 'function'
     ? deps.scanQuestionIds
     : scanQuestionIds;
+  const questionScanTimeoutMs = normalizeTimeoutMs(
+    deps.questionScanTimeoutMs,
+    normalizeTimeoutMs(process.env.CE_CC_QUESTION_SCAN_TIMEOUT_MS, QUESTION_SCAN_TIMEOUT_MS),
+  );
 
   // Check cache freshness
   const cached = questionIdCache.get(slug);
@@ -270,13 +297,22 @@ export async function fetchQuestionIds(slug, deps = {}) {
   debug(`[questions] Fetching question IDs for session "${slug}" (surveys=${surveysAddress}, chain=${chainId}, startBlock=${sessionStartBlock || 'fallback'}, endBlock=${sessionEndBlock || 'latest'})`);
 
   try {
-    const ids = await scanQuestionIdsImpl(surveysAddress, chainId, sessionStartBlock, sessionEndBlock);
+    const ids = await withTimeout(
+      scanQuestionIdsImpl(surveysAddress, chainId, sessionStartBlock, sessionEndBlock),
+      questionScanTimeoutMs,
+      `Question scan for session "${slug}"`,
+    );
     questionIdCache.set(slug, { ids, ts: Date.now() });
     return ids;
   } catch (err) {
     error(`[questions] Failed to scan question IDs for ${slug}:`, err.message);
     const diskIds = loadAllCachedQuestionIds(slug);
-    return new Set(diskIds);
+    const fallbackIds = new Set(diskIds);
+    if (fallbackIds.size > 0) {
+      warn(`[questions] Falling back to ${fallbackIds.size} cached question IDs for session "${slug}"`);
+      questionIdCache.set(slug, { ids: fallbackIds, ts: Date.now() });
+    }
+    return fallbackIds;
   }
 }
 
@@ -350,6 +386,10 @@ async function getOnChainAnsweredQuestionIds(slug, questionIds, walletAddress) {
   const normalizedSurveysAddress = String(surveysAddress).toLowerCase();
   const idsFingerprint = simpleHash(validIds.slice().sort().join(','));
   const cacheKey = `${slug}:${wallet}:${chainId}:${normalizedSurveysAddress}:${validIds.length}:${idsFingerprint}`;
+  const onChainAnsweredTimeoutMs = normalizeTimeoutMs(
+    process.env.CE_CC_ONCHAIN_ANSWERED_TIMEOUT_MS,
+    ON_CHAIN_ANSWERED_TIMEOUT_MS,
+  );
 
   const cached = onChainAnsweredCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < ON_CHAIN_ANSWERED_CACHE_TTL_MS) {
@@ -398,9 +438,18 @@ async function getOnChainAnsweredQuestionIds(slug, questionIds, walletAddress) {
     return answered;
   })();
 
-  pendingOnChainAnswered.set(cacheKey, fetchPromise);
+  const timedFetchPromise = withTimeout(
+    fetchPromise,
+    onChainAnsweredTimeoutMs,
+    `On-chain answered lookup for session "${slug}"`,
+  );
+
+  pendingOnChainAnswered.set(cacheKey, timedFetchPromise);
   try {
-    return await fetchPromise;
+    return await timedFetchPromise;
+  } catch (err) {
+    warn(`[questions] Falling back to local answered-state for "${slug}": ${err.message}`);
+    return new Set();
   } finally {
     pendingOnChainAnswered.delete(cacheKey);
   }
@@ -723,4 +772,5 @@ export const __test__questions = {
   getSessionQuestionBlockLimits,
   normalizePositiveBlockNumber,
   resolveQuestionScanToBlock,
+  withTimeout,
 };

@@ -7,7 +7,7 @@ function stripAnsi(value) {
   return String(value || '').replace(/\x1b\[[0-9;]*m/g, '');
 }
 
-test('renderStatusLine shows progress, cooldown, and latest question summary', () => {
+test('renderStatusLine shows progress, cooldown, and an explicit phase summary when enabled', () => {
   const output = stripAnsi(renderStatusLine({
     hasToken: true,
     wallet: '0x1111111111111111111111111111111111111111',
@@ -41,18 +41,51 @@ test('renderStatusLine shows progress, cooldown, and latest question summary', (
     cwd: '/tmp/memewars',
   }));
 
-  assert.match(output, /CE/);
+  assert.match(output, /context-engine/);
   assert.match(output, /0x1111\.\.\.1111/);
   assert.match(output, /2 sessions/);
   assert.match(output, /3 pending/);
-  assert.match(output, /submit ready/);
-  assert.match(output, /60%/);
+  assert.doesNotMatch(output, /submit ready/);
   assert.match(output, /12\/20/);
+  assert.doesNotMatch(output, /60%/);
   assert.match(output, /1m 15s/);
   assert.match(output, /freeform: What changed this week\?/);
+  assert.match(output, /press q for question/);
+  assert.doesNotMatch(output, /\n/);
 });
 
-test('renderStatusLine flags worker auth gaps separately from submit readiness', () => {
+test('renderStatusLine keeps compact progress visible without passive ready noise', () => {
+  const output = stripAnsi(renderStatusLine({
+    hasToken: true,
+    wallet: '0x1111111111111111111111111111111111111111',
+    config: {
+      serverUrl: 'http://localhost:7391',
+      selectedSessions: ['alpha'],
+    },
+    totals: {
+      sessions: 1,
+      pending: 0,
+      answered: 3,
+      total: 5,
+    },
+    cooldown: {
+      active: false,
+      remainingMs: 0,
+    },
+  }, {
+    cwd: '/tmp/context-engine',
+  }));
+
+  assert.match(output, /context-engine/);
+  assert.match(output, /3\/5/);
+  assert.match(output, /[█░]{4,}/);
+  assert.match(output, /press q for question/);
+  assert.doesNotMatch(output, /0 pending/);
+  assert.doesNotMatch(output, /⏱ ready/);
+  assert.doesNotMatch(output, /\n/);
+});
+
+test('renderStatusLine keeps only the actionable session sign-in warning', () => {
   const output = stripAnsi(renderStatusLine({
     hasToken: true,
     wallet: '0x1111111111111111111111111111111111111111',
@@ -80,11 +113,11 @@ test('renderStatusLine flags worker auth gaps separately from submit readiness',
     },
   }));
 
-  assert.match(output, /submit ready/);
-  assert.match(output, /worker auth needed/);
+  assert.match(output, /session sign-in needed/);
+  assert.doesNotMatch(output, /submit ready/);
 });
 
-test('renderStatusLine shows ready-question hints without prompt text', () => {
+test('renderStatusLine does not show automatic ready-question hints by default', () => {
   const output = stripAnsi(renderStatusLine({
     hasToken: true,
     wallet: '0x1111111111111111111111111111111111111111',
@@ -113,8 +146,37 @@ test('renderStatusLine shows ready-question hints without prompt text', () => {
     },
   }));
 
-  assert.match(output, /binary ready in alpha/);
+  assert.match(output, /press q for question/);
+  assert.doesNotMatch(output, /binary ready in alpha/);
   assert.doesNotMatch(output, /This prompt should not be rendered/);
+  assert.doesNotMatch(output, /\n/);
+});
+
+test('renderStatusLine suppresses passive offline and stale cache labels', () => {
+  const output = stripAnsi(renderStatusLine({
+    hasToken: true,
+    wallet: '0x1111111111111111111111111111111111111111',
+    config: {
+      serverUrl: 'http://localhost:7391',
+      selectedSessions: ['alpha'],
+    },
+    totals: {
+      sessions: 1,
+      pending: 0,
+      answered: 2,
+      total: 5,
+    },
+    cooldown: {
+      active: false,
+      remainingMs: 0,
+    },
+    offline: true,
+    stale: true,
+  }));
+
+  assert.doesNotMatch(output, /offline/);
+  assert.doesNotMatch(output, /showing cache/);
+  assert.doesNotMatch(output, /stale/);
 });
 
 test('renderStatusLine shows auth-required guidance when token is unavailable', () => {
@@ -126,7 +188,7 @@ test('renderStatusLine shows auth-required guidance when token is unavailable', 
     },
   }));
 
-  assert.match(output, /CE/);
+  assert.match(output, /context-engine/);
   assert.match(output, /auth required/);
   assert.match(output, /localhost:7391/);
   assert.match(output, /authenticate and select a session/i);
@@ -144,5 +206,5 @@ test('renderStatusLine counts an explicit general defaultSession as a configured
   }));
 
   assert.match(output, /1 session selected/);
-  assert.match(output, /sign in to load progress/);
+  assert.match(output, /authenticate and select a session/i);
 });

@@ -287,7 +287,7 @@ function debugLog(msg) {
 
 // --- Main ---
 
-async function main() {
+export async function main() {
   try {
     // 0. Read hook input and load config (needed for threshold settings)
     const hookInput = readStdin();
@@ -588,4 +588,15 @@ async function main() {
   }
 }
 
-main();
+function isMainModule() {
+  try {
+    const entry = process.argv[1] ? resolve(process.argv[1]) : '';
+    return entry === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  main();
+}

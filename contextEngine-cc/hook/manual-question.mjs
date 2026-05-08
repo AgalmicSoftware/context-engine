@@ -29,6 +29,33 @@ function getConfiguredSessions(config = {}) {
   });
 }
 
+function buildSubmitMeta(payload, fallbackSession = '') {
+  const question = payload?.question && typeof payload.question === 'object'
+    ? payload.question
+    : {};
+  const defaults = payload?.defaults && typeof payload.defaults === 'object'
+    ? payload.defaults
+    : {};
+  const session = String(question.session || fallbackSession || '').trim();
+  const meta = {
+    questionId: String(question.id || '').trim(),
+    session,
+    questionType: String(question.type || 'unknown').trim() || 'unknown',
+    answerEncryptionAudience: String(
+      defaults.answerEncryptionAudience || (defaults.encrypt ? 'self' : 'none')
+    ).trim() || 'none',
+    additionalEncryptionAudience: 'follow',
+  };
+  if (defaults.encrypt === true) {
+    meta.encrypt = true;
+  }
+  const answerEncryptionGateId = String(defaults.answerEncryptionGateId || '').trim();
+  if (answerEncryptionGateId) {
+    meta.answerEncryptionGateId = answerEncryptionGateId;
+  }
+  return meta;
+}
+
 function httpGet(urlStr, headers = {}, timeoutMs = 8000) {
   return new Promise((resolveGet, rejectGet) => {
     const url = new URL(urlStr);
@@ -70,7 +97,7 @@ async function main() {
       ok: false,
       status: 'auth-required',
       signInUrl: serverUrl,
-      message: `Open ${serverUrl} and sign in with passkey/SIWE, then press q again.`,
+      message: `Open ${serverUrl} and sign in with passkey, then press q again.`,
     });
     return;
   }
@@ -103,7 +130,7 @@ async function main() {
         ok: false,
         status: 'auth-required',
         signInUrl: serverUrl,
-        message: `Open ${serverUrl} and sign in with passkey/SIWE, then press q again.`,
+        message: `Open ${serverUrl} and sign in with passkey, then press q again.`,
       });
       return;
     }
@@ -120,6 +147,10 @@ async function main() {
     if (payload.question) {
       writeJson({
         ...payload,
+        session: String(payload?.question?.session || session || '').trim(),
+        questionId: String(payload?.question?.id || '').trim(),
+        questionType: String(payload?.question?.type || 'unknown').trim() || 'unknown',
+        submitMeta: buildSubmitMeta(payload, session),
         ok: true,
         status: 'question',
         source: 'manual-question',

@@ -75,6 +75,16 @@ test('manual question helper fetches compact questions without raw formatted out
     assert.equal(body.presentation, 'compact');
     assert.equal(body.formatted, undefined);
     assert.equal(body.question.prompt, 'A compact question?');
+    assert.equal(body.session, 'alpha');
+    assert.equal(body.questionId, '0x' + '12'.repeat(32));
+    assert.equal(body.questionType, 'binary');
+    assert.deepEqual(body.submitMeta, {
+      questionId: '0x' + '12'.repeat(32),
+      session: 'alpha',
+      questionType: 'binary',
+      answerEncryptionAudience: 'none',
+      additionalEncryptionAudience: 'follow',
+    });
     assert.match(seenRequest.url, /presentation=compact/);
     assert.match(seenRequest.url, /reason=manual/);
     assert.equal(seenRequest.auth, 'Bearer manual-token');
@@ -98,6 +108,8 @@ test('manual question helper reports auth-required without a token', async () =>
   assert.equal(body.ok, false);
   assert.equal(body.status, 'auth-required');
   assert.equal(body.signInUrl, 'http://127.0.0.1:7391');
+  assert.match(body.message, /sign in with passkey/i);
+  assert.doesNotMatch(body.message, /SIWE/i);
 });
 
 test('manual question helper reports server-unavailable without failing the process', async () => {
