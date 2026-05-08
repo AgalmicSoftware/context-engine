@@ -220,3 +220,67 @@ export function evaluateResponseActionPolicy({
   }
   return { ok: false, reason: 'unknown_response_action' };
 }
+
+export function evaluateTelegramNormalSessionSubmit({
+  account = {},
+  grant = {},
+  session = {},
+  action = TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+  joinedSbtIds = [],
+  fallbackWhenDirectDenied = true,
+} = {}) {
+  const gate = evaluateSessionSbtGateJoin(session, { joinedSbtIds });
+  if (!gate.ok) {
+    return {
+      ok: false,
+      reason: 'session_sbt_gate_required',
+      gate,
+      effectiveAction: null,
+    };
+  }
+
+  const direct = evaluateResponseActionPolicy({
+    account,
+    grant,
+    session,
+    action,
+  });
+  if (direct.ok) {
+    return {
+      ...direct,
+      ok: true,
+      mode: action === TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE ? 'direct_submit' : action,
+      effectiveAction: action,
+      directSubmitAllowed: action === TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+      gate,
+    };
+  }
+
+  if (action !== TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE || fallbackWhenDirectDenied !== true) {
+    return { ...direct, gate, effectiveAction: null };
+  }
+
+  const allowedActions = Array.isArray(grant.allowedActions) ? grant.allowedActions : [];
+  const fallbackAction = allowedActions.includes(TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE)
+    ? TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE
+    : TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE;
+  const fallback = evaluateResponseActionPolicy({
+    account,
+    grant,
+    session,
+    action: fallbackAction,
+  });
+  return {
+    ...fallback,
+    ok: fallback.ok === true,
+    reason: fallbackAction === TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE
+      ? 'direct_submit_denied_submit_request_created'
+      : 'direct_submit_denied_draft_created',
+    deniedDirectSubmitReason: direct.reason,
+    directSubmitAllowed: false,
+    fallbackCreated: true,
+    effectiveAction: fallbackAction,
+    mode: fallbackAction === TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE ? 'submit_request' : 'draft',
+    gate,
+  };
+}

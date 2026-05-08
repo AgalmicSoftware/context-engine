@@ -219,3 +219,143 @@ test('suggest responses are ephemeral while draft responses are saved', async ()
   assert.equal(draft.policy.persisted, true);
   assert.equal(submitRequest.policy.requiresApproval, true);
 });
+
+
+test('managed Telegram demo accounts submit to normal sessions when gates and grants allow', async () => {
+  const harness = new MockTelegramTransportHarness({
+    sessionPolicy: {
+      defaultSessionSlug: 'normal-room',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'normal-room',
+        sessionName: 'Normal Room',
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+      }],
+    },
+  });
+  const account = (await harness.createOrRecoverManagedAccount({
+    principal: { telegramUserId: '88' },
+  })).account;
+  const first = harness.answerQuestion({
+    account,
+    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+    answer: { sessionSlug: 'normal-room', answer: 'private response text' },
+    grant: {
+      allowedActions: [TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE],
+      riskCeiling: 'submit',
+    },
+    idempotencyKey: 'telegram:normal-room:q1:answer1',
+  });
+  const replay = harness.answerQuestion({
+    account,
+    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+    answer: { sessionSlug: 'normal-room', answer: 'changed text ignored by idempotency' },
+    grant: {
+      allowedActions: [TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE],
+      riskCeiling: 'submit',
+    },
+    idempotencyKey: 'telegram:normal-room:q1:answer1',
+  });
+
+  assert.equal(first.ok, true);
+  assert.equal(first.policy.directSubmitAllowed, true);
+  assert.equal(first.groupSafeSummary.status, AGENT_BRIDGE_EVENT_TYPES.DIRECT_SUBMITTED);
+  assert.equal(replay.idempotentReplay, true);
+  assert.equal(replay.actionRecord.actionId, first.actionRecord.actionId);
+  assert.equal(harness.events.filter((event) => event.eventType === AGENT_BRIDGE_EVENT_TYPES.DIRECT_SUBMITTED).length, 1);
+  assert.equal(JSON.stringify(harness.events).includes('private response text'), false);
+  assert.equal(JSON.stringify(first).includes('changed text'), false);
+});
+
+test('normal-session submit respects SBT gates and falls back when direct submit is not allowed', async () => {
+  const harness = new MockTelegramTransportHarness({
+    sessionPolicy: {
+      defaultSessionSlug: 'gated-room',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'gated-room',
+        sessionName: 'Gated Room',
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: false,
+        requiredSbtGroups: [{ sbtId: 'alpha-pass', groupId: 'alpha-pass', joinMode: 'public' }],
+      }],
+    },
+  });
+  const account = (await harness.createOrRecoverManagedAccount({
+    principal: { telegramUserId: '99' },
+  })).account;
+  const blocked = harness.answerQuestion({
+    account,
+    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+    answer: { sessionSlug: 'gated-room', answerLabel: 'Agree' },
+    grant: {
+      allowedActions: [TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE],
+      riskCeiling: 'submit',
+    },
+  });
+  const fallback = harness.answerQuestion({
+    account,
+    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+    joinedSbtIds: ['alpha-pass'],
+    answer: { sessionSlug: 'gated-room', answerLabel: 'Agree' },
+    grant: {
+      allowedActions: [TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE],
+      riskCeiling: 'submit',
+    },
+  });
+  const draftFallback = harness.answerQuestion({
+    account,
+    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+    joinedSbtIds: ['alpha-pass'],
+    answer: { sessionSlug: 'gated-room', answerLabel: 'Unsure' },
+    grant: {
+      allowedActions: [],
+      riskCeiling: 'submit',
+    },
+  });
+
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.reason, 'session_sbt_gate_required');
+  assert.equal(fallback.ok, true);
+  assert.equal(fallback.policy.directSubmitAllowed, false);
+  assert.equal(fallback.policy.reason, 'direct_submit_denied_submit_request_created');
+  assert.equal(fallback.actionRecord.action, TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE);
+  assert.equal(fallback.groupSafeSummary.status, AGENT_BRIDGE_EVENT_TYPES.SUBMIT_REQUESTED);
+  assert.equal(draftFallback.actionRecord.action, TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE);
+  assert.equal(draftFallback.groupSafeSummary.status, AGENT_BRIDGE_EVENT_TYPES.DRAFT_SAVED);
+});
+
+test('any linked group participant can pose an existing question by id or search without leaking gated prompts', () => {
+  const harness = new MockTelegramTransportHarness({
+    sessionPolicy: {
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+      }],
+    },
+    questions: [
+      { questionId: 'q-roadmap', prompt: 'Which roadmap item should Alpha pose next?' },
+      { questionId: 'q-private', prompt: 'Private eligibility context', visibility: 'private' },
+    ],
+  });
+
+  const bySearch = harness.poseQuestion({
+    sessionSlug: 'alpha',
+    questionSearch: 'roadmap',
+    participant: { role: 'member' },
+  });
+  const missingSession = harness.poseQuestion({ sessionSlug: 'missing', questionId: 'q-roadmap' });
+  const locked = harness.poseQuestion({ sessionSlug: 'alpha', questionId: 'q-private' });
+
+  assert.equal(bySearch.ok, true);
+  assert.equal(bySearch.poseState.action.targetLane, 'telegram_group_lobby');
+  assert.equal(bySearch.groupSafeOutput.questionText, 'Which roadmap item should Alpha pose next?');
+  assert.equal(missingSession.reason, 'session_not_linked');
+  assert.equal(locked.groupSafeOutput.locked, true);
+  assert.equal(locked.groupSafeOutput.questionText, null);
+  assert.equal(JSON.stringify(locked).includes('Private eligibility context'), false);
+  assert.equal(harness.events.find((event) => event.questionId === 'q-roadmap').summary.participantRole, 'member');
+});
