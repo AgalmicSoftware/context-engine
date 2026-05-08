@@ -2734,7 +2734,7 @@ const SessionWizard = ({
               ) : null}
               {storageProfile.backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE ? (
                 <div className={styles.helperText}>
-                  Cloudflare storage config uses R2, D1, KV, and Durable Objects through the session worker.
+                  Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.
                 </div>
               ) : null}
             </>

@@ -17,11 +17,44 @@ const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 ||
 const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
 
 const safeSlugPart = (value) => trim(value || 'general').toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '') || 'general';
-const buildCloudflareStorageId = ({ randomUUID, now = Date.now } = {}) => {
-  const raw = typeof randomUUID === 'function'
-    ? randomUUID()
-    : `ts-${now()}-${Math.random().toString(36).slice(2)}`;
-  return `cf_${trim(raw).toLowerCase().replace(/[^a-z0-9._:-]+/g, '')}`.slice(0, 120);
+const bytesToBase64url = (bytes) => {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  }
+  let binary = '';
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+const fillDeterministicBytes = (seed) => {
+  const source = encoder.encode(trim(seed) || `ts-${Date.now()}-${Math.random()}`);
+  const bytes = new Uint8Array(32);
+  for (let index = 0; index < bytes.length; index += 1) {
+    bytes[index] = source[index % source.length] ^ ((index * 31) & 0xff);
+  }
+  return bytes;
+};
+const buildCloudflareStorageId = ({ randomBytes, randomUUID, getRandomValues: getRandomValuesDep, now = Date.now } = {}) => {
+  const bytes = new Uint8Array(32);
+  const suppliedBytes = typeof randomBytes === 'function' ? randomBytes() : null;
+  const getRandomValues = typeof getRandomValuesDep === 'function'
+    ? getRandomValuesDep
+    : globalThis?.crypto?.getRandomValues?.bind(globalThis.crypto);
+  if (suppliedBytes && suppliedBytes.length >= 32) {
+    bytes.set(new Uint8Array(suppliedBytes).slice(0, 32));
+  } else if (typeof getRandomValues === 'function') {
+    getRandomValues(bytes);
+  } else {
+    bytes.set(fillDeterministicBytes(
+      typeof randomUUID === 'function'
+        ? randomUUID()
+        : `ts-${now()}-${Math.random().toString(36).slice(2)}`
+    ));
+  }
+  // Contract pointer fields are bytes32. Keeping Cloudflare refs to the same
+  // 32-byte base64url shape lets existing bytes32 helpers round-trip the id
+  // without exposing any bucket/key/account details.
+  bytes[0] &= 0xf7;
+  return bytesToBase64url(bytes);
 };
 const buildObjectKey = ({ slug, id }) => `sessions/${safeSlugPart(slug)}/storage/${id}`;
 const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${safeSlugPart(slug)}:${trim(resource) || 'docsContext'}:${id}`;
@@ -149,7 +182,12 @@ const handleCloudflareUpload = async ({ env, slug, payload, baseHeaders, deps })
     return responseJson(deps, { error: 'Cloudflare storage binding not configured.' }, 501, baseHeaders);
   }
 
-  const id = buildCloudflareStorageId({ randomUUID: deps?.randomUUID, now: deps?.now });
+  const id = buildCloudflareStorageId({
+    randomBytes: deps?.randomBytes,
+    randomUUID: deps?.randomUUID,
+    getRandomValues: deps?.getRandomValues,
+    now: deps?.now,
+  });
   if (!isSafeCloudflareStorageRefId(id)) {
     return responseJson(deps, { error: 'Failed to create safe Cloudflare storage reference.' }, 500, baseHeaders);
   }

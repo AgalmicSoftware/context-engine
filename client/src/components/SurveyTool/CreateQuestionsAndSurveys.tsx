@@ -63,6 +63,7 @@ import {
   getLegacyArweaveTxId,
   resolvePayloadStorageRef,
 } from '../../utilities/storage/storageRefs.js';
+import { usesCloudflareSessionStorage } from '../../utilities/storage/sessionStorageConfig.js';
 import { mergeSessionContractMaps, resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -3044,25 +3045,28 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         });
         const surveyDataString = JSON.stringify(completeSurveyData);
         let surveyArweaveTxId = '';
-        try {
-          surveyArweaveTxId = String(
-            await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
-              arweaveJwk: arweaveKey?.arweaveJwk || '',
-              sessionSlug,
-              sessionConfig,
-              context: {
-                account: this.props.account,
-                providerLike: this.props.provider,
-                chainId: chainIdFallback,
-              },
-            }) || ''
-          );
-        } catch (error: unknown) {
-          const resettableError = error as { resetSubmitProgress?: boolean };
-          if (error && typeof error === 'object') {
-            resettableError.resetSubmitProgress = true;
+        const cloudflareSurveyStorage = usesCloudflareSessionStorage(sessionConfig, { resource: 'surveys' });
+        if (!cloudflareSurveyStorage) {
+          try {
+            surveyArweaveTxId = String(
+              await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
+                arweaveJwk: arweaveKey?.arweaveJwk || '',
+                sessionSlug,
+                sessionConfig,
+                context: {
+                  account: this.props.account,
+                  providerLike: this.props.provider,
+                  chainId: chainIdFallback,
+                },
+              }) || ''
+            );
+          } catch (error: unknown) {
+            const resettableError = error as { resetSubmitProgress?: boolean };
+            if (error && typeof error === 'object') {
+              resettableError.resetSubmitProgress = true;
+            }
+            throw error;
           }
-          throw error;
         }
 
         // Step 2: on-chain
