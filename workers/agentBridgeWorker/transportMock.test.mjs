@@ -24,6 +24,7 @@ test('mock Telegram group-to-private transport runs the managed account answer l
     'Join Session',
     'View Questions',
     'View / Add Docs',
+    'Pose Question',
   ]);
   assert.equal(JSON.stringify(result.groupCard).includes('Answer Privately'), false);
   assert.equal(result.groupCard.publicSummary.question.questionText.includes('Telegram account lane'), true);
@@ -79,6 +80,7 @@ test('group lobby defaults to viewing questions and exposes add/generate by poli
     'Join Session',
     'View Questions',
     'View / Add Docs',
+    'Pose Question',
   ]);
   assert.deepEqual(card.groupSafeCard.publicSummary.policyActions.map((button) => button.action), [
     TELEGRAM_BRIDGE_ACTIONS.ADD_QUESTION,
@@ -88,14 +90,14 @@ test('group lobby defaults to viewing questions and exposes add/generate by poli
   assert.equal(event.summary.defaultAction, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
   assert.equal(event.summary.addQuestionAvailable, true);
   assert.equal(event.summary.generateQuestionAvailable, true);
-  assert.deepEqual(event.summary.buttons, ['Join Session', 'View Questions', 'View / Add Docs']);
+  assert.deepEqual(event.summary.buttons, ['Join Session', 'View Questions', 'View / Add Docs', 'Pose Question']);
   assert.deepEqual(event.summary.policyActions, [
     TELEGRAM_BRIDGE_ACTIONS.ADD_QUESTION,
     TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION,
   ]);
 });
 
-test('view questions lists existing session questions and pose q posts group-safe output', () => {
+test('view questions lists existing session questions and pose question posts group-safe output', () => {
   const harness = new MockTelegramTransportHarness({
     sessionPolicy: {
       defaultSessionSlug: 'alpha',
