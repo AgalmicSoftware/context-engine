@@ -171,10 +171,7 @@ export const normalizeStorageRef = (input: unknown, {
   return next;
 };
 
-export const deriveStorageRefFromLegacyArweaveTxId = (
-  arweaveTxId: unknown,
-  opts: LegacyStorageRefOptions = {}
-): StorageRef | null => {
+export const deriveStorageRefFromLegacyArweaveTxId = (arweaveTxId, opts = {}) => {
   const txId = trim(arweaveTxId);
   if (!txId) return null;
   return normalizeStorageRef(
@@ -189,10 +186,7 @@ export const deriveStorageRefFromLegacyArweaveTxId = (
   );
 };
 
-export const resolvePayloadStorageRef = (
-  record: unknown,
-  opts: LegacyStorageRefOptions = {}
-): StorageRef | null => {
+export const resolvePayloadStorageRef = (record, opts = {}) => {
   const raw = isObj(record) ? record : {};
   const isEncrypted = opts.encrypted ?? raw.encrypted ?? raw.payloadEncrypted;
   const fallbackBackend = opts.fallbackBackend || (isEncrypted ? STORAGE_BACKENDS.LIT_ARWEAVE : STORAGE_BACKENDS.ARWEAVE);
@@ -217,10 +211,7 @@ export const resolvePayloadStorageRef = (
   });
 };
 
-export const getLegacyArweaveTxId = (
-  record: unknown,
-  opts: NormalizeStorageRefOptions = {}
-): string => {
+export const getLegacyArweaveTxId = (record, opts = {}) => {
   if (!isObj(record)) return trim(record);
   const storageRef = record.storageRef
     ? normalizeStorageRef(record.storageRef, {
@@ -234,10 +225,7 @@ export const getLegacyArweaveTxId = (
   return trim(record.arweaveTxId || record.txId || opts.legacyArweaveTxId);
 };
 
-export const attachStorageRefCompatibilityFields = (
-  record: unknown,
-  opts: LegacyStorageRefOptions = {}
-): UnknownRecord => {
+export const attachStorageRefCompatibilityFields = (record, opts = {}) => {
   const source = isObj(record) ? { ...record } : {};
   const storageRef = resolvePayloadStorageRef(source, opts);
   if (!storageRef) return source;
@@ -253,7 +241,7 @@ export const storageRefFromLegacyArweaveTxId = deriveStorageRefFromLegacyArweave
 export const normalizeStorageRefForRecord = resolvePayloadStorageRef;
 export const withStorageRefCompatibility = attachStorageRefCompatibilityFields;
 
-export const assertNoCloudflarePrivateMaterial = (value: unknown): true => {
+export const assertNoCloudflarePrivateMaterial = (value) => {
   const text = typeof value === 'string' ? value : JSON.stringify(value || {});
   if (/(r2:\/\/|d1:\/\/|kv:\/\/|bucket[-_\s]?name|account[-_\s]?id|api[-_\s]?token|worker[-_\s]?token|secret|private[-_\s]?key)/i.test(text as string)) {
     throw new Error('Cloudflare storage references must not expose private storage identifiers or credentials.');
