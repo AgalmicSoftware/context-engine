@@ -122,7 +122,7 @@ You need:
 - An API token with Workers-related permissions. The wizard expects the same scope used by the deploy-helper flow described in [session-cors-worker.md](session-cors-worker.md).
 - Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/reference/template/>
 
-In practice, the deploy flow needs permission to manage Workers scripts, Workers KV, and the account-level settings needed to enable a `workers.dev` subdomain.
+In practice, the deploy flow needs least-privilege permission to manage Workers scripts, Workers KV, R2 buckets/objects for CE payload blobs, D1 or KV metadata/index resources where configured, Durable Objects only for signer/runtime coordination, and the account-level settings needed to enable a `workers.dev` subdomain. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
 
 ### 3. OP Sepolia ETH
 

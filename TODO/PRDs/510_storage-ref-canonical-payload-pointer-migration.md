@@ -24,16 +24,28 @@ During the current slice:
 - add `storageRef` to new off-chain, client cache, worker, and agent shapes;
 - read `storageRef` first and fall back to `arweaveTxId`;
 - emit both `arweaveTxId` and `storageRef` for Arweave and Lit-Arweave writes;
-- emit only opaque `storageRef` for Cloudflare writes unless a documented
-  compatibility path strictly requires a real Arweave pointer;
+- emit opaque Cloudflare `storageRef` values and, where existing contract
+  `bytes32` pointer fields are the only compatibility path, write the same
+  opaque 32-byte base64url Cloudflare ID into the legacy on-chain pointer field;
 - do not change smart contract interfaces.
+
+The existing Surveys contract fields are opaque `bytes32` values. They do not
+validate Arweave transaction shape on-chain, so Cloudflare session payload
+pointers can use those fields as long as the worker returns IDs that round-trip
+through the existing bytes32/base64url helper boundary. Those IDs are not
+Arweave transaction IDs; `storageRef.backend = "cloudflare"` is the canonical
+disambiguator.
 
 ## Scope
 
 This migration covers CE payload storage: session context, documents, media,
 questions, surveys, responses, and generated artifacts. Cloudflare storage is
 not user preference/profile storage and must not become a place for long-lived
-profile preferences.
+profile preferences. The only exception in the current agent lane is the
+private Telegram demo bridge, which may store demo onboarding preferences,
+suggested response drafts, temporary action IDs, event logs, and Telegram demo
+account state. It must call the canonical session worker storage/API surface for
+real session questions, surveys, responses, docs, and context.
 
 ## Non-Goals
 
@@ -43,13 +55,15 @@ profile preferences.
 - Expose raw Cloudflare bucket paths, account ids, worker tokens, long-lived
   URLs, secrets, or private key material.
 - Change Solidity interfaces or historical on-chain event meanings.
+- Add storage-backend mutation or migration for existing sessions. Storage
+  backend selection is creation-time `/new` config for this lane.
 
 ## Migration Plan
 
 1. Make all readers `storageRef`-aware while preserving legacy fallback reads.
 2. Keep emitting dual fields for Arweave/Lit-Arweave writes.
-3. Route Cloudflare payload writes through opaque worker refs and worker
-   authorization.
+3. Route Cloudflare payload writes through opaque bytes32-compatible worker refs
+   and worker authorization.
 4. After readers and public/agent consumers are storageRef-aware, rename the
    canonical top-level pointer in docs and API schemas to `storageRef`.
 5. Leave `arweaveTxId` as a deprecated compatibility alias for Arweave-backed

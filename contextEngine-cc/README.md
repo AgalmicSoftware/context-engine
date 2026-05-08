@@ -314,9 +314,13 @@ session/general worker enforces SBT gates for uploads, lists, reads, snippets,
 short-lived reads, and downloads. Agent-facing question/response shapes now add
 `storageRef` while preserving `arweaveTxId` for Arweave-backed compatibility.
 Readers prefer `storageRef` and fall back to `arweaveTxId`; Cloudflare payloads
-do not get fake Arweave ids. Cloudflare storage is CE payload storage for
-session context, docs, media, questions, surveys, responses, and generated
-artifacts, not user preference/profile storage. Lit is required only for
+do not get fake Arweave ids. If a legacy on-chain Surveys pointer must carry a
+Cloudflare payload pointer, it carries an opaque bytes32-compatible Cloudflare
+storage ID and relies on `storageRef.backend`/session config for interpretation.
+Cloudflare storage is CE payload storage for session context, docs, media,
+questions, surveys, responses, and generated artifacts, not user
+preference/profile storage. Backend selection happens in `/new` at session
+creation time; mutation/migration is out of scope. Lit is required only for
 payloads that are intentionally Lit/client encrypted.
 Telegram/OpenClaw/CE-CC/MCP receive safe metadata or permission states, not
 Cloudflare credentials, bucket names, worker tokens, raw storage paths, or
