@@ -3,10 +3,20 @@
 'use strict';
 
 const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
-  { key: 'workers_kv_storage', type: 'edit' },
   { key: 'workers_scripts', type: 'edit' },
+  { key: 'workers_kv_storage', type: 'edit' },
+  { key: 'workers_r2_storage', type: 'edit' },
+  { key: 'd1', type: 'edit' },
+  { key: 'workers_durable_objects', type: 'edit' },
   { key: 'account_settings', type: 'edit' },
 ]);
+
+const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
+  r2: 'CE payload blobs for session context, docs, media, questions, surveys, and responses',
+  d1: 'metadata and index records where queryable storage indexes are modeled',
+  kv: 'metadata indexes, short-lived action IDs, webhook replay cache, and ephemeral start params',
+  durableObjects: 'signer/runtime coordination only, not ordinary payload blob storage',
+});
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 
@@ -74,6 +84,7 @@ const printUsage = () => {
     '',
     'Output:',
     '  Prints the same prefilled Cloudflare API token template URL used by the wizard UX.',
+    '  Scope covers Workers, KV, R2, D1, Durable Objects, and account settings only.',
   ].join('\n'));
 };
 
@@ -101,6 +112,7 @@ if (require.main === module) {
 
 module.exports = {
   CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
+  CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
   buildCloudflareTokenTemplateUrl,
   buildTokenName,
   formatTokenTimestamp,

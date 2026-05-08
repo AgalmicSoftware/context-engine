@@ -100,7 +100,13 @@ Per-network shape:
         "groupName": "",
         "sessionSlug": "edge",
         "sessionSlugExplicit": true,
-        "arweaveTxId": "Vqw8D5USJYcEQ6e4nEzbvej78ZKiCXkmRnAYeR5qlyU"
+        "arweaveTxId": "Vqw8D5USJYcEQ6e4nEzbvej78ZKiCXkmRnAYeR5qlyU",
+        "storageRef": {
+          "backend": "arweave",
+          "id": "Vqw8D5USJYcEQ6e4nEzbvej78ZKiCXkmRnAYeR5qlyU",
+          "uri": "ar://Vqw8D5USJYcEQ6e4nEzbvej78ZKiCXkmRnAYeR5qlyU",
+          "resource": "questions"
+        }
       }
     },
     "questionResponses": {

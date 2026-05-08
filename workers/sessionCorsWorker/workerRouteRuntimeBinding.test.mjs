@@ -41,6 +41,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps returns the expected runtime contra
         fetchImage: 'fetchImage',
         fetchUrl: 'fetchUrl',
         arweaveUpload: 'arweaveUpload',
+        storageRoute: 'storageRoute',
         verifyAdminSignature: 'verifyAdminSignature',
       }),
       createWorkerRouteShellWithWorkerDeps: () => ({
@@ -239,6 +240,9 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           consumeNonce: 'consumeNonce',
           validateAdmin: 'validateAdmin',
           log,
+          now,
+          randomUUID: 'randomUUID',
+          getSessionSecrets: 'getSessionSecrets',
         });
         assert.deepEqual(value.constants, {
           openAiTranscribeUrl: 'https://api.openai.example/v1/audio/transcriptions',
@@ -264,6 +268,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           fetchImage: 'fetchImage',
           fetchUrl: 'fetchUrl',
           arweaveUpload: 'arweaveUpload',
+          storageRoute: 'storageRoute',
           verifyAdminSignature: 'verifyAdminSignature',
         };
       },
@@ -301,6 +306,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
           verifyAdminSignature: 'verifyAdminSignature',
           getSessionSecrets: 'getSessionSecrets',
           arweaveUpload: 'arweaveUpload',
+          storageRoute: 'storageRoute',
           validateBootstrapAdmin: 'validateBootstrapAdmin',
           validateAdmin: 'validateAdmin',
           mergeWorkerConfigRecords: 'mergeWorkerConfigRecords',
@@ -422,6 +428,7 @@ test('createWorkerRouteRuntimeWithWorkerDeps preserves route runtime assembly bu
       now,
       readArweaveBootstrapUploadPayload: 'readArweaveBootstrapUploadPayload',
       getSessionSecrets: 'getSessionSecrets',
+      randomUUID: 'randomUUID',
       mergeWorkerConfigRecords: 'mergeWorkerConfigRecords',
       mergeWorkerLimitRecords: 'mergeWorkerLimitRecords',
       putSessionConfig: 'putSessionConfig',

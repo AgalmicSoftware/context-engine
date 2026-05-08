@@ -1,10 +1,20 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 
 export const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
-  { key: 'workers_kv_storage', type: 'edit' },
   { key: 'workers_scripts', type: 'edit' },
+  { key: 'workers_kv_storage', type: 'edit' },
+  { key: 'workers_r2_storage', type: 'edit' },
+  { key: 'd1', type: 'edit' },
+  { key: 'workers_durable_objects', type: 'edit' },
   { key: 'account_settings', type: 'edit' },
 ]);
+
+export const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
+  r2: 'CE payload blobs for session context, docs, media, questions, surveys, and responses',
+  d1: 'metadata and index records where queryable storage indexes are modeled',
+  kv: 'metadata indexes, short-lived action IDs, webhook replay cache, and ephemeral start params',
+  durableObjects: 'signer/runtime coordination only, not ordinary payload blob storage',
+});
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const;
 

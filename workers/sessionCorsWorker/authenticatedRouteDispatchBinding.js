@@ -23,6 +23,7 @@ export const dispatchAuthenticatedRouteWithWorkerDeps = async ({
           json: deps?.json,
           transcribe: deps?.transcribe,
           arweaveUpload: deps?.arweaveUpload,
+          storageRoute: deps?.storageRoute,
         },
       }),
       readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,

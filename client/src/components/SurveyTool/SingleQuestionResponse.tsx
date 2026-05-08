@@ -20,6 +20,7 @@ import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.j
 import { normalizeSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
 import GateTooltip from '../Gates/GateTooltip';
 import {
   listNamespaceEntriesSync,
@@ -74,6 +75,7 @@ type SingleQuestionGateLike = SingleQuestionRecord & {
 type SingleQuestionQuestionLike = SingleQuestionRecord & {
   _id?: unknown;
   arweaveTxId?: unknown;
+  storageRef?: unknown;
   encryption?: SingleQuestionRecord & {
     gate?: SingleQuestionGateLike | null;
     gateId?: unknown;
@@ -101,6 +103,7 @@ type SingleQuestionResponseLike = SingleQuestionRecord & {
   additional?: SingleQuestionAnswerLike | null;
   answer?: SingleQuestionAnswerLike | null;
   arweaveTxId?: unknown;
+  storageRef?: unknown;
   conviction?: unknown;
   importance?: unknown;
 };
@@ -900,8 +903,9 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     // Stable id + URL
     const qid = this.getQuestionId(questionRecord);
     const url = qid ? buildQuestionRoutePath(qid, { sessionSlug: this.resolveGroupSlug() }) : '/questions';
-    const arweaveUrl = questionRecord?.arweaveTxId
-      ? normalizeArweaveUrl(questionRecord.arweaveTxId, { contextLabel: 'single_question_response_link' })
+    const questionArweaveTxId = getLegacyArweaveTxId(questionRecord);
+    const arweaveUrl = questionArweaveTxId
+      ? normalizeArweaveUrl(questionArweaveTxId, { contextLabel: 'single_question_response_link' })
       : '';
     const hasCardActions = Boolean(qid || arweaveUrl);
     const isFullscreen = mode === 'fullscreen';
@@ -1081,8 +1085,8 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
       );
     }
 
-    const { prompt, type, id, arweaveTxId: questionArweaveTxId } = question;
-    const finalArweaveTxId = response?.arweaveTxId || questionArweaveTxId;
+    const { prompt, type, id } = question;
+    const finalArweaveTxId = getLegacyArweaveTxId(response) || getLegacyArweaveTxId(question);
     const answer = response.answer || {};
     const additional = response.additional || {};
     const conviction =
@@ -1392,7 +1396,7 @@ class SingleQuestionResponse extends Component<SingleQuestionResponseProps, Sing
     if (aggregatorResponseMode) {
       const aggregatorQuestion = question || {};
       const aggregatorQuestionId = aggregatorQuestion.id;
-      const aggregatorQuestionArweaveTxId = aggregatorQuestion.arweaveTxId;
+      const aggregatorQuestionArweaveTxId = getLegacyArweaveTxId(aggregatorQuestion);
       const containerClassName = joinClassNames(styles.fullscreenQuestionContainer, this.props.containerClassName);
       const hasCardActions = Boolean(aggregatorQuestionId || aggregatorQuestionArweaveTxId);
       const questionBodyClassName = joinClassNames(

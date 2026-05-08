@@ -7,15 +7,17 @@ const os = require('node:os');
 const path = require('node:path');
 
 const {
+  collectContextEngineCcFallbackTestFiles,
   collectContextEngineCcTestFiles,
+  FALLBACK_CONTEXTENGINE_CC_TEST_MARKER,
   hasRunnableContextEngineCc,
   REQUIRED_CONTEXTENGINE_CC_FILES,
 } = require('./run-contextengine-cc-tests');
 
-function writeFile(rootDir, relativePath) {
+function writeFile(rootDir, relativePath, contents = '// test fixture\n') {
   const absolutePath = path.join(rootDir, relativePath);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-  fs.writeFileSync(absolutePath, '// test fixture\n');
+  fs.writeFileSync(absolutePath, contents);
 }
 
 function withTempRepo(run) {
@@ -45,6 +47,19 @@ test('collectContextEngineCcTestFiles finds nested CE-CC tests without package m
 test('collectContextEngineCcTestFiles returns an empty list when CE-CC tests are absent', () => {
   withTempRepo((rootDir) => {
     assert.deepEqual(collectContextEngineCcTestFiles(rootDir), []);
+  });
+});
+
+test('collectContextEngineCcFallbackTestFiles keeps only marked fallback tests', () => {
+  withTempRepo((rootDir) => {
+    writeFile(rootDir, 'contextEngine-cc/test/server.static-assets.test.mjs');
+    writeFile(rootDir, 'contextEngine-cc/test/router-fallback.test.mjs', `// ${FALLBACK_CONTEXTENGINE_CC_TEST_MARKER}\n`);
+    writeFile(rootDir, 'contextEngine-cc/lib/contracts/schema-fallback.test.mjs', `// ${FALLBACK_CONTEXTENGINE_CC_TEST_MARKER}\n`);
+
+    assert.deepEqual(collectContextEngineCcFallbackTestFiles(rootDir), [
+      path.join('contextEngine-cc', 'lib', 'contracts', 'schema-fallback.test.mjs'),
+      path.join('contextEngine-cc', 'test', 'router-fallback.test.mjs'),
+    ]);
   });
 });
 

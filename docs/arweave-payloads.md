@@ -299,6 +299,7 @@ Notes:
 - Question tag encryption is controlled by `encryption.targets.questionTags` and defaults to enabled when prompt encryption is enabled in CreateQuestionsAndSurveys.
 - `encryption.gate` can mirror the first entry in `encryption.gates`; this compatibility alias is expected for mixed old/new readers.
 - Survey/question/response payloads use `sessionName` as the canonical session identity key; legacy `groupName` is still normalized on reads.
+- Off-chain/client/agent records should carry `storageRef` as the backend-agnostic payload pointer and preserve `arweaveTxId` for Arweave compatibility. Readers prefer `storageRef` and fall back to `arweaveTxId`. Cloudflare-backed records use opaque worker refs and do not synthesize Arweave ids.
 - New survey/question writes keep `groupName` as a blank reserved field (`""`) so it no longer duplicates `sessionName`; this reserved field can be repurposed later for SBT association metadata.
 - Response payloads may include `surveyTitle` and `prompt` for public metadata, but locked survey titles and locked question prompts are copied as `"[encrypted]"` so decrypted UI state is not re-uploaded.
 - Question payloads are cached client-side in the managed `questionsCache` namespace (logical key `dg:questionsCache:<slug>`) via `cacheScripts` (IndexedDB primary, localStorage fallback), and fields such as `singleSelect` are preserved for consistent rendering.
