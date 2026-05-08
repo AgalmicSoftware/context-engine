@@ -232,19 +232,13 @@ Admin test panel:
 
 Authenticated clients can use the worker as the session storage boundary:
 
-- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings when R2 is available. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
-- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. Public-read sessions may be served anonymously; gated sessions require authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
-- `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+- `POST /storage/upload`: accepts JSON or multipart payloads. `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings, returning only an opaque Cloudflare `storageRef`.
+- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the existing authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare` and never exposes raw object keys.
+- `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects and tag metadata.
 
-Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. One-click deploys that receive a Cloudflare storage profile bind the created session KV namespace as both `GROUP_KV` and `CE_STORAGE_INDEX_KV`, then persist a sanitized `storageProfile` in `session:{slug}:config`. If the deploy request explicitly asks for R2 storage, it must provide an existing bucket name so the helper can bind it as `CE_STORAGE_R2`; otherwise the helper fails before provisioning partial Cloudflare resources. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"`. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
-`storageProfile.payloadAccessControl.mode` controls Cloudflare payload access:
-
-- `worker_sbt_gate` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
-- `public_read` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
-- `lit_encrypted` is the stronger scaffolded mode. Cloudflare stores only encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
-
-Lit credentials are required only for `lit-arweave` storage or Cloudflare `lit_encrypted` payload mode. Cloudflare `worker_sbt_gate` and `public_read` hide the `/new` Lit key input; `worker_sbt_gate` relies on the session worker SBT check while `public_read` relies on the operator intentionally publishing the payload.
+SBT gating is enforced by the same authenticated worker preflight used for protected Arweave routes. Lit is required only when the payload is intentionally Lit/client encrypted; plaintext Cloudflare docs/context rely on worker-enforced access.
 
 ## Required bindings
 
@@ -275,9 +269,8 @@ Runtime:
   ```json
   {
     "storageProfile": {
-      "backend": "cloudflare",
-      "resources": { "docsContext": "active", "questions": "active", "surveys": "active", "responses": "active" },
-      "payloadAccessControl": { "mode": "worker_sbt_gate" }
+      "backend": "arweave",
+      "resources": { "docsContext": "active", "questions": "staged", "surveys": "staged", "responses": "staged" }
     },
     "slug": "test-72",
     "networkChainId": 11155420,
