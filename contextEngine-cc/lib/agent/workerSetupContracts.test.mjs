@@ -8,6 +8,8 @@ import {
   WORKER_SETUP_STEPS,
   applyWorkerSetupStep,
   normalizeWorkerSetupOnboardingConfig,
+  normalizeWorkerSetupSecretStatus,
+  normalizeWorkerSetupSessionStorageDisplay,
   normalizeWorkerSetupState,
 } from './workerSetupContracts.mjs';
 
@@ -29,6 +31,13 @@ test('worker setup state includes the Telegram demo readiness checkpoints', () =
       },
       [WORKER_SETUP_STEPS.TELEGRAM_WEBHOOK_SET]: {
         status: 'ready',
+      },
+      [WORKER_SETUP_STEPS.SESSION_FETCHED]: {
+        status: 'ready',
+      },
+      [WORKER_SETUP_STEPS.SBT_GATE_CHECKED]: {
+        status: 'ready',
+        summary: { requiredGateCount: 0, eligible: true },
       },
       [WORKER_SETUP_STEPS.GROUP_DEEP_LINK_ACTION_RESOLVED]: {
         status: 'ready',
@@ -54,6 +63,9 @@ test('worker setup state includes the Telegram demo readiness checkpoints', () =
     assert.equal(state.steps[step].type, 'agent_worker_setup_step', step);
   }
   assert.equal(state.steps.worker_reachable.status, 'ready');
+  assert.equal(state.steps.telegram_webhook_configured.status, 'pending');
+  assert.equal(state.steps.session_fetched.status, 'ready');
+  assert.equal(state.steps.sbt_gate_checked.status, 'ready');
   assert.equal(state.steps.onboarding_skipped.status, 'skipped');
   assert.equal(state.steps.managed_account_recovered.status, 'pending');
 });
@@ -91,6 +103,40 @@ test('onboarding config defaults off and caps configured questions', () => {
   assert.equal(config.skippable, false);
   assert.equal(config.predictiveAnswer.enabled, true);
   assert.equal(config.retentionPolicy, 'session');
+});
+
+
+test('worker setup secrets are write-only and storage profile is display-only', () => {
+  const secrets = normalizeWorkerSetupSecretStatus({
+    saved: true,
+    fields: {
+      telegramBotToken: '123456:secret-token',
+      webhookSecret: { configured: true },
+      ceAgentToken: '',
+    },
+  });
+  const storage = normalizeWorkerSetupSessionStorageDisplay({ storageProfile: 'cloudflare' });
+  const state = normalizeWorkerSetupState({
+    secrets: {
+      saved: true,
+      fields: { telegramBotToken: '123456:secret-token' },
+    },
+    sessionStorage: { storageProfile: 'cloudflare' },
+  });
+
+  assert.equal(secrets.saved, true);
+  assert.equal(secrets.fields.telegramBotToken.configured, true);
+  assert.equal(secrets.fields.telegramBotToken.value, null);
+  assert.equal(secrets.fields.telegramBotToken.displayValue, null);
+  assert.equal(JSON.stringify(secrets).includes('secret-token'), false);
+  assert.equal(secrets.secretsDisplayedAfterSave, false);
+  assert.equal(storage.storageProfile, 'cloudflare');
+  assert.equal(storage.sessionOwned, true);
+  assert.equal(storage.telegramOwned, false);
+  assert.equal(storage.editableHere, false);
+  assert.equal(storage.policyRoute, '/new?mode=advanced');
+  assert.equal(state.secrets.fields.telegramBotToken.configured, true);
+  assert.equal(state.sessionStorage.storageProfile, 'cloudflare');
 });
 
 test('worker setup events and summaries redact secrets while keeping safe refs', () => {
