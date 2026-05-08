@@ -142,6 +142,17 @@ contextEngine-cc/.cache/
 contextEngine-cc/cache/
 contextEngine-cc/tmp/
 
+# Private agent bridge worker secrets, local state, dependencies, and generated artifacts.
+workers/agentBridgeWorker/.dev.vars
+workers/agentBridgeWorker/.wrangler/
+workers/agentBridgeWorker/.data/
+workers/agentBridgeWorker/.state/
+workers/agentBridgeWorker/node_modules/
+workers/agentBridgeWorker/**/*.log
+workers/agentBridgeWorker/**/*.key
+workers/agentBridgeWorker/**/*.pem
+workers/agentBridgeWorker/**/*.jwt
+
 # E2E test layer (stripped from public release)
 scripts/test-*.js
 scripts/test-*.ui.js

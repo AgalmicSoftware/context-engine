@@ -55,6 +55,9 @@ The release script removes these paths from the exported copy:
 |------|--------|
 | `TODO/` | Internal planning and PRDs |
 | `contextEngine-cc/` | Claude Code extension (local dev tool) |
+| `docs/agent-native*.md` | Private agent-native contract docs |
+| `client/public/skill.md` | Private agent skill artifact |
+| `workers/agentBridgeWorker/` | Private Telegram agent bridge worker |
 | `CLAUDE.md` | Maintainer AI instructions |
 | `.claude/`, `.codex/` | AI agent skills and settings |
 | `artifacts/` | Local test artifacts |
