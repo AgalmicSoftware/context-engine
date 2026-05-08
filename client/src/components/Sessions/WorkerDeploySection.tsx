@@ -261,7 +261,7 @@ const WorkerDeploySection = ({
                 <span>Cloudflare API token</span>
                 {renderTooltip({
                   id: 'gw-cf-token-tip',
-                  content: 'Use the prefilled template link below. It includes Workers/KV/Routes, Account Settings, Tail (read), R2, Pages, Builds, Agents, Observability, and Containers permissions.',
+                  content: 'Use the prefilled template link below. It includes Workers, KV, R2, D1, Durable Objects, and Account Settings permissions.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
                   ariaLabel: 'Cloudflare API token info',
