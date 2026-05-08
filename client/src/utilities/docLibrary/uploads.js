@@ -1,6 +1,8 @@
 /** @file uploads.js */
 
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
+import { uploadDataToSessionStorage } from '../storage/storageClient.js';
+import { STORAGE_BACKENDS, normalizeStorageRef } from '../storage/storageRefs.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { toStr } from '../shared/primitives.js';
 import { buildPublicUrlPath } from '../ui/publicUrl.js';
@@ -155,28 +157,42 @@ export const uploadDocLibraryFile = async ({
       encryption,
     });
     const txId = toStr(result?.txId).trim();
+    const storageRef = normalizeStorageRef({
+      backend: STORAGE_BACKENDS.LIT_ARWEAVE,
+      id: txId,
+      contentType: 'application/json',
+      resource: 'docsContext',
+      encrypted: true,
+    });
     return {
       txId,
       url: txId ? litStorage.buildLitArweaveUrl(txId) : '',
-      storage: 'lit-arweave',
+      storage: STORAGE_BACKENDS.LIT_ARWEAVE,
+      storageRef,
       kind: 'file',
       tagMap: buildTagMap(normalizedTags),
       data: { size: null, type: 'application/json' },
     };
   }
 
-  const txId = await arweaveScripts.uploadDataToArweave(file, undefined, {
+  const result = await uploadDataToSessionStorage(file, undefined, {
     sessionSlug,
     sessionConfig,
     context: buildBaseUploadContext({ account, providerLike, chainId }),
     tags: normalizedTags,
     contentType,
+    resource: 'docsContext',
   });
+  const txId = toStr(result?.arweaveTxId || result?.txId || result?.id).trim();
+  const storage = toStr(result?.storageRef?.backend || result?.storage || STORAGE_BACKENDS.ARWEAVE).trim() || STORAGE_BACKENDS.ARWEAVE;
 
   return {
     txId,
-    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
-    storage: 'arweave',
+    url: storage === STORAGE_BACKENDS.CLOUDFLARE
+      ? toStr(result?.storageRef?.uri).trim()
+      : (txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : ''),
+    storage,
+    storageRef: result?.storageRef || null,
     kind: 'file',
     tagMap: buildTagMap(normalizedTags),
     data: { size: file.size || null, type: file.type || null },
@@ -214,10 +230,18 @@ export const uploadDocLibraryUrlRecord = async ({
       },
     });
     const txId = toStr(result?.txId).trim();
+    const storageRef = normalizeStorageRef({
+      backend: STORAGE_BACKENDS.LIT_ARWEAVE,
+      id: txId,
+      contentType: 'application/json',
+      resource: 'docsContext',
+      encrypted: true,
+    });
     return {
       txId,
       url: txId ? litStorage.buildLitArweaveUrl(txId) : '',
-      storage: 'lit-arweave',
+      storage: STORAGE_BACKENDS.LIT_ARWEAVE,
+      storageRef,
       kind: 'link',
       tagMap: buildTagMap(normalizedTags),
       data: { size: null, type: 'application/json' },
@@ -225,17 +249,24 @@ export const uploadDocLibraryUrlRecord = async ({
     };
   }
 
-  const txId = await arweaveScripts.uploadDataToArweave(record, 'json', {
+  const result = await uploadDataToSessionStorage(record, 'json', {
     sessionSlug,
     sessionConfig,
     context: buildBaseUploadContext({ account, providerLike, chainId }),
     tags: normalizedTags,
+    contentType: 'application/json',
+    resource: 'docsContext',
   });
+  const txId = toStr(result?.arweaveTxId || result?.txId || result?.id).trim();
+  const storage = toStr(result?.storageRef?.backend || result?.storage || STORAGE_BACKENDS.ARWEAVE).trim() || STORAGE_BACKENDS.ARWEAVE;
 
   return {
     txId,
-    url: txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : '',
-    storage: 'arweave',
+    url: storage === STORAGE_BACKENDS.CLOUDFLARE
+      ? toStr(result?.storageRef?.uri).trim()
+      : (txId ? arweaveScripts.buildArweaveGatewayUrl(txId) : ''),
+    storage,
+    storageRef: result?.storageRef || null,
     kind: 'link',
     tagMap: buildTagMap(normalizedTags),
     data: { size: null, type: 'application/json' },
