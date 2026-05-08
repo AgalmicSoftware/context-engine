@@ -303,6 +303,14 @@ test('Telegram storage helpers reject secrets in CloudStorage and scoped grant p
     () => buildTelegramCloudStoragePayload({ nested: { workerToken: 'local-token' } }),
     /must not contain secrets/,
   );
+  assert.throws(
+    () => buildTelegramCloudStoragePayload({ decryptedPrompt: 'Private prompt must stay private.' }),
+    /private question text/,
+  );
+  assert.throws(
+    () => buildTelegramCloudStoragePayload({ nested: { questionContext: 'Private context must stay private.' } }),
+    /private question text/,
+  );
   assert.deepEqual(buildTelegramSecureStorageGrant({
     grantId: 'grant-short',
     scope: 'agent:draft',

@@ -95,6 +95,56 @@ test('group lobby defaults to viewing questions and exposes add/generate by poli
   ]);
 });
 
+test('view questions lists existing session questions and pose q posts group-safe output', () => {
+  const harness = new MockTelegramTransportHarness({
+    sessionPolicy: {
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowQuestionGeneration: true,
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+      }],
+    },
+    questions: [
+      {
+        questionId: 'q-1',
+        questionType: 'freeform',
+        prompt: 'What should Alpha decide next?',
+      },
+      {
+        questionId: 'q-locked',
+        questionType: 'freeform',
+        prompt: 'Locked prompt must not be posed publicly',
+        visibility: 'sbt_gated',
+      },
+    ],
+  });
+
+  const listed = harness.listQuestions({ sessionSlug: 'alpha' });
+  const posed = harness.poseQuestion({ sessionSlug: 'alpha', questionId: 'q-1' });
+  const locked = harness.poseQuestion({ sessionSlug: 'alpha', questionId: 'q-locked' });
+
+  assert.equal(listed.listState.source, 'canonical_agent_questions');
+  assert.deepEqual(listed.listState.questions.map((question) => question.title), [
+    'What should Alpha decide next?',
+    'Locked question',
+  ]);
+  assert.equal(posed.poseState.action.action, TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION);
+  assert.equal(posed.poseState.action.command, '/ce_pose_question');
+  assert.deepEqual(posed.poseState.action.aliases, ['/q']);
+  assert.equal(posed.groupSafeOutput.questionText, 'What should Alpha decide next?');
+  assert.equal(locked.groupSafeOutput.questionText, null);
+  assert.equal(JSON.stringify(locked).includes('Locked prompt must not be posed publicly'), false);
+  assert.deepEqual(harness.events.map((event) => event.eventType), [
+    AGENT_BRIDGE_EVENT_TYPES.QUESTION_LISTED,
+    AGENT_BRIDGE_EVENT_TYPES.QUESTION_POSED,
+    AGENT_BRIDGE_EVENT_TYPES.QUESTION_POSED,
+  ]);
+  assert.equal(harness.events.every((event) => event.lane === 'telegram_group_lobby'), true);
+});
+
 test('group join deep link resolves missing managed accounts to private account setup', () => {
   const harness = new MockTelegramTransportHarness();
   const card = harness.postGroupSessionCard({

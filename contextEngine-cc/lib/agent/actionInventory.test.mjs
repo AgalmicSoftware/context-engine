@@ -20,7 +20,7 @@ test('agent action inventory covers private web UX action families', () => {
   }
 
   const families = new Set(AGENT_ACTION_INVENTORY.map((entry) => entry.family));
-  for (const family of ['read', 'response', 'decrypt', 'grant', 'account', 'worker_setup', 'question', 'survey', 'sbt_group', 'session', 'deliberation']) {
+  for (const family of ['read', 'response', 'decrypt', 'grant', 'account', 'worker_setup', 'question', 'survey', 'sbt_group', 'session', 'session_storage', 'deliberation']) {
     assert.equal(families.has(family), true, `missing family: ${family}`);
   }
 
@@ -33,6 +33,9 @@ test('agent action inventory covers private web UX action families', () => {
   assert.equal(getAgentAction(AGENT_ACTION_IDS.ACCOUNT_CREATE).route.path, '/api/agent/accounts/create');
   assert.equal(getAgentAction(AGENT_ACTION_IDS.ACCOUNT_LINK_REQUEST).route.path, '/api/agent/accounts/link-request');
   assert.equal(getAgentAction(AGENT_ACTION_IDS.WORKER_SETUP_STATUS).route.path, '/api/agent/worker-setup');
+  assert.equal(getAgentAction(AGENT_ACTION_IDS.SESSION_STORAGE_ACCESS_REQUEST).route.path, '/api/agent/session-storage/access-request');
+  assert.equal(getAgentAction(AGENT_ACTION_IDS.SESSION_STORAGE_ACCESS_REQUEST).status, AGENT_ACTION_STATUS.DEFERRED);
+  assert.equal(getAgentAction(AGENT_ACTION_IDS.SESSION_STORAGE_ACCESS_REQUEST).signingOrWorkerAuthority, 'session_worker_short_lived_storage_permission');
 });
 
 test('agent action inventory exposes only canonical agent routes and no remote authority', () => {

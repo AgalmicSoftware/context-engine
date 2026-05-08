@@ -27,6 +27,7 @@ test('MCP tool descriptors cover the planned agent tool names', () => {
     'get_request_status',
     'get_connect_request',
     'request_decrypt',
+    'request_session_storage_access',
     'revoke_agent_grant',
   ]);
 });
@@ -300,8 +301,18 @@ test('MCP handler factory only exposes implemented tools', async () => {
   assert.equal(typeof handlers.revoke_agent_grant, 'function');
   assert.equal(Object.hasOwn(handlers, 'create_question_request'), false);
   assert.equal(Object.hasOwn(handlers, 'request_decrypt'), false);
+  assert.equal(Object.hasOwn(handlers, 'request_session_storage_access'), false);
   assert.throws(
     () => buildAgentMcpHttpRequest('create_question_request', { session: 'general' }),
+    /not implemented/,
+  );
+  assert.throws(
+    () => buildAgentMcpHttpRequest('request_session_storage_access', {
+      session: 'general',
+      resourceId: 'doc-1',
+      operation: 'download',
+      storageProfile: 'cloudflare',
+    }),
     /not implemented/,
   );
   assert.equal(fetchCalls, 0);
