@@ -47,6 +47,13 @@ test('buildCloudflareTokenTemplateUrl does not request legacy broad Cloudflare p
   assert.equal(permissionKeys.includes('tail'), false);
 });
 
+test('Cloudflare token helper documents storage resource boundaries', () => {
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.r2, /questions, surveys, and responses/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.d1, /metadata and index/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv, /metadata indexes/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.durableObjects, /not ordinary payload blob storage/);
+});
+
 test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {
   const url = new URL(buildCloudflareTokenTemplateUrl());
 

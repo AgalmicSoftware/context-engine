@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { storageRoute } from './storageRouteExecution.js';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
+const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
+
+const fixedRandomBytes = () => Uint8Array.from({ length: 32 }, (_, index) => index + 1);
 
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), {
   status,
@@ -148,13 +151,14 @@ for (const resource of ['questions', 'surveys', 'responses']) {
       baseHeaders: {},
       deps: {
         json,
-        randomUUID: () => `01J7${resource.toUpperCase()}OPAQUEID`,
+        randomBytes: fixedRandomBytes,
         now: () => Date.parse('2026-01-02T03:04:05.000Z'),
       },
     });
 
     const uploadBody = await readJson(uploadResponse);
     assert.equal(uploadBody.storageRef.backend, 'cloudflare');
+    assert.equal(uploadBody.storageRef.id.length, 43);
     assert.equal(uploadBody.storageRef.resource, resource);
     assert.equal(uploadBody.storageRef.encrypted === true, resource === 'responses');
     assert.equal(Object.hasOwn(uploadBody, 'arweaveTxId'), false);
@@ -219,17 +223,17 @@ test('storageRoute stores Cloudflare docs payloads behind opaque refs and reads 
     baseHeaders: { 'Access-Control-Allow-Origin': 'https://app.example' },
     deps: {
       json,
-      randomUUID: () => '01J7SAFEOPAQUEID',
+      randomBytes: fixedRandomBytes,
       now: () => Date.parse('2026-01-02T03:04:05.000Z'),
     },
   });
 
   const uploadBody = await readJson(uploadResponse);
-  assert.equal(uploadBody.id, 'cf_01j7safeopaqueid');
+  assert.equal(uploadBody.id, CF_ID);
   assert.deepEqual(uploadBody.storageRef, {
     backend: 'cloudflare',
-    id: 'cf_01j7safeopaqueid',
-    uri: '/storage/read?id=cf_01j7safeopaqueid',
+    id: CF_ID,
+    uri: `/storage/read?id=${CF_ID}`,
     contentType: 'text/plain',
     gate: 'docUploads',
     resource: 'docsContext',
@@ -240,14 +244,14 @@ test('storageRoute stores Cloudflare docs payloads behind opaque refs and reads 
   const readResponse = await storageRoute({
     path: '/storage/read',
     method: 'GET',
-    request: new Request('https://worker.example/storage/read?id=cf_01j7safeopaqueid'),
+    request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
     env,
     config: { storageProfile: { backend: 'cloudflare' } },
     slug: 'session-a',
     baseHeaders: {},
     deps: { json },
   });
-  assert.equal(readResponse.headers.get('X-CE-Storage-Ref'), 'cf_01j7safeopaqueid');
+  assert.equal(readResponse.headers.get('X-CE-Storage-Ref'), CF_ID);
   assert.equal(readResponse.headers.get('Content-Type'), 'text/plain');
   assert.equal(await readResponse.text(), 'hello storage');
 });
@@ -270,7 +274,7 @@ test('storageRoute lists Cloudflare refs from the metadata index without raw obj
     config: { storageProfile: { backend: 'cloudflare' } },
     slug: 'session-a',
     baseHeaders: {},
-    deps: { json, randomUUID: () => '01J7LISTOPAQUEID', now: () => Date.parse('2026-01-02T03:04:05.000Z') },
+    deps: { json, randomBytes: fixedRandomBytes, now: () => Date.parse('2026-01-02T03:04:05.000Z') },
   });
 
   const listResponse = await storageRoute({
@@ -286,7 +290,7 @@ test('storageRoute lists Cloudflare refs from the metadata index without raw obj
 
   const body = await readJson(listResponse);
   assert.equal(body.items.length, 1);
-  assert.equal(body.items[0].storageRef.id, 'cf_01j7listopaqueid');
+  assert.equal(body.items[0].storageRef.id, CF_ID);
   assert.equal(body.items[0].storageRef.backend, 'cloudflare');
   assert.doesNotMatch(JSON.stringify(body), /sessions\/session-a\/storage|bucket|token|secret/i);
 });

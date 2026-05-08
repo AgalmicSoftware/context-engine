@@ -10,10 +10,10 @@ export const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
 ]);
 
 export const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
-  r2: 'docs/context/media/blob payloads',
-  d1: 'metadata/index/audit/event records',
-  kv: 'short-lived action IDs, webhook replay cache, ephemeral start params',
-  durableObjects: 'managed signer runtime and coordination locks',
+  r2: 'CE payload blobs for session context, docs, media, questions, surveys, and responses',
+  d1: 'metadata and index records where queryable storage indexes are modeled',
+  kv: 'metadata indexes, short-lived action IDs, webhook replay cache, and ephemeral start params',
+  durableObjects: 'signer/runtime coordination only, not ordinary payload blob storage',
 });
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const;
