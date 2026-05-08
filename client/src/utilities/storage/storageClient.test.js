@@ -1,0 +1,92 @@
+import { uploadDataToSessionStorage } from './storageClient.js';
+
+jest.mock('../arweave/arweaveScripts.js', () => ({
+  arweaveScripts: {
+    uploadDataToArweave: jest.fn(),
+    buildArweaveGatewayUrl: jest.fn((id) => `https://arweave.net/${id}`),
+  },
+}));
+
+jest.mock('../worker/corsProxy.js', () => ({
+  getCorsProxyUrlOrThrow: jest.fn(),
+}));
+
+jest.mock('../worker/workerAuth.js', () => ({
+  fetchWorkerWithAuth: jest.fn(),
+}));
+
+const { arweaveScripts } = require('../arweave/arweaveScripts.js');
+const { getCorsProxyUrlOrThrow } = require('../worker/corsProxy.js');
+const { fetchWorkerWithAuth } = require('../worker/workerAuth.js');
+
+const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
+
+describe('storageClient', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    arweaveScripts.uploadDataToArweave.mockResolvedValue(TX_ID);
+    getCorsProxyUrlOrThrow.mockResolvedValue('https://worker.example');
+    fetchWorkerWithAuth.mockResolvedValue(new Response(JSON.stringify({
+      id: 'cf_01j7safeopaqueid',
+      storageRef: {
+        backend: 'cloudflare',
+        id: 'cf_01j7safeopaqueid',
+        uri: '/storage/read?id=cf_01j7safeopaqueid',
+        contentType: 'application/json',
+        resource: 'docsContext',
+      },
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+  });
+
+  test('keeps default Arweave upload path unchanged', async () => {
+    const result = await uploadDataToSessionStorage({ ok: true }, 'json', {
+      sessionSlug: 'alpha',
+      sessionConfig: {},
+      tags: [{ name: 'CE-DocStorage', value: 'arweave' }],
+    });
+
+    expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledWith(
+      { ok: true },
+      'json',
+      expect.objectContaining({ sessionSlug: 'alpha' })
+    );
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+    expect(result.storageRef).toEqual({ backend: 'arweave', id: TX_ID, uri: `ar://${TX_ID}`, resource: 'docsContext' });
+  });
+
+  test('keeps lit-arweave available for encrypted payload storage refs', async () => {
+    const result = await uploadDataToSessionStorage({ envelope: true }, 'json', {
+      sessionSlug: 'alpha',
+      sessionConfig: { storageProfile: { backend: 'lit-arweave' } },
+      encrypted: true,
+    });
+
+    expect(arweaveScripts.uploadDataToArweave).toHaveBeenCalledTimes(1);
+    expect(result.storageRef).toEqual({
+      backend: 'lit-arweave',
+      id: TX_ID,
+      uri: `lit-arweave://${TX_ID}`,
+      encrypted: true,
+      resource: 'docsContext',
+    });
+  });
+
+  test('routes Cloudflare uploads through storage endpoint without exposing raw identifiers', async () => {
+    const result = await uploadDataToSessionStorage({ ok: true }, 'json', {
+      sessionSlug: 'alpha',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      context: { account: '0xabc' },
+      tags: [{ name: 'CE-DocStorage', value: 'cloudflare' }],
+    });
+
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://worker.example/storage/upload');
+    expect(JSON.parse(fetchWorkerWithAuth.mock.calls[0][1].body)).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      resource: 'docsContext',
+    }));
+    expect(JSON.stringify(result)).not.toMatch(/account|bucket|token|secret|r2:\/\//i);
+    expect(result.storageRef.backend).toBe('cloudflare');
+  });
+});

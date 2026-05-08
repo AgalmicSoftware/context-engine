@@ -13,6 +13,8 @@ const mockResolveArweaveGraphqlUrls = jest.fn();
 const mockResolveDocUploadsGate = jest.fn();
 const mockUploadDocLibraryFile = jest.fn();
 const mockUploadDocLibraryUrlRecord = jest.fn();
+const mockListSessionStorageRefs = jest.fn();
+const mockReadSessionStorageBlob = jest.fn();
 const mockSBTSelector = jest.fn();
 
 jest.mock('../../utilities/logging.js', () => ({
@@ -57,6 +59,11 @@ jest.mock('../../utilities/docLibrary/uploads.js', () => ({
   resolveDocUploadsGate: (...args: any[]) => mockResolveDocUploadsGate(...args),
   uploadDocLibraryFile: (...args: any[]) => mockUploadDocLibraryFile(...args),
   uploadDocLibraryUrlRecord: (...args: any[]) => mockUploadDocLibraryUrlRecord(...args),
+}));
+
+jest.mock('../../utilities/storage/storageClient.js', () => ({
+  listSessionStorageRefs: (...args: any[]) => mockListSessionStorageRefs(...args),
+  readSessionStorageBlob: (...args: any[]) => mockReadSessionStorageBlob(...args),
 }));
 
 jest.mock('../SBTs/SBTSelector', () => ({
@@ -128,6 +135,11 @@ describe('DocumentLibraryPanel photo docs', () => {
       txId: 'Y'.repeat(43),
       tagMap: {},
       data: { size: null, type: 'application/json' },
+    });
+    mockListSessionStorageRefs.mockResolvedValue([]);
+    mockReadSessionStorageBlob.mockResolvedValue({
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
+      blob: async () => ({ type: 'text/plain', text: async () => 'mock document' }),
     });
     mockListArweaveTransactionsByTags.mockResolvedValue([]);
     global.fetch = jest.fn() as any;
@@ -426,6 +438,113 @@ describe('DocumentLibraryPanel photo docs', () => {
     const image = preview.querySelector('img');
     expect(image).toBeTruthy();
     expect(image?.getAttribute('src')).toBe(`https://arweave.example.test/${'D'.repeat(43)}`);
+  });
+
+
+
+  it('lists and opens Cloudflare session docs through storage refs', async () => {
+    mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
+    mockListSessionStorageRefs.mockResolvedValueOnce([
+      {
+        storageRef: {
+          backend: 'cloudflare',
+          id: 'cf_docopaque1',
+          uri: '/storage/read?id=cf_docopaque1',
+          contentType: 'text/plain',
+          resource: 'docsContext',
+        },
+        metadata: {
+          size: 12,
+          tags: [
+            { name: 'CE-DocKind', value: 'file' },
+            { name: 'CE-DocName', value: 'Cloud policy note' },
+          ],
+        },
+      },
+    ]);
+    mockReadSessionStorageBlob.mockResolvedValueOnce({
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
+      blob: async () => ({ type: 'text/plain', text: async () => 'cloud text' }),
+    });
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
+        mode="session"
+        sessionIdHex={`0x${'7'.repeat(32)}`}
+      />
+    );
+
+    expect(await screen.findByText('Cloud policy note')).toBeInTheDocument();
+    expect(mockListSessionStorageRefs).toHaveBeenCalledWith(expect.objectContaining({
+      sessionSlug: 'edge',
+      resource: 'docsContext',
+    }));
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
+
+    await waitFor(() => {
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_docopaque1' }),
+      }));
+    });
+    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('cloud text');
+    expect(JSON.stringify(mockReadSessionStorageBlob.mock.calls[0][0].storageRef)).not.toMatch(/bucket|account|token|secret|r2:\/\//i);
+  });
+
+  it('requires encrypted uploads for lit-arweave session document storage', async () => {
+    mockResolveDocLibraryProvider.mockReturnValue('lit-arweave');
+    const saveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
+    mockGetGlobalLitHooks.mockReturnValue({ saveKey });
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={{
+          ...TEST_SESSION_CONFIG,
+          storageProfile: { backend: 'lit-arweave' },
+        }}
+        mode="session"
+        sessionIdHex={`0x${'8'.repeat(32)}`}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.DOC_LOCK_TOGGLE)).toHaveAttribute('data-ce-locked', 'true');
+      expect(screen.getByTestId(E2E_TESTIDS.DOC_LOCK_TOGGLE)).toBeDisabled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add mock selected SBT' }));
+    const file = new File(['secret'], 'secret.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
+        file,
+        encryption: expect.objectContaining({
+          enabled: true,
+          saveKey,
+          accessControlConditions: [{ contractAddress: '0xgate' }],
+        }),
+        tags: expect.arrayContaining([
+          expect.objectContaining({ name: 'CE-DocStorage', value: 'lit-arweave' }),
+        ]),
+      }));
+    });
   });
 
   it('can render the browse list without upload controls', async () => {
