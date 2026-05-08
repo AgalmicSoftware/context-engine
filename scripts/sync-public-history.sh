@@ -197,8 +197,34 @@ verify_strip_patterns_absent() {
 }
 
 reset_clone_to_branch_head() {
+  git -C "$TEMP_CLONE" cherry-pick --abort >/dev/null 2>&1 || true
   git -C "$TEMP_CLONE" reset --hard --quiet HEAD
   git -C "$TEMP_CLONE" clean -fdq
+}
+
+resolve_private_cherry_pick_conflicts() {
+  local path
+  local found_conflict=0
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    found_conflict=1
+    if ! path_matches_strip_pattern "$path"; then
+      return 1
+    fi
+  done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
+
+  if [ "$found_conflict" -ne 1 ]; then
+    return 1
+  fi
+
+  strip_private_paths_from_clone
+
+  if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
+    return 1
+  fi
+
+  return 0
 }
 
 sync_branch_back_to_source_repo() {
@@ -384,11 +410,14 @@ for commit_sha in "${COMMITS[@]}"; do
 
   log_info "Replaying $commit_sha | $subject"
   if ! git -C "$TEMP_CLONE" cherry-pick --no-commit "$commit_sha" >/dev/null 2>&1; then
-    log_error "Cherry-pick failed for $commit_sha | $subject"
-    git -C "$TEMP_CLONE" cherry-pick --abort >/dev/null 2>&1 || true
-    reset_clone_to_branch_head
-    log_error "Resolve the conflict manually by replaying this commit onto a branch based on origin/main."
-    exit 1
+    if resolve_private_cherry_pick_conflicts; then
+      log_info "Resolved stripped-path cherry-pick conflicts for $commit_sha | $subject"
+    else
+      log_error "Cherry-pick failed for $commit_sha | $subject"
+      reset_clone_to_branch_head
+      log_error "Resolve the conflict manually by replaying this commit onto a branch based on origin/main."
+      exit 1
+    fi
   fi
 
   strip_private_paths_from_clone
