@@ -217,11 +217,11 @@ Admin test panel:
 
 Authenticated clients can use the worker as the session storage boundary:
 
-- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings, returning only an opaque Cloudflare `storageRef`.
+- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings, returning an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
 - `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the existing authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare` and never exposes raw object keys.
 - `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects and tag metadata.
 
-Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"`. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
 SBT gating is enforced by the same authenticated worker preflight used for protected Arweave routes. Lit is required only when the payload is intentionally Lit/client encrypted; plaintext Cloudflare docs/context rely on worker-enforced access.
 
@@ -229,6 +229,12 @@ SBT gating is enforced by the same authenticated worker preflight used for prote
 
 KV:
 - `GROUP_KV`
+- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows.
+
+R2/D1:
+- `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for Cloudflare payload blobs.
+- D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
+- Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
@@ -268,6 +274,10 @@ Runtime:
     "scopes": { "ai": true, "arweave": true, "transcribe": true, "faucet": true, "fetch": true }
   }
   ```
+  For `"backend": "cloudflare"`, new `/new` configs default canonical CE payload
+  resources (`docsContext`, `questions`, `surveys`, `responses`, media, and
+  generated artifacts) to `"active"` unless an advanced draft explicitly stages
+  a resource for legacy fallback.
   - `hatsAddress` / `adminHatId` are optional; leave blank/zero to use `adminAddress` only.
   - Worker KV config is normalized on read/write:
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array.
