@@ -29,13 +29,13 @@ changed. The Fast & Cheap card summarizes its inputs as
 | Arweave JWK | Pays for session metadata and other Arweave uploads | Yes for publish/upload flows | Yes |
 | RPC URL | Used by the worker for chain reads and related operations | Yes for a deploy-ready worker | Yes |
 | Faucet private key | Lets the session sponsor small OP Sepolia ETH grants for onboarding/publish support | Optional | Yes |
-| Lit credentials for gated fields | Needed only when the session uses worker-mediated Lit/Chipotle encryption. Current scoped-runtime setup uses `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`. The next hard-cut sponsorship mode uses a per-bundle `litAccountApiKey` so `/new` can mint a fresh group, PKP, and usage key for each redeemed session. | Optional | Yes |
+| Lit credentials for gated fields or encrypted Cloudflare payloads | Needed only when the session uses worker-mediated Lit/Chipotle encryption, `lit-arweave`, or Cloudflare `lit_encrypted` payload mode. The manual `/new` setup asks only for `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; the worker derives `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid` after deploy. Cloudflare `worker_sbt_gate` mode does not require a Lit key. | Optional | Yes |
 
 Important:
 
 - The worker secret minimum for the normal deploy-ready path is: AI key(s) matching the selected provider, Arweave JWK, and RPC URL.
 - The faucet private key is not required to create a session. It is only needed if you want the session to sponsor testnet gas for users or bootstrap publish funding.
-- Lit-sponsored setup is optional. Today the deploy-ready flow expects scoped runtime values for worker-mediated Chipotle execution; the agreed next sponsorship model is one disposable `litAccountApiKey` per sponsored bundle so each `/new` redemption can derive a fresh group / PKP / usage key inside that bundle-owned account.
+- Lit-sponsored setup is optional. Today the manual deploy-ready flow centers on one `litAccountApiKey`; sponsored bundles can still carry either that authority key or already scoped runtime values when an admin intentionally prepares them. If `/new` Advanced selects Cloudflare `worker_sbt_gate`, the Lit key input is hidden because access is worker-enforced rather than Lit-encrypted.
 - Secrets live in worker secrets or sponsored bundles, not in public Arweave session metadata.
 
 ## Sponsored Bundles: Skip Manual Config
@@ -315,32 +315,10 @@ AI configuration also lives in the session metadata draft:
 
 What gets stored where:
 
-- For `worker_canonical`, the session worker stores the sanitized canonical
-  identity, text metadata, AI model choices, authority policy, and storage
-  profile in Worker KV. Publish verifies a read-after-write of that config
-  before showing the session URL.
-- Decentralized and explicit Arweave-backed profiles keep storing the
-  human-readable session config on Arweave: name, description, AI defaults,
-  block limits, contract pointers, featured lists, and any Lit-encrypted fields.
-- The Fast & Cheap preset combines `storageProfile.backend = "cloudflare"`
-  with `worker_envelope` encryption and Worker-role/agent-grant access.
-  Advanced Cloudflare profiles can add an explicit `sbt_onchain` access
-  condition, which makes the profile hybrid and requires its configured
-  chain/RPC before the Worker serves bytes. That is a separately labelled
-  Advanced on-chain gate; it does not replace the session's Worker-native
-  Groups and is not end-to-end encryption.
-- Advanced encryption options are `none` (payload bytes are stored as provided), `lit` (Cloudflare stores caller-supplied Lit ciphertext and rejects plaintext uploads until the Lit path sends `payloadEncrypted=true`), and Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it, and the session worker decrypts only after checking access. `worker_envelope` is available only with Cloudflare storage. The operator and Cloudflare runtime can decrypt; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime.
-- Public stored-results visibility requires unencrypted storage. The current
-  wizard offers it only for Arweave + no encryption; switching backend or
-  encryption coerces an incompatible selection back to participant aggregate.
-  Validated legacy Cloudflare public-result profiles remain readable only when
-  their payload gate is `none` and neither profile policy branch carries access
-  conditions.
-- When `/new` deploys a custom worker for Cloudflare storage, the deploy helper receives the normalized storage profile before Worker upload so it can bind the storage index KV and any requested R2 bucket. If `worker_envelope` is selected, the helper also generates the worker secret used as the deployment KEK; the generated value is not written to session metadata.
-- Worker-envelope key provider is fixed to `worker_secret` in this release. The default Cloudflare rule permits configured session admins or agents granted the `storage` scope; normal participant responses use their dedicated submission route. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
-- `SessionRegistry` does not store long-form content directly. Decentralized
-  profiles store a metadata URI pointer plus minimal session identity fields;
-  the default worker-canonical profile skips registry writes entirely.
+- Arweave metadata stores the human-readable session config: name, description, AI defaults, block limits, contract pointers, featured lists, and any Lit-encrypted metadata fields
+- `/new` Advanced can select `storageProfile.backend = "cloudflare"` for canonical session payload storage. Its default payload access mode is `worker_sbt_gate`: the session worker stores Cloudflare objects and checks the requester's SBT gate with configured chain/RPC before serving bytes. This is worker-enforced access control, not end-to-end encryption, so the Lit key input is hidden.
+- Cloudflare `lit_encrypted` mode is the stronger scaffolded option. It requires Lit credentials and rejects plaintext Cloudflare uploads until the Lit envelope path provides `payloadEncrypted=true` encrypted payloads.
+- `SessionRegistry` does not store this long-form content directly; it stores the metadata URI pointer plus the minimal session identity fields
 
 Important:
 
