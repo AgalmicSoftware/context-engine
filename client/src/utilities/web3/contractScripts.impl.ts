@@ -86,6 +86,7 @@ import {
   shouldBypassSessionScopeWindow,
 } from '../session/sessionScopeWindow.js';
 import { toStr } from '../shared/primitives.js';
+import { storageRefFromLegacyArweaveTxId } from '../storage/storageRefs.js';
 import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
 import { createContractHelperMethods } from './contractHelpers.js';
@@ -2799,10 +2800,15 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       revertMessage: 'addQuestions transaction reverted on-chain.',
     });
 
-    const uploadedQuestions = qIds32.map((id, index) => ({
-      questionId: id,
-      arweaveTxId: questionArweaveHashes[index],
-    }));
+    const uploadedQuestions = qIds32.map((id, index) => {
+      const arweaveTxId = questionArweaveHashes[index];
+      const storageRef = storageRefFromLegacyArweaveTxId(arweaveTxId);
+      return {
+        questionId: id,
+        arweaveTxId,
+        ...(storageRef ? { storageRef } : {}),
+      };
+    });
 
     clearReadCachesForGroup(groupKeyOrCfg);
     return { receipt, uploadedQuestions };
@@ -3104,6 +3110,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         if (mockedResponse) {
           normalizeSessionNameFields(mockedResponse);
           mockedResponse.arweaveTxId = arweaveHashBase64;
+          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHashBase64);
+          if (storageRef) mockedResponse.storageRef = storageRef;
           return normalizeConvictionImportance(mockedResponse);
         }
         if (!ARWEAVE_ACTIVE) {
@@ -3136,6 +3144,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         }
         normalizeSessionNameFields(responseJson);
         responseJson.arweaveTxId = arweaveHashBase64;
+        const storageRef = storageRefFromLegacyArweaveTxId(arweaveHashBase64);
+        if (storageRef) responseJson.storageRef = storageRef;
         return normalizeConvictionImportance(responseJson);
       }
     );
@@ -3416,6 +3426,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             await maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
           }
           questionData.arweaveTxId = arweaveHash;
+          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHash);
+          if (storageRef) questionData.storageRef = storageRef;
           return questionData;
         }
       );
@@ -3498,6 +3510,9 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           if (!skipDecrypt) {
             await maybeDecryptSurveyPayload(parsed, groupKeyOrCfg, opts);
           }
+          parsed.arweaveTxId = arweaveHash;
+          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHash);
+          if (storageRef) parsed.storageRef = storageRef;
           return parsed;
         }
       );
