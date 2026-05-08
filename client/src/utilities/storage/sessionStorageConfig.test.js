@@ -1,0 +1,27 @@
+import {
+  normalizeSessionStorageConfig,
+  requiresLitForSessionStorage,
+  resolveSessionStorageBackend,
+  usesCloudflareSessionStorage,
+} from './sessionStorageConfig.js';
+import { STORAGE_BACKENDS } from './storageRefs.js';
+
+describe('sessionStorageConfig', () => {
+  test('defaults to Arweave for sessions without storage config', () => {
+    expect(resolveSessionStorageBackend(null)).toBe(STORAGE_BACKENDS.ARWEAVE);
+    expect(normalizeSessionStorageConfig({}).resources.docsContext).toBe('active');
+  });
+
+  test('keeps lit-arweave available and selected for encrypted document payloads', () => {
+    expect(resolveSessionStorageBackend({}, { encrypted: true })).toBe(STORAGE_BACKENDS.LIT_ARWEAVE);
+    expect(resolveSessionStorageBackend({ storageProfile: { backend: 'lit-arweave' } })).toBe(STORAGE_BACKENDS.LIT_ARWEAVE);
+    expect(requiresLitForSessionStorage({ storageProfile: { backend: 'lit-arweave' } })).toBe(true);
+  });
+
+  test('routes explicit Cloudflare session storage through worker storage endpoints', () => {
+    const sessionConfig = { storageProfile: { backend: 'cloudflare' } };
+    expect(resolveSessionStorageBackend(sessionConfig)).toBe(STORAGE_BACKENDS.CLOUDFLARE);
+    expect(usesCloudflareSessionStorage(sessionConfig)).toBe(true);
+    expect(requiresLitForSessionStorage(sessionConfig, { encrypted: true })).toBe(false);
+  });
+});
