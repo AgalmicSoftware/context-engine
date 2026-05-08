@@ -18,6 +18,7 @@ import {
   normalizeAiProvider,
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
+import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import type { AnyRecord } from '../shellTypes';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -95,6 +96,9 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   if (typeof draft.embeddedDeployHelperEnabled !== 'boolean') {
     draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   }
+  draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile || draft.sessionStorageProfile || draft.storage);
+  delete draft.sessionStorageProfile;
+  delete draft.storage;
 
   return normalizeLitMetadataNetwork(draft) as AnyRecord;
 };
@@ -121,6 +125,7 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.litCredentials = {};
   draft.perMemberSpendLimits = draft.perMemberSpendLimits || { ai: '', arweave: '', txGas: '' };
   draft.arweave = draft.arweave || { jwk: '', encryptedJwk: '' };
+  draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile);
   draft.faucet = draft.faucet || {
     rpcUrl: '',
     amountEth: '0.0002',

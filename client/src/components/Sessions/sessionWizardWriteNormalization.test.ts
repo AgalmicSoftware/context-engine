@@ -222,4 +222,42 @@ describe('sessionWizardWriteNormalization', () => {
     });
     expect(payload.contracts.reputation).toBeUndefined();
   });
+  test('session storage profile is session-owned metadata and worker config, with Cloudflare secrets omitted', () => {
+    const metadata = sanitizeSessionWizardMetadataPayload({
+      slug: 'storage-edge',
+      sessionName: 'Storage Edge',
+      storageProfile: {
+        backend: 'cloudflare',
+        cloudflare: {
+          accountId: 'must-not-pass-through',
+          bucketName: 'private-bucket',
+          workerToken: 'cf-secret-token',
+        },
+      },
+    }, {
+      fieldOrder: ['slug', 'sessionName', 'storageProfile'],
+    });
+
+    expect(metadata.storageProfile.backend).toBe('cloudflare');
+    expect(metadata.storageProfile.sessionOwned).toBe(true);
+    expect(metadata.storageProfile.telegramOwned).toBe(false);
+    expect(metadata.storageProfile.resources.docsContext).toBe('active');
+    expect(metadata.storageProfile.sbtGatedAccess.litRequired).toBe('payload_encrypted_only');
+    expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('docs_context_payloads');
+    expect(JSON.stringify(metadata)).not.toMatch(/private-bucket|cf-secret-token|must-not-pass-through/i);
+
+    const workerPayload = buildSessionWizardWorkerConfigPayload({
+      slug: 'storage-edge',
+      draft: {
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        storageProfile: { backend: 'cloudflare' },
+      },
+      deployPayload: {},
+    });
+
+    expect(workerPayload.storageProfile.backend).toBe('cloudflare');
+    expect(workerPayload.storageProfile.sessionOwned).toBe(true);
+    expect(workerPayload.storageProfile.telegramOwned).toBe(false);
+  });
+
 });

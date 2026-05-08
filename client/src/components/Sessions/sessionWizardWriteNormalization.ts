@@ -15,6 +15,7 @@ import {
 } from './sessionWizardContracts.js';
 import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
 import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
+import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -328,6 +329,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
       ? cloneValue(resolvedDeployPayload.faucet)
       : cloneValue(resolveWorkerFaucetConfig()),
     litCredentials: buildWorkerLitCredentialsConfig(workerSecrets),
+    storageProfile: normalizeSessionStorageProfileConfig(resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile),
   };
   if (resolvedDraft.telegramOnly === true) {
     next.telegramOnly = true;
