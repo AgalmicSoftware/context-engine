@@ -6,10 +6,13 @@ jest.mock('../../variables/appConfig.js', () => {
   };
 });
 
-const mockBase64urlToHex = (value) =>
-  String(value || '').startsWith('A') ? `0x${'11'.repeat(32)}` : `0x${'22'.repeat(32)}`;
+const mockBase64urlToHex = (value) => (
+  String(value || '').startsWith('A')
+    ? `0x${'11'.repeat(32)}`
+    : `0x${'22'.repeat(32)}`
+);
 
-jest.mock('../arweave/arweaveClient.js', () => {
+jest.mock('../arweave/arweaveScripts.js', () => {
   return {
     arweaveClient: {
       uploadDataToArweave: jest.fn(),
@@ -83,9 +86,9 @@ jest.mock('ethers', () => {
 });
 
 const { ethers } = require('ethers');
-const { arweaveClient } = require('../arweave/arweaveClient.js');
+const { arweaveScripts } = require('../arweave/arweaveScripts.js');
 const { uploadDataToSessionStorage, readSessionStorageBlob } = require('../storage/storageClient.js');
-const contractScriptsBarrel = require('./chainGateway');
+const contractScriptsBarrel = require('./contractScripts');
 
 const contractScripts = contractScriptsBarrel.default;
 const submitResponses = (...args) => contractScripts.submitResponses(...args);
@@ -125,46 +128,6 @@ const CLOUDFLARE_GROUP_CFG = {
     backend: 'cloudflare',
   },
 };
-const WORKER_CANONICAL_GROUP_CFG = {
-  slug: 'demo-sh',
-  sessionId: '0x00112233445566778899aabbccddeeff',
-  corsWorkerUrl: 'https://worker.example',
-  contracts: {},
-  sessionModeProfile: {
-    profileVersion: 1,
-    preset: 'custom',
-    authority: { mode: 'worker_canonical' },
-    evm: { registryChainId: null },
-    storage: {
-      backend: 'cloudflare',
-      payloadAccessControl: { gate: 'none', encryption: 'none' },
-    },
-    identity: { default: 'passkey', enabled: ['passkey'] },
-    authorization: { mechanisms: ['worker_roles'] },
-    encryption: { mode: 'none' },
-    surfaces: {
-      web: true,
-      telegram: false,
-      miniApp: false,
-      agentHttp: false,
-      mcp: false,
-      ceCc: false,
-    },
-    results: {
-      visibility: 'participant_aggregate',
-      exposure: {
-        aggregateResultsEnabled: true,
-        anonymizedGroupsEnabled: false,
-        minGroupSize: 2,
-      },
-    },
-    export: { scope: 'all_session' },
-  },
-  storageProfile: {
-    backend: 'cloudflare',
-    resources: { responses: 'active' },
-  },
-};
 
 const makeRpcProvider = ({ sendTxError } = {}) => ({
   request: jest.fn(async ({ method }) => {
@@ -200,8 +163,8 @@ const makeWriteContractMock = ({ address = TEST_ADDRESS, data = '0xdeadbeef', me
 describe('error paths', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    arweaveClient.uploadDataToArweave.mockReset();
-    arweaveClient.base64urlToHex.mockImplementation(mockBase64urlToHex);
+    arweaveScripts.uploadDataToArweave.mockReset();
+    arweaveScripts.base64urlToHex.mockImplementation(mockBase64urlToHex);
     uploadDataToSessionStorage.mockReset();
     readSessionStorageBlob.mockReset();
     delete window.ethereum;
@@ -1074,7 +1037,7 @@ describe('error paths', () => {
       CLOUDFLARE_GROUP_CFG,
     );
 
-    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
     expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(2);
     expect(uploadDataToSessionStorage.mock.calls.map((call) => call[2].resource)).toEqual(['surveys', 'questions']);
     expect(mockSurveyContract.interface.encodeFunctionData).toHaveBeenCalledWith('addSurvey', [
@@ -1084,21 +1047,17 @@ describe('error paths', () => {
       [`0x${'22'.repeat(32)}`],
     ]);
     expect(result.surveyArweaveTxId).toBeUndefined();
-    expect(result.surveyStorageRef).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        id: CF_SURVEY_ID,
-        resource: 'surveys',
-      }),
-    );
+    expect(result.surveyStorageRef).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      id: CF_SURVEY_ID,
+      resource: 'surveys',
+    }));
     expect(result.uploadedQuestions[0].arweaveTxId).toBe('');
-    expect(result.uploadedQuestions[0].storageRef).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        id: CF_QUESTION_ID,
-        resource: 'questions',
-      }),
-    );
+    expect(result.uploadedQuestions[0].storageRef).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      id: CF_QUESTION_ID,
+      resource: 'questions',
+    }));
   });
 
   it('routes Cloudflare response payload writes through session storage before submitResponses', async () => {
@@ -1128,17 +1087,9 @@ describe('error paths', () => {
       CLOUDFLARE_GROUP_CFG,
     );
 
-    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
+    expect(arweaveScripts.uploadDataToArweave).not.toHaveBeenCalled();
     expect(uploadDataToSessionStorage).toHaveBeenCalledTimes(2);
     expect(uploadDataToSessionStorage.mock.calls.every((call) => call[2].resource === 'responses')).toBe(true);
-    expect(uploadDataToSessionStorage.mock.calls[0][2].context).toEqual(
-      expect.objectContaining({
-        account: TEST_ADDRESS,
-        chainId: 84532,
-        providerLike: expect.any(Object),
-        signer: expect.any(Object),
-      }),
-    );
     expect(mockSurveyContract.interface.encodeFunctionData).toHaveBeenCalledWith('submitResponses', [
       [expect.any(String)],
       [`0x${'22'.repeat(32)}`],
@@ -1148,17 +1099,12 @@ describe('error paths', () => {
   });
 
   it('resolves Cloudflare question pointers through session storage before Arweave fallback', async () => {
-    arweaveClient.hexToBase64url.mockReturnValue(CF_QUESTION_ID);
-    readSessionStorageBlob.mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          id: QUESTION_ID,
-          prompt: 'Loaded from Cloudflare storage',
-          questionType: 'freeform',
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
+    arweaveScripts.hexToBase64url.mockReturnValue(CF_QUESTION_ID);
+    readSessionStorageBlob.mockResolvedValue(new Response(JSON.stringify({
+      id: QUESTION_ID,
+      prompt: 'Loaded from Cloudflare storage',
+      questionType: 'freeform',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const mockSurveyContract = {
       getQuestionHash: jest.fn(async () => `0x${'22'.repeat(32)}`),
     };
@@ -1166,26 +1112,25 @@ describe('error paths', () => {
       return mockSurveyContract;
     });
 
-    const result = await contractScripts.getQuestionData('none', QUESTION_ID, CLOUDFLARE_GROUP_CFG, {
-      skipDecrypt: true,
-    });
+    const result = await contractScripts.getQuestionData(
+      'none',
+      QUESTION_ID,
+      CLOUDFLARE_GROUP_CFG,
+      { skipDecrypt: true },
+    );
 
     expect(readSessionStorageBlob).toHaveBeenCalledTimes(1);
-    expect(readSessionStorageBlob.mock.calls[0][0].storageRef).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        id: CF_QUESTION_ID,
-        resource: 'questions',
-      }),
-    );
+    expect(readSessionStorageBlob.mock.calls[0][0].storageRef).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      id: CF_QUESTION_ID,
+      resource: 'questions',
+    }));
     expect(result.prompt).toBe('Loaded from Cloudflare storage');
-    expect(result.storageRef).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        id: CF_QUESTION_ID,
-        resource: 'questions',
-      }),
-    );
+    expect(result.storageRef).toEqual(expect.objectContaining({
+      backend: 'cloudflare',
+      id: CF_QUESTION_ID,
+      resource: 'questions',
+    }));
     expect(result.arweaveTxId).toBeUndefined();
   });
 

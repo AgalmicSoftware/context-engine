@@ -872,8 +872,43 @@ describe('SessionWizard rendered validation', () => {
 
     fireEvent.click(customizeButton);
 
-    await waitFor(() => expect(customizeButton).toHaveAttribute('aria-pressed', 'true'));
-    expect(screen.queryByText(/Advanced mode/i)).not.toBeInTheDocument();
+    fireEvent.click(settingsButton);
+
+    expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
+    expect(normalModeButton).toBeVisible();
+    expect(advancedModeButton).toBeVisible();
+
+    fireEvent.click(advancedModeButton);
+
+    await waitFor(() => {
+      expect(settingsButton).toHaveAttribute('aria-expanded', 'false');
+    });
+    expect(screen.getByText('Advanced mode shows the full session configuration.')).toBeInTheDocument();
+  });
+
+  it('keeps session storage profile selection in advanced mode and defaults to Arweave', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
+
+    enableAdvancedMode();
+
+    expect(await screen.findByText('Session Storage')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+
+    const arweaveOption = screen.getByRole('radio', { name: 'Arweave' });
+    const cloudflareOption = screen.getByRole('radio', { name: 'Cloudflare' });
+    expect(arweaveOption).toHaveAttribute('aria-checked', 'true');
+    expect(cloudflareOption).toHaveAttribute('aria-checked', 'false');
+
+    fireEvent.click(cloudflareOption);
+
+    await waitFor(() => {
+      expect(arweaveOption).toHaveAttribute('aria-checked', 'false');
+      expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
+    });
+    expect(screen.getByText(/R2 for blobs, D1 or KV for metadata\/indexes/)).toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for sponsored /new drafts', async () => {

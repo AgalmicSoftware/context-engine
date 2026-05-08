@@ -119,7 +119,18 @@ import {
   shouldBypassSessionScopeWindow,
 } from '../session/sessionScopeWindow.js';
 import { toStr } from '../shared/primitives.js';
-import { storageRefFromLegacyArweaveTxId } from '../storage/storageRefs.js';
+import {
+  STORAGE_BACKENDS,
+  STORAGE_RESOURCE_KEYS,
+  attachStorageRefCompatibilityFields,
+  deriveStorageRefFromLegacyArweaveTxId,
+  normalizeStorageRef,
+} from '../storage/storageRefs.js';
+import {
+  readSessionStorageBlob,
+  uploadDataToSessionStorage,
+} from '../storage/storageClient.js';
+import { resolveSessionStorageBackend } from '../storage/sessionStorageConfig.js';
 import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
 import { createContractHelperMethods } from './contractHelpers.js';
@@ -624,34 +635,26 @@ const { recordTerminalArweaveInvalidFailure, downloadArweaveTextForGroup } = cre
   buildArweaveDebugContext: buildArweaveDebugContext as any,
 });
 
-const SBT_TOKENURI_METADATA_GATEWAYS = Object.freeze([
-  'https://arweave.net',
-  'https://gateway.irys.xyz',
-  'https://g8way.io',
-  'https://permagate.io',
-  'https://ar-io.dev',
-]);
-
-const resolveStorageSessionSlug = (groupKeyOrCfg: any, cfg: any = null) => {
+const resolveStorageSessionSlug = (groupKeyOrCfg, cfg = null) => {
   const fromCfg = normalizeSessionSlug(cfg?.slug || cfg?.sessionSlug || '');
   if (fromCfg) return fromCfg;
   if (typeof groupKeyOrCfg === 'string') return normalizeSessionSlug(groupKeyOrCfg);
   return normalizeSessionSlug(groupKeyOrCfg?.slug || groupKeyOrCfg?.sessionSlug || '');
 };
 
-const resolveStorageBackendForResource = (cfg: any, resource: any, opts: any = {}) =>
-  resolveSessionStorageBackend(cfg, {
-    resource,
-    encrypted: opts.encrypted === true,
-  });
+const resolveStorageBackendForResource = (cfg, resource, opts = {}) => resolveSessionStorageBackend(cfg, {
+  resource,
+  encrypted: opts.encrypted === true,
+});
 
-const isCloudflareStorageResource = (cfg: any, resource: any, opts: any = {}) =>
-  resolveStorageBackendForResource(cfg, resource, opts) === STORAGE_BACKENDS.CLOUDFLARE;
+const isCloudflareStorageResource = (cfg, resource, opts = {}) => (
+  resolveStorageBackendForResource(cfg, resource, opts) === STORAGE_BACKENDS.CLOUDFLARE
+);
 
-const payloadPointerIdToBytes32 = (id: any, label: any = 'storage pointer') => {
+const payloadPointerIdToBytes32 = (id, label = 'storage pointer') => {
   const pointerId = toStr(id).trim();
   if (!pointerId) throw new Error(`${label}: missing storage pointer id.`);
-  const hex = arweaveClient.base64urlToHex(pointerId);
+  const hex = arweaveScripts.base64urlToHex(pointerId);
   if (!/^0x[0-9a-fA-F]{64}$/.test(toStr(hex))) {
     throw new Error(`${label}: storage pointer id is not bytes32-compatible (hex length ${toStr(hex).length}).`);
   }
@@ -666,7 +669,7 @@ const uploadJsonPayloadForContractPointer = async ({
   arweaveUploadOpts,
   uploadWithRetry = false,
   storageContext = {},
-}: any) => {
+}) => {
   const payloadString = JSON.stringify(payload);
   if (isCloudflareStorageResource(cfg, resource)) {
     const sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
@@ -697,7 +700,7 @@ const uploadJsonPayloadForContractPointer = async ({
   }
   const txId = uploadWithRetry
     ? await uploadDataToArweaveWithRetry(payloadString, 'json', arweaveUploadOpts)
-    : await arweaveClient.uploadDataToArweave(payloadString, 'json', arweaveUploadOpts);
+    : await arweaveScripts.uploadDataToArweave(payloadString, 'json', arweaveUploadOpts);
   return {
     pointerId: txId,
     pointerBytes: payloadPointerIdToBytes32(txId, `${resource} Arweave upload`),
@@ -706,16 +709,18 @@ const uploadJsonPayloadForContractPointer = async ({
   };
 };
 
-const readCloudflarePointerTextForGroup = async ({ pointerId, resource, groupKeyOrCfg, cfg }: any) => {
-  const storageRef = normalizeStorageRef(
-    {
-      backend: STORAGE_BACKENDS.CLOUDFLARE,
-      id: pointerId,
-      resource,
-      contentType: 'application/json',
-    },
-    { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE, resource },
-  );
+const readCloudflarePointerTextForGroup = async ({
+  pointerId,
+  resource,
+  groupKeyOrCfg,
+  cfg,
+}) => {
+  const storageRef = normalizeStorageRef({
+    backend: STORAGE_BACKENDS.CLOUDFLARE,
+    id: pointerId,
+    resource,
+    contentType: 'application/json',
+  }, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE, resource });
   if (!storageRef) throw new Error(`Invalid Cloudflare ${resource} storage pointer.`);
   const response = await readSessionStorageBlob({
     storageRef,
@@ -729,11 +734,17 @@ const readCloudflarePointerTextForGroup = async ({ pointerId, resource, groupKey
   };
 };
 
-const readPayloadPointerTextForGroup = async ({ pointerId, resource, groupKeyOrCfg, cfg, arweaveOpts }: any) => {
+const readPayloadPointerTextForGroup = async ({
+  pointerId,
+  resource,
+  groupKeyOrCfg,
+  cfg,
+  arweaveOpts,
+}) => {
   if (isCloudflareStorageResource(cfg, resource)) {
     try {
       return await readCloudflarePointerTextForGroup({ pointerId, resource, groupKeyOrCfg, cfg });
-    } catch (cloudflareError: any) {
+    } catch (cloudflareError) {
       contractsLog.warn(`Cloudflare ${resource} payload read failed; trying legacy Arweave fallback.`, cloudflareError);
       if (!ARWEAVE_ACTIVE) throw cloudflareError;
     }
@@ -749,17 +760,17 @@ const readPayloadPointerTextForGroup = async ({ pointerId, resource, groupKeyOrC
   };
 };
 
-const attachPayloadPointerFields = (payload: any, pointerId: any, resource: any, storageRef: any = null) =>
-  attachStorageRefCompatibilityFields(
-    {
-      ...(payload || {}),
-      ...(storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE ? { storageRef } : { arweaveTxId: pointerId }),
-      resource,
-    },
-    { resource },
-  );
+const attachPayloadPointerFields = (payload, pointerId, resource, storageRef = null) => (
+  attachStorageRefCompatibilityFields({
+    ...(payload || {}),
+    ...(storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE
+      ? { storageRef }
+      : { arweaveTxId: pointerId }),
+    resource,
+  }, { resource })
+);
 
-const recordInFlightStat = (kind: any = 'miss') => {
+const recordInFlightStat = (kind = 'miss') => {
   try {
     if (typeof window === 'undefined') return;
     const stats = window.__RPC_STATS__ || { counts: {}, recent: [] };
@@ -2161,8 +2172,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     }
     const SurveyContract = new ethers.Contract(addr, SURVEYS, signer);
 
-    let surveyArweaveHash;
-    let questionArweaveHashes = [];
+    let surveyPayloadUpload = null;
+    let questionPayloadUploads = [];
 
     // Normalize IDs to bytes32
     const ensureHash = (v) => {
@@ -2184,7 +2195,9 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       if (!utils.isHexString(id, 32)) throw new Error(`addSurveyWithQuestions: questionIds[${i}] is not bytes32.`);
     });
 
-    if (ARWEAVE_ACTIVE) {
+    const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS)
+      || isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
+    if (ARWEAVE_ACTIVE || canUseSessionStorage) {
       // Safety net: inject sessionName if caller omitted it
       const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
       const surveyDataToUpload = normalizeSessionNameFields({
@@ -2208,34 +2221,42 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         });
       });
 
-      const surveyDataString = JSON.stringify(surveyDataToUpload);
-      surveyArweaveHash = await arweaveScripts.uploadDataToArweave(
-        surveyDataString,
-        'json',
-        await resolveArweaveUploadOpts(groupKeyOrCfg, {
+      const arweaveUploadOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
           providerLike: ethersProvider,
           signer,
-        })
-      );
+      });
+      surveyPayloadUpload = await uploadJsonPayloadForContractPointer({
+        payload: surveyDataToUpload,
+        resource: STORAGE_RESOURCE_KEYS.SURVEYS,
+        groupKeyOrCfg,
+        cfg,
+        arweaveUploadOpts,
+        storageContext: {
+          account: await signer.getAddress().catch(() => ''),
+          providerLike: ethersProvider,
+        },
+      });
 
       for (let questionData of qArrayToUpload) {
-        const questionDataString = JSON.stringify(questionData);
-        const questionArweaveHash = await arweaveScripts.uploadDataToArweave(
-          questionDataString,
-          'json',
-          await resolveArweaveUploadOpts(groupKeyOrCfg, {
+        const questionPayloadUpload = await uploadJsonPayloadForContractPointer({
+          payload: questionData,
+          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+          groupKeyOrCfg,
+          cfg,
+          arweaveUploadOpts,
+          storageContext: {
+            account: await signer.getAddress().catch(() => ''),
             providerLike: ethersProvider,
-            signer,
-          })
-        );
-        questionArweaveHashes.push(questionArweaveHash);
+          },
+        });
+        questionPayloadUploads.push(questionPayloadUpload);
       }
     } else {
-      throw new Error('Arweave uploads are disabled; cannot create survey/questions.');
+      throw new Error('Payload uploads are disabled; cannot create survey/questions.');
     }
 
-    const surveyArweaveHashBytes = arweaveScripts.base64urlToHex(surveyArweaveHash);
-    const questionArweaveHashesBytes = questionArweaveHashes.map((h) => arweaveScripts.base64urlToHex(h));
+    const surveyArweaveHashBytes = surveyPayloadUpload.pointerBytes;
+    const questionArweaveHashesBytes = questionPayloadUploads.map((upload) => upload.pointerBytes);
 
     rpcLog('RPC Call (Tx):', {
       function: 'addSurveyWithQuestions',
@@ -2270,7 +2291,21 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         revertMessage: 'addSurveyWithQuestions transaction reverted on-chain.',
       });
       clearReadCachesForGroup(groupKeyOrCfg);
-      return { receipt };
+      const surveyStorageRef = surveyPayloadUpload.storageRef;
+      const uploadedQuestions = qIds32.map((id, index) => (
+        attachStorageRefCompatibilityFields({
+          questionId: id,
+          arweaveTxId: questionPayloadUploads[index]?.arweaveTxId || '',
+          storageRef: questionPayloadUploads[index]?.storageRef || null,
+          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+        }, { resource: STORAGE_RESOURCE_KEYS.QUESTIONS })
+      ));
+      return {
+        receipt,
+        ...(surveyPayloadUpload.arweaveTxId ? { surveyArweaveTxId: surveyPayloadUpload.arweaveTxId } : {}),
+        ...(surveyStorageRef ? { surveyStorageRef } : {}),
+        uploadedQuestions,
+      };
     } catch (error) {
       notifyUserFacingTransactionError(error);
       throw error;
@@ -2303,7 +2338,7 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     }
     const SurveyContract = new ethers.Contract(addr, SURVEYS, signer);
 
-    let questionArweaveHashes = [];
+    let questionPayloadUploads = [];
 
     // Normalize IDs to bytes32
     const ensureHash = (v) => {
@@ -2327,7 +2362,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
       if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: surveyIds[${i}] is not a bytes32.`);
     });
 
-    if (ARWEAVE_ACTIVE) {
+    const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
+    if (ARWEAVE_ACTIVE || canUseSessionStorage) {
       // Safety net: inject sessionName if caller omitted it
       const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
       const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q) => (
@@ -2343,23 +2379,30 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         });
       });
 
+      const arweaveUploadOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
+        providerLike: ethersProvider,
+        signer,
+      });
+
       for (let questionData of qArrayToUpload) {
-        const questionDataString = JSON.stringify(questionData);
-        const questionArweaveHash = await arweaveScripts.uploadDataToArweave(
-          questionDataString,
-          'json',
-          await resolveArweaveUploadOpts(groupKeyOrCfg, {
+        const questionPayloadUpload = await uploadJsonPayloadForContractPointer({
+          payload: questionData,
+          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+          groupKeyOrCfg,
+          cfg,
+          arweaveUploadOpts,
+          storageContext: {
+            account: await signer.getAddress().catch(() => ''),
             providerLike: ethersProvider,
-            signer,
-          })
-        );
-        questionArweaveHashes.push(questionArweaveHash);
+          },
+        });
+        questionPayloadUploads.push(questionPayloadUpload);
       }
     } else {
-      throw new Error('Arweave uploads are disabled; cannot add questions.');
+      throw new Error('Payload uploads are disabled; cannot add questions.');
     }
 
-    const questionArweaveHashBytesArray = questionArweaveHashes.map((h) => arweaveScripts.base64urlToHex(h));
+    const questionArweaveHashBytesArray = questionPayloadUploads.map((upload) => upload.pointerBytes);
 
     rpcLog('RPC Call (Tx):', {
       function: 'addQuestions',
@@ -2393,13 +2436,13 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     });
 
     const uploadedQuestions = qIds32.map((id, index) => {
-      const arweaveTxId = questionArweaveHashes[index];
-      const storageRef = storageRefFromLegacyArweaveTxId(arweaveTxId);
-      return {
+      const upload = questionPayloadUploads[index] || {};
+      return attachStorageRefCompatibilityFields({
         questionId: id,
-        arweaveTxId,
-        ...(storageRef ? { storageRef } : {}),
-      };
+        arweaveTxId: upload.arweaveTxId || '',
+        storageRef: upload.storageRef || null,
+        resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+      }, { resource: STORAGE_RESOURCE_KEYS.QUESTIONS });
     });
 
     clearReadCachesForGroup(groupKeyOrCfg);
@@ -2453,48 +2496,56 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
   const userAddress = await signer.getAddress(); // throws if no account
 
   // Prepare data to upload and on-chain params.
-  let questionResponseHashes = [];
+  let questionResponseUploads = [];
   let surveyResponseHashBytes = ethers.constants.HashZero;
 
-  if (ARWEAVE_ACTIVE) {
+  const cfg = resolveSession(groupKeyOrCfg || '');
+  const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
+  if (ARWEAVE_ACTIVE || canUseSessionStorage) {
     const arweaveOpts = await resolveArweaveUploadOpts(groupKeyOrCfg);
     if (surveyResponse) {
       validateNoLockedPlaintextInPayload(surveyResponse, {
         family: 'survey_response_payload',
         path: 'survey response',
       });
-      const surveyResponseString = JSON.stringify(surveyResponse);
-      const surveyResponseHash = await uploadDataToArweaveWithRetry(
-        surveyResponseString,
-        'json',
-        arweaveOpts
-      );
-      surveyResponseHashBytes = arweaveScripts.base64urlToHex(surveyResponseHash);
+      const surveyResponseUpload = await uploadJsonPayloadForContractPointer({
+        payload: surveyResponse,
+        resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+        groupKeyOrCfg,
+        cfg,
+        arweaveUploadOpts: arweaveOpts,
+        uploadWithRetry: true,
+        storageContext: { account: userAddress },
+      });
+      surveyResponseHashBytes = surveyResponseUpload.pointerBytes;
     }
     // Upload response objects sequentially to avoid Arweave anchor/signature races
     // that can appear when multiple uploads are posted in parallel for one wallet.
-    questionResponseHashes = [];
+    questionResponseUploads = [];
     for (const response of questionResponses) {
       validateNoLockedPlaintextInPayload(response, {
         family: 'question_response_payload',
         path: 'question response',
       });
       // eslint-disable-next-line no-await-in-loop
-      const txId = await uploadDataToArweaveWithRetry(
-        JSON.stringify(response),
-        'json',
-        arweaveOpts
-      );
-      questionResponseHashes.push(txId);
+      const responseUpload = await uploadJsonPayloadForContractPointer({
+        payload: response,
+        resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+        groupKeyOrCfg,
+        cfg,
+        arweaveUploadOpts: arweaveOpts,
+        uploadWithRetry: true,
+        storageContext: { account: userAddress },
+      });
+      questionResponseUploads.push(responseUpload);
     }
   } else {
-    return; // no-op when Arweave disabled
+    return; // no-op when no configured payload storage path is available
   }
 
-  const questionResponseHashesBytes = questionResponseHashes.map((hash) => arweaveScripts.base64urlToHex(hash));
+  const questionResponseHashesBytes = questionResponseUploads.map((upload) => upload.pointerBytes);
 
   // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)
-  const cfg    = resolveSession(groupKeyOrCfg || '');
   const gAddrs = getSessionAddresses(cfg);
   const addr   = gAddrs.surveys?.address;
   if (!addr) {
@@ -2687,21 +2738,32 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           }
           return null;
         }
-        const arweaveHashBase64 = arweaveScripts.hexToBase64url(arweaveHash);
+        const payloadPointerId = arweaveScripts.hexToBase64url(arweaveHash);
         const mockedResponse = readE2EMockedViewedResponse();
         if (mockedResponse) {
           normalizeSessionNameFields(mockedResponse);
-          mockedResponse.arweaveTxId = arweaveHashBase64;
-          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHashBase64);
-          if (storageRef) mockedResponse.storageRef = storageRef;
-          return normalizeConvictionImportance(mockedResponse);
+          const mockedStorageRef = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES)
+            ? normalizeStorageRef({
+              backend: STORAGE_BACKENDS.CLOUDFLARE,
+              id: payloadPointerId,
+              resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+            }, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE, resource: STORAGE_RESOURCE_KEYS.RESPONSES })
+            : null;
+          return normalizeConvictionImportance(attachPayloadPointerFields(
+            mockedResponse,
+            payloadPointerId,
+            STORAGE_RESOURCE_KEYS.RESPONSES,
+            mockedStorageRef
+          ));
         }
-        if (!ARWEAVE_ACTIVE) {
+        if (!ARWEAVE_ACTIVE && !isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES)) {
           return null;
         }
-        const arweaveData = await downloadArweaveTextForGroup({
-          txId: arweaveHashBase64,
+        const storageRead = await readPayloadPointerTextForGroup({
+          pointerId: payloadPointerId,
+          resource: STORAGE_RESOURCE_KEYS.RESPONSES,
           groupKeyOrCfg,
+          cfg,
           arweaveOpts: {
             debugContext: buildArweaveDebugContext(groupKeyOrCfg, responseCategory, {
               fn: 'getResponse',
@@ -2713,22 +2775,25 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             bypassFailureCache: forceArweaveFetch,
           },
         });
+        const arweaveData = storageRead?.text;
         let responseJson = null;
         try {
           responseJson = JSON.parse(arweaveData);
         } catch (parseErr) {
           throw await recordTerminalArweaveInvalidFailure({
             groupKeyOrCfg,
-            txId: arweaveHashBase64,
-            message: `Invalid response JSON for tx ${arweaveHashBase64}`,
+            txId: payloadPointerId,
+            message: `Invalid response JSON for pointer ${payloadPointerId}`,
             cause: parseErr,
           });
         }
         normalizeSessionNameFields(responseJson);
-        responseJson.arweaveTxId = arweaveHashBase64;
-        const storageRef = storageRefFromLegacyArweaveTxId(arweaveHashBase64);
-        if (storageRef) responseJson.storageRef = storageRef;
-        return normalizeConvictionImportance(responseJson);
+        return normalizeConvictionImportance(attachPayloadPointerFields(
+          responseJson,
+          payloadPointerId,
+          STORAGE_RESOURCE_KEYS.RESPONSES,
+          storageRead?.storageRef || null
+        ));
       }
     );
     return cloneJsonSafe(result);
@@ -2950,11 +3015,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         READ_INFLIGHT.questionData,
         inflightKey,
         async () => {
-          const arweaveHash = await this.getQuestionHash(providerName, qId, groupKeyOrCfg, {
+          const payloadPointerId = await this.getQuestionHash(providerName, qId, groupKeyOrCfg, {
             throwOnError: !!(opts && opts.throwOnFailure),
           });
-          if (!arweaveHash) {
-            if (opts && opts.throwOnFailure && ARWEAVE_ACTIVE) {
+          if (!payloadPointerId) {
+            if (opts && opts.throwOnFailure && (ARWEAVE_ACTIVE || isCloudflareStorageResource(resolveSession(groupKeyOrCfg || ''), STORAGE_RESOURCE_KEYS.QUESTIONS))) {
               throw buildHashUnavailableMetadataError(
                 `Question hash unavailable for question ${qId}`,
                 { txId: '' }
@@ -2962,12 +3027,15 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             }
             return null;
           }
-          if (!ARWEAVE_ACTIVE) {
+          const cfg = resolveSession(groupKeyOrCfg || '');
+          if (!ARWEAVE_ACTIVE && !isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS)) {
             return null;
           }
-          const questionDataString = await downloadArweaveTextForGroup({
-            txId: arweaveHash,
+          const storageRead = await readPayloadPointerTextForGroup({
+            pointerId: payloadPointerId,
+            resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
             groupKeyOrCfg,
+            cfg,
             arweaveOpts: {
               disableExistencePrecheck: true,
               preflightTxExistence: false,
@@ -2986,8 +3054,9 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               }),
             },
           });
+          const questionDataString = storageRead?.text;
           if (!questionDataString) {
-            contractsLog.error(`No data found on Arweave for hash: ${arweaveHash}`);
+            contractsLog.error(`No data found for question payload pointer: ${payloadPointerId}`);
             return null;
           }
           let questionData = null;
@@ -2996,8 +3065,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           } catch (parseErr) {
             throw await recordTerminalArweaveInvalidFailure({
               groupKeyOrCfg,
-              txId: arweaveHash,
-              message: `Invalid question metadata JSON for tx ${arweaveHash}`,
+              txId: payloadPointerId,
+              message: `Invalid question metadata JSON for pointer ${payloadPointerId}`,
               cause: parseErr,
             });
           }
@@ -3007,10 +3076,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           if (!skipDecrypt) {
             await maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
           }
-          questionData.arweaveTxId = arweaveHash;
-          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHash);
-          if (storageRef) questionData.storageRef = storageRef;
-          return questionData;
+          return attachPayloadPointerFields(
+            questionData,
+            payloadPointerId,
+            STORAGE_RESOURCE_KEYS.QUESTIONS,
+            storageRead?.storageRef || null
+          );
         }
       );
       return cloneJsonSafe(result);
@@ -3046,10 +3117,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         READ_INFLIGHT.surveyData,
         inflightKey,
         async () => {
-          const arweaveHash = await this.getSurveyHash(providerName, sId, groupKeyOrCfg, {
+          const payloadPointerId = await this.getSurveyHash(providerName, sId, groupKeyOrCfg, {
             throwOnError: !!(opts && opts.throwOnFailure),
           });
-          if (!arweaveHash) {
+          if (!payloadPointerId) {
             if (opts && opts.throwOnFailure) {
               throw buildHashUnavailableMetadataError(
                 `Survey hash unavailable for survey ${sId}`,
@@ -3058,12 +3129,15 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             }
             return null;
           }
-          if (!ARWEAVE_ACTIVE) {
+          const cfg = resolveSession(groupKeyOrCfg || '');
+          if (!ARWEAVE_ACTIVE && !isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS)) {
             return null;
           }
-          const surveyData = await downloadArweaveTextForGroup({
-            txId: arweaveHash,
+          const storageRead = await readPayloadPointerTextForGroup({
+            pointerId: payloadPointerId,
+            resource: STORAGE_RESOURCE_KEYS.SURVEYS,
             groupKeyOrCfg,
+            cfg,
             arweaveOpts: {
               disableExistencePrecheck: true,
               preflightTxExistence: false,
@@ -3076,14 +3150,15 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
               }),
             },
           });
+          const surveyData = storageRead?.text;
           let parsed = null;
           try {
             parsed = JSON.parse(surveyData);
           } catch (parseErr) {
             throw await recordTerminalArweaveInvalidFailure({
               groupKeyOrCfg,
-              txId: arweaveHash,
-              message: `Invalid survey JSON for tx ${arweaveHash}`,
+              txId: payloadPointerId,
+              message: `Invalid survey JSON for pointer ${payloadPointerId}`,
               cause: parseErr,
             });
           }
@@ -3092,10 +3167,12 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           if (!skipDecrypt) {
             await maybeDecryptSurveyPayload(parsed, groupKeyOrCfg, opts);
           }
-          parsed.arweaveTxId = arweaveHash;
-          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHash);
-          if (storageRef) parsed.storageRef = storageRef;
-          return parsed;
+          return attachPayloadPointerFields(
+            parsed,
+            payloadPointerId,
+            STORAGE_RESOURCE_KEYS.SURVEYS,
+            storageRead?.storageRef || null
+          );
         }
       );
       return cloneJsonSafe(result);

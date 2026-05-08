@@ -47,7 +47,12 @@ import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
-import { storageRefFromLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
+import {
+  attachStorageRefCompatibilityFields,
+  getLegacyArweaveTxId,
+  resolvePayloadStorageRef,
+} from '../../utilities/storage/storageRefs.js';
+import { usesCloudflareSessionStorage } from '../../utilities/storage/sessionStorageConfig.js';
 import { mergeSessionContractMaps, resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import {
   claimsWorkerCanonicalAuthority,
@@ -2596,42 +2601,27 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         // Step 1: Upload to Arweave (survey.json)
         this.setState(buildCreateSurveySubmitProgressPatch({ progress: 30, submitStep: 1 }));
         let surveyArweaveTxId = '';
-        if (!isWorkerCanonicalAuthoring) {
-          const arweaveKey = await getEffectiveArweaveKey({
-            sessionSlug,
-            sessionConfig: sessionConfig as CreateSurveyEffectiveArweaveSessionConfig,
-            context: {
-              account: this.props.account,
-              providerLike: this.props.provider as CreateSurveyResourceKeyProviderLike,
-              chainId: chainIdFallback,
-            },
-          });
-          const surveyDataString = JSON.stringify(completeSurveyData);
-          const cloudflareSurveyStorage = usesCloudflareSessionStorageForCreateSurvey(sessionConfig, {
-            resource: 'surveys',
-          });
-          if (!cloudflareSurveyStorage) {
-            try {
-              surveyArweaveTxId = String(
-                (await arweaveClient.uploadDataToArweave(surveyDataString, 'json', {
-                  arweaveJwk: arweaveKey?.arweaveJwk || '',
-                  forceDirectArweaveUpload: arweaveKey?.source === 'local' && !!arweaveKey?.arweaveJwk,
-                  sessionSlug,
-                  sessionConfig,
-                  context: {
-                    account: this.props.account,
-                    providerLike: this.props.provider,
-                    chainId: chainIdFallback,
-                  },
-                })) || '',
-              );
-            } catch (error: unknown) {
-              const resettableError = error as { resetSubmitProgress?: boolean };
-              if (error && typeof error === 'object') {
-                resettableError.resetSubmitProgress = true;
-              }
-              throw error;
+        const cloudflareSurveyStorage = usesCloudflareSessionStorage(sessionConfig, { resource: 'surveys' });
+        if (!cloudflareSurveyStorage) {
+          try {
+            surveyArweaveTxId = String(
+              await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
+                arweaveJwk: arweaveKey?.arweaveJwk || '',
+                sessionSlug,
+                sessionConfig,
+                context: {
+                  account: this.props.account,
+                  providerLike: this.props.provider,
+                  chainId: chainIdFallback,
+                },
+              }) || ''
+            );
+          } catch (error: unknown) {
+            const resettableError = error as { resetSubmitProgress?: boolean };
+            if (error && typeof error === 'object') {
+              resettableError.resetSubmitProgress = true;
             }
+            throw error;
           }
         }
 
