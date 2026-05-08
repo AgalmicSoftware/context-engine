@@ -181,6 +181,19 @@ export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
     }, ['session', 'resourceId']),
   },
   {
+    name: 'request_session_storage_access',
+    description: 'Future session-worker-backed request for SBT-gated Cloudflare storage snippets, uploads, short reads, or downloads.',
+    method: 'POST',
+    path: '/api/agent/session-storage/access-request',
+    implemented: false,
+    inputSchema: jsonSchema({
+      session: stringProp('Session slug.'),
+      resourceId: stringProp('Document or context resource identifier.'),
+      operation: stringProp('Storage operation such as upload_permission, query_snippet, short_read, or download.'),
+      storageProfile: stringProp('Session storage profile, for example cloudflare.'),
+    }, ['session', 'resourceId', 'operation', 'storageProfile']),
+  },
+  {
     name: 'revoke_agent_grant',
     description: 'Revoke an existing scoped agent grant by id.',
     method: 'POST',

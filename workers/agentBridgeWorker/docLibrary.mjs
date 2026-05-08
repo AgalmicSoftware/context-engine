@@ -1,6 +1,7 @@
 import {
   AGENT_BRIDGE_WORKER_VERSION,
   DOC_VISIBILITY,
+  SESSION_STORAGE_PROFILES,
   SUPPORTED_DOC_TYPES,
   TELEGRAM_BRIDGE_ACTIONS,
   TELEGRAM_CHAT_LANES,
@@ -13,6 +14,12 @@ const TYPE_SET = new Set(SUPPORTED_DOC_TYPES);
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function normalizeSessionStorageProfile(value = SESSION_STORAGE_PROFILES.ARWEAVE) {
+  return safeString(value).toLowerCase() === SESSION_STORAGE_PROFILES.CLOUDFLARE
+    ? SESSION_STORAGE_PROFILES.CLOUDFLARE
+    : SESSION_STORAGE_PROFILES.ARWEAVE;
 }
 
 function fileExtension(value = '') {
@@ -39,6 +46,7 @@ export function normalizeDocumentRecord(input = {}) {
     };
   }
   const visibility = VISIBILITY_SET.has(input.visibility) ? input.visibility : DOC_VISIBILITY.SESSION;
+  const storageProfile = normalizeSessionStorageProfile(input.storageProfile || input.storageBackend);
   const record = {
     type: 'agent_bridge_document_record',
     version: AGENT_BRIDGE_WORKER_VERSION,
@@ -47,6 +55,7 @@ export function normalizeDocumentRecord(input = {}) {
     title: safeString(input.title || input.name) || 'Untitled document',
     fileType,
     visibility,
+    storageProfile,
     r2: {
       bucket: safeString(input.r2?.bucket || input.bucket) || null,
       objectKey: safeString(input.r2?.objectKey || input.objectKey) || null,
@@ -105,6 +114,7 @@ export function summarizeDocumentForGroup(doc = {}) {
       docTitle: record.title,
       fileType: record.fileType,
       visibility: record.visibility,
+      storageProfile: record.storageProfile,
       indexStatus: record.d1.indexStatus,
       contentPreview: record.visibility === DOC_VISIBILITY.PUBLIC ? record.contentPreview : null,
       gatedContentHidden: record.visibility !== DOC_VISIBILITY.PUBLIC,
@@ -189,5 +199,56 @@ export function createQuestionGenerationRequestFromDocs({
     createdAt,
   };
   assertNoSecretShape(request, 'Question-generation requests must not serialize secrets.');
+  return { ok: true, request };
+}
+
+export function buildDocumentStorageAccessRequest({
+  sessionSlug = '',
+  doc = {},
+  account = {},
+  operation = 'read_snippet',
+  payloadEncrypted = false,
+  createdAt = null,
+} = {}) {
+  const normalized = normalizeDocumentRecord(doc);
+  if (!normalized.ok) return normalized;
+  const { record } = normalized;
+  const cloudflareBacked = record.storageProfile === SESSION_STORAGE_PROFILES.CLOUDFLARE;
+  const request = {
+    type: 'agent_bridge_document_storage_access_request',
+    version: AGENT_BRIDGE_WORKER_VERSION,
+    requestId: buildOpaqueActionId(`doc_access|${record.sessionSlug || sessionSlug}|${record.docId}|${operation}`),
+    sessionSlug: safeString(sessionSlug || record.sessionSlug),
+    docId: record.docId,
+    operation: safeString(operation) || 'read_snippet',
+    storageProfile: record.storageProfile,
+    visibility: record.visibility,
+    sbtGated: record.visibility === DOC_VISIBILITY.SBT_GATED,
+    litRequired: payloadEncrypted === true,
+    gateAuthority: cloudflareBacked
+      ? 'session_worker_sbt_gate'
+      : 'canonical_agent_decrypt_or_arweave_read',
+    canonicalApiRequest: {
+      method: 'POST',
+      path: cloudflareBacked
+        ? '/api/agent/session-storage/access-request'
+        : '/api/agent/decrypt/request',
+      status: 'planned_contract_only',
+      body: {
+        session: safeString(sessionSlug || record.sessionSlug),
+        docId: record.docId,
+        operation: safeString(operation) || 'read_snippet',
+        accountAddress: safeString(account.accountAddress || account.address) || null,
+        storageProfile: record.storageProfile,
+        payloadEncrypted: payloadEncrypted === true,
+      },
+    },
+    exposesCloudflareCredential: false,
+    exposesBucketName: false,
+    exposesRawStoragePath: false,
+    exposesLongLivedUrl: false,
+    createdAt,
+  };
+  assertNoSecretShape(request, 'Document storage access requests must not serialize secrets.');
   return { ok: true, request };
 }

@@ -6,6 +6,7 @@ const PUBLIC_SESSION_RE = /^[a-z0-9_-]+$/i;
 const MAX_PUBLIC_SESSION_LENGTH = 128;
 const SENSITIVE_KEY_RE = /(?:privatekey|private_key|jwt|token|secret|signature|bearer|authorization|mnemonic|seed|password)/i;
 const SENSITIVE_VALUE_RE = /(?:bearer\s+[a-z0-9._-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64})/i;
+const PRIVATE_QUESTION_TEXT_KEY_RE = /(?:decrypted(?:prompt|context|text)|private(?:prompt|context|text)|question(?:prompt|context))/i;
 const SAFE_HASH_VALUE_KEYS = new Set(['questionid', 'contenthash', 'hash', 'txhash']);
 const SAFE_FALSE_AUTHORITY_KEYS = new Set([
   'privatekeyauthority',
@@ -42,6 +43,18 @@ function hasSensitiveKeyOrValue(value, path = []) {
   if (typeof value === 'string') {
     const key = lower(path[path.length - 1]);
     return !SAFE_HASH_VALUE_KEYS.has(key) && SENSITIVE_VALUE_RE.test(value);
+  }
+  return false;
+}
+
+function hasPrivateQuestionTextKey(value) {
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasPrivateQuestionTextKey(entry));
+  }
+  if (value && typeof value === 'object') {
+    return Object.entries(value).some(([key, entry]) => (
+      PRIVATE_QUESTION_TEXT_KEY_RE.test(key) || hasPrivateQuestionTextKey(entry)
+    ));
   }
   return false;
 }
@@ -409,8 +422,8 @@ export function validateTelegramMiniAppInitData(initData, botToken, {
 }
 
 export function buildTelegramCloudStoragePayload(preferences = {}) {
-  if (hasSensitiveKeyOrValue(preferences)) {
-    throw new Error('Telegram CloudStorage payload must not contain secrets or bearer credentials.');
+  if (hasSensitiveKeyOrValue(preferences) || hasPrivateQuestionTextKey(preferences)) {
+    throw new Error('Telegram CloudStorage payload must not contain secrets, bearer credentials, or private question text.');
   }
   return {
     kind: 'ce_telegram_preferences_v1',

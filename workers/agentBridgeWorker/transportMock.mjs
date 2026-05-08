@@ -7,7 +7,12 @@ import {
 import { appendBridgeEvent, summarizeEventLog } from './eventLog.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { createOpaqueActionRecord, createTelegramStartAction } from './opaqueActions.mjs';
-import { buildTelegramGroupSessionCardState, buildTelegramQuestionCard } from './questionUi.mjs';
+import {
+  buildTelegramGroupSessionCardState,
+  buildTelegramPoseQuestionState,
+  buildTelegramQuestionCard,
+  buildTelegramQuestionListState,
+} from './questionUi.mjs';
 import { buildSanitizedEnvelope, groupSafeQuestionSummary } from './sanitizedEnvelopes.mjs';
 import {
   evaluateResponseActionPolicy,
@@ -228,20 +233,70 @@ export class MockTelegramTransportHarness {
       docsExist: true,
       microphoneSupported: true,
     }));
+    const listState = buildTelegramQuestionListState({
+      sessionSlug,
+      questions: this.questions,
+      createdAt,
+    });
     this.events = appendBridgeEvent(this.events, {
       eventType: AGENT_BRIDGE_EVENT_TYPES.QUESTION_LISTED,
-      lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
       sessionSlug,
       summary: {
         count: cards.length,
+        source: listState.source,
+        questions: listState.questions,
       },
       createdAt,
     });
     return {
       ok: true,
       sessionSlug,
+      listState,
       questions: this.questions.slice(),
       cards,
+    };
+  }
+
+  poseQuestion({
+    sessionSlug = this.sessionPolicy.defaultSessionSlug,
+    questionId = '',
+    question = null,
+    source = 'existing_session_question',
+    createdAt = null,
+  } = {}) {
+    const resolved = resolveSessionInvocation(this.sessionPolicy, sessionSlug);
+    if (!resolved.ok) return resolved;
+    const selected = question || this.questions.find((entry) => (
+      String(entry.questionId || entry.id || '').trim() === String(questionId || '').trim()
+    ));
+    if (!selected) return { ok: false, reason: 'question_not_found' };
+    const state = buildTelegramPoseQuestionState({
+      sessionSlug: resolved.session.sessionSlug,
+      question: selected,
+      source,
+      createdAt,
+    });
+    this.events = appendBridgeEvent(this.events, {
+      eventType: AGENT_BRIDGE_EVENT_TYPES.QUESTION_POSED,
+      lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+      sessionSlug: resolved.session.sessionSlug,
+      questionId: state.questionId,
+      summary: {
+        action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
+        source,
+        groupSafeOutput: state.groupSafeOutput,
+      },
+      refs: {
+        actionId: state.action.actionId,
+      },
+      createdAt,
+    });
+    return {
+      ok: true,
+      session: resolved.session,
+      poseState: state,
+      groupSafeOutput: state.groupSafeOutput,
     };
   }
 

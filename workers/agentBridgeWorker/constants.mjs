@@ -17,7 +17,13 @@ export const AGENT_BRIDGE_EVENT_TYPES = Object.freeze({
   DOC_LISTED: 'doc_listed',
   DOC_SELECTED: 'doc_selected',
   QUESTION_GENERATION_REQUESTED: 'question_generation_requested',
+  QUESTION_POSED: 'question_posed',
   SESSION_JOINED: 'session_joined',
+  SBT_JOIN_REQUESTED: 'sbt_join_requested',
+  SBT_JOINED: 'sbt_joined',
+  SBT_GROUP_CREATE_REQUESTED: 'sbt_group_create_requested',
+  ACCOUNT_VIEWED: 'account_viewed',
+  PRIVATE_QUESTION_DECRYPT_REQUESTED: 'private_question_decrypt_requested',
   FAILED: 'failed',
 });
 
@@ -48,6 +54,7 @@ export const RISK_RANK = Object.freeze({
 export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   VIEW_QUESTIONS: 'view_questions',
   SELECT_QUESTION: 'select_question',
+  POSE_QUESTION: 'pose_question',
   START_PRIVATE: 'start_private',
   CREATE_MANAGED_ACCOUNT: 'create_managed_account',
   RECOVER_MANAGED_ACCOUNT: 'recover_managed_account',
@@ -61,11 +68,22 @@ export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   DIRECT_SUBMIT_RESPONSE: 'direct_submit_response',
   ADD_QUESTION: 'add_question',
   GENERATE_QUESTION: 'generate_question',
+  SAVE_GENERATED_QUESTION: 'save_generated_question',
   LIST_DOCS: 'list_docs',
   SELECT_DOCS: 'select_docs',
   USE_DOCS_AS_ANSWER_CONTEXT: 'use_docs_as_answer_context',
   JOIN_SESSION: 'join_session',
   JOIN_SBT: 'join_sbt',
+  VIEW_SBT_DETAILS: 'view_sbt_details',
+  JOIN_PUBLIC_SBT: 'join_public_sbt',
+  JOIN_PASSWORD_SBT: 'join_password_sbt',
+  CREATE_SBT_GROUP: 'create_sbt_group',
+  MY_ACCOUNT: 'my_account',
+  VIEW_JOINED_SBTS: 'view_joined_sbts',
+  EXPORT_ACCOUNT: 'export_account',
+  RESTORE_ACCOUNT: 'restore_account',
+  REQUEST_PRIVATE_QUESTION_DECRYPT: 'request_private_question_decrypt',
+  READ_PRIVATE_QUESTION: 'read_private_question',
   ADDITIONAL_COMMENTS: 'additional_comments',
   MICROPHONE_INPUT: 'microphone_input',
   DOC_CONTEXT: 'doc_context',
@@ -86,6 +104,18 @@ export const DOC_VISIBILITY = Object.freeze({
   PUBLIC: 'public',
   SESSION: 'session',
   SBT_GATED: 'sbt_gated',
+});
+
+export const SESSION_STORAGE_PROFILES = Object.freeze({
+  ARWEAVE: 'arweave',
+  CLOUDFLARE: 'cloudflare',
+});
+
+export const QUESTION_VISIBILITY = Object.freeze({
+  PUBLIC: 'public',
+  PRIVATE: 'private',
+  SBT_GATED: 'sbt_gated',
+  LIT_ENCRYPTED: 'lit_encrypted',
 });
 
 export const QUESTION_TYPES = Object.freeze({
