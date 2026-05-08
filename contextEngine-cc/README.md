@@ -262,16 +262,37 @@ answers.
 
 The private bridge worker screen contract records launch metadata for every
 Telegram state. Current commands are `/start`, `/ce_join`, `/ce_questions`,
-`/ce_docs`, `/ce_generate_questions`, `/ce_onboarding`, `/ce_export_key`, and
-`/ce_recover_key`, with opaque callback actions or
+`/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`,
+`/ce_generate_questions`, `/ce_account`, `/ce_sbt`, `/ce_sbt_join`,
+`/ce_sbt_create`, `/ce_onboarding`, `/ce_export_key`, and `/ce_recover_key`,
+with opaque callback actions, `callback:<pose_question_action>`, or
 `t.me/<bot>?start=<opaque-action-id>` used where commands are not enough. The
 group session-linked card says `Context Engine session linked: <session>` and
 shows `Join Session`, `View Questions`, and `View / Add Docs`; it does not add a
-default `Answer Privately` button. `Join Session` routes missing configured
-accounts to private account setup. Question cards keep CE control parity:
+default `Answer Privately` button. `View Questions` reads existing session
+questions through `GET /api/agent/questions`. `Pose Question` posts one
+public-safe existing or generated question to the group; locked private/gated
+questions stay locked in group and route eligible accounts to private chat or
+Mini App. `Join Session` routes missing configured accounts to private account
+setup. Question cards keep CE control parity:
 agree/unsure/disagree, rating `0` through `10`, single-select vs multi-select
 multichoice state, freeform type/voice, additional comments, microphone where
 supported, and docs/context only when docs exist or are relevant.
+
+SBT/account Telegram screens are contract-only helpers over canonical CE agent
+routes. Public/password joins and create-group requests target planned
+`/api/agent/sbt-groups/*` contracts; `My Account` shows managed address, joined
+sessions, joined SBT summaries, and private export/restore controls. Private
+question decrypt requests target the planned `/api/agent/decrypt/request` route
+and do not implement Lit decrypt inside Telegram.
+
+Storage profile selection belongs to session config in `/new`, not Telegram.
+`arweave` remains the default/current profile; `cloudflare` is an explicit
+profile where the session/general worker may enforce SBT gates for uploads,
+snippets, short-lived reads, and downloads. Lit is required only for payloads
+that are intentionally Lit/client encrypted. Telegram/OpenClaw/CE-CC/MCP receive
+safe metadata or permission states, not Cloudflare credentials, bucket names,
+worker tokens, raw storage paths, or long-lived signed URLs.
 
 `lib/agent/workerSetupContracts.mjs` defines the private `/worker-setup`
 planning surface and default-off onboarding config. The contextengine.sh domain

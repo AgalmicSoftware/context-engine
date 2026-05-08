@@ -37,8 +37,13 @@ Private bridge worker status:
 - `workers/agentBridgeWorker/` is the private Telegram demo bridge worker and is stripped from public releases while private.
 - The worker uses a Durable Object signer boundary for managed demo accounts and currently returns signed testnet demo envelopes only; broadcast is disabled.
 - Supported bridge doc-library file types are `md`, `pdf`, `png`, `jpg`, `jpeg`, and `webp`.
-- Telegram screen states record launch metadata for `/start`, `/ce_join`, `/ce_questions`, `/ce_docs`, `/ce_generate_questions`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`, opaque callbacks, or `t.me/<bot>?start=<opaque-action-id>`.
+- Telegram screen states record launch metadata for `/start`, `/ce_join`, `/ce_questions`, `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`, `/ce_generate_questions`, `/ce_account`, `/ce_sbt`, `/ce_sbt_join`, `/ce_sbt_create`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`, opaque callbacks, `callback:<pose_question_action>`, or `t.me/<bot>?start=<opaque-action-id>`.
 - Telegram group session-linked cards say `Context Engine session linked: <session>` with `Join Session`, `View Questions`, and `View / Add Docs`; do not add `Answer Privately` by default.
+- `View Questions` reads existing session questions through `GET /api/agent/questions`. `Pose Question` uses `/ce_pose_question` or `/q` to pose one existing/generated public-safe question to the group. `/ce_drop_question` is only a deprecated compatibility alias.
+- Private, SBT-gated, or Lit-encrypted questions show locked group states. Eligible accounts request private reads through canonical CE agent/session APIs such as `POST /api/agent/decrypt/request`; Telegram does not implement Lit decrypt logic.
+- SBT screens expose `Join SBT`, `Details`, `My Account`, public/password join paths, Create SBT Group, and Joined SBTs without holder lists or private holder metadata. Join/create actions route through planned canonical `/api/agent/sbt-groups/*` contracts.
+- My Account shows the managed address, joined sessions, joined SBT summaries, and private export/restore controls.
+- Session storage backend selection belongs to `/new` session config, not Telegram. `arweave` is the default/current profile; `cloudflare` is explicit and lets the session/general worker enforce SBT gates for docs/context uploads, snippets, short-lived reads, and downloads without requiring Lit unless the payload itself is Lit/client encrypted.
 - Telegram question cards must keep CE parity: binary/agree-style uses `Agree`, `Unsure`, `Disagree`; rating is discrete `0` through `10`; multichoice preserves single-select vs multi-select state; freeform offers type/voice; every card has additional comments and microphone where supported; doc/context appears only when documents exist or are relevant.
 - The doc-library copy is `View / Add Docs`; selected docs feed `Generate Questions` and may later become `Use as Answer Context`.
 

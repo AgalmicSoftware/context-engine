@@ -25,6 +25,11 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | `setup_welcome`, `test_checklist` | `/start` |
 | `group_session_card`, `account_created` | `/ce_join` |
 | `private_start` | `/start <opaque-action-id>` or `t.me/<bot>?start=<opaque-action-id>` |
+| `question_list` | `/ce_questions` |
+| `pose_question` | `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, or `callback:<pose_question_action>` |
+| `generated_question_candidates` | `/ce_generate_questions` |
+| `my_account`, `joined_sbts` | `/ce_account` |
+| SBT join/create states | `/ce_sbt`, `/ce_sbt_join`, `/ce_sbt_create` |
 | `onboarding` | `/ce_onboarding` |
 | question cards | `/ce_questions` |
 | `doc_library`, `doc_detail` | `/ce_docs` |
@@ -34,7 +39,38 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 
 The group session-linked card says `Context Engine session linked: <session>` and exposes `Join Session`, `View Questions`, and `View / Add Docs`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
 
+`View Questions` reads the linked session through `GET /api/agent/questions`.
+`Pose Question` uses `/ce_pose_question` or `/q` to pose one existing or
+generated question to the group. The old `/ce_drop_question` command is only a
+deprecated compatibility alias. Private or gated question text is never posed to
+the group; group output shows a locked state and routes eligible accounts to
+private chat or Mini App.
+
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
+
+## SBT and Account Screens
+
+The SBT group card exposes `Join SBT`, `Details`, and `My Account` only. It does
+not serialize holder lists, holder addresses, raw eligibility data, or private
+member metadata.
+
+Public/open SBT joins route to the planned canonical
+`POST /api/agent/sbt-groups/claim-request` contract when session policy allows a
+managed Telegram account to join. Password SBT joins collect the credential only
+in private chat or Mini App and pass an opaque private-input ref to the planned
+canonical request shape. Create SBT Group is Mini App first and targets the
+planned `POST /api/agent/sbt-groups/create-request` contract.
+
+`My Account` shows the managed address, joined sessions, joined SBT summaries,
+and private-only export/restore controls.
+
+## Private Questions
+
+Public questions may be summarized in group. Private, SBT-gated, or
+Lit-encrypted questions use locked group states. Eligible managed accounts create
+a contract-only `POST /api/agent/decrypt/request` through the canonical CE
+agent/session API; the Telegram worker does not implement Lit decrypt logic.
+Decrypted prompt/context text is private-chat or Mini App only.
 
 ## Doc Library
 
@@ -47,6 +83,14 @@ The worker contract models R2 document bytes, D1 metadata/index status, and KV s
 Public summaries include titles, file types, visibility, and index status. Private or SBT-gated contents are never included in group-safe summaries.
 
 The doc-library button copy is `View / Add Docs`. Selected docs are recorded as inputs for `Generate Questions` and as future `Use as Answer Context` candidates. Generating questions without selected docs returns `Select or upload docs before generating questions.`
+
+Storage profile selection belongs to session config, not Telegram.
+`arweave` remains the default profile. `cloudflare` is an explicit session
+storage profile where the session/general worker can enforce SBT gates before
+issuing upload permissions, snippets, short-lived reads, or download bytes. Lit
+is required only when the payload itself is intentionally Lit/client encrypted.
+The bridge exposes no Cloudflare credentials, bucket names, long-lived signed
+URLs, worker tokens, or raw storage paths.
 
 ## Question Cards
 
