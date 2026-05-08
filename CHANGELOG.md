@@ -12,10 +12,13 @@ All notable changes to this project will be documented in this file.
 - Added explicit dual-field helpers, made question/survey/response client and CE-CC records prefer `storageRef` before legacy `arweaveTxId`, extended worker storage tests for `questions`, `surveys`, and `responses`, and documented the future canonical `storageRef` naming migration.
 - Routed Cloudflare-configured session question, survey, and response writes through sessionCorsWorker `/storage/upload`, using opaque bytes32-compatible Cloudflare IDs in existing Surveys pointer fields without changing the contract ABI; readers now try Cloudflare `storageRef` resolution before Arweave fallback.
 - Clarified Cloudflare setup permissions for R2 payload blobs, D1/KV metadata indexes, and Durable Objects only for signer/runtime coordination, while keeping Telegram/agentBridgeWorker scoped to demo preferences, drafts, action IDs, event logs, and demo account state.
+- Added `/new` Cloudflare payload access modes: default `worker_sbt_gate` worker-enforced SBT access control without Lit credential requirements, plus a `lit_encrypted` scaffold that requires pre-encrypted payloads and rejects plaintext Cloudflare uploads until the Lit envelope path is complete.
+- Added a safe agentBridgeWorker Telegram webhook setup path with local `.dev.vars`/`.env` examples, Wrangler secret guidance, and a secret-token-gated `/telegram/webhook` acknowledgement route.
+- Fixed encrypted Document Library image thumbnails so scoped Lit hooks arriving after initial render trigger preview loading.
 
 ### Remaining TODOs
 
-- Lit-encrypted Cloudflare document upload/read remains blocked until the encrypted envelope can be produced independently of Arweave upload and read back through the worker safely.
+- Finish the Cloudflare `lit_encrypted` envelope producer/reader so documents, private questions/responses, surveys, and generated artifacts can be encrypted before `/storage/upload` without routing through Lit-Arweave.
 - Once all public and agent readers are storageRef-aware, rename the top-level payload pointer contract to `storageRef` in API docs and schemas, leaving `arweaveTxId` as a deprecated Arweave compatibility alias.
 
 ## 2026-05-04
