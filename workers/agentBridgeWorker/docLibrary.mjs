@@ -3,6 +3,7 @@ import {
   DOC_VISIBILITY,
   SUPPORTED_DOC_TYPES,
   TELEGRAM_BRIDGE_ACTIONS,
+  TELEGRAM_CHAT_LANES,
 } from './constants.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape, sanitizeForGroup } from './redaction.mjs';
@@ -85,6 +86,7 @@ export function listDocumentsForSession(docs = [], {
     type: 'agent_bridge_doc_list',
     version: AGENT_BRIDGE_WORKER_VERSION,
     sessionSlug,
+    buttonLabel: 'View / Add Docs',
     docs: normalized,
     count: normalized.length,
   };
@@ -123,8 +125,22 @@ export function createDocSelectionAction({
     version: AGENT_BRIDGE_WORKER_VERSION,
     actionId: buildOpaqueActionId(`select_docs|${sessionSlug}|${selectedDocIds.join('|')}`),
     action: TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS,
+    targetLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     sessionSlug: safeString(sessionSlug),
     selectedDocIds,
+    selectionUses: ['generate_questions_input', 'answer_context_candidate'],
+    nextActions: [
+      {
+        action: TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION,
+        label: 'Generate Questions',
+        requiresSelectedDocs: true,
+      },
+      {
+        action: TELEGRAM_BRIDGE_ACTIONS.USE_DOCS_AS_ANSWER_CONTEXT,
+        label: 'Use as Answer Context',
+        status: 'deferred_contract_only',
+      },
+    ],
     createdAt,
   };
 }
@@ -143,7 +159,11 @@ export function createQuestionGenerationRequestFromDocs({
   const normalizedDocs = listDocumentsForSession(docs, { sessionSlug }).docs
     .filter((doc) => selected.has(doc.docId));
   if (!normalizedDocs.length) {
-    return { ok: false, reason: 'selected_docs_required' };
+    return {
+      ok: false,
+      reason: 'selected_docs_required',
+      prompt: 'Select or upload docs before generating questions.',
+    };
   }
   const request = {
     type: 'agent_bridge_question_generation_request',
@@ -154,6 +174,16 @@ export function createQuestionGenerationRequestFromDocs({
     selectedDocIds: normalizedDocs.map((doc) => doc.docId),
     selectedDocTypes: [...new Set(normalizedDocs.map((doc) => doc.fileType))],
     visibility: [...new Set(normalizedDocs.map((doc) => doc.visibility))],
+    requestContext: {
+      source: 'selected_docs',
+      use: 'generate_questions_input',
+      selectedDocIds: normalizedDocs.map((doc) => doc.docId),
+    },
+    answerContext: {
+      status: 'eligible_later',
+      action: TELEGRAM_BRIDGE_ACTIONS.USE_DOCS_AS_ANSWER_CONTEXT,
+      selectedDocIds: normalizedDocs.map((doc) => doc.docId),
+    },
     status: 'mocked_contract_only',
     aiRoute: policy.safeAiRoute || null,
     createdAt,

@@ -7,7 +7,7 @@ import {
 import { appendBridgeEvent, summarizeEventLog } from './eventLog.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { createOpaqueActionRecord, createTelegramStartAction } from './opaqueActions.mjs';
-import { buildTelegramQuestionCard } from './questionUi.mjs';
+import { buildTelegramGroupSessionCardState, buildTelegramQuestionCard } from './questionUi.mjs';
 import { buildSanitizedEnvelope, groupSafeQuestionSummary } from './sanitizedEnvelopes.mjs';
 import {
   evaluateResponseActionPolicy,
@@ -88,6 +88,12 @@ export class MockTelegramTransportHarness {
       createdAt,
     });
     this.actions.set(action.actionId, action);
+    const groupCardState = buildTelegramGroupSessionCardState({
+      sessionSlug: resolved.session.sessionSlug,
+      sessionName: resolved.session.sessionName,
+      policy: resolved.policy,
+      createdAt,
+    });
     this.events = appendBridgeEvent(this.events, {
       eventType: AGENT_BRIDGE_EVENT_TYPES.GROUP_CARD_POSTED,
       lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
@@ -96,6 +102,9 @@ export class MockTelegramTransportHarness {
       questionId: question.questionId,
       summary: {
         groupTitle: group.title,
+        text: groupCardState.text,
+        buttons: groupCardState.buttons.map((button) => button.label),
+        policyActions: groupCardState.policyActions.map((button) => button.action),
         question: groupSafeQuestionSummary(question),
         defaultAction: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
         addQuestionAvailable: resolved.policy.allowAddQuestion === true,
@@ -115,6 +124,7 @@ export class MockTelegramTransportHarness {
         envelopeType: 'telegram_group_session_card',
         lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
         publicSummary: {
+          ...groupCardState,
           sessionSlug: resolved.session.sessionSlug,
           sessionName: resolved.session.sessionName,
           question: groupSafeQuestionSummary(question),
@@ -129,7 +139,12 @@ export class MockTelegramTransportHarness {
     };
   }
 
-  openPrivateStart({ groupActionId = '', update = {}, createdAt = null } = {}) {
+  openPrivateStart({
+    groupActionId = '',
+    update = {},
+    hasConfiguredAccount = false,
+    createdAt = null,
+  } = {}) {
     const groupAction = this.actions.get(groupActionId);
     if (!groupAction) return { ok: false, reason: 'group_action_not_found' };
     const normalized = normalizeTelegramMockUpdate(update);
@@ -161,6 +176,8 @@ export class MockTelegramTransportHarness {
       questionId: groupAction.serverContextRef.questionId,
       summary: {
         deepLinkPayload: start.deepLinkPayload,
+        requiresPrivateAccountSetup: hasConfiguredAccount !== true,
+        nextStep: hasConfiguredAccount === true ? TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS : 'private_account_setup',
       },
       refs: {
         groupActionId,
@@ -171,6 +188,8 @@ export class MockTelegramTransportHarness {
       ok: true,
       principal,
       deepLinkPayload: start.deepLinkPayload,
+      requiresPrivateAccountSetup: hasConfiguredAccount !== true,
+      nextStep: hasConfiguredAccount === true ? TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS : 'private_account_setup',
       privateStartAction: this.actions.get(start.deepLinkPayload),
     };
   }
@@ -361,6 +380,8 @@ export async function runMockTelegramDemoFlow({
     privateStart: {
       deepLinkPayload: privateStart.deepLinkPayload,
       principal: privateStart.principal,
+      requiresPrivateAccountSetup: privateStart.requiresPrivateAccountSetup,
+      nextStep: privateStart.nextStep,
     },
     account: account.account,
     questions: listed.cards,
