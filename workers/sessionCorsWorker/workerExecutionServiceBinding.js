@@ -16,6 +16,9 @@ import {
 import {
   createTranscribeWithWorkerDeps as createTranscribeWithWorkerDepsBoundary,
 } from './transcribeExecutionBinding.js';
+import {
+  storageRoute as storageRouteBoundary,
+} from './storageRouteExecution.js';
 
 export const createWorkerExecutionServicesWithWorkerDeps = ({
   deps,
@@ -127,6 +130,18 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     },
   });
 
+  const storageRoute = async (value = {}) => storageRouteBoundary({
+    ...value,
+    deps: {
+      json: deps?.json,
+      getSessionSecrets: deps?.getSessionSecrets,
+      arweaveUpload,
+      randomUUID: deps?.randomUUID,
+      now: deps?.now,
+      log: workerLog,
+    },
+  });
+
   const verifyAdminSignature = (
     deps?.createVerifyAdminSignatureWithWorkerDeps || createVerifyAdminSignatureWithWorkerDepsBoundary
   )({
@@ -163,6 +178,7 @@ export const createWorkerExecutionServicesWithWorkerDeps = ({
     fetchImage: fetchHelpers.fetchImage,
     fetchUrl: fetchHelpers.fetchUrl,
     arweaveUpload,
+    storageRoute,
     verifyAdminSignature,
   };
 };

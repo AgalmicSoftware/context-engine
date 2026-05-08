@@ -55,6 +55,7 @@ export const dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
             json: deps?.json,
             transcribe: deps?.transcribe,
             arweaveUpload: deps?.arweaveUpload,
+            storageRoute: deps?.storageRoute,
             fetchImage: deps?.fetchImage,
             fetchUrl: deps?.fetchUrl,
             normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
