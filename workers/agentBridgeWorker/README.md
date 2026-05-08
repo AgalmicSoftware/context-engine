@@ -104,6 +104,11 @@ Storage profile selection belongs to session config, not Telegram.
 storage profile where the session/general worker can enforce SBT gates before
 issuing upload permissions, snippets, short-lived reads, or download bytes. Lit
 is required only when the payload itself is intentionally Lit/client encrypted.
+Cloudflare storage is for CE payloads such as session context, docs, media,
+questions, surveys, responses, and generated artifacts; it is not Telegram,
+user preference, or profile storage. Agent and Telegram-facing records should
+prefer `storageRef` and keep `arweaveTxId` only as an Arweave compatibility
+alias.
 The bridge exposes no Cloudflare credentials, bucket names, long-lived signed
 URLs, worker tokens, or raw storage paths. `/new` Advanced owns the selected
 storage profile. `/worker-setup` may display that profile but does not edit

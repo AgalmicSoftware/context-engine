@@ -287,6 +287,14 @@ and the session/general worker, not by Telegram. `arweave` remains the default
 profile, `lit-arweave` remains the encrypted Arweave document mode, and
 `cloudflare` is an explicit session storage profile. Storage-capable agent APIs
 should accept/return `storageRef` while preserving legacy `arweaveTxId` fields.
+Cloudflare storage is CE payload storage for session context, docs, media,
+questions, surveys, responses, and generated artifacts; it is not user
+preference/profile storage. Readers should resolve `storageRef` first and only
+fall back to `arweaveTxId` when no storage ref is present. Future naming
+migration is tracked in
+[`TODO/PRDs/510_storage-ref-canonical-payload-pointer-migration.md`](../TODO/PRDs/510_storage-ref-canonical-payload-pointer-migration.md):
+`storageRef` becomes the canonical top-level pointer and `arweaveTxId` becomes a
+deprecated Arweave compatibility alias after readers are storageRef-aware.
 For Cloudflare docs/context, the session/general worker enforces SBT gates
 directly before upload, list, read, snippet, or download bytes are exposed. Lit
 remains required only when the payload itself is intentionally Lit-encrypted or

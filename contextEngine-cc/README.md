@@ -312,8 +312,12 @@ Storage profile selection belongs to session config in `/new`, not Telegram.
 for encrypted Arweave payloads; `cloudflare` is an explicit profile where the
 session/general worker enforces SBT gates for uploads, lists, reads, snippets,
 short-lived reads, and downloads. Agent-facing question/response shapes now add
-`storageRef` when an Arweave tx id is known while preserving `arweaveTxId`. Lit
-is required only for payloads that are intentionally Lit/client encrypted.
+`storageRef` while preserving `arweaveTxId` for Arweave-backed compatibility.
+Readers prefer `storageRef` and fall back to `arweaveTxId`; Cloudflare payloads
+do not get fake Arweave ids. Cloudflare storage is CE payload storage for
+session context, docs, media, questions, surveys, responses, and generated
+artifacts, not user preference/profile storage. Lit is required only for
+payloads that are intentionally Lit/client encrypted.
 Telegram/OpenClaw/CE-CC/MCP receive safe metadata or permission states, not
 Cloudflare credentials, bucket names, worker tokens, raw storage paths, or
 long-lived signed URLs.
