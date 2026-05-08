@@ -225,6 +225,7 @@ async function fetchQuestionData(questionId, surveysAddress, chainId) {
 
   data.id = data.id || questionId; // Ensure contract question ID is preserved
   data.arweaveTxId = txId;
+  data.storageRef = { backend: 'arweave', id: txId, uri: `ar://${txId}` };
   questionDataCache.set(questionId, data);
   return data;
 }

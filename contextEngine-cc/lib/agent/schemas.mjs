@@ -113,6 +113,31 @@ export function buildAgentError(error, {
   };
 }
 
+function normalizeAgentStorageRef(source = {}, legacyArweaveTxId = '') {
+  const ref = source && typeof source === 'object' && source.storageRef && typeof source.storageRef === 'object'
+    ? source.storageRef
+    : null;
+  if (ref) {
+    const backend = String(ref.backend || '').trim();
+    const id = String(ref.id || '').trim();
+    if (backend && id) {
+      return {
+        backend,
+        id,
+        ...(ref.uri ? { uri: String(ref.uri) } : {}),
+        ...(ref.contentType ? { contentType: String(ref.contentType) } : {}),
+        ...(ref.encrypted === true ? { encrypted: true } : {}),
+        ...(ref.gate ? { gate: String(ref.gate) } : {}),
+        ...(ref.resource ? { resource: String(ref.resource) } : {}),
+        ...(ref.createdAt ? { createdAt: String(ref.createdAt) } : {}),
+      };
+    }
+  }
+  const txId = String(legacyArweaveTxId || source?.arweaveTxId || '').trim();
+  if (!txId) return null;
+  return { backend: 'arweave', id: txId, uri: `ar://${txId}` };
+}
+
 export function normalizeAgentQuestionPayload({ session = '', question = null, fields = {} } = {}) {
   const normalizedSession = String(session || '').trim();
   const normalizedQuestion = normalizeAgentQuestion(question, { session: normalizedSession });
@@ -128,6 +153,8 @@ export function normalizeAgentQuestionPayload({ session = '', question = null, f
 
 export function normalizeAgentQuestion(question = {}, { session = '' } = {}) {
   if (!question || typeof question !== 'object') return null;
+  const arweaveTxId = question.arweaveTxId || null;
+  const storageRef = normalizeAgentStorageRef(question, arweaveTxId);
   return {
     type: 'agent_question',
     version: AGENT_CONTRACT_VERSION,
@@ -139,11 +166,13 @@ export function normalizeAgentQuestion(question = {}, { session = '' } = {}) {
     options: Array.isArray(question.options) ? question.options.slice() : [],
     tags: Array.isArray(question.tags) ? question.tags.slice() : [],
     associatedSurveyId: question.associatedSurveyId || null,
-    arweaveTxId: question.arweaveTxId || null,
+    arweaveTxId,
+    ...(storageRef ? { storageRef } : {}),
   };
 }
 
 export function normalizeAgentDraftResponse(response = {}, { session = '', includeAnswer = false } = {}) {
+  const storageRef = normalizeAgentStorageRef(response, response.arweaveTxId);
   const draft = {
     type: 'agent_draft_response',
     version: AGENT_CONTRACT_VERSION,
@@ -156,6 +185,8 @@ export function normalizeAgentDraftResponse(response = {}, { session = '', inclu
     timestamp: response.timestamp || null,
     submittedAt: response.submittedAt || null,
     txHash: response.txHash || null,
+    ...(response.arweaveTxId ? { arweaveTxId: response.arweaveTxId } : {}),
+    ...(storageRef ? { storageRef } : {}),
     source: response.source || null,
   };
   if (includeAnswer) {
@@ -199,6 +230,7 @@ export function isValidAgentGrantId(grantId) {
 }
 
 export function summarizePendingResponseForAgent(response = {}, { session = '' } = {}) {
+  const storageRef = normalizeAgentStorageRef(response, response.arweaveTxId);
   return {
     type: 'response_draft',
     session: String(session || response.session || '').trim(),
@@ -210,6 +242,8 @@ export function summarizePendingResponseForAgent(response = {}, { session = '' }
     timestamp: response.timestamp || null,
     submittedAt: response.submittedAt || null,
     txHash: response.txHash || null,
+    ...(response.arweaveTxId ? { arweaveTxId: response.arweaveTxId } : {}),
+    ...(storageRef ? { storageRef } : {}),
   };
 }
 

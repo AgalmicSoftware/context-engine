@@ -1169,6 +1169,8 @@ export function buildHookResponseDefaults(config = {}) {
 
 function buildCompactHookQuestion(question, slug) {
   if (!question) return null;
+  const arweaveTxId = question.arweaveTxId || null;
+  const storageRef = question.storageRef || (arweaveTxId ? { backend: 'arweave', id: arweaveTxId, uri: `ar://${arweaveTxId}` } : null);
   return {
     id: question.id || '',
     session: slug,
@@ -1179,7 +1181,8 @@ function buildCompactHookQuestion(question, slug) {
     singleSelect: question.singleSelect !== false,
     tags: Array.isArray(question.tags) ? question.tags : [],
     associatedSurveyId: question.associatedSurveyId || null,
-    arweaveTxId: question.arweaveTxId || null,
+    arweaveTxId,
+    ...(storageRef ? { storageRef } : {}),
   };
 }
 
@@ -3357,6 +3360,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       response.submitted = true;
       response.txHash = txHash || null;
       response.arweaveTxId = arweaveTxId || null;
+      response.storageRef = arweaveTxId ? { backend: 'arweave', id: arweaveTxId, uri: `ar://${arweaveTxId}` } : null;
       response.submittedAt = new Date().toISOString();
       writeSecureFile(file, JSON.stringify(response, null, 2));
       try {

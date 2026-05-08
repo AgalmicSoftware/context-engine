@@ -133,6 +133,7 @@ export function recordConfirmedSubmission({
     const arweaveTxId = Array.isArray(arweaveTxIds)
       ? String(arweaveTxIds[index] || '').trim() || null
       : null;
+    const storageRef = arweaveTxId ? { backend: 'arweave', id: arweaveTxId, uri: `ar://${arweaveTxId}` } : null;
     next.questions[questionId] = {
       questionId,
       wallet: normalizedWallet,
@@ -142,6 +143,7 @@ export function recordConfirmedSubmission({
       ...(safeSurveyId ? { surveyId: safeSurveyId } : {}),
       ...(safeSurveyArweaveTxId ? { surveyArweaveTxId: safeSurveyArweaveTxId } : {}),
       ...(arweaveTxId ? { arweaveTxId } : {}),
+      ...(storageRef ? { storageRef } : {}),
       ...existing,
     };
     next.questions[questionId] = {
@@ -154,6 +156,7 @@ export function recordConfirmedSubmission({
       ...(safeSurveyId ? { surveyId: safeSurveyId } : {}),
       ...(safeSurveyArweaveTxId ? { surveyArweaveTxId: safeSurveyArweaveTxId } : {}),
       ...(arweaveTxId ? { arweaveTxId } : {}),
+      ...(storageRef ? { storageRef } : {}),
     };
   });
 

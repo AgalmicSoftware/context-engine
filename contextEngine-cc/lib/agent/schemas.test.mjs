@@ -121,6 +121,34 @@ test('agent question shape is versioned and keeps canonical ids explicit', () =>
   });
 });
 
+
+test('agent question and submitted response shapes include storageRef compatibility when Arweave ids exist', () => {
+  const question = normalizeAgentQuestion({
+    id: '0xabc',
+    type: 'freeform',
+    prompt: 'Explain?',
+    arweaveTxId: 'QuestionArweaveId123',
+  }, { session: 'alpha' });
+  assert.deepEqual(question.storageRef, {
+    backend: 'arweave',
+    id: 'QuestionArweaveId123',
+    uri: 'ar://QuestionArweaveId123',
+  });
+
+  const response = summarizePendingResponseForAgent({
+    questionId: '0xabc',
+    submitted: true,
+    arweaveTxId: 'ResponseArweaveId123',
+    txHash: '0xtx',
+  }, { session: 'alpha' });
+  assert.equal(response.arweaveTxId, 'ResponseArweaveId123');
+  assert.deepEqual(response.storageRef, {
+    backend: 'arweave',
+    id: 'ResponseArweaveId123',
+    uri: 'ar://ResponseArweaveId123',
+  });
+});
+
 test('agent draft response shape withholds answer text unless requested', () => {
   const input = {
     questionId: '0xabc',
