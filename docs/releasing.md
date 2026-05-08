@@ -62,6 +62,9 @@ Both workflows remove these paths from the public result:
 |------|--------|
 | `TODO/` | Internal planning and PRDs |
 | `contextEngine-cc/` | Claude Code extension (local dev tool) |
+| `docs/agent-native*.md` | Private agent-native contract docs |
+| `client/public/skill.md` | Private agent skill artifact |
+| `workers/agentBridgeWorker/` | Private Telegram agent bridge worker |
 | `CLAUDE.md` | Maintainer AI instructions |
 | `.claude/`, `.codex/` | AI agent skills and settings |
 | `video-clickthrough-local/` | Durable local video workflow scripts and handoff notes |
