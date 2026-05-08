@@ -1,5 +1,6 @@
 import {
   STORAGE_BACKENDS,
+  attachStorageRefCompatibilityFields,
   assertNoCloudflarePrivateMaterial,
   isArweaveStorageBackend,
   isSafeCloudflareStorageRefId,
@@ -115,7 +116,7 @@ const parseArweaveUploadResponse = async (response) => {
   return { body, id };
 };
 
-const handleArweaveStorageUpload = async ({ request, config, slug, uploaderAddress, backend, baseHeaders, deps }) => {
+const handleArweaveStorageUpload = async ({ request, config, slug, uploaderAddress, backend, payload, baseHeaders, deps }) => {
   const secrets = (await deps?.getSessionSecrets?.(slug)) || {};
   const response = await deps?.arweaveUpload?.({
     request,
@@ -128,15 +129,17 @@ const handleArweaveStorageUpload = async ({ request, config, slug, uploaderAddre
   if (!response?.ok) return response;
   const parsed = await parseArweaveUploadResponse(response);
   if (!parsed.id) return responseJson(deps, { error: 'Storage upload succeeded but no id was returned.' }, 502, baseHeaders);
-  const storageRef = normalizeStorageRef({
+  const compatible = attachStorageRefCompatibilityFields({
     backend,
-    id: parsed.id,
+    arweaveTxId: parsed.id,
+    contentType: payload?.contentType,
+    resource: payload?.resource,
+    gate: payload?.gate,
     encrypted: backend === STORAGE_BACKENDS.LIT_ARWEAVE,
   });
   return responseJson(deps, {
     id: parsed.id,
-    arweaveTxId: parsed.id,
-    storageRef,
+    ...compatible,
   }, 200, baseHeaders);
 };
 
@@ -276,7 +279,7 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
       payloadEncrypted: payload.payloadEncrypted,
     });
     if (isArweaveStorageBackend(backend)) {
-      return handleArweaveStorageUpload({ request, config, slug, uploaderAddress, backend, baseHeaders, deps });
+      return handleArweaveStorageUpload({ request, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
     }
     return handleCloudflareUpload({ env, slug, payload, baseHeaders, deps });
   }
