@@ -51,7 +51,7 @@ test('storageRoute delegates Arweave uploads and returns storageRef compatibilit
   const request = new Request('https://worker.example/storage/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: { ok: true }, contentType: 'application/json' }),
+    body: JSON.stringify({ data: { ok: true }, contentType: 'application/json', resource: 'questions' }),
   });
   let uploadContext = null;
 
@@ -78,14 +78,20 @@ test('storageRoute delegates Arweave uploads and returns storageRef compatibilit
   const body = await readJson(response);
   assert.equal(body.id, TX_ID);
   assert.equal(body.arweaveTxId, TX_ID);
-  assert.deepEqual(body.storageRef, { backend: 'arweave', id: TX_ID, uri: `ar://${TX_ID}` });
+  assert.deepEqual(body.storageRef, {
+    backend: 'arweave',
+    id: TX_ID,
+    uri: `ar://${TX_ID}`,
+    contentType: 'application/json',
+    resource: 'questions',
+  });
 });
 
 test('storageRoute returns lit-arweave storageRef for encrypted Arweave session storage', async () => {
   const request = new Request('https://worker.example/storage/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: { ok: true }, payloadEncrypted: true }),
+    body: JSON.stringify({ data: { ok: true }, payloadEncrypted: true, resource: 'responses' }),
   });
 
   const response = await storageRoute({
@@ -108,11 +114,85 @@ test('storageRoute returns lit-arweave storageRef for encrypted Arweave session 
     backend: 'lit-arweave',
     id: TX_ID,
     uri: `lit-arweave://${TX_ID}`,
+    contentType: 'application/json',
     encrypted: true,
+    resource: 'responses',
   });
 });
 
-test('storageRoute stores Cloudflare payloads behind opaque refs and reads them back', async () => {
+for (const resource of ['questions', 'surveys', 'responses']) {
+  test(`storageRoute stores and lists Cloudflare ${resource} payloads behind opaque refs`, async () => {
+    const r2 = createMockR2();
+    const kv = createMockKv();
+    const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+    const uploadRequest = new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: { resource, ok: true },
+        contentType: 'application/json',
+        resource,
+        payloadEncrypted: resource === 'responses',
+        tags: [{ name: 'CE-Resource', value: resource }],
+      }),
+    });
+
+    const uploadResponse = await storageRoute({
+      path: '/storage/upload',
+      method: 'POST',
+      request: uploadRequest,
+      env,
+      config: { storageProfile: { backend: 'cloudflare' } },
+      slug: 'session-a',
+      uploaderAddress: '0xabc',
+      baseHeaders: {},
+      deps: {
+        json,
+        randomUUID: () => `01J7${resource.toUpperCase()}OPAQUEID`,
+        now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+      },
+    });
+
+    const uploadBody = await readJson(uploadResponse);
+    assert.equal(uploadBody.storageRef.backend, 'cloudflare');
+    assert.equal(uploadBody.storageRef.resource, resource);
+    assert.equal(uploadBody.storageRef.encrypted === true, resource === 'responses');
+    assert.equal(Object.hasOwn(uploadBody, 'arweaveTxId'), false);
+    assert.doesNotMatch(JSON.stringify(uploadBody), /sessions\/session-a\/storage|account|bucket|token|secret|r2:\/\//i);
+
+    const readResponse = await storageRoute({
+      path: '/storage/read',
+      method: 'GET',
+      request: new Request(`https://worker.example/storage/read?id=${encodeURIComponent(uploadBody.storageRef.id)}`),
+      env,
+      config: { storageProfile: { backend: 'cloudflare' } },
+      slug: 'session-a',
+      baseHeaders: {},
+      deps: { json },
+    });
+    assert.equal(readResponse.headers.get('X-CE-Storage-Ref'), uploadBody.storageRef.id);
+    assert.deepEqual(JSON.parse(await readResponse.text()), { resource, ok: true });
+
+    const listResponse = await storageRoute({
+      path: '/storage/list',
+      method: 'GET',
+      request: new Request(`https://worker.example/storage/list?resource=${resource}`),
+      env,
+      config: { storageProfile: { backend: 'cloudflare' } },
+      slug: 'session-a',
+      baseHeaders: {},
+      deps: { json },
+    });
+
+    const listed = await readJson(listResponse);
+    assert.equal(listed.items.length, 1);
+    assert.equal(listed.items[0].storageRef.id, uploadBody.storageRef.id);
+    assert.equal(listed.items[0].storageRef.resource, resource);
+    assert.doesNotMatch(JSON.stringify(listed), /sessions\/session-a\/storage|bucket|token|secret/i);
+  });
+}
+
+test('storageRoute stores Cloudflare docs payloads behind opaque refs and reads them back', async () => {
   const r2 = createMockR2();
   const kv = createMockKv();
   const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
