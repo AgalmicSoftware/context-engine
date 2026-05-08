@@ -31,24 +31,57 @@ Docs can be associated with:
 
 ## Storage Provider Abstraction (Per Session)
 
-Session metadata may include a non-authoritative `docLibrary` config:
+Session metadata can select a backend-owned session storage profile. This is storage routing for session payloads, not a user preference/profile setting.
 
 ```json
 {
+  "storageProfile": {
+    "type": "session_storage_profile",
+    "version": "session-storage-profile-v1",
+    "backend": "arweave",
+    "resources": {
+      "docsContext": "active",
+      "questions": "staged",
+      "surveys": "staged",
+      "responses": "staged",
+      "generatedArtifacts": "staged",
+      "media": "staged"
+    }
+  },
   "docLibrary": {
     "provider": "arweave",
-    "arweave": { "index": "graphql", "graphqlUrl": "https://permagate.io/graphql" },
-    "ipfs": {},
-    "local": {}
+    "arweave": { "index": "graphql", "graphqlUrl": "https://permagate.io/graphql" }
   }
 }
 ```
 
 Defaults:
-- If missing, provider defaults to `arweave`.
-- `ipfs` and `local` providers are currently stubbed (UI disables list/upload with a “not implemented” notice).
+- If missing, `storageProfile.backend` defaults to `arweave`.
+- `lit-arweave` remains available and represents encrypted Arweave payloads. Selecting it for session docs forces encrypted Doc Library uploads.
+- `cloudflare` routes plaintext session docs/context through the session worker `/storage/*` routes and keeps Cloudflare object identifiers private. Lit-encrypted Cloudflare document upload/read is intentionally blocked until the encrypted-envelope path is implemented.
+- `ipfs` and `local` `docLibrary.provider` values remain stubbed (UI disables list/upload with a “not implemented” notice).
 
-Note: GraphQL here refers to Arweave’s public indexing API. The client now prefers `https://permagate.io/graphql`, then falls back to `https://g8way.io/graphql`, and only then to `https://arweave.net/graphql`, so a single flaky gateway does not blank the Doc Library.
+Storage records normalize to:
+
+```json
+{
+  "storageRef": {
+    "backend": "arweave",
+    "id": "<opaque-id-or-arweave-tx-id>",
+    "uri": "ar://<tx-id>",
+    "contentType": "application/json",
+    "encrypted": false,
+    "gate": "docUploads",
+    "resource": "docsContext",
+    "createdAt": "2026-05-08T00:00:00.000Z"
+  },
+  "arweaveTxId": "<legacy-compatible-tx-id>"
+}
+```
+
+Cloudflare `storageRef` values must stay opaque: do not expose account IDs, bucket names, raw R2 object keys, worker tokens, long-lived signed URLs, or secrets.
+
+Note: GraphQL here refers to Arweave’s public indexing API. The client now prefers `https://permagate.io/graphql`, then falls back to `https://g8way.io/graphql`, and only then to `https://arweave.net/graphql`, so a single flaky gateway does not blank the Arweave/Lit-Arweave Doc Library.
 
 ## Tag Schema (Arweave Index)
 
@@ -57,7 +90,7 @@ All doc-library uploads add Arweave tags with `CE-` prefix.
 Common:
 - `CE-DocLibrary`: `"1"`
 - `CE-DocKind`: `"file"` or `"link"`
-- `CE-DocStorage`: `"arweave"` or `"lit-arweave"`
+- `CE-DocStorage`: `"arweave"`, `"lit-arweave"`, or `"cloudflare"`
 
 Plaintext-only optional metadata:
 - `CE-DocName`: human label / filename
@@ -75,7 +108,7 @@ A single upload may include both the session tag and the SBT tags so it appears 
 
 ## Listing (Arweave GraphQL)
 
-Listing is client-side via Arweave GraphQL:
+Arweave and Lit-Arweave listing is client-side via Arweave GraphQL:
 
 - Session docs query:
   - `CE-DocLibrary=1 AND CE-SessionId=<sessionIdHex>`
@@ -83,6 +116,8 @@ Listing is client-side via Arweave GraphQL:
   - `CE-DocLibrary=1 AND CE-SbtChainId=<chainId> AND CE-SbtAddress=<addr>`
 
 The client paginates via cursors and inserts newly uploaded txIds optimistically (to hide indexing lag).
+
+Cloudflare listing is session-scoped and worker-mediated via `GET /storage/list?resource=docsContext`. The returned items carry safe `storageRef` objects and tag-like metadata; raw R2 keys and bucket/account identifiers are not returned to the browser.
 
 ## Encryption UX Rules (No Gate Fallback)
 
