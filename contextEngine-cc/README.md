@@ -14,6 +14,13 @@ npm start
 Then open `http://localhost:7391` to authenticate. Run `npm test` for the local `contextEngine-cc` test suite.
 Responses submitted through the CC extension now attempt on-chain submission immediately by default, fall back to local pending storage when submission is not possible (for example no worker token or insufficient funds), and can be kept pending-only by setting `{"autoSubmitResponses":false}` on `/api/settings`. The legacy `submitMode` field is still accepted for backward compatibility.
 
+Current checkout note: CE-CC source is privately version-controlled on this
+branch and is stripped from public release/public-history exports. This checkout
+contains the local runtime files needed for server-level `/api/agent/*` route
+tests. From the repo root, `npm run test:cc` runs the private agent contract,
+router harness, and runtime import tests that are meaningful in this package
+shape.
+
 ## How It Works
 
 1. A **local server** (port 7391) authenticates you via passkey, loads survey questions from on-chain session data (currently OP Sepolia), and serves them over a local API.
@@ -195,6 +202,115 @@ Optional `privateKey` storage is validated:
 
 All authenticated API calls require a server-signed local JWT. Stored worker tokens are used for Arweave worker calls, not as API auth credentials.
 
+## Agent-Native Delegation Boundary
+
+The canonical agent-native surface is `/api/agent/*`. MCP, Telegram, and
+OpenClaw wrappers are thin clients of those routes; they are not authority
+stores and must not store CE-CC JWTs, private keys, worker tokens, long-lived
+bearer tokens, private deployment config, or equivalent signing authority.
+
+Default risky actions remain approval-required. The private
+`scoped_delegated_execute` mode lets a human explicitly delegate a narrow action
+to a specific agent for a specific session, action id, risk ceiling, expiry, and
+audit requirement. `trusted_local_auto_submit` remains local-only and stronger
+than scoped remote delegation.
+
+Current grant management routes are connect-request create/read/approve/deny
+plus grant read/revoke:
+
+Private Telegram demo worker note: `workers/agentBridgeWorker/` now carries the
+isolated bridge worker skeleton for the group-lobby/private-account lane. It is
+not part of CE-CC runtime, does not modify `workers/sessionCorsWorker/`, and is
+stripped from public release/public-history exports while private.
+
+- `POST /api/agent/connect-requests`
+- `GET /api/agent/connect-requests/:id`
+- `POST /api/agent/connect-requests/approve`
+- `POST /api/agent/connect-requests/deny`
+- `GET /api/agent/grants`
+- `GET /api/agent/grants/:id`
+- `POST /api/agent/grants/revoke`
+- `POST /api/agent/accounts/create`
+- `POST /api/agent/accounts/link-request`
+
+Connect requests are the only current grant-creation path. They bind the human
+principal, delegated agent, explicit session slugs, allowed action ids, risk
+ceiling, expiry, execution policy, audit requirement, idempotency key, and
+fingerprint. Reads are side-effect free. Approval requires local human auth and
+creates only scoped grant metadata; denial closes the request without creating a
+grant. Approval rejects body fields that would widen scope.
+
+`POST /api/agent/responses/delegated-execute` validates a scoped grant and
+writes an audit lifecycle record, but it is contract-only right now:
+`executed:false` with `contract_only_deferred`. Actual signing or
+worker-mediated execution still requires an approved CE-owned execution path and
+a product/security decision.
+
+The private `agentBridgeWorker` primitives under `lib/agent/bridgePrimitives.mjs`
+are contract-only: principal summaries, preference profiles, opaque action
+records, idempotency records, safe bridge events, grant cache summaries, and
+agent-created account metadata. V1 agent-created accounts are modeled as managed
+testnet/account-runtime metadata only; Durable Object isolated signer is the
+preferred future signer boundary, and no raw keys, seeds, JWTs, worker tokens,
+or signing authority are returned.
+
+Telegram group-to-private helpers in `lib/agent/telegramContracts.mjs` are also
+contract-only. Group deep links carry opaque action ids, private chat resolves
+group/session/question context server-side, unknown participants route to
+managed account setup, and group-safe summaries omit private account state and
+answers.
+
+The private bridge worker screen contract records launch metadata for every
+Telegram state. Current commands are `/start`, `/ce_join`, `/ce_questions`,
+`/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`,
+`/ce_generate_questions`, `/ce_account`,
+`/ce_sbt <sbt-address-or-group-id-or-link>`,
+`/ce_join_sbt <sbt-address-or-invite-code-or-link>`,
+`/ce_create_sbt_group [session-slug]`, `/ce_onboarding`, `/ce_export_key`, and `/ce_recover_key`,
+with opaque callback actions, `callback:<pose_question_action>`, or
+`t.me/<bot>?start=<opaque-action-id>` used where commands are not enough. The
+group session-linked card says `Context Engine session linked: <session>` and
+shows `Join Session`, `View Questions`, `View / Add Docs`, and policy-allowed
+`Pose Question`; it does not add a default `Answer Privately` button. `View
+Questions` reads existing session questions through `GET /api/agent/questions`.
+`Pose Question` posts one
+public-safe existing or generated question to the group; locked private/gated
+questions stay locked in group and route eligible accounts to private chat or
+Mini App. `Join Session` routes missing configured accounts to private account
+setup. Question cards keep CE control parity:
+agree/unsure/disagree, rating `0` through `10`, single-select vs multi-select
+multichoice state, freeform type/voice, additional comments, microphone where
+supported, and docs/context only when docs exist or are relevant.
+
+SBT/account Telegram screens are contract-only helpers over canonical CE agent
+routes. Public/password joins and create-group requests target planned
+`/api/agent/sbt-groups/*` contracts; `My Account` shows managed address, joined
+sessions, joined SBT summaries, and private export/restore controls. Private
+question decrypt requests target the planned `/api/agent/decrypt/request` route
+and do not implement Lit decrypt inside Telegram.
+
+SBT command parsing allows public SBT addresses, group ids, and share links in
+group commands. Passwords, invite credentials, wallet proofs, and private
+eligibility checks are private chat or Mini App only. Required SBT gates on
+`Join Session` list safe group summaries, prompt public/open joins when eligible,
+route password/invite input privately, route wallet/passkey/non-public gates to
+full CE account linking, and retry the session join after the gate is satisfied.
+
+Storage profile selection belongs to session config in `/new`, not Telegram.
+`arweave` remains the default/current profile; `cloudflare` is an explicit
+profile where the session/general worker may enforce SBT gates for uploads,
+snippets, short-lived reads, and downloads. Lit is required only for payloads
+that are intentionally Lit/client encrypted. Telegram/OpenClaw/CE-CC/MCP receive
+safe metadata or permission states, not Cloudflare credentials, bucket names,
+worker tokens, raw storage paths, or long-lived signed URLs.
+
+`lib/agent/workerSetupContracts.mjs` defines the private `/worker-setup`
+planning surface and default-off onboarding config. The contextengine.sh domain
+cutover is planned separately and is not implemented here.
+
+See [Agent Native Contract](../docs/agent-native-contract.md) for the scoped
+grant fields, action inventory, and current web UX parity gaps.
+
 ## Configure a Session
 
 Edit `~/.claude/plugins/contextEngine-cc/.state/config.json`:
@@ -372,6 +488,42 @@ Server data is stored in `contextEngine-cc/.data/`:
 | GET | `/api/responses/pending?session=` | Yes | List pending local responses for the authenticated wallet |
 | POST | `/api/responses/submit-onchain` | Yes | Submit pending local responses on-chain |
 | POST | `/api/responses/mark-submitted` | Yes | Mark a local response as submitted and persist confirmed local state |
+
+## Agent-Native API
+
+Canonical agent routes live under `/api/agent/*` and are documented in
+[`docs/agent-native-contract.md`](../docs/agent-native-contract.md). They use
+the same local JWT auth as the legacy CE-CC API.
+
+Agent routes require explicit public session identity. Use `general` for the
+general/default session; empty values such as `session: ""` or `?session=` are
+rejected even though older browser/client internals may still use an empty
+string for that local convention.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/agent/me` | Return local agent identity, auth mode, and capability metadata |
+| GET | `/api/agent/sessions` | List agent-visible sessions using the existing scan scope |
+| GET | `/api/agent/questions?session=` | Return the next question as `question` plus canonical `questions[]` |
+| GET | `/api/agent/inbox` | Return pending-response and approval-request summaries |
+| POST | `/api/agent/responses/draft` | Save a response draft locally without auto-submit |
+| GET | `/api/agent/responses/drafts?session=` | List authenticated-wallet local response drafts |
+| POST | `/api/agent/responses/submit-request` | Create an approval-required submit request instead of signing |
+| POST | `/api/agent/accounts/create` | Create or recover managed demo account metadata only |
+| POST | `/api/agent/accounts/link-request` | Create an approval-required account link request |
+| GET | `/api/agent/requests/:id` | Read approval request status by opaque request id |
+
+Submit requests may include an optional `idempotencyKey`. The key is normalized
+inside the authenticated wallet scope so same-payload retries return the
+existing pending approval request instead of creating duplicate work. Reusing a
+key for a different session or question set returns a conflict.
+
+MCP descriptors in `lib/agent/mcpTools.mjs` are thin wrappers over these
+routes. Telegram and OpenClaw helpers in `lib/agent/` are pure contract helpers
+only; they do not add webhook deployment, bot-token storage, OpenClaw transport
+dependencies, or remote signing authority. Telegram callback data remains an
+opaque action id, Mini App `initData` is HMAC-validated with freshness checks,
+and OpenClaw envelopes must point back to canonical `/api/agent/*` routes.
 
 ## Uninstall
 
