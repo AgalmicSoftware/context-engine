@@ -86,18 +86,7 @@ import {
   shouldBypassSessionScopeWindow,
 } from '../session/sessionScopeWindow.js';
 import { toStr } from '../shared/primitives.js';
-import {
-  STORAGE_BACKENDS,
-  STORAGE_RESOURCE_KEYS,
-  attachStorageRefCompatibilityFields,
-  deriveStorageRefFromLegacyArweaveTxId,
-  normalizeStorageRef,
-} from '../storage/storageRefs.js';
-import {
-  readSessionStorageBlob,
-  uploadDataToSessionStorage,
-} from '../storage/storageClient.js';
-import { resolveSessionStorageBackend } from '../storage/sessionStorageConfig.js';
+import { storageRefFromLegacyArweaveTxId } from '../storage/storageRefs.js';
 import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
 import { createContractHelperMethods } from './contractHelpers.js';
@@ -2982,13 +2971,13 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
     });
 
     const uploadedQuestions = qIds32.map((id, index) => {
-      const upload = questionPayloadUploads[index] || {};
-      return attachStorageRefCompatibilityFields({
+      const arweaveTxId = questionArweaveHashes[index];
+      const storageRef = storageRefFromLegacyArweaveTxId(arweaveTxId);
+      return {
         questionId: id,
-        arweaveTxId: upload.arweaveTxId || '',
-        storageRef: upload.storageRef || null,
-        resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
-      }, { resource: STORAGE_RESOURCE_KEYS.QUESTIONS });
+        arweaveTxId,
+        ...(storageRef ? { storageRef } : {}),
+      };
     });
 
     clearReadCachesForGroup(groupKeyOrCfg);
@@ -3296,6 +3285,8 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         if (mockedResponse) {
           normalizeSessionNameFields(mockedResponse);
           mockedResponse.arweaveTxId = arweaveHashBase64;
+          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHashBase64);
+          if (storageRef) mockedResponse.storageRef = storageRef;
           return normalizeConvictionImportance(mockedResponse);
         }
         if (!ARWEAVE_ACTIVE) {
@@ -3329,12 +3320,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           });
         }
         normalizeSessionNameFields(responseJson);
-        return normalizeConvictionImportance(attachPayloadPointerFields(
-          responseJson,
-          payloadPointerId,
-          STORAGE_RESOURCE_KEYS.RESPONSES,
-          storageRead?.storageRef || null
-        ));
+        responseJson.arweaveTxId = arweaveHashBase64;
+        const storageRef = storageRefFromLegacyArweaveTxId(arweaveHashBase64);
+        if (storageRef) responseJson.storageRef = storageRef;
+        return normalizeConvictionImportance(responseJson);
       }
     );
     return cloneJsonSafe(result);
@@ -3617,12 +3606,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           if (!skipDecrypt) {
             await maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
           }
-          return attachPayloadPointerFields(
-            questionData,
-            payloadPointerId,
-            STORAGE_RESOURCE_KEYS.QUESTIONS,
-            storageRead?.storageRef || null
-          );
+          questionData.arweaveTxId = arweaveHash;
+          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHash);
+          if (storageRef) questionData.storageRef = storageRef;
+          return questionData;
         }
       );
       return cloneJsonSafe(result);
@@ -3708,12 +3695,10 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           if (!skipDecrypt) {
             await maybeDecryptSurveyPayload(parsed, groupKeyOrCfg, opts);
           }
-          return attachPayloadPointerFields(
-            parsed,
-            payloadPointerId,
-            STORAGE_RESOURCE_KEYS.SURVEYS,
-            storageRead?.storageRef || null
-          );
+          parsed.arweaveTxId = arweaveHash;
+          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHash);
+          if (storageRef) parsed.storageRef = storageRef;
+          return parsed;
         }
       );
       return cloneJsonSafe(result);

@@ -60,6 +60,7 @@ import { buildUploadGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
+import { storageRefFromLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
 import { mergeSessionContractMaps, resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -1887,12 +1888,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           const qid = uploadedQid || fallbackQid;
           if (!qid) return null;
           const uploaded = uploadedById.get(qid) || uploadedByIndex || null;
-          const compatible = attachStorageRefCompatibilityFields({
+          const arweaveTxId = String(uploaded?.arweaveTxId || row?.arweaveTxId || '').trim();
+          const storageRef = uploaded?.storageRef || row?.storageRef || storageRefFromLegacyArweaveTxId(arweaveTxId);
+          return {
             ...row,
             ...(uploaded || {}),
             id: qid,
-          });
-          return compatible as CreateQuestionsSeededQuestionRow;
+            ...(arweaveTxId ? { arweaveTxId } : {}),
+            ...(storageRef ? { storageRef } : {}),
+          };
         })
         .filter((row): row is CreateQuestionsSeededQuestionRow => !!row);
       if (!normalizedRows.length) return false;
