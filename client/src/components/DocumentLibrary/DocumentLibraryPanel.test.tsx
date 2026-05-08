@@ -440,6 +440,58 @@ describe('DocumentLibraryPanel photo docs', () => {
     expect(image?.getAttribute('src')).toBe(`https://arweave.example.test/${'D'.repeat(43)}`);
   });
 
+  it('loads encrypted image thumbnails when scoped Lit hooks become available after render', async () => {
+    const litStorage = require('../../utilities/crypto/litProtocol.js').litStorage;
+    const getKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
+    litStorage.downloadEncryptedArweaveData.mockResolvedValue({
+      payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' },
+    });
+    litStorage.decodeLitPayloadToBlob.mockReturnValue(
+      new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }),
+    );
+    mockListArweaveTransactionsByTags.mockResolvedValue([
+      {
+        cursor: 'cursor-e',
+        txId: 'E'.repeat(43),
+        owner: 'owner',
+        tags: [],
+        tagMap: {
+          'CE-DocStorage': 'lit-arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'encrypted-board.png',
+          'CE-DocMime': 'image/png',
+        },
+        data: { size: 4, type: 'image/png' },
+        block: { height: 1, timestamp: 1710000004 },
+      },
+    ]);
+
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge',
+      sessionConfig: TEST_SESSION_CONFIG,
+      mode: 'session',
+      sessionIdHex: `0x${'9'.repeat(32)}`,
+    };
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+
+    await screen.findByText('encrypted-board.png');
+    expect(screen.queryByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW)).not.toBeInTheDocument();
+
+    rerender(<DocumentLibraryPanel {...panelProps} litHooks={{ getKey }} />);
+
+    const preview = await screen.findByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW);
+    const image = preview.querySelector('img');
+    expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(expect.objectContaining({
+      lit: { getKey },
+    }));
+    expect(image?.getAttribute('src')).toBe('blob:doc-library-image-preview');
+  });
+
 
 
   it('lists and opens Cloudflare session docs through storage refs', async () => {

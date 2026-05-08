@@ -89,4 +89,18 @@ describe('storageClient', () => {
     expect(JSON.stringify(result)).not.toMatch(/account|bucket|token|secret|r2:\/\//i);
     expect(result.storageRef.backend).toBe('cloudflare');
   });
+
+  test('rejects plaintext uploads when Cloudflare lit_encrypted mode is selected', async () => {
+    await expect(uploadDataToSessionStorage({ ok: true }, 'json', {
+      sessionSlug: 'alpha',
+      sessionConfig: {
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'lit_encrypted' },
+        },
+      },
+    })).rejects.toThrow(/pre-encrypted payload/i);
+
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
 });

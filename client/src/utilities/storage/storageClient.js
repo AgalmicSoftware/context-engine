@@ -9,7 +9,11 @@ import {
   STORAGE_BACKENDS,
   normalizeStorageRef,
 } from './storageRefs.js';
-import { resolveSessionStorageBackend } from './sessionStorageConfig.js';
+import {
+  SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
+  normalizeSessionStorageConfig,
+  resolveSessionStorageBackend,
+} from './sessionStorageConfig.js';
 
 const normalizeWorkerBaseUrl = (rawUrl) => toStr(rawUrl).trim().replace(/\/+$/, '');
 const normalizeTags = (tags) => (
@@ -56,6 +60,7 @@ export const uploadDataToSessionStorage = async (data, format, {
   const payloadIsEncrypted = encrypted || payloadEncrypted;
   const backend = resolveSessionStorageBackend(sessionConfig, { resource, encrypted: payloadIsEncrypted });
   const normalizedTags = normalizeTags(tags);
+  const storageConfig = normalizeSessionStorageConfig(sessionConfig);
 
   if (backend === STORAGE_BACKENDS.ARWEAVE || backend === STORAGE_BACKENDS.LIT_ARWEAVE) {
     const txId = await arweaveScripts.uploadDataToArweave(data, format, {
@@ -80,6 +85,13 @@ export const uploadDataToSessionStorage = async (data, format, {
       storageRef,
       storage: backend,
     };
+  }
+
+  if (
+    storageConfig.payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED &&
+    !payloadIsEncrypted
+  ) {
+    throw new Error('Cloudflare lit_encrypted storage requires a pre-encrypted payload before upload.');
   }
 
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
