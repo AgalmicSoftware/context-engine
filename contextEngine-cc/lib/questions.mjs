@@ -11,6 +11,7 @@ import {
 import { debug, warn, error } from './log.mjs';
 import { getSessionConfig, getSurveysAddress, getSessionMetadata } from './sessions.mjs';
 import { getConfirmedSubmittedQuestionIds } from './submissionState.mjs';
+import { attachStorageRefCompatibilityFields } from './storageRefs.mjs';
 // Shared pure utilities (symlinked from client/src/utilities/shared/)
 import { hexToBase64url as _hexToBase64url } from './shared/questionUtils.mjs';
 
@@ -224,8 +225,11 @@ async function fetchQuestionData(questionId, surveysAddress, chainId) {
   if (!data) return null;
 
   data.id = data.id || questionId; // Ensure contract question ID is preserved
-  data.arweaveTxId = txId;
-  data.storageRef = { backend: 'arweave', id: txId, uri: `ar://${txId}` };
+  Object.assign(data, attachStorageRefCompatibilityFields({
+    ...data,
+    arweaveTxId: txId,
+    resource: 'questions',
+  }, { resource: 'questions' }));
   questionDataCache.set(questionId, data);
   return data;
 }

@@ -34,6 +34,11 @@ import {
 import { submitResponses as submitOnChain, submitQuestions, canSubmit } from './submit.mjs';
 import { isTrustedLocalRequest } from './localRequest.mjs';
 import { recordConfirmedSubmission } from './submissionState.mjs';
+import {
+  attachStorageRefCompatibilityFields,
+  getLegacyArweaveTxId,
+  resolvePayloadStorageRef,
+} from './storageRefs.mjs';
 
 const LOCAL_AUTH_ORIGIN = 'http://localhost:7391';
 import { normalizeConfiguredSessions } from '../public/js/sessionSlugs.mjs';
@@ -1169,8 +1174,8 @@ export function buildHookResponseDefaults(config = {}) {
 
 function buildCompactHookQuestion(question, slug) {
   if (!question) return null;
-  const arweaveTxId = question.arweaveTxId || null;
-  const storageRef = question.storageRef || (arweaveTxId ? { backend: 'arweave', id: arweaveTxId, uri: `ar://${arweaveTxId}` } : null);
+  const storageRef = resolvePayloadStorageRef(question, { resource: 'questions' });
+  const arweaveTxId = getLegacyArweaveTxId(question) || null;
   return {
     id: question.id || '',
     session: slug,
@@ -1184,6 +1189,27 @@ function buildCompactHookQuestion(question, slug) {
     arweaveTxId,
     ...(storageRef ? { storageRef } : {}),
   };
+}
+
+function buildStorageRefFromResult(result, index, resource = 'responses') {
+  const storageRefs = Array.isArray(result?.storageRefs) ? result.storageRefs : [];
+  const directRef = storageRefs[index] || null;
+  const arweaveTxId = Array.isArray(result?.arweaveTxIds)
+    ? String(result.arweaveTxIds[index] || '').trim()
+    : '';
+  return resolvePayloadStorageRef({
+    storageRef: directRef,
+    arweaveTxId,
+    resource,
+  }, { resource });
+}
+
+function buildSurveyStorageRefFromResult(result) {
+  return resolvePayloadStorageRef({
+    storageRef: result?.surveyStorageRef,
+    arweaveTxId: result?.surveyArweaveTxId,
+    resource: 'responses',
+  }, { resource: 'responses' });
 }
 
 function buildAutoSubmitStatus(kind, fields = {}) {
@@ -1648,8 +1674,18 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
             stored.submitted = true;
             stored.txHash = result.txHash;
             stored.blockNumber = result.blockNumber ?? null;
-            stored.arweaveTxId = result.arweaveTxIds?.[i] || null;
-            stored.surveyArweaveTxId = result.surveyArweaveTxId || null;
+            const storageRef = buildStorageRefFromResult(result, i);
+            const surveyStorageRef = buildSurveyStorageRefFromResult(result);
+            stored.arweaveTxId = getLegacyArweaveTxId({
+              storageRef,
+              arweaveTxId: result.arweaveTxIds?.[i],
+            }) || null;
+            stored.storageRef = storageRef || null;
+            stored.surveyArweaveTxId = getLegacyArweaveTxId({
+              storageRef: surveyStorageRef,
+              arweaveTxId: result.surveyArweaveTxId,
+            }) || null;
+            stored.surveyStorageRef = surveyStorageRef || null;
             stored.submittedAt = submittedAt;
             writeSecureFile(file, JSON.stringify(stored, null, 2));
           }
@@ -3289,8 +3325,18 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
               stored.submitted = true;
               stored.txHash = result.txHash;
               stored.blockNumber = result.blockNumber ?? null;
-              stored.arweaveTxId = result.arweaveTxIds?.[i] || null;
-              stored.surveyArweaveTxId = result.surveyArweaveTxId || null;
+              const storageRef = buildStorageRefFromResult(result, i);
+              const surveyStorageRef = buildSurveyStorageRefFromResult(result);
+              stored.arweaveTxId = getLegacyArweaveTxId({
+                storageRef,
+                arweaveTxId: result.arweaveTxIds?.[i],
+              }) || null;
+              stored.storageRef = storageRef || null;
+              stored.surveyArweaveTxId = getLegacyArweaveTxId({
+                storageRef: surveyStorageRef,
+                arweaveTxId: result.surveyArweaveTxId,
+              }) || null;
+              stored.surveyStorageRef = surveyStorageRef || null;
               stored.submittedAt = new Date().toISOString();
               writeSecureFile(file, JSON.stringify(stored, null, 2));
             }
@@ -3336,7 +3382,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   if (path === '/api/responses/mark-submitted' && method === 'POST') {
     const auth = requireAuth(req);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
-    const { questionId, session, txHash, arweaveTxId } = body || {};
+    const { questionId, session, txHash, arweaveTxId, storageRef } = body || {};
     const questionValidation = validateQuestionId(questionId);
     if (!questionValidation.ok) return json(res, 400, { error: questionValidation.error });
     const sessionValidation = validateSessionSlug(session, {
@@ -3359,8 +3405,13 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       }
       response.submitted = true;
       response.txHash = txHash || null;
-      response.arweaveTxId = arweaveTxId || null;
-      response.storageRef = arweaveTxId ? { backend: 'arweave', id: arweaveTxId, uri: `ar://${arweaveTxId}` } : null;
+      const compatibleStorage = attachStorageRefCompatibilityFields({
+        arweaveTxId,
+        storageRef,
+        resource: 'responses',
+      }, { resource: 'responses' });
+      response.arweaveTxId = getLegacyArweaveTxId(compatibleStorage) || null;
+      response.storageRef = compatibleStorage.storageRef || null;
       response.submittedAt = new Date().toISOString();
       writeSecureFile(file, JSON.stringify(response, null, 2));
       try {
@@ -3370,6 +3421,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
           txHash: txHash || null,
           questionIds: [canonicalQuestionId],
           arweaveTxIds: arweaveTxId ? [arweaveTxId] : [],
+          storageRefs: compatibleStorage.storageRef ? [compatibleStorage.storageRef] : [],
           submittedAt: response.submittedAt,
         });
       } catch (stateErr) {

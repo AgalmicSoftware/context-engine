@@ -2,6 +2,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { writeSecureFile } from './keyEncryption.mjs';
+import {
+  getLegacyArweaveTxId,
+  resolvePayloadStorageRef,
+} from './storageRefs.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SESSION_SLUG_RE = /^[a-z0-9_-]+$/i;
@@ -102,9 +106,11 @@ export function recordConfirmedSubmission({
   blockNumber = null,
   questionIds = [],
   arweaveTxIds = [],
+  storageRefs = [],
   submittedAt = new Date().toISOString(),
   surveyId = null,
   surveyArweaveTxId = null,
+  surveyStorageRef = null,
 } = {}) {
   const normalizedSlug = normalizeSessionSlug(slug);
   const normalizedWallet = normalizeAddressLower(walletAddress);
@@ -123,17 +129,33 @@ export function recordConfirmedSubmission({
     : new Date().toISOString();
   const safeTxHash = String(txHash || '').trim() || null;
   const safeSurveyId = String(surveyId || '').trim() || null;
-  const safeSurveyArweaveTxId = String(surveyArweaveTxId || '').trim() || null;
+  const resolvedSurveyStorageRef = resolvePayloadStorageRef({
+    storageRef: surveyStorageRef,
+    arweaveTxId: surveyArweaveTxId,
+    resource: 'responses',
+  }, { resource: 'responses' });
+  const safeSurveyArweaveTxId = getLegacyArweaveTxId({
+    storageRef: resolvedSurveyStorageRef,
+    arweaveTxId: surveyArweaveTxId,
+  }) || null;
   const safeBlockNumber = Number.isFinite(Number(blockNumber)) ? Number(blockNumber) : null;
 
   normalizedQuestionIds.forEach((questionId, index) => {
     const existing = (next.questions[questionId] && typeof next.questions[questionId] === 'object')
       ? next.questions[questionId]
       : {};
-    const arweaveTxId = Array.isArray(arweaveTxIds)
+    const fallbackArweaveTxId = Array.isArray(arweaveTxIds)
       ? String(arweaveTxIds[index] || '').trim() || null
       : null;
-    const storageRef = arweaveTxId ? { backend: 'arweave', id: arweaveTxId, uri: `ar://${arweaveTxId}` } : null;
+    const storageRef = resolvePayloadStorageRef({
+      storageRef: Array.isArray(storageRefs) ? storageRefs[index] : null,
+      arweaveTxId: fallbackArweaveTxId,
+      resource: 'responses',
+    }, { resource: 'responses' });
+    const arweaveTxId = getLegacyArweaveTxId({
+      storageRef,
+      arweaveTxId: fallbackArweaveTxId,
+    }) || null;
     next.questions[questionId] = {
       questionId,
       wallet: normalizedWallet,
@@ -142,6 +164,7 @@ export function recordConfirmedSubmission({
       ...(safeBlockNumber != null ? { blockNumber: safeBlockNumber } : {}),
       ...(safeSurveyId ? { surveyId: safeSurveyId } : {}),
       ...(safeSurveyArweaveTxId ? { surveyArweaveTxId: safeSurveyArweaveTxId } : {}),
+      ...(resolvedSurveyStorageRef ? { surveyStorageRef: resolvedSurveyStorageRef } : {}),
       ...(arweaveTxId ? { arweaveTxId } : {}),
       ...(storageRef ? { storageRef } : {}),
       ...existing,
@@ -155,6 +178,7 @@ export function recordConfirmedSubmission({
       ...(safeBlockNumber != null ? { blockNumber: safeBlockNumber } : {}),
       ...(safeSurveyId ? { surveyId: safeSurveyId } : {}),
       ...(safeSurveyArweaveTxId ? { surveyArweaveTxId: safeSurveyArweaveTxId } : {}),
+      ...(resolvedSurveyStorageRef ? { surveyStorageRef: resolvedSurveyStorageRef } : {}),
       ...(arweaveTxId ? { arweaveTxId } : {}),
       ...(storageRef ? { storageRef } : {}),
     };

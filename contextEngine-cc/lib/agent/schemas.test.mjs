@@ -133,6 +133,7 @@ test('agent question and submitted response shapes include storageRef compatibil
     backend: 'arweave',
     id: 'QuestionArweaveId123',
     uri: 'ar://QuestionArweaveId123',
+    resource: 'questions',
   });
 
   const response = summarizePendingResponseForAgent({
@@ -146,6 +147,40 @@ test('agent question and submitted response shapes include storageRef compatibil
     backend: 'arweave',
     id: 'ResponseArweaveId123',
     uri: 'ar://ResponseArweaveId123',
+    resource: 'responses',
+  });
+});
+
+test('agent shapes prefer storageRef and avoid fake arweaveTxId for Cloudflare payloads', () => {
+  const question = normalizeAgentQuestion({
+    id: '0xabc',
+    type: 'freeform',
+    prompt: 'Explain?',
+    arweaveTxId: 'stale-arweave-id',
+    storageRef: { backend: 'cloudflare', id: 'cf_questionopaque01', resource: 'questions' },
+  }, { session: 'alpha' });
+
+  assert.equal(question.arweaveTxId, null);
+  assert.deepEqual(question.storageRef, {
+    backend: 'cloudflare',
+    id: 'cf_questionopaque01',
+    uri: '/storage/read?id=cf_questionopaque01',
+    resource: 'questions',
+  });
+
+  const response = summarizePendingResponseForAgent({
+    questionId: '0xabc',
+    submitted: true,
+    arweaveTxId: 'stale-response-id',
+    storageRef: { backend: 'cloudflare', id: 'cf_responseopaque01', resource: 'responses' },
+  }, { session: 'alpha' });
+
+  assert.equal(Object.hasOwn(response, 'arweaveTxId'), false);
+  assert.deepEqual(response.storageRef, {
+    backend: 'cloudflare',
+    id: 'cf_responseopaque01',
+    uri: '/storage/read?id=cf_responseopaque01',
+    resource: 'responses',
   });
 });
 
