@@ -1,0 +1,9 @@
+# Copy to .dev.vars for local private testing only.
+AGENT_BRIDGE_DEPLOYMENT_ID=local-demo
+TELEGRAM_BRIDGE_ENABLED=false
+BROADCAST_ENABLED=false
+
+# Set only in your untracked local file:
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_WEBHOOK_SECRET=
+# DEMO_SIGNER_ROOT_SECRET=

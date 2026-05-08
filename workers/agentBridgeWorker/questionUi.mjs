@@ -1,0 +1,1376 @@
+import {
+  DEFAULT_RATING_SCALE,
+  QUESTION_VISIBILITY,
+  QUESTION_TYPES,
+  SESSION_STORAGE_PROFILES,
+  TELEGRAM_BRIDGE_ACTIONS,
+  TELEGRAM_CHAT_LANES,
+} from './constants.mjs';
+import { buildOpaqueActionId } from './opaqueActions.mjs';
+import { sanitizeForGroup } from './redaction.mjs';
+import { evaluateSbtJoinPolicy, evaluateSessionSbtGateJoin } from './sessionPolicy.mjs';
+
+const OPAQUE_CALLBACK_LAUNCH = 'callback:<opaque-action-id>';
+const OPAQUE_DEEP_LINK_LAUNCH = 't.me/<bot>?start=<opaque-action-id>';
+const POSE_QUESTION_CALLBACK_LAUNCH = 'callback:<pose_question_action>';
+const RATING_BUTTON_VALUES = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+const SBT_ADDRESS_RE = /^0x[a-f0-9]{40}$/i;
+const SBT_GROUP_ID_RE = /^[a-z0-9][a-z0-9_-]{2,127}$/i;
+const SESSION_SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,127}$/i;
+const SBT_PRIVATE_CREDENTIAL_RE = /^(invite|password|proof|credential):/i;
+const SBT_PRIVATE_LINK_VALUE_RE = /(?:[?&#](?:invite|password|proof|credential|token)=)/i;
+
+export const TELEGRAM_SCREEN_IDS = Object.freeze([
+  'setup_welcome',
+  'test_checklist',
+  'group_session_card',
+  'private_start',
+  'question_list',
+  'pose_question',
+  'generated_question_candidates',
+  'account_created',
+  'account_recovered',
+  'my_account',
+  'joined_sbts',
+  'onboarding',
+  'sbt_group_card',
+  'join_public_sbt',
+  'join_password_sbt',
+  'create_sbt_group',
+  'session_join_sbt_gate',
+  'freeform_question',
+  'agree_unsure_disagree_question',
+  'rating_question',
+  'multichoice_question',
+  'locked_private_question',
+  'private_question_read',
+  'doc_library',
+  'doc_detail',
+  'generate_questions',
+  'submit_response',
+  'confirmation_signing',
+  'submitted',
+  'draft_saved',
+  'event_log_summary',
+  'error_retry',
+]);
+
+export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
+  setup_welcome: { command: '/start', deepLink: OPAQUE_DEEP_LINK_LAUNCH },
+  test_checklist: { command: '/start' },
+  group_session_card: { command: '/ce_join', callback: OPAQUE_CALLBACK_LAUNCH },
+  private_start: { command: '/start <opaque-action-id>', deepLink: OPAQUE_DEEP_LINK_LAUNCH },
+  question_list: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  pose_question: {
+    command: '/ce_pose_question',
+    aliases: ['/q'],
+    deprecatedAliases: ['/ce_drop_question'],
+    callback: POSE_QUESTION_CALLBACK_LAUNCH,
+  },
+  generated_question_candidates: { command: '/ce_generate_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  account_created: { command: '/ce_join', callback: OPAQUE_CALLBACK_LAUNCH },
+  account_recovered: { command: '/ce_recover_key', callback: OPAQUE_CALLBACK_LAUNCH },
+  my_account: { command: '/ce_account', callback: OPAQUE_CALLBACK_LAUNCH },
+  joined_sbts: { command: '/ce_account', callback: OPAQUE_CALLBACK_LAUNCH },
+  onboarding: { command: '/ce_onboarding', callback: OPAQUE_CALLBACK_LAUNCH },
+  sbt_group_card: { command: '/ce_sbt <sbt-address-or-group-id-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
+  join_public_sbt: { command: '/ce_join_sbt <sbt-address-or-invite-code-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
+  join_password_sbt: { command: '/ce_join_sbt <sbt-address-or-invite-code-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
+  create_sbt_group: { command: '/ce_create_sbt_group [session-slug]', callback: OPAQUE_CALLBACK_LAUNCH },
+  session_join_sbt_gate: { command: '/ce_join', callback: OPAQUE_CALLBACK_LAUNCH },
+  freeform_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  agree_unsure_disagree_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  rating_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  multichoice_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  locked_private_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  private_question_read: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  doc_library: { command: '/ce_docs', callback: OPAQUE_CALLBACK_LAUNCH },
+  doc_detail: { command: '/ce_docs', callback: OPAQUE_CALLBACK_LAUNCH },
+  generate_questions: { command: '/ce_generate_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  submit_response: { callback: OPAQUE_CALLBACK_LAUNCH },
+  confirmation_signing: { callback: OPAQUE_CALLBACK_LAUNCH },
+  submitted: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  draft_saved: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  event_log_summary: { command: '/ce_events', callback: OPAQUE_CALLBACK_LAUNCH },
+  error_retry: { callback: OPAQUE_CALLBACK_LAUNCH },
+});
+
+function safeString(value) {
+  return String(value || '').trim();
+}
+
+function splitCommandText(text = '') {
+  const [command = '', ...args] = safeString(text).split(/\s+/).filter(Boolean);
+  return {
+    command: command.toLowerCase(),
+    args,
+    argText: args.join(' '),
+  };
+}
+
+function looksLikePublicLink(value = '') {
+  return /^(?:https?:\/\/|t\.me\/|tg:\/\/)/i.test(value);
+}
+
+function classifySbtCommandTarget(value = '') {
+  const target = safeString(value);
+  if (!target) return { targetKind: 'missing', target: null, publicTarget: false };
+  if (SBT_PRIVATE_CREDENTIAL_RE.test(target) || SBT_PRIVATE_LINK_VALUE_RE.test(target)) {
+    return { targetKind: 'private_credential', target: null, publicTarget: false, credentialRef: 'telegram_private_input_ref' };
+  }
+  if (SBT_ADDRESS_RE.test(target)) return { targetKind: 'sbt_address', target, publicTarget: true };
+  if (looksLikePublicLink(target)) return { targetKind: 'sbt_share_link', target, publicTarget: true };
+  if (SBT_GROUP_ID_RE.test(target)) return { targetKind: 'sbt_group_id', target, publicTarget: true };
+  return { targetKind: 'private_credential', target: null, publicTarget: false, credentialRef: 'telegram_private_input_ref' };
+}
+
+function privateCredentialCommandResult({ command = '', commandFamily = '', lane = TELEGRAM_CHAT_LANES.GROUP_LOBBY } = {}) {
+  const targetLane = lane === TELEGRAM_CHAT_LANES.GROUP_LOBBY
+    ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT
+    : TELEGRAM_CHAT_LANES.MINI_APP;
+  return sanitizeForGroup({
+    ok: lane !== TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    command,
+    commandFamily,
+    targetKind: 'private_credential',
+    target: null,
+    publicTarget: false,
+    privateCredentialDetected: true,
+    requiresPrivateLane: lane === TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    targetLane,
+    credentialInputLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    credentialRef: lane === TELEGRAM_CHAT_LANES.GROUP_LOBBY ? null : 'telegram_private_input_ref',
+    reason: lane === TELEGRAM_CHAT_LANES.GROUP_LOBBY
+      ? 'private_sbt_credential_required'
+      : 'private_sbt_credential_ref_recorded',
+  });
+}
+
+export function parseTelegramSbtCommand(text = '', {
+  lane = TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+} = {}) {
+  const { command, args, argText } = splitCommandText(text);
+  if (!['/ce_sbt', '/ce_join_sbt', '/ce_create_sbt_group'].includes(command)) {
+    return sanitizeForGroup({
+      ok: false,
+      command,
+      reason: 'unsupported_sbt_command',
+    });
+  }
+
+  if (command === '/ce_create_sbt_group') {
+    const sessionSlug = safeString(args[0] || '');
+    if (SBT_PRIVATE_CREDENTIAL_RE.test(sessionSlug) || SBT_PRIVATE_LINK_VALUE_RE.test(sessionSlug)) {
+      return privateCredentialCommandResult({ command, commandFamily: 'create_sbt_group', lane });
+    }
+    if (sessionSlug && !SESSION_SLUG_RE.test(sessionSlug)) {
+      return sanitizeForGroup({
+        ok: false,
+        command,
+        commandFamily: 'create_sbt_group',
+        reason: 'invalid_session_slug',
+      });
+    }
+    return sanitizeForGroup({
+      ok: true,
+      command,
+      commandFamily: 'create_sbt_group',
+      sessionSlug: sessionSlug || null,
+      targetLane: TELEGRAM_CHAT_LANES.MINI_APP,
+      launch: getTelegramScreenLaunch('create_sbt_group'),
+    });
+  }
+
+  const classified = classifySbtCommandTarget(argText);
+  if (classified.targetKind === 'missing') {
+    return sanitizeForGroup({
+      ok: false,
+      command,
+      commandFamily: command === '/ce_sbt' ? 'view_sbt' : 'join_sbt',
+      reason: 'sbt_target_required',
+    });
+  }
+  if (classified.targetKind === 'private_credential') {
+    return privateCredentialCommandResult({
+      command,
+      commandFamily: command === '/ce_sbt' ? 'view_sbt' : 'join_sbt',
+      lane,
+    });
+  }
+  return sanitizeForGroup({
+    ok: true,
+    command,
+    commandFamily: command === '/ce_sbt' ? 'view_sbt' : 'join_sbt',
+    targetKind: classified.targetKind,
+    target: classified.target,
+    publicTarget: true,
+    publicCommandTargetAllowed: true,
+    targetLane: command === '/ce_sbt'
+      ? TELEGRAM_CHAT_LANES.GROUP_LOBBY
+      : TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    launch: getTelegramScreenLaunch(command === '/ce_sbt' ? 'sbt_group_card' : 'join_public_sbt'),
+  });
+}
+
+function normalizeQuestionType(value = '') {
+  const normalized = safeString(value).toLowerCase();
+  if (['text', 'freeform', 'free_response'].includes(normalized)) return QUESTION_TYPES.FREEFORM;
+  if (['agree_unsure_disagree', 'agree-disagree', 'boolean', 'binary', 'yes_no', 'yes-no'].includes(normalized)) return QUESTION_TYPES.AGREE_UNSURE_DISAGREE;
+  if (['rating', 'scale', 'linear_scale'].includes(normalized)) return QUESTION_TYPES.RATING;
+  if ([
+    'multichoice',
+    'multi_choice',
+    'multi-choice',
+    'multi_select',
+    'multi-select',
+    'multiple_choice',
+    'multiple-choice',
+    'single_choice',
+    'single-choice',
+  ].includes(normalized)) return QUESTION_TYPES.MULTICHOICE;
+  return QUESTION_TYPES.FREEFORM;
+}
+
+function normalizeChoiceSelectionMode(question = {}) {
+  const rawType = safeString(question.questionType || question.type).toLowerCase();
+  if (
+    rawType === 'single_choice'
+    || rawType === 'single-choice'
+    || question.singleSelect === true
+    || question.singleChoice === true
+    || question.oneSelectionOnly === true
+  ) {
+    return 'single';
+  }
+  return 'multi';
+}
+
+function normalizeOptions(question = {}) {
+  return (Array.isArray(question.options) ? question.options : [])
+    .map((option) => safeString(option.label || option.text || option))
+    .filter(Boolean);
+}
+
+function selectedChoiceSet(question = {}) {
+  const raw = Array.isArray(question.selectedValues)
+    ? question.selectedValues
+    : (Array.isArray(question.selectedOptions) ? question.selectedOptions : question.value);
+  const values = Array.isArray(raw) ? raw : [raw];
+  return new Set(values.map(safeString).filter(Boolean));
+}
+
+function baseControl(action, label, questionId, targetLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, extra = {}) {
+  return {
+    actionId: buildOpaqueActionId(`${action}|${questionId}|${label}`),
+    action,
+    label,
+    targetLane,
+    ...extra,
+  };
+}
+
+function buildScreenButton(action, label, targetLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, extra = {}) {
+  return {
+    actionId: buildOpaqueActionId(`screen_button|${action}|${label}|${targetLane}`),
+    action,
+    label,
+    targetLane,
+    callback: OPAQUE_CALLBACK_LAUNCH,
+    ...extra,
+  };
+}
+
+function buildDefaultScreenButtons(screen) {
+  if (screen === 'question_list') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+        command: '/ce_questions',
+      }),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION, 'Pose Question', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+        command: '/ce_pose_question',
+        aliases: ['/q'],
+      }),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        command: '/ce_generate_questions',
+      }),
+    ];
+  }
+  if (screen === 'pose_question') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION, 'Pose Question', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+        command: '/ce_pose_question',
+        aliases: ['/q'],
+      }),
+    ];
+  }
+  if (screen === 'generated_question_candidates') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SAVE_GENERATED_QUESTION, 'Save', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION, 'Pose Question', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+        command: '/ce_pose_question',
+        aliases: ['/q'],
+      }),
+    ];
+  }
+  if (screen === 'account_created') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.START_ONBOARDING, 'Enter Startup Info'),
+    ];
+  }
+  if (screen === 'my_account') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_JOINED_SBTS, 'Joined SBTs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.EXPORT_ACCOUNT, 'Export'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.RESTORE_ACCOUNT, 'Restore'),
+    ];
+  }
+  if (screen === 'joined_sbts') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT, 'My Account'),
+    ];
+  }
+  if (screen === 'onboarding') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.START_ONBOARDING, 'Enter Startup Info'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'Skip'),
+    ];
+  }
+  if (screen === 'sbt_group_card') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.JOIN_SBT, 'Join SBT', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_SBT_DETAILS, 'Details', TELEGRAM_CHAT_LANES.GROUP_LOBBY),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT, 'My Account', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
+    ];
+  }
+  if (screen === 'join_public_sbt') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.JOIN_PUBLIC_SBT, 'Join SBT', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT, 'My Account', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
+    ];
+  }
+  if (screen === 'join_password_sbt') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.JOIN_PASSWORD_SBT, 'Join SBT', TELEGRAM_CHAT_LANES.MINI_APP),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT, 'My Account', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
+    ];
+  }
+  if (screen === 'create_sbt_group') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.CREATE_SBT_GROUP, 'Create SBT Group', TELEGRAM_CHAT_LANES.MINI_APP),
+    ];
+  }
+  if (screen === 'session_join_sbt_gate') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN, 'Retry Join Session', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        command: '/ce_join',
+      }),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT, 'My Account', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
+    ];
+  }
+  if (screen === 'locked_private_question') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.REQUEST_PRIVATE_QUESTION_DECRYPT, 'Open Privately', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
+    ];
+  }
+  if (screen === 'doc_library') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.USE_DOCS_AS_ANSWER_CONTEXT, 'Use as Answer Context'),
+    ];
+  }
+  if (screen === 'generate_questions') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions'),
+    ];
+  }
+  if (screen === 'submit_response') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE, 'Submit Response'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Save draft'),
+    ];
+  }
+  if (screen === 'confirmation_signing') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Save draft'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.EDIT_RESPONSE, 'Edit'),
+    ];
+  }
+  return [];
+}
+
+function buildDefaultScreenCopy(screen) {
+  if (screen === 'question_list') {
+    return {
+      title: 'View Questions',
+      text: 'Existing session questions.',
+    };
+  }
+  if (screen === 'pose_question') {
+    return {
+      title: 'Pose Question',
+      text: 'Choose one question to pose to the group.',
+    };
+  }
+  if (screen === 'generated_question_candidates') {
+    return {
+      title: 'Generated Questions',
+      text: 'Save a candidate or pose it to the group.',
+    };
+  }
+  if (screen === 'account_created') {
+    return {
+      title: 'Account ready',
+      text: 'Your Telegram account is ready for this session.',
+    };
+  }
+  if (screen === 'my_account') {
+    return {
+      title: 'My Account',
+      text: 'Managed account summary.',
+    };
+  }
+  if (screen === 'joined_sbts') {
+    return {
+      title: 'Joined SBTs',
+      text: 'SBT groups joined by this account.',
+    };
+  }
+  if (screen === 'onboarding') {
+    return {
+      title: 'Startup Info',
+      text: 'Enter startup info so I can suggest answers for you.',
+    };
+  }
+  if (screen === 'sbt_group_card') {
+    return {
+      title: 'SBT Group',
+      text: 'Group membership card.',
+    };
+  }
+  if (screen === 'join_public_sbt') {
+    return {
+      title: 'Join Public SBT',
+      text: 'Join this open SBT with your managed account.',
+    };
+  }
+  if (screen === 'join_password_sbt') {
+    return {
+      title: 'Join Password SBT',
+      text: 'Enter the group credential in private chat or Mini App.',
+    };
+  }
+  if (screen === 'create_sbt_group') {
+    return {
+      title: 'Create SBT Group',
+      text: 'Create the group through the canonical CE agent API.',
+    };
+  }
+  if (screen === 'session_join_sbt_gate') {
+    return {
+      title: 'Join Session',
+      text: 'Required SBT groups for this session.',
+    };
+  }
+  if (screen === 'locked_private_question') {
+    return {
+      title: 'Question Locked',
+      text: 'Open privately with an eligible account.',
+    };
+  }
+  if (screen === 'private_question_read') {
+    return {
+      title: 'Private Question',
+      text: 'Private question content is shown only in private chat or Mini App.',
+    };
+  }
+  if (screen === 'doc_library') {
+    return {
+      title: 'View / Add Docs',
+      text: 'Select docs to generate questions or save them for answer context.',
+      buttonLabel: 'View / Add Docs',
+    };
+  }
+  if (screen === 'generate_questions') {
+    return {
+      title: 'Generate Questions',
+      text: 'Selected docs are inputs for Generate Questions.',
+    };
+  }
+  if (screen === 'submit_response') {
+    return {
+      title: 'Submit Response',
+      text: 'Submit Response appears after an answer is present.',
+    };
+  }
+  if (screen === 'confirmation_signing') {
+    return {
+      title: 'Submit Response',
+      text: 'Submit this response?',
+    };
+  }
+  return {};
+}
+
+export function getTelegramScreenLaunch(screen = '') {
+  const screenId = safeString(screen);
+  return {
+    ...(TELEGRAM_SCREEN_LAUNCHES[screenId] || { callback: OPAQUE_CALLBACK_LAUNCH }),
+  };
+}
+
+export function listTelegramScreenLaunchContracts() {
+  return TELEGRAM_SCREEN_IDS.map((screen) => ({
+    screen,
+    launch: getTelegramScreenLaunch(screen),
+  }));
+}
+
+export function buildTelegramGroupSessionCardState({
+  sessionName = '',
+  sessionSlug = '',
+  policy = {},
+  createdAt = null,
+} = {}) {
+  const sessionLabel = safeString(sessionName || sessionSlug || 'general');
+  const buttons = [
+    buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.JOIN_SESSION, 'Join Session', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+      command: '/ce_join',
+      deepLink: OPAQUE_DEEP_LINK_LAUNCH,
+    }),
+    buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+      command: '/ce_questions',
+      default: true,
+    }),
+    buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+      command: '/ce_docs',
+    }),
+  ];
+  if (policy.allowPoseQuestion !== false) {
+    buttons.push(buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION, 'Pose Question', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+      command: '/ce_pose_question',
+      aliases: ['/q'],
+    }));
+  }
+  const policyActions = [];
+  if (policy.allowAddQuestion === true) {
+    policyActions.push(buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.ADD_QUESTION, 'Add Question', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT));
+  }
+  if (policy.allowGenerateQuestion === true || policy.allowQuestionGeneration === true) {
+    policyActions.push(buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+      command: '/ce_generate_questions',
+    }));
+  }
+  return buildTelegramScreenState('group_session_card', {
+    text: `Context Engine session linked: ${sessionLabel}`,
+    sessionSlug: safeString(sessionSlug),
+    sessionName: safeString(sessionName),
+    buttons,
+    policyActions,
+    defaultAction: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+    createdAt,
+  });
+}
+
+function normalizeQuestionVisibility(question = {}) {
+  const raw = safeString(question.visibility || question.access || question.questionVisibility).toLowerCase();
+  if ([
+    QUESTION_VISIBILITY.PRIVATE,
+    QUESTION_VISIBILITY.SBT_GATED,
+    QUESTION_VISIBILITY.LIT_ENCRYPTED,
+  ].includes(raw)) {
+    return raw;
+  }
+  if (question.private === true || question.isPrivate === true) return QUESTION_VISIBILITY.PRIVATE;
+  if (question.sbtGated === true || question.gated === true) return QUESTION_VISIBILITY.SBT_GATED;
+  if (question.litEncrypted === true || question.encrypted === true) return QUESTION_VISIBILITY.LIT_ENCRYPTED;
+  return QUESTION_VISIBILITY.PUBLIC;
+}
+
+function isGroupSafeQuestionVisible(question = {}) {
+  return normalizeQuestionVisibility(question) === QUESTION_VISIBILITY.PUBLIC;
+}
+
+function summarizeQuestionForList(question = {}, index = 0) {
+  const questionId = safeString(question.questionId || question.id);
+  const visibility = normalizeQuestionVisibility(question);
+  const visible = visibility === QUESTION_VISIBILITY.PUBLIC;
+  return sanitizeForGroup({
+    type: 'telegram_question_list_item',
+    displayIndex: index + 1,
+    questionId,
+    questionType: normalizeQuestionType(question.questionType || question.type),
+    title: visible
+      ? safeString(question.title || question.questionText || question.prompt)
+      : 'Locked question',
+    visibility,
+    locked: !visible,
+    unavailableInGroup: !visible,
+    source: safeString(question.source || 'existing_session_question'),
+    poseActionId: buildOpaqueActionId(`pose_question|${questionId}|${index}`),
+  });
+}
+
+function groupSafeQuestionForPose(question = {}) {
+  const visibility = normalizeQuestionVisibility(question);
+  const visible = visibility === QUESTION_VISIBILITY.PUBLIC;
+  return sanitizeForGroup({
+    type: 'telegram_group_posed_question',
+    questionId: safeString(question.questionId || question.id),
+    questionType: normalizeQuestionType(question.questionType || question.type),
+    visibility,
+    locked: !visible,
+    questionText: visible ? safeString(question.questionText || question.prompt || question.title) : null,
+    answerLabels: visible ? normalizeOptions(question) : [],
+    status: visible ? 'posed' : 'locked_unavailable_in_group',
+  });
+}
+
+function normalizeSbtSummary(sbt = {}) {
+  return sanitizeForGroup({
+    type: 'telegram_sbt_group_summary',
+    sbtId: safeString(sbt.sbtId || sbt.id || sbt.address),
+    sbtAddress: safeString(sbt.sbtAddress || sbt.address) || null,
+    groupId: safeString(sbt.groupId || sbt.sbtGroupId || sbt.groupSlug || sbt.slug) || null,
+    shareLink: safeString(sbt.shareLink || sbt.link || sbt.url) || null,
+    name: safeString(sbt.name || sbt.title) || 'SBT Group',
+    description: safeString(sbt.description || sbt.summary) || null,
+    image: safeString(sbt.image || sbt.imageUrl) || null,
+    visibility: safeString(sbt.visibility || 'public'),
+    joinMode: safeString(sbt.joinMode || sbt.mode || 'public'),
+    sessionSlug: safeString(sbt.sessionSlug || sbt.session),
+  });
+}
+
+function sbtPublicTarget(summary = {}) {
+  return safeString(summary.sbtAddress || summary.groupId || summary.shareLink || summary.sbtId);
+}
+
+function buildSbtGateAction(group = {}, action, label, targetLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, extra = {}) {
+  return sanitizeForGroup({
+    actionId: buildOpaqueActionId(`sbt_gate|${action}|${group.sbtId || group.sbtAddress || group.groupId || group.shareLink}|${group.joinMode}`),
+    action,
+    label,
+    targetLane,
+    callback: OPAQUE_CALLBACK_LAUNCH,
+    ...extra,
+  });
+}
+
+function buildRequiredSbtGateGroup(group = {}, {
+  sessionSlug = '',
+  publicJoinEligible = true,
+} = {}) {
+  const summary = normalizeSbtSummary(group);
+  const joinMode = safeString(group.joinMode || summary.joinMode || 'public').toLowerCase();
+  const joined = group.joined === true;
+  const publicTarget = sbtPublicTarget(summary);
+  const publicOpen = ['public', 'open'].includes(joinMode);
+  const credentialType = ['password', 'invite'].includes(joinMode) ? joinMode : null;
+  const requiresFullCeAccount = group.requiresFullCeAccount === true
+    || ['linked-wallet', 'wallet', 'wallet-proof', 'passkey', 'non-public', 'private'].includes(joinMode);
+  let action = null;
+
+  if (joined) {
+    action = buildSbtGateAction(group, TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN, 'Retry Join Session', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+      command: '/ce_join',
+    });
+  } else if (publicOpen && publicJoinEligible === true) {
+    action = buildSbtGateAction(group, TELEGRAM_BRIDGE_ACTIONS.JOIN_PUBLIC_SBT, 'Join SBT', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+      command: '/ce_join_sbt <sbt-address-or-invite-code-or-link>',
+      publicCommandTarget: publicTarget || null,
+      publicCommandTargetAllowed: Boolean(publicTarget),
+      privateEligibilityCheckLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      canonicalApiRequest: canonicalAgentRequest({
+        path: '/api/agent/sbt-groups/claim-request',
+        actionId: 'agent.sbt_group.claim_request',
+        body: {
+          session: safeString(sessionSlug || group.sessionSlug || summary.sessionSlug),
+          sbtAddress: summary.sbtAddress,
+          groupId: summary.groupId,
+          shareLink: summary.shareLink,
+          joinMode,
+        },
+      }),
+    });
+  } else if (credentialType) {
+    action = buildSbtGateAction(group, TELEGRAM_BRIDGE_ACTIONS.JOIN_PASSWORD_SBT, 'Join SBT', TELEGRAM_CHAT_LANES.MINI_APP, {
+      command: '/ce_join_sbt <sbt-address-or-invite-code-or-link>',
+      credentialType,
+      credentialRequired: true,
+      credentialInputLane: TELEGRAM_CHAT_LANES.MINI_APP,
+      credentialRef: 'telegram_private_input_ref',
+      canonicalApiRequest: canonicalAgentRequest({
+        path: '/api/agent/sbt-groups/claim-request',
+        actionId: 'agent.sbt_group.claim_request',
+        body: {
+          session: safeString(sessionSlug || group.sessionSlug || summary.sessionSlug),
+          sbtAddress: summary.sbtAddress,
+          groupId: summary.groupId,
+          shareLink: summary.shareLink,
+          joinMode,
+          credentialRef: 'telegram_private_input_ref',
+        },
+      }),
+    });
+  } else if (requiresFullCeAccount || publicOpen !== true) {
+    action = buildSbtGateAction(group, TELEGRAM_BRIDGE_ACTIONS.LINK_FULL_CE_ACCOUNT, 'Link CE Account', TELEGRAM_CHAT_LANES.MINI_APP, {
+      reason: 'full_ce_account_required_for_sbt_eligibility',
+      accountLinkApiRequest: canonicalAgentRequest({
+        path: '/api/agent/accounts/link-request',
+        actionId: 'agent.account.link_request',
+        body: {
+          session: safeString(sessionSlug || group.sessionSlug || summary.sessionSlug),
+          sbtAddress: summary.sbtAddress,
+          groupId: summary.groupId,
+          shareLink: summary.shareLink,
+          joinMode,
+        },
+      }),
+    });
+  }
+
+  return sanitizeForGroup({
+    ...summary,
+    required: true,
+    joined,
+    joinMode,
+    credentialRequired: Boolean(credentialType),
+    credentialType,
+    requiresFullCeAccount,
+    privateHolderMetadataIncluded: false,
+    action,
+  });
+}
+
+function normalizeJoinedSbtSummary(sbt = {}) {
+  return sanitizeForGroup({
+    type: 'telegram_joined_sbt_summary',
+    sbtId: safeString(sbt.sbtId || sbt.id || sbt.address),
+    sbtAddress: safeString(sbt.sbtAddress || sbt.address) || null,
+    name: safeString(sbt.name || sbt.title) || 'SBT Group',
+    joinedAt: sbt.joinedAt || null,
+    sessionSlug: safeString(sbt.sessionSlug || sbt.session),
+  });
+}
+
+function normalizeJoinedSessionSummary(session = {}) {
+  return sanitizeForGroup({
+    type: 'telegram_joined_session_summary',
+    sessionSlug: safeString(session.sessionSlug || session.slug || session),
+    sessionName: safeString(session.sessionName || session.name || session),
+    joinedAt: session.joinedAt || null,
+  });
+}
+
+function canonicalAgentRequest({ method = 'POST', path = '', actionId = '', status = 'planned_contract_only', body = {} } = {}) {
+  return sanitizeForGroup({
+    type: 'canonical_ce_agent_api_request',
+    method,
+    path,
+    actionId,
+    status,
+    body,
+    authority: 'canonical_ce_agent_session_api',
+  });
+}
+
+export function buildTelegramQuestionListState({
+  sessionSlug = '',
+  questions = [],
+  createdAt = null,
+} = {}) {
+  const items = (Array.isArray(questions) ? questions : []).map(summarizeQuestionForList);
+  return buildTelegramScreenState('question_list', {
+    sessionSlug: safeString(sessionSlug),
+    count: items.length,
+    source: 'canonical_agent_questions',
+    canonicalApiRequest: canonicalAgentRequest({
+      method: 'GET',
+      path: '/api/agent/questions',
+      actionId: 'agent.read.questions',
+      status: 'implemented',
+      body: {
+        session: safeString(sessionSlug),
+      },
+    }),
+    questions: items,
+    createdAt,
+  });
+}
+
+export function createTelegramPoseQuestionAction({
+  sessionSlug = '',
+  question = {},
+  source = 'existing_session_question',
+  createdAt = null,
+} = {}) {
+  const questionId = safeString(question.questionId || question.id);
+  return sanitizeForGroup({
+    type: 'telegram_pose_question_action',
+    actionId: buildOpaqueActionId(`pose_question|${sessionSlug}|${questionId}|${source}`),
+    action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
+    label: 'Pose Question',
+    command: '/ce_pose_question',
+    aliases: ['/q'],
+    deprecatedAliases: ['/ce_drop_question'],
+    callback: POSE_QUESTION_CALLBACK_LAUNCH,
+    targetLane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    sessionSlug: safeString(sessionSlug),
+    questionId,
+    source: safeString(source),
+    createdAt,
+  });
+}
+
+export function buildTelegramPoseQuestionState({
+  sessionSlug = '',
+  question = {},
+  source = 'existing_session_question',
+  createdAt = null,
+} = {}) {
+  const action = createTelegramPoseQuestionAction({ sessionSlug, question, source, createdAt });
+  const groupQuestion = groupSafeQuestionForPose(question);
+  return buildTelegramScreenState('pose_question', {
+    sessionSlug: safeString(sessionSlug),
+    questionId: groupQuestion.questionId,
+    source,
+    action,
+    groupSafeOutput: groupQuestion,
+    card: groupQuestion.locked ? null : buildTelegramQuestionCard(question),
+    status: groupQuestion.status,
+    createdAt,
+  });
+}
+
+export function buildTelegramGeneratedQuestionCandidatesState({
+  sessionSlug = '',
+  candidates = [],
+  selectedDocIds = [],
+  createdAt = null,
+} = {}) {
+  const normalizedCandidates = (Array.isArray(candidates) ? candidates : []).map((candidate, index) => {
+    const question = {
+      ...candidate,
+      source: 'generated_candidate',
+      questionId: safeString(candidate.questionId || candidate.candidateId || `generated-${index + 1}`),
+    };
+    return {
+      ...summarizeQuestionForList(question, index),
+      saveActionId: buildOpaqueActionId(`save_generated_question|${sessionSlug}|${question.questionId}`),
+      poseAction: createTelegramPoseQuestionAction({
+        sessionSlug,
+        question,
+        source: 'generated_candidate',
+        createdAt,
+      }),
+    };
+  });
+  return buildTelegramScreenState('generated_question_candidates', {
+    sessionSlug: safeString(sessionSlug),
+    selectedDocIds: (Array.isArray(selectedDocIds) ? selectedDocIds : []).map(safeString).filter(Boolean),
+    candidates: normalizedCandidates,
+    count: normalizedCandidates.length,
+    splitFromSubmitResponse: true,
+    createdAt,
+  });
+}
+
+export function buildTelegramSubmitResponseState({
+  sessionSlug = '',
+  questionId = '',
+  answer = null,
+  createdAt = null,
+} = {}) {
+  const hasAnswer = answer != null && safeString(answer.answerLabel || answer.answer || answer.value || answer).length > 0;
+  if (!hasAnswer) {
+    return buildTelegramScreenState('submit_response', {
+      sessionSlug: safeString(sessionSlug),
+      questionId: safeString(questionId),
+      status: 'answer_required',
+      submitAvailable: false,
+      buttons: [],
+      createdAt,
+    });
+  }
+  return buildTelegramScreenState('submit_response', {
+    sessionSlug: safeString(sessionSlug),
+    questionId: safeString(questionId),
+    status: 'ready_to_submit',
+    submitAvailable: true,
+    answerRef: {
+      present: true,
+      contentHash: safeString(answer.contentHash || answer.hash) || null,
+    },
+    createdAt,
+  });
+}
+
+export function buildTelegramSbtGroupCardState({
+  sbt = {},
+  sessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const summary = normalizeSbtSummary({ ...sbt, sessionSlug: sessionSlug || sbt.sessionSlug });
+  return buildTelegramScreenState('sbt_group_card', {
+    sbt: summary,
+    sessionSlug: safeString(sessionSlug || summary.sessionSlug),
+    privateHolderMetadataIncluded: false,
+    createdAt,
+  });
+}
+
+export function buildTelegramSessionSbtGateJoinState({
+  session = {},
+  joinedSbtIds = [],
+  publicJoinEligible = true,
+  createdAt = null,
+} = {}) {
+  const evaluation = evaluateSessionSbtGateJoin(session, { joinedSbtIds });
+  const sessionSlug = safeString(session.sessionSlug || session.slug);
+  const requiredSbtGroups = evaluation.requiredSbtGroups.map((group) => buildRequiredSbtGateGroup(group, {
+    sessionSlug,
+    publicJoinEligible,
+  }));
+  const retryAction = evaluation.allSatisfied === true
+    ? buildSbtGateAction({ sbtId: sessionSlug || 'session', joinMode: 'retry' }, TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN, 'Retry Join Session', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+      command: '/ce_join',
+      deepLink: OPAQUE_DEEP_LINK_LAUNCH,
+    })
+    : null;
+  return buildTelegramScreenState('session_join_sbt_gate', {
+    sessionSlug,
+    sessionName: safeString(session.sessionName || session.name),
+    status: evaluation.status,
+    joinAvailable: evaluation.allSatisfied === true,
+    allRequiredSbtSatisfied: evaluation.allSatisfied === true,
+    requiredSbtGroups,
+    nextStep: evaluation.nextStep,
+    retryAction,
+    groupSafe: true,
+    createdAt,
+  });
+}
+
+export function buildTelegramJoinPublicSbtState({
+  sbt = {},
+  session = {},
+  account = {},
+  createdAt = null,
+} = {}) {
+  const summary = normalizeSbtSummary(sbt);
+  const policy = evaluateSbtJoinPolicy(session, { mode: 'public' });
+  return buildTelegramScreenState('join_public_sbt', {
+    sbt: summary,
+    managedAddress: safeString(account.accountAddress || account.address) || null,
+    joinPolicy: {
+      ok: policy.ok === true,
+      reason: safeString(policy.reason),
+      credentialRequired: policy.requiresPassword === true,
+    },
+    joinAvailable: policy.ok === true && policy.requiresPassword !== true,
+    canonicalApiRequest: policy.ok ? canonicalAgentRequest({
+      path: '/api/agent/sbt-groups/claim-request',
+      actionId: 'agent.sbt_group.claim_request',
+      body: {
+        session: safeString(summary.sessionSlug || session.sessionSlug || session.slug),
+        sbtAddress: summary.sbtAddress,
+        accountAddress: safeString(account.accountAddress || account.address) || null,
+        joinMode: 'public',
+      },
+    }) : null,
+    createdAt,
+  });
+}
+
+export function buildTelegramJoinPasswordSbtState({
+  sbt = {},
+  session = {},
+  account = {},
+  credentialEntered = false,
+  createdAt = null,
+} = {}) {
+  const summary = normalizeSbtSummary({ ...sbt, joinMode: 'password' });
+  const policy = evaluateSbtJoinPolicy(session, {
+    mode: 'password',
+    password: credentialEntered ? 'provided-by-private-input' : '',
+  });
+  return buildTelegramScreenState('join_password_sbt', {
+    sbt: summary,
+    managedAddress: safeString(account.accountAddress || account.address) || null,
+    credentialRequired: true,
+    credentialInputLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    credentialEntered: credentialEntered === true,
+    joinPolicy: {
+      ok: policy.ok === true,
+      reason: safeString(policy.reason),
+      credentialRequired: true,
+    },
+    joinAvailable: policy.ok === true,
+    canonicalApiRequest: credentialEntered ? canonicalAgentRequest({
+      path: '/api/agent/sbt-groups/claim-request',
+      actionId: 'agent.sbt_group.claim_request',
+      body: {
+        session: safeString(summary.sessionSlug || session.sessionSlug || session.slug),
+        sbtAddress: summary.sbtAddress,
+        accountAddress: safeString(account.accountAddress || account.address) || null,
+        joinMode: 'password',
+        credentialRef: 'telegram_private_input_ref',
+      },
+    }) : null,
+    createdAt,
+  });
+}
+
+export function buildTelegramCreateSbtGroupState({
+  sessionSlug = '',
+  fields = {},
+  createdAt = null,
+} = {}) {
+  const normalizedFields = sanitizeForGroup({
+    name: safeString(fields.name),
+    description: safeString(fields.description),
+    image: safeString(fields.image || fields.imageUrl),
+    visibility: safeString(fields.visibility || 'public'),
+    joinMode: safeString(fields.joinMode || 'public'),
+    credentialConfigured: fields.credentialConfigured === true || fields.hasCredential === true,
+    sessionAssociation: safeString(fields.sessionAssociation || fields.sessionSlug || sessionSlug),
+  });
+  return buildTelegramScreenState('create_sbt_group', {
+    preferredLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    fields: normalizedFields,
+    canonicalApiRequest: canonicalAgentRequest({
+      path: '/api/agent/sbt-groups/create-request',
+      actionId: 'agent.sbt_group.create_request',
+      body: {
+        ...normalizedFields,
+        session: safeString(sessionSlug || normalizedFields.sessionAssociation),
+      },
+    }),
+    contractOnlyPlaceholder: true,
+    createdAt,
+  });
+}
+
+export function buildTelegramJoinedSbtsState({
+  account = {},
+  joinedSbts = [],
+  createdAt = null,
+} = {}) {
+  return buildTelegramScreenState('joined_sbts', {
+    managedAddress: safeString(account.accountAddress || account.address) || null,
+    joinedSbts: (Array.isArray(joinedSbts) ? joinedSbts : []).map(normalizeJoinedSbtSummary),
+    count: Array.isArray(joinedSbts) ? joinedSbts.length : 0,
+    createdAt,
+  });
+}
+
+export function buildTelegramMyAccountState({
+  account = {},
+  joinedSessions = [],
+  joinedSbts = [],
+  createdAt = null,
+} = {}) {
+  return buildTelegramScreenState('my_account', {
+    managedAddress: safeString(account.accountAddress || account.address) || null,
+    accountMode: safeString(account.accountMode || account.mode || 'managed_telegram_demo'),
+    joinedSessions: (Array.isArray(joinedSessions) ? joinedSessions : []).map(normalizeJoinedSessionSummary),
+    joinedSbts: (Array.isArray(joinedSbts) ? joinedSbts : []).map(normalizeJoinedSbtSummary),
+    exportRestoreControls: {
+      export: TELEGRAM_BRIDGE_ACTIONS.EXPORT_ACCOUNT,
+      restore: TELEGRAM_BRIDGE_ACTIONS.RESTORE_ACCOUNT,
+      lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    },
+    createdAt,
+  });
+}
+
+export function buildTelegramQuestionAccessState({
+  sessionSlug = '',
+  question = {},
+  eligible = false,
+  createdAt = null,
+} = {}) {
+  if (isGroupSafeQuestionVisible(question)) {
+    return buildTelegramPoseQuestionState({
+      sessionSlug,
+      question,
+      source: safeString(question.source || 'existing_session_question'),
+      createdAt,
+    });
+  }
+  const visibility = normalizeQuestionVisibility(question);
+  return buildTelegramScreenState('locked_private_question', {
+    sessionSlug: safeString(sessionSlug),
+    questionId: safeString(question.questionId || question.id),
+    visibility,
+    locked: true,
+    groupSafeOutput: groupSafeQuestionForPose(question),
+    privateAvailable: eligible === true,
+    status: eligible === true ? 'private_unlock_available' : 'locked_unavailable',
+    createdAt,
+  });
+}
+
+export function createTelegramPrivateQuestionDecryptRequest({
+  sessionSlug = '',
+  question = {},
+  account = {},
+  eligible = false,
+  createdAt = null,
+} = {}) {
+  const questionId = safeString(question.questionId || question.id);
+  if (eligible !== true) {
+    return sanitizeForGroup({
+      ok: false,
+      status: 'locked_unavailable',
+      reason: 'account_not_eligible',
+      sessionSlug: safeString(sessionSlug),
+      questionId,
+      createdAt,
+    });
+  }
+  return sanitizeForGroup({
+    ok: true,
+    type: 'telegram_private_question_decrypt_request',
+    status: 'contract_only_request',
+    requestId: buildOpaqueActionId(`decrypt_request|${sessionSlug}|${questionId}|${account.accountId || account.accountAddress || ''}`),
+    sessionSlug: safeString(sessionSlug),
+    questionId,
+    accountAddress: safeString(account.accountAddress || account.address) || null,
+    targetLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    canonicalApiRequest: canonicalAgentRequest({
+      path: '/api/agent/decrypt/request',
+      actionId: 'agent.decrypt.request',
+      status: 'deferred_contract_only',
+      body: {
+        session: safeString(sessionSlug),
+        questionId,
+        accountAddress: safeString(account.accountAddress || account.address) || null,
+        resourceType: 'private_question',
+      },
+    }),
+    decryptAuthority: 'canonical_ce_agent_session_api',
+    litAuthority: 'session_worker_lit_optional_for_lit_encrypted_payloads',
+    telegramDecryptImplemented: false,
+    createdAt,
+  });
+}
+
+export function buildTelegramPrivateQuestionReadState({
+  sessionSlug = '',
+  question = {},
+  decrypted = {},
+  lane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+  eligible = false,
+  createdAt = null,
+} = {}) {
+  const targetLane = lane === TELEGRAM_CHAT_LANES.MINI_APP ? TELEGRAM_CHAT_LANES.MINI_APP : TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT;
+  if (eligible !== true) {
+    return buildTelegramQuestionAccessState({ sessionSlug, question, eligible: false, createdAt });
+  }
+  return buildTelegramScreenState('private_question_read', {
+    sessionSlug: safeString(sessionSlug),
+    questionId: safeString(question.questionId || question.id),
+    targetLane,
+    visibility: normalizeQuestionVisibility(question),
+    decryptedPrompt: safeString(decrypted.prompt || decrypted.questionText),
+    decryptedContext: safeString(decrypted.context),
+    groupSafe: false,
+    createdAt,
+  });
+}
+
+export function buildSessionStorageAccessContract({
+  sessionSlug = '',
+  storageProfile = SESSION_STORAGE_PROFILES.ARWEAVE,
+  resource = 'docs',
+  gate = {},
+  payloadEncrypted = false,
+  createdAt = null,
+} = {}) {
+  const profile = safeString(storageProfile).toLowerCase() === SESSION_STORAGE_PROFILES.CLOUDFLARE
+    ? SESSION_STORAGE_PROFILES.CLOUDFLARE
+    : SESSION_STORAGE_PROFILES.ARWEAVE;
+  return sanitizeForGroup({
+    type: 'session_storage_access_contract',
+    sessionSlug: safeString(sessionSlug),
+    storageProfile: profile,
+    defaultProfile: SESSION_STORAGE_PROFILES.ARWEAVE,
+    selectedInSessionConfig: true,
+    telegramSelectedStorage: false,
+    resource: safeString(resource),
+    gateMode: safeString(gate.mode || 'none'),
+    sbtGated: Array.isArray(gate.sbtAddresses) && gate.sbtAddresses.length > 0,
+    litRequired: payloadEncrypted === true,
+    canonicalApiRequest: canonicalAgentRequest({
+      method: 'POST',
+      path: profile === SESSION_STORAGE_PROFILES.CLOUDFLARE
+        ? '/api/agent/session-storage/access-request'
+        : '/api/agent/decrypt/request',
+      actionId: profile === SESSION_STORAGE_PROFILES.CLOUDFLARE
+        ? 'agent.session_storage.access_request'
+        : 'agent.decrypt.request',
+      status: 'planned_contract_only',
+      body: {
+        session: safeString(sessionSlug),
+        storageProfile: profile,
+        resource: safeString(resource),
+        payloadEncrypted: payloadEncrypted === true,
+      },
+    }),
+    exposesCloudflareCredential: false,
+    exposesBucketName: false,
+    exposesRawStoragePath: false,
+    exposesLongLivedUrl: false,
+    createdAt,
+  });
+}
+
+export function buildTelegramQuestionControls(question = {}, {
+  docsExist = false,
+  docsRelevant = false,
+  microphoneSupported = true,
+} = {}) {
+  const questionId = safeString(question.questionId || question.id);
+  const questionType = normalizeQuestionType(question.questionType || question.type);
+  const controls = [];
+  if (questionType === QUESTION_TYPES.AGREE_UNSURE_DISAGREE) {
+    controls.push(
+      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Agree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'agree', selectionMode: 'single' }),
+      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Unsure', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'unsure', selectionMode: 'single' }),
+      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Disagree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'disagree', selectionMode: 'single' }),
+    );
+  } else if (questionType === QUESTION_TYPES.RATING) {
+    const scale = {
+      ...DEFAULT_RATING_SCALE,
+      ...(question.ratingScale || {}),
+    };
+    for (const value of RATING_BUTTON_VALUES) {
+      controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, String(value), questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        controlType: 'rating_button',
+        value,
+        min: 0,
+        max: 10,
+        step: 1,
+        requestedMin: scale.min,
+        requestedMax: scale.max,
+        selectionMode: 'single',
+      }));
+    }
+  } else if (questionType === QUESTION_TYPES.MULTICHOICE) {
+    const selectionMode = normalizeChoiceSelectionMode(question);
+    const selected = selectedChoiceSet(question);
+    for (const label of normalizeOptions(question)) {
+      controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, label, questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        controlType: selectionMode === 'single' ? 'single_select' : 'multi_select_toggle',
+        value: label,
+        selectionMode,
+        selected: selected.has(label),
+      }));
+    }
+  } else {
+    controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Type', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+      controlType: 'text_input',
+    }));
+    if (microphoneSupported) {
+      controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.MICROPHONE_INPUT, 'Voice', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        controlType: 'voice_input',
+      }));
+    }
+  }
+  controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.ADDITIONAL_COMMENTS, 'Additional comments', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+    controlType: 'additional_comments',
+  }));
+  if (microphoneSupported && questionType !== QUESTION_TYPES.FREEFORM) {
+    controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.MICROPHONE_INPUT, 'Microphone', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+      controlType: 'voice_input',
+    }));
+  }
+  if (docsExist || docsRelevant) {
+    controls.push(baseControl(TELEGRAM_BRIDGE_ACTIONS.DOC_CONTEXT, 'Use as Answer Context', questionId, TELEGRAM_CHAT_LANES.MINI_APP, {
+      controlType: 'doc_context',
+    }));
+  }
+  return controls;
+}
+
+export function buildTelegramQuestionCard(question = {}, options = {}) {
+  const questionId = safeString(question.questionId || question.id);
+  const questionType = normalizeQuestionType(question.questionType || question.type);
+  const docsContextAvailable = options.docsExist === true || options.docsRelevant === true;
+  return sanitizeForGroup({
+    type: 'telegram_question_card',
+    questionId,
+    questionType,
+    selectionMode: questionType === QUESTION_TYPES.MULTICHOICE ? normalizeChoiceSelectionMode(question) : null,
+    ratingScale: questionType === QUESTION_TYPES.RATING ? { min: 0, max: 10, step: 1 } : null,
+    questionText: safeString(question.questionText || question.prompt),
+    answerLabels: normalizeOptions(question),
+    docsContextAvailable,
+    microphoneSupported: options.microphoneSupported !== false,
+    additionalCommentsSupported: true,
+    controls: buildTelegramQuestionControls(question, options),
+  });
+}
+
+export function buildTelegramScreenState(screen = '', fields = {}) {
+  const screenId = safeString(screen);
+  const { botUsername, launch, buttons, ...publicFields } = fields;
+  const defaults = buildDefaultScreenCopy(screenId);
+  const defaultButtons = buildDefaultScreenButtons(screenId);
+  return sanitizeForGroup({
+    type: 'telegram_screen_state',
+    screen: screenId,
+    launch: launch || getTelegramScreenLaunch(screenId, { botUsername }),
+    ...defaults,
+    buttons: buttons || defaultButtons,
+    ...publicFields,
+  });
+}
+
+export function assertQuestionCardParity(card = {}) {
+  const controls = Array.isArray(card.controls) ? card.controls : [];
+  const actions = new Set(controls.map((control) => control.action));
+  if (card.questionType === QUESTION_TYPES.RATING) {
+    const ratingValues = controls
+      .filter((control) => control.controlType === 'rating_button')
+      .map((control) => control.value);
+    if (JSON.stringify(ratingValues) !== JSON.stringify(RATING_BUTTON_VALUES)) {
+      return { ok: false, reason: 'rating_scale_must_match_ce_client_0_10' };
+    }
+  }
+  if (card.questionType === QUESTION_TYPES.MULTICHOICE) {
+    const choiceControls = controls.filter((control) => (
+      control.controlType === 'single_select' || control.controlType === 'multi_select_toggle'
+    ));
+    if (card.selectionMode === 'single' && choiceControls.some((control) => control.controlType !== 'single_select')) {
+      return { ok: false, reason: 'single_choice_controls_must_be_single_select' };
+    }
+    if (card.selectionMode === 'multi' && choiceControls.some((control) => control.controlType !== 'multi_select_toggle' || typeof control.selected !== 'boolean')) {
+      return { ok: false, reason: 'multi_choice_controls_must_keep_selection_state' };
+    }
+  }
+  if (card.questionType === QUESTION_TYPES.FREEFORM) {
+    if (!controls.some((control) => control.controlType === 'text_input')) {
+      return { ok: false, reason: 'freeform_type_action_required' };
+    }
+  }
+  if (!actions.has(TELEGRAM_BRIDGE_ACTIONS.ADDITIONAL_COMMENTS)) {
+    return { ok: false, reason: 'additional_comments_action_required' };
+  }
+  if (card.microphoneSupported !== false && !actions.has(TELEGRAM_BRIDGE_ACTIONS.MICROPHONE_INPUT)) {
+    return { ok: false, reason: 'microphone_input_action_required' };
+  }
+  if (card.docsContextAvailable === false && actions.has(TELEGRAM_BRIDGE_ACTIONS.DOC_CONTEXT)) {
+    return { ok: false, reason: 'doc_context_action_requires_docs_or_relevance' };
+  }
+  if (card.docsContextAvailable === true && !actions.has(TELEGRAM_BRIDGE_ACTIONS.DOC_CONTEXT)) {
+    return { ok: false, reason: 'doc_context_action_required_when_docs_exist' };
+  }
+  return { ok: true, reason: 'telegram_question_card_matches_ce_conventions' };
+}
