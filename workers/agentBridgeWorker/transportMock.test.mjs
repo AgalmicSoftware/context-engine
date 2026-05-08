@@ -19,11 +19,20 @@ test('mock Telegram group-to-private transport runs the managed account answer l
 
   assert.equal(result.ok, true);
   assert.equal(result.groupCard.publicSummary.sessionSlug, 'alpha');
+  assert.equal(result.groupCard.publicSummary.text, 'Context Engine session linked: alpha');
+  assert.deepEqual(result.groupCard.publicSummary.buttons.map((button) => button.label), [
+    'Join Session',
+    'View Questions',
+    'View / Add Docs',
+  ]);
+  assert.equal(JSON.stringify(result.groupCard).includes('Answer Privately'), false);
   assert.equal(result.groupCard.publicSummary.question.questionText.includes('Telegram account lane'), true);
   assert.equal(result.groupCard.publicSummary.question.aggregateCount, 0);
   assert.equal(result.privateStart.deepLinkPayload.startsWith('cetg_'), true);
   assert.equal(result.privateStart.deepLinkPayload.includes('alpha'), false);
   assert.equal(result.privateStart.deepLinkPayload.includes('question-demo-1'), false);
+  assert.equal(result.privateStart.requiresPrivateAccountSetup, true);
+  assert.equal(result.privateStart.nextStep, 'private_account_setup');
   assert.equal(result.account.accountMode, 'managed_telegram_demo');
   assert.equal(result.account.chainScope, 'testnet');
   assert.equal(result.questions[0].questionType, 'rating');
@@ -65,10 +74,63 @@ test('group lobby defaults to viewing questions and exposes add/generate by poli
 
   assert.equal(card.ok, true);
   assert.equal(card.action.action, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
+  assert.equal(card.groupSafeCard.publicSummary.defaultAction, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
+  assert.deepEqual(card.groupSafeCard.publicSummary.buttons.map((button) => button.label), [
+    'Join Session',
+    'View Questions',
+    'View / Add Docs',
+  ]);
+  assert.deepEqual(card.groupSafeCard.publicSummary.policyActions.map((button) => button.action), [
+    TELEGRAM_BRIDGE_ACTIONS.ADD_QUESTION,
+    TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION,
+  ]);
   const event = harness.events[0];
   assert.equal(event.summary.defaultAction, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
   assert.equal(event.summary.addQuestionAvailable, true);
   assert.equal(event.summary.generateQuestionAvailable, true);
+  assert.deepEqual(event.summary.buttons, ['Join Session', 'View Questions', 'View / Add Docs']);
+  assert.deepEqual(event.summary.policyActions, [
+    TELEGRAM_BRIDGE_ACTIONS.ADD_QUESTION,
+    TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION,
+  ]);
+});
+
+test('group join deep link resolves missing managed accounts to private account setup', () => {
+  const harness = new MockTelegramTransportHarness();
+  const card = harness.postGroupSessionCard({
+    update: {
+      message: {
+        chat: { id: '-100102', type: 'supergroup', title: 'General lobby' },
+        text: '/session',
+      },
+    },
+  });
+  const missingAccount = harness.openPrivateStart({
+    groupActionId: card.action.actionId,
+    update: {
+      message: {
+        chat: { id: '55', type: 'private' },
+        from: { id: 55, username: 'participant' },
+        text: '/start',
+      },
+    },
+  });
+  const configuredAccount = harness.openPrivateStart({
+    groupActionId: card.action.actionId,
+    update: {
+      message: {
+        chat: { id: '55', type: 'private' },
+        from: { id: 55, username: 'participant' },
+        text: '/start',
+      },
+    },
+    hasConfiguredAccount: true,
+  });
+
+  assert.equal(missingAccount.requiresPrivateAccountSetup, true);
+  assert.equal(missingAccount.nextStep, 'private_account_setup');
+  assert.equal(configuredAccount.requiresPrivateAccountSetup, false);
+  assert.equal(configuredAccount.nextStep, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
 });
 
 test('suggest responses are ephemeral while draft responses are saved', async () => {

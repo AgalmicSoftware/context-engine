@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DOC_VISIBILITY, SUPPORTED_DOC_TYPES } from './constants.mjs';
+import {
+  DOC_VISIBILITY,
+  SUPPORTED_DOC_TYPES,
+  TELEGRAM_BRIDGE_ACTIONS,
+  TELEGRAM_CHAT_LANES,
+} from './constants.mjs';
 import {
   createDocSelectionAction,
   createQuestionGenerationRequestFromDocs,
@@ -40,6 +45,7 @@ const DOCS = [
 test('doc library lists supported docs by session and rejects unsupported types', () => {
   const listed = listDocumentsForSession(DOCS, { sessionSlug: 'alpha' });
   assert.equal(listed.count, 2);
+  assert.equal(listed.buttonLabel, 'View / Add Docs');
   assert.deepEqual([...SUPPORTED_DOC_TYPES], ['md', 'pdf', 'png', 'jpg', 'jpeg', 'webp']);
 
   assert.equal(normalizeDocumentRecord({
@@ -50,9 +56,15 @@ test('doc library lists supported docs by session and rejects unsupported types'
     title: 'Photo',
     mimeType: 'image/jpeg',
   }).record.fileType, 'jpeg');
+  for (const fileType of SUPPORTED_DOC_TYPES) {
+    assert.equal(normalizeDocumentRecord({
+      title: `fixture.${fileType}`,
+      fileType,
+    }).record.fileType, fileType);
+  }
 });
 
-test('selected docs create mocked question-generation request without embedding bytes', () => {
+test('selected docs create generate-question context without embedding bytes', () => {
   const selection = createDocSelectionAction({
     sessionSlug: 'alpha',
     docIds: ['doc-public-md', 'doc-gated-pdf', 'doc-public-md'],
@@ -67,8 +79,18 @@ test('selected docs create mocked question-generation request without embedding 
   });
 
   assert.equal(selection.selectedDocIds.length, 2);
+  assert.equal(selection.targetLane, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT);
+  assert.deepEqual(selection.selectionUses, ['generate_questions_input', 'answer_context_candidate']);
+  assert.deepEqual(selection.nextActions.map((entry) => entry.label), [
+    'Generate Questions',
+    'Use as Answer Context',
+  ]);
   assert.equal(request.ok, true);
   assert.equal(request.request.status, 'mocked_contract_only');
+  assert.equal(request.request.requestContext.use, 'generate_questions_input');
+  assert.deepEqual(request.request.requestContext.selectedDocIds, ['doc-public-md', 'doc-gated-pdf']);
+  assert.equal(request.request.answerContext.status, 'eligible_later');
+  assert.equal(request.request.answerContext.action, TELEGRAM_BRIDGE_ACTIONS.USE_DOCS_AS_ANSWER_CONTEXT);
   assert.deepEqual(request.request.selectedDocTypes.sort(), ['md', 'pdf']);
   assert.deepEqual(request.request.visibility.sort(), ['public', 'sbt_gated']);
   assert.equal(JSON.stringify(request).includes('Private gated contents'), false);
@@ -78,6 +100,18 @@ test('selected docs create mocked question-generation request without embedding 
     selectedDocIds: ['doc-public-md'],
     policy: {},
   }).reason, 'question_generation_not_allowed');
+  assert.deepEqual(createQuestionGenerationRequestFromDocs({
+    sessionSlug: 'alpha',
+    docs: DOCS,
+    selectedDocIds: [],
+    policy: {
+      allowQuestionGeneration: true,
+    },
+  }), {
+    ok: false,
+    reason: 'selected_docs_required',
+    prompt: 'Select or upload docs before generating questions.',
+  });
 });
 
 test('group-safe doc summaries represent visibility without leaking private or gated contents', () => {
