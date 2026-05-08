@@ -140,6 +140,8 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'private bridge worker\n');
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'private bridge docs\n');
 
     const result = runPrepareScript(sourceDir, outputDir);
     assert.equal(result.status, 0, result.stderr);
@@ -216,6 +218,8 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), false);
 
     const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
     assert.equal(fs.existsSync(manifestPath), true);

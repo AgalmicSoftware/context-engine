@@ -30,6 +30,7 @@ ce_public_release_strip_patterns() {
 contextEngine-cc
 docs/agent-native*.md
 client/public/skill.md
+workers/agentBridgeWorker
 TODO
 local-private-version
 CLAUDE.md
@@ -106,6 +107,7 @@ CLAUDE.md
 .claude
 docs/agent-native*.md
 client/public/skill.md
+workers/agentBridgeWorker
 video-clickthrough-local
 local-private-version
 scripts/test-*.js
