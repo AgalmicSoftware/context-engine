@@ -878,7 +878,7 @@ describe('SessionWizard rendered validation', () => {
       expect(arweaveOption).toHaveAttribute('aria-checked', 'false');
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
-    expect(screen.getByText(/R2, D1, KV, and Durable Objects/)).toBeInTheDocument();
+    expect(screen.getByText(/R2 for blobs, D1 or KV for metadata\/indexes/)).toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for sponsored /new drafts', async () => {

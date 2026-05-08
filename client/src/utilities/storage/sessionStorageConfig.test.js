@@ -21,7 +21,21 @@ describe('sessionStorageConfig', () => {
   test('routes explicit Cloudflare session storage through worker storage endpoints', () => {
     const sessionConfig = { storageProfile: { backend: 'cloudflare' } };
     expect(resolveSessionStorageBackend(sessionConfig)).toBe(STORAGE_BACKENDS.CLOUDFLARE);
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'questions' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'surveys' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
     expect(usesCloudflareSessionStorage(sessionConfig)).toBe(true);
     expect(requiresLitForSessionStorage(sessionConfig, { encrypted: true })).toBe(false);
+  });
+
+  test('keeps explicitly staged Cloudflare resources on legacy Arweave fallback', () => {
+    const sessionConfig = {
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'staged' },
+      },
+    };
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'questions' })).toBe(STORAGE_BACKENDS.ARWEAVE);
+    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
   });
 });
