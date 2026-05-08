@@ -284,19 +284,22 @@ private refs and are not included in group-safe summaries.
 
 Session storage backend selection is a session config concern, owned by `/new`
 and the session/general worker, not by Telegram. `arweave` remains the default
-profile. `cloudflare` is an explicit session storage profile. For Cloudflare
-docs/context, the session/general worker may enforce SBT gates directly before
-issuing upload permissions, query snippets, signed short-lived reads, or
-download bytes. Lit remains optional and is required only when the payload itself
-is intentionally Lit-encrypted or client-side encrypted. Telegram, OpenClaw,
-CE-CC, and MCP call canonical CE agent/session APIs and receive only safe
-metadata, snippets, permission states, or opaque request refs. They must not
-receive Cloudflare credentials, bucket names, worker tokens, raw private storage
-paths, or long-lived signed URLs. `/new` Advanced stores the session-owned
-storage profile: docs/context is active first, while questions, surveys,
-responses, and images remain staged. The Cloudflare token helper requests only
-the deploy/storage resources needed for Workers, KV, R2, D1, Durable Objects,
-and account settings; it does not embed account ids, bucket names, or tokens.
+profile, `lit-arweave` remains the encrypted Arweave document mode, and
+`cloudflare` is an explicit session storage profile. Storage-capable agent APIs
+should accept/return `storageRef` while preserving legacy `arweaveTxId` fields.
+For Cloudflare docs/context, the session/general worker enforces SBT gates
+directly before upload, list, read, snippet, or download bytes are exposed. Lit
+remains required only when the payload itself is intentionally Lit-encrypted or
+client-side encrypted. Telegram, OpenClaw, CE-CC, and MCP call canonical CE
+agent/session APIs and receive only safe metadata, snippets, permission states,
+or opaque request refs. They must not receive Cloudflare credentials, bucket
+names, worker tokens, raw private storage paths, or long-lived signed URLs.
+`/new` Advanced stores the session-owned storage profile: docs/context is
+active first, while questions, surveys, responses, generated artifacts, and
+media remain staged behind Arweave-compatible contract paths until the contract
+interface changes. The Cloudflare token helper requests only the deploy/storage
+resources needed for Workers, KV, R2, D1, Durable Objects, and account settings;
+it does not embed account ids, bucket names, or tokens.
 
 Telegram screen/message helpers expose launch metadata on every
 `telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`,

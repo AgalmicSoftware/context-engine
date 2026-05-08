@@ -308,12 +308,15 @@ route password/invite input privately, route wallet/passkey/non-public gates to
 full CE account linking, and retry the session join after the gate is satisfied.
 
 Storage profile selection belongs to session config in `/new`, not Telegram.
-`arweave` remains the default/current profile; `cloudflare` is an explicit
-profile where the session/general worker may enforce SBT gates for uploads,
-snippets, short-lived reads, and downloads. Lit is required only for payloads
-that are intentionally Lit/client encrypted. Telegram/OpenClaw/CE-CC/MCP receive
-safe metadata or permission states, not Cloudflare credentials, bucket names,
-worker tokens, raw storage paths, or long-lived signed URLs.
+`arweave` remains the default/current profile; `lit-arweave` remains supported
+for encrypted Arweave payloads; `cloudflare` is an explicit profile where the
+session/general worker enforces SBT gates for uploads, lists, reads, snippets,
+short-lived reads, and downloads. Agent-facing question/response shapes now add
+`storageRef` when an Arweave tx id is known while preserving `arweaveTxId`. Lit
+is required only for payloads that are intentionally Lit/client encrypted.
+Telegram/OpenClaw/CE-CC/MCP receive safe metadata or permission states, not
+Cloudflare credentials, bucket names, worker tokens, raw storage paths, or
+long-lived signed URLs.
 
 `lib/agent/workerSetupContracts.mjs` defines the private `/worker-setup`
 planning surface and default-off onboarding config. The contextengine.sh domain
