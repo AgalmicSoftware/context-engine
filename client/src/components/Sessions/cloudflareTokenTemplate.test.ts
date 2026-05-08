@@ -17,11 +17,14 @@ describe('cloudflareTokenTemplate', () => {
       /^contextEngine-corsSessionWorker-alpha-session-[A-Z]{3}\d{2}-\d{4}-\d{4}(AM|PM)$/
     );
     expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
-      { key: 'workers_kv_storage', type: 'edit' },
       { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+      { key: 'workers_r2_storage', type: 'edit' },
+      { key: 'd1', type: 'edit' },
+      { key: 'workers_durable_objects', type: 'edit' },
       { key: 'account_settings', type: 'edit' },
     ]);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(3);
+    expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(6);
   });
 
   test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {

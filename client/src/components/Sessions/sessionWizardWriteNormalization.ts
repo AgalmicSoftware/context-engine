@@ -15,6 +15,7 @@ import {
 } from './sessionWizardContracts.js';
 import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
 import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
+import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -159,6 +160,10 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
+    next.storageProfile = normalizeSessionStorageProfileConfig(next.storageProfile);
+  }
+
   if (isObj(next.faucet)) {
     delete next.faucet.rpcUrl;
     delete next.faucet.privateKey;
@@ -296,6 +301,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
       ? cloneValue(resolvedDeployPayload.faucet)
       : cloneValue(resolveWorkerFaucetConfig()),
     litCredentials: buildWorkerLitCredentialsConfig(workerSecrets),
+    storageProfile: normalizeSessionStorageProfileConfig(resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile),
   };
 
   if (
