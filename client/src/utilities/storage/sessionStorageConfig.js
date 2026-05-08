@@ -13,6 +13,26 @@ export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
   STAGED: 'staged',
 });
 
+export const SESSION_STORAGE_PAYLOAD_ACCESS_MODES = Object.freeze({
+  WORKER_SBT_GATE: 'worker_sbt_gate',
+  LIT_ENCRYPTED: 'lit_encrypted',
+});
+
+const normalizePayloadAccessMode = (value) => {
+  const normalized = toStr(value).trim().toLowerCase();
+  if (normalized === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED) {
+    return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED;
+  }
+  return SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
+};
+
+const resolvePayloadAccessMode = (raw) => normalizePayloadAccessMode(
+  raw?.payloadAccessControl?.mode ||
+  raw?.cloudflare?.payloadAccessMode ||
+  raw?.payloadAccessMode ||
+  raw?.accessControlMode
+);
+
 export const normalizeSessionStorageConfig = (sessionConfig = null) => {
   const cfg = isObj(sessionConfig) ? sessionConfig : {};
   const raw = isObj(cfg.storageProfile)
@@ -33,6 +53,11 @@ export const normalizeSessionStorageConfig = (sessionConfig = null) => {
       generatedArtifacts: toStr(resources.generatedArtifacts || '').trim().toLowerCase() || defaultCanonicalStage,
       media: toStr(resources.media || '').trim().toLowerCase() || defaultCanonicalStage,
     },
+    payloadAccessControl: {
+      mode: backend === STORAGE_BACKENDS.CLOUDFLARE
+        ? resolvePayloadAccessMode(raw)
+        : SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED,
+    },
   };
 };
 
@@ -51,9 +76,18 @@ export const resolveSessionStorageBackend = (sessionConfig = null, {
 };
 
 export const requiresLitForSessionStorage = (sessionConfig = null, opts = {}) => (
-  resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.LIT_ARWEAVE
+  resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.LIT_ARWEAVE ||
+  (
+    resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE &&
+    normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED
+  )
 );
 
 export const usesCloudflareSessionStorage = (sessionConfig = null, opts = {}) => (
   resolveSessionStorageBackend(sessionConfig, opts) === STORAGE_BACKENDS.CLOUDFLARE
+);
+
+export const usesWorkerSbtGateCloudflareStorage = (sessionConfig = null, opts = {}) => (
+  usesCloudflareSessionStorage(sessionConfig, opts) &&
+  normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE
 );
