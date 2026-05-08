@@ -1,6 +1,16 @@
 import { RISK_CEILINGS, RISK_RANK, TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
 
 const SESSION_SLUG_RE = /^[a-z0-9_-]{1,128}$/i;
+const PUBLIC_SBT_JOIN_MODES = new Set(['public', 'open']);
+const PRIVATE_CREDENTIAL_SBT_JOIN_MODES = new Set(['password', 'invite']);
+const FULL_CE_ACCOUNT_SBT_JOIN_MODES = new Set([
+  'linked-wallet',
+  'wallet',
+  'wallet-proof',
+  'passkey',
+  'non-public',
+  'private',
+]);
 
 function safeString(value) {
   return String(value || '').trim();
@@ -13,6 +23,58 @@ function normalizeRisk(value = RISK_CEILINGS.READ) {
 
 function riskAllows(requested, ceiling) {
   return RISK_RANK[normalizeRisk(requested)] <= RISK_RANK[normalizeRisk(ceiling)];
+}
+
+function normalizeJoinMode(value = 'public') {
+  return safeString(value || 'public').toLowerCase().replace(/_/g, '-');
+}
+
+function normalizeRequiredSbtGroup(input = {}) {
+  const joinMode = normalizeJoinMode(input.joinMode || input.mode || input.claimMode || input.gateMode);
+  const sbtAddress = safeString(input.sbtAddress || input.address);
+  const groupId = safeString(input.groupId || input.sbtGroupId || input.groupSlug || input.slug);
+  const shareLink = safeString(input.shareLink || input.link || input.url);
+  const sbtId = safeString(input.sbtId || input.id || sbtAddress || groupId || shareLink);
+  if (!sbtId) return null;
+  return {
+    sbtId,
+    sbtAddress: sbtAddress || null,
+    groupId: groupId || null,
+    shareLink: shareLink || null,
+    name: safeString(input.name || input.title) || 'Required SBT',
+    description: safeString(input.description || input.summary) || null,
+    joinMode,
+    credentialRequired: PRIVATE_CREDENTIAL_SBT_JOIN_MODES.has(joinMode),
+    credentialType: PRIVATE_CREDENTIAL_SBT_JOIN_MODES.has(joinMode) ? joinMode : null,
+    requiresFullCeAccount: FULL_CE_ACCOUNT_SBT_JOIN_MODES.has(joinMode) || input.requiresFullCeAccount === true,
+    publicCommandTargetAllowed: Boolean(sbtAddress || groupId || shareLink),
+  };
+}
+
+export function normalizeRequiredSbtGroups(session = {}) {
+  const candidates = Array.isArray(session.requiredSbtGroups)
+    ? session.requiredSbtGroups
+    : (
+      Array.isArray(session.requiredSbts)
+        ? session.requiredSbts
+        : (Array.isArray(session.sbtGates) ? session.sbtGates : [])
+    );
+  return candidates
+    .map(normalizeRequiredSbtGroup)
+    .filter(Boolean);
+}
+
+function buildJoinedSbtLookup(joinedSbtIds = []) {
+  return new Set((Array.isArray(joinedSbtIds) ? joinedSbtIds : [])
+    .map((value) => safeString(value).toLowerCase())
+    .filter(Boolean));
+}
+
+function isRequiredSbtJoined(group = {}, joinedLookup = new Set()) {
+  return [group.sbtId, group.sbtAddress, group.groupId, group.shareLink]
+    .map((value) => safeString(value).toLowerCase())
+    .filter(Boolean)
+    .some((value) => joinedLookup.has(value));
 }
 
 export function normalizeSessionPolicy(input = {}) {
@@ -29,6 +91,7 @@ export function normalizeSessionPolicy(input = {}) {
     sponsoredRpcAllowed: session.sponsoredRpcAllowed === true,
     sponsoredFaucetAllowed: session.sponsoredFaucetAllowed === true,
     sbtJoinModes: Array.isArray(session.sbtJoinModes) ? session.sbtJoinModes.slice() : ['public'],
+    requiredSbtGroups: normalizeRequiredSbtGroups(session),
     docLibraryEnabled: session.docLibraryEnabled === true,
     defaultGroupChatId: safeString(session.defaultGroupChatId || input.defaultGroupChatId) || null,
   })).filter((session) => SESSION_SLUG_RE.test(session.sessionSlug));
@@ -75,6 +138,36 @@ export function evaluateSbtJoinPolicy(session = {}, {
     return { ok: false, reason: 'sbt_invite_required', requiresInvite: true };
   }
   return { ok: false, reason: 'sbt_join_not_allowed' };
+}
+
+export function evaluateSessionSbtGateJoin(session = {}, {
+  joinedSbtIds = [],
+} = {}) {
+  const requiredSbtGroups = normalizeRequiredSbtGroups(session);
+  const joinedLookup = buildJoinedSbtLookup(joinedSbtIds);
+  const groups = requiredSbtGroups.map((group) => ({
+    ...group,
+    joined: isRequiredSbtJoined(group, joinedLookup),
+  }));
+  const allSatisfied = groups.every((group) => group.joined === true);
+  if (groups.length === 0) {
+    return {
+      ok: true,
+      status: 'no_sbt_gate_required',
+      requiredSbtGroups: [],
+      allSatisfied: true,
+      nextStep: TELEGRAM_BRIDGE_ACTIONS.JOIN_SESSION,
+    };
+  }
+  return {
+    ok: allSatisfied,
+    status: allSatisfied ? 'ready_to_retry_session_join' : 'sbt_gate_required',
+    requiredSbtGroups: groups,
+    allSatisfied,
+    nextStep: allSatisfied
+      ? TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN
+      : 'join_required_sbt',
+  };
 }
 
 export function evaluateSponsoredResourceEligibility(session = {}, {

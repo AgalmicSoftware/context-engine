@@ -78,6 +78,8 @@ export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   JOIN_PUBLIC_SBT: 'join_public_sbt',
   JOIN_PASSWORD_SBT: 'join_password_sbt',
   CREATE_SBT_GROUP: 'create_sbt_group',
+  LINK_FULL_CE_ACCOUNT: 'link_full_ce_account',
+  RETRY_SESSION_JOIN: 'retry_session_join',
   MY_ACCOUNT: 'my_account',
   VIEW_JOINED_SBTS: 'view_joined_sbts',
   EXPORT_ACCOUNT: 'export_account',
