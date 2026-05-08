@@ -743,6 +743,10 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
     const responseBody = JSON.parse(res.body || '{}');
     assert.equal(responseBody.submitted, true);
     assert.equal(responseBody.txHash, '0xsubmit123');
+    assert.equal(
+      responseBody.txExplorerUrl,
+      'https://optimism-sepolia.blockscout.com/tx/0xsubmit123'
+    );
     assert.equal(responseBody.requiresWorkerAuth, false);
     assert.equal(responseBody.autoSubmitting, undefined);
     assert.equal(responseBody.acknowledgement, 'Submitted securely. Auto-submit succeeded.');
@@ -752,6 +756,7 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
       message: 'Auto-submit succeeded.',
       txHash: '0xsubmit123',
       blockNumber: null,
+      txExplorerUrl: 'https://optimism-sepolia.blockscout.com/tx/0xsubmit123',
     });
 
     await submitDone;
@@ -1906,7 +1911,7 @@ test('faucet proxy requires a stored worker token for the requested session', as
     assert.equal(res.statusCode, 401);
     assert.deepEqual(
       JSON.parse(res.body || '{}'),
-      { error: 'No worker token stored. Re-authenticate via PWA.' },
+      { error: 'Session sign-in is missing. Re-authenticate in the local Context Engine UI.' },
     );
   } finally {
     if (prevDataDir == null) delete process.env.CE_CC_DATA_DIR;
@@ -3003,7 +3008,7 @@ test('submit-onchain rejects when no worker token is stored instead of reusing t
     assert.equal(res.statusCode, 401);
     assert.deepEqual(
       JSON.parse(res.body || '{}'),
-      { error: 'No worker token stored. Re-authenticate via PWA.' },
+      { error: 'Session sign-in is missing. Re-authenticate in the local Context Engine UI.' },
     );
   } finally {
     if (prevDataDir == null) delete process.env.CE_CC_DATA_DIR;
@@ -3064,10 +3069,10 @@ test('respond immediate mode surfaces worker-auth gaps in the save response befo
     assert.equal(body.stored, true);
     assert.equal(body.submitted, false);
     assert.equal(body.requiresWorkerAuth, true);
-    assert.equal(body.acknowledgement, 'Saved locally. Worker auth is required before auto-submit can run.');
+    assert.equal(body.acknowledgement, 'Saved locally. Session sign-in is required before auto-submit can run.');
     assert.equal(body.autoSubmit.status, 'worker-auth-required');
     assert.equal(body.autoSubmit.alert, 'warning');
-    assert.match(body.message, /complete worker auth at http:\/\/localhost:7391/);
+    assert.match(body.message, /complete session sign-in at http:\/\/localhost:7391/);
 
     await flushBackgroundWork();
     assert.equal(submitCalled, false);
