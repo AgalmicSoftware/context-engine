@@ -863,6 +863,48 @@ describe('SessionWizard rendered validation', () => {
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
     expect(screen.getByText(/R2 for blobs, D1 or KV for metadata\/indexes/)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/worker-enforced access control, not end-to-end encryption/i)).toBeInTheDocument();
+  });
+
+  it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'worker_sbt_gate' },
+        },
+      },
+      workerSecretsEnabled: true,
+    }));
+
+    const firstRender = renderLoggedInSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectNormalModeCard('Worker');
+    await waitFor(() => {
+      expect(getWizardResourceCard('lit')).toBeUndefined();
+    });
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).not.toBeInTheDocument();
+
+    firstRender.unmount();
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'lit_encrypted' },
+        },
+      },
+      workerSecretsEnabled: true,
+    }));
+
+    renderLoggedInSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectNormalModeCard('Worker');
+
+    const litCard = await waitFor(() => getWizardResourceCard('lit'));
+    expect(litCard).toBeTruthy();
+    expect(within(litCard).getByText('Lit account API key')).toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for sponsored /new drafts', async () => {

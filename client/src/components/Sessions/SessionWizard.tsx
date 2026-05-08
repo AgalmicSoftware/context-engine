@@ -1094,6 +1094,15 @@ const SessionWizard = ({
     () => getSessionWizardWorkerResourceKeys(),
     []
   );
+  const normalizedDraftStorageProfile = useMemo(
+    () => normalizeSessionStorageProfileConfig(draft?.storageProfile),
+    [draft?.storageProfile]
+  );
+  const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
+  const visibleWorkerResourceKeys = useMemo(
+    () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
+    [cloudflareWorkerSbtGateMode, workerResourceKeys]
+  );
   const setSessionHeaderStatus = useCallback((text = '', tone = 'default') => {
     setSessionHeaderUploadStatus(text);
     setSessionHeaderUploadStatusTone(text ? tone : 'default');
@@ -2689,6 +2698,30 @@ const SessionWizard = ({
       if (wizardMode !== 'advanced') return null;
       const storageProfile = value && typeof value === 'object' ? value : {};
       const isCollapsed = metadataObjectCollapsed.storageProfile;
+      const updateStorageBackend = (backend) => {
+        updateDraftValue(
+          ['storageProfile'],
+          normalizeSessionStorageProfileConfig({
+            ...(value && typeof value === 'object' ? value : {}),
+            backend,
+          })
+        );
+      };
+      const updateCloudflarePayloadAccessMode = (mode) => {
+        updateDraftValue(
+          ['storageProfile'],
+          normalizeSessionStorageProfileConfig({
+            ...(value && typeof value === 'object' ? value : {}),
+            backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE,
+            payloadAccessControl: {
+              ...(storageProfile.payloadAccessControl && typeof storageProfile.payloadAccessControl === 'object'
+                ? storageProfile.payloadAccessControl
+                : {}),
+              mode,
+            },
+          })
+        );
+      };
       return (
         <CollapsibleFieldGroup
           key={keyString}
@@ -2732,9 +2765,50 @@ const SessionWizard = ({
                 </div>
               ) : null}
               {storageProfile.backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE ? (
-                <div className={styles.helperText}>
-                  Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.
-                </div>
+                <>
+                  <div className={styles.helperText}>
+                    Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.
+                  </div>
+                  <div
+                    className={styles.inlineToggleRow}
+                    role="radiogroup"
+                    aria-label="Cloudflare payload access mode"
+                  >
+                    {[
+                      {
+                        mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
+                        label: 'Worker SBT gate',
+                      },
+                      {
+                        mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED,
+                        label: 'Lit encrypted',
+                      },
+                    ].map((option) => {
+                      const selected = storageProfile.payloadAccessControl?.mode === option.mode;
+                      return (
+                        <Button
+                          key={option.mode}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          className={`${styles.workerModePill} ${selected ? styles.workerModePillActive : ''}`}
+                          onClick={() => updateCloudflarePayloadAccessMode(option.mode)}
+                        >
+                          {option.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  {storageProfile.payloadAccessControl?.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED ? (
+                    <div className={styles.helperText}>
+                      Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes. Lit credentials are required; plaintext Cloudflare uploads are rejected until the Lit envelope path supplies payloadEncrypted data.
+                    </div>
+                  ) : (
+                    <div className={styles.helperText}>
+                      Worker SBT gate mode is worker-enforced access control, not end-to-end encryption. The session worker checks the requester&apos;s SBT on the configured chain/RPC before serving Cloudflare objects.
+                    </div>
+                  )}
+                </>
               ) : null}
             </>
           )}
@@ -4491,7 +4565,11 @@ const SessionWizard = ({
   const sponsoredBundleStatusTone = toStr(sponsoredBundleStatus?.tone).trim().toLowerCase();
   const hasNewSessionAiRequirementCovered = !!toStr(currentWorkerSecrets?.openaiKey).trim();
   const hasNewSessionArweaveRequirementCovered = !!toStr(currentWorkerSecrets?.arweaveJwk).trim();
-  const hasNewSessionLitRequirementCovered = !!toStr(currentWorkerSecrets?.litAccountApiKey).trim();
+  const newSessionRequiresLitCredential = !cloudflareWorkerSbtGateMode;
+  const hasNewSessionLitRequirementCovered = (
+    !newSessionRequiresLitCredential ||
+    !!toStr(currentWorkerSecrets?.litAccountApiKey).trim()
+  );
   const hasNewSessionFundingRequirementCovered = !!(
     toStr(currentWorkerSecrets?.faucetPrivateKey).trim() ||
     toStr(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
@@ -4860,15 +4938,19 @@ const SessionWizard = ({
                 {' '}for text and transcription
               </li>
               <li>
-                <a
-                  href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.newSessionBannerLink}
-                >
-                  Lit account API key
-                </a>
-                {' '}for encrypted access automation
+                {newSessionRequiresLitCredential ? (
+                  <>
+                    <a
+                      href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.newSessionBannerLink}
+                    >
+                      Lit account API key
+                    </a>
+                    {' '}for encrypted access automation
+                  </>
+                ) : 'No Lit key is required for Cloudflare worker-enforced SBT access control'}
               </li>
               <li>
                 <a

@@ -5,6 +5,19 @@ import { storageRoute } from './storageRouteExecution.js';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
+const CLOUDFLARE_WORKER_GATE_CONFIG = {
+  storageProfile: {
+    backend: 'cloudflare',
+    payloadAccessControl: { mode: 'worker_sbt_gate' },
+  },
+  __registry: {
+    gatesByResource: {
+      docUploads: { sbtAddresses: [], chainId: 84532, mode: 0 },
+      questionResponses: { sbtAddresses: [], chainId: 84532, mode: 0 },
+      surveyResponses: { sbtAddresses: [], chainId: 84532, mode: 0 },
+    },
+  },
+};
 
 const fixedRandomBytes = () => Uint8Array.from({ length: 32 }, (_, index) => index + 1);
 

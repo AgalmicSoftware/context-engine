@@ -297,9 +297,12 @@ describe('sessionWizardWriteNormalization', () => {
     expect(metadata.storageProfile.resources.questions).toBe('active');
     expect(metadata.storageProfile.resources.surveys).toBe('active');
     expect(metadata.storageProfile.resources.responses).toBe('active');
-    expect(metadata.storageProfile.sbtGatedAccess.litRequired).toBe('payload_encrypted_only');
+    expect(metadata.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
+    expect(metadata.storageProfile.payloadAccessControl.resources.docsContext).toBe('docUploads');
+    expect(metadata.storageProfile.sbtGatedAccess.litRequired).toBe('not_required_worker_enforced');
     expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('question_payloads');
     expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('response_payloads');
+    expect(metadata.storageProfile.cloudflare.payloadAccessMode).toBe('worker_sbt_gate');
     expect(JSON.stringify(metadata)).not.toMatch(/private-bucket|cf-secret-token|must-not-pass-through/i);
 
     const workerPayload = buildSessionWizardWorkerConfigPayload({
@@ -314,6 +317,8 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.storageProfile.backend).toBe('cloudflare');
     expect(workerPayload.storageProfile.sessionOwned).toBe(true);
     expect(workerPayload.storageProfile.telegramOwned).toBe(false);
+    expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
+    expect(workerPayload.litCredentials).toEqual({});
   });
 
 });
