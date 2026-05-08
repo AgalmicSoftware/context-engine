@@ -529,6 +529,55 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     );
   });
 
+  it('seeds uploaded question cache with storageRef-first compatibility fields', async () => {
+    peekCacheSyncMock.mockReturnValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
+
+    const instance = makeInstance();
+    instance.getSessionConfig = jest.fn(() => ({
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: { surveys: { chainId: 84532 } },
+    }));
+
+    await expect(instance.seedUploadedQuestionsCache({
+      questionDataArray: [
+        {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          creator: '0xabc',
+          arweaveTxId: 'legacy-tx',
+        },
+      ],
+      uploadedQuestions: [
+        {
+          questionId: 'q1',
+          storageRef: { backend: 'arweave', id: 'preferred-tx', resource: 'questions' },
+        },
+      ],
+      sourceQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
+      ],
+    })).resolves.toBe(true);
+
+    const cacheWrite = writeCacheOptimisticMock.mock.calls.find(([namespace]) => namespace === 'questionsCache');
+    const writtenQuestions = cacheWrite?.[2]?.['84532']?.questions || {};
+    expect(writtenQuestions.q1.arweaveTxId).toBe('preferred-tx');
+    expect(writtenQuestions.q1.storageRef).toEqual({
+      backend: 'arweave',
+      id: 'preferred-tx',
+      uri: 'ar://preferred-tx',
+      resource: 'questions',
+    });
+  });
+
   it('still writes question cache through the general bucket for general-session authoring', async () => {
     peekCacheSyncMock.mockReturnValue({
       '84532': {

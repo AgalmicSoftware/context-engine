@@ -209,6 +209,7 @@ import {
   warmSbtDisplayNamesTargeted,
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
 import {
   normalizeRatingValue,
   RATING_MAX,
@@ -3209,19 +3210,22 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     question,
     showResponseLookupSpinner,
     isQuestionBookmarked,
-  }) => (
-    <QuestionCardLinks
-      showResponseLookupSpinner={showResponseLookupSpinner}
-      isQuestionBookmarked={isQuestionBookmarked}
-      onBookmarkToggle={() => this.handleBookmarkToggle(question.id)}
-      arweaveHref={question.arweaveTxId
-        ? normalizeArweaveUrl(question.arweaveTxId, { contextLabel: 'survey_tool_question_link' })
-        : ''}
-      questionHref={question.id
-        ? buildQuestionRoutePath(question.id, { sessionSlug: this._getEffectiveDraftSlug() })
-        : ''}
-    />
-  );
+  }) => {
+    const arweaveTxId = getLegacyArweaveTxId(question);
+    return (
+      <QuestionCardLinks
+        showResponseLookupSpinner={showResponseLookupSpinner}
+        isQuestionBookmarked={isQuestionBookmarked}
+        onBookmarkToggle={() => this.handleBookmarkToggle(question.id)}
+        arweaveHref={arweaveTxId
+          ? normalizeArweaveUrl(arweaveTxId, { contextLabel: 'survey_tool_question_link' })
+          : ''}
+        questionHref={question.id
+          ? buildQuestionRoutePath(question.id, { sessionSlug: this._getEffectiveDraftSlug() })
+          : ''}
+      />
+    );
+  };
 
   renderQuestionFieldDecryptControl = ({
     questionId,
