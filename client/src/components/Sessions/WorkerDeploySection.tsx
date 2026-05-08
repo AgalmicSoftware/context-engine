@@ -261,7 +261,7 @@ const WorkerDeploySection = ({
                 <span>Cloudflare API token</span>
                 {renderTooltip({
                   id: 'gw-cf-token-tip',
-                  content: 'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, and Durable Objects for signer coordination only. Add Account Settings: Edit only when creating or changing the workers.dev subdomain.',
+                  content: 'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, Durable Objects for signer coordination only, and Account Settings permissions.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
                   ariaLabel: 'Cloudflare API token info',

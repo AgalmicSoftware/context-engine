@@ -36,6 +36,24 @@ test('buildCloudflareTokenTemplateUrl only requests the deploy-helper scopes it 
   assert.equal(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.length, 6);
 });
 
+test('buildCloudflareTokenTemplateUrl does not request legacy broad Cloudflare product scopes', () => {
+  const permissionKeys = CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.map((permission) => permission.key);
+
+  assert.equal(permissionKeys.includes('pages'), false);
+  assert.equal(permissionKeys.includes('builds'), false);
+  assert.equal(permissionKeys.includes('agents'), false);
+  assert.equal(permissionKeys.includes('observability'), false);
+  assert.equal(permissionKeys.includes('containers'), false);
+  assert.equal(permissionKeys.includes('tail'), false);
+});
+
+test('Cloudflare token helper documents storage resource boundaries', () => {
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.r2, /questions, surveys, and responses/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.d1, /metadata and index/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv, /metadata indexes/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.durableObjects, /not ordinary payload blob storage/);
+});
+
 test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {
   const url = new URL(buildCloudflareTokenTemplateUrl());
 

@@ -12,10 +12,10 @@ export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
 });
 
 export const SESSION_STORAGE_CLOUDFLARE_PRIMITIVES = Object.freeze({
-  r2: ['docs_context_payloads', 'media_blob_payloads'],
+  r2: ['session_context_payloads', 'question_payloads', 'survey_payloads', 'response_payloads', 'media_blob_payloads'],
   d1: ['metadata_indexes', 'audit_events', 'queryable_records'],
-  kv: ['short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
-  durableObjects: ['managed_signer_runtime', 'coordination_locks'],
+  kv: ['metadata_indexes', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
+  durableObjects: ['signer_runtime_coordination_only', 'coordination_locks'],
 });
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -55,6 +55,9 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
   const backend = normalizeBackend(raw.backend || raw.profile || raw.storageProfile);
   const base = buildDefaultSessionStorageProfile();
   const rawResources = isObj(raw.resources) ? raw.resources : {};
+  const defaultCanonicalStage = backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE
+    ? SESSION_STORAGE_RESOURCE_STAGES.ACTIVE
+    : SESSION_STORAGE_RESOURCE_STAGES.STAGED;
   const docsContext = trim(rawResources.docsContext || raw.docsContext || '').toLowerCase();
   const normalized: AnyRecord = {
     ...base,
@@ -66,6 +69,15 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
       docsContext: docsContext === SESSION_STORAGE_RESOURCE_STAGES.STAGED
         ? SESSION_STORAGE_RESOURCE_STAGES.STAGED
         : SESSION_STORAGE_RESOURCE_STAGES.ACTIVE,
+      questions: normalizeResourceStage(rawResources.questions || raw.questions, defaultCanonicalStage),
+      surveys: normalizeResourceStage(rawResources.surveys || raw.surveys, defaultCanonicalStage),
+      responses: normalizeResourceStage(rawResources.responses || raw.responses, defaultCanonicalStage),
+      generatedArtifacts: normalizeResourceStage(
+        rawResources.generatedArtifacts || raw.generatedArtifacts,
+        defaultCanonicalStage
+      ),
+      media: normalizeResourceStage(rawResources.media || raw.media, defaultCanonicalStage),
+      images: normalizeResourceStage(rawResources.images || raw.images, defaultCanonicalStage),
     },
     sbtGatedAccess: {
       ...base.sbtGatedAccess,

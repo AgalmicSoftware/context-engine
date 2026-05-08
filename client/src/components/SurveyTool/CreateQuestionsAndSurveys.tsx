@@ -60,7 +60,12 @@ import { buildUploadGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
-import { storageRefFromLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
+import {
+  attachStorageRefCompatibilityFields,
+  getLegacyArweaveTxId,
+  resolvePayloadStorageRef,
+} from '../../utilities/storage/storageRefs.js';
+import { usesCloudflareSessionStorage } from '../../utilities/storage/sessionStorageConfig.js';
 import { mergeSessionContractMaps, resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
@@ -2772,13 +2777,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         });
         const surveyDataString = JSON.stringify(completeSurveyData);
         let surveyArweaveTxId = '';
-        const cloudflareSurveyStorage = usesCloudflareSessionStorageForCreateSurvey(sessionConfig, { resource: 'surveys' });
+        const cloudflareSurveyStorage = usesCloudflareSessionStorage(sessionConfig, { resource: 'surveys' });
         if (!cloudflareSurveyStorage) {
           try {
             surveyArweaveTxId = String(
               await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
                 arweaveJwk: arweaveKey?.arweaveJwk || '',
-                forceDirectArweaveUpload: arweaveKey?.source === 'local' && !!arweaveKey?.arweaveJwk,
                 sessionSlug,
                 sessionConfig,
                 context: {

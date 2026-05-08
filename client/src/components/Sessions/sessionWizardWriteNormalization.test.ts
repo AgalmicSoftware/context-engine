@@ -294,8 +294,12 @@ describe('sessionWizardWriteNormalization', () => {
     expect(metadata.storageProfile.sessionOwned).toBe(true);
     expect(metadata.storageProfile.telegramOwned).toBe(false);
     expect(metadata.storageProfile.resources.docsContext).toBe('active');
+    expect(metadata.storageProfile.resources.questions).toBe('active');
+    expect(metadata.storageProfile.resources.surveys).toBe('active');
+    expect(metadata.storageProfile.resources.responses).toBe('active');
     expect(metadata.storageProfile.sbtGatedAccess.litRequired).toBe('payload_encrypted_only');
-    expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('docs_context_payloads');
+    expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('question_payloads');
+    expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('response_payloads');
     expect(JSON.stringify(metadata)).not.toMatch(/private-bucket|cf-secret-token|must-not-pass-through/i);
 
     const workerPayload = buildSessionWizardWorkerConfigPayload({

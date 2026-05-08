@@ -2699,8 +2699,44 @@ const SessionWizard = ({
             setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
           }
         >
-          {!isCollapsed && Object.entries(storageProfile).map(([childKey, childValue]) =>
-            renderField(childKey, childValue, currentPath)
+          {!isCollapsed && (
+            <>
+              <div
+                className={styles.inlineToggleRow}
+                role="radiogroup"
+                aria-label="Session storage profile"
+              >
+                {[
+                  { backend: SESSION_STORAGE_BACKENDS.ARWEAVE, label: 'Arweave' },
+                  { backend: SESSION_STORAGE_BACKENDS.LIT_ARWEAVE, label: 'Lit-Arweave' },
+                  { backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE, label: 'Cloudflare' },
+                ].map((option) => {
+                  const selected = storageProfile.backend === option.backend;
+                  return (
+                    <Button
+                      key={option.backend}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={`${styles.workerModePill} ${selected ? styles.workerModePillActive : ''}`}
+                      onClick={() => updateStorageBackend(option.backend)}
+                    >
+                      {option.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              {storageProfile.backend === SESSION_STORAGE_BACKENDS.LIT_ARWEAVE ? (
+                <div className={styles.helperText}>
+                  Lit-Arweave stores encrypted Arweave payloads for session documents and context.
+                </div>
+              ) : null}
+              {storageProfile.backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE ? (
+                <div className={styles.helperText}>
+                  Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.
+                </div>
+              ) : null}
+            </>
           )}
         </CollapsibleFieldGroup>
       );

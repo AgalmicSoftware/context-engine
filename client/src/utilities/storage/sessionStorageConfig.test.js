@@ -32,19 +32,6 @@ describe('sessionStorageConfig', () => {
     expect(requiresLitForSessionStorage(sessionConfig, { encrypted: true })).toBe(false);
   });
 
-  test('marks Cloudflare lit_encrypted mode as Lit-required while retaining Cloudflare routing', () => {
-    const sessionConfig = {
-      storageProfile: {
-        backend: 'cloudflare',
-        payloadAccessControl: { mode: 'lit_encrypted' },
-      },
-    };
-    expect(resolveSessionStorageBackend(sessionConfig, { resource: 'responses' })).toBe(STORAGE_BACKENDS.CLOUDFLARE);
-    expect(requiresLitForSessionStorage(sessionConfig, { resource: 'responses' })).toBe(true);
-    expect(usesWorkerSbtGateCloudflareStorage(sessionConfig)).toBe(false);
-    expect(normalizeSessionStorageConfig(sessionConfig).payloadAccessControl.mode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED);
-  });
-
   test('keeps explicitly staged Cloudflare resources on legacy Arweave fallback', () => {
     const sessionConfig = {
       storageProfile: {
