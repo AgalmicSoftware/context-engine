@@ -277,10 +277,32 @@ text, document titles, answer labels, aggregate counts, file type, visibility,
 and index status. Private/session/SBT-gated document contents stay behind
 private refs and are not included in group-safe summaries.
 
+Telegram screen/message helpers expose launch metadata on every
+`telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`, `/ce_docs`,
+`/ce_generate_questions`, `/ce_onboarding`, `/ce_export_key`,
+`/ce_recover_key`, opaque callback actions, or the
+`t.me/<bot>?start=<opaque-action-id>` template. The group session-linked card
+uses the safe public copy `Context Engine session linked: <session>` and the
+buttons `Join Session`, `View Questions`, and `View / Add Docs`. It does not
+include a default `Answer Privately` action. `View Questions` is the group-lobby
+default, while `Join Session` opens private chat and routes participants without
+a configured account to private account setup.
+
 Telegram question-card helpers guard CE client parity for the demo lane:
-rating controls are fixed at 0-10, every question card includes additional
-comments and microphone actions, and doc/context controls appear when documents
-exist.
+binary/agree-style questions use `Agree`, `Unsure`, and `Disagree`; rating
+questions render discrete `0` through `10` buttons; single-select multichoice
+questions render single-select buttons; multi-select multichoice questions keep
+per-option selected state; and freeform questions expose `Type` and `Voice`.
+Every card includes additional comments, microphone input when supported, and a
+docs/context action only when documents exist or are relevant.
+
+The doc-library action copy is `View / Add Docs`. Selected docs feed
+`Generate Questions` as request context and are also recorded as future
+`Use as Answer Context` candidates. Generating questions with no selected docs
+returns the prompt `Select or upload docs before generating questions.`
+Account-created screens intentionally omit `Open in CE` for now, onboarding
+copy is `Enter startup info so I can suggest answers for you.`, and confirm
+submit copy is `Submit this response?` with `Save draft` and `Edit`.
 
 ## Telegram Group-To-Private Contract
 
