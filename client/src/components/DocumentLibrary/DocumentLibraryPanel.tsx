@@ -470,7 +470,7 @@ const DocRowImagePreview = ({
         }
       }
     };
-  }, [account, chainId, isEncryptedStorage, panelContextKey, provider, txId]);
+  }, [account, chainId, isEncryptedStorage, panelContextKey, provider, scopedLitHooks, txId]);
 
   const previewSrc = isEncryptedStorage ? encryptedPreviewUrl : arweaveUrl;
   if (!previewSrc) return null;

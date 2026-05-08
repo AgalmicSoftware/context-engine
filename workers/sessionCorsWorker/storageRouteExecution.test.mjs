@@ -5,6 +5,19 @@ import { storageRoute } from './storageRouteExecution.js';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
+const CLOUDFLARE_WORKER_GATE_CONFIG = {
+  storageProfile: {
+    backend: 'cloudflare',
+    payloadAccessControl: { mode: 'worker_sbt_gate' },
+  },
+  __registry: {
+    gatesByResource: {
+      docUploads: { sbtAddresses: [], chainId: 84532, mode: 0 },
+      questionResponses: { sbtAddresses: [], chainId: 84532, mode: 0 },
+      surveyResponses: { sbtAddresses: [], chainId: 84532, mode: 0 },
+    },
+  },
+};
 
 const fixedRandomBytes = () => Uint8Array.from({ length: 32 }, (_, index) => index + 1);
 
@@ -145,7 +158,7 @@ for (const resource of ['questions', 'surveys', 'responses']) {
       method: 'POST',
       request: uploadRequest,
       env,
-      config: { storageProfile: { backend: 'cloudflare' } },
+      config: CLOUDFLARE_WORKER_GATE_CONFIG,
       slug: 'session-a',
       uploaderAddress: '0xabc',
       baseHeaders: {},
@@ -169,8 +182,9 @@ for (const resource of ['questions', 'surveys', 'responses']) {
       method: 'GET',
       request: new Request(`https://worker.example/storage/read?id=${encodeURIComponent(uploadBody.storageRef.id)}`),
       env,
-      config: { storageProfile: { backend: 'cloudflare' } },
+      config: CLOUDFLARE_WORKER_GATE_CONFIG,
       slug: 'session-a',
+      uploaderAddress: '0xabc',
       baseHeaders: {},
       deps: { json },
     });
@@ -182,8 +196,9 @@ for (const resource of ['questions', 'surveys', 'responses']) {
       method: 'GET',
       request: new Request(`https://worker.example/storage/list?resource=${resource}`),
       env,
-      config: { storageProfile: { backend: 'cloudflare' } },
+      config: CLOUDFLARE_WORKER_GATE_CONFIG,
       slug: 'session-a',
+      uploaderAddress: '0xabc',
       baseHeaders: {},
       deps: { json },
     });
@@ -217,7 +232,7 @@ test('storageRoute stores Cloudflare docs payloads behind opaque refs and reads 
     method: 'POST',
     request: uploadRequest,
     env,
-    config: { storageProfile: { backend: 'cloudflare' } },
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
     slug: 'session-a',
     uploaderAddress: '0xabc',
     baseHeaders: { 'Access-Control-Allow-Origin': 'https://app.example' },
@@ -246,14 +261,136 @@ test('storageRoute stores Cloudflare docs payloads behind opaque refs and reads 
     method: 'GET',
     request: new Request(`https://worker.example/storage/read?id=${CF_ID}`),
     env,
-    config: { storageProfile: { backend: 'cloudflare' } },
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
     slug: 'session-a',
+    uploaderAddress: '0xabc',
     baseHeaders: {},
     deps: { json },
   });
   assert.equal(readResponse.headers.get('X-CE-Storage-Ref'), CF_ID);
   assert.equal(readResponse.headers.get('Content-Type'), 'text/plain');
   assert.equal(await readResponse.text(), 'hello storage');
+});
+
+test('storageRoute denies Cloudflare worker_sbt_gate reads when SBT gate check fails', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const gatedConfig = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'worker_sbt_gate' },
+    },
+    __registry: {
+      gatesByResource: {
+        docUploads: {
+          sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+          chainId: 84532,
+          mode: 'all',
+        },
+      },
+    },
+  };
+
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'gated', contentType: 'text/plain', resource: 'docsContext' }),
+    }),
+    env,
+    config: gatedConfig,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+      resolveRpcUrlListForGate: () => ['https://rpc.example'],
+      checkSbtGate: async () => true,
+    },
+  });
+  const uploadBody = await readJson(uploadResponse);
+
+  const readResponse = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${uploadBody.storageRef.id}`),
+    env,
+    config: gatedConfig,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      resolveRpcUrlListForGate: () => ['https://rpc.example'],
+      checkSbtGate: async () => false,
+    },
+  });
+  const denied = await readJson(readResponse);
+  assert.equal(readResponse.status, 403);
+  assert.equal(denied.error, 'Access denied: Cloudflare worker SBT gate failed.');
+});
+
+test('storageRoute scaffold rejects plaintext Cloudflare lit_encrypted uploads', async () => {
+  const r2 = createMockR2();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: createMockKv() };
+  const litConfig = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'lit_encrypted' },
+    },
+  };
+
+  const plaintextResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'plain', contentType: 'text/plain', resource: 'docsContext' }),
+    }),
+    env,
+    config: litConfig,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+  assert.equal(plaintextResponse.status, 400);
+  assert.match((await readJson(plaintextResponse)).error, /payloadEncrypted=true/);
+
+  const encryptedResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: '{"ciphertext":"encrypted"}',
+        contentType: 'application/json',
+        resource: 'responses',
+        payloadEncrypted: true,
+      }),
+    }),
+    env,
+    config: litConfig,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+  const encryptedBody = await readJson(encryptedResponse);
+  assert.equal(encryptedResponse.status, 200);
+  assert.equal(encryptedBody.storageRef.backend, 'cloudflare');
+  assert.equal(encryptedBody.storageRef.encrypted, true);
 });
 
 test('storageRoute lists Cloudflare refs from the metadata index without raw object keys', async () => {
@@ -271,8 +408,9 @@ test('storageRoute lists Cloudflare refs from the metadata index without raw obj
     method: 'POST',
     request: uploadRequest,
     env,
-    config: { storageProfile: { backend: 'cloudflare' } },
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
     slug: 'session-a',
+    uploaderAddress: '0xabc',
     baseHeaders: {},
     deps: { json, randomBytes: fixedRandomBytes, now: () => Date.parse('2026-01-02T03:04:05.000Z') },
   });
@@ -282,8 +420,9 @@ test('storageRoute lists Cloudflare refs from the metadata index without raw obj
     method: 'GET',
     request: new Request('https://worker.example/storage/list?resource=docsContext'),
     env,
-    config: { storageProfile: { backend: 'cloudflare' } },
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
     slug: 'session-a',
+    uploaderAddress: '0xabc',
     baseHeaders: {},
     deps: { json },
   });
