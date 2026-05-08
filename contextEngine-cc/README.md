@@ -21,6 +21,17 @@ tests. From the repo root, `npm run test:cc` runs the private agent contract,
 router harness, and runtime import tests that are meaningful in this package
 shape.
 
+## Private Agent Runtime Contracts
+
+This private branch includes contract-only agent runtime helpers for Telegram,
+OpenClaw, worker setup, and session storage profile coordination. `/worker-setup`
+models bridge readiness checks, write-only secret save state, and display-only
+session storage status. Session storage profile selection remains in `/new`
+Advanced: `arweave` is default, `cloudflare` is explicit and uses worker-enforced
+SBT gates for Cloudflare docs/context unless the payload itself is Lit/client
+encrypted. Mock OpenClaw forwarding emits safe envelopes only; no real OpenClaw
+transport or production signing authority is added here.
+
 ## How It Works
 
 1. A **local server** (port 7391) authenticates you via passkey, loads survey questions from on-chain session data (currently OP Sepolia), and serves them over a local API.

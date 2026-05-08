@@ -67,7 +67,8 @@ versioned shapes for:
   server-side action resolutions, managed account summaries, and answer action
   records. Deep-link payloads carry only opaque action ids.
 - `WorkerSetup` records: private `/worker-setup` route inventory, setup-state
-  checkpoints, onboarding config defaults, and safe event summaries.
+  checkpoints, write-only secret save status, display-only session storage
+  profile status, onboarding config defaults, and safe event summaries.
 
 `AgentGrant` is the private contract for explicit delegation. A grant must be
 bound to all of:
@@ -262,8 +263,9 @@ The skeleton includes dependency-free pure modules for:
 - A `ManagedDemoSignerDurableObject` boundary that signs canonical testnet demo
   envelopes, records audit events, and keeps broadcast disabled.
 - Doc-library records that model Arweave/Cloudflare storage profiles, R2 bytes,
-  D1 metadata/index state, and KV short-lived actions without exposing storage
-  internals to Telegram.
+  D1 metadata/index/audit state, KV short-lived actions/replay caches, and
+  Durable Object account-runtime boundaries without exposing storage internals to
+  Telegram.
 - Event logs, sanitized group-safe envelopes, session/SBT join policy,
   sponsored-resource policy, Telegram question-card controls, SBT/account screen
   states, private-question lock/decrypt request states, and pose-question
@@ -290,7 +292,11 @@ is intentionally Lit-encrypted or client-side encrypted. Telegram, OpenClaw,
 CE-CC, and MCP call canonical CE agent/session APIs and receive only safe
 metadata, snippets, permission states, or opaque request refs. They must not
 receive Cloudflare credentials, bucket names, worker tokens, raw private storage
-paths, or long-lived signed URLs.
+paths, or long-lived signed URLs. `/new` Advanced stores the session-owned
+storage profile: docs/context is active first, while questions, surveys,
+responses, and images remain staged. The Cloudflare token helper requests only
+the deploy/storage resources needed for Workers, KV, R2, D1, Durable Objects,
+and account settings; it does not embed account ids, bucket names, or tokens.
 
 Telegram screen/message helpers expose launch metadata on every
 `telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`,
@@ -383,9 +389,12 @@ keys, worker tokens, seed phrases, or account material.
 `/worker-setup` planning surface and pure setup-state helpers. The current
 checkpoints cover worker reachability, Telegram webhook setup, `/start`
 receipt, group deep-link resolution, Telegram principal normalization, managed
-account create/recover, CE session fetch, question fetch, onboarding
-skipped/completed, response action creation, draft/submit request creation, and
-event-log update.
+account create/recover, CE session fetch, session fetch, SBT gate check,
+question fetch, onboarding skipped/completed, response action creation,
+response draft creation, submit request creation, draft/submit request creation,
+and event-log update. Secret fields can be saved but never displayed after
+save. The selected session storage profile is shown for operator context only;
+policy remains owned by `/new` Advanced.
 
 Onboarding is default-off. Config allows intro copy, 0-10 questions, normalized
 question type, skippable/required behavior, predictive-answer enabled/disabled,
@@ -400,6 +409,18 @@ inventory. It maps web UX action families to `/api/agent/*` implemented or
 planned routes, required grant scopes, risk levels, approval/delegation
 behavior, signing/worker authority requirements, and whether Telegram/OpenClaw
 may call the route directly.
+
+Managed Telegram demo accounts may submit to normal CE sessions when the
+session is linked, ordinary SBT/join gates are satisfied, the session policy
+allows managed demo submit, and the scoped grant allows
+`direct_submit_response`. When direct submit is not allowed, the bridge creates
+a submit request or draft through canonical agent contracts instead of treating
+the session as demo-only.
+
+Mock OpenClaw forwarding is contract-only. It covers delivered questions,
+drafts, submit requests, approval-required handoffs, failures, and final status
+using safe summaries and canonical `/api/agent/*` refs only. Real HTTP/MCP
+transport remains deferred.
 
 Implemented or contract-only families cover read identity/session/question,
 draft response, submit request, delegated response execution, connect request
