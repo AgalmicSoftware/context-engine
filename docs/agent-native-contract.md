@@ -261,10 +261,13 @@ The skeleton includes dependency-free pure modules for:
   `recover_demo_key` actions.
 - A `ManagedDemoSignerDurableObject` boundary that signs canonical testnet demo
   envelopes, records audit events, and keeps broadcast disabled.
-- Doc-library records that model R2 bytes, D1 metadata/index state, and KV
-  short-lived actions.
+- Doc-library records that model Arweave/Cloudflare storage profiles, R2 bytes,
+  D1 metadata/index state, and KV short-lived actions without exposing storage
+  internals to Telegram.
 - Event logs, sanitized group-safe envelopes, session/SBT join policy,
-  sponsored-resource policy, and Telegram question-card controls.
+  sponsored-resource policy, Telegram question-card controls, SBT/account screen
+  states, private-question lock/decrypt request states, and pose-question
+  actions.
 
 The signer currently creates signed demo envelopes only. It does not broadcast
 transactions or touch production authority. Raw demo key export/recover is
@@ -277,16 +280,53 @@ text, document titles, answer labels, aggregate counts, file type, visibility,
 and index status. Private/session/SBT-gated document contents stay behind
 private refs and are not included in group-safe summaries.
 
+Session storage backend selection is a session config concern, owned by `/new`
+and the session/general worker, not by Telegram. `arweave` remains the default
+profile. `cloudflare` is an explicit session storage profile. For Cloudflare
+docs/context, the session/general worker may enforce SBT gates directly before
+issuing upload permissions, query snippets, signed short-lived reads, or
+download bytes. Lit remains optional and is required only when the payload itself
+is intentionally Lit-encrypted or client-side encrypted. Telegram, OpenClaw,
+CE-CC, and MCP call canonical CE agent/session APIs and receive only safe
+metadata, snippets, permission states, or opaque request refs. They must not
+receive Cloudflare credentials, bucket names, worker tokens, raw private storage
+paths, or long-lived signed URLs.
+
 Telegram screen/message helpers expose launch metadata on every
-`telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`, `/ce_docs`,
-`/ce_generate_questions`, `/ce_onboarding`, `/ce_export_key`,
-`/ce_recover_key`, opaque callback actions, or the
+`telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`,
+`/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`,
+`/ce_generate_questions`, `/ce_account`, `/ce_sbt`, `/ce_sbt_join`,
+`/ce_sbt_create`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`,
+opaque callback actions, `callback:<pose_question_action>`, or the
 `t.me/<bot>?start=<opaque-action-id>` template. The group session-linked card
 uses the safe public copy `Context Engine session linked: <session>` and the
 buttons `Join Session`, `View Questions`, and `View / Add Docs`. It does not
 include a default `Answer Privately` action. `View Questions` is the group-lobby
 default, while `Join Session` opens private chat and routes participants without
 a configured account to private account setup.
+
+`View Questions` pulls existing session questions through
+`GET /api/agent/questions`. `Pose Question` lets an allowed user choose one
+existing or generated question and pose it to the group. Group output for
+public questions may include question text and answer labels; private,
+SBT-gated, or Lit-encrypted questions show a locked/unavailable group state and
+resolve only in private chat or Mini App for eligible accounts.
+
+Telegram SBT screens are transport contracts over canonical CE SBT actions:
+
+- `SBT Group Card`: buttons are `Join SBT`, `Details`, and `My Account`; holder
+  lists, holder addresses, and private holder metadata are omitted.
+- `Join Public SBT`: open/public joins can route a managed Telegram account to
+  the planned `POST /api/agent/sbt-groups/claim-request` contract when session
+  policy allows it.
+- `Join Password SBT`: credential entry is private chat or Mini App only; the
+  bridge passes an opaque private-input ref, not the credential text.
+- `Create SBT Group`: Mini App first, with name, description, image,
+  visibility, join mode, optional credential-present flag, and session
+  association. Until a real agent SBT create API is exposed, it remains a
+  planned `POST /api/agent/sbt-groups/create-request` contract.
+- `My Account` and `Joined SBTs`: show managed address, joined sessions, joined
+  SBT summaries, and private export/restore controls.
 
 Telegram question-card helpers guard CE client parity for the demo lane:
 binary/agree-style questions use `Agree`, `Unsure`, and `Disagree`; rating
@@ -300,6 +340,9 @@ The doc-library action copy is `View / Add Docs`. Selected docs feed
 `Generate Questions` as request context and are also recorded as future
 `Use as Answer Context` candidates. Generating questions with no selected docs
 returns the prompt `Select or upload docs before generating questions.`
+Generated candidates can be saved or posed. Generation is separate from
+response submission; `Submit Response` becomes available only after an answer
+exists for a selected question.
 Account-created screens intentionally omit `Open in CE` for now, onboarding
 copy is `Enter startup info so I can suggest answers for you.`, and confirm
 submit copy is `Submit this response?` with `Save draft` and `Edit`.
@@ -350,10 +393,10 @@ Implemented or contract-only families cover read identity/session/question,
 draft response, submit request, delegated response execution, connect request
 create/read/approve/deny, grant revoke, and contract-only account create/link
 request metadata plus worker setup status/config contracts.
-Deferred families cover decrypt request, question generation, survey/question
-authoring, SBT group draft/create/share/claim requests, session
-create/configure requests, and PRD 557 deliberative statement
-signal/proposal/ranking requests.
+Deferred families cover decrypt request, session-storage access request,
+question generation, survey/question authoring, SBT group
+draft/create/share/claim requests, session create/configure requests, and
+PRD 557 deliberative statement signal/proposal/ranking requests.
 
 Parity with the web UX is not complete. The agent API does not yet expose every
 web action for survey authoring, SBT lifecycle management, session creation and
@@ -405,8 +448,8 @@ descriptors and HTTP wrapper functions. Implemented tools call only
 - `revoke_agent_grant`
 
 Planned descriptors are present for `create_question_request`,
-and `request_decrypt`, but no SDK dependency or second runtime path has been
-added.
+`request_decrypt`, and `request_session_storage_access`, but no SDK dependency
+or second runtime path has been added.
 
 Drift guards assert that every implemented MCP tool maps to an inventoried
 canonical `/api/agent/*` route and to the route-equivalence table.
