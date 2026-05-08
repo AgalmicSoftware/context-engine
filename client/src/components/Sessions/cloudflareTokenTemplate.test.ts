@@ -27,6 +27,19 @@ describe('cloudflareTokenTemplate', () => {
     expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(6);
   });
 
+  test('does not request legacy broad Cloudflare product scopes', () => {
+    const permissionKeys = CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.map((permission) => permission.key);
+
+    expect(permissionKeys).not.toEqual(expect.arrayContaining([
+      'pages',
+      'builds',
+      'agents',
+      'observability',
+      'containers',
+      'tail',
+    ]));
+  });
+
   test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {
     const url = new URL(buildCloudflareTokenTemplateUrl());
 
