@@ -24,6 +24,8 @@ business-logic paths.
 | Grant list | `GET /api/agent/grants[?session=<slug>]` | None | Wallet-scoped grant read |
 | Grant read | `GET /api/agent/grants/:id[?session=<slug>]` | None | Wallet-scoped grant read |
 | Grant revoke | `POST /api/agent/grants/revoke` | None | Wallet-scoped grant revocation |
+| Managed account create/recover | `POST /api/agent/accounts/create` | None | Contract-only managed demo account metadata |
+| Managed account link request | `POST /api/agent/accounts/link-request` | None | Approval-gated link request metadata |
 
 Legacy routes remain supported. The canonical routes require the same local JWT
 auth as their CE-CC equivalents and do not weaken worker-token or trusted-local
@@ -61,6 +63,11 @@ versioned shapes for:
 - `AgentBridgeWorker` primitives: contract-only principal summaries,
   preference profiles, opaque action records, idempotency records, bridge
   events, grant cache summaries, and agent-created account metadata.
+- `TelegramBridge` records: group bindings, private-start actions,
+  server-side action resolutions, managed account summaries, and answer action
+  records. Deep-link payloads carry only opaque action ids.
+- `WorkerSetup` records: private `/worker-setup` route inventory, setup-state
+  checkpoints, onboarding config defaults, and safe event summaries.
 
 `AgentGrant` is the private contract for explicit delegation. A grant must be
 bound to all of:
@@ -197,6 +204,20 @@ store a worker token, or expose a private key.
 Grant update routes are still not exposed. Any future grant expansion must go
 through a fresh connect request and local human approval.
 
+## Managed Demo Accounts
+
+`POST /api/agent/accounts/create` creates or recovers deterministic managed
+testnet account metadata for one Telegram principal per worker deployment. The
+route returns address/account metadata and records either `account_created` or
+`account_recovered`. It does not create a raw key export path, return seed
+phrases, expose CE-CC JWTs, expose worker tokens, or enable production delegated
+signing.
+
+`POST /api/agent/accounts/link-request` creates an approval-required
+`account_link_request` and records `link_requested`. It does not link the
+managed account automatically and returns `linked: false`. Actual account
+linking remains a local human approval path.
+
 ## AgentBridgeWorker Primitives
 
 `contextEngine-cc/lib/agent/bridgePrimitives.mjs` models the private
@@ -212,8 +233,9 @@ agentBridgeWorker contract without real Telegram/OpenClaw transport:
 - `AgentIdempotencyRecord` is scoped by CE account/principal, agent principal,
   integration principal, session, and grant; the same key with a different
   fingerprint is a conflict.
-- `AgentBridgeEvent` supports question delivered, response suggested, draft
-  saved, submit requested, delegated-execute deferred/executed, approved,
+- `AgentBridgeEvent` supports group-card posted, private-start opened,
+  account created/recovered, question delivered, response action created,
+  draft saved, submit requested, delegated-execute deferred/executed, approved,
   submitted, failed, and grant revoked events. Events contain safe summaries and
   refs only.
 - Grant cache summaries strip CE-CC JWTs, worker tokens, private keys,
@@ -228,6 +250,40 @@ integration principal, session, and grant. They do not implement webhooks, bot
 tokens, OpenClaw transport, real signing, delegated session keys, or worker
 authority.
 
+## Telegram Group-To-Private Contract
+
+`contextEngine-cc/lib/agent/telegramContracts.mjs` models the V1 bot-first
+Telegram flow without real transport:
+
+1. A group card stores `TelegramGroupBinding` server-side.
+2. The group card deep link carries only a short opaque `cetg_...` action id.
+3. Private chat resolves the group/session/question context server-side through
+   `TelegramActionResolution`.
+4. Unknown participants route to managed account setup.
+5. Known participants can produce `TelegramAnswerAction` records that reference
+   draft/submit requests without serializing answer text into group-safe output.
+
+Group-safe summaries omit private account state and answers. Callback data,
+deep-link payloads, CloudStorage, Mini App payloads, and chat state must not
+contain session payloads, question payloads, answer text, grants, JWTs, private
+keys, worker tokens, seed phrases, or account material.
+
+## Worker Setup Contract
+
+`contextEngine-cc/lib/agent/workerSetupContracts.mjs` defines the private
+`/worker-setup` planning surface and pure setup-state helpers. The current
+checkpoints cover worker reachability, Telegram webhook setup, `/start`
+receipt, group deep-link resolution, Telegram principal normalization, managed
+account create/recover, CE session fetch, question fetch, onboarding
+skipped/completed, response action creation, draft/submit request creation, and
+event-log update.
+
+Onboarding is default-off. Config allows intro copy, 0-10 questions, normalized
+question type, skippable/required behavior, predictive-answer enabled/disabled,
+and a retention policy. Predictive answers are still allowed only after
+onboarding/preferences are configured and completed, or when a preference bundle
+is supplied.
+
 ## Action Inventory
 
 `contextEngine-cc/lib/agent/actionInventory.mjs` is the canonical private action
@@ -239,7 +295,7 @@ may call the route directly.
 Implemented or contract-only families cover read identity/session/question,
 draft response, submit request, delegated response execution, connect request
 create/read/approve/deny, grant revoke, and contract-only account create/link
-request metadata.
+request metadata plus worker setup status/config contracts.
 Deferred families cover decrypt request, question generation, survey/question
 authoring, SBT group draft/create/share/claim requests, session
 create/configure requests, and PRD 557 deliberative statement
@@ -253,11 +309,15 @@ configuration, decrypt flows, or deliberative statement workflows.
 
 This private lane tracks CE-CC source under private version control while public
 release and public-history tooling continue to strip `contextEngine-cc/**`.
+They also strip `docs/agent-native*.md` and the private
+`client/public/skill.md` artifact until the agent API is explicitly public.
 It uses dependency-free pure contract tests and router-level agent harness tests.
 The current private branch includes the local runtime files needed for
 app-server `/api/agent/*` tests. From the repo root, `npm run test:cc` runs the
 private agent contract, route inventory, router harness, and runtime tests that
 are meaningful for this package shape.
+
+The `contextengine.sh` domain cutover is planned separately from this lane.
 
 Private implementation and contract details stay under public-release strip
 patterns: `contextEngine-cc/**` and `docs/agent-native*.md`. CE-CC local state,
