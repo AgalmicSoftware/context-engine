@@ -37,7 +37,10 @@ Private bridge worker status:
 - `workers/agentBridgeWorker/` is the private Telegram demo bridge worker and is stripped from public releases while private.
 - The worker uses a Durable Object signer boundary for managed demo accounts and currently returns signed testnet demo envelopes only; broadcast is disabled.
 - Supported bridge doc-library file types are `md`, `pdf`, `png`, `jpg`, `jpeg`, and `webp`.
-- Telegram question cards must keep CE parity: rating is 0-10, every card has comment and microphone actions, and doc/context appears when documents exist.
+- Telegram screen states record launch metadata for `/start`, `/ce_join`, `/ce_questions`, `/ce_docs`, `/ce_generate_questions`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`, opaque callbacks, or `t.me/<bot>?start=<opaque-action-id>`.
+- Telegram group session-linked cards say `Context Engine session linked: <session>` with `Join Session`, `View Questions`, and `View / Add Docs`; do not add `Answer Privately` by default.
+- Telegram question cards must keep CE parity: binary/agree-style uses `Agree`, `Unsure`, `Disagree`; rating is discrete `0` through `10`; multichoice preserves single-select vs multi-select state; freeform offers type/voice; every card has additional comments and microphone where supported; doc/context appears only when documents exist or are relevant.
+- The doc-library copy is `View / Add Docs`; selected docs feed `Generate Questions` and may later become `Use as Answer Context`.
 
 ## Core Flows
 

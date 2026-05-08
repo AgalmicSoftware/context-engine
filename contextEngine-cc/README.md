@@ -260,6 +260,19 @@ group/session/question context server-side, unknown participants route to
 managed account setup, and group-safe summaries omit private account state and
 answers.
 
+The private bridge worker screen contract records launch metadata for every
+Telegram state. Current commands are `/start`, `/ce_join`, `/ce_questions`,
+`/ce_docs`, `/ce_generate_questions`, `/ce_onboarding`, `/ce_export_key`, and
+`/ce_recover_key`, with opaque callback actions or
+`t.me/<bot>?start=<opaque-action-id>` used where commands are not enough. The
+group session-linked card says `Context Engine session linked: <session>` and
+shows `Join Session`, `View Questions`, and `View / Add Docs`; it does not add a
+default `Answer Privately` button. `Join Session` routes missing configured
+accounts to private account setup. Question cards keep CE control parity:
+agree/unsure/disagree, rating `0` through `10`, single-select vs multi-select
+multichoice state, freeform type/voice, additional comments, microphone where
+supported, and docs/context only when docs exist or are relevant.
+
 `lib/agent/workerSetupContracts.mjs` defines the private `/worker-setup`
 planning surface and default-off onboarding config. The contextengine.sh domain
 cutover is planned separately and is not implemented here.
