@@ -1,0 +1,107 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  AGENT_BRIDGE_EVENT_TYPES,
+  TELEGRAM_BRIDGE_ACTIONS,
+} from './constants.mjs';
+import {
+  MockTelegramTransportHarness,
+  runMockTelegramDemoFlow,
+} from './transportMock.mjs';
+
+test('mock Telegram group-to-private transport runs the managed account answer lane end-to-end', async () => {
+  const result = await runMockTelegramDemoFlow({
+    deploymentId: 'deploy-a',
+    rootSecret: 'root-a',
+    sessionSlug: 'alpha',
+    createdAt: '2026-05-07T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.groupCard.publicSummary.sessionSlug, 'alpha');
+  assert.equal(result.groupCard.publicSummary.question.questionText.includes('Telegram account lane'), true);
+  assert.equal(result.groupCard.publicSummary.question.aggregateCount, 0);
+  assert.equal(result.privateStart.deepLinkPayload.startsWith('cetg_'), true);
+  assert.equal(result.privateStart.deepLinkPayload.includes('alpha'), false);
+  assert.equal(result.privateStart.deepLinkPayload.includes('question-demo-1'), false);
+  assert.equal(result.account.accountMode, 'managed_telegram_demo');
+  assert.equal(result.account.chainScope, 'testnet');
+  assert.equal(result.questions[0].questionType, 'rating');
+  assert.equal(result.answered.ok, true);
+  assert.equal(result.answered.groupSafeSummary.status, AGENT_BRIDGE_EVENT_TYPES.DIRECT_SUBMITTED);
+  assert.deepEqual(result.events.map((event) => event.eventType), [
+    AGENT_BRIDGE_EVENT_TYPES.GROUP_CARD_POSTED,
+    AGENT_BRIDGE_EVENT_TYPES.PRIVATE_START_OPENED,
+    AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED,
+    AGENT_BRIDGE_EVENT_TYPES.QUESTION_LISTED,
+    AGENT_BRIDGE_EVENT_TYPES.DIRECT_SUBMITTED,
+  ]);
+  assert.equal(JSON.stringify(result.groupCard).includes(result.account.accountAddress), false);
+  assert.equal(JSON.stringify(result.events).includes('root-a'), false);
+});
+
+test('group lobby defaults to viewing questions and exposes add/generate by policy only', () => {
+  const harness = new MockTelegramTransportHarness({
+    sessionPolicy: {
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowAddQuestion: true,
+      allowQuestionGeneration: true,
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+      }],
+    },
+  });
+  const card = harness.postGroupSessionCard({
+    update: {
+      message: {
+        chat: { id: '-100101', type: 'group', title: 'Alpha lobby' },
+        text: '/session',
+      },
+    },
+  });
+
+  assert.equal(card.ok, true);
+  assert.equal(card.action.action, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
+  const event = harness.events[0];
+  assert.equal(event.summary.defaultAction, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
+  assert.equal(event.summary.addQuestionAvailable, true);
+  assert.equal(event.summary.generateQuestionAvailable, true);
+});
+
+test('suggest responses are ephemeral while draft responses are saved', async () => {
+  const harness = new MockTelegramTransportHarness({
+    sessionPolicy: {
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+      }],
+    },
+  });
+  const account = (await harness.createOrRecoverManagedAccount({
+    principal: { telegramUserId: '55' },
+  })).account;
+
+  const suggestion = harness.answerQuestion({
+    account,
+    action: TELEGRAM_BRIDGE_ACTIONS.SUGGEST_RESPONSE,
+  });
+  const draft = harness.answerQuestion({
+    account,
+    action: TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE,
+  });
+  const submitRequest = harness.answerQuestion({
+    account,
+    action: TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
+  });
+
+  assert.equal(suggestion.policy.persisted, false);
+  assert.equal(draft.policy.persisted, true);
+  assert.equal(submitRequest.policy.requiresApproval, true);
+});
