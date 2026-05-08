@@ -273,12 +273,6 @@ reset_clone_to_branch_head() {
   git -C "$TEMP_CLONE" clean -fdq
 }
 
-clone_has_no_pending_changes() {
-  git -C "$TEMP_CLONE" diff --quiet &&
-    git -C "$TEMP_CLONE" diff --cached --quiet &&
-    ! git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .
-}
-
 resolve_private_cherry_pick_conflicts() {
   local path
   local found_conflict=0
@@ -296,31 +290,6 @@ resolve_private_cherry_pick_conflicts() {
   fi
 
   strip_private_paths_from_clone
-
-  if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
-    return 1
-  fi
-
-  return 0
-}
-
-resolve_theirs_cherry_pick_conflicts() {
-  local path
-  local found_conflict=0
-
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    found_conflict=1
-    git -C "$TEMP_CLONE" checkout --theirs -- "$path" >/dev/null 2>&1 ||
-      git -C "$TEMP_CLONE" rm -f -- "$path" >/dev/null 2>&1 ||
-      return 1
-  done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
-
-  if [ "$found_conflict" -ne 1 ]; then
-    return 1
-  fi
-
-  git -C "$TEMP_CLONE" add -A
 
   if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
     return 1
@@ -572,16 +541,9 @@ for commit_sha in "${COMMITS[@]}"; do
   git -C "$REPO_ROOT" log -1 --format='%B' "$commit_sha" > "$message_file"
 
   log_info "Replaying $commit_sha | $subject"
-  if ! git -C "$TEMP_CLONE" cherry-pick --no-commit -X theirs "$commit_sha" >/dev/null 2>&1; then
+  if ! git -C "$TEMP_CLONE" cherry-pick --no-commit "$commit_sha" >/dev/null 2>&1; then
     if resolve_private_cherry_pick_conflicts; then
       log_info "Resolved stripped-path cherry-pick conflicts for $commit_sha | $subject"
-    elif resolve_theirs_cherry_pick_conflicts; then
-      log_info "Resolved remaining cherry-pick conflicts from source for $commit_sha | $subject"
-    elif clone_has_no_pending_changes; then
-      SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
-      log_info "Skipped $commit_sha because the public patch is already present."
-      reset_clone_to_branch_head
-      continue
     else
       log_error "Cherry-pick failed for $commit_sha | $subject"
       reset_clone_to_branch_head

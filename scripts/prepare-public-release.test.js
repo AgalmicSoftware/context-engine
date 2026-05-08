@@ -72,6 +72,8 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('contextEngine-cc', 'package.json'), '{"private":true}\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
+    writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
+    writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
 
     const result = runPrepareScript(sourceDir, outputDir);
     assert.equal(result.status, 0, result.stderr);
@@ -108,6 +110,8 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'server.mjs')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'package.json')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
 
     const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
     assert.equal(fs.existsSync(manifestPath), true);

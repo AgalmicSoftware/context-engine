@@ -7,6 +7,7 @@ ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
 docs/agent-native*.md
+client/public/skill.md
 TODO
 local-private-version
 CLAUDE.md
@@ -85,6 +86,7 @@ contextEngine-cc
 CLAUDE.md
 .claude
 docs/agent-native*.md
+client/public/skill.md
 video-clickthrough-local
 local-private-version
 scripts/test-*.js
