@@ -15,11 +15,11 @@ Docs can be associated with:
   - When `:token` is a session id, the app keeps the URL stable (no rewrite to slug) on this subroute.
 - Tool Explorer `Data` panel:
   - `Add` keeps the existing question-generation ingest flow.
-  - In `Add`, manual ingest now has both `Generate Questions` and `Add to Library`.
+  - In `Add`, manual ingest creates questions through `Generate Questions`; the older direct `Add to Library` action is not shown in this surface.
   - When one or more files/images are uploaded in `Add`, a title field appears at the top of the ingest surface and is reused as the doc title / filename when possible.
-  - Files and images share a single upload control in `Add`; image paste stays in the shared compact chooser, the main `Add URL` field is the only URL entry path, and queued images render previews before question generation or library upload.
-  - In `Add`, queued extra URL/file sources can optionally be saved into the session Doc Library on `Generate Questions`.
-  - Saved Tool Explorer sources are written as encrypted session docs with an audience of either `only me` or the session `docUploads` gate when that gate exists. `only me` uses the local `self-eip712-v1` recipient envelope and does not require Lit hooks; the session audience uses the Chipotle/Lit SBT-gated path.
+  - Files and images share a single upload control in `Add`; image paste stays in the shared compact chooser, the main `Add URL` field is the only URL entry path, and queued images render previews before question generation or context save.
+  - In `Add`, typed or queued extra URL/file/photo sources can optionally be saved into session context on `Generate Questions`.
+  - Saved Tool Explorer sources are written as encrypted session docs with an audience of either `only me` or the session `docUploads` gate when that gate exists. The closed UI shows this audience behind a lock icon. `only me` uses the local `self-eip712-v1` recipient envelope and does not require Lit hooks; the session audience uses the Chipotle/Lit SBT-gated path.
   - When the save option is enabled, generated surveys store doc-library viewer URLs for those saved extra sources instead of the raw source URLs.
   - `View` defaults to the sample demo corpus viewer used on `/session/demo` when demo surfaces are enabled.
   - The demo corpus viewer now exposes the full curated tab set, including `LessWrong` and `Cross-Corpus Debates`, instead of keeping those slices hidden.
