@@ -265,7 +265,7 @@ import {
   resolveSbtDisplayLabel,
   warmSbtDisplayNamesTargeted,
 } from '../../utilities/sbt/sbtDisplayNames.js';
-import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { resolvePayloadStorageRef } from '../../utilities/storage/storageRefs.js';
 import {
   normalizeRatingValue,
   RATING_MAX,
@@ -723,7 +723,7 @@ export class PileViewMode extends SurveyQuestions {
       String(question.type || '').trim().toLowerCase(),
       String(question.prompt || ''),
       question.promptDecrypted ? '1' : '0',
-      String(question.arweaveTxId || ''),
+      String(resolvePayloadStorageRef(question)?.id || question.arweaveTxId || ''),
       this.buildQuestionOptionsDigest(Array.isArray(question.options) ? question.options : []),
     ].join('|');
     try {
