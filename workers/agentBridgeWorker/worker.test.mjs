@@ -30,3 +30,48 @@ test('worker mock demo route returns end-to-end private Telegram flow without se
   assert.equal(JSON.stringify(body).includes('route-secret'), false);
   assert.equal(JSON.stringify(body.groupCard).includes(body.account.accountAddress), false);
 });
+
+test('worker Telegram webhook requires enable flag, bot token, and secret token', async () => {
+  const request = new Request('https://bridge.example/telegram/webhook', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-Telegram-Bot-Api-Secret-Token': 'webhook-secret',
+    },
+    body: JSON.stringify({
+      update_id: 101,
+      message: {
+        text: '/start',
+        chat: { id: 55, type: 'private' },
+        from: { id: 77, username: 'demo_user' },
+      },
+    }),
+  });
+
+  const disabled = await worker.fetch(request.clone(), {
+    TELEGRAM_BRIDGE_ENABLED: 'false',
+    TELEGRAM_BOT_TOKEN: 'bot-token',
+    TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+  });
+  assert.equal(disabled.status, 403);
+
+  const denied = await worker.fetch(request.clone(), {
+    TELEGRAM_BRIDGE_ENABLED: 'true',
+    TELEGRAM_BOT_TOKEN: 'bot-token',
+    TELEGRAM_WEBHOOK_SECRET: 'different-secret',
+  });
+  assert.equal(denied.status, 401);
+
+  const accepted = await worker.fetch(request, {
+    TELEGRAM_BRIDGE_ENABLED: 'true',
+    TELEGRAM_BOT_TOKEN: 'bot-token',
+    TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+  });
+  const body = await accepted.json();
+  assert.equal(accepted.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.transport, 'telegram_webhook');
+  assert.equal(body.lane, 'telegram_private_account');
+  assert.equal(JSON.stringify(body).includes('bot-token'), false);
+  assert.equal(JSON.stringify(body).includes('webhook-secret'), false);
+});
