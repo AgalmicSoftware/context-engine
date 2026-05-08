@@ -2,20 +2,20 @@
 
 'use strict';
 
-const CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS = Object.freeze([
+const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
   { key: 'workers_scripts', type: 'edit' },
   { key: 'workers_kv_storage', type: 'edit' },
+  { key: 'workers_r2_storage', type: 'edit' },
+  { key: 'd1', type: 'edit' },
+  { key: 'workers_durable_objects', type: 'edit' },
+  { key: 'account_settings', type: 'edit' },
 ]);
-
-const CLOUDFLARE_TOKEN_TEMPLATE_R2_PERMISSIONS = Object.freeze([
-  { key: 'workers_r2', type: 'edit' },
-]);
-
-const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS;
 
 const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
-  kv: 'canonical config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state',
-  r2: 'optional existing R2 bucket for advanced deployments that explicitly enable R2 payload storage',
+  r2: 'docs/context/media/blob payloads',
+  d1: 'metadata/index/audit/event records',
+  kv: 'short-lived action IDs, webhook replay cache, ephemeral start params',
+  durableObjects: 'managed signer runtime and coordination locks',
 });
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -128,9 +128,7 @@ const printUsage = () => {
     '',
     'Output:',
     '  Prints the same prefilled Cloudflare API token template URL used by the wizard UX.',
-    '  Default scope is exactly Workers Scripts: Edit and Workers KV Storage: Edit.',
-    '  The optional R2 scope does not create a bucket; configure an existing bucket separately.',
-    '  When account ID defaults to *, restrict Account Resources to the intended account before creating the token.',
+    '  Scope covers Workers, KV, R2, D1, Durable Objects, and account settings only.',
   ].join('\n'));
 };
 
@@ -159,10 +157,7 @@ if (require.main === module) {
 
 module.exports = {
   CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
-  CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS,
-  CLOUDFLARE_TOKEN_TEMPLATE_R2_PERMISSIONS,
   CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
-  buildCloudflareTokenTemplatePermissions,
   buildCloudflareTokenTemplateUrl,
   buildTokenName,
   formatTokenTimestamp,

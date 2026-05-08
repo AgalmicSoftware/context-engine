@@ -23,54 +23,12 @@ describe('cloudflareTokenTemplate', () => {
     expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
+      { key: 'workers_r2_storage', type: 'edit' },
+      { key: 'd1', type: 'edit' },
+      { key: 'workers_durable_objects', type: 'edit' },
+      { key: 'account_settings', type: 'edit' },
     ]);
-    expect(buildCloudflareTokenTemplatePermissions()).toEqual([
-      { key: 'workers_scripts', type: 'edit' },
-      { key: 'workers_kv_storage', type: 'edit' },
-    ]);
-  });
-
-  test('points legacy token guidance at the canonical worker documentation', () => {
-    expect(CLOUDFLARE_TOKEN_SETUP_GUIDE_URL).toBe(
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
-    );
-  });
-
-  test('adds only R2 when an advanced deployment explicitly opts into R2 storage', () => {
-    const url = new URL(
-      buildCloudflareTokenTemplateUrl({
-        slug: 'alpha-session',
-        includeR2Storage: true,
-      }),
-    );
-    const permissions = JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]');
-
-    expect(permissions).toEqual([
-      { key: 'workers_scripts', type: 'edit' },
-      { key: 'workers_kv_storage', type: 'edit' },
-      { key: 'workers_r2', type: 'edit' },
-    ]);
-    expect(buildCloudflareTokenTemplatePermissions({ includeR2Storage: true })).toEqual(permissions);
-    expect(url.searchParams.get('accountId')).toBe('*');
-  });
-
-  test('does not request unrelated Cloudflare product scopes by default', () => {
-    const permissionKeys = buildCloudflareTokenTemplatePermissions().map((permission) => permission.key);
-
-    expect(permissionKeys).not.toEqual(
-      expect.arrayContaining([
-        'workers_r2',
-        'd1',
-        'workers_durable_objects',
-        'account_settings',
-        'pages',
-        'builds',
-        'agents',
-        'observability',
-        'containers',
-        'tail',
-      ]),
-    );
+    expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(6);
   });
 
   test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {

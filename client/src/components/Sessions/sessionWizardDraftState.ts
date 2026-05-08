@@ -16,16 +16,6 @@ import {
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
-import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupport';
-import { sanitizeSessionWizardDraftForBrowserCache } from './sessionWizardBrowserCacheSanitization';
-import {
-  classifySessionModeProfileSupport,
-  compileSessionModeProfile,
-  hasLegacyTelegramFirstSessionFlags,
-  mergeSessionModeProfileStorageAccess,
-  profileFromLegacyConfig,
-  type SessionModeProfile,
-} from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord } from '../shellTypes';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -187,23 +177,7 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   if (typeof draft.embeddedDeployHelperEnabled !== 'boolean') {
     draft.embeddedDeployHelperEnabled = CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false;
   }
-  if (draft.sessionModeProfile && typeof draft.sessionModeProfile === 'object') {
-    draft.sessionModeProfile = mergeSessionModeProfileStorageAccess(
-      draft.sessionModeProfile as SessionModeProfile,
-      draft.storageProfile,
-    );
-    const support = classifySessionModeProfileSupport(draft.sessionModeProfile);
-    draft.storageProfile =
-      support.status === 'reachable'
-        ? normalizeSessionStorageProfileConfig(
-            compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile).storageProfile,
-          )
-        : normalizeSessionStorageProfileConfig(draft.storageProfile);
-  } else {
-    draft.storageProfile = normalizeSessionStorageProfileConfig(
-      draft.storageProfile || draft.sessionStorageProfile || draft.storage,
-    );
-  }
+  draft.storageProfile = normalizeSessionStorageProfileConfig(draft.storageProfile || draft.sessionStorageProfile || draft.storage);
   delete draft.sessionStorageProfile;
   delete draft.storage;
 

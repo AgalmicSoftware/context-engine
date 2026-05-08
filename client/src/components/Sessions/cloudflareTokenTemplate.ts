@@ -1,22 +1,21 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import { buildPublicRepoBlobUrl } from '../../variables/publicRepoMetadata.js';
 
-type CloudflareTokenPermission = {
-  key: string;
-  type: string;
-};
-
-const CLOUDFLARE_API_TOKENS_URL = 'https://dash.cloudflare.com/profile/api-tokens';
-export const CLOUDFLARE_TOKEN_SETUP_GUIDE_URL = buildPublicRepoBlobUrl(
-  'docs/session-cors-worker.md#api-token-setup-and-handling',
-);
-
-export const CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS = Object.freeze([
+export const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
   { key: 'workers_scripts', type: 'edit' },
   { key: 'workers_kv_storage', type: 'edit' },
+  { key: 'workers_r2_storage', type: 'edit' },
+  { key: 'd1', type: 'edit' },
+  { key: 'workers_durable_objects', type: 'edit' },
+  { key: 'account_settings', type: 'edit' },
 ]);
 
-export const CLOUDFLARE_TOKEN_TEMPLATE_R2_PERMISSIONS = Object.freeze([{ key: 'workers_r2', type: 'edit' }]);
+export const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
+  r2: 'docs/context/media/blob payloads',
+  d1: 'metadata/index/audit/event records',
+  kv: 'short-lived action IDs, webhook replay cache, ephemeral start params',
+  durableObjects: 'managed signer runtime and coordination locks',
+});
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const;
 const CLOUDFLARE_TOKEN_NAME_PREFIX = 'contextEngine-corsSessionWorker-';
