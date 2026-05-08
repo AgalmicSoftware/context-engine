@@ -263,14 +263,17 @@ answers.
 The private bridge worker screen contract records launch metadata for every
 Telegram state. Current commands are `/start`, `/ce_join`, `/ce_questions`,
 `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`,
-`/ce_generate_questions`, `/ce_account`, `/ce_sbt`, `/ce_sbt_join`,
-`/ce_sbt_create`, `/ce_onboarding`, `/ce_export_key`, and `/ce_recover_key`,
+`/ce_generate_questions`, `/ce_account`,
+`/ce_sbt <sbt-address-or-group-id-or-link>`,
+`/ce_join_sbt <sbt-address-or-invite-code-or-link>`,
+`/ce_create_sbt_group [session-slug]`, `/ce_onboarding`, `/ce_export_key`, and `/ce_recover_key`,
 with opaque callback actions, `callback:<pose_question_action>`, or
 `t.me/<bot>?start=<opaque-action-id>` used where commands are not enough. The
 group session-linked card says `Context Engine session linked: <session>` and
-shows `Join Session`, `View Questions`, and `View / Add Docs`; it does not add a
-default `Answer Privately` button. `View Questions` reads existing session
-questions through `GET /api/agent/questions`. `Pose Question` posts one
+shows `Join Session`, `View Questions`, `View / Add Docs`, and policy-allowed
+`Pose Question`; it does not add a default `Answer Privately` button. `View
+Questions` reads existing session questions through `GET /api/agent/questions`.
+`Pose Question` posts one
 public-safe existing or generated question to the group; locked private/gated
 questions stay locked in group and route eligible accounts to private chat or
 Mini App. `Join Session` routes missing configured accounts to private account
@@ -285,6 +288,13 @@ routes. Public/password joins and create-group requests target planned
 sessions, joined SBT summaries, and private export/restore controls. Private
 question decrypt requests target the planned `/api/agent/decrypt/request` route
 and do not implement Lit decrypt inside Telegram.
+
+SBT command parsing allows public SBT addresses, group ids, and share links in
+group commands. Passwords, invite credentials, wallet proofs, and private
+eligibility checks are private chat or Mini App only. Required SBT gates on
+`Join Session` list safe group summaries, prompt public/open joins when eligible,
+route password/invite input privately, route wallet/passkey/non-public gates to
+full CE account linking, and retry the session join after the gate is satisfied.
 
 Storage profile selection belongs to session config in `/new`, not Telegram.
 `arweave` remains the default/current profile; `cloudflare` is an explicit
