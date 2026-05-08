@@ -32,9 +32,17 @@ bucket_name = "ce-agent-docs-private"
 [vars]
 AGENT_BRIDGE_DEPLOYMENT_ID = "local-demo"
 TELEGRAM_BRIDGE_ENABLED = "false"
+TELEGRAM_BOT_USERNAME = "YOUR_BOT_USERNAME"
+AGENT_BRIDGE_PUBLIC_URL = "https://ce-agent-bridge-worker.<account-subdomain>.workers.dev"
+CE_SESSION_WORKER_BASE_URL = "https://<session-worker>.<account-subdomain>.workers.dev"
+DEFAULT_CHAIN_ID = "11155420"
+DEFAULT_RPC_URL = "https://your-op-sepolia-rpc.example"
+AGENT_AI_PROVIDER = "ce_session_policy"
 BROADCAST_ENABLED = "false"
 
 # Set secrets with Wrangler, never in this file:
 #   npx wrangler secret put TELEGRAM_BOT_TOKEN
 #   npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
 #   npx wrangler secret put DEMO_SIGNER_ROOT_SECRET
+# Optional local deploy automation credential; prefer `wrangler login`:
+#   npx wrangler secret put CLOUDFLARE_API_TOKEN

@@ -103,7 +103,10 @@ Storage profile selection belongs to session config, not Telegram.
 `arweave` remains the default profile. `cloudflare` is an explicit session
 storage profile where the session/general worker can enforce SBT gates before
 issuing upload permissions, snippets, short-lived reads, or download bytes. Lit
-is required only when the payload itself is intentionally Lit/client encrypted.
+is required only when the session profile selects `lit_encrypted` and the
+payload itself is intentionally Lit/client encrypted. The default Cloudflare
+payload access mode is `worker_sbt_gate`, which is worker-enforced access
+control and not end-to-end encryption.
 Cloudflare storage is for CE payloads such as session context, docs, media,
 questions, surveys, responses, and generated artifacts; it is not Telegram,
 user preference, or profile storage. Agent and Telegram-facing records should
@@ -117,6 +120,50 @@ storage profile. `/worker-setup` may display that profile but does not edit
 storage policy. Cloudflare profiles use R2 for bytes, D1 for queryable metadata
 and audit/index records, KV for short-lived action/replay/start refs, and Durable
 Objects for managed signer runtime and coordination locks.
+
+## Live Telegram Setup
+
+Local dry-run:
+
+```bash
+cd workers/agentBridgeWorker
+cp .dev.vars.example .dev.vars
+npx wrangler dev --local --port 8787
+```
+
+Paste only local test values into `.dev.vars`. Keep real deployed secrets in
+Wrangler secrets:
+
+```bash
+npx wrangler secret put TELEGRAM_BOT_TOKEN
+npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
+npx wrangler secret put DEMO_SIGNER_ROOT_SECRET
+```
+
+Required values:
+
+| Value | Where it goes |
+| --- | --- |
+| `TELEGRAM_BOT_TOKEN` from BotFather | `.dev.vars` for local tests; Wrangler secret for deploy |
+| `TELEGRAM_BOT_USERNAME` | `.dev.vars` and `[vars]` in copied `wrangler.toml` |
+| `TELEGRAM_WEBHOOK_SECRET` | `.dev.vars` for local tests; Wrangler secret for deploy; send as `X-Telegram-Bot-Api-Secret-Token` |
+| Public deployed `agentBridgeWorker` URL | `AGENT_BRIDGE_PUBLIC_URL` in `.dev.vars`/`wrangler.toml`; use it for `https://api.telegram.org/bot<TOKEN>/setWebhook?url=<AGENT_BRIDGE_PUBLIC_URL>/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>` |
+| Cloudflare account ID | `account_id` in copied `wrangler.toml` and `CLOUDFLARE_ACCOUNT_ID` in local `.env` if using scripts |
+| Cloudflare API token | Prefer `wrangler login`; otherwise untracked `.env` or Wrangler secret `CLOUDFLARE_API_TOKEN` with least-privilege Workers Scripts, KV, R2, D1, and Durable Objects access needed for this worker |
+| R2 bucket | `AGENT_DOCS_R2` binding in copied `wrangler.toml` |
+| KV namespace | `AGENT_ACTION_KV` binding in copied `wrangler.toml` for opaque action IDs/replay cache |
+| D1 database | `AGENT_DOCS_D1` binding in copied `wrangler.toml` for event/audit/index records |
+| Durable Object binding | `MANAGED_DEMO_SIGNER` binding and migration in copied `wrangler.toml` |
+| CE/session worker base URL | `CE_SESSION_WORKER_BASE_URL` in `.dev.vars`/`wrangler.toml` |
+| Default chain and RPC URL | `DEFAULT_CHAIN_ID` and `DEFAULT_RPC_URL` in `.dev.vars`/`wrangler.toml` for SBT checks |
+| Draft-generation AI policy | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker |
+
+The live webhook route is `/telegram/webhook`. It rejects requests unless
+`TELEGRAM_BRIDGE_ENABLED=true`, a bot token is configured, and Telegram supplies
+the configured webhook secret token. The current route normalizes the real
+Telegram update and returns a safe acknowledgement; canonical question,
+response, and session-context payloads still go through the session worker or
+canonical agent APIs.
 
 ## Normal Session Submit
 
