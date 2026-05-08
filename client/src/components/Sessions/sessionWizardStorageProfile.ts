@@ -1,10 +1,10 @@
-import { toStr } from '../../utilities/shared/primitives.js';
+import {
+  STORAGE_BACKENDS,
+  normalizeStorageBackend,
+} from '../../utilities/storage/storageRefs.js';
 import type { AnyRecord } from '../shellTypes';
 
-export const SESSION_STORAGE_BACKENDS = Object.freeze({
-  ARWEAVE: 'arweave',
-  CLOUDFLARE: 'cloudflare',
-});
+export const SESSION_STORAGE_BACKENDS = STORAGE_BACKENDS;
 
 export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
   ACTIVE: 'active',
@@ -19,13 +19,9 @@ export const SESSION_STORAGE_CLOUDFLARE_PRIMITIVES = Object.freeze({
 });
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-const trim = (value: unknown): string => toStr(value).trim();
+const trim = (value: unknown): string => (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
 
-const normalizeBackend = (value: unknown): string => (
-  trim(value).toLowerCase() === SESSION_STORAGE_BACKENDS.CLOUDFLARE
-    ? SESSION_STORAGE_BACKENDS.CLOUDFLARE
-    : SESSION_STORAGE_BACKENDS.ARWEAVE
-);
+const normalizeBackend = (value: unknown): string => normalizeStorageBackend(value);
 
 export const buildDefaultSessionStorageProfile = (): AnyRecord => ({
   type: 'session_storage_profile',
@@ -38,6 +34,8 @@ export const buildDefaultSessionStorageProfile = (): AnyRecord => ({
     questions: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     surveys: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     responses: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
+    generatedArtifacts: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
+    media: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
     images: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
   },
   sbtGatedAccess: {
@@ -56,6 +54,12 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
   const base = buildDefaultSessionStorageProfile();
   const rawResources = isObj(raw.resources) ? raw.resources : {};
   const docsContext = trim(rawResources.docsContext || raw.docsContext || '').toLowerCase();
+  const normalizeResourceStage = (value: unknown, fallback: string): string => {
+    const normalized = trim(value).toLowerCase();
+    if (normalized === SESSION_STORAGE_RESOURCE_STAGES.ACTIVE) return SESSION_STORAGE_RESOURCE_STAGES.ACTIVE;
+    if (normalized === SESSION_STORAGE_RESOURCE_STAGES.STAGED) return SESSION_STORAGE_RESOURCE_STAGES.STAGED;
+    return fallback;
+  };
   const normalized: AnyRecord = {
     ...base,
     backend,
@@ -66,6 +70,15 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
       docsContext: docsContext === SESSION_STORAGE_RESOURCE_STAGES.STAGED
         ? SESSION_STORAGE_RESOURCE_STAGES.STAGED
         : SESSION_STORAGE_RESOURCE_STAGES.ACTIVE,
+      questions: normalizeResourceStage(rawResources.questions || raw.questions, base.resources.questions),
+      surveys: normalizeResourceStage(rawResources.surveys || raw.surveys, base.resources.surveys),
+      responses: normalizeResourceStage(rawResources.responses || raw.responses, base.resources.responses),
+      generatedArtifacts: normalizeResourceStage(
+        rawResources.generatedArtifacts || raw.generatedArtifacts,
+        base.resources.generatedArtifacts
+      ),
+      media: normalizeResourceStage(rawResources.media || raw.media, base.resources.media),
+      images: normalizeResourceStage(rawResources.images || raw.images, base.resources.images),
     },
     sbtGatedAccess: {
       ...base.sbtGatedAccess,
