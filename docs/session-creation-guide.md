@@ -23,13 +23,13 @@ Use this as the quick checklist for a production-style session created from `/ne
 | Arweave JWK | Pays for session metadata and other Arweave uploads | Yes for publish/upload flows | Yes |
 | RPC URL | Used by the worker for chain reads and related operations | Yes for a deploy-ready worker | Yes |
 | Faucet private key | Lets the session sponsor small OP Sepolia ETH grants for onboarding/publish support | Optional | Yes |
-| Lit credentials for gated fields | Needed only when the session uses worker-mediated Lit/Chipotle encryption. The manual `/new` setup asks only for `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; the worker derives `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid` after deploy. | Optional | Yes |
+| Lit credentials for gated fields or encrypted Cloudflare payloads | Needed only when the session uses worker-mediated Lit/Chipotle encryption, `lit-arweave`, or Cloudflare `lit_encrypted` payload mode. The manual `/new` setup asks only for `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; the worker derives `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid` after deploy. Cloudflare `worker_sbt_gate` mode does not require a Lit key. | Optional | Yes |
 
 Important:
 
 - The worker secret minimum for the normal deploy-ready path is: AI key(s) matching the selected provider, Arweave JWK, and RPC URL.
 - The faucet private key is not required to create a session. It is only needed if you want the session to sponsor testnet gas for users or bootstrap publish funding.
-- Lit-sponsored setup is optional. Today the manual deploy-ready flow centers on one `litAccountApiKey`; sponsored bundles can still carry either that authority key or already scoped runtime values when an admin intentionally prepares them.
+- Lit-sponsored setup is optional. Today the manual deploy-ready flow centers on one `litAccountApiKey`; sponsored bundles can still carry either that authority key or already scoped runtime values when an admin intentionally prepares them. If `/new` Advanced selects Cloudflare `worker_sbt_gate`, the Lit key input is hidden because access is worker-enforced rather than Lit-encrypted.
 - Secrets live in worker secrets or sponsored bundles, not in public Arweave session metadata.
 
 ## Sponsored Bundles: Skip Manual Config
@@ -122,7 +122,7 @@ You need:
 - An API token with Workers-related permissions. The wizard expects the same scope used by the deploy-helper flow described in [session-cors-worker.md](session-cors-worker.md).
 - Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/reference/template/>
 
-In practice, the deploy flow needs permission to manage Workers scripts, Workers KV, and the account-level settings needed to enable a `workers.dev` subdomain.
+In practice, the deploy flow needs least-privilege permission to manage Workers scripts, Workers KV, R2 buckets/objects for CE payload blobs, D1 or KV metadata/index resources where configured, Durable Objects only for signer/runtime coordination, and the account-level settings needed to enable a `workers.dev` subdomain. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
 
 ### 3. OP Sepolia ETH
 
@@ -188,6 +188,8 @@ AI configuration also lives in the session metadata draft:
 What gets stored where:
 
 - Arweave metadata stores the human-readable session config: name, description, AI defaults, block limits, contract pointers, featured lists, and any Lit-encrypted metadata fields
+- `/new` Advanced can select `storageProfile.backend = "cloudflare"` for canonical session payload storage. Its default payload access mode is `worker_sbt_gate`: the session worker stores Cloudflare objects and checks the requester's SBT gate with configured chain/RPC before serving bytes. This is worker-enforced access control, not end-to-end encryption, so the Lit key input is hidden.
+- Cloudflare `lit_encrypted` mode is the stronger scaffolded option. It requires Lit credentials and rejects plaintext Cloudflare uploads until the Lit envelope path provides `payloadEncrypted=true` encrypted payloads.
 - `SessionRegistry` does not store this long-form content directly; it stores the metadata URI pointer plus the minimal session identity fields
 
 Important:

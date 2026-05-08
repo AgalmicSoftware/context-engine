@@ -33,6 +33,7 @@ import {
   createNodeLitHooks,
   resolveLitChain,
 } from './litNodeHooks.mjs';
+import { deriveStorageRefFromLegacyArweaveTxId } from './storageRefs.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(process.env.CE_CC_DATA_DIR || resolve(__dirname, '..', '.data'));
@@ -577,6 +578,7 @@ export async function submitResponses(responses, slug, token, deps = {}) {
     const questionIds = [];
     const responseHashes = [];
     const arweaveTxIds = [];
+    const storageRefs = [];
 
     for (const response of responses) {
       const payload = await buildArweavePayload(response, slug, {
@@ -593,6 +595,7 @@ export async function submitResponses(responses, slug, token, deps = {}) {
       questionIds.push(toBytes32(response.questionId));
       responseHashes.push(hexHash);
       arweaveTxIds.push(txId);
+      storageRefs.push(deriveStorageRefFromLegacyArweaveTxId(txId, { resource: 'responses' }));
     }
 
     // 7. Determine surveyId from on-chain question data
@@ -637,6 +640,9 @@ export async function submitResponses(responses, slug, token, deps = {}) {
     debug(`[submit] TX confirmed in block ${receipt.blockNumber}`);
 
     try {
+      const surveyStorageRef = surveyTxId
+        ? deriveStorageRefFromLegacyArweaveTxId(surveyTxId, { resource: 'responses' })
+        : null;
       recordConfirmedSubmission({
         slug,
         walletAddress: wallet.address,
@@ -644,8 +650,10 @@ export async function submitResponses(responses, slug, token, deps = {}) {
         blockNumber: receipt.blockNumber,
         questionIds: responses.map((response) => String(response?.questionId || '').trim()).filter(Boolean),
         arweaveTxIds,
+        storageRefs,
         surveyId,
         surveyArweaveTxId: surveyTxId,
+        surveyStorageRef,
         submittedAt: new Date().toISOString(),
       });
     } catch (stateErr) {
@@ -657,13 +665,17 @@ export async function submitResponses(responses, slug, token, deps = {}) {
       txHash: tx.hash,
       blockNumber: receipt.blockNumber,
       arweaveTxIds,
+      storageRefs,
       count: responses.length,
       standalone: isStandalone,
       submittedQuestionIds: responses
         .map((response) => String(response?.questionId || '').trim())
         .filter(Boolean),
     };
-    if (!isStandalone && surveyTxId) result.surveyArweaveTxId = surveyTxId;
+    if (!isStandalone && surveyTxId) {
+      result.surveyArweaveTxId = surveyTxId;
+      result.surveyStorageRef = deriveStorageRefFromLegacyArweaveTxId(surveyTxId, { resource: 'responses' });
+    }
     return result;
   } catch (err) {
     error(`[submit] Failed:`, err.message);
@@ -749,7 +761,12 @@ export async function submitQuestions(questions, slug, token) {
       questionIds.push(toBytes32(questionId));
       contentHashes.push(hexHash);
       surveyIds.push(ethers.constants.HashZero); // standalone
-      resultQuestions.push({ questionId, arweaveTxId: txId, payload });
+      resultQuestions.push({
+        questionId,
+        arweaveTxId: txId,
+        storageRef: deriveStorageRefFromLegacyArweaveTxId(txId, { resource: 'questions' }),
+        payload,
+      });
     }
 
     // 5. Sign and send transaction
@@ -773,7 +790,11 @@ export async function submitQuestions(questions, slug, token) {
       ok: true,
       txHash: tx.hash,
       blockNumber: receipt.blockNumber,
-      questions: resultQuestions.map(rq => ({ questionId: rq.questionId, arweaveTxId: rq.arweaveTxId })),
+      questions: resultQuestions.map(rq => ({
+        questionId: rq.questionId,
+        arweaveTxId: rq.arweaveTxId,
+        storageRef: rq.storageRef,
+      })),
     };
   } catch (err) {
     error(`[submit] Failed:`, err.message);

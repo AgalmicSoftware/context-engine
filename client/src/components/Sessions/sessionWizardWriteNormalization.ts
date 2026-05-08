@@ -15,6 +15,10 @@ import {
 } from './sessionWizardContracts.js';
 import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
 import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
+import {
+  isWorkerSbtGateCloudflareStorageProfile,
+  normalizeSessionStorageProfileConfig,
+} from './sessionWizardStorageProfile';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -159,6 +163,10 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
+    next.storageProfile = normalizeSessionStorageProfileConfig(next.storageProfile);
+  }
+
   if (isObj(next.faucet)) {
     delete next.faucet.rpcUrl;
     delete next.faucet.privateKey;
@@ -276,6 +284,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
+  const storageProfile = normalizeSessionStorageProfileConfig(resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile);
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
@@ -295,7 +304,10 @@ export const buildSessionWizardWorkerConfigPayload = ({
     faucet: isObj(resolvedDeployPayload.faucet)
       ? cloneValue(resolvedDeployPayload.faucet)
       : cloneValue(resolveWorkerFaucetConfig()),
-    litCredentials: buildWorkerLitCredentialsConfig(workerSecrets),
+    litCredentials: isWorkerSbtGateCloudflareStorageProfile(storageProfile)
+      ? {}
+      : buildWorkerLitCredentialsConfig(workerSecrets),
+    storageProfile,
   };
 
   if (

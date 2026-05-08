@@ -1,4 +1,5 @@
 import { setTimeout as nativeSetTimeout, clearTimeout as nativeClearTimeout } from 'node:timers';
+import { createHash } from 'node:crypto';
 import { readFileSync, mkdirSync, existsSync, readdirSync, rmSync } from 'fs';
 import { resolve, dirname, relative } from 'path';
 import { fileURLToPath } from 'url';
@@ -33,6 +34,11 @@ import {
 import { submitResponses as submitOnChain, submitQuestions, canSubmit } from './submit.mjs';
 import { isTrustedLocalRequest } from './localRequest.mjs';
 import { recordConfirmedSubmission } from './submissionState.mjs';
+import {
+  attachStorageRefCompatibilityFields,
+  getLegacyArweaveTxId,
+  resolvePayloadStorageRef,
+} from './storageRefs.mjs';
 
 const LOCAL_AUTH_ORIGIN = 'http://localhost:7391';
 import { normalizeConfiguredSessions } from '../public/js/sessionSlugs.mjs';
@@ -41,12 +47,57 @@ import {
   normalizeResponseAudienceSelections,
   isEncryptedAudience,
 } from './responseAudience.mjs';
+import { buildAgentCapabilities } from './agent/capabilities.mjs';
+import {
+  buildAgentError,
+  buildAgentOk,
+  normalizeAgentQuestionPayload,
+  redactAgentSensitiveFields,
+  isValidAgentGrantId,
+  normalizeAgentGrant,
+  summarizeAgentRequestStatusCounts,
+  summarizePendingResponseForAgent,
+  summarizeRequestForAgent,
+} from './agent/schemas.mjs';
+import {
+  AGENT_REQUEST_STATUS,
+  AGENT_REQUEST_TYPES,
+  buildApprovalRequiredResponse,
+  buildAgentRequestFingerprint,
+  buildAgentRequestRecord,
+  createApprovalRequestId,
+  isValidApprovalRequestId,
+  normalizeAgentIdempotencyKey,
+} from './agent/approvalResponses.mjs';
+import {
+  AGENT_ACCOUNT_SIGNER_BOUNDARIES,
+  AGENT_BRIDGE_EVENT_TYPES,
+  normalizeAgentBridgeEvent,
+  normalizeAgentCreatedAccountMetadata,
+} from './agent/bridgePrimitives.mjs';
+import {
+  AGENT_EXECUTION_POLICIES,
+  AGENT_GRANT_SCOPES,
+  AGENT_RISK_LEVELS,
+  buildAgentGrantFromConnectRequest,
+  evaluateAgentConnectRequestApproval,
+  evaluateAgentRequestLifecycle,
+  evaluateScopedDelegatedExecutionGrant,
+  normalizeAgentConnectRequest,
+  normalizeAgentGrantLifecycle,
+  validateAgentConnectRequestForCreation,
+} from './agent/lifecycle.mjs';
+import { AGENT_ACTION_IDS } from './agent/actionInventory.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(process.env.CE_CC_DATA_DIR || resolve(__dirname, '..', '.data'));
 const RESPONSES_DIR = resolve(DATA_DIR, 'responses');
 const WORKER_TOKENS_DIR = resolve(DATA_DIR, 'worker-tokens');
 const CONFIRMED_SUBMISSIONS_DIR = resolve(DATA_DIR, 'confirmed-submissions');
+const AGENT_REQUESTS_DIR = resolve(DATA_DIR, 'agent-requests');
+const AGENT_GRANTS_DIR = resolve(DATA_DIR, 'agent-grants');
+const AGENT_ACCOUNTS_DIR = resolve(DATA_DIR, 'agent-accounts');
+const AGENT_EVENTS_DIR = resolve(DATA_DIR, 'agent-events');
 const SETTINGS_PATH = resolve(DATA_DIR, 'settings.json');
 const DEFAULT_HOOK_COOLDOWN_MS = 45_000;
 const MAX_HOOK_COOLDOWN_MS = 600_000;
@@ -318,6 +369,353 @@ function getResponseFilePath(slug, questionId) {
   return resolve(RESPONSES_DIR, slug, `${String(questionId || '').replace(/[^a-fA-F0-9x]/g, '_')}.json`);
 }
 
+function getAgentRequestFilePath(requestId) {
+  const id = String(requestId || '').trim();
+  if (!isValidApprovalRequestId(id)) return null;
+  return resolve(AGENT_REQUESTS_DIR, `${id}.json`);
+}
+
+function getAgentGrantFilePath(grantId) {
+  const id = String(grantId || '').trim();
+  if (!isValidAgentGrantId(id)) return null;
+  return resolve(AGENT_GRANTS_DIR, `${id}.json`);
+}
+
+function getTrustedAgentServerUrl() {
+  const configured = loadHookConfig().serverUrl;
+  const validation = validateLoopbackServerUrl(configured);
+  return validation.ok ? validation.serverUrl : LOCAL_AUTH_ORIGIN;
+}
+
+function saveAgentRequest(record = {}) {
+  const file = getAgentRequestFilePath(record.requestId);
+  if (!file) throw new Error('Invalid agent request id.');
+  mkdirSync(AGENT_REQUESTS_DIR, { recursive: true });
+  writeSecureFile(file, JSON.stringify(record, null, 2));
+  return record;
+}
+
+function loadAgentRequest(requestId) {
+  const file = getAgentRequestFilePath(requestId);
+  if (!file || !existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function loadAgentRequestsForWallet(walletAddress = '') {
+  if (!existsSync(AGENT_REQUESTS_DIR)) return [];
+  const wallet = normalizeAddressLower(walletAddress);
+  return readdirSync(AGENT_REQUESTS_DIR)
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => {
+      try { return JSON.parse(readFileSync(resolve(AGENT_REQUESTS_DIR, file), 'utf8')); }
+      catch { return null; }
+    })
+    .filter((entry) => entry && (!wallet || normalizeAddressLower(entry.requester) === wallet));
+}
+
+function loadAgentRequestByIdempotencyKey(walletAddress = '', idempotencyKey = '') {
+  const normalizedKey = normalizeAgentIdempotencyKey(idempotencyKey);
+  if (!normalizedKey) return null;
+  return loadAgentRequestsForWallet(walletAddress)
+    .find((entry) => normalizeAgentIdempotencyKey(entry?.idempotencyKey) === normalizedKey) || null;
+}
+
+function saveAgentGrant(record = {}) {
+  const file = getAgentGrantFilePath(record.grantId);
+  if (!file) throw new Error('Invalid agent grant id.');
+  mkdirSync(AGENT_GRANTS_DIR, { recursive: true });
+  writeSecureFile(file, JSON.stringify(normalizeAgentGrantLifecycle(record), null, 2));
+  return normalizeAgentGrantLifecycle(record);
+}
+
+function loadAgentGrant(grantId) {
+  const file = getAgentGrantFilePath(grantId);
+  if (!file || !existsSync(file)) return null;
+  try {
+    return normalizeAgentGrantLifecycle(JSON.parse(readFileSync(file, 'utf8')));
+  } catch {
+    return null;
+  }
+}
+
+function loadAgentGrantsForWallet(walletAddress = '') {
+  if (!existsSync(AGENT_GRANTS_DIR)) return [];
+  const wallet = normalizeAddressLower(walletAddress);
+  return readdirSync(AGENT_GRANTS_DIR)
+    .filter((file) => file.endsWith('.json'))
+    .map((file) => {
+      try { return normalizeAgentGrantLifecycle(JSON.parse(readFileSync(resolve(AGENT_GRANTS_DIR, file), 'utf8'))); }
+      catch { return null; }
+    })
+    .filter((entry) => entry && (!wallet || normalizeAddressLower(entry.humanPrincipal) === wallet));
+}
+
+function summarizeAgentGrantForRead(grant = {}) {
+  return normalizeAgentGrantLifecycle(grant);
+}
+
+function summarizeAgentRequestForRead(request = {}) {
+  const lifecycle = evaluateAgentRequestLifecycle(request);
+  const normalized = { ...request };
+  if (lifecycle.status) normalized.status = lifecycle.status;
+  if (lifecycle.ok !== true || normalized.status !== 'pending_approval') {
+    normalized.requiresApproval = false;
+  }
+  return {
+    summary: summarizeRequestForAgent(normalized),
+    lifecycle,
+  };
+}
+
+function createAgentGrantIdFromConnectRequestId(requestId = '') {
+  const suffix = String(requestId || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^agent_req_/, '')
+    .replace(/[^a-z0-9-]/g, '-')
+    .slice(0, 96);
+  return `agent_grant_${suffix || 'connect'}`;
+}
+
+function summarizeAgentConnectRequestForRead(request = {}) {
+  const normalized = normalizeAgentConnectRequest(request);
+  const lifecycle = evaluateAgentRequestLifecycle(normalized);
+  if (lifecycle.status) normalized.status = lifecycle.status;
+  return {
+    connectRequest: {
+      type: normalized.type,
+      version: normalized.version,
+      requestId: normalized.requestId,
+      status: normalized.status,
+      requiresApproval: normalized.status === AGENT_REQUEST_STATUS.PENDING_APPROVAL && lifecycle.ok,
+      terminal: lifecycle.ok !== true || normalized.status !== AGENT_REQUEST_STATUS.PENDING_APPROVAL,
+      approvalUrl: normalized.approvalUrl,
+      humanPrincipal: normalized.humanPrincipal,
+      agentId: normalized.agentId,
+      subject: normalized.subject,
+      requestedScopes: normalized.requestedScopes,
+      requestedSessions: normalized.requestedSessions,
+      requestedActions: normalized.requestedActions,
+      riskCeiling: normalized.riskCeiling,
+      executionPolicy: normalized.executionPolicy,
+      auditRequired: normalized.auditRequired,
+      idempotencyKey: normalized.idempotencyKey,
+      fingerprint: normalized.fingerprint,
+      grantId: normalized.grantId,
+      expiresAt: normalized.expiresAt,
+      createdAt: normalized.createdAt,
+      updatedAt: normalized.updatedAt,
+      approvedAt: normalized.approvedAt,
+      deniedAt: normalized.deniedAt,
+      signingAuthority: false,
+      workerTokenAuthority: false,
+      privateKeyAuthority: false,
+      longLivedBearerAuthority: false,
+    },
+    lifecycle,
+  };
+}
+
+function isAgentConnectApprovalOverrideAttempt(body = {}) {
+  const forbiddenFields = [
+    'agentId',
+    'subject',
+    'humanPrincipal',
+    'principal',
+    'requester',
+    'requestedScopes',
+    'scopes',
+    'scope',
+    'requestedSessions',
+    'sessions',
+    'session',
+    'requestedActions',
+    'allowedActions',
+    'action',
+    'riskCeiling',
+    'executionPolicy',
+    'auditRequired',
+    'expiresAt',
+    'fingerprint',
+    'grantId',
+    'signingAuthority',
+    'workerTokenAuthority',
+    'privateKeyAuthority',
+    'longLivedBearerAuthority',
+  ];
+  return forbiddenFields.some((field) => Object.prototype.hasOwnProperty.call(body || {}, field));
+}
+
+function stableAgentHash(value, length = 16) {
+  return createHash('sha256').update(String(value || '')).digest('hex').slice(0, length);
+}
+
+function bodyContainsAgentSensitiveMaterial(value = {}) {
+  return JSON.stringify(redactAgentSensitiveFields(value)) !== JSON.stringify(value);
+}
+
+function normalizeAgentWorkerDeploymentId(value) {
+  const id = String(value || 'local-worker').trim().toLowerCase().replace(/[^a-z0-9._:-]/g, '-');
+  return id.slice(0, 96) || 'local-worker';
+}
+
+function normalizeManagedTelegramPrincipal(body = {}) {
+  const raw = String(
+    body.principalId
+    || body.integrationPrincipalId
+    || body.telegramPrincipalId
+    || (body.telegramUserId ? `telegram:${body.telegramUserId}` : '')
+  ).trim().toLowerCase();
+  const principalId = raw.startsWith('telegram:') ? raw : (raw ? `telegram:${raw}` : '');
+  if (!/^telegram:[a-z0-9._:@-]{1,96}$/.test(principalId)) {
+    return { ok: false, error: 'telegram principalId or telegramUserId is required.' };
+  }
+  return {
+    ok: true,
+    principalId,
+    principalKind: 'telegram',
+  };
+}
+
+function getAgentAccountFilePath(accountId) {
+  const id = String(accountId || '').trim();
+  if (!/^agent_account_[a-z0-9]{16,48}$/.test(id)) return null;
+  return resolve(AGENT_ACCOUNTS_DIR, `${id}.json`);
+}
+
+function normalizeManagedAgentAccountContract({
+  body = {},
+  authPayload = {},
+  createdAt = new Date().toISOString(),
+  lifecycle = 'account_created',
+} = {}) {
+  const principal = normalizeManagedTelegramPrincipal(body);
+  if (!principal.ok) return principal;
+  const workerDeploymentId = normalizeAgentWorkerDeploymentId(body.workerDeploymentId);
+  const accountKey = `${workerDeploymentId}|${principal.principalId}`;
+  const accountId = `agent_account_${stableAgentHash(accountKey, 20)}`;
+  const accountAddress = `0x${stableAgentHash(`managed-demo-account|${accountKey}`, 40)}`;
+  const sessionValidation = validateAgentSessionSlug(body.session || 'general', {
+    required: true,
+  });
+  if (!sessionValidation.ok) return { ok: false, error: sessionValidation.error };
+  const metadata = normalizeAgentCreatedAccountMetadata({
+    accountId,
+    accountAddress,
+    accountKind: 'managed_testnet_account_runtime',
+    chainScope: body.chainScope || 'testnet',
+    createdByAgentPrincipal: {
+      kind: 'agent',
+      principalId: 'context-engine-agent',
+    },
+    integrationPrincipal: {
+      kind: principal.principalKind,
+      principalId: principal.principalId,
+    },
+    session: sessionValidation.slug,
+    signerBoundary: AGENT_ACCOUNT_SIGNER_BOUNDARIES.MANAGED_TESTNET_ACCOUNT_RUNTIME,
+    createdAt,
+  });
+  return {
+    ok: true,
+    account: {
+      ...metadata,
+      workerDeploymentId,
+      principalId: principal.principalId,
+      humanPrincipal: normalizeAddressLower(authPayload?.sub || ''),
+      lifecycle,
+      recoveredAt: lifecycle === 'account_recovered' ? createdAt : null,
+      updatedAt: createdAt,
+      contractOnly: true,
+      signingEnabled: false,
+    },
+  };
+}
+
+function saveAgentAccount(record = {}) {
+  const file = getAgentAccountFilePath(record.accountId);
+  if (!file) throw new Error('Invalid managed agent account id.');
+  mkdirSync(AGENT_ACCOUNTS_DIR, { recursive: true });
+  writeSecureFile(file, JSON.stringify(record, null, 2));
+  return record;
+}
+
+function loadAgentAccount(accountId) {
+  const file = getAgentAccountFilePath(accountId);
+  if (!file || !existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function saveAgentBridgeEvent(event = {}) {
+  mkdirSync(AGENT_EVENTS_DIR, { recursive: true });
+  const eventId = String(event.eventId || `agent_event_${stableAgentHash(JSON.stringify(event), 18)}`).trim();
+  const file = resolve(AGENT_EVENTS_DIR, `${eventId.replace(/[^a-z0-9._:-]/gi, '-')}.json`);
+  writeSecureFile(file, JSON.stringify(event, null, 2));
+  return event;
+}
+
+function buildAgentAccountEvent({ eventType, account = {}, request = null, createdAt = new Date().toISOString() } = {}) {
+  return normalizeAgentBridgeEvent({
+    eventType,
+    accountPrincipal: {
+      kind: 'ce_wallet',
+      principalId: account.humanPrincipal,
+    },
+    agentPrincipal: {
+      kind: 'agent',
+      principalId: 'context-engine-agent',
+    },
+    integrationPrincipal: account.integrationPrincipal,
+    session: account.session || 'general',
+    actionRecordId: request?.requestId || account.accountId,
+    summary: {
+      accountId: account.accountId,
+      accountAddress: account.accountAddress,
+      accountKind: account.accountKind,
+      lifecycle: account.lifecycle,
+      workerDeploymentId: account.workerDeploymentId,
+      requestId: request?.requestId || null,
+      contractOnly: true,
+      signingEnabled: false,
+    },
+    createdAt,
+  });
+}
+
+function agentRouteError(res, httpStatus, errorMessage, {
+  code = 'agent_error',
+  agentStatus = 'error',
+} = {}) {
+  return json(res, httpStatus, buildAgentError(errorMessage, {
+    status: agentStatus,
+    code,
+  }));
+}
+
+function agentAuthError(res, auth = {}) {
+  const message = auth.error || 'Agent authorization failed.';
+  const code = /missing/i.test(message) ? 'agent_auth_required' : 'agent_auth_failed';
+  return agentRouteError(res, auth.status || 401, message, {
+    code,
+    agentStatus: 'auth_error',
+  });
+}
+
+function agentServerError(res, err = {}) {
+  return agentRouteError(res, 500, err?.message || 'Agent route failed.', {
+    code: 'agent_internal_error',
+    agentStatus: 'server_error',
+  });
+}
+
 function buildPendingSubmissionLockKey(slug, response) {
   const normalizedSlug = String(slug ?? '').trim().toLowerCase();
   const questionId = String(response?.questionId || '').trim().toLowerCase();
@@ -433,6 +831,164 @@ export function filterPendingResponsesForSubmission(
   return filteredByRespondent.filter((entry) => idSet.has(String(entry?.questionId || '').toLowerCase()));
 }
 
+async function saveAgentResponseDraft({ body = {}, authPayload = {} } = {}) {
+  const {
+    questionId,
+    session,
+    answer,
+    questionType,
+    conviction,
+    importance,
+    additional,
+    encrypt,
+    encryptAdditional,
+    answerEncryptionAudience,
+    answerEncryptionGateId,
+    additionalEncryptionAudience,
+    additionalEncryptionGateId,
+  } = body || {};
+  const questionValidation = validateQuestionId(questionId);
+  if (!questionValidation.ok) {
+    return {
+      ok: false,
+      status: 400,
+      payload: buildAgentError(questionValidation.error, {
+        status: 'bad_request',
+        code: 'invalid_question_id',
+      }),
+    };
+  }
+  const canonicalQuestionId = questionValidation.questionId;
+  const sessionValidation = validateAgentSessionSlug(session, {
+    required: true,
+  });
+  if (!sessionValidation.ok) {
+    return {
+      ok: false,
+      status: 400,
+      payload: buildAgentError(sessionValidation.error, {
+        status: 'bad_request',
+        code: 'invalid_session',
+      }),
+    };
+  }
+
+  const normalizedQuestionType = String(questionType || 'unknown').toLowerCase().trim();
+  let resolvedAnswer = answer;
+  if (normalizedQuestionType === 'rating' && answer != null) {
+    if (typeof answer === 'number') {
+      resolvedAnswer = answer;
+    } else {
+      const str = String(answer).trim();
+      const direct = Number(str);
+      if (Number.isFinite(direct)) {
+        resolvedAnswer = direct;
+      } else {
+        const match = str.match(/(\d+(?:\.\d+)?)/);
+        resolvedAnswer = match ? Number(match[1]) : answer;
+      }
+    }
+  }
+
+  const isEmptyAnswer = resolvedAnswer == null
+    || (typeof resolvedAnswer === 'string' && resolvedAnswer.trim() === '');
+  const isInvalidRating = normalizedQuestionType === 'rating'
+    && (resolvedAnswer == null || !Number.isFinite(Number(resolvedAnswer)) || Number(resolvedAnswer) < 0 || Number(resolvedAnswer) > 10);
+  if (isEmptyAnswer || isInvalidRating) {
+    return {
+      ok: false,
+      status: 400,
+      payload: buildAgentError('questionId and answer are required.', {
+        status: 'bad_request',
+        code: 'invalid_response_draft',
+      }),
+    };
+  }
+
+  const storedAnswerResult = normalizeStoredResponseAnswer(answer, normalizedQuestionType, resolvedAnswer);
+  if (!storedAnswerResult.ok) {
+    return {
+      ok: false,
+      status: storedAnswerResult.status,
+      payload: buildAgentError(storedAnswerResult.error, {
+        status: 'bad_request',
+        code: 'invalid_answer',
+      }),
+    };
+  }
+
+  const slug = sessionValidation.slug;
+  const metadata = await getSessionMetadata(slug).catch(() => null);
+  const audienceContext = deriveResponseGateOptionsFromMetadata(metadata, { isQuestionResponseFlow: true });
+  const encryptionRequested = isEncryptionRequested(encrypt);
+  const hasAdditionalText = String(additional ?? '').trim() !== '';
+  const hasExplicitEncryptAdditional = Object.prototype.hasOwnProperty.call(body || {}, 'encryptAdditional');
+  const encryptionAdditionalRequested = hasExplicitEncryptAdditional
+    ? isEncryptionRequested(encryptAdditional)
+    : (encryptionRequested && hasAdditionalText);
+  const normalizedAudiences = normalizeResponseAudienceSelections({
+    answerAudience: answerEncryptionAudience,
+    answerGateId: answerEncryptionGateId,
+    additionalAudience: additionalEncryptionAudience,
+    additionalGateId: additionalEncryptionGateId,
+    encryptRequested: encryptionRequested,
+    encryptAdditionalRequested: hasExplicitEncryptAdditional ? encryptionAdditionalRequested : null,
+    hasAdditionalText,
+    gateOptions: audienceContext.gateOptions,
+  });
+
+  const dir = resolve(RESPONSES_DIR, slug);
+  const rel = relative(resolve(RESPONSES_DIR), dir);
+  if (rel.startsWith('..') || resolve(RESPONSES_DIR, rel) !== dir) {
+    return {
+      ok: false,
+      status: 400,
+      payload: buildAgentError('Invalid session slug.', {
+        status: 'bad_request',
+        code: 'invalid_session',
+      }),
+    };
+  }
+  mkdirSync(dir, { recursive: true });
+
+  const response = {
+    questionId: canonicalQuestionId,
+    answer: storedAnswerResult.storedAnswer,
+    conviction: conviction != null ? conviction : null,
+    importance: importance != null ? importance : null,
+    additional: additional || null,
+    encrypt: isEncryptedAudience(normalizedAudiences.answerEncryptionAudience),
+    encryptAdditional: hasAdditionalText
+      ? isEncryptedAudience(normalizedAudiences.additionalEncryptionAudience)
+      : false,
+    answerEncryptionAudience: normalizedAudiences.answerEncryptionAudience,
+    answerEncryptionGateId: normalizedAudiences.answerEncryptionGateId,
+    additionalEncryptionAudience: normalizedAudiences.additionalEncryptionAudience,
+    additionalEncryptionGateId: normalizedAudiences.additionalEncryptionGateId,
+    additionalAudienceMode: normalizedAudiences.additionalAudienceMode,
+    questionType: questionType || 'unknown',
+    respondent: authPayload.sub,
+    timestamp: new Date().toISOString(),
+    submitted: false,
+    agentDraft: true,
+    source: 'agent-http',
+  };
+  const file = resolve(dir, `${canonicalQuestionId.replace(/[^a-fA-F0-9x]/g, '_')}.json`);
+  writeSecureFile(file, JSON.stringify(response, null, 2));
+  clearServed(questionId);
+
+  return {
+    ok: true,
+    status: 200,
+    response,
+    payload: buildAgentOk({
+      stored: true,
+      submitted: false,
+      draft: summarizePendingResponseForAgent(response, { session: slug }),
+    }, { status: 'draft_saved' }),
+  };
+}
+
 function validateSessionSlug(value, { required = false, allowExplicitEmpty = false } = {}) {
   const raw = value == null ? null : String(value).trim();
   if (raw == null) {
@@ -448,6 +1004,20 @@ function validateSessionSlug(value, { required = false, allowExplicitEmpty = fal
     return { ok: false, error: 'Invalid session slug.' };
   }
   return { ok: true, slug };
+}
+
+function validateAgentSessionSlug(value, { required = false } = {}) {
+  const raw = value == null ? null : String(value).trim();
+  if (raw === '') {
+    return {
+      ok: false,
+      error: 'session must be a non-empty agent session slug; use "general" for the general session.',
+    };
+  }
+  return validateSessionSlug(value, {
+    required,
+    allowExplicitEmpty: false,
+  });
 }
 
 function validateConfigSessionSlug(value, fieldName, { allowEmpty = false } = {}) {
@@ -604,6 +1174,8 @@ export function buildHookResponseDefaults(config = {}) {
 
 function buildCompactHookQuestion(question, slug) {
   if (!question) return null;
+  const storageRef = resolvePayloadStorageRef(question, { resource: 'questions' });
+  const arweaveTxId = getLegacyArweaveTxId(question) || null;
   return {
     id: question.id || '',
     session: slug,
@@ -614,8 +1186,30 @@ function buildCompactHookQuestion(question, slug) {
     singleSelect: question.singleSelect !== false,
     tags: Array.isArray(question.tags) ? question.tags : [],
     associatedSurveyId: question.associatedSurveyId || null,
-    arweaveTxId: question.arweaveTxId || null,
+    arweaveTxId,
+    ...(storageRef ? { storageRef } : {}),
   };
+}
+
+function buildStorageRefFromResult(result, index, resource = 'responses') {
+  const storageRefs = Array.isArray(result?.storageRefs) ? result.storageRefs : [];
+  const directRef = storageRefs[index] || null;
+  const arweaveTxId = Array.isArray(result?.arweaveTxIds)
+    ? String(result.arweaveTxIds[index] || '').trim()
+    : '';
+  return resolvePayloadStorageRef({
+    storageRef: directRef,
+    arweaveTxId,
+    resource,
+  }, { resource });
+}
+
+function buildSurveyStorageRefFromResult(result) {
+  return resolvePayloadStorageRef({
+    storageRef: result?.surveyStorageRef,
+    arweaveTxId: result?.surveyArweaveTxId,
+    resource: 'responses',
+  }, { resource: 'responses' });
 }
 
 function buildAutoSubmitStatus(kind, fields = {}) {
@@ -1080,8 +1674,18 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
             stored.submitted = true;
             stored.txHash = result.txHash;
             stored.blockNumber = result.blockNumber ?? null;
-            stored.arweaveTxId = result.arweaveTxIds?.[i] || null;
-            stored.surveyArweaveTxId = result.surveyArweaveTxId || null;
+            const storageRef = buildStorageRefFromResult(result, i);
+            const surveyStorageRef = buildSurveyStorageRefFromResult(result);
+            stored.arweaveTxId = getLegacyArweaveTxId({
+              storageRef,
+              arweaveTxId: result.arweaveTxIds?.[i],
+            }) || null;
+            stored.storageRef = storageRef || null;
+            stored.surveyArweaveTxId = getLegacyArweaveTxId({
+              storageRef: surveyStorageRef,
+              arweaveTxId: result.surveyArweaveTxId,
+            }) || null;
+            stored.surveyStorageRef = surveyStorageRef || null;
             stored.submittedAt = submittedAt;
             writeSecureFile(file, JSON.stringify(stored, null, 2));
           }
@@ -1144,6 +1748,30 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
     return json(res, 200, auth.payload);
   }
 
+  if (path === '/api/agent/me' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const hookConfig = loadHookConfig();
+    const sessions = getConfiguredSessions(hookConfig);
+    const walletAddress = auth.payload?.sub || '';
+    const workerTokenSummary = summarizeWorkerTokenStatuses(sessions, walletAddress);
+    return json(res, 200, buildAgentOk({
+      identity: auth.payload,
+      wallet: walletAddress,
+      auth: {
+        type: 'local-jwt',
+        scope: auth.payload?.scope || null,
+      },
+      capabilities: buildAgentCapabilities({
+        wallet: walletAddress,
+        sessions,
+        workerTokenSummary,
+        settings: loadSettings(),
+        submitStatus: canSubmitImpl(),
+      }),
+    }));
+  }
+
   if (path === '/api/sessions' && method === 'GET') {
     const auth = requireAuth(req);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
@@ -1160,6 +1788,27 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       });
     } catch (err) {
       return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/agent/sessions' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    try {
+      const { scoped, all } = await listScopedSessions();
+      for (const slug of scoped) {
+        warmQuestionCache(slug);
+      }
+      const hookConfig = loadHookConfig();
+      return json(res, 200, buildAgentOk({
+        sessions: scoped,
+        allSessions: all,
+        selectedSessions: getConfiguredSessions(hookConfig),
+        scope: CE_SESSION_SCAN_SCOPE,
+        scopeSlugs: CE_SESSION_SCAN_SLUGS,
+      }));
+    } catch (err) {
+      return agentServerError(res, err);
     }
   }
 
@@ -1257,6 +1906,84 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       });
     } catch (err) {
       return json(res, 500, { error: err.message });
+    }
+  }
+
+  if (path === '/api/agent/questions' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
+      required: true,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
+    const slug = sessionValidation.slug;
+    const walletAddr = auth.payload?.sub || '';
+    try {
+      const hookConfig = loadHookConfig();
+      const allowReanswer = hookConfig.allowReanswer === true || hookConfig.allowReanswer === 'true';
+      const randomUnseen = await getRandomUnseenImpl(slug, { walletAddress: walletAddr, allowReanswer });
+      const question = randomUnseen?.question || null;
+      const metadata = await getSessionMetadata(slug).catch(() => null);
+      const audienceContext = deriveResponseGateOptionsFromMetadata(metadata, { isQuestionResponseFlow: true });
+      return json(res, 200, normalizeAgentQuestionPayload({
+        session: slug,
+        question,
+        fields: {
+          message: question ? undefined : 'No questions available.',
+          allowReanswer,
+          gateOptions: audienceContext.gateOptions,
+          defaultGateId: audienceContext.defaultGateId || '',
+        },
+      }));
+    } catch (err) {
+      return agentServerError(res, err);
+    }
+  }
+
+  if (path === '/api/agent/inbox' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
+      required: false,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
+    try {
+      const sessions = sessionValidation.slug
+        ? [sessionValidation.slug]
+        : getConfiguredSessions(loadHookConfig());
+      const pendingResponses = sessions.flatMap((slug) => filterResponsesByRespondent(
+        loadPendingResponses(slug),
+        auth.payload?.sub || '',
+      ).map((response) => summarizePendingResponseForAgent(response, { session: slug })));
+      const requests = loadAgentRequestsForWallet(auth.payload?.sub || '')
+        .filter((request) => (
+          !sessionValidation.slug
+          || String(request?.session || '').trim().toLowerCase() === sessionValidation.slug.toLowerCase()
+        ))
+        .map((request) => summarizeAgentRequestForRead(request).summary);
+      const requestStatusCounts = summarizeAgentRequestStatusCounts(requests);
+      return json(res, 200, buildAgentOk({
+        inbox: [
+          ...pendingResponses,
+          ...requests,
+        ],
+        pendingResponses,
+        requests,
+        requestStatusCounts,
+        count: pendingResponses.length + requests.length,
+      }));
+    } catch (err) {
+      return agentServerError(res, err);
     }
   }
 
@@ -1471,6 +2198,802 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   }
 
   // --- Response submission (store locally for later on-chain submission) ---
+
+  if (path === '/api/agent/responses/draft' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    try {
+      const result = await saveAgentResponseDraft({
+        body,
+        authPayload: auth.payload,
+      });
+      return json(res, result.status, result.payload);
+    } catch (err) {
+      return agentServerError(res, err);
+    }
+  }
+
+  if (path === '/api/agent/responses/drafts' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
+      required: true,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
+    const slug = sessionValidation.slug;
+    try {
+      const drafts = filterResponsesByRespondent(
+        loadPendingResponses(slug),
+        auth.payload?.sub || '',
+      );
+      return json(res, 200, buildAgentOk({
+        session: slug,
+        drafts,
+        summaries: drafts.map((response) => summarizePendingResponseForAgent(response, { session: slug })),
+        count: drafts.length,
+      }));
+    } catch (err) {
+      return agentServerError(res, err);
+    }
+  }
+
+  if (path === '/api/agent/responses/submit-request' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+
+    const { session, questionIds, questionId } = body || {};
+    const sessionValidation = validateAgentSessionSlug(session, {
+      required: true,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
+
+    const rawQuestionIds = Array.isArray(questionIds)
+      ? questionIds
+      : (questionId ? [questionId] : []);
+    const normalizedQuestionIds = rawQuestionIds.map((value) => validateQuestionId(value));
+    if (!normalizedQuestionIds.length || normalizedQuestionIds.some((entry) => !entry.ok)) {
+      return agentRouteError(res, 400, 'questionIds must contain at least one 32-byte hex string.', {
+        code: 'invalid_question_ids',
+        agentStatus: 'bad_request',
+      });
+    }
+
+    const requester = auth.payload?.sub || '';
+    const requestQuestionIds = normalizedQuestionIds.map((entry) => entry.questionId);
+    const requestFingerprint = buildAgentRequestFingerprint({
+      type: AGENT_REQUEST_TYPES.RESPONSE_SUBMIT,
+      requester,
+      session: sessionValidation.slug,
+      questionIds: requestQuestionIds,
+    });
+    const idempotencyKey = normalizeAgentIdempotencyKey(body?.idempotencyKey);
+    const existingRequest = loadAgentRequestByIdempotencyKey(auth.payload?.sub || '', idempotencyKey);
+    if (existingRequest) {
+      const existingFingerprint = existingRequest.fingerprint || buildAgentRequestFingerprint(existingRequest);
+      if (existingFingerprint !== requestFingerprint) {
+        return json(res, 409, buildAgentError('idempotencyKey conflicts with an existing agent request.', {
+          status: 'idempotency_conflict',
+          code: 'idempotency_key_conflict',
+        }));
+      }
+      const existingRead = summarizeAgentRequestForRead(existingRequest);
+      if (existingRead.summary.requiresApproval !== true) {
+        return json(res, 409, buildAgentError(
+          'idempotencyKey refers to an agent request that is not pending approval.',
+          {
+            status: 'request_not_pending_approval',
+            code: 'idempotency_key_not_pending_approval',
+            fields: {
+              request: existingRead.summary,
+              lifecycle: existingRead.lifecycle,
+            },
+          },
+        ));
+      }
+      const existingApproval = buildApprovalRequiredResponse({
+        requestId: existingRequest.requestId,
+        serverUrl: getTrustedAgentServerUrl(),
+        fields: {
+          capabilityMode: 'submit-request',
+          idempotent: true,
+        },
+      });
+      return json(res, 202, {
+        ...existingApproval,
+        request: summarizeAgentRequestForRead({
+          ...existingRequest,
+          approvalUrl: existingApproval.approvalUrl,
+        }).summary,
+      });
+    }
+
+    const requestId = createApprovalRequestId();
+    const createdAt = new Date().toISOString();
+    const serverUrl = getTrustedAgentServerUrl();
+    const approval = buildApprovalRequiredResponse({
+      requestId,
+      serverUrl,
+      fields: {
+        capabilityMode: 'submit-request',
+      },
+    });
+    const record = saveAgentRequest(buildAgentRequestRecord({
+      type: AGENT_REQUEST_TYPES.RESPONSE_SUBMIT,
+      requestId,
+      status: approval.status,
+      requiresApproval: true,
+      approvalUrl: approval.approvalUrl,
+      session: sessionValidation.slug,
+      questionIds: normalizedQuestionIds.map((entry) => entry.questionId),
+      requester,
+      idempotencyKey,
+      createdAt,
+      updatedAt: createdAt,
+      source: 'agent-http',
+      payload: redactAgentSensitiveFields({
+        session: sessionValidation.slug,
+        questionIds: normalizedQuestionIds.map((entry) => entry.questionId),
+        agentContext: body?.agentContext || null,
+      }),
+    }));
+
+    return json(res, 202, {
+      ...approval,
+      request: summarizeAgentRequestForRead(record).summary,
+    });
+  }
+
+  if (path === '/api/agent/responses/delegated-execute' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+
+    const { session, questionIds, questionId, grantId, agentId } = body || {};
+    const sessionValidation = validateAgentSessionSlug(session, {
+      required: true,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
+
+    const rawQuestionIds = Array.isArray(questionIds)
+      ? questionIds
+      : (questionId ? [questionId] : []);
+    const normalizedQuestionIds = rawQuestionIds.map((value) => validateQuestionId(value));
+    if (!normalizedQuestionIds.length || normalizedQuestionIds.some((entry) => !entry.ok)) {
+      return agentRouteError(res, 400, 'questionIds must contain at least one 32-byte hex string.', {
+        code: 'invalid_question_ids',
+        agentStatus: 'bad_request',
+      });
+    }
+
+    const normalizedGrantId = String(grantId || '').trim();
+    if (!isValidAgentGrantId(normalizedGrantId)) {
+      return agentRouteError(res, 400, 'Invalid agent grant id.', {
+        code: 'invalid_grant_id',
+        agentStatus: 'bad_request',
+      });
+    }
+
+    const requester = auth.payload?.sub || '';
+    const grant = loadAgentGrant(normalizedGrantId);
+    if (!grant || normalizeAddressLower(grant.humanPrincipal) !== normalizeAddressLower(requester)) {
+      return agentRouteError(res, 404, 'Agent grant not found.', {
+        code: 'agent_grant_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+
+    const requestQuestionIds = normalizedQuestionIds.map((entry) => entry.questionId);
+    const actionId = AGENT_ACTION_IDS.RESPONSE_DELEGATED_EXECUTE;
+    const decision = evaluateScopedDelegatedExecutionGrant(grant, {
+      requiredScope: AGENT_GRANT_SCOPES.DELEGATED_EXECUTE,
+      session: sessionValidation.slug,
+      actionId,
+      riskLevel: AGENT_RISK_LEVELS.MEDIUM,
+      humanPrincipal: requester,
+      agentId,
+      auditWillBeRecorded: true,
+      exposesRemoteSigningAuthority: false,
+      exposesRemoteWorkerAuthority: false,
+    });
+    if (!decision.ok) {
+      return json(res, 403, buildAgentError('Scoped delegated grant denied.', {
+        status: 'denied',
+        code: 'agent_grant_denied',
+        fields: {
+          reason: decision.reason,
+          grant: summarizeAgentGrantForRead(decision.grant),
+        },
+      }));
+    }
+
+    const requestFingerprint = buildAgentRequestFingerprint({
+      type: AGENT_REQUEST_TYPES.RESPONSE_DELEGATED_EXECUTE,
+      requester,
+      session: sessionValidation.slug,
+      actionId,
+      grantId: normalizedGrantId,
+      questionIds: requestQuestionIds,
+    });
+    const idempotencyKey = normalizeAgentIdempotencyKey(body?.idempotencyKey);
+    const existingRequest = loadAgentRequestByIdempotencyKey(auth.payload?.sub || '', idempotencyKey);
+    if (existingRequest) {
+      const existingFingerprint = existingRequest.fingerprint || buildAgentRequestFingerprint(existingRequest);
+      if (existingFingerprint !== requestFingerprint) {
+        return json(res, 409, buildAgentError('idempotencyKey conflicts with an existing agent request.', {
+          status: 'idempotency_conflict',
+          code: 'idempotency_key_conflict',
+        }));
+      }
+      const existingRead = summarizeAgentRequestForRead(existingRequest);
+      return json(res, 202, buildAgentOk({
+        executed: false,
+        execution: {
+          status: 'contract_only_deferred',
+          reason: 'delegated_execution_already_recorded',
+          productDecisionRequired: true,
+        },
+        idempotent: true,
+        request: existingRead.summary,
+        lifecycle: existingRead.lifecycle,
+      }, { status: 'delegated_execution_deferred' }));
+    }
+
+    const requestId = createApprovalRequestId();
+    const createdAt = new Date().toISOString();
+    const record = saveAgentRequest(buildAgentRequestRecord({
+      type: AGENT_REQUEST_TYPES.RESPONSE_DELEGATED_EXECUTE,
+      requestId,
+      status: AGENT_REQUEST_STATUS.APPROVED,
+      requiresApproval: false,
+      approvalUrl: null,
+      session: sessionValidation.slug,
+      questionIds: requestQuestionIds,
+      requester,
+      actionId,
+      grantId: normalizedGrantId,
+      idempotencyKey,
+      createdAt,
+      updatedAt: createdAt,
+      source: 'agent-http',
+      payload: redactAgentSensitiveFields({
+        session: sessionValidation.slug,
+        questionIds: requestQuestionIds,
+        agentId,
+        grantId: normalizedGrantId,
+        actionId,
+        executionPolicy: AGENT_EXECUTION_POLICIES.SCOPED_DELEGATED_EXECUTE,
+        executionStatus: 'contract_only_deferred',
+        agentContext: body?.agentContext || null,
+      }),
+    }));
+
+    const requestRead = summarizeAgentRequestForRead(record);
+    return json(res, 202, buildAgentOk({
+      executed: false,
+      execution: {
+        status: 'contract_only_deferred',
+        reason: 'delegated_execution_validated',
+        productDecisionRequired: true,
+      },
+      grant: summarizeAgentGrantForRead(decision.grant),
+      request: requestRead.summary,
+      lifecycle: requestRead.lifecycle,
+    }, { status: 'delegated_execution_deferred' }));
+  }
+
+  if (path === '/api/agent/connect-requests' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+
+    const requester = auth.payload?.sub || '';
+    const requestId = createApprovalRequestId();
+    const createdAt = new Date().toISOString();
+    const serverUrl = getTrustedAgentServerUrl();
+    const validation = validateAgentConnectRequestForCreation({
+      ...body,
+      requestId,
+      humanPrincipal: requester,
+      requester,
+      createdAt,
+      updatedAt: createdAt,
+      status: AGENT_REQUEST_STATUS.PENDING_APPROVAL,
+    }, {
+      humanPrincipal: requester,
+    });
+    if (!validation.ok) {
+      return json(res, 400, buildAgentError('Invalid agent connect request.', {
+        status: 'bad_request',
+        code: 'invalid_connect_request',
+        fields: {
+          reason: validation.reason,
+        },
+      }));
+    }
+
+    const normalized = validation.request;
+    const existingRequest = loadAgentRequestByIdempotencyKey(requester, normalized.idempotencyKey);
+    if (existingRequest) {
+      const existingConnect = normalizeAgentConnectRequest(existingRequest);
+      if (existingConnect.fingerprint !== normalized.fingerprint) {
+        return json(res, 409, buildAgentError('idempotencyKey conflicts with an existing agent connect request.', {
+          status: 'idempotency_conflict',
+          code: 'idempotency_key_conflict',
+        }));
+      }
+      const existingRead = summarizeAgentConnectRequestForRead(existingConnect);
+      if (existingRead.connectRequest.requiresApproval !== true) {
+        return json(res, 409, buildAgentError(
+          'idempotencyKey refers to an agent connect request that is not pending approval.',
+          {
+            status: 'request_not_pending_approval',
+            code: 'idempotency_key_not_pending_approval',
+            fields: existingRead,
+          },
+        ));
+      }
+      return json(res, 202, {
+        ...buildApprovalRequiredResponse({
+          requestId: existingConnect.requestId,
+          approvalUrl: existingConnect.approvalUrl,
+          serverUrl,
+          reason: 'human_grant_approval_required',
+          message: 'Human approval is required before this scoped agent grant can be created.',
+          fields: {
+            capabilityMode: 'connect-grant-request',
+            idempotent: true,
+          },
+        }),
+        ...existingRead,
+      });
+    }
+
+    const approval = buildApprovalRequiredResponse({
+      requestId,
+      serverUrl,
+      reason: 'human_grant_approval_required',
+      message: 'Human approval is required before this scoped agent grant can be created.',
+      fields: {
+        capabilityMode: 'connect-grant-request',
+      },
+    });
+    const record = saveAgentRequest({
+      ...normalized,
+      requestId,
+      status: AGENT_REQUEST_STATUS.PENDING_APPROVAL,
+      requiresApproval: true,
+      requester,
+      approvalUrl: approval.approvalUrl,
+      createdAt,
+      updatedAt: createdAt,
+      payload: redactAgentSensitiveFields({
+        agentId: normalized.agentId,
+        requestedScopes: normalized.requestedScopes,
+        requestedSessions: normalized.requestedSessions,
+        requestedActions: normalized.requestedActions,
+        riskCeiling: normalized.riskCeiling,
+        executionPolicy: normalized.executionPolicy,
+        auditRequired: normalized.auditRequired,
+        expiresAt: normalized.expiresAt,
+        agentContext: body?.agentContext || null,
+      }),
+    });
+    return json(res, 202, {
+      ...approval,
+      ...summarizeAgentConnectRequestForRead(record),
+    });
+  }
+
+  if (path === '/api/agent/connect-requests/approve' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    if (isAgentConnectApprovalOverrideAttempt(body)) {
+      return json(res, 400, buildAgentError('Connect request approval cannot override scoped grant fields.', {
+        status: 'bad_request',
+        code: 'connect_request_scope_override_denied',
+      }));
+    }
+    const requestId = String(body?.requestId || '').trim();
+    if (!isValidApprovalRequestId(requestId)) {
+      return agentRouteError(res, 400, 'Invalid agent request id.', {
+        code: 'invalid_request_id',
+        agentStatus: 'bad_request',
+      });
+    }
+    const request = loadAgentRequest(requestId);
+    const walletAddress = normalizeAddressLower(auth.payload?.sub || '');
+    if (
+      !request
+      || request.type !== AGENT_REQUEST_TYPES.CONNECT_GRANT
+      || normalizeAddressLower(request.humanPrincipal || request.requester) !== walletAddress
+    ) {
+      return agentRouteError(res, 404, 'Agent connect request not found.', {
+        code: 'agent_connect_request_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+    const decision = evaluateAgentConnectRequestApproval(request, {
+      humanPrincipal: walletAddress,
+    });
+    if (!decision.ok) {
+      return json(res, 409, buildAgentError('Agent connect request cannot be approved.', {
+        status: 'not_approvable',
+        code: 'connect_request_not_approvable',
+        fields: {
+          reason: decision.reason,
+          ...summarizeAgentConnectRequestForRead(decision.request),
+        },
+      }));
+    }
+    const approvedAt = new Date().toISOString();
+    const grantId = createAgentGrantIdFromConnectRequestId(requestId);
+    const grant = saveAgentGrant(buildAgentGrantFromConnectRequest(decision.request, {
+      grantId,
+      approvedAt,
+    }));
+    const updated = saveAgentRequest({
+      ...request,
+      status: AGENT_REQUEST_STATUS.APPROVED,
+      requiresApproval: false,
+      grantId,
+      approvedAt,
+      updatedAt: approvedAt,
+    });
+    return json(res, 200, buildAgentOk({
+      approved: true,
+      grant: summarizeAgentGrantForRead(grant),
+      ...summarizeAgentConnectRequestForRead(updated),
+    }, { status: 'connect_request_approved' }));
+  }
+
+  if (path === '/api/agent/connect-requests/deny' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    if (isAgentConnectApprovalOverrideAttempt(body)) {
+      return json(res, 400, buildAgentError('Connect request denial cannot override scoped grant fields.', {
+        status: 'bad_request',
+        code: 'connect_request_scope_override_denied',
+      }));
+    }
+    const requestId = String(body?.requestId || '').trim();
+    if (!isValidApprovalRequestId(requestId)) {
+      return agentRouteError(res, 400, 'Invalid agent request id.', {
+        code: 'invalid_request_id',
+        agentStatus: 'bad_request',
+      });
+    }
+    const request = loadAgentRequest(requestId);
+    const walletAddress = normalizeAddressLower(auth.payload?.sub || '');
+    if (
+      !request
+      || request.type !== AGENT_REQUEST_TYPES.CONNECT_GRANT
+      || normalizeAddressLower(request.humanPrincipal || request.requester) !== walletAddress
+    ) {
+      return agentRouteError(res, 404, 'Agent connect request not found.', {
+        code: 'agent_connect_request_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+    const decision = evaluateAgentConnectRequestApproval(request, {
+      humanPrincipal: walletAddress,
+    });
+    if (!decision.ok) {
+      return json(res, 409, buildAgentError('Agent connect request cannot be denied.', {
+        status: 'not_deniable',
+        code: 'connect_request_not_deniable',
+        fields: {
+          reason: decision.reason,
+          ...summarizeAgentConnectRequestForRead(decision.request),
+        },
+      }));
+    }
+    const deniedAt = new Date().toISOString();
+    const updated = saveAgentRequest({
+      ...request,
+      status: AGENT_REQUEST_STATUS.REJECTED,
+      requiresApproval: false,
+      deniedAt,
+      denialReason: String(body?.reason || '').trim() || null,
+      updatedAt: deniedAt,
+    });
+    return json(res, 200, buildAgentOk({
+      denied: true,
+      ...summarizeAgentConnectRequestForRead(updated),
+    }, { status: 'connect_request_denied' }));
+  }
+
+  if (path.startsWith('/api/agent/connect-requests/') && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const requestId = decodeURIComponent(path.slice('/api/agent/connect-requests/'.length));
+    if (!isValidApprovalRequestId(requestId)) {
+      return agentRouteError(res, 400, 'Invalid agent request id.', {
+        code: 'invalid_request_id',
+        agentStatus: 'bad_request',
+      });
+    }
+    const request = loadAgentRequest(requestId);
+    const walletAddress = normalizeAddressLower(auth.payload?.sub || '');
+    if (
+      !request
+      || request.type !== AGENT_REQUEST_TYPES.CONNECT_GRANT
+      || normalizeAddressLower(request.humanPrincipal || request.requester) !== walletAddress
+    ) {
+      return agentRouteError(res, 404, 'Agent connect request not found.', {
+        code: 'agent_connect_request_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+    return json(res, 200, buildAgentOk(summarizeAgentConnectRequestForRead(request)));
+  }
+
+  if (path === '/api/agent/accounts/create' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    if (bodyContainsAgentSensitiveMaterial(body)) {
+      return json(res, 400, buildAgentError('Managed account requests must not include secrets or signing material.', {
+        status: 'bad_request',
+        code: 'account_secret_material_denied',
+      }));
+    }
+
+    const createdAt = new Date().toISOString();
+    const prepared = normalizeManagedAgentAccountContract({
+      body,
+      authPayload: auth.payload,
+      createdAt,
+      lifecycle: 'account_created',
+    });
+    if (!prepared.ok) {
+      return json(res, 400, buildAgentError(prepared.error || 'Invalid managed account request.', {
+        status: 'bad_request',
+        code: 'invalid_managed_account_request',
+      }));
+    }
+
+    const existing = loadAgentAccount(prepared.account.accountId);
+    const account = existing
+      ? {
+        ...existing,
+        lifecycle: 'account_recovered',
+        recoveredAt: createdAt,
+        updatedAt: createdAt,
+        signingAuthority: false,
+        workerTokenAuthority: false,
+        privateKeyAuthority: false,
+        longLivedBearerAuthority: false,
+        rawKeyMaterialExportable: false,
+        signingEnabled: false,
+        contractOnly: true,
+      }
+      : prepared.account;
+    const saved = saveAgentAccount(account);
+    const eventType = existing
+      ? AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED
+      : AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED;
+    const event = saveAgentBridgeEvent(buildAgentAccountEvent({
+      eventType,
+      account: saved,
+      createdAt,
+    }));
+    return json(res, existing ? 200 : 201, buildAgentOk({
+      account: saved,
+      event,
+      events: [event],
+      signingEnabled: false,
+      contractOnly: true,
+    }, {
+      status: existing ? 'account_recovered' : 'account_created',
+    }));
+  }
+
+  if (path === '/api/agent/accounts/link-request' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    if (bodyContainsAgentSensitiveMaterial(body)) {
+      return json(res, 400, buildAgentError('Account link requests must not include secrets or signing material.', {
+        status: 'bad_request',
+        code: 'account_secret_material_denied',
+      }));
+    }
+
+    const accountId = String(body?.accountId || body?.managedAccountId || '').trim();
+    const account = loadAgentAccount(accountId);
+    const requester = normalizeAddressLower(auth.payload?.sub || '');
+    if (!account || normalizeAddressLower(account.humanPrincipal) !== requester) {
+      return agentRouteError(res, 404, 'Managed agent account not found.', {
+        code: 'managed_agent_account_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+
+    const idempotencyKey = normalizeAgentIdempotencyKey(body?.idempotencyKey);
+    const requestFingerprint = buildAgentRequestFingerprint({
+      type: AGENT_REQUEST_TYPES.ACCOUNT_LINK,
+      requester,
+      session: account.session || 'general',
+      actionId: AGENT_ACTION_IDS.ACCOUNT_LINK_REQUEST,
+      grantId: account.accountId,
+    });
+    const existingRequest = loadAgentRequestByIdempotencyKey(requester, idempotencyKey);
+    if (existingRequest) {
+      const existingFingerprint = existingRequest.fingerprint || buildAgentRequestFingerprint(existingRequest);
+      if (existingFingerprint !== requestFingerprint) {
+        return json(res, 409, buildAgentError('idempotencyKey conflicts with an existing account link request.', {
+          status: 'idempotency_conflict',
+          code: 'idempotency_key_conflict',
+        }));
+      }
+      const existingRead = summarizeAgentRequestForRead(existingRequest);
+      return json(res, 202, buildAgentOk({
+        request: existingRead.summary,
+        lifecycle: existingRead.lifecycle,
+        account,
+        idempotent: true,
+        linked: false,
+        signingEnabled: false,
+        contractOnly: true,
+      }, { status: 'account_link_requested' }));
+    }
+
+    const requestId = createApprovalRequestId();
+    const createdAt = new Date().toISOString();
+    const approval = buildApprovalRequiredResponse({
+      requestId,
+      serverUrl: getTrustedAgentServerUrl(),
+      reason: 'account_link_approval_required',
+      message: 'Human approval is required before this managed account can be linked.',
+      fields: {
+        capabilityMode: 'account-link-request',
+      },
+    });
+    const request = saveAgentRequest(buildAgentRequestRecord({
+      type: AGENT_REQUEST_TYPES.ACCOUNT_LINK,
+      requestId,
+      status: approval.status,
+      requiresApproval: true,
+      approvalUrl: approval.approvalUrl,
+      session: account.session || 'general',
+      requester,
+      actionId: AGENT_ACTION_IDS.ACCOUNT_LINK_REQUEST,
+      grantId: account.accountId,
+      idempotencyKey,
+      createdAt,
+      updatedAt: createdAt,
+      source: 'agent-http',
+      payload: redactAgentSensitiveFields({
+        accountId: account.accountId,
+        accountAddress: account.accountAddress,
+        targetPrincipal: body?.targetPrincipal || null,
+        agentContext: body?.agentContext || null,
+      }),
+    }));
+    const requestRead = summarizeAgentRequestForRead(request);
+    const event = saveAgentBridgeEvent(buildAgentAccountEvent({
+      eventType: AGENT_BRIDGE_EVENT_TYPES.LINK_REQUESTED,
+      account,
+      request,
+      createdAt,
+    }));
+    return json(res, 202, {
+      ...approval,
+      account,
+      request: requestRead.summary,
+      lifecycle: requestRead.lifecycle,
+      event,
+      events: [event],
+      linked: false,
+      signingEnabled: false,
+      contractOnly: true,
+    });
+  }
+
+  if (path === '/api/agent/grants' && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
+      required: false,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
+    const requestedSession = sessionValidation.slug.toLowerCase();
+    const grants = loadAgentGrantsForWallet(auth.payload?.sub || '')
+      .filter((grant) => (
+        !requestedSession
+        || grant.sessions.map((entry) => String(entry || '').toLowerCase()).includes(requestedSession)
+      ))
+      .map((grant) => summarizeAgentGrantForRead(grant));
+    return json(res, 200, buildAgentOk({
+      grants,
+      count: grants.length,
+    }));
+  }
+
+  if (path === '/api/agent/grants/revoke' && method === 'POST') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const grantId = String(body?.grantId || '').trim();
+    if (!isValidAgentGrantId(grantId)) {
+      return agentRouteError(res, 400, 'Invalid agent grant id.', {
+        code: 'invalid_grant_id',
+        agentStatus: 'bad_request',
+      });
+    }
+    const grant = loadAgentGrant(grantId);
+    if (!grant || normalizeAddressLower(grant.humanPrincipal) !== normalizeAddressLower(auth.payload?.sub || '')) {
+      return agentRouteError(res, 404, 'Agent grant not found.', {
+        code: 'agent_grant_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+    const revokedAt = new Date().toISOString();
+    const revoked = saveAgentGrant({
+      ...grant,
+      status: 'revoked',
+      revokedAt: grant.revokedAt || revokedAt,
+      updatedAt: revokedAt,
+    });
+    return json(res, 200, buildAgentOk({
+      revoked: true,
+      grant: summarizeAgentGrantForRead(revoked),
+    }, { status: 'grant_revoked' }));
+  }
+
+  if (path.startsWith('/api/agent/grants/') && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
+      required: false,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
+    const grantId = decodeURIComponent(path.slice('/api/agent/grants/'.length));
+    if (!isValidAgentGrantId(grantId)) {
+      return agentRouteError(res, 400, 'Invalid agent grant id.', {
+        code: 'invalid_grant_id',
+        agentStatus: 'bad_request',
+      });
+    }
+    const grant = loadAgentGrant(grantId);
+    const requestedSession = sessionValidation.slug.toLowerCase();
+    if (
+      !grant
+      || normalizeAddressLower(grant.humanPrincipal) !== normalizeAddressLower(auth.payload?.sub || '')
+      || (
+        requestedSession
+        && !grant.sessions.map((entry) => String(entry || '').toLowerCase()).includes(requestedSession)
+      )
+    ) {
+      return agentRouteError(res, 404, 'Agent grant not found.', {
+        code: 'agent_grant_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+    return json(res, 200, buildAgentOk({
+      grant: summarizeAgentGrantForRead(grant),
+    }));
+  }
 
   if (path === '/api/respond' && method === 'POST') {
     const auth = requireAuth(req);
@@ -1802,8 +3325,18 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
               stored.submitted = true;
               stored.txHash = result.txHash;
               stored.blockNumber = result.blockNumber ?? null;
-              stored.arweaveTxId = result.arweaveTxIds?.[i] || null;
-              stored.surveyArweaveTxId = result.surveyArweaveTxId || null;
+              const storageRef = buildStorageRefFromResult(result, i);
+              const surveyStorageRef = buildSurveyStorageRefFromResult(result);
+              stored.arweaveTxId = getLegacyArweaveTxId({
+                storageRef,
+                arweaveTxId: result.arweaveTxIds?.[i],
+              }) || null;
+              stored.storageRef = storageRef || null;
+              stored.surveyArweaveTxId = getLegacyArweaveTxId({
+                storageRef: surveyStorageRef,
+                arweaveTxId: result.surveyArweaveTxId,
+              }) || null;
+              stored.surveyStorageRef = surveyStorageRef || null;
               stored.submittedAt = new Date().toISOString();
               writeSecureFile(file, JSON.stringify(stored, null, 2));
             }
@@ -1849,7 +3382,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   if (path === '/api/responses/mark-submitted' && method === 'POST') {
     const auth = requireAuth(req);
     if (!auth.ok) return json(res, auth.status, { error: auth.error });
-    const { questionId, session, txHash, arweaveTxId } = body || {};
+    const { questionId, session, txHash, arweaveTxId, storageRef } = body || {};
     const questionValidation = validateQuestionId(questionId);
     if (!questionValidation.ok) return json(res, 400, { error: questionValidation.error });
     const sessionValidation = validateSessionSlug(session, {
@@ -1872,7 +3405,13 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       }
       response.submitted = true;
       response.txHash = txHash || null;
-      response.arweaveTxId = arweaveTxId || null;
+      const compatibleStorage = attachStorageRefCompatibilityFields({
+        arweaveTxId,
+        storageRef,
+        resource: 'responses',
+      }, { resource: 'responses' });
+      response.arweaveTxId = getLegacyArweaveTxId(compatibleStorage) || null;
+      response.storageRef = compatibleStorage.storageRef || null;
       response.submittedAt = new Date().toISOString();
       writeSecureFile(file, JSON.stringify(response, null, 2));
       try {
@@ -1882,6 +3421,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
           txHash: txHash || null,
           questionIds: [canonicalQuestionId],
           arweaveTxIds: arweaveTxId ? [arweaveTxId] : [],
+          storageRefs: compatibleStorage.storageRef ? [compatibleStorage.storageRef] : [],
           submittedAt: response.submittedAt,
         });
       } catch (stateErr) {
@@ -1891,6 +3431,45 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
     } catch (err) {
       return json(res, 500, { error: err.message });
     }
+  }
+
+  if (path.startsWith('/api/agent/requests/') && method === 'GET') {
+    const auth = requireAuth(req);
+    if (!auth.ok) return agentAuthError(res, auth);
+    const sessionValidation = validateAgentSessionSlug(url.searchParams.get('session'), {
+      required: false,
+    });
+    if (!sessionValidation.ok) {
+      return agentRouteError(res, 400, sessionValidation.error, {
+        code: 'invalid_session',
+        agentStatus: 'bad_request',
+      });
+    }
+    const requestId = decodeURIComponent(path.slice('/api/agent/requests/'.length));
+    if (!isValidApprovalRequestId(requestId)) {
+      return agentRouteError(res, 400, 'Invalid agent request id.', {
+        code: 'invalid_request_id',
+        agentStatus: 'bad_request',
+      });
+    }
+    const request = loadAgentRequest(requestId);
+    const walletAddress = normalizeAddressLower(auth.payload?.sub || '');
+    const requestedSession = sessionValidation.slug.toLowerCase();
+    if (
+      !request
+      || (walletAddress && normalizeAddressLower(request.requester) !== walletAddress)
+      || (requestedSession && String(request.session || '').trim().toLowerCase() !== requestedSession)
+    ) {
+      return agentRouteError(res, 404, 'Agent request not found.', {
+        code: 'agent_request_not_found',
+        agentStatus: 'not_found',
+      });
+    }
+    const requestRead = summarizeAgentRequestForRead(request);
+    return json(res, 200, buildAgentOk({
+      request: requestRead.summary,
+      lifecycle: requestRead.lifecycle,
+    }));
   }
 
   // --- Question creation (on-chain) ---

@@ -172,6 +172,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           verifyAdminSignature: deps?.verifyAdminSignature,
           getSessionSecrets: deps?.getSessionSecrets,
           arweaveUpload: deps?.arweaveUpload,
+          storageRoute: deps?.storageRoute,
         },
         constants: {
           missingSlugError: constants?.missingSlugError,
@@ -289,6 +290,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           getSessionSecrets: deps?.getSessionSecrets,
           transcribe: deps?.transcribe,
           arweaveUpload: deps?.arweaveUpload,
+          storageRoute: deps?.storageRoute,
           fetchImage: deps?.fetchImage,
           fetchUrl: deps?.fetchUrl,
           normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,

@@ -1481,9 +1481,21 @@ test('submit-onchain marks all successful pending responses as submitted in orde
     assert.equal(storedEncrypted.submitted, true);
     assert.equal(storedEncrypted.txHash, '0xabc123');
     assert.equal(storedEncrypted.arweaveTxId, 'tx-encrypted');
+    assert.deepEqual(storedEncrypted.storageRef, {
+      backend: 'arweave',
+      id: 'tx-encrypted',
+      uri: 'ar://tx-encrypted',
+      resource: 'responses',
+    });
     assert.equal(storedPlain.submitted, true);
     assert.equal(storedPlain.txHash, '0xabc123');
     assert.equal(storedPlain.arweaveTxId, 'tx-plain');
+    assert.deepEqual(storedPlain.storageRef, {
+      backend: 'arweave',
+      id: 'tx-plain',
+      uri: 'ar://tx-plain',
+      resource: 'responses',
+    });
   } finally {
     if (prevDataDir == null) delete process.env.CE_CC_DATA_DIR;
     else process.env.CE_CC_DATA_DIR = prevDataDir;
@@ -2336,7 +2348,19 @@ test('worker-token storage auto-submits matching pending responses on login by d
     assert.equal(storedResponse.txHash, '0xautosubmit');
     assert.equal(storedResponse.blockNumber, 123);
     assert.equal(storedResponse.arweaveTxId, 'tx-auto-login');
+    assert.deepEqual(storedResponse.storageRef, {
+      backend: 'arweave',
+      id: 'tx-auto-login',
+      uri: 'ar://tx-auto-login',
+      resource: 'responses',
+    });
     assert.equal(storedResponse.surveyArweaveTxId, 'survey-auto-login');
+    assert.deepEqual(storedResponse.surveyStorageRef, {
+      backend: 'arweave',
+      id: 'survey-auto-login',
+      uri: 'ar://survey-auto-login',
+      resource: 'responses',
+    });
     assert.equal(typeof storedResponse.submittedAt, 'string');
     assert.equal(untouchedResponse.submitted, false);
     assert.equal(untouchedResponse.txHash, undefined);
@@ -3243,6 +3267,12 @@ test('mark-submitted records confirmed local submission state for the authentica
     assert.equal(confirmed.wallet, walletAddress.toLowerCase());
     assert.equal(confirmed.questions[questionId.toLowerCase()].txHash, '0x1234');
     assert.equal(confirmed.questions[questionId.toLowerCase()].arweaveTxId, 'ArweaveId123');
+    assert.deepEqual(confirmed.questions[questionId.toLowerCase()].storageRef, {
+      backend: 'arweave',
+      id: 'ArweaveId123',
+      uri: 'ar://ArweaveId123',
+      resource: 'responses',
+    });
   } finally {
     if (prevDataDir == null) delete process.env.CE_CC_DATA_DIR;
     else process.env.CE_CC_DATA_DIR = prevDataDir;
