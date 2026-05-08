@@ -726,8 +726,32 @@ describe('error paths', () => {
     );
 
     expect(surveyResult.receipt).toEqual({ status: 1, transactionHash: '0xtxhash' });
+    expect(surveyResult.surveyArweaveTxId).toBe(SURVEY_TX_ID);
+    expect(surveyResult.surveyStorageRef).toEqual({
+      backend: 'arweave',
+      id: SURVEY_TX_ID,
+      uri: `ar://${SURVEY_TX_ID}`,
+      resource: 'surveys',
+    });
+    expect(surveyResult.uploadedQuestions[0]).toEqual(expect.objectContaining({
+      questionId: expect.any(String),
+      arweaveTxId: QUESTION_TX_ID,
+      storageRef: expect.objectContaining({
+        backend: 'arweave',
+        id: QUESTION_TX_ID,
+        resource: 'questions',
+      }),
+    }));
     expect(questionsResult.receipt).toEqual({ status: 1, transactionHash: '0xtxhash' });
     expect(questionsResult.uploadedQuestions).toHaveLength(1);
+    expect(questionsResult.uploadedQuestions[0]).toEqual(expect.objectContaining({
+      arweaveTxId: QUESTION_TX_ID,
+      storageRef: expect.objectContaining({
+        backend: 'arweave',
+        id: QUESTION_TX_ID,
+        resource: 'questions',
+      }),
+    }));
     expect(mockSurveyContract.addSurvey).not.toHaveBeenCalled();
     expect(mockSurveyContract.addQuestions).not.toHaveBeenCalled();
     expect(rpcProvider.request).toHaveBeenCalledWith(expect.objectContaining({

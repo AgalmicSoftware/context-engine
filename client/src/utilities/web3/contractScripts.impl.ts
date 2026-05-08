@@ -86,7 +86,11 @@ import {
   shouldBypassSessionScopeWindow,
 } from '../session/sessionScopeWindow.js';
 import { toStr } from '../shared/primitives.js';
-import { storageRefFromLegacyArweaveTxId } from '../storage/storageRefs.js';
+import {
+  STORAGE_RESOURCE_KEYS,
+  attachStorageRefCompatibilityFields,
+  deriveStorageRefFromLegacyArweaveTxId,
+} from '../storage/storageRefs.js';
 import store from '../../store';
 import { sessionRegistryStore, sessionRegistryUtils } from './sessionRegistry.js';
 import { createContractHelperMethods } from './contractHelpers.js';
@@ -2678,7 +2682,22 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         revertMessage: 'addSurveyWithQuestions transaction reverted on-chain.',
       });
       clearReadCachesForGroup(groupKeyOrCfg);
-      return { receipt };
+      const surveyStorageRef = deriveStorageRefFromLegacyArweaveTxId(surveyArweaveHash, {
+        resource: STORAGE_RESOURCE_KEYS.SURVEYS,
+      });
+      const uploadedQuestions = qIds32.map((id, index) => (
+        attachStorageRefCompatibilityFields({
+          questionId: id,
+          arweaveTxId: questionArweaveHashes[index],
+          resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+        }, { resource: STORAGE_RESOURCE_KEYS.QUESTIONS })
+      ));
+      return {
+        receipt,
+        surveyArweaveTxId: surveyArweaveHash,
+        ...(surveyStorageRef ? { surveyStorageRef } : {}),
+        uploadedQuestions,
+      };
     } catch (error) {
       notifyUserFacingTransactionError(error);
       throw error;
@@ -2802,12 +2821,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
 
     const uploadedQuestions = qIds32.map((id, index) => {
       const arweaveTxId = questionArweaveHashes[index];
-      const storageRef = storageRefFromLegacyArweaveTxId(arweaveTxId);
-      return {
+      return attachStorageRefCompatibilityFields({
         questionId: id,
         arweaveTxId,
-        ...(storageRef ? { storageRef } : {}),
-      };
+        resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+      }, { resource: STORAGE_RESOURCE_KEYS.QUESTIONS });
     });
 
     clearReadCachesForGroup(groupKeyOrCfg);
@@ -3109,10 +3127,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
         const mockedResponse = readE2EMockedViewedResponse();
         if (mockedResponse) {
           normalizeSessionNameFields(mockedResponse);
-          mockedResponse.arweaveTxId = arweaveHashBase64;
-          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHashBase64);
-          if (storageRef) mockedResponse.storageRef = storageRef;
-          return normalizeConvictionImportance(mockedResponse);
+          return normalizeConvictionImportance(attachStorageRefCompatibilityFields({
+            ...mockedResponse,
+            arweaveTxId: arweaveHashBase64,
+            resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+          }, { resource: STORAGE_RESOURCE_KEYS.RESPONSES }));
         }
         if (!ARWEAVE_ACTIVE) {
           return null;
@@ -3143,10 +3162,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           });
         }
         normalizeSessionNameFields(responseJson);
-        responseJson.arweaveTxId = arweaveHashBase64;
-        const storageRef = storageRefFromLegacyArweaveTxId(arweaveHashBase64);
-        if (storageRef) responseJson.storageRef = storageRef;
-        return normalizeConvictionImportance(responseJson);
+        return normalizeConvictionImportance(attachStorageRefCompatibilityFields({
+          ...responseJson,
+          arweaveTxId: arweaveHashBase64,
+          resource: STORAGE_RESOURCE_KEYS.RESPONSES,
+        }, { resource: STORAGE_RESOURCE_KEYS.RESPONSES }));
       }
     );
     return cloneJsonSafe(result);
@@ -3425,10 +3445,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           if (!skipDecrypt) {
             await maybeDecryptQuestionPayload(questionData, groupKeyOrCfg, opts);
           }
-          questionData.arweaveTxId = arweaveHash;
-          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHash);
-          if (storageRef) questionData.storageRef = storageRef;
-          return questionData;
+          return attachStorageRefCompatibilityFields({
+            ...questionData,
+            arweaveTxId: arweaveHash,
+            resource: STORAGE_RESOURCE_KEYS.QUESTIONS,
+          }, { resource: STORAGE_RESOURCE_KEYS.QUESTIONS });
         }
       );
       return cloneJsonSafe(result);
@@ -3510,10 +3531,11 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
           if (!skipDecrypt) {
             await maybeDecryptSurveyPayload(parsed, groupKeyOrCfg, opts);
           }
-          parsed.arweaveTxId = arweaveHash;
-          const storageRef = storageRefFromLegacyArweaveTxId(arweaveHash);
-          if (storageRef) parsed.storageRef = storageRef;
-          return parsed;
+          return attachStorageRefCompatibilityFields({
+            ...parsed,
+            arweaveTxId: arweaveHash,
+            resource: STORAGE_RESOURCE_KEYS.SURVEYS,
+          }, { resource: STORAGE_RESOURCE_KEYS.SURVEYS });
         }
       );
       return cloneJsonSafe(result);
