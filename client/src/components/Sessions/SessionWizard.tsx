@@ -517,6 +517,7 @@ type MetadataObjectCollapsedState = Record<string, boolean> & {
   faucet: boolean;
   ai: boolean;
   lit: boolean;
+  storageProfile: boolean;
 };
 
 type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
@@ -1060,6 +1061,7 @@ const SessionWizard = ({
     faucet: true,
     ai: true,
     lit: true,
+    storageProfile: true,
   });
   const [collapsedSections, setCollapsedSections] = useState<CollapsedSectionsState>(() => ({
     worker: true,
@@ -2665,6 +2667,27 @@ const SessionWizard = ({
           }
         >
           {!isCollapsed && Object.entries(lit).map(([childKey, childValue]) =>
+            renderField(childKey, childValue, currentPath)
+          )}
+        </CollapsibleFieldGroup>
+      );
+    }
+
+    if (path.length === 0 && key === 'storageProfile') {
+      if (wizardMode !== 'advanced') return null;
+      const storageProfile = value && typeof value === 'object' ? value : {};
+      const isCollapsed = metadataObjectCollapsed.storageProfile;
+      return (
+        <CollapsibleFieldGroup
+          key={keyString}
+          title={displayLabel}
+          isCollapsed={isCollapsed}
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
+          }
+        >
+          {!isCollapsed && Object.entries(storageProfile).map(([childKey, childValue]) =>
             renderField(childKey, childValue, currentPath)
           )}
         </CollapsibleFieldGroup>

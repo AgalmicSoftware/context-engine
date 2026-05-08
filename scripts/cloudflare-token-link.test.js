@@ -22,11 +22,14 @@ test('buildCloudflareTokenTemplateUrl only requests the deploy-helper scopes it 
     /^contextEngine-corsSessionWorker-alpha-session-[A-Z]{3}\d{2}-\d{4}-\d{4}(AM|PM)$/
   );
   assert.deepEqual(JSON.parse(url.searchParams.get('permissionGroupKeys')), [
-    { key: 'workers_kv_storage', type: 'edit' },
     { key: 'workers_scripts', type: 'edit' },
+    { key: 'workers_kv_storage', type: 'edit' },
+    { key: 'workers_r2_storage', type: 'edit' },
+    { key: 'd1', type: 'edit' },
+    { key: 'workers_durable_objects', type: 'edit' },
     { key: 'account_settings', type: 'edit' },
   ]);
-  assert.equal(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.length, 3);
+  assert.equal(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.length, 6);
 });
 
 test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {
