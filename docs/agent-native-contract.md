@@ -250,6 +250,38 @@ integration principal, session, and grant. They do not implement webhooks, bot
 tokens, OpenClaw transport, real signing, delegated session keys, or worker
 authority.
 
+`workers/agentBridgeWorker/` now contains the private deployable worker
+skeleton. It is intentionally independent from `workers/sessionCorsWorker/`.
+The skeleton includes dependency-free pure modules for:
+
+- Telegram mock update normalization and group/private lane routing.
+- Opaque action IDs for callbacks, private deep links, and server-side context
+  refs.
+- Managed Telegram demo account metadata and explicit `export_demo_key` /
+  `recover_demo_key` actions.
+- A `ManagedDemoSignerDurableObject` boundary that signs canonical testnet demo
+  envelopes, records audit events, and keeps broadcast disabled.
+- Doc-library records that model R2 bytes, D1 metadata/index state, and KV
+  short-lived actions.
+- Event logs, sanitized group-safe envelopes, session/SBT join policy,
+  sponsored-resource policy, and Telegram question-card controls.
+
+The signer currently creates signed demo envelopes only. It does not broadcast
+transactions or touch production authority. Raw demo key export/recover is
+private-only, testnet/demo-labeled, audited, and rejected for passkey, Porto,
+CE-CC local, linked external wallet, and production account modes.
+
+The worker doc-library contract supports Markdown (`md`), PDF (`pdf`), and
+images (`png`, `jpg`, `jpeg`, `webp`). Group summaries may show public question
+text, document titles, answer labels, aggregate counts, file type, visibility,
+and index status. Private/session/SBT-gated document contents stay behind
+private refs and are not included in group-safe summaries.
+
+Telegram question-card helpers guard CE client parity for the demo lane:
+rating controls are fixed at 0-10, every question card includes additional
+comments and microphone actions, and doc/context controls appear when documents
+exist.
+
 ## Telegram Group-To-Private Contract
 
 `contextEngine-cc/lib/agent/telegramContracts.mjs` models the V1 bot-first
@@ -311,6 +343,8 @@ This private lane tracks CE-CC source under private version control while public
 release and public-history tooling continue to strip `contextEngine-cc/**`.
 They also strip `docs/agent-native*.md` and the private
 `client/public/skill.md` artifact until the agent API is explicitly public.
+While the Telegram bridge worker is private, the same release tooling strips
+`workers/agentBridgeWorker/**`.
 It uses dependency-free pure contract tests and router-level agent harness tests.
 The current private branch includes the local runtime files needed for
 app-server `/api/agent/*` tests. From the repo root, `npm run test:cc` runs the
@@ -320,9 +354,11 @@ are meaningful for this package shape.
 The `contextengine.sh` domain cutover is planned separately from this lane.
 
 Private implementation and contract details stay under public-release strip
-patterns: `contextEngine-cc/**` and `docs/agent-native*.md`. CE-CC local state,
-secrets, dependency installs, logs, and caches remain ignored even though source
-files are private-tracked.
+patterns: `contextEngine-cc/**`, `docs/agent-native*.md`, private
+`client/public/skill.md`, and `workers/agentBridgeWorker/**`. CE-CC and agent
+bridge worker local state, secrets, dependency installs, logs, generated state,
+and key-like artifacts remain ignored even though source files are
+private-tracked.
 
 ## MCP Wrapper Status
 

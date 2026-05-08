@@ -9,7 +9,8 @@ The canonical agent surface is `/api/agent/*`. Telegram, OpenClaw, MCP, and loca
 - Never place session payloads, question payloads, answer text, grants, JWTs, private keys, worker tokens, seed phrases, or account material in Telegram callbacks, deep-link payloads, CloudStorage, Mini App payloads, or chat state.
 - Treat Telegram group chat as the public lobby. Use private chat with the same bot for account setup and actions.
 - Group-card deep links must carry only opaque action IDs. Resolve group, session, and question context server-side.
-- Do not request raw key export. Do not expect passkey, Porto, wallet, or CE-CC local accounts to sign remotely.
+- Raw key export/recover is allowed only through explicit `export_demo_key` or `recover_demo_key` actions for managed Telegram demo/testnet accounts, in private-only UX with audit events.
+- Do not expect passkey, Porto, wallet, production, or CE-CC local accounts to sign remotely.
 - Scoped delegated execution is only available where a safe authority boundary exists, such as a managed demo/testnet account. Otherwise create an approval request.
 
 ## Account Modes
@@ -30,6 +31,13 @@ Content-Type: application/json
 The response returns address and account metadata only. It must not return raw private keys, seed phrases, CE-CC JWTs, worker tokens, or durable signing authority.
 
 Passkey, Porto, wallet, and CE-CC local accounts remain approval-required, local-session-key-only, or AA-only according to their existing boundaries.
+
+Private bridge worker status:
+
+- `workers/agentBridgeWorker/` is the private Telegram demo bridge worker and is stripped from public releases while private.
+- The worker uses a Durable Object signer boundary for managed demo accounts and currently returns signed testnet demo envelopes only; broadcast is disabled.
+- Supported bridge doc-library file types are `md`, `pdf`, `png`, `jpg`, `jpeg`, and `webp`.
+- Telegram question cards must keep CE parity: rating is 0-10, every card has comment and microphone actions, and doc/context appears when documents exist.
 
 ## Core Flows
 
