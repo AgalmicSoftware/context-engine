@@ -153,6 +153,10 @@ import {
   isSessionWizardDefaultWorkerPlaceholderUrl,
 } from './sessionWizardWorkerDefaults';
 import {
+  SESSION_STORAGE_BACKENDS,
+  normalizeSessionStorageProfileConfig,
+} from './sessionWizardStorageProfile';
+import {
   DEFAULT_AI_MODELS,
   normalizeAiModelForProvider,
   normalizeAiModels,
@@ -2675,8 +2679,17 @@ const SessionWizard = ({
 
     if (path.length === 0 && key === 'storageProfile') {
       if (wizardMode !== 'advanced') return null;
-      const storageProfile = value && typeof value === 'object' ? value : {};
+      const storageProfile = normalizeSessionStorageProfileConfig(value);
       const isCollapsed = metadataObjectCollapsed.storageProfile;
+      const updateStorageBackend = (backend) => {
+        updateDraftValue(
+          ['storageProfile'],
+          normalizeSessionStorageProfileConfig({
+            ...(value && typeof value === 'object' ? value : {}),
+            backend,
+          })
+        );
+      };
       return (
         <CollapsibleFieldGroup
           key={keyString}
@@ -2687,8 +2700,38 @@ const SessionWizard = ({
             setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
           }
         >
-          {!isCollapsed && Object.entries(storageProfile).map(([childKey, childValue]) =>
-            renderField(childKey, childValue, currentPath)
+          {!isCollapsed && (
+            <>
+              <div
+                className={styles.inlineToggleRow}
+                role="radiogroup"
+                aria-label="Session storage profile"
+              >
+                {[
+                  { backend: SESSION_STORAGE_BACKENDS.ARWEAVE, label: 'Arweave' },
+                  { backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE, label: 'Cloudflare' },
+                ].map((option) => {
+                  const selected = storageProfile.backend === option.backend;
+                  return (
+                    <Button
+                      key={option.backend}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={`${styles.workerModePill} ${selected ? styles.workerModePillActive : ''}`}
+                      onClick={() => updateStorageBackend(option.backend)}
+                    >
+                      {option.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              {storageProfile.backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE ? (
+                <div className={styles.helperText}>
+                  Cloudflare profile uses R2, D1, KV, and Durable Objects through the session worker.
+                </div>
+              ) : null}
+            </>
           )}
         </CollapsibleFieldGroup>
       );
