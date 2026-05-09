@@ -41,9 +41,14 @@ function normalizePositiveInteger(value, fallback) {
 }
 
 function normalizeBlock(value) {
+  if (value == null || safeString(value) === '') return null;
   const raw = Number(value);
   if (!Number.isFinite(raw) || raw < 0) return null;
   return Math.floor(raw);
+}
+
+function envFlagEnabled(value = '') {
+  return ['1', 'true', 'yes', 'on'].includes(lower(value));
 }
 
 function normalizeHexAddress(value = '') {
@@ -341,6 +346,7 @@ function resolveScanWindow({
     fromBlock,
     toBlock,
     source: explicitStart == null ? 'fallback_recent_blocks' : 'session_block_limits',
+    sessionScoped: explicitStart != null,
   };
 }
 
@@ -352,13 +358,20 @@ async function scanQuestionIds({
   env = {},
   fetchImpl = globalThis.fetch,
 } = {}) {
-  if (!surveysAddress) return [];
-  if (toBlock < fromBlock) return [];
+  const summary = {
+    ids: [],
+    chunksAttempted: 0,
+    chunksSucceeded: 0,
+    chunksFailed: 0,
+    errors: [],
+  };
+  if (!surveysAddress) return summary;
+  if (toBlock < fromBlock) return summary;
   const chunkSize = normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_LOG_CHUNK_SIZE, DEFAULT_LOG_CHUNK_SIZE);
-  const ids = [];
   const seen = new Set();
   for (let from = fromBlock; from <= toBlock; from += chunkSize) {
     const to = Math.min(from + chunkSize - 1, toBlock);
+    summary.chunksAttempted += 1;
     const result = await rpcWithFallback({
       rpcUrls,
       method: 'eth_getLogs',
@@ -370,17 +383,22 @@ async function scanQuestionIds({
       }],
       fetchImpl,
     });
-    if (!result.ok) continue;
+    if (!result.ok) {
+      summary.chunksFailed += 1;
+      if (summary.errors.length < 3) summary.errors.push(result.error || 'eth_getLogs failed');
+      continue;
+    }
+    summary.chunksSucceeded += 1;
     const logs = Array.isArray(result.result) ? result.result : [];
     for (const log of logs) {
       for (const questionId of decodeBytes32ArrayFromData(log?.data || '', 0)) {
         if (seen.has(questionId)) continue;
         seen.add(questionId);
-        ids.push(questionId);
+        summary.ids.push(questionId);
       }
     }
   }
-  return ids;
+  return summary;
 }
 
 function normalizeQuestionVisibility(payload = {}) {
@@ -537,7 +555,20 @@ export async function listCachedSessionQuestionsForBridge({
     };
   }
   const scanWindow = resolveScanWindow({ currentBlock, session, env });
-  const allIds = await scanQuestionIds({
+  if (scanWindow.sessionScoped !== true && !envFlagEnabled(env.AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN)) {
+    return {
+      ok: false,
+      reason: 'question_scan_window_unscoped',
+      sessionSlug: slug,
+      source: 'live_session_question_cache',
+      chainId: normalizeChainId(session.chainId),
+      surveysAddress,
+      scanWindow,
+      questions: [],
+    };
+  }
+
+  const scanResult = await scanQuestionIds({
     rpcUrls,
     surveysAddress,
     fromBlock: scanWindow.fromBlock,
@@ -545,9 +576,25 @@ export async function listCachedSessionQuestionsForBridge({
     env,
     fetchImpl,
   });
+  const allIds = scanResult.ids;
+  if (scanResult.chunksAttempted > 0 && scanResult.chunksSucceeded === 0) {
+    return {
+      ok: false,
+      reason: 'question_log_scan_failed',
+      error: scanResult.errors[0] || 'Question log scan failed',
+      sessionSlug: slug,
+      source: 'live_session_question_cache',
+      chainId: normalizeChainId(session.chainId),
+      surveysAddress,
+      scanWindow,
+      scan: scanResult,
+      questions: [],
+    };
+  }
   const maxQuestions = normalizePositiveInteger(env.AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION, DEFAULT_MAX_QUESTIONS);
   const candidateIds = allIds.slice(-maxQuestions).reverse();
   const questions = [];
+  let payloadFailureCount = 0;
   for (const questionId of candidateIds) {
     const question = await fetchQuestionPayload({
       rpcUrls,
@@ -557,11 +604,19 @@ export async function listCachedSessionQuestionsForBridge({
       fetchImpl,
     });
     if (question) questions.push(question);
+    else payloadFailureCount += 1;
   }
+  const hadReadFailures = scanResult.chunksFailed > 0 || payloadFailureCount > 0;
+  const ok = questions.length > 0 || !hadReadFailures;
+  const reason = questions.length
+    ? (hadReadFailures ? 'live_questions_loaded_partial' : 'live_questions_loaded')
+    : (scanResult.chunksFailed > 0
+        ? 'question_log_scan_partial_failed'
+        : (payloadFailureCount > 0 ? 'question_payload_load_failed' : 'live_questions_empty'));
 
   const result = {
-    ok: true,
-    reason: questions.length ? 'live_questions_loaded' : 'live_questions_empty',
+    ok,
+    reason,
     sessionSlug: slug,
     source: 'live_session_question_cache',
     cacheLayer: 'fresh',
@@ -569,12 +624,16 @@ export async function listCachedSessionQuestionsForBridge({
     chainId: normalizeChainId(session.chainId),
     surveysAddress,
     scanWindow,
+    scan: scanResult,
     discoveredCount: allIds.length,
+    payloadFailureCount,
     questionCount: questions.length,
     questions,
   };
-  questionMemoryCache.set(key, result);
-  await writeKvCache(env, key, result, ttlSeconds);
+  if (ok && !hadReadFailures) {
+    questionMemoryCache.set(key, result);
+    await writeKvCache(env, key, result, ttlSeconds);
+  }
   return result;
 }
 
@@ -593,4 +652,5 @@ export const __test__sessionQuestions = {
   normalizeQuestionPayload,
   questionMemoryCache,
   resolveScanWindow,
+  scanQuestionIds,
 };

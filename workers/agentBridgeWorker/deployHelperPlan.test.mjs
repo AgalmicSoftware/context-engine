@@ -251,6 +251,7 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
       AGENT_BRIDGE_DEMO_DOCS_JSON: docs,
       AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: '25',
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+      AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN: '1',
       AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS: '300',
       AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK: '100',
       AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK: '200',
@@ -274,6 +275,10 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_QUESTION_SOURCE' &&
     binding.text === 'fixture'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN' &&
+    binding.text === '1'
   )), true);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS' &&

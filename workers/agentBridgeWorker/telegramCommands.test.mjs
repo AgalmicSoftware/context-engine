@@ -5,6 +5,7 @@ import {
   dispatchTelegramCommandResponse,
   parseTelegramCommandText,
 } from './telegramCommands.mjs';
+import { __test__sessionQuestions } from './sessionQuestions.mjs';
 
 class MemoryKv {
   constructor() {
@@ -200,6 +201,7 @@ test('/ce_sessions uses live SessionRegistry slugs when no demo session policy i
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'group_session_card');
+  assert.match(result.response.text, /Available sessions:/);
   assert.match(result.response.text, /- alpha \(alpha\)/);
   assert.match(result.response.text, /- beta-room \(beta-room\)/);
   assert.equal(result.response.text.includes('general'), false);
@@ -240,6 +242,45 @@ test('/ce_questions and callback dispatch list questions without leaking locked 
 });
 
 test('/ce_questions does not invent demo questions when live question cache is empty', async () => {
+  __test__sessionQuestions.clearCaches();
+  const questionFetch = async (_url, init = {}) => {
+    const body = JSON.parse(init.body || '{}');
+    if (body.method === 'eth_blockNumber') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0x64' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (body.method === 'eth_getLogs') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected ${body.method}`);
+  };
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions alpha'),
+    env: baseEnv({
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+      AGENT_BRIDGE_QUESTION_SKIP_SESSION_REGISTRY: '1',
+      AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK: '90',
+      AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK: '100',
+      QUESTION_FETCH: questionFetch,
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questionCount, 0);
+  assert.equal(result.questionSourceReason, 'live_questions_empty');
+  assert.match(result.response.text, /No public questions are available yet/);
+  assert.equal(result.response.text.includes('q-readiness'), false);
+  assert.equal(result.response.text.includes('What should Alpha decide next'), false);
+});
+
+test('/ce_questions reports live source failures without caching them as empty lists', async () => {
+  __test__sessionQuestions.clearCaches();
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/ce_questions alpha'),
     env: baseEnv({
@@ -252,9 +293,9 @@ test('/ce_questions does not invent demo questions when live question cache is e
 
   assert.equal(result.ok, true);
   assert.equal(result.questionCount, 0);
-  assert.match(result.response.text, /No public questions are available yet/);
-  assert.equal(result.response.text.includes('q-readiness'), false);
-  assert.equal(result.response.text.includes('What should Alpha decide next'), false);
+  assert.equal(result.questionSourceReason, 'question_rpc_url_missing');
+  assert.match(result.response.text, /Question source is missing RPC config/);
+  assert.equal(result.response.text.includes('No public questions are available yet'), false);
 });
 
 test('group session binding makes later question and doc commands use the joined session', async () => {
