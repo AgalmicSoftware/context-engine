@@ -1,4 +1,6 @@
-# Copy this file to wrangler.toml for private demo deployment.
+# Developer fallback only. Product/operator setup should use deploy:apply, which
+# creates resources, uploads the Worker, and writes secrets through Cloudflare API.
+# Copy this file to wrangler.toml only for manual private demo debugging.
 
 name = "ce-agent-bridge-worker"
 main = "worker.js"
@@ -15,12 +17,15 @@ durable_objects.bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["ManagedDemoSignerDurableObject"]
+new_sqlite_classes = ["ManagedDemoSignerDurableObject"]
 
 kv_namespaces = [
   { binding = "AGENT_ACTION_KV", id = "YOUR_SHORT_LIVED_ACTION_KV_NAMESPACE_ID" },
 ]
 
+# Optional bridge-owned demo doc/artifact storage. The normal live Telegram
+# smoke deploy omits these bindings unless AGENT_BRIDGE_ENABLE_DOC_STORAGE=true
+# or deploy:apply receives --enable-doc-storage.
 [[d1_databases]]
 binding = "AGENT_DOCS_D1"
 database_name = "ce-agent-docs-private"
@@ -43,9 +48,10 @@ DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 AGENT_AI_PROVIDER = "ce_session_policy"
 BROADCAST_ENABLED = "false"
 
-# Set secrets with Wrangler, never in this file:
+# deploy:apply writes these secrets through Cloudflare API. If debugging a
+# manual Wrangler deployment, set secrets with Wrangler, never in this file:
 #   npx wrangler secret put TELEGRAM_BOT_TOKEN
 #   npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
 #   npx wrangler secret put DEMO_SIGNER_ROOT_SECRET
-# Optional local deploy automation credential; prefer `wrangler login`:
-#   npx wrangler secret put CLOUDFLARE_API_TOKEN
+# Keep CLOUDFLARE_API_TOKEN out of deployed Worker secrets. Use it only from an
+# untracked local shell/.env/.dev.vars for deploy planning or apply automation.

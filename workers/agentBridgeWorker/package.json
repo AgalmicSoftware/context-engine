@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "deploy:apply": "node deployHelperApply.mjs",
     "deploy:plan": "node deployHelperPlan.mjs",
     "test": "node --test *.test.mjs"
   },

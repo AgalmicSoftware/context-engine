@@ -1,6 +1,6 @@
 # PRD 553: Telegram Bot Bridge and OpenClaw Thread
 
-## Current State - 2026-05-08
+## Current State - 2026-05-09
 
 - `sessionCorsWorker` is the canonical session payload storage and access
   enforcement boundary for Cloudflare-backed docs/context, questions, surveys,
@@ -13,9 +13,9 @@
   onboarding preferences, suggested drafts, opaque action IDs, event logs, and
   managed demo account state, but it must call canonical CE agent/session APIs
   for real session questions, responses, docs/context, and survey payloads.
-- Live Telegram setup scaffolding is present with safe `.dev.vars`, `.env`, and
-  Wrangler examples plus a secret-token-gated `/telegram/webhook`
-  acknowledgement route.
+- Live Telegram setup scaffolding is present with safe `.dev.vars`, `.env`,
+  deploy-plan/apply helpers, and Wrangler fallback examples plus a
+  secret-token-gated `/telegram/webhook` acknowledgement route.
 - Current branch: `agent-native-telegram-live`.
 - Recent landed commits before this setup slice:
   - `56d6f157 feat(autocoder): add live Telegram bridge commands`
@@ -32,17 +32,47 @@
     exactly one Cloudflare account from `CLOUDFLARE_API_TOKEN` and blocks if the
     token can see multiple accounts because account selection is not implemented
     yet.
-  - Real Telegram credentials and live network deploy remain disabled/mocked in
-    tests until BotFather values and a private deploy token are available.
+  - `workers/agentBridgeWorker` deploy planning is offline by default. It can
+    opt in to a single live Cloudflare account lookup with
+    `--live-account-lookup` or `AGENT_BRIDGE_LIVE_ACCOUNT_LOOKUP=1`; tests keep
+    this mocked and no token is printed.
+  - `workers/agentBridgeWorker` now has a dry-run-by-default `deploy:apply`
+    helper. Live mode requires `--apply`, reads untracked `.dev.vars` directly,
+    creates or reuses KV, uploads the module Worker, writes Worker secrets
+    through the Cloudflare API, enables workers.dev, sets the Telegram webhook,
+    and verifies `/health`. Bridge-owned R2/D1 demo storage is explicitly
+    opt-in with `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or
+    `--enable-doc-storage`; the default Telegram smoke no longer requires
+    Cloudflare R2 account enablement.
+  - The Worker upload uses Cloudflare's direct multipart metadata shape for
+    SQLite-backed Durable Object migrations and retries without migrations when
+    the `v1` migration has already been applied.
+  - Live network deploys remain disabled/mocked in tests unless explicitly run
+    with `--apply`; real secrets remain untracked.
+  - First live apply completed for
+    `https://ce-agent-bridge-worker.agalmic.workers.dev`: KV was reused,
+    R2/D1 were skipped, Worker secrets were written through Cloudflare API,
+    `/health` returned `agent-bridge-worker-private-v1`, and Telegram
+    `getWebhookInfo` confirmed the webhook URL with zero pending errors.
+  - Still mocked/contract-only before live smoke: `/telegram-demo-setup` does
+    not itself deploy or set webhook, `deploy:plan` does not create Cloudflare
+    resources, live `deploy:apply` is not run by tests, demo questions/docs are
+    fixture-backed unless canonical `/api/agent/*` session routes are wired for
+    that call, OpenClaw/MCP forwarding sends no real external transport,
+    broadcast remains disabled, and Cloudflare `lit_encrypted` envelope
+    producer/reader work is later storage hardening.
 
 ## Next Queue Head
 
-1. After BotFather values are available, run the live end-to-end deploy path:
-   paste `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `CLOUDFLARE_API_TOKEN`,
-   optional extra OP Sepolia RPC, derive the Cloudflare account, upload generated
-   `TELEGRAM_WEBHOOK_SECRET` and `DEMO_SIGNER_ROOT_SECRET` as Worker secrets,
-   deploy `agentBridgeWorker`, set webhook, and smoke `/start`, `/ce_join`,
-   `/ce_sessions`, `/ce_questions`, `/ce_docs`, and `/ce_me`.
-2. Implement the Cloudflare `lit_encrypted` envelope producer/reader path for
-   docs/context, private questions, private responses, surveys, and generated
-   artifacts without routing those payloads through Lit-Arweave.
+1. Smoke the live Telegram bot from Telegram: private `/start`, group
+   `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
+   `/q <question-id-or-text>`, `/ce_docs`, and private `/ce_me`. Confirm
+   replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs.
+2. After the transport smoke, replace fixture-backed Telegram question/doc/session
+   reads with canonical `/api/agent/*` calls where the contract is ready, then
+   continue setup UX convergence so `/telegram-demo-setup` can invoke the same
+   apply path without exposing Cloudflare/Wrangler details.
+3. Later storage hardening: implement the Cloudflare `lit_encrypted` envelope
+   producer/reader path for docs/context, private questions, private responses,
+   surveys, and generated artifacts without routing those payloads through
+   Lit-Arweave.

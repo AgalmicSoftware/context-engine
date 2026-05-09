@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   AGENT_BRIDGE_CLOUDFLARE_TOKEN_PERMISSIONS,
+  AGENT_BRIDGE_DOC_STORAGE_CLOUDFLARE_TOKEN_PERMISSIONS,
   buildAgentBridgeDeployPlan,
   buildAgentBridgeGeneratedSecrets,
   buildAgentBridgeWorkerUploadMetadata,
   deriveSingleCloudflareAccount,
   generateAgentBridgeSecret,
   resolveAgentBridgeDeployConfig,
+  resolveAgentBridgeDeployConfigForLive,
   validateAgentBridgeDeployConfig,
   validateAgentBridgeTokenScope,
 } from './deployHelperPlan.mjs';
@@ -87,6 +89,68 @@ test('deriveSingleCloudflareAccount resolves one account and blocks multiple vis
   assert.match(multiple.blocker, /not implemented/i);
 });
 
+test('live account lookup is opt-in and derives one account without leaking token', async () => {
+  const calls = [];
+  const fetchMock = async (...args) => {
+    calls.push(args);
+    return new Response(JSON.stringify({
+      success: true,
+      result: [{ id: 'account-derived', name: 'Derived Demo' }],
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const planOnlyConfig = await resolveAgentBridgeDeployConfigForLive({
+    env: completeEnv({ CLOUDFLARE_ACCOUNT_ID: '' }),
+    fetchImpl: fetchMock,
+  });
+  assert.equal(planOnlyConfig.accountId, '');
+  assert.equal(planOnlyConfig.accountLookup.mode, 'derive_from_token_pending');
+  assert.equal(calls.length, 0);
+
+  const liveConfig = await resolveAgentBridgeDeployConfigForLive({
+    env: completeEnv({ CLOUDFLARE_ACCOUNT_ID: '' }),
+    flags: { 'live-account-lookup': true },
+    fetchImpl: fetchMock,
+  });
+  assert.equal(liveConfig.accountId, 'account-derived');
+  assert.equal(liveConfig.accountLookup.mode, 'derived_from_token');
+  assert.equal(validateAgentBridgeDeployConfig(liveConfig).ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'https://api.cloudflare.com/client/v4/accounts?per_page=2');
+  assert.equal(calls[0][1].headers.authorization, 'Bearer cf-test-token');
+  assert.equal(JSON.stringify(liveConfig).includes('cf-test-token'), false);
+});
+
+test('live account lookup blocks multiple visible accounts without falling back silently', async () => {
+  const fetchMock = async () => new Response(JSON.stringify({
+    success: true,
+    result: [
+      { id: 'account-one', name: 'One' },
+      { id: 'account-two', name: 'Two' },
+    ],
+  }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+
+  const config = await resolveAgentBridgeDeployConfigForLive({
+    env: completeEnv({ CLOUDFLARE_ACCOUNT_ID: '' }),
+    flags: { 'live-account-lookup': true },
+    fetchImpl: fetchMock,
+  });
+  const validation = validateAgentBridgeDeployConfig(config);
+
+  assert.equal(config.accountId, '');
+  assert.equal(config.accountLookup.mode, 'derive_from_token_failed');
+  assert.equal(config.accountLookup.accountCount, 2);
+  assert.match(config.accountLookup.blocker, /multiple accounts/i);
+  assert.equal(validation.ok, false);
+  assert.equal(validation.missing.some((entry) => entry.includes('CLOUDFLARE_ACCOUNT_ID derivation failed')), true);
+});
+
 test('generated secrets are high entropy hex values and never appear in deploy plans', () => {
   const fakeRandomBytes = (length) => Buffer.from(Array.from({ length }, (_, index) => (index + 7) % 256));
   const webhookSecret = generateAgentBridgeSecret({ randomBytesImpl: fakeRandomBytes });
@@ -111,6 +175,17 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
   const base = validateAgentBridgeTokenScope({
     permissions: AGENT_BRIDGE_CLOUDFLARE_TOKEN_PERMISSIONS,
   });
+  const needsDocStorage = validateAgentBridgeTokenScope({
+    permissions: AGENT_BRIDGE_CLOUDFLARE_TOKEN_PERMISSIONS,
+    includeDocStorage: true,
+  });
+  const withDocStorage = validateAgentBridgeTokenScope({
+    permissions: [
+      ...AGENT_BRIDGE_CLOUDFLARE_TOKEN_PERMISSIONS,
+      ...AGENT_BRIDGE_DOC_STORAGE_CLOUDFLARE_TOKEN_PERMISSIONS,
+    ],
+    includeDocStorage: true,
+  });
   const needsWorkersDevSetup = validateAgentBridgeTokenScope({
     permissions: AGENT_BRIDGE_CLOUDFLARE_TOKEN_PERMISSIONS,
     includeWorkersDevSubdomainSetup: true,
@@ -125,6 +200,9 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
 
   assert.equal(base.ok, true);
   assert.equal(base.accountSettingsEditRequired, false);
+  assert.equal(needsDocStorage.ok, false);
+  assert.deepEqual(needsDocStorage.missing, AGENT_BRIDGE_DOC_STORAGE_CLOUDFLARE_TOKEN_PERMISSIONS);
+  assert.equal(withDocStorage.ok, true);
   assert.equal(needsWorkersDevSetup.ok, false);
   assert.deepEqual(needsWorkersDevSetup.optionalMissing, [
     { key: 'account_settings', type: 'edit' },
@@ -132,7 +210,7 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
   assert.equal(withWorkersDevSetup.ok, true);
 });
 
-test('buildAgentBridgeWorkerUploadMetadata models bindings, vars, and Durable Object migration', () => {
+test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2/D1', () => {
   const config = resolveAgentBridgeDeployConfig({
     env: completeEnv({ ADDITIONAL_RPC_URL: 'https://infura.example.test/op-sepolia' }),
   });
@@ -141,17 +219,18 @@ test('buildAgentBridgeWorkerUploadMetadata models bindings, vars, and Durable Ob
   assert.equal(metadata.main_module, 'worker.mjs');
   assert.equal(metadata.compatibility_date, '2024-09-02');
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_ACTION_KV' && binding.type === 'kv_namespace'), true);
-  assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_R2' && binding.type === 'r2_bucket'), true);
-  assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_D1' && binding.type === 'd1'), true);
+  assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_R2'), false);
+  assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_D1'), false);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'MANAGED_DEMO_SIGNER' &&
     binding.type === 'durable_object_namespace' &&
     binding.class_name === 'ManagedDemoSignerDurableObject'
   )), true);
-  assert.deepEqual(metadata.migrations, [{
-    tag: 'v1',
-    new_classes: ['ManagedDemoSignerDurableObject'],
-  }]);
+  assert.deepEqual(metadata.migrations, {
+    old_tag: '',
+    new_tag: 'v1',
+    new_sqlite_classes: ['ManagedDemoSignerDurableObject'],
+  });
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_PUBLIC_URL' &&
     binding.text === 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev'
@@ -160,6 +239,17 @@ test('buildAgentBridgeWorkerUploadMetadata models bindings, vars, and Durable Ob
     binding.name === 'ADDITIONAL_RPC_URL' &&
     binding.text === 'https://infura.example.test/op-sepolia'
   )), true);
+});
+
+test('buildAgentBridgeWorkerUploadMetadata includes R2/D1 only when doc storage is enabled', () => {
+  const config = resolveAgentBridgeDeployConfig({
+    env: completeEnv({ AGENT_BRIDGE_ENABLE_DOC_STORAGE: 'true' }),
+  });
+  const metadata = buildAgentBridgeWorkerUploadMetadata(config);
+
+  assert.equal(config.resources.enableDocStorage, true);
+  assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_R2' && binding.type === 'r2_bucket'), true);
+  assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_D1' && binding.type === 'd1'), true);
 });
 
 test('resolveAgentBridgeDeployConfig defaults to OP Sepolia POKT RPC and treats extra RPC as additive', () => {
@@ -185,12 +275,25 @@ test('buildAgentBridgeDeployPlan documents remaining direct Cloudflare API calls
   assert.equal(plan.publicUrl, 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev');
   assert.equal(plan.webhookUrl, 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev/telegram/webhook');
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/storage/kv/namespaces')), true);
-  assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/r2/buckets')), true);
-  assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/d1/database')), true);
+  assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/r2/buckets')), false);
+  assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/d1/database')), false);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/workers/scripts/ce-agent-bridge-worker/secrets')), true);
   assert.equal(plan.remainingDirectApiCalls[0].path, '/accounts?per_page=2');
   assert.equal(plan.optionalTokenPermissions.length, 1);
   assert.equal(JSON.stringify(plan).includes('123456:test-token'), false);
   assert.equal(JSON.stringify(plan).includes('webhook-secret'), false);
   assert.equal(JSON.stringify(plan).includes('demo-root'), false);
+});
+
+test('buildAgentBridgeDeployPlan documents R2/D1 calls only for doc-storage opt-in', () => {
+  const config = resolveAgentBridgeDeployConfig({
+    env: completeEnv({ AGENT_BRIDGE_ENABLE_DOC_STORAGE: 'true' }),
+  });
+  const plan = buildAgentBridgeDeployPlan(config);
+
+  assert.equal(plan.resources.enableDocStorage, true);
+  assert.equal(plan.requiredTokenPermissions.some((permission) => permission.key === 'workers_r2'), true);
+  assert.equal(plan.requiredTokenPermissions.some((permission) => permission.key === 'd1'), true);
+  assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/r2/buckets')), true);
+  assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/d1/database')), true);
 });
