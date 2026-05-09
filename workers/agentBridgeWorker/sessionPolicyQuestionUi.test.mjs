@@ -219,9 +219,10 @@ test('screen states expose launch commands and current UX copy', () => {
   }
 
   const docLibrary = states.find((state) => state.screen === 'doc_library');
-  assert.equal(docLibrary.title, 'View / Add Docs');
-  assert.equal(docLibrary.buttonLabel, 'View / Add Docs');
-  assert.equal(docLibrary.launch.command, '/ce_docs');
+  assert.equal(docLibrary.title, 'Attachments');
+  assert.equal(docLibrary.buttonLabel, 'Attachments');
+  assert.equal(docLibrary.launch.command, '/ce_attachments');
+  assert.deepEqual(docLibrary.launch.aliases, ['/ce_docs']);
 
   const onboarding = states.find((state) => state.screen === 'onboarding');
   assert.equal(onboarding.text, 'Enter startup info so I can suggest answers for you.');
@@ -269,7 +270,7 @@ test('group session card uses safe public copy and required lobby buttons', () =
   assert.deepEqual(card.buttons.map((button) => button.label), [
     'Join Session',
     'View Questions',
-    'View / Add Docs',
+    'Attachments',
     'Pose Question',
   ]);
   assert.equal(card.buttons.find((button) => button.label === 'Pose Question').command, '/ce_pose_question');

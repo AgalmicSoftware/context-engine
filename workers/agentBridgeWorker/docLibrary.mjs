@@ -95,7 +95,7 @@ export function listDocumentsForSession(docs = [], {
     type: 'agent_bridge_doc_list',
     version: AGENT_BRIDGE_WORKER_VERSION,
     sessionSlug,
-    buttonLabel: 'View / Add Docs',
+    buttonLabel: 'Attachments',
     docs: normalized,
     count: normalized.length,
   };
@@ -172,7 +172,7 @@ export function createQuestionGenerationRequestFromDocs({
     return {
       ok: false,
       reason: 'selected_docs_required',
-      prompt: 'Select or upload docs before generating questions.',
+      prompt: 'Select or upload attachments before generating questions.',
     };
   }
   const request = {

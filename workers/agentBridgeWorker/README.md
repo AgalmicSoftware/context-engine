@@ -32,12 +32,12 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | SBT join/create states | `/ce_sbt <sbt-address-or-group-id-or-link>`, `/ce_join_sbt <sbt-address-or-invite-code-or-link>`, `/ce_create_sbt_group [session-slug]` |
 | `onboarding` | `/ce_onboarding` |
 | question cards | `/ce_questions` |
-| `doc_library`, `doc_detail` | `/ce_docs` |
+| `doc_library`, `doc_detail` | `/ce_attachments`; legacy alias `/ce_docs` |
 | `generate_questions` | `/ce_generate_questions` |
 | `account_recovered` | `/ce_recover_key` |
 | confirmation, submitted, draft, retry states | opaque callback actions |
 
-The group session-linked card says `Session: <session>` and exposes `Join Session`, `View Questions`, `View / Add Docs`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
+The group session-linked card says `Session: <session>` and exposes `Join Session`, `View Questions`, `Attachments`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
 
 `View Questions` reads the linked session through the bridge's worker-local
 question cache for now. Canonical `GET /api/agent/questions` remains the target
@@ -90,7 +90,7 @@ a contract-only `POST /api/agent/decrypt/request` through the canonical CE
 agent/session API; the Telegram worker does not implement Lit decrypt logic.
 Decrypted prompt/context text is private-chat or Mini App only.
 
-## Doc Library
+## Attachments
 
 The worker contract models R2 document bytes, D1 metadata/index status, and KV short-lived action records. The default live Telegram smoke binds only KV plus the Worker/Durable Object runtime; bridge-owned R2/D1 resources are opt-in with `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or `--enable-doc-storage`. Supported file types are:
 
@@ -98,9 +98,15 @@ The worker contract models R2 document bytes, D1 metadata/index status, and KV s
 - PDF: `pdf`
 - Images: `png`, `jpg`, `jpeg`, `webp`
 
-Public summaries include titles, file types, visibility, and index status. Private or SBT-gated contents are never included in group-safe summaries.
+Public summaries include titles, file types, visibility, and index status.
+Private or SBT-gated contents are never included in group-safe summaries.
 
-The doc-library button copy is `View / Add Docs`. Selected docs are recorded as inputs for `Generate Questions` and as future `Use as Answer Context` candidates. Generating questions without selected docs returns `Select or upload docs before generating questions.`
+The attachment button copy is `Attachments`. `/ce_attachments` is the preferred
+command; `/ce_docs` remains a legacy alias during bot-v1 smoke. Selected files
+are recorded as inputs for `Generate Questions` and as future `Use as Answer
+Context` candidates. Private or gated files should open through the Mini App
+once that surface is wired. Generating questions without selected files returns
+`Select or upload attachments before generating questions.`
 
 Storage profile selection belongs to session config, not Telegram.
 `arweave` remains the default profile. `cloudflare` is an explicit session
@@ -203,11 +209,11 @@ The live webhook route is `/telegram/webhook`. It rejects requests unless
 `TELEGRAM_BRIDGE_ENABLED=true`, a bot token is configured, and Telegram supplies
 the configured webhook secret token. It parses real Telegram `message` and
 `callback_query` updates, handles `/start`, `/ce_join <session>`,
-`/ce_sessions`, `/ce_questions`, `/ce_pose_question`, `/q`, `/ce_docs`, and
-`/ce_me`, answers callback queries to clear Telegram's inline-button loading
-state, and sends replies through an injected Telegram Bot API adapter. Unit tests
-use mocked `fetch` and fake bot tokens; real `TELEGRAM_BOT_TOKEN` is needed only
-for live Telegram smoke.
+`/ce_sessions`, `/ce_questions`, `/ce_pose_question`, `/q`, `/ce_attachments`
+or legacy `/ce_docs`, and `/ce_me`, answers callback queries to clear
+Telegram's inline-button loading state, and sends replies through an injected
+Telegram Bot API adapter. Unit tests use mocked `fetch` and fake bot tokens;
+real `TELEGRAM_BOT_TOKEN` is needed only for live Telegram smoke.
 
 Callback data and private deep-link start payloads are opaque `cecb_*` or
 `cetg_*` identifiers. Private payloads, JWTs, worker tokens, account material,
@@ -220,7 +226,8 @@ live Worker reads the real OP Sepolia `SessionRegistry` over `DEFAULT_RPC_URL`
 plus optional `ADDITIONAL_RPC_URL` fallback and uses the returned slugs for
 `/ce_sessions` and `/ce_join`. Group `/ce_join <session>` also persists the
 chat's selected session in `AGENT_ACTION_KV`, so later `/ce_questions`,
-`/q <number-or-id>`, and `/ce_docs` use that session without repeating the slug.
+`/q <number-or-id>`, and `/ce_attachments` use that session without repeating
+the slug. `/ce_docs` remains a compatibility alias.
 
 Question lists default to live mode. The Telegram worker scans public
 `QuestionsAdded` logs, reads public question payload pointers, and caches safe
@@ -400,7 +407,7 @@ IDs.
    the normal live smoke should run both.
 8. Confirm the deployed `/health` output reports `worker: agentBridgeWorker`.
 9. Smoke Telegram private chat `/start`, group `/ce_join <session>`,
-   `/ce_sessions`, `/ce_questions`, `/q <number-or-id>`, `/ce_docs`, and
+   `/ce_sessions`, `/ce_questions`, `/q <number-or-id>`, `/ce_attachments`, and
    private `/ce_me`.
 10. Confirm replies contain only safe summaries and opaque `cecb_*` / `cetg_*`
     action IDs, no raw callback payloads, grants, JWTs, Cloudflare credentials,

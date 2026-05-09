@@ -357,7 +357,7 @@ test('group session binding makes later question and doc commands use the joined
     now: '2026-05-08T12:00:02.000Z',
   });
   const docs = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_docs'),
+    update: groupMessage('/ce_attachments'),
     env,
     now: '2026-05-08T12:00:03.000Z',
   });
@@ -366,7 +366,7 @@ test('group session binding makes later question and doc commands use the joined
   assert.match(questions.response.text, /Questions for demo/);
   assert.match(questions.response.text, /q-demo - What should Demo decide next/);
   assert.match(posed.response.text, /Question for demo:/);
-  assert.match(docs.response.text, /Docs for demo/);
+  assert.match(docs.response.text, /Attachments for demo/);
   assert.match(docs.response.text, /Demo brief/);
 });
 
@@ -485,7 +485,23 @@ test('callback dispatch answers callback queries before editing messages', async
   assert.equal(calls[1][0], 'https://api.telegram.org/bot123456:test-token/editMessageText');
 });
 
-test('/ce_docs lists public metadata and hides private storage refs', async () => {
+test('/ce_attachments lists public metadata and hides private storage refs', async () => {
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_attachments alpha'),
+    env: baseEnv(),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'doc_library');
+  assert.match(result.response.text, /Attachments for alpha/);
+  assert.match(result.response.text, /Private or gated files open in the Mini App/);
+  assert.match(result.response.text, /Public plan \(md, public\)/);
+  assert.match(result.response.text, /Gated appendix \(pdf, sbt_gated\)/);
+  assert.equal(result.response.text.includes('r2://private'), false);
+});
+
+test('/ce_docs remains a legacy alias for attachments', async () => {
   const result = await buildTelegramCommandResponse({
     update: groupMessage('/ce_docs alpha'),
     env: baseEnv(),
@@ -494,9 +510,7 @@ test('/ce_docs lists public metadata and hides private storage refs', async () =
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'doc_library');
-  assert.match(result.response.text, /Public plan \(md, public\)/);
-  assert.match(result.response.text, /Gated appendix \(pdf, sbt_gated\)/);
-  assert.equal(result.response.text.includes('r2://private'), false);
+  assert.match(result.response.text, /Attachments for alpha/);
 });
 
 test('/ce_me returns managed demo account metadata without the root secret', async () => {

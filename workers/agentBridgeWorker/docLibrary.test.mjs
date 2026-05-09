@@ -48,7 +48,7 @@ const DOCS = [
 test('doc library lists supported docs by session and rejects unsupported types', () => {
   const listed = listDocumentsForSession(DOCS, { sessionSlug: 'alpha' });
   assert.equal(listed.count, 2);
-  assert.equal(listed.buttonLabel, 'View / Add Docs');
+  assert.equal(listed.buttonLabel, 'Attachments');
   assert.deepEqual([...SUPPORTED_DOC_TYPES], ['md', 'pdf', 'png', 'jpg', 'jpeg', 'webp']);
 
   assert.equal(normalizeDocumentRecord({
@@ -113,7 +113,7 @@ test('selected docs create generate-question context without embedding bytes', (
   }), {
     ok: false,
     reason: 'selected_docs_required',
-    prompt: 'Select or upload docs before generating questions.',
+    prompt: 'Select or upload attachments before generating questions.',
   });
 });
 
