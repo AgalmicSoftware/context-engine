@@ -173,7 +173,7 @@ Required values:
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
 | CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
 | Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
-| Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC |
+| Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
 | KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
@@ -210,11 +210,18 @@ Callback data and private deep-link start payloads are opaque `cecb_*` or
 private keys, and Cloudflare credentials must never be placed in Telegram
 callback data.
 
-The current command handler uses configured demo fixtures from optional
-`AGENT_BRIDGE_SESSION_POLICY_JSON`, `AGENT_BRIDGE_DEMO_QUESTIONS_JSON`, and
-`AGENT_BRIDGE_DEMO_DOCS_JSON` vars. Canonical question, response, and
-session-context payloads still go through the session worker or canonical agent
-APIs as that contract is promoted from demo fixtures.
+The command handler uses `AGENT_BRIDGE_SESSION_POLICY_JSON` as an explicit
+demo/session-policy override when it is configured. Without that override, the
+live Worker reads the real OP Sepolia `SessionRegistry` over `DEFAULT_RPC_URL`
+plus optional `ADDITIONAL_RPC_URL` fallback and uses the returned slugs for
+`/ce_sessions` and `/ce_join`.
+
+Question and doc bodies still use optional `AGENT_BRIDGE_DEMO_QUESTIONS_JSON`
+and `AGENT_BRIDGE_DEMO_DOCS_JSON` fixtures until a reachable canonical
+`/api/agent/*` service is deployed for the bridge. Those fixtures must remain
+non-identifying and secret-free. Real questions, responses, documents, grants,
+and private session-context payloads still go through the session worker or
+canonical agent APIs as that contract is promoted from demo fixtures.
 
 ## Interactive Preview
 

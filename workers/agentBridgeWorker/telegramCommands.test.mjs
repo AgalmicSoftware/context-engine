@@ -101,6 +101,41 @@ function privateMessage(text) {
   };
 }
 
+function word(value) {
+  return BigInt(value).toString(16).padStart(64, '0');
+}
+
+function encodeRegistryStringResult(value = '') {
+  const bytes = new TextEncoder().encode(String(value));
+  const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  const paddedLength = Math.ceil(hex.length / 64) * 64;
+  return `0x${word(32)}${word(bytes.length)}${hex.padEnd(paddedLength, '0')}`;
+}
+
+function registryFetchForSlugs(slugs = []) {
+  return async (_url, init = {}) => {
+    const body = JSON.parse(init.body || '{}');
+    const data = String(body.params?.[0]?.data || '');
+    if (data === '0x6e6734bf') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: `0x${word(slugs.length)}` }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (data.startsWith('0x27916a76')) {
+      const index = Number(BigInt(`0x${data.slice(10) || '0'}`));
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: encodeRegistryStringResult(slugs[index] || '') }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, error: { message: 'unknown call' } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+}
+
 function flattenButtons(replyMarkup) {
   return (replyMarkup?.inline_keyboard || []).flat();
 }
@@ -147,6 +182,26 @@ test('group /ce_join returns a Workers-safe session card with opaque buttons onl
     assert.equal(button.callback_data.includes('alpha'), false);
     assert.equal(button.callback_data.includes('q-readiness'), false);
   }
+});
+
+test('/ce_sessions uses live SessionRegistry slugs when no demo session policy is configured', async () => {
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_sessions'),
+    env: {
+      TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+      DEFAULT_CHAIN_ID: '11155420',
+      DEFAULT_RPC_URL: 'https://public-rpc.example',
+      ADDITIONAL_RPC_URL: 'https://infura.example/op-sepolia',
+      REGISTRY_FETCH: registryFetchForSlugs(['alpha', 'beta-room']),
+    },
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'group_session_card');
+  assert.match(result.response.text, /- alpha \(alpha\)/);
+  assert.match(result.response.text, /- beta-room \(beta-room\)/);
+  assert.equal(result.response.text.includes('general'), false);
 });
 
 test('/ce_questions and callback dispatch list questions without leaking locked prompts', async () => {

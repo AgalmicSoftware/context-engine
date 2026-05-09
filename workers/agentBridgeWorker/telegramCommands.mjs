@@ -19,6 +19,7 @@ import {
   buildTelegramQuestionListState,
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
+import { listRegistrySessionsForBridge } from './registrySessions.mjs';
 import { normalizeSessionPolicy, resolveSessionInvocation } from './sessionPolicy.mjs';
 import {
   normalizeTelegramGroup,
@@ -94,10 +95,29 @@ function questionId(question = {}) {
   return safeString(question.questionId || question.id);
 }
 
-function loadSessionPolicy(env = {}) {
+async function loadSessionPolicy(env = {}) {
   const configured = safeJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
   if (configured && typeof configured === 'object' && !Array.isArray(configured)) {
     return normalizeSessionPolicy(configured);
+  }
+  const registry = await listRegistrySessionsForBridge({ env }).catch((error) => ({
+    ok: false,
+    reason: 'session_registry_unavailable',
+    error: safeString(error?.message || error),
+    sessions: [],
+  }));
+  if (registry.ok && registry.sessions.length) {
+    return normalizeSessionPolicy({
+      defaultSessionSlug: (
+        sanitizeSessionSlug(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) ||
+        registry.sessions.find((session) => session.default)?.sessionSlug ||
+        registry.sessions[0]?.sessionSlug
+      ),
+      riskCeiling: RISK_CEILINGS.SUBMIT,
+      allowQuestionGeneration: true,
+      allowGenerateQuestion: true,
+      sessions: registry.sessions,
+    });
   }
   const defaultSessionSlug = sanitizeSessionSlug(
     env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG ||
@@ -356,7 +376,7 @@ function formatHelpText() {
 }
 
 async function buildHelpResponse({ normalized, command = COMMANDS.START, env, createdAt }) {
-  const policy = loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env);
   const sessionSlug = policy.defaultSessionSlug || 'general';
   const keyboard = [[
     await makeCallbackButton({
@@ -389,7 +409,7 @@ async function buildHelpResponse({ normalized, command = COMMANDS.START, env, cr
 }
 
 async function buildSessionsResponse({ normalized, command, env, createdAt }) {
-  const policy = loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env);
   const sessions = policy.linkedSessions.length ? policy.linkedSessions : [{
     sessionSlug: policy.defaultSessionSlug || 'general',
     sessionName: policy.defaultSessionSlug || 'general',
@@ -429,7 +449,7 @@ async function buildJoinResponse({
   sessionSlugOverride = '',
   createdAt,
 } = {}) {
-  const policy = loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env);
   const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || args[0] || policy.defaultSessionSlug || 'general') || 'general';
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
@@ -572,7 +592,7 @@ async function buildQuestionsResponse({
   messageId = '',
   createdAt,
 } = {}) {
-  const policy = loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env);
   const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || args[0] || policy.defaultSessionSlug || 'general') || 'general';
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
@@ -633,7 +653,7 @@ async function buildPoseQuestionResponse({
   messageId = '',
   createdAt,
 } = {}) {
-  const policy = loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env);
   const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || policy.defaultSessionSlug || 'general') || 'general';
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
@@ -732,7 +752,7 @@ async function buildDocsResponse({
   messageId = '',
   createdAt,
 } = {}) {
-  const policy = loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env);
   const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || args[0] || policy.defaultSessionSlug || 'general') || 'general';
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
@@ -783,7 +803,7 @@ async function buildDocsResponse({
 }
 
 async function buildMeResponse({ normalized, command, env, createdAt, method = 'sendMessage', messageId = '' }) {
-  const policy = loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env);
   const account = await deriveManagedDemoAccount({
     principal: normalizeTelegramPrincipal(normalized),
     deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
