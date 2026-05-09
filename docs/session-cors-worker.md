@@ -30,8 +30,12 @@ If you deploy via the Group Wizard and a deploy-helper:
 
 1) Fill in the Cloudflare API token and worker name.
    - The "Create API token" link opens a prefilled Cloudflare token template with the required
-     Workers KV + Workers Scripts + Account Settings permissions used by the deploy-helper.
+     Workers KV, Workers Scripts, R2, D1, and Durable Objects permissions used by the deploy-helper.
+     `Account Settings: Edit` is needed only when the helper must create or change the
+     account-level workers.dev subdomain.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
+     Add `--include-workers-dev-subdomain-setup` only when the account does not already have a
+     workers.dev subdomain or when intentionally changing it.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
    - The first-party wizard no longer asks for Cloudflare account ID; the deploy-helper resolves it from the API token.
 2) Fill worker secrets in the wizard (OpenAI key, Arweave JWK, RPC URL, Anthropic key only if any selected AI model uses Anthropic, and optional OpenRouter key) and then click "Deploy worker".
@@ -1091,7 +1095,9 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
-  when none exists yet (falls back to a deterministic `ce-<accountId>` name).
+  when none exists yet (falls back to a deterministic `ce-<accountId>` name). This is the only
+  deploy-helper path that needs `Account Settings: Edit`; script-level Workers.dev enablement uses
+  the Workers script scope.
 - `allowOrigins` entries are normalized to origins (`https://host`, `http://localhost:3000`), and the
   helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard default seed list includes the hosted app plus local dev/E2E origins for ports `3000`, `3001`, and `7391`.
 - `/new` now uses the project helper by default at `https://ce-deploy-helper.agalmic.workers.dev/`.
