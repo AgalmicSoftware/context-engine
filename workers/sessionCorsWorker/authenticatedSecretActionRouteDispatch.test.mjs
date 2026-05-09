@@ -242,6 +242,7 @@ test('dispatchAuthenticatedSecretActionRoute preserves lit preflight failure pas
 test('dispatchAuthenticatedSecretActionRoute executes session-scoped Lit Chipotle actions with session secrets', async () => {
   const headers = { 'Access-Control-Allow-Origin': '*' };
   const secrets = { litUsageApiKey: 'usage-key' };
+  const env = { GROUP_KV: {}, LIT_USAGE_API_KEY: 'env-usage-key' };
 
   const result = await dispatchAuthenticatedSecretActionRoute({
     path: '/',
@@ -255,7 +256,7 @@ test('dispatchAuthenticatedSecretActionRoute executes session-scoped Lit Chipotl
     },
     slug: 'session-a',
     address: '0xabc',
-    env: { GROUP_KV: {} },
+    env,
     limit: 3,
     headers,
     scopes: { lit: true },
@@ -264,6 +265,7 @@ test('dispatchAuthenticatedSecretActionRoute executes session-scoped Lit Chipotl
       resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets }),
       executeSessionLitChipotleAction: async (value) => {
         assert.deepEqual(value, {
+          env,
           config: {
             litCredentials: {
               litActionCid: 'QmAction123',

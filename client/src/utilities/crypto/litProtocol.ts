@@ -13,6 +13,12 @@ import { cryptoUtils } from './cryptography.js';
 import {
   DEFAULT_CHIPOTLE_ACTION_CODE,
 } from './litChipotleCatalog.js';
+import {
+  buildLitChipotlePolicy,
+  fingerprintLitChipotlePolicy,
+  normalizeChipotleCekHex,
+  normalizeLitChipotleMetadataVersion,
+} from './litChipotlePolicy.js';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { createLogger } from '../logging';
 import { perfDebugLitGetKey } from '../web3/rpcDebugStats.js';
@@ -21,7 +27,6 @@ import {
   fetchWorkerWithAuth,
   normalizeWorkerUrl,
 } from '../worker/workerAuth.js';
-import { getDefaultHttpRpc } from '../../variables/chains.js';
 
 /**
  * @typedef {import('ethers').providers.Provider} EthersProvider
@@ -432,10 +437,7 @@ const encodeChipotleKeyMessage = (raw) => {
 };
 
 const decodeChipotleKeyMessage = (value) => {
-  const normalized = toStr(value).trim();
-  if (!/^0x[0-9a-f]+$/i.test(normalized)) {
-    throw new Error('Lit Chipotle plaintext did not contain a hex-encoded CEK.');
-  }
+  const normalized = normalizeChipotleCekHex(value);
   const bytes = ethers.utils.arrayify(normalized);
   if (bytes.length !== 32) {
     throw new Error(`Lit Chipotle CEK had invalid length (${bytes.length}).`);
@@ -458,6 +460,7 @@ const buildChipotleDataHashSentinel = ({
   chainId = null,
   gateMode = 'any',
   sbtAddresses = [],
+  policyFingerprint = '',
 } = {}) => (
   [
     'chipotle-v3',
@@ -465,6 +468,7 @@ const buildChipotleDataHashSentinel = ({
     Number(chainId || 0) || 0,
     toStr(gateMode).trim() || 'any',
     normalizeSbtAddressList(sbtAddresses).join(',').toLowerCase(),
+    toStr(policyFingerprint).trim().toLowerCase(),
   ].join(':')
 );
 
@@ -472,39 +476,38 @@ const buildChipotleGateFromOptions = ({
   accessControlConditions,
   chipotle = {},
   chainId,
-  rpcUrl = '',
 } = {}) => {
   const explicitGate = chipotle && typeof chipotle === 'object' ? chipotle : {};
+  const explicitPolicy = explicitGate.policy && typeof explicitGate.policy === 'object'
+    ? explicitGate.policy
+    : {};
   const derivedGate = extractSbtGateFromAccessControlConditions(accessControlConditions) || {};
   const sbtAddresses = normalizeSbtAddressList(
-    explicitGate.sbtAddresses || derivedGate.sbtAddresses || []
+    explicitGate.sbtAddresses || explicitPolicy.sbtAddresses || derivedGate.sbtAddresses || []
   );
   if (!sbtAddresses.length) {
     throw new Error('Lit Chipotle requires at least one SBT gate address.');
   }
   const gateChainId = Number(
     explicitGate.chainId ||
+    explicitPolicy.chainId ||
     derivedGate.chainId ||
     chainId ||
     0
   ) || null;
-  const gateMode = toStr(explicitGate.gateMode || derivedGate.gateMode || 'any').trim().toLowerCase() === 'all'
+  const gateMode = toStr(
+    explicitGate.gateMode ||
+    explicitPolicy.gateMode ||
+    derivedGate.gateMode ||
+    'any'
+  ).trim().toLowerCase() === 'all'
     ? 'all'
     : 'any';
-  const resolvedRpcUrl = toStr(
-    rpcUrl ||
-    explicitGate.rpcUrl ||
-    (gateChainId ? getDefaultHttpRpc(gateChainId) : '')
-  ).trim();
-  if (!resolvedRpcUrl) {
-    throw new Error('Lit Chipotle requires an RPC URL for the target SBT gate chain.');
-  }
   return {
     sbtAddresses,
     gateChainId,
     gateMode,
     litChain: toStr(explicitGate.litChain || derivedGate.litChain).trim(),
-    rpcUrl: resolvedRpcUrl,
   };
 };
 
@@ -1275,6 +1278,7 @@ const createLitChipotleHooks = ({
     gate,
     message,
     ciphertext,
+    chipotleMetadata,
   } = {}) => {
     const response = await fetchWorkerWithAuth(
       normalizedWorkerUrl,
@@ -1288,7 +1292,7 @@ const createLitChipotleHooks = ({
           sbtAddresses: gate.sbtAddresses,
           gateMode: gate.gateMode,
           chainId: gate.gateChainId,
-          rpcUrl: gate.rpcUrl,
+          ...(chipotleMetadata ? { chipotle: chipotleMetadata } : {}),
           ...(message ? { message } : {}),
           ...(ciphertext ? { ciphertext } : {}),
         }),
@@ -1308,7 +1312,11 @@ const createLitChipotleHooks = ({
     if (!response.ok) {
       throw new Error(payload?.error || `Lit Chipotle request failed (${response.status}).`);
     }
-    return parseChipotleActionResponse(payload);
+    const actionResponse = parseChipotleActionResponse(payload);
+    if (actionResponse?.ok === false) {
+      throw new Error(actionResponse.reason || 'Lit Chipotle gate check failed.');
+    }
+    return actionResponse;
   };
 
   const saveKey = async (symmetricKey, opts = {}) => {
@@ -1318,7 +1326,6 @@ const createLitChipotleHooks = ({
         : baseConditions,
       chipotle: opts.chipotle || chipotle,
       chainId: opts.chainId || chainId || null,
-      rpcUrl: opts.rpcUrl,
     });
     const wrapped = await executeChipotleAction({
       op: 'encrypt',
@@ -1329,22 +1336,39 @@ const createLitChipotleHooks = ({
     if (!wrappedCiphertext) {
       throw new Error('Lit Chipotle encrypt did not return ciphertext.');
     }
+    const responsePolicy = wrapped?.policy
+      ? buildLitChipotlePolicy(wrapped.policy)
+      : buildLitChipotlePolicy({
+        chainId: gate.gateChainId,
+        gateMode: gate.gateMode,
+        sbtAddresses: gate.sbtAddresses,
+        litActionCid: litCredentials.litActionCid,
+        litPkpId: litCredentials.litPkpId,
+      });
+    const policyFingerprint = toStr(
+      wrapped?.policyFingerprint || fingerprintLitChipotlePolicy(responsePolicy)
+    ).trim();
+    if (policyFingerprint.toLowerCase() !== fingerprintLitChipotlePolicy(responsePolicy).toLowerCase()) {
+      throw new Error('Lit Chipotle encrypt returned mismatched policy metadata.');
+    }
     return {
       ciphertext: wrappedCiphertext,
       dataToEncryptHash: buildChipotleDataHashSentinel({
-        litActionCid: litCredentials.litActionCid,
-        chainId: gate.gateChainId,
-        gateMode: gate.gateMode,
-        sbtAddresses: gate.sbtAddresses,
+        litActionCid: responsePolicy.litActionCid,
+        chainId: responsePolicy.chainId,
+        gateMode: responsePolicy.gateMode,
+        sbtAddresses: responsePolicy.sbtAddresses,
+        policyFingerprint,
       }),
       chipotle: {
-        version: 1,
-        litActionCid: toStr(litCredentials.litActionCid).trim(),
-        litPkpId: toStr(litCredentials.litPkpId).trim(),
-        sbtAddresses: gate.sbtAddresses,
-        gateMode: gate.gateMode,
-        chainId: gate.gateChainId,
-        rpcUrl: gate.rpcUrl,
+        version: 2,
+        litActionCid: responsePolicy.litActionCid,
+        litPkpId: responsePolicy.litPkpId,
+        sbtAddresses: responsePolicy.sbtAddresses,
+        gateMode: responsePolicy.gateMode,
+        chainId: responsePolicy.chainId,
+        policyFingerprint,
+        policy: responsePolicy,
       },
     };
   };
@@ -1358,18 +1382,22 @@ const createLitChipotleHooks = ({
     if (!ciphertext) {
       throw new Error('Lit Chipotle decrypt requires ciphertext.');
     }
+    const metadataVersion = normalizeLitChipotleMetadataVersion(opts.chipotle || {});
+    if (opts.chipotle && metadataVersion !== 2) {
+      throw new Error('Lit Chipotle legacy wrapped keys are not supported.');
+    }
     const gate = buildChipotleGateFromOptions({
       accessControlConditions: Array.isArray(opts.accessControlConditions)
         ? opts.accessControlConditions
         : baseConditions,
       chipotle: opts.chipotle || chipotle,
       chainId: opts.chainId || chainId || null,
-      rpcUrl: opts.rpcUrl,
     });
     const unwrapped = await executeChipotleAction({
       op: 'decrypt',
       gate,
       ciphertext,
+      chipotleMetadata: opts.chipotle || null,
     });
     const plaintext = toStr(unwrapped?.plaintext).trim();
     if (!plaintext) {
