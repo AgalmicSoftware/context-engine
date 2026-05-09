@@ -46,7 +46,6 @@ export const E2E_TESTIDS = Object.freeze({
   PAGE_ATLAS_ROOT: 'ce-page-atlas-root',
   PAGE_MATRIX_ROOT: 'ce-page-matrix-root',
   PAGE_AGENT_ROOT: 'ce-page-agent-root',
-  PAGE_AGENT_INBOX_ROOT: 'ce-page-agent-inbox-root',
   PAGE_DEBATE_ROOT: 'ce-page-debate-root',
   DEBATE_VIEW_MODE: 'ce-debate-view-mode',
   ATLAS_NODE: 'ce-atlas-node',
@@ -178,9 +177,6 @@ export const E2E_TESTIDS = Object.freeze({
   AGENT_RUN: 'ce-agent-run',
   AGENT_STEP: 'ce-agent-step',
   AGENT_LOG: 'ce-agent-log',
-  AGENT_INBOX_HISTORY: 'ce-agent-inbox-history',
-  AGENT_INBOX_EVENT: 'ce-agent-inbox-event',
-  AGENT_INBOX_EMPTY: 'ce-agent-inbox-empty',
 
   // SurveyTool (answering/responding)
   SURVEY_DECRYPT_PROMPT: 'ce-survey-decrypt-prompt',
