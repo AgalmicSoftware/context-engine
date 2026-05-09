@@ -1,8 +1,9 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { MainSite } from './MainSite';
+import { act, render, screen } from '@testing-library/react';
+import { MainSite, mainSiteDispatchActions } from './MainSite';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
+import { initCacheManager } from '../../utilities/cache/cacheScripts.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -21,6 +22,7 @@ const mockSBTsPage = jest.fn(() => null);
 const mockCompareAddresses = jest.fn(() => null);
 const mockTagPage = jest.fn(() => null);
 const mockDebateMap = jest.fn(() => null);
+const mockTelegramDemoSetupPage = jest.fn(() => null);
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
 
@@ -39,7 +41,7 @@ const restoreSessionScanGlobals = () => {
 };
 
 jest.mock('react-redux', () => ({
-  connect: () => (Comp) => Comp,
+  connect: jest.fn((_mapStateToProps, _mapDispatchToProps) => (Comp) => Comp),
 }));
 
 jest.mock('../HooksHOC/withWagmiBridge', () => ({
@@ -232,6 +234,19 @@ jest.mock('../DebateMap/DebateMap', () => {
   };
 });
 
+jest.mock('../TelegramDemoSetup/TelegramDemoSetupPage', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockTelegramDemoSetupPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-telegram-demo-setup-page',
+        'data-active-session-slug': String(props.activeSessionSlug || ''),
+      });
+    },
+  };
+});
 
 jest.mock('../../utilities/web3/contractScripts.js', () => {
   const contractScripts = {
@@ -280,6 +295,12 @@ jest.mock('../../utilities/arweave/arweaveUrls.js', () => ({
   normalizeArweaveUrl: jest.fn((value = '') => String(value || '').trim()),
 }));
 
+jest.mock('../../utilities/cache/cacheScripts.js', () => ({
+  __esModule: true,
+  initCacheManager: jest.fn(() => Promise.resolve()),
+  subscribeCacheUpdates: jest.fn(() => jest.fn()),
+}));
+
 jest.mock('../../utilities/web3/sessionRegistry.js', () => {
   const readCache = () => {
     try {
@@ -325,6 +346,7 @@ const SESSION_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const buildProps = (overrides = {}) => ({
   fetchSessionState: jest.fn(),
   fetchAccount: jest.fn(),
+  changeAccount: jest.fn(),
   changeFocusedTab: jest.fn(),
   toggleLoginModal: jest.fn(),
   updateLoginInfo: jest.fn(),
@@ -389,6 +411,16 @@ const syncSessionRegistryStoreMocks = () => {
       return [];
     }
   });
+};
+
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
 };
 
 const createSubject = ({
@@ -476,11 +508,21 @@ const createSubject = ({
   return subject;
 };
 
+describe('MainSite connected export wiring', () => {
+  it('wires changeAccount into the connected MainSite export for wagmi hydration', () => {
+    expect(mainSiteDispatchActions).toEqual(expect.objectContaining({
+      changeAccount: expect.any(Function),
+      updateLoginInfo: expect.any(Function),
+    }));
+  });
+});
+
 describe('MainSite route render smoke', () => {
   const originalPublicUrl = process.env.PUBLIC_URL;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    initCacheManager.mockResolvedValue(undefined);
     getSessionConfigBySlug.mockImplementation(() => null);
     normalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
     localStorage.clear();
@@ -497,6 +539,7 @@ describe('MainSite route render smoke', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    initCacheManager.mockResolvedValue(undefined);
     getSessionConfigBySlug.mockImplementation(() => null);
     normalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
     localStorage.clear();
@@ -569,6 +612,55 @@ describe('MainSite route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
+  });
+
+  it('does not restore the mount session after navigating during cache initialization', async () => {
+    const deferredCacheInit = createDeferred();
+    initCacheManager.mockReturnValueOnce(deferredCacheInit.promise);
+    const props = buildProps({
+      path: '/session/edge',
+      sessionState: {
+        primarySessionSlug: 'edge',
+        primarySessionExplicit: true,
+      },
+    });
+    setRoute('/session/edge');
+    const subject = new MainSite(props);
+    subject.setState = jest.fn((next) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      return patch;
+    });
+    subject.applySessionFallbackRedirect = jest.fn(() => null);
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+    subject.manageAutoHashPersistence = jest.fn();
+    subject.getDisplaySessionChainId = jest.fn(() => DEFAULT_NETWORK.id);
+    subject.getDisplaySessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.resolveSessionPathSlug = jest.fn();
+    subject.syncLitHooks = jest.fn();
+    subject.refreshSessionInfo = jest.fn();
+    subject.refreshSessionMetaFields = jest.fn();
+    subject.refreshGroupCredentials = jest.fn();
+    subject.hasPersistedManagedCacheData = jest.fn(async () => false);
+    subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
+    subject.getSessionNetwork = jest.fn(() => null);
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.checkAllCachesReady = jest.fn();
+    subject.handleDeepLinkScan = jest.fn();
+
+    const mountPromise = subject.componentDidMount();
+    await Promise.resolve();
+
+    setRoute('/session/alpha');
+    await act(async () => {
+      deferredCacheInit.resolve();
+      await mountPromise;
+    });
+
+    expect(props.changeActiveSessionSlug).not.toHaveBeenCalledWith('edge');
+    expect(props.changeActiveSessionSlug).not.toHaveBeenCalled();
   });
 
   it('redirects a general route to the first list-scoped session once and consumes the redirect', async () => {
@@ -653,6 +745,25 @@ describe('MainSite route render smoke', () => {
     expect(screen.getByTestId('mock-sponsor-page')).toHaveAttribute('data-network-id', '84532');
   });
 
+  it('renders the Telegram demo setup route without waiting for cache bootstrap', async () => {
+    const subject = createSubject({
+      path: '/telegram-demo-setup',
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+      cacheHasLoaded: false,
+      isAllCachesReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-telegram-demo-setup-page')).toHaveAttribute('data-active-session-slug', 'edge');
+    expect(mockTelegramDemoSetupPage.mock.calls[mockTelegramDemoSetupPage.mock.calls.length - 1][0]?.activeSessionSlug)
+      .toBe('edge');
+  });
+
   it.each([
     ['/debate', /Debate view is not part of the supported public surface yet\./i],
   ])('renders the experimental stub for %s without waiting for cache bootstrap', async (path, descriptionMatcher) => {
@@ -714,6 +825,16 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
     expect(screen.getByText(/not part of the supported public surface/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
+  });
+
+  it.each(['/sessionevil', '/sessions'])('renders a clean 404 for invalid session prefix %s', async (path) => {
+    const subject = createSubject({ path });
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).not.toBeInTheDocument();
+    expect(mockOnePageSession).not.toHaveBeenCalled();
   });
 
   it.each(['/compare', '/compare/'])('renders the compare route root for %s', async (path) => {
@@ -822,6 +943,53 @@ describe('MainSite route render smoke', () => {
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'edge');
     expect(mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0]?.ensureLightSbtDiscovery).toBe(subject.ensureLightSbtDiscovery);
     expect(mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0]?.ensureLightSbtUniverse).toBe(subject.ensureLightSbtUniverse);
+  });
+
+  it('prefers registry-backed slug session configs and forwards scoped Lit hooks', async () => {
+    const litHooks = { saveKey: jest.fn(), getKey: jest.fn() };
+    const sessionConfig = buildSessionConfig({
+      slug: 'live-session',
+      sessionName: 'Live Registry Session',
+      networkChainId: 11155420,
+      corsWorkerUrl: 'https://worker.example.test',
+      __registry: {
+        sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x0000000000000000000000000000000000000101'],
+            chainId: 11155420,
+            mode: 'any',
+          },
+        },
+      },
+    });
+    seedSessionRegistryCache(sessionConfig);
+    sessionRegistryStore.getSessionConfig.mockImplementation((slug) => (
+      slug === 'live-session' ? sessionConfig : null
+    ));
+    const subject = createSubject({
+      path: '/session/live-session',
+      activeSessionSlug: 'live-session',
+      sessionConfig: null,
+    });
+    subject.state = {
+      ...subject.state,
+      litHooks,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Live Registry Session');
+    const latestProps = mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0] || {};
+    expect(sessionRegistryStore.getSessionConfig).toHaveBeenCalledWith('live-session');
+    expect(latestProps.sessionConfig).toEqual(expect.objectContaining({
+      slug: 'live-session',
+      corsWorkerUrl: 'https://worker.example.test',
+    }));
+    expect(latestProps.litHooks).toBe(litHooks);
   });
 
   it('matches PUBLIC_URL-prefixed session routes when the app is served from a subpath', async () => {

@@ -2,7 +2,7 @@
 
 import React, { Component, Suspense } from "react";
 import { connect } from 'react-redux';
-import { fetchAccount } from '../../actions/accountActions.js';
+import { changeAccount, fetchAccount } from '../../actions/accountActions.js';
 import {
   fetchSessionState,
   changeFocusedTab,
@@ -154,7 +154,10 @@ import {
   resolveMainSiteSessionRouteContext,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
-import { resolveMainSiteLitSessionConfig } from './litSessionConfig.js';
+import {
+  resolveMainSiteLitSessionConfig,
+  resolveMainSiteLitSessionConfigSource,
+} from './litSessionConfig.js';
 import {
   buildMetadataSessionCacheEnvelope as buildMetadataSessionCacheEnvelopeFn,
   resolveMetadataSessionBinding as resolveMetadataSessionBindingFn,
@@ -259,6 +262,7 @@ import {
   SponsorPage as SponsorPageRaw,
   SurveyPage as SurveyPageRaw,
   SurveyTool as SurveyToolRaw,
+  TelegramDemoSetupPage as TelegramDemoSetupPageRaw,
   TagPage as TagPageRaw,
   UserPage as UserPageRaw,
 } from './routeLazyComponents.js';
@@ -377,6 +381,7 @@ const SimulatedUserPage = SimulatedUserPageRaw as unknown as MainSiteRouteCompon
 const SponsorPage = SponsorPageRaw as unknown as MainSiteRouteComponent;
 const SurveyPage = SurveyPageRaw as unknown as MainSiteRouteComponent;
 const SurveyTool = SurveyToolRaw as unknown as MainSiteRouteComponent;
+const TelegramDemoSetupPage = TelegramDemoSetupPageRaw as unknown as MainSiteRouteComponent;
 const TagPage = TagPageRaw as unknown as MainSiteRouteComponent;
 const UserPage = UserPageRaw as unknown as MainSiteRouteComponent;
 
@@ -1503,7 +1508,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   syncLitHooks = () => {
     if (typeof window === 'undefined') return;
     const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
+    const cfg = resolveMainSiteLitSessionConfigSource({
+      slug,
+      resolveRegistryConfigBySlug: (sessionSlug: string) => sessionRegistryStore.getSessionConfig(sessionSlug),
+      resolveStaticConfigBySlug: (sessionSlug: string) => getSessionConfigBySlugOrDefault(sessionSlug),
+    });
     const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } = resolveMainSiteLitSessionConfig({
       sessionConfig: cfg,
       networkChainIdFallback: this.props.network?.id || null,
@@ -3718,6 +3727,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const mountFallbackTarget = this.applySessionFallbackRedirect({ pathIn: mountPathRaw });
     this.syncSessionFallbackRedirectConsumption({ pathIn: mountPathRaw });
     const currentPath = this.getEffectiveRoutePath(mountPathRaw);
+    const mountSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';
 
     // Handle auto-hash persistence (restore)
     this.manageAutoHashPersistence();
@@ -3746,9 +3756,15 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     }
 
     // Determine active group from URL and persist locally in state
+    const postInitPathRaw = this.getCurrentPathname();
+    const postInitPath = this.getEffectiveRoutePath(postInitPathRaw);
     const currentSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';
-    const slug = this.getBootstrapActiveSessionSlug(currentPath, currentSearch);
-    this.props.changeActiveSessionSlug(slug);
+    const routeChangedDuringCacheInit = postInitPath !== currentPath || currentSearch !== mountSearch;
+    const bootstrapPath = routeChangedDuringCacheInit ? postInitPath : currentPath;
+    const slug = this.getBootstrapActiveSessionSlug(bootstrapPath, currentSearch);
+    if (!routeChangedDuringCacheInit) {
+      this.props.changeActiveSessionSlug(slug);
+    }
     if (slug && !this.getDisplaySessionChainId(slug)) {
       this.resolveSessionPathSlug(slug);
     }
@@ -3846,7 +3862,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     mainSiteLog.log("this.props.urlExtension:", this.props.urlExtension);
 
     // Prioritize user load (deep search) if on a user profile
-    const targetUser = this.getUserAddressFromPath(currentPath);
+    const targetUser = this.getUserAddressFromPath(bootstrapPath);
     if (targetUser) {
       mainSiteLog.log(`[MainSite] User Profile detected (${targetUser}). Prioritizing Deep Search.`);
       // Best effort: warm active-chain registry cache without adding another blocking wait.
@@ -5308,6 +5324,13 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     );
   };
 
+  _renderTelegramDemoSetupRoute = (ctx: RouteRenderCtx) => (
+    <Suspense fallback={<LazyFallback label="Loading Telegram Demo Setup..." />}>
+      <RouteErrorBoundary resetKey={ctx.fullPath}>
+        <TelegramDemoSetupPage activeSessionSlug={ctx.defaultSlug} />
+      </RouteErrorBoundary>
+    </Suspense>
+  );
 
   _renderSimUserRoute = (fullPath: string, defaultSessionNetwork: ReturnType<typeof _getSessionNetwork>) => {
     const simUsername = fullPath.slice(4);
@@ -5329,6 +5352,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               account={this.props.account}
               provider={this.props.provider}
               network={defaultSessionNetwork}
+              litHooks={this.state.litHooks}
               toggleLoginModal={this.props.toggleLoginModal}
               loginComplete={this.props.loginComplete}
               activeSessionSlug={defaultSlug}
@@ -6025,7 +6049,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       sessionTokenRaw,
       formatSessionId: sessionRegistryUtils.formatSessionId,
       resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
-      resolveSessionConfigBySlug: (slug: string) => getSessionConfigBySlug(slug),
+      resolveSessionConfigBySlug: (slug: string) => (
+        sessionRegistryStore.getSessionConfig(slug) || getSessionConfigBySlug(slug)
+      ),
       resolveDisplaySessionConfigBySlug: (slug: string) => (
         getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
       ),
@@ -6215,6 +6241,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               }
               routeQuestionsOpen={isQuestionsRoute}
               routeAutoOpenResults={isQuestionResultsRoute}
+              litHooks={this.state.litHooks}
             />
           </div>
         </RouteErrorBoundary>
@@ -6436,7 +6463,10 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     if (fullPath === "/agent" || fullPath === "/agent/") {
       return this._renderAgentRoute();
     }
-    if (fullPath.startsWith("/session")) {
+    if (fullPath === "/telegram-demo-setup" || fullPath === "/telegram-demo-setup/") {
+      return this._renderTelegramDemoSetupRoute(ctx);
+    }
+    if (firstPathSegment === "session") {
       return this._renderSessionRoute(ctx);
     }
     return <NotFoundRoute path={fullPath} />;
@@ -6520,12 +6550,15 @@ const mapStateToProps = (state: RootState) => ({
 
 const MainSiteWithWagmiHooks = WagmiHooksHOC(MainSite);
 
-export default connect(mapStateToProps, {
+export const mainSiteDispatchActions = {
   fetchAccount,
+  changeAccount,
   fetchSessionState,
   changeFocusedTab,
   toggleLoginModal,
   updateLoginInfo,
   toggleDemoMode,
   changeActiveSessionSlug
-})(MainSiteWithWagmiHooks) as unknown as React.ComponentType<Record<string, unknown>>;
+};
+
+export default connect(mapStateToProps, mainSiteDispatchActions)(MainSiteWithWagmiHooks) as unknown as React.ComponentType<Record<string, unknown>>;
