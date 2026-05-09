@@ -1,7 +1,11 @@
 import { Buffer } from 'buffer';
 import { ethers } from 'ethers';
-import { DEFAULT_CHAIN_ID, resolveRpcUrlsForChain } from './constants.mjs';
+import { DEFAULT_CHAIN_ID } from './constants.mjs';
 import { DEFAULT_CHIPOTLE_ACTION_CODE } from './litChipotleActionCatalog.mjs';
+import {
+  buildLitChipotlePolicy,
+  fingerprintLitChipotlePolicy,
+} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
 
 const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_CONNECT_TIMEOUT_MS = 45_000;
@@ -221,6 +225,7 @@ const buildChipotleDataHashSentinel = ({
   chainId = null,
   gateMode = 'any',
   sbtAddresses = [],
+  policyFingerprint = '',
 } = {}) => (
   [
     'chipotle-v3',
@@ -228,6 +233,7 @@ const buildChipotleDataHashSentinel = ({
     Number(chainId || 0) || 0,
     toStr(gateMode).trim() || 'any',
     normalizeSbtAddressList(sbtAddresses).join(',').toLowerCase(),
+    toStr(policyFingerprint).trim().toLowerCase(),
   ].join(':')
 );
 
@@ -235,39 +241,37 @@ const resolveGateFromOptions = ({
   accessControlConditions,
   chipotle = {},
   chainId,
-  rpcUrl = '',
 } = {}) => {
   const explicitGate = chipotle && typeof chipotle === 'object' ? chipotle : {};
+  const explicitPolicy = explicitGate.policy && typeof explicitGate.policy === 'object'
+    ? explicitGate.policy
+    : {};
   const derivedGate = extractSbtGateFromAccessControlConditions(accessControlConditions) || {};
   const sbtAddresses = normalizeSbtAddressList(
-    explicitGate.sbtAddresses || derivedGate.sbtAddresses || []
+    explicitGate.sbtAddresses || explicitPolicy.sbtAddresses || derivedGate.sbtAddresses || []
   );
   if (!sbtAddresses.length) {
     throw new Error('Lit Chipotle requires at least one SBT gate address.');
   }
   const gateChainId = Number(
     explicitGate.chainId ||
+    explicitPolicy.chainId ||
     derivedGate.chainId ||
     chainId ||
     0
   ) || DEFAULT_CHAIN_ID;
-  const gateMode = toStr(explicitGate.gateMode || derivedGate.gateMode || 'any').trim().toLowerCase() === 'all'
+  const gateMode = toStr(
+    explicitGate.gateMode ||
+    explicitPolicy.gateMode ||
+    derivedGate.gateMode ||
+    'any'
+  ).trim().toLowerCase() === 'all'
     ? 'all'
     : 'any';
-  const resolvedRpcUrl = toStr(
-    rpcUrl ||
-    explicitGate.rpcUrl ||
-    resolveRpcUrlsForChain(gateChainId)[0] ||
-    ''
-  ).trim();
-  if (!resolvedRpcUrl) {
-    throw new Error('Lit Chipotle requires an RPC URL for the target SBT gate chain.');
-  }
   return {
     sbtAddresses,
     gateChainId,
     gateMode,
-    rpcUrl: resolvedRpcUrl,
   };
 };
 
@@ -330,7 +334,6 @@ export async function createNodeLitHooks({
           sbtAddresses: gate.sbtAddresses,
           gateMode: gate.gateMode,
           chainId: gate.gateChainId,
-          rpcUrl: gate.rpcUrl,
           ...(message ? { message } : {}),
         }),
       }),
@@ -356,7 +359,6 @@ export async function createNodeLitHooks({
       accessControlConditions: opts.accessControlConditions,
       chipotle: opts.chipotle,
       chainId: opts.chainId || chainId,
-      rpcUrl: opts.rpcUrl,
     });
     const wrapped = await executeChipotleAction({
       op: 'encrypt',
@@ -367,22 +369,39 @@ export async function createNodeLitHooks({
     if (!ciphertext) {
       throw new Error('Lit Chipotle encrypt did not return ciphertext.');
     }
-    const litActionCid = toStr(wrapped?.litActionCid || opts?.chipotle?.litActionCid).trim();
+    const responsePolicy = wrapped?.policy
+      ? buildLitChipotlePolicy(wrapped.policy)
+      : buildLitChipotlePolicy({
+        chainId: gate.gateChainId,
+        gateMode: gate.gateMode,
+        sbtAddresses: gate.sbtAddresses,
+        litActionCid: wrapped?.litActionCid || opts?.chipotle?.litActionCid,
+        litPkpId: wrapped?.litPkpId || opts?.chipotle?.litPkpId,
+      });
+    const policyFingerprint = toStr(
+      wrapped?.policyFingerprint || fingerprintLitChipotlePolicy(responsePolicy)
+    ).trim();
+    if (policyFingerprint.toLowerCase() !== fingerprintLitChipotlePolicy(responsePolicy).toLowerCase()) {
+      throw new Error('Lit Chipotle encrypt returned mismatched policy metadata.');
+    }
     return {
       ciphertext,
       dataToEncryptHash: buildChipotleDataHashSentinel({
-        litActionCid,
-        chainId: gate.gateChainId,
-        gateMode: gate.gateMode,
-        sbtAddresses: gate.sbtAddresses,
+        litActionCid: responsePolicy.litActionCid,
+        chainId: responsePolicy.chainId,
+        gateMode: responsePolicy.gateMode,
+        sbtAddresses: responsePolicy.sbtAddresses,
+        policyFingerprint,
       }),
       chipotle: {
-        version: 1,
-        ...(litActionCid ? { litActionCid } : {}),
-        sbtAddresses: gate.sbtAddresses,
-        gateMode: gate.gateMode,
-        chainId: gate.gateChainId,
-        rpcUrl: gate.rpcUrl,
+        version: 2,
+        litActionCid: responsePolicy.litActionCid,
+        litPkpId: responsePolicy.litPkpId,
+        sbtAddresses: responsePolicy.sbtAddresses,
+        gateMode: responsePolicy.gateMode,
+        chainId: responsePolicy.chainId,
+        policyFingerprint,
+        policy: responsePolicy,
       },
     };
   };
