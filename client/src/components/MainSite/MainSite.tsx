@@ -243,7 +243,6 @@ import { reloadWindowLocation as reloadWindowLocationFn } from './reloadWindowLo
 import {
   AboutPage as AboutPageRaw,
   AdminPage as AdminPageRaw,
-  AgentInboxPage as AgentInboxPageRaw,
   AgentPage as AgentPageRaw,
   DebateMap as DebateMapRaw,
   BookmarksPage as BookmarksPageRaw,
@@ -354,7 +353,6 @@ const NotFoundRoute = NotFoundRouteRaw as unknown as MainSiteRouteComponent;
 const SessionLoadingSkeleton = SessionLoadingSkeletonRaw as unknown as MainSiteRouteComponent;
 const AboutPage = AboutPageRaw as unknown as MainSiteRouteComponent;
 const AdminPage = AdminPageRaw as unknown as MainSiteRouteComponent;
-const AgentInboxPage = AgentInboxPageRaw as unknown as MainSiteRouteComponent;
 const AgentPage = AgentPageRaw as unknown as MainSiteRouteComponent;
 const DebateMap = DebateMapRaw as unknown as MainSiteRouteComponent;
 const BookmarksPage = BookmarksPageRaw as unknown as MainSiteRouteComponent;
@@ -5312,14 +5310,6 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     );
   };
 
-  _renderAgentInboxRoute = (ctx: RouteRenderCtx) => (
-    <Suspense fallback={<LazyFallback label="Loading Inbox..." />}>
-      <RouteErrorBoundary resetKey={ctx.fullPath}>
-        <AgentInboxPage />
-      </RouteErrorBoundary>
-    </Suspense>
-  );
-
   _renderTelegramDemoSetupRoute = (ctx: RouteRenderCtx) => (
     <Suspense fallback={<LazyFallback label="Loading Telegram Demo Setup..." />}>
       <RouteErrorBoundary resetKey={ctx.fullPath}>
@@ -6454,9 +6444,6 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     }
     if (fullPath === "/agent" || fullPath === "/agent/") {
       return this._renderAgentRoute();
-    }
-    if (fullPath === "/inbox" || fullPath === "/inbox/") {
-      return this._renderAgentInboxRoute(ctx);
     }
     if (fullPath === "/telegram-demo-setup" || fullPath === "/telegram-demo-setup/") {
       return this._renderTelegramDemoSetupRoute(ctx);
