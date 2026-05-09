@@ -183,6 +183,41 @@ test('/ce_questions and callback dispatch list questions without leaking locked 
   assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
 });
 
+test('group Pose Question callback opens a choose-question menu instead of posing the first question', async () => {
+  const env = baseEnv();
+  const joined = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const poseQuestion = flattenButtons(joined.response.replyMarkup)
+    .find((button) => button.text === 'Pose Question');
+  const callback = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7004,
+      callback_query: {
+        id: 'callback-pose-menu',
+        data: poseQuestion.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 56,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(callback.ok, true);
+  assert.equal(callback.response.method, 'editMessageText');
+  assert.equal(callback.response.messageId, '56');
+  assert.equal(callback.screen, 'question_list');
+  assert.match(callback.response.text, /Choose a question to pose to the group/);
+  assert.match(callback.response.text, /q-readiness - What should Alpha decide next/);
+  assert.equal(callback.response.text.startsWith('Question for alpha:'), false);
+});
+
 test('/q poses existing or ad hoc public questions to the group', async () => {
   const env = baseEnv();
   const existing = await buildTelegramCommandResponse({
@@ -202,6 +237,58 @@ test('/q poses existing or ad hoc public questions to the group', async () => {
   assert.equal(adHoc.ok, true);
   assert.match(adHoc.response.text, /What should we fund this week\?/);
   assert.equal(JSON.stringify(adHoc.response.replyMarkup).includes('What should we fund'), false);
+});
+
+test('callback dispatch answers callback queries before editing messages', async () => {
+  const env = baseEnv();
+  const joined = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const viewQuestions = flattenButtons(joined.response.replyMarkup)
+    .find((button) => button.text === 'View Questions');
+  const commandResponse = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7005,
+      callback_query: {
+        id: 'callback-answer-me',
+        data: viewQuestions.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 57,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const calls = [];
+  const fetchMock = async (...args) => {
+    calls.push(args);
+    return new Response(JSON.stringify({ ok: true, result: true }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const dispatched = await dispatchTelegramCommandResponse({
+    commandResponse,
+    env,
+    fetchImpl: fetchMock,
+  });
+
+  assert.equal(dispatched.telegram.ok, true);
+  assert.equal(dispatched.telegram.callbackAnswer.ok, true);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0][0], 'https://api.telegram.org/bot123456:test-token/answerCallbackQuery');
+  assert.deepEqual(JSON.parse(calls[0][1].body), {
+    callback_query_id: 'callback-answer-me',
+    show_alert: false,
+    cache_time: 0,
+  });
+  assert.equal(calls[1][0], 'https://api.telegram.org/bot123456:test-token/editMessageText');
 });
 
 test('/ce_docs lists public metadata and hides private storage refs', async () => {

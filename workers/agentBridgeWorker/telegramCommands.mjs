@@ -25,7 +25,7 @@ import {
   normalizeTelegramMockUpdate,
   normalizeTelegramPrincipal,
 } from './telegramUpdates.mjs';
-import { editTelegramMessageText, sendTelegramMessage } from './telegramSender.mjs';
+import { answerTelegramCallbackQuery, editTelegramMessageText, sendTelegramMessage } from './telegramSender.mjs';
 
 const ACTION_KV_PREFIX = 'telegram:action:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
@@ -174,7 +174,7 @@ function parseTelegramCommandText(text = '', {
 
 function findQuestion(questions = [], selector = '') {
   const needle = lower(selector);
-  if (!needle) return questions[0] || null;
+  if (!needle) return null;
   return questions.find((question) => lower(questionId(question)) === needle)
     || questions.find((question) => lower(questionText(question)).includes(needle))
     || null;
@@ -334,6 +334,11 @@ function errorReply({
       reason,
     },
   });
+}
+
+function attachCallbackQueryId(commandResponse = {}, callbackQueryId = '') {
+  const id = safeString(callbackQueryId);
+  return id ? { ...commandResponse, callbackQueryId: id } : commandResponse;
 }
 
 function formatHelpText() {
@@ -562,6 +567,7 @@ async function buildQuestionsResponse({
   env,
   args = [],
   sessionSlugOverride = '',
+  introText = '',
   method = 'sendMessage',
   messageId = '',
   createdAt,
@@ -602,10 +608,11 @@ async function buildQuestionsResponse({
     chatId: normalized.chat.chatId,
     messageId,
     text: [
+      ...(safeString(introText) ? [safeString(introText), ''] : []),
       `Questions for ${resolved.session.sessionSlug}:`,
       ...state.questions.map((question) => `${question.displayIndex}. ${question.questionId} - ${question.title}`),
       '',
-      'Use /q <question-id-or-text> to pose one to the group.',
+      'Tap Pose on a listed question, or send /q <question-id-or-text>.',
     ].join('\n'),
     replyMarkup: rows.length ? { inline_keyboard: rows } : null,
     screen: state.screen,
@@ -622,6 +629,8 @@ async function buildPoseQuestionResponse({
   args = [],
   sessionSlugOverride = '',
   questionIdOverride = '',
+  method = 'sendMessage',
+  messageId = '',
   createdAt,
 } = {}) {
   const policy = loadSessionPolicy(env);
@@ -637,6 +646,18 @@ async function buildPoseQuestionResponse({
   }
 
   const selector = safeString(questionIdOverride || args.join(' '));
+  if (!selector) {
+    return buildQuestionsResponse({
+      normalized,
+      command,
+      env,
+      sessionSlugOverride: resolved.session.sessionSlug,
+      introText: 'Choose a question to pose to the group.',
+      method,
+      messageId,
+      createdAt,
+    });
+  }
   const questions = loadDemoQuestions(env);
   const matched = findQuestion(questions, selector);
   const selected = matched || buildAdHocQuestion(selector, {
@@ -649,6 +670,9 @@ async function buildPoseQuestionResponse({
       command,
       env,
       sessionSlugOverride: resolved.session.sessionSlug,
+      introText: 'Choose a question to pose to the group.',
+      method,
+      messageId,
       createdAt,
     });
   }
@@ -670,7 +694,9 @@ async function buildPoseQuestionResponse({
         : []),
     ].join('\n');
   return reply({
+    method,
     chatId: normalized.chat.chatId,
+    messageId,
     text,
     replyMarkup: {
       inline_keyboard: [[
@@ -847,33 +873,34 @@ async function buildCallbackResponse({ normalized, env, createdAt }) {
   const callbackData = safeString(normalized.callbackData);
   const parsed = parseOpaqueActionId(callbackData);
   const callback = normalized.raw?.callback_query || {};
+  const callbackQueryId = safeString(callback.id);
   const message = callback.message || {};
   const method = message.chat?.id && message.message_id ? 'editMessageText' : 'sendMessage';
   const messageId = safeString(message.message_id);
   if (!parsed.ok) {
-    return errorReply({
+    return attachCallbackQueryId(errorReply({
       normalized,
       command: 'callback',
       reason: 'invalid_callback_data',
       text: 'This action is not available. Callback data must be an opaque Context Engine action id.',
       method,
       messageId,
-    });
+    }), callbackQueryId);
   }
   const record = await readActionRecord(env, parsed.actionId);
   if (!record) {
-    return errorReply({
+    return attachCallbackQueryId(errorReply({
       normalized,
       command: 'callback',
       reason: 'action_not_found',
       text: 'This action expired. Run /ce_sessions or /start to refresh the buttons.',
       method,
       messageId,
-    });
+    }), callbackQueryId);
   }
   const sessionSlug = record.serverContextRef?.sessionSlug || '';
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS) {
-    return buildQuestionsResponse({
+    return attachCallbackQueryId(await buildQuestionsResponse({
       normalized,
       command: 'callback:view_questions',
       env,
@@ -881,10 +908,10 @@ async function buildCallbackResponse({ normalized, env, createdAt }) {
       method,
       messageId,
       createdAt,
-    });
+    }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS) {
-    return buildDocsResponse({
+    return attachCallbackQueryId(await buildDocsResponse({
       normalized,
       command: 'callback:list_docs',
       env,
@@ -892,45 +919,47 @@ async function buildCallbackResponse({ normalized, env, createdAt }) {
       method,
       messageId,
       createdAt,
-    });
+    }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION) {
-    return buildPoseQuestionResponse({
+    return attachCallbackQueryId(await buildPoseQuestionResponse({
       normalized,
       command: 'callback:pose_question',
       env,
       sessionSlugOverride: sessionSlug,
       questionIdOverride: record.serverContextRef?.questionId || '',
+      method,
+      messageId,
       createdAt,
-    });
+    }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT) {
-    return buildMeResponse({
+    return attachCallbackQueryId(await buildMeResponse({
       normalized,
       command: 'callback:my_account',
       env,
       createdAt,
       method,
       messageId,
-    });
+    }), callbackQueryId);
   }
   if ([TELEGRAM_BRIDGE_ACTIONS.JOIN_SESSION, TELEGRAM_BRIDGE_ACTIONS.START_PRIVATE].includes(record.action)) {
-    return buildJoinResponse({
+    return attachCallbackQueryId(await buildJoinResponse({
       normalized,
       command: 'callback:join_session',
       env,
       sessionSlugOverride: sessionSlug,
       createdAt,
-    });
+    }), callbackQueryId);
   }
-  return errorReply({
+  return attachCallbackQueryId(errorReply({
     normalized,
     command: 'callback',
     reason: 'unsupported_callback_action',
     text: 'This action is not available in the Telegram demo yet.',
     method,
     messageId,
-  });
+  }), callbackQueryId);
 }
 
 export async function buildTelegramCommandResponse({
@@ -1040,6 +1069,14 @@ function summarizeTelegramSendResult(result = {}) {
     };
 }
 
+function callbackQueryIdFromCommandResponse(commandResponse = {}) {
+  return safeString(
+    commandResponse.callbackQueryId ||
+    commandResponse.normalized?.raw?.callback_query?.id ||
+    commandResponse.normalized?.callbackQueryId
+  );
+}
+
 export async function dispatchTelegramCommandResponse({
   commandResponse = {},
   env = {},
@@ -1050,6 +1087,14 @@ export async function dispatchTelegramCommandResponse({
   }
   const response = commandResponse.response;
   const botToken = env.TELEGRAM_BOT_TOKEN || '';
+  const callbackQueryId = callbackQueryIdFromCommandResponse(commandResponse);
+  const callbackAnswer = callbackQueryId
+    ? await answerTelegramCallbackQuery({
+      botToken,
+      callbackQueryId,
+      fetchImpl,
+    })
+    : null;
   const sendResult = response.method === 'editMessageText'
     ? await editTelegramMessageText({
       botToken,
@@ -1068,7 +1113,10 @@ export async function dispatchTelegramCommandResponse({
     });
   return {
     ...commandResponse,
-    telegram: summarizeTelegramSendResult(sendResult),
+    telegram: {
+      ...summarizeTelegramSendResult(sendResult),
+      callbackAnswer: callbackAnswer ? summarizeTelegramSendResult(callbackAnswer) : null,
+    },
   };
 }
 

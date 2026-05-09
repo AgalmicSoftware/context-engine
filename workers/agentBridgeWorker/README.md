@@ -41,12 +41,13 @@ The group session-linked card says `Context Engine session linked: <session>` an
 
 `View Questions` reads the linked session through `GET /api/agent/questions`.
 `Pose Question` uses `/ce_pose_question` or `/q` to pose one existing or
-generated question to the group. Anyone in the linked group may pose a question;
-the worker still enforces session linkage, opaque action ids, idempotent action
-refs, and public-safe output. The old `/ce_drop_question` command is only a
-deprecated compatibility alias. Private or gated question text is never posed to
-the group; group output shows a locked state and routes eligible accounts to
-private chat or Mini App.
+generated question to the group. If no selector is provided, the action opens a
+choose-question menu instead of silently posing the first question. Anyone in
+the linked group may pose a question; the worker still enforces session
+linkage, opaque action ids, idempotent action refs, and public-safe output. The
+old `/ce_drop_question` command is only a deprecated compatibility alias.
+Private or gated question text is never posed to the group; group output shows a
+locked state and routes eligible accounts to private chat or Mini App.
 
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 
@@ -199,9 +200,10 @@ The live webhook route is `/telegram/webhook`. It rejects requests unless
 the configured webhook secret token. It parses real Telegram `message` and
 `callback_query` updates, handles `/start`, `/ce_join <session>`,
 `/ce_sessions`, `/ce_questions`, `/ce_pose_question`, `/q`, `/ce_docs`, and
-`/ce_me`, and sends replies through an injected Telegram Bot API adapter. Unit
-tests use mocked `fetch` and fake bot tokens; real `TELEGRAM_BOT_TOKEN` is
-needed only for live Telegram smoke.
+`/ce_me`, answers callback queries to clear Telegram's inline-button loading
+state, and sends replies through an injected Telegram Bot API adapter. Unit tests
+use mocked `fetch` and fake bot tokens; real `TELEGRAM_BOT_TOKEN` is needed only
+for live Telegram smoke.
 
 Callback data and private deep-link start payloads are opaque `cecb_*` or
 `cetg_*` identifiers. Private payloads, JWTs, worker tokens, account material,
@@ -213,6 +215,21 @@ The current command handler uses configured demo fixtures from optional
 `AGENT_BRIDGE_DEMO_DOCS_JSON` vars. Canonical question, response, and
 session-context payloads still go through the session worker or canonical agent
 APIs as that contract is promoted from demo fixtures.
+
+## Interactive Preview
+
+`GET /mock/telegram/preview` serves a small browser preview for the private demo
+worker. It exercises the same command and callback builder as the Telegram
+webhook through `POST /mock/telegram/preview-update`, but it never calls the
+Telegram Bot API. Use it to tune group/private copy, inline keyboards, callback
+navigation, and future Mini App payloads before setting or reusing the live
+webhook.
+
+The preview is mock-only: it should render safe display text and opaque action
+IDs, not raw grants, private answers, keys, Cloudflare credentials, or Telegram
+bot tokens. Mini App work should keep using the same opaque action IDs and move
+private form/input flows into the Mini App lane rather than Telegram group
+messages.
 
 ## Deploy Helper Plan And Apply
 

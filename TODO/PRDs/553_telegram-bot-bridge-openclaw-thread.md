@@ -54,6 +54,19 @@
     R2/D1 were skipped, Worker secrets were written through Cloudflare API,
     `/health` returned `agent-bridge-worker-private-v1`, and Telegram
     `getWebhookInfo` confirmed the webhook URL with zero pending errors.
+  - Live Telegram callback navigation follow-up acknowledges callback queries
+    before edits so Telegram inline buttons stop loading, and `Pose Question`
+    without a selector opens the question picker instead of silently posing the
+    first available question.
+  - `GET /mock/telegram/preview` now provides a browser-only Telegram preview
+    lane backed by the same command/callback builder and no Telegram Bot API
+    network calls. Use it to tune copy, keyboards, callback flows, and future
+    Mini App payload boundaries before live webhook smoke.
+  - The callback/preview Worker update was deployed to the same Workers.dev
+    URL. The apply helper reused KV, skipped R2/D1, rewrote Worker secrets
+    through Cloudflare, kept the existing Telegram webhook, verified `/health`,
+    and live preview POST returned the fixed question-picker response for
+    `/ce_pose_question`.
   - Still mocked/contract-only before live smoke: `/telegram-demo-setup` does
     not itself deploy or set webhook, `deploy:plan` does not create Cloudflare
     resources, live `deploy:apply` is not run by tests, demo questions/docs are
@@ -64,15 +77,19 @@
 
 ## Next Queue Head
 
-1. Smoke the live Telegram bot from Telegram: private `/start`, group
-   `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
+1. Smoke the live Telegram bot from Telegram after the callback/preview deploy:
+   private `/start`, group `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
    `/q <question-id-or-text>`, `/ce_docs`, and private `/ce_me`. Confirm
-   replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs.
-2. After the transport smoke, replace fixture-backed Telegram question/doc/session
+   replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs,
+   callback buttons stop loading, and `Pose Question` opens the picker.
+2. Use `/mock/telegram/preview` as the fast local/browser lane for copy,
+   callback keyboard, and Mini App handoff iteration before pushing new webhook
+   behavior live.
+3. After the transport smoke, replace fixture-backed Telegram question/doc/session
    reads with canonical `/api/agent/*` calls where the contract is ready, then
    continue setup UX convergence so `/telegram-demo-setup` can invoke the same
    apply path without exposing Cloudflare/Wrangler details.
-3. Later storage hardening: implement the Cloudflare `lit_encrypted` envelope
+4. Later storage hardening: implement the Cloudflare `lit_encrypted` envelope
    producer/reader path for docs/context, private questions, private responses,
    surveys, and generated artifacts without routing those payloads through
    Lit-Arweave.
