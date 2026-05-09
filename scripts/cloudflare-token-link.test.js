@@ -28,7 +28,7 @@ test('buildCloudflareTokenTemplateUrl only requests the deploy-helper scopes it 
   assert.deepEqual(JSON.parse(url.searchParams.get('permissionGroupKeys')), [
     { key: 'workers_scripts', type: 'edit' },
     { key: 'workers_kv_storage', type: 'edit' },
-    { key: 'workers_r2_storage', type: 'edit' },
+    { key: 'workers_r2', type: 'edit' },
     { key: 'd1', type: 'edit' },
     { key: 'workers_durable_objects', type: 'edit' },
   ]);
@@ -44,7 +44,7 @@ test('buildCloudflareTokenTemplateUrl adds Account Settings only for workers.dev
   assert.deepEqual(JSON.parse(url.searchParams.get('permissionGroupKeys')), [
     { key: 'workers_scripts', type: 'edit' },
     { key: 'workers_kv_storage', type: 'edit' },
-    { key: 'workers_r2_storage', type: 'edit' },
+    { key: 'workers_r2', type: 'edit' },
     { key: 'd1', type: 'edit' },
     { key: 'workers_durable_objects', type: 'edit' },
     { key: 'account_settings', type: 'edit' },
@@ -53,6 +53,21 @@ test('buildCloudflareTokenTemplateUrl adds Account Settings only for workers.dev
   assert.deepEqual(buildCloudflareTokenTemplatePermissions({
     includeWorkersDevSubdomainSetup: false,
   }), CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS);
+});
+
+test('buildCloudflareTokenTemplateUrl can omit R2/D1 for default Telegram smoke deploy', () => {
+  const url = new URL(buildCloudflareTokenTemplateUrl({
+    slug: 'alpha-session',
+    includeDocStorage: false,
+  }));
+  const permissions = JSON.parse(url.searchParams.get('permissionGroupKeys'));
+
+  assert.deepEqual(permissions, [
+    { key: 'workers_scripts', type: 'edit' },
+    { key: 'workers_kv_storage', type: 'edit' },
+    { key: 'workers_durable_objects', type: 'edit' },
+  ]);
+  assert.deepEqual(buildCloudflareTokenTemplatePermissions({ includeDocStorage: false }), permissions);
 });
 
 test('buildCloudflareTokenTemplateUrl does not request legacy broad Cloudflare product scopes', () => {
@@ -87,8 +102,10 @@ test('parseArgs accepts the workers.dev setup scope flag', () => {
   assert.deepEqual(parseArgs([
     '--slug', 'alpha',
     '--include-workers-dev-subdomain-setup',
+    '--no-doc-storage',
   ]), {
     slug: 'alpha',
     'include-workers-dev-subdomain-setup': true,
+    'no-doc-storage': true,
   });
 });
