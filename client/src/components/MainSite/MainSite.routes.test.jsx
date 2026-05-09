@@ -22,6 +22,7 @@ const mockSBTsPage = jest.fn(() => null);
 const mockCompareAddresses = jest.fn(() => null);
 const mockTagPage = jest.fn(() => null);
 const mockDebateMap = jest.fn(() => null);
+const mockAgentInboxPage = jest.fn(() => null);
 const mockTelegramDemoSetupPage = jest.fn(() => null);
 const ORIGINAL_SESSION_SCAN_SCOPE = globalThis.CE_SESSION_SCAN_SCOPE;
 const ORIGINAL_SESSION_SCAN_SLUGS = globalThis.CE_SESSION_SCAN_SLUGS;
@@ -229,6 +230,19 @@ jest.mock('../DebateMap/DebateMap', () => {
       return React.createElement('div', {
         'data-testid': 'mock-debate-map',
         'data-demo-mode': typeof props.demoMode === 'undefined' ? '' : String(props.demoMode),
+      });
+    },
+  };
+});
+
+jest.mock('../Agent/AgentInboxPage', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockAgentInboxPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-agent-inbox-page',
       });
     },
   };
@@ -787,6 +801,24 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByTestId('mock-telegram-demo-setup-page')).toHaveAttribute('data-active-session-slug', 'edge');
     expect(mockTelegramDemoSetupPage.mock.calls[mockTelegramDemoSetupPage.mock.calls.length - 1][0]?.activeSessionSlug)
       .toBe('edge');
+  });
+
+  it('renders the agent inbox route without waiting for cache bootstrap', async () => {
+    const subject = createSubject({
+      path: '/inbox',
+      activeSessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      isCacheManagerReady: false,
+      cacheHasLoaded: false,
+      isAllCachesReady: false,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-agent-inbox-page')).toBeInTheDocument();
+    expect(mockAgentInboxPage).toHaveBeenCalledTimes(1);
   });
 
   it.each([

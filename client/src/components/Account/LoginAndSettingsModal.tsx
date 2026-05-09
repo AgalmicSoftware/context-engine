@@ -182,7 +182,28 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
-export { buildBookmarksRoutePath };
+type SponsoredStatusEntry = LoginAndSettingsRecord & {
+  status?: string;
+};
+
+const normalizeSettingsSessionSlug = (value: unknown) => {
+  const raw = toStr(value).trim().toLowerCase();
+  return raw === 'general' ? '' : raw;
+};
+const formatSettingsSessionSlug = (value: unknown) => {
+  const normalized = normalizeSettingsSessionSlug(value);
+  return normalized || 'general';
+};
+const buildSettingsSessionHref = (slugIn?: string) => {
+  const normalizedBasePath = toStr(readPublicUrlBasePath()).trim().replace(/\/+$/, '');
+  const slug = normalizeSettingsSessionSlug(slugIn);
+  return `${normalizedBasePath}${slug ? `/session/${encodeURIComponent(slug)}` : '/session'}`;
+};
+const buildSettingsInboxHref = (slugIn?: string) => {
+  const normalizedBasePath = toStr(readPublicUrlBasePath()).trim().replace(/\/+$/, '');
+  const slug = normalizeSettingsSessionSlug(slugIn);
+  return `${normalizedBasePath}/inbox${slug ? `?session=${encodeURIComponent(slug)}` : ''}`;
+};
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );
@@ -2765,6 +2786,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                 </div>
               )}
               <div className={styles.accountModalControls}>
+                <Button
+                  color="secondary"
+                  size="sm"
+                  href={buildSettingsInboxHref(this.getActiveSessionSlug())}
+                  className={styles.walletButton}
+                >
+                  <FontAwesomeIcon icon={faExternalLinkAlt} /> Activity
+                </Button>
                 <Button color="secondary" size="sm" onClick={this.openBookmarks} className={styles.walletButton}>
                   <FontAwesomeIcon icon={faBookmark} /> Bookmarks
                 </Button>

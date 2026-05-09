@@ -10,6 +10,7 @@ describe('routeConfig', () => {
   it('tracks the known MainSite route prefixes', () => {
     expect(KNOWN_ROUTE_PREFIXES.has('survey')).toBe(true);
     expect(KNOWN_ROUTE_PREFIXES.has('session')).toBe(true);
+    expect(KNOWN_ROUTE_PREFIXES.has('inbox')).toBe(true);
     expect(KNOWN_ROUTE_PREFIXES.has('docs')).toBe(true);
     expect(KNOWN_ROUTE_PREFIXES.has('unknown')).toBe(false);
   });
@@ -19,6 +20,7 @@ describe('routeConfig', () => {
     expect(isStaticNonCacheRoute('/tag/governance')).toBe(true);
     expect(isStaticNonCacheRoute('/contracts/0xabc')).toBe(true);
     expect(isStaticNonCacheRoute('/docs/privacy')).toBe(true);
+    expect(isStaticNonCacheRoute('/inbox')).toBe(true);
     expect(isStaticNonCacheRoute('/surveys')).toBe(false);
     expect(isStaticNonCacheRoute('/session/edge')).toBe(false);
   });

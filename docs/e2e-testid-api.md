@@ -155,6 +155,7 @@ Agent Mode is a dev/e2e-only global interface `window.__ceAgent` (installed from
 Use `window.__ceAgent.describe()` when you want the current supported action/tool contract and canonical doc paths for this surface.
 
 Agent page UI: `client/src/components/Agent/AgentPage.tsx`
+Agent inbox UI: `client/src/components/Agent/AgentInboxPage.tsx`
 
 | `data-testid` | Meaning / When Present | TestID API |
 | --- | --- | --- |
@@ -162,6 +163,10 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 | `ce-agent-run` | Runs all actions. | yes |
 | `ce-agent-step` | Runs a single action (step). | yes |
 | `ce-agent-log` | Log output container. | yes |
+| `ce-page-agent-inbox-root` | Agent inbox route root. | yes |
+| `ce-agent-inbox-history` | Agent inbox history panel. | yes |
+| `ce-agent-inbox-event` | Repeated safe activity event row. | yes |
+| `ce-agent-inbox-empty` | Empty activity state. | yes |
 
 ## SurveyTool (Answering)
 
