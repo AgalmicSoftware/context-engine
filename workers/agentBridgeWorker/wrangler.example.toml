@@ -47,9 +47,12 @@ DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 # ADDITIONAL_RPC_URL = "https://your-op-sepolia-rpc.example"
 # Default question source is live. Use "fixture" only for local preview/demo copy.
 # AGENT_BRIDGE_QUESTION_SOURCE = "fixture"
+# AGENT_BRIDGE_RPC_TIMEOUT_MS = "5000"
+# AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS = "2500"
 # AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS = "300"
-# AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION = "20"
-# Live question scans require session metadata blockLimits or explicit bounds.
+# AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY = "4"
+# AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS = "1"
+# Live question scans prefer metadata blockLimits, then SessionCreated for the slug.
 # AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK = "0"
 # AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK = ""
 # Emergency/debug only: allows recent-block fallback when no scoped bounds exist.

@@ -2,11 +2,15 @@ import { resolveRegistryRpcUrls, resolveSessionRegistryAddress } from './registr
 
 const DEFAULT_CHAIN_ID = '11155420';
 const ARWEAVE_GATEWAY = 'https://ar-io.dev';
+const ARWEAVE_GATEWAYS = Object.freeze([ARWEAVE_GATEWAY, 'https://arweave.net']);
 const DEFAULT_CACHE_TTL_SECONDS = 5 * 60;
 const DEFAULT_SCAN_BLOCKS = 130_000;
-const DEFAULT_LOG_CHUNK_SIZE = 20_000;
-const DEFAULT_MAX_QUESTIONS = 20;
-const QUESTION_CACHE_PREFIX = 'telegram:questions:v1:';
+const DEFAULT_LOG_CHUNK_SIZE = 250_000;
+const DEFAULT_PAYLOAD_CONCURRENCY = 4;
+const DEFAULT_FOREGROUND_CHUNKS = 1;
+const DEFAULT_RPC_TIMEOUT_MS = 5_000;
+const DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 2_500;
+const QUESTION_CACHE_PREFIX = 'telegram:questions:v2:';
 const questionMemoryCache = new Map();
 
 const SURVEYS_BY_CHAIN = Object.freeze({
@@ -19,6 +23,7 @@ const SELECTORS = Object.freeze({
 });
 
 const QUESTIONS_ADDED_TOPIC0 = '0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a';
+const SESSION_CREATED_TOPIC0 = '0xda4a316a58925980f9d609158916dd8a071a29c9118777e57a5daed4ba17744f';
 const ZERO_BYTES32 = `0x${'00'.repeat(32)}`;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
 
@@ -49,6 +54,14 @@ function normalizeBlock(value) {
 
 function envFlagEnabled(value = '') {
   return ['1', 'true', 'yes', 'on'].includes(lower(value));
+}
+
+function rpcTimeoutMs(env = {}) {
+  return normalizePositiveInteger(env.AGENT_BRIDGE_RPC_TIMEOUT_MS, DEFAULT_RPC_TIMEOUT_MS);
+}
+
+function questionPayloadTimeoutMs(env = {}) {
+  return normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS, DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS);
 }
 
 function normalizeHexAddress(value = '') {
@@ -182,10 +195,14 @@ async function rpcRequest({
   method = '',
   params = [],
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error(`RPC ${method} timed out`)), timeoutMs);
   const response = await fetchImpl(rpcUrl, {
     method: 'POST',
+    signal: controller.signal,
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       jsonrpc: '2.0',
@@ -193,12 +210,16 @@ async function rpcRequest({
       method,
       params,
     }),
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.error) {
-    throw new Error(safeString(body?.error?.message) || `RPC ${method} failed (${response.status || 502})`);
+  }).finally(() => clearTimeout(timeout));
+  try {
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body?.error) {
+      throw new Error(safeString(body?.error?.message) || `RPC ${method} failed (${response.status || 502})`);
+    }
+    return body?.result;
+  } finally {
+    clearTimeout(timeout);
   }
-  return body?.result;
 }
 
 async function rpcWithFallback({
@@ -206,13 +227,14 @@ async function rpcWithFallback({
   method = '',
   params = [],
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
 } = {}) {
   let lastError = null;
   for (const rpcUrl of rpcUrls) {
     try {
       return {
         ok: true,
-        result: await rpcRequest({ rpcUrl, method, params, fetchImpl }),
+        result: await rpcRequest({ rpcUrl, method, params, fetchImpl, timeoutMs }),
         rpcUrl,
       };
     } catch (error) {
@@ -230,12 +252,14 @@ async function ethCall({
   to = '',
   data = '',
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
 } = {}) {
   const result = await rpcWithFallback({
     rpcUrls,
     method: 'eth_call',
     params: [{ to, data }, 'latest'],
     fetchImpl,
+    timeoutMs,
   });
   if (!result.ok) return result;
   const text = safeString(result.result);
@@ -247,26 +271,105 @@ async function ethCall({
 
 function resolveSurveysAddress(env = {}, chainId = DEFAULT_CHAIN_ID) {
   return normalizeHexAddress(
-    env.AGENT_BRIDGE_SURVEYS_ADDRESS ||
-    env.SURVEYS_CONTRACT_ADDRESS ||
-    env.SURVEYS_ADDRESS ||
+    resolveConfiguredSurveysAddress(env) ||
     SURVEYS_BY_CHAIN[normalizeChainId(chainId)]
   );
 }
 
+function resolveConfiguredSurveysAddress(env = {}) {
+  return normalizeHexAddress(
+    env.AGENT_BRIDGE_SURVEYS_ADDRESS ||
+    env.SURVEYS_CONTRACT_ADDRESS ||
+    env.SURVEYS_ADDRESS
+  );
+}
+
+function resolveMetadataSurveysAddress(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return '';
+  const contracts = metadata.contracts && typeof metadata.contracts === 'object'
+    ? metadata.contracts
+    : {};
+  const candidates = [
+    contracts?.surveys?.address,
+    contracts?.survey?.address,
+    contracts?.surveysContract?.address,
+    contracts?.surveyContract?.address,
+    contracts?.Surveys?.address,
+    contracts?.surveys,
+    contracts?.survey,
+    metadata.surveysAddress,
+    metadata.surveyAddress,
+    metadata.surveysContractAddress,
+    metadata.surveyContractAddress,
+  ];
+  for (const candidate of candidates) {
+    const address = normalizeHexAddress(candidate);
+    if (address) return address;
+  }
+  return '';
+}
+
+async function fetchArweaveJson(pointerId = '', {
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
+} = {}) {
+  const id = safeString(pointerId);
+  if (!/^[a-zA-Z0-9_-]{43}$/.test(id)) return null;
+  for (const gateway of ARWEAVE_GATEWAYS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(new Error('Arweave fetch timed out')), timeoutMs);
+    try {
+      const response = await fetchImpl(`${gateway}/${id}`, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { accept: 'application/json' },
+      });
+      if (!response?.ok) continue;
+      const payload = await response.json().catch(() => null);
+      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+        return payload;
+      }
+    } catch {
+      // Try the next gateway. The bot must not depend on one gateway being up.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  return null;
+}
+
 async function fetchSessionMetadata(metadataURI = '', {
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
 } = {}) {
   const dataJson = parseDataUriJson(metadataURI);
   if (dataJson && typeof dataJson === 'object') return dataJson;
   const txId = parseArweaveId(metadataURI);
   if (!txId) return null;
-  const response = await fetchImpl(`${ARWEAVE_GATEWAY}/${txId}`, {
-    method: 'GET',
-    headers: { accept: 'application/json' },
-  });
-  if (!response.ok) return null;
-  return response.json().catch(() => null);
+  return fetchArweaveJson(txId, { fetchImpl, timeoutMs });
+}
+
+async function fetchSessionTupleWithFallback({
+  rpcUrls = [],
+  registryAddress = '',
+  sessionSlug = '',
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
+} = {}) {
+  const data = `${SELECTORS.getSessionBySlug}${encodeAbiStringArg(lower(sessionSlug))}`;
+  for (const rpcUrl of rpcUrls) {
+    const call = await ethCall({
+      rpcUrls: [rpcUrl],
+      to: registryAddress,
+      data,
+      fetchImpl,
+      timeoutMs,
+    });
+    if (!call.ok) continue;
+    const tuple = decodeSessionTuple(call.result);
+    if (tuple?.slug) return tuple;
+  }
+  return null;
 }
 
 async function fetchSessionConfigForQuestions({
@@ -278,7 +381,8 @@ async function fetchSessionConfigForQuestions({
   const chainId = normalizeChainId(env.DEFAULT_CHAIN_ID);
   const envStart = normalizeBlock(env.AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK);
   const envEnd = normalizeBlock(env.AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK);
-  const envSurveysAddress = resolveSurveysAddress(env, chainId);
+  const configuredSurveysAddress = resolveConfiguredSurveysAddress(env);
+  const fallbackSurveysAddress = resolveSurveysAddress(env, chainId);
   const registryAddress = resolveSessionRegistryAddress(env);
   const session = {
     slug: lower(sessionSlug),
@@ -289,35 +393,87 @@ async function fetchSessionConfigForQuestions({
       start: envStart,
       end: envEnd,
     },
-    surveysAddress: envSurveysAddress,
+    surveysAddress: configuredSurveysAddress || fallbackSurveysAddress,
   };
-  if (envSurveysAddress && (envStart != null || safeString(env.AGENT_BRIDGE_QUESTION_SKIP_SESSION_REGISTRY))) {
+  if (configuredSurveysAddress && (envStart != null || envFlagEnabled(env.AGENT_BRIDGE_QUESTION_SKIP_SESSION_REGISTRY))) {
     return session;
   }
   if (!registryAddress || !rpcUrls.length) return session;
 
-  const call = await ethCall({
+  const tuple = await fetchSessionTupleWithFallback({
     rpcUrls,
-    to: registryAddress,
-    data: `${SELECTORS.getSessionBySlug}${encodeAbiStringArg(lower(sessionSlug))}`,
+    registryAddress,
+    sessionSlug,
     fetchImpl,
+    timeoutMs: rpcTimeoutMs(env),
   });
-  if (!call.ok) return session;
-  const tuple = decodeSessionTuple(call.result);
   if (!tuple?.slug) return session;
   session.slug = lower(tuple.slug);
   session.chainId = normalizeChainId(tuple.chainId || chainId);
   session.metadataURI = tuple.metadataURI;
-  session.surveysAddress = envSurveysAddress || resolveSurveysAddress(env, session.chainId);
-  const metadata = await fetchSessionMetadata(tuple.metadataURI, { fetchImpl }).catch(() => null);
+  session.surveysAddress = configuredSurveysAddress || resolveSurveysAddress(env, session.chainId);
+  const metadata = await fetchSessionMetadata(tuple.metadataURI, {
+    fetchImpl,
+    timeoutMs: rpcTimeoutMs(env),
+  }).catch(() => null);
   if (metadata && typeof metadata === 'object') {
     session.metadata = metadata;
     session.blockLimits = {
       start: envStart ?? normalizeBlock(metadata?.blockLimits?.start),
       end: envEnd ?? normalizeBlock(metadata?.blockLimits?.end),
     };
+    session.surveysAddress = configuredSurveysAddress ||
+      resolveMetadataSurveysAddress(metadata) ||
+      resolveSurveysAddress(env, session.chainId);
+  }
+  if (session.blockLimits.start == null && envStart == null) {
+    const createdBlock = await fetchSessionCreatedBlock({
+      rpcUrls,
+      registryAddress,
+      sessionSlug: session.slug,
+      fetchImpl,
+      timeoutMs: rpcTimeoutMs(env),
+    }).catch(() => null);
+    if (createdBlock != null) {
+      session.blockLimits = {
+        ...session.blockLimits,
+        start: createdBlock,
+      };
+    }
   }
   return session;
+}
+
+async function fetchSessionCreatedBlock({
+  rpcUrls = [],
+  registryAddress = '',
+  sessionSlug = '',
+  fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
+} = {}) {
+  const slug = lower(sessionSlug);
+  if (!slug || !registryAddress || !rpcUrls.length) return null;
+  const result = await rpcWithFallback({
+    rpcUrls,
+    method: 'eth_getLogs',
+    params: [{
+      address: registryAddress,
+      fromBlock: '0x0',
+      toBlock: 'latest',
+      topics: [SESSION_CREATED_TOPIC0],
+    }],
+    fetchImpl,
+    timeoutMs,
+  });
+  if (!result.ok) return null;
+  const logs = Array.isArray(result.result) ? result.result : [];
+  for (const log of logs.slice().reverse()) {
+    const eventSlug = lower(decodeAbiString(log?.data || '', 0));
+    if (eventSlug !== slug) continue;
+    const block = Number(BigInt(safeString(log?.blockNumber || '0x0')));
+    return Number.isFinite(block) && block >= 0 ? block : null;
+  }
+  return null;
 }
 
 async function currentBlockNumber({ rpcUrls = [], fetchImpl = globalThis.fetch } = {}) {
@@ -347,6 +503,7 @@ function resolveScanWindow({
     toBlock,
     source: explicitStart == null ? 'fallback_recent_blocks' : 'session_block_limits',
     sessionScoped: explicitStart != null,
+    recentBlockCap: explicitStart == null ? fallbackBlocks : null,
   };
 }
 
@@ -364,13 +521,14 @@ async function scanQuestionIds({
     chunksSucceeded: 0,
     chunksFailed: 0,
     errors: [],
+    order: 'newest_first',
   };
   if (!surveysAddress) return summary;
   if (toBlock < fromBlock) return summary;
   const chunkSize = normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_LOG_CHUNK_SIZE, DEFAULT_LOG_CHUNK_SIZE);
   const seen = new Set();
-  for (let from = fromBlock; from <= toBlock; from += chunkSize) {
-    const to = Math.min(from + chunkSize - 1, toBlock);
+  for (let to = toBlock; to >= fromBlock;) {
+    const from = Math.max(fromBlock, to - chunkSize + 1);
     summary.chunksAttempted += 1;
     const result = await rpcWithFallback({
       rpcUrls,
@@ -382,6 +540,7 @@ async function scanQuestionIds({
         topics: [QUESTIONS_ADDED_TOPIC0],
       }],
       fetchImpl,
+      timeoutMs: rpcTimeoutMs(env),
     });
     if (!result.ok) {
       summary.chunksFailed += 1;
@@ -390,13 +549,14 @@ async function scanQuestionIds({
     }
     summary.chunksSucceeded += 1;
     const logs = Array.isArray(result.result) ? result.result : [];
-    for (const log of logs) {
-      for (const questionId of decodeBytes32ArrayFromData(log?.data || '', 0)) {
+    for (const log of logs.slice().reverse()) {
+      for (const questionId of decodeBytes32ArrayFromData(log?.data || '', 0).reverse()) {
         if (seen.has(questionId)) continue;
         seen.add(questionId);
         summary.ids.push(questionId);
       }
     }
+    to = from - 1;
   }
   return summary;
 }
@@ -447,12 +607,40 @@ function normalizeQuestionPayload(payload = {}, {
   return normalized;
 }
 
+function lockedQuestionPlaceholder({
+  questionId = '',
+  pointerId = '',
+  sessionSlug = '',
+  reason = 'question_payload_unavailable',
+} = {}) {
+  const id = normalizeBytes32(questionId);
+  if (!id) return null;
+  return {
+    questionId: id,
+    id,
+    questionType: 'unknown',
+    prompt: '',
+    questionText: '',
+    title: 'Locked question',
+    options: [],
+    visibility: 'lit_encrypted',
+    locked: true,
+    payloadUnavailable: true,
+    payloadUnavailableReason: safeString(reason) || 'question_payload_unavailable',
+    source: 'live_session_question',
+    sessionSlug: lower(sessionSlug),
+    arweaveTxId: pointerId,
+    storageRef: pointerId ? { backend: 'arweave', id: pointerId, resource: 'questions', uri: `ar://${pointerId}` } : null,
+  };
+}
+
 async function fetchQuestionPayload({
   rpcUrls = [],
   surveysAddress = '',
   questionId = '',
   sessionSlug = '',
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
 } = {}) {
   const id = normalizeBytes32(questionId);
   if (!id || !surveysAddress) return null;
@@ -461,71 +649,298 @@ async function fetchQuestionPayload({
     to: surveysAddress,
     data: `${SELECTORS.getQuestionHash}${strip0x(id)}`,
     fetchImpl,
+    timeoutMs,
   });
   if (!hashResult.ok) return null;
   const pointerBytes = normalizeBytes32(hashResult.result);
   if (!pointerBytes || pointerBytes === ZERO_BYTES32) return null;
   const pointerId = hexToBase64url(pointerBytes);
   if (!/^[a-zA-Z0-9_-]{43}$/.test(pointerId)) return null;
-  const response = await fetchImpl(`${ARWEAVE_GATEWAY}/${pointerId}`, {
-    method: 'GET',
-    headers: { accept: 'application/json' },
-  }).catch(() => null);
-  if (!response?.ok) return null;
-  const payload = await response.json().catch(() => null);
-  return normalizeQuestionPayload(payload, { questionId: id, pointerId, sessionSlug });
+  const payload = await fetchArweaveJson(pointerId, { fetchImpl, timeoutMs });
+  return normalizeQuestionPayload(payload, { questionId: id, pointerId, sessionSlug }) ||
+    lockedQuestionPlaceholder({ questionId: id, pointerId, sessionSlug });
 }
 
 function cacheTtlSeconds(env = {}) {
   return normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS, DEFAULT_CACHE_TTL_SECONDS);
 }
 
+function payloadConcurrency(env = {}) {
+  return normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY, DEFAULT_PAYLOAD_CONCURRENCY);
+}
+
+function foregroundChunks(env = {}) {
+  return normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS, DEFAULT_FOREGROUND_CHUNKS);
+}
+
 function cacheKey(sessionSlug = '') {
   return `${QUESTION_CACHE_PREFIX}${lower(sessionSlug) || 'general'}`;
 }
 
-function validCachedResult(value = {}, ttlSeconds = DEFAULT_CACHE_TTL_SECONDS) {
+function normalizeQuestionIndex(value = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (!Array.isArray(value.questions)) return null;
+  const questions = value.questions
+    .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry));
   const cachedAtMs = Number(value.cachedAtMs);
-  if (!Number.isFinite(cachedAtMs) || Date.now() - cachedAtMs > ttlSeconds * 1000) return null;
   return {
     ...value,
+    ok: value.ok !== false,
+    reason: safeString(value.reason || (questions.length ? 'live_questions_loaded' : 'live_questions_empty')),
+    source: safeString(value.source || 'live_session_question_cache'),
+    cachedAtMs: Number.isFinite(cachedAtMs) ? cachedAtMs : Date.now(),
+    questions,
+    questionCount: questions.length,
+    indexedFromBlock: normalizeBlock(value.indexedFromBlock),
+    indexedToBlock: normalizeBlock(value.indexedToBlock),
+    targetFromBlock: normalizeBlock(value.targetFromBlock),
+    targetToBlock: normalizeBlock(value.targetToBlock),
+    nextScanToBlock: normalizeBlock(value.nextScanToBlock),
+    complete: value.complete === true,
     cached: true,
   };
 }
 
-async function readKvCache(env = {}, key = '', ttlSeconds = DEFAULT_CACHE_TTL_SECONDS) {
+function isFreshQuestionIndex(value = {}, ttlSeconds = DEFAULT_CACHE_TTL_SECONDS) {
+  const index = normalizeQuestionIndex(value);
+  if (!index) return false;
+  return Date.now() - index.cachedAtMs <= ttlSeconds * 1000;
+}
+
+function cachedIndexForReturn(value = {}, cacheLayer = 'kv') {
+  const index = normalizeQuestionIndex(value);
+  if (!index) return null;
+  return {
+    ...index,
+    cached: true,
+    cacheLayer,
+  };
+}
+
+function scheduleIndexRefresh({
+  waitUntil = null,
+  env = {},
+  sessionSlug = '',
+  existingIndex = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  if (typeof waitUntil !== 'function') return;
+  if (!existingIndex || existingIndex.complete === true) return;
+  waitUntil(refreshSessionQuestionIndex({
+    env,
+    sessionSlug,
+    existingIndex,
+    mode: 'complete',
+    fetchImpl,
+  }).catch(() => null));
+}
+
+async function readKvQuestionIndex(env = {}, key = '') {
   if (!key || !env.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function') return null;
   const text = await env.AGENT_ACTION_KV.get(key).catch(() => null);
   if (!text) return null;
   try {
-    return validCachedResult(JSON.parse(text), ttlSeconds);
+    return normalizeQuestionIndex(JSON.parse(text));
   } catch {
     return null;
   }
 }
 
-async function writeKvCache(env = {}, key = '', value = {}, ttlSeconds = DEFAULT_CACHE_TTL_SECONDS) {
+async function writeKvQuestionIndex(env = {}, key = '', value = {}) {
   if (!key || !env.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') return;
-  await env.AGENT_ACTION_KV.put(key, JSON.stringify(value), { expirationTtl: ttlSeconds }).catch(() => null);
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(value)).catch(() => null);
 }
 
-export async function listCachedSessionQuestionsForBridge({
+function questionIdFromRecord(question = {}) {
+  return normalizeBytes32(question.questionId || question.id);
+}
+
+function mergeQuestionRecords(existing = [], additions = [], placement = 'append') {
+  const merged = [];
+  const seen = new Set();
+  const ordered = placement === 'prepend'
+    ? [...additions, ...existing]
+    : [...existing, ...additions];
+  for (const question of ordered) {
+    const id = questionIdFromRecord(question);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(question);
+  }
+  return merged;
+}
+
+async function fetchQuestionPayloads({
+  rpcUrls = [],
+  surveysAddress = '',
+  questionIds = [],
+  sessionSlug = '',
+  seenQuestionIds = new Set(),
+  env = {},
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const ids = questionIds
+    .map((id) => normalizeBytes32(id))
+    .filter((id) => id && !seenQuestionIds.has(id));
+  const results = new Array(ids.length);
+  let cursor = 0;
+  let payloadFailureCount = 0;
+  const workers = Array.from({
+    length: Math.min(ids.length, payloadConcurrency(env)),
+  }, async () => {
+    while (cursor < ids.length) {
+      const index = cursor;
+      cursor += 1;
+      const id = ids[index];
+      seenQuestionIds.add(id);
+      const question = await fetchQuestionPayload({
+        rpcUrls,
+        surveysAddress,
+        questionId: id,
+        sessionSlug,
+        fetchImpl,
+        timeoutMs: questionPayloadTimeoutMs(env),
+      }).catch(() => null);
+      if (question) results[index] = question;
+      else payloadFailureCount += 1;
+    }
+  });
+  await Promise.all(workers);
+  return {
+    attemptedCount: ids.length,
+    payloadFailureCount,
+    questions: results.filter(Boolean),
+  };
+}
+
+async function scanQuestionRange({
+  rpcUrls = [],
+  surveysAddress = '',
+  sessionSlug = '',
+  fromBlock = 0,
+  toBlock = 0,
+  seenQuestionIds = new Set(),
+  stopAfterFirstAvailable = false,
+  maxChunks = Infinity,
+  env = {},
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const summary = {
+    ids: [],
+    chunksAttempted: 0,
+    chunksSucceeded: 0,
+    chunksFailed: 0,
+    errors: [],
+    order: 'newest_first',
+  };
+  const questions = [];
+  let payloadFailureCount = 0;
+  let lowestScannedBlock = null;
+  let nextScanToBlock = null;
+  if (!surveysAddress || toBlock < fromBlock) {
+    return {
+      completed: true,
+      scan: summary,
+      questions,
+      payloadFailureCount,
+      lowestScannedBlock,
+      nextScanToBlock,
+    };
+  }
+  const chunkSize = normalizePositiveInteger(env.AGENT_BRIDGE_QUESTION_LOG_CHUNK_SIZE, DEFAULT_LOG_CHUNK_SIZE);
+  const maxChunkCount = Number.isFinite(Number(maxChunks)) && Number(maxChunks) > 0
+    ? Math.floor(Number(maxChunks))
+    : Infinity;
+  for (let to = toBlock; to >= fromBlock && summary.chunksAttempted < maxChunkCount;) {
+    const from = Math.max(fromBlock, to - chunkSize + 1);
+    summary.chunksAttempted += 1;
+    const result = await rpcWithFallback({
+      rpcUrls,
+      method: 'eth_getLogs',
+      params: [{
+        address: surveysAddress,
+        fromBlock: `0x${from.toString(16)}`,
+        toBlock: `0x${to.toString(16)}`,
+        topics: [QUESTIONS_ADDED_TOPIC0],
+      }],
+      fetchImpl,
+      timeoutMs: rpcTimeoutMs(env),
+    });
+    if (!result.ok) {
+      summary.chunksFailed += 1;
+      if (summary.errors.length < 3) summary.errors.push(result.error || 'eth_getLogs failed');
+      to = from - 1;
+      continue;
+    }
+    summary.chunksSucceeded += 1;
+    lowestScannedBlock = from;
+    const chunkIds = [];
+    const logs = Array.isArray(result.result) ? result.result : [];
+    for (const log of logs.slice().reverse()) {
+      for (const questionId of decodeBytes32ArrayFromData(log?.data || '', 0).reverse()) {
+        if (chunkIds.includes(questionId)) continue;
+        chunkIds.push(questionId);
+        summary.ids.push(questionId);
+      }
+    }
+    const payloads = await fetchQuestionPayloads({
+      rpcUrls,
+      surveysAddress,
+      questionIds: chunkIds,
+      sessionSlug,
+      seenQuestionIds,
+      env,
+      fetchImpl,
+    });
+    payloadFailureCount += payloads.payloadFailureCount;
+    questions.push(...payloads.questions);
+    if (stopAfterFirstAvailable && questions.length > 0) {
+      nextScanToBlock = from - 1 >= fromBlock ? from - 1 : null;
+      break;
+    }
+    to = from - 1;
+    if (to >= fromBlock && summary.chunksAttempted >= maxChunkCount) {
+      nextScanToBlock = to;
+      break;
+    }
+  }
+  return {
+    completed: nextScanToBlock == null && summary.chunksFailed === 0,
+    scan: summary,
+    questions,
+    payloadFailureCount,
+    lowestScannedBlock,
+    nextScanToBlock,
+  };
+}
+
+function mergeScanSummaries(left = {}, right = {}) {
+  return {
+    ids: [
+      ...(Array.isArray(left.ids) ? left.ids : []),
+      ...(Array.isArray(right.ids) ? right.ids : []),
+    ],
+    chunksAttempted: Number(left.chunksAttempted || 0) + Number(right.chunksAttempted || 0),
+    chunksSucceeded: Number(left.chunksSucceeded || 0) + Number(right.chunksSucceeded || 0),
+    chunksFailed: Number(left.chunksFailed || 0) + Number(right.chunksFailed || 0),
+    errors: [
+      ...(Array.isArray(left.errors) ? left.errors : []),
+      ...(Array.isArray(right.errors) ? right.errors : []),
+    ].slice(0, 3),
+    order: 'newest_first',
+  };
+}
+
+async function refreshSessionQuestionIndex({
   env = {},
   sessionSlug = '',
-  fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
+  existingIndex = null,
+  mode = 'complete',
+  fetchImpl = globalThis.fetch,
 } = {}) {
   const slug = lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
-  const ttlSeconds = cacheTtlSeconds(env);
   const key = cacheKey(slug);
-  const memory = validCachedResult(questionMemoryCache.get(key), ttlSeconds);
-  if (memory) return { ...memory, cacheLayer: 'memory' };
-  const kv = await readKvCache(env, key, ttlSeconds);
-  if (kv) {
-    questionMemoryCache.set(key, kv);
-    return { ...kv, cacheLayer: 'kv' };
-  }
-
+  const previous = normalizeQuestionIndex(existingIndex);
   const rpcUrls = resolveRegistryRpcUrls(env);
   if (!rpcUrls.length) {
     return { ok: false, reason: 'question_rpc_url_missing', sessionSlug: slug, questions: [] };
@@ -537,7 +952,7 @@ export async function listCachedSessionQuestionsForBridge({
     rpcUrls,
     fetchImpl,
   });
-  const surveysAddress = resolveSurveysAddress(env, session.chainId);
+  const surveysAddress = normalizeHexAddress(session.surveysAddress) || resolveSurveysAddress(env, session.chainId);
   if (!surveysAddress) {
     return { ok: false, reason: 'surveys_address_missing', sessionSlug: slug, questions: [] };
   }
@@ -551,7 +966,7 @@ export async function listCachedSessionQuestionsForBridge({
       reason: 'question_current_block_failed',
       error: safeString(error?.message || error),
       sessionSlug: slug,
-      questions: [],
+      questions: previous?.questions || [],
     };
   }
   const scanWindow = resolveScanWindow({ currentBlock, session, env });
@@ -564,77 +979,191 @@ export async function listCachedSessionQuestionsForBridge({
       chainId: normalizeChainId(session.chainId),
       surveysAddress,
       scanWindow,
-      questions: [],
+      questions: previous?.questions || [],
     };
   }
 
-  const scanResult = await scanQuestionIds({
-    rpcUrls,
-    surveysAddress,
-    fromBlock: scanWindow.fromBlock,
-    toBlock: scanWindow.toBlock,
-    env,
-    fetchImpl,
-  });
-  const allIds = scanResult.ids;
-  if (scanResult.chunksAttempted > 0 && scanResult.chunksSucceeded === 0) {
-    return {
-      ok: false,
-      reason: 'question_log_scan_failed',
-      error: scanResult.errors[0] || 'Question log scan failed',
-      sessionSlug: slug,
-      source: 'live_session_question_cache',
-      chainId: normalizeChainId(session.chainId),
-      surveysAddress,
-      scanWindow,
-      scan: scanResult,
-      questions: [],
-    };
+  let questions = Array.isArray(previous?.questions) ? previous.questions.slice() : [];
+  const seenQuestionIds = new Set(questions.map(questionIdFromRecord).filter(Boolean));
+  let indexedFromBlock = previous?.indexedFromBlock;
+  let indexedToBlock = previous?.indexedToBlock;
+  let nextScanToBlock = previous?.nextScanToBlock;
+  let complete = previous?.complete === true;
+  let aggregateScan = previous?.scan || {};
+  let payloadFailureCount = Number(previous?.payloadFailureCount || 0) || 0;
+  let partial = false;
+
+  const ranges = [];
+  const hasCoverage = indexedFromBlock != null && indexedToBlock != null;
+  if (hasCoverage && indexedToBlock < scanWindow.toBlock) {
+    ranges.push({
+      fromBlock: indexedToBlock + 1,
+      toBlock: scanWindow.toBlock,
+      placement: 'prepend',
+      label: 'delta',
+    });
   }
-  const maxQuestions = normalizePositiveInteger(env.AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION, DEFAULT_MAX_QUESTIONS);
-  const candidateIds = allIds.slice(-maxQuestions).reverse();
-  const questions = [];
-  let payloadFailureCount = 0;
-  for (const questionId of candidateIds) {
-    const question = await fetchQuestionPayload({
+  if (!hasCoverage) {
+    ranges.push({
+      fromBlock: scanWindow.fromBlock,
+      toBlock: scanWindow.toBlock,
+      placement: 'append',
+      label: 'initial',
+    });
+  } else if (complete !== true || indexedFromBlock > scanWindow.fromBlock) {
+    const historicalTo = Math.min(
+      normalizeBlock(nextScanToBlock) ?? indexedFromBlock - 1,
+      scanWindow.toBlock
+    );
+    if (historicalTo >= scanWindow.fromBlock) {
+      ranges.push({
+        fromBlock: scanWindow.fromBlock,
+        toBlock: historicalTo,
+        placement: 'append',
+        label: 'historical',
+      });
+    }
+  }
+
+  for (const range of ranges) {
+    const rangeResult = await scanQuestionRange({
       rpcUrls,
       surveysAddress,
-      questionId,
       sessionSlug: slug,
+      fromBlock: range.fromBlock,
+      toBlock: range.toBlock,
+      seenQuestionIds,
+      stopAfterFirstAvailable: mode === 'until_first_available' && questions.length === 0,
+      maxChunks: mode === 'until_first_available' && questions.length === 0 ? foregroundChunks(env) : Infinity,
+      env,
       fetchImpl,
     });
-    if (question) questions.push(question);
-    else payloadFailureCount += 1;
+    questions = mergeQuestionRecords(questions, rangeResult.questions, range.placement);
+    payloadFailureCount += rangeResult.payloadFailureCount;
+    aggregateScan = mergeScanSummaries(aggregateScan, rangeResult.scan);
+    if (rangeResult.lowestScannedBlock != null) {
+      if (range.placement === 'prepend') {
+        indexedToBlock = Math.max(indexedToBlock ?? rangeResult.lowestScannedBlock, range.toBlock);
+        indexedFromBlock = indexedFromBlock ?? rangeResult.lowestScannedBlock;
+      } else {
+        indexedToBlock = indexedToBlock ?? range.toBlock;
+        indexedFromBlock = indexedFromBlock == null
+          ? rangeResult.lowestScannedBlock
+          : Math.min(indexedFromBlock, rangeResult.lowestScannedBlock);
+      }
+    }
+    nextScanToBlock = rangeResult.nextScanToBlock;
+    if (rangeResult.nextScanToBlock != null) {
+      partial = true;
+      complete = false;
+      break;
+    }
+    if (rangeResult.completed !== true) {
+      partial = true;
+      complete = false;
+    }
   }
-  const hadReadFailures = scanResult.chunksFailed > 0 || payloadFailureCount > 0;
+
+  if (!ranges.length) {
+    complete = true;
+  } else if (!partial) {
+    complete = indexedFromBlock != null &&
+      indexedFromBlock <= scanWindow.fromBlock &&
+      (indexedToBlock ?? 0) >= scanWindow.toBlock &&
+      aggregateScan.chunksFailed === 0 &&
+      payloadFailureCount === 0;
+    nextScanToBlock = complete ? null : nextScanToBlock;
+  }
+
+  const hadReadFailures = Number(aggregateScan.chunksFailed || 0) > 0 || payloadFailureCount > 0;
   const ok = questions.length > 0 || !hadReadFailures;
   const reason = questions.length
-    ? (hadReadFailures ? 'live_questions_loaded_partial' : 'live_questions_loaded')
-    : (scanResult.chunksFailed > 0
+    ? (complete ? 'live_questions_indexed' : 'live_questions_index_partial')
+    : (!complete && !hadReadFailures
+        ? 'live_questions_indexing'
+        : Number(aggregateScan.chunksAttempted || 0) > 0 && Number(aggregateScan.chunksSucceeded || 0) === 0
+        ? 'question_log_scan_failed'
+        : Number(aggregateScan.chunksFailed || 0) > 0
         ? 'question_log_scan_partial_failed'
         : (payloadFailureCount > 0 ? 'question_payload_load_failed' : 'live_questions_empty'));
-
   const result = {
     ok,
     reason,
     sessionSlug: slug,
-    source: 'live_session_question_cache',
+    source: 'telegram_worker_question_index',
     cacheLayer: 'fresh',
     cachedAtMs: Date.now(),
     chainId: normalizeChainId(session.chainId),
     surveysAddress,
     scanWindow,
-    scan: scanResult,
-    discoveredCount: allIds.length,
+    indexedFromBlock,
+    indexedToBlock,
+    targetFromBlock: scanWindow.fromBlock,
+    targetToBlock: scanWindow.toBlock,
+    nextScanToBlock,
+    complete,
+    scan: aggregateScan,
+    discoveredCount: aggregateScan.ids?.length || 0,
     payloadFailureCount,
     questionCount: questions.length,
     questions,
   };
-  if (ok && !hadReadFailures) {
+  if (ok) {
     questionMemoryCache.set(key, result);
-    await writeKvCache(env, key, result, ttlSeconds);
+    await writeKvQuestionIndex(env, key, result);
   }
   return result;
+}
+
+export async function listCachedSessionQuestionsForBridge({
+  env = {},
+  sessionSlug = '',
+  fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
+  waitUntil = null,
+} = {}) {
+  const slug = lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
+  const ttlSeconds = cacheTtlSeconds(env);
+  const key = cacheKey(slug);
+  const memory = cachedIndexForReturn(questionMemoryCache.get(key), 'memory');
+  if (memory && isFreshQuestionIndex(memory, ttlSeconds)) {
+    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: memory, fetchImpl });
+    return memory;
+  }
+  const kv = await readKvQuestionIndex(env, key);
+  if (kv && isFreshQuestionIndex(kv, ttlSeconds)) {
+    questionMemoryCache.set(key, kv);
+    const cached = cachedIndexForReturn(kv, 'kv');
+    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: cached, fetchImpl });
+    return cached;
+  }
+  const durableCached = cachedIndexForReturn(kv || memory, kv ? 'kv' : 'memory');
+  if (durableCached && typeof waitUntil === 'function') {
+    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: durableCached, fetchImpl });
+    return durableCached;
+  }
+
+  const firstResult = await refreshSessionQuestionIndex({
+    env,
+    sessionSlug: slug,
+    existingIndex: durableCached,
+    mode: typeof waitUntil === 'function' ? 'until_first_available' : 'complete',
+    fetchImpl,
+  });
+  if (
+    typeof waitUntil === 'function' &&
+    firstResult.ok &&
+    firstResult.complete !== true &&
+    firstResult.nextScanToBlock != null
+  ) {
+    waitUntil(refreshSessionQuestionIndex({
+      env,
+      sessionSlug: slug,
+      existingIndex: firstResult,
+      mode: 'complete',
+      fetchImpl,
+    }).catch(() => null));
+  }
+  return firstResult;
 }
 
 export const __test__sessionQuestions = {

@@ -181,7 +181,7 @@ function telegramPreviewHtml() {
 }
 
 export default {
-  async fetch(request, env = {}) {
+  async fetch(request, env = {}, ctx = {}) {
     const url = new URL(request.url);
     if (url.pathname === '/health') {
       return json({
@@ -207,6 +207,7 @@ export default {
       const preview = await buildTelegramCommandResponse({
         update: buildPreviewUpdate(body),
         env,
+        waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
       });
       return json({
         ok: preview.ok === true,
@@ -239,6 +240,7 @@ export default {
         update,
         env,
         fetchImpl: env.TELEGRAM_FETCH || globalThis.fetch,
+        waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
       });
       if (!handled.ok && !handled.response) {
         return json({ ok: false, error: handled.reason || 'invalid_telegram_update' }, { status: 400 });

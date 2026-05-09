@@ -40,8 +40,9 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 The group session-linked card says `Session: <session>` and exposes `Join Session`, `View Questions`, `Attachments`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
 
 `View Questions` reads the linked session through the bridge's worker-local
-question cache for now. Canonical `GET /api/agent/questions` remains the target
-contract once a reachable agent API base is deployed for the bridge.
+materialized question index for now. Canonical `GET /api/agent/questions`
+remains the target contract once a reachable agent API base is deployed for the
+bridge.
 `Pose Question` uses `/ce_pose_question` or `/q` to pose one existing or
 generated question to the group. If no selector is provided, the action opens a
 choose-question menu instead of silently posing the first question. Anyone in
@@ -183,7 +184,7 @@ Required values:
 | Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
 | Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads |
 | Optional question source | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional |
-| Optional question cache tuning | `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local cache. Defaults are sufficient when session metadata includes `blockLimits.start` |
+| Optional question cache tuning | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
 | KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
@@ -229,14 +230,24 @@ chat's selected session in `AGENT_ACTION_KV`, so later `/ce_questions`,
 `/q <number-or-id>`, and `/ce_attachments` use that session without repeating
 the slug. `/ce_docs` remains a compatibility alias.
 
-Question lists default to live mode. The Telegram worker scans public
-`QuestionsAdded` logs, reads public question payload pointers, and caches safe
-question summaries in memory plus `AGENT_ACTION_KV` for short periods. It only
-caches successful, scoped reads. RPC/log/payload failures are reported as source
-errors instead of cached as empty lists, and sessions without metadata
-`blockLimits.start` need explicit scan bounds unless
-`AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1` is set for a debug run. The cache
-is a Telegram performance layer only; `sessionCorsWorker` and canonical
+Question lists default to live mode. The Telegram worker owns a worker-local
+materialized question index for Telegram/agent delivery: it scans scoped
+`QuestionsAdded` logs, reads question payload pointers, stores Telegram-usable
+question records in memory plus `AGENT_ACTION_KV`, and resumes from the indexed
+block range instead of rescanning the whole session on every command. Registry
+reads fall through empty/stale RPC tuple responses to the additive fallback RPC,
+and Arweave metadata/payload reads try multiple gateways. On a cold session it
+returns the first available question records as soon as they are loaded, then
+uses the Worker background task lane to finish indexing the full session block
+window. If a question ID and payload pointer are visible on-chain but the
+payload gateway is unavailable, group chat receives a conservative locked
+question row instead of an empty list. RPC/log/hash failures are reported as
+source errors instead of cached as empty lists. Session scans prefer metadata
+`blockLimits.start`; when metadata is unavailable, the Worker derives a scoped
+start block from that slug's `SessionCreated` event. Explicit scan bounds are
+still available for debug/repair runs, and unscoped recent-block fallback
+requires `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1`. The index is a Telegram
+performance/materialized-view layer only; `sessionCorsWorker` and canonical
 `/api/agent/*` remain the long-term storage/access boundary for real questions,
 responses, docs, grants, and private session-context payloads.
 
@@ -254,11 +265,14 @@ Question cache controls:
 | Var | Purpose |
 | --- | --- |
 | `AGENT_BRIDGE_QUESTION_SOURCE` | Defaults to `live`; use `fixture` only for local preview/demo copy or `live_or_fixture` for explicit fallback |
-| `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS` | KV/memory TTL for safe public question lists; default `300` |
-| `AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION` | Max public questions returned to Telegram; default `20` |
+| `AGENT_BRIDGE_RPC_TIMEOUT_MS` | Per-RPC timeout before trying the next configured RPC URL; default `5000` |
+| `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS` | Per-gateway timeout for question payload JSON reads; default `2500`. If all gateways miss but an on-chain pointer exists, Telegram shows a locked question row |
+| `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS` | Freshness TTL before a cached Telegram question index schedules a background refresh; default `300` |
+| `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY` | Concurrent payload reads while materializing question records; default `4` |
+| `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS` | Maximum log chunks scanned before replying on a cold Telegram request; default `1`, with the rest completed through Worker background indexing |
 | `AGENT_BRIDGE_QUESTION_SCAN_BLOCKS` | Recent-block fallback window used only when `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1`; default `130000` |
 | `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` | Optional manual scan bounds for faster live smoke runs |
-| `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN` | Emergency/debug only. Allows recent-block fallback when session metadata has no `blockLimits.start`; leave unset for normal live smoke |
+| `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN` | Emergency/debug only. Allows recent-block fallback when neither metadata nor `SessionCreated` can scope the session; leave unset for normal live smoke |
 
 ## Interactive Preview
 

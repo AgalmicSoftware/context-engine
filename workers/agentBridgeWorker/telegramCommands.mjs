@@ -103,6 +103,11 @@ function shortQuestionId(value = '') {
   return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(0, 10)}...${text.slice(-6)}` : text;
 }
 
+function questionIdSeedPart(value = '') {
+  const text = safeString(value);
+  return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
+}
+
 function shortAddress(value = '') {
   const text = safeString(value);
   return /^0x[0-9a-fA-F]{40}$/.test(text) ? `${text.slice(0, 6)}...${text.slice(-4)}` : text;
@@ -212,10 +217,15 @@ function questionLoadIssueText(result = {}) {
   if (reason === 'question_current_block_failed') {
     return 'Question source could not read the latest block. Try again shortly.';
   }
+  if (reason === 'live_questions_indexing') {
+    return 'Questions are indexing. Run /ce_questions again shortly.';
+  }
   return 'Questions could not be loaded. Try again shortly.';
 }
 
-async function loadQuestionsForSession(env = {}, sessionSlug = '') {
+async function loadQuestionsForSession(env = {}, sessionSlug = '', {
+  waitUntil = null,
+} = {}) {
   const mode = questionSourceMode(env);
   if (mode === 'fixture') {
     return {
@@ -225,7 +235,7 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '') {
       questions: loadDemoQuestions(env),
     };
   }
-  const live = await listCachedSessionQuestionsForBridge({ env, sessionSlug }).catch((error) => ({
+  const live = await listCachedSessionQuestionsForBridge({ env, sessionSlug, waitUntil }).catch((error) => ({
     ok: false,
     reason: 'live_question_cache_failed',
     error: safeString(error?.message || error),
@@ -743,6 +753,7 @@ async function buildQuestionsResponse({
   method = 'sendMessage',
   messageId = '',
   createdAt,
+  waitUntil = null,
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const sessionSlug = await resolveCommandSessionSlug({
@@ -762,7 +773,7 @@ async function buildQuestionsResponse({
       messageId,
     });
   }
-  const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug);
+  const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug, { waitUntil });
   const questions = loadedQuestions.questions;
   const state = buildTelegramQuestionListState({
     sessionSlug: resolved.session.sessionSlug,
@@ -779,7 +790,7 @@ async function buildQuestionsResponse({
         action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
         lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
         serverContextRef: { sessionSlug: resolved.session.sessionSlug, questionId: questionId(question) },
-        seed: `questions|pose|${resolved.session.sessionSlug}|${questionId(question)}|${normalized.updateId}`,
+        seed: `questions|pose|${resolved.session.sessionSlug}|${questionIdSeedPart(questionId(question))}|${normalized.updateId}`,
         createdAt,
       })]);
     }
@@ -801,7 +812,9 @@ async function buildQuestionsResponse({
         ? 'Run /ce_questions again after the source is fixed.'
         : (state.questions.length
         ? 'Tap Pose, or send /q <number>.'
-        : 'Create questions in the CE client, then run /ce_questions again.'),
+        : (loadedQuestions.reason === 'live_questions_indexing'
+          ? 'Run /ce_questions again shortly.'
+          : 'Create questions in the CE client, then run /ce_questions again.')),
     ].join('\n'),
     replyMarkup: rows.length ? { inline_keyboard: rows } : null,
     screen: state.screen,
@@ -826,6 +839,7 @@ async function buildPoseQuestionResponse({
   method = 'sendMessage',
   messageId = '',
   createdAt,
+  waitUntil = null,
 } = {}) {
   const policy = await loadSessionPolicy(env);
   const sessionSlug = await resolveCommandSessionSlug({
@@ -855,9 +869,10 @@ async function buildPoseQuestionResponse({
       method,
       messageId,
       createdAt,
+      waitUntil,
     });
   }
-  const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug);
+  const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug, { waitUntil });
   const questions = loadedQuestions.questions;
   const matched = findQuestion(questions, selector);
   const selected = matched || (allowAdHocQuestions(env)
@@ -876,6 +891,7 @@ async function buildPoseQuestionResponse({
       method,
       messageId,
       createdAt,
+      waitUntil,
     });
   }
 
@@ -908,7 +924,7 @@ async function buildPoseQuestionResponse({
           action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
           lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
           serverContextRef: { sessionSlug: resolved.session.sessionSlug },
-          seed: `pose|questions|${resolved.session.sessionSlug}|${questionId(selected)}|${normalized.updateId}`,
+          seed: `pose|questions|${resolved.session.sessionSlug}|${questionIdSeedPart(questionId(selected))}|${normalized.updateId}`,
           createdAt,
         }),
       ]],
@@ -1075,7 +1091,12 @@ async function buildStartPayloadResponse({
   });
 }
 
-async function buildCallbackResponse({ normalized, env, createdAt }) {
+async function buildCallbackResponse({
+  normalized,
+  env,
+  createdAt,
+  waitUntil = null,
+}) {
   const callbackData = safeString(normalized.callbackData);
   const parsed = parseOpaqueActionId(callbackData);
   const callback = normalized.raw?.callback_query || {};
@@ -1114,6 +1135,7 @@ async function buildCallbackResponse({ normalized, env, createdAt }) {
       method,
       messageId,
       createdAt,
+      waitUntil,
     }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS) {
@@ -1125,6 +1147,7 @@ async function buildCallbackResponse({ normalized, env, createdAt }) {
       method,
       messageId,
       createdAt,
+      waitUntil,
     }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION) {
@@ -1137,6 +1160,7 @@ async function buildCallbackResponse({ normalized, env, createdAt }) {
       method,
       messageId,
       createdAt,
+      waitUntil,
     }), callbackQueryId);
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT) {
@@ -1172,6 +1196,7 @@ export async function buildTelegramCommandResponse({
   update = {},
   env = {},
   now = null,
+  waitUntil = null,
 } = {}) {
   if (!update || typeof update !== 'object' || Array.isArray(update)) {
     return { ok: false, reason: 'invalid_telegram_update' };
@@ -1185,7 +1210,7 @@ export async function buildTelegramCommandResponse({
   }
   const createdAt = nowIso(now);
   if (normalized.kind === 'callback') {
-    return buildCallbackResponse({ normalized, env, createdAt });
+    return buildCallbackResponse({ normalized, env, createdAt, waitUntil });
   }
 
   const parsed = parseTelegramCommandText(normalized.text, {
@@ -1232,6 +1257,7 @@ export async function buildTelegramCommandResponse({
       env,
       args: parsed.args,
       createdAt,
+      waitUntil,
     });
   }
   if ([COMMANDS.POSE_QUESTION, COMMANDS.POSE_QUESTION_SHORT].includes(parsed.command)) {
@@ -1241,6 +1267,7 @@ export async function buildTelegramCommandResponse({
       env,
       args: parsed.args,
       createdAt,
+      waitUntil,
     });
   }
   if ([COMMANDS.ATTACHMENTS, COMMANDS.DOCS].includes(parsed.command)) {
@@ -1331,8 +1358,9 @@ export async function handleTelegramWebhookUpdate({
   env = {},
   fetchImpl = globalThis.fetch,
   now = null,
+  waitUntil = null,
 } = {}) {
-  const commandResponse = await buildTelegramCommandResponse({ update, env, now });
+  const commandResponse = await buildTelegramCommandResponse({ update, env, now, waitUntil });
   if (!commandResponse.ok && !commandResponse.response) {
     return commandResponse;
   }
