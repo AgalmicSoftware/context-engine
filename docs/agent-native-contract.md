@@ -408,7 +408,9 @@ keys, worker tokens, seed phrases, or account material.
 ## Worker Setup Contract
 
 `contextEngine-cc/lib/agent/workerSetupContracts.mjs` defines the private
-`/worker-setup` planning surface and pure setup-state helpers. The current
+setup planning surface and pure setup-state helpers. The current client route is
+`/telegram-demo-setup`; older notes may still call this `/worker-setup`. The
+current
 checkpoints cover worker reachability, Telegram webhook setup, `/start`
 receipt, group deep-link resolution, Telegram principal normalization, managed
 account create/recover, CE session fetch, session fetch, SBT gate check,
@@ -417,6 +419,21 @@ response draft creation, submit request creation, draft/submit request creation,
 and event-log update. Secret fields can be saved but never displayed after
 save. The selected session storage profile is shown for operator context only;
 policy remains owned by `/new` Advanced.
+
+`/telegram-demo-setup` does not ask the operator to paste
+`CLOUDFLARE_ACCOUNT_ID`. It derives exactly one Cloudflare account from the
+pasted `CLOUDFLARE_API_TOKEN`; if the token can see multiple accounts, setup
+blocks because account selection is not implemented yet. It pulls
+`CE_SESSION_WORKER_BASE_URL` and `DEFAULT_CHAIN_ID` from the selected CE session
+when possible, preserves the default OP Sepolia POKT/PATH RPC
+(`https://op-sepolia-testnet.api.pocket.network`) as `DEFAULT_RPC_URL`, treats an
+Infura or other RPC as optional `ADDITIONAL_RPC_URL`, derives
+`AGENT_BRIDGE_PUBLIC_URL` from
+`https://<worker-name>.<workers-subdomain>.workers.dev`, and generates
+`TELEGRAM_WEBHOOK_SECRET` plus `DEMO_SIGNER_ROOT_SECRET` as Worker secrets. The
+normal session worker remains canonical for CE session payloads; the
+`agentBridgeWorker` stores only Telegram/demo preferences, drafts, opaque
+actions, events, webhook acknowledgement, and managed demo account state.
 
 Onboarding is default-off. Config allows intro copy, 0-10 questions, normalized
 question type, skippable/required behavior, predictive-answer enabled/disabled,
