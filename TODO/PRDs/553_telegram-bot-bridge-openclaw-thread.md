@@ -82,34 +82,17 @@
     `/ce_attachments` default to the joined session instead of falling back to
     the first registry/default session. `/ce_docs` remains a compatibility alias
     while bot v1 settles.
-  - The Telegram worker now has a private materialized question index for
-    Telegram/agent delivery: it scans scoped `QuestionsAdded` logs, reads public
-    question payloads, stores Telegram-usable question records in memory plus
-    KV, resumes from the indexed block range instead of rescanning on every
-    command, and no longer silently invents demo questions in live mode. On a
-    cold session it scans a bounded foreground chunk, returns the first available
-    question records when present, and lets a Worker background task finish the
-    full block-limited index. RPC calls have a bounded timeout so the bridge can
-    fall through to an additive fallback RPC instead of hanging the Telegram
-    command. Fixture questions are still available with
+  - The Telegram worker now has a private performance cache for live public
+    question reads: it scans `QuestionsAdded`, reads public question payloads,
+    caches safe summaries in memory plus KV, and no longer silently invents demo
+    questions in live mode. Fixture questions are still available with
     `AGENT_BRIDGE_QUESTION_SOURCE=fixture` or the explicit fallback mode for
     preview/copy work.
-  - The Telegram question index now fails closed for ambiguous live reads: failed
-    RPC/log/hash reads are surfaced as question-source errors and are not cached
-    as empty lists; empty/stale SessionRegistry tuple reads fall through to the
-    additive fallback RPC; Arweave metadata/payload reads try multiple gateways;
-    and visible on-chain question IDs with unavailable payloads render as locked
-    group-safe rows instead of disappearing. Question scans prefer metadata
-    `blockLimits.start`, derive a scoped start from the slug's `SessionCreated`
-    event when metadata is unavailable, or require explicit scan bounds unless
-    `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1` is set for a debug-only
-    recent-block scan.
-  - Live deployed preview now returns actual OP Sepolia question rows for
-    `demo` and `demo-4` at
-    `https://ce-agent-bridge-worker.agalmic.workers.dev`: public prompts are
-    shown when payload metadata is readable, encrypted/private payloads render
-    as `Locked question`, and button callback payloads remain opaque `cecb_*`
-    values with raw bytes32 question IDs kept only in server-side action state.
+  - The Telegram question cache now fails closed for ambiguous live reads: failed
+    RPC/log/payload reads are surfaced as question-source errors and are not
+    cached as empty lists; question scans require metadata `blockLimits.start` or
+    explicit scan bounds unless `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1` is
+    set for a debug-only recent-block scan.
   - Bot copy was shortened for live use: group/session replies no longer explain
     Telegram/Worker internals, account addresses are abbreviated in chat, and
     private/gated attachment messaging points at the Mini App path planned after
@@ -128,21 +111,19 @@
    private `/start`, group `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
    `/q <number-or-id>`, `/ce_attachments`, and private `/ce_me`. Confirm
    replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs,
-   callback buttons stop loading, `Pose Question` opens the picker, live
-   questions match questions created in the CE client, locked encrypted rows do
-   not leak prompts, and missing block bounds show the scoped-source error
-   instead of cross-session fallback results.
+   callback buttons stop loading, `Pose Question` opens the picker, and live
+   questions match questions created in the CE client, and missing block bounds
+   show the scoped-source error instead of cross-session fallback results.
 2. Use `/mock/telegram/preview` as the fast local/browser lane for copy,
    callback keyboard, and Mini App handoff iteration before pushing new webhook
    behavior live.
 3. Plan the Mini App attachment surface after bot v1 smoke: private/gated files
    should open from opaque Mini App attachment actions rather than Telegram group
    chat or generic Context Engine copy.
-4. After the transport smoke, keep the Telegram worker-local materialized
-   question index as the Telegram/agent delivery cache, but make its refresh path
-   consume canonical `/api/agent/*` where available; also replace fixture-backed
-   doc reads with canonical agent calls once a reachable agent API base exists
-   for the deployed bridge, then continue setup UX convergence so
+4. After the transport smoke, replace the worker-local Telegram question cache
+   and fixture-backed doc reads with canonical `/api/agent/*` calls once a
+   reachable agent API base exists for the deployed bridge, then continue setup
+   UX convergence so
    `/telegram-demo-setup` can invoke the same apply path without exposing
    Cloudflare/Wrangler details.
 5. Later storage hardening: implement the Cloudflare `lit_encrypted` envelope

@@ -147,7 +147,7 @@ export const AGENT_MCP_TOOL_DEFINITIONS = Object.freeze([
   },
   {
     name: 'get_inbox',
-    description: 'Read local pending-response, approval-request, and activity summaries.',
+    description: 'Read local pending-response and approval-request summaries.',
     method: 'GET',
     path: '/api/agent/inbox',
     implemented: true,

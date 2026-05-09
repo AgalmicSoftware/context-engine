@@ -11,7 +11,7 @@ business-logic paths.
 | Identity | `GET /api/agent/me` | `GET /api/me` | Read adapter with capability metadata |
 | Sessions | `GET /api/agent/sessions` | `GET /api/sessions` | Read adapter |
 | Questions | `GET /api/agent/questions?session=<slug>` | `GET /api/questions?session=<slug>` | Read adapter with `question` and `questions[]` |
-| Inbox | `GET /api/agent/inbox` | `GET /api/responses/pending?session=<slug>` | Summary and activity adapter |
+| Inbox | `GET /api/agent/inbox` | `GET /api/responses/pending?session=<slug>` | Summary adapter |
 | Draft responses | `POST /api/agent/responses/draft` | `POST /api/respond` | Draft-only local save |
 | Draft listing | `GET /api/agent/responses/drafts?session=<slug>` | `GET /api/responses/pending?session=<slug>` | Pending-response adapter |
 | Submit request | `POST /api/agent/responses/submit-request` | `POST /api/responses/submit-onchain` | Approval-gated request |
@@ -52,12 +52,6 @@ versioned shapes for:
 - `AgentRequest`: approval-gated request records with status, request id,
   approval URL, requester, session, question ids, optional idempotency key, and
   stable fingerprint.
-- `CeActivityEvent`: safe agent activity history entries with account,
-  optional session, actor type/id, event type, optional request/grant/resource
-  references, readable `safeSummary`, and timestamp. Activity summaries are
-  derived from redacted request summaries, local draft summaries, and saved
-  bridge events; raw answer text, bearer tokens, worker tokens, private keys,
-  signing material, and secret-shaped values are not serialized into activity.
 - `AgentGrant`: scoped grant metadata that never grants signing authority or
   worker-token authority.
 - `AgentConnectRequest`: human-approved connect/approval handoff metadata for
@@ -120,8 +114,6 @@ stale records with actionable approval prompts. These helpers are pure contract
 guards only; wiring them to a richer client approval UI remains deferred.
 Inbox responses include request status counts across pending, approved, denied,
 expired, revoked, submitted, and failed records after lifecycle normalization.
-They also include `activity`, `activityCount`, and `activityEventCounts` so
-human review surfaces can render agent history without reading raw payloads.
 Capability decisions keep risky remote modes, such as submit requests, in the
 approval-required state. Trusted local auto-submit remains local-only even when
 local worker readiness is true.

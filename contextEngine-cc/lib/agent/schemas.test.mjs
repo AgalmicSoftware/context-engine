@@ -9,14 +9,8 @@ import {
   normalizeAgentGrant,
   normalizeAgentQuestion,
   normalizeAgentQuestionPayload,
-  normalizeCeActivityEvent,
   redactAgentSensitiveFields,
-  sortCeActivityEvents,
-  summarizeAgentBridgeActivityEvent,
-  summarizeAgentRequestActivityEvent,
   summarizeAgentRequestStatusCounts,
-  summarizeCeActivityEventCounts,
-  summarizePendingResponseActivityEvent,
   summarizePendingResponseForAgent,
   summarizeRequestForAgent,
 } from './schemas.mjs';
@@ -314,99 +308,5 @@ test('sensitive fields are redacted recursively', () => {
       note: '[redacted]',
     },
     list: [{ privateKey: '[redacted]' }, '[redacted]'],
-  });
-});
-
-test('activity events normalize safe agent history without serializing secrets', () => {
-  const requestEvent = summarizeAgentRequestActivityEvent({
-    type: 'response_submit_request',
-    requestId: 'agent_req_pending123',
-    status: 'pending_approval',
-    session: 'alpha',
-    requester: '0xabc',
-    agentId: 'telegram:agent-1',
-    questionIds: [`0x${'11'.repeat(32)}`],
-    grantId: 'agent_grant_alpha123',
-    payload: {
-      workerToken: 'must-redact',
-      note: 'Bearer long-lived-token',
-    },
-    createdAt: '2026-05-07T00:00:00.000Z',
-  }, { accountId: '0xabc' });
-
-  assert.equal(requestEvent.accountId, '0xabc');
-  assert.equal(requestEvent.actorType, 'telegram');
-  assert.equal(requestEvent.actorId, 'telegram:agent-1');
-  assert.equal(requestEvent.eventType, 'response_submit_request.pending_approval');
-  assert.equal(requestEvent.requestId, 'agent_req_pending123');
-  assert.equal(requestEvent.grantId, 'agent_grant_alpha123');
-  assert.equal(requestEvent.safeSummary, 'Agent request pending approval for alpha (1 question).');
-  assert.equal(JSON.stringify(requestEvent).includes('must-redact'), false);
-  assert.equal(JSON.stringify(requestEvent).includes('long-lived-token'), false);
-
-  const draftEvent = summarizePendingResponseActivityEvent({
-    questionId: `0x${'22'.repeat(32)}`,
-    respondent: '0xabc',
-    source: 'contextengine-cc',
-    timestamp: '2026-05-07T00:01:00.000Z',
-  }, { accountId: '0xabc', session: 'alpha' });
-  assert.equal(draftEvent.actorType, 'ce_cc');
-  assert.equal(draftEvent.resourceRef, 'question:0x22222222...222222');
-  assert.equal(draftEvent.safeSummary, 'Draft response saved for alpha.');
-
-  const passkeyEvent = normalizeCeActivityEvent({
-    accountId: '0xabc',
-    actorType: 'human_passkey',
-    actorId: 'passkey:local',
-    eventType: 'passkey.sign_in',
-    safeSummary: 'Passkey sign-in recorded.',
-    createdAt: '2026-05-07T00:02:00.000Z',
-  });
-  assert.equal(passkeyEvent.actorType, 'human_passkey');
-  assert.equal(passkeyEvent.eventType, 'passkey.sign_in');
-});
-
-test('bridge activity events and counts preserve safe summaries only', () => {
-  const event = summarizeAgentBridgeActivityEvent({
-    eventId: 'agent_event_alpha123',
-    eventType: 'account_created',
-    scope: {
-      accountPrincipal: { principalKind: 'ce_wallet', principalId: '0xabc' },
-      agentPrincipal: { principalKind: 'agent', principalId: 'context-engine-agent' },
-      integrationPrincipal: { principalKind: 'telegram', principalId: 'telegram:555' },
-      session: 'alpha',
-      grantId: '',
-    },
-    actionRecordId: 'agent_account_abc123',
-    summary: {
-      accountId: 'agent_account_abc123',
-      accountAddress: '0x1234567890123456789012345678901234567890',
-      workerToken: 'must-redact',
-      note: 'Bearer long-lived-token',
-    },
-    createdAt: '2026-05-07T00:03:00.000Z',
-  }, { accountId: '0xabc' });
-
-  assert.equal(event.eventId, 'agent_event_alpha123');
-  assert.equal(event.actorType, 'telegram');
-  assert.equal(event.resourceRef, 'agent_account_abc123');
-  assert.equal(event.safeSummary, 'Agent activity account created for alpha.');
-  assert.equal(JSON.stringify(event).includes('must-redact'), false);
-  assert.equal(JSON.stringify(event).includes('long-lived-token'), false);
-
-  const sorted = sortCeActivityEvents([
-    normalizeCeActivityEvent({
-      accountId: '0xabc',
-      actorId: 'agent',
-      eventType: 'older',
-      createdAt: '2026-05-07T00:00:00.000Z',
-      safeSummary: 'Older event.',
-    }),
-    event,
-  ]);
-  assert.equal(sorted[0].eventId, 'agent_event_alpha123');
-  assert.deepEqual(summarizeCeActivityEventCounts(sorted), {
-    account_created: 1,
-    older: 1,
   });
 });

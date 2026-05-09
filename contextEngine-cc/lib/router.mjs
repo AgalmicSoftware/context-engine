@@ -55,12 +55,7 @@ import {
   redactAgentSensitiveFields,
   isValidAgentGrantId,
   normalizeAgentGrant,
-  sortCeActivityEvents,
-  summarizeAgentBridgeActivityEvent,
-  summarizeAgentRequestActivityEvent,
   summarizeAgentRequestStatusCounts,
-  summarizeCeActivityEventCounts,
-  summarizePendingResponseActivityEvent,
   summarizePendingResponseForAgent,
   summarizeRequestForAgent,
 } from './agent/schemas.mjs';
@@ -457,23 +452,6 @@ function loadAgentGrantsForWallet(walletAddress = '') {
       catch { return null; }
     })
     .filter((entry) => entry && (!wallet || normalizeAddressLower(entry.humanPrincipal) === wallet));
-}
-
-function loadAgentBridgeEventsForWallet(walletAddress = '') {
-  if (!existsSync(AGENT_EVENTS_DIR)) return [];
-  const wallet = normalizeAddressLower(walletAddress);
-  return readdirSync(AGENT_EVENTS_DIR)
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => {
-      try { return JSON.parse(readFileSync(resolve(AGENT_EVENTS_DIR, file), 'utf8')); }
-      catch { return null; }
-    })
-    .filter((event) => {
-      if (!event) return false;
-      if (!wallet) return true;
-      const scopeAccount = event?.scope?.accountPrincipal?.principalId || event?.accountId || event?.summary?.accountId || '';
-      return normalizeAddressLower(scopeAccount) === wallet;
-    });
 }
 
 function summarizeAgentGrantForRead(grant = {}) {
@@ -1980,46 +1958,20 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
       });
     }
     try {
-      const accountId = auth.payload?.sub || '';
       const sessions = sessionValidation.slug
         ? [sessionValidation.slug]
         : getConfiguredSessions(loadHookConfig());
       const pendingResponses = sessions.flatMap((slug) => filterResponsesByRespondent(
         loadPendingResponses(slug),
-        accountId,
+        auth.payload?.sub || '',
       ).map((response) => summarizePendingResponseForAgent(response, { session: slug })));
-      const requestReads = loadAgentRequestsForWallet(accountId)
+      const requests = loadAgentRequestsForWallet(auth.payload?.sub || '')
         .filter((request) => (
           !sessionValidation.slug
           || String(request?.session || '').trim().toLowerCase() === sessionValidation.slug.toLowerCase()
         ))
-        .map((request) => {
-          const read = summarizeAgentRequestForRead(request);
-          return {
-            raw: request,
-            summary: read.summary,
-          };
-        });
-      const requests = requestReads.map((request) => request.summary);
+        .map((request) => summarizeAgentRequestForRead(request).summary);
       const requestStatusCounts = summarizeAgentRequestStatusCounts(requests);
-      const bridgeEvents = loadAgentBridgeEventsForWallet(accountId)
-        .filter((event) => (
-          !sessionValidation.slug
-          || String(event?.scope?.session || event?.session || '').trim().toLowerCase() === sessionValidation.slug.toLowerCase()
-        ));
-      const activity = sortCeActivityEvents([
-        ...pendingResponses.map((response) => summarizePendingResponseActivityEvent(response, {
-          accountId,
-          session: response.session,
-        })),
-        ...requestReads.map(({ raw, summary }) => summarizeAgentRequestActivityEvent({
-          ...raw,
-          ...summary,
-          grantId: raw.grantId,
-          source: raw.agentId || raw.subject || raw.source,
-        }, { accountId })),
-        ...bridgeEvents.map((event) => summarizeAgentBridgeActivityEvent(event, { accountId })),
-      ]);
       return json(res, 200, buildAgentOk({
         inbox: [
           ...pendingResponses,
@@ -2028,9 +1980,6 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         pendingResponses,
         requests,
         requestStatusCounts,
-        activity,
-        activityCount: activity.length,
-        activityEventCounts: summarizeCeActivityEventCounts(activity),
         count: pendingResponses.length + requests.length,
       }));
     } catch (err) {
