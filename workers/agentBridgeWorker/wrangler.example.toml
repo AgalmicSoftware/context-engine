@@ -5,8 +5,9 @@ main = "worker.js"
 compatibility_date = "2024-09-02"
 compatibility_flags = ["nodejs_compat"]
 
-# Replace with a private Cloudflare account ID before deploy.
-account_id = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+# account_id is intentionally omitted for product setup. /telegram-demo-setup
+# derives the account from CLOUDFLARE_API_TOKEN and blocks if multiple accounts
+# are visible. Developers may add account_id locally only as a Wrangler fallback.
 
 durable_objects.bindings = [
   { name = "MANAGED_DEMO_SIGNER", class_name = "ManagedDemoSignerDurableObject" },
@@ -36,7 +37,9 @@ TELEGRAM_BOT_USERNAME = "YOUR_BOT_USERNAME"
 AGENT_BRIDGE_PUBLIC_URL = "https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev"
 CE_SESSION_WORKER_BASE_URL = "https://<session-worker>.<workers-subdomain>.workers.dev"
 DEFAULT_CHAIN_ID = "11155420"
-DEFAULT_RPC_URL = "https://your-op-sepolia-rpc.example"
+DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
+# Optional additive fallback, not a replacement for DEFAULT_RPC_URL:
+# ADDITIONAL_RPC_URL = "https://your-op-sepolia-rpc.example"
 AGENT_AI_PROVIDER = "ce_session_policy"
 BROADCAST_ENABLED = "false"
 

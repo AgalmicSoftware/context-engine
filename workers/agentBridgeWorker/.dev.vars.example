@@ -8,7 +8,9 @@ AGENT_BRIDGE_DEPLOYMENT_ID=local-demo
 AGENT_BRIDGE_PUBLIC_URL=https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev
 CE_SESSION_WORKER_BASE_URL=https://<session-worker>.<workers-subdomain>.workers.dev
 DEFAULT_CHAIN_ID=11155420
-DEFAULT_RPC_URL=https://your-op-sepolia-rpc.example
+DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network
+# Optional additive fallback. This does not replace DEFAULT_RPC_URL.
+# ADDITIONAL_RPC_URL=https://your-op-sepolia-rpc.example
 AGENT_AI_PROVIDER=ce_session_policy
 BROADCAST_ENABLED=false
 

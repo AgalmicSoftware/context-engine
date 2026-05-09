@@ -165,8 +165,9 @@ Required values:
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into local `.dev.vars` only for local smoke; set as deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
 | Public deployed `agentBridgeWorker` URL | Paste the Workers.dev base URL into `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev` |
 | CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
-| Default chain and RPC URL | Paste into `DEFAULT_CHAIN_ID` and `DEFAULT_RPC_URL`; first demo defaults to OP Sepolia `11155420` |
-| Cloudflare account ID | Put in copied `wrangler.toml` as `account_id`; put in untracked local env as `CLOUDFLARE_ACCOUNT_ID` if using `deploy:plan` |
+| Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
+| Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC |
+| Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
 | KV namespace | Bind as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
 | R2 bucket | Bind as `AGENT_DOCS_R2` for demo artifacts/doc bytes when enabled |
@@ -208,10 +209,13 @@ APIs as that contract is promoted from demo fixtures.
 
 ## Deploy Helper Plan
 
-The long-term product flow should not require manual Wrangler. `/new` or
-`/worker-setup` should generate a scoped Cloudflare token link, accept/paste the
-token, and let a deploy helper create or update the worker, resources, bindings,
-and secrets through Cloudflare APIs. Wrangler remains a developer fallback.
+The long-term product flow should not require manual Wrangler. The current
+operator UX is `/telegram-demo-setup`: it selects a CE session, pulls
+`CE_SESSION_WORKER_BASE_URL` and `DEFAULT_CHAIN_ID` from that session when
+available, preserves the default OP Sepolia POKT/PATH RPC, accepts optional
+additional RPC fallback input, generates `TELEGRAM_WEBHOOK_SECRET` and
+`DEMO_SIGNER_ROOT_SECRET`, derives the Workers.dev public URL, and creates a
+redacted deploy plan. Wrangler remains a developer fallback.
 
 This slice adds a planning/validation helper:
 
@@ -220,9 +224,12 @@ cd workers/agentBridgeWorker
 npm run deploy:plan -- --worker-name ce-agent-bridge-worker --workers-subdomain <workers-subdomain>
 ```
 
-The helper accepts `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and the
-required Telegram/session vars from local environment, prints only redacted
-secret presence, and models the direct Cloudflare API calls still needed:
+The helper accepts `CLOUDFLARE_API_TOKEN` and the required Telegram/session vars
+from local environment, prints only redacted secret presence, and models the
+direct Cloudflare API calls still needed. `CLOUDFLARE_ACCOUNT_ID` is no longer a
+required pasted value; the helper models account lookup as
+`GET /accounts?per_page=2`, accepts exactly one visible account, and blocks if
+multiple accounts are visible because account selection is not implemented yet:
 
 - Workers script upload with vars and bindings.
 - KV namespace for opaque action IDs and webhook replay cache.
@@ -232,7 +239,8 @@ secret presence, and models the direct Cloudflare API calls still needed:
 - Worker secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
   `DEMO_SIGNER_ROOT_SECRET`.
 - Worker vars: `TELEGRAM_BOT_USERNAME`, `AGENT_BRIDGE_PUBLIC_URL`,
-  `CE_SESSION_WORKER_BASE_URL`, `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`.
+  `CE_SESSION_WORKER_BASE_URL`, `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`, and
+  optional `ADDITIONAL_RPC_URL`.
 - Script-level Workers.dev enablement for
   `https://<worker-name>.<workers-subdomain>.workers.dev`.
 
