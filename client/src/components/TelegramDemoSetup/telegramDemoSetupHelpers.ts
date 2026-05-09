@@ -175,11 +175,13 @@ export const deriveSingleCloudflareAccount = (input: unknown): {
 export const validateAgentBridgeTokenScopes = ({
   permissions = [],
   includeWorkersDevSubdomainSetup = false,
+  includeDocStorage = false,
 }: {
   permissions?: Permission[];
   includeWorkersDevSubdomainSetup?: boolean;
+  includeDocStorage?: boolean;
 } = {}) => {
-  const required = buildCloudflareTokenTemplatePermissions();
+  const required = buildCloudflareTokenTemplatePermissions({ includeDocStorage });
   const normalized = new Set((Array.isArray(permissions) ? permissions : [])
     .map((permission) => `${toStr(permission.key).trim()}:${toStr(permission.type).trim()}`));
   const missing = required.filter((permission) => !normalized.has(`${permission.key}:${permission.type}`));
@@ -252,10 +254,12 @@ export const normalizeAdditionalRpcUrl = (value: unknown, defaultRpcUrl = ''): s
 export const buildAgentBridgeTokenTemplateUrl = ({
   sessionSlug = '',
   includeWorkersDevSubdomainSetup = false,
+  includeDocStorage = false,
   now = new Date(),
 }: {
   sessionSlug?: unknown;
   includeWorkersDevSubdomainSetup?: boolean;
+  includeDocStorage?: boolean;
   now?: Date;
 } = {}): string => {
   const params = new URLSearchParams();
@@ -263,6 +267,7 @@ export const buildAgentBridgeTokenTemplateUrl = ({
   const datePart = now.toISOString().slice(0, 16).replace(/[-:T]/g, '');
   params.set('permissionGroupKeys', JSON.stringify(buildCloudflareTokenTemplatePermissions({
     includeWorkersDevSubdomainSetup,
+    includeDocStorage,
   })));
   params.set('accountId', '*');
   params.set('zoneId', 'all');
@@ -333,8 +338,8 @@ export const buildTelegramDemoSetupPlan = ({
     },
     resources: {
       kv: 'AGENT_ACTION_KV for opaque action IDs and webhook replay cache',
-      r2: 'AGENT_DOCS_R2 for demo artifacts/docs when enabled',
-      d1: 'AGENT_DOCS_D1 for event, audit, and index records',
+      r2: 'AGENT_DOCS_R2 for demo artifacts/docs only when doc storage is explicitly enabled',
+      d1: 'AGENT_DOCS_D1 for event, audit, and index records only when doc storage is explicitly enabled',
       durableObject: 'MANAGED_DEMO_SIGNER for managed demo signer/runtime',
     },
     cloudflareToken: redactSecretPresence(cloudflareApiToken),
