@@ -104,7 +104,7 @@ function telegramPreviewHtml() {
         <button data-command="/ce_questions">/ce_questions</button>
         <button data-command="/ce_pose_question">/ce_pose_question</button>
         <button data-command="/q q-readiness">/q q-readiness</button>
-        <button data-command="/ce_docs">/ce_docs</button>
+        <button data-command="/ce_attachments">/ce_attachments</button>
         <button data-command="/ce_me">/ce_me</button>
       </div>
     </aside>

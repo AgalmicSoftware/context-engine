@@ -48,6 +48,7 @@ const COMMANDS = Object.freeze({
   QUESTIONS: '/ce_questions',
   POSE_QUESTION: '/ce_pose_question',
   POSE_QUESTION_SHORT: '/q',
+  ATTACHMENTS: '/ce_attachments',
   DOCS: '/ce_docs',
   ME: '/ce_me',
   ACCOUNT: '/ce_account',
@@ -516,7 +517,7 @@ function formatHelpText() {
     '/ce_sessions - list linked sessions',
     '/ce_questions - view session questions',
     '/q <number-or-id> - pose a question',
-    '/ce_docs - view linked docs',
+    '/ce_attachments - view attachments',
     '/ce_me - view your account',
   ].join('\n');
 }
@@ -536,7 +537,7 @@ async function buildHelpResponse({ normalized, command = COMMANDS.START, env, cr
     }),
     await makeCallbackButton({
       env,
-      label: 'View / Add Docs',
+      label: 'Attachments',
       action: TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS,
       lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
       serverContextRef: { sessionSlug },
@@ -632,7 +633,7 @@ async function buildJoinResponse({
         `Account: ${shortAddress(account.accountAddress)}`,
         `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
         '',
-        'Use /ce_questions, /ce_docs, or /ce_me.',
+        'Use /ce_questions, /ce_attachments, or /ce_me.',
       ].join('\n'),
       replyMarkup: {
         inline_keyboard: [[
@@ -697,7 +698,7 @@ async function buildJoinResponse({
     }),
     await makeCallbackButton({
       env,
-      label: 'View / Add Docs',
+      label: 'Attachments',
       action: TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS,
       lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
       serverContextRef: { sessionSlug: resolved.session.sessionSlug, groupChatId: group.groupChatId },
@@ -722,7 +723,7 @@ async function buildJoinResponse({
     text: [
       state.text,
       '',
-      'Use /ce_questions, /ce_docs, or /q <number>.',
+      'Use /ce_questions, /ce_attachments, or /q <number>.',
     ].join('\n'),
     replyMarkup: { inline_keyboard: [buttons] },
     screen: state.screen,
@@ -957,16 +958,16 @@ async function buildDocsResponse({
   const summaries = docs.docs.map((doc) => summarizeDocumentForGroup(doc)).filter((entry) => entry.ok);
   const lines = summaries.length
     ? summaries.map((entry, index) => `${index + 1}. ${entry.summary.docTitle} (${entry.summary.fileType}, ${entry.summary.visibility})`)
-    : ['No docs are linked to this session yet.'];
+    : ['No attachments are linked to this session yet.'];
   return reply({
     method,
     chatId: normalized.chat.chatId,
     messageId,
     text: [
-      `Docs for ${resolved.session.sessionSlug}:`,
+      `Attachments for ${resolved.session.sessionSlug}:`,
       ...lines,
       '',
-      'Private or gated files open in Context Engine.',
+      'Private or gated files open in the Mini App.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [[
@@ -1017,7 +1018,7 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
       `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
       `Joined sessions: ${joinedSessions.map((session) => session.sessionSlug).join(', ') || 'none'}`,
       '',
-      'Use /ce_questions or /ce_docs.',
+      'Use /ce_questions or /ce_attachments.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [[
@@ -1242,7 +1243,7 @@ export async function buildTelegramCommandResponse({
       createdAt,
     });
   }
-  if (parsed.command === COMMANDS.DOCS) {
+  if ([COMMANDS.ATTACHMENTS, COMMANDS.DOCS].includes(parsed.command)) {
     return buildDocsResponse({
       normalized,
       command: parsed.command,

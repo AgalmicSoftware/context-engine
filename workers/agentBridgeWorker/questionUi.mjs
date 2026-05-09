@@ -84,8 +84,8 @@ export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
   multichoice_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
   locked_private_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
   private_question_read: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  doc_library: { command: '/ce_docs', callback: OPAQUE_CALLBACK_LAUNCH },
-  doc_detail: { command: '/ce_docs', callback: OPAQUE_CALLBACK_LAUNCH },
+  doc_library: { command: '/ce_attachments', aliases: ['/ce_docs'], callback: OPAQUE_CALLBACK_LAUNCH },
+  doc_detail: { command: '/ce_attachments', aliases: ['/ce_docs'], callback: OPAQUE_CALLBACK_LAUNCH },
   generate_questions: { command: '/ce_generate_questions', callback: OPAQUE_CALLBACK_LAUNCH },
   submit_response: { callback: OPAQUE_CALLBACK_LAUNCH },
   confirmation_signing: { callback: OPAQUE_CALLBACK_LAUNCH },
@@ -315,7 +315,7 @@ function buildDefaultScreenButtons(screen) {
   if (screen === 'account_created') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions'),
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.START_ONBOARDING, 'Enter Startup Info'),
     ];
   }
@@ -376,15 +376,15 @@ function buildDefaultScreenButtons(screen) {
   }
   if (screen === 'doc_library') {
     return [
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs'),
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Attachments'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.USE_DOCS_AS_ANSWER_CONTEXT, 'Use as Answer Context'),
     ];
   }
   if (screen === 'generate_questions') {
     return [
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Attachments'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions'),
     ];
   }
@@ -490,15 +490,15 @@ function buildDefaultScreenCopy(screen) {
   }
   if (screen === 'doc_library') {
     return {
-      title: 'View / Add Docs',
-      text: 'Select docs to generate questions or save them for answer context.',
-      buttonLabel: 'View / Add Docs',
+      title: 'Attachments',
+      text: 'Select attachments to generate questions or save them for answer context.',
+      buttonLabel: 'Attachments',
     };
   }
   if (screen === 'generate_questions') {
     return {
       title: 'Generate Questions',
-      text: 'Selected docs are inputs for Generate Questions.',
+      text: 'Selected attachments are inputs for Generate Questions.',
     };
   }
   if (screen === 'submit_response') {
@@ -546,8 +546,9 @@ export function buildTelegramGroupSessionCardState({
       command: '/ce_questions',
       default: true,
     }),
-    buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-      command: '/ce_docs',
+    buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+      command: '/ce_attachments',
+      aliases: ['/ce_docs'],
     }),
   ];
   if (policy.allowPoseQuestion !== false) {

@@ -79,8 +79,9 @@
     reachable.
   - Telegram group session selection is now persisted in the bridge KV after
     `/ce_join <session>`, so later `/ce_questions`, `/q <number-or-id>`, and
-    `/ce_docs` default to the joined session instead of falling back to the
-    first registry/default session.
+    `/ce_attachments` default to the joined session instead of falling back to
+    the first registry/default session. `/ce_docs` remains a compatibility alias
+    while bot v1 settles.
   - The Telegram worker now has a private performance cache for live public
     question reads: it scans `QuestionsAdded`, reads public question payloads,
     caches safe summaries in memory plus KV, and no longer silently invents demo
@@ -94,7 +95,8 @@
     set for a debug-only recent-block scan.
   - Bot copy was shortened for live use: group/session replies no longer explain
     Telegram/Worker internals, account addresses are abbreviated in chat, and
-    private/gated content messaging routes users back to Context Engine.
+    private/gated attachment messaging points at the Mini App path planned after
+    bot v1 smoke.
   - Still mocked/contract-only before live smoke: `/telegram-demo-setup` does
     not itself deploy or set webhook, `deploy:plan` does not create Cloudflare
     resources, live `deploy:apply` is not run by tests, docs remain
@@ -107,7 +109,7 @@
 
 1. Smoke the live Telegram bot from Telegram after the callback/preview deploy:
    private `/start`, group `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
-   `/q <number-or-id>`, `/ce_docs`, and private `/ce_me`. Confirm
+   `/q <number-or-id>`, `/ce_attachments`, and private `/ce_me`. Confirm
    replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs,
    callback buttons stop loading, `Pose Question` opens the picker, and live
    questions match questions created in the CE client, and missing block bounds
@@ -115,13 +117,16 @@
 2. Use `/mock/telegram/preview` as the fast local/browser lane for copy,
    callback keyboard, and Mini App handoff iteration before pushing new webhook
    behavior live.
-3. After the transport smoke, replace the worker-local Telegram question cache
+3. Plan the Mini App attachment surface after bot v1 smoke: private/gated files
+   should open from opaque Mini App attachment actions rather than Telegram group
+   chat or generic Context Engine copy.
+4. After the transport smoke, replace the worker-local Telegram question cache
    and fixture-backed doc reads with canonical `/api/agent/*` calls once a
    reachable agent API base exists for the deployed bridge, then continue setup
    UX convergence so
    `/telegram-demo-setup` can invoke the same apply path without exposing
    Cloudflare/Wrangler details.
-4. Later storage hardening: implement the Cloudflare `lit_encrypted` envelope
+5. Later storage hardening: implement the Cloudflare `lit_encrypted` envelope
    producer/reader path for docs/context, private questions, private responses,
    surveys, and generated artifacts without routing those payloads through
    Lit-Arweave.
