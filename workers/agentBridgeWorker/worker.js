@@ -1,7 +1,7 @@
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 export { ManagedDemoSignerDurableObject } from './durableObjectSigner.mjs';
 import { runMockTelegramDemoFlow } from './transportMock.mjs';
-import { normalizeTelegramMockUpdate } from './telegramUpdates.mjs';
+import { handleTelegramWebhookUpdate } from './telegramCommands.mjs';
 
 function json(data, init = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -48,13 +48,21 @@ export default {
       if (!update || typeof update !== 'object') {
         return json({ ok: false, error: 'invalid_telegram_update' }, { status: 400 });
       }
-      const normalized = normalizeTelegramMockUpdate(update);
+      const handled = await handleTelegramWebhookUpdate({
+        update,
+        env,
+        fetchImpl: env.TELEGRAM_FETCH || globalThis.fetch,
+      });
+      if (!handled.ok && !handled.response) {
+        return json({ ok: false, error: handled.reason || 'invalid_telegram_update' }, { status: 400 });
+      }
       return json({
-        ok: true,
+        ok: handled.telegram?.ok === true,
         transport: 'telegram_webhook',
-        updateId: normalized.updateId,
-        lane: normalized.lane,
-        kind: normalized.kind,
+        updateId: handled.updateId,
+        command: handled.command || null,
+        screen: handled.screen || null,
+        telegram: handled.telegram || null,
       });
     }
     return json({ ok: false, error: 'not_found' }, { status: 404 });

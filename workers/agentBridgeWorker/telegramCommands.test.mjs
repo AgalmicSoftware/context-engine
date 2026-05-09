@@ -1,0 +1,258 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  buildTelegramCommandResponse,
+  dispatchTelegramCommandResponse,
+  parseTelegramCommandText,
+} from './telegramCommands.mjs';
+
+class MemoryKv {
+  constructor() {
+    this.store = new Map();
+  }
+
+  async put(key, value) {
+    this.store.set(key, value);
+  }
+
+  async get(key) {
+    return this.store.get(key) || null;
+  }
+}
+
+function baseEnv(overrides = {}) {
+  return {
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    TELEGRAM_BOT_TOKEN: '123456:test-token',
+    DEFAULT_CHAIN_ID: '11155420',
+    DEFAULT_RPC_URL: 'https://rpc.example.test',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowQuestionGeneration: true,
+      allowGenerateQuestion: true,
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        docLibraryEnabled: true,
+      }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: 'q-readiness',
+        questionType: 'freeform',
+        prompt: 'What should Alpha decide next?',
+      },
+      {
+        questionId: 'q-locked',
+        questionType: 'freeform',
+        prompt: 'Private prompt must not leak',
+        visibility: 'sbt_gated',
+      },
+    ]),
+    AGENT_BRIDGE_DEMO_DOCS_JSON: JSON.stringify([
+      {
+        docId: 'doc-public',
+        sessionSlug: 'alpha',
+        title: 'Public plan',
+        fileType: 'md',
+        visibility: 'public',
+        contentPreview: 'Safe public summary',
+      },
+      {
+        docId: 'doc-gated',
+        sessionSlug: 'alpha',
+        title: 'Gated appendix',
+        fileType: 'pdf',
+        visibility: 'sbt_gated',
+        privateContentRef: 'r2://private/gated.pdf',
+      },
+    ]),
+    AGENT_ACTION_KV: new MemoryKv(),
+    ...overrides,
+  };
+}
+
+function groupMessage(text) {
+  return {
+    update_id: 7001,
+    message: {
+      message_id: 11,
+      text,
+      chat: { id: -100123, type: 'supergroup', title: 'Alpha Lobby' },
+      from: { id: 42, username: 'host' },
+    },
+  };
+}
+
+function privateMessage(text) {
+  return {
+    update_id: 7002,
+    message: {
+      message_id: 12,
+      text,
+      chat: { id: 42, type: 'private' },
+      from: { id: 42, username: 'participant' },
+    },
+  };
+}
+
+function flattenButtons(replyMarkup) {
+  return (replyMarkup?.inline_keyboard || []).flat();
+}
+
+test('parseTelegramCommandText handles mentions without accepting commands for another bot', () => {
+  assert.deepEqual(parseTelegramCommandText('/ce_join@ce_demo_bot alpha', {
+    botUsername: 'ce_demo_bot',
+  }), {
+    isCommand: true,
+    command: '/ce_join',
+    args: ['alpha'],
+    argText: 'alpha',
+    mention: 'ce_demo_bot',
+    addressedToOtherBot: false,
+  });
+  assert.equal(parseTelegramCommandText('/ce_join@other_bot alpha', {
+    botUsername: 'ce_demo_bot',
+  }).addressedToOtherBot, true);
+  assert.equal(parseTelegramCommandText('hello').isCommand, false);
+});
+
+test('group /ce_join returns a Workers-safe session card with opaque buttons only', async () => {
+  const env = baseEnv();
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.command, '/ce_join');
+  assert.equal(result.screen, 'group_session_card');
+  assert.equal(result.response.chatId, '-100123');
+  assert.match(result.response.text, /Context Engine session linked: Alpha Session/);
+
+  const buttons = flattenButtons(result.response.replyMarkup);
+  const startButton = buttons.find((button) => button.text === 'Join Session');
+  const callbackButtons = buttons.filter((button) => button.callback_data);
+  assert.match(startButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.equal(startButton.url.includes('alpha'), false);
+  assert.equal(callbackButtons.length, 3);
+  for (const button of callbackButtons) {
+    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+    assert.equal(button.callback_data.includes('alpha'), false);
+    assert.equal(button.callback_data.includes('q-readiness'), false);
+  }
+});
+
+test('/ce_questions and callback dispatch list questions without leaking locked prompts', async () => {
+  const env = baseEnv();
+  const joined = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const viewQuestions = flattenButtons(joined.response.replyMarkup)
+    .find((button) => button.text === 'View Questions');
+  const callback = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7003,
+      callback_query: {
+        id: 'callback-1',
+        data: viewQuestions.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 55,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(callback.ok, true);
+  assert.equal(callback.response.method, 'editMessageText');
+  assert.match(callback.response.text, /Questions for alpha/);
+  assert.match(callback.response.text, /q-readiness - What should Alpha decide next/);
+  assert.match(callback.response.text, /q-locked - Locked question/);
+  assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
+});
+
+test('/q poses existing or ad hoc public questions to the group', async () => {
+  const env = baseEnv();
+  const existing = await buildTelegramCommandResponse({
+    update: groupMessage('/q q-readiness'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const adHoc = await buildTelegramCommandResponse({
+    update: groupMessage('/q What should we fund this week?'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+
+  assert.equal(existing.ok, true);
+  assert.equal(existing.screen, 'pose_question');
+  assert.match(existing.response.text, /What should Alpha decide next/);
+  assert.equal(adHoc.ok, true);
+  assert.match(adHoc.response.text, /What should we fund this week\?/);
+  assert.equal(JSON.stringify(adHoc.response.replyMarkup).includes('What should we fund'), false);
+});
+
+test('/ce_docs lists public metadata and hides private storage refs', async () => {
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_docs alpha'),
+    env: baseEnv(),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'doc_library');
+  assert.match(result.response.text, /Public plan \(md, public\)/);
+  assert.match(result.response.text, /Gated appendix \(pdf, sbt_gated\)/);
+  assert.equal(result.response.text.includes('r2://private'), false);
+});
+
+test('/ce_me returns managed demo account metadata without the root secret', async () => {
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/ce_me'),
+    env: baseEnv(),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'my_account');
+  assert.match(result.response.text, /Managed Telegram demo account/);
+  assert.match(result.response.text, /Address: 0x[0-9a-f]{40}/);
+  assert.equal(JSON.stringify(result).includes('unit-root'), false);
+});
+
+test('dispatchTelegramCommandResponse uses mocked fetch and does not require real Telegram credentials', async () => {
+  const calls = [];
+  const fetchMock = async (...args) => {
+    calls.push(args);
+    return new Response(JSON.stringify({ ok: true, result: { message_id: 77 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const commandResponse = await buildTelegramCommandResponse({
+    update: privateMessage('/start'),
+    env: baseEnv(),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const dispatched = await dispatchTelegramCommandResponse({
+    commandResponse,
+    env: baseEnv(),
+    fetchImpl: fetchMock,
+  });
+
+  assert.equal(dispatched.telegram.ok, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'https://api.telegram.org/bot123456:test-token/sendMessage');
+});
