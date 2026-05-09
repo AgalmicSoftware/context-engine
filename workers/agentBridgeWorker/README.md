@@ -228,7 +228,10 @@ plus optional `ADDITIONAL_RPC_URL` fallback and uses the returned slugs for
 `/ce_sessions` and `/ce_join`. Group `/ce_join <session>` also persists the
 chat's selected session in `AGENT_ACTION_KV`, so later `/ce_questions`,
 `/q <number-or-id>`, and `/ce_attachments` use that session without repeating
-the slug. `/ce_docs` remains a compatibility alias.
+the slug. Private `/ce_join <session>` persists the selected session for that
+Telegram user as well, so private `/ce_questions` and `/q <number-or-id>` use
+the same session unless a command supplies an explicit slug. `/ce_docs` remains
+a compatibility alias.
 
 Question lists default to live mode. The Telegram worker owns a worker-local
 materialized question index for Telegram/agent delivery: it scans scoped
@@ -239,7 +242,9 @@ reads fall through empty/stale RPC tuple responses to the additive fallback RPC,
 and Arweave metadata/payload reads try multiple gateways. On a cold session it
 returns the first available question records as soon as they are loaded, then
 uses the Worker background task lane to finish indexing the full session block
-window. If a question ID and payload pointer are visible on-chain but the
+window. When a loaded question payload explicitly names a different session
+slug, the Worker skips it instead of materializing it under the selected
+session. If a question ID and payload pointer are visible on-chain but the
 payload gateway is unavailable, group chat receives a conservative locked
 question row instead of an empty list. RPC/log/hash failures are reported as
 source errors instead of cached as empty lists. Session scans prefer metadata
@@ -462,12 +467,20 @@ OpenClaw HTTP/MCP transport is deferred.
 
 Telegram question cards follow CE control conventions:
 
-- Binary/agree-style questions use `Agree`, `Unsure`, and `Disagree`.
-- Rating questions render discrete `0` through `10` buttons.
+- Live CE metadata is normalized from `type`, `prompt`, `options`,
+  `singleSelect`, and `sessionName`/`sessionSlug`; the worker cache prefix was
+  bumped so stale freeform-only records are not reused after deploy.
+- Binary/agree-style questions use `Agree`, `Unsure`, and `Disagree` answer
+  buttons.
+- Rating questions render discrete `0` through `10` answer buttons.
 - Single-select multichoice questions render single-select option buttons.
 - Multi-select multichoice questions preserve per-option selected state.
 - Freeform questions expose `Type` and `Voice`.
-- Additional comments are always present, microphone is present when supported, and docs/context appears only when docs exist or are relevant.
+- Button answers save a Telegram worker-local draft keyed by user/session/question;
+  final on-chain submission is still a Mini App/canonical `/api/agent/*`
+  handoff.
+- Additional comments are always present, microphone is present when supported,
+  and docs/context appears only when docs exist or are relevant.
 
 ## Local Checks
 

@@ -407,6 +407,139 @@ test('group session binding makes later question and doc commands use the joined
   assert.match(docs.response.text, /Demo brief/);
 });
 
+test('private session join makes later question commands use the selected session', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        },
+        {
+          sessionSlug: 'demo',
+          sessionName: 'Demo Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-alpha',
+        questionType: 'freeform',
+        prompt: 'What should Alpha decide next?',
+      },
+      {
+        sessionSlug: 'demo',
+        questionId: 'q-demo',
+        questionType: 'freeform',
+        prompt: 'What should Demo decide next?',
+      },
+    ]),
+  });
+
+  const joined = await buildTelegramCommandResponse({
+    update: privateMessage('/ce_join demo'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const questions = await buildTelegramCommandResponse({
+    update: privateMessage('/ce_questions'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const posed = await buildTelegramCommandResponse({
+    update: privateMessage('/q 1'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+
+  assert.equal(joined.sessionSlug, 'demo');
+  assert.match(questions.response.text, /Questions for demo/);
+  assert.match(questions.response.text, /q-demo - What should Demo decide next/);
+  assert.equal(questions.response.text.includes('q-alpha'), false);
+  assert.match(posed.response.text, /Question for demo:/);
+  assert.match(posed.response.text, /What should Demo decide next/);
+});
+
+test('/ce_sessions callback switches the group session used by later question commands', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        },
+        {
+          sessionSlug: 'demo',
+          sessionName: 'Demo Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-alpha',
+        questionType: 'freeform',
+        prompt: 'What should Alpha decide next?',
+      },
+      {
+        sessionSlug: 'demo',
+        questionId: 'q-demo',
+        questionType: 'freeform',
+        prompt: 'What should Demo decide next?',
+      },
+    ]),
+  });
+  const sessions = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_sessions'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const demoButton = flattenButtons(sessions.response.replyMarkup)
+    .find((button) => button.text === 'Demo Session');
+
+  const selected = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7010,
+      callback_query: {
+        id: 'callback-select-demo',
+        data: demoButton.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 60,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const questions = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+
+  assert.equal(selected.sessionSlug, 'demo');
+  assert.match(questions.response.text, /Questions for demo/);
+  assert.match(questions.response.text, /q-demo - What should Demo decide next/);
+  assert.equal(questions.response.text.includes('q-alpha'), false);
+});
+
 test('group Pose Question callback opens a choose-question menu instead of posing the first question', async () => {
   const env = baseEnv();
   const joined = await buildTelegramCommandResponse({
@@ -468,6 +601,117 @@ test('/q poses existing or ad hoc public questions to the group', async () => {
   assert.equal(adHoc.ok, true);
   assert.match(adHoc.response.text, /What should we fund this week\?/);
   assert.equal(JSON.stringify(adHoc.response.replyMarkup).includes('What should we fund'), false);
+});
+
+test('/q renders structured answer buttons and saves answer drafts from callbacks', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: `0x${'12'.repeat(32)}`,
+        questionType: 'binary',
+        prompt: 'Should Demo adopt this proposal?',
+      },
+      {
+        questionId: `0x${'34'.repeat(32)}`,
+        questionType: 'rating',
+        prompt: 'How strong is the signal?',
+      },
+      {
+        questionId: `0x${'56'.repeat(32)}`,
+        questionType: 'multichoice',
+        prompt: 'Which option should Demo prioritize?',
+        options: ['Option A', 'Option B', 'Option C'],
+        singleSelect: true,
+      },
+    ]),
+  });
+
+  const binary = await buildTelegramCommandResponse({
+    update: groupMessage('/q 1'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const rating = await buildTelegramCommandResponse({
+    update: groupMessage('/q 2'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const multichoice = await buildTelegramCommandResponse({
+    update: groupMessage('/q 3'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+
+  assert.equal(binary.ok, true);
+  assert.match(binary.response.text, /Tap an answer to save a draft/);
+  assert.deepEqual(
+    flattenButtons(binary.response.replyMarkup).map((button) => button.text).slice(0, 3),
+    ['Agree', 'Unsure', 'Disagree']
+  );
+  assert.deepEqual(
+    flattenButtons(rating.response.replyMarkup).map((button) => button.text).slice(0, 11),
+    ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10']
+  );
+  assert.deepEqual(
+    flattenButtons(multichoice.response.replyMarkup).map((button) => button.text).slice(0, 3),
+    ['Option A', 'Option B', 'Option C']
+  );
+  assert.equal(binary.response.text.includes('0x1212121212121212121212121212121212121212121212121212121212121212'), false);
+
+  const agree = flattenButtons(binary.response.replyMarkup).find((button) => button.text === 'Agree');
+  const saved = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7011,
+      callback_query: {
+        id: 'callback-answer-agree',
+        data: agree.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 61,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.equal(saved.ok, true);
+  assert.equal(saved.response, null);
+  assert.equal(saved.answerDraftSaved, true);
+  assert.equal(saved.callbackAnswerText, 'Draft saved. Final submit opens in the Mini App.');
+
+  const draftRecords = Array.from(env.AGENT_ACTION_KV.store.values())
+    .map((value) => JSON.parse(value))
+    .filter((value) => value.status === 'draft_saved');
+  assert.equal(draftRecords.length, 1);
+  assert.equal(draftRecords[0].answerLabel, 'Agree');
+  assert.equal(draftRecords[0].questionId, `0x${'12'.repeat(32)}`);
+  assert.equal(draftRecords[0].submitLane, 'telegram_mini_app');
+
+  const calls = [];
+  const dispatched = await dispatchTelegramCommandResponse({
+    commandResponse: saved,
+    env,
+    fetchImpl: async (...args) => {
+      calls.push(args);
+      return new Response(JSON.stringify({ ok: true, result: true }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    },
+  });
+
+  assert.equal(dispatched.telegram.ok, true);
+  assert.equal(dispatched.telegram.skipped, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'https://api.telegram.org/bot123456:test-token/answerCallbackQuery');
+  assert.deepEqual(JSON.parse(calls[0][1].body), {
+    callback_query_id: 'callback-answer-agree',
+    show_alert: false,
+    cache_time: 0,
+    text: 'Draft saved. Final submit opens in the Mini App.',
+  });
 });
 
 test('callback dispatch answers callback queries before editing messages', async () => {

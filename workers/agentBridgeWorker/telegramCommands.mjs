@@ -30,8 +30,16 @@ import { answerTelegramCallbackQuery, editTelegramMessageText, sendTelegramMessa
 
 const ACTION_KV_PREFIX = 'telegram:action:';
 const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
+const PRIVATE_SESSION_KV_PREFIX = 'telegram:private-session:';
+const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const ANSWER_BUTTON_CONTROL_TYPES = new Set([
+  'agree_unsure_disagree',
+  'rating_button',
+  'single_select',
+  'multi_select_toggle',
+]);
 
 const DEFAULT_QUESTION = Object.freeze({
   questionId: 'question-demo-1',
@@ -100,7 +108,8 @@ function questionId(question = {}) {
 
 function shortQuestionId(value = '') {
   const text = safeString(value);
-  return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(0, 10)}...${text.slice(-6)}` : text;
+  if (/^0x[0-9a-fA-F]{64}$/.test(text)) return `${text.slice(0, 10)}...${text.slice(-6)}`;
+  return text.length > 18 ? `${text.slice(0, 10)}...${text.slice(-6)}` : text;
 }
 
 function questionIdSeedPart(value = '') {
@@ -176,6 +185,19 @@ function loadDemoQuestions(env = {}) {
   return normalized.length ? normalized : [DEFAULT_QUESTION];
 }
 
+function questionSessionSlug(question = {}) {
+  return sanitizeSessionSlug(question.sessionSlug || question.session);
+}
+
+function filterQuestionsForSession(questions = [], sessionSlug = '') {
+  const selectedSlug = sanitizeSessionSlug(sessionSlug);
+  if (!selectedSlug) return questions;
+  return (Array.isArray(questions) ? questions : []).filter((question) => {
+    const slug = questionSessionSlug(question);
+    return !slug || slug === selectedSlug;
+  });
+}
+
 function envFlagEnabled(value = '') {
   return ['1', 'true', 'yes', 'on'].includes(lower(value));
 }
@@ -232,7 +254,7 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
       ok: true,
       reason: 'fixture_questions_loaded',
       source: 'demo_fixture',
-      questions: loadDemoQuestions(env),
+      questions: filterQuestionsForSession(loadDemoQuestions(env), sessionSlug),
     };
   }
   const live = await listCachedSessionQuestionsForBridge({ env, sessionSlug, waitUntil }).catch((error) => ({
@@ -253,7 +275,7 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
     reason: 'fixture_questions_fallback',
     source: 'demo_fixture',
     fallbackFrom: live.reason || 'live_question_cache_unavailable',
-    questions: loadDemoQuestions(env),
+    questions: filterQuestionsForSession(loadDemoQuestions(env), sessionSlug),
   };
 }
 
@@ -389,6 +411,98 @@ async function readGroupSessionBinding(env = {}, normalized = {}) {
   return sessionSlug ? { ...parsed, sessionSlug } : null;
 }
 
+function privateSessionBindingKey(normalized = {}) {
+  const telegramUserId = safeString(normalized.user?.telegramUserId);
+  return telegramUserId ? `${PRIVATE_SESSION_KV_PREFIX}${telegramUserId}` : '';
+}
+
+async function persistPrivateSessionBinding({
+  env = {},
+  normalized = {},
+  session = {},
+  createdAt = null,
+} = {}) {
+  if (!normalized.chat?.isPrivate) return { ok: false, reason: 'not_private_chat' };
+  const key = privateSessionBindingKey(normalized);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const record = {
+    version: 1,
+    telegramUserId: safeString(normalized.user?.telegramUserId),
+    sessionSlug: sanitizeSessionSlug(session.sessionSlug || session.slug),
+    sessionName: sessionLabel(session),
+    selectedAt: createdAt || nowIso(),
+  };
+  if (!record.sessionSlug) return { ok: false, reason: 'session_slug_missing' };
+  assertNoSecretShape(record, 'Telegram private session bindings must not serialize secrets.');
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
+    expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
+  });
+  return { ok: true, sessionSlug: record.sessionSlug };
+}
+
+async function readPrivateSessionBinding(env = {}, normalized = {}) {
+  if (!normalized.chat?.isPrivate) return null;
+  const key = privateSessionBindingKey(normalized);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function') return null;
+  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  assertNoSecretShape(parsed, 'Telegram private session bindings must not serialize secrets.');
+  const sessionSlug = sanitizeSessionSlug(parsed.sessionSlug);
+  return sessionSlug ? { ...parsed, sessionSlug } : null;
+}
+
+function answerDraftKey({
+  normalized = {},
+  sessionSlug = '',
+  questionId: selectedQuestionId = '',
+} = {}) {
+  const telegramUserId = safeString(normalized.user?.telegramUserId);
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const qid = questionIdSeedPart(selectedQuestionId || 'question');
+  return telegramUserId && slug && qid
+    ? `${ANSWER_DRAFT_KV_PREFIX}${telegramUserId}:${slug}:${qid}`
+    : '';
+}
+
+async function persistAnswerDraft({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  answerLabel = '',
+  answerValue = '',
+  controlType = '',
+  createdAt = null,
+} = {}) {
+  const key = answerDraftKey({ normalized, sessionSlug, questionId: selectedQuestionId });
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const record = {
+    version: 1,
+    telegramUserId: safeString(normalized.user?.telegramUserId),
+    chatId: safeString(normalized.chat?.chatId),
+    sessionSlug: sanitizeSessionSlug(sessionSlug),
+    questionId: safeString(selectedQuestionId),
+    answerLabel: safeString(answerLabel),
+    answerValue: safeString(answerValue || answerLabel),
+    controlType: safeString(controlType),
+    status: 'draft_saved',
+    submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    selectedAt: createdAt || nowIso(),
+  };
+  if (!record.telegramUserId || !record.sessionSlug || !record.questionId || !record.answerLabel) {
+    return { ok: false, reason: 'answer_draft_incomplete' };
+  }
+  assertNoSecretShape(record, 'Telegram answer drafts must not serialize secrets.');
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
+    expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
+  });
+  return { ok: true, key, draft: record };
+}
+
 async function resolveCommandSessionSlug({
   env = {},
   normalized = {},
@@ -397,6 +511,8 @@ async function resolveCommandSessionSlug({
 } = {}) {
   const explicit = sanitizeSessionSlug(explicitSessionSlug);
   if (explicit) return explicit;
+  const privateBinding = await readPrivateSessionBinding(env, normalized);
+  if (privateBinding?.sessionSlug) return privateBinding.sessionSlug;
   const binding = await readGroupSessionBinding(env, normalized);
   return sanitizeSessionSlug(binding?.sessionSlug || policy.defaultSessionSlug || 'general') || 'general';
 }
@@ -465,6 +581,60 @@ async function makeStartButton({
   };
 }
 
+async function makeAnswerButton({
+  env = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  control = {},
+  seed = '',
+  createdAt = null,
+} = {}) {
+  const label = safeString(control.label).slice(0, 48);
+  return makeCallbackButton({
+    env,
+    label,
+    action: TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: {
+      sessionSlug,
+      questionId: selectedQuestionId,
+      answerLabel: label,
+      answerValue: safeString(control.value || label),
+      controlType: safeString(control.controlType),
+      submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    },
+    seed: seed || `answer|${sessionSlug}|${questionIdSeedPart(selectedQuestionId)}|${safeString(control.controlType)}|${label}`,
+    createdAt,
+  });
+}
+
+async function buildAnswerButtonRows({
+  env = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  controls = [],
+  createdAt = null,
+} = {}) {
+  const buttons = [];
+  for (const [index, control] of controls.entries()) {
+    buttons.push(await makeAnswerButton({
+      env,
+      sessionSlug,
+      selectedQuestionId,
+      control,
+      seed: `answer|${sessionSlug}|${questionIdSeedPart(selectedQuestionId)}|${index}|${safeString(control.label)}`,
+      createdAt,
+    }));
+  }
+  const rows = [];
+  const numeric = buttons.every((button) => /^\d{1,2}$/.test(button.text));
+  const chunkSize = numeric ? 4 : 2;
+  for (let index = 0; index < buttons.length; index += chunkSize) {
+    rows.push(buttons.slice(index, index + chunkSize));
+  }
+  return rows;
+}
+
 function reply({
   method = 'sendMessage',
   chatId = '',
@@ -488,6 +658,28 @@ function reply({
       text: safeString(text),
       replyMarkup,
     },
+    ...extra,
+  };
+}
+
+function callbackOnly({
+  normalized = {},
+  command = 'callback',
+  callbackQueryId = '',
+  callbackAnswerText = '',
+  callbackAnswerShowAlert = false,
+  screen = '',
+  extra = {},
+} = {}) {
+  return {
+    ok: true,
+    command,
+    screen,
+    updateId: normalized.updateId ?? null,
+    callbackQueryId: safeString(callbackQueryId),
+    callbackAnswerText: safeString(callbackAnswerText),
+    callbackAnswerShowAlert: callbackAnswerShowAlert === true,
+    response: null,
     ...extra,
   };
 }
@@ -517,6 +709,15 @@ function errorReply({
 function attachCallbackQueryId(commandResponse = {}, callbackQueryId = '') {
   const id = safeString(callbackQueryId);
   return id ? { ...commandResponse, callbackQueryId: id } : commandResponse;
+}
+
+function answerControlsFromPoseState(state = {}) {
+  const controls = Array.isArray(state.card?.controls) ? state.card.controls : [];
+  return controls.filter((control) => (
+    control?.action === TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE &&
+    ANSWER_BUTTON_CONTROL_TYPES.has(safeString(control.controlType)) &&
+    safeString(control.label)
+  ));
 }
 
 function formatHelpText() {
@@ -619,6 +820,12 @@ async function buildJoinResponse({
   }
 
   if (normalized.chat.isPrivate) {
+    await persistPrivateSessionBinding({
+      env,
+      normalized,
+      session: resolved.session,
+      createdAt,
+    });
     const account = await deriveManagedDemoAccount({
       principal: normalizeTelegramPrincipal(normalized),
       deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
@@ -902,14 +1109,23 @@ async function buildPoseQuestionResponse({
     createdAt,
   });
   const group = state.groupSafeOutput || {};
+  const answerControls = group.locked ? [] : answerControlsFromPoseState(state);
+  const answerRows = await buildAnswerButtonRows({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    selectedQuestionId: group.questionId,
+    controls: answerControls,
+    createdAt,
+  });
   const text = group.locked
-    ? `Question ${group.questionId} is locked for group chat. Open it privately from /ce_questions.`
+    ? `Question ${shortQuestionId(group.questionId)} is locked. Open it in the Mini App.`
     : [
       `Question for ${resolved.session.sessionSlug}:`,
       group.questionText,
       ...(Array.isArray(group.answerLabels) && group.answerLabels.length
         ? ['', `Options: ${group.answerLabels.join(', ')}`]
         : []),
+      ...(answerRows.length ? ['', 'Tap an answer to save a draft.'] : []),
     ].join('\n');
   return reply({
     method,
@@ -917,7 +1133,9 @@ async function buildPoseQuestionResponse({
     messageId,
     text,
     replyMarkup: {
-      inline_keyboard: [[
+      inline_keyboard: [
+        ...answerRows,
+        [
         await makeCallbackButton({
           env,
           label: 'View Questions',
@@ -927,7 +1145,8 @@ async function buildPoseQuestionResponse({
           seed: `pose|questions|${resolved.session.sessionSlug}|${questionIdSeedPart(questionId(selected))}|${normalized.updateId}`,
           createdAt,
         }),
-      ]],
+        ],
+      ],
     },
     screen: state.screen,
     command,
@@ -936,6 +1155,50 @@ async function buildPoseQuestionResponse({
       sessionSlug: resolved.session.sessionSlug,
       questionId: group.questionId,
       posed: group.locked !== true,
+    },
+  });
+}
+
+async function buildAnswerDraftResponse({
+  normalized,
+  command,
+  env,
+  record = {},
+  callbackQueryId = '',
+  createdAt,
+} = {}) {
+  const ref = record.serverContextRef || {};
+  const sessionSlug = sanitizeSessionSlug(ref.sessionSlug);
+  const selectedQuestionId = safeString(ref.questionId);
+  const answerLabel = safeString(ref.answerLabel);
+  const answerValue = safeString(ref.answerValue || answerLabel);
+  const controlType = safeString(ref.controlType);
+  const saved = await persistAnswerDraft({
+    env,
+    normalized,
+    sessionSlug,
+    selectedQuestionId,
+    answerLabel,
+    answerValue,
+    controlType,
+    createdAt,
+  });
+  return callbackOnly({
+    normalized,
+    command,
+    callbackQueryId,
+    callbackAnswerText: saved.ok
+      ? 'Draft saved. Final submit opens in the Mini App.'
+      : 'Draft could not be saved. Try again.',
+    callbackAnswerShowAlert: saved.ok !== true,
+    screen: 'submit_response',
+    extra: {
+      ok: saved.ok === true,
+      reason: saved.ok ? 'answer_draft_saved' : saved.reason,
+      sessionSlug,
+      questionId: selectedQuestionId,
+      answerDraftSaved: saved.ok === true,
+      submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
     },
   });
 }
@@ -1163,6 +1426,16 @@ async function buildCallbackResponse({
       waitUntil,
     }), callbackQueryId);
   }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE) {
+    return buildAnswerDraftResponse({
+      normalized,
+      command: 'callback:draft_response',
+      env,
+      record,
+      callbackQueryId,
+      createdAt,
+    });
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT) {
     return attachCallbackQueryId(await buildMeResponse({
       normalized,
@@ -1315,7 +1588,7 @@ export async function dispatchTelegramCommandResponse({
   env = {},
   fetchImpl = globalThis.fetch,
 } = {}) {
-  if (commandResponse.ignored === true || !commandResponse.response) {
+  if (commandResponse.ignored === true) {
     return { ...commandResponse, telegram: { ok: true, skipped: true } };
   }
   const response = commandResponse.response;
@@ -1325,9 +1598,21 @@ export async function dispatchTelegramCommandResponse({
     ? await answerTelegramCallbackQuery({
       botToken,
       callbackQueryId,
+      text: commandResponse.callbackAnswerText || '',
+      showAlert: commandResponse.callbackAnswerShowAlert === true,
       fetchImpl,
     })
     : null;
+  if (!response) {
+    return {
+      ...commandResponse,
+      telegram: {
+        ok: true,
+        skipped: true,
+        callbackAnswer: callbackAnswer ? summarizeTelegramSendResult(callbackAnswer) : null,
+      },
+    };
+  }
   const sendResult = response.method === 'editMessageText'
     ? await editTelegramMessageText({
       botToken,
