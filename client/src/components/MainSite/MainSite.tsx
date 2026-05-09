@@ -5308,6 +5308,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     );
   };
 
+
   _renderSimUserRoute = (fullPath: string, defaultSessionNetwork: ReturnType<typeof _getSessionNetwork>) => {
     const simUsername = fullPath.slice(4);
     return (

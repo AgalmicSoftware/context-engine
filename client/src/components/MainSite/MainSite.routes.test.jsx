@@ -232,6 +232,7 @@ jest.mock('../DebateMap/DebateMap', () => {
   };
 });
 
+
 jest.mock('../../utilities/web3/contractScripts.js', () => {
   const contractScripts = {
     decryptQuestionPayloadInPlace: jest.fn(),
