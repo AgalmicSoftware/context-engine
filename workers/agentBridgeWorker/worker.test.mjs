@@ -32,6 +32,14 @@ test('worker mock demo route returns end-to-end private Telegram flow without se
 });
 
 test('worker Telegram webhook requires enable flag, bot token, and secret token', async () => {
+  const telegramCalls = [];
+  const telegramFetch = async (...args) => {
+    telegramCalls.push(args);
+    return new Response(JSON.stringify({ ok: true, result: { message_id: 90 } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
   const request = new Request('https://bridge.example/telegram/webhook', {
     method: 'POST',
     headers: {
@@ -65,13 +73,58 @@ test('worker Telegram webhook requires enable flag, bot token, and secret token'
   const accepted = await worker.fetch(request, {
     TELEGRAM_BRIDGE_ENABLED: 'true',
     TELEGRAM_BOT_TOKEN: 'bot-token',
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+    TELEGRAM_FETCH: telegramFetch,
   });
   const body = await accepted.json();
   assert.equal(accepted.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.transport, 'telegram_webhook');
-  assert.equal(body.lane, 'telegram_private_account');
+  assert.equal(body.command, '/start');
+  assert.equal(body.screen, 'setup_welcome');
+  assert.equal(body.telegram.ok, true);
+  assert.equal(telegramCalls.length, 1);
+  assert.equal(String(telegramCalls[0][0]).includes('/sendMessage'), true);
   assert.equal(JSON.stringify(body).includes('bot-token'), false);
   assert.equal(JSON.stringify(body).includes('webhook-secret'), false);
+});
+
+test('worker Telegram webhook handles command send errors without leaking token or payload', async () => {
+  const request = new Request('https://bridge.example/telegram/webhook', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-Telegram-Bot-Api-Secret-Token': 'webhook-secret',
+    },
+    body: JSON.stringify({
+      update_id: 102,
+      message: {
+        text: '/ce_questions',
+        chat: { id: -10055, type: 'supergroup' },
+        from: { id: 77, username: 'demo_user' },
+      },
+    }),
+  });
+
+  const response = await worker.fetch(request, {
+    TELEGRAM_BRIDGE_ENABLED: 'true',
+    TELEGRAM_BOT_TOKEN: 'bot-token',
+    TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+    TELEGRAM_FETCH: async () => new Response(JSON.stringify({
+      ok: false,
+      error_code: 400,
+      description: 'Bad Request for bot-token',
+    }), {
+      status: 400,
+      headers: { 'content-type': 'application/json' },
+    }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, false);
+  assert.equal(body.telegram.ok, false);
+  assert.equal(JSON.stringify(body).includes('bot-token'), false);
+  assert.equal(JSON.stringify(body).includes('Bad Request'), true);
 });

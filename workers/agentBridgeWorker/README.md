@@ -28,7 +28,7 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | `question_list` | `/ce_questions` |
 | `pose_question` | `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, or `callback:<pose_question_action>` |
 | `generated_question_candidates` | `/ce_generate_questions` |
-| `my_account`, `joined_sbts` | `/ce_account` |
+| `my_account`, `joined_sbts` | `/ce_me` or `/ce_account` |
 | SBT join/create states | `/ce_sbt <sbt-address-or-group-id-or-link>`, `/ce_join_sbt <sbt-address-or-invite-code-or-link>`, `/ce_create_sbt_group [session-slug]` |
 | `onboarding` | `/ce_onboarding` |
 | question cards | `/ce_questions` |
@@ -123,6 +123,21 @@ Objects for managed signer runtime and coordination locks.
 
 ## Live Telegram Setup
 
+The first live demo uses the default Cloudflare Workers URL:
+
+```text
+https://<worker-name>.<workers-subdomain>.workers.dev
+```
+
+Set `AGENT_BRIDGE_PUBLIC_URL` to that base URL. The Telegram webhook endpoint is
+always:
+
+```text
+$AGENT_BRIDGE_PUBLIC_URL/telegram/webhook
+```
+
+Custom domain routing is out of scope for the first Telegram demo.
+
 Local dry-run:
 
 ```bash
@@ -144,26 +159,88 @@ Required values:
 
 | Value | Where it goes |
 | --- | --- |
-| `TELEGRAM_BOT_TOKEN` from BotFather | `.dev.vars` for local tests; Wrangler secret for deploy |
-| `TELEGRAM_BOT_USERNAME` | `.dev.vars` and `[vars]` in copied `wrangler.toml` |
-| `TELEGRAM_WEBHOOK_SECRET` | `.dev.vars` for local tests; Wrangler secret for deploy; send as `X-Telegram-Bot-Api-Secret-Token` |
-| Public deployed `agentBridgeWorker` URL | `AGENT_BRIDGE_PUBLIC_URL` in `.dev.vars`/`wrangler.toml`; use it for `https://api.telegram.org/bot<TOKEN>/setWebhook?url=<AGENT_BRIDGE_PUBLIC_URL>/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>` |
-| Cloudflare account ID | `account_id` in copied `wrangler.toml` and `CLOUDFLARE_ACCOUNT_ID` in local `.env` if using scripts |
-| Cloudflare API token | Prefer `wrangler login`; otherwise untracked `.env` or Wrangler secret `CLOUDFLARE_API_TOKEN` with least-privilege Workers Scripts, KV, R2, D1, and Durable Objects access needed for this worker |
-| R2 bucket | `AGENT_DOCS_R2` binding in copied `wrangler.toml` |
-| KV namespace | `AGENT_ACTION_KV` binding in copied `wrangler.toml` for opaque action IDs/replay cache |
-| D1 database | `AGENT_DOCS_D1` binding in copied `wrangler.toml` for event/audit/index records |
-| Durable Object binding | `MANAGED_DEMO_SIGNER` binding and migration in copied `wrangler.toml` |
-| CE/session worker base URL | `CE_SESSION_WORKER_BASE_URL` in `.dev.vars`/`wrangler.toml` |
-| Default chain and RPC URL | `DEFAULT_CHAIN_ID` and `DEFAULT_RPC_URL` in `.dev.vars`/`wrangler.toml` for SBT checks |
+| `TELEGRAM_BOT_TOKEN` from BotFather | Paste into local `.dev.vars` only for local smoke; set as deployed Worker secret `TELEGRAM_BOT_TOKEN` |
+| `TELEGRAM_BOT_USERNAME` from BotFather, without `@` | Paste into `.dev.vars` and `[vars]` in copied `wrangler.toml` |
+| `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into local `.dev.vars` only for local smoke; set as deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
+| `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into local `.dev.vars` only for local smoke; set as deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
+| Public deployed `agentBridgeWorker` URL | Paste the Workers.dev base URL into `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev` |
+| CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
+| Default chain and RPC URL | Paste into `DEFAULT_CHAIN_ID` and `DEFAULT_RPC_URL`; first demo defaults to OP Sepolia `11155420` |
+| Cloudflare account ID | Put in copied `wrangler.toml` as `account_id`; put in untracked local env as `CLOUDFLARE_ACCOUNT_ID` if using `deploy:plan` |
+| Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
+| KV namespace | Bind as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
+| R2 bucket | Bind as `AGENT_DOCS_R2` for demo artifacts/doc bytes when enabled |
+| D1 database | Bind as `AGENT_DOCS_D1` for event/audit/index records when enabled |
+| Durable Object binding | Bind `MANAGED_DEMO_SIGNER` and include the `ManagedDemoSignerDurableObject` migration |
 | Draft-generation AI policy | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker |
+
+Set the webhook after deploy with placeholders only:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -H "content-type: application/json" \
+  --data '{
+    "url": "<AGENT_BRIDGE_PUBLIC_URL>/telegram/webhook",
+    "secret_token": "<TELEGRAM_WEBHOOK_SECRET>",
+    "allowed_updates": ["message", "callback_query"]
+  }'
+```
 
 The live webhook route is `/telegram/webhook`. It rejects requests unless
 `TELEGRAM_BRIDGE_ENABLED=true`, a bot token is configured, and Telegram supplies
-the configured webhook secret token. The current route normalizes the real
-Telegram update and returns a safe acknowledgement; canonical question,
-response, and session-context payloads still go through the session worker or
-canonical agent APIs.
+the configured webhook secret token. It parses real Telegram `message` and
+`callback_query` updates, handles `/start`, `/ce_join <session>`,
+`/ce_sessions`, `/ce_questions`, `/ce_pose_question`, `/q`, `/ce_docs`, and
+`/ce_me`, and sends replies through an injected Telegram Bot API adapter. Unit
+tests use mocked `fetch` and fake bot tokens; real `TELEGRAM_BOT_TOKEN` is
+needed only for live Telegram smoke.
+
+Callback data and private deep-link start payloads are opaque `cecb_*` or
+`cetg_*` identifiers. Private payloads, JWTs, worker tokens, account material,
+private keys, and Cloudflare credentials must never be placed in Telegram
+callback data.
+
+The current command handler uses configured demo fixtures from optional
+`AGENT_BRIDGE_SESSION_POLICY_JSON`, `AGENT_BRIDGE_DEMO_QUESTIONS_JSON`, and
+`AGENT_BRIDGE_DEMO_DOCS_JSON` vars. Canonical question, response, and
+session-context payloads still go through the session worker or canonical agent
+APIs as that contract is promoted from demo fixtures.
+
+## Deploy Helper Plan
+
+The long-term product flow should not require manual Wrangler. `/new` or
+`/worker-setup` should generate a scoped Cloudflare token link, accept/paste the
+token, and let a deploy helper create or update the worker, resources, bindings,
+and secrets through Cloudflare APIs. Wrangler remains a developer fallback.
+
+This slice adds a planning/validation helper:
+
+```bash
+cd workers/agentBridgeWorker
+npm run deploy:plan -- --worker-name ce-agent-bridge-worker --workers-subdomain <workers-subdomain>
+```
+
+The helper accepts `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and the
+required Telegram/session vars from local environment, prints only redacted
+secret presence, and models the direct Cloudflare API calls still needed:
+
+- Workers script upload with vars and bindings.
+- KV namespace for opaque action IDs and webhook replay cache.
+- R2 bucket for demo artifacts when enabled.
+- D1 database for event/audit/index records when enabled.
+- Durable Object binding and migration for managed demo signer/runtime.
+- Worker secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
+  `DEMO_SIGNER_ROOT_SECRET`.
+- Worker vars: `TELEGRAM_BOT_USERNAME`, `AGENT_BRIDGE_PUBLIC_URL`,
+  `CE_SESSION_WORKER_BASE_URL`, `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`.
+- Script-level Workers.dev enablement for
+  `https://<worker-name>.<workers-subdomain>.workers.dev`.
+
+The generated Cloudflare token request needs Workers Scripts, Workers KV, R2,
+D1, and Durable Objects edit scopes. `Account Settings: Edit` is needed only
+when the helper must create or change the account-level workers.dev subdomain;
+if the account already has a workers.dev subdomain, the first demo can omit that
+broader scope and just enable the script on Workers.dev.
 
 ## Normal Session Submit
 

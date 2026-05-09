@@ -1,16 +1,18 @@
-# Copy to .dev.vars for local private testing only.
+TELEGRAM_BRIDGE_ENABLED=true
+TELEGRAM_BOT_TOKEN=PASTE_TELEGRAM_BOT_TOKEN_FOR_LOCAL_ONLY
+TELEGRAM_BOT_USERNAME=your_context_engine_bot
+TELEGRAM_WEBHOOK_SECRET=PASTE_RANDOM_WEBHOOK_SECRET_FOR_LOCAL_ONLY
+DEMO_SIGNER_ROOT_SECRET=PASTE_RANDOM_DEMO_SIGNER_ROOT_SECRET_FOR_LOCAL_ONLY
+
 AGENT_BRIDGE_DEPLOYMENT_ID=local-demo
-TELEGRAM_BRIDGE_ENABLED=false
-TELEGRAM_BOT_USERNAME=
-AGENT_BRIDGE_PUBLIC_URL=http://127.0.0.1:8787
-CE_SESSION_WORKER_BASE_URL=http://127.0.0.1:8788
+AGENT_BRIDGE_PUBLIC_URL=https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev
+CE_SESSION_WORKER_BASE_URL=https://<session-worker>.<workers-subdomain>.workers.dev
 DEFAULT_CHAIN_ID=11155420
-DEFAULT_RPC_URL=
+DEFAULT_RPC_URL=https://your-op-sepolia-rpc.example
 AGENT_AI_PROVIDER=ce_session_policy
 BROADCAST_ENABLED=false
 
-# Set only in your untracked local file:
-# TELEGRAM_BOT_TOKEN=
-# TELEGRAM_WEBHOOK_SECRET=
-# DEMO_SIGNER_ROOT_SECRET=
-# CLOUDFLARE_API_TOKEN=
+# Optional local demo fixtures. Keep these non-identifying and secret-free.
+# AGENT_BRIDGE_SESSION_POLICY_JSON={"defaultSessionSlug":"general","sessions":[{"sessionSlug":"general","sessionName":"General","telegramBridgeEnabled":true}]}
+# AGENT_BRIDGE_DEMO_QUESTIONS_JSON=[{"questionId":"q-readiness","questionType":"freeform","prompt":"What should this group decide next?"}]
+# AGENT_BRIDGE_DEMO_DOCS_JSON=[{"docId":"doc-public","sessionSlug":"general","title":"Public notes","fileType":"md","visibility":"public","contentPreview":"Public summary only"}]
