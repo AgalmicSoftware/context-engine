@@ -37,9 +37,11 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | `account_recovered` | `/ce_recover_key` |
 | confirmation, submitted, draft, retry states | opaque callback actions |
 
-The group session-linked card says `Context Engine session linked: <session>` and exposes `Join Session`, `View Questions`, `View / Add Docs`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
+The group session-linked card says `Session: <session>` and exposes `Join Session`, `View Questions`, `View / Add Docs`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
 
-`View Questions` reads the linked session through `GET /api/agent/questions`.
+`View Questions` reads the linked session through the bridge's worker-local
+question cache for now. Canonical `GET /api/agent/questions` remains the target
+contract once a reachable agent API base is deployed for the bridge.
 `Pose Question` uses `/ce_pose_question` or `/q` to pose one existing or
 generated question to the group. If no selector is provided, the action opens a
 choose-question menu instead of silently posing the first question. Anyone in
@@ -174,6 +176,8 @@ Required values:
 | CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
 | Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
 | Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads |
+| Optional question source | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional |
+| Optional question cache tuning | `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION`, and `AGENT_BRIDGE_QUESTION_SCAN_BLOCKS` tune the Telegram worker-local cache. Defaults are sufficient for the first smoke |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
 | KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
@@ -214,16 +218,35 @@ The command handler uses `AGENT_BRIDGE_SESSION_POLICY_JSON` as an explicit
 demo/session-policy override when it is configured. Without that override, the
 live Worker reads the real OP Sepolia `SessionRegistry` over `DEFAULT_RPC_URL`
 plus optional `ADDITIONAL_RPC_URL` fallback and uses the returned slugs for
-`/ce_sessions` and `/ce_join`.
+`/ce_sessions` and `/ce_join`. Group `/ce_join <session>` also persists the
+chat's selected session in `AGENT_ACTION_KV`, so later `/ce_questions`,
+`/q <number-or-id>`, and `/ce_docs` use that session without repeating the slug.
 
-Question and doc bodies still use optional `AGENT_BRIDGE_DEMO_QUESTIONS_JSON`
-and `AGENT_BRIDGE_DEMO_DOCS_JSON` fixtures until a reachable canonical
-`/api/agent/*` service is deployed for the bridge. Those fixtures must remain
-non-identifying and secret-free. Real questions, responses, documents, grants,
-and private session-context payloads still go through the session worker or
-canonical agent APIs as that contract is promoted from demo fixtures.
-When these optional fixture vars are present in untracked `.dev.vars`,
-`deploy:apply -- --apply` uploads them as plain Worker vars.
+Question lists default to live mode. The Telegram worker scans public
+`QuestionsAdded` logs, reads public question payload pointers, and caches safe
+question summaries in memory plus `AGENT_ACTION_KV` for short periods. The
+cache is a Telegram performance layer only; `sessionCorsWorker` and canonical
+`/api/agent/*` remain the long-term storage/access boundary for real questions,
+responses, docs, grants, and private session-context payloads.
+
+Optional `AGENT_BRIDGE_DEMO_QUESTIONS_JSON` and
+`AGENT_BRIDGE_DEMO_DOCS_JSON` fixtures are still available for local preview or
+copy work. Set `AGENT_BRIDGE_QUESTION_SOURCE=fixture` to force fixture
+questions, or `AGENT_BRIDGE_QUESTION_SOURCE=live_or_fixture` to fall back to
+fixtures when live question reads return nothing. Fixtures must remain
+non-identifying and secret-free. When optional fixture/cache vars are present in
+untracked `.dev.vars`, `deploy:apply -- --apply` uploads them as plain Worker
+vars.
+
+Question cache controls:
+
+| Var | Purpose |
+| --- | --- |
+| `AGENT_BRIDGE_QUESTION_SOURCE` | Defaults to `live`; use `fixture` only for local preview/demo copy or `live_or_fixture` for explicit fallback |
+| `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS` | KV/memory TTL for safe public question lists; default `300` |
+| `AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION` | Max public questions returned to Telegram; default `20` |
+| `AGENT_BRIDGE_QUESTION_SCAN_BLOCKS` | Recent-block fallback window when session metadata has no `blockLimits.start`; default `130000` |
+| `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` | Optional manual scan bounds for faster live smoke runs |
 
 ## Interactive Preview
 
@@ -372,7 +395,7 @@ IDs.
    the normal live smoke should run both.
 8. Confirm the deployed `/health` output reports `worker: agentBridgeWorker`.
 9. Smoke Telegram private chat `/start`, group `/ce_join <session>`,
-   `/ce_sessions`, `/ce_questions`, `/q <question-id-or-text>`, `/ce_docs`, and
+   `/ce_sessions`, `/ce_questions`, `/q <number-or-id>`, `/ce_docs`, and
    private `/ce_me`.
 10. Confirm replies contain only safe summaries and opaque `cecb_*` / `cetg_*`
     action IDs, no raw callback payloads, grants, JWTs, Cloudflare credentials,
@@ -384,9 +407,9 @@ Still mocked or contract-only for this first smoke:
 - `deploy:plan` creates no KV, R2, D1, Durable Object, Worker upload, secret, or
   webhook resources; the only optional live call is account lookup. Use
   `deploy:apply -- --apply` for the live resource and webhook path.
-- Real question/doc/session payload reads are still represented by configured
-  demo fixtures unless the canonical `/api/agent/*` session contract is wired
-  for that route.
+- Live public question reads use the Telegram worker-local cache for now; docs
+  still use configured demo fixtures unless the canonical `/api/agent/*`
+  session contract is wired for that route.
 - OpenClaw/MCP forwarding is contract-only; no real external OpenClaw HTTP/MCP
   transport is sent from this worker.
 - Broadcast remains disabled.

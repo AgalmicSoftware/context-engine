@@ -250,6 +250,11 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
       AGENT_BRIDGE_DEMO_QUESTIONS_JSON: questions,
       AGENT_BRIDGE_DEMO_DOCS_JSON: docs,
       AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: '25',
+      AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+      AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS: '300',
+      AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK: '100',
+      AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK: '200',
+      AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION: '12',
     }),
   });
   const metadata = buildAgentBridgeWorkerUploadMetadata(config);
@@ -265,6 +270,26 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_MAX_REGISTRY_SESSIONS' &&
     binding.text === '25'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_QUESTION_SOURCE' &&
+    binding.text === 'fixture'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS' &&
+    binding.text === '300'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK' &&
+    binding.text === '100'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK' &&
+    binding.text === '200'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION' &&
+    binding.text === '12'
   )), true);
 });
 

@@ -566,7 +566,7 @@ export function buildTelegramGroupSessionCardState({
     }));
   }
   return buildTelegramScreenState('group_session_card', {
-    text: `Context Engine session linked: ${sessionLabel}`,
+    text: `Session: ${sessionLabel}`,
     sessionSlug: safeString(sessionSlug),
     sessionName: safeString(sessionName),
     buttons,

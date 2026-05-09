@@ -6,6 +6,20 @@ import {
   resolveSessionRegistryAddress,
 } from './registrySessions.mjs';
 
+class MemoryKv {
+  constructor(seed = {}) {
+    this.store = new Map(Object.entries(seed));
+  }
+
+  async put(key, value) {
+    this.store.set(key, value);
+  }
+
+  async get(key) {
+    return this.store.get(key) || null;
+  }
+}
+
 function word(value) {
   return BigInt(value).toString(16).padStart(64, '0');
 }
@@ -139,4 +153,43 @@ test('listRegistrySessionsForBridge stays disabled without explicit RPC URL', as
 
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'registry_rpc_url_missing');
+});
+
+test('listRegistrySessionsForBridge writes and reads KV cache without storing RPC URLs', async () => {
+  const defaultRpc = 'https://kv-rpc.example';
+  const kv = new MemoryKv();
+  const { calls, fetchImpl } = registryFetchMock({ slugs: ['kv-alpha'], defaultRpc });
+
+  const loaded = await listRegistrySessionsForBridge({
+    env: {
+      DEFAULT_CHAIN_ID: '11155420',
+      DEFAULT_RPC_URL: defaultRpc,
+      AGENT_ACTION_KV: kv,
+      AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: '7',
+    },
+    fetchImpl,
+  });
+
+  assert.equal(loaded.ok, true);
+  assert.deepEqual(loaded.sessions.map((session) => session.sessionSlug), ['kv-alpha']);
+  assert.equal(calls.length > 0, true);
+  const cacheEntries = [...kv.store.entries()];
+  assert.equal(cacheEntries.length, 1);
+  assert.equal(cacheEntries[0][0].includes(defaultRpc), false);
+
+  const cached = await listRegistrySessionsForBridge({
+    env: {
+      DEFAULT_CHAIN_ID: '11155420',
+      DEFAULT_RPC_URL: 'https://kv-rpc-fresh-process.example',
+      AGENT_ACTION_KV: new MemoryKv(Object.fromEntries(cacheEntries)),
+      AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: '7',
+    },
+    fetchImpl: async () => {
+      throw new Error('must not call network on KV cache hit');
+    },
+  });
+
+  assert.equal(cached.ok, true);
+  assert.equal(cached.cacheLayer, 'kv');
+  assert.deepEqual(cached.sessions.map((session) => session.sessionSlug), ['kv-alpha']);
 });

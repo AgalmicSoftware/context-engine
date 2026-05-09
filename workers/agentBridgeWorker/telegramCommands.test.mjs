@@ -27,6 +27,7 @@ function baseEnv(overrides = {}) {
     DEFAULT_CHAIN_ID: '11155420',
     DEFAULT_RPC_URL: 'https://rpc.example.test',
     DEMO_SIGNER_ROOT_SECRET: 'unit-root',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
@@ -169,7 +170,7 @@ test('group /ce_join returns a Workers-safe session card with opaque buttons onl
   assert.equal(result.command, '/ce_join');
   assert.equal(result.screen, 'group_session_card');
   assert.equal(result.response.chatId, '-100123');
-  assert.match(result.response.text, /Context Engine session linked: Alpha Session/);
+  assert.match(result.response.text, /Session: Alpha Session/);
 
   const buttons = flattenButtons(result.response.replyMarkup);
   const startButton = buttons.find((button) => button.text === 'Join Session');
@@ -238,6 +239,96 @@ test('/ce_questions and callback dispatch list questions without leaking locked 
   assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
 });
 
+test('/ce_questions does not invent demo questions when live question cache is empty', async () => {
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions alpha'),
+    env: baseEnv({
+      AGENT_BRIDGE_QUESTION_SOURCE: 'live',
+      DEFAULT_RPC_URL: '',
+      ADDITIONAL_RPC_URL: '',
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questionCount, 0);
+  assert.match(result.response.text, /No public questions are available yet/);
+  assert.equal(result.response.text.includes('q-readiness'), false);
+  assert.equal(result.response.text.includes('What should Alpha decide next'), false);
+});
+
+test('group session binding makes later question and doc commands use the joined session', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowQuestionGeneration: true,
+      allowGenerateQuestion: true,
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+          docLibraryEnabled: true,
+        },
+        {
+          sessionSlug: 'demo',
+          sessionName: 'Demo Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+          docLibraryEnabled: true,
+        },
+      ],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: 'q-demo',
+        questionType: 'freeform',
+        prompt: 'What should Demo decide next?',
+      },
+    ]),
+    AGENT_BRIDGE_DEMO_DOCS_JSON: JSON.stringify([
+      {
+        docId: 'doc-demo',
+        sessionSlug: 'demo',
+        title: 'Demo brief',
+        fileType: 'md',
+        visibility: 'public',
+      },
+    ]),
+  });
+
+  const joined = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_join demo'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const questions = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const posed = await buildTelegramCommandResponse({
+    update: groupMessage('/q q-demo'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  const docs = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_docs'),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+
+  assert.equal(joined.sessionSlug, 'demo');
+  assert.match(questions.response.text, /Questions for demo/);
+  assert.match(questions.response.text, /q-demo - What should Demo decide next/);
+  assert.match(posed.response.text, /Question for demo:/);
+  assert.match(docs.response.text, /Docs for demo/);
+  assert.match(docs.response.text, /Demo brief/);
+});
+
 test('group Pose Question callback opens a choose-question menu instead of posing the first question', async () => {
   const env = baseEnv();
   const joined = await buildTelegramCommandResponse({
@@ -280,6 +371,11 @@ test('/q poses existing or ad hoc public questions to the group', async () => {
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
+  const byNumber = await buildTelegramCommandResponse({
+    update: groupMessage('/q 1'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
   const adHoc = await buildTelegramCommandResponse({
     update: groupMessage('/q What should we fund this week?'),
     env,
@@ -289,6 +385,8 @@ test('/q poses existing or ad hoc public questions to the group', async () => {
   assert.equal(existing.ok, true);
   assert.equal(existing.screen, 'pose_question');
   assert.match(existing.response.text, /What should Alpha decide next/);
+  assert.equal(byNumber.ok, true);
+  assert.match(byNumber.response.text, /What should Alpha decide next/);
   assert.equal(adHoc.ok, true);
   assert.match(adHoc.response.text, /What should we fund this week\?/);
   assert.equal(JSON.stringify(adHoc.response.replyMarkup).includes('What should we fund'), false);
@@ -369,8 +467,8 @@ test('/ce_me returns managed demo account metadata without the root secret', asy
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'my_account');
-  assert.match(result.response.text, /Managed Telegram demo account/);
-  assert.match(result.response.text, /Address: 0x[0-9a-f]{40}/);
+  assert.match(result.response.text, /Account/);
+  assert.match(result.response.text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
 });
 

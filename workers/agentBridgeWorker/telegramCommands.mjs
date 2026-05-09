@@ -1,5 +1,4 @@
 import {
-  ACCOUNT_MODES,
   AGENT_BRIDGE_EVENT_TYPES,
   RISK_CEILINGS,
   TELEGRAM_BRIDGE_ACTIONS,
@@ -20,6 +19,7 @@ import {
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { listRegistrySessionsForBridge } from './registrySessions.mjs';
+import { listCachedSessionQuestionsForBridge } from './sessionQuestions.mjs';
 import { normalizeSessionPolicy, resolveSessionInvocation } from './sessionPolicy.mjs';
 import {
   normalizeTelegramGroup,
@@ -29,7 +29,9 @@ import {
 import { answerTelegramCallbackQuery, editTelegramMessageText, sendTelegramMessage } from './telegramSender.mjs';
 
 const ACTION_KV_PREFIX = 'telegram:action:';
+const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
+const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 const DEFAULT_QUESTION = Object.freeze({
   questionId: 'question-demo-1',
@@ -95,6 +97,16 @@ function questionId(question = {}) {
   return safeString(question.questionId || question.id);
 }
 
+function shortQuestionId(value = '') {
+  const text = safeString(value);
+  return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(0, 10)}...${text.slice(-6)}` : text;
+}
+
+function shortAddress(value = '') {
+  const text = safeString(value);
+  return /^0x[0-9a-fA-F]{40}$/.test(text) ? `${text.slice(0, 6)}...${text.slice(-4)}` : text;
+}
+
 async function loadSessionPolicy(env = {}) {
   const configured = safeJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
   if (configured && typeof configured === 'object' && !Array.isArray(configured)) {
@@ -158,6 +170,59 @@ function loadDemoQuestions(env = {}) {
   return normalized.length ? normalized : [DEFAULT_QUESTION];
 }
 
+function envFlagEnabled(value = '') {
+  return ['1', 'true', 'yes', 'on'].includes(lower(value));
+}
+
+function questionSourceMode(env = {}) {
+  const mode = lower(env.AGENT_BRIDGE_QUESTION_SOURCE || 'live');
+  if (['fixture', 'demo', 'demo_fixture'].includes(mode)) return 'fixture';
+  if (['live_or_fixture', 'live-or-fixture', 'fallback'].includes(mode)) return 'live_or_fixture';
+  return 'live';
+}
+
+function allowDemoQuestionFallback(env = {}) {
+  return questionSourceMode(env) === 'live_or_fixture'
+    || envFlagEnabled(env.AGENT_BRIDGE_ALLOW_DEMO_QUESTION_FALLBACK);
+}
+
+function allowAdHocQuestions(env = {}) {
+  return envFlagEnabled(env.AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS)
+    || questionSourceMode(env) === 'fixture';
+}
+
+async function loadQuestionsForSession(env = {}, sessionSlug = '') {
+  const mode = questionSourceMode(env);
+  if (mode === 'fixture') {
+    return {
+      ok: true,
+      reason: 'fixture_questions_loaded',
+      source: 'demo_fixture',
+      questions: loadDemoQuestions(env),
+    };
+  }
+  const live = await listCachedSessionQuestionsForBridge({ env, sessionSlug }).catch((error) => ({
+    ok: false,
+    reason: 'live_question_cache_failed',
+    error: safeString(error?.message || error),
+    questions: [],
+  }));
+  if ((live.ok && Array.isArray(live.questions) && live.questions.length) || !allowDemoQuestionFallback(env)) {
+    return {
+      ...live,
+      source: live.source || 'telegram_worker_question_cache',
+      questions: Array.isArray(live.questions) ? live.questions : [],
+    };
+  }
+  return {
+    ok: true,
+    reason: 'fixture_questions_fallback',
+    source: 'demo_fixture',
+    fallbackFrom: live.reason || 'live_question_cache_unavailable',
+    questions: loadDemoQuestions(env),
+  };
+}
+
 function loadDemoDocuments(env = {}) {
   const parsed = safeJsonParse(env.AGENT_BRIDGE_DEMO_DOCS_JSON, null);
   const docs = Array.isArray(parsed) ? parsed : [];
@@ -195,7 +260,12 @@ function parseTelegramCommandText(text = '', {
 function findQuestion(questions = [], selector = '') {
   const needle = lower(selector);
   if (!needle) return null;
+  const index = Number(needle);
+  if (Number.isInteger(index) && index > 0 && index <= questions.length) {
+    return questions[index - 1] || null;
+  }
   return questions.find((question) => lower(questionId(question)) === needle)
+    || questions.find((question) => lower(shortQuestionId(questionId(question))) === needle)
     || questions.find((question) => lower(questionText(question)).includes(needle))
     || null;
 }
@@ -241,6 +311,60 @@ async function readActionRecord(env = {}, actionId = '') {
   if (!parsed || typeof parsed !== 'object') return null;
   assertNoSecretShape(parsed, 'Telegram action records must not serialize secrets.');
   return parsed;
+}
+
+function groupSessionBindingKey(normalized = {}) {
+  const chatId = safeString(normalized.chat?.chatId);
+  return chatId ? `${GROUP_SESSION_KV_PREFIX}${chatId}` : '';
+}
+
+async function persistGroupSessionBinding({
+  env = {},
+  normalized = {},
+  session = {},
+  createdAt = null,
+} = {}) {
+  if (normalized.chat?.isPrivate) return { ok: false, reason: 'private_chat' };
+  const key = groupSessionBindingKey(normalized);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const record = {
+    version: 1,
+    chatId: safeString(normalized.chat?.chatId),
+    sessionSlug: sanitizeSessionSlug(session.sessionSlug || session.slug),
+    sessionName: sessionLabel(session),
+    linkedAt: createdAt || nowIso(),
+  };
+  if (!record.sessionSlug) return { ok: false, reason: 'session_slug_missing' };
+  assertNoSecretShape(record, 'Telegram group session bindings must not serialize secrets.');
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
+    expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
+  });
+  return { ok: true, sessionSlug: record.sessionSlug };
+}
+
+async function readGroupSessionBinding(env = {}, normalized = {}) {
+  if (normalized.chat?.isPrivate) return null;
+  const key = groupSessionBindingKey(normalized);
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function') return null;
+  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  assertNoSecretShape(parsed, 'Telegram group session bindings must not serialize secrets.');
+  const sessionSlug = sanitizeSessionSlug(parsed.sessionSlug);
+  return sessionSlug ? { ...parsed, sessionSlug } : null;
+}
+
+async function resolveCommandSessionSlug({
+  env = {},
+  normalized = {},
+  policy = {},
+  explicitSessionSlug = '',
+} = {}) {
+  const explicit = sanitizeSessionSlug(explicitSessionSlug);
+  if (explicit) return explicit;
+  const binding = await readGroupSessionBinding(env, normalized);
+  return sanitizeSessionSlug(binding?.sessionSlug || policy.defaultSessionSlug || 'general') || 'general';
 }
 
 async function makeCallbackButton({
@@ -363,21 +487,20 @@ function attachCallbackQueryId(commandResponse = {}, callbackQueryId = '') {
 
 function formatHelpText() {
   return [
-    'Context Engine Telegram demo',
+    'Context Engine',
     '',
     '/ce_join <session> - link this chat to a session',
     '/ce_sessions - list linked sessions',
     '/ce_questions - view session questions',
-    '/ce_pose_question <question-id-or-text> - pose a question',
-    '/q <question-id-or-text> - short pose command',
+    '/q <number-or-id> - pose a question',
     '/ce_docs - view linked docs',
-    '/ce_me - view your managed demo account',
+    '/ce_me - view your account',
   ].join('\n');
 }
 
 async function buildHelpResponse({ normalized, command = COMMANDS.START, env, createdAt }) {
   const policy = await loadSessionPolicy(env);
-  const sessionSlug = policy.defaultSessionSlug || 'general';
+  const sessionSlug = await resolveCommandSessionSlug({ env, normalized, policy });
   const keyboard = [[
     await makeCallbackButton({
       env,
@@ -432,7 +555,7 @@ async function buildSessionsResponse({ normalized, command, env, createdAt }) {
       'Linked sessions:',
       ...sessions.map((session) => `- ${session.sessionSlug} (${sessionLabel(session)})`),
       '',
-      'Use /ce_join <session> to link the current chat.',
+      'Use /ce_join <session> to switch sessions.',
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
     screen: 'group_session_card',
@@ -457,7 +580,7 @@ async function buildJoinResponse({
       normalized,
       command,
       reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not linked to this bridge. Run /ce_sessions to see available sessions.`,
+      text: `Session "${sessionSlug}" is not available. Run /ce_sessions to see sessions.`,
     });
   }
 
@@ -483,8 +606,7 @@ async function buildJoinResponse({
       text: [
         `Joined session: ${sessionLabel(resolved.session)}`,
         '',
-        `Managed demo account: ${account.accountAddress}`,
-        `Mode: ${ACCOUNT_MODES.MANAGED_TELEGRAM_DEMO}`,
+        `Account: ${shortAddress(account.accountAddress)}`,
         `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
         '',
         'Use /ce_questions, /ce_docs, or /ce_me.',
@@ -519,6 +641,12 @@ async function buildJoinResponse({
   }
 
   const group = normalizeTelegramGroup(normalized);
+  await persistGroupSessionBinding({
+    env,
+    normalized,
+    session: resolved.session,
+    createdAt,
+  });
   const state = buildTelegramGroupSessionCardState({
     sessionSlug: resolved.session.sessionSlug,
     sessionName: resolved.session.sessionName,
@@ -571,7 +699,7 @@ async function buildJoinResponse({
     text: [
       state.text,
       '',
-      'Use the buttons below, or run /ce_questions, /ce_docs, or /q <question>.',
+      'Use /ce_questions, /ce_docs, or /q <number>.',
     ].join('\n'),
     replyMarkup: { inline_keyboard: [buttons] },
     screen: state.screen,
@@ -593,19 +721,25 @@ async function buildQuestionsResponse({
   createdAt,
 } = {}) {
   const policy = await loadSessionPolicy(env);
-  const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || args[0] || policy.defaultSessionSlug || 'general') || 'general';
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride || args[0],
+  });
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
     return errorReply({
       normalized,
       command,
       reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not linked to this bridge. Run /ce_sessions to see available sessions.`,
+      text: `Session "${sessionSlug}" is not available. Run /ce_sessions to see sessions.`,
       method,
       messageId,
     });
   }
-  const questions = loadDemoQuestions(env);
+  const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug);
+  const questions = loadedQuestions.questions;
   const state = buildTelegramQuestionListState({
     sessionSlug: resolved.session.sessionSlug,
     questions,
@@ -630,15 +764,24 @@ async function buildQuestionsResponse({
     text: [
       ...(safeString(introText) ? [safeString(introText), ''] : []),
       `Questions for ${resolved.session.sessionSlug}:`,
-      ...state.questions.map((question) => `${question.displayIndex}. ${question.questionId} - ${question.title}`),
+      ...(state.questions.length
+        ? state.questions.map((question) => `${question.displayIndex}. ${shortQuestionId(question.questionId)} - ${question.title}`)
+        : ['No public questions are available yet.']),
       '',
-      'Tap Pose on a listed question, or send /q <question-id-or-text>.',
+      state.questions.length
+        ? 'Tap Pose, or send /q <number>.'
+        : 'Create questions in the CE client, then run /ce_questions again.',
     ].join('\n'),
     replyMarkup: rows.length ? { inline_keyboard: rows } : null,
     screen: state.screen,
     command,
     normalized,
-    extra: { sessionSlug: resolved.session.sessionSlug, questionCount: state.count },
+    extra: {
+      sessionSlug: resolved.session.sessionSlug,
+      questionCount: state.count,
+      questionSource: loadedQuestions.source || 'telegram_worker_question_cache',
+      questionSourceReason: loadedQuestions.reason || '',
+    },
   });
 }
 
@@ -654,14 +797,19 @@ async function buildPoseQuestionResponse({
   createdAt,
 } = {}) {
   const policy = await loadSessionPolicy(env);
-  const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || policy.defaultSessionSlug || 'general') || 'general';
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride,
+  });
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
     return errorReply({
       normalized,
       command,
       reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not linked to this bridge. Run /ce_sessions to see available sessions.`,
+      text: `Session "${sessionSlug}" is not available. Run /ce_sessions to see sessions.`,
     });
   }
 
@@ -678,19 +826,22 @@ async function buildPoseQuestionResponse({
       createdAt,
     });
   }
-  const questions = loadDemoQuestions(env);
+  const loadedQuestions = await loadQuestionsForSession(env, resolved.session.sessionSlug);
+  const questions = loadedQuestions.questions;
   const matched = findQuestion(questions, selector);
-  const selected = matched || buildAdHocQuestion(selector, {
-    sessionSlug: resolved.session.sessionSlug,
-    updateId: normalized.updateId,
-  });
+  const selected = matched || (allowAdHocQuestions(env)
+    ? buildAdHocQuestion(selector, {
+        sessionSlug: resolved.session.sessionSlug,
+        updateId: normalized.updateId,
+      })
+    : null);
   if (!selected) {
     return buildQuestionsResponse({
       normalized,
       command,
       env,
       sessionSlugOverride: resolved.session.sessionSlug,
-      introText: 'Choose a question to pose to the group.',
+      introText: 'That question was not found.',
       method,
       messageId,
       createdAt,
@@ -753,14 +904,19 @@ async function buildDocsResponse({
   createdAt,
 } = {}) {
   const policy = await loadSessionPolicy(env);
-  const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || args[0] || policy.defaultSessionSlug || 'general') || 'general';
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride || args[0],
+  });
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
     return errorReply({
       normalized,
       command,
       reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not linked to this bridge. Run /ce_sessions to see available sessions.`,
+      text: `Session "${sessionSlug}" is not available. Run /ce_sessions to see sessions.`,
       method,
       messageId,
     });
@@ -780,7 +936,7 @@ async function buildDocsResponse({
       `Docs for ${resolved.session.sessionSlug}:`,
       ...lines,
       '',
-      'Private or SBT-gated contents stay behind the session worker.',
+      'Private or gated files open in Context Engine.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [[
@@ -826,13 +982,12 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
     chatId: normalized.chat.chatId,
     messageId,
     text: [
-      'Managed Telegram demo account',
-      `Address: ${account.accountAddress}`,
-      `Mode: ${state.accountMode}`,
+      'Account',
+      `Address: ${shortAddress(account.accountAddress)}`,
       `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
       `Joined sessions: ${joinedSessions.map((session) => session.sessionSlug).join(', ') || 'none'}`,
       '',
-      'Demo signing stays inside the worker Durable Object boundary.',
+      'Use /ce_questions or /ce_docs.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [[
@@ -976,7 +1131,7 @@ async function buildCallbackResponse({ normalized, env, createdAt }) {
     normalized,
     command: 'callback',
     reason: 'unsupported_callback_action',
-    text: 'This action is not available in the Telegram demo yet.',
+    text: 'This action is not available yet.',
     method,
     messageId,
   }), callbackQueryId);

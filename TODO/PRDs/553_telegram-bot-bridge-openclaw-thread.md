@@ -77,10 +77,23 @@
     `AGENT_BRIDGE_DEMO_QUESTIONS_JSON` and `AGENT_BRIDGE_DEMO_DOCS_JSON`, so
     live bot copy can be exercised before canonical question/doc reads are
     reachable.
+  - Telegram group session selection is now persisted in the bridge KV after
+    `/ce_join <session>`, so later `/ce_questions`, `/q <number-or-id>`, and
+    `/ce_docs` default to the joined session instead of falling back to the
+    first registry/default session.
+  - The Telegram worker now has a private performance cache for live public
+    question reads: it scans `QuestionsAdded`, reads public question payloads,
+    caches safe summaries in memory plus KV, and no longer silently invents demo
+    questions in live mode. Fixture questions are still available with
+    `AGENT_BRIDGE_QUESTION_SOURCE=fixture` or the explicit fallback mode for
+    preview/copy work.
+  - Bot copy was shortened for live use: group/session replies no longer explain
+    Telegram/Worker internals, account addresses are abbreviated in chat, and
+    private/gated content messaging routes users back to Context Engine.
   - Still mocked/contract-only before live smoke: `/telegram-demo-setup` does
     not itself deploy or set webhook, `deploy:plan` does not create Cloudflare
-    resources, live `deploy:apply` is not run by tests, demo questions/docs
-    remain fixture-backed until a reachable canonical `/api/agent/*` service is
+    resources, live `deploy:apply` is not run by tests, docs remain
+    fixture-backed until a reachable canonical `/api/agent/*` service is
     deployed for the bridge, OpenClaw/MCP forwarding sends no real external
     transport, broadcast remains disabled, and Cloudflare `lit_encrypted`
     envelope producer/reader work is later storage hardening.
@@ -89,15 +102,17 @@
 
 1. Smoke the live Telegram bot from Telegram after the callback/preview deploy:
    private `/start`, group `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
-   `/q <question-id-or-text>`, `/ce_docs`, and private `/ce_me`. Confirm
+   `/q <number-or-id>`, `/ce_docs`, and private `/ce_me`. Confirm
    replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs,
-   callback buttons stop loading, and `Pose Question` opens the picker.
+   callback buttons stop loading, `Pose Question` opens the picker, and live
+   questions match questions created in the CE client.
 2. Use `/mock/telegram/preview` as the fast local/browser lane for copy,
    callback keyboard, and Mini App handoff iteration before pushing new webhook
    behavior live.
-3. After the transport smoke, replace fixture-backed Telegram question/doc reads
-   with canonical `/api/agent/*` calls once a reachable agent API base exists for
-   the deployed bridge, then continue setup UX convergence so
+3. After the transport smoke, replace the worker-local Telegram question cache
+   and fixture-backed doc reads with canonical `/api/agent/*` calls once a
+   reachable agent API base exists for the deployed bridge, then continue setup
+   UX convergence so
    `/telegram-demo-setup` can invoke the same apply path without exposing
    Cloudflare/Wrangler details.
 4. Later storage hardening: implement the Cloudflare `lit_encrypted` envelope
