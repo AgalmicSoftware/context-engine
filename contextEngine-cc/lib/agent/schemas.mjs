@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   getLegacyArweaveTxId,
   resolvePayloadStorageRef,
@@ -25,7 +26,7 @@ export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
   {
     family: 'inbox',
     routes: Object.freeze(['GET /api/agent/inbox']),
-    purpose: 'Expose local pending-response/request summaries for human review surfaces.',
+    purpose: 'Expose local pending-response, approval-request, and activity summaries for human review surfaces.',
   },
   {
     family: 'responses',
@@ -73,6 +74,8 @@ export const AGENT_ENDPOINT_FAMILIES = Object.freeze([
 
 export const AGENT_SENSITIVE_FIELD_RE = /(?:privatekey|private_key|worker.?token|bearer|jwt|authorization|secret|signature|mnemonic|seed|password)/i;
 export const AGENT_SENSITIVE_VALUE_RE = /(?:bearer\s+[a-z0-9._:-]+|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64})/i;
+export const CE_ACTIVITY_ACTOR_TYPES = Object.freeze(['human_passkey', 'agent', 'telegram', 'openclaw', 'ce_cc']);
+const CE_ACTIVITY_EPOCH = '1970-01-01T00:00:00.000Z';
 
 export const AGENT_DRAFT_RESPONSE_STATUS = Object.freeze({
   DRAFT: 'draft',
@@ -268,4 +271,203 @@ export function redactAgentSensitiveFields(value) {
     if (AGENT_SENSITIVE_FIELD_RE.test(key)) return [key, '[redacted]'];
     return [key, redactAgentSensitiveFields(entry)];
   }));
+}
+
+function stableActivityHash(value = '', length = 24) {
+  return createHash('sha256').update(String(value || '')).digest('hex').slice(0, length);
+}
+
+function safeActivityString(value, { max = 256, lower = false } = {}) {
+  const raw = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!raw) return '';
+  const redacted = redactAgentSensitiveFields(raw);
+  if (redacted === '[redacted]') return '';
+  const normalized = String(redacted).slice(0, max);
+  return lower ? normalized.toLowerCase() : normalized;
+}
+
+function normalizeActivityDate(value) {
+  const raw = safeActivityString(value, { max: 128 });
+  if (!raw) return CE_ACTIVITY_EPOCH;
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : raw;
+}
+
+function inferActivityActorType(value = '', actorId = '') {
+  const explicit = safeActivityString(value, { max: 32, lower: true });
+  if (CE_ACTIVITY_ACTOR_TYPES.includes(explicit)) return explicit;
+  const normalizedActorId = safeActivityString(actorId, { max: 128, lower: true });
+  if (normalizedActorId.startsWith('telegram:')) return 'telegram';
+  if (normalizedActorId.startsWith('openclaw:')) return 'openclaw';
+  if (normalizedActorId.startsWith('passkey:')) return 'human_passkey';
+  if (normalizedActorId.includes('ce-cc') || normalizedActorId.includes('contextengine-cc')) return 'ce_cc';
+  return 'agent';
+}
+
+function normalizeActivityResourceRef(value, prefix = 'resource') {
+  const candidate = String(value || '').replace(/\s+/g, ' ').trim();
+  if (/^0x[0-9a-fA-F]{64}$/.test(candidate)) {
+    return `${prefix}:${candidate.slice(0, 10)}...${candidate.slice(-6)}`;
+  }
+  const raw = safeActivityString(candidate, { max: 256 });
+  if (!raw) return '';
+  return raw.slice(0, 160);
+}
+
+function normalizeActivityEventType(value) {
+  return safeActivityString(value || 'activity_recorded', { max: 96, lower: true })
+    .replace(/[^a-z0-9._:-]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'activity_recorded';
+}
+
+function normalizeActivitySummary(value, fallback = 'Activity recorded.') {
+  const normalized = safeActivityString(value, { max: 240 });
+  return normalized || fallback;
+}
+
+export function normalizeCeActivityEvent(event = {}) {
+  const accountId = safeActivityString(
+    event.accountId || event.accountPrincipalId || event.principalId || event.subjectAddress || 'unknown',
+    { max: 160 },
+  ) || 'unknown';
+  const subjectAddress = safeActivityString(event.subjectAddress, { max: 128 });
+  const session = safeActivityString(event.session, { max: 128 });
+  const actorId = safeActivityString(event.actorId || event.subject || event.agentId || 'context-engine-agent', {
+    max: 160,
+  }) || 'context-engine-agent';
+  const actorType = inferActivityActorType(event.actorType, actorId);
+  const eventType = normalizeActivityEventType(event.eventType);
+  const requestId = safeActivityString(event.requestId, { max: 128 });
+  const grantId = safeActivityString(event.grantId, { max: 128 });
+  const resourceRef = normalizeActivityResourceRef(event.resourceRef);
+  const createdAt = normalizeActivityDate(event.createdAt);
+  const eventId = safeActivityString(event.eventId, { max: 128 }) || `ce_activity_${stableActivityHash(JSON.stringify({
+    accountId,
+    subjectAddress,
+    session,
+    actorType,
+    actorId,
+    eventType,
+    requestId,
+    grantId,
+    resourceRef,
+    createdAt,
+  }))}`;
+  const safeSummary = normalizeActivitySummary(event.safeSummary);
+
+  return {
+    eventId,
+    accountId,
+    ...(subjectAddress ? { subjectAddress } : {}),
+    ...(session ? { session } : {}),
+    actorType,
+    actorId,
+    eventType,
+    ...(requestId ? { requestId } : {}),
+    ...(grantId ? { grantId } : {}),
+    ...(resourceRef ? { resourceRef } : {}),
+    safeSummary,
+    createdAt,
+  };
+}
+
+function summarizeRequestActivityText(summary = {}) {
+  const status = safeActivityString(summary.status || 'pending_approval', { max: 64 }).replace(/_/g, ' ');
+  const session = safeActivityString(summary.session, { max: 128 });
+  const questionCount = Array.isArray(summary.questionIds) ? summary.questionIds.length : 0;
+  const questionText = questionCount > 0 ? ` (${questionCount} question${questionCount === 1 ? '' : 's'})` : '';
+  return `Agent request ${status}${session ? ` for ${session}` : ''}${questionText}.`;
+}
+
+export function summarizeAgentRequestActivityEvent(request = {}, { accountId = '', actorType = '', actorId = '' } = {}) {
+  const summary = summarizeRequestForAgent(request);
+  const normalizedAccountId = safeActivityString(accountId || summary.requester || request.humanPrincipal || 'unknown', {
+    max: 160,
+  }) || 'unknown';
+  const normalizedActorId = safeActivityString(
+    actorId || request.agentId || request.subject || request.source || 'agent',
+    { max: 160 },
+  ) || 'agent';
+  return normalizeCeActivityEvent({
+    accountId: normalizedAccountId,
+    subjectAddress: summary.requester || request.humanPrincipal || '',
+    session: summary.session,
+    actorType: actorType || inferActivityActorType('', normalizedActorId),
+    actorId: normalizedActorId,
+    eventType: `${summary.type || 'agent_request'}.${summary.status || 'pending_approval'}`,
+    requestId: summary.requestId,
+    grantId: request.grantId,
+    resourceRef: summary.requestId,
+    safeSummary: summarizeRequestActivityText(summary),
+    createdAt: summary.updatedAt || summary.createdAt || request.expiresAt,
+  });
+}
+
+export function summarizePendingResponseActivityEvent(response = {}, { accountId = '', session = '' } = {}) {
+  const summary = summarizePendingResponseForAgent(response, { session });
+  const source = safeActivityString(summary.source || response.source || 'contextengine-cc', { max: 160 });
+  const eventType = summary.submitted ? 'response_draft.submitted' : 'response_draft.saved';
+  return normalizeCeActivityEvent({
+    accountId: accountId || summary.respondent || 'unknown',
+    subjectAddress: summary.respondent,
+    session: summary.session,
+    actorType: inferActivityActorType('', source),
+    actorId: source || 'contextengine-cc',
+    eventType,
+    resourceRef: normalizeActivityResourceRef(summary.questionId, 'question'),
+    safeSummary: `Draft response ${summary.submitted ? 'submitted' : 'saved'} for ${summary.session || 'session'}.`,
+    createdAt: summary.submittedAt || summary.timestamp,
+  });
+}
+
+function summarizeBridgeActivityText(event = {}) {
+  const eventType = normalizeActivityEventType(event.eventType).replace(/_/g, ' ');
+  const session = safeActivityString(event.scope?.session || event.session, { max: 128 });
+  return `Agent activity ${eventType}${session ? ` for ${session}` : ''}.`;
+}
+
+export function summarizeAgentBridgeActivityEvent(event = {}, { accountId = '' } = {}) {
+  const scope = event.scope || {};
+  const integrationPrincipal = scope.integrationPrincipal || {};
+  const agentPrincipal = scope.agentPrincipal || {};
+  const summary = event.summary && typeof event.summary === 'object' ? event.summary : {};
+  const actorPrincipal = integrationPrincipal.principalId && integrationPrincipal.principalId !== 'integration:unknown'
+    ? integrationPrincipal
+    : agentPrincipal;
+  const actorId = safeActivityString(actorPrincipal.principalId || agentPrincipal.principalId || 'agent', { max: 160 });
+  const actorType = inferActivityActorType(actorPrincipal.principalKind, actorId);
+  const requestId = safeActivityString(summary.requestId || event.actionRecordId, { max: 128 });
+
+  return normalizeCeActivityEvent({
+    eventId: event.eventId,
+    accountId: accountId || scope.accountPrincipal?.principalId || summary.accountId || 'unknown',
+    subjectAddress: summary.accountAddress || '',
+    session: scope.session || event.session,
+    actorType,
+    actorId,
+    eventType: event.eventType || 'agent_bridge_event',
+    requestId: requestId.startsWith('agent_req_') ? requestId : '',
+    grantId: scope.grantId || summary.grantId || '',
+    resourceRef: summary.accountId || event.refs?.payloadRef?.refId || event.actionRecordId,
+    safeSummary: summarizeBridgeActivityText(event),
+    createdAt: event.createdAt,
+  });
+}
+
+export function summarizeCeActivityEventCounts(events = []) {
+  const counts = {};
+  for (const event of Array.isArray(events) ? events : []) {
+    const eventType = normalizeActivityEventType(event?.eventType);
+    counts[eventType] = (counts[eventType] || 0) + 1;
+  }
+  return counts;
+}
+
+export function sortCeActivityEvents(events = []) {
+  return [...(Array.isArray(events) ? events : [])].sort((a, b) => {
+    const bTime = Date.parse(b?.createdAt || CE_ACTIVITY_EPOCH);
+    const aTime = Date.parse(a?.createdAt || CE_ACTIVITY_EPOCH);
+    if (Number.isFinite(bTime) && Number.isFinite(aTime) && bTime !== aTime) return bTime - aTime;
+    return String(b?.eventId || '').localeCompare(String(a?.eventId || ''));
+  });
 }

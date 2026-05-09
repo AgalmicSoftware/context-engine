@@ -514,6 +514,10 @@ test('agent question and draft routes validate payloads and expose local drafts'
   assert.equal(inbox.status, 200);
   assert.equal(inbox.payload.pendingResponses.length, 1);
   assert.equal(inbox.payload.inbox[0].type, 'response_draft');
+  assert.equal(inbox.payload.activityCount, 1);
+  assert.equal(inbox.payload.activity[0].eventType, 'response_draft.saved');
+  assert.equal(inbox.payload.activity[0].safeSummary, 'Draft response saved for alpha.');
+  assert.equal(JSON.stringify(inbox.payload.activity).includes('Use the canonical HTTP contract.'), false);
 });
 
 test('agent response routes require explicit public session slugs', async (t) => {
@@ -843,6 +847,16 @@ test('agent submit-request creates approval records and idempotent retries', asy
   assert.equal(inbox.status, 200);
   assert.equal(inbox.payload.requests.length, 1);
   assert.equal(inbox.payload.requests[0].requestId, first.payload.requestId);
+  assert.equal(
+    inbox.payload.activity.some((event) => (
+      event.requestId === first.payload.requestId
+      && event.eventType === 'response_submit_request.pending_approval'
+      && event.safeSummary === 'Agent request pending approval for alpha (1 question).'
+    )),
+    true,
+  );
+  assert.equal(JSON.stringify(inbox.payload.activity).includes('must-redact'), false);
+  assert.equal(JSON.stringify(inbox.payload.activity).includes('long-lived-token'), false);
 
   const betaRequest = await callRoute(handleRoute, {
     path: '/api/agent/responses/submit-request',
@@ -1247,6 +1261,26 @@ test('agent managed account routes create metadata and approval-only link reques
   assert.equal(replay.status, 202);
   assert.equal(replay.payload.idempotent, true);
   assert.equal(replay.payload.request.requestId, linkRequest.payload.request.requestId);
+
+  const inbox = await callRoute(handleRoute, { path: '/api/agent/inbox?session=alpha' });
+  assert.equal(inbox.status, 200);
+  assert.equal(
+    inbox.payload.activity.some((event) => (
+      event.eventType === 'account_created'
+      && event.actorType === 'telegram'
+      && event.resourceRef === created.payload.account.accountId
+    )),
+    true,
+  );
+  assert.equal(
+    inbox.payload.activity.some((event) => (
+      event.eventType === 'account_link_request.pending_approval'
+      && event.requestId === linkRequest.payload.request.requestId
+    )),
+    true,
+  );
+  assert.equal(JSON.stringify(inbox.payload.activity).includes('must-redact'), false);
+  assert.equal(JSON.stringify(inbox.payload.activity).includes(`0x${'99'.repeat(32)}`), false);
 });
 
 test('agent delegated response execution validates grant scope and writes a contract-only audit record', async (t) => {
