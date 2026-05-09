@@ -81,82 +81,14 @@ Preferred worker sources:
 
 The Worker source keeps runtime wiring explicit so route logic can be tested without Cloudflare bindings or live secrets:
 
-- `worker.js` creates the runtime through `createWorkerRuntimeDepsWithWorkerDeps`.
-- `workerRuntimeDepResolution.js` resolves imported helpers and worker-local primitives into one canonical dependency record.
-- `workerRuntimeInputBinding.js` splits that record into low-level helpers and route runtime input.
-- `workerRouteRuntimeBinding.js` assembles named route groups: registry/login bootstrap, rate-limit/faucet support, anonymous registry access, auth/CORS/admin adapters, execution services, and the route shell.
-
-The route-shell bundle is intentionally still a large boundary object because it is where authenticated, anonymous, admin, AI, Arweave, storage, fetch, and faucet routes meet. Keep behavior changes inside the smaller route/execution modules when possible, and update the binding tests when the boundary adds or removes a dependency.
-
-## Native wizard flow (/new + Cloudflare deploy button)
-
-For the default `Fast & Cheap (Cloudflare)` preset:
-
-1. Context Engine shows the exact session slug, public passkey-derived admin
-   address, and two independently generated Worker runtime secrets.
-2. The deploy link opens Cloudflare with an immutable 40-character Git commit
-   and the isolated `deploy/cloudflare/session-worker/` package. Cloudflare
-   provisions the Worker, KV namespace, and Durable Object in the user's own
-   account.
-3. The user copies all four displayed values into Cloudflare, including the two
-   runtime secrets in Cloudflare's encrypted secret fields, deploys, and
-   returns the resulting `workers.dev` URL to the wizard.
-4. The wizard verifies reachability, browser-origin/CORS access, and canonical
-   config identity/readback before it accepts the Worker and performs the
-   signed initial session configuration write. No Cloudflare credential
-   crosses a Context Engine-operated origin.
-
-The initial and signed follow-up config writes use the selected capability
-profile as an allowlist. Pure Worker-canonical sessions keep generic session
-defaults (`defaultTags`, `defaultGroupTags`, `questionsGenPrompt`, and
-`defaultFilterState`) and may set `sessionEndsAt`, but reject `blockLimits`,
-faucet/registry fields, and contract maps. A Worker profile that explicitly
-uses on-chain SBT authorization may additionally persist its network and only
-the `sbtFactory` contract; it does not inherit Surveys or Session Registry
-controls. Registry-canonical deployments preserve their existing chain fields.
-
-This is a manual dashboard handoff, not browser OAuth, an automatic callback,
-or a one-click deployment. Keep the wizard tab open while completing the
-Cloudflare steps.
-
-The generated runtime secrets are `TOKEN_HMAC_SECRET` and
-`CE_STORAGE_ENVELOPE_KEK`. They secure the deployed app runtime; they do not
-grant Cloudflare account access. The Worker is deployed with
-`DEPLOY_HELPER_ENABLED=0`.
-
-## Legacy wizard flow (/new + deploy-helper fallback)
-
-For the default `Fast & Cheap (Cloudflare)` preset:
-
-### API token setup and handling
-
-The legacy deploy-helper fallback uses a short-lived Cloudflare API token. Keep
-the following constraints in mind before creating or pasting one:
-
-- Cloudflare may preselect **All accounts**. Before creating the token, restrict
-  **Account Resources** to the one account where this Worker will run.
-- Context Engine infers the account during deployment only when the token can
-  see exactly one account.
-- The browser sends the token only for the current deployment attempt to the
-  deploy helper at `https://ce-deploy-helper.agalmic.workers.dev/`. The helper
-  uses it to call Cloudflare. The token is not saved to the session draft or
-  browser storage, and it is not installed in the deployed Session Worker.
-- Set the earliest expiration Cloudflare permits that still covers setup and an
-  immediate retry. Revoke the token as soon as deployment succeeds or you
-  abandon the attempt from
-  [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens).
-
-1. Fill in the Cloudflare API token and one key for the selected AI provider.
-   - The "Create prefilled API token" link opens a Cloudflare token template with the required
-     `Workers Scripts: Edit` and `Workers KV Storage: Edit` permissions used by the default
-     deploy-helper path. The helper's workers.dev subdomain calls are also covered by
-     `Workers Scripts: Edit`.
-   - The first onboarding requirements banner uses the same prefilled link. Cloudflare only
-     pre-fills the form: create the token, copy its generated value, and paste it into the
-     password field in the Worker step.
+1) Fill in the Cloudflare API token and worker name.
+   - The "Create API token" link opens a prefilled Cloudflare token template with the required
+     Workers KV, Workers Scripts, R2, D1, and Durable Objects permissions used by the deploy-helper.
+     `Account Settings: Edit` is needed only when the helper must create or change the
+     account-level workers.dev subdomain.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
-     Add `--include-r2-storage` only for an advanced deployment that manages an existing R2 bucket;
-     the flag does not create the bucket.
+     Add `--include-workers-dev-subdomain-setup` only when the account does not already have a
+     workers.dev subdomain or when intentionally changing it.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
    - The first-party wizard no longer asks for Cloudflare account ID; the deploy-helper resolves it from the API token.
 2) Fill worker secrets in the wizard (OpenAI key, Arweave JWK, RPC URL, Anthropic key only if any selected AI model uses Anthropic, and optional OpenRouter key) and then click "Deploy worker".
@@ -1625,8 +1557,9 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   and any later non-success remains pending. The helper returns/replays success
   only after the terminal receipt commits and the rejection marker is removed.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
-  when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
-  script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
+  when none exists yet (falls back to a deterministic `ce-<accountId>` name). This is the only
+  deploy-helper path that needs `Account Settings: Edit`; script-level Workers.dev enablement uses
+  the Workers script scope.
 - `allowOrigins` entries are normalized to origins (`https://host`, `http://localhost:3000`), and the
   helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard default seed list includes the hosted app plus local dev/E2E origins for ports `3000`, `3001`, and `7391`.
 - `/new` uses the native Cloudflare dashboard handoff by default. The project

@@ -185,7 +185,7 @@ You need:
 - An API token with Workers-related permissions. The wizard expects the same scope used by the deploy-helper flow described in [session-cors-worker.md](session-cors-worker.md).
 - Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/reference/template/>
 
-In practice, the deploy flow needs least-privilege permission to manage Workers scripts, Workers KV, R2 buckets/objects for CE payload blobs, D1 or KV metadata/index resources where configured, Durable Objects only for signer/runtime coordination, and the account-level settings needed to enable a `workers.dev` subdomain. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
+In practice, the deploy flow needs least-privilege permission to manage Workers scripts, Workers KV, R2 buckets/objects for CE payload blobs, D1 or KV metadata/index resources where configured, and Durable Objects only for signer/runtime coordination. `Account Settings: Edit` is needed only if the helper must create or change the account-level `workers.dev` subdomain; omit it when the account already has a workers.dev subdomain and the helper only enables a script URL. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
 
 ### 3. OP Sepolia ETH
 
@@ -456,13 +456,7 @@ Common combinations:
 What happens during deploy:
 
 - The deploy-helper calls Cloudflare’s Workers API
-- For every first-party publish, it creates an isolated physical worker name by
-  deriving a deterministic suffix from the publish generation's stable
-  `deploymentRequestId`. A retry after a lost or gateway-shaped response reuses
-  that ID and resumes or replays the same physical deployment instead of
-  allocating another worker. Starting an explicit new generation produces a
-  new deterministic identity; only legacy requests without an ID receive a
-  random suffix.
+- It creates or updates the worker
 - It fetches the account `workers.dev` subdomain and creates/changes it only when explicitly needed
 - It returns the final worker URL
 - The wizard auto-fills `corsWorkerUrl`

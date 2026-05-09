@@ -8,14 +8,16 @@ const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
   { key: 'workers_r2_storage', type: 'edit' },
   { key: 'd1', type: 'edit' },
   { key: 'workers_durable_objects', type: 'edit' },
-  { key: 'account_settings', type: 'edit' },
 ]);
+
+const CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION = Object.freeze({ key: 'account_settings', type: 'edit' });
 
 const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
   r2: 'CE payload blobs for session context, docs, media, questions, surveys, and responses',
   d1: 'metadata and index records where queryable storage indexes are modeled',
   kv: 'metadata indexes, short-lived action IDs, webhook replay cache, and ephemeral start params',
   durableObjects: 'signer/runtime coordination only, not ordinary payload blob storage',
+  accountSettings: 'Only needed when creating or changing the account-level workers.dev subdomain',
 });
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -44,28 +46,12 @@ const hashTokenNameSlug = (value) => {
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
 
-const compactTokenNameSlug = (slug, maxLength) => {
-  if (slug.length <= maxLength) return slug;
-  const hash = hashTokenNameSlug(slug);
-  const visibleLength = Math.max(0, maxLength - hash.length - 1);
-  return `${slug.slice(0, visibleLength)}-${hash}`.slice(0, maxLength);
-};
-
-const buildTokenName = (slug) => {
-  const safeSlug = toStr(slug).trim() || 'general';
-  const timestamp = formatTokenTimestamp();
-  // Cloudflare caps user-token names at 120 characters; keep a hash when a valid long session slug must be shortened.
-  const maxSlugLength = CLOUDFLARE_TOKEN_NAME_MAX_LENGTH - CLOUDFLARE_TOKEN_NAME_PREFIX.length - timestamp.length - 1;
-  const tokenSlug = compactTokenNameSlug(safeSlug, maxSlugLength);
-  return `${CLOUDFLARE_TOKEN_NAME_PREFIX}${tokenSlug}-${timestamp}`;
-};
-
 const buildCloudflareTokenTemplatePermissions = ({
-  includeR2Storage = false,
+  includeWorkersDevSubdomainSetup = false,
 } = {}) => {
-  const permissions = [...CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS];
-  if (includeR2Storage === true) {
-    permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_R2_PERMISSIONS);
+  const permissions = [...CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS];
+  if (includeWorkersDevSubdomainSetup === true) {
+    permissions.push(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION);
   }
   return permissions;
 };
@@ -73,11 +59,11 @@ const buildCloudflareTokenTemplatePermissions = ({
 const buildCloudflareTokenTemplateUrl = ({
   accountId,
   slug,
-  includeR2Storage = false,
+  includeWorkersDevSubdomainSetup = false,
 } = {}) => {
   const params = new URLSearchParams();
   params.set('permissionGroupKeys', JSON.stringify(buildCloudflareTokenTemplatePermissions({
-    includeR2Storage,
+    includeWorkersDevSubdomainSetup,
   })));
   params.set('accountId', toStr(accountId).trim() || '*');
   params.set('zoneId', 'all');
@@ -99,7 +85,7 @@ const parseArgs = (argv = process.argv.slice(2)) => {
       flags.help = true;
       continue;
     }
-    if (key === 'include-r2-storage') {
+    if (key === 'include-workers-dev-subdomain-setup') {
       flags[key] = true;
       continue;
     }
@@ -118,17 +104,19 @@ const printUsage = () => {
     'Usage:',
     '  npm run -s cloudflare:token-link -- --slug my-session',
     '  npm run -s cloudflare:token-link -- --slug my-session --account-id <cloudflare-account-id>',
-    '  npm run -s cloudflare:token-link -- --slug my-session --include-r2-storage',
+    '  npm run -s cloudflare:token-link -- --slug my-session --include-workers-dev-subdomain-setup',
     '',
     'Flags:',
     '  --slug <slug>            Session slug used in the token name',
     '  --account-id <id|*>      Optional Cloudflare account ID (defaults to *)',
-    '  --include-r2-storage     Add R2: Edit for an advanced deployment that manages an existing R2 bucket',
+    '  --include-workers-dev-subdomain-setup',
+    '                           Add Account Settings: Edit when the helper must create/change the account-level workers.dev subdomain',
     '  --help                   Show this help text',
     '',
     'Output:',
     '  Prints the same prefilled Cloudflare API token template URL used by the wizard UX.',
-    '  Scope covers Workers, KV, R2, D1, Durable Objects, and account settings only.',
+    '  Scope covers Workers, KV, R2, D1, and Durable Objects by default.',
+    '  Account Settings: Edit is added only with --include-workers-dev-subdomain-setup.',
   ].join('\n'));
 };
 
@@ -142,7 +130,7 @@ function main() {
   console.log(buildCloudflareTokenTemplateUrl({
     accountId: flags['account-id'] || '',
     slug: flags.slug || '',
-    includeR2Storage: flags['include-r2-storage'] === true,
+    includeWorkersDevSubdomainSetup: flags['include-workers-dev-subdomain-setup'] === true,
   }));
 }
 
@@ -157,7 +145,9 @@ if (require.main === module) {
 
 module.exports = {
   CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
+  CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION,
   CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
+  buildCloudflareTokenTemplatePermissions,
   buildCloudflareTokenTemplateUrl,
   buildTokenName,
   formatTokenTimestamp,
