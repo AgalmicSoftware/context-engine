@@ -67,13 +67,18 @@
     through Cloudflare, kept the existing Telegram webhook, verified `/health`,
     and live preview POST returned the fixed question-picker response for
     `/ce_pose_question`.
+  - Session listing/join wiring now uses the real OP Sepolia `SessionRegistry`
+    when `AGENT_BRIDGE_SESSION_POLICY_JSON` is not configured. The Worker reads
+    registry slugs over `DEFAULT_RPC_URL` first and optional `ADDITIONAL_RPC_URL`
+    second, preserving the additional Infura-style URL as a fallback instead of
+    replacing the public default.
   - Still mocked/contract-only before live smoke: `/telegram-demo-setup` does
     not itself deploy or set webhook, `deploy:plan` does not create Cloudflare
-    resources, live `deploy:apply` is not run by tests, demo questions/docs are
-    fixture-backed unless canonical `/api/agent/*` session routes are wired for
-    that call, OpenClaw/MCP forwarding sends no real external transport,
-    broadcast remains disabled, and Cloudflare `lit_encrypted` envelope
-    producer/reader work is later storage hardening.
+    resources, live `deploy:apply` is not run by tests, demo questions/docs
+    remain fixture-backed until a reachable canonical `/api/agent/*` service is
+    deployed for the bridge, OpenClaw/MCP forwarding sends no real external
+    transport, broadcast remains disabled, and Cloudflare `lit_encrypted`
+    envelope producer/reader work is later storage hardening.
 
 ## Next Queue Head
 
@@ -85,10 +90,11 @@
 2. Use `/mock/telegram/preview` as the fast local/browser lane for copy,
    callback keyboard, and Mini App handoff iteration before pushing new webhook
    behavior live.
-3. After the transport smoke, replace fixture-backed Telegram question/doc/session
-   reads with canonical `/api/agent/*` calls where the contract is ready, then
-   continue setup UX convergence so `/telegram-demo-setup` can invoke the same
-   apply path without exposing Cloudflare/Wrangler details.
+3. After the transport smoke, replace fixture-backed Telegram question/doc reads
+   with canonical `/api/agent/*` calls once a reachable agent API base exists for
+   the deployed bridge, then continue setup UX convergence so
+   `/telegram-demo-setup` can invoke the same apply path without exposing
+   Cloudflare/Wrangler details.
 4. Later storage hardening: implement the Cloudflare `lit_encrypted` envelope
    producer/reader path for docs/context, private questions, private responses,
    surveys, and generated artifacts without routing those payloads through
