@@ -56,22 +56,6 @@ describe('cloudflareTokenTemplate', () => {
       { key: 'workers_r2', type: 'edit' },
       { key: 'd1', type: 'edit' },
       { key: 'workers_durable_objects', type: 'edit' },
-    ]);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(5);
-  });
-
-  test('adds Account Settings only for workers.dev subdomain setup', () => {
-    const url = new URL(buildCloudflareTokenTemplateUrl({
-      slug: 'alpha-session',
-      includeWorkersDevSubdomainSetup: true,
-    }));
-
-    expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
-      { key: 'workers_scripts', type: 'edit' },
-      { key: 'workers_kv_storage', type: 'edit' },
-      { key: 'workers_r2_storage', type: 'edit' },
-      { key: 'd1', type: 'edit' },
-      { key: 'workers_durable_objects', type: 'edit' },
       { key: 'account_settings', type: 'edit' },
     ]);
     expect(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION).toEqual({ key: 'account_settings', type: 'edit' });
