@@ -14,7 +14,7 @@ Primary docs:
 
 ---
 
-## Current CE Chipotle plan (2026-04-29)
+## Current CE Chipotle plan (2026-05-09)
 
 - Context Engine cannot preserve its old browser-native Naga auth-context / ACC flow as-is on Chipotle.
 - The current migration direction is therefore **worker-mediated Chipotle execution**:
@@ -25,6 +25,12 @@ Primary docs:
   - worker env fallback: `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY` when self-hosts prefer a usage-only env key)
   - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`
   - per-session worker config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }`
+- Runtime security contract:
+  - `op: "encrypt"` wraps a CEK for the configured audience but does not require the author to hold the target SBT
+  - `op: "check"` and `op: "decrypt"` still require the requester to satisfy the SBT gate
+  - Chipotle wrapped keys are v2 JSON payloads containing `{ v: 2, cekHex, policyFingerprint, policy }`; the action returns the CEK only when the embedded policy fingerprint matches the worker-approved policy
+  - legacy v1 / bare-hex Chipotle wrapped keys are rejected by default and should be recreated, not migrated in-place
+  - check/decrypt RPC selection is a worker trust decision: request `rpcUrl` / `customRpcUrl` is rejected unless it exactly matches a worker-approved URL, the action verifies `provider.getNetwork().chainId`, and stored Chipotle metadata does not carry RPC URLs
 - These fields are intentionally treated differently:
   - `litUsageApiKey` is a secret
   - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but still operational metadata and should stay in worker config rather than public session metadata by default
@@ -44,6 +50,11 @@ Primary docs:
     - `lit-chipotle-status`
     - `lit-chipotle-provision`
     - `lit-chipotle-bootstrap-session`
+- Re-provisioning note: any edit to the default CE Lit Action source changes the
+  derived `litActionCid`. Chipotle-enabled sessions must re-run
+  `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` before live
+  v2 wrapped-key encrypt/decrypt is expected to work. CE intentionally does not
+  fall back to older insecure action CIDs.
 - Current default CE architecture direction:
   - create one new Lit account per session
   - create one default group inside that account
