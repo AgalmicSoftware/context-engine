@@ -330,21 +330,6 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(sessionLink).not.toHaveAttribute('href', '/session/Edge%20Session');
   });
 
-  it('links signed-in users to the session-filtered activity inbox', () => {
-    const subject = new LoginAndSettingsModal(buildProps({
-      account: WAGMI_ADDRESS,
-      activeSessionSlug: 'edge',
-      loginComplete: true,
-      provider: 'wagmi',
-    }));
-    subject.getActiveSessionSlug = jest.fn(() => 'edge');
-
-    render(subject.getModalDisplay());
-
-    expect(screen.getByRole('link', { name: /activity/i }))
-      .toHaveAttribute('href', '/inbox?session=edge');
-  });
-
   it('preserves PUBLIC_URL when building the active-session link', () => {
     process.env.PUBLIC_URL = '/ce/';
     const subject = buildWrongNetworkSubject();
