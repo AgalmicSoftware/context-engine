@@ -191,6 +191,29 @@ function allowAdHocQuestions(env = {}) {
     || questionSourceMode(env) === 'fixture';
 }
 
+function questionLoadIssueText(result = {}) {
+  const reason = safeString(result.reason);
+  if (reason === 'question_scan_window_unscoped') {
+    return 'Question source needs session block limits before it can be shown here.';
+  }
+  if (reason === 'question_rpc_url_missing') {
+    return 'Question source is missing RPC config.';
+  }
+  if (reason === 'surveys_address_missing') {
+    return 'Question source is missing Surveys contract config.';
+  }
+  if (reason === 'question_log_scan_failed' || reason === 'question_log_scan_partial_failed') {
+    return 'Question source is unavailable. Try again shortly.';
+  }
+  if (reason === 'question_payload_load_failed') {
+    return 'Question payloads could not be loaded. Try again shortly.';
+  }
+  if (reason === 'question_current_block_failed') {
+    return 'Question source could not read the latest block. Try again shortly.';
+  }
+  return 'Questions could not be loaded. Try again shortly.';
+}
+
 async function loadQuestionsForSession(env = {}, sessionSlug = '') {
   const mode = questionSourceMode(env);
   if (mode === 'fixture') {
@@ -552,7 +575,7 @@ async function buildSessionsResponse({ normalized, command, env, createdAt }) {
   return reply({
     chatId: normalized.chat.chatId,
     text: [
-      'Linked sessions:',
+      'Available sessions:',
       ...sessions.map((session) => `- ${session.sessionSlug} (${sessionLabel(session)})`),
       '',
       'Use /ce_join <session> to switch sessions.',
@@ -745,17 +768,20 @@ async function buildQuestionsResponse({
     questions,
     createdAt,
   });
+  const loadFailed = loadedQuestions.ok === false;
   const rows = [];
-  for (const [index, question] of questions.entries()) {
-    rows.push([await makeCallbackButton({
-      env,
-      label: `Pose ${index + 1}`,
-      action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
-      lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
-      serverContextRef: { sessionSlug: resolved.session.sessionSlug, questionId: questionId(question) },
-      seed: `questions|pose|${resolved.session.sessionSlug}|${questionId(question)}|${normalized.updateId}`,
-      createdAt,
-    })]);
+  if (!loadFailed) {
+    for (const [index, question] of questions.entries()) {
+      rows.push([await makeCallbackButton({
+        env,
+        label: `Pose ${index + 1}`,
+        action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
+        lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+        serverContextRef: { sessionSlug: resolved.session.sessionSlug, questionId: questionId(question) },
+        seed: `questions|pose|${resolved.session.sessionSlug}|${questionId(question)}|${normalized.updateId}`,
+        createdAt,
+      })]);
+    }
   }
   return reply({
     method,
@@ -764,13 +790,17 @@ async function buildQuestionsResponse({
     text: [
       ...(safeString(introText) ? [safeString(introText), ''] : []),
       `Questions for ${resolved.session.sessionSlug}:`,
-      ...(state.questions.length
+      ...(loadFailed
+        ? [questionLoadIssueText(loadedQuestions)]
+        : (state.questions.length
         ? state.questions.map((question) => `${question.displayIndex}. ${shortQuestionId(question.questionId)} - ${question.title}`)
-        : ['No public questions are available yet.']),
+        : ['No public questions are available yet.'])),
       '',
-      state.questions.length
+      loadFailed
+        ? 'Run /ce_questions again after the source is fixed.'
+        : (state.questions.length
         ? 'Tap Pose, or send /q <number>.'
-        : 'Create questions in the CE client, then run /ce_questions again.',
+        : 'Create questions in the CE client, then run /ce_questions again.'),
     ].join('\n'),
     replyMarkup: rows.length ? { inline_keyboard: rows } : null,
     screen: state.screen,

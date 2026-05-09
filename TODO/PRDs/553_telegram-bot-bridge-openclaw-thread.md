@@ -87,6 +87,11 @@
     questions in live mode. Fixture questions are still available with
     `AGENT_BRIDGE_QUESTION_SOURCE=fixture` or the explicit fallback mode for
     preview/copy work.
+  - The Telegram question cache now fails closed for ambiguous live reads: failed
+    RPC/log/payload reads are surfaced as question-source errors and are not
+    cached as empty lists; question scans require metadata `blockLimits.start` or
+    explicit scan bounds unless `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1` is
+    set for a debug-only recent-block scan.
   - Bot copy was shortened for live use: group/session replies no longer explain
     Telegram/Worker internals, account addresses are abbreviated in chat, and
     private/gated content messaging routes users back to Context Engine.
@@ -105,7 +110,8 @@
    `/q <number-or-id>`, `/ce_docs`, and private `/ce_me`. Confirm
    replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs,
    callback buttons stop loading, `Pose Question` opens the picker, and live
-   questions match questions created in the CE client.
+   questions match questions created in the CE client, and missing block bounds
+   show the scoped-source error instead of cross-session fallback results.
 2. Use `/mock/telegram/preview` as the fast local/browser lane for copy,
    callback keyboard, and Mini App handoff iteration before pushing new webhook
    behavior live.

@@ -27,10 +27,12 @@ BROADCAST_ENABLED=false
 # AGENT_BRIDGE_QUESTION_SOURCE=fixture
 # AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS=300
 # AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION=20
-# Optional scan bounds for faster live question discovery when session metadata
-# does not include blockLimits.
+# Live question scans require session metadata blockLimits or explicit bounds.
+# This prevents cross-session question mixing on shared Surveys contracts.
 # AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK=0
 # AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK=
+# Emergency/debug only: allows recent-block fallback when no scoped bounds exist.
+# AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1
 # AGENT_BRIDGE_SESSION_POLICY_JSON={"defaultSessionSlug":"general","sessions":[{"sessionSlug":"general","sessionName":"General","telegramBridgeEnabled":true}]}
 # AGENT_BRIDGE_DEMO_QUESTIONS_JSON=[{"questionId":"q-readiness","questionType":"freeform","prompt":"What should this group decide next?"}]
 # AGENT_BRIDGE_DEMO_DOCS_JSON=[{"docId":"doc-public","sessionSlug":"general","title":"Public notes","fileType":"md","visibility":"public","contentPreview":"Public summary only"}]
