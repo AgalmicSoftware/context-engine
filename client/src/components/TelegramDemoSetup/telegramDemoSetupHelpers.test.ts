@@ -47,18 +47,29 @@ describe('telegramDemoSetupHelpers', () => {
   });
 
   it('validates required Cloudflare token scopes and optional workers.dev setup scope', () => {
-    const permissions = [
+    const smokePermissions = [
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
-      { key: 'workers_r2_storage', type: 'edit' },
-      { key: 'd1', type: 'edit' },
       { key: 'workers_durable_objects', type: 'edit' },
     ];
+    const docStoragePermissions = [
+      ...smokePermissions,
+      { key: 'workers_r2', type: 'edit' },
+      { key: 'd1', type: 'edit' },
+    ];
 
-    expect(validateAgentBridgeTokenScopes({ permissions }).ok).toBe(true);
+    expect(validateAgentBridgeTokenScopes({ permissions: smokePermissions }).ok).toBe(true);
+    expect(validateAgentBridgeTokenScopes({
+      permissions: smokePermissions,
+      includeDocStorage: true,
+    }).ok).toBe(false);
+    expect(validateAgentBridgeTokenScopes({
+      permissions: docStoragePermissions,
+      includeDocStorage: true,
+    }).ok).toBe(true);
 
     const withSubdomainSetup = validateAgentBridgeTokenScopes({
-      permissions,
+      permissions: smokePermissions,
       includeWorkersDevSubdomainSetup: true,
     });
     expect(withSubdomainSetup.ok).toBe(false);
@@ -147,5 +158,10 @@ describe('telegramDemoSetupHelpers', () => {
 
     expect(url.searchParams.get('accountId')).toBe('*');
     expect(url.searchParams.get('name')).toBe('contextEngine-agentBridgeWorker-alpha-202605081234');
+    expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
+      { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+      { key: 'workers_durable_objects', type: 'edit' },
+    ]);
   });
 });

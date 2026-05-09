@@ -5,12 +5,24 @@ type CloudflareTokenPermission = {
   type: string;
 };
 
-export const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
+export const CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS = Object.freeze([
   { key: 'workers_scripts', type: 'edit' },
   { key: 'workers_kv_storage', type: 'edit' },
-  { key: 'workers_r2_storage', type: 'edit' },
+]);
+
+export const CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS = Object.freeze([
+  { key: 'workers_r2', type: 'edit' },
   { key: 'd1', type: 'edit' },
+]);
+
+export const CLOUDFLARE_TOKEN_TEMPLATE_RUNTIME_PERMISSIONS = Object.freeze([
   { key: 'workers_durable_objects', type: 'edit' },
+]);
+
+export const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
+  ...CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS,
+  ...CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS,
+  ...CLOUDFLARE_TOKEN_TEMPLATE_RUNTIME_PERMISSIONS,
 ]);
 
 export const CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION = Object.freeze({ key: 'account_settings', type: 'edit' });
@@ -43,10 +55,16 @@ const buildTokenName = (slug?: unknown): string => {
 
 export const buildCloudflareTokenTemplatePermissions = ({
   includeWorkersDevSubdomainSetup = false,
+  includeDocStorage = true,
 }: {
   includeWorkersDevSubdomainSetup?: boolean;
+  includeDocStorage?: boolean;
 } = {}) => {
-  const permissions: CloudflareTokenPermission[] = [...CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS];
+  const permissions: CloudflareTokenPermission[] = [...CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS];
+  if (includeDocStorage === true) {
+    permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS);
+  }
+  permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_RUNTIME_PERMISSIONS);
   if (includeWorkersDevSubdomainSetup === true) {
     permissions.push(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION);
   }
@@ -57,14 +75,17 @@ export const buildCloudflareTokenTemplateUrl = ({
   accountId,
   slug,
   includeWorkersDevSubdomainSetup = false,
+  includeDocStorage = true,
 }: {
   accountId?: unknown;
   slug?: unknown;
   includeWorkersDevSubdomainSetup?: boolean;
+  includeDocStorage?: boolean;
 } = {}): string => {
   const params = new URLSearchParams();
   params.set('permissionGroupKeys', JSON.stringify(buildCloudflareTokenTemplatePermissions({
     includeWorkersDevSubdomainSetup,
+    includeDocStorage,
   })));
   params.set('accountId', toStr(accountId).trim() || '*');
   params.set('zoneId', 'all');

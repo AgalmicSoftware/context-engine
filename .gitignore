@@ -144,6 +144,8 @@ contextEngine-cc/tmp/
 
 # Private agent bridge worker secrets, local state, dependencies, and generated artifacts.
 workers/agentBridgeWorker/.dev.vars
+workers/agentBridgeWorker/dev.vars
+workers/agentBridgeWorker/wrangler.toml
 workers/agentBridgeWorker/.wrangler/
 workers/agentBridgeWorker/.data/
 workers/agentBridgeWorker/.state/

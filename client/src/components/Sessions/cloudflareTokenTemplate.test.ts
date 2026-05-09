@@ -22,12 +22,27 @@ describe('cloudflareTokenTemplate', () => {
     expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
-      { key: 'workers_r2_storage', type: 'edit' },
+      { key: 'workers_r2', type: 'edit' },
       { key: 'd1', type: 'edit' },
       { key: 'workers_durable_objects', type: 'edit' },
     ]);
     expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(5);
   });
+
+  test('can omit R2/D1 scopes for the default Telegram smoke deploy', () => {
+    const permissions = buildCloudflareTokenTemplatePermissions({ includeDocStorage: false });
+
+    expect(permissions).toEqual([
+      { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+      { key: 'workers_durable_objects', type: 'edit' },
+    ]);
+    expect(permissions).not.toEqual(expect.arrayContaining([
+      { key: 'workers_r2', type: 'edit' },
+      { key: 'd1', type: 'edit' },
+    ]));
+  });
+
 
   test('adds Account Settings only for workers.dev subdomain setup', () => {
     const url = new URL(buildCloudflareTokenTemplateUrl({
@@ -38,7 +53,7 @@ describe('cloudflareTokenTemplate', () => {
     expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
-      { key: 'workers_r2_storage', type: 'edit' },
+      { key: 'workers_r2', type: 'edit' },
       { key: 'd1', type: 'edit' },
       { key: 'workers_durable_objects', type: 'edit' },
       { key: 'account_settings', type: 'edit' },
