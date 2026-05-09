@@ -230,37 +230,15 @@ type AiPresetConfig = {
   provider?: unknown;
   models?: Readonly<Record<string, unknown>>;
 };
-
-type ChainIdLike =
-  | {
-      id?: unknown;
-      chainId?: unknown;
-    }
-  | null
-  | undefined;
-
-type WagmiBalanceLike =
-  | {
-      data?: { value?: unknown };
-      value?: unknown;
-    }
-  | null
-  | undefined;
-
-type TestFundsRequestOptions = {
-  source?: 'manual' | 'auto';
+const buildSettingsInboxHref = (slugIn?: string) => {
+  const normalizedBasePath = toStr(readPublicUrlBasePath()).trim().replace(/\/+$/, '');
+  const slug = normalizeSettingsSessionSlug(slugIn);
+  return `${normalizedBasePath}/inbox${slug ? `?session=${encodeURIComponent(slug)}` : ''}`;
 };
-
-export { buildBookmarksRoutePath };
-const getErrorCode = (error: unknown) =>
-  error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined;
-const getErrorMessage = (error: unknown): string =>
-  error instanceof Error
-    ? error.message
-    : error && typeof error === 'object'
-      ? toStr((error as { message?: unknown }).message)
-      : toStr(error);
-const uniqueList = <T = unknown,>(values: T[] = []) =>
+const getErrorCode = (error: unknown) => (
+  error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
+);
+const uniqueList = <T = unknown>(values: T[] = []) => (
   Array.from(
     new Set((Array.isArray(values) ? values : []).filter((value): value is T => value !== undefined && value !== null)),
   );
@@ -2391,35 +2369,116 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         ? activeSessionCapabilities.chainId
         : null;
 
-    return LoginModalDisplayBody({
-      account: this.props.account,
-      activeSessionConfig,
-      activeSessionNetworkChainId,
-      activeSessionSlug,
-      handleLogout: this.handleLogout,
-      handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
-      handlePasskeyWalletSignIn: this.handlePasskeyWalletSignIn,
-      loginComplete: this.props.loginComplete,
-      loginInProgress: this.props.loginInProgress,
-      network: this.props.network,
-      openBookmarks: () => {
-        this.closeLoginModal();
-        if (typeof window !== 'undefined') {
-          window.location.href = buildBookmarksRoutePath();
-        }
-      },
-      openCryptoModal: this.openCryptoModal,
-      passkeyWalletStatusMessage: this.state.passkeyWalletStatusMessage,
-      passkeyWalletStatusTone: this.state.passkeyWalletStatusTone,
-      passkeyMode: this.state.passkeyMode,
-      provider: this.props.provider,
-      renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,
-      sessionIdentityUnavailable,
-      showAdvancedWalletAccess,
-      showTestnetOnly,
-      showWalletIdentity,
-    });
-  };
+    // Login view
+    if (!this.props.loginComplete && !this.props.loginInProgress) {
+      return (
+        <CardBody>
+          <div className={styles.accountWarningContainer}>
+            <div className={styles.accountWarningMessage}>
+              <p>
+                Account is an{" "}
+                <a href="https://ethereum.org/en/wallets/" target="_blank" rel="noopener noreferrer">Ethereum wallet</a>:
+              </p>
+              <ul>
+                <li>controlled by you</li>
+                <li>no password</li>
+                {showTestnetOnly && <li>test network only</li>}
+              </ul>
+            </div>
+
+            {/* Porto / passkey buttons */}
+             <div className={styles.passkeyButtonContainer}>
+               <Button
+                  onClick={this.handlePortoSignUp}
+                  color="primary"
+                  className={`${styles.passkeyButton} ${styles.passkeyButtonPrimary}`}
+                >
+                  <FontAwesomeIcon icon={faFingerprint} size="2x" />
+                  <span>Create  </span>
+               </Button>
+               <Button
+                  onClick={this.handlePortoSignIn}
+                  color="secondary"
+                  outline
+                  className={`${styles.passkeyButton} ${styles.passkeyButtonOutline}`}
+                >
+                  <FontAwesomeIcon icon={faFingerprint} size="2x" />
+                  <span> Login</span>
+               </Button>
+            </div>
+
+            <button
+              type="button"
+              aria-label="Open Crypto Login (RainbowKit)"
+              onClick={this.openCryptoModal}
+              className={styles.cryptoLoginLink}
+            >
+              <img src={MetaMaskLogo} alt="MetaMask" className={styles.cryptoLoginIcon} />
+            </button>
+          </div>
+        </CardBody>
+      );
+    }
+
+    if (this.props.loginInProgress) {
+      return (
+        <CardBody>
+          <div id={styles.loadingIconContainer}>
+            <h3 id={styles.verifyingText}> logging in... </h3>
+            <FontAwesomeIcon icon={faSpinner} pulse id={styles.verifyingTXloadingIcon} />
+          </div>
+        </CardBody>
+      );
+    }
+
+    // Logged-in view for all providers (Porto, Wagmi)
+    if (this.props.loginComplete) {
+       return (
+        <CardBody id={styles.accountModalCard}>
+          <div id={styles.accountModalPanel}>
+            <div className={styles.accountModalBody}>
+              {this.props.account && (
+                <div className={styles.accountModalProfileShell}>
+                  <UserPage
+                    viewAddress={this.props.account}
+                    account={this.props.account}
+                    provider={this.props.provider}
+                    minimized={true}
+                    network={this.props.network}
+                  />
+                </div>
+              )}
+              <div className={styles.accountModalControls}>
+                <Button
+                  color="secondary"
+                  size="sm"
+                  href={buildSettingsInboxHref(this.getActiveSessionSlug())}
+                  className={styles.walletButton}
+                >
+                  <FontAwesomeIcon icon={faExternalLinkAlt} /> Activity
+                </Button>
+                <Button color="secondary" size="sm" onClick={this.openBookmarks} className={styles.walletButton}>
+                  <FontAwesomeIcon icon={faBookmark} /> Bookmarks
+                </Button>
+                <Button color="danger" size="sm" onClick={this.handleLogout} className={styles.disconnectButton}>
+                  <FontAwesomeIcon icon={faSignOutAlt} /> Disconnect
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardBody>
+      );
+    }
+
+    return <CardBody><p>Please log in.</p></CardBody>;
+  }
+
+  getModalTitle: any = () => {
+    if (!this.props.loginComplete && !this.props.loginInProgress) return "LOGIN";
+    if (this.props.loginInProgress) return "ACCOUNT";
+    if (this.props.loginComplete) return "ACCOUNT";
+    return "CONNECT";
+  }
 
   render() {
     const modalTitle =

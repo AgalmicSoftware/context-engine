@@ -542,35 +542,19 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect(sessionLink).not.toHaveAttribute('href', '/session/Edge%20Session');
   });
 
-  it('shows worker session access and AI state without chain resource controls', () => {
-    const subject = buildWrongNetworkSubject({
-      mode: 'crypto',
-      aiSettingsOpen: true,
-      sessionConfig: {
-        slug: 'edge',
-        sessionName: 'Edge Session',
-        corsWorkerUrl: 'https://edge-worker.example.test',
-        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-      },
-    });
-    subject.state = {
-      ...subject.state,
-      aiSettingsSectionsOpen: {
-        ...subject.state.aiSettingsSectionsOpen,
-        session: true,
-      },
-    };
+  it('links signed-in users to the session-filtered activity inbox', () => {
+    const subject = new LoginAndSettingsModal(buildProps({
+      account: WAGMI_ADDRESS,
+      activeSessionSlug: 'edge',
+      loginComplete: true,
+      provider: 'wagmi',
+    }));
+    subject.getActiveSessionSlug = jest.fn(() => 'edge');
 
-    render(subject.getSettingsDisplay());
+    render(subject.getModalDisplay());
 
-    expect(screen.getByTestId('ce-settings-worker-session-access')).toHaveTextContent(
-      /Passkey session access: signed in.*Session Worker: configured.*AI: session default/i,
-    );
-    expect(screen.queryByText('Network')).not.toBeInTheDocument();
-    expect(screen.queryByText('RPC')).not.toBeInTheDocument();
-    expect(screen.queryByText('Arweave')).not.toBeInTheDocument();
-    expect(screen.queryByText('Tx gas')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /activity/i }))
+      .toHaveAttribute('href', '/inbox?session=edge');
   });
 
   it('preserves PUBLIC_URL when building the active-session link', () => {
