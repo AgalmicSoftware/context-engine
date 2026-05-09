@@ -55,6 +55,7 @@ test('worker preview update exercises command builder without Telegram network c
       defaultSessionSlug: 'alpha',
       sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true }],
     }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       { questionId: 'q-readiness', prompt: 'What should Alpha decide next?' },
     ]),

@@ -10,6 +10,7 @@ const SELECTORS = Object.freeze({
 
 const SESSION_SLUG_RE = /^[a-z0-9_-]{1,128}$/i;
 const REGISTRY_SESSION_CACHE_TTL_MS = 2 * 60 * 1000;
+const REGISTRY_SESSION_KV_PREFIX = 'telegram:registry-sessions:v1:';
 const registrySessionCache = new Map();
 
 function safeString(value) {
@@ -30,6 +31,16 @@ function splitRpcUrls(value = '') {
     .split(/[\s,]+/)
     .map((entry) => safeString(entry))
     .filter((entry) => /^https:\/\/[^/\s]+(?:\/.*)?$/i.test(entry));
+}
+
+function safeJsonParse(value, fallback = null) {
+  const text = safeString(value);
+  if (!text) return fallback;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
 }
 
 export function resolveRegistryRpcUrls(env = {}) {
@@ -140,15 +151,23 @@ export async function listRegistrySessionsForBridge({
   const chainId = normalizeChainId(env.DEFAULT_CHAIN_ID);
   const maxSessions = Math.max(1, Math.min(250, Number(env.AGENT_BRIDGE_MAX_REGISTRY_SESSIONS || 50) || 50));
   const cacheKey = `${chainId}|${registryAddress.toLowerCase()}|${rpcUrls.join('|')}|${maxSessions}`;
+  const kvCacheKey = `${REGISTRY_SESSION_KV_PREFIX}${chainId}:${registryAddress.toLowerCase()}:${maxSessions}`;
   const cached = registrySessionCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < REGISTRY_SESSION_CACHE_TTL_MS) {
-    return { ...cached.result, cached: true };
+    return { ...cached.result, cached: true, cacheLayer: 'memory' };
   }
   if (!registryAddress) {
     return { ok: false, reason: 'session_registry_address_missing', sessions: [] };
   }
   if (!rpcUrls.length) {
     return { ok: false, reason: 'registry_rpc_url_missing', sessions: [] };
+  }
+  if (env?.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function') {
+    const kvCached = safeJsonParse(await env.AGENT_ACTION_KV.get(kvCacheKey), null);
+    if (kvCached && Array.isArray(kvCached.sessions)) {
+      registrySessionCache.set(cacheKey, { cachedAt: Date.now(), result: kvCached });
+      return { ...kvCached, cached: true, cacheLayer: 'kv' };
+    }
   }
   const countResult = await callWithRpcFallback({
     rpcUrls,
@@ -197,6 +216,13 @@ export async function listRegistrySessionsForBridge({
     registryAddress,
     rpcFallbackCount: rpcUrls.length,
   };
-  if (result.ok) registrySessionCache.set(cacheKey, { cachedAt: Date.now(), result });
+  if (result.ok) {
+    registrySessionCache.set(cacheKey, { cachedAt: Date.now(), result });
+    if (env?.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.put === 'function') {
+      await env.AGENT_ACTION_KV.put(kvCacheKey, JSON.stringify(result), {
+        expirationTtl: Math.ceil(REGISTRY_SESSION_CACHE_TTL_MS / 1000),
+      }).catch(() => null);
+    }
+  }
   return result;
 }

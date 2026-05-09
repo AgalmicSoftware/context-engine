@@ -265,7 +265,7 @@ test('group session card uses safe public copy and required lobby buttons', () =
     },
   });
 
-  assert.equal(card.text, 'Context Engine session linked: Alpha');
+  assert.equal(card.text, 'Session: Alpha');
   assert.deepEqual(card.buttons.map((button) => button.label), [
     'Join Session',
     'View Questions',

@@ -45,6 +45,12 @@ DEFAULT_CHAIN_ID = "11155420"
 DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 # Optional additive fallback, not a replacement for DEFAULT_RPC_URL:
 # ADDITIONAL_RPC_URL = "https://your-op-sepolia-rpc.example"
+# Default question source is live. Use "fixture" only for local preview/demo copy.
+# AGENT_BRIDGE_QUESTION_SOURCE = "fixture"
+# AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS = "300"
+# AGENT_BRIDGE_MAX_QUESTIONS_PER_SESSION = "20"
+# AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK = "0"
+# AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK = ""
 AGENT_AI_PROVIDER = "ce_session_policy"
 BROADCAST_ENABLED = "false"
 
