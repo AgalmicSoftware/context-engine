@@ -241,6 +241,43 @@ test('/ce_questions and callback dispatch list questions without leaking locked 
   assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
 });
 
+test('/ce_questions handles bytes32 question IDs without putting them in opaque seeds', async () => {
+  const publicQuestionId = `0x${'12'.repeat(32)}`;
+  const lockedQuestionId = `0x${'34'.repeat(32)}`;
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions alpha'),
+    env: baseEnv({
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+        {
+          questionId: publicQuestionId,
+          questionType: 'freeform',
+          prompt: 'Can bytes32 question IDs render?',
+        },
+        {
+          questionId: lockedQuestionId,
+          questionType: 'freeform',
+          prompt: 'Locked bytes32 prompt must not leak',
+          visibility: 'lit_encrypted',
+        },
+      ]),
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'question_list');
+  assert.match(result.response.text, /0x12121212\.\.\.121212 - Can bytes32 question IDs render/);
+  assert.match(result.response.text, /0x34343434\.\.\.343434 - Locked question/);
+  assert.equal(result.response.text.includes('Locked bytes32 prompt must not leak'), false);
+  const buttons = flattenButtons(result.response.replyMarkup);
+  assert.equal(buttons.length, 2);
+  for (const button of buttons) {
+    assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+    assert.equal(button.callback_data.includes(publicQuestionId), false);
+    assert.equal(button.callback_data.includes(lockedQuestionId), false);
+  }
+});
+
 test('/ce_questions does not invent demo questions when live question cache is empty', async () => {
   __test__sessionQuestions.clearCaches();
   const questionFetch = async (_url, init = {}) => {

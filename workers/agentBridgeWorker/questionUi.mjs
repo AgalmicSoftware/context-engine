@@ -19,6 +19,7 @@ const SBT_GROUP_ID_RE = /^[a-z0-9][a-z0-9_-]{2,127}$/i;
 const SESSION_SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,127}$/i;
 const SBT_PRIVATE_CREDENTIAL_RE = /^(invite|password|proof|credential):/i;
 const SBT_PRIVATE_LINK_VALUE_RE = /(?:[?&#](?:invite|password|proof|credential|token)=)/i;
+const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
 
 export const TELEGRAM_SCREEN_IDS = Object.freeze([
   'setup_welcome',
@@ -97,6 +98,12 @@ export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function safeOpaqueSeedPart(value = '') {
+  const text = safeString(value);
+  if (BYTES32_RE.test(text)) return `${text.slice(2, 10)}${text.slice(-6)}`;
+  return text;
 }
 
 function splitCommandText(text = '') {
@@ -261,7 +268,7 @@ function selectedChoiceSet(question = {}) {
 
 function baseControl(action, label, questionId, targetLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, extra = {}) {
   return {
-    actionId: buildOpaqueActionId(`${action}|${questionId}|${label}`),
+    actionId: buildOpaqueActionId(`${action}|${safeOpaqueSeedPart(questionId)}|${label}`),
     action,
     label,
     targetLane,
@@ -612,7 +619,7 @@ function summarizeQuestionForList(question = {}, index = 0) {
     locked: !visible,
     unavailableInGroup: !visible,
     source: safeString(question.source || 'existing_session_question'),
-    poseActionId: buildOpaqueActionId(`pose_question|${questionId}|${index}`),
+    poseActionId: buildOpaqueActionId(`pose_question|${safeOpaqueSeedPart(questionId)}|${index}`),
   });
 }
 
@@ -813,7 +820,7 @@ export function createTelegramPoseQuestionAction({
   const questionId = safeString(question.questionId || question.id);
   return sanitizeForGroup({
     type: 'telegram_pose_question_action',
-    actionId: buildOpaqueActionId(`pose_question|${sessionSlug}|${questionId}|${source}`),
+    actionId: buildOpaqueActionId(`pose_question|${sessionSlug}|${safeOpaqueSeedPart(questionId)}|${source}`),
     action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
     label: 'Pose Question',
     command: '/ce_pose_question',
@@ -862,7 +869,7 @@ export function buildTelegramGeneratedQuestionCandidatesState({
     };
     return {
       ...summarizeQuestionForList(question, index),
-      saveActionId: buildOpaqueActionId(`save_generated_question|${sessionSlug}|${question.questionId}`),
+      saveActionId: buildOpaqueActionId(`save_generated_question|${sessionSlug}|${safeOpaqueSeedPart(question.questionId)}`),
       poseAction: createTelegramPoseQuestionAction({
         sessionSlug,
         question,
@@ -1139,7 +1146,7 @@ export function createTelegramPrivateQuestionDecryptRequest({
     ok: true,
     type: 'telegram_private_question_decrypt_request',
     status: 'contract_only_request',
-    requestId: buildOpaqueActionId(`decrypt_request|${sessionSlug}|${questionId}|${account.accountId || account.accountAddress || ''}`),
+    requestId: buildOpaqueActionId(`decrypt_request|${sessionSlug}|${safeOpaqueSeedPart(questionId)}|${account.accountId || account.accountAddress || ''}`),
     sessionSlug: safeString(sessionSlug),
     questionId,
     accountAddress: safeString(account.accountAddress || account.address) || null,

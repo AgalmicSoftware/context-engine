@@ -1,4 +1,5 @@
 const DEFAULT_CHAIN_ID = '11155420';
+const DEFAULT_RPC_TIMEOUT_MS = 5_000;
 const SESSION_REGISTRY_BY_CHAIN = Object.freeze({
   '11155420': '0xDcB1731984E9F75c6a061c38dD8b67d18De4C0c1',
 });
@@ -41,6 +42,16 @@ function safeJsonParse(value, fallback = null) {
   } catch {
     return fallback;
   }
+}
+
+function normalizePositiveInteger(value, fallback) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return fallback;
+  return Math.floor(raw);
+}
+
+function rpcTimeoutMs(env = {}) {
+  return normalizePositiveInteger(env.AGENT_BRIDGE_RPC_TIMEOUT_MS, DEFAULT_RPC_TIMEOUT_MS);
 }
 
 export function resolveRegistryRpcUrls(env = {}) {
@@ -100,10 +111,14 @@ async function jsonRpcCall({
   registryAddress = '',
   data = '',
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
 } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('fetch unavailable');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(new Error('SessionRegistry RPC timed out')), timeoutMs);
   const response = await fetchImpl(rpcUrl, {
     method: 'POST',
+    signal: controller.signal,
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       jsonrpc: '2.0',
@@ -111,14 +126,18 @@ async function jsonRpcCall({
       method: 'eth_call',
       params: [{ to: registryAddress, data }, 'latest'],
     }),
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok || body?.error) {
-    throw new Error(safeString(body?.error?.message) || `RPC call failed (${response.status || 502})`);
+  }).finally(() => clearTimeout(timeout));
+  try {
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body?.error) {
+      throw new Error(safeString(body?.error?.message) || `RPC call failed (${response.status || 502})`);
+    }
+    const result = safeString(body?.result);
+    if (!/^0x[0-9a-fA-F]*$/.test(result)) throw new Error('RPC result was not hex');
+    return result;
+  } finally {
+    clearTimeout(timeout);
   }
-  const result = safeString(body?.result);
-  if (!/^0x[0-9a-fA-F]*$/.test(result)) throw new Error('RPC result was not hex');
-  return result;
 }
 
 async function callWithRpcFallback({
@@ -126,11 +145,12 @@ async function callWithRpcFallback({
   registryAddress = '',
   data = '',
   fetchImpl = globalThis.fetch,
+  timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
 } = {}) {
   let lastError = null;
   for (const rpcUrl of rpcUrls) {
     try {
-      const result = await jsonRpcCall({ rpcUrl, registryAddress, data, fetchImpl });
+      const result = await jsonRpcCall({ rpcUrl, registryAddress, data, fetchImpl, timeoutMs });
       return { ok: true, result, rpcUrl };
     } catch (error) {
       lastError = error;
@@ -174,6 +194,7 @@ export async function listRegistrySessionsForBridge({
     registryAddress,
     data: SELECTORS.getSessionCount,
     fetchImpl,
+    timeoutMs: rpcTimeoutMs(env),
   });
   if (!countResult.ok) {
     return { ok: false, reason: 'session_registry_count_failed', error: countResult.error, sessions: [] };
@@ -187,6 +208,7 @@ export async function listRegistrySessionsForBridge({
       registryAddress,
       data: buildGetSessionSlugByIndexData(index),
       fetchImpl,
+      timeoutMs: rpcTimeoutMs(env),
     });
     if (!slugResult.ok) continue;
     const slug = safeString(decodeAbiString(slugResult.result));
