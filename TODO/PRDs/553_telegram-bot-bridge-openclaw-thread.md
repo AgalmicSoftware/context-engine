@@ -93,6 +93,14 @@
     cached as empty lists; question scans require metadata `blockLimits.start` or
     explicit scan bounds unless `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1` is
     set for a debug-only recent-block scan.
+  - Structured CE question metadata is now preserved in the Telegram worker
+    cache: `binary`, `rating`, and `multichoice` payloads keep their type,
+    options, single-select flag, and session name/slug. The cache prefix was
+    bumped to avoid reusing old records that collapsed to freeform-only shapes.
+  - Posed public structured questions now render native Telegram answer buttons
+    and save a worker-local answer draft keyed by Telegram user, session, and
+    question. Final smart-contract submit remains a Mini App/canonical
+    `/api/agent/*` handoff, not a group-chat action.
   - Bot copy was shortened for live use: group/session replies no longer explain
     Telegram/Worker internals, account addresses are abbreviated in chat, and
     private/gated attachment messaging points at the Mini App path planned after
@@ -112,8 +120,10 @@
    `/q <number-or-id>`, `/ce_attachments`, and private `/ce_me`. Confirm
    replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs,
    callback buttons stop loading, `Pose Question` opens the picker, and live
-   questions match questions created in the CE client, and missing block bounds
-   show the scoped-source error instead of cross-session fallback results.
+   questions match questions created in the CE client. For binary, rating, and
+   multichoice questions, confirm answer buttons save a draft and the bot points
+   final submit at the Mini App path. Missing block bounds should show the
+   scoped-source error instead of cross-session fallback results.
 2. Use `/mock/telegram/preview` as the fast local/browser lane for copy,
    callback keyboard, and Mini App handoff iteration before pushing new webhook
    behavior live.

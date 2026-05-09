@@ -187,7 +187,117 @@ test('listCachedSessionQuestionsForBridge reads live public questions and writes
   assert.equal(result.questions[0].arweaveTxId, txId);
   assert.equal(result.questions[0].source, 'live_session_question');
   assert.equal(calls.some(([url]) => String(url).startsWith('https://ar-io.dev/')), true);
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v2:demo'), true);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v3:demo'), true);
+});
+
+test('normalizeQuestionPayload preserves CE question type, options, and session name metadata', () => {
+  const questionId = `0x${'91'.repeat(32)}`;
+  const normalized = __test__sessionQuestions.normalizeQuestionPayload({
+    questionData: {
+      id: questionId,
+      type: 'multichoice',
+      prompt: 'Which launch path should Demo prioritize?',
+      options: [{ label: 'Mini App' }, { text: 'Bot only' }, 'Both'],
+      singleSelect: true,
+      sessionName: 'demo-4',
+    },
+  }, {
+    questionId,
+    pointerId: __test__sessionQuestions.hexToBase64url(`0x${'92'.repeat(32)}`),
+    sessionSlug: 'fallback',
+  });
+
+  assert.equal(normalized.questionId, questionId);
+  assert.equal(normalized.questionType, 'multichoice');
+  assert.equal(normalized.type, 'multichoice');
+  assert.equal(normalized.prompt, 'Which launch path should Demo prioritize?');
+  assert.deepEqual(normalized.options, ['Mini App', 'Bot only', 'Both']);
+  assert.equal(normalized.singleSelect, true);
+  assert.equal(normalized.sessionSlug, 'demo-4');
+  assert.equal(normalized.visibility, 'public');
+});
+
+test('listCachedSessionQuestionsForBridge skips payloads that belong to another session', async () => {
+  __test__sessionQuestions.questionMemoryCache.clear();
+  const alphaQuestionId = `0x${'a1'.repeat(32)}`;
+  const demoQuestionId = `0x${'b2'.repeat(32)}`;
+  const alphaPointer = `0x${'c3'.repeat(32)}`;
+  const demoPointer = `0x${'d4'.repeat(32)}`;
+  const pointerByQuestion = {
+    [alphaQuestionId]: alphaPointer,
+    [demoQuestionId]: demoPointer,
+  };
+  const txByPointer = {
+    [alphaPointer]: __test__sessionQuestions.hexToBase64url(alphaPointer),
+    [demoPointer]: __test__sessionQuestions.hexToBase64url(demoPointer),
+  };
+  const env = baseEnv();
+  const fetchImpl = async (url, init = {}) => {
+    const urlText = String(url);
+    if (urlText.startsWith('https://ar-io.dev/')) {
+      const txId = urlText.split('/').pop();
+      const isDemo = txId === txByPointer[demoPointer];
+      return new Response(JSON.stringify({
+        id: isDemo ? demoQuestionId : alphaQuestionId,
+        sessionSlug: isDemo ? 'demo' : 'alpha',
+        type: 'freeform',
+        prompt: isDemo
+          ? 'Question scoped to Demo?'
+          : 'Question scoped to Alpha?',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    const body = JSON.parse(init.body || '{}');
+    const data = String(body.params?.[0]?.data || '');
+    if (body.method === 'eth_blockNumber') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0x64' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (body.method === 'eth_getLogs') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: [{
+          address: '0x1111111111111111111111111111111111111111',
+          topics: [__test__sessionQuestions.QUESTIONS_ADDED_TOPIC0],
+          data: encodeQuestionsAddedData([alphaQuestionId, demoQuestionId], []),
+        }],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (
+      body.method === 'eth_call' &&
+      data.startsWith(__test__sessionQuestions.SELECTORS.getQuestionHash)
+    ) {
+      const questionId = `0x${data.slice(__test__sessionQuestions.SELECTORS.getQuestionHash.length)}`.toLowerCase();
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: pointerByQuestion[questionId] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected ${body.method}`);
+  };
+
+  const result = await listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug: 'demo',
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.reason, 'live_questions_indexed');
+  assert.equal(result.discoveredCount, 2);
+  assert.equal(result.skippedSessionMismatchCount, 1);
+  assert.equal(result.questionCount, 1);
+  assert.equal(result.questions[0].questionId, demoQuestionId);
+  assert.equal(result.questions[0].sessionSlug, 'demo');
+  assert.equal(result.questions[0].prompt, 'Question scoped to Demo?');
 });
 
 test('listCachedSessionQuestionsForBridge serves first available questions while background indexes remaining blocks', async () => {
@@ -281,7 +391,7 @@ test('listCachedSessionQuestionsForBridge serves first available questions while
   assert.equal(background.length, 1);
 
   await Promise.all(background);
-  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v2:demo'));
+  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v3:demo'));
   assert.equal(cached.complete, true);
   assert.deepEqual(cached.questions.map((question) => question.prompt), [
     'Recent question should show first',
@@ -366,7 +476,7 @@ test('listCachedSessionQuestionsForBridge replies after bounded foreground index
   assert.equal(background.length, 1);
 
   await Promise.all(background);
-  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v2:demo'));
+  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v3:demo'));
   assert.equal(cached.complete, true);
   assert.deepEqual(cached.questions.map((question) => question.prompt), [
     'Older question appears after background indexing',
@@ -397,7 +507,7 @@ test('listCachedSessionQuestionsForBridge schedules background refresh for fresh
   const env = baseEnv({
     AGENT_BRIDGE_QUESTION_LOG_CHUNK_SIZE: '5',
     AGENT_ACTION_KV: new MemoryKv({
-      'telegram:questions:v2:demo': JSON.stringify(partial),
+      'telegram:questions:v3:demo': JSON.stringify(partial),
     }),
   });
   const background = [];
@@ -465,7 +575,7 @@ test('listCachedSessionQuestionsForBridge schedules background refresh for fresh
   assert.equal(background.length, 1);
 
   await Promise.all(background);
-  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v2:demo'));
+  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v3:demo'));
   assert.equal(cached.complete, true);
   assert.deepEqual(cached.questions.map((question) => question.prompt), [
     'Fresh partial cache continued in background',
@@ -502,7 +612,7 @@ test('listCachedSessionQuestionsForBridge refuses unscoped fallback scans by def
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'question_scan_window_unscoped');
   assert.equal(result.scanWindow.source, 'fallback_recent_blocks');
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v2:demo'), false);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v3:demo'), false);
   assert.equal(calls.some(([, init]) => JSON.parse(init.body || '{}').method === 'eth_getLogs'), false);
 });
 
@@ -999,7 +1109,7 @@ test('listCachedSessionQuestionsForBridge does not cache failed log scans', asyn
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'question_log_scan_failed');
   assert.equal(result.scan.chunksFailed, 1);
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v2:demo'), false);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v3:demo'), false);
 });
 
 test('listCachedSessionQuestionsForBridge does not cache payload load failures as empty results', async () => {
@@ -1054,7 +1164,7 @@ test('listCachedSessionQuestionsForBridge does not cache payload load failures a
   assert.equal(result.reason, 'question_payload_load_failed');
   assert.equal(result.discoveredCount, 1);
   assert.equal(result.payloadFailureCount, 1);
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v2:demo'), false);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v3:demo'), false);
 });
 
 test('listCachedSessionQuestionsForBridge keeps on-chain question IDs when payload gateways fail', async () => {
@@ -1111,7 +1221,7 @@ test('listCachedSessionQuestionsForBridge keeps on-chain question IDs when paylo
   assert.equal(result.questions[0].visibility, 'lit_encrypted');
   assert.equal(result.questions[0].payloadUnavailable, true);
   assert.equal(result.questions[0].title, 'Locked question');
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v2:demo'), true);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v3:demo'), true);
 });
 
 test('listCachedSessionQuestionsForBridge serves KV cache without RPC calls', async () => {
@@ -1134,7 +1244,7 @@ test('listCachedSessionQuestionsForBridge serves KV cache without RPC calls', as
   };
   const env = baseEnv({
     AGENT_ACTION_KV: new MemoryKv({
-      'telegram:questions:v2:demo': JSON.stringify(cached),
+      'telegram:questions:v3:demo': JSON.stringify(cached),
     }),
   });
 
@@ -1149,4 +1259,55 @@ test('listCachedSessionQuestionsForBridge serves KV cache without RPC calls', as
   assert.equal(result.ok, true);
   assert.equal(result.cacheLayer, 'kv');
   assert.equal(result.questions[0].prompt, 'Cached question?');
+});
+
+test('listCachedSessionQuestionsForBridge filters stale KV cache records from other sessions', async () => {
+  __test__sessionQuestions.questionMemoryCache.clear();
+  const cached = {
+    ok: true,
+    reason: 'live_questions_loaded',
+    sessionSlug: 'demo',
+    source: 'live_session_question_cache',
+    cachedAtMs: Date.now(),
+    questions: [
+      {
+        questionId: `0x${'44'.repeat(32)}`,
+        id: `0x${'44'.repeat(32)}`,
+        sessionSlug: 'alpha',
+        questionType: 'freeform',
+        prompt: 'Cached alpha question?',
+        visibility: 'public',
+        source: 'live_session_question',
+      },
+      {
+        questionId: `0x${'55'.repeat(32)}`,
+        id: `0x${'55'.repeat(32)}`,
+        sessionSlug: 'demo',
+        questionType: 'freeform',
+        prompt: 'Cached demo question?',
+        visibility: 'public',
+        source: 'live_session_question',
+      },
+    ],
+    questionCount: 2,
+  };
+  const env = baseEnv({
+    AGENT_ACTION_KV: new MemoryKv({
+      'telegram:questions:v3:demo': JSON.stringify(cached),
+    }),
+  });
+
+  const result = await listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug: 'demo',
+    fetchImpl: async () => {
+      throw new Error('network should not be called');
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.cacheLayer, 'kv');
+  assert.equal(result.questionCount, 1);
+  assert.equal(result.skippedSessionMismatchCount, 1);
+  assert.equal(result.questions[0].prompt, 'Cached demo question?');
 });
