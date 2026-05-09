@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {
   AGENT_BRIDGE_CLOUDFLARE_TOKEN_PERMISSIONS,
   buildAgentBridgeDeployPlan,
+  buildAgentBridgeGeneratedSecrets,
   buildAgentBridgeWorkerUploadMetadata,
+  deriveSingleCloudflareAccount,
+  generateAgentBridgeSecret,
   resolveAgentBridgeDeployConfig,
   validateAgentBridgeDeployConfig,
   validateAgentBridgeTokenScope,
@@ -45,15 +48,63 @@ test('validateAgentBridgeDeployConfig requires only live deploy credentials, not
   const missing = validateAgentBridgeDeployConfig(resolveAgentBridgeDeployConfig({
     env: {},
   }));
-  const complete = validateAgentBridgeDeployConfig(resolveAgentBridgeDeployConfig({
-    env: completeEnv(),
+  const missingWorkersSubdomain = validateAgentBridgeDeployConfig(resolveAgentBridgeDeployConfig({
+    env: completeEnv({ CLOUDFLARE_WORKERS_SUBDOMAIN: '' }),
+  }));
+  const completeWithoutManualAccountId = validateAgentBridgeDeployConfig(resolveAgentBridgeDeployConfig({
+    env: completeEnv({ CLOUDFLARE_ACCOUNT_ID: '' }),
   }));
 
   assert.equal(missing.ok, false);
   assert.equal(missing.missing.includes('TELEGRAM_BOT_TOKEN'), true);
-  assert.equal(missing.missing.includes('DEFAULT_RPC_URL'), true);
-  assert.equal(complete.ok, true);
-  assert.deepEqual(complete.missing, []);
+  assert.equal(missing.missing.includes('DEFAULT_RPC_URL'), false);
+  assert.equal(missing.missing.includes('CLOUDFLARE_ACCOUNT_ID'), false);
+  assert.equal(missingWorkersSubdomain.ok, false);
+  assert.equal(missingWorkersSubdomain.missing.includes('CLOUDFLARE_WORKERS_SUBDOMAIN'), true);
+  assert.equal(completeWithoutManualAccountId.ok, true);
+  assert.deepEqual(completeWithoutManualAccountId.missing, []);
+});
+
+test('deriveSingleCloudflareAccount resolves one account and blocks multiple visible accounts', () => {
+  assert.deepEqual(deriveSingleCloudflareAccount({
+    result: [{ id: 'account-123', name: 'Demo Account' }],
+  }), {
+    ok: true,
+    accountId: 'account-123',
+    accountName: 'Demo Account',
+    blocker: '',
+    accountCount: 1,
+  });
+
+  const multiple = deriveSingleCloudflareAccount({
+    result: [
+      { id: 'account-123', name: 'One' },
+      { id: 'account-456', name: 'Two' },
+    ],
+  });
+  assert.equal(multiple.ok, false);
+  assert.match(multiple.blocker, /multiple accounts/i);
+  assert.match(multiple.blocker, /not implemented/i);
+});
+
+test('generated secrets are high entropy hex values and never appear in deploy plans', () => {
+  const fakeRandomBytes = (length) => Buffer.from(Array.from({ length }, (_, index) => (index + 7) % 256));
+  const webhookSecret = generateAgentBridgeSecret({ randomBytesImpl: fakeRandomBytes });
+  const generated = buildAgentBridgeGeneratedSecrets({ randomBytesImpl: fakeRandomBytes });
+  const config = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      TELEGRAM_WEBHOOK_SECRET: generated.TELEGRAM_WEBHOOK_SECRET,
+      DEMO_SIGNER_ROOT_SECRET: generated.DEMO_SIGNER_ROOT_SECRET,
+    }),
+  });
+  const plan = buildAgentBridgeDeployPlan(config);
+  const serialized = JSON.stringify(plan);
+
+  assert.match(webhookSecret, /^[0-9a-f]{64}$/);
+  assert.match(generated.TELEGRAM_WEBHOOK_SECRET, /^[0-9a-f]{64}$/);
+  assert.match(generated.DEMO_SIGNER_ROOT_SECRET, /^[0-9a-f]{64}$/);
+  assert.equal(serialized.includes(generated.TELEGRAM_WEBHOOK_SECRET), false);
+  assert.equal(serialized.includes(generated.DEMO_SIGNER_ROOT_SECRET), false);
 });
 
 test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev setup only', () => {
@@ -83,7 +134,7 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
 
 test('buildAgentBridgeWorkerUploadMetadata models bindings, vars, and Durable Object migration', () => {
   const config = resolveAgentBridgeDeployConfig({
-    env: completeEnv(),
+    env: completeEnv({ ADDITIONAL_RPC_URL: 'https://infura.example.test/op-sepolia' }),
   });
   const metadata = buildAgentBridgeWorkerUploadMetadata(config);
 
@@ -105,6 +156,23 @@ test('buildAgentBridgeWorkerUploadMetadata models bindings, vars, and Durable Ob
     binding.name === 'AGENT_BRIDGE_PUBLIC_URL' &&
     binding.text === 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev'
   )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'ADDITIONAL_RPC_URL' &&
+    binding.text === 'https://infura.example.test/op-sepolia'
+  )), true);
+});
+
+test('resolveAgentBridgeDeployConfig defaults to OP Sepolia POKT RPC and treats extra RPC as additive', () => {
+  const config = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      DEFAULT_RPC_URL: '',
+      ADDITIONAL_RPC_URL: 'https://infura.example.test/op-sepolia',
+    }),
+  });
+
+  assert.equal(config.vars.DEFAULT_CHAIN_ID, '11155420');
+  assert.equal(config.vars.DEFAULT_RPC_URL, 'https://op-sepolia-testnet.api.pocket.network');
+  assert.equal(config.vars.ADDITIONAL_RPC_URL, 'https://infura.example.test/op-sepolia');
 });
 
 test('buildAgentBridgeDeployPlan documents remaining direct Cloudflare API calls without secret values', () => {
@@ -120,6 +188,7 @@ test('buildAgentBridgeDeployPlan documents remaining direct Cloudflare API calls
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/r2/buckets')), true);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/d1/database')), true);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/workers/scripts/ce-agent-bridge-worker/secrets')), true);
+  assert.equal(plan.remainingDirectApiCalls[0].path, '/accounts?per_page=2');
   assert.equal(plan.optionalTokenPermissions.length, 1);
   assert.equal(JSON.stringify(plan).includes('123456:test-token'), false);
   assert.equal(JSON.stringify(plan).includes('webhook-secret'), false);
