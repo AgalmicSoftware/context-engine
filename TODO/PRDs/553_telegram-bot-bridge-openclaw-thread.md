@@ -72,6 +72,11 @@
     registry slugs over `DEFAULT_RPC_URL` first and optional `ADDITIONAL_RPC_URL`
     second, preserving the additional Infura-style URL as a fallback instead of
     replacing the public default.
+  - Deploy apply now also uploads optional non-secret demo fixture vars when
+    present in untracked `.dev.vars`, including
+    `AGENT_BRIDGE_DEMO_QUESTIONS_JSON` and `AGENT_BRIDGE_DEMO_DOCS_JSON`, so
+    live bot copy can be exercised before canonical question/doc reads are
+    reachable.
   - Still mocked/contract-only before live smoke: `/telegram-demo-setup` does
     not itself deploy or set webhook, `deploy:plan` does not create Cloudflare
     resources, live `deploy:apply` is not run by tests, demo questions/docs
