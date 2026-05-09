@@ -137,4 +137,26 @@ export async function editTelegramMessageText({
   });
 }
 
+export async function answerTelegramCallbackQuery({
+  botToken = '',
+  callbackQueryId = '',
+  text = '',
+  showAlert = false,
+  cacheTime = 0,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const payload = {
+    callback_query_id: safeString(callbackQueryId),
+    show_alert: showAlert === true,
+    cache_time: Math.max(0, Math.floor(Number(cacheTime || 0) || 0)),
+  };
+  if (safeString(text)) payload.text = safeString(text);
+  return telegramBotApiRequest({
+    botToken,
+    method: 'answerCallbackQuery',
+    payload,
+    fetchImpl,
+  });
+}
+
 export { buildTelegramApiUrl, redactTelegramErrorText };

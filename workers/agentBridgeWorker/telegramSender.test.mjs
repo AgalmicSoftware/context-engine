@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  answerTelegramCallbackQuery,
   editTelegramMessageText,
   sendTelegramMessage,
   telegramBotApiRequest,
@@ -61,6 +62,30 @@ test('editTelegramMessageText wraps editMessageText with injected fetch', async 
     message_id: 456,
     text: 'Updated',
     disable_web_page_preview: true,
+  });
+});
+
+test('answerTelegramCallbackQuery stops inline button spinners without leaking callback context', async () => {
+  const calls = [];
+  const fetchMock = async (...args) => {
+    calls.push(args);
+    return jsonResponse({ ok: true, result: true });
+  };
+
+  const result = await answerTelegramCallbackQuery({
+    botToken: '123456:test-token',
+    callbackQueryId: 'callback-123',
+    text: 'Updated',
+    fetchImpl: fetchMock,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0][0], 'https://api.telegram.org/bot123456:test-token/answerCallbackQuery');
+  assert.deepEqual(JSON.parse(calls[0][1].body), {
+    callback_query_id: 'callback-123',
+    show_alert: false,
+    cache_time: 0,
+    text: 'Updated',
   });
 });
 

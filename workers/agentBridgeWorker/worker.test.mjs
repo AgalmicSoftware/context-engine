@@ -31,6 +31,43 @@ test('worker mock demo route returns end-to-end private Telegram flow without se
   assert.equal(JSON.stringify(body.groupCard).includes(body.account.accountAddress), false);
 });
 
+test('worker preview route renders an interactive mock Telegram surface', async () => {
+  const response = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview'));
+  const text = await response.text();
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /text\/html/);
+  assert.match(text, /CE Telegram Preview/);
+  assert.match(text, /mock\/telegram\/preview-update/);
+});
+
+test('worker preview update exercises command builder without Telegram network calls', async () => {
+  const response = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      chatType: 'supergroup',
+      text: '/ce_pose_question',
+    }),
+  }), {
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-readiness', prompt: 'What should Alpha decide next?' },
+    ]),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.preview.screen, 'question_list');
+  assert.match(body.preview.response.text, /Choose a question to pose to the group/);
+  assert.equal(JSON.stringify(body).includes('TELEGRAM_BOT_TOKEN'), false);
+});
+
 test('worker Telegram webhook requires enable flag, bot token, and secret token', async () => {
   const telegramCalls = [];
   const telegramFetch = async (...args) => {
