@@ -31,9 +31,28 @@ test('buildCloudflareTokenTemplateUrl only requests the deploy-helper scopes it 
     { key: 'workers_r2_storage', type: 'edit' },
     { key: 'd1', type: 'edit' },
     { key: 'workers_durable_objects', type: 'edit' },
+  ]);
+  assert.equal(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.length, 5);
+});
+
+test('buildCloudflareTokenTemplateUrl adds Account Settings only for workers.dev subdomain setup', () => {
+  const url = new URL(buildCloudflareTokenTemplateUrl({
+    slug: 'alpha-session',
+    includeWorkersDevSubdomainSetup: true,
+  }));
+
+  assert.deepEqual(JSON.parse(url.searchParams.get('permissionGroupKeys')), [
+    { key: 'workers_scripts', type: 'edit' },
+    { key: 'workers_kv_storage', type: 'edit' },
+    { key: 'workers_r2_storage', type: 'edit' },
+    { key: 'd1', type: 'edit' },
+    { key: 'workers_durable_objects', type: 'edit' },
     { key: 'account_settings', type: 'edit' },
   ]);
-  assert.equal(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.length, 6);
+  assert.deepEqual(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION, { key: 'account_settings', type: 'edit' });
+  assert.deepEqual(buildCloudflareTokenTemplatePermissions({
+    includeWorkersDevSubdomainSetup: false,
+  }), CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS);
 });
 
 test('buildCloudflareTokenTemplateUrl does not request legacy broad Cloudflare product scopes', () => {
@@ -52,6 +71,7 @@ test('Cloudflare token helper documents storage resource boundaries', () => {
   assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.d1, /metadata and index/);
   assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv, /metadata indexes/);
   assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.durableObjects, /not ordinary payload blob storage/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.accountSettings, /workers\.dev subdomain/);
 });
 
 test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {
@@ -67,10 +87,8 @@ test('parseArgs accepts the workers.dev setup scope flag', () => {
   assert.deepEqual(parseArgs([
     '--slug', 'alpha',
     '--include-workers-dev-subdomain-setup',
-    '--no-doc-storage',
   ]), {
     slug: 'alpha',
     'include-workers-dev-subdomain-setup': true,
-    'no-doc-storage': true,
   });
 });

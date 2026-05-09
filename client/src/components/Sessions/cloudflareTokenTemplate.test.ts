@@ -1,5 +1,6 @@
 import {
   buildCloudflareTokenTemplateUrl,
+  buildCloudflareTokenTemplatePermissions,
   CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
   CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
   CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION,
@@ -24,9 +25,26 @@ describe('cloudflareTokenTemplate', () => {
       { key: 'workers_r2_storage', type: 'edit' },
       { key: 'd1', type: 'edit' },
       { key: 'workers_durable_objects', type: 'edit' },
+    ]);
+    expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(5);
+  });
+
+  test('adds Account Settings only for workers.dev subdomain setup', () => {
+    const url = new URL(buildCloudflareTokenTemplateUrl({
+      slug: 'alpha-session',
+      includeWorkersDevSubdomainSetup: true,
+    }));
+
+    expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
+      { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+      { key: 'workers_r2_storage', type: 'edit' },
+      { key: 'd1', type: 'edit' },
+      { key: 'workers_durable_objects', type: 'edit' },
       { key: 'account_settings', type: 'edit' },
     ]);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(6);
+    expect(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION).toEqual({ key: 'account_settings', type: 'edit' });
+    expect(buildCloudflareTokenTemplatePermissions()).toEqual(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS);
   });
 
   test('does not request legacy broad Cloudflare product scopes', () => {
@@ -47,6 +65,7 @@ describe('cloudflareTokenTemplate', () => {
     expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.d1).toMatch(/metadata and index/);
     expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv).toMatch(/metadata indexes/);
     expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.durableObjects).toMatch(/not ordinary payload blob storage/);
+    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.accountSettings).toMatch(/workers\.dev subdomain/);
   });
 
   test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {

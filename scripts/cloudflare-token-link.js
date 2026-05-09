@@ -8,14 +8,16 @@ const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
   { key: 'workers_r2_storage', type: 'edit' },
   { key: 'd1', type: 'edit' },
   { key: 'workers_durable_objects', type: 'edit' },
-  { key: 'account_settings', type: 'edit' },
 ]);
+
+const CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION = Object.freeze({ key: 'account_settings', type: 'edit' });
 
 const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
   r2: 'CE payload blobs for session context, docs, media, questions, surveys, and responses',
   d1: 'metadata and index records where queryable storage indexes are modeled',
   kv: 'metadata indexes, short-lived action IDs, webhook replay cache, and ephemeral start params',
   durableObjects: 'signer/runtime coordination only, not ordinary payload blob storage',
+  accountSettings: 'Only needed when creating or changing the account-level workers.dev subdomain',
 });
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
@@ -40,13 +42,8 @@ const buildTokenName = (slug) => {
 
 const buildCloudflareTokenTemplatePermissions = ({
   includeWorkersDevSubdomainSetup = false,
-  includeDocStorage = true,
 } = {}) => {
-  const permissions = [...CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS];
-  if (includeDocStorage === true) {
-    permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS);
-  }
-  permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_RUNTIME_PERMISSIONS);
+  const permissions = [...CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS];
   if (includeWorkersDevSubdomainSetup === true) {
     permissions.push(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION);
   }
@@ -57,12 +54,10 @@ const buildCloudflareTokenTemplateUrl = ({
   accountId,
   slug,
   includeWorkersDevSubdomainSetup = false,
-  includeDocStorage = true,
 } = {}) => {
   const params = new URLSearchParams();
   params.set('permissionGroupKeys', JSON.stringify(buildCloudflareTokenTemplatePermissions({
     includeWorkersDevSubdomainSetup,
-    includeDocStorage,
   })));
   params.set('accountId', toStr(accountId).trim() || '*');
   params.set('zoneId', 'all');
@@ -88,10 +83,6 @@ const parseArgs = (argv = process.argv.slice(2)) => {
       flags[key] = true;
       continue;
     }
-    if (key === 'no-doc-storage') {
-      flags[key] = true;
-      continue;
-    }
     const nextValue = argv[index + 1];
     if (typeof nextValue !== 'string' || !String(nextValue).trim() || String(nextValue).startsWith('--')) {
       throw new Error(`Flag --${key} requires a value.`);
@@ -108,19 +99,18 @@ const printUsage = () => {
     '  npm run -s cloudflare:token-link -- --slug my-session',
     '  npm run -s cloudflare:token-link -- --slug my-session --account-id <cloudflare-account-id>',
     '  npm run -s cloudflare:token-link -- --slug my-session --include-workers-dev-subdomain-setup',
-    '  npm run -s cloudflare:token-link -- --slug my-session --no-doc-storage',
     '',
     'Flags:',
     '  --slug <slug>            Session slug used in the token name',
     '  --account-id <id|*>      Optional Cloudflare account ID (defaults to *)',
     '  --include-workers-dev-subdomain-setup',
     '                           Add Account Settings: Edit when the helper must create/change the account-level workers.dev subdomain',
-    '  --no-doc-storage         Omit R2/D1 scopes for the default Telegram smoke deploy',
     '  --help                   Show this help text',
     '',
     'Output:',
     '  Prints the same prefilled Cloudflare API token template URL used by the wizard UX.',
-    '  Scope covers Workers, KV, R2, D1, Durable Objects, and account settings only.',
+    '  Scope covers Workers, KV, R2, D1, and Durable Objects by default.',
+    '  Account Settings: Edit is added only with --include-workers-dev-subdomain-setup.',
   ].join('\n'));
 };
 
@@ -135,7 +125,6 @@ function main() {
     accountId: flags['account-id'] || '',
     slug: flags.slug || '',
     includeWorkersDevSubdomainSetup: flags['include-workers-dev-subdomain-setup'] === true,
-    includeDocStorage: flags['no-doc-storage'] !== true,
   }));
 }
 
@@ -150,7 +139,9 @@ if (require.main === module) {
 
 module.exports = {
   CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
+  CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION,
   CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
+  buildCloudflareTokenTemplatePermissions,
   buildCloudflareTokenTemplateUrl,
   buildTokenName,
   formatTokenTimestamp,
