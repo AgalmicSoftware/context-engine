@@ -95,6 +95,38 @@ describe('litProtocol chipotle error paths', () => {
     })).rejects.toThrow('Requester does not satisfy the SBT gate.');
   });
 
+  it('rejects legacy Chipotle v1 metadata before worker decrypt', async () => {
+    const fetchWorkerWithAuth = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ response: { response: { ok: true, plaintext: `0x${'07'.repeat(32)}` } } }),
+    }));
+    const { litProtocol } = loadLitHarness({
+      workerAuth: { fetchWorkerWithAuth },
+    });
+
+    const hooks = litProtocol.createLitHooks({
+      providerLike: 'wagmi',
+      account: TEST_ADDRESS,
+      chainId: 84532,
+      accessControlConditions: ACCESS_CONTROL_CONDITIONS,
+      chipotle: CHIPOTLE_RUNTIME,
+    });
+
+    await expect(hooks.getKey({
+      requesterAddress: TEST_ADDRESS,
+      ciphertext: 'ciphertext-1',
+      dataToEncryptHash: 'hash-1',
+      chipotle: {
+        version: 1,
+        chainId: 84532,
+        gateMode: 'any',
+        sbtAddresses: ['0x0000000000000000000000000000000000000101'],
+      },
+    })).rejects.toThrow('Lit Chipotle legacy wrapped keys are not supported.');
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
+
   it('rejects encrypt responses that do not contain a ciphertext payload', async () => {
     const { litProtocol } = loadLitHarness({
       workerAuth: {
