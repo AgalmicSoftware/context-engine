@@ -89,7 +89,7 @@ Decrypted prompt/context text is private-chat or Mini App only.
 
 ## Doc Library
 
-The worker contract models R2 document bytes, D1 metadata/index status, and KV short-lived action records. Supported file types are:
+The worker contract models R2 document bytes, D1 metadata/index status, and KV short-lived action records. The default live Telegram smoke binds only KV plus the Worker/Durable Object runtime; bridge-owned R2/D1 resources are opt-in with `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or `--enable-doc-storage`. Supported file types are:
 
 - Markdown: `md`
 - PDF: `pdf`
@@ -146,36 +146,43 @@ cp .dev.vars.example .dev.vars
 npx wrangler dev --local --port 8787
 ```
 
-Paste only local test values into `.dev.vars`. Keep real deployed secrets in
-Wrangler secrets:
+Paste local test or live smoke values into untracked `.dev.vars`. The automated
+deploy helper reads that file directly, so template placeholders such as
+`<workers-subdomain>` are parsed as data instead of being sourced by the shell.
+Never commit `.dev.vars` or `dev.vars`.
 
 ```bash
-npx wrangler secret put TELEGRAM_BOT_TOKEN
-npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
-npx wrangler secret put DEMO_SIGNER_ROOT_SECRET
+npm run deploy:apply
+npm run deploy:apply -- --apply
 ```
+
+`deploy:apply` is a dry-run by default. The explicit `--apply` mode creates or
+reuses Cloudflare resources, uploads the worker through the Cloudflare API,
+writes deployed Worker secrets, enables the workers.dev route, sets the Telegram
+webhook, and verifies `/health`.
 
 Required values:
 
 | Value | Where it goes |
 | --- | --- |
-| `TELEGRAM_BOT_TOKEN` from BotFather | Paste into local `.dev.vars` only for local smoke; set as deployed Worker secret `TELEGRAM_BOT_TOKEN` |
-| `TELEGRAM_BOT_USERNAME` from BotFather, without `@` | Paste into `.dev.vars` and `[vars]` in copied `wrangler.toml` |
-| `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into local `.dev.vars` only for local smoke; set as deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
-| `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into local `.dev.vars` only for local smoke; set as deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
-| Public deployed `agentBridgeWorker` URL | Paste the Workers.dev base URL into `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev` |
+| `TELEGRAM_BOT_TOKEN` from BotFather | Paste into untracked `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_BOT_TOKEN` |
+| `TELEGRAM_BOT_USERNAME` from BotFather, without `@` | Paste into `.dev.vars`; deployed as plain Worker var |
+| `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
+| `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
+| Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
 | CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
 | Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
 | Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC |
 | Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
 | Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
-| KV namespace | Bind as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
-| R2 bucket | Bind as `AGENT_DOCS_R2` for demo artifacts/doc bytes when enabled |
-| D1 database | Bind as `AGENT_DOCS_D1` for event/audit/index records when enabled |
-| Durable Object binding | Bind `MANAGED_DEMO_SIGNER` and include the `ManagedDemoSignerDurableObject` migration |
+| KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
+| R2 bucket | Optional. `deploy:apply -- --apply --enable-doc-storage` or `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` creates or reuses and binds `AGENT_DOCS_R2` for bridge-owned demo artifacts/doc bytes |
+| D1 database | Optional. `deploy:apply -- --apply --enable-doc-storage` or `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` creates or reuses and binds `AGENT_DOCS_D1` for bridge-owned event/audit/index records |
+| Durable Object binding | `deploy:apply -- --apply` binds `MANAGED_DEMO_SIGNER` and includes the SQLite-backed `ManagedDemoSignerDurableObject` migration |
 | Draft-generation AI policy | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker |
 
-Set the webhook after deploy with placeholders only:
+`deploy:apply -- --apply` sets the webhook automatically. For manual diagnosis,
+the equivalent Telegram API call is:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
@@ -207,15 +214,15 @@ The current command handler uses configured demo fixtures from optional
 session-context payloads still go through the session worker or canonical agent
 APIs as that contract is promoted from demo fixtures.
 
-## Deploy Helper Plan
+## Deploy Helper Plan And Apply
 
-The long-term product flow should not require manual Wrangler. The current
+The product flow should not require manual Wrangler. The current
 operator UX is `/telegram-demo-setup`: it selects a CE session, pulls
 `CE_SESSION_WORKER_BASE_URL` and `DEFAULT_CHAIN_ID` from that session when
 available, preserves the default OP Sepolia POKT/PATH RPC, accepts optional
 additional RPC fallback input, generates `TELEGRAM_WEBHOOK_SECRET` and
 `DEMO_SIGNER_ROOT_SECRET`, derives the Workers.dev public URL, and creates a
-redacted deploy plan. Wrangler remains a developer fallback.
+redacted deploy plan. Wrangler remains a developer fallback only.
 
 This slice adds a planning/validation helper:
 
@@ -233,9 +240,12 @@ multiple accounts are visible because account selection is not implemented yet:
 
 - Workers script upload with vars and bindings.
 - KV namespace for opaque action IDs and webhook replay cache.
-- R2 bucket for demo artifacts when enabled.
-- D1 database for event/audit/index records when enabled.
-- Durable Object binding and migration for managed demo signer/runtime.
+- R2 bucket for demo artifacts only when `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true`
+  or `--enable-doc-storage`.
+- D1 database for event/audit/index records only when
+  `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or `--enable-doc-storage`.
+- SQLite-backed Durable Object binding and migration for managed demo
+  signer/runtime.
 - Worker secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
   `DEMO_SIGNER_ROOT_SECRET`.
 - Worker vars: `TELEGRAM_BOT_USERNAME`, `AGENT_BRIDGE_PUBLIC_URL`,
@@ -244,11 +254,118 @@ multiple accounts are visible because account selection is not implemented yet:
 - Script-level Workers.dev enablement for
   `https://<worker-name>.<workers-subdomain>.workers.dev`.
 
-The generated Cloudflare token request needs Workers Scripts, Workers KV, R2,
-D1, and Durable Objects edit scopes. `Account Settings: Edit` is needed only
-when the helper must create or change the account-level workers.dev subdomain;
-if the account already has a workers.dev subdomain, the first demo can omit that
-broader scope and just enable the script on Workers.dev.
+The default Telegram smoke token needs Workers Scripts, Workers KV, and Durable
+Objects edit scopes. R2 and D1 edit scopes are needed only when bridge-owned
+demo doc/artifact storage is explicitly enabled. `Account Settings: Edit` is
+needed only when the helper must create or change the account-level workers.dev
+subdomain; if the account already has a workers.dev subdomain, the first demo
+can omit that broader scope and just enable the script on Workers.dev.
+
+By default, `deploy:plan` is offline and does not call Cloudflare. To verify
+account derivation immediately before a live smoke, opt in explicitly:
+
+```bash
+cd workers/agentBridgeWorker
+AGENT_BRIDGE_LIVE_ACCOUNT_LOOKUP=1 npm run deploy:plan -- --workers-subdomain <workers-subdomain>
+```
+
+or:
+
+```bash
+npm run deploy:plan -- --workers-subdomain <workers-subdomain> --live-account-lookup
+```
+
+That opt-in performs only `GET /accounts?per_page=2` with the local
+`CLOUDFLARE_API_TOKEN`. The token is never printed. Zero or multiple visible
+accounts make validation fail; do not work around that for the first demo except
+with the documented developer-only `CLOUDFLARE_ACCOUNT_ID` fallback.
+
+The apply helper reads `.dev.vars` directly and is still safe to run without
+deploying because dry-run is the default:
+
+```bash
+cd workers/agentBridgeWorker
+npm run deploy:apply
+```
+
+The live path requires explicit opt-in:
+
+```bash
+npm run deploy:apply -- --apply
+```
+
+`--apply` performs the direct Cloudflare and Telegram calls modeled by
+`deploy:plan`: account lookup when needed, workers.dev subdomain lookup, KV
+create-or-reuse, optional R2/D1 create-or-reuse for doc storage, module worker
+upload, Worker secret writes, workers.dev script enablement, Telegram
+`setWebhook`, and `/health` verification. Tests keep these network calls mocked
+unless the operator runs the command with `--apply`.
+
+Useful guarded variants:
+
+```bash
+npm run deploy:apply -- --apply --skip-telegram-webhook
+npm run deploy:apply -- --apply --skip-health-check
+npm run deploy:apply -- --apply --enable-doc-storage
+```
+
+## Live Smoke Checklist
+
+Everything below uses user-provided live values from untracked `.dev.vars` or a
+temporary shell environment. Avoid passing secrets as command-line flags because
+shells may persist history. Do not commit generated `.env`, `.dev.vars`,
+`dev.vars`, `wrangler.toml`, real tokens, bot tokens, webhook secrets, signer
+root secrets, account IDs, RPC URLs with private keys, or Cloudflare resource
+IDs.
+
+1. Create the Telegram bot in BotFather and record `TELEGRAM_BOT_TOKEN` plus
+   `TELEGRAM_BOT_USERNAME` without `@`.
+2. Create a scoped Cloudflare token with Workers Scripts, Workers KV, and
+   Durable Objects edit scopes. Add R2 and D1 edit scopes only when testing
+   bridge-owned doc/artifact storage with `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true`
+   or `--enable-doc-storage`. Add `Account Settings: Edit` only when the
+   account-level workers.dev subdomain must be created or changed.
+3. Open `/telegram-demo-setup`, select the CE session, paste the Telegram and
+   Cloudflare values, keep the default OP Sepolia POKT/PATH RPC, optionally add
+   a second OP Sepolia RPC fallback, enter the workers.dev subdomain, and build
+   the redacted plan.
+4. Populate untracked `workers/agentBridgeWorker/.dev.vars` with the live values.
+   Run `npm run deploy:plan` once offline, then run `npm run deploy:apply` once
+   as a dry-run. Use `--live-account-lookup` only when you want the plan command
+   to make the account lookup call before applying.
+5. Run `npm run deploy:apply -- --apply`. The helper creates or reuses KV,
+   uploads the module worker, writes deployed Worker secrets, enables the
+   workers.dev script route, sets the Telegram webhook with
+   `secret_token=<TELEGRAM_WEBHOOK_SECRET>`, and verifies
+   `$AGENT_BRIDGE_PUBLIC_URL/health`. It does not touch R2/D1 unless doc
+   storage is explicitly enabled.
+6. If the Cloudflare token cannot read the account workers.dev subdomain, paste
+   `CLOUDFLARE_WORKERS_SUBDOMAIN` and `AGENT_BRIDGE_PUBLIC_URL` into `.dev.vars`
+   and re-run the dry-run before applying.
+7. Keep `--skip-telegram-webhook` or `--skip-health-check` only for diagnosis;
+   the normal live smoke should run both.
+8. Confirm the deployed `/health` output reports `worker: agentBridgeWorker`.
+9. Smoke Telegram private chat `/start`, group `/ce_join <session>`,
+   `/ce_sessions`, `/ce_questions`, `/q <question-id-or-text>`, `/ce_docs`, and
+   private `/ce_me`.
+10. Confirm replies contain only safe summaries and opaque `cecb_*` / `cetg_*`
+    action IDs, no raw callback payloads, grants, JWTs, Cloudflare credentials,
+    private keys, RPC secrets, document paths, or private/gated text.
+
+Still mocked or contract-only for this first smoke:
+
+- `/telegram-demo-setup` does not deploy the worker or set the Telegram webhook.
+- `deploy:plan` creates no KV, R2, D1, Durable Object, Worker upload, secret, or
+  webhook resources; the only optional live call is account lookup. Use
+  `deploy:apply -- --apply` for the live resource and webhook path.
+- Real question/doc/session payload reads are still represented by configured
+  demo fixtures unless the canonical `/api/agent/*` session contract is wired
+  for that route.
+- OpenClaw/MCP forwarding is contract-only; no real external OpenClaw HTTP/MCP
+  transport is sent from this worker.
+- Broadcast remains disabled.
+- Cloudflare `lit_encrypted` envelope production/reading is later storage
+  hardening and is not part of the immediate Telegram smoke.
 
 ## Normal Session Submit
 

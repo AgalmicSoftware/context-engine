@@ -1,3 +1,10 @@
+CLOUDFLARE_API_TOKEN=PASTE_SCOPED_CLOUDFLARE_TOKEN_FOR_LOCAL_DEPLOY_APPLY_ONLY
+CLOUDFLARE_WORKERS_SUBDOMAIN=your-workers-subdomain
+AGENT_BRIDGE_WORKER_NAME=ce-agent-bridge-worker
+# Default live Telegram smoke provisions only KV plus Worker/DO bindings. Set
+# true only when explicitly testing bridge-owned R2/D1 demo doc/artifact storage.
+AGENT_BRIDGE_ENABLE_DOC_STORAGE=false
+
 TELEGRAM_BRIDGE_ENABLED=true
 TELEGRAM_BOT_TOKEN=PASTE_TELEGRAM_BOT_TOKEN_FOR_LOCAL_ONLY
 TELEGRAM_BOT_USERNAME=your_context_engine_bot
@@ -5,8 +12,8 @@ TELEGRAM_WEBHOOK_SECRET=PASTE_RANDOM_WEBHOOK_SECRET_FOR_LOCAL_ONLY
 DEMO_SIGNER_ROOT_SECRET=PASTE_RANDOM_DEMO_SIGNER_ROOT_SECRET_FOR_LOCAL_ONLY
 
 AGENT_BRIDGE_DEPLOYMENT_ID=local-demo
-AGENT_BRIDGE_PUBLIC_URL=https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev
-CE_SESSION_WORKER_BASE_URL=https://<session-worker>.<workers-subdomain>.workers.dev
+AGENT_BRIDGE_PUBLIC_URL=https://ce-agent-bridge-worker.your-workers-subdomain.workers.dev
+CE_SESSION_WORKER_BASE_URL=https://your-session-worker.your-workers-subdomain.workers.dev
 DEFAULT_CHAIN_ID=11155420
 DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network
 # Optional additive fallback. This does not replace DEFAULT_RPC_URL.
@@ -18,3 +25,7 @@ BROADCAST_ENABLED=false
 # AGENT_BRIDGE_SESSION_POLICY_JSON={"defaultSessionSlug":"general","sessions":[{"sessionSlug":"general","sessionName":"General","telegramBridgeEnabled":true}]}
 # AGENT_BRIDGE_DEMO_QUESTIONS_JSON=[{"questionId":"q-readiness","questionType":"freeform","prompt":"What should this group decide next?"}]
 # AGENT_BRIDGE_DEMO_DOCS_JSON=[{"docId":"doc-public","sessionSlug":"general","title":"Public notes","fileType":"md","visibility":"public","contentPreview":"Public summary only"}]
+
+# Optional developer fallback only. Live apply derives the account from the
+# token when exactly one account is visible.
+# CLOUDFLARE_ACCOUNT_ID=PASTE_ONLY_IF_DEBUGGING_MANUAL_ACCOUNT_SELECTION
