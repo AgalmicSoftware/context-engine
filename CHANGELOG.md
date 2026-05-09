@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - Clarified Cloudflare setup permissions for R2 payload blobs, D1/KV metadata indexes, and Durable Objects only for signer/runtime coordination, while keeping Telegram/agentBridgeWorker scoped to demo preferences, drafts, action IDs, event logs, and demo account state.
 - Added `/new` Cloudflare payload access modes: default `worker_sbt_gate` worker-enforced SBT access control without Lit credential requirements, plus a `lit_encrypted` scaffold that requires pre-encrypted payloads and rejects plaintext Cloudflare uploads until the Lit envelope path is complete.
 - Added a safe agentBridgeWorker Telegram webhook setup path with local `.dev.vars`/`.env` examples, Wrangler secret guidance, and a secret-token-gated `/telegram/webhook` acknowledgement route.
+- Added live agentBridgeWorker Telegram command handling for `/start`, `/ce_join`, `/ce_sessions`, `/ce_questions`, `/ce_pose_question`/`/q`, `/ce_docs`, and `/ce_me`, plus a mocked Telegram sender adapter and a redacted Cloudflare deploy-plan helper for the first Workers.dev demo.
 - Fixed encrypted Document Library image thumbnails so scoped Lit hooks arriving after initial render trigger preview loading.
 
 ### Remaining TODOs

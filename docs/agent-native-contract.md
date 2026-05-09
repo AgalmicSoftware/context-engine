@@ -323,7 +323,7 @@ embed account ids, bucket names, or tokens.
 Telegram screen/message helpers expose launch metadata on every
 `telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`,
 `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`,
-`/ce_generate_questions`, `/ce_account`,
+`/ce_generate_questions`, `/ce_me`, `/ce_account`,
 `/ce_sbt <sbt-address-or-group-id-or-link>`,
 `/ce_join_sbt <sbt-address-or-invite-code-or-link>`,
 `/ce_create_sbt_group [session-slug]`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`,
@@ -542,6 +542,13 @@ future work unless they only need parsing or docs.
 Rules:
 
 - `callback_data` uses opaque short action IDs, not full payloads or secrets.
+- `workers/agentBridgeWorker/` validates
+  `X-Telegram-Bot-Api-Secret-Token` against `TELEGRAM_WEBHOOK_SECRET` before
+  handling live webhook updates. The first live demo handles `/start`,
+  `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
+  `/ce_pose_question`, `/q`, `/ce_docs`, and `/ce_me` through the
+  `https://<worker-name>.<workers-subdomain>.workers.dev/telegram/webhook`
+  endpoint.
 - Mini App `initData` must be validated server-side before trusting Telegram
   identity. The helper follows Telegram's official Mini App HMAC validation
   flow: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app

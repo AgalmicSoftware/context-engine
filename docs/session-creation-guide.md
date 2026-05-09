@@ -122,7 +122,7 @@ You need:
 - An API token with Workers-related permissions. The wizard expects the same scope used by the deploy-helper flow described in [session-cors-worker.md](session-cors-worker.md).
 - Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/reference/template/>
 
-In practice, the deploy flow needs least-privilege permission to manage Workers scripts, Workers KV, R2 buckets/objects for CE payload blobs, D1 or KV metadata/index resources where configured, Durable Objects only for signer/runtime coordination, and the account-level settings needed to enable a `workers.dev` subdomain. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
+In practice, the deploy flow needs least-privilege permission to manage Workers scripts, Workers KV, R2 buckets/objects for CE payload blobs, D1 or KV metadata/index resources where configured, and Durable Objects only for signer/runtime coordination. `Account Settings: Edit` is needed only if the helper must create or change the account-level `workers.dev` subdomain; omit it when the account already has a workers.dev subdomain and the helper only enables a script URL. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
 
 ### 3. OP Sepolia ETH
 
@@ -250,7 +250,7 @@ What happens during deploy:
 
 - The deploy-helper calls Cloudflare’s Workers API
 - It creates or updates the worker
-- It fetches or creates the account `workers.dev` subdomain if needed
+- It fetches the account `workers.dev` subdomain and creates/changes it only when explicitly needed
 - It returns the final worker URL
 - The wizard auto-fills `corsWorkerUrl`
 - The wizard signs admin requests and calls `/admin/set-config` and `/admin/set-secrets` to verify or backfill the per-session worker data
