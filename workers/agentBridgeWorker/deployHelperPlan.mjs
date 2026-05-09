@@ -46,6 +46,15 @@ export const REQUIRED_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'DEFAULT_RPC_URL',
 ]);
 
+export const OPTIONAL_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
+  'ADDITIONAL_RPC_URL',
+  'AGENT_BRIDGE_SESSION_POLICY_JSON',
+  'AGENT_BRIDGE_DEMO_QUESTIONS_JSON',
+  'AGENT_BRIDGE_DEMO_DOCS_JSON',
+  'AGENT_BRIDGE_MAX_REGISTRY_SESSIONS',
+  'AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS',
+]);
+
 function safeString(value) {
   return String(value || '').trim();
 }
@@ -218,6 +227,11 @@ export function resolveAgentBridgeDeployConfig({
       DEFAULT_CHAIN_ID: defaultChainId,
       DEFAULT_RPC_URL: safeString(flags['default-rpc-url'] || env.DEFAULT_RPC_URL || rpcDefaults.getPathRpcUrl(defaultChainId) || DEFAULT_RPC_URL),
       ADDITIONAL_RPC_URL: safeString(flags['additional-rpc-url'] || env.ADDITIONAL_RPC_URL),
+      AGENT_BRIDGE_SESSION_POLICY_JSON: safeString(env.AGENT_BRIDGE_SESSION_POLICY_JSON),
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: safeString(env.AGENT_BRIDGE_DEMO_QUESTIONS_JSON),
+      AGENT_BRIDGE_DEMO_DOCS_JSON: safeString(env.AGENT_BRIDGE_DEMO_DOCS_JSON),
+      AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: safeString(env.AGENT_BRIDGE_MAX_REGISTRY_SESSIONS),
+      AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS: safeString(env.AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS || env.SESSION_REGISTRY_ADDRESS || env.SESSION_REGISTRY),
       TELEGRAM_BRIDGE_ENABLED: 'true',
       BROADCAST_ENABLED: 'false',
       AGENT_AI_PROVIDER: safeString(flags['agent-ai-provider'] || env.AGENT_AI_PROVIDER || 'ce_session_policy'),
@@ -400,7 +414,7 @@ export function buildAgentBridgeCloudflareTokenPermissions(config = {}) {
 
 export function buildAgentBridgeWorkerUploadMetadata(config = {}) {
   const vars = Object.fromEntries(Object.entries(config.vars || {})
-    .filter(([name, text]) => name !== 'ADDITIONAL_RPC_URL' || !!safeString(text)));
+    .filter(([name, text]) => !OPTIONAL_AGENT_BRIDGE_VAR_NAMES.includes(name) || !!safeString(text)));
   const bindings = [
     { name: 'AGENT_ACTION_KV', type: 'kv_namespace', namespace_id: '<created-kv-namespace-id>' },
   ];

@@ -239,6 +239,33 @@ test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2
     binding.name === 'ADDITIONAL_RPC_URL' &&
     binding.text === 'https://infura.example.test/op-sepolia'
   )), true);
+  assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_BRIDGE_DEMO_QUESTIONS_JSON'), false);
+});
+
+test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when configured', () => {
+  const questions = '[{"questionId":"q-demo","prompt":"What should this group decide next?"}]';
+  const docs = '[{"docId":"doc-public","title":"Public notes","visibility":"public"}]';
+  const config = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: questions,
+      AGENT_BRIDGE_DEMO_DOCS_JSON: docs,
+      AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: '25',
+    }),
+  });
+  const metadata = buildAgentBridgeWorkerUploadMetadata(config);
+
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_DEMO_QUESTIONS_JSON' &&
+    binding.text === questions
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_DEMO_DOCS_JSON' &&
+    binding.text === docs
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_MAX_REGISTRY_SESSIONS' &&
+    binding.text === '25'
+  )), true);
 });
 
 test('buildAgentBridgeWorkerUploadMetadata includes R2/D1 only when doc storage is enabled', () => {

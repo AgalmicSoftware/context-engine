@@ -222,6 +222,8 @@ and `AGENT_BRIDGE_DEMO_DOCS_JSON` fixtures until a reachable canonical
 non-identifying and secret-free. Real questions, responses, documents, grants,
 and private session-context payloads still go through the session worker or
 canonical agent APIs as that contract is promoted from demo fixtures.
+When these optional fixture vars are present in untracked `.dev.vars`,
+`deploy:apply -- --apply` uploads them as plain Worker vars.
 
 ## Interactive Preview
 
