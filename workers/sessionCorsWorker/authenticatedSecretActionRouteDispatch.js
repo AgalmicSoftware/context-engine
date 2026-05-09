@@ -252,6 +252,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     const result = await (
       deps?.executeSessionLitChipotleAction || executeSessionLitChipotleAction
     )({
+      env,
       config,
       secrets: secretContext.secrets,
       request: body,

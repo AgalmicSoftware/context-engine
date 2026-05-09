@@ -1,6 +1,6 @@
 # Lit v3 Design: Chipotle Worker-Mediated SBT-Gated Encryption
 
-_Last updated: April 29, 2026._
+_Last updated: May 9, 2026._
 
 ## Why this doc exists
 
@@ -77,17 +77,24 @@ Lit Action / PKP:
 
 ## Proposed v3 envelope direction
 
-The current v2 envelope should remain readable during migration, but new v3 writes should stop depending on browser ACC `saveKey/getKey` semantics.
+The current v2 envelope should remain readable for non-Chipotle recipients, but
+Chipotle wrapped-key recipients now fail closed unless they use the v2
+policy-bound wrapped-key format.
 
 Recommended v3 envelope shape:
 
 - ciphertext: existing CE AES-GCM encrypted payload
-- cekWrap: PKP- or action-mediated wrapped CEK for Chipotle release
-- gate: explicit SBT gate metadata needed for verification
-- litV: explicit schema version such as `chipotle-sbt-v1`
-- rpcHint: optional worker-managed RPC selector when the Lit Action must read a non-default chain
+- cekWrap: Chipotle ciphertext wrapping a JSON plaintext `{ v: 2, cekHex, policyFingerprint, policy }`
+- policy: canonical SBT gate policy `{ chainId, gateMode, sbtAddresses, litActionCid, litPkpId }`
+- litV: explicit wrapped-key version `2`
+- rpc: no stored request-selected RPC URL; check/decrypt RPC is chosen from the worker allowlist and verified by `provider.getNetwork().chainId`
 
 This keeps the user data format close to CE's current envelope model while swapping only the Lit recipient mechanism.
+
+Operationally, default Lit Action source changes require re-running
+`lit-chipotle-provision` or `lit-chipotle-bootstrap-session` for each
+Chipotle-enabled session. The worker verifies submitted action source against
+the configured `litActionCid` and does not fall back to old action CIDs.
 
 ## First real vertical slice
 
