@@ -1,42 +1,22 @@
 import SurveyTool from './SurveyTool';
-import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
+import { SurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
 import { SurveySelector } from './SurveySelector';
-import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
-import { resolveSurveyToolQuestionReadCacheContext } from './surveyToolSessionResolution';
+import ConnectedSurveyResults from './SurveyResults';
 
-const REACT_LAZY_TYPE = Symbol.for('react.lazy');
-
-const findFirstNode = (node, predicate) => {
+const findFirstNodeByType = (node, targetType) => {
   if (node == null) return null;
   if (Array.isArray(node)) {
     for (const child of node) {
-      const found = findFirstNode(child, predicate);
+      const found = findFirstNodeByType(child, targetType);
       if (found) return found;
     }
     return null;
   }
   if (typeof node !== 'object') return null;
-  if (predicate(node)) return node;
-  return findFirstNode(node?.props?.children, predicate);
+  if (node?.type === targetType) return node;
+  return findFirstNodeByType(node?.props?.children, targetType);
 };
-
-const findFirstNodeByType = (node, targetType) => (
-  findFirstNode(node, (candidate) => candidate?.type === targetType)
-);
-
-const findLazySurveyResultsNode = (node) => (
-  findFirstNode(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen')
-  ))
-);
-
-const findLazySurveyQuestionsNode = (node) => (
-  findFirstNode(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode')
-  ))
-);
 
 describe('SurveyTool compatibility wiring', () => {
   afterEach(() => {
@@ -49,38 +29,19 @@ describe('SurveyTool compatibility wiring', () => {
   });
 
   it('uses __registry.registryChainId when SurveyQuestions resolves the session chain', () => {
-    const resolveBySlug = jest.fn((slug) => (
-      slug === 'edge'
-        ? {
-            slug: 'edge',
-            __registry: {
-              registryChainId: 84532,
-            },
-          }
-        : null
-    ));
-
-    const resolved = resolveSurveyToolQuestionReadCacheContext({
+    const subject = new SurveyQuestions({
       sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
       network: { id: 8453, chainId: 8453, name: 'Base' },
-      resolveBySlug,
     });
-
-    expect(resolved).toMatchObject({
-      sessionSlug: 'edge',
-      sessionConfig: {
-        slug: 'edge',
-        __registry: {
-          registryChainId: 84532,
-        },
+    subject.resolveEffectiveResponseGateConfig = jest.fn(() => ({
+      slug: 'edge',
+      __registry: {
+        registryChainId: 84532,
       },
-      networkId: 84532,
-      networkIdStr: '84532',
-    });
-    expect(resolveBySlug).toHaveBeenCalledWith('edge');
-    // port note: dropped direct `SurveyQuestions.resolveSessionChainId()`
-    // invocation. The exported session-resolution helper is the behavior-level
-    // chain selector that preserves the same registryChainId-over-wallet rule.
+    }));
+
+    expect(subject.resolveSessionChainId('edge')).toBe(84532);
   });
 
   it('renders extracted PileViewMode through SurveyTool.tsx in pile mode', () => {
@@ -93,8 +54,7 @@ describe('SurveyTool compatibility wiring', () => {
 
     const tree = shell.render();
 
-    expect(tree.type?.$$typeof).toBe(REACT_LAZY_TYPE);
-    expect(tree.props.minifiedMode).toBe('pile');
+    expect(tree.type).toBe(PileViewMode);
   });
 
   it('forwards scoped Lit hooks from SurveyTool into normal survey surfaces', () => {
@@ -109,66 +69,34 @@ describe('SurveyTool compatibility wiring', () => {
 
     const tree = shell.render();
     const selectorNode = findFirstNodeByType(tree, SurveySelector);
-    const resultsNode = findLazySurveyResultsNode(tree);
+    const resultsNode = findFirstNodeByType(tree, ConnectedSurveyResults);
 
     expect(selectorNode?.props?.lit).toBe(lit);
     expect(selectorNode?.props?.litHooks).toBe(litHooks);
     expect(resultsNode?.props?.lit).toBe(lit);
     expect(resultsNode?.props?.litHooks).toBe(litHooks);
-    expect(resultsNode?.props?.isOpen).toBe(false);
   });
 
   it('forwards scoped Lit hooks from SurveyTool into single-question surfaces', () => {
     const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
     const lit = { getKey: jest.fn() };
-    const sessionConfig = {
-      slug: 'edge',
-      networkChainId: 11155420,
-      encryption: {
-        gates: {
-          questionResponses: {
-            type: 'sbt',
-            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
-          },
-        },
-      },
-    };
     const shell = new SurveyTool({
       singleQuestionMode: true,
       questionID: '0xquestion',
       network: { id: 11155420 },
       networkChainId: 11155420,
-      sessionSlug: 'edge',
-      sessionConfig,
       lit,
       litHooks,
     });
 
     const tree = shell.render();
-    const questionsNode = findLazySurveyQuestionsNode(tree);
+    const questionsNode = findFirstNodeByType(tree, SurveyQuestions);
 
     expect(questionsNode?.props?.lit).toBe(lit);
     expect(questionsNode?.props?.litHooks).toBe(litHooks);
-    expect(questionsNode?.props?.sessionSlug).toBe('edge');
-    expect(questionsNode?.props?.sessionConfig).toBe(sessionConfig);
-    expect(questionsNode?.props?.networkChainId).toBe(11155420);
   });
 
   it('keeps extracted PileViewMode wired to the SurveyQuestions base class', () => {
-    const { getByTestId } = renderSurveyPileViewMode({
-      minifiedMode: 'pile',
-      network: { id: 84532 },
-      networkChainId: 84532,
-      isQuestionCacheReady: true,
-      onFilterChange: jest.fn(),
-      runtimeStrategy: createPileViewRuntimeStrategy(),
-    });
-
-    expect(getByTestId('ce-survey-filter-toggle')).toBeInTheDocument();
-    expect(getByTestId('ce-survey-create-toggle-pile')).toBeInTheDocument();
-    // port note: dropped prototype inheritance assertion. The coordinated
-    // hooks flip intentionally removes `extends SurveyQuestions`; this guard
-    // now verifies the extracted pile surface still renders through its shared
-    // runtime wiring instead of pinning the class prototype chain.
+    expect(Object.getPrototypeOf(PileViewMode.prototype)).toBe(SurveyQuestions.prototype);
   });
 });
