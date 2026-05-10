@@ -1624,10 +1624,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   generateQuestionId = (
     type: unknown,
     prompt: unknown,
-    options: any = [],
-    singleSelect: any = false
+    options: unknown = [],
+    singleSelect: unknown = false
   ): string => {
-    return generateSharedQuestionId(type, prompt, options, singleSelect);
+    return generateSharedQuestionId(
+      type,
+      prompt,
+      Array.isArray(options) ? options : [],
+      singleSelect === true
+    );
   };
 
   handleTitleChange = (event: CreateSurveyInputValueEvent): void => {
