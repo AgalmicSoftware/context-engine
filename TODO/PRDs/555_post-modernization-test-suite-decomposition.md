@@ -214,7 +214,7 @@ Large-test inventory from this branch:
 
 | Test file | Lines | Current ownership note |
 |---|---:|---|
-| `client/src/components/SurveyTool/SurveyTool.module.test.js` | 14,973 | Single top-level `SurveyTool module` suite; mixed shell compatibility, pile runtime, cache, gate/decrypt, draft, response, and UI helper coverage. |
+| `client/src/components/SurveyTool/SurveyTool.module.test.js` | 14,739 | Single top-level `SurveyTool module` suite; mixed shell compatibility, pile runtime, cache, gate/decrypt, draft, response, and UI helper coverage. |
 | `client/src/components/SBTs/SBTsList.loading-status.test.jsx` | 6,386 | Single top-level `SBTsList per-session loader countdown` suite; loading/status model plus render timing and cache hydration. |
 | `client/src/components/UserPage/UserPage.test.jsx` | 5,095 | Three top-level clusters: cache refresh pipeline, cold-load network fallback, deep-scan tooltip formatting. |
 | `client/src/components/Sessions/SessionWizard.render.test.jsx` | 4,901 | Single top-level rendered-validation suite. |
@@ -229,6 +229,8 @@ Completed split:
 - Added `client/src/components/SurveyTool/SurveyTool.compat.test.js` for the isolated SurveyTool shell compatibility cluster: import smoke, registry-chain resolution, PileViewMode wiring, and Lit-hook forwarding.
 - Removed the moved assertions from `SurveyTool.module.test.js`.
 - Left a short comment in `SurveyTool.module.test.js` marking it as the remaining broad runtime/controller suite until more clusters have clear focused owners.
+- Added `client/src/components/SurveyTool/SurveyQuestions.runtime.test.js` for the SurveyQuestions-owned bookmark cache and auto-decrypt runtime helper cluster.
+- Removed those five direct `SurveyQuestions` assertions from `SurveyTool.module.test.js` without changing assertions.
 
 Verification:
 
@@ -241,6 +243,9 @@ cd client && npm test -- --watchAll=false --runTestsByPath \
   src/components/SurveyTool/CreateQuestionsAndSurveys.cache.test.ts \
   src/components/SurveyTool/SurveyTool.module.test.js \
   src/components/SurveyTool/SurveyTool.compat.test.js
+cd client && npm test -- --watchAll=false --runTestsByPath \
+  src/components/SurveyTool/SurveyTool.module.test.js \
+  src/components/SurveyTool/SurveyQuestions.runtime.test.js
 cd client && npx tsc --noEmit --pretty false
 git diff --check
 ```
@@ -249,6 +254,7 @@ Results:
 
 - SurveyTool old + new split test run: PASS, 2 suites, 285 tests.
 - Combined focused test run after TypeScript boundary cleanup: PASS, 4 suites, 337 tests.
+- SurveyQuestions runtime split test run with old SurveyTool suite: PASS, 2 suites, 279 tests.
 - `npx tsc --noEmit --pretty false`: PASS after local JS-boundary typing cleanup in DocumentLibrary/CreateQuestions.
 - `git diff --check`: PASS.
 
