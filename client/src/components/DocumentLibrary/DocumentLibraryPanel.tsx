@@ -80,6 +80,29 @@ type DocData = {
   type: string | null;
 };
 
+type StorageRef = {
+  backend: string;
+  id: string;
+  uri?: string;
+  contentType?: string;
+  encrypted?: boolean;
+  [key: string]: unknown;
+};
+
+type NormalizeStorageRefOptions = {
+  fallbackBackend?: string;
+  legacyArweaveTxId?: unknown;
+  encrypted?: boolean;
+  resource?: string;
+  [key: string]: unknown;
+};
+
+type SessionStorageContext = {
+  account?: string | null;
+  providerLike?: unknown;
+  chainId?: number | string | null;
+};
+
 type DocBlock = {
   height?: number | null;
   timestamp?: number | string | null;
@@ -93,7 +116,7 @@ type DocRecord = {
   tagMap: DocTagMap;
   block: DocBlock | null;
   data: DocData | null;
-  storageRef?: Record<string, unknown> | null;
+  storageRef?: StorageRef | null;
 };
 
 type CustomSbtEntry = {
@@ -160,8 +183,29 @@ type UploadResult = {
   tagMap?: unknown;
   data?: Partial<DocData> | null;
   storage?: string;
-  storageRef?: Record<string, unknown> | null;
+  storageRef?: StorageRef | null;
 };
+
+const normalizeDocStorageRef = normalizeStorageRef as (
+  input: unknown,
+  opts?: NormalizeStorageRefOptions
+) => StorageRef | null;
+
+const listSessionStorageRefsForDocs = listSessionStorageRefs as (opts: {
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig;
+  context?: SessionStorageContext | null;
+  workerUrl?: string;
+  resource?: string;
+}) => Promise<Record<string, unknown>[]>;
+
+const readSessionStorageBlobForDocs = readSessionStorageBlob as (opts: {
+  storageRef: StorageRef;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig;
+  context?: SessionStorageContext | null;
+  workerUrl?: string;
+}) => Promise<Response>;
 
 type DocumentLibraryPanelProps = {
   provider?: unknown;
@@ -255,7 +299,7 @@ const buildPendingDocRecord = ({
   txId: string;
   tagMap?: unknown;
   data?: Partial<DocData> | null;
-  storageRef?: Record<string, unknown> | null;
+  storageRef?: StorageRef | null;
 }): DocRecord => ({
   txId,
   cursor: null,
@@ -272,7 +316,7 @@ const buildPendingDocRecord = ({
 
 
 const buildDocRecordFromStorageItem = (item: Record<string, unknown>): DocRecord | null => {
-  const storageRef = normalizeStorageRef(item?.storageRef, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE });
+  const storageRef = normalizeDocStorageRef(item?.storageRef, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE });
   if (!storageRef) return null;
   const metadata = item?.metadata && typeof item.metadata === 'object' ? item.metadata as Record<string, unknown> : {};
   const tagMap = buildTagMapFromTags(Array.isArray(metadata.tags) ? metadata.tags as TagEntry[] : []);
@@ -755,7 +799,7 @@ export default function DocumentLibraryPanel({
     try {
       const after = reset ? null : cursorRef.current;
       const edges = docProvider === STORAGE_BACKENDS.CLOUDFLARE
-        ? ((await listSessionStorageRefs({
+        ? ((await listSessionStorageRefsForDocs({
           sessionSlug,
           sessionConfig,
           context: { account, providerLike: provider, chainId: network?.id || null },
@@ -845,7 +889,7 @@ export default function DocumentLibraryPanel({
     const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
     const kind = toStr(tagMap['CE-DocKind']).trim().toLowerCase();
     const isEncrypted = storage === 'lit-arweave' || storage === 'lit';
-    const storageRef = normalizeStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
+    const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
     const isCloudflareStorage = storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE;
 
     setViewerOpen(true);
@@ -861,7 +905,7 @@ export default function DocumentLibraryPanel({
         if (isEncrypted) {
           throw new Error('Lit-encrypted Cloudflare document reads are not implemented yet.');
         }
-        const response = await readSessionStorageBlob({
+        const response = await readSessionStorageBlobForDocs({
           storageRef,
           sessionSlug,
           sessionConfig,
@@ -1769,7 +1813,7 @@ export default function DocumentLibraryPanel({
           const name = toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : (storage === 'lit-arweave' ? 'Encrypted document' : 'Document'));
           const txId = toStr(doc?.txId).trim();
           const isEncryptedStorage = storage === 'lit-arweave' || storage === 'lit';
-          const storageRef = normalizeStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
+          const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
           const isCloudflareStorage = storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE;
           const arweaveUrl = txId && !isCloudflareStorage ? arweaveScripts.buildArweaveGatewayUrl(txId) : '';
           const litUrl = txId && !isCloudflareStorage ? litStorage.buildLitArweaveUrl(txId) : '';
