@@ -18,6 +18,8 @@ import { faWindowClose, faCheck, faCheckSquare } from '@fortawesome/free-solid-s
 
 const log = createLogger('ui');
 
+const buildClassName = (classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
+
 type GreetingModalProps = {
   fetchSessionState: () => void;
   account?: string | null;
@@ -103,7 +105,7 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
 
     const formBottomVisibleClassName = this.props.optOutAndEmailBottom ? styles.updatesPanel : styles.isHidden;
 
-    const modalVisibleID = this.props.visible ? styles.rulesModal : styles.invisibleModal;
+    const modalVisibleClassName = this.props.visible ? styles.rulesModal : styles.isClosed;
 
 
 

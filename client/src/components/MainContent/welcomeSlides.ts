@@ -5,15 +5,40 @@ import modalPicture3 from '../../assets/img/seedsman_slim.jpg';
 import modalPicture4 from '../../assets/img/frontliner.png';
 import modalPicture5 from '../../assets/img/explainer_final.png';
 
-export const WELCOME_SLIDES = [
+export type WelcomeSlideMediaButtonVariant = 'standard' | 'centered';
+export type WelcomeSlideImageVariant =
+  | 'intro'
+  | 'toolkit'
+  | 'goals'
+  | 'audience'
+  | 'motivation'
+  | 'collaborators';
+
+export type WelcomeSlide = {
+  key: string;
+  title: string;
+  overlayTitle: string;
+  textAlign: 'center' | 'left' | 'right';
+  mediaLayout?: 'default' | 'flushBottom' | 'centered';
+  mediaButtonVariant: WelcomeSlideMediaButtonVariant;
+  imageVariant: WelcomeSlideImageVariant;
+  image: string;
+  imageAlt: string;
+  bulletPoints: Array<{
+    bold: string;
+    text: string;
+  }>;
+};
+
+export const WELCOME_SLIDES: WelcomeSlide[] = [
   {
     key: 'intro',
     title: '',
     overlayTitle: 'Context Engine',
     textAlign: 'center',
     mediaLayout: 'flushBottom',
-    buttonStyleId: 'siteExplainer',
-    imageStyleId: 'greetingImage',
+    mediaButtonVariant: 'standard',
+    imageVariant: 'intro',
     image: modalPicture0,
     imageAlt: 'Context Engine welcome slide',
     bulletPoints: [
@@ -27,8 +52,8 @@ export const WELCOME_SLIDES = [
     overlayTitle: 'What Is Context Engine?',
     textAlign: 'left',
     mediaLayout: 'centered',
-    buttonStyleId: 'siteExplainerMultiply',
-    imageStyleId: 'betaViewerRobot',
+    mediaButtonVariant: 'centered',
+    imageVariant: 'toolkit',
     image: modalPicture1,
     imageAlt: 'Context Engine toolkit slide',
     bulletPoints: [
@@ -42,8 +67,8 @@ export const WELCOME_SLIDES = [
     title: 'Goals',
     overlayTitle: 'Goals',
     textAlign: 'right',
-    buttonStyleId: 'siteExplainer',
-    imageStyleId: 'betaViewerShip',
+    mediaButtonVariant: 'standard',
+    imageVariant: 'goals',
     image: modalPicture2,
     imageAlt: 'Context Engine goals slide',
     bulletPoints: [
@@ -57,8 +82,8 @@ export const WELCOME_SLIDES = [
     title: 'Built To Help',
     overlayTitle: 'Built To Help',
     textAlign: 'center',
-    buttonStyleId: 'siteExplainer',
-    imageStyleId: 'betaViewerSeedsman',
+    mediaButtonVariant: 'standard',
+    imageVariant: 'audience',
     image: modalPicture3,
     imageAlt: 'Context Engine people helped slide',
     bulletPoints: [
@@ -72,8 +97,8 @@ export const WELCOME_SLIDES = [
     title: 'Because',
     overlayTitle: 'Because',
     textAlign: 'left',
-    buttonStyleId: 'siteExplainerMultiply',
-    imageStyleId: 'frontlinerImage',
+    mediaButtonVariant: 'centered',
+    imageVariant: 'motivation',
     image: modalPicture4,
     imageAlt: 'Context Engine motivation slide',
     bulletPoints: [
@@ -87,8 +112,8 @@ export const WELCOME_SLIDES = [
     title: 'Looking For',
     overlayTitle: 'Looking For',
     textAlign: 'left',
-    buttonStyleId: 'siteExplainer',
-    imageStyleId: 'finalImage',
+    mediaButtonVariant: 'standard',
+    imageVariant: 'collaborators',
     image: modalPicture5,
     imageAlt: 'Context Engine collaborators slide',
     bulletPoints: [
@@ -99,7 +124,7 @@ export const WELCOME_SLIDES = [
   },
 ];
 
-export const getWelcomeSlide = (index = 0): any => {
+export const getWelcomeSlide = (index = 0): WelcomeSlide | null => {
   if (WELCOME_SLIDES.length === 0) return null;
   if (Number.isFinite(index) && index >= 0 && index < WELCOME_SLIDES.length) {
     return WELCOME_SLIDES[index];
