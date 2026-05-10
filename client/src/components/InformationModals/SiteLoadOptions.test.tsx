@@ -59,54 +59,56 @@ describe('SiteLoadOptions', () => {
     renderSiteLoadOptions(0);
 
     const greetingImage = screen.getByAltText('Context Engine welcome slide');
-    const greetingButton = greetingImage.closest('button');
+    const greetingButton = screen.getByTestId('ce-welcome-slide-media');
 
     expect(greetingImage).toBeInTheDocument();
-    expect(greetingImage.id).toBe('greetingImage');
-    expect(greetingButton?.id).toBe('siteExplainer');
+    expect(greetingImage).toHaveClass('welcomeSlideImageIntro');
+    expect(greetingButton).toHaveClass('welcomeSlideMediaButton');
+    expect(greetingButton).not.toHaveClass('welcomeSlideMediaButtonCentered');
     expect(greetingButton).toHaveAttribute('data-slide-layout', 'flushBottom');
     expect(greetingImage).toHaveAttribute('data-slide-layout', 'flushBottom');
   });
 
   it('centers bullet content for titleless slides and dims only the trailing copy', () => {
-    const { container } = renderSiteLoadOptions(1);
+    renderSiteLoadOptions(1);
 
     const robotImage = screen.getByAltText('Context Engine toolkit slide');
-    const robotButton = robotImage.closest('button');
-    const bulletListContainer = container.querySelector('#betaExaplainerList');
-    const bulletList = container.querySelector('#betaExplainerBulletpoint');
+    const robotButton = screen.getByTestId('ce-welcome-slide-media');
+    const bulletListContainer = screen.getByTestId('ce-welcome-slide-bullet-list');
+    const bulletList = screen.getByTestId('ce-welcome-slide-bullet-items');
     const firstBoldText = screen.getByText('A toolkit', { selector: 'strong' });
     const firstTrailingText = screen.getByText('for large-group discourse and coordination', { selector: 'span' });
 
     expect(robotImage).toBeInTheDocument();
-    expect(robotImage.id).toBe('betaViewerRobot');
-    expect(robotButton?.id).toBe('siteExplainerMultiply');
+    expect(robotImage).toHaveClass('welcomeSlideImageToolkit');
+    expect(robotButton).toHaveClass('welcomeSlideMediaButtonCentered');
     expect(robotButton).toHaveAttribute('data-slide-layout', 'centered');
     expect(robotImage).toHaveAttribute('data-slide-layout', 'centered');
-    expect(bulletListContainer).toHaveClass('titlelessBulletListContainer');
+    expect(bulletListContainer).toHaveClass('isTitlelessBulletList');
     expect(firstBoldText).toBeInTheDocument();
-    expect(firstTrailingText).toHaveClass('betaExplainerBulletTrailingText');
-    expect(bulletList).not.toHaveClass('titlelessBulletList');
+    expect(firstTrailingText).toHaveClass('welcomeSlideBulletTrailingText');
+    expect(bulletList).not.toHaveClass('isTitlelessBulletList');
   });
 
   it('leaves titled slides on the existing bullet alignment', () => {
-    const { container } = renderSiteLoadOptions(2);
+    renderSiteLoadOptions(2);
 
-    const bulletListContainer = container.querySelector('#betaExaplainerList');
-    const bulletList = container.querySelector('#betaExplainerBulletpoint');
+    const bulletListContainer = screen.getByTestId('ce-welcome-slide-bullet-list');
+    const bulletList = screen.getByTestId('ce-welcome-slide-bullet-items');
 
     expect(screen.getByText(/Open-source templates/i)).toBeInTheDocument();
-    expect(bulletListContainer).not.toHaveClass('titlelessBulletListContainer');
+    expect(bulletListContainer).not.toHaveClass('isTitlelessBulletList');
+    expect(bulletList).toHaveClass('welcomeSlideBulletItems');
   });
 
   it('removes the unused email updates UI and still lets the sidebar collapse', () => {
-    const { container } = render(<SidebarHarness arrowIndex={0} />);
+    render(<SidebarHarness arrowIndex={0} />);
 
     expect(screen.queryByText(/Get updates/i)).not.toBeInTheDocument();
-    expect(container.querySelector('#betaTabSideBar')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-site-load-sidebar')).toHaveClass('welcomeSlideSidebar');
 
     fireEvent.click(screen.getByTestId('ce-site-load-close-sidebar'));
 
-    expect(container.querySelector('#betaSidebarDisappeared')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-site-load-sidebar')).toHaveClass('isSidebarCollapsed');
   });
 });
