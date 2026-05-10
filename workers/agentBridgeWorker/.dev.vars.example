@@ -24,6 +24,12 @@ BROADCAST_ENABLED=false
 
 # Optional local demo fixtures. Keep these non-identifying and secret-free.
 # Default question source is live. Use fixture only for local preview/demo copy.
+# Mock Telegram preview routes are disabled by default; enable only for local
+# browser/copy testing, not live deployments.
+# AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW=true
+# Optional Mini App overrides. Defaults to $AGENT_BRIDGE_PUBLIC_URL/telegram/mini-app.
+# AGENT_BRIDGE_MINI_APP_URL=https://ce-agent-bridge-worker.your-workers-subdomain.workers.dev/telegram/mini-app
+# AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS=86400
 # AGENT_BRIDGE_QUESTION_SOURCE=fixture
 # AGENT_BRIDGE_RPC_TIMEOUT_MS=5000
 # AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS=2500

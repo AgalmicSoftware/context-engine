@@ -10,7 +10,7 @@ const DEFAULT_PAYLOAD_CONCURRENCY = 4;
 const DEFAULT_FOREGROUND_CHUNKS = 1;
 const DEFAULT_RPC_TIMEOUT_MS = 5_000;
 const DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 2_500;
-const QUESTION_CACHE_PREFIX = 'telegram:questions:v3:';
+const QUESTION_CACHE_PREFIX = 'telegram:questions:v4:';
 const questionMemoryCache = new Map();
 const QUESTION_PAYLOAD_SKIP = '__telegramQuestionPayloadSkip';
 
@@ -696,10 +696,10 @@ function lockedQuestionPlaceholder({
     questionType: 'unknown',
     prompt: '',
     questionText: '',
-    title: 'Locked question',
+    title: 'Question unavailable',
     options: [],
-    visibility: 'lit_encrypted',
-    locked: true,
+    visibility: 'payload_unavailable',
+    locked: false,
     payloadUnavailable: true,
     payloadUnavailableReason: safeString(reason) || 'question_payload_unavailable',
     source: 'live_session_question',
@@ -809,6 +809,14 @@ function filterQuestionRecordsForSession(questions = [], sessionSlug = '') {
     .filter((question) => questionRecordMatchesSession(question, sessionSlug));
 }
 
+function isPayloadUnavailableQuestion(question = {}) {
+  return question?.payloadUnavailable === true || lower(question?.visibility) === 'payload_unavailable';
+}
+
+function hasPayloadUnavailableQuestions(index = {}) {
+  return Array.isArray(index?.questions) && index.questions.some(isPayloadUnavailableQuestion);
+}
+
 function scopedCachedIndexForReturn(value = {}, cacheLayer = 'kv', sessionSlug = '') {
   const index = cachedIndexForReturn(value, cacheLayer);
   if (!index) return null;
@@ -830,7 +838,7 @@ function scheduleIndexRefresh({
   fetchImpl = globalThis.fetch,
 } = {}) {
   if (typeof waitUntil !== 'function') return;
-  if (!existingIndex || existingIndex.complete === true) return;
+  if (!existingIndex || (existingIndex.complete === true && !hasPayloadUnavailableQuestions(existingIndex))) return;
   waitUntil(refreshSessionQuestionIndex({
     env,
     sessionSlug,
@@ -1099,7 +1107,12 @@ async function refreshSessionQuestionIndex({
     };
   }
 
-  let questions = filterQuestionRecordsForSession(previous?.questions || [], slug);
+  const previousQuestions = filterQuestionRecordsForSession(previous?.questions || [], slug);
+  const retryUnavailableQuestions = previousQuestions.filter(isPayloadUnavailableQuestion);
+  const retryQuestionIds = retryUnavailableQuestions
+    .map(questionIdFromRecord)
+    .filter(Boolean);
+  let questions = previousQuestions.filter((question) => !isPayloadUnavailableQuestion(question));
   const seenQuestionIds = new Set(questions.map(questionIdFromRecord).filter(Boolean));
   let indexedFromBlock = previous?.indexedFromBlock;
   let indexedToBlock = previous?.indexedToBlock;
@@ -1109,6 +1122,24 @@ async function refreshSessionQuestionIndex({
   let payloadFailureCount = Number(previous?.payloadFailureCount || 0) || 0;
   let skippedSessionMismatchCount = Number(previous?.skippedSessionMismatchCount || 0) || 0;
   let partial = false;
+
+  if (retryQuestionIds.length) {
+    const retryPayloads = await fetchQuestionPayloads({
+      rpcUrls,
+      surveysAddress,
+      questionIds: retryQuestionIds,
+      sessionSlug: slug,
+      seenQuestionIds,
+      env,
+      fetchImpl,
+    });
+    payloadFailureCount += retryPayloads.payloadFailureCount;
+    skippedSessionMismatchCount += Number(retryPayloads.skippedSessionMismatchCount || 0) || 0;
+    const recoveredIds = new Set(retryPayloads.questions.map(questionIdFromRecord).filter(Boolean));
+    const stillUnavailable = retryUnavailableQuestions
+      .filter((question) => !recoveredIds.has(questionIdFromRecord(question)));
+    questions = mergeQuestionRecords(questions, [...retryPayloads.questions, ...stillUnavailable], 'append');
+  }
 
   const ranges = [];
   const hasCoverage = indexedFromBlock != null && indexedToBlock != null;
@@ -1256,7 +1287,7 @@ export async function listCachedSessionQuestionsForBridge({
     return cached;
   }
   const durableCached = scopedCachedIndexForReturn(kv || memory, kv ? 'kv' : 'memory', slug);
-  if (durableCached && typeof waitUntil === 'function') {
+  if (durableCached && typeof waitUntil === 'function' && !hasPayloadUnavailableQuestions(durableCached)) {
     scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: durableCached, fetchImpl });
     return durableCached;
   }
@@ -1298,6 +1329,7 @@ export const __test__sessionQuestions = {
   encodeAbiStringArg,
   hexToBase64url,
   normalizeQuestionPayload,
+  isPayloadUnavailableQuestion,
   questionMemoryCache,
   resolveScanWindow,
   scanQuestionIds,

@@ -55,6 +55,8 @@ export const OPTIONAL_AGENT_BRIDGE_VAR_NAMES = Object.freeze([
   'AGENT_BRIDGE_ALLOW_DEMO_QUESTION_FALLBACK',
   'AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS',
   'AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN',
+  'AGENT_BRIDGE_MINI_APP_URL',
+  'AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS',
   'AGENT_BRIDGE_RPC_TIMEOUT_MS',
   'AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS',
   'AGENT_BRIDGE_QUESTION_SCAN_BLOCKS',
@@ -247,6 +249,8 @@ export function resolveAgentBridgeDeployConfig({
       AGENT_BRIDGE_ALLOW_DEMO_QUESTION_FALLBACK: safeString(env.AGENT_BRIDGE_ALLOW_DEMO_QUESTION_FALLBACK),
       AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS: safeString(env.AGENT_BRIDGE_ALLOW_AD_HOC_QUESTIONS),
       AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN: safeString(env.AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN),
+      AGENT_BRIDGE_MINI_APP_URL: safeString(env.AGENT_BRIDGE_MINI_APP_URL),
+      AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: safeString(env.AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS),
       AGENT_BRIDGE_RPC_TIMEOUT_MS: safeString(env.AGENT_BRIDGE_RPC_TIMEOUT_MS),
       AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS: safeString(env.AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS),
       AGENT_BRIDGE_QUESTION_SCAN_BLOCKS: safeString(env.AGENT_BRIDGE_QUESTION_SCAN_BLOCKS),
@@ -401,6 +405,15 @@ export function validateAgentBridgeDeployConfig(config = {}) {
   }
   if (sessionWorkerUrl && !isHttpsUrl(sessionWorkerUrl)) {
     missing.push('CE_SESSION_WORKER_BASE_URL must be an https URL');
+  }
+  if (safeString(config.vars?.AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW)) {
+    missing.push('AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW is local-only and must not be deployed');
+  }
+  if (safeString(config.vars?.AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH)) {
+    missing.push('AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH is local-only and must not be deployed');
+  }
+  if (safeString(config.vars?.AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA).toLowerCase() === 'false') {
+    missing.push('AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA=false is local-only and must not be deployed');
   }
   return {
     ok: missing.length === 0,

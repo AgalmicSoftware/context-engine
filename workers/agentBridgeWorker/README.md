@@ -233,7 +233,15 @@ Telegram user as well, so private `/ce_questions` and `/q <number-or-id>` use
 the same session unless a command supplies an explicit slug. `/ce_docs` remains
 a compatibility alias.
 
-Question lists default to live mode. The Telegram worker owns a worker-local
+Question lists default to live mode. Bot messages show at most five question
+rows at a time and add an `Open Mini App` control when
+`AGENT_BRIDGE_PUBLIC_URL` or `AGENT_BRIDGE_MINI_APP_URL` is configured. Private
+chat uses Telegram's inline `web_app` button directly; group chat deep-links the
+participant to private chat first because Telegram only allows `web_app` inline
+buttons there. The presentation order keeps answerable public questions ahead of
+true locked rows, and keeps payload-unavailable placeholders last so broken
+recent payloads do not hide usable questions. The
+Telegram worker owns a worker-local
 materialized question index for Telegram/agent delivery: it scans scoped
 `QuestionsAdded` logs, reads question payload pointers, stores Telegram-usable
 question records in memory plus `AGENT_ACTION_KV`, and resumes from the indexed
@@ -245,8 +253,11 @@ uses the Worker background task lane to finish indexing the full session block
 window. When a loaded question payload explicitly names a different session
 slug, the Worker skips it instead of materializing it under the selected
 session. If a question ID and payload pointer are visible on-chain but the
-payload gateway is unavailable, group chat receives a conservative locked
-question row instead of an empty list. RPC/log/hash failures are reported as
+payload gateway is unavailable, the bot shows an unavailable/retryable row
+instead of a private/encrypted lock. That state is an availability signal, not
+proof that the question was encrypted. Payload-unavailable cache records are
+retried from the on-chain pointer on refresh, and stale unavailable caches are
+refreshed before the bot returns them. RPC/log/hash failures are reported as
 source errors instead of cached as empty lists. Session scans prefer metadata
 `blockLimits.start`; when metadata is unavailable, the Worker derives a scoped
 start block from that slug's `SessionCreated` event. Explicit scan bounds are
@@ -271,13 +282,14 @@ Question cache controls:
 | --- | --- |
 | `AGENT_BRIDGE_QUESTION_SOURCE` | Defaults to `live`; use `fixture` only for local preview/demo copy or `live_or_fixture` for explicit fallback |
 | `AGENT_BRIDGE_RPC_TIMEOUT_MS` | Per-RPC timeout before trying the next configured RPC URL; default `5000` |
-| `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS` | Per-gateway timeout for question payload JSON reads; default `2500`. If all gateways miss but an on-chain pointer exists, Telegram shows a locked question row |
+| `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS` | Per-gateway timeout for question payload JSON reads; default `2500`. If all gateways miss but an on-chain pointer exists, Telegram shows an unavailable/retryable row instead of inventing a prompt |
 | `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS` | Freshness TTL before a cached Telegram question index schedules a background refresh; default `300` |
 | `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY` | Concurrent payload reads while materializing question records; default `4` |
 | `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS` | Maximum log chunks scanned before replying on a cold Telegram request; default `1`, with the rest completed through Worker background indexing |
 | `AGENT_BRIDGE_QUESTION_SCAN_BLOCKS` | Recent-block fallback window used only when `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1`; default `130000` |
 | `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` | Optional manual scan bounds for faster live smoke runs |
 | `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN` | Emergency/debug only. Allows recent-block fallback when neither metadata nor `SessionCreated` can scope the session; leave unset for normal live smoke |
+| `AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW` | Local/operator debug only. Enables `/mock/telegram/preview` and `/mock/telegram/preview-update`; leave unset in live deployments |
 
 ## Interactive Preview
 
@@ -288,11 +300,66 @@ Telegram Bot API. Use it to tune group/private copy, inline keyboards, callback
 navigation, and future Mini App payloads before setting or reusing the live
 webhook.
 
+The preview routes are disabled unless `AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW`
+is set to `true`. Leave this unset in live deployments; preview callbacks can
+create the same short-lived KV action records as real bot callbacks.
+The product deploy helper intentionally omits this local-only flag from Worker
+upload metadata and rejects configs that try to include it.
+
 The preview is mock-only: it should render safe display text and opaque action
 IDs, not raw grants, private answers, keys, Cloudflare credentials, or Telegram
 bot tokens. Mini App work should keep using the same opaque action IDs and move
 private form/input flows into the Mini App lane rather than Telegram group
 messages.
+
+## Mini App
+
+The Worker serves a v0 Telegram Mini App at:
+
+```text
+GET  /telegram/mini-app
+GET  /telegram/mini-app/api/state?launch=<opaque-cecb-id>
+POST /telegram/mini-app/api/draft
+```
+
+The bot opens the Mini App with Telegram inline `web_app` buttons in private
+chat. Group chat buttons carry the same opaque launch through
+`t.me/<bot>?start=<cecb_*>` and render the private `web_app` button after the
+user opens the bot. Launch URLs carry only an opaque `cecb_*` action ID that
+maps back to `AGENT_ACTION_KV`; raw question IDs, grants, answers, and private
+session context stay server-side.
+`AGENT_BRIDGE_MINI_APP_URL` may override the default
+`$AGENT_BRIDGE_PUBLIC_URL/telegram/mini-app`. The URL must be HTTPS for live
+Telegram, except localhost during local development.
+When Telegram init data validates in live mode, the state and draft APIs require
+a valid opaque launch action and will not fall back to a default session for
+missing or expired launch parameters. Draft writes also verify that the launch
+session, and question when scoped, matches the server-side question action.
+
+The Mini App backend validates raw `Telegram.WebApp.initData` with the
+configured `TELEGRAM_BOT_TOKEN` before generating stateful question actions or
+trusting Telegram user/chat/session identity on write endpoints. Treat
+`initDataUnsafe`, `web_app_data`, and all browser-submitted fields as untrusted
+client input until validated server-side.
+When `TELEGRAM_BOT_TOKEN` is absent, local tests/previews use a preview auth
+principal. When the bot token is configured, Mini App init data is always
+required; there is no deployable preview-auth bypass.
+`AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS` controls accepted init-data age and
+defaults to 24 hours.
+
+Current v0 scope:
+
+- Native freeform, binary, rating, and multichoice answer forms with a
+  five-question paged queue similar to the CE pile response flow.
+- Draft saves through `POST /telegram/mini-app/api/draft`.
+- `submit=true` creates a Worker-local submit request with an opaque request ID
+  and a planned canonical `/api/agent/responses/submit-request` handoff. Exact
+  answer replays for the same Telegram user, session, and question reuse the
+  same idempotent request ID; changed answers create distinct pending requests.
+  It does not directly sign or submit the smart-contract response yet.
+- Payload-unavailable questions stay retryable/unanswered; true private or gated
+  questions stay locked until the canonical private/gated decrypt path is
+  available.
 
 ## Deploy Helper Plan And Apply
 
@@ -432,6 +499,32 @@ IDs.
     action IDs, no raw callback payloads, grants, JWTs, Cloudflare credentials,
     private keys, RPC secrets, document paths, or private/gated text.
 
+## Live Deploy Troubleshooting
+
+- Manual `wrangler.toml` and `wrangler secret put` steps are not part of the
+  product path. Keep them as developer fallback only; `deploy:apply -- --apply`
+  reads untracked `.dev.vars`, writes Worker secrets through Cloudflare, uploads
+  plain Worker vars, enables workers.dev, sets the Telegram webhook, and checks
+  `/health`.
+- After a deploy, old Telegram inline messages can still show old buttons or
+  copy. Send a fresh `/ce_questions` or `/q <number-or-id>` command instead of
+  testing from an old edited message.
+- If the bot receives no updates, check `getWebhookInfo`, then rerun
+  `npm run deploy:apply -- --apply` so the helper resets the webhook URL and
+  `secret_token`. Keep token-bearing diagnostic commands out of shell history.
+- If a public question appears unavailable but the CE session is expected to be
+  public, treat it first as a payload availability issue. Verify the
+  question's Arweave payload pointer resolves through at least one configured
+  gateway, then verify the session scan is scoped by metadata `blockLimits.start`,
+  the slug's `SessionCreated` event, or explicit
+  `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK`.
+- If questions from another session appear, confirm the group has a fresh
+  `/ce_join <session>` after the latest deploy and that the loaded question
+  payload includes matching `sessionSlug`/`sessionName` metadata when available.
+- Keep `AGENT_BRIDGE_QUESTION_SOURCE=fixture` for preview/copy work only. Live
+  smoke should omit it, or use `live_or_fixture` only when a temporary fallback
+  is intentional and clearly called out.
+
 Still mocked or contract-only for this first smoke:
 
 - `/telegram-demo-setup` does not deploy the worker or set the Telegram webhook.
@@ -456,6 +549,13 @@ that direct path is denied, the worker creates a canonical submit request or
 draft. Group summaries include only status/count refs; response text and account
 state stay private.
 
+Bot v1 structured answer buttons now save a private Telegram answer draft, and
+the `Submit Draft` callback creates a Worker-local submit request under
+`telegram:submit-request:*` with a canonical
+`/api/agent/responses/submit-request` handoff body. This is the bot-side submit
+queue; direct smart-contract broadcast remains disabled until the canonical
+approval/signing path is wired.
+
 ## Mock OpenClaw Forwarding
 
 `openclawForwarding.mjs` models contract-only forwarding for delivered questions,
@@ -469,7 +569,8 @@ Telegram question cards follow CE control conventions:
 
 - Live CE metadata is normalized from `type`, `prompt`, `options`,
   `singleSelect`, and `sessionName`/`sessionSlug`; the worker cache prefix was
-  bumped so stale freeform-only records are not reused after deploy.
+  bumped so stale freeform-only and payload-unavailable records are not reused
+  after deploy.
 - Binary/agree-style questions use `Agree`, `Unsure`, and `Disagree` answer
   buttons.
 - Rating questions render discrete `0` through `10` answer buttons.
@@ -477,7 +578,8 @@ Telegram question cards follow CE control conventions:
 - Multi-select multichoice questions preserve per-option selected state.
 - Freeform questions expose `Type` and `Voice`.
 - Button answers save a Telegram worker-local draft keyed by user/session/question;
-  final on-chain submission is still a Mini App/canonical `/api/agent/*`
+  `Submit Draft` queues a bot-side submit request with an opaque request ID.
+  Final on-chain broadcast is still a canonical `/api/agent/*` approval/signing
   handoff.
 - Additional comments are always present, microphone is present when supported,
   and docs/context appears only when docs exist or are relevant.

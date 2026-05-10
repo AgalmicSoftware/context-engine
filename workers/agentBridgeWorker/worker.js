@@ -2,6 +2,7 @@ import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 export { ManagedDemoSignerDurableObject } from './durableObjectSigner.mjs';
 import { runMockTelegramDemoFlow } from './transportMock.mjs';
 import { buildTelegramCommandResponse, handleTelegramWebhookUpdate } from './telegramCommands.mjs';
+import { handleTelegramMiniAppRequest } from './telegramMiniApp.mjs';
 
 function json(data, init = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -25,6 +26,14 @@ function html(text, init = {}) {
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function envFlagEnabled(value = '') {
+  return ['1', 'true', 'yes', 'on'].includes(safeString(value).toLowerCase());
+}
+
+function telegramPreviewEnabled(env = {}) {
+  return envFlagEnabled(env.AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW);
 }
 
 function buildPreviewUpdate(body = {}) {
@@ -162,6 +171,8 @@ function telegramPreviewHtml() {
             btn.onclick = () => postPreview({ callbackData: button.callback_data });
           } else if (button.url) {
             btn.onclick = () => window.open(button.url, '_blank', 'noopener,noreferrer');
+          } else if (button.web_app?.url) {
+            btn.onclick = () => window.open(button.web_app.url, '_blank', 'noopener,noreferrer');
           } else {
             btn.disabled = true;
           }
@@ -200,9 +211,15 @@ export default {
       }));
     }
     if (url.pathname === '/mock/telegram/preview' && request.method === 'GET') {
+      if (!telegramPreviewEnabled(env)) {
+        return json({ ok: false, error: 'telegram_preview_disabled' }, { status: 404 });
+      }
       return html(telegramPreviewHtml());
     }
     if (url.pathname === '/mock/telegram/preview-update' && request.method === 'POST') {
+      if (!telegramPreviewEnabled(env)) {
+        return json({ ok: false, error: 'telegram_preview_disabled' }, { status: 404 });
+      }
       const body = await request.json().catch(() => ({}));
       const preview = await buildTelegramCommandResponse({
         update: buildPreviewUpdate(body),
@@ -219,6 +236,13 @@ export default {
           response: preview.response || null,
         },
       }, { status: preview.ok === true ? 200 : 400 });
+    }
+    if (url.pathname === '/telegram/mini-app' || url.pathname.startsWith('/telegram/mini-app/api/')) {
+      return handleTelegramMiniAppRequest({
+        request,
+        env,
+        waitUntil: typeof ctx.waitUntil === 'function' ? (promise) => ctx.waitUntil(promise) : null,
+      });
     }
     if (url.pathname === '/telegram/webhook' && request.method === 'POST') {
       if (String(env.TELEGRAM_BRIDGE_ENABLED || '').trim().toLowerCase() !== 'true') {

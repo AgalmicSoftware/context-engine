@@ -7,7 +7,9 @@ import {
 import { listDocumentsForSession, summarizeDocumentForGroup } from './docLibrary.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
+  buildOpaqueActionId,
   createTelegramCallbackAction,
+  createRandomTelegramCallbackAction,
   createTelegramStartAction,
   parseOpaqueActionId,
 } from './opaqueActions.mjs';
@@ -32,8 +34,11 @@ const ACTION_KV_PREFIX = 'telegram:action:';
 const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
 const PRIVATE_SESSION_KV_PREFIX = 'telegram:private-session:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
+const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
+const TELEGRAM_QUESTION_LIST_LIMIT = 5;
 const ANSWER_BUTTON_CONTROL_TYPES = new Set([
   'agree_unsure_disagree',
   'rating_button',
@@ -117,6 +122,26 @@ function questionIdSeedPart(value = '') {
   return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
 }
 
+function stableJson(value) {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => (
+      `${JSON.stringify(key)}:${stableJson(value[key])}`
+    )).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+function stableFingerprint(value = {}) {
+  const input = stableJson(value);
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36).padStart(10, '0');
+}
+
 function shortAddress(value = '') {
   const text = safeString(value);
   return /^0x[0-9a-fA-F]{40}$/.test(text) ? `${text.slice(0, 6)}...${text.slice(-4)}` : text;
@@ -198,6 +223,31 @@ function filterQuestionsForSession(questions = [], sessionSlug = '') {
   });
 }
 
+function questionIsPayloadUnavailable(question = {}) {
+  return question?.payloadUnavailable === true || lower(question?.visibility) === 'payload_unavailable';
+}
+
+function questionIsLocked(question = {}) {
+  const visibility = lower(question?.visibility);
+  return question?.locked === true || ['private', 'sbt_gated', 'lit_encrypted'].includes(visibility);
+}
+
+function questionPresentationRank(question = {}) {
+  if (questionIsPayloadUnavailable(question)) return 2;
+  if (questionIsLocked(question)) return 1;
+  return 0;
+}
+
+function orderQuestionsForPresentation(questions = []) {
+  return (Array.isArray(questions) ? questions : [])
+    .map((question, index) => ({ question, index }))
+    .sort((left, right) => (
+      questionPresentationRank(left.question) - questionPresentationRank(right.question) ||
+      left.index - right.index
+    ))
+    .map(({ question }) => question);
+}
+
 function envFlagEnabled(value = '') {
   return ['1', 'true', 'yes', 'on'].includes(lower(value));
 }
@@ -254,7 +304,7 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
       ok: true,
       reason: 'fixture_questions_loaded',
       source: 'demo_fixture',
-      questions: filterQuestionsForSession(loadDemoQuestions(env), sessionSlug),
+      questions: orderQuestionsForPresentation(filterQuestionsForSession(loadDemoQuestions(env), sessionSlug)),
     };
   }
   const live = await listCachedSessionQuestionsForBridge({ env, sessionSlug, waitUntil }).catch((error) => ({
@@ -267,7 +317,7 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
     return {
       ...live,
       source: live.source || 'telegram_worker_question_cache',
-      questions: Array.isArray(live.questions) ? live.questions : [],
+      questions: orderQuestionsForPresentation(live.questions),
     };
   }
   return {
@@ -275,7 +325,7 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
     reason: 'fixture_questions_fallback',
     source: 'demo_fixture',
     fallbackFrom: live.reason || 'live_question_cache_unavailable',
-    questions: filterQuestionsForSession(loadDemoQuestions(env), sessionSlug),
+    questions: orderQuestionsForPresentation(filterQuestionsForSession(loadDemoQuestions(env), sessionSlug)),
   };
 }
 
@@ -345,14 +395,16 @@ function buildAdHocQuestion(text = '', {
   };
 }
 
-async function persistActionRecord(env = {}, actionId = '', record = {}) {
+async function persistActionRecord(env = {}, actionId = '', record = {}, {
+  ttlSeconds = DEFAULT_ACTION_TTL_SECONDS,
+} = {}) {
   const id = safeString(actionId);
   if (!id || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
     return { ok: false, reason: 'action_kv_unavailable' };
   }
   assertNoSecretShape(record, 'Telegram action records must not serialize secrets.');
   await env.AGENT_ACTION_KV.put(`${ACTION_KV_PREFIX}${id}`, JSON.stringify(record), {
-    expirationTtl: DEFAULT_ACTION_TTL_SECONDS,
+    expirationTtl: ttlSeconds,
   });
   return { ok: true, actionId: id };
 }
@@ -466,6 +518,20 @@ function answerDraftKey({
     : '';
 }
 
+async function readAnswerDraft({
+  env = {},
+  normalized = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+} = {}) {
+  const key = answerDraftKey({ normalized, sessionSlug, questionId: selectedQuestionId });
+  if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function') return null;
+  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  assertNoSecretShape(parsed, 'Telegram answer drafts must not serialize secrets.');
+  return { ...parsed, key };
+}
+
 async function persistAnswerDraft({
   env = {},
   normalized = {},
@@ -490,7 +556,7 @@ async function persistAnswerDraft({
     answerValue: safeString(answerValue || answerLabel),
     controlType: safeString(controlType),
     status: 'draft_saved',
-    submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     selectedAt: createdAt || nowIso(),
   };
   if (!record.telegramUserId || !record.sessionSlug || !record.questionId || !record.answerLabel) {
@@ -501,6 +567,91 @@ async function persistAnswerDraft({
     expirationTtl: DEFAULT_GROUP_SESSION_TTL_SECONDS,
   });
   return { ok: true, key, draft: record };
+}
+
+async function persistTelegramSubmitRequest({
+  env = {},
+  normalized = {},
+  draft = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  createdAt = null,
+} = {}) {
+  if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const telegramUserId = safeString(normalized.user?.telegramUserId);
+  const slug = sanitizeSessionSlug(sessionSlug || draft.sessionSlug);
+  const qid = safeString(selectedQuestionId || draft.questionId);
+  if (!telegramUserId || !slug || !qid || draft.status !== 'draft_saved') {
+    return { ok: false, reason: 'submit_request_incomplete' };
+  }
+  const answerFingerprint = stableFingerprint({
+    answerLabel: safeString(draft.answerLabel),
+    answerValue: safeString(draft.answerValue),
+    controlType: safeString(draft.controlType),
+  });
+  const idempotencyKey = `telegram_bot_submit:${telegramUserId}:${slug}:${questionIdSeedPart(qid)}:${answerFingerprint}`;
+  const requestId = buildOpaqueActionId(idempotencyKey);
+  const kvKey = `${SUBMIT_REQUEST_KV_PREFIX}${requestId}`;
+  const existing = env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
+    : null;
+  if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+    assertNoSecretShape(existing, 'Telegram submit requests must not serialize secrets.');
+    return {
+      ok: true,
+      requestId,
+      status: existing.status || 'submit_request_created',
+      canonicalApiRequest: existing.canonicalApiRequest || null,
+      idempotencyKey,
+      replayed: true,
+    };
+  }
+  const record = {
+    version: 1,
+    requestId,
+    idempotencyKey,
+    answerFingerprint,
+    action: TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
+    status: 'submit_request_created',
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    telegramUserId,
+    chatId: safeString(normalized.chat?.chatId),
+    sessionSlug: slug,
+    questionId: qid,
+    questionIdShort: shortQuestionId(qid),
+    answer: {
+      label: safeString(draft.answerLabel),
+      value: safeString(draft.answerValue),
+      controlType: safeString(draft.controlType),
+    },
+    answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+    canonicalApiRequest: {
+      method: 'POST',
+      path: '/api/agent/responses/submit-request',
+      status: 'pending_canonical_handoff',
+      body: {
+        session: slug,
+        questionId: qid,
+        answerRef: 'telegram_private_answer_ref',
+        idempotencyKey,
+      },
+    },
+    createdAt,
+  };
+  assertNoSecretShape(record, 'Telegram submit requests must not serialize secrets.');
+  await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(record), {
+    expirationTtl: SUBMIT_REQUEST_TTL_SECONDS,
+  });
+  return {
+    ok: true,
+    requestId,
+    status: record.status,
+    canonicalApiRequest: record.canonicalApiRequest,
+    idempotencyKey,
+    replayed: false,
+  };
 }
 
 async function resolveCommandSessionSlug({
@@ -581,6 +732,73 @@ async function makeStartButton({
   };
 }
 
+function resolveMiniAppBaseUrl(env = {}) {
+  const configured = safeString(env.AGENT_BRIDGE_MINI_APP_URL);
+  const publicUrl = safeString(env.AGENT_BRIDGE_PUBLIC_URL).replace(/\/+$/, '');
+  const candidate = configured || (publicUrl ? `${publicUrl}/telegram/mini-app` : '');
+  if (!candidate) return '';
+  try {
+    const url = new URL(candidate);
+    const isLocal = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocal)) return '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+function miniAppUrlForLaunch(env = {}, launch = '') {
+  const base = resolveMiniAppBaseUrl(env);
+  if (!base) return '';
+  const url = new URL(base);
+  const payload = safeString(launch);
+  if (payload) url.searchParams.set('launch', payload);
+  return url.toString();
+}
+
+async function makeMiniAppButton({
+  env = {},
+  label = 'Open Mini App',
+  action = TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+  serverContextRef = {},
+  seed = '',
+  createdAt = null,
+  privateChat = false,
+  botUsername = '',
+} = {}) {
+  if (!resolveMiniAppBaseUrl(env)) return null;
+  let callback;
+  try {
+    callback = createRandomTelegramCallbackAction({
+      action,
+      lane: TELEGRAM_CHAT_LANES.MINI_APP,
+      serverContextRef,
+      createdAt,
+    });
+  } catch {
+    return null;
+  }
+  const stored = await persistActionRecord(env, callback.callbackData, {
+    ...callback.record,
+    callbackData: callback.callbackData,
+    miniAppLaunch: true,
+  });
+  if (!stored.ok) return null;
+  const url = miniAppUrlForLaunch(env, callback.callbackData);
+  if (!url) return null;
+  if (privateChat) {
+    return {
+      text: safeString(label),
+      web_app: { url },
+    };
+  }
+  const username = normalizeBotUsername(botUsername || env.TELEGRAM_BOT_USERNAME);
+  return username ? {
+    text: safeString(label),
+    url: `https://t.me/${username}?start=${callback.callbackData}`,
+  } : null;
+}
+
 async function makeAnswerButton({
   env = {},
   sessionSlug = '',
@@ -601,9 +819,30 @@ async function makeAnswerButton({
       answerLabel: label,
       answerValue: safeString(control.value || label),
       controlType: safeString(control.controlType),
-      submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
+      submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     },
     seed: seed || `answer|${sessionSlug}|${questionIdSeedPart(selectedQuestionId)}|${safeString(control.controlType)}|${label}`,
+    createdAt,
+  });
+}
+
+async function makeSubmitDraftButton({
+  env = {},
+  sessionSlug = '',
+  selectedQuestionId = '',
+  seed = '',
+  createdAt = null,
+} = {}) {
+  return makeCallbackButton({
+    env,
+    label: 'Submit Draft',
+    action: TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: {
+      sessionSlug,
+      questionId: selectedQuestionId,
+    },
+    seed: seed || `submit|${sessionSlug}|${questionIdSeedPart(selectedQuestionId)}`,
     createdAt,
   });
 }
@@ -850,7 +1089,7 @@ async function buildJoinResponse({
         `Account: ${shortAddress(account.accountAddress)}`,
         `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
         '',
-        'Use /ce_questions, /ce_attachments, or /ce_me.',
+        'Use /ce_attachments for session files.',
       ].join('\n'),
       replyMarkup: {
         inline_keyboard: [[
@@ -940,7 +1179,7 @@ async function buildJoinResponse({
     text: [
       state.text,
       '',
-      'Use /ce_questions, /ce_attachments, or /q <number>.',
+      'Use /ce_attachments for session files.',
     ].join('\n'),
     replyMarkup: { inline_keyboard: [buttons] },
     screen: state.screen,
@@ -989,8 +1228,9 @@ async function buildQuestionsResponse({
   });
   const loadFailed = loadedQuestions.ok === false;
   const rows = [];
+  const displayQuestions = state.questions.slice(0, TELEGRAM_QUESTION_LIST_LIMIT);
   if (!loadFailed) {
-    for (const [index, question] of questions.entries()) {
+    for (const [index, question] of questions.slice(0, TELEGRAM_QUESTION_LIST_LIMIT).entries()) {
       rows.push([await makeCallbackButton({
         env,
         label: `Pose ${index + 1}`,
@@ -1001,6 +1241,17 @@ async function buildQuestionsResponse({
         createdAt,
       })]);
     }
+    const miniAppButton = await makeMiniAppButton({
+      env,
+      label: 'Open Mini App',
+      action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+      serverContextRef: { sessionSlug: resolved.session.sessionSlug },
+      seed: `questions|mini_app|${resolved.session.sessionSlug}|${normalized.updateId}`,
+      createdAt,
+      privateChat: normalized.chat.isPrivate,
+      botUsername: env.TELEGRAM_BOT_USERNAME,
+    });
+    if (miniAppButton) rows.push([miniAppButton]);
   }
   return reply({
     method,
@@ -1012,13 +1263,20 @@ async function buildQuestionsResponse({
       ...(loadFailed
         ? [questionLoadIssueText(loadedQuestions)]
         : (state.questions.length
-        ? state.questions.map((question) => `${question.displayIndex}. ${shortQuestionId(question.questionId)} - ${question.title}`)
+        ? [
+          ...displayQuestions.map((question) => `${question.displayIndex}. ${shortQuestionId(question.questionId)} - ${question.title}`),
+          ...(state.questions.length > displayQuestions.length
+            ? [`Showing ${displayQuestions.length} of ${state.questions.length}. Open the Mini App for the full queue.`]
+            : []),
+        ]
         : ['No public questions are available yet.'])),
       '',
       loadFailed
         ? 'Run /ce_questions again after the source is fixed.'
         : (state.questions.length
-        ? 'Tap Pose, or send /q <number>.'
+        ? (state.questions.length > displayQuestions.length
+          ? 'Tap Pose, send /q <number>, or open the Mini App.'
+          : 'Tap Pose, or send /q <number>.')
         : (loadedQuestions.reason === 'live_questions_indexing'
           ? 'Run /ce_questions again shortly.'
           : 'Create questions in the CE client, then run /ce_questions again.')),
@@ -1109,7 +1367,8 @@ async function buildPoseQuestionResponse({
     createdAt,
   });
   const group = state.groupSafeOutput || {};
-  const answerControls = group.locked ? [] : answerControlsFromPoseState(state);
+  const payloadUnavailable = group.payloadUnavailable === true;
+  const answerControls = group.locked || payloadUnavailable ? [] : answerControlsFromPoseState(state);
   const answerRows = await buildAnswerButtonRows({
     env,
     sessionSlug: resolved.session.sessionSlug,
@@ -1117,7 +1376,12 @@ async function buildPoseQuestionResponse({
     controls: answerControls,
     createdAt,
   });
-  const text = group.locked
+  const text = payloadUnavailable
+    ? [
+      `Question ${shortQuestionId(group.questionId)} is unavailable.`,
+      'The public payload could not be loaded yet. Try /ce_questions again later.',
+    ].join('\n')
+    : group.locked
     ? `Question ${shortQuestionId(group.questionId)} is locked. Open it in the Mini App.`
     : [
       `Question for ${resolved.session.sessionSlug}:`,
@@ -1125,28 +1389,52 @@ async function buildPoseQuestionResponse({
       ...(Array.isArray(group.answerLabels) && group.answerLabels.length
         ? ['', `Options: ${group.answerLabels.join(', ')}`]
         : []),
-      ...(answerRows.length ? ['', 'Tap an answer to save a draft.'] : []),
+      ...(answerRows.length ? ['', 'Tap an answer, then submit the draft from Telegram.'] : []),
     ].join('\n');
+  const miniAppButton = payloadUnavailable ? null : await makeMiniAppButton({
+    env,
+    label: 'Open Mini App',
+    action: TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
+    serverContextRef: {
+      sessionSlug: resolved.session.sessionSlug,
+      questionId: group.questionId,
+    },
+    seed: `pose|mini_app|${resolved.session.sessionSlug}|${questionIdSeedPart(group.questionId)}|${normalized.updateId}`,
+    createdAt,
+    privateChat: normalized.chat.isPrivate,
+    botUsername: env.TELEGRAM_BOT_USERNAME,
+  });
+  const actionRows = [
+    ...answerRows,
+    ...(group.locked || payloadUnavailable ? [] : [[
+      await makeSubmitDraftButton({
+        env,
+        sessionSlug: resolved.session.sessionSlug,
+        selectedQuestionId: group.questionId,
+        seed: `pose|submit|${resolved.session.sessionSlug}|${questionIdSeedPart(group.questionId)}|${normalized.updateId}`,
+        createdAt,
+      }),
+    ]]),
+    ...(miniAppButton ? [[miniAppButton]] : []),
+    [
+      await makeCallbackButton({
+        env,
+        label: 'View Questions',
+        action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+        lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+        serverContextRef: { sessionSlug: resolved.session.sessionSlug },
+        seed: `pose|questions|${resolved.session.sessionSlug}|${questionIdSeedPart(questionId(selected))}|${normalized.updateId}`,
+        createdAt,
+      }),
+    ],
+  ];
   return reply({
     method,
     chatId: normalized.chat.chatId,
     messageId,
     text,
     replyMarkup: {
-      inline_keyboard: [
-        ...answerRows,
-        [
-        await makeCallbackButton({
-          env,
-          label: 'View Questions',
-          action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
-          lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
-          serverContextRef: { sessionSlug: resolved.session.sessionSlug },
-          seed: `pose|questions|${resolved.session.sessionSlug}|${questionIdSeedPart(questionId(selected))}|${normalized.updateId}`,
-          createdAt,
-        }),
-        ],
-      ],
+      inline_keyboard: actionRows,
     },
     screen: state.screen,
     command,
@@ -1154,7 +1442,8 @@ async function buildPoseQuestionResponse({
     extra: {
       sessionSlug: resolved.session.sessionSlug,
       questionId: group.questionId,
-      posed: group.locked !== true,
+      posed: group.locked !== true && payloadUnavailable !== true,
+      payloadUnavailable,
     },
   });
 }
@@ -1188,7 +1477,7 @@ async function buildAnswerDraftResponse({
     command,
     callbackQueryId,
     callbackAnswerText: saved.ok
-      ? 'Draft saved. Final submit opens in the Mini App.'
+      ? 'Draft saved. Tap Submit Draft when ready.'
       : 'Draft could not be saved. Try again.',
     callbackAnswerShowAlert: saved.ok !== true,
     screen: 'submit_response',
@@ -1198,7 +1487,69 @@ async function buildAnswerDraftResponse({
       sessionSlug,
       questionId: selectedQuestionId,
       answerDraftSaved: saved.ok === true,
-      submitLane: TELEGRAM_CHAT_LANES.MINI_APP,
+      submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    },
+  });
+}
+
+async function buildSubmitDraftResponse({
+  normalized,
+  command,
+  env,
+  record = {},
+  callbackQueryId = '',
+  createdAt,
+} = {}) {
+  const ref = record.serverContextRef || {};
+  const sessionSlug = sanitizeSessionSlug(ref.sessionSlug);
+  const selectedQuestionId = safeString(ref.questionId);
+  const draft = await readAnswerDraft({
+    env,
+    normalized,
+    sessionSlug,
+    selectedQuestionId,
+  });
+  if (!draft) {
+    return callbackOnly({
+      normalized,
+      command,
+      callbackQueryId,
+      callbackAnswerText: 'Answer first, then tap Submit Draft.',
+      callbackAnswerShowAlert: true,
+      screen: 'submit_response',
+      extra: {
+        ok: false,
+        reason: 'answer_draft_missing',
+        sessionSlug,
+        questionId: selectedQuestionId,
+        submitRequestCreated: false,
+      },
+    });
+  }
+  const submitted = await persistTelegramSubmitRequest({
+    env,
+    normalized,
+    draft,
+    sessionSlug,
+    selectedQuestionId,
+    createdAt,
+  });
+  return callbackOnly({
+    normalized,
+    command,
+    callbackQueryId,
+    callbackAnswerText: submitted.ok
+      ? `Submit request queued for ${shortQuestionId(selectedQuestionId)}.`
+      : 'Submit request could not be queued. Try again.',
+    callbackAnswerShowAlert: true,
+    screen: 'submit_response',
+    extra: {
+      ok: submitted.ok === true,
+      reason: submitted.ok ? 'submit_request_created' : submitted.reason,
+      sessionSlug,
+      questionId: selectedQuestionId,
+      submitRequestCreated: submitted.ok === true,
+      submitRequest: submitted.ok ? submitted : null,
     },
   });
 }
@@ -1319,6 +1670,72 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
   });
 }
 
+function isMiniAppLaunchRecord(record = {}) {
+  return record?.miniAppLaunch === true &&
+    record?.lane === TELEGRAM_CHAT_LANES.MINI_APP &&
+    [
+      TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+      TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
+    ].includes(record.action);
+}
+
+function buildMiniAppStartResponse({
+  normalized,
+  command,
+  env,
+  record = {},
+  launch = '',
+} = {}) {
+  const sessionSlug = sanitizeSessionSlug(record.serverContextRef?.sessionSlug) || 'general';
+  const url = miniAppUrlForLaunch(env, launch);
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'Open the Mini App from a private chat with the bot.',
+        '',
+        'Use /ce_join <session> in private chat to continue.',
+      ].join('\n'),
+      screen: 'private_start',
+      command,
+      normalized,
+      extra: { sessionSlug, miniAppLaunch: true, privateChatRequired: true },
+    });
+  }
+  if (!url) {
+    return reply({
+      chatId: normalized.chat.chatId,
+      text: [
+        'The Mini App URL is not configured for this worker.',
+        '',
+        'Use /ce_questions to answer from Telegram for now.',
+      ].join('\n'),
+      screen: 'private_start',
+      command,
+      normalized,
+      extra: { sessionSlug, miniAppLaunch: true, miniAppUrlConfigured: false },
+    });
+  }
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: [
+      `Open the Mini App for ${sessionSlug}.`,
+      '',
+      'Use this private button to answer and queue submissions.',
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [[{
+        text: 'Open Mini App',
+        web_app: { url },
+      }]],
+    },
+    screen: 'private_start',
+    command,
+    normalized,
+    extra: { sessionSlug, miniAppLaunch: true },
+  });
+}
+
 async function buildStartPayloadResponse({
   normalized,
   command,
@@ -1343,6 +1760,16 @@ async function buildStartPayloadResponse({
       command,
       normalized,
       extra: { startPayload: parsed.actionId, active: false },
+    });
+  }
+  if (isMiniAppLaunchRecord(record)) {
+    return buildMiniAppStartResponse({
+      normalized,
+      command,
+      env,
+      record,
+      launch: parsed.actionId,
+      createdAt,
     });
   }
   return buildJoinResponse({
@@ -1430,6 +1857,16 @@ async function buildCallbackResponse({
     return buildAnswerDraftResponse({
       normalized,
       command: 'callback:draft_response',
+      env,
+      record,
+      callbackQueryId,
+      createdAt,
+    });
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE) {
+    return buildSubmitDraftResponse({
+      normalized,
+      command: 'callback:submit_response',
       env,
       record,
       callbackQueryId,
@@ -1658,7 +2095,15 @@ export async function handleTelegramWebhookUpdate({
 
 export {
   ACTION_KV_PREFIX,
+  ANSWER_DRAFT_KV_PREFIX,
   COMMANDS,
+  loadQuestionsForSession,
   parseTelegramCommandText,
+  persistActionRecord,
+  persistAnswerDraft,
+  questionId,
   readActionRecord,
+  readAnswerDraft,
+  shortQuestionId,
+  SUBMIT_REQUEST_KV_PREFIX,
 };
