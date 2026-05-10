@@ -19,6 +19,8 @@ import { faWindowClose, faCheck, faCheckSquare } from '@fortawesome/free-solid-s
 
 const log = createLogger('ui');
 
+const buildClassName = (classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
+
 type GreetingModalProps = {
   fetchSessionState: () => void;
   account?: string | null;
@@ -102,21 +104,22 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
 
     const closeModalIcon = this.state.emailInput === "" ? faWindowClose : faCheckSquare;
 
-    const formBottomVisibleID = this.props.optOutAndEmailBottom ? styles.betaInfo : styles.betaInfoInvisible;
+    const formBottomVisibleClassName = this.props.optOutAndEmailBottom ? styles.updatesPanel : styles.isHidden;
 
-    const modalVisibleID = this.props.visible ? styles.rulesModal : styles.invisibleModal;
+    const modalVisibleClassName = this.props.visible ? styles.rulesModal : styles.isClosed;
 
 
 
     const explainModal =
     <>
-      <Modal isOpen={this.state.rulesModalOpen} modalClassName="modal-rules transparentModal"
-      id={modalVisibleID}
+      <Modal
+      isOpen={this.state.rulesModalOpen}
+      modalClassName={buildClassName(['modal-rules transparentModal', modalVisibleClassName])}
       >
 
-      <Card id={styles.rulesModalCard}>
+      <Card className={styles.rulesModalCard}>
 
-        <CardBody id={styles.rulesModalCardBody}
+        <CardBody className={styles.rulesModalCardBody}
                             style={{
                       backgroundImage: "url(" + modalPicture + ")",
                       backgroundSize: "contain",
@@ -127,30 +130,30 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
 
 
         </CardBody>
-        <div id={formBottomVisibleID}>
-        <FormGroup check id={styles.optOutMetrics}>
-            <Label check id={styles.optOutLabel}>
-              <Input type="radio" name="radio1" checked={this.state.userOptsOutMetrics} id={styles.optOutSelect}
+        <div className={formBottomVisibleClassName}>
+        <FormGroup check className={styles.optOutMetrics}>
+            <Label check className={styles.optOutLabel}>
+              <Input type="radio" name="radio1" checked={this.state.userOptsOutMetrics} className={styles.optOutSelect}
               onChange={this.optOutChanged}
               /> {' '}
 
-  <div id={styles.optOutMainText}> Opt out metrics <div id={styles.optOutDetailText}> (tracks UI use) </div> </div>
+  <div className={styles.optOutMainText}> Opt out metrics <div className={styles.optOutDetailText}> (tracks UI use) </div> </div>
             </Label>
           </FormGroup>
 
-          <CardFooter id={styles.rulesModalFooter}>
+          <CardFooter className={styles.rulesModalFooter}>
 
-                      <div id={styles.exitButton}>
+                      <div className={styles.exitButton}>
 
           </div>
 
 
 
-          <div id={styles.emailAndOptOut}>
+          <div className={styles.emailAndOptOut}>
 
-          <Label id={styles.emailFormLabel}> Get updates
+          <Label className={styles.emailFormLabel}> Get updates
           </Label>
-          <div id={styles.emailSubjects}>
+          <div className={styles.emailSubjects}>
 
             <div className={styles.emailSubject}>
               — Beta Info
@@ -167,9 +170,9 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
 
           </div>
 
-          <FormGroup id={styles.enterEmail}>
+          <FormGroup className={styles.enterEmail}>
 
-          <Input type="email" name="emailInput" onChange={this.emailInputChange} id={styles.emailInput} placeholder="name@example.com" />
+          <Input type="email" name="emailInput" onChange={this.emailInputChange} className={styles.emailInput} placeholder="name@example.com" />
           </FormGroup>
 
 
@@ -178,8 +181,8 @@ class GreetingModal extends Component<GreetingModalProps, GreetingModalState> {
           </CardFooter>
         </div>
 
-        <button id={styles.closeExplainerModalButton} aria-label="Close" className="close" data-dismiss="modal" type="button" onClick={this.closeRulesModal}>
-                <FontAwesomeIcon id={styles.closeModalIcon} icon={closeModalIcon} />
+        <button className={buildClassName([styles.closeExplainerModalButton, 'close'])} aria-label="Close" data-dismiss="modal" type="button" onClick={this.closeRulesModal}>
+                <FontAwesomeIcon className={styles.closeModalIcon} icon={closeModalIcon} />
 
           </button>
 
