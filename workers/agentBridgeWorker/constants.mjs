@@ -118,6 +118,7 @@ export const QUESTION_VISIBILITY = Object.freeze({
   PRIVATE: 'private',
   SBT_GATED: 'sbt_gated',
   LIT_ENCRYPTED: 'lit_encrypted',
+  PAYLOAD_UNAVAILABLE: 'payload_unavailable',
 });
 
 export const QUESTION_TYPES = Object.freeze({

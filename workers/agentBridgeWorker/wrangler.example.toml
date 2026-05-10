@@ -46,6 +46,11 @@ DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 # Optional additive fallback, not a replacement for DEFAULT_RPC_URL:
 # ADDITIONAL_RPC_URL = "https://your-op-sepolia-rpc.example"
 # Default question source is live. Use "fixture" only for local preview/demo copy.
+# Mock Telegram preview routes are disabled by default; enable only for local browser/copy testing.
+# AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW = "true"
+# Optional Mini App overrides. Defaults to $AGENT_BRIDGE_PUBLIC_URL/telegram/mini-app.
+# AGENT_BRIDGE_MINI_APP_URL = "https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev/telegram/mini-app"
+# AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS = "86400"
 # AGENT_BRIDGE_QUESTION_SOURCE = "fixture"
 # AGENT_BRIDGE_RPC_TIMEOUT_MS = "5000"
 # AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS = "2500"

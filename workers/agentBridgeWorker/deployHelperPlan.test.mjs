@@ -67,6 +67,40 @@ test('validateAgentBridgeDeployConfig requires only live deploy credentials, not
   assert.deepEqual(completeWithoutManualAccountId.missing, []);
 });
 
+test('validateAgentBridgeDeployConfig rejects local-only Telegram preview vars', () => {
+  const base = resolveAgentBridgeDeployConfig({
+    env: completeEnv(),
+  });
+  const telegramPreview = validateAgentBridgeDeployConfig({
+    ...base,
+    vars: {
+      ...base.vars,
+      AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    },
+  });
+  const previewAuth = validateAgentBridgeDeployConfig({
+    ...base,
+    vars: {
+      ...base.vars,
+      AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: '1',
+    },
+  });
+  const disabledInitData = validateAgentBridgeDeployConfig({
+    ...base,
+    vars: {
+      ...base.vars,
+      AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA: 'false',
+    },
+  });
+
+  assert.equal(telegramPreview.ok, false);
+  assert.equal(telegramPreview.missing.includes('AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW is local-only and must not be deployed'), true);
+  assert.equal(previewAuth.ok, false);
+  assert.equal(previewAuth.missing.includes('AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH is local-only and must not be deployed'), true);
+  assert.equal(disabledInitData.ok, false);
+  assert.equal(disabledInitData.missing.includes('AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA=false is local-only and must not be deployed'), true);
+});
+
 test('deriveSingleCloudflareAccount resolves one account and blocks multiple visible accounts', () => {
   assert.deepEqual(deriveSingleCloudflareAccount({
     result: [{ id: 'account-123', name: 'Demo Account' }],
@@ -252,6 +286,11 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
       AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: '25',
       AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
       AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN: '1',
+      AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+      AGENT_BRIDGE_MINI_APP_URL: 'https://mini.example.test/telegram',
+      AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH: '1',
+      AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA: 'false',
+      AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: '3600',
       AGENT_BRIDGE_RPC_TIMEOUT_MS: '5000',
       AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS: '300',
       AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK: '100',
@@ -281,6 +320,23 @@ test('buildAgentBridgeWorkerUploadMetadata includes optional demo fixtures when 
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN' &&
     binding.text === '1'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW'
+  )), false);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_MINI_APP_URL' &&
+    binding.text === 'https://mini.example.test/telegram'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_MINI_APP_ALLOW_PREVIEW_AUTH'
+  )), false);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_MINI_APP_REQUIRE_INIT_DATA'
+  )), false);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS' &&
+    binding.text === '3600'
   )), true);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_RPC_TIMEOUT_MS' &&

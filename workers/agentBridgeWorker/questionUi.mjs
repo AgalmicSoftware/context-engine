@@ -585,11 +585,13 @@ export function buildTelegramGroupSessionCardState({
 }
 
 function normalizeQuestionVisibility(question = {}) {
+  if (question.payloadUnavailable === true) return QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
   const raw = safeString(question.visibility || question.access || question.questionVisibility).toLowerCase();
   if ([
     QUESTION_VISIBILITY.PRIVATE,
     QUESTION_VISIBILITY.SBT_GATED,
     QUESTION_VISIBILITY.LIT_ENCRYPTED,
+    QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE,
   ].includes(raw)) {
     return raw;
   }
@@ -606,18 +608,23 @@ function isGroupSafeQuestionVisible(question = {}) {
 function summarizeQuestionForList(question = {}, index = 0) {
   const questionId = safeString(question.questionId || question.id);
   const visibility = normalizeQuestionVisibility(question);
-  const visible = visibility === QUESTION_VISIBILITY.PUBLIC;
+  const payloadUnavailable = question.payloadUnavailable === true || visibility === QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
+  const visible = visibility === QUESTION_VISIBILITY.PUBLIC && !payloadUnavailable;
   return sanitizeForGroup({
     type: 'telegram_question_list_item',
     displayIndex: index + 1,
     questionId,
     questionType: normalizeQuestionType(question.questionType || question.type),
-    title: visible
+    title: payloadUnavailable
+      ? 'Question unavailable'
+      : visible
       ? safeString(question.title || question.questionText || question.prompt)
       : 'Locked question',
     visibility,
-    locked: !visible,
-    unavailableInGroup: !visible,
+    locked: !visible && !payloadUnavailable,
+    payloadUnavailable,
+    unavailableInGroup: !visible && !payloadUnavailable,
+    retryable: payloadUnavailable,
     source: safeString(question.source || 'existing_session_question'),
     poseActionId: buildOpaqueActionId(`pose_question|${safeOpaqueSeedPart(questionId)}|${index}`),
   });
@@ -625,6 +632,21 @@ function summarizeQuestionForList(question = {}, index = 0) {
 
 function groupSafeQuestionForPose(question = {}) {
   const visibility = normalizeQuestionVisibility(question);
+  const payloadUnavailable = question.payloadUnavailable === true || visibility === QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
+  if (payloadUnavailable) {
+    return sanitizeForGroup({
+      type: 'telegram_group_posed_question',
+      questionId: safeString(question.questionId || question.id),
+      questionType: 'unavailable',
+      visibility,
+      locked: false,
+      payloadUnavailable: true,
+      retryable: true,
+      questionText: null,
+      answerLabels: [],
+      status: 'payload_unavailable',
+    });
+  }
   const visible = visibility === QUESTION_VISIBILITY.PUBLIC;
   return sanitizeForGroup({
     type: 'telegram_group_posed_question',
@@ -849,7 +871,7 @@ export function buildTelegramPoseQuestionState({
     source,
     action,
     groupSafeOutput: groupQuestion,
-    card: groupQuestion.locked ? null : buildTelegramQuestionCard(question),
+    card: groupQuestion.locked || groupQuestion.payloadUnavailable ? null : buildTelegramQuestionCard(question),
     status: groupQuestion.status,
     createdAt,
   });

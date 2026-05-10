@@ -337,6 +337,12 @@ test('question list pulls existing session questions and pose action is group-sa
       prompt: 'Private prompt must stay out of group summaries',
       visibility: 'sbt_gated',
     },
+    {
+      questionId: 'q-unavailable',
+      questionType: 'unknown',
+      payloadUnavailable: true,
+      title: 'Question unavailable',
+    },
   ];
   const list = buildTelegramQuestionListState({
     sessionSlug: 'alpha',
@@ -356,13 +362,25 @@ test('question list pulls existing session questions and pose action is group-sa
   assert.deepEqual(list.questions.map((question) => question.title), [
     'What should the group discuss next?',
     'Locked question',
+    'Question unavailable',
   ]);
+  assert.equal(list.questions[2].locked, false);
+  assert.equal(list.questions[2].payloadUnavailable, true);
+  assert.equal(list.questions[2].retryable, true);
   assert.equal(posed.action.action, TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION);
   assert.equal(posed.action.command, '/ce_pose_question');
   assert.deepEqual(posed.action.aliases, ['/q']);
   assert.equal(posed.groupSafeOutput.questionText, 'What should the group discuss next?');
   assert.equal(locked.groupSafeOutput.questionText, null);
   assert.equal(JSON.stringify(locked).includes('Private prompt must stay out of group summaries'), false);
+  const unavailable = buildTelegramPoseQuestionState({
+    sessionSlug: 'alpha',
+    question: questions[2],
+  });
+  assert.equal(unavailable.card, null);
+  assert.equal(unavailable.groupSafeOutput.locked, false);
+  assert.equal(unavailable.groupSafeOutput.payloadUnavailable, true);
+  assert.equal(unavailable.groupSafeOutput.status, 'payload_unavailable');
 });
 
 test('SBT group screens support public/password joins and account summaries without private leaks', () => {

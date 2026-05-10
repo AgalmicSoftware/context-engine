@@ -142,6 +142,12 @@ function flattenButtons(replyMarkup) {
   return (replyMarkup?.inline_keyboard || []).flat();
 }
 
+function launchFromButton(button = {}) {
+  if (button.web_app?.url) return new URL(button.web_app.url).searchParams.get('launch') || '';
+  if (button.url) return new URL(button.url).searchParams.get('start') || '';
+  return '';
+}
+
 test('parseTelegramCommandText handles mentions without accepting commands for another bot', () => {
   assert.deepEqual(parseTelegramCommandText('/ce_join@ce_demo_bot alpha', {
     botUsername: 'ce_demo_bot',
@@ -172,6 +178,9 @@ test('group /ce_join returns a Workers-safe session card with opaque buttons onl
   assert.equal(result.screen, 'group_session_card');
   assert.equal(result.response.chatId, '-100123');
   assert.match(result.response.text, /Session: Alpha Session/);
+  assert.match(result.response.text, /Use \/ce_attachments for session files/);
+  assert.equal(result.response.text.includes('/ce_me'), false);
+  assert.equal(result.response.text.includes('Use /ce_questions'), false);
 
   const buttons = flattenButtons(result.response.replyMarkup);
   const startButton = buttons.find((button) => button.text === 'Join Session');
@@ -276,6 +285,185 @@ test('/ce_questions handles bytes32 question IDs without putting them in opaque 
     assert.equal(button.callback_data.includes(publicQuestionId), false);
     assert.equal(button.callback_data.includes(lockedQuestionId), false);
   }
+});
+
+test('/ce_questions caps Telegram rows at five and deep-links group Mini App launches through private chat', async () => {
+  const questions = Array.from({ length: 7 }, (_value, index) => ({
+    questionId: `q-${index + 1}`,
+    questionType: index % 2 === 0 ? 'freeform' : 'rating',
+    prompt: `Question ${index + 1} prompt`,
+  }));
+  const env = baseEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify(questions),
+  });
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.match(result.response.text, /Showing 5 of 7/);
+  assert.match(result.response.text, /Open the Mini App for the full queue/);
+  assert.equal(result.response.text.includes('Question 6 prompt'), false);
+
+  const buttons = flattenButtons(result.response.replyMarkup);
+  assert.deepEqual(buttons.slice(0, 5).map((button) => button.text), [
+    'Pose 1',
+    'Pose 2',
+    'Pose 3',
+    'Pose 4',
+    'Pose 5',
+  ]);
+  const miniApp = buttons.find((button) => button.text === 'Open Mini App');
+  assert.equal(miniApp.web_app, undefined);
+  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
+  assert.equal(miniApp.url.includes('alpha'), false);
+  assert.equal(miniApp.url.includes('q-1'), false);
+
+  const launch = launchFromButton(miniApp);
+  const repeated = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const repeatedLaunch = launchFromButton(flattenButtons(repeated.response.replyMarkup)
+    .find((button) => button.text === 'Open Mini App'));
+  const privateStart = await buildTelegramCommandResponse({
+    update: privateMessage(`/start ${launch}`),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const privateMiniApp = flattenButtons(privateStart.response.replyMarkup)
+    .find((button) => button.text === 'Open Mini App');
+
+  assert.equal(privateStart.ok, true);
+  assert.equal(privateStart.screen, 'private_start');
+  assert.match(launch, /^cecb_[a-f0-9]{32}$/);
+  assert.match(repeatedLaunch, /^cecb_[a-f0-9]{32}$/);
+  assert.notEqual(repeatedLaunch, launch);
+  assert.match(privateMiniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.equal(new URL(privateMiniApp.web_app.url).searchParams.get('launch'), launch);
+});
+
+test('/ce_questions uses Telegram web_app buttons directly in private chat', async () => {
+  const result = await buildTelegramCommandResponse({
+    update: privateMessage('/ce_questions alpha'),
+    env: baseEnv({
+      AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+        { questionId: 'q-private-1', questionType: 'freeform', prompt: 'Private prompt?' },
+      ]),
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const miniApp = flattenButtons(result.response.replyMarkup)
+    .find((button) => button.text === 'Open Mini App');
+
+  assert.equal(result.ok, true);
+  assert.equal(miniApp.url, undefined);
+  assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+});
+
+test('/ce_questions prioritizes answerable questions before payload-unavailable rows', async () => {
+  const unavailableQuestionId = `0x${'11'.repeat(32)}`;
+  const answerableQuestionId = `0x${'22'.repeat(32)}`;
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions alpha'),
+    env: baseEnv({
+      AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+        {
+          questionId: unavailableQuestionId,
+          questionType: 'unknown',
+          title: 'Question unavailable',
+          payloadUnavailable: true,
+          visibility: 'payload_unavailable',
+        },
+        {
+          questionId: answerableQuestionId,
+          questionType: 'rating',
+          prompt: 'How much do you trust this result?',
+        },
+      ]),
+    }),
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const posed = await buildTelegramCommandResponse({
+    update: groupMessage('/q 1'),
+    env: baseEnv({
+      AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+      AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+        {
+          questionId: unavailableQuestionId,
+          questionType: 'unknown',
+          title: 'Question unavailable',
+          payloadUnavailable: true,
+          visibility: 'payload_unavailable',
+        },
+        {
+          questionId: answerableQuestionId,
+          questionType: 'rating',
+          prompt: 'How much do you trust this result?',
+        },
+      ]),
+    }),
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(result.ok, true);
+  assert.match(result.response.text, /1\. 0x22222222\.\.\.222222 - How much do you trust this result\?/);
+  assert.match(result.response.text, /2\. 0x11111111\.\.\.111111 - Question unavailable/);
+  assert.equal(posed.ok, true);
+  assert.match(posed.response.text, /How much do you trust this result\?/);
+  assert.equal(posed.payloadUnavailable, false);
+  assert.equal(posed.posed, true);
+});
+
+test('payload-unavailable question rows do not render as encrypted locks', async () => {
+  const unavailableQuestionId = `0x${'78'.repeat(32)}`;
+  const env = baseEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        questionId: unavailableQuestionId,
+        questionType: 'unknown',
+        title: 'Question unavailable',
+        payloadUnavailable: true,
+        visibility: 'payload_unavailable',
+      },
+      {
+        questionId: `0x${'90'.repeat(32)}`,
+        questionType: 'freeform',
+        prompt: 'Encrypted prompt must not leak',
+        visibility: 'lit_encrypted',
+      },
+    ]),
+  });
+  const list = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_questions alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const posed = await buildTelegramCommandResponse({
+    update: groupMessage(`/q ${unavailableQuestionId.slice(0, 10)}...${unavailableQuestionId.slice(-6)}`),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(list.ok, true);
+  assert.match(list.response.text, /0x78787878\.\.\.787878 - Question unavailable/);
+  assert.match(list.response.text, /0x90909090\.\.\.909090 - Locked question/);
+  assert.equal(list.response.text.includes('Encrypted prompt must not leak'), false);
+
+  assert.equal(posed.ok, true);
+  assert.match(posed.response.text, /Question 0x78787878\.\.\.787878 is unavailable/);
+  assert.match(posed.response.text, /public payload could not be loaded yet/);
+  const buttons = flattenButtons(posed.response.replyMarkup);
+  assert.equal(buttons.some((button) => button.text === 'Open Mini App'), false);
+  assert.equal(posed.payloadUnavailable, true);
+  assert.equal(posed.posed, false);
 });
 
 test('/ce_questions does not invent demo questions when live question cache is empty', async () => {
@@ -400,6 +588,9 @@ test('group session binding makes later question and doc commands use the joined
   });
 
   assert.equal(joined.sessionSlug, 'demo');
+  assert.match(joined.response.text, /Use \/ce_attachments for session files/);
+  assert.equal(joined.response.text.includes('/ce_me'), false);
+  assert.equal(joined.response.text.includes('Use /ce_questions'), false);
   assert.match(questions.response.text, /Questions for demo/);
   assert.match(questions.response.text, /q-demo - What should Demo decide next/);
   assert.match(posed.response.text, /Question for demo:/);
@@ -643,7 +834,7 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   });
 
   assert.equal(binary.ok, true);
-  assert.match(binary.response.text, /Tap an answer to save a draft/);
+  assert.match(binary.response.text, /Tap an answer, then submit the draft from Telegram/);
   assert.deepEqual(
     flattenButtons(binary.response.replyMarkup).map((button) => button.text).slice(0, 3),
     ['Agree', 'Unsure', 'Disagree']
@@ -658,7 +849,11 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   );
   assert.equal(binary.response.text.includes('0x1212121212121212121212121212121212121212121212121212121212121212'), false);
 
-  const agree = flattenButtons(binary.response.replyMarkup).find((button) => button.text === 'Agree');
+  const binaryButtons = flattenButtons(binary.response.replyMarkup);
+  const agree = binaryButtons.find((button) => button.text === 'Agree');
+  const disagree = binaryButtons.find((button) => button.text === 'Disagree');
+  const submitDraft = binaryButtons.find((button) => button.text === 'Submit Draft');
+  assert.match(submitDraft.callback_data, /^cecb_[a-z0-9]{10,48}$/);
   const saved = await buildTelegramCommandResponse({
     update: {
       update_id: 7011,
@@ -679,7 +874,7 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   assert.equal(saved.ok, true);
   assert.equal(saved.response, null);
   assert.equal(saved.answerDraftSaved, true);
-  assert.equal(saved.callbackAnswerText, 'Draft saved. Final submit opens in the Mini App.');
+  assert.equal(saved.callbackAnswerText, 'Draft saved. Tap Submit Draft when ready.');
 
   const draftRecords = Array.from(env.AGENT_ACTION_KV.store.values())
     .map((value) => JSON.parse(value))
@@ -687,7 +882,111 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   assert.equal(draftRecords.length, 1);
   assert.equal(draftRecords[0].answerLabel, 'Agree');
   assert.equal(draftRecords[0].questionId, `0x${'12'.repeat(32)}`);
-  assert.equal(draftRecords[0].submitLane, 'telegram_mini_app');
+  assert.equal(draftRecords[0].submitLane, 'telegram_private_account');
+
+  const submitted = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7012,
+      callback_query: {
+        id: 'callback-submit-draft',
+        data: submitDraft.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 61,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:04.000Z',
+  });
+
+  assert.equal(submitted.ok, true);
+  assert.equal(submitted.response, null);
+  assert.equal(submitted.submitRequestCreated, true);
+  assert.equal(submitted.submitRequest.status, 'submit_request_created');
+  assert.equal(submitted.submitRequest.canonicalApiRequest.path, '/api/agent/responses/submit-request');
+  assert.equal(submitted.submitRequest.replayed, false);
+  assert.match(submitted.submitRequest.idempotencyKey, /^telegram_bot_submit:42:alpha:/);
+  assert.match(submitted.callbackAnswerText, /Submit request queued for 0x12121212\.\.\.121212/);
+
+  const replayedSubmit = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7013,
+      callback_query: {
+        id: 'callback-submit-draft-replay',
+        data: submitDraft.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 61,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:05.000Z',
+  });
+
+  assert.equal(replayedSubmit.ok, true);
+  assert.equal(replayedSubmit.submitRequestCreated, true);
+  assert.equal(replayedSubmit.submitRequest.requestId, submitted.submitRequest.requestId);
+  assert.equal(replayedSubmit.submitRequest.replayed, true);
+
+  const submitRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith('telegram:submit-request:'))
+    .map(([, value]) => JSON.parse(value));
+  assert.equal(submitRecords.length, 1);
+  assert.equal(submitRecords[0].action, 'submit_response');
+  assert.equal(submitRecords[0].lane, 'telegram_private_account');
+  assert.equal(submitRecords[0].answer.label, 'Agree');
+  assert.equal(submitRecords[0].canonicalApiRequest.body.questionId, `0x${'12'.repeat(32)}`);
+  assert.equal(submitRecords[0].canonicalApiRequest.body.idempotencyKey, submitted.submitRequest.idempotencyKey);
+
+  const changedSaved = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7014,
+      callback_query: {
+        id: 'callback-answer-disagree',
+        data: disagree.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 61,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:06.000Z',
+  });
+  const changedSubmitted = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7015,
+      callback_query: {
+        id: 'callback-submit-changed-draft',
+        data: submitDraft.callback_data,
+        from: { id: 42, username: 'host' },
+        message: {
+          message_id: 61,
+          chat: { id: -100123, type: 'supergroup' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:07.000Z',
+  });
+
+  assert.equal(changedSaved.ok, true);
+  assert.equal(changedSubmitted.ok, true);
+  assert.equal(changedSubmitted.submitRequestCreated, true);
+  assert.equal(changedSubmitted.submitRequest.replayed, false);
+  assert.notEqual(changedSubmitted.submitRequest.requestId, submitted.submitRequest.requestId);
+  assert.notEqual(changedSubmitted.submitRequest.idempotencyKey, submitted.submitRequest.idempotencyKey);
+  const changedSubmitRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith('telegram:submit-request:'))
+    .map(([, value]) => JSON.parse(value));
+  assert.equal(changedSubmitRecords.length, 2);
+  assert.equal(changedSubmitRecords.some((record) => record.answer.label === 'Agree'), true);
+  assert.equal(changedSubmitRecords.some((record) => record.answer.label === 'Disagree'), true);
 
   const calls = [];
   const dispatched = await dispatchTelegramCommandResponse({
@@ -710,7 +1009,7 @@ test('/q renders structured answer buttons and saves answer drafts from callback
     callback_query_id: 'callback-answer-agree',
     show_alert: false,
     cache_time: 0,
-    text: 'Draft saved. Final submit opens in the Mini App.',
+    text: 'Draft saved. Tap Submit Draft when ready.',
   });
 });
 
