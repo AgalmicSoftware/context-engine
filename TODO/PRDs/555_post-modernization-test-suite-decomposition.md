@@ -216,7 +216,7 @@ Large-test inventory from this branch:
 |---|---:|---|
 | `client/src/components/SurveyTool/SurveyTool.module.test.js` | 14,739 | Single top-level `SurveyTool module` suite; mixed shell compatibility, pile runtime, cache, gate/decrypt, draft, response, and UI helper coverage. |
 | `client/src/components/SBTs/SBTsList.loading-status.test.jsx` | 6,386 | Single top-level `SBTsList per-session loader countdown` suite; loading/status model plus render timing and cache hydration. |
-| `client/src/components/UserPage/UserPage.test.jsx` | 5,095 | Three top-level clusters: cache refresh pipeline, cold-load network fallback, deep-scan tooltip formatting. |
+| `client/src/components/UserPage/UserPage.test.jsx` | 4,619 | Remaining top-level clusters: cache refresh pipeline and cold-load network fallback. |
 | `client/src/components/Sessions/SessionWizard.render.test.jsx` | 4,901 | Single top-level rendered-validation suite. |
 | `client/src/components/SurveyTool/SurveyResults.test.tsx` | 4,507 | Many focused top-level helper/render clusters; candidate for later concern-led splits. |
 | `client/src/components/SBTs/SBTPage.test.jsx` | 4,176 | Single modal holder optimization suite. |
@@ -231,6 +231,8 @@ Completed split:
 - Left a short comment in `SurveyTool.module.test.js` marking it as the remaining broad runtime/controller suite until more clusters have clear focused owners.
 - Added `client/src/components/SurveyTool/SurveyQuestions.runtime.test.js` for the SurveyQuestions-owned bookmark cache and auto-decrypt runtime helper cluster.
 - Removed those five direct `SurveyQuestions` assertions from `SurveyTool.module.test.js` without changing assertions.
+- Added `client/src/components/UserPage/UserPage.deepScanTooltip.test.jsx` for the former `UserPage deep scan tooltip formatting` top-level cluster.
+- Removed that cluster from `UserPage.test.jsx`, leaving cache refresh and cold-load fallback coverage in the broader UserPage suite.
 
 Verification:
 
@@ -246,6 +248,9 @@ cd client && npm test -- --watchAll=false --runTestsByPath \
 cd client && npm test -- --watchAll=false --runTestsByPath \
   src/components/SurveyTool/SurveyTool.module.test.js \
   src/components/SurveyTool/SurveyQuestions.runtime.test.js
+cd client && npm test -- --watchAll=false --runTestsByPath \
+  src/components/UserPage/UserPage.test.jsx \
+  src/components/UserPage/UserPage.deepScanTooltip.test.jsx
 cd client && npx tsc --noEmit --pretty false
 git diff --check
 ```
@@ -255,6 +260,7 @@ Results:
 - SurveyTool old + new split test run: PASS, 2 suites, 285 tests.
 - Combined focused test run after TypeScript boundary cleanup: PASS, 4 suites, 337 tests.
 - SurveyQuestions runtime split test run with old SurveyTool suite: PASS, 2 suites, 279 tests.
+- UserPage deep-scan split test run with old UserPage suite: PASS, 2 suites, 123 tests.
 - `npx tsc --noEmit --pretty false`: PASS after local JS-boundary typing cleanup in DocumentLibrary/CreateQuestions.
 - `git diff --check`: PASS.
 
@@ -265,7 +271,7 @@ Known local execution note:
 Next safe PRD 555 slices:
 
 - Split a small PileViewMode render/submit-feedback cluster only if helper setup can be shared without weakening assertions.
-- Otherwise move to `UserPage.test.jsx` top-level clusters, where the existing `UserPage` helper ownership is clearer than the remaining SurveyTool runtime cluster.
+- Split the remaining `UserPage.test.jsx` cache refresh cluster only if the helper setup can be shared cleanly; the cold-load fallback cluster may stay as a broader render/cache smoke guard for now.
 
 ---
 
