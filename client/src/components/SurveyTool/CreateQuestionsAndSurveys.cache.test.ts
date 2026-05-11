@@ -825,6 +825,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
     const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions').mockResolvedValue({
+      uploadedQuestions: [],
       receipt: { status: 1 },
     });
     const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
@@ -889,6 +890,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
     const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions').mockResolvedValue({
+      uploadedQuestions: [],
       receipt: { status: 1 },
     });
     const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({

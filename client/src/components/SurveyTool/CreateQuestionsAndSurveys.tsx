@@ -379,6 +379,10 @@ type CreateSurveyEffectiveArweaveOptions = NonNullable<Parameters<typeof getEffe
 type CreateSurveyEffectiveArweaveSessionConfig = CreateSurveyEffectiveArweaveOptions extends {
   sessionConfig?: infer T;
 } ? T : unknown;
+const usesCloudflareSessionStorageForCreateSurvey = usesCloudflareSessionStorage as (
+  sessionConfig: unknown,
+  opts?: { resource?: string; encrypted?: boolean }
+) => boolean;
 type CreateSurveyTargetNetworkDetails = UnknownRecord & {
   blockExplorers?: {
     default?: {
@@ -1620,10 +1624,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   generateQuestionId = (
     type: unknown,
     prompt: unknown,
-    options: any = [],
-    singleSelect: any = false
+    options: unknown = [],
+    singleSelect: unknown = false
   ): string => {
-    return generateSharedQuestionId(type, prompt, options, singleSelect);
+    return generateSharedQuestionId(
+      type,
+      prompt,
+      Array.isArray(options) ? options : [],
+      singleSelect === true
+    );
   };
 
   handleTitleChange = (event: CreateSurveyInputValueEvent): void => {
@@ -3045,7 +3054,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         });
         const surveyDataString = JSON.stringify(completeSurveyData);
         let surveyArweaveTxId = '';
-        const cloudflareSurveyStorage = usesCloudflareSessionStorage(sessionConfig, { resource: 'surveys' });
+        const cloudflareSurveyStorage = usesCloudflareSessionStorageForCreateSurvey(sessionConfig, { resource: 'surveys' });
         if (!cloudflareSurveyStorage) {
           try {
             surveyArweaveTxId = String(
