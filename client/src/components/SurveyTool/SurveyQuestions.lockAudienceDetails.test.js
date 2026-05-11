@@ -1,42 +1,55 @@
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
-import {
-  buildGateAudienceSbtItems,
-  resolveLockAudienceSessionName,
-} from './surveyToolResponseGateController';
-import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
+import { SurveyQuestions } from './SurveyQuestions';
+import styles from './SurveyTool.module.scss';
+import { renderToStaticMarkup } from 'react-dom/server';
+import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 
-const address = '0x1111111111111111111111111111111111111111';
-
-const normalizeText = (value) => {
-  const raw = (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
-  if (!raw || /^\[object\s+object\]$/i.test(raw)) return '';
-  return raw;
+const treeHasDataTestId = (node, testId) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
+  if (typeof node !== 'object') return false;
+  if (node?.props?.['data-testid'] === testId) return true;
+  return treeHasDataTestId(node?.props?.children, testId);
 };
 
-const renderAudienceControl = (overrides = {}) => render(
-  <SurveyQuestionsLockAudienceControl
-    qid="q1"
-    effectiveFieldKey="answer"
-    buttonTitle="Choose encryption audience"
-    hasAudienceMenu
-    menuOpen
-    normalizedSelfAudienceLabel="only me"
-    gateOptions={[{
-      gateId: 'default_gate',
-      label: 'test-12',
-      sbtItems: [{
-        address,
-        label: 'AI Gate Test SBT',
-        meta: '0x1111...1111',
-        href: buildSbtDetailPath(address, 'edge'),
-      }],
-    }]}
-    {...overrides}
-  />
+const treeHasText = (node, text) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node).includes(text);
+  }
+  if (typeof node !== 'object') return false;
+  return treeHasText(node?.props?.children, text);
+};
+
+const findElement = (node, predicate) => {
+  const stack = [node];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (Array.isArray(current)) {
+      for (let i = current.length - 1; i >= 0; i -= 1) {
+        stack.push(current[i]);
+      }
+      continue;
+    }
+    if (typeof current !== 'object') continue;
+    if (predicate(current)) return current;
+    const children = current?.props?.children;
+    if (children !== undefined) stack.push(children);
+  }
+  return null;
+};
+
+const nodeHasClassName = (node, className) => {
+  const value = node?.props?.className;
+  if (typeof value !== 'string') return false;
+  return value.split(/\s+/).includes(className);
+};
+
+const findNodeByClassName = (node, className) => (
+  findElement(node, (candidate) => nodeHasClassName(candidate, className))
 );
 
 describe('SurveyQuestions lock audience details', () => {
@@ -47,59 +60,147 @@ describe('SurveyQuestions lock audience details', () => {
   });
 
   it('keeps lock audience SBT detail links on terminology-aware routes instead of nested /u/ links', () => {
-    const items = buildGateAudienceSbtItems([address], 'edge', {
-      resolveSbtGateLabel: () => '',
-      getShortenedAddress: (nextAddress) => `${nextAddress.slice(0, 6)}...${nextAddress.slice(-4)}`,
-      buildSbtDetailPath,
+    const address = '0x1111111111111111111111111111111111111111';
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const menuKey = subject.getLockAudienceMenuStateKey('q1', 'answer');
+    subject.state = {
+      ...subject.state,
+      lockAudienceMenuByQuestion: { [menuKey]: true },
+      lockAudienceGateDetailsByQuestion: { [menuKey]: 'vip_gate' },
+    };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => ({
+      gateDetails: [{
+        gateId: 'vip_gate',
+        label: 'VIP gate',
+        sbtItems: subject.buildGateAudienceSbtItems([address], 'edge'),
+      }],
+    }));
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.resolveFieldEncryptionGateId = jest.fn(() => '');
+    subject.resolveSbtGateLabel = jest.fn(() => '');
+
+    const lockControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      lockDisabled: false,
+      lockTitle: 'Choose encryption audience',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
     });
 
-    expect(items).toHaveLength(1);
-    expect(items[0].href).toBe(buildSbtDetailPath(address, 'edge'));
-    expect(items[0].href).not.toBe(`/u/${address}`);
+    const markup = renderToStaticMarkup(lockControl);
+    expect(markup).toContain(`href="${buildSbtDetailPath(address, 'edge')}"`);
+    expect(markup).not.toContain(`href="/u/${address}"`);
   });
 
   it('does not inherit the general session name in lock audience labels when the slug is unresolved', () => {
-    const resolveSlugForIds = jest.fn(() => 'missing-session-slug');
-    const resolveLockAudienceSessionNameContext = jest.fn((slug) => (
-      slug === ''
-        ? { sessionName: 'General Session' }
+    const generalCfg = {
+      slug: '',
+      sessionName: 'General Session',
+      networkChainId: 84532,
+    };
+    const strictLookup = (slug) => (
+      String(slug || '').trim().toLowerCase() === ''
+        ? generalCfg
         : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
+      strictLookup(slug) || generalCfg
     ));
 
-    const label = resolveLockAudienceSessionName({
-      normalizeGateLabelText: normalizeText,
-      props: {
-        singleQuestionMode: true,
-        isStandalone: false,
-        questionID: '',
-        sessionSlug: 'missing-session-slug',
-        activeSessionSlug: 'missing-session-slug',
-      },
-      responseGatePolicyCacheCfg: null,
-      resolveSlugForIds,
-      resolveLockAudienceSessionNameContext,
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: '',
+      sessionSlug: 'missing-session-slug',
+      activeSessionSlug: 'missing-session-slug',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
     });
-
-    expect(label).toBe('session');
-    expect(label).not.toBe('General Session');
-    expect(resolveSlugForIds).toHaveBeenCalledWith(expect.objectContaining({
-      questionId: '',
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.getResponseGatePolicy = jest.fn(() => ({
+      gates: [{
+        gateId: 'default_gate',
+        label: 'Registry default gate',
+        sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+      }],
+      recipients: [{ accessControlConditions: [{ contractAddress: '0x1' }], chain: 'baseSepolia' }],
     }));
-    expect(resolveLockAudienceSessionNameContext).toHaveBeenCalledWith('missing-session-slug');
-    expect(resolveLockAudienceSessionNameContext).not.toHaveBeenCalledWith('');
+    subject.resolveConfiguredGateLabel = jest.fn(() => 'Registry default gate');
+    subject.resolveGateDisplayLabel = jest.fn(() => 'Registry default gate');
+
+    const gateOptions = subject.getResponseGateOptions('q1');
+
+    expect(gateOptions).toHaveLength(1);
+    expect(gateOptions[0]).toEqual(expect.objectContaining({
+      gateId: 'default_gate',
+      label: 'session',
+    }));
+    expect(gateOptions[0].label).not.toBe('General Session');
   });
 
   it('does not inherit the general response gate policy for unknown explicit session slugs', () => {
-    const resolvedCfg = {
-      slug: 'missing-session-slug',
-      sessionName: 'Pinned Missing Session',
+    const generalCfg = {
+      slug: '',
+      sessionName: 'General Session',
+      networkChainId: 84532,
+      sponsored: {
+        defaultGateId: 'general_gate',
+        gates: {
+          general_gate: {
+            gateId: 'general_gate',
+            type: 'sbt',
+            label: 'General Gate',
+            chainId: 84532,
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+          },
+        },
+        resources: {
+          questionResponses: { gateId: 'general_gate' },
+          default: { gateId: 'general_gate' },
+        },
+      },
     };
+    const strictLookup = (slug) => (
+      String(slug || '').trim().toLowerCase() === ''
+        ? generalCfg
+        : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
+      strictLookup(slug) || generalCfg
+    ));
 
-    const policy = buildResponseGatePolicy({
-      cfg: resolvedCfg,
-      isQuestionResponseFlow: true,
-      fallbackChainId: 84532,
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'missing-session-slug',
+      activeSessionSlug: '',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      sessionConfig: {
+        sessionName: 'Pinned Missing Session',
+      },
     });
+
+    const policy = subject.getResponseGatePolicy();
 
     expect(policy).toEqual({
       primaryResource: 'questionResponses',
@@ -107,84 +208,167 @@ describe('SurveyQuestions lock audience details', () => {
       recipients: [],
       allowFallbackConditions: true,
     });
-    // port note: dropped direct inspection of SurveyQuestions._responseGatePolicyCache;
-    // the private cache belongs to the class shell, while the behavior contract here is
-    // that the unresolved explicit slug produces an empty policy rather than general gates.
-    expect(resolvedCfg.sponsored).toBeUndefined();
+    expect(subject._responseGatePolicyCache?.cfg).toMatchObject({
+      slug: 'missing-session-slug',
+      sessionName: 'Pinned Missing Session',
+    });
+    expect(subject._responseGatePolicyCache?.cfg?.sponsored).toBeUndefined();
   });
 
   it('keeps response gate SBT details hidden behind the caret until expanded', () => {
-    const { rerender } = renderAudienceControl();
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: {},
+    };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => ({
+      gateDetails: [{
+        gateId: 'default_gate',
+        label: 'test-12',
+        sbtItems: [{
+          address: '0x1111111111111111111111111111111111111111',
+          label: 'AI Gate Test SBT',
+          meta: '0x1111...1111',
+          href: '/sbt/0x1111111111111111111111111111111111111111',
+        }],
+      }],
+    }));
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.resolveFieldEncryptionGateId = jest.fn(() => null);
 
-    expect(screen.getByText('only me')).toBeInTheDocument();
-    expect(screen.getByText('test-12')).toBeInTheDocument();
-    expect(screen.queryByText('for test-12')).not.toBeInTheDocument();
-    expect(screen.queryByText('AI Gate Test SBT')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /show test-12/i })).toBeInTheDocument();
+    const collapsedControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      lockDisabled: false,
+      lockTitle: 'Not encrypted',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+    });
 
-    rerender(
-      <SurveyQuestionsLockAudienceControl
-        qid="q1"
-        effectiveFieldKey="answer"
-        buttonTitle="Choose encryption audience"
-        hasAudienceMenu
-        menuOpen
-        normalizedSelfAudienceLabel="only me"
-        expandedGateId="default_gate"
-        gateOptions={[{
-          gateId: 'default_gate',
-          label: 'test-12',
-          sbtItems: [{
-            address,
-            label: 'AI Gate Test SBT',
-            meta: '0x1111...1111',
-            href: buildSbtDetailPath(address, 'edge'),
-          }],
-        }]}
-      />
-    );
+    expect(treeHasText(collapsedControl, 'only me')).toBe(true);
+    expect(treeHasText(collapsedControl, 'test-12')).toBe(true);
+    expect(treeHasText(collapsedControl, 'for test-12')).toBe(false);
+    expect(treeHasText(collapsedControl, 'AI Gate Test SBT')).toBe(false);
+    expect(findNodeByClassName(collapsedControl, styles.lockAudienceCaretButton)).toBeTruthy();
 
-    expect(screen.getByText('AI Gate Test SBT')).toBeInTheDocument();
-    expect(screen.getByText('0x1111...1111')).toBeInTheDocument();
+    subject.state = {
+      ...subject.state,
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: { q1: 'default_gate' },
+    };
+
+    const expandedControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      lockDisabled: false,
+      lockTitle: 'Not encrypted',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+    });
+
+    expect(treeHasText(expandedControl, 'AI Gate Test SBT')).toBe(true);
+    expect(treeHasText(expandedControl, '0x1111...1111')).toBe(true);
   });
 
   it('wires shared lock-audience gate helper callbacks for select and details toggle', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.toggleLockAudienceGateDetails = jest.fn();
     const onSelectAudience = jest.fn();
-    const onToggleGateDetails = jest.fn();
 
-    renderAudienceControl({
-      gateOptions: [{
+    const gateOption = subject.renderLockAudienceGateOption({
+      qid: 'q1',
+      effectiveFieldKey: 'answer',
+      option: {
         gateId: 'vip_gate',
         label: 'VIP gate',
         sbtItems: [{
-          address,
+          address: '0x1111111111111111111111111111111111111111',
           label: 'AI Gate Test SBT',
           meta: '0x1111...1111',
-          href: buildSbtDetailPath(address, 'edge'),
+          href: '/sbt/0x1111111111111111111111111111111111111111',
         }],
-      }],
+      },
+      gateActive: false,
+      currentGateId: '',
+      expandedGateId: '',
       onSelectAudience,
-      onToggleGateDetails,
     });
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE));
-    fireEvent.click(screen.getByRole('button', { name: /show vip gate/i }));
+    const gateButton = findElement(
+      gateOption,
+      (candidate) => candidate?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE
+        && candidate?.props?.['data-ce-gate-id'] === 'vip_gate'
+    );
+    const caretButton = findNodeByClassName(gateOption, styles.lockAudienceCaretButton);
 
+    expect(gateButton).toBeTruthy();
+    expect(caretButton).toBeTruthy();
+
+    gateButton.props.onClick();
     expect(onSelectAudience).toHaveBeenCalledWith('gate', 'vip_gate');
-    expect(onToggleGateDetails).toHaveBeenCalledWith('q1', 'vip_gate', 'answer');
+
+    const preventDefault = jest.fn();
+    const stopPropagation = jest.fn();
+    caretButton.props.onClick({ preventDefault, stopPropagation });
+
+    expect(preventDefault).toHaveBeenCalled();
+    expect(stopPropagation).toHaveBeenCalled();
+    expect(subject.toggleLockAudienceGateDetails).toHaveBeenCalledWith('q1', 'vip_gate', 'answer');
   });
 
   it('hides the plaintext audience option for additional comment lock menus', () => {
-    renderAudienceControl({
-      effectiveFieldKey: 'additional',
-      fieldState: { encrypted: false, encryptionAudience: 'self' },
-      gateOptions: [],
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = { ...subject.state, lockAudienceMenuByQuestion: { 'q1:additional': true } };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.resolveLockAudienceSessionName = jest.fn(() => 'session');
+
+    const lockControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      field: { encrypted: false, encryptionAudience: 'self' },
+      fieldKey: 'additional',
+      lockDisabled: false,
+      lockTitle: 'Comments encryption audience',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
+      showPlaintextOption: true,
       showFollowOption: true,
     });
 
-    expect(screen.queryByText('Not encrypted')).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).not.toBeInTheDocument();
-    expect(screen.getByText('only me')).toBeInTheDocument();
-    expect(screen.getByText('Match Answer')).toBeInTheDocument();
+    expect(treeHasText(lockControl, 'Not encrypted')).toBe(false);
+    expect(treeHasDataTestId(lockControl, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).toBe(false);
+    expect(treeHasText(lockControl, 'only me')).toBe(true);
+    expect(treeHasText(lockControl, 'Match Answer')).toBe(true);
   });
 });

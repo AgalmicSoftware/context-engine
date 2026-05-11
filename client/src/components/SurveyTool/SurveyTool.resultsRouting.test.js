@@ -1,7 +1,6 @@
 import SurveyTool from './SurveyTool';
 import { SurveySelector } from './SurveySelector';
-
-const REACT_LAZY_TYPE = Symbol.for('react.lazy');
+import ConnectedSurveyResults from './SurveyResults';
 
 const treeHasDataTestId = (node, testId) => {
   if (node == null) return false;
@@ -39,13 +38,6 @@ const findElement = (node, predicate) => {
   }
   return null;
 };
-
-const findLazySurveyResultsNode = (node) => (
-  findElement(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen')
-  ))
-);
 
 describe('SurveyTool results routing', () => {
   afterEach(() => {
@@ -132,7 +124,7 @@ describe('SurveyTool results routing', () => {
 
     const tree = subject.render();
     const selectorNode = findElement(tree, (candidate) => candidate?.type === SurveySelector);
-    const resultsNode = findLazySurveyResultsNode(tree);
+    const resultsNode = findElement(tree, (candidate) => candidate?.type === ConnectedSurveyResults);
 
     expect(selectorNode).toBeTruthy();
     expect(selectorNode.props.autoOpenResults).toBe(false);
@@ -161,7 +153,7 @@ describe('SurveyTool results routing', () => {
     });
 
     const tree = subject.render();
-    const resultsNode = findLazySurveyResultsNode(tree);
+    const resultsNode = findElement(tree, (candidate) => candidate?.type === ConnectedSurveyResults);
 
     expect(resultsNode).toBeTruthy();
     expect(resultsNode.props.sessionSlugPinned).toBe(true);
