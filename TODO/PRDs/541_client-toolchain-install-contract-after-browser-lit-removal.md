@@ -1,5 +1,15 @@
 # Client Toolchain Install Contract After Browser Lit Removal
 
+## Integration Status - 2026-05-11
+
+The browser Lit package pressure has been removed in the integration branch, and
+the production dependency split is merged there, but the client install/toolchain
+contract is still unresolved. The remaining blocker is the CRA 4 / TypeScript 5
+peer mismatch plus Node 20 build compatibility, not Telegram bot behavior.
+
+Keep this as a separate toolchain decision. Do not attempt strict peer install,
+CRA migration, or Node-line changes inside the next Telegram continuation.
+
 ## Problem
 
 The browser-side Lit SDK packages have now been removed from the active client runtime and dependency graph:

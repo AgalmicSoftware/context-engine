@@ -1,5 +1,18 @@
 # ContextEngine-CC Chipotle Follow-On After Merge
 
+## Integration Status - 2026-05-11
+
+The Lit Chipotle remediation branch is merged into
+`autocoder/integration-agent-storage-modernization`, but the integration branch
+has not yet landed on `dev`. The runtime hardening work is in place; this PRD
+remains open because CE-CC still needs a post-merge convergence audit against
+the worker-mediated Chipotle architecture.
+
+This is a follow-on audit lane, not a reason to reopen the main app Chipotle
+runtime cut. Prefer docs, install/start notes, stale browser-Lit/Naga wording,
+and CE-CC test alignment first. Do not introduce a parallel CE-CC Lit runtime
+unless a concrete existing path proves it is required.
+
 ## Why this PRD exists
 
 The Chipotle migration worktree completed the main app transition:

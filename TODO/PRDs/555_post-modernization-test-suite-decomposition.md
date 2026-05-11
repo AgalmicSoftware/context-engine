@@ -1,5 +1,16 @@
 # PRD 555 - Post-Modernization Test Suite Decomposition
 
+## Integration Status - 2026-05-11
+
+The first decomposition slices are merged into
+`autocoder/integration-agent-storage-modernization`, but this remains an active
+low-risk churn lane rather than a completed project. Continue by moving small,
+coherent test clusters into focused files with assertions and mocks preserved.
+
+This PRD is useful for overnight mechanical progress. It should pause during the
+next Telegram bot context unless a Telegram-related test split is directly
+needed for that work.
+
 **Priority:** MEDIUM-HIGH | **Effort:** HIGH | **Status:** Draft | **Category:** Test Architecture / Agent Navigation
 **Created:** 2026-05-05
 

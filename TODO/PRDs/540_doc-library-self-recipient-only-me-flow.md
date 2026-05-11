@@ -1,5 +1,17 @@
 # Doc Library Self-Recipient Only-Me Flow
 
+## Integration Status - 2026-05-11
+
+The storage/document-routing branch is merged into
+`autocoder/integration-agent-storage-modernization`, but this private-document
+encryption follow-up is still open. The current merged state still leaves the
+"only me" document-save path to be separated from shared/session-gated Chipotle
+document encryption.
+
+This is a crypto/storage behavior change and should not be bundled into a
+Telegram bot continuation. Keep it as a focused follow-up with explicit tests
+for private doc save/reopen and unchanged session-gated Chipotle behavior.
+
 ## Problem
 
 The repo already has a non-Lit self-recipient envelope path for private data:

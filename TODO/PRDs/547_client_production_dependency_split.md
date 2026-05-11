@@ -1,5 +1,18 @@
 # PRD 547 - Split Client Dev Tooling Out Of Production Dependencies
 
+## Integration Status - 2026-05-11
+
+The first production dependency split is merged into
+`autocoder/integration-agent-storage-modernization`: obvious build/test/static
+serving packages moved to `devDependencies`, while runtime packages stayed in
+`dependencies`. The production audit surface is smaller, but this PRD is not a
+complete dependency modernization.
+
+Remaining work is a separate client runtime/toolchain lane: runtime advisories
+for packages such as `ethers` v5, `jspdf`, router/map/Markdown/wallet/storage
+dependencies, and the CRA 4 / TypeScript 5 / Node 20 build split. Do not mix
+that work into the Telegram bot continuation.
+
 **Priority:** HIGH | **Effort:** MEDIUM | **Status:** Draft | **Category:** Supply Chain / Client Tooling
 **Created:** 2026-05-02
 

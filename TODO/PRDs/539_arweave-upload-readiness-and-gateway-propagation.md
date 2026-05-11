@@ -1,5 +1,18 @@
 # Arweave Upload Readiness And Gateway Propagation
 
+## Integration Status - 2026-05-11
+
+The storage-routing work is present in
+`autocoder/integration-agent-storage-modernization`, but this PRD remains open
+after the merge. The known gap is still operational reliability around fresh
+Arweave upload readability: upload acceptance and gateway propagation need to be
+modeled as separate states.
+
+Do not treat this as a Telegram bot blocker unless a Telegram continuation needs
+to read freshly uploaded Arweave-backed payloads. The first implementation slice
+should be a focused upload/readiness state and retry/reporting change with
+targeted tests, not a broad storage rewrite.
+
 ## Problem
 
 Our live Chipotle document flow can upload a fresh encrypted Arweave payload successfully, but the follow-up read often fails for several minutes because the transaction is not yet readable through the gateway as the expected JSON envelope.

@@ -1,5 +1,17 @@
 # PRD 550 - Modernization Churn Continuation Handoff
 
+## Integration Status - 2026-05-11
+
+The modernization branch is merged into
+`autocoder/integration-agent-storage-modernization` as a set of safe typed/test
+and dependency-cleanup slices. It is not the end of modernization. Remaining
+work should stay leaf-oriented: PRD 555 test decomposition, PRD 430 selector
+naming cleanup, narrowly scoped typing leaves, and a separate client toolchain
+decision.
+
+Do not use this PRD as permission for broad SBTPage class-state typing,
+CRA/toolchain migration, or behavior changes during a Telegram continuation.
+
 **Priority:** High
 **Effort:** Medium-high
 **Status:** Draft

@@ -1,5 +1,17 @@
 # PRD 430 — Frontend SCSS Naming Standardization
 
+## Integration Status - 2026-05-11
+
+The first conservative naming slice is merged into
+`autocoder/integration-agent-storage-modernization`, but this PRD is not
+complete. Continue it only in small, isolated frontend slices that replace
+styling-only IDs/selectors with semantic `className` or `data-testid` hooks and
+run focused tests.
+
+This is a good low-risk churn lane after Telegram work, but it should not be
+mixed into the next Telegram bot context unless a Telegram UI/setup component
+itself needs a tiny selector cleanup.
+
 **Priority:** MEDIUM | **Effort:** LARGE | **Status:** Proposed | **Category:** Frontend Hygiene — CSS Modules / Naming / Testability
 **Source:** User-requested follow-up to review of `InformationModals/Modals.module.scss` and broader SCSS naming cleanup on 2026-04-20
 

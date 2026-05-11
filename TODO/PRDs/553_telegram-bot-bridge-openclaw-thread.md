@@ -1,5 +1,23 @@
 # PRD 553: Telegram Bot Bridge and OpenClaw Thread
 
+## Integration Status - 2026-05-11
+
+The Telegram live and demo-runtime branches are merged into
+`autocoder/integration-agent-storage-modernization`, but that integration branch
+has not yet been merged back into `dev`. Treat this PRD as the queue head for
+the next Telegram-focused context.
+
+The merged slice provides the private `agentBridgeWorker`, live command
+handling, deploy plan/apply helpers, the `/telegram-demo-setup` setup route,
+question-cache behavior, Mini App answer scaffolding, and safe Telegram
+response controls. It is not a completed production bot. The next safe product
+direction is to keep the bridge private, prove the live bot loop, then replace
+fixture/worker-local seams with canonical CE agent/session APIs.
+
+Do not fold in `coprompt` or the dirty `agent-native-openclaw-telegram` worktree
+while continuing this PRD. OpenClaw/MCP forwarding remains a later integration
+lane unless the user explicitly redirects.
+
 ## Current State - 2026-05-09
 
 - `sessionCorsWorker` is the canonical session payload storage and access
@@ -115,7 +133,9 @@
 
 ## Next Queue Head
 
-1. Smoke the live Telegram bot from Telegram after the callback/preview deploy:
+1. Create a fresh Telegram continuation branch from
+   `autocoder/integration-agent-storage-modernization`, then smoke the live
+   Telegram bot from Telegram after the callback/preview deploy:
    private `/start`, group `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
    `/q <number-or-id>`, `/ce_attachments`, and private `/ce_me`. Confirm
    replies expose only safe summaries and opaque `cecb_*` / `cetg_*` action IDs,
