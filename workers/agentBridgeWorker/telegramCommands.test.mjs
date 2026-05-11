@@ -165,6 +165,122 @@ test('parseTelegramCommandText handles mentions without accepting commands for a
   assert.equal(parseTelegramCommandText('hello').isCommand, false);
 });
 
+test('agent action menu is group-safe and persists only opaque launch records', async () => {
+  const env = baseEnv();
+  const result = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_actions'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const buttons = flattenButtons(result.response.replyMarkup);
+  const createAgent = buttons.find((button) => button.text === 'Create Agent');
+  const settings = buttons.find((button) => button.text === 'Settings');
+  const viewQuestions = buttons.find((button) => button.text === 'View Questions');
+  const storedActionKeys = Array.from(env.AGENT_ACTION_KV.store.keys())
+    .filter((key) => key.startsWith('telegram:action:'));
+
+  assert.equal(result.ok, true);
+  assert.equal(result.screen, 'agent_action_menu');
+  assert.match(result.response.text, /Account and settings inputs open in private chat or Mini App/);
+  assert.equal(result.response.text.includes('Address:'), false);
+  assert.equal(result.catalog.canonicalBoundary, '/api/agent/*');
+  assert.equal(result.catalog.capabilities.some((capability) => capability.id === 'agent.settings.update'), false);
+  assert.match(createAgent.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(settings.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(viewQuestions.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.equal(JSON.stringify(result).includes('unit-root'), false);
+  assert.equal(createAgent.url.includes('alpha'), false);
+  assert.equal(settings.url.includes('alpha'), false);
+  assert.equal(storedActionKeys.length >= 3, true);
+});
+
+test('agent create and settings commands route group inputs private and model canonical requests', async () => {
+  const env = baseEnv();
+  const groupCreate = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_create_agent'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const privateCreate = await buildTelegramCommandResponse({
+    update: privateMessage('/ce_create_agent'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+  const groupSettings = await buildTelegramCommandResponse({
+    update: groupMessage('/ce_settings'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  const privateSettings = await buildTelegramCommandResponse({
+    update: privateMessage('/ce_settings'),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
+  const agentRequests = Array.from(env.AGENT_ACTION_KV.store.entries())
+    .filter(([key]) => key.startsWith('telegram:agent-request:'))
+    .map(([, value]) => JSON.parse(value));
+
+  assert.equal(groupCreate.screen, 'agent_account_create');
+  assert.equal(groupCreate.privateChatRequired, true);
+  assert.match(groupCreate.response.text, /No account state is shown in group chat/);
+  assert.equal(groupCreate.response.text.includes('Address:'), false);
+  assert.match(flattenButtons(groupCreate.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+
+  assert.equal(privateCreate.screen, 'agent_account_create');
+  assert.match(privateCreate.response.text, /Agent account/);
+  assert.match(privateCreate.response.text, /Canonical: POST \/api\/agent\/accounts\/create-request/);
+  assert.equal(privateCreate.canonicalApiRequest.path, '/api/agent/accounts/create-request');
+  assert.equal(privateCreate.canonicalApiRequest.status, 'pending_canonical_handoff');
+  assert.equal(JSON.stringify(privateCreate).includes('unit-root'), false);
+  assert.equal(agentRequests.length, 1);
+  assert.equal(agentRequests[0].canonicalApiRequest.path, '/api/agent/accounts/create-request');
+
+  assert.equal(groupSettings.screen, 'agent_settings_overview');
+  assert.equal(groupSettings.privateChatRequired, true);
+  assert.equal(groupSettings.response.text.includes('Draft style:'), false);
+  assert.match(flattenButtons(groupSettings.response.replyMarkup)[0].url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+
+  assert.equal(privateSettings.screen, 'agent_settings_overview');
+  assert.match(privateSettings.response.text, /Draft style: balanced/);
+  assert.equal(privateSettings.canonicalApiRequest.path, '/api/agent/settings');
+  assert.equal(privateSettings.settings.telegramReminders, false);
+});
+
+test('settings edit callback stays private and points input collection at Mini App scaffold', async () => {
+  const env = baseEnv();
+  const settings = await buildTelegramCommandResponse({
+    update: privateMessage('/ce_settings'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+  const edit = flattenButtons(settings.response.replyMarkup)
+    .find((button) => button.text === 'Edit Settings');
+  const callback = await buildTelegramCommandResponse({
+    update: {
+      update_id: 7100,
+      callback_query: {
+        id: 'callback-edit-settings',
+        data: edit.callback_data,
+        from: { id: 42, username: 'participant' },
+        message: {
+          message_id: 70,
+          chat: { id: 42, type: 'private' },
+        },
+      },
+    },
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.equal(callback.ok, true);
+  assert.equal(callback.screen, 'agent_settings_edit');
+  assert.equal(callback.response.method, 'editMessageText');
+  assert.match(callback.response.text, /Mini App is not configured/);
+  assert.equal(callback.canonicalApiRequest.path, '/api/agent/settings/update-request');
+  assert.equal(callback.canonicalApiRequest.body.settingsPatchRef, 'telegram_settings_patch_ref');
+  assert.equal(callback.canonicalApiRequest.body.idempotencyKey, 'provided_on_submit');
+});
+
 test('group /ce_join returns a Workers-safe session card with opaque buttons only', async () => {
   const env = baseEnv();
   const result = await buildTelegramCommandResponse({
@@ -794,7 +910,7 @@ test('/q poses existing or ad hoc public questions to the group', async () => {
   assert.equal(JSON.stringify(adHoc.response.replyMarkup).includes('What should we fund'), false);
 });
 
-test('/q renders structured answer buttons and saves answer drafts from callbacks', async () => {
+test('/q renders structured answer buttons and auto-submits from callbacks', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       {
@@ -834,10 +950,10 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   });
 
   assert.equal(binary.ok, true);
-  assert.match(binary.response.text, /Tap an answer, then submit the draft from Telegram/);
+  assert.match(binary.response.text, /Tap an answer to submit from Telegram/);
   assert.deepEqual(
     flattenButtons(binary.response.replyMarkup).map((button) => button.text).slice(0, 3),
-    ['Agree', 'Unsure', 'Disagree']
+    ['Agree', 'Disagree', 'Unsure']
   );
   assert.deepEqual(
     flattenButtons(rating.response.replyMarkup).map((button) => button.text).slice(0, 11),
@@ -853,7 +969,7 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   const agree = binaryButtons.find((button) => button.text === 'Agree');
   const disagree = binaryButtons.find((button) => button.text === 'Disagree');
   const submitDraft = binaryButtons.find((button) => button.text === 'Submit Draft');
-  assert.match(submitDraft.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+  assert.equal(submitDraft, undefined);
   const saved = await buildTelegramCommandResponse({
     update: {
       update_id: 7011,
@@ -874,7 +990,12 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   assert.equal(saved.ok, true);
   assert.equal(saved.response, null);
   assert.equal(saved.answerDraftSaved, true);
-  assert.equal(saved.callbackAnswerText, 'Draft saved. Tap Submit Draft when ready.');
+  assert.equal(saved.submitRequestCreated, true);
+  assert.equal(saved.submitRequest.status, 'submit_request_created');
+  assert.equal(saved.submitRequest.canonicalApiRequest.path, '/api/agent/responses/submit-request');
+  assert.equal(saved.submitRequest.replayed, false);
+  assert.match(saved.submitRequest.idempotencyKey, /^telegram_bot_submit:42:alpha:/);
+  assert.equal(saved.callbackAnswerText, 'Submitted.');
 
   const draftRecords = Array.from(env.AGENT_ACTION_KV.store.values())
     .map((value) => JSON.parse(value))
@@ -884,12 +1005,12 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   assert.equal(draftRecords[0].questionId, `0x${'12'.repeat(32)}`);
   assert.equal(draftRecords[0].submitLane, 'telegram_private_account');
 
-  const submitted = await buildTelegramCommandResponse({
+  const replayedSubmit = await buildTelegramCommandResponse({
     update: {
       update_id: 7012,
       callback_query: {
-        id: 'callback-submit-draft',
-        data: submitDraft.callback_data,
+        id: 'callback-answer-agree-replay',
+        data: agree.callback_data,
         from: { id: 42, username: 'host' },
         message: {
           message_id: 61,
@@ -901,35 +1022,9 @@ test('/q renders structured answer buttons and saves answer drafts from callback
     now: '2026-05-08T12:00:04.000Z',
   });
 
-  assert.equal(submitted.ok, true);
-  assert.equal(submitted.response, null);
-  assert.equal(submitted.submitRequestCreated, true);
-  assert.equal(submitted.submitRequest.status, 'submit_request_created');
-  assert.equal(submitted.submitRequest.canonicalApiRequest.path, '/api/agent/responses/submit-request');
-  assert.equal(submitted.submitRequest.replayed, false);
-  assert.match(submitted.submitRequest.idempotencyKey, /^telegram_bot_submit:42:alpha:/);
-  assert.match(submitted.callbackAnswerText, /Submit request queued for 0x12121212\.\.\.121212/);
-
-  const replayedSubmit = await buildTelegramCommandResponse({
-    update: {
-      update_id: 7013,
-      callback_query: {
-        id: 'callback-submit-draft-replay',
-        data: submitDraft.callback_data,
-        from: { id: 42, username: 'host' },
-        message: {
-          message_id: 61,
-          chat: { id: -100123, type: 'supergroup' },
-        },
-      },
-    },
-    env,
-    now: '2026-05-08T12:00:05.000Z',
-  });
-
   assert.equal(replayedSubmit.ok, true);
   assert.equal(replayedSubmit.submitRequestCreated, true);
-  assert.equal(replayedSubmit.submitRequest.requestId, submitted.submitRequest.requestId);
+  assert.equal(replayedSubmit.submitRequest.requestId, saved.submitRequest.requestId);
   assert.equal(replayedSubmit.submitRequest.replayed, true);
 
   const submitRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
@@ -940,9 +1035,9 @@ test('/q renders structured answer buttons and saves answer drafts from callback
   assert.equal(submitRecords[0].lane, 'telegram_private_account');
   assert.equal(submitRecords[0].answer.label, 'Agree');
   assert.equal(submitRecords[0].canonicalApiRequest.body.questionId, `0x${'12'.repeat(32)}`);
-  assert.equal(submitRecords[0].canonicalApiRequest.body.idempotencyKey, submitted.submitRequest.idempotencyKey);
+  assert.equal(submitRecords[0].canonicalApiRequest.body.idempotencyKey, saved.submitRequest.idempotencyKey);
 
-  const changedSaved = await buildTelegramCommandResponse({
+  const changedSubmitted = await buildTelegramCommandResponse({
     update: {
       update_id: 7014,
       callback_query: {
@@ -958,29 +1053,12 @@ test('/q renders structured answer buttons and saves answer drafts from callback
     env,
     now: '2026-05-08T12:00:06.000Z',
   });
-  const changedSubmitted = await buildTelegramCommandResponse({
-    update: {
-      update_id: 7015,
-      callback_query: {
-        id: 'callback-submit-changed-draft',
-        data: submitDraft.callback_data,
-        from: { id: 42, username: 'host' },
-        message: {
-          message_id: 61,
-          chat: { id: -100123, type: 'supergroup' },
-        },
-      },
-    },
-    env,
-    now: '2026-05-08T12:00:07.000Z',
-  });
 
-  assert.equal(changedSaved.ok, true);
   assert.equal(changedSubmitted.ok, true);
   assert.equal(changedSubmitted.submitRequestCreated, true);
   assert.equal(changedSubmitted.submitRequest.replayed, false);
-  assert.notEqual(changedSubmitted.submitRequest.requestId, submitted.submitRequest.requestId);
-  assert.notEqual(changedSubmitted.submitRequest.idempotencyKey, submitted.submitRequest.idempotencyKey);
+  assert.notEqual(changedSubmitted.submitRequest.requestId, saved.submitRequest.requestId);
+  assert.notEqual(changedSubmitted.submitRequest.idempotencyKey, saved.submitRequest.idempotencyKey);
   const changedSubmitRecords = Array.from(env.AGENT_ACTION_KV.store.entries())
     .filter(([key]) => key.startsWith('telegram:submit-request:'))
     .map(([, value]) => JSON.parse(value));
@@ -1009,7 +1087,7 @@ test('/q renders structured answer buttons and saves answer drafts from callback
     callback_query_id: 'callback-answer-agree',
     show_alert: false,
     cache_time: 0,
-    text: 'Draft saved. Tap Submit Draft when ready.',
+    text: 'Submitted.',
   });
 });
 

@@ -108,6 +108,9 @@ function telegramPreviewHtml() {
       </select>
       <div class="commands">
         <button data-command="/start">/start</button>
+        <button data-command="/ce_actions">/ce_actions</button>
+        <button data-command="/ce_create_agent">/ce_create_agent</button>
+        <button data-command="/ce_settings">/ce_settings</button>
         <button data-command="/ce_join alpha">/ce_join alpha</button>
         <button data-command="/ce_sessions">/ce_sessions</button>
         <button data-command="/ce_questions">/ce_questions</button>

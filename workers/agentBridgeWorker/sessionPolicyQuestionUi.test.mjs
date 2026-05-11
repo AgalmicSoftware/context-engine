@@ -163,7 +163,7 @@ test('Telegram question cards preserve CE rating/comment/mic/doc conventions by 
     binary.controls
       .filter((control) => control.controlType === 'agree_unsure_disagree')
       .map((control) => control.label),
-    ['Agree', 'Unsure', 'Disagree'],
+    ['Agree', 'Disagree', 'Unsure'],
   );
   assert.equal(singleChoice.selectionMode, 'single');
   assert.equal(singleChoice.controls.filter((control) => control.controlType === 'single_select').length, 2);
@@ -205,7 +205,7 @@ test('screen states expose launch commands and current UX copy', () => {
   const states = TELEGRAM_SCREEN_IDS.map((screen) => buildTelegramScreenState(screen, { status: 'ready' }));
   const launches = listTelegramScreenLaunchContracts();
 
-  assert.equal(states.length, 32);
+  assert.equal(states.length, 36);
   assert.equal(states.every((state) => state.type === 'telegram_screen_state'), true);
   assert.deepEqual(states.map((state) => state.screen), TELEGRAM_SCREEN_IDS);
   assert.deepEqual(launches.map((entry) => entry.screen), TELEGRAM_SCREEN_IDS);
@@ -230,6 +230,20 @@ test('screen states expose launch commands and current UX copy', () => {
 
   const accountCreated = states.find((state) => state.screen === 'account_created');
   assert.equal(JSON.stringify(accountCreated).includes('Open in CE'), false);
+
+  const actionMenu = states.find((state) => state.screen === 'agent_action_menu');
+  assert.equal(actionMenu.title, 'Agent Actions');
+  assert.equal(actionMenu.launch.command, '/ce_actions');
+  assert.deepEqual(actionMenu.launch.aliases, ['/ce_agent']);
+  assert.deepEqual(actionMenu.buttons.map((button) => button.label), ['Create Agent', 'Settings', 'View Questions']);
+
+  const agentCreate = states.find((state) => state.screen === 'agent_account_create');
+  assert.equal(agentCreate.launch.command, '/ce_create_agent');
+  assert.equal(agentCreate.launch.deepLink, 't.me/<bot>?start=<opaque-action-id>');
+
+  const settings = states.find((state) => state.screen === 'agent_settings_overview');
+  assert.equal(settings.launch.command, '/ce_settings');
+  assert.equal(settings.buttons.find((button) => button.label === 'Edit Settings').targetLane, 'telegram_mini_app');
 
   const poseQuestion = states.find((state) => state.screen === 'pose_question');
   assert.equal(poseQuestion.title, 'Pose Question');
