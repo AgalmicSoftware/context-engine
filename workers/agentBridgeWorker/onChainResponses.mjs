@@ -37,7 +37,7 @@ function envFlagDisabled(value = '') {
 function jsonHeaders(origin = '') {
   return {
     'content-type': 'application/json',
-    ...(origin ? { origin, Origin: origin } : {}),
+    ...(origin ? { Origin: origin } : {}),
   };
 }
 
@@ -270,7 +270,6 @@ export async function requestSessionWorkerFaucet({
     method: 'POST',
     headers: {
       ...jsonHeaders(resolveLoginOrigin(env)),
-      authorization: `Bearer ${login.token}`,
       Authorization: `Bearer ${login.token}`,
     },
     body: JSON.stringify({
@@ -403,7 +402,6 @@ async function uploadResponsePayload({
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      authorization: `Bearer ${token}`,
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
