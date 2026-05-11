@@ -222,11 +222,11 @@ test('buildArweavePayload carries explicit audience metadata for answer and addi
             ciphertext: 'lit-ciphertext',
             dataToEncryptHash: 'lit-hash',
             chipotle: {
-              version: 1,
+              version: 2,
               chainId: CHAIN_ID,
               gateMode: 'any',
               sbtAddresses: [GATE_A],
-              rpcUrl: 'https://base-sepolia.example.test',
+              policyFingerprint: `0x${'ab'.repeat(32)}`,
             },
           }),
         },
@@ -254,11 +254,11 @@ test('buildArweavePayload carries explicit audience metadata for answer and addi
     assert.equal(typeof answerLitRecipient?.lit?.ciphertext, 'string');
     assert.equal(answerLitRecipient?.lit?.dataToEncryptHash, 'lit-hash');
     assert.deepEqual(answerLitRecipient?.lit?.chipotle, {
-      version: 1,
+      version: 2,
       chainId: CHAIN_ID,
       gateMode: 'any',
       sbtAddresses: [GATE_A],
-      rpcUrl: 'https://base-sepolia.example.test',
+      policyFingerprint: `0x${'ab'.repeat(32)}`,
     });
   } finally {
     if (prevDataDir == null) delete process.env.CE_CC_DATA_DIR;

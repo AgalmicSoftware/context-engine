@@ -6,9 +6,24 @@ import {
   buildSbtAccessControlConditions,
   createNodeLitHooks,
 } from './litNodeHooks.mjs';
+import {
+  buildLitChipotlePolicy,
+  fingerprintLitChipotlePolicy,
+} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
 
 const GATE_ADDRESS = '0x29563ff3aCC8AFb220D810F8022218095e25C1f6';
 const GATE_ADDRESS_B = '0x1111111111111111111111111111111111111111';
+const TEST_ACTION_CID = 'QmAction123';
+const TEST_PKP_ID = '0xpkp123';
+
+const makePolicy = (overrides = {}) => buildLitChipotlePolicy({
+  chainId: 84532,
+  gateMode: 'all',
+  sbtAddresses: [GATE_ADDRESS, GATE_ADDRESS_B],
+  litActionCid: TEST_ACTION_CID,
+  litPkpId: TEST_PKP_ID,
+  ...overrides,
+});
 
 test('createNodeLitHooks fails closed when worker-mediated Chipotle config is missing', async () => {
   await assert.rejects(
@@ -22,6 +37,7 @@ test('createNodeLitHooks fails closed when worker-mediated Chipotle config is mi
 
 test('createNodeLitHooks wraps keys through the session worker Chipotle endpoint', async () => {
   const calls = [];
+  const policy = makePolicy();
   const fetchImpl = async (url, options = {}) => {
     calls.push([String(url), options]);
     return {
@@ -33,6 +49,8 @@ test('createNodeLitHooks wraps keys through the session worker Chipotle endpoint
           response: {
             ok: true,
             ciphertext: 'wrapped-cek',
+            policy,
+            policyFingerprint: fingerprintLitChipotlePolicy(policy),
           },
         },
       }),
@@ -62,14 +80,17 @@ test('createNodeLitHooks wraps keys through the session worker Chipotle endpoint
   assert.equal(result.ciphertext, 'wrapped-cek');
   assert.equal(
     result.dataToEncryptHash,
-    `chipotle-v3:action:84532:all:${GATE_ADDRESS.toLowerCase()},${GATE_ADDRESS_B.toLowerCase()}`,
+    `chipotle-v3:${TEST_ACTION_CID}:84532:all:${policy.sbtAddresses.join(',')}:${fingerprintLitChipotlePolicy(policy)}`,
   );
   assert.deepEqual(result.chipotle, {
-    version: 1,
-    sbtAddresses: [GATE_ADDRESS, GATE_ADDRESS_B],
+    version: 2,
+    litActionCid: TEST_ACTION_CID,
+    litPkpId: TEST_PKP_ID,
+    sbtAddresses: policy.sbtAddresses,
     gateMode: 'all',
     chainId: 84532,
-    rpcUrl: 'https://base-sepolia.example.test',
+    policyFingerprint: fingerprintLitChipotlePolicy(policy),
+    policy,
   });
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], 'https://worker.example.test/lit/chipotle-action');
@@ -81,10 +102,10 @@ test('createNodeLitHooks wraps keys through the session worker Chipotle endpoint
   assert.equal(body.op, 'encrypt');
   assert.equal(body.gateMode, 'all');
   assert.equal(body.chainId, 84532);
-  assert.equal(body.rpcUrl, 'https://base-sepolia.example.test');
   assert.deepEqual(body.sbtAddresses, [GATE_ADDRESS, GATE_ADDRESS_B]);
   assert.match(body.actionCode, /async function main/);
   assert.equal(body.message, `0x${'07'.repeat(32)}`);
+  assert.equal(body.rpcUrl, undefined);
 });
 
 test('createNodeLitHooks surfaces worker-mediated SBT gate denials', async () => {
@@ -135,6 +156,5 @@ test('resolveGateFromOptions extracts SBT gate details from CE access conditions
     sbtAddresses: [GATE_ADDRESS, GATE_ADDRESS_B],
     gateChainId: 84532,
     gateMode: 'all',
-    rpcUrl: 'https://base-sepolia.example.test',
   });
 });
