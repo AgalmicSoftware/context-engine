@@ -42,6 +42,7 @@ Important behavior:
 - Existing local target branches still require `--force-with-lease` before the script rewrites them
 - `--force-with-lease` remains accepted explicitly, and is required whenever the local target branch already exists
 - Without `--push`, the script prints the follow-up `git push -u origin <branch>` command after importing the branch back into the local repo
+- Legacy internal planning identifiers in commit messages are allowed during replay when the commit still contains public-safe changes. Prefer rewriting new commit messages before sync, but do not force public-history replay to fail only because an old subject/body has a planning ID.
 
 Push safety:
 
@@ -60,7 +61,7 @@ Both workflows remove these paths from the public result:
 
 | Path | Reason |
 |------|--------|
-| `TODO/` | Internal planning and PRDs |
+| `TODO/` | Internal planning |
 | `contextEngine-cc/` | Claude Code extension (local dev tool) |
 | `docs/agent-native*.md` | Private agent-native contract docs |
 | `client/public/skill.md` | Private agent skill artifact |
@@ -75,7 +76,7 @@ Both workflows remove these paths from the public result:
 | `scripts/test-*.js`, `scripts/lib/e2e/` | E2E test layer |
 | `whitepaper/Slides.pdf`, `whitepaper/IdeasMap.md` | Internal whitepaper assets |
 
-For the artifact workflow, a fresh `private-pack.manifest.json` is generated in the output listing every stripped file with its SHA-256 checksum, so the strip can be verified or reversed. Any tracked repo-root copy is stripped before publish.
+For the artifact workflow, a fresh `private-pack.manifest.json` is generated in the output listing stripped files with SHA-256 checksums, so the strip can be verified or reversed. Private planning paths are deliberately omitted from that public manifest so roadmap filenames and planning IDs are not exposed. Any tracked repo-root copy is stripped before publish.
 
 ## PII scan
 

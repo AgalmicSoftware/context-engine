@@ -134,7 +134,7 @@ export function resolveSession(groupKeyOrCfg?: unknown): SessionConfigLike | nul
     };
   }
   if (typeof resolvedInput === 'object') return normalizeSessionNaming(resolvedInput) as SessionConfigLike;
-  // Fallback to "general" — gated behind strict demo-fallback policy (PRD 238 Stage-C).
+  // Fallback to "general" only when strict demo-fallback policy allows it.
   if (!defaultStrictAllowDemoFallback()) return null;
   return getDemoDefaultSessionConfig() as SessionConfigLike | null;
 }
@@ -223,7 +223,7 @@ export function getAllSessionEntries(): SessionConfigEntry[] {
       ([key, cfg]) => [key, normalizeSessionNaming(cfg) as SessionConfigLike] as SessionConfigEntry
     );
   }
-  // In on-chain mode, do not silently fall back to demo sessions (PRD 238 Stage-C).
+  // In on-chain mode, do not silently fall back to demo sessions.
   if (!defaultStrictAllowDemoFallback()) return [];
   return getAllDemoSessionConfigs() as SessionConfigEntry[];
 }

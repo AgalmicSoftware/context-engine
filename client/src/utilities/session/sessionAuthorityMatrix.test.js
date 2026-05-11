@@ -18,7 +18,7 @@ describe('sessionAuthorityMatrix', () => {
     expect(isDemoSourceAllowed('workerConfig', 'demo')).toBe(false);
   });
 
-  it('documents PRD 441 registry authority, faucet, and discovery boundaries', () => {
+  it('documents registry authority, faucet, and discovery boundaries', () => {
     expect(AUTHORITY_MATRIX.slugNormalization).toEqual(expect.objectContaining({
       authoritativeSource: AUTHORITY_SOURCES.REGISTRY,
       fields: expect.arrayContaining(['registrySlug', 'legacyExactSlug']),

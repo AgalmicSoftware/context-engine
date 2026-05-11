@@ -1343,7 +1343,7 @@ const SessionWizard = ({
         // NOTE: For now we assume session chain === registry chain; split these when they diverge.
         next.networkChainId = chainId;
       }
-      // Contract defaults currently come from bundled per-chain config; ENS discovery is tracked in PRD 060 / 096.
+      // Contract defaults currently come from bundled per-chain config; ENS discovery remains future work.
       const defaults = getSessionWizardContractDefaults(chainId);
       if (!next.contracts || typeof next.contracts !== 'object') {
         next.contracts = {};
@@ -1362,7 +1362,7 @@ const SessionWizard = ({
         }
         next.contracts[key].chainId = chainId;
       });
-      // Auto-fill the current PATH public RPC; dedicated gateway/provider-tier work is tracked in PRD 198 / 354.
+      // Auto-fill the current PATH public RPC; dedicated gateway/provider-tier support remains future work.
       const pathRpc = getDefaultHttpRpc(chainId);
       if (pathRpc) {
         if (!next.rpc || typeof next.rpc !== 'object') next.rpc = {};
@@ -2417,7 +2417,7 @@ const SessionWizard = ({
     const isSecretPath = isSecretFieldPath(currentPath);
     const canLock = shouldLockable(value) && (!isSecretPath || !workerSecretsEnabled);
     if (!forceShow && isSecretPath && workerSecretsEnabled) return null;
-    // PRD 423 tracks a user-facing builder for serialized defaultFilterState presets.
+    // Hide serialized defaultFilterState presets until a user-facing builder exists.
     const isDefaultFilterState = keyString === 'defaultFilterState';
     const isQuestionsPrompt = keyString === 'questionsGenPrompt';
     const isSessionHeaderField = keyString === 'sessionHeader';
@@ -3429,7 +3429,7 @@ const SessionWizard = ({
     if (metadata.lit && typeof metadata.lit === 'object') {
       metadata.lit.defaultGateId = defaultGateId || metadata.lit.defaultGateId;
     }
-    // PRD 424 tracks per-member budget semantics and enforcement. Keep the field hidden until then.
+    // Keep per-member budget fields hidden until semantics and enforcement are implemented.
     metadata.perMemberSpendLimits = {
       ...(metadata.perMemberSpendLimits || {}),
       ai: gateSelections.ai?.perMemberLimit || metadata.perMemberSpendLimits?.ai || '',

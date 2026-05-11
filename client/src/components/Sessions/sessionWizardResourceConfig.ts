@@ -50,7 +50,7 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   ],
   rpc: [
     { key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' },
-    // Intentionally hidden until PATH gateway auth is supported (tracked in PRD 198 / 354).
+    // Intentionally hidden until PATH gateway auth is supported.
     // { key: 'customRpcKey', label: 'Custom RPC key', type: 'password' },
   ],
   arweave: [

@@ -104,6 +104,7 @@ function setupSourceRepo() {
     });
 
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private only\n');
+    writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '123_private-roadmap.md'), 'private roadmap\n');
     commitAll(sourceDir, 'Private-only commit', {
       authorDate: '2025-01-03T04:05:06Z',
       committerDate: '2025-01-03T04:05:06Z',
@@ -124,6 +125,7 @@ function setupSourceRepo() {
     writeFile(sourceDir, 'public.txt', 'public one\npublic two\n');
     writeFile(sourceDir, 'private-pack.manifest.json', '{"generated":"local-only"}\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review-snapshot.js'), 'temp review snapshot\n');
+    writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '456_private-mixed-roadmap.md'), 'private mixed roadmap\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'internal\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill v2\n');
@@ -156,6 +158,12 @@ function withSourceRepo(run) {
 function parseSummaryValue(stdout, label) {
   const match = stdout.match(new RegExp(`^${label}: (.+)$`, 'm'));
   return match ? match[1] : null;
+}
+
+function assertNoPrivatePlanningPaths(trackedPaths) {
+  const planningToken = `${'PR'}${'D'}`;
+  const planningPathPattern = new RegExp(`(^|/)TODO(/|$)|(^|/)[^/\\n]*${planningToken}s?[^/\\n]*(/|$)`, 'm');
+  assert.doesNotMatch(trackedPaths, planningPathPattern);
 }
 
 test('sync-public-history dry run reports replayed and skipped commits without creating a branch', () => {
@@ -247,6 +255,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
     ]);
 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'release-staging']);
+    assertNoPrivatePlanningPaths(trackedPaths);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/server\.mjs$/m);
@@ -263,11 +272,28 @@ test('sync-public-history replays public commits, skips private-only commits, an
   });
 });
 
+test('sync-public-history allows planning identifiers in commit messages while stripping planning files', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const planningId = `${'PR'}${'D'} 123`;
+    writeFile(sourceDir, 'public-planning-message.txt', 'public change\n');
+    writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '789_private-roadmap.md'), 'private planning still stripped\n');
+    commitAll(sourceDir, `Public planning reference\n\nReferences ${planningId} without publishing planning files.\n`, {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const dryRun = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+    assert.equal(dryRun.status, 0);
+    assert.match(dryRun.stdout, /Would replay: 3/);
+    assert.match(dryRun.stderr, /DRY RUN replay .*Public planning reference/);
+  });
+});
+
 test('sync-public-history rejects replayed commit messages that mention private tokens', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(sourceDir, 'public-leak.txt', 'public change\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-leak.md'), 'private doc\n');
-    commitAll(sourceDir, 'Public change\n\nReferences agent-native PRD details.\n', {
+    commitAll(sourceDir, 'Public change\n\nReferences agent-native details.\n', {
       authorDate: '2025-01-05T06:07:08Z',
       committerDate: '2025-01-05T06:07:08Z',
     });
@@ -325,6 +351,7 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     ]);
 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
+    assertNoPrivatePlanningPaths(trackedPaths);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/server\.mjs$/m);
@@ -397,6 +424,7 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     ]);
 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
+    assertNoPrivatePlanningPaths(trackedPaths);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\//m);
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/server\.mjs$/m);

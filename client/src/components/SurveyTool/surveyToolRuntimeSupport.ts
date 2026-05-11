@@ -19,7 +19,7 @@ const getSurveyRuntimeGlobal = (): SurveyRuntimeGlobal | null => (
 export const surveyLog = createLogger('surveys');
 export const GATE_SBT_HYDRATION_RETRY_MS = 45 * 1000;
 
-// Keep this dormant toggle path for PRD 135 voice-only interview mode.
+// Keep this dormant toggle path for future voice-only interview mode.
 // The pile hologram avatar is intentionally hidden for now, but the render/state
 // plumbing stays in place so future voice-mode work can re-enable it cleanly.
 export const SHOW_PILE_HOLOGRAM_TOGGLE = false;

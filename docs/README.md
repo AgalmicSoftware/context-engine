@@ -4,14 +4,14 @@ Primary product and system specification:
 - `spec.md` (repo root)
 
 Canonical reference set:
-- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `spec.md`
+- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
 - the `docs/` reference docs listed below
 
 Non-canonical / historical planning material:
-- `TODO/`
+- private planning files under ignored local paths
 - one-off debug prompts or migration notes unless they are explicitly linked below as current reference
 
-Planning docs should be added under `TODO/`, not `docs/`.
+Private planning docs should stay in ignored local paths, not in public docs.
 
 ## How To Keep Docs Updated
 

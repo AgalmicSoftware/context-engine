@@ -88,7 +88,7 @@
 
 Key difference from public mode: planned private deployments swap public registry-backed session reads for private session-source adapters (for example a local DB) while keeping the same auth-capable worker surface. The `/new` wizard writes session configs to that private backend instead of relying on public registry lookups. Same UI, same contracts, different storage + encryption backends.
 
-See [PRD 045](TODO/PRDs/045_corporate-private-deployment.md) for the corporate deployment roadmap.
+The corporate deployment roadmap remains in private planning until the public deployment mode is ready to document here.
 
 ## Layer Descriptions
 

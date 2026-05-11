@@ -2836,8 +2836,8 @@ class SBTPage extends Component<any, any> {
         }
 
         if (mintStep === 0) {
-          // PRD 137: Pre-validate password before spending gas on startClaim().
-          // isPasswordValid() is a free view call — saves two wasted txs on bad passwords.
+          // Pre-validate password before spending gas on startClaim().
+          // isPasswordValid() is a free view call and saves two wasted txs on bad passwords.
           const hashedPassword = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(effectivePassword));
           try {
             const isValid = await contractScriptsUntyped.isPasswordValid(
