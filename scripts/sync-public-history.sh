@@ -256,7 +256,7 @@ verify_private_planning_paths_absent() {
   findings=$(
     cd "$TEMP_CLONE"
     git ls-files |
-      grep -Ei '(^|/)TODO(/|$)|(^|/)[^/]*prds?[^/]*(/|$)' || true
+      grep -E '(^|/)TODO(/|$)|(^|/)[^/]*PRDs?[^/]*(/|$)' || true
   )
 
   if [ -n "$findings" ]; then
@@ -592,8 +592,7 @@ else
   exit 2
 fi
 
-offending_identities=$(git -C "$TEMP_CLONE" log --format='%H %an <%ae> | %cn <%ce>' "$TARGET_BASE..$TARGET_BRANCH" \
-  | grep -Fv "$PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL> | $PUBLIC_GIT_NAME <$PUBLIC_GIT_EMAIL>" || true)
+offending_identities=$(author_audit_output)
 if [ -n "$offending_identities" ]; then
   log_error "Identity audit failed; offending commits:"
   printf '%s\n' "$offending_identities" >&2

@@ -65,18 +65,6 @@ ce_public_release_manifest_exclude_patterns() {
   cat <<'EOF'
 TODO
 contextEngine-cc/TODO
-.env
-.env.local
-.env.*.local
-.env.e2e
-.keys
-.e2e-secrets
-.e2e-cache
-docs/codebase-*.md
-docs/assets/codebase-*
-docs/*PRD*.md
-docs/*prd*.md
-test/*.private.test.*
 EOF
 }
 

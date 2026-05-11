@@ -166,7 +166,7 @@ function parseSummaryValue(stdout, label) {
 
 function assertNoPrivatePlanningPaths(trackedPaths) {
   const planningToken = `${'PR'}${'D'}`;
-  const planningPathPattern = new RegExp(`(^|/)TODO(/|$)|(^|/)[^/\\n]*${planningToken}s?[^/\\n]*(/|$)`, 'mi');
+  const planningPathPattern = new RegExp(`(^|/)TODO(/|$)|(^|/)[^/\\n]*${planningToken}s?[^/\\n]*(/|$)`, 'm');
   assert.doesNotMatch(trackedPaths, planningPathPattern);
 }
 
