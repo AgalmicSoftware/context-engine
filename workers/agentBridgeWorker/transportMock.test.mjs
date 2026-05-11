@@ -19,11 +19,11 @@ test('mock Telegram group-to-private transport runs the managed account answer l
 
   assert.equal(result.ok, true);
   assert.equal(result.groupCard.publicSummary.sessionSlug, 'alpha');
-  assert.equal(result.groupCard.publicSummary.text, 'Context Engine session linked: alpha');
+  assert.equal(result.groupCard.publicSummary.text, 'Session: alpha');
   assert.deepEqual(result.groupCard.publicSummary.buttons.map((button) => button.label), [
     'Join Session',
     'View Questions',
-    'View / Add Docs',
+    'Attachments',
     'Pose Question',
   ]);
   assert.equal(JSON.stringify(result.groupCard).includes('Answer Privately'), false);
@@ -79,7 +79,7 @@ test('group lobby defaults to viewing questions and exposes add/generate by poli
   assert.deepEqual(card.groupSafeCard.publicSummary.buttons.map((button) => button.label), [
     'Join Session',
     'View Questions',
-    'View / Add Docs',
+    'Attachments',
     'Pose Question',
   ]);
   assert.deepEqual(card.groupSafeCard.publicSummary.policyActions.map((button) => button.action), [
@@ -90,7 +90,7 @@ test('group lobby defaults to viewing questions and exposes add/generate by poli
   assert.equal(event.summary.defaultAction, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
   assert.equal(event.summary.addQuestionAvailable, true);
   assert.equal(event.summary.generateQuestionAvailable, true);
-  assert.deepEqual(event.summary.buttons, ['Join Session', 'View Questions', 'View / Add Docs', 'Pose Question']);
+  assert.deepEqual(event.summary.buttons, ['Join Session', 'View Questions', 'Attachments', 'Pose Question']);
   assert.deepEqual(event.summary.policyActions, [
     TELEGRAM_BRIDGE_ACTIONS.ADD_QUESTION,
     TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION,

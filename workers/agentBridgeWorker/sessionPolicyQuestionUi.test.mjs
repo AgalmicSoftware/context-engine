@@ -163,7 +163,7 @@ test('Telegram question cards preserve CE rating/comment/mic/doc conventions by 
     binary.controls
       .filter((control) => control.controlType === 'agree_unsure_disagree')
       .map((control) => control.label),
-    ['Agree', 'Unsure', 'Disagree'],
+    ['Agree', 'Disagree', 'Unsure'],
   );
   assert.equal(singleChoice.selectionMode, 'single');
   assert.equal(singleChoice.controls.filter((control) => control.controlType === 'single_select').length, 2);
@@ -205,7 +205,7 @@ test('screen states expose launch commands and current UX copy', () => {
   const states = TELEGRAM_SCREEN_IDS.map((screen) => buildTelegramScreenState(screen, { status: 'ready' }));
   const launches = listTelegramScreenLaunchContracts();
 
-  assert.equal(states.length, 32);
+  assert.equal(states.length, 36);
   assert.equal(states.every((state) => state.type === 'telegram_screen_state'), true);
   assert.deepEqual(states.map((state) => state.screen), TELEGRAM_SCREEN_IDS);
   assert.deepEqual(launches.map((entry) => entry.screen), TELEGRAM_SCREEN_IDS);
@@ -219,9 +219,10 @@ test('screen states expose launch commands and current UX copy', () => {
   }
 
   const docLibrary = states.find((state) => state.screen === 'doc_library');
-  assert.equal(docLibrary.title, 'View / Add Docs');
-  assert.equal(docLibrary.buttonLabel, 'View / Add Docs');
-  assert.equal(docLibrary.launch.command, '/ce_docs');
+  assert.equal(docLibrary.title, 'Attachments');
+  assert.equal(docLibrary.buttonLabel, 'Attachments');
+  assert.equal(docLibrary.launch.command, '/ce_attachments');
+  assert.deepEqual(docLibrary.launch.aliases, ['/ce_docs']);
 
   const onboarding = states.find((state) => state.screen === 'onboarding');
   assert.equal(onboarding.text, 'Enter startup info so I can suggest answers for you.');
@@ -229,6 +230,20 @@ test('screen states expose launch commands and current UX copy', () => {
 
   const accountCreated = states.find((state) => state.screen === 'account_created');
   assert.equal(JSON.stringify(accountCreated).includes('Open in CE'), false);
+
+  const actionMenu = states.find((state) => state.screen === 'agent_action_menu');
+  assert.equal(actionMenu.title, 'Agent Actions');
+  assert.equal(actionMenu.launch.command, '/ce_actions');
+  assert.deepEqual(actionMenu.launch.aliases, ['/ce_agent']);
+  assert.deepEqual(actionMenu.buttons.map((button) => button.label), ['Create Agent', 'Settings', 'View Questions']);
+
+  const agentCreate = states.find((state) => state.screen === 'agent_account_create');
+  assert.equal(agentCreate.launch.command, '/ce_create_agent');
+  assert.equal(agentCreate.launch.deepLink, 't.me/<bot>?start=<opaque-action-id>');
+
+  const settings = states.find((state) => state.screen === 'agent_settings_overview');
+  assert.equal(settings.launch.command, '/ce_settings');
+  assert.equal(settings.buttons.find((button) => button.label === 'Edit Settings').targetLane, 'telegram_mini_app');
 
   const poseQuestion = states.find((state) => state.screen === 'pose_question');
   assert.equal(poseQuestion.title, 'Pose Question');
@@ -265,11 +280,11 @@ test('group session card uses safe public copy and required lobby buttons', () =
     },
   });
 
-  assert.equal(card.text, 'Context Engine session linked: Alpha');
+  assert.equal(card.text, 'Session: Alpha');
   assert.deepEqual(card.buttons.map((button) => button.label), [
     'Join Session',
     'View Questions',
-    'View / Add Docs',
+    'Attachments',
     'Pose Question',
   ]);
   assert.equal(card.buttons.find((button) => button.label === 'Pose Question').command, '/ce_pose_question');
@@ -336,6 +351,12 @@ test('question list pulls existing session questions and pose action is group-sa
       prompt: 'Private prompt must stay out of group summaries',
       visibility: 'sbt_gated',
     },
+    {
+      questionId: 'q-unavailable',
+      questionType: 'unknown',
+      payloadUnavailable: true,
+      title: 'Question unavailable',
+    },
   ];
   const list = buildTelegramQuestionListState({
     sessionSlug: 'alpha',
@@ -355,13 +376,25 @@ test('question list pulls existing session questions and pose action is group-sa
   assert.deepEqual(list.questions.map((question) => question.title), [
     'What should the group discuss next?',
     'Locked question',
+    'Question unavailable',
   ]);
+  assert.equal(list.questions[2].locked, false);
+  assert.equal(list.questions[2].payloadUnavailable, true);
+  assert.equal(list.questions[2].retryable, true);
   assert.equal(posed.action.action, TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION);
   assert.equal(posed.action.command, '/ce_pose_question');
   assert.deepEqual(posed.action.aliases, ['/q']);
   assert.equal(posed.groupSafeOutput.questionText, 'What should the group discuss next?');
   assert.equal(locked.groupSafeOutput.questionText, null);
   assert.equal(JSON.stringify(locked).includes('Private prompt must stay out of group summaries'), false);
+  const unavailable = buildTelegramPoseQuestionState({
+    sessionSlug: 'alpha',
+    question: questions[2],
+  });
+  assert.equal(unavailable.card, null);
+  assert.equal(unavailable.groupSafeOutput.locked, false);
+  assert.equal(unavailable.groupSafeOutput.payloadUnavailable, true);
+  assert.equal(unavailable.groupSafeOutput.status, 'payload_unavailable');
 });
 
 test('SBT group screens support public/password joins and account summaries without private leaks', () => {

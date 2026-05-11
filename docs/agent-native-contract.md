@@ -323,7 +323,7 @@ embed account ids, bucket names, or tokens.
 Telegram screen/message helpers expose launch metadata on every
 `telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`,
 `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`,
-`/ce_generate_questions`, `/ce_account`,
+`/ce_generate_questions`, `/ce_me`, `/ce_account`,
 `/ce_sbt <sbt-address-or-group-id-or-link>`,
 `/ce_join_sbt <sbt-address-or-invite-code-or-link>`,
 `/ce_create_sbt_group [session-slug]`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`,
@@ -408,7 +408,9 @@ keys, worker tokens, seed phrases, or account material.
 ## Worker Setup Contract
 
 `contextEngine-cc/lib/agent/workerSetupContracts.mjs` defines the private
-`/worker-setup` planning surface and pure setup-state helpers. The current
+setup planning surface and pure setup-state helpers. The current client route is
+`/telegram-demo-setup`; older notes may still call this `/worker-setup`. The
+current
 checkpoints cover worker reachability, Telegram webhook setup, `/start`
 receipt, group deep-link resolution, Telegram principal normalization, managed
 account create/recover, CE session fetch, session fetch, SBT gate check,
@@ -417,6 +419,21 @@ response draft creation, submit request creation, draft/submit request creation,
 and event-log update. Secret fields can be saved but never displayed after
 save. The selected session storage profile is shown for operator context only;
 policy remains owned by `/new` Advanced.
+
+`/telegram-demo-setup` does not ask the operator to paste
+`CLOUDFLARE_ACCOUNT_ID`. It derives exactly one Cloudflare account from the
+pasted `CLOUDFLARE_API_TOKEN`; if the token can see multiple accounts, setup
+blocks because account selection is not implemented yet. It pulls
+`CE_SESSION_WORKER_BASE_URL` and `DEFAULT_CHAIN_ID` from the selected CE session
+when possible, preserves the default OP Sepolia POKT/PATH RPC
+(`https://op-sepolia-testnet.api.pocket.network`) as `DEFAULT_RPC_URL`, treats an
+Infura or other RPC as optional `ADDITIONAL_RPC_URL`, derives
+`AGENT_BRIDGE_PUBLIC_URL` from
+`https://<worker-name>.<workers-subdomain>.workers.dev`, and generates
+`TELEGRAM_WEBHOOK_SECRET` plus `DEMO_SIGNER_ROOT_SECRET` as Worker secrets. The
+normal session worker remains canonical for CE session payloads; the
+`agentBridgeWorker` stores only Telegram/demo preferences, drafts, opaque
+actions, events, webhook acknowledgement, and managed demo account state.
 
 Onboarding is default-off. Config allows intro copy, 0-10 questions, normalized
 question type, skippable/required behavior, predictive-answer enabled/disabled,
@@ -542,6 +559,13 @@ future work unless they only need parsing or docs.
 Rules:
 
 - `callback_data` uses opaque short action IDs, not full payloads or secrets.
+- `workers/agentBridgeWorker/` validates
+  `X-Telegram-Bot-Api-Secret-Token` against `TELEGRAM_WEBHOOK_SECRET` before
+  handling live webhook updates. The first live demo handles `/start`,
+  `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
+  `/ce_pose_question`, `/q`, `/ce_docs`, and `/ce_me` through the
+  `https://<worker-name>.<workers-subdomain>.workers.dev/telegram/webhook`
+  endpoint.
 - Mini App `initData` must be validated server-side before trusting Telegram
   identity. The helper follows Telegram's official Mini App HMAC validation
   flow: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
