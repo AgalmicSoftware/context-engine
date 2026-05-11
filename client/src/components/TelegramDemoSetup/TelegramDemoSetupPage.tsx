@@ -320,7 +320,8 @@ export default function TelegramDemoSetupPage({ activeSessionSlug = '', sessionO
             </div>
             {[
               'Derive one Cloudflare account from token',
-              'Create or reuse KV, R2, D1, and Durable Object binding',
+              'Create or reuse KV and Durable Object binding',
+              'Add R2/D1 only when doc storage is explicitly enabled',
               'Upload worker vars and redacted secrets',
               'Enable Workers.dev route and set Telegram webhook',
               'Smoke /start, /ce_join, /ce_questions, /ce_docs, /ce_me',
