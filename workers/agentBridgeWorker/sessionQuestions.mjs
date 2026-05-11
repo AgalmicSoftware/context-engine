@@ -317,23 +317,25 @@ async function fetchArweaveJson(pointerId = '', {
   const id = safeString(pointerId);
   if (!/^[a-zA-Z0-9_-]{43}$/.test(id)) return null;
   for (const gateway of ARWEAVE_GATEWAYS) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(new Error('Arweave fetch timed out')), timeoutMs);
-    try {
-      const response = await fetchImpl(`${gateway}/${id}`, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: { accept: 'application/json' },
-      });
-      if (!response?.ok) continue;
-      const payload = await response.json().catch(() => null);
-      if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
-        return payload;
+    for (const pathPrefix of ['', 'raw/']) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(new Error('Arweave fetch timed out')), timeoutMs);
+      try {
+        const response = await fetchImpl(`${gateway}/${pathPrefix}${id}`, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: { accept: 'application/json' },
+        });
+        if (!response?.ok) continue;
+        const payload = await response.json().catch(() => null);
+        if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+          return payload;
+        }
+      } catch {
+        // Try the next path/gateway. The bot must not depend on one gateway being up.
+      } finally {
+        clearTimeout(timeout);
       }
-    } catch {
-      // Try the next gateway. The bot must not depend on one gateway being up.
-    } finally {
-      clearTimeout(timeout);
     }
   }
   return null;
