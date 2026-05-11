@@ -457,7 +457,7 @@ const DocRowImagePreview = ({
       (scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
       getGlobalLitHooks()
     ) as LitHooks;
-    if (!litHooks || typeof litHooks.getKey !== 'function' || !provider || !toStr(account).trim()) {
+    if (!provider || !toStr(account).trim()) {
       setEncryptedPreviewUrl('');
       return undefined;
     }
@@ -472,7 +472,9 @@ const DocRowImagePreview = ({
           providerLike: provider,
           account,
           chainId: chainId || null,
-          lit: { getKey: litHooks.getKey },
+          ...(litHooks && typeof litHooks.getKey === 'function'
+            ? { lit: { getKey: litHooks.getKey } }
+            : {}),
           arweave: {
             debugContext: {
               category: 'doc_lit_preview',
@@ -931,7 +933,7 @@ export default function DocumentLibraryPanel({
 
       if (isEncrypted) {
         const litHooks = getActiveLitHooks();
-        if (!litHooks || typeof litHooks.getKey !== 'function') {
+        if (!provider || !toStr(account).trim()) {
           throw new Error('Connect a wallet to decrypt this document.');
         }
         const { payload } = await litStorage.downloadEncryptedArweaveData({
@@ -939,7 +941,9 @@ export default function DocumentLibraryPanel({
           providerLike: provider,
           account,
           chainId: network?.id || null,
-          lit: { getKey: litHooks.getKey },
+          ...(litHooks && typeof litHooks.getKey === 'function'
+            ? { lit: { getKey: litHooks.getKey } }
+            : {}),
           arweave: {
             debugContext: {
               category: 'doc_lit_payload',
