@@ -97,6 +97,13 @@ EOF
   ce_public_release_private_doc_patterns
 }
 
+ce_public_release_manifest_exclude_patterns() {
+  cat <<'EOF'
+TODO
+contextEngine-cc/TODO
+EOF
+}
+
 ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 TODO

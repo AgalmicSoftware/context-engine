@@ -374,7 +374,7 @@ const CALLER_EXPORT_RESOLVERS = {
   getReadProviderForGroup: ({ rpcProvidersModule }) => rpcProvidersModule.getReadProviderForGroup,
 };
 
-describe('PRD 378 — resolveSession parity characterization', () => {
+describe('resolveSession parity characterization', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     localStorage.clear();

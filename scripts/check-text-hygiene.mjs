@@ -32,7 +32,7 @@ const EXCLUDED_PATHS = new Set([
   'dist/sessionCorsWorker.bundle.js',
 ]);
 
-const CHANGELOG_PRD_IDENTIFIER_PATTERN = /\bPRDs?[\s-]\d{1,4}(-[A-Z]\d+)?(-\d{1,4})?\b/g;
+const CHANGELOG_INTERNAL_PLANNING_IDENTIFIER_PATTERN = /\bPRDs?[\s-]\d{1,4}(-[A-Z]\d+)?(-\d{1,4})?\b/g;
 
 const isTrackedTextFile = (filePath) => {
   if (INCLUDED_SPECIAL_FILES.has(filePath)) {
@@ -98,9 +98,9 @@ const issues = [];
       }
 
       if (path.basename(filePath) === 'CHANGELOG.md') {
-        for (const match of line.matchAll(CHANGELOG_PRD_IDENTIFIER_PATTERN)) {
+        for (const match of line.matchAll(CHANGELOG_INTERNAL_PLANNING_IDENTIFIER_PATTERN)) {
           issues.push(
-            `${filePath}:${index + 1}: changelog must not reference PRD identifier "${match[0]}"`
+            `${filePath}:${index + 1}: changelog must not reference internal planning identifier "${match[0]}"`
           );
         }
       }

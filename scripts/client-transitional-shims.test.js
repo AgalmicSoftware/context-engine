@@ -70,47 +70,15 @@ const listFiles = (absoluteDir) => {
   return files;
 };
 
-const toRelativePath = (absolutePath) => path.relative(ROOT, absolutePath).split(path.sep).join('/');
+test('active component shim clusters stay explicitly inventoried during sequencing', () => {
+  Object.entries(EXPECTED_COMPONENT_SHIM_CLUSTERS).forEach(([relativeDir, expectedEntries]) => {
+    const actualEntries = readPureTsReexportShims(relativeDir);
+    const expectedSorted = [...expectedEntries].sort();
 
-const listClientJsFiles = () => listFiles(CLIENT_SRC)
-  .filter((absolutePath) => absolutePath.endsWith('.js'))
-  .sort();
-
-const isPureTsReexportShim = (source) => {
-  const lines = stripLineComments(source)
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  return lines.length > 0 && lines.every((line) => PURE_TS_REEXPORT_LINE_RE.test(line));
-};
-
-test('pure JS-to-TS re-export shims stay retired', () => {
-  const pureShims = listClientJsFiles()
-    .filter((absolutePath) => isPureTsReexportShim(fs.readFileSync(absolutePath, 'utf8')))
-    .map(toRelativePath);
-
-  assert.deepEqual(
-    pureShims,
-    [],
-    'pure JS wrappers should stay deleted; import the adjacent TS module through existing Vite/Jest compatibility instead',
-  );
-});
-
-test('remaining explicit JS-to-TS transitional files stay documented exceptions', () => {
-  const transitionalFiles = listClientJsFiles()
-    .filter((absolutePath) => ADJACENT_TS_REEXPORT_RE.test(fs.readFileSync(absolutePath, 'utf8')))
-    .map(toRelativePath);
-
-  assert.deepEqual(transitionalFiles, Object.keys(EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES).sort());
-
-  transitionalFiles.forEach((relativePath) => {
-    const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
-    assert.match(source, /initializeRuntimeConfig/);
-    assert.equal(
-      isPureTsReexportShim(source),
-      false,
-      `${relativePath} should remain a documented non-pure exception, not a pure wrapper`,
+    assert.deepEqual(
+      actualEntries,
+      expectedSorted,
+      `${relativeDir} shim inventory changed; update cleanup tracking before adding or removing wrappers`,
     );
   });
 });

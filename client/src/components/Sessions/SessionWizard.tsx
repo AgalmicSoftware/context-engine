@@ -1220,19 +1220,48 @@ const SessionWizard = ({
     const chainId = Number(registryChainId || 0) || 0;
     if (!chainId) return;
     setDraft((prev) => {
-      // NOTE: For now we assume session chain === registry chain; split these when they diverge.
+      const next = deepClone(prev);
+      if (Number(next.networkChainId || 0) !== chainId) {
+        // NOTE: For now we assume session chain === registry chain; split these when they diverge.
+        next.networkChainId = chainId;
+      }
       // Contract defaults currently come from bundled per-chain config; ENS discovery remains future work.
+      const defaults = getSessionWizardContractDefaults(chainId);
+      if (!next.contracts || typeof next.contracts !== 'object') {
+        next.contracts = {};
+      }
+      const keys = new Set([
+        ...Object.keys(next.contracts || {}),
+        ...Object.keys(defaults || {}),
+      ]);
+      keys.forEach((key) => {
+        if (!next.contracts[key] || typeof next.contracts[key] !== 'object') {
+          next.contracts[key] = {};
+        }
+        const fallback = toStr(defaults?.[key] || '').trim();
+        if (fallback) {
+          next.contracts[key].address = fallback;
+        }
+        next.contracts[key].chainId = chainId;
+      });
       // Auto-fill the current PATH public RPC; dedicated gateway/provider-tier support remains future work.
-      return applySessionWizardRegistryChainDraftDefaults({
-        draft: prev,
-        chainId,
-        contractDefaults: sessionModeRequirements.publish.registerSession
-          ? getSessionWizardContractDefaults(chainId)
-          : {},
-        pathRpc: getDefaultHttpRpc(chainId),
-        includeContracts: sessionModeRequirements.publish.registerSession,
-        includeFaucet: sessionModeRequirements.requiresFunding,
-      }) as DraftState;
+      const pathRpc = getDefaultHttpRpc(chainId);
+      if (pathRpc) {
+        if (!next.rpc || typeof next.rpc !== 'object') next.rpc = {};
+        if (!toStr(next.rpc.provider).trim()) {
+          next.rpc.provider = 'path';
+        }
+        if (!next.rpc.providers || typeof next.rpc.providers !== 'object') next.rpc.providers = {};
+        if (!next.rpc.providers.path || typeof next.rpc.providers.path !== 'object') next.rpc.providers.path = {};
+        if (!toStr(next.rpc.providers.path.rpcUrl).trim()) {
+          next.rpc.providers.path.rpcUrl = pathRpc;
+        }
+        if (!next.faucet || typeof next.faucet !== 'object') next.faucet = {};
+        if (!toStr(next.faucet.rpcUrl).trim()) {
+          next.faucet.rpcUrl = pathRpc;
+        }
+      }
+      return next;
     });
     setGateSelections((prev) => {
       let changed = false;
@@ -1994,7 +2023,7 @@ const SessionWizard = ({
     const isSecretPath = isSecretFieldPath(currentPath);
     const canLock = shouldLockable(value) && (!isSecretPath || !workerSecretsEnabled);
     if (!forceShow && isSecretPath && workerSecretsEnabled) return null;
-    // PRD 423 tracks a user-facing builder for serialized defaultFilterState presets.
+    // Hide serialized defaultFilterState presets until a user-facing builder exists.
     const isDefaultFilterState = keyString === 'defaultFilterState';
     const isQuestionsPrompt = keyString === 'questionsGenPrompt';
     const isSessionHeaderField = keyString === 'sessionHeader';
@@ -3006,7 +3035,7 @@ const SessionWizard = ({
     if (metadata.lit && typeof metadata.lit === 'object') {
       metadata.lit.defaultGateId = defaultGateId || metadata.lit.defaultGateId;
     }
-    // PRD 424 tracks per-member budget semantics and enforcement. Keep the field hidden until then.
+    // Keep per-member budget fields hidden until semantics and enforcement are implemented.
     metadata.perMemberSpendLimits = {
       ...(metadata.perMemberSpendLimits || {}),
       ai: gateSelections.ai?.perMemberLimit || metadata.perMemberSpendLimits?.ai || '',

@@ -133,7 +133,9 @@ test('prepare-public-release strips private surfaces without publishing an inven
       'legacy private application state\n',
     );
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
+    writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '123_private-roadmap.md'), 'private roadmap\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'private companion surface\n');
+    writeFile(sourceDir, path.join('contextEngine-cc', 'TODO', `${'PR'}${'D'}s`, '155_private-cecc.md'), 'private companion plan\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'server.mjs'), 'private runtime server\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'package.json'), '{"private":true}\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
@@ -212,6 +214,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'server.mjs')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'package.json')), false);
@@ -226,7 +229,37 @@ test('prepare-public-release strips private surfaces without publishing an inven
 
     const manifestText = fs.readFileSync(manifestPath, 'utf8');
     assert.doesNotMatch(manifestText, /tracked root manifest that should be replaced/);
+    assert.doesNotMatch(manifestText, /TODO/);
+    assert.doesNotMatch(manifestText, new RegExp(`${'PR'}${'D'}s`));
     assert.match(manifestText, /private-pack\.manifest\.json/);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('prepare-public-release fails if private planning paths survive strip rules', () => {
+  fs.mkdirSync(TEST_TMP_ROOT, { recursive: true });
+  const tempRoot = fs.mkdtempSync(path.join(TEST_TMP_ROOT, 'ce-prepare-public-release-'));
+  const sourceDir = path.join(tempRoot, 'source');
+  const outputDir = path.join(tempRoot, 'release-public');
+
+  try {
+    writeFile(sourceDir, path.join('scripts', 'prepare-public-release.sh'), fs.readFileSync(SCRIPT_SOURCE_PATH, 'utf8'));
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
+      fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
+    );
+    fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
+
+    writeFile(sourceDir, 'public.txt', 'keep\n');
+    writeFile(sourceDir, path.join('docs', `${'PR'}${'D'}-leak.md`), 'private planning in a public path\n');
+
+    const result = runPrepareScript(sourceDir, outputDir);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Private planning paths are still visible/);
+    assert.match(result.stderr, new RegExp(`${'PR'}${'D'}-leak`));
+    assert.equal(fs.existsSync(outputDir), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

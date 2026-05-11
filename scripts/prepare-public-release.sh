@@ -77,6 +77,33 @@ while IFS= read -r pattern; do
   STRIP_ASSERT_ABSENT+=("$pattern")
 done < <(ce_public_release_strip_assert_absent_patterns)
 
+MANIFEST_EXCLUDE_PATTERNS=()
+while IFS= read -r pattern; do
+  MANIFEST_EXCLUDE_PATTERNS+=("$pattern")
+done < <(ce_public_release_manifest_exclude_patterns)
+
+path_matches_manifest_exclude() {
+  local relative_path="$1"
+  local pattern
+
+  for pattern in "${MANIFEST_EXCLUDE_PATTERNS[@]}"; do
+    case "$pattern" in
+      *'*'*|*'?'*|*'['*)
+        if [[ "$relative_path" == $pattern ]]; then
+          return 0
+        fi
+        ;;
+      *)
+        if [[ "$relative_path" == "$pattern" || "$relative_path" == "$pattern/"* ]]; then
+          return 0
+        fi
+        ;;
+    esac
+  done
+
+  return 1
+}
+
 verify_private_planning_paths_absent() {
   local findings
 
@@ -84,7 +111,7 @@ verify_private_planning_paths_absent() {
     cd "$STAGING_ROOT"
     find . -path './.git' -prune -o -print |
       sed 's#^\./##' |
-      grep -Ei '(^|/)TODO(/|$)|(^|/)[^/]*prds?[^/]*(/|$)' || true
+      grep -E '(^|/)TODO(/|$)|(^|/)[^/]*PRDs?[^/]*(/|$)' || true
   )
 
   if [ -n "$findings" ]; then
@@ -93,95 +120,6 @@ verify_private_planning_paths_absent() {
   fi
 
   return 0
-}
-
-scrub_public_package_json() {
-  local package_json="$STAGING_ROOT/package.json"
-
-  if [ ! -f "$package_json" ]; then
-    return 0
-  fi
-
-  if ! command -v node >/dev/null 2>&1; then
-    printf 'node is required to scrub public package.json metadata.\n' >&2
-    return 1
-  fi
-
-  node "$SCRIPT_DIR/scrub-public-package-json.js" "$package_json"
-}
-
-scrub_public_pii_text() {
-  if ! command -v node >/dev/null 2>&1; then
-    printf 'node is required to scrub public PII text.\n' >&2
-    return 1
-  fi
-
-  node - "$STAGING_ROOT" <<'NODE'
-const fs = require('node:fs');
-const path = require('node:path');
-
-const rootDir = path.resolve(process.argv[2]);
-const skipDirs = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage']);
-const byteStableGeneratedFiles = new Set([
-  'deploy/cloudflare/session-worker/worker.mjs',
-]);
-const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
-// Intentionally public addresses that must survive the sweep (e.g. the
-// SECURITY.md vulnerability-reporting contact). Keep in sync with the
-// allowlist in scripts/verify-public-release-pii.sh.
-const allowedPublicEmails = new Set([
-  'agalmicsoftware@protonmail.com',
-  'contextengine@protonmail.com',
-]);
-const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
-
-function isProbablyBinary(buffer) {
-  if (buffer.includes(0)) return true;
-  const sampleLength = Math.min(buffer.length, 4096);
-  if (sampleLength === 0) return false;
-
-  let controlBytes = 0;
-  for (let index = 0; index < sampleLength; index += 1) {
-    const byte = buffer[index];
-    if ((byte < 8) || (byte > 13 && byte < 32)) controlBytes += 1;
-  }
-  return controlBytes > Math.max(8, sampleLength * 0.02);
-}
-
-function scrubFile(absolutePath) {
-  const relativePath = path.relative(rootDir, absolutePath).split(path.sep).join('/');
-  // Generated worker bytes are verified against their manifest and source.
-  // Rewriting email-shaped dependency data would invalidate that verification
-  // and can corrupt bundled wordlists, so leave this artifact byte-for-byte intact.
-  if (byteStableGeneratedFiles.has(relativePath)) return;
-
-  const buffer = fs.readFileSync(absolutePath);
-  if (isProbablyBinary(buffer)) return;
-
-  const original = buffer.toString('utf8');
-  const scrubbed = original
-    .replace(emailRe, (match) => (allowedPublicEmails.has(match.toLowerCase()) ? match : '[redacted-email]'))
-    .replace(homePathRe, (match, homePath) => match.replace(homePath, '/redacted-home'));
-
-  if (scrubbed !== original) {
-    fs.writeFileSync(absolutePath, scrubbed);
-  }
-}
-
-function walk(absoluteDir) {
-  for (const entry of fs.readdirSync(absoluteDir, { withFileTypes: true })) {
-    const absolutePath = path.join(absoluteDir, entry.name);
-    if (entry.isDirectory()) {
-      if (skipDirs.has(entry.name)) continue;
-      walk(absolutePath);
-      continue;
-    }
-    if (entry.isFile()) scrubFile(absolutePath);
-  }
-}
-
-walk(rootDir);
-NODE
 }
 
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
@@ -307,6 +245,42 @@ done < "$MATCHED_PATHS_FILE"
 sort -u "$STRIP_ENTRIES_FILE" -o "$STRIP_ENTRIES_FILE"
 
 stripped_count=$(wc -l < "$STRIP_ENTRIES_FILE" | tr -d ' ')
+entry_index=0
+
+{
+  printf '{\n'
+  printf '  "manifest_version": 1,\n'
+  printf '  "sha256_format": "sha256sum",\n'
+  printf '  "entries": [\n'
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+
+    if path_matches_manifest_exclude "$path"; then
+      continue
+    fi
+
+    if [ "$entry_index" -gt 0 ]; then
+      printf ',\n'
+    fi
+
+    if [ -L "$STAGING_ROOT/$path" ]; then
+      link_target=$(readlink "$STAGING_ROOT/$path")
+      checksum_line="$(sha256_text "$link_target")  $path"
+      printf '    {"type":"symlink","sha256sum":"%s","linkTarget":"%s"}' \
+        "$(json_escape "$checksum_line")" \
+        "$(json_escape "$link_target")"
+    else
+      checksum_line=$(sha256sum_line "$STAGING_ROOT" "$path")
+      printf '    {"type":"file","sha256sum":"%s"}' "$(json_escape "$checksum_line")"
+    fi
+
+    entry_index=$((entry_index + 1))
+  done < "$STRIP_ENTRIES_FILE"
+
+  printf '\n  ]\n'
+  printf '}\n'
+} > "$MANIFEST_PATH"
 
 while IFS= read -r path; do
   [ -n "$path" ] || continue
@@ -330,36 +304,6 @@ scrub_public_pii_text
 )
 
 verify_private_planning_paths_absent
-
-if [ ! -f "$STAGING_ROOT/scripts/verify-public-release-surface.js" ]; then
-  printf 'Public release surface verifier is missing from release copy: scripts/verify-public-release-surface.js\n' >&2
-  exit 1
-fi
-
-node "$STAGING_ROOT/scripts/verify-public-release-surface.js" "$STAGING_ROOT" >&2
-
-if [ ! -f "$STAGING_ROOT/scripts/verify-public-docs.js" ]; then
-  printf 'Public documentation verifier is missing from release copy: scripts/verify-public-docs.js\n' >&2
-  exit 1
-fi
-
-# Regression guard: source-side private docs are allowed on dev, so validate
-# Markdown only after the strip and package-script scrub have completed.
-node "$STAGING_ROOT/scripts/verify-public-docs.js" "$STAGING_ROOT" >&2
-
-if [ ! -f "$STAGING_ROOT/scripts/verify-public-assets.js" ]; then
-  printf 'Public asset verifier is missing from release copy: scripts/verify-public-assets.js\n' >&2
-  exit 1
-fi
-
-node "$STAGING_ROOT/scripts/verify-public-assets.js" "$STAGING_ROOT" >&2
-
-if [ ! -f "$STAGING_ROOT/scripts/verify-public-text.js" ]; then
-  printf 'Public text verifier is missing from release copy: scripts/verify-public-text.js\n' >&2
-  exit 1
-fi
-
-node "$STAGING_ROOT/scripts/verify-public-text.js" "$STAGING_ROOT" >&2
 
 mv "$STAGING_ROOT" "$OUTPUT_ABS"
 

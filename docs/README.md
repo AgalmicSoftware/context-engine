@@ -4,7 +4,7 @@ Primary product and system specification:
 - `spec.md` (repo root)
 
 Canonical reference set:
-- root docs: `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `spec.md`
+- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
 - the `docs/` reference docs listed below
 - `docs/architecture-overview.md` is the first-read architecture and verification
   map for new engineers and auditors
@@ -25,7 +25,7 @@ When you add or change a feature, update documentation in the same PR:
 ## Core Docs
 
 Code navigation maps:
-- `docs/ai-agent-bootstrap.md`: current AI-agent entry points, supported contracts, and the PRD map for broader agent usability work.
+- `docs/ai-agent-bootstrap.md`: current AI-agent entry points and supported contracts.
 - `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
 - `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
 - `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.

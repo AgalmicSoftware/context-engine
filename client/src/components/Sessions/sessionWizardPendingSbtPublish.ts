@@ -69,11 +69,17 @@ export const buildPendingSbtDeployContextSignature = (
   fallbackChainId: ChainIdLike = null,
 ): string => {
   // Stronger invalidation and slug-finalization rules for linked pending SBT drafts remain future work.
-  const chainId =
-    Number(sessionLike?.networkChainId || sessionLike?.contracts?.sbtFactory?.chainId || fallbackChainId || 0) || 0;
-  const sbtFactoryAddress = toStr(sessionLike?.contracts?.sbtFactory?.address || sessionLike?.sbtFactoryAddress || '')
-    .trim()
-    .toLowerCase();
+  const chainId = Number(
+    sessionLike?.networkChainId ||
+    sessionLike?.contracts?.sbtFactory?.chainId ||
+    fallbackChainId ||
+    0
+  ) || 0;
+  const sbtFactoryAddress = toStr(
+    sessionLike?.contracts?.sbtFactory?.address ||
+    sessionLike?.sbtFactoryAddress ||
+    ''
+  ).trim().toLowerCase();
   return `${chainId}|${sbtFactoryAddress}`;
 };
 

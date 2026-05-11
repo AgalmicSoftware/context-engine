@@ -56,11 +56,9 @@ flowchart LR
   Boundary -.->|possible future optional adapter| PrivateEVM["Private EVM"]
 ```
 
-Company-Operated is a target for existing hardware, private clouds, and internal
-networks; these adapters and a packaged corporate edition are not generally
-available. The target can be entirely off-chain. A private EVM may be explored
-as an optional compatibility adapter, but it is not required by this
-architecture.
+Key difference from public mode: planned private deployments swap public registry-backed session reads for private session-source adapters (for example a local DB) while keeping the same auth-capable worker surface. The `/new` wizard writes session configs to that private backend instead of relying on public registry lookups. Same UI, same contracts, different storage + encryption backends.
+
+The corporate deployment roadmap remains in private planning until the public deployment mode is ready to document here.
 
 ## Layer Descriptions
 
