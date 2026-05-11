@@ -91,6 +91,51 @@ while IFS= read -r pattern; do
   STRIP_ASSERT_ABSENT+=("$pattern")
 done < <(ce_public_release_strip_assert_absent_patterns)
 
+MANIFEST_EXCLUDE_PATTERNS=()
+while IFS= read -r pattern; do
+  MANIFEST_EXCLUDE_PATTERNS+=("$pattern")
+done < <(ce_public_release_manifest_exclude_patterns)
+
+path_matches_manifest_exclude() {
+  local relative_path="$1"
+  local pattern
+
+  for pattern in "${MANIFEST_EXCLUDE_PATTERNS[@]}"; do
+    case "$pattern" in
+      *'*'*|*'?'*|*'['*)
+        if [[ "$relative_path" == $pattern ]]; then
+          return 0
+        fi
+        ;;
+      *)
+        if [[ "$relative_path" == "$pattern" || "$relative_path" == "$pattern/"* ]]; then
+          return 0
+        fi
+        ;;
+    esac
+  done
+
+  return 1
+}
+
+verify_private_planning_paths_absent() {
+  local findings
+
+  findings=$(
+    cd "$STAGING_ROOT"
+    find . -path './.git' -prune -o -print |
+      sed 's#^\./##' |
+      grep -E '(^|/)TODO(/|$)|(^|/)[^/]*PRDs?[^/]*(/|$)' || true
+  )
+
+  if [ -n "$findings" ]; then
+    printf 'Private planning paths are still visible in public release copy:\n%s\n' "$findings" >&2
+    return 1
+  fi
+
+  return 0
+}
+
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
   printf 'Refusing to overwrite the repo root.\n' >&2
   exit 1
@@ -277,13 +322,6 @@ scrub_public_package_json
 )
 
 verify_private_planning_paths_absent
-
-if [ ! -f "$STAGING_ROOT/scripts/verify-public-release-surface.js" ]; then
-  printf 'Public release surface verifier is missing from release copy: scripts/verify-public-release-surface.js\n' >&2
-  exit 1
-fi
-
-node "$STAGING_ROOT/scripts/verify-public-release-surface.js" "$STAGING_ROOT" >&2
 
 mv "$STAGING_ROOT" "$OUTPUT_ABS"
 

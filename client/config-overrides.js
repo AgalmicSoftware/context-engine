@@ -101,7 +101,7 @@ const override = function override(config, env) {
       resource.request = path.join(base, 'dist', env, subpath);
     }),
 
-    // PRD 358 Phase 4 — resolver shim for utility .js → .ts rename sites.
+    // Resolver shim for utility .js -> .ts rename sites.
     // Existing callers across the repo import relative utility modules with an
     // explicit `.js` extension. As utilities are converted to TypeScript, their
     // callers cannot be touched in the same commit (too large a blast radius),
@@ -126,7 +126,7 @@ const override = function override(config, env) {
       }
     }),
 
-    // PRD 358 Phase 4 — extend the same `.js` → `.ts` compatibility shim to
+    // Extend the same `.js` -> `.ts` compatibility shim to
     // baseUrl-style utility imports such as `utilities/crypto/cryptography.js`.
     // These requests do not start with `./` or `../`, so the relative-only
     // rewrite above never sees them during full Jest/build flows.
@@ -251,7 +251,7 @@ override.jest = (config) => {
   const oxScopedPrefixes = '(erc\\d{4}|tempo|trusted-setups|window)';
   next.moduleNameMapper = {
     ...(next.moduleNameMapper || {}),
-    // PRD 358 Phase 4 — strip trailing `.js` on relative imports so Jest's
+    // Strip trailing `.js` on relative imports so Jest's
     // default moduleFileExtensions resolve `.ts` siblings of converted
     // utilities. Matches `./foo.js`, `../foo.js`, `./a/b.js`, etc. Existing
     // `.js` files continue to resolve because Jest's extension order still

@@ -8,10 +8,10 @@ Canonical reference set:
 - the `docs/` reference docs listed below
 
 Non-canonical / historical planning material:
-- `TODO/`
+- private planning files under ignored local paths
 - one-off debug prompts or migration notes unless they are explicitly linked below as current reference
 
-Planning docs should be added under `TODO/`, not `docs/`.
+Private planning docs should stay in ignored local paths, not in public docs.
 
 ## How To Keep Docs Updated
 
@@ -23,7 +23,7 @@ When you add or change a feature, update documentation in the same PR:
 ## Core Docs
 
 Code navigation maps:
-- `docs/ai-agent-bootstrap.md`: current AI-agent entry points, supported contracts, and the PRD map for broader agent usability work.
+- `docs/ai-agent-bootstrap.md`: current AI-agent entry points and supported contracts.
 - `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
 - `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
 - `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
