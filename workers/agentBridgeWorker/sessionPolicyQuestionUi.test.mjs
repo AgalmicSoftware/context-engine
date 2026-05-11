@@ -235,7 +235,7 @@ test('screen states expose launch commands and current UX copy', () => {
   assert.equal(actionMenu.title, 'Agent Actions');
   assert.equal(actionMenu.launch.command, '/ce_actions');
   assert.deepEqual(actionMenu.launch.aliases, ['/ce_agent']);
-  assert.deepEqual(actionMenu.buttons.map((button) => button.label), ['Create Agent', 'Settings', 'View Questions']);
+  assert.deepEqual(actionMenu.buttons.map((button) => button.label), ['Settings', 'View Questions']);
 
   const agentCreate = states.find((state) => state.screen === 'agent_account_create');
   assert.equal(agentCreate.launch.command, '/ce_create_agent');

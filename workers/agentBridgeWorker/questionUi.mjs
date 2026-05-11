@@ -303,9 +303,6 @@ function buildScreenButton(action, label, targetLane = TELEGRAM_CHAT_LANES.PRIVA
 function buildDefaultScreenButtons(screen) {
   if (screen === 'agent_action_menu') {
     return [
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT, 'Create Agent', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/ce_create_agent',
-      }),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS, 'Settings', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
         command: '/ce_settings',
       }),
@@ -468,8 +465,8 @@ function buildDefaultScreenCopy(screen) {
   }
   if (screen === 'agent_account_create') {
     return {
-      title: 'Create Agent',
-      text: 'Create or recover the Telegram-managed agent account through the canonical CE agent API.',
+      title: 'Managed Account',
+      text: 'Manage the Telegram-managed demo account through the canonical CE agent API.',
     };
   }
   if (screen === 'agent_settings_overview') {

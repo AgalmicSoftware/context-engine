@@ -1149,12 +1149,11 @@ function formatHelpText() {
     'Context Engine',
     '',
     '/ce_actions - open the agent action menu',
-    '/ce_create_agent - create a Telegram-managed agent',
     '/ce_settings - view or edit agent settings',
     '/ce_join <session> - link this chat to a session',
     '/ce_sessions - list linked sessions',
     '/ce_questions - view session questions',
-    '/q <number-or-id> - pose a question',
+    '/q <number> - pose a question',
     '/ce_attachments - view attachments',
     '/ce_me - view your account',
   ].join('\n');
@@ -1259,15 +1258,6 @@ async function buildAgentActionsResponse({
     rows.push([
       await makeCallbackButton({
         env,
-        label: 'Create Agent',
-        action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
-        lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-        serverContextRef: { sessionSlug },
-        seed: `agent_actions|create|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
-        createdAt,
-      }),
-      await makeCallbackButton({
-        env,
         label: 'Settings',
         action: TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
         lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
@@ -1278,15 +1268,6 @@ async function buildAgentActionsResponse({
     ]);
   } else {
     rows.push([
-      await makePrivateStartActionButton({
-        env,
-        botUsername: env.TELEGRAM_BOT_USERNAME,
-        label: 'Create Agent',
-        action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
-        serverContextRef: { sessionSlug, groupChatId: normalized.chat.chatId },
-        seed: `agent_actions|group_create|${sessionSlug}|${normalized.chat.chatId}|${normalized.updateId}`,
-        createdAt,
-      }),
       await makePrivateStartActionButton({
         env,
         botUsername: env.TELEGRAM_BOT_USERNAME,
@@ -1329,7 +1310,7 @@ async function buildAgentActionsResponse({
       `Session: ${sessionSlug}`,
       '',
       normalized.chat.isPrivate
-        ? 'Create an agent, edit settings, or launch session workflows.'
+        ? 'Edit settings or launch session workflows.'
         : 'Account and settings inputs open in private chat or Mini App.',
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
@@ -1399,13 +1380,6 @@ async function buildJoinResponse({
       reason: 'faucet_request_failed',
       error: safeString(error?.message || error),
     }));
-    const faucetLine = faucet.ok && faucet.skipped
-      ? 'Faucet: account already funded.'
-      : faucet.ok
-      ? `Faucet: funded${faucet.amountEth ? ` ${faucet.amountEth} ETH` : ''}${faucet.txHash ? ` (${shortTxHash(faucet.txHash)})` : ''}.`
-      : faucet.skipped
-      ? ''
-      : `Faucet: not funded (${safeString(faucet.reason || faucet.error || 'unavailable')}).`;
     return reply({
       chatId: normalized.chat.chatId,
       text: [
@@ -1413,7 +1387,6 @@ async function buildJoinResponse({
         '',
         `Account: ${shortAddress(account.accountAddress)}`,
         `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
-        ...(faucetLine ? [faucetLine] : []),
         '',
         'Use /ce_attachments for session files.',
       ].join('\n'),
@@ -1590,7 +1563,7 @@ async function buildQuestionsResponse({
         ? [questionLoadIssueText(loadedQuestions)]
         : (state.questions.length
         ? [
-          ...displayQuestions.map((question) => `${question.displayIndex}. ${shortQuestionId(question.questionId)} - ${question.title}`),
+          displayQuestions.map((question) => `${question.displayIndex}. ${question.title}`).join('\n\n'),
           ...(state.questions.length > displayQuestions.length
             ? [`Showing ${displayQuestions.length} of ${state.questions.length}. Open the Mini App for the full queue.`]
             : []),
@@ -1704,11 +1677,11 @@ async function buildPoseQuestionResponse({
   });
   const text = payloadUnavailable
     ? [
-      `Question ${shortQuestionId(group.questionId)} is unavailable.`,
+      'Question is unavailable.',
       'The public payload could not be loaded yet. Try /ce_questions again later.',
     ].join('\n')
     : group.locked
-    ? `Question ${shortQuestionId(group.questionId)} is locked. Open it in the Mini App.`
+    ? 'This question is locked. Open it in the Mini App.'
     : [
       `Question for ${resolved.session.sessionSlug}:`,
       group.questionText,
@@ -2027,7 +2000,7 @@ async function buildCreateAgentResponse({
       chatId: normalized.chat.chatId,
       messageId,
       text: [
-        'Create Agent opens in private chat.',
+        'Account setup opens in private chat.',
         '',
         'No account state is shown in group chat.',
       ].join('\n'),
@@ -2036,7 +2009,7 @@ async function buildCreateAgentResponse({
           await makePrivateStartActionButton({
             env,
             botUsername: env.TELEGRAM_BOT_USERNAME,
-            label: 'Create Agent',
+            label: 'Open Private Chat',
             action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
             serverContextRef: { sessionSlug, groupChatId: normalized.chat.chatId },
             seed: `create_agent|group_redirect|${sessionSlug}|${normalized.chat.chatId}|${normalized.updateId}`,

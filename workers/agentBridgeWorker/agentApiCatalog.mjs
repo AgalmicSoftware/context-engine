@@ -49,7 +49,7 @@ const CAPABILITIES = Object.freeze([
   freezeEntry({
     id: 'agent.account.create',
     category: 'account',
-    label: 'Create Agent',
+    label: 'Managed Account',
     canonicalActionId: 'agent.account.create_request',
     method: 'POST',
     path: '/api/agent/accounts/create-request',

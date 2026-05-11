@@ -198,7 +198,7 @@ test('worker serves Telegram Mini App shell', async () => {
   assert.match(text, /telegram-web-app\.js/);
   assert.match(text, /telegram\/mini-app\/api\/state/);
   assert.equal(text.includes('button.innerHTML'), false);
-  assert.match(text, /title\.textContent = question\.title/);
+  assert.match(text, /prompt\.textContent = question\.prompt \|\| question\.title/);
 });
 
 test('worker preview update is disabled unless explicitly enabled and does not mutate KV', async () => {
@@ -292,7 +292,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(state.pageSize, 5);
   assert.equal(state.questionCount, 6);
   assert.equal(JSON.stringify(state).includes(bytes32QuestionId), false);
-  assert.match(state.questions[0].idShort, /^0x12121212\.\.\.121212$/);
+  assert.equal(Object.hasOwn(state.questions[0], 'idShort'), false);
   assert.match(state.questions[0].questionKey, /^cecb_[a-z0-9]{10,48}$/);
   assert.equal(state.agent.actions.some((action) => action.id === 'agent.settings.update'), true);
   assert.equal(state.agent.account.canonicalApiRequest.path, '/api/agent/accounts/create-request');
@@ -554,7 +554,7 @@ test('worker Mini App handoff keeps question-specific group launches opaque thro
 
   const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`), env);
   const state = await stateResponse.json();
-  const target = state.questions.find((question) => question.idShort === 'q-target');
+  const target = state.questions.find((question) => question.prompt === 'Which lane should Alpha choose?');
 
   assert.equal(stateResponse.status, 200);
   assert.equal(state.ok, true);
@@ -965,8 +965,9 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   assert.match(byCommand['/ce_join alpha'].text, /Use \/ce_attachments for session files/);
   assert.match(byCommand['/ce_sessions'].text, /Available sessions:/);
   assert.match(byCommand['/ce_questions'].text, /Questions for alpha:/);
-  assert.match(byCommand['/ce_questions'].text, /q-readiness - What should Alpha decide next/);
-  assert.match(byCommand['/ce_questions'].text, /q-locked - Locked question/);
+  assert.match(byCommand['/ce_questions'].text, /1\. What should Alpha decide next\?\n\n2\. Locked question/);
+  assert.equal(byCommand['/ce_questions'].text.includes('q-readiness'), false);
+  assert.equal(byCommand['/ce_questions'].text.includes('q-locked'), false);
   assert.match(byCommand['/q 1'].text, /Question for alpha:/);
   assert.match(byCommand['/q 1'].text, /What should Alpha decide next/);
   assert.match(byCommand['/ce_attachments'].text, /Attachments for alpha:/);
