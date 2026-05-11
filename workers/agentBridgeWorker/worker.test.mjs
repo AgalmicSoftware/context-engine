@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import { Buffer } from 'node:buffer';
 import worker from './worker.js';
 
 class MemoryKv {
@@ -37,7 +38,107 @@ function launchFromMiniButton(button = {}) {
   return '';
 }
 
-test('worker health endpoint marks private bridge skeleton and broadcast-disabled status', async () => {
+function flattenButtons(replyMarkup = {}) {
+  return (replyMarkup?.inline_keyboard || []).flat();
+}
+
+function telegramWebhookRequest(update = {}) {
+  return new Request('https://bridge.example/telegram/webhook', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'X-Telegram-Bot-Api-Secret-Token': 'webhook-secret',
+    },
+    body: JSON.stringify(update),
+  });
+}
+
+function telegramMessageUpdate(text, {
+  updateId = 1000,
+  messageId = 10,
+  chatId = -100123,
+  chatType = 'supergroup',
+  userId = 42,
+  username = 'host',
+} = {}) {
+  return {
+    update_id: updateId,
+    message: {
+      message_id: messageId,
+      text,
+      chat: { id: chatId, type: chatType, title: chatType === 'private' ? undefined : 'Alpha Lobby' },
+      from: { id: userId, username },
+    },
+  };
+}
+
+function parseTelegramCallPayload(call = []) {
+  return JSON.parse(call?.[1]?.body || '{}');
+}
+
+function arweaveId(byte = 7) {
+  return Buffer.from(Uint8Array.from({ length: 32 }, () => byte)).toString('base64url');
+}
+
+function mockSessionWorkerFetch(calls = [], { txId = arweaveId() } = {}) {
+  return async (url, init = {}) => {
+    calls.push({ url: String(url), init });
+    if (String(url).endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token', exp: 2000000000 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/arweave/upload')) {
+      return new Response(JSON.stringify({ id: txId }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ amountEth: '0.05', txHash: `0x${'34'.repeat(32)}` }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+}
+
+function assertOpaqueTelegramButtons(buttons = []) {
+  for (const button of buttons) {
+    if (button.callback_data) {
+      assert.match(button.callback_data, /^cecb_[a-z0-9]{10,48}$/);
+      assert.equal(button.callback_data.includes('alpha'), false);
+      assert.equal(button.callback_data.includes('q-readiness'), false);
+    }
+    if (button.url) {
+      const url = new URL(button.url);
+      const launch = url.searchParams.get('start') || '';
+      assert.match(launch, /^ce(?:cb|tg)_[a-z0-9]{10,48}$/);
+      assert.equal(button.url.includes('q-readiness'), false);
+      assert.equal(button.url.includes('private'), false);
+    }
+    if (button.web_app?.url) {
+      const launch = new URL(button.web_app.url).searchParams.get('launch') || '';
+      assert.match(launch, /^cecb_[a-z0-9]{10,48}$/);
+      assert.equal(button.web_app.url.includes('q-readiness'), false);
+      assert.equal(button.web_app.url.includes('private'), false);
+    }
+  }
+}
+
+function assertGroupSafeText(text = '') {
+  assert.equal(text.includes('Private prompt must not leak'), false);
+  assert.equal(text.includes('r2://private'), false);
+  assert.equal(text.includes('unit-root'), false);
+  assert.equal(text.includes('123456:test-token'), false);
+}
+
+test('worker health endpoint marks private bridge and default broadcast-enabled status', async () => {
   const response = await worker.fetch(new Request('https://bridge.example/health'));
   const body = await response.json();
 
@@ -45,7 +146,7 @@ test('worker health endpoint marks private bridge skeleton and broadcast-disable
   assert.equal(body.ok, true);
   assert.equal(body.worker, 'agentBridgeWorker');
   assert.equal(body.privateRelease, true);
-  assert.equal(body.broadcastEnabled, false);
+  assert.equal(body.broadcastEnabled, true);
 });
 
 test('worker mock demo route returns end-to-end private Telegram flow without secrets', async () => {
@@ -311,6 +412,161 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(storedSubmitRequests.some((record) => record.answer.value === 4), true);
 });
 
+test('worker Mini App direct submit broadcasts on-chain when worker and policy are configured', async () => {
+  const kv = new MemoryKv();
+  const calls = [];
+  const submitted = {};
+  const bytes32QuestionId = `0x${'23'.repeat(32)}`;
+  const env = {
+    BROADCAST_ENABLED: 'true',
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    DEFAULT_CHAIN_ID: '11155420',
+    DEFAULT_RPC_URL: 'https://rpc.example',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        sponsoredFaucetAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        surveysAddress: '0x1111111111111111111111111111111111111111',
+      }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: bytes32QuestionId, questionType: 'rating', prompt: 'How strong is the signal?' },
+    ]),
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_FETCH: mockSessionWorkerFetch(calls, { txId: arweaveId(8) }),
+    AGENT_BRIDGE_CONTRACT_FACTORY: ({ signer }) => ({
+      async submitResponses(questionIds, responseHashes, surveyId, surveyResponseHash) {
+        submitted.signer = signer.address;
+        submitted.questionIds = questionIds;
+        submitted.responseHashes = responseHashes;
+        submitted.surveyId = surveyId;
+        submitted.surveyResponseHash = surveyResponseHash;
+        return {
+          hash: `0x${'56'.repeat(32)}`,
+          wait: async () => ({ blockNumber: 88 }),
+        };
+      },
+    }),
+  };
+  const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chatType: 'private', text: '/ce_questions alpha' }),
+  }), env);
+  const preview = await previewResponse.json();
+  const miniButton = preview.preview.response.replyMarkup.inline_keyboard
+    .flat()
+    .find((button) => button.text === 'Open Mini App');
+  const launch = launchFromMiniButton(miniButton);
+  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`), env);
+  const state = await stateResponse.json();
+
+  const draftResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      launch,
+      questionKey: state.questions[0].questionKey,
+      answer: { value: 9, comments: 'Ready' },
+      submit: true,
+    }),
+  }), env);
+  const draft = await draftResponse.json();
+
+  assert.equal(draftResponse.status, 200);
+  assert.equal(draft.ok, true);
+  assert.equal(draft.status, 'direct_submitted');
+  assert.equal(draft.submitRequest.status, 'direct_submitted');
+  assert.equal(draft.submitRequest.onChain.txHash, `0x${'56'.repeat(32)}`);
+  assert.equal(draft.submitRequest.onChain.blockNumber, 88);
+  assert.deepEqual(submitted.questionIds, [bytes32QuestionId]);
+  assert.equal(submitted.signer, draft.submitRequest.onChain.accountAddress);
+  assert.equal(calls.some((call) => call.url === 'https://session.example/'), true);
+  assert.equal(calls.some((call) => call.url === 'https://session.example/arweave/upload'), true);
+
+  const storedSubmitRequests = Array.from(kv.store.entries())
+    .filter(([key]) => key.startsWith('telegram:submit-request:'))
+    .map(([, value]) => JSON.parse(value));
+  assert.equal(storedSubmitRequests.length, 1);
+  assert.equal(storedSubmitRequests[0].status, 'direct_submitted');
+  assert.equal(storedSubmitRequests[0].canonicalApiRequest.status, 'executed_direct_onchain');
+  assert.equal(JSON.stringify(storedSubmitRequests[0]).includes('unit-root'), false);
+});
+
+test('worker Mini App handoff keeps question-specific group launches opaque through private start', async () => {
+  const kv = new MemoryKv();
+  const env = {
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: 'q-first', questionType: 'rating', prompt: 'How strong is the first signal?' },
+      { questionId: 'q-target', questionType: 'multichoice', prompt: 'Which lane should Alpha choose?', options: ['Build', 'Wait'], singleSelect: true },
+    ]),
+    AGENT_ACTION_KV: kv,
+  };
+  const groupPoseResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chatType: 'supergroup', text: '/q 2' }),
+  }), env);
+  const groupPose = await groupPoseResponse.json();
+  const groupButtons = groupPose.preview.response.replyMarkup.inline_keyboard.flat();
+  const groupMiniAppButton = groupButtons.find((button) => button.text === 'Open Mini App');
+  const launch = launchFromMiniButton(groupMiniAppButton);
+
+  assert.equal(groupPoseResponse.status, 200);
+  assert.equal(groupPose.preview.screen, 'pose_question');
+  assert.match(groupMiniAppButton.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
+  assert.match(launch, /^cecb_[a-z0-9]{10,48}$/);
+  assert.equal(groupMiniAppButton.url.includes('q-target'), false);
+
+  const privateStartResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chatType: 'private', text: `/start ${launch}` }),
+  }), env);
+  const privateStart = await privateStartResponse.json();
+  const privateMiniAppButton = privateStart.preview.response.replyMarkup.inline_keyboard
+    .flat()
+    .find((button) => button.text === 'Open Mini App');
+
+  assert.equal(privateStartResponse.status, 200);
+  assert.equal(privateStart.preview.screen, 'private_start');
+  assert.match(privateMiniAppButton.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
+  assert.equal(new URL(privateMiniAppButton.web_app.url).searchParams.get('launch'), launch);
+  assert.equal(privateMiniAppButton.web_app.url.includes('q-target'), false);
+
+  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`), env);
+  const state = await stateResponse.json();
+  const target = state.questions.find((question) => question.idShort === 'q-target');
+
+  assert.equal(stateResponse.status, 200);
+  assert.equal(state.ok, true);
+  assert.equal(state.launch.launch, launch);
+  assert.equal(target.activeFromLaunch, true);
+  assert.equal(state.activeQuestionKey, target.questionKey);
+  assert.match(target.questionKey, /^cecb_[a-z0-9]{10,48}$/);
+  assert.equal(target.questionKey.includes('q-target'), false);
+  assert.equal(state.launch.launch.includes('q-target'), false);
+  assert.equal(JSON.stringify(state).includes('Which lane should Alpha choose?'), true);
+});
+
 test('worker Mini App state endpoint requires Telegram init data before creating question actions', async () => {
   const kv = new MemoryKv();
   const response = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/state?launch=cecb_missing'), {
@@ -569,6 +825,171 @@ test('worker Telegram webhook requires enable flag, bot token, and secret token'
   assert.equal(String(telegramCalls[0][0]).includes('/sendMessage'), true);
   assert.equal(JSON.stringify(body).includes('bot-token'), false);
   assert.equal(JSON.stringify(body).includes('webhook-secret'), false);
+});
+
+test('worker Telegram webhook mocked live-bot smoke covers core commands with safe opaque payloads', async () => {
+  const kv = new MemoryKv();
+  const telegramCalls = [];
+  const telegramFetch = async (...args) => {
+    telegramCalls.push(args);
+    return new Response(JSON.stringify({ ok: true, result: { message_id: 900 + telegramCalls.length } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const env = {
+    TELEGRAM_BRIDGE_ENABLED: 'true',
+    TELEGRAM_BOT_TOKEN: '123456:test-token',
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+    TELEGRAM_FETCH: telegramFetch,
+    DEFAULT_CHAIN_ID: '11155420',
+    DEFAULT_RPC_URL: 'https://rpc.example.test',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      allowQuestionGeneration: true,
+      allowGenerateQuestion: true,
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+          docLibraryEnabled: true,
+        },
+        {
+          sessionSlug: 'demo',
+          sessionName: 'Demo Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+          docLibraryEnabled: true,
+        },
+      ],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-readiness',
+        questionType: 'freeform',
+        prompt: 'What should Alpha decide next?',
+      },
+      {
+        sessionSlug: 'alpha',
+        questionId: 'q-locked',
+        questionType: 'freeform',
+        prompt: 'Private prompt must not leak',
+        visibility: 'sbt_gated',
+      },
+      {
+        sessionSlug: 'demo',
+        questionId: 'q-demo',
+        questionType: 'rating',
+        prompt: 'How ready is Demo?',
+      },
+    ]),
+    AGENT_BRIDGE_DEMO_DOCS_JSON: JSON.stringify([
+      {
+        docId: 'doc-public',
+        sessionSlug: 'alpha',
+        title: 'Public plan',
+        fileType: 'md',
+        visibility: 'public',
+        contentPreview: 'Safe public summary',
+      },
+      {
+        docId: 'doc-gated',
+        sessionSlug: 'alpha',
+        title: 'Gated appendix',
+        fileType: 'pdf',
+        visibility: 'sbt_gated',
+        privateContentRef: 'r2://private/gated.pdf',
+      },
+    ]),
+    AGENT_ACTION_KV: kv,
+  };
+  const commands = [
+    { text: '/start', chatType: 'private', chatId: 42, userId: 42, username: 'participant' },
+    { text: '/ce_join alpha', chatType: 'supergroup' },
+    { text: '/ce_sessions', chatType: 'supergroup' },
+    { text: '/ce_questions', chatType: 'supergroup' },
+    { text: '/q 1', chatType: 'supergroup' },
+    { text: '/ce_attachments', chatType: 'supergroup' },
+    { text: '/ce_docs', chatType: 'supergroup' },
+    { text: '/ce_me', chatType: 'private', chatId: 42, userId: 42, username: 'participant' },
+  ];
+  const bodies = [];
+  for (const [index, command] of commands.entries()) {
+    const response = await worker.fetch(telegramWebhookRequest(telegramMessageUpdate(command.text, {
+      updateId: 2000 + index,
+      messageId: 100 + index,
+      chatId: command.chatId || -100123,
+      chatType: command.chatType,
+      userId: command.userId || 42,
+      username: command.username || 'host',
+    })), env);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.command, command.text.split(/\s+/)[0]);
+    bodies.push(body);
+  }
+
+  assert.equal(telegramCalls.length, commands.length);
+  assert.deepEqual(bodies.map((body) => body.screen), [
+    'setup_welcome',
+    'group_session_card',
+    'group_session_card',
+    'question_list',
+    'pose_question',
+    'doc_library',
+    'doc_library',
+    'my_account',
+  ]);
+
+  const payloads = telegramCalls.map(parseTelegramCallPayload);
+  const byCommand = Object.fromEntries(commands.map((command, index) => [command.text, payloads[index]]));
+  for (const [index, payload] of payloads.entries()) {
+    assert.equal(telegramCalls[index][0], 'https://api.telegram.org/bot123456:test-token/sendMessage');
+    assertOpaqueTelegramButtons(flattenButtons(payload.reply_markup));
+    assert.equal(JSON.stringify(payload.reply_markup || {}).includes('q-readiness'), false);
+    assert.equal(JSON.stringify(payload.reply_markup || {}).includes('alpha'), false);
+  }
+
+  assert.match(byCommand['/start'].text, /Context Engine/);
+  assert.match(byCommand['/ce_join alpha'].text, /Session: Alpha Session/);
+  assert.match(byCommand['/ce_join alpha'].text, /Use \/ce_attachments for session files/);
+  assert.match(byCommand['/ce_sessions'].text, /Available sessions:/);
+  assert.match(byCommand['/ce_questions'].text, /Questions for alpha:/);
+  assert.match(byCommand['/ce_questions'].text, /q-readiness - What should Alpha decide next/);
+  assert.match(byCommand['/ce_questions'].text, /q-locked - Locked question/);
+  assert.match(byCommand['/q 1'].text, /Question for alpha:/);
+  assert.match(byCommand['/q 1'].text, /What should Alpha decide next/);
+  assert.match(byCommand['/ce_attachments'].text, /Attachments for alpha:/);
+  assert.match(byCommand['/ce_docs'].text, /Attachments for alpha:/);
+  assert.match(byCommand['/ce_me'].text, /Account/);
+  assert.match(byCommand['/ce_me'].text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/);
+
+  for (const command of ['/ce_join alpha', '/ce_sessions', '/ce_questions', '/q 1', '/ce_attachments', '/ce_docs']) {
+    assertGroupSafeText(byCommand[command].text);
+  }
+  assert.equal(JSON.stringify(payloads).includes('unit-root'), false);
+  assert.equal(JSON.stringify(payloads).includes('r2://private'), false);
+  assert.equal(JSON.stringify(payloads).includes('Private prompt must not leak'), false);
+
+  const joinButtons = flattenButtons(byCommand['/ce_join alpha'].reply_markup);
+  const joinStart = joinButtons.find((button) => button.text === 'Join Session');
+  const questionButtons = flattenButtons(byCommand['/ce_questions'].reply_markup);
+  const miniApp = questionButtons.find((button) => button.text === 'Open Mini App');
+
+  assert.match(joinStart.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
+  assert.equal(Array.from(kv.store.keys()).some((key) => key.startsWith('telegram:group-session:')), true);
+  assert.equal(Array.from(kv.store.keys()).filter((key) => key.startsWith('telegram:action:')).length >= 12, true);
 });
 
 test('worker Telegram webhook handles command send errors without leaking token or payload', async () => {

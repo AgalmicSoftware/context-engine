@@ -7,6 +7,10 @@ import {
 import { listDocumentsForSession, summarizeDocumentForGroup } from './docLibrary.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
+  requestManagedAccountFaucetOnJoin,
+  submitTelegramResponseOnChain,
+} from './onChainResponses.mjs';
+import {
   buildOpaqueActionId,
   createTelegramCallbackAction,
   createRandomTelegramCallbackAction,
@@ -154,6 +158,43 @@ function stableFingerprint(value = {}) {
 function shortAddress(value = '') {
   const text = safeString(value);
   return /^0x[0-9a-fA-F]{40}$/.test(text) ? `${text.slice(0, 6)}...${text.slice(-4)}` : text;
+}
+
+function shortTxHash(value = '') {
+  const text = safeString(value);
+  return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(0, 10)}...${text.slice(-6)}` : text;
+}
+
+function onChainAnswerFromDraft(draft = {}) {
+  const controlType = safeString(draft.controlType);
+  if (controlType === 'rating_button') {
+    return {
+      questionType: 'rating',
+      value: Number(draft.answerValue),
+      comments: '',
+    };
+  }
+  if (controlType === 'agree_unsure_disagree') {
+    return {
+      questionType: 'agree_unsure_disagree',
+      value: lower(draft.answerValue || draft.answerLabel),
+      label: safeString(draft.answerLabel),
+      comments: '',
+    };
+  }
+  if (controlType === 'single_select' || controlType === 'multi_select_toggle') {
+    return {
+      questionType: 'multichoice',
+      values: [safeString(draft.answerValue || draft.answerLabel)].filter(Boolean),
+      selectionMode: controlType === 'single_select' ? 'single' : 'multi',
+      comments: '',
+    };
+  }
+  return {
+    questionType: 'freeform',
+    text: safeString(draft.answerValue || draft.answerLabel),
+    comments: '',
+  };
 }
 
 async function loadSessionPolicy(env = {}) {
@@ -627,8 +668,94 @@ async function persistTelegramSubmitRequest({
       status: existing.status || 'submit_request_created',
       canonicalApiRequest: existing.canonicalApiRequest || null,
       idempotencyKey,
+      onChain: existing.onChain || null,
       replayed: true,
     };
+  }
+  const policy = await loadSessionPolicy(env);
+  const resolved = resolveSessionInvocation(policy, slug);
+  const session = resolved.ok ? resolved.session : { sessionSlug: slug };
+  const principal = normalizeTelegramPrincipal(normalized);
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED,
+    createdAt,
+  });
+  const directSubmit = await submitTelegramResponseOnChain({
+    env,
+    session,
+    account,
+    principal,
+    questionRef: {
+      sessionSlug: slug,
+      questionId: qid,
+    },
+    answer: onChainAnswerFromDraft(draft),
+    idempotencyKey,
+    createdAt,
+    contractFactory: env.AGENT_BRIDGE_CONTRACT_FACTORY,
+  });
+  if (directSubmit.ok === true || directSubmit.skipped !== true) {
+    const record = {
+      version: 1,
+      requestId,
+      idempotencyKey,
+      answerFingerprint,
+      action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+      status: directSubmit.ok === true ? 'direct_submitted' : 'direct_submit_failed',
+      lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      telegramUserId,
+      chatId: safeString(normalized.chat?.chatId),
+      sessionSlug: slug,
+      questionId: qid,
+      questionIdShort: shortQuestionId(qid),
+      answer: {
+        label: safeString(draft.answerLabel),
+        value: safeString(draft.answerValue),
+        controlType: safeString(draft.controlType),
+      },
+      answerRef: draft.key ? { kind: 'telegram_answer_draft', key: draft.key } : null,
+      canonicalApiRequest: {
+        method: 'POST',
+        path: '/api/agent/responses/submit-request',
+        status: directSubmit.ok === true ? 'executed_direct_onchain' : 'direct_submit_failed',
+        body: {
+          session: slug,
+          questionId: qid,
+          answerRef: 'telegram_private_answer_ref',
+          idempotencyKey,
+        },
+      },
+      onChain: directSubmit,
+      createdAt,
+    };
+    assertNoSecretShape(record, 'Telegram direct submit records must not serialize secrets.');
+    await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(record), {
+      expirationTtl: SUBMIT_REQUEST_TTL_SECONDS,
+    });
+    return directSubmit.ok === true
+      ? {
+        ok: true,
+        requestId,
+        status: record.status,
+        canonicalApiRequest: record.canonicalApiRequest,
+        idempotencyKey,
+        onChain: directSubmit,
+        replayed: false,
+      }
+      : {
+        ok: false,
+        reason: directSubmit.reason || 'direct_submit_failed',
+        error: directSubmit.error || directSubmit.reason || 'direct_submit_failed',
+        requestId,
+        status: record.status,
+        canonicalApiRequest: record.canonicalApiRequest,
+        idempotencyKey,
+        onChain: directSubmit,
+        replayed: false,
+      };
   }
   const record = {
     version: 1,
@@ -660,6 +787,7 @@ async function persistTelegramSubmitRequest({
         idempotencyKey,
       },
     },
+    directSubmitAttempt: directSubmit,
     createdAt,
   };
   assertNoSecretShape(record, 'Telegram submit requests must not serialize secrets.');
@@ -672,6 +800,7 @@ async function persistTelegramSubmitRequest({
     status: record.status,
     canonicalApiRequest: record.canonicalApiRequest,
     idempotencyKey,
+    directSubmitAttempt: directSubmit,
     replayed: false,
   };
 }
@@ -1259,6 +1388,24 @@ async function buildJoinResponse({
       }],
       createdAt,
     });
+    const faucet = await requestManagedAccountFaucetOnJoin({
+      env,
+      session: resolved.session,
+      account,
+      principal: normalizeTelegramPrincipal(normalized),
+      createdAt,
+    }).catch((error) => ({
+      ok: false,
+      reason: 'faucet_request_failed',
+      error: safeString(error?.message || error),
+    }));
+    const faucetLine = faucet.ok && faucet.skipped
+      ? 'Faucet: account already funded.'
+      : faucet.ok
+      ? `Faucet: funded${faucet.amountEth ? ` ${faucet.amountEth} ETH` : ''}${faucet.txHash ? ` (${shortTxHash(faucet.txHash)})` : ''}.`
+      : faucet.skipped
+      ? ''
+      : `Faucet: not funded (${safeString(faucet.reason || faucet.error || 'unavailable')}).`;
     return reply({
       chatId: normalized.chat.chatId,
       text: [
@@ -1266,6 +1413,7 @@ async function buildJoinResponse({
         '',
         `Account: ${shortAddress(account.accountAddress)}`,
         `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
+        ...(faucetLine ? [faucetLine] : []),
         '',
         'Use /ce_attachments for session files.',
       ].join('\n'),
@@ -1294,7 +1442,7 @@ async function buildJoinResponse({
       screen: accountState.screen,
       command,
       normalized,
-      extra: { sessionSlug: resolved.session.sessionSlug },
+      extra: { sessionSlug: resolved.session.sessionSlug, faucet },
     });
   }
 
@@ -1666,12 +1814,13 @@ async function buildAnswerDraftResponse({
     screen: 'submit_response',
     extra: {
       ok,
-      reason: ok ? 'submit_request_created' : (saved.ok ? submitted?.reason : saved.reason),
+      reason: ok ? (submitted?.status || 'submit_request_created') : (saved.ok ? submitted?.reason : saved.reason),
       sessionSlug,
       questionId: selectedQuestionId,
       answerDraftSaved: saved.ok === true,
       submitRequestCreated: submitted?.ok === true,
       submitRequest: submitted?.ok ? submitted : null,
+      onChainSubmitted: submitted?.status === 'direct_submitted',
       submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     },
   });
@@ -1730,11 +1879,12 @@ async function buildSubmitDraftResponse({
     screen: 'submit_response',
     extra: {
       ok: submitted.ok === true,
-      reason: submitted.ok ? 'submit_request_created' : submitted.reason,
+      reason: submitted.ok ? (submitted.status || 'submit_request_created') : submitted.reason,
       sessionSlug,
       questionId: selectedQuestionId,
       submitRequestCreated: submitted.ok === true,
       submitRequest: submitted.ok ? submitted : null,
+      onChainSubmitted: submitted.status === 'direct_submitted',
     },
   });
 }
@@ -2669,6 +2819,7 @@ export {
   AGENT_REQUEST_KV_PREFIX,
   ANSWER_DRAFT_KV_PREFIX,
   COMMANDS,
+  loadSessionPolicy,
   loadQuestionsForSession,
   parseTelegramCommandText,
   persistActionRecord,

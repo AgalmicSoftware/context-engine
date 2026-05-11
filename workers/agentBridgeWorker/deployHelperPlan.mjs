@@ -263,7 +263,9 @@ export function resolveAgentBridgeDeployConfig({
       AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: safeString(env.AGENT_BRIDGE_MAX_REGISTRY_SESSIONS),
       AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS: safeString(env.AGENT_BRIDGE_SESSION_REGISTRY_ADDRESS || env.SESSION_REGISTRY_ADDRESS || env.SESSION_REGISTRY),
       TELEGRAM_BRIDGE_ENABLED: 'true',
-      BROADCAST_ENABLED: 'false',
+      BROADCAST_ENABLED: safeString(env.BROADCAST_ENABLED || 'true'),
+      AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED: safeString(env.AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED || 'true'),
+      AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN: safeString(env.AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN || 'true'),
       AGENT_AI_PROVIDER: safeString(flags['agent-ai-provider'] || env.AGENT_AI_PROVIDER || 'ce_session_policy'),
     },
     secrets: Object.fromEntries(REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => [
@@ -476,7 +478,7 @@ export function buildAgentBridgeWorkerUploadMetadata(config = {}) {
     })),
   );
   return {
-    main_module: 'worker.mjs',
+    main_module: 'worker.js',
     compatibility_date: safeString(config.compatibilityDate || DEFAULT_COMPATIBILITY_DATE),
     compatibility_flags: ['nodejs_compat'],
     bindings,

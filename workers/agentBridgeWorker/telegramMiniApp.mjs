@@ -6,6 +6,8 @@ import {
   buildCanonicalAgentRequest,
   listAgentApiCapabilities,
 } from './agentApiCatalog.mjs';
+import { deriveManagedDemoAccount } from './managedAccounts.mjs';
+import { submitTelegramResponseOnChain } from './onChainResponses.mjs';
 import { buildOpaqueActionId, createTelegramCallbackAction, parseOpaqueActionId } from './opaqueActions.mjs';
 import {
   buildTelegramAgentSettingsEditState,
@@ -13,14 +15,17 @@ import {
   buildTelegramPoseQuestionState,
 } from './questionUi.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
+import { resolveSessionInvocation } from './sessionPolicy.mjs';
 import {
   loadQuestionsForSession,
+  loadSessionPolicy,
   persistActionRecord,
   persistAnswerDraft,
   questionId as readQuestionId,
   readActionRecord,
   shortQuestionId,
 } from './telegramCommands.mjs';
+import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 
 const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_MINI_APP_PAGE_SIZE = 5;
@@ -692,8 +697,87 @@ async function persistSubmitRequest({
       status: existing.status || 'submit_request_created',
       canonicalApiRequest: existing.canonicalApiRequest || null,
       idempotencyKey,
+      onChain: existing.onChain || null,
       replayed: true,
     };
+  }
+  const policy = await loadSessionPolicy(env);
+  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  const session = resolved.ok ? resolved.session : { sessionSlug };
+  const principal = normalizeTelegramPrincipal(auth.user || {});
+  const account = await deriveManagedDemoAccount({
+    principal,
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: 'account_created',
+    createdAt,
+  });
+  const directSubmit = await submitTelegramResponseOnChain({
+    env,
+    session,
+    account,
+    principal,
+    questionRef,
+    answer,
+    idempotencyKey,
+    createdAt,
+    contractFactory: env.AGENT_BRIDGE_CONTRACT_FACTORY,
+  });
+  if (directSubmit.ok === true || directSubmit.skipped !== true) {
+    const record = {
+      version: 1,
+      requestId,
+      idempotencyKey,
+      answerFingerprint,
+      action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
+      status: directSubmit.ok === true ? 'direct_submitted' : 'direct_submit_failed',
+      lane: TELEGRAM_CHAT_LANES.MINI_APP,
+      telegramUserId,
+      sessionSlug,
+      questionId: qid,
+      questionIdShort: shortQuestionId(qid),
+      answer,
+      answerRef: draftKey ? { kind: 'telegram_answer_draft', key: draftKey } : null,
+      canonicalApiRequest: {
+        method: 'POST',
+        path: '/api/agent/responses/submit-request',
+        status: directSubmit.ok === true ? 'executed_direct_onchain' : 'direct_submit_failed',
+        body: {
+          session: sessionSlug,
+          questionId: qid,
+          questionRef: 'telegram_server_question_ref',
+          answerRef: 'telegram_private_answer_ref',
+          idempotencyKey,
+        },
+      },
+      onChain: directSubmit,
+      createdAt,
+    };
+    assertNoSecretShape(record, 'Telegram direct submit records must not serialize secrets.');
+    await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(record), {
+      expirationTtl: SUBMIT_REQUEST_TTL_SECONDS,
+    });
+    return directSubmit.ok === true
+      ? {
+        ok: true,
+        requestId,
+        status: record.status,
+        canonicalApiRequest: record.canonicalApiRequest,
+        idempotencyKey,
+        onChain: directSubmit,
+        replayed: false,
+      }
+      : {
+        ok: false,
+        reason: directSubmit.reason || 'direct_submit_failed',
+        error: directSubmit.error || directSubmit.reason || 'direct_submit_failed',
+        requestId,
+        status: record.status,
+        canonicalApiRequest: record.canonicalApiRequest,
+        idempotencyKey,
+        onChain: directSubmit,
+        replayed: false,
+      };
   }
   const record = {
     version: 1,
@@ -721,6 +805,7 @@ async function persistSubmitRequest({
         idempotencyKey,
       },
     },
+    directSubmitAttempt: directSubmit,
     createdAt,
   };
   await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(record), {
@@ -732,6 +817,7 @@ async function persistSubmitRequest({
     status: record.status,
     canonicalApiRequest: record.canonicalApiRequest,
     idempotencyKey,
+    directSubmitAttempt: directSubmit,
     replayed: false,
   };
 }
@@ -888,7 +974,7 @@ async function handleDraftRequest({
 
   return json({
     ok: true,
-    status: submitRequest?.ok ? 'submit_request_created' : 'draft_saved',
+    status: submitRequest?.ok ? (submitRequest.status || 'submit_request_created') : 'draft_saved',
     draft: {
       status: 'draft_saved',
       questionIdShort: shortQuestionId(questionRef.questionId),
@@ -964,15 +1050,19 @@ function telegramMiniAppHtml() {
   <style>
     :root {
       color-scheme: light dark;
-      --bg: var(--tg-theme-bg-color, #f4f7fb);
-      --surface: var(--tg-theme-secondary-bg-color, #ffffff);
-      --text: var(--tg-theme-text-color, #17202a);
-      --muted: var(--tg-theme-hint-color, #596579);
-      --line: rgba(77, 96, 122, 0.24);
-      --accent: var(--tg-theme-button-color, #1769e0);
-      --accent-text: var(--tg-theme-button-text-color, #ffffff);
-      --danger: #b42318;
-      --ok: #137a4b;
+      --bg: #171936;
+      --surface: #202458;
+      --surface-soft: #262b66;
+      --text: #f6f8ff;
+      --muted: #b8c0d8;
+      --line: rgba(255, 255, 255, 0.16);
+      --accent: #62ffbf;
+      --accent-2: #2cc3ff;
+      --accent-text: #11142f;
+      --danger: #ff8a7a;
+      --ok: #62ffbf;
+      --shadow-dark: #10122c;
+      --shadow-light: #2d3274;
     }
     * { box-sizing: border-box; }
     body {
@@ -988,11 +1078,11 @@ function telegramMiniAppHtml() {
       min-height: 100vh;
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
-      padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
-      gap: 12px;
+      padding: max(16px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+      gap: 14px;
     }
     header { display: grid; gap: 8px; }
-    h1 { margin: 0; font-size: 22px; line-height: 1.15; letter-spacing: 0; }
+    h1 { margin: 0; font-size: 20px; line-height: 1.15; letter-spacing: 0; }
     .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; }
     .status { min-height: 20px; color: var(--muted); font-size: 13px; }
     .agentBar {
@@ -1003,8 +1093,8 @@ function telegramMiniAppHtml() {
     .agentBar button, .settingsPanel select {
       min-height: 38px;
       border: 1px solid var(--line);
-      border-radius: 7px;
-      background: var(--surface);
+      border-radius: 8px;
+      background: var(--surface-soft);
       color: var(--text);
       padding: 8px 10px;
     }
@@ -1022,7 +1112,13 @@ function telegramMiniAppHtml() {
     .field { display: grid; gap: 5px; }
     .field label { color: var(--muted); font-size: 12px; }
     .toggle { display: flex; align-items: center; gap: 8px; min-height: 38px; color: var(--text); }
-    .layout { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.35fr); gap: 12px; min-height: 0; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(160px, 0.72fr) minmax(0, 1.42fr);
+      gap: 16px;
+      min-height: 0;
+      align-items: stretch;
+    }
     .queue, .active { min-height: 0; }
     .queueList { display: grid; gap: 8px; }
     .queueButton {
@@ -1032,10 +1128,14 @@ function telegramMiniAppHtml() {
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 9px 10px;
-      background: var(--surface);
+      background: rgba(255, 255, 255, 0.06);
       color: var(--text);
     }
-    .queueButton[aria-current="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+    .queueButton[aria-current="true"] {
+      border-color: rgba(98, 255, 191, 0.75);
+      box-shadow: inset 4px 0 0 var(--accent), 0 0 0 1px rgba(98, 255, 191, 0.18);
+      background: rgba(98, 255, 191, 0.1);
+    }
     .queueButton:disabled { color: var(--muted); cursor: default; }
     .qid { color: var(--muted); font-size: 12px; margin-bottom: 3px; }
     .qtitle { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -1044,7 +1144,7 @@ function telegramMiniAppHtml() {
       min-height: 36px;
       border: 1px solid var(--line);
       border-radius: 7px;
-      background: var(--surface);
+      background: rgba(255, 255, 255, 0.06);
       color: var(--text);
       padding: 7px 10px;
     }
@@ -1055,10 +1155,11 @@ function telegramMiniAppHtml() {
       background: var(--surface);
       display: grid;
       grid-template-rows: auto minmax(0, 1fr);
+      box-shadow: 7px 7px 14px var(--shadow-dark), -7px -7px 14px var(--shadow-light);
     }
-    .cardHead { padding: 14px; border-bottom: 1px solid var(--line); }
+    .cardHead { padding: 16px; border-bottom: 1px solid var(--line); }
     .prompt { margin: 0; font-size: 19px; line-height: 1.28; letter-spacing: 0; }
-    .cardBody { padding: 14px; display: grid; align-content: start; gap: 14px; overflow: auto; }
+    .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; overflow: auto; }
     .segmented, .choices, .ratingTicks { display: grid; gap: 8px; }
     .segmented { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .choices { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
@@ -1067,7 +1168,7 @@ function telegramMiniAppHtml() {
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 9px 10px;
-      background: transparent;
+      background: rgba(255, 255, 255, 0.06);
       color: var(--text);
       text-align: center;
     }
@@ -1075,8 +1176,9 @@ function telegramMiniAppHtml() {
       background: var(--accent);
       border-color: var(--accent);
       color: var(--accent-text);
+      box-shadow: 0 0 14px rgba(98, 255, 191, 0.28);
     }
-    .ratingValue { font-size: 32px; font-weight: 700; letter-spacing: 0; }
+    .ratingValue { font-size: 34px; font-weight: 700; letter-spacing: 0; color: var(--accent); }
     input[type="range"] { width: 100%; accent-color: var(--accent); }
     textarea {
       width: 100%;
@@ -1085,17 +1187,17 @@ function telegramMiniAppHtml() {
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 10px;
-      background: var(--surface);
+      background: rgba(255, 255, 255, 0.06);
       color: var(--text);
     }
-    .locked { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 12px; }
+    .locked { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 12px; background: rgba(255, 255, 255, 0.04); }
     footer {
       position: sticky;
       bottom: 0;
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 10px;
-      padding-top: 4px;
+      padding-top: 6px;
       background: var(--bg);
     }
     .primary {
@@ -1106,6 +1208,7 @@ function telegramMiniAppHtml() {
       color: var(--accent-text);
       padding: 10px;
       text-align: center;
+      font-weight: 700;
     }
     .primary:disabled, .secondary:disabled { opacity: 0.58; cursor: default; }
     .ok { color: var(--ok); }
@@ -1382,7 +1485,7 @@ function telegramMiniAppHtml() {
         setStatus(body.error || 'Could not save answer.', 'error');
         return;
       }
-      setStatus(body.status === 'submit_request_created' ? 'Submitted.' : 'Draft saved.', 'ok');
+      setStatus(['submit_request_created', 'direct_submitted'].includes(body.status) ? 'Submitted.' : 'Draft saved.', 'ok');
       if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     }
     async function sendSettings() {

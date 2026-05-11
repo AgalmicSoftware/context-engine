@@ -20,7 +20,9 @@ DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network
 # tries DEFAULT_RPC_URL first and then this URL for live SessionRegistry reads.
 # ADDITIONAL_RPC_URL=https://your-op-sepolia-rpc.example
 AGENT_AI_PROVIDER=ce_session_policy
-BROADCAST_ENABLED=false
+BROADCAST_ENABLED=true
+AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED=true
+AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN=true
 
 # Optional local demo fixtures. Keep these non-identifying and secret-free.
 # Default question source is live. Use fixture only for local preview/demo copy.

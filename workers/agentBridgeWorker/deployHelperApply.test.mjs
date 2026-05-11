@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  bundleAgentBridgeWorkerModule,
   buildAgentBridgeWorkerUploadForm,
   collectAgentBridgeWorkerModules,
   executeAgentBridgeDeployApply,
@@ -102,6 +103,16 @@ test('collectAgentBridgeWorkerModules includes the worker entrypoint and transit
   assert.equal(names.includes('telegramCommands.mjs'), true);
   assert.equal(names.includes('durableObjectSigner.mjs'), true);
   assert.equal(modules.every((module) => module.source.length > 0), true);
+});
+
+test('bundleAgentBridgeWorkerModule folds package imports into one upload module', () => {
+  const bundle = bundleAgentBridgeWorkerModule();
+
+  assert.equal(bundle.name, 'worker.js');
+  assert.equal(bundle.contentType, 'application/javascript+module');
+  assert.match(bundle.source, /submitResponses/);
+  assert.equal(/from\s+['"]ethers['"]/.test(bundle.source), false);
+  assert.equal(bundle.source.includes("from './onChainResponses.mjs'"), false);
 });
 
 test('buildAgentBridgeWorkerUploadForm can omit migrations for already-migrated Durable Objects', () => {

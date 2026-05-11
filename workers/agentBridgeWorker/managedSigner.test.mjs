@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { ethers } from 'ethers';
 import { ACCOUNT_MODES, RISK_CEILINGS, TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
 import {
   ManagedDemoSignerDurableObject,
@@ -45,6 +46,21 @@ test('same Telegram principal and deployment recover the same managed demo accou
   assert.notEqual(first.accountId, differentPrincipal.accountId);
   assert.notEqual(first.accountId, differentDeployment.accountId);
   assert.equal(JSON.stringify(first).includes('root-a'), false);
+});
+
+test('managed demo account address is derived from the exportable demo key', async () => {
+  const signer = makeSigner();
+  const account = await signer.getOrCreateAccount({
+    principal: { telegramUserId: '42' },
+  });
+  const revealed = await signer.exportDemoKey({
+    account,
+    principal: account.telegramPrincipal,
+    reveal: true,
+  });
+
+  assert.equal(revealed.ok, true);
+  assert.equal(new ethers.Wallet(revealed.reveal.privateKey).address, account.accountAddress);
 });
 
 test('Durable Object signer creates signed canonical demo envelopes after grant checks', async () => {

@@ -38,6 +38,9 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
   assert.equal(config.workerName, 'ce-agent-bridge-worker');
   assert.equal(config.vars.AGENT_BRIDGE_PUBLIC_URL, 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev');
   assert.equal(config.vars.CE_SESSION_WORKER_BASE_URL, 'https://session-worker.tenant-subdomain.workers.dev');
+  assert.equal(config.vars.BROADCAST_ENABLED, 'true');
+  assert.equal(config.vars.AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED, 'true');
+  assert.equal(config.vars.AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN, 'true');
   assert.equal(config.secrets.TELEGRAM_BOT_TOKEN, '[set]');
   assert.equal(config.secrets.TELEGRAM_WEBHOOK_SECRET, '[set]');
   assert.equal(config.secrets.DEMO_SIGNER_ROOT_SECRET, '[set]');
@@ -250,7 +253,7 @@ test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2
   });
   const metadata = buildAgentBridgeWorkerUploadMetadata(config);
 
-  assert.equal(metadata.main_module, 'worker.mjs');
+  assert.equal(metadata.main_module, 'worker.js');
   assert.equal(metadata.compatibility_date, '2024-09-02');
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_ACTION_KV' && binding.type === 'kv_namespace'), true);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_R2'), false);
@@ -272,6 +275,18 @@ test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'ADDITIONAL_RPC_URL' &&
     binding.text === 'https://infura.example.test/op-sepolia'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'BROADCAST_ENABLED' &&
+    binding.text === 'true'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED' &&
+    binding.text === 'true'
+  )), true);
+  assert.equal(metadata.bindings.some((binding) => (
+    binding.name === 'AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN' &&
+    binding.text === 'true'
   )), true);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_BRIDGE_DEMO_QUESTIONS_JSON'), false);
 });

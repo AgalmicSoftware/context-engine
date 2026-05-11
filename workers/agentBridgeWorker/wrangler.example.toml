@@ -63,7 +63,17 @@ DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 # Emergency/debug only: allows recent-block fallback when no scoped bounds exist.
 # AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN = "1"
 AGENT_AI_PROVIDER = "ce_session_policy"
-BROADCAST_ENABLED = "false"
+BROADCAST_ENABLED = "true"
+AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED = "true"
+AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN = "true"
+# Direct managed Telegram demo submits still require a live
+# CE_SESSION_WORKER_BASE_URL, Surveys address config from the linked session,
+# AGENT_BRIDGE_SURVEYS_ADDRESS, or the OP Sepolia default, plus
+# managedAccountSubmitAllowed=true in AGENT_BRIDGE_SESSION_POLICY_JSON. Set
+# either broadcast flag to "false" to force canonical submit-request records
+# instead of broadcasting.
+# AGENT_BRIDGE_WORKER_LOGIN_ORIGIN = "http://localhost:7391"
+# AGENT_BRIDGE_SURVEYS_ADDRESS = "0x..."
 
 # deploy:apply writes these secrets through Cloudflare API. If debugging a
 # manual Wrangler deployment, set secrets with Wrangler, never in this file:

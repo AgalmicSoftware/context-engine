@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import {
   buildTelegramCommandResponse,
   dispatchTelegramCommandResponse,
@@ -112,6 +113,38 @@ function encodeRegistryStringResult(value = '') {
   const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
   const paddedLength = Math.ceil(hex.length / 64) * 64;
   return `0x${word(32)}${word(bytes.length)}${hex.padEnd(paddedLength, '0')}`;
+}
+
+function arweaveId(byte = 7) {
+  return Buffer.from(Uint8Array.from({ length: 32 }, () => byte)).toString('base64url');
+}
+
+function mockSessionWorkerFetch(calls = [], { txId = arweaveId() } = {}) {
+  return async (url, init = {}) => {
+    calls.push({ url: String(url), init });
+    if (String(url).endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-token', exp: 2000000000 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/arweave/upload')) {
+      return new Response(JSON.stringify({ id: txId }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ amountEth: '0.05', txHash: `0x${'34'.repeat(32)}` }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
 }
 
 function registryFetchForSlugs(slugs = []) {
@@ -773,6 +806,43 @@ test('private session join makes later question commands use the selected sessio
   assert.equal(questions.response.text.includes('q-alpha'), false);
   assert.match(posed.response.text, /Question for demo:/);
   assert.match(posed.response.text, /What should Demo decide next/);
+});
+
+test('private session join requests faucet funding when session policy allows it', async () => {
+  const calls = [];
+  const env = baseEnv({
+    AGENT_BRIDGE_FETCH: mockSessionWorkerFetch(calls),
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        sponsoredFaucetAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+      }],
+    }),
+  });
+
+  const joined = await buildTelegramCommandResponse({
+    update: privateMessage('/ce_join alpha'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  assert.equal(joined.ok, true);
+  assert.match(joined.response.text, /Faucet: funded 0\.05 ETH/);
+  assert.equal(joined.faucet.ok, true);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[2].url, 'https://session.example/');
+  const faucetBody = JSON.parse(calls[2].init.body);
+  assert.equal(faucetBody.action, 'request_test_eth');
+  assert.equal(faucetBody.sessionSlug, 'alpha');
+  assert.match(faucetBody.to, /^0x[0-9a-fA-F]{40}$/);
+  assert.equal(JSON.stringify(joined).includes('unit-root'), false);
 });
 
 test('/ce_sessions callback switches the group session used by later question commands', async () => {
