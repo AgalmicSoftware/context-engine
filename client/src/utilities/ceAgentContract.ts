@@ -97,7 +97,7 @@ export const describeCeAgentContract = (): CeAgentContract => ({
   tools: cloneEntries(TOOLS),
   notes: [
     'fill, click, and assertVisible operate on stable data-testid hooks documented in the TestID API.',
-    'invokeAi is intentionally narrow and deterministic; broader headless read/create surfaces remain PRD work.',
+    'invokeAi is intentionally narrow and deterministic; broader headless read/create surfaces remain planned work.',
     'PolisReport does not silently fall back to a legacy fixture slug; pass params.sessionSlug or select an active session first.',
   ],
 });

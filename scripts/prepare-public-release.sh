@@ -91,6 +91,51 @@ while IFS= read -r pattern; do
   STRIP_ASSERT_ABSENT+=("$pattern")
 done < <(ce_public_release_strip_assert_absent_patterns)
 
+MANIFEST_EXCLUDE_PATTERNS=()
+while IFS= read -r pattern; do
+  MANIFEST_EXCLUDE_PATTERNS+=("$pattern")
+done < <(ce_public_release_manifest_exclude_patterns)
+
+path_matches_manifest_exclude() {
+  local relative_path="$1"
+  local pattern
+
+  for pattern in "${MANIFEST_EXCLUDE_PATTERNS[@]}"; do
+    case "$pattern" in
+      *'*'*|*'?'*|*'['*)
+        if [[ "$relative_path" == $pattern ]]; then
+          return 0
+        fi
+        ;;
+      *)
+        if [[ "$relative_path" == "$pattern" || "$relative_path" == "$pattern/"* ]]; then
+          return 0
+        fi
+        ;;
+    esac
+  done
+
+  return 1
+}
+
+verify_private_planning_paths_absent() {
+  local findings
+
+  findings=$(
+    cd "$STAGING_ROOT"
+    find . -path './.git' -prune -o -print |
+      sed 's#^\./##' |
+      grep -E '(^|/)TODO(/|$)|(^|/)[^/]*PRDs?[^/]*(/|$)' || true
+  )
+
+  if [ -n "$findings" ]; then
+    printf 'Private planning paths are still visible in public release copy:\n%s\n' "$findings" >&2
+    return 1
+  fi
+
+  return 0
+}
+
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
   printf 'Refusing to overwrite the repo root.\n' >&2
   exit 1
@@ -188,6 +233,10 @@ entry_index=0
   while IFS= read -r path; do
     [ -n "$path" ] || continue
 
+    if path_matches_manifest_exclude "$path"; then
+      continue
+    fi
+
     if [ "$entry_index" -gt 0 ]; then
       printf ',\n'
     fi
@@ -230,6 +279,8 @@ done < "$MATCHED_PATHS_FILE"
     done
   done
 )
+
+verify_private_planning_paths_absent
 
 mv "$STAGING_ROOT" "$OUTPUT_ABS"
 
