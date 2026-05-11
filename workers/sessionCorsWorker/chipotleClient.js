@@ -1,5 +1,13 @@
 import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
 import { ethers } from 'ethers';
+import {
+  buildLitChipotlePolicy,
+  buildLitChipotleWrappedPlaintext,
+  fingerprintLitChipotlePolicy,
+  normalizeChipotleCekHex,
+  normalizeChipotleSbtAddresses,
+  normalizeLitChipotleMetadataVersion,
+} from '../../client/src/utilities/crypto/litChipotlePolicy.js';
 
 const DEFAULT_LIT_API_BASE = 'https://api.chipotle.litprotocol.com';
 const CHIPOTLE_API_PREFIX = '/core/v1';
@@ -398,20 +406,6 @@ const normalizeSessionScopedNameSegment = (value, fallback = 'session') => {
   return normalized || fallback;
 };
 
-const normalizeSbtAddressList = (values = []) => {
-  const out = [];
-  const seen = new Set();
-  (Array.isArray(values) ? values : []).forEach((raw) => {
-    const value = toTrimmedString(raw);
-    if (!value) return;
-    const normalized = value.toLowerCase();
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    out.push(value);
-  });
-  return out;
-};
-
 const normalizeGateMode = (value) => (
   toTrimmedString(value).toLowerCase() === 'all' ? 'all' : 'any'
 );
@@ -485,38 +479,49 @@ const resolveSessionChipotleRpcUrl = ({
   request = {},
   config = {},
   secrets = {},
+  chainId = 0,
+  op = '',
 } = {}) => {
   const requestBody = isObj(request) ? request : {};
-  const explicitRpcUrl = toTrimmedString(
-    requestBody.rpcUrl ||
-    requestBody.customRpcUrl ||
-    secrets?.customRpcUrl
-  );
-  if (explicitRpcUrl) {
-    return validateChipotleRpcUrl(explicitRpcUrl);
-  }
-
-  const chainId = toChainId(
-    requestBody.chainId ||
-    requestBody.gateChainId ||
-    config?.networkChainId ||
-    config?.registryChainId
-  );
+  const normalizedChainId = toChainId(chainId);
+  const requestRpcUrl = toTrimmedString(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
-    ...resolveConfigMappedChipotleRpcUrls({ config, chainId }),
-    ...resolveDefaultChipotleRpcUrls(chainId),
+    secrets?.customRpcUrl,
+    ...resolveConfigMappedChipotleRpcUrls({ config, chainId: normalizedChainId }),
+    ...resolveDefaultChipotleRpcUrls(normalizedChainId),
   ]);
+  const approvedUrls = [];
+  const seen = new Set();
   for (const candidate of candidates) {
     try {
-      return validateChipotleRpcUrl(candidate);
+      const normalized = validateChipotleRpcUrl(candidate);
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      approvedUrls.push(normalized);
     } catch {
       // Ignore invalid candidates and keep walking the fallback chain.
     }
   }
 
-  if (chainId) {
+  if (requestRpcUrl) {
+    const normalizedRequestRpcUrl = validateChipotleRpcUrl(requestRpcUrl);
+    const approved = approvedUrls.some((candidate) => (
+      candidate.toLowerCase() === normalizedRequestRpcUrl.toLowerCase()
+    ));
+    if (!approved) {
+      throw new Error('Lit Chipotle request RPC URL is not approved for this gate chain.');
+    }
+    return op === 'encrypt' ? '' : normalizedRequestRpcUrl;
+  }
+
+  if (op === 'encrypt') return '';
+
+  if (approvedUrls.length) return approvedUrls[0];
+
+  if (normalizedChainId) {
     throw new Error(
-      `Lit Chipotle RPC URL is required or chain ${chainId} must have a known default RPC.`
+      `Lit Chipotle RPC URL is required or chain ${normalizedChainId} must have a known default RPC.`
     );
   }
   throw new Error('Lit Chipotle RPC URL is required.');
@@ -1241,37 +1246,73 @@ export const executeSessionLitChipotleAction = async ({
     throw new Error('Lit Chipotle op must be check, encrypt, or decrypt.');
   }
 
-  const sbtAddresses = normalizeSbtAddressList(requestBody.sbtAddresses);
+  const sbtAddresses = normalizeChipotleSbtAddresses(requestBody.sbtAddresses);
   if (!sbtAddresses.length) {
     throw new Error('Lit Chipotle requires at least one SBT address.');
   }
 
+  const gateMode = normalizeGateMode(requestBody.gateMode);
+  const gateChainId = toChainId(
+    requestBody.chainId ||
+    requestBody.gateChainId ||
+    config?.networkChainId ||
+    config?.registryChainId
+  );
+  if (!gateChainId) {
+    throw new Error('Lit Chipotle requires a gate chain ID.');
+  }
+  const policy = buildLitChipotlePolicy({
+    chainId: gateChainId,
+    gateMode,
+    sbtAddresses,
+    litActionCid,
+    litPkpId,
+  });
+  const expectedPolicyFingerprint = fingerprintLitChipotlePolicy(policy);
   const rpcUrl = resolveSessionChipotleRpcUrl({
     request: requestBody,
     config,
     secrets,
+    chainId: gateChainId,
+    op,
   });
-  const gateMode = normalizeGateMode(requestBody.gateMode);
   const normalizedRequesterAddress = toTrimmedString(requesterAddress);
   if (!normalizedRequesterAddress) {
     throw new Error('Requester address unavailable for Lit Chipotle action.');
   }
 
+  // Regression guard: RPC is an authorization oracle for check/decrypt.
+  // Keep it worker-approved and out of stored Chipotle metadata.
   const jsParams = {
     op,
     pkpId: litPkpId,
+    litActionCid,
     requesterAddress: normalizedRequesterAddress,
     sbtAddresses,
     gateMode,
-    rpcUrl,
+    expectedChainId: gateChainId,
+    expectedPolicyFingerprint,
+    policy,
   };
+  if (rpcUrl) {
+    jsParams.rpcUrl = rpcUrl;
+  }
   if (op === 'encrypt') {
-    jsParams.message = toTrimmedString(requestBody.message);
-    if (!jsParams.message) {
+    const cekHex = normalizeChipotleCekHex(requestBody.message);
+    const wrappedPlaintext = buildLitChipotleWrappedPlaintext({
+      cekHex,
+      policy,
+    });
+    jsParams.message = JSON.stringify(wrappedPlaintext);
+    if (!cekHex) {
       throw new Error('Lit Chipotle encrypt requires a message.');
     }
   }
   if (op === 'decrypt') {
+    const metadataVersion = normalizeLitChipotleMetadataVersion(requestBody.chipotle || {});
+    if (metadataVersion && metadataVersion !== 2) {
+      throw new Error('Lit Chipotle legacy wrapped keys are not supported.');
+    }
     jsParams.ciphertext = toTrimmedString(requestBody.ciphertext);
     if (!jsParams.ciphertext) {
       throw new Error('Lit Chipotle decrypt requires ciphertext.');
