@@ -111,6 +111,7 @@ Legacy note:
 
 What users can do:
 - Open a session by slug or by session id link (`/session/<slug-or-id>`).
+- Open pile-adjacent listening mode with `/session/<slug-or-id>?mode=listening`; the panel starts only after the user clicks Record, then rolls 3-minute transcription chunks into a stitched transcript and draft question suggestions.
 - Open session-scoped question views via `/session/<slug-or-id>/questions` and `/session/<slug-or-id>/questions/results`.
 - Open the session doc library via `/session/<slug-or-id>/docs`.
 - Create a new session via the Session Wizard (`/session/new` or `/new`), including grant-backed sponsored-bundle entry links.

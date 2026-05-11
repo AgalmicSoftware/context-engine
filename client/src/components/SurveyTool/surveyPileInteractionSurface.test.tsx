@@ -263,9 +263,12 @@ describe('surveyPileInteractionSurface', () => {
     const renderActiveQuestion = jest.fn((question: PileQuestionLike) => (
       <div data-testid={`active-${question.id}`}>{question.prompt}</div>
     ));
+    const toggleListeningPanel = jest.fn();
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),
       showMiniBackgroundSpinner: true,
+      showListeningPanel: true,
+      toggleListeningPanel,
       pileQuestions: [
         { id: 'q1', prompt: 'Q1' },
         { id: 'q2', prompt: 'Q2' },
@@ -295,6 +298,15 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(controlsChildren[0], 'pileActions')).toBe(true);
     expect(nodeHasClassName(controlsChildren[1], 'pileFooter')).toBe(true);
     expect(nodeHasClassName(controlsChildren[2], 'pileNav')).toBe(true);
+
+    const listeningToggle = findElement(tree, (node) => (
+      isElementNode(node) && node.props['data-testid'] === 'ce-session-listening-toggle'
+    )) as TestElementNode | null;
+    expect(listeningToggle).not.toBeNull();
+    expect(listeningToggle?.props['aria-pressed']).toBe(true);
+    expect(nodeHasClassName(listeningToggle, 'actionButtonActive')).toBe(true);
+    (listeningToggle?.props.onClick as () => void)();
+    expect(toggleListeningPanel).toHaveBeenCalledTimes(1);
   });
 
   it('renders the hologram takeover instead of the pile controls when active', () => {
