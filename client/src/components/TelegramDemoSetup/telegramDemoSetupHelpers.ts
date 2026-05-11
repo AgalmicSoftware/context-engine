@@ -26,7 +26,7 @@ export const AGENT_BRIDGE_REQUIRED_VAR_NAMES = Object.freeze([
 type UnknownRecord = Record<string, unknown>;
 type Permission = { key?: unknown; type?: unknown };
 type CryptoLike = {
-  getRandomValues?: <T extends Uint8Array>(array: T) => T;
+  getRandomValues?: (array: Uint8Array) => Uint8Array;
 };
 
 const toStr = (value: unknown): string => (
