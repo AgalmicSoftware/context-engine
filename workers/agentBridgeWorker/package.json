@@ -8,7 +8,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node --test \"*.test.mjs\""
+    "deploy:apply": "node deployHelperApply.mjs",
+    "deploy:plan": "node deployHelperPlan.mjs",
+    "test": "node --test *.test.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.33.2"

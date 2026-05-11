@@ -56,6 +56,11 @@ export const TELEGRAM_BRIDGE_ACTIONS = Object.freeze({
   SELECT_QUESTION: 'select_question',
   POSE_QUESTION: 'pose_question',
   START_PRIVATE: 'start_private',
+  AGENT_ACTION_MENU: 'agent_action_menu',
+  CREATE_AGENT_ACCOUNT: 'create_agent_account',
+  VIEW_AGENT_SETTINGS: 'view_agent_settings',
+  EDIT_AGENT_SETTINGS: 'edit_agent_settings',
+  UPDATE_AGENT_SETTINGS: 'update_agent_settings',
   CREATE_MANAGED_ACCOUNT: 'create_managed_account',
   RECOVER_MANAGED_ACCOUNT: 'recover_managed_account',
   START_ONBOARDING: 'start_onboarding',
@@ -118,6 +123,7 @@ export const QUESTION_VISIBILITY = Object.freeze({
   PRIVATE: 'private',
   SBT_GATED: 'sbt_gated',
   LIT_ENCRYPTED: 'lit_encrypted',
+  PAYLOAD_UNAVAILABLE: 'payload_unavailable',
 });
 
 export const QUESTION_TYPES = Object.freeze({

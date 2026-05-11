@@ -6,6 +6,11 @@ import {
   TELEGRAM_BRIDGE_ACTIONS,
   TELEGRAM_CHAT_LANES,
 } from './constants.mjs';
+import {
+  buildCanonicalAgentRequest,
+  describeTelegramAgentApiCatalog,
+  listAgentApiCapabilities,
+} from './agentApiCatalog.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { sanitizeForGroup } from './redaction.mjs';
 import { evaluateSbtJoinPolicy, evaluateSessionSbtGateJoin } from './sessionPolicy.mjs';
@@ -19,10 +24,15 @@ const SBT_GROUP_ID_RE = /^[a-z0-9][a-z0-9_-]{2,127}$/i;
 const SESSION_SLUG_RE = /^[a-z0-9][a-z0-9_-]{0,127}$/i;
 const SBT_PRIVATE_CREDENTIAL_RE = /^(invite|password|proof|credential):/i;
 const SBT_PRIVATE_LINK_VALUE_RE = /(?:[?&#](?:invite|password|proof|credential|token)=)/i;
+const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
 
 export const TELEGRAM_SCREEN_IDS = Object.freeze([
   'setup_welcome',
   'test_checklist',
+  'agent_action_menu',
+  'agent_account_create',
+  'agent_settings_overview',
+  'agent_settings_edit',
   'group_session_card',
   'private_start',
   'question_list',
@@ -58,6 +68,10 @@ export const TELEGRAM_SCREEN_IDS = Object.freeze([
 export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
   setup_welcome: { command: '/start', deepLink: OPAQUE_DEEP_LINK_LAUNCH },
   test_checklist: { command: '/start' },
+  agent_action_menu: { command: '/ce_actions', aliases: ['/ce_agent'], callback: OPAQUE_CALLBACK_LAUNCH },
+  agent_account_create: { command: '/ce_create_agent', callback: OPAQUE_CALLBACK_LAUNCH, deepLink: OPAQUE_DEEP_LINK_LAUNCH },
+  agent_settings_overview: { command: '/ce_settings', callback: OPAQUE_CALLBACK_LAUNCH, deepLink: OPAQUE_DEEP_LINK_LAUNCH },
+  agent_settings_edit: { command: '/ce_settings', callback: OPAQUE_CALLBACK_LAUNCH },
   group_session_card: { command: '/ce_join', callback: OPAQUE_CALLBACK_LAUNCH },
   private_start: { command: '/start <opaque-action-id>', deepLink: OPAQUE_DEEP_LINK_LAUNCH },
   question_list: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
@@ -84,8 +98,8 @@ export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
   multichoice_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
   locked_private_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
   private_question_read: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  doc_library: { command: '/ce_docs', callback: OPAQUE_CALLBACK_LAUNCH },
-  doc_detail: { command: '/ce_docs', callback: OPAQUE_CALLBACK_LAUNCH },
+  doc_library: { command: '/ce_attachments', aliases: ['/ce_docs'], callback: OPAQUE_CALLBACK_LAUNCH },
+  doc_detail: { command: '/ce_attachments', aliases: ['/ce_docs'], callback: OPAQUE_CALLBACK_LAUNCH },
   generate_questions: { command: '/ce_generate_questions', callback: OPAQUE_CALLBACK_LAUNCH },
   submit_response: { callback: OPAQUE_CALLBACK_LAUNCH },
   confirmation_signing: { callback: OPAQUE_CALLBACK_LAUNCH },
@@ -97,6 +111,12 @@ export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function safeOpaqueSeedPart(value = '') {
+  const text = safeString(value);
+  if (BYTES32_RE.test(text)) return `${text.slice(2, 10)}${text.slice(-6)}`;
+  return text;
 }
 
 function splitCommandText(text = '') {
@@ -261,7 +281,7 @@ function selectedChoiceSet(question = {}) {
 
 function baseControl(action, label, questionId, targetLane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, extra = {}) {
   return {
-    actionId: buildOpaqueActionId(`${action}|${questionId}|${label}`),
+    actionId: buildOpaqueActionId(`${action}|${safeOpaqueSeedPart(questionId)}|${label}`),
     action,
     label,
     targetLane,
@@ -281,6 +301,42 @@ function buildScreenButton(action, label, targetLane = TELEGRAM_CHAT_LANES.PRIVA
 }
 
 function buildDefaultScreenButtons(screen) {
+  if (screen === 'agent_action_menu') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT, 'Create Agent', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        command: '/ce_create_agent',
+      }),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS, 'Settings', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        command: '/ce_settings',
+      }),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+        command: '/ce_questions',
+      }),
+    ];
+  }
+  if (screen === 'agent_account_create') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS, 'Settings', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        command: '/ce_settings',
+      }),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU, 'Actions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        command: '/ce_actions',
+      }),
+    ];
+  }
+  if (screen === 'agent_settings_overview') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS, 'Edit Settings', TELEGRAM_CHAT_LANES.MINI_APP),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU, 'Actions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
+        command: '/ce_actions',
+      }),
+    ];
+  }
+  if (screen === 'agent_settings_edit') {
+    return [
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.UPDATE_AGENT_SETTINGS, 'Save Settings', TELEGRAM_CHAT_LANES.MINI_APP),
+    ];
+  }
   if (screen === 'question_list') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
@@ -315,7 +371,7 @@ function buildDefaultScreenButtons(screen) {
   if (screen === 'account_created') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions'),
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.START_ONBOARDING, 'Enter Startup Info'),
     ];
   }
@@ -376,15 +432,15 @@ function buildDefaultScreenButtons(screen) {
   }
   if (screen === 'doc_library') {
     return [
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs'),
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Attachments'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.USE_DOCS_AS_ANSWER_CONTEXT, 'Use as Answer Context'),
     ];
   }
   if (screen === 'generate_questions') {
     return [
-      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Docs'),
+      buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SELECT_DOCS, 'Select Attachments'),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions'),
     ];
   }
@@ -404,6 +460,30 @@ function buildDefaultScreenButtons(screen) {
 }
 
 function buildDefaultScreenCopy(screen) {
+  if (screen === 'agent_action_menu') {
+    return {
+      title: 'Agent Actions',
+      text: 'Agent action launcher.',
+    };
+  }
+  if (screen === 'agent_account_create') {
+    return {
+      title: 'Create Agent',
+      text: 'Create or recover the Telegram-managed agent account through the canonical CE agent API.',
+    };
+  }
+  if (screen === 'agent_settings_overview') {
+    return {
+      title: 'Settings',
+      text: 'Agent settings overview.',
+    };
+  }
+  if (screen === 'agent_settings_edit') {
+    return {
+      title: 'Edit Settings',
+      text: 'Edit safe Telegram agent settings.',
+    };
+  }
   if (screen === 'question_list') {
     return {
       title: 'View Questions',
@@ -490,15 +570,15 @@ function buildDefaultScreenCopy(screen) {
   }
   if (screen === 'doc_library') {
     return {
-      title: 'View / Add Docs',
-      text: 'Select docs to generate questions or save them for answer context.',
-      buttonLabel: 'View / Add Docs',
+      title: 'Attachments',
+      text: 'Select attachments to generate questions or save them for answer context.',
+      buttonLabel: 'Attachments',
     };
   }
   if (screen === 'generate_questions') {
     return {
       title: 'Generate Questions',
-      text: 'Selected docs are inputs for Generate Questions.',
+      text: 'Selected attachments are inputs for Generate Questions.',
     };
   }
   if (screen === 'submit_response') {
@@ -546,8 +626,9 @@ export function buildTelegramGroupSessionCardState({
       command: '/ce_questions',
       default: true,
     }),
-    buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'View / Add Docs', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-      command: '/ce_docs',
+    buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
+      command: '/ce_attachments',
+      aliases: ['/ce_docs'],
     }),
   ];
   if (policy.allowPoseQuestion !== false) {
@@ -566,7 +647,7 @@ export function buildTelegramGroupSessionCardState({
     }));
   }
   return buildTelegramScreenState('group_session_card', {
-    text: `Context Engine session linked: ${sessionLabel}`,
+    text: `Session: ${sessionLabel}`,
     sessionSlug: safeString(sessionSlug),
     sessionName: safeString(sessionName),
     buttons,
@@ -577,11 +658,13 @@ export function buildTelegramGroupSessionCardState({
 }
 
 function normalizeQuestionVisibility(question = {}) {
+  if (question.payloadUnavailable === true) return QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
   const raw = safeString(question.visibility || question.access || question.questionVisibility).toLowerCase();
   if ([
     QUESTION_VISIBILITY.PRIVATE,
     QUESTION_VISIBILITY.SBT_GATED,
     QUESTION_VISIBILITY.LIT_ENCRYPTED,
+    QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE,
   ].includes(raw)) {
     return raw;
   }
@@ -598,25 +681,45 @@ function isGroupSafeQuestionVisible(question = {}) {
 function summarizeQuestionForList(question = {}, index = 0) {
   const questionId = safeString(question.questionId || question.id);
   const visibility = normalizeQuestionVisibility(question);
-  const visible = visibility === QUESTION_VISIBILITY.PUBLIC;
+  const payloadUnavailable = question.payloadUnavailable === true || visibility === QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
+  const visible = visibility === QUESTION_VISIBILITY.PUBLIC && !payloadUnavailable;
   return sanitizeForGroup({
     type: 'telegram_question_list_item',
     displayIndex: index + 1,
     questionId,
     questionType: normalizeQuestionType(question.questionType || question.type),
-    title: visible
+    title: payloadUnavailable
+      ? 'Question unavailable'
+      : visible
       ? safeString(question.title || question.questionText || question.prompt)
       : 'Locked question',
     visibility,
-    locked: !visible,
-    unavailableInGroup: !visible,
+    locked: !visible && !payloadUnavailable,
+    payloadUnavailable,
+    unavailableInGroup: !visible && !payloadUnavailable,
+    retryable: payloadUnavailable,
     source: safeString(question.source || 'existing_session_question'),
-    poseActionId: buildOpaqueActionId(`pose_question|${questionId}|${index}`),
+    poseActionId: buildOpaqueActionId(`pose_question|${safeOpaqueSeedPart(questionId)}|${index}`),
   });
 }
 
 function groupSafeQuestionForPose(question = {}) {
   const visibility = normalizeQuestionVisibility(question);
+  const payloadUnavailable = question.payloadUnavailable === true || visibility === QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
+  if (payloadUnavailable) {
+    return sanitizeForGroup({
+      type: 'telegram_group_posed_question',
+      questionId: safeString(question.questionId || question.id),
+      questionType: 'unavailable',
+      visibility,
+      locked: false,
+      payloadUnavailable: true,
+      retryable: true,
+      questionText: null,
+      answerLabels: [],
+      status: 'payload_unavailable',
+    });
+  }
   const visible = visibility === QUESTION_VISIBILITY.PUBLIC;
   return sanitizeForGroup({
     type: 'telegram_group_posed_question',
@@ -767,15 +870,149 @@ function normalizeJoinedSessionSummary(session = {}) {
   });
 }
 
-function canonicalAgentRequest({ method = 'POST', path = '', actionId = '', status = 'planned_contract_only', body = {} } = {}) {
-  return sanitizeForGroup({
-    type: 'canonical_ce_agent_api_request',
-    method,
-    path,
-    actionId,
-    status,
-    body,
-    authority: 'canonical_ce_agent_session_api',
+function canonicalAgentRequest(input = {}) {
+  return buildCanonicalAgentRequest(input);
+}
+
+function normalizeDraftStyle(value = '') {
+  const normalized = safeString(value).toLowerCase();
+  return ['concise', 'balanced', 'detailed'].includes(normalized) ? normalized : 'balanced';
+}
+
+function normalizeBoolean(value, fallback = false) {
+  if (value === true || value === false) return value;
+  const normalized = safeString(value).toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+}
+
+export function buildTelegramAgentActionMenuState({
+  lane = TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+  sessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const safeLane = safeString(lane) || TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT;
+  const capabilities = listAgentApiCapabilities({
+    lane: safeLane,
+    includeGroupUnsafe: safeLane !== TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+  });
+  return buildTelegramScreenState('agent_action_menu', {
+    lane: safeLane,
+    sessionSlug: safeString(sessionSlug),
+    catalog: describeTelegramAgentApiCatalog({
+      lane: safeLane,
+      includeGroupUnsafe: safeLane !== TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    }),
+    capabilities: capabilities.map((capability) => sanitizeForGroup({
+      id: capability.id,
+      label: capability.label,
+      category: capability.category,
+      method: capability.method,
+      path: capability.path,
+      handoffStatus: capability.handoffStatus,
+      requiredFields: capability.requiredFields,
+      safeTelegramLanes: capability.safeTelegramLanes,
+      groupSafe: capability.groupSafe === true,
+      botCommands: capability.botCommands,
+      miniAppRoutes: capability.miniAppRoutes,
+    })),
+    canonicalApiRequest: canonicalAgentRequest({
+      capabilityId: 'agent.actions.list',
+      body: {
+        lane: safeLane,
+        session: safeString(sessionSlug),
+      },
+    }),
+    createdAt,
+  });
+}
+
+export function buildTelegramAgentAccountCreateState({
+  account = {},
+  sessionSlug = '',
+  requestId = '',
+  idempotencyKey = '',
+  createdAt = null,
+} = {}) {
+  return buildTelegramScreenState('agent_account_create', {
+    managedAddress: safeString(account.accountAddress || account.address) || null,
+    accountMode: safeString(account.accountMode || account.mode || 'managed_telegram_demo'),
+    sessionSlug: safeString(sessionSlug),
+    requestId: safeString(requestId) || null,
+    canonicalApiRequest: canonicalAgentRequest({
+      capabilityId: 'agent.account.create',
+      body: {
+        telegramPrincipalRef: 'telegram_principal_ref',
+        accountMode: safeString(account.accountMode || account.mode || 'managed_telegram_demo'),
+        session: safeString(sessionSlug),
+        deploymentRef: 'agent_bridge_deployment_ref',
+        idempotencyKey: safeString(idempotencyKey || requestId),
+      },
+    }),
+    createdAt,
+  });
+}
+
+export function buildTelegramAgentSettingsOverviewState({
+  settings = {},
+  sessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const normalizedSettings = sanitizeForGroup({
+    draftStyle: normalizeDraftStyle(settings.draftStyle),
+    telegramReminders: normalizeBoolean(settings.telegramReminders, false),
+  });
+  return buildTelegramScreenState('agent_settings_overview', {
+    sessionSlug: safeString(sessionSlug),
+    settings: normalizedSettings,
+    editableFields: ['draftStyle', 'telegramReminders'],
+    canonicalApiRequest: canonicalAgentRequest({
+      capabilityId: 'agent.settings.read',
+      body: {
+        agentAccountRef: 'telegram_managed_agent_ref',
+        session: safeString(sessionSlug),
+      },
+    }),
+    createdAt,
+  });
+}
+
+export function buildTelegramAgentSettingsEditState({
+  settings = {},
+  sessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const current = sanitizeForGroup({
+    draftStyle: normalizeDraftStyle(settings.draftStyle),
+    telegramReminders: normalizeBoolean(settings.telegramReminders, false),
+  });
+  return buildTelegramScreenState('agent_settings_edit', {
+    preferredLane: TELEGRAM_CHAT_LANES.MINI_APP,
+    sessionSlug: safeString(sessionSlug),
+    fields: [{
+      field: 'draftStyle',
+      label: 'Draft style',
+      input: 'select',
+      options: ['concise', 'balanced', 'detailed'],
+      value: current.draftStyle,
+    }, {
+      field: 'telegramReminders',
+      label: 'Telegram reminders',
+      input: 'toggle',
+      value: current.telegramReminders,
+    }],
+    canonicalApiRequest: canonicalAgentRequest({
+      capabilityId: 'agent.settings.update',
+      body: {
+        agentAccountRef: 'telegram_managed_agent_ref',
+        settingsPatchRef: 'telegram_settings_patch_ref',
+        settingsPatchSummary: current,
+        session: safeString(sessionSlug),
+        idempotencyKey: 'provided_on_submit',
+      },
+    }),
+    createdAt,
   });
 }
 
@@ -812,7 +1049,7 @@ export function createTelegramPoseQuestionAction({
   const questionId = safeString(question.questionId || question.id);
   return sanitizeForGroup({
     type: 'telegram_pose_question_action',
-    actionId: buildOpaqueActionId(`pose_question|${sessionSlug}|${questionId}|${source}`),
+    actionId: buildOpaqueActionId(`pose_question|${sessionSlug}|${safeOpaqueSeedPart(questionId)}|${source}`),
     action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
     label: 'Pose Question',
     command: '/ce_pose_question',
@@ -841,7 +1078,7 @@ export function buildTelegramPoseQuestionState({
     source,
     action,
     groupSafeOutput: groupQuestion,
-    card: groupQuestion.locked ? null : buildTelegramQuestionCard(question),
+    card: groupQuestion.locked || groupQuestion.payloadUnavailable ? null : buildTelegramQuestionCard(question),
     status: groupQuestion.status,
     createdAt,
   });
@@ -861,7 +1098,7 @@ export function buildTelegramGeneratedQuestionCandidatesState({
     };
     return {
       ...summarizeQuestionForList(question, index),
-      saveActionId: buildOpaqueActionId(`save_generated_question|${sessionSlug}|${question.questionId}`),
+      saveActionId: buildOpaqueActionId(`save_generated_question|${sessionSlug}|${safeOpaqueSeedPart(question.questionId)}`),
       poseAction: createTelegramPoseQuestionAction({
         sessionSlug,
         question,
@@ -1138,7 +1375,7 @@ export function createTelegramPrivateQuestionDecryptRequest({
     ok: true,
     type: 'telegram_private_question_decrypt_request',
     status: 'contract_only_request',
-    requestId: buildOpaqueActionId(`decrypt_request|${sessionSlug}|${questionId}|${account.accountId || account.accountAddress || ''}`),
+    requestId: buildOpaqueActionId(`decrypt_request|${sessionSlug}|${safeOpaqueSeedPart(questionId)}|${account.accountId || account.accountAddress || ''}`),
     sessionSlug: safeString(sessionSlug),
     questionId,
     accountAddress: safeString(account.accountAddress || account.address) || null,
@@ -1242,8 +1479,8 @@ export function buildTelegramQuestionControls(question = {}, {
   if (questionType === QUESTION_TYPES.AGREE_UNSURE_DISAGREE) {
     controls.push(
       baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Agree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'agree', selectionMode: 'single' }),
-      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Unsure', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'unsure', selectionMode: 'single' }),
       baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Disagree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'disagree', selectionMode: 'single' }),
+      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Unsure', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'unsure', selectionMode: 'single' }),
     );
   } else if (questionType === QUESTION_TYPES.RATING) {
     const scale = {
