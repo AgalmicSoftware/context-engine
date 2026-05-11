@@ -22,6 +22,7 @@ import WelcomeSlideRenderer from './WelcomeSlideRenderer';
 
 const uiLog = createLogger('ui');
 
+const buildClassName = (classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
 type SiteLoadOptionsProps = {
   fetchSessionState: () => void;
@@ -114,7 +115,7 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
     // If exit button is hit, sidebar disappears
     const sidebarExited = !this.state.sidebarNotClosed;
 
-    const sidebarVisibleClassname = sidebarExited ? styles.betaSidebarDisappeared : styles.betaTabSideBar;
+    const sidebarVisibleClassName = sidebarExited ? styles.isSidebarCollapsed : styles.welcomeSlideSidebar;
 
     // Explanation modal (only seen on first site-load)
 
@@ -122,11 +123,11 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
     const closeMetricsDetailsIcon = faWindowClose;
     const questionMarkMetricsIcon =
-    <button id={styles.metricDetailsButton} onClick={this.toggleMetricsDetails}>
-      <FontAwesomeIcon icon={faQuestionCircle} id={styles.metricsInfoIcon} />
+    <button className={styles.metricDetailsButton} onClick={this.toggleMetricsDetails}>
+      <FontAwesomeIcon icon={faQuestionCircle} className={styles.metricsInfoIcon} />
     </button>
 
-    const metricsDetailsID = this.state.metricsDetailsSelected ? styles.visibleMetricsDetails : styles.invisibleMetricsDetails;
+    const metricsDetailsClassName = this.state.metricsDetailsSelected ? styles.metricsDetailsPanel : styles.isHidden;
 
     const slideButtonClickHandler = this.props.arrowIndex === 0
       ? this.props.clickRightArrow
@@ -134,22 +135,22 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
 
     const metricsDetailExplainer =
-    <Card id={metricsDetailsID}>
-      <div id={styles.metricsDetailsTitle}>
-        <div id={styles.emailFormLabel}>
+    <Card className={metricsDetailsClassName}>
+      <div className={styles.metricsDetailsTitle}>
+        <div className={styles.emailFormLabel}>
           Web3 = control over your data
 
-          <div id={styles.metricsDetailsSubtitle}>
+          <div className={styles.metricsDetailsSubtitle}>
           </div>
         </div>
         </div>
 
 
-    <div id={styles.metricsDetailsPoints}>
+    <div className={styles.metricsDetailsPoints}>
 
-      <div id={styles.emailSubjects}>
+      <div className={styles.emailSubjects}>
 
-      <div id={styles.metricsCollectedText}>
+      <div className={styles.metricsCollectedText}>
                 Metrics:
       </div>
 
@@ -167,11 +168,11 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
       </div>
 
-      <div id={styles.metricsDetailsButtons}>
+      <div className={styles.metricsDetailsButtons}>
 
 
-        <button id={styles.closeModalButton} aria-label="Close" className="close" data-dismiss="modal" type="button" onClick={this.toggleMetricsDetails}>
-                <FontAwesomeIcon icon={closeMetricsDetailsIcon} id={styles.closeModalIcon}  />
+        <button className={buildClassName([styles.closeModalButton, 'close'])} aria-label="Close" data-dismiss="modal" type="button" onClick={this.toggleMetricsDetails}>
+                <FontAwesomeIcon icon={closeMetricsDetailsIcon} className={styles.closeModalIcon}  />
         </button>
 
       </div>
@@ -183,28 +184,27 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
     const explainModal =
     <>
     <GreetingModal visible={this.state.explainerModalOpen} closeExplainerFunction={this.closeExplainerModal}/>
-        <div id={styles.betaInfoEmbed}>
+        <div className={styles.welcomeSlideEmbed}>
 
           <CardFooter>
             <WelcomeSlideRenderer
               slideIndex={this.props.arrowIndex}
               onSlideClick={slideButtonClickHandler}
               leadingContent={
-      <div id={sidebarVisibleClassname}>
+      <div className={sidebarVisibleClassName} data-testid="ce-site-load-sidebar">
 
 
           { metricsDetailExplainer }
 
           <button
-            id={styles.closeModalButton}
+            className={buildClassName([styles.closeModalButton, 'close'])}
             data-testid="ce-site-load-close-sidebar"
             aria-label="Close"
-            className="close"
             data-dismiss="modal"
             type="button"
             onClick={this.closeBetaSidebar}
           >
-              <FontAwesomeIcon icon={closeModalIcon} id={styles.closeModalIcon} />
+              <FontAwesomeIcon icon={closeModalIcon} className={styles.closeModalIcon} />
           </button>
 
           </div>
