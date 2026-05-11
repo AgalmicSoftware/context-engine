@@ -2559,54 +2559,40 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .pileListeningLayout {
-  position: relative;
-  width: 100%;
-  margin: 0;
-  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 56px;
+  width: min(1280px, 100%);
+  margin: 0 auto 38px;
+  padding: 0 16px;
 }
 
 .pileListeningLayout .pileWrapper {
-  width: 100%;
-  margin-bottom: 38px;
-}
-
-.sessionListeningPanelAnchor {
-  position: fixed;
-  right: clamp(16px, 3vw, 40px);
-  bottom: clamp(16px, 3vw, 36px);
-  z-index: 60;
-  width: min(520px, calc(100vw - 32px));
-  display: flex;
-  justify-content: flex-end;
-  pointer-events: none;
+  flex: 0 1 650px;
+  width: auto;
+  margin-bottom: 0;
 }
 
 .sessionListeningPanel {
-  width: 100%;
-  min-width: 0;
-  max-width: 360px;
-  max-height: calc(100vh - 32px);
-  margin: 0;
+  flex: 0 1 430px;
+  min-width: 320px;
+  max-width: 460px;
+  margin-top: 30px;
   border: 1px solid rgba(210, 218, 232, 0.9);
   border-radius: var(--ce-radius-8);
   background: #f8fafc;
   color: #18243a;
   box-shadow: 0 18px 36px rgba(6, 12, 30, 0.2);
-  padding: 12px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   font-size: 0.95rem;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  pointer-events: auto;
-}
-
-.sessionListeningPanelWithDraft {
-  max-width: 520px;
 }
 
 .sessionListeningHeader,
+.sessionListeningControls,
 .sessionListeningActions {
   display: flex;
   align-items: center;
@@ -2622,12 +2608,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   gap: 8px;
   min-width: 0;
-  font-size: 0.92rem;
   font-weight: 800;
   color: #152033;
 }
 
-.sessionListeningClose {
+.sessionListeningClose,
+.sessionListeningIconButton {
   border: 1px solid rgba(32, 45, 71, 0.16);
   border-radius: var(--ce-radius-8);
   background: #fff;
@@ -2640,11 +2626,22 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   cursor: pointer;
 }
 
-.sessionListeningClose:hover:not(:disabled) {
+.sessionListeningClose:hover:not(:disabled),
+.sessionListeningIconButton:hover:not(:disabled) {
   border-color: rgba(42, 80, 160, 0.35);
   color: #193d8f;
 }
 
+.sessionListeningIconButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sessionListeningControls {
+  flex-wrap: wrap;
+}
+
+.sessionListeningPrimary,
 .sessionListeningGenerate {
   display: inline-flex !important;
   align-items: center;
@@ -2655,178 +2652,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-weight: 800 !important;
 }
 
-.sessionListeningRecordWrap {
-  display: flex;
-  justify-content: center;
-  padding: 0 0 2px;
-}
-
-.sessionListeningRecordButton {
-  width: 132px;
-  height: 132px;
-  border-radius: 50% !important;
-  border: 2px solid rgba(22, 114, 85, 0.5) !important;
-  background: #167255 !important;
+.sessionListeningPrimary {
+  background: #174ea6 !important;
+  border-color: #174ea6 !important;
   color: #fff !important;
-  display: inline-flex !important;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 14px !important;
-  box-shadow: 0 14px 28px rgba(11, 80, 62, 0.25);
-  font-weight: 900 !important;
-  line-height: 1.1;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    background-color 0.18s ease;
-
-  &:hover:not(:disabled),
-  &:focus:not(:disabled) {
-    background: #0f7f5a !important;
-    border-color: rgba(22, 114, 85, 0.72) !important;
-    color: #fff !important;
-    transform: translateY(-1px);
-    box-shadow: 0 18px 34px rgba(11, 80, 62, 0.32);
-  }
-
-  &:disabled {
-    opacity: 0.68;
-    cursor: wait;
-  }
-}
-
-.sessionListeningRecordIcon {
-  font-size: 2.2rem;
-  line-height: 1;
-}
-
-.sessionListeningRecordText {
-  font-size: 0.95rem;
-  max-width: 100%;
-  text-align: center;
-}
-
-.sessionListeningActiveRecorder {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-  padding: 10px;
-  border: 1px solid rgba(32, 45, 71, 0.14);
-  border-radius: var(--ce-radius-8);
-  background-color: #f9f9f9;
-  box-sizing: border-box;
-}
-
-.sessionListeningWaveformShell {
-  position: relative;
-  flex-basis: 90%;
-  flex-grow: 1;
-  min-width: 0;
-  height: 80px;
-  padding: 5px;
-  border: 2px inset #808080;
-  background-color: #c0c0c0;
-  box-sizing: border-box;
-}
-
-.sessionListeningWaveformCanvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background-color: #c0c0c0;
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-  image-rendering: crisp-edges;
-}
-
-.sessionListeningWaveformTimer {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: var(--ce-radius-12);
-  background: rgba(0, 0, 0, 0.58);
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.sessionListeningTimerDot {
-  color: #ff4d4f;
-  font-size: 0.62rem;
-}
-
-.sessionListeningTimerDotPaused {
-  color: #d6d9df;
-  font-size: 0.62rem;
-}
-
-.sessionListeningButtonColumn {
-  flex-basis: auto;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  justify-content: flex-start;
-  align-items: stretch;
-}
-
-.sessionListeningAudioButton {
-  width: 61px;
-  height: 61px;
-  padding: 5px 8px;
-  border: 2px solid #9a9a9a;
-  background: linear-gradient(#dfdfdf, #ffffff);
-  color: #000;
-  box-shadow: 1px 1px 0 #fff, -1px -1px 0 #777;
-  font-size: 1.3em;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:active:not(:disabled) {
-    background: #c2c2c2;
-    box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #777;
-  }
-
-  &:focus-visible {
-    outline: 2px solid #174ea6;
-    outline-offset: 2px;
-  }
-
-  &:disabled {
-    border-color: #aaa;
-    background: #d0d0d0;
-    color: #777;
-    box-shadow: none;
-    cursor: not-allowed;
-  }
-}
-
-.sessionListeningStopButton {
-  color: #e11900;
-}
-
-.sessionListeningSrOnly {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0 0 0 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
 }
 
 .sessionListeningGenerate {
@@ -2852,32 +2681,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 3px 8px;
 }
 
-.sessionListeningTranscriptButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid rgba(32, 45, 71, 0.14);
-  border-radius: var(--ce-radius-pill);
-  background: #fff;
-  color: #18243a;
-  padding: 3px 8px;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.sessionListeningTranscriptButton span:last-child {
-  color: rgba(24, 36, 58, 0.62);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.sessionListeningTranscriptButton:hover,
-.sessionListeningTranscriptButton:focus-visible {
-  border-color: rgba(42, 80, 160, 0.34);
-  color: #193d8f;
-}
-
 .sessionListeningError {
   border: 1px solid rgba(191, 64, 64, 0.24);
   border-radius: var(--ce-radius-8);
@@ -2887,21 +2690,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 0.86rem;
 }
 
-.sessionListeningTranscriptDetails {
-  border: 1px solid rgba(32, 45, 71, 0.14);
-  border-radius: var(--ce-radius-8);
-  background: #fff;
-  overflow: hidden;
-}
-
-.sessionListeningTranscriptShell {
-  position: relative;
-  padding: 10px;
-}
-
 .sessionListeningTranscript {
   width: 100%;
-  min-height: 150px;
+  min-height: 190px;
   max-height: 360px;
   resize: vertical;
   overflow: auto;
@@ -2909,7 +2700,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border-radius: var(--ce-radius-8);
   background: #fff;
   color: #18243a;
-  padding: 10px 42px 10px 12px;
+  padding: 10px 12px;
   line-height: 1.45;
 }
 
@@ -2917,235 +2708,27 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: rgba(24, 36, 58, 0.48);
 }
 
-.sessionListeningClearTranscript {
-  position: absolute;
-  top: 8px;
-  right: 18px;
-  width: 28px;
-  height: 28px;
-  border: 1px solid rgba(32, 45, 71, 0.16);
-  border-radius: var(--ce-radius-6);
-  background: rgba(248, 250, 252, 0.96);
-  color: #253654;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.sessionListeningClearTranscript:hover:not(:disabled) {
-  border-color: rgba(191, 64, 64, 0.35);
-  color: #8a1f1f;
-}
-
-.sessionListeningClearTranscript:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 .sessionListeningCreateWrap {
   border-top: 1px solid rgba(32, 45, 71, 0.12);
   padding-top: 12px;
-
-  :global([class*="createSurveyContainer"]) {
-    background: #edf2f7 !important;
-    border-color: rgba(32, 45, 71, 0.14) !important;
-    color: #18243a !important;
-    box-shadow: 0 16px 32px rgba(6, 12, 30, 0.14) !important;
-  }
-
-  h3,
-  h4,
-  label,
-  strong {
-    color: #18243a !important;
-  }
-
-  :global([class*="modeHeader"]) {
-    border-bottom-color: rgba(32, 45, 71, 0.14) !important;
-  }
-
-  :global([class*="toggleLabel"]),
-  :global([class*="inheritToggle"]),
-  :global([class*="optionItem"]),
-  :global([class*="singleSelectLabel"]),
-  :global([class*="questionMetadata"]),
-  :global([class*="tagsManagerContainer"]),
-  :global([class*="questionId"]),
-  :global([class*="surveyIdPreview"]),
-  :global([class*="aiPromptMeta"]) {
-    color: #18243a !important;
-    opacity: 1 !important;
-  }
-
-  :global([class*="surveyTitleInput"]),
-  :global([class*="docUrlInput"]),
-  :global([class*="questionPromptInput"]),
-  :global([class*="optionInput"]),
-  :global([class*="questionTypeSelect"]),
-  :global([class*="associatedSurveyInput"]) {
-    background: #fff !important;
-    border-color: rgba(32, 45, 71, 0.18) !important;
-    color: #18243a !important;
-    box-shadow: 0 3px 10px rgba(6, 12, 30, 0.08) !important;
-
-    &::placeholder {
-      color: rgba(24, 36, 58, 0.5) !important;
-    }
-  }
-
-  :global([class*="questionContainer"]),
-  :global([class*="typeSelectorBlock"]) {
-    background: #fff !important;
-    border-color: rgba(32, 45, 71, 0.14) !important;
-    color: #18243a !important;
-    box-shadow: 0 10px 22px rgba(6, 12, 30, 0.12) !important;
-  }
-
-  :global([class*="step"]) {
-    color: rgba(24, 36, 58, 0.72) !important;
-
-    span,
-    svg {
-      background: #edf2f7 !important;
-      color: inherit !important;
-      box-shadow: 0 0 0 8px #edf2f7 !important;
-    }
-  }
-
-  :global([class*="stepCompleted"]) {
-    color: #167255 !important;
-  }
-
-  :global([class*="questionTypeText"]),
-  :global([class*="typeSelectorLabel"]),
-  :global([class*="typeTitle"]) {
-    color: #167255 !important;
-    opacity: 1 !important;
-  }
-
-  :global([class*="typeButton"]) {
-    background: #f8fafc !important;
-    border-color: rgba(32, 45, 71, 0.18) !important;
-    color: #18243a !important;
-    opacity: 1 !important;
-    box-shadow: 0 3px 10px rgba(6, 12, 30, 0.08) !important;
-  }
-
-  :global([class*="pill"]) {
-    background: #e8eef7 !important;
-    border-color: rgba(32, 45, 71, 0.18) !important;
-    color: #18243a !important;
-  }
-
-  :global([class*="pillAgree"]) {
-    background: #dff7ea !important;
-    border-color: rgba(22, 114, 85, 0.35) !important;
-    color: #123a2d !important;
-  }
-
-  :global([class*="pillDisagree"]) {
-    background: #ffe3e3 !important;
-    border-color: rgba(191, 64, 64, 0.32) !important;
-    color: #7f1d1d !important;
-  }
-
-  :global([class*="pillUnsure"]) {
-    background: #fff4cc !important;
-    border-color: rgba(161, 106, 0, 0.34) !important;
-    color: #5f4200 !important;
-  }
-
-  :global([class*="freeformPreview"]),
-  :global([class*="ratingPreviewWrap"]) {
-    background: #e8eef7 !important;
-    border-color: rgba(32, 45, 71, 0.22) !important;
-    color: rgba(24, 36, 58, 0.72) !important;
-  }
-
-  :global([class*="modeSwitchButton"]),
-  :global([class*="removeQuestionButton"]),
-  :global([class*="removeOptionButton"]),
-  :global([class*="addOptionButton"]),
-  :global([class*="addTagButton"]),
-  :global([class*="magicTagButton"]),
-  :global([class*="clearFormButton"]) {
-    background: #fff !important;
-    border: 1px solid rgba(32, 45, 71, 0.2) !important;
-    color: #18243a !important;
-  }
-
-  :global([class*="removeQuestionButton"]):hover,
-  :global([class*="removeOptionButton"]):hover {
-    background: #ffe3e3 !important;
-    border-color: rgba(191, 64, 64, 0.35) !important;
-    color: #7f1d1d !important;
-  }
-
-  :global([class*="addOptionButton"]):hover,
-  :global([class*="addTagButton"]):hover,
-  :global([class*="magicTagButton"]):hover {
-    background: #dff7ea !important;
-    border-color: rgba(22, 114, 85, 0.35) !important;
-    color: #123a2d !important;
-  }
-
-  :global([class*="tagInputGroup"]) {
-    background: #fff !important;
-    border-color: rgba(32, 45, 71, 0.18) !important;
-  }
-
-  :global([class*="tagInputField"]) {
-    color: #18243a !important;
-
-    &::placeholder {
-      color: rgba(24, 36, 58, 0.5) !important;
-    }
-  }
-
-  :global([class*="filterBubble"]) {
-    background: #dff7ea !important;
-    border-color: rgba(22, 114, 85, 0.35) !important;
-    color: #123a2d !important;
-  }
-
-  :global([class*="removeIcon"]) {
-    color: #123a2d !important;
-  }
-
-  :global([class*="jsonDisplay"]) {
-    background: #fff !important;
-    border-color: rgba(32, 45, 71, 0.14) !important;
-    color: #18243a !important;
-  }
-
-  :global([class*="buttonContent"]) {
-    color: #fff !important;
-  }
 }
 
 @media (max-width: 1100px) {
   .pileListeningLayout {
-    display: block;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    margin-bottom: 0;
   }
 
   .pileListeningLayout .pileWrapper {
     width: 100%;
-    margin-bottom: 0;
-  }
-
-  .sessionListeningPanelAnchor {
-    position: static;
-    width: 100%;
-    max-width: 100%;
-    display: flex;
-    justify-content: center;
-    pointer-events: auto;
   }
 
   .sessionListeningPanel {
     width: min(100%, 560px);
     max-width: calc(100% - 24px);
+    margin-top: 0;
     margin-bottom: 28px;
   }
 }

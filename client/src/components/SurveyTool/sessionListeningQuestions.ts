@@ -11,12 +11,6 @@ import {
 
 export const LISTENING_QUESTION_COUNT = 5;
 
-export const LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS = [
-  'For listening transcripts, read the entire transcript before selecting questions.',
-  'Do not overweight the opening topic; compare early, middle, and late sections and choose the most interesting, contentious, or debate-worthy claims across the full conversation.',
-  'Prefer statements that expose disagreement, trade-offs, decision criteria, evidence gaps, or questions that would produce useful debate among informed participants.',
-].join(' ');
-
 export const LISTENING_QUESTION_TYPES: QuestionTypeSelection = Object.freeze({
   binary: true,
   multichoice: true,
@@ -33,8 +27,6 @@ export type ListeningQuestionGenerationOptions = {
   sessionConfig?: Record<string, unknown> | null;
   context?: unknown;
   workerUrl?: string;
-  sourceTypeOverride?: string;
-  multiSpeakerHintOverride?: string;
 };
 
 export type ListeningQuestionGenerationResult = {
@@ -50,29 +42,20 @@ export const buildListeningQuestionPrompt = (
     defaultTags = null,
     questionTypes = LISTENING_QUESTION_TYPES,
     sessionInstructions = '',
-    sourceTypeOverride = 'transcript',
-    multiSpeakerHintOverride = 'likely_multiple_speakers',
   }: ListeningQuestionGenerationOptions = {},
-) => {
-  const listeningInstructions = [
-    LISTENING_TRANSCRIPT_FOCUS_INSTRUCTIONS,
-    String(sessionInstructions || '').trim(),
-  ].filter(Boolean).join('\n\n');
-
-  return buildSingleGenerationPrompt({
-    promptTemplate: seedGenPrompt,
-    sourceDocContent: transcript,
-    count,
-    questionTypes,
-    defaultTags,
-    transcriptMode: true,
-    overrides: {
-      sourceTypeOverride,
-      multiSpeakerHintOverride,
-    },
-    sessionInstructions: listeningInstructions,
-  });
-};
+) => buildSingleGenerationPrompt({
+  promptTemplate: seedGenPrompt,
+  sourceDocContent: transcript,
+  count,
+  questionTypes,
+  defaultTags,
+  transcriptMode: true,
+  overrides: {
+    sourceTypeOverride: 'transcript',
+    multiSpeakerHintOverride: 'likely_multiple_speakers',
+  },
+  sessionInstructions,
+});
 
 export const parseListeningQuestionResponse = (raw: unknown): GeneratedAiQuestionPayload => {
   const text = String(raw || '');

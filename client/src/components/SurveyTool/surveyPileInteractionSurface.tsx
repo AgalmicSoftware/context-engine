@@ -12,6 +12,7 @@ import {
   faMinus,
   faCaretDown,
   faRobot,
+  faMicrophone,
 } from '@fortawesome/free-solid-svg-icons';
 
 import PileHologramAssistant from './PileHologramAssistant';
@@ -47,6 +48,8 @@ type PileActionControlsProps = {
   toggleFilterModal: VoidHandler;
   showCreate: boolean;
   toggleCreate: VoidHandler;
+  showListeningPanel?: boolean;
+  toggleListeningPanel?: VoidHandler;
   onViewAllClick?: VoidHandler | null;
   handleViewAllFromPile: VoidHandler;
 };
@@ -118,6 +121,8 @@ export type PileInteractionSurfaceProps = {
   toggleFilterModal: VoidHandler;
   showCreate: boolean;
   toggleCreate: VoidHandler;
+  showListeningPanel?: boolean;
+  toggleListeningPanel?: VoidHandler;
   onViewAllClick?: VoidHandler | null;
   handleViewAllFromPile: VoidHandler;
   pileTopRailVisible: boolean;
@@ -270,6 +275,8 @@ const renderPileActionControls = ({
   toggleFilterModal,
   showCreate,
   toggleCreate,
+  showListeningPanel = false,
+  toggleListeningPanel = () => {},
   onViewAllClick,
   handleViewAllFromPile,
 }: PileActionControlsProps): React.ReactElement => {
@@ -295,6 +302,16 @@ const renderPileActionControls = ({
         data-testid={E2E_TESTIDS.SURVEY_CREATE_TOGGLE_PILE}
       >
         <FontAwesomeIcon icon={showCreate ? faMinus : faPlus} />
+      </button>
+
+      <button
+        onClick={toggleListeningPanel}
+        className={`${styles.actionButton} ${showListeningPanel ? styles.actionButtonActive : ''}`}
+        title={showListeningPanel ? 'Close listening' : 'Open listening'}
+        aria-pressed={showListeningPanel}
+        data-testid={E2E_TESTIDS.SESSION_LISTENING_TOGGLE}
+      >
+        <FontAwesomeIcon icon={faMicrophone} />
       </button>
 
       {onViewAllClick && (
@@ -524,6 +541,8 @@ export const renderPileInteractionSurface = ({
   toggleFilterModal,
   showCreate,
   toggleCreate,
+  showListeningPanel,
+  toggleListeningPanel,
   onViewAllClick,
   handleViewAllFromPile,
   pileTopRailVisible,
@@ -613,6 +632,8 @@ export const renderPileInteractionSurface = ({
           toggleFilterModal,
           showCreate,
           toggleCreate,
+          showListeningPanel,
+          toggleListeningPanel,
           onViewAllClick,
           handleViewAllFromPile,
         })}
