@@ -85,6 +85,8 @@ test('authenticates managed Telegram account against the session worker without 
   const nonceBody = JSON.parse(calls[0].init.body);
   const loginBody = JSON.parse(calls[1].init.body);
   assert.equal(calls[0].init.headers.Origin, 'http://localhost:7391');
+  assert.equal(Object.hasOwn(calls[0].init.headers, 'origin'), false);
+  assert.equal(Object.hasOwn(calls[1].init.headers, 'origin'), false);
   assert.equal(nonceBody.address, account.accountAddress);
   assert.equal(nonceBody.sessionSlug, 'alpha');
   assert.equal(loginBody.address, account.accountAddress);
@@ -118,6 +120,8 @@ test('private join faucet uses latest session worker when session policy allows 
   const faucetCall = calls[2];
   assert.equal(faucetCall.url, 'https://session.example/');
   assert.equal(faucetCall.init.headers.Authorization, 'Bearer worker-token');
+  assert.equal(Object.hasOwn(faucetCall.init.headers, 'origin'), false);
+  assert.equal(Object.hasOwn(faucetCall.init.headers, 'authorization'), false);
   assert.deepEqual(JSON.parse(faucetCall.init.body), {
     action: 'request_test_eth',
     sessionSlug: 'alpha',
@@ -226,6 +230,8 @@ test('direct submit uploads response and calls Surveys.submitResponses with mana
   assert.equal(submitted.surveyResponseHash, `0x${'0'.repeat(64)}`);
 
   const uploadCall = calls.find((call) => call.url.endsWith('/arweave/upload'));
+  assert.equal(uploadCall.init.headers.Authorization, 'Bearer worker-token');
+  assert.equal(Object.hasOwn(uploadCall.init.headers, 'authorization'), false);
   const uploadBody = JSON.parse(uploadCall.init.body);
   const payload = JSON.parse(uploadBody.data);
   assert.equal(payload.source, 'telegram-agent-bridge');
