@@ -880,9 +880,92 @@ test('listCachedSessionQuestionsForBridge falls back across Arweave gateways for
   assert.equal(result.questions[0].prompt, 'Question from fallback gateway?');
   assert.deepEqual(arweaveUrls, [
     `https://ar-io.dev/${metadataTxId}`,
+    `https://ar-io.dev/raw/${metadataTxId}`,
     `https://arweave.net/${metadataTxId}`,
     `https://ar-io.dev/${txId}`,
+    `https://ar-io.dev/raw/${txId}`,
     `https://arweave.net/${txId}`,
+  ]);
+});
+
+test('listCachedSessionQuestionsForBridge reads Arweave raw payload fallback before marking public question unavailable', async () => {
+  __test__sessionQuestions.questionMemoryCache.clear();
+  const questionId = `0x${'7a'.repeat(32)}`;
+  const pointerBytes = `0x${'7b'.repeat(32)}`;
+  const txId = __test__sessionQuestions.hexToBase64url(pointerBytes);
+  const env = baseEnv({
+    AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK: '10',
+    AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK: '20',
+    AGENT_BRIDGE_QUESTION_SKIP_SESSION_REGISTRY: '1',
+    AGENT_BRIDGE_SURVEYS_ADDRESS: '0x1111111111111111111111111111111111111111',
+  });
+  const arweaveUrls = [];
+  const fetchImpl = async (url, init = {}) => {
+    const urlText = String(url);
+    if (urlText.startsWith('https://ar-io.dev/') || urlText.startsWith('https://arweave.net/')) {
+      arweaveUrls.push(urlText);
+      if (urlText === `https://ar-io.dev/${txId}`) {
+        return new Response('not indexed on pretty path yet', { status: 404 });
+      }
+      if (urlText === `https://ar-io.dev/raw/${txId}`) {
+        return new Response(JSON.stringify({
+          id: questionId,
+          type: 'binary',
+          prompt: 'Raw gateway payload is usable?',
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('unexpected gateway path', { status: 500 });
+    }
+    const body = JSON.parse(init.body || '{}');
+    const data = String(body.params?.[0]?.data || '');
+    if (
+      body.method === 'eth_call' &&
+      data.startsWith(__test__sessionQuestions.SELECTORS.getQuestionHash)
+    ) {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: pointerBytes }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (body.method === 'eth_blockNumber') {
+      return new Response(JSON.stringify({ jsonrpc: '2.0', id: body.id, result: '0x20' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (body.method === 'eth_getLogs') {
+      return new Response(JSON.stringify({
+        jsonrpc: '2.0',
+        id: body.id,
+        result: [{
+          address: '0x1111111111111111111111111111111111111111',
+          topics: [__test__sessionQuestions.QUESTIONS_ADDED_TOPIC0],
+          data: encodeQuestionsAddedData([questionId], []),
+        }],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected ${body.method}`);
+  };
+
+  const result = await listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug: 'demo',
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.questions[0].questionType, 'binary');
+  assert.equal(result.questions[0].prompt, 'Raw gateway payload is usable?');
+  assert.equal(result.questions[0].payloadUnavailable, undefined);
+  assert.deepEqual(arweaveUrls, [
+    `https://ar-io.dev/${txId}`,
+    `https://ar-io.dev/raw/${txId}`,
   ]);
 });
 
