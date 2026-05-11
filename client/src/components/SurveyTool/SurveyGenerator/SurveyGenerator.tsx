@@ -51,7 +51,6 @@ import SessionChipSelector from '../../Shared/SessionChipSelector';
 import { seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
 import {
   buildSbtAccessControlConditions,
-  buildWalletAddressAccessControlConditions,
   getUnsupportedLitContractAccessControlError,
   getGlobalLitHooks,
   resolveLitChain,
@@ -200,6 +199,9 @@ type SurveyGeneratorProps = UnknownRecord & {
 };
 type SurveyGeneratorDocSaveEncryption = {
   enabled: boolean;
+  recipientType?: string;
+  mode?: string;
+  selfRecipient?: boolean;
   saveKey?: unknown;
   accessControlConditions?: unknown;
   litChain?: unknown;
@@ -1083,13 +1085,12 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   };
 
   const resolveDocSaveEncryption = (): SurveyGeneratorDocSaveEncryption => {
-    const litHooks = getActiveLitHooks();
-    if (!litHooks || typeof litHooks.saveKey !== 'function') {
-      throw new Error('Connect a wallet to save sources to the session doc library.');
-    }
-
     const fallbackChainId = Number(network?.id || 0) || null;
     if (saveDocAudience === 'session') {
+      const litHooks = getActiveLitHooks();
+      if (!litHooks || typeof litHooks.saveKey !== 'function') {
+        throw new Error('Connect a wallet to save sources to the session doc library.');
+      }
       if (!docSaveSessionAudienceAvailable) {
         throw new Error(docSaveSessionChainError || 'Session docUploads gate is unavailable or empty.');
       }
@@ -1121,26 +1122,16 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (!toStr(account).trim()) {
       throw new Error('Connect a wallet to save private doc sources.');
     }
-
-    const chainId = fallbackChainId;
-    const accessControlConditions = buildWalletAddressAccessControlConditions({
-      walletAddress: account,
-      chainId,
-    });
-    if (!accessControlConditions) {
-      throw new Error('Connected wallet address is unavailable for private doc save.');
+    if (!fallbackChainId) {
+      throw new Error('Connected wallet chain is unavailable for private doc save.');
     }
-    const litChain = toStr(accessControlConditions?.[0]?.chain).trim() || resolveLitChain({ chainId });
+
     return {
       enabled: true,
-      saveKey: litHooks.saveKey,
-      accessControlConditions,
-      litChain,
-      chainId,
-      ...(litHooks.litNetwork ? { litNetwork: litHooks.litNetwork } : {}),
-      ...(litHooks.connectTimeout ? { connectTimeout: litHooks.connectTimeout } : {}),
-      ...(litHooks.providerLike ? { providerLike: litHooks.providerLike } : {}),
-      ...(litHooks.resourceAbilityRequests ? { resourceAbilityRequests: litHooks.resourceAbilityRequests } : {}),
+      recipientType: 'self-eip712-v1',
+      mode: 'self',
+      selfRecipient: true,
+      chainId: fallbackChainId,
       contextLabel: `doc-self:${resolvedSessionSlug || ''}`,
     };
   };

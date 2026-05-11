@@ -969,6 +969,7 @@ describe('AudioSurveyGenerator', () => {
   });
 
   it('defaults direct library uploads to only-me when the session doc gate uses OP Sepolia', async () => {
+    delete window.__litHooks;
     await renderSubject(
       <AudioSurveyGenerator
         provider={{ request: jest.fn() }}
@@ -1003,9 +1004,12 @@ describe('AudioSurveyGenerator', () => {
 
     expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
     expect(mockUploadDocLibraryFile.mock.calls[0][0].encryption).toEqual(expect.objectContaining({
-      litChain: 'sepolia',
+      recipientType: 'self-eip712-v1',
+      selfRecipient: true,
       contextLabel: 'doc-self:edge',
     }));
+    expect(mockUploadDocLibraryFile.mock.calls[0][0].encryption).not.toHaveProperty('saveKey');
+    expect(mockUploadDocLibraryFile.mock.calls[0][0].encryption).not.toHaveProperty('accessControlConditions');
   });
 
   it('can skip photo analysis when adding images to the library directly', async () => {

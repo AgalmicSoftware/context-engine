@@ -4,6 +4,7 @@ import { Buffer } from 'buffer';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { uploadDataToSessionStorage } from '../storage/storageClient.js';
 import { STORAGE_BACKENDS, normalizeStorageRef } from '../storage/storageRefs.js';
+import { cryptoUtils } from '../crypto/cryptography.js';
 import { litStorage } from '../crypto/litProtocol.js';
 import { toStr } from '../shared/primitives.js';
 import { buildPublicUrlPath } from '../ui/publicUrl.js';
@@ -178,6 +179,18 @@ const encodeDocEncryptedPayload = async (data, opts = {}) => {
   };
 };
 
+export const isSelfRecipientDocEncryption = (encryption = {}) => {
+  const raw = toStr(encryption?.recipientType || encryption?.mode || encryption?.audience).trim().toLowerCase();
+  return (
+    encryption?.selfRecipient === true ||
+    raw === 'self' ||
+    raw === 'only me' ||
+    raw === 'only-me' ||
+    raw === 'only_me' ||
+    raw === 'self-eip712-v1'
+  );
+};
+
 export const uploadSelfRecipientEncryptedDocData = async ({
   data,
   format,
@@ -255,6 +268,36 @@ const buildEncryptedUploadArgs = ({
       ...(encryption?.connectTimeout ? { connectTimeout: encryption.connectTimeout } : {}),
       ...(encryption?.providerLike ? { providerLike: encryption.providerLike } : {}),
       ...(encryption?.resourceAbilityRequests ? { resourceAbilityRequests: encryption.resourceAbilityRequests } : {}),
+    },
+  })
+);
+
+const buildSelfRecipientUploadArgs = ({
+  data,
+  name,
+  mime,
+  tags,
+  sessionSlug,
+  sessionConfig,
+  account,
+  providerLike,
+  chainId,
+  encryption,
+} = {}) => (
+  uploadSelfRecipientEncryptedDocData({
+    data,
+    name,
+    mime,
+    ...(encryption?.arweaveJwk ? { arweaveJwk: encryption.arweaveJwk } : {}),
+    providerLike,
+    account,
+    chainId: encryption?.chainId || chainId || null,
+    contextLabel: encryption?.contextLabel || `doc-self:${sessionSlug || ''}`,
+    tags,
+    arweave: {
+      sessionSlug,
+      sessionConfig,
+      context: buildBaseUploadContext({ account, providerLike, chainId }),
     },
   })
 );
