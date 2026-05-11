@@ -206,7 +206,6 @@ test('agent action menu is group-safe and persists only opaque launch records', 
     now: '2026-05-08T12:00:00.000Z',
   });
   const buttons = flattenButtons(result.response.replyMarkup);
-  const createAgent = buttons.find((button) => button.text === 'Create Agent');
   const settings = buttons.find((button) => button.text === 'Settings');
   const viewQuestions = buttons.find((button) => button.text === 'View Questions');
   const storedActionKeys = Array.from(env.AGENT_ACTION_KV.store.keys())
@@ -218,13 +217,12 @@ test('agent action menu is group-safe and persists only opaque launch records', 
   assert.equal(result.response.text.includes('Address:'), false);
   assert.equal(result.catalog.canonicalBoundary, '/api/agent/*');
   assert.equal(result.catalog.capabilities.some((capability) => capability.id === 'agent.settings.update'), false);
-  assert.match(createAgent.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
+  assert.equal(buttons.some((button) => button.text === 'Create Agent'), false);
   assert.match(settings.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
   assert.match(viewQuestions.callback_data, /^cecb_[a-z0-9]{10,48}$/);
   assert.equal(JSON.stringify(result).includes('unit-root'), false);
-  assert.equal(createAgent.url.includes('alpha'), false);
   assert.equal(settings.url.includes('alpha'), false);
-  assert.equal(storedActionKeys.length >= 3, true);
+  assert.equal(storedActionKeys.length >= 2, true);
 });
 
 test('agent create and settings commands route group inputs private and model canonical requests', async () => {
@@ -394,8 +392,9 @@ test('/ce_questions and callback dispatch list questions without leaking locked 
   assert.equal(callback.ok, true);
   assert.equal(callback.response.method, 'editMessageText');
   assert.match(callback.response.text, /Questions for alpha/);
-  assert.match(callback.response.text, /q-readiness - What should Alpha decide next/);
-  assert.match(callback.response.text, /q-locked - Locked question/);
+  assert.match(callback.response.text, /1\. What should Alpha decide next\?\n\n2\. Locked question/);
+  assert.equal(callback.response.text.includes('q-readiness'), false);
+  assert.equal(callback.response.text.includes('q-locked'), false);
   assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
 });
 
@@ -424,8 +423,9 @@ test('/ce_questions handles bytes32 question IDs without putting them in opaque 
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'question_list');
-  assert.match(result.response.text, /0x12121212\.\.\.121212 - Can bytes32 question IDs render/);
-  assert.match(result.response.text, /0x34343434\.\.\.343434 - Locked question/);
+  assert.match(result.response.text, /1\. Can bytes32 question IDs render\?\n\n2\. Locked question/);
+  assert.equal(result.response.text.includes('0x12121212'), false);
+  assert.equal(result.response.text.includes('0x34343434'), false);
   assert.equal(result.response.text.includes('Locked bytes32 prompt must not leak'), false);
   const buttons = flattenButtons(result.response.replyMarkup);
   assert.equal(buttons.length, 2);
@@ -455,6 +455,7 @@ test('/ce_questions caps Telegram rows at five and deep-links group Mini App lau
   assert.equal(result.ok, true);
   assert.match(result.response.text, /Showing 5 of 7/);
   assert.match(result.response.text, /Open the Mini App for the full queue/);
+  assert.match(result.response.text, /1\. Question 1 prompt\n\n2\. Question 2 prompt/);
   assert.equal(result.response.text.includes('Question 6 prompt'), false);
 
   const buttons = flattenButtons(result.response.replyMarkup);
@@ -562,8 +563,9 @@ test('/ce_questions prioritizes answerable questions before payload-unavailable 
   });
 
   assert.equal(result.ok, true);
-  assert.match(result.response.text, /1\. 0x22222222\.\.\.222222 - How much do you trust this result\?/);
-  assert.match(result.response.text, /2\. 0x11111111\.\.\.111111 - Question unavailable/);
+  assert.match(result.response.text, /1\. How much do you trust this result\?\n\n2\. Question unavailable/);
+  assert.equal(result.response.text.includes('0x22222222'), false);
+  assert.equal(result.response.text.includes('0x11111111'), false);
   assert.equal(posed.ok, true);
   assert.match(posed.response.text, /How much do you trust this result\?/);
   assert.equal(posed.payloadUnavailable, false);
@@ -602,12 +604,15 @@ test('payload-unavailable question rows do not render as encrypted locks', async
   });
 
   assert.equal(list.ok, true);
-  assert.match(list.response.text, /0x78787878\.\.\.787878 - Question unavailable/);
-  assert.match(list.response.text, /0x90909090\.\.\.909090 - Locked question/);
+  assert.match(list.response.text, /1\. Locked question/);
+  assert.match(list.response.text, /2\. Question unavailable/);
+  assert.equal(list.response.text.includes('0x78787878'), false);
+  assert.equal(list.response.text.includes('0x90909090'), false);
   assert.equal(list.response.text.includes('Encrypted prompt must not leak'), false);
 
   assert.equal(posed.ok, true);
-  assert.match(posed.response.text, /Question 0x78787878\.\.\.787878 is unavailable/);
+  assert.match(posed.response.text, /Question is unavailable/);
+  assert.equal(posed.response.text.includes('0x78787878'), false);
   assert.match(posed.response.text, /public payload could not be loaded yet/);
   const buttons = flattenButtons(posed.response.replyMarkup);
   assert.equal(buttons.some((button) => button.text === 'Open Mini App'), false);
@@ -741,7 +746,8 @@ test('group session binding makes later question and doc commands use the joined
   assert.equal(joined.response.text.includes('/ce_me'), false);
   assert.equal(joined.response.text.includes('Use /ce_questions'), false);
   assert.match(questions.response.text, /Questions for demo/);
-  assert.match(questions.response.text, /q-demo - What should Demo decide next/);
+  assert.match(questions.response.text, /1\. What should Demo decide next/);
+  assert.equal(questions.response.text.includes('q-demo'), false);
   assert.match(posed.response.text, /Question for demo:/);
   assert.match(docs.response.text, /Attachments for demo/);
   assert.match(docs.response.text, /Demo brief/);
@@ -802,7 +808,8 @@ test('private session join makes later question commands use the selected sessio
 
   assert.equal(joined.sessionSlug, 'demo');
   assert.match(questions.response.text, /Questions for demo/);
-  assert.match(questions.response.text, /q-demo - What should Demo decide next/);
+  assert.match(questions.response.text, /1\. What should Demo decide next/);
+  assert.equal(questions.response.text.includes('q-demo'), false);
   assert.equal(questions.response.text.includes('q-alpha'), false);
   assert.match(posed.response.text, /Question for demo:/);
   assert.match(posed.response.text, /What should Demo decide next/);
@@ -834,7 +841,7 @@ test('private session join requests faucet funding when session policy allows it
   });
 
   assert.equal(joined.ok, true);
-  assert.match(joined.response.text, /Faucet: funded 0\.05 ETH/);
+  assert.equal(joined.response.text.includes('Faucet:'), false);
   assert.equal(joined.faucet.ok, true);
   assert.equal(calls.length, 3);
   assert.equal(calls[2].url, 'https://session.example/');
@@ -913,7 +920,8 @@ test('/ce_sessions callback switches the group session used by later question co
 
   assert.equal(selected.sessionSlug, 'demo');
   assert.match(questions.response.text, /Questions for demo/);
-  assert.match(questions.response.text, /q-demo - What should Demo decide next/);
+  assert.match(questions.response.text, /1\. What should Demo decide next/);
+  assert.equal(questions.response.text.includes('q-demo'), false);
   assert.equal(questions.response.text.includes('q-alpha'), false);
 });
 
@@ -948,7 +956,8 @@ test('group Pose Question callback opens a choose-question menu instead of posin
   assert.equal(callback.response.messageId, '56');
   assert.equal(callback.screen, 'question_list');
   assert.match(callback.response.text, /Choose a question to pose to the group/);
-  assert.match(callback.response.text, /q-readiness - What should Alpha decide next/);
+  assert.match(callback.response.text, /1\. What should Alpha decide next/);
+  assert.equal(callback.response.text.includes('q-readiness'), false);
   assert.equal(callback.response.text.startsWith('Question for alpha:'), false);
 });
 

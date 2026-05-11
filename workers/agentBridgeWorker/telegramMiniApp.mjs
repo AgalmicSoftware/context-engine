@@ -429,7 +429,6 @@ async function miniQuestionFromRecord({
     index,
     displayIndex: index + 1,
     questionKey,
-    idShort: shortQuestionId(qid),
     activeFromLaunch: Boolean(launchQuestionId && qid && lower(qid) === lower(launchQuestionId)),
     questionType: safeString(card.questionType || group.questionType || 'freeform'),
     selectionMode: safeString(card.selectionMode || ''),
@@ -1085,12 +1084,7 @@ function telegramMiniAppHtml() {
     h1 { margin: 0; font-size: 20px; line-height: 1.15; letter-spacing: 0; }
     .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; }
     .status { min-height: 20px; color: var(--muted); font-size: 13px; }
-    .agentBar {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-    }
-    .agentBar button, .settingsPanel select {
+    .settingsPanel select {
       min-height: 38px;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -1114,31 +1108,11 @@ function telegramMiniAppHtml() {
     .toggle { display: flex; align-items: center; gap: 8px; min-height: 38px; color: var(--text); }
     .layout {
       display: grid;
-      grid-template-columns: minmax(160px, 0.72fr) minmax(0, 1.42fr);
-      gap: 16px;
+      gap: 12px;
       min-height: 0;
-      align-items: stretch;
     }
-    .queue, .active { min-height: 0; }
-    .queueList { display: grid; gap: 8px; }
-    .queueButton {
-      width: 100%;
-      min-height: 54px;
-      text-align: left;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 9px 10px;
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text);
-    }
-    .queueButton[aria-current="true"] {
-      border-color: rgba(98, 255, 191, 0.75);
-      box-shadow: inset 4px 0 0 var(--accent), 0 0 0 1px rgba(98, 255, 191, 0.18);
-      background: rgba(98, 255, 191, 0.1);
-    }
-    .queueButton:disabled { color: var(--muted); cursor: default; }
-    .qid { color: var(--muted); font-size: 12px; margin-bottom: 3px; }
-    .qtitle { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .questionStack { display: grid; gap: 12px; min-height: 0; }
+    .questionMeta { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
     .pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
     .pager button, .secondary {
       min-height: 36px;
@@ -1149,17 +1123,21 @@ function telegramMiniAppHtml() {
       padding: 7px 10px;
     }
     .card {
-      min-height: 100%;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--surface);
       display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-rows: auto auto;
       box-shadow: 7px 7px 14px var(--shadow-dark), -7px -7px 14px var(--shadow-light);
+    }
+    .card[data-active="true"] {
+      border-color: rgba(98, 255, 191, 0.75);
+      box-shadow: inset 4px 0 0 var(--accent), 7px 7px 14px var(--shadow-dark), -7px -7px 14px var(--shadow-light);
     }
     .cardHead { padding: 16px; border-bottom: 1px solid var(--line); }
     .prompt { margin: 0; font-size: 19px; line-height: 1.28; letter-spacing: 0; }
-    .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; overflow: auto; }
+    .cardBody { padding: 16px; display: grid; align-content: start; gap: 14px; }
+    .cardActions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
     .segmented, .choices, .ratingTicks { display: grid; gap: 8px; }
     .segmented { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .choices { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
@@ -1195,7 +1173,7 @@ function telegramMiniAppHtml() {
       position: sticky;
       bottom: 0;
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
       gap: 10px;
       padding-top: 6px;
       background: var(--bg);
@@ -1214,10 +1192,8 @@ function telegramMiniAppHtml() {
     .ok { color: var(--ok); }
     .error { color: var(--danger); white-space: pre-wrap; }
     @media (max-width: 760px) {
-      .layout { grid-template-columns: 1fr; }
-      .card { min-height: 390px; }
       footer { grid-template-columns: 1fr; }
-      .agentBar, .settingsPanel { grid-template-columns: 1fr; }
+      .settingsPanel { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1227,11 +1203,6 @@ function telegramMiniAppHtml() {
       <h1>CE Agent</h1>
       <div class="meta" id="meta"></div>
       <div class="status" id="status">Loading...</div>
-      <div class="agentBar">
-        <button id="showQuestions" type="button">Questions</button>
-        <button id="showSettings" type="button">Settings</button>
-        <button id="createAgent" type="button">Create Agent</button>
-      </div>
       <section class="settingsPanel" id="settingsPanel" aria-label="Agent settings">
         <div class="field">
           <label for="draftStyle">Draft style</label>
@@ -1245,25 +1216,15 @@ function telegramMiniAppHtml() {
       </section>
     </header>
     <section class="layout">
-      <aside class="queue">
-        <div class="queueList" id="queue"></div>
-        <div class="pager">
-          <button id="prev" type="button">Previous</button>
-          <span id="page"></span>
-          <button id="next" type="button">Next</button>
-        </div>
-      </aside>
-      <section class="active">
-        <article class="card">
-          <div class="cardHead">
-            <div class="qid" id="activeId"></div>
-            <p class="prompt" id="prompt"></p>
-          </div>
-          <div class="cardBody" id="answer"></div>
-        </article>
+      <section class="questionStack" id="questionStack" aria-label="Questions"></section>
+      <section class="pager" aria-label="Question pages">
+        <button id="prev" type="button">Previous</button>
+        <span id="page"></span>
+        <button id="next" type="button">Next</button>
       </section>
     </section>
     <footer>
+      <button class="secondary" id="showSettings" type="button">Settings</button>
       <button class="secondary" id="save" type="button">Save Draft</button>
       <button class="primary" id="submit" type="button">Submit</button>
     </footer>
@@ -1280,18 +1241,13 @@ function telegramMiniAppHtml() {
     const el = {
       meta: document.getElementById('meta'),
       status: document.getElementById('status'),
-      queue: document.getElementById('queue'),
+      questionStack: document.getElementById('questionStack'),
       page: document.getElementById('page'),
       prev: document.getElementById('prev'),
       next: document.getElementById('next'),
-      activeId: document.getElementById('activeId'),
-      prompt: document.getElementById('prompt'),
-      answer: document.getElementById('answer'),
       save: document.getElementById('save'),
       submit: document.getElementById('submit'),
-      showQuestions: document.getElementById('showQuestions'),
       showSettings: document.getElementById('showSettings'),
-      createAgent: document.getElementById('createAgent'),
       settingsPanel: document.getElementById('settingsPanel'),
       draftStyle: document.getElementById('draftStyle'),
       telegramReminders: document.getElementById('telegramReminders'),
@@ -1303,88 +1259,75 @@ function telegramMiniAppHtml() {
       return out;
     };
     const activeQuestion = () => (state.data?.questions || []).find((question) => question.questionKey === state.activeKey) || null;
-    const activeDraft = () => {
-      const question = activeQuestion();
+    const draftFor = (question) => {
       if (!question) return {};
       state.drafts[question.questionKey] = state.drafts[question.questionKey] || {};
       return state.drafts[question.questionKey];
+    };
+    const activate = (question) => {
+      if (question?.questionKey) state.activeKey = question.questionKey;
     };
     const setStatus = (message, kind = '') => {
       el.status.className = 'status ' + kind;
       el.status.textContent = message || '';
     };
-    function renderQueue() {
+    function renderQuestionStack() {
       const questions = state.data?.questions || [];
       const pageSize = state.data?.pageSize || 5;
       const pageCount = Math.max(1, Math.ceil(questions.length / pageSize));
       state.page = Math.min(state.page, pageCount - 1);
       const visible = questions.slice(state.page * pageSize, state.page * pageSize + pageSize);
-      el.queue.innerHTML = '';
+      el.questionStack.innerHTML = '';
       visible.forEach((question) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'queueButton';
-        button.disabled = !question.questionKey;
-        button.setAttribute('aria-current', question.questionKey === state.activeKey ? 'true' : 'false');
-        const qid = document.createElement('div');
-        qid.className = 'qid';
-        qid.textContent = question.displayIndex + '. ' + (question.idShort || '');
-        const title = document.createElement('div');
-        title.className = 'qtitle';
-        title.textContent = question.title || '';
-        button.append(qid, title);
-        button.onclick = () => { state.activeKey = question.questionKey; render(); };
-        el.queue.appendChild(button);
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.dataset.active = question.questionKey === state.activeKey ? 'true' : 'false';
+        card.onclick = () => { activate(question); updateFooterControls(); };
+        const head = document.createElement('div');
+        head.className = 'cardHead';
+        const meta = document.createElement('div');
+        meta.className = 'questionMeta';
+        meta.textContent = 'Question ' + question.displayIndex;
+        const prompt = document.createElement('p');
+        prompt.className = 'prompt';
+        prompt.textContent = question.prompt || question.title || '';
+        head.append(meta, prompt);
+        const body = document.createElement('div');
+        body.className = 'cardBody';
+        renderAnswerControls(question, body);
+        card.append(head, body);
+        el.questionStack.appendChild(card);
       });
       el.page.textContent = questions.length ? (state.page + 1) + ' / ' + pageCount : '0 / 0';
       el.prev.disabled = state.page <= 0;
       el.next.disabled = state.page >= pageCount - 1;
+      updateFooterControls();
     }
-    function escapeHtml(value) {
-      return String(value || '').replace(/[&<>"']/g, (char) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;',
-      }[char]));
-    }
-    function selectValue(value) {
-      const draft = activeDraft();
+    function selectValue(question, value) {
+      activate(question);
+      const draft = draftFor(question);
       draft.value = value;
-      renderAnswer();
+      renderQuestionStack();
     }
-    function toggleChoice(option, single) {
-      const draft = activeDraft();
+    function toggleChoice(question, option, single) {
+      activate(question);
+      const draft = draftFor(question);
       const values = Array.isArray(draft.values) ? draft.values.slice() : [];
       const next = single
         ? (values.includes(option) ? [] : [option])
         : (values.includes(option) ? values.filter((value) => value !== option) : values.concat(option));
       draft.values = next;
-      renderAnswer();
+      renderQuestionStack();
     }
-    function renderAnswer() {
-      const question = activeQuestion();
-      el.answer.innerHTML = '';
-      if (!question) {
-        el.activeId.textContent = '';
-        el.prompt.textContent = 'No answerable question is selected.';
-        el.save.disabled = true;
-        el.submit.disabled = true;
-        return;
-      }
-      el.activeId.textContent = question.idShort + ' | ' + question.questionType;
-      el.prompt.textContent = question.prompt || question.title;
-      el.save.disabled = !question.canAnswer;
-      el.submit.disabled = !question.canAnswer;
+    function renderAnswerControls(question, mount) {
       if (question.locked || !question.canAnswer) {
         const locked = document.createElement('div');
         locked.className = 'locked';
         locked.textContent = 'This question is locked or unavailable in Telegram.';
-        el.answer.appendChild(locked);
+        mount.appendChild(locked);
         return;
       }
-      const draft = activeDraft();
+      const draft = draftFor(question);
       if (question.questionType === 'agree_unsure_disagree') {
         const row = document.createElement('div');
         row.className = 'segmented';
@@ -1393,10 +1336,10 @@ function telegramMiniAppHtml() {
           button.type = 'button';
           button.className = 'segment' + (draft.value === value ? ' selected' : '');
           button.textContent = label;
-          button.onclick = () => selectValue(value);
+          button.onclick = () => selectValue(question, value);
           row.appendChild(button);
         });
-        el.answer.appendChild(row);
+        mount.appendChild(row);
       } else if (question.questionType === 'rating') {
         const label = document.createElement('div');
         label.className = 'ratingValue';
@@ -1407,8 +1350,13 @@ function telegramMiniAppHtml() {
         input.max = '10';
         input.step = '1';
         input.value = draft.value ?? 5;
-        input.oninput = () => { draft.value = Number(input.value); label.textContent = input.value; };
-        el.answer.append(label, input);
+        input.oninput = () => {
+          activate(question);
+          draft.value = Number(input.value);
+          label.textContent = input.value;
+          updateFooterControls();
+        };
+        mount.append(label, input);
       } else if (question.questionType === 'multichoice') {
         const wrap = document.createElement('div');
         wrap.className = 'choices';
@@ -1419,29 +1367,62 @@ function telegramMiniAppHtml() {
           button.type = 'button';
           button.className = 'choice' + (values.includes(option) ? ' selected' : '');
           button.textContent = option;
-          button.onclick = () => toggleChoice(option, single);
+          button.onclick = () => toggleChoice(question, option, single);
           wrap.appendChild(button);
         });
-        el.answer.appendChild(wrap);
+        mount.appendChild(wrap);
       } else {
         const input = document.createElement('textarea');
         input.placeholder = 'Type your response';
         input.value = draft.text || '';
-        input.oninput = () => { draft.text = input.value; };
-        el.answer.appendChild(input);
+        input.oninput = () => {
+          activate(question);
+          draft.text = input.value;
+          updateFooterControls();
+        };
+        mount.appendChild(input);
       }
       const comments = document.createElement('textarea');
       comments.placeholder = 'Additional comments';
       comments.value = draft.comments || '';
-      comments.oninput = () => { draft.comments = comments.value; };
-      el.answer.appendChild(comments);
+      comments.oninput = () => {
+        activate(question);
+        draft.comments = comments.value;
+        updateFooterControls();
+      };
+      mount.appendChild(comments);
+      const actions = document.createElement('div');
+      actions.className = 'cardActions';
+      const save = document.createElement('button');
+      save.type = 'button';
+      save.className = 'secondary';
+      save.textContent = 'Save Draft';
+      save.onclick = (event) => {
+        event.stopPropagation();
+        sendAnswer(false, question);
+      };
+      const submit = document.createElement('button');
+      submit.type = 'button';
+      submit.className = 'primary';
+      submit.textContent = 'Submit';
+      submit.onclick = (event) => {
+        event.stopPropagation();
+        sendAnswer(true, question);
+      };
+      actions.append(save, submit);
+      mount.appendChild(actions);
+    }
+    function updateFooterControls() {
+      const question = activeQuestion();
+      const disabled = !question?.canAnswer;
+      el.save.disabled = disabled;
+      el.submit.disabled = disabled;
     }
     function render() {
       const data = state.data;
       el.meta.textContent = data ? [data.session.title, data.questionCount + ' questions'].join(' | ') : '';
       renderAgentSettings();
-      renderQueue();
-      renderAnswer();
+      renderQuestionStack();
     }
     function renderAgentSettings() {
       const settings = state.data?.agent?.settings || {};
@@ -1461,14 +1442,15 @@ function telegramMiniAppHtml() {
       el.telegramReminders.checked = values.telegramReminders === true;
     }
     function answerPayload(question) {
-      const draft = activeDraft();
+      const draft = draftFor(question);
       if (question.questionType === 'multichoice') return { values: draft.values || [], comments: draft.comments || '' };
       if (question.questionType === 'freeform') return { text: draft.text || '', comments: draft.comments || '' };
       return { value: draft.value, comments: draft.comments || '' };
     }
-    async function sendAnswer(submit) {
-      const question = activeQuestion();
+    async function sendAnswer(submit, question = activeQuestion()) {
       if (!question) return;
+      activate(question);
+      updateFooterControls();
       setStatus(submit ? 'Submitting...' : 'Saving draft...');
       const response = await fetch('/telegram/mini-app/api/draft', {
         method: 'POST',
@@ -1527,16 +1509,11 @@ function telegramMiniAppHtml() {
       setStatus(body.sourceOk ? '' : body.sourceError, body.sourceOk ? '' : 'error');
       render();
     }
-    el.prev.onclick = () => { state.page -= 1; renderQueue(); };
-    el.next.onclick = () => { state.page += 1; renderQueue(); };
+    el.prev.onclick = () => { state.page -= 1; render(); };
+    el.next.onclick = () => { state.page += 1; render(); };
     el.save.onclick = () => sendAnswer(false);
     el.submit.onclick = () => sendAnswer(true);
-    el.showQuestions.onclick = () => { el.settingsPanel.classList.remove('open'); };
     el.showSettings.onclick = () => { el.settingsPanel.classList.toggle('open'); };
-    el.createAgent.onclick = () => {
-      const request = state.data?.agent?.account?.canonicalApiRequest;
-      setStatus(request ? 'Agent create request scaffold is ready.' : 'Agent action unavailable.', request ? 'ok' : 'error');
-    };
     el.saveSettings.onclick = () => sendSettings();
     load();
   </script>
