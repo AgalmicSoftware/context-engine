@@ -1803,7 +1803,8 @@ export const uploadEncryptedArweaveData = async ({
 };
 
 /**
- * Downloads an encrypted Lit payload from Arweave and decrypts it with the active Lit hooks.
+ * Downloads an encrypted Arweave envelope payload and decrypts it with self-recipient wallet
+ * signing, Lit hooks, or both when the envelope carries both recipient types.
  *
  * @param {{
  *   url?: string,
@@ -1827,9 +1828,6 @@ export const downloadEncryptedArweaveData = async ({
 } = {}) => {
   const resolvedTx = toStr(txId || '') || parseLitArweaveUrl(url);
   if (!resolvedTx) throw new Error('Missing Arweave transaction ID for Lit doc.');
-  if (!lit || typeof lit.getKey !== 'function') {
-    throw new Error('Lit getKey is required to decrypt Arweave data.');
-  }
 
   const arweaveOpts = (arweave && typeof arweave === 'object') ? { ...arweave } : {};
   const existingDebugContext = (
@@ -1844,11 +1842,12 @@ export const downloadEncryptedArweaveData = async ({
   };
 
   const envelopeJson = await arweaveScripts.downloadDataFromArweave(resolvedTx, arweaveOpts);
+  const litOpts = lit && typeof lit.getKey === 'function' ? { getKey: lit.getKey } : undefined;
   const payload = await cryptoUtils.decryptEnvelopeValue(envelopeJson, {
     account,
     chainId,
     providerLike,
-    litOpts: { getKey: lit.getKey },
+    ...(litOpts ? { litOpts } : {}),
   });
   return { payload, txId: resolvedTx, url: buildLitArweaveUrl(resolvedTx) };
 };
