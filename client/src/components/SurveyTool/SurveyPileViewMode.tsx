@@ -70,6 +70,7 @@ import {
   renderPileFooterSection,
 } from './surveyPileQuestionSections';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
+import SessionListeningPanel from './SessionListeningPanel';
 import {
   buildPileBaselineCheckPlan,
   buildPileBaselineConsistencyPlan,
@@ -112,6 +113,10 @@ import {
   normalizeTransientSubmitFeedbackDurationMs,
 } from './surveyQuestionSubmitFeedback.js';
 import { buildRenderedQuestionIdsFromPileWindow } from './surveyQuestionScope.js';
+import {
+  buildListeningModeSearch,
+  isListeningModeQueryEnabled,
+} from '../../utilities/audio/rollingTranscription';
 import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
@@ -518,6 +523,9 @@ export class PileViewMode extends SurveyQuestions {
       hasHiddenGatedQuestions: false,
       loadingElapsedSec: 0,
       showHologramAssistant: false,
+      showListeningPanel: typeof window !== 'undefined'
+        ? isListeningModeQueryEnabled(window.location.search || '')
+        : false,
     };
     const warmSeedState = this.buildWarmPileSeedState(props);
     if (warmSeedState) {
@@ -1385,6 +1393,28 @@ export class PileViewMode extends SurveyQuestions {
           this.createSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
       }
+    });
+  }
+
+  syncListeningModeQuery = (enabled) => {
+    if (typeof window === 'undefined' || !window.history?.replaceState) return;
+    try {
+      const nextSearch = buildListeningModeSearch(window.location.search || '', enabled);
+      const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash || ''}`;
+      window.history.replaceState({}, '', nextUrl);
+    } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+  }
+
+  toggleListeningPanel = () => {
+    this.setState((prev) => ({ showListeningPanel: !prev.showListeningPanel }), () => {
+      this.syncListeningModeQuery(!!this.state.showListeningPanel);
+    });
+  }
+
+  closeListeningPanel = () => {
+    if (!this.state.showListeningPanel) return;
+    this.setState({ showListeningPanel: false }, () => {
+      this.syncListeningModeQuery(false);
     });
   }
 
@@ -2503,7 +2533,8 @@ export class PileViewMode extends SurveyQuestions {
       filterModalOpen,
       showLongLoading,
       navCounterVisible,
-      showHologramAssistant
+      showHologramAssistant,
+      showListeningPanel,
     } = this.state;
 
     const hiddenMaskSource = (
@@ -2625,55 +2656,68 @@ export class PileViewMode extends SurveyQuestions {
         </>
       );
 
+    const showListeningAside = showListeningPanel && !showHologramAssistant;
+
     return (
       <div className={styles.pileViewContainer}>
-        <div className={styles.pileWrapper}>
-          {renderPileInteractionSurface({
-            showHologramAssistant,
-            toggleHologramAssistant: this.toggleHologramAssistant,
-            showMiniBackgroundSpinner,
-            priorResponsesHydrating,
-            showLongLoading,
-            loadingElapsedSec: this.state.loadingElapsedSec,
-            pileQuestions,
-            activePileIndex,
-            renderActiveQuestion: this.renderActiveQuestion,
-            hasTerminalScanError,
-            scanErrorMessage,
-            hasError,
-            isStillLoading,
-            hydrateDone,
-            hydrateDiscovered,
-            isHydrating,
-            scanTotalBlocks,
-            pileScanDisplay,
-            scanPercent,
-            showFilteredEmptyState,
-            showGatedEmptyState,
-            gatedEmptyPanel,
-            isFilterActive,
-            toggleFilterModal: this.toggleFilterModal,
-            showCreate,
-            toggleCreate: this.toggleCreate,
-            onViewAllClick: this.props.onViewAllClick,
-            handleViewAllFromPile: this.handleViewAllFromPile,
-            pileTopRailVisible,
-            showSuccessBadgeLink,
-            pileSubmitResponderHref,
-            showSuccessBadgeStatus,
-            showSubmitButton,
-            handlePileSubmitClick: this.handlePileSubmitClick,
-            hasPendingPileChanges,
-            shouldHidePileSubmitButton,
-            isSubmitting: this.state.isSubmitting,
-            activePromptMasked,
-            finalSubmitText,
-            showClearPendingButton,
-            handleRevertPendingChanges: this.handleRevertPendingChanges,
-            navCounterVisible,
-            handlePrev: this.handlePrev,
-            handleNext: this.handleNext,
-          })}
+        <div className={showListeningAside ? styles.pileListeningLayout : undefined}>
+          <div className={styles.pileWrapper}>
+            {renderPileInteractionSurface({
+              showHologramAssistant,
+              toggleHologramAssistant: this.toggleHologramAssistant,
+              showMiniBackgroundSpinner,
+              priorResponsesHydrating,
+              showLongLoading,
+              loadingElapsedSec: this.state.loadingElapsedSec,
+              pileQuestions,
+              activePileIndex,
+              renderActiveQuestion: this.renderActiveQuestion,
+              hasTerminalScanError,
+              scanErrorMessage,
+              hasError,
+              isStillLoading,
+              hydrateDone,
+              hydrateDiscovered,
+              isHydrating,
+              scanTotalBlocks,
+              pileScanDisplay,
+              scanPercent,
+              showFilteredEmptyState,
+              showGatedEmptyState,
+              gatedEmptyPanel,
+              isFilterActive,
+              toggleFilterModal: this.toggleFilterModal,
+              showCreate,
+              toggleCreate: this.toggleCreate,
+              showListeningPanel,
+              toggleListeningPanel: this.toggleListeningPanel,
+              onViewAllClick: this.props.onViewAllClick,
+              handleViewAllFromPile: this.handleViewAllFromPile,
+              pileTopRailVisible,
+              showSuccessBadgeLink,
+              pileSubmitResponderHref,
+              showSuccessBadgeStatus,
+              showSubmitButton,
+              handlePileSubmitClick: this.handlePileSubmitClick,
+              hasPendingPileChanges,
+              shouldHidePileSubmitButton,
+              isSubmitting: this.state.isSubmitting,
+              activePromptMasked,
+              finalSubmitText,
+              showClearPendingButton,
+              handleRevertPendingChanges: this.handleRevertPendingChanges,
+              navCounterVisible,
+              handlePrev: this.handlePrev,
+              handleNext: this.handleNext,
+            })}
+          </div>
+          {showListeningAside && (
+            <SessionListeningPanel
+              {...this.props}
+              {...this.getAudioInputWorkerProps()}
+              onClose={this.closeListeningPanel}
+            />
+          )}
         </div>
 
         {!showHologramAssistant && showCreate && (
