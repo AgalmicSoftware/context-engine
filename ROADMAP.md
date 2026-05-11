@@ -4,11 +4,18 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 
 ## Recently Completed Foundations
 
-- **Scaling**: the initial on-chain mode may only support hundreds of users per session; scaling to hundreds of thousands will require architectural optimizations and variations which are already planned.
-- **God component decomposition**: all production components are now TSX; `MainSite.tsx` is still a ~6,294 line orchestrator that needs runtime decomposition (PRD 449); `SessionWizard.tsx` is still a 5,000+ line orchestrator that needs further decomposition.
-- **Lit Protocol Naga-era runtime → Chipotle re-platform**: CE still ships a legacy Naga-shaped Lit integration even though Naga sunset on April 1, 2026 and Chipotle is now GA. Moving onto the supported stack is a re-platform from SDK/auth-context/PaymentManager/network selection to Chipotle's REST/API-key/account/group model, not a simple dependency bump.
-- **Frontend modernization**: migrate remaining class components to functional React, upgrade React 17 → 18 with Vite, and consolidate SCSS into a standardized design system.
-- **Worker auth trust-boundary hardening**: browser login to the session worker still needs stricter trusted-origin / SIWE audience binding so off-origin or originless token redemption is not possible.
+- **Chipotle runtime cutover**: supported sessions now use worker-mediated Chipotle execution, and new session flows no longer invent legacy hosted Lit defaults.
+- **Client modernization baseline**: the client is on React 18 and TypeScript 5.8, with production component surfaces moved to TSX and a growing set of helper-level tests.
+- **Protected SBT mint modes**: SBT contracts now expose explicit mint modes so protected password, group-signature, and invite-signature flows do not fall through to public `claim()` minting.
+
+## Current Engineering Priorities
+
+- **Scaling**: current public/on-chain defaults target hundreds to low thousands of users per session; larger deployments use the planned scaling profiles and architecture variations.
+- **Runtime decomposition**: large orchestrators such as `MainSite.tsx` and `SessionWizard.tsx` remain the main maintainability targets now that production components are TSX and major helper extraction work has landed.
+- **Chipotle operational polish**: continue hardening worker-mediated Lit provisioning, status reporting, recovery paths, and deployment documentation around the supported Chipotle model.
+- **Frontend/toolchain modernization**: finish the toolchain migration work after the React 18 and TypeScript baselines by moving off CRA, consolidating SCSS, and reducing remaining warning noise.
+- **Worker auth trust-boundary hardening**: browser login to the session worker still needs durable nonce/rate-limit state plus scope revalidation / revocation boundaries so auth stays correct under concurrency and gate changes.
+- **Browser secret-storage hardening**: SBT invite and recovery handling should move toward export-only defaults with optional encrypted local recovery.
 
 
 ## AI Agent Interface
