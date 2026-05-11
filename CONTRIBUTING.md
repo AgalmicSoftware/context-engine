@@ -44,7 +44,7 @@ Before opening a PR, run the smallest relevant test set for your change. `npm te
 - Branch from the current default branch.
 - Keep PRs scoped to one change or closely related set of changes.
 - Describe user-visible behavior changes clearly.
-- Keep changelog entries public-facing. Do not include internal planning identifiers such as `PRD 123` in any `CHANGELOG.md`; rewrite entries as release notes that describe the shipped behavior or technical change directly.
+- Keep changelog entries public-facing. Do not include internal planning identifiers in any `CHANGELOG.md`; rewrite entries as release notes that describe the shipped behavior or technical change directly.
 - Include screenshots, logs, or repro notes for UI, web3, worker, or encryption-flow changes when they help review.
 - Update docs and tests when behavior, config, or workflows change.
 

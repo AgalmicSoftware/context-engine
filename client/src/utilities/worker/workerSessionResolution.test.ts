@@ -75,7 +75,7 @@ describe('workerSessionResolution', () => {
     })).toBe(false);
   });
 
-  it('defaults to mode-aware demo fallback when no policy is provided (PRD 238 Stage-C)', () => {
+  it('defaults to mode-aware demo fallback when no policy is provided', () => {
     expect(resolveWorkerAllowDemoFallback({})).toBe(false);
     expect(resolveWorkerAllowDemoFallback()).toBe(false);
     expect(resolveWorkerAllowDemoFallback({ sessionSlug: 'edge' })).toBe(false);

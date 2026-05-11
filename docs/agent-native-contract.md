@@ -294,10 +294,9 @@ fall back to `arweaveTxId` when no storage ref is present. When a Cloudflare
 session writes through legacy Surveys contract pointer fields, the pointer is an
 opaque bytes32-compatible Cloudflare storage ID, not an Arweave tx id. Storage
 backend is selected during `/new` session creation; mutation/migration is not in
-scope for this lane. Future naming migration is tracked in
-[`TODO/PRDs/510_storage-ref-canonical-payload-pointer-migration.md`](../TODO/PRDs/510_storage-ref-canonical-payload-pointer-migration.md):
-`storageRef` becomes the canonical top-level pointer and `arweaveTxId` becomes a
-deprecated Arweave compatibility alias after readers are storageRef-aware.
+scope for this lane. Future naming migration is tracked privately: `storageRef`
+becomes the canonical top-level pointer and `arweaveTxId` becomes a deprecated
+Arweave compatibility alias after readers are storageRef-aware.
 For Cloudflare docs/context and other canonical payload resources, `/new`
 stores `storageProfile.payloadAccessControl.mode`. `worker_sbt_gate` is the
 default for Telegram/demo Cloudflare sessions: the session/general worker
@@ -468,7 +467,7 @@ request metadata plus worker setup status/config contracts.
 Deferred families cover decrypt request, session-storage access request,
 question generation, survey/question authoring, SBT group
 draft/create/share/claim requests, session create/configure requests, and
-PRD 557 deliberative statement signal/proposal/ranking requests.
+deliberative statement signal/proposal/ranking requests.
 
 Parity with the web UX is not complete. The agent API does not yet expose every
 web action for survey authoring, SBT lifecycle management, session creation and

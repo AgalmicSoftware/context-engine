@@ -58,7 +58,6 @@ PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "OpenClaw"
   "Telegram bridge"
   "TODO/"
-  "PRD"
 )
 
 TMP_ROOT=""
@@ -194,6 +193,23 @@ verify_strip_patterns_absent() {
 
     exit "$found_any"
   )
+}
+
+verify_private_planning_paths_absent() {
+  local findings
+
+  findings=$(
+    cd "$TEMP_CLONE"
+    git ls-files |
+      grep -E '(^|/)TODO(/|$)|(^|/)[^/]*PRDs?[^/]*(/|$)' || true
+  )
+
+  if [ -n "$findings" ]; then
+    printf '%s\n' "$findings"
+    return 1
+  fi
+
+  return 0
 }
 
 reset_clone_to_branch_head() {
@@ -449,6 +465,14 @@ if strip_findings=$(verify_strip_patterns_absent); then
 else
   log_error "Strip verification failed; private paths are still present:"
   printf '%s\n' "$strip_findings" >&2
+  exit 2
+fi
+
+if planning_findings=$(verify_private_planning_paths_absent); then
+  :
+else
+  log_error "Private planning path verification failed; public branch still contains:"
+  printf '%s\n' "$planning_findings" >&2
   exit 2
 fi
 

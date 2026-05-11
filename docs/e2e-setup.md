@@ -68,7 +68,7 @@ Manual fork recipe today:
 4. If the forked upstream RPC is not the shared default for that chain, also set `E2E_FORK_RPC_URL` so reports describe the actual upstream you forked.
 5. Choose mock-vs-live toggles independently (`E2E_LIT_MOCK`, `E2E_AI_MOCK`, `E2E_ARWEAVE_MOCK`).
 
-Current committed runners do not yet auto-spawn or tear down a fork runtime for you. First-class `E2E_CHAIN_MODE=fork` orchestration is tracked in [PRD 236](../TODO/PRDs/236_e2e-first-class-local-fork-mode.md).
+Current committed runners do not yet auto-spawn or tear down a fork runtime for you. First-class `E2E_CHAIN_MODE=fork` orchestration should remain tracked in private planning until it is implemented.
 
 ## Common Env Vars
 

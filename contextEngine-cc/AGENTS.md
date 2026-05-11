@@ -4,7 +4,7 @@ Claude Code extension for Context Engine. Surfaces passkey-gated survey question
 
 ## Quick commands
 ```bash
-npm run test:cc                         # from repo root; runs current CE-CC fallback tests
+npm run test:cc                         # from repo root; runs the full CE-CC suite when runtime files are present
 node --test contextEngine-cc/lib/agent/*.test.mjs
 node --test contextEngine-cc/test/agent-router.integration.test.mjs contextEngine-cc/test/agent-router-contract.test.mjs contextEngine-cc/test/router.route-inventory.test.mjs
 ```

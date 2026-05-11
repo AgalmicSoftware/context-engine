@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PRD 240 — Diff-based security audit via Codex
+# Diff-based security audit via Codex
 # Usage: bash scripts/audit-diff.sh [--base <commit>]
 #   Default base: merge-base with main, falling back to master
 set -euo pipefail

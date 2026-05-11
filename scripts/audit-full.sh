@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PRD 240 — Full codebase security audit via Codex
+# Full codebase security audit via Codex
 # Usage: bash scripts/audit-full.sh [--domain <worker|crypto|client|cecc|rpc|arweave|userpage|sbts|porto|contracts|ai|survey|all>]
 set -euo pipefail
 

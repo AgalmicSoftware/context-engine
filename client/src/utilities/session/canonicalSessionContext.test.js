@@ -447,7 +447,7 @@ describe('canonicalSessionContext', () => {
     });
   });
 
-  it('quarantines structurally corrupt metadata and falls through to demo sources (PRD 238 Stage-C)', () => {
+  it('quarantines structurally corrupt metadata and falls through to demo sources', () => {
     const resolved = resolveCanonicalSessionContext({
       requestedSlug: 'alpha',
       registrySession: VALID_REGISTRY_SESSION,
@@ -465,7 +465,7 @@ describe('canonicalSessionContext', () => {
     });
   });
 
-  it('still treats valid Arweave metadata as authoritative even with field-level errors (PRD 238 Stage-C)', () => {
+  it('still treats valid Arweave metadata as authoritative even with field-level errors', () => {
     const resolved = resolveCanonicalSessionContext({
       requestedSlug: 'alpha',
       registrySession: VALID_REGISTRY_SESSION,

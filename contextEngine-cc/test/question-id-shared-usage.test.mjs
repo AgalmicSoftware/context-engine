@@ -40,7 +40,7 @@ test('CreateQuestionsAndSurveys and SurveyGenerator both route question IDs thro
   );
   assert.match(
     createSurvey,
-    /return\s+(?:generateSharedQuestionId|generateSharedQuestionIdForCreateSurvey)\(type,\s*prompt,\s*options,\s*singleSelect\);/,
+    /return\s+(?:generateSharedQuestionId|generateSharedQuestionIdForCreateSurvey)\(\s*type,\s*prompt,\s*Array\.isArray\(options\)\s*\?\s*options\s*:\s*\[\],\s*singleSelect\s*===\s*true\s*\);/,
   );
 
   assert.match(

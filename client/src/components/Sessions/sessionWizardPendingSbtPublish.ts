@@ -71,7 +71,7 @@ export const buildPendingSbtDeployContextSignature = (
   sessionLike: AnyRecord = {},
   fallbackChainId: ChainIdLike = null
 ): string => {
-  // PRD 422 tracks stronger invalidation and slug-finalization rules for linked pending SBT drafts.
+  // Stronger invalidation and slug-finalization rules for linked pending SBT drafts remain future work.
   const chainId = Number(
     sessionLike?.networkChainId ||
     sessionLike?.contracts?.sbtFactory?.chainId ||

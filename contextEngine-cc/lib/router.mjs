@@ -1507,7 +1507,7 @@ async function autoRequestFaucetAfterAuth(walletAddress, hookConfig, deps = {}) 
   debug(`[auth] Auto-faucet: sent ${amountEth} ETH to ${walletAddress} (tx: ${txHash})`);
 }
 
-// TODO(PRD-348): Defer splitting this monolithic router into focused route modules for a later slice.
+// TODO: Defer splitting this monolithic router into focused route modules for a later slice.
 export async function handleRoute(req, res, { url, method, body }, deps = {}) {
   const path = url.pathname;
   const submitOnChainImpl = typeof deps.submitOnChain === 'function' ? deps.submitOnChain : submitOnChain;

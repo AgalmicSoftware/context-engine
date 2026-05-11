@@ -11,7 +11,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - `script/` holds Foundry Solidity deploy scripts. Keep the singular name; it matches Foundry conventions.
 - `scripts/` holds automation, seeding, audits, migration helpers, and E2E entrypoints.
 - `docs/` holds canonical implementation and operations documentation.
-- `TODO/` holds PRDs, planning notes, and unshipped work items.
+- `TODO/` is an ignored local area for private planning notes and unshipped work items.
 - `contextEngine-cc/` holds the local Claude Code companion integration.
 - `test/` holds source-of-truth root Foundry and Node test files when source-adjacent tests are not practical.
 - `tests/` is an index/symlink view over selected test surfaces. Do not assume it is the source of truth.
