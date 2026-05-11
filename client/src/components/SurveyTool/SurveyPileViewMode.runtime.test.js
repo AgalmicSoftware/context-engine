@@ -61,6 +61,7 @@ const syncClassSetState = (subject) => {
 
 describe('SurveyPileViewMode runtime surface', () => {
   afterEach(() => {
+    window.history.pushState({}, '', '/');
     jest.clearAllMocks();
     jest.restoreAllMocks();
     jest.useRealTimers();
@@ -139,6 +140,30 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(submitContent).not.toBeNull();
     expect(submitTrail).not.toBeNull();
     expect(submitTrailChildren).toHaveLength(3);
+  });
+
+  it('opens listening mode from the query string and keeps the URL synchronized', () => {
+    window.history.pushState({}, '', '/session/demo?foo=1&mode=listening#pile');
+    const subject = new PileViewMode({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '',
+      network: { id: 1 },
+    });
+    syncClassSetState(subject);
+
+    expect(subject.state.showListeningPanel).toBe(true);
+
+    subject.closeListeningPanel();
+    expect(subject.state.showListeningPanel).toBe(false);
+    expect(window.location.pathname).toBe('/session/demo');
+    expect(window.location.search).toBe('?foo=1');
+    expect(window.location.hash).toBe('#pile');
+
+    subject.toggleListeningPanel();
+    expect(subject.state.showListeningPanel).toBe(true);
+    expect(window.location.search).toBe('?foo=1&mode=listening');
   });
 
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {
