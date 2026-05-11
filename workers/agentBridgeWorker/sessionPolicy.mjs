@@ -94,6 +94,29 @@ export function normalizeSessionPolicy(input = {}) {
     requiredSbtGroups: normalizeRequiredSbtGroups(session),
     docLibraryEnabled: session.docLibraryEnabled === true,
     defaultGroupChatId: safeString(session.defaultGroupChatId || input.defaultGroupChatId) || null,
+    sessionWorkerUrl: safeString(
+      session.sessionWorkerUrl ||
+      session.workerUrl ||
+      session.corsWorkerUrl ||
+      session.ceSessionWorkerBaseUrl ||
+      session.CE_SESSION_WORKER_BASE_URL ||
+      input.sessionWorkerUrl ||
+      input.workerUrl ||
+      input.corsWorkerUrl ||
+      input.ceSessionWorkerBaseUrl ||
+      input.CE_SESSION_WORKER_BASE_URL
+    ) || null,
+    surveysAddress: safeString(
+      session.surveysAddress ||
+      session.surveyAddress ||
+      session.surveysContractAddress ||
+      session.surveyContractAddress ||
+      input.surveysAddress ||
+      input.surveyAddress ||
+      input.surveysContractAddress ||
+      input.surveyContractAddress
+    ) || null,
+    chainId: safeString(session.chainId || input.chainId || input.defaultChainId) || null,
   })).filter((session) => SESSION_SLUG_RE.test(session.sessionSlug));
   return {
     type: 'agent_bridge_session_policy',

@@ -11,7 +11,12 @@
 - Telegram group chats are public lobbies for safe session/question/doc summaries.
 - Private chat or Mini App surfaces are the account/action lane.
 - Callback data, deep-link payloads, CloudStorage, Mini App payloads, and persistent chat state use opaque action IDs or safe display text only.
-- Broadcast is intentionally disabled in this skeleton. The signer produces signed demo envelopes only.
+- Smart-contract broadcast is enabled by default for deterministic managed
+  Telegram demo accounts, but still requires session policy to allow
+  managed-account submit plus live worker/RPC/Surveys config or the OP Sepolia
+  Surveys default. Set
+  `AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED=false` or `BROADCAST_ENABLED=false` to
+  force canonical submit-request records instead of broadcasting.
 
 ## Managed Demo Accounts
 
@@ -37,7 +42,7 @@ Initial Telegram-facing capabilities:
 | Settings overview | `GET /api/agent/settings` | private, Mini App | planned contract-only |
 | Settings update | `POST /api/agent/settings/update-request` | private, Mini App | pending canonical handoff |
 | Questions | `GET /api/agent/questions` | group, private, Mini App | worker-local index until canonical |
-| Response submit request | `POST /api/agent/responses/submit-request` | private, Mini App | pending canonical handoff |
+| Response submit request | `POST /api/agent/responses/submit-request` | private, Mini App | direct on-chain when enabled; otherwise pending canonical handoff |
 | SBT claim/create, decrypt, storage access, OpenClaw events | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only |
 
 Settings updates currently accept only safe structured fields such as
@@ -406,17 +411,22 @@ Current v0 scope:
 - Agent/account/settings action surface backed by the catalog, including safe
   settings inputs for `draftStyle` and `telegramReminders`.
 - Native freeform, binary, rating, and multichoice answer forms with a
-  five-question paged queue similar to the CE pile response flow.
+  five-question paged queue styled after the CE pile response flow.
 - Draft saves through `POST /telegram/mini-app/api/draft`.
 - Settings saves through `POST /telegram/mini-app/api/settings`, which creates a
   Worker-local `telegram:agent-request:*` record and a planned canonical
   `/api/agent/settings/update-request` envelope. It does not execute the live
   settings backend yet.
-- `submit=true` creates a Worker-local submit request with an opaque request ID
-  and a planned canonical `/api/agent/responses/submit-request` handoff. Exact
-  answer replays for the same Telegram user, session, and question reuse the
-  same idempotent request ID; changed answers create distinct pending requests.
-  It does not directly sign or submit the smart-contract response yet.
+- `submit=true` attempts direct on-chain submit by default when the session has
+  a worker URL and Surveys address, and session policy allows managed Telegram
+  demo submit. The worker authenticates the managed account to the session
+  worker, requests faucet gas when `sponsoredFaucetAllowed=true`,
+  uploads the response payload through the session worker, and calls
+  `Surveys.submitResponses`. If direct submit is not configured, it creates the
+  same Worker-local submit request with an opaque request ID and canonical
+  `/api/agent/responses/submit-request` handoff as before. Exact answer replays
+  for the same Telegram user, session, and question reuse the same idempotent
+  request ID; changed answers create distinct records.
 - Payload-unavailable questions stay retryable/unanswered; true private or gated
   questions stay locked until the canonical private/gated decrypt path is
   available.
@@ -600,7 +610,8 @@ Still mocked or contract-only for this first smoke:
   canonical backend implementation.
 - OpenClaw/MCP forwarding is contract-only; no real external OpenClaw HTTP/MCP
   transport is sent from this worker.
-- Broadcast remains disabled.
+- Broadcast remains testnet-managed-account only and can be disabled with
+  `AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED=false` or `BROADCAST_ENABLED=false`.
 - Cloudflare `lit_encrypted` envelope production/reading is later storage
   hardening and is not part of the immediate Telegram smoke.
 
@@ -614,12 +625,19 @@ draft. Group summaries include only status/count refs; response text and account
 state stay private.
 
 Bot v1 structured answer buttons now save a private Telegram answer draft and
-immediately create a Worker-local submit request under
+then either broadcast directly or create a Worker-local submit request under
 `telegram:submit-request:*` with a canonical
 `/api/agent/responses/submit-request` handoff body. Older submit callbacks are
-still accepted for compatibility, but new bot messages submit on answer tap.
-This is the bot-side submit queue; direct smart-contract broadcast remains
-disabled until the canonical approval/signing path is wired.
+still accepted for compatibility, but new bot messages submit on answer tap. The
+direct path uses only deterministic managed Telegram demo accounts on testnets;
+passkey, Porto, CE-CC local, linked external wallet, and production modes remain
+blocked from worker-side signing.
+
+Private `/ce_join <session>` also requests faucet gas for the managed Telegram
+account when the session policy sets `sponsoredFaucetAllowed=true` and a session
+worker URL is configured. If the account balance is already above the worker
+threshold, join reports it as already funded. If policy or worker configuration
+does not allow faucet, join still succeeds without funding.
 
 ## Mock OpenClaw Forwarding
 

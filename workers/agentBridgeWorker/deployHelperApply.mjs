@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, readFileSync } from 'fs';
+import { createRequire } from 'module';
 import { dirname, extname, relative, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -20,6 +21,7 @@ const DEFAULT_ENV_FILE = resolve(WORKER_DIR, '.dev.vars');
 const DEFAULT_ENTRYPOINT = 'worker.js';
 const SCRIPT_CONTENT_TYPE = 'application/javascript+module';
 const TRUE_STRINGS = new Set(['1', 'true', 'yes', 'on']);
+const require = createRequire(import.meta.url);
 
 function safeString(value) {
   return String(value || '').trim();
@@ -386,6 +388,46 @@ export function collectAgentBridgeWorkerModules({
   return modules;
 }
 
+function defaultEsbuildSync() {
+  try {
+    return require('esbuild').buildSync;
+  } catch {
+    throw new Error('esbuild is required to bundle agentBridgeWorker for deploy:apply. Run npm install from the repository root.');
+  }
+}
+
+export function bundleAgentBridgeWorkerModule({
+  workerDir = WORKER_DIR,
+  entrypoint = DEFAULT_ENTRYPOINT,
+  esbuildSyncImpl = defaultEsbuildSync(),
+} = {}) {
+  const result = esbuildSyncImpl({
+    entryPoints: [resolve(workerDir, entrypoint)],
+    absWorkingDir: workerDir,
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    target: 'es2022',
+    write: false,
+    sourcemap: false,
+    legalComments: 'eof',
+    logLevel: 'silent',
+    mainFields: ['browser', 'module', 'main'],
+  });
+  const output = Array.isArray(result?.outputFiles) ? result.outputFiles[0] : null;
+  const source = typeof output?.text === 'string'
+    ? output.text
+    : Buffer.from(output?.contents || '').toString('utf8');
+  if (!source.trim()) {
+    throw new Error('agentBridgeWorker bundle output is empty.');
+  }
+  return {
+    name: entrypoint,
+    source,
+    contentType: SCRIPT_CONTENT_TYPE,
+  };
+}
+
 function withCreatedBindings(metadata = {}, resources = {}) {
   return {
     ...metadata,
@@ -417,12 +459,11 @@ export function buildAgentBridgeWorkerUploadForm({
   if (omitMigrations) {
     delete metadata.migrations;
   }
-  const modules = collectAgentBridgeWorkerModules({
+  const bundledModule = bundleAgentBridgeWorkerModule({
     workerDir,
     entrypoint: DEFAULT_ENTRYPOINT,
-    readFileImpl,
-    existsImpl,
   });
+  const modules = [bundledModule];
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }), 'metadata.json');
   for (const module of modules) {

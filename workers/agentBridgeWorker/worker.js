@@ -1,5 +1,6 @@
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
 export { ManagedDemoSignerDurableObject } from './durableObjectSigner.mjs';
+import { directSubmitFeatureEnabled } from './onChainResponses.mjs';
 import { runMockTelegramDemoFlow } from './transportMock.mjs';
 import { buildTelegramCommandResponse, handleTelegramWebhookUpdate } from './telegramCommands.mjs';
 import { handleTelegramMiniAppRequest } from './telegramMiniApp.mjs';
@@ -203,7 +204,7 @@ export default {
         worker: 'agentBridgeWorker',
         version: AGENT_BRIDGE_WORKER_VERSION,
         privateRelease: true,
-        broadcastEnabled: false,
+        broadcastEnabled: directSubmitFeatureEnabled(env),
       });
     }
     if (url.pathname === '/mock/telegram/demo-flow' && request.method === 'POST') {

@@ -1,3 +1,4 @@
+import { ethers } from 'ethers';
 import {
   ACCOUNT_MODES,
   AGENT_BRIDGE_EVENT_TYPES,
@@ -55,12 +56,14 @@ export async function deriveManagedDemoAccount({
   const normalizedDeploymentId = normalizeDeploymentId(deploymentId);
   const secretScope = rootSecret ? `secret:${rootSecret}` : 'secret:metadata-only-demo';
   const fingerprint = await sha256Hex(`${secretScope}|${telegramPrincipal.principalId}|${normalizedDeploymentId}`);
+  const privateKeyHex = await sha256Hex(`demo-private-key|${rootSecret}|${telegramPrincipal.principalId}|${normalizedDeploymentId}`);
+  const accountAddress = ethers.utils.computeAddress(`0x${privateKeyHex}`);
   const account = {
     type: 'managed_telegram_demo_account',
     version: AGENT_BRIDGE_WORKER_VERSION,
     accountMode: ACCOUNT_MODES.MANAGED_TELEGRAM_DEMO,
     accountId: `ce_tg_demo_${fingerprint.slice(0, 24)}`,
-    accountAddress: `0x${fingerprint.slice(24, 64)}`,
+    accountAddress,
     chainScope: 'testnet',
     telegramPrincipal,
     workerDeploymentId: normalizedDeploymentId,
