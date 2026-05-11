@@ -14,6 +14,10 @@ import {
   parseOpaqueActionId,
 } from './opaqueActions.mjs';
 import {
+  buildTelegramAgentAccountCreateState,
+  buildTelegramAgentActionMenuState,
+  buildTelegramAgentSettingsEditState,
+  buildTelegramAgentSettingsOverviewState,
   buildTelegramGroupSessionCardState,
   buildTelegramMyAccountState,
   buildTelegramPoseQuestionState,
@@ -35,6 +39,7 @@ const GROUP_SESSION_KV_PREFIX = 'telegram:group-session:';
 const PRIVATE_SESSION_KV_PREFIX = 'telegram:private-session:';
 const ANSWER_DRAFT_KV_PREFIX = 'telegram:answer-draft:';
 const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
+const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -56,6 +61,10 @@ const DEFAULT_QUESTION = Object.freeze({
 
 const COMMANDS = Object.freeze({
   START: '/start',
+  ACTIONS: '/ce_actions',
+  AGENT: '/ce_agent',
+  CREATE_AGENT: '/ce_create_agent',
+  SETTINGS: '/ce_settings',
   JOIN: '/ce_join',
   SESSIONS: '/ce_sessions',
   QUESTIONS: '/ce_questions',
@@ -334,6 +343,19 @@ function loadDemoDocuments(env = {}) {
   const docs = Array.isArray(parsed) ? parsed : [];
   assertNoSecretShape(docs, 'Telegram demo docs must not serialize secrets.');
   return docs;
+}
+
+function loadAgentSettings(env = {}) {
+  const parsed = safeJsonParse(env.AGENT_BRIDGE_DEMO_AGENT_SETTINGS_JSON, null);
+  const source = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  const draftStyle = ['concise', 'balanced', 'detailed'].includes(lower(source.draftStyle))
+    ? lower(source.draftStyle)
+    : 'balanced';
+  const telegramReminders = source.telegramReminders === true ||
+    ['1', 'true', 'yes', 'on'].includes(lower(source.telegramReminders));
+  const settings = { draftStyle, telegramReminders };
+  assertNoSecretShape(settings, 'Telegram agent settings fixtures must not serialize secrets.');
+  return settings;
 }
 
 function parseTelegramCommandText(text = '', {
@@ -654,6 +676,23 @@ async function persistTelegramSubmitRequest({
   };
 }
 
+async function persistAgentRequestRecord({
+  env = {},
+  requestId = '',
+  record = {},
+  ttlSeconds = SUBMIT_REQUEST_TTL_SECONDS,
+} = {}) {
+  const id = safeString(requestId);
+  if (!id || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  assertNoSecretShape(record, 'Telegram agent request records must not serialize secrets.');
+  await env.AGENT_ACTION_KV.put(`${AGENT_REQUEST_KV_PREFIX}${id}`, JSON.stringify(record), {
+    expirationTtl: ttlSeconds,
+  });
+  return { ok: true, requestId: id };
+}
+
 async function resolveCommandSessionSlug({
   env = {},
   normalized = {},
@@ -720,6 +759,44 @@ async function makeStartButton({
     action: TELEGRAM_BRIDGE_ACTIONS.START_PRIVATE,
     lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     serverContextRef: { sessionSlug, groupChatId },
+    createdAt,
+  });
+  await persistActionRecord(env, start.deepLinkPayload, {
+    ...start.record,
+    deepLinkPayload: start.deepLinkPayload,
+  });
+  return {
+    text: safeString(label),
+    url: `https://t.me/${username}?start=${start.deepLinkPayload}`,
+  };
+}
+
+async function makePrivateStartActionButton({
+  env = {},
+  botUsername = '',
+  label = '',
+  action = '',
+  serverContextRef = {},
+  seed = '',
+  createdAt = null,
+} = {}) {
+  const username = normalizeBotUsername(botUsername);
+  if (!username) {
+    return makeCallbackButton({
+      env,
+      label,
+      action,
+      lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      serverContextRef,
+      seed: seed || `private_action|${action}|${stableFingerprint(serverContextRef)}`,
+      createdAt,
+    });
+  }
+  const start = createTelegramStartAction({
+    seed: seed || `private_start_action|${action}|${stableFingerprint(serverContextRef)}`,
+    action,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef,
     createdAt,
   });
   await persistActionRecord(env, start.deepLinkPayload, {
@@ -822,27 +899,6 @@ async function makeAnswerButton({
       submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     },
     seed: seed || `answer|${sessionSlug}|${questionIdSeedPart(selectedQuestionId)}|${safeString(control.controlType)}|${label}`,
-    createdAt,
-  });
-}
-
-async function makeSubmitDraftButton({
-  env = {},
-  sessionSlug = '',
-  selectedQuestionId = '',
-  seed = '',
-  createdAt = null,
-} = {}) {
-  return makeCallbackButton({
-    env,
-    label: 'Submit Draft',
-    action: TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
-    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-    serverContextRef: {
-      sessionSlug,
-      questionId: selectedQuestionId,
-    },
-    seed: seed || `submit|${sessionSlug}|${questionIdSeedPart(selectedQuestionId)}`,
     createdAt,
   });
 }
@@ -963,6 +1019,9 @@ function formatHelpText() {
   return [
     'Context Engine',
     '',
+    '/ce_actions - open the agent action menu',
+    '/ce_create_agent - create a Telegram-managed agent',
+    '/ce_settings - view or edit agent settings',
     '/ce_join <session> - link this chat to a session',
     '/ce_sessions - list linked sessions',
     '/ce_questions - view session questions',
@@ -976,6 +1035,16 @@ async function buildHelpResponse({ normalized, command = COMMANDS.START, env, cr
   const policy = await loadSessionPolicy(env);
   const sessionSlug = await resolveCommandSessionSlug({ env, normalized, policy });
   const keyboard = [[
+    await makeCallbackButton({
+      env,
+      label: 'Agent Actions',
+      action: TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU,
+      lane: normalized.chat.isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+      serverContextRef: { sessionSlug },
+      seed: `help|agent_actions|${sessionSlug}|${normalized.updateId}`,
+      createdAt,
+    }),
+  ], [
     await makeCallbackButton({
       env,
       label: 'View Questions',
@@ -1035,6 +1104,115 @@ async function buildSessionsResponse({ normalized, command, env, createdAt }) {
     screen: 'group_session_card',
     command,
     normalized,
+  });
+}
+
+async function buildAgentActionsResponse({
+  normalized,
+  command,
+  env,
+  method = 'sendMessage',
+  messageId = '',
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride,
+  });
+  const lane = normalized.chat.isPrivate ? TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT : TELEGRAM_CHAT_LANES.GROUP_LOBBY;
+  const state = buildTelegramAgentActionMenuState({ lane, sessionSlug, createdAt });
+  const rows = [];
+  if (normalized.chat.isPrivate) {
+    rows.push([
+      await makeCallbackButton({
+        env,
+        label: 'Create Agent',
+        action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
+        lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+        serverContextRef: { sessionSlug },
+        seed: `agent_actions|create|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+        createdAt,
+      }),
+      await makeCallbackButton({
+        env,
+        label: 'Settings',
+        action: TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
+        lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+        serverContextRef: { sessionSlug },
+        seed: `agent_actions|settings|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+        createdAt,
+      }),
+    ]);
+  } else {
+    rows.push([
+      await makePrivateStartActionButton({
+        env,
+        botUsername: env.TELEGRAM_BOT_USERNAME,
+        label: 'Create Agent',
+        action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
+        serverContextRef: { sessionSlug, groupChatId: normalized.chat.chatId },
+        seed: `agent_actions|group_create|${sessionSlug}|${normalized.chat.chatId}|${normalized.updateId}`,
+        createdAt,
+      }),
+      await makePrivateStartActionButton({
+        env,
+        botUsername: env.TELEGRAM_BOT_USERNAME,
+        label: 'Settings',
+        action: TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
+        serverContextRef: { sessionSlug, groupChatId: normalized.chat.chatId },
+        seed: `agent_actions|group_settings|${sessionSlug}|${normalized.chat.chatId}|${normalized.updateId}`,
+        createdAt,
+      }),
+    ]);
+  }
+  rows.push([
+    await makeCallbackButton({
+      env,
+      label: 'View Questions',
+      action: TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+      lane,
+      serverContextRef: { sessionSlug },
+      seed: `agent_actions|questions|${sessionSlug}|${normalized.updateId}`,
+      createdAt,
+    }),
+  ]);
+  const miniAppButton = await makeMiniAppButton({
+    env,
+    label: 'Open Mini App',
+    action: TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU,
+    serverContextRef: { sessionSlug },
+    seed: `agent_actions|mini_app|${sessionSlug}|${normalized.updateId}`,
+    createdAt,
+    privateChat: normalized.chat.isPrivate,
+    botUsername: env.TELEGRAM_BOT_USERNAME,
+  });
+  if (miniAppButton) rows.push([miniAppButton]);
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      'Agent actions',
+      `Session: ${sessionSlug}`,
+      '',
+      normalized.chat.isPrivate
+        ? 'Create an agent, edit settings, or launch session workflows.'
+        : 'Account and settings inputs open in private chat or Mini App.',
+    ].join('\n'),
+    replyMarkup: { inline_keyboard: rows },
+    screen: state.screen,
+    command,
+    normalized,
+    extra: {
+      sessionSlug,
+      catalog: state.catalog,
+      capabilityCount: state.capabilities.length,
+      canonicalApiRequest: state.canonicalApiRequest,
+    },
   });
 }
 
@@ -1389,7 +1567,7 @@ async function buildPoseQuestionResponse({
       ...(Array.isArray(group.answerLabels) && group.answerLabels.length
         ? ['', `Options: ${group.answerLabels.join(', ')}`]
         : []),
-      ...(answerRows.length ? ['', 'Tap an answer, then submit the draft from Telegram.'] : []),
+      ...(answerRows.length ? ['', 'Tap an answer to submit from Telegram.'] : []),
     ].join('\n');
   const miniAppButton = payloadUnavailable ? null : await makeMiniAppButton({
     env,
@@ -1406,15 +1584,6 @@ async function buildPoseQuestionResponse({
   });
   const actionRows = [
     ...answerRows,
-    ...(group.locked || payloadUnavailable ? [] : [[
-      await makeSubmitDraftButton({
-        env,
-        sessionSlug: resolved.session.sessionSlug,
-        selectedQuestionId: group.questionId,
-        seed: `pose|submit|${resolved.session.sessionSlug}|${questionIdSeedPart(group.questionId)}|${normalized.updateId}`,
-        createdAt,
-      }),
-    ]]),
     ...(miniAppButton ? [[miniAppButton]] : []),
     [
       await makeCallbackButton({
@@ -1472,21 +1641,37 @@ async function buildAnswerDraftResponse({
     controlType,
     createdAt,
   });
+  const submitted = saved.ok
+    ? await persistTelegramSubmitRequest({
+      env,
+      normalized,
+      draft: {
+        ...saved.draft,
+        key: saved.key,
+      },
+      sessionSlug,
+      selectedQuestionId,
+      createdAt,
+    })
+    : null;
+  const ok = saved.ok === true && submitted?.ok === true;
   return callbackOnly({
     normalized,
     command,
     callbackQueryId,
-    callbackAnswerText: saved.ok
-      ? 'Draft saved. Tap Submit Draft when ready.'
-      : 'Draft could not be saved. Try again.',
-    callbackAnswerShowAlert: saved.ok !== true,
+    callbackAnswerText: ok
+      ? 'Submitted.'
+      : (saved.ok ? 'Answer saved, but submit failed. Try again.' : 'Answer could not be saved. Try again.'),
+    callbackAnswerShowAlert: ok !== true,
     screen: 'submit_response',
     extra: {
-      ok: saved.ok === true,
-      reason: saved.ok ? 'answer_draft_saved' : saved.reason,
+      ok,
+      reason: ok ? 'submit_request_created' : (saved.ok ? submitted?.reason : saved.reason),
       sessionSlug,
       questionId: selectedQuestionId,
       answerDraftSaved: saved.ok === true,
+      submitRequestCreated: submitted?.ok === true,
+      submitRequest: submitted?.ok ? submitted : null,
       submitLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
     },
   });
@@ -1514,7 +1699,7 @@ async function buildSubmitDraftResponse({
       normalized,
       command,
       callbackQueryId,
-      callbackAnswerText: 'Answer first, then tap Submit Draft.',
+      callbackAnswerText: 'Tap an answer to submit.',
       callbackAnswerShowAlert: true,
       screen: 'submit_response',
       extra: {
@@ -1539,8 +1724,8 @@ async function buildSubmitDraftResponse({
     command,
     callbackQueryId,
     callbackAnswerText: submitted.ok
-      ? `Submit request queued for ${shortQuestionId(selectedQuestionId)}.`
-      : 'Submit request could not be queued. Try again.',
+      ? 'Submitted.'
+      : 'Submit failed. Try again.',
     callbackAnswerShowAlert: true,
     screen: 'submit_response',
     extra: {
@@ -1670,10 +1855,301 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
   });
 }
 
+async function buildCreateAgentResponse({
+  normalized,
+  command,
+  env,
+  method = 'sendMessage',
+  messageId = '',
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride,
+  });
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        'Create Agent opens in private chat.',
+        '',
+        'No account state is shown in group chat.',
+      ].join('\n'),
+      replyMarkup: {
+        inline_keyboard: [[
+          await makePrivateStartActionButton({
+            env,
+            botUsername: env.TELEGRAM_BOT_USERNAME,
+            label: 'Create Agent',
+            action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
+            serverContextRef: { sessionSlug, groupChatId: normalized.chat.chatId },
+            seed: `create_agent|group_redirect|${sessionSlug}|${normalized.chat.chatId}|${normalized.updateId}`,
+            createdAt,
+          }),
+        ]],
+      },
+      screen: 'agent_account_create',
+      command,
+      normalized,
+      extra: {
+        sessionSlug,
+        privateChatRequired: true,
+      },
+    });
+  }
+  const account = await deriveManagedDemoAccount({
+    principal: normalizeTelegramPrincipal(normalized),
+    deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo',
+    rootSecret: env.DEMO_SIGNER_ROOT_SECRET || '',
+    lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED,
+    createdAt,
+  });
+  const requestId = buildOpaqueActionId(`agent_account_create|${normalized.user.telegramUserId}|${sessionSlug}|${env.AGENT_BRIDGE_DEPLOYMENT_ID || 'agent-bridge-live-demo'}`);
+  const state = buildTelegramAgentAccountCreateState({
+    account,
+    sessionSlug,
+    requestId,
+    idempotencyKey: requestId,
+    createdAt,
+  });
+  await persistAgentRequestRecord({
+    env,
+    requestId,
+    record: {
+      version: 1,
+      requestId,
+      action: TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
+      status: 'agent_account_create_request_created',
+      lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+      sessionSlug,
+      accountMode: state.accountMode,
+      managedAddress: state.managedAddress,
+      canonicalApiRequest: state.canonicalApiRequest,
+      createdAt,
+    },
+  });
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      'Agent account',
+      `Address: ${shortAddress(account.accountAddress)}`,
+      `Mode: ${state.accountMode}`,
+      '',
+      `Canonical: ${state.canonicalApiRequest.method} ${state.canonicalApiRequest.path}`,
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [[
+        await makeCallbackButton({
+          env,
+          label: 'Settings',
+          action: TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
+          lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+          serverContextRef: { sessionSlug },
+          seed: `create_agent|settings|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+          createdAt,
+        }),
+        await makeCallbackButton({
+          env,
+          label: 'Actions',
+          action: TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU,
+          lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+          serverContextRef: { sessionSlug },
+          seed: `create_agent|actions|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+          createdAt,
+        }),
+      ]],
+    },
+    screen: state.screen,
+    command,
+    normalized,
+    extra: {
+      sessionSlug,
+      requestId,
+      canonicalApiRequest: state.canonicalApiRequest,
+      accountMode: state.accountMode,
+    },
+  });
+}
+
+async function buildSettingsResponse({
+  normalized,
+  command,
+  env,
+  method = 'sendMessage',
+  messageId = '',
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride,
+  });
+  if (!normalized.chat.isPrivate) {
+    return reply({
+      method,
+      chatId: normalized.chat.chatId,
+      messageId,
+      text: [
+        'Agent settings open in private chat or Mini App.',
+        '',
+        'Group chat does not show account settings.',
+      ].join('\n'),
+      replyMarkup: {
+        inline_keyboard: [[
+          await makePrivateStartActionButton({
+            env,
+            botUsername: env.TELEGRAM_BOT_USERNAME,
+            label: 'Settings',
+            action: TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
+            serverContextRef: { sessionSlug, groupChatId: normalized.chat.chatId },
+            seed: `settings|group_redirect|${sessionSlug}|${normalized.chat.chatId}|${normalized.updateId}`,
+            createdAt,
+          }),
+        ]],
+      },
+      screen: 'agent_settings_overview',
+      command,
+      normalized,
+      extra: {
+        sessionSlug,
+        privateChatRequired: true,
+      },
+    });
+  }
+  const state = buildTelegramAgentSettingsOverviewState({
+    settings: loadAgentSettings(env),
+    sessionSlug,
+    createdAt,
+  });
+  const editMiniAppButton = await makeMiniAppButton({
+    env,
+    label: 'Edit Settings',
+    action: TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS,
+    serverContextRef: { sessionSlug },
+    seed: `settings|mini_app_edit|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+    privateChat: true,
+    botUsername: env.TELEGRAM_BOT_USERNAME,
+  });
+  const editButton = editMiniAppButton || await makeCallbackButton({
+    env,
+    label: 'Edit Settings',
+    action: TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS,
+    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+    serverContextRef: { sessionSlug },
+    seed: `settings|edit|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+  });
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      'Agent settings',
+      `Draft style: ${state.settings.draftStyle}`,
+      `Telegram reminders: ${state.settings.telegramReminders ? 'on' : 'off'}`,
+      '',
+      `Canonical: ${state.canonicalApiRequest.method} ${state.canonicalApiRequest.path}`,
+    ].join('\n'),
+    replyMarkup: {
+      inline_keyboard: [[editButton], [
+        await makeCallbackButton({
+          env,
+          label: 'Actions',
+          action: TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU,
+          lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
+          serverContextRef: { sessionSlug },
+          seed: `settings|actions|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+          createdAt,
+        }),
+      ]],
+    },
+    screen: state.screen,
+    command,
+    normalized,
+    extra: {
+      sessionSlug,
+      settings: state.settings,
+      canonicalApiRequest: state.canonicalApiRequest,
+    },
+  });
+}
+
+async function buildSettingsEditResponse({
+  normalized,
+  command,
+  env,
+  method = 'sendMessage',
+  messageId = '',
+  sessionSlugOverride = '',
+  createdAt,
+} = {}) {
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = await resolveCommandSessionSlug({
+    env,
+    normalized,
+    policy,
+    explicitSessionSlug: sessionSlugOverride,
+  });
+  const state = buildTelegramAgentSettingsEditState({
+    settings: loadAgentSettings(env),
+    sessionSlug,
+    createdAt,
+  });
+  const miniAppButton = await makeMiniAppButton({
+    env,
+    label: 'Open Mini App',
+    action: TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS,
+    serverContextRef: { sessionSlug },
+    seed: `settings_edit|mini_app|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
+    createdAt,
+    privateChat: normalized.chat.isPrivate,
+    botUsername: env.TELEGRAM_BOT_USERNAME,
+  });
+  return reply({
+    method,
+    chatId: normalized.chat.chatId,
+    messageId,
+    text: [
+      'Edit settings',
+      `Draft style: ${state.fields.find((field) => field.field === 'draftStyle')?.value || 'balanced'}`,
+      `Telegram reminders: ${state.fields.find((field) => field.field === 'telegramReminders')?.value ? 'on' : 'off'}`,
+      '',
+      miniAppButton
+        ? 'Use the Mini App to save settings.'
+        : 'Mini App is not configured for settings input.',
+    ].join('\n'),
+    replyMarkup: miniAppButton ? { inline_keyboard: [[miniAppButton]] } : null,
+    screen: state.screen,
+    command,
+    normalized,
+    extra: {
+      sessionSlug,
+      canonicalApiRequest: state.canonicalApiRequest,
+      miniAppConfigured: Boolean(miniAppButton),
+    },
+  });
+}
+
 function isMiniAppLaunchRecord(record = {}) {
   return record?.miniAppLaunch === true &&
     record?.lane === TELEGRAM_CHAT_LANES.MINI_APP &&
     [
+      TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU,
+      TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
+      TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
+      TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS,
       TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
       TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
     ].includes(record.action);
@@ -1721,7 +2197,7 @@ function buildMiniAppStartResponse({
     text: [
       `Open the Mini App for ${sessionSlug}.`,
       '',
-      'Use this private button to answer and queue submissions.',
+      'Use this private button for agent actions, settings, answers, and queued submissions.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [[{
@@ -1772,6 +2248,33 @@ async function buildStartPayloadResponse({
       createdAt,
     });
   }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU) {
+    return buildAgentActionsResponse({
+      normalized,
+      command,
+      env,
+      sessionSlugOverride: record.serverContextRef?.sessionSlug || '',
+      createdAt,
+    });
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT) {
+    return buildCreateAgentResponse({
+      normalized,
+      command,
+      env,
+      sessionSlugOverride: record.serverContextRef?.sessionSlug || '',
+      createdAt,
+    });
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS) {
+    return buildSettingsResponse({
+      normalized,
+      command,
+      env,
+      sessionSlugOverride: record.serverContextRef?.sessionSlug || '',
+      createdAt,
+    });
+  }
   return buildJoinResponse({
     normalized,
     command,
@@ -1816,6 +2319,50 @@ async function buildCallbackResponse({
     }), callbackQueryId);
   }
   const sessionSlug = record.serverContextRef?.sessionSlug || '';
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU) {
+    return attachCallbackQueryId(await buildAgentActionsResponse({
+      normalized,
+      command: 'callback:agent_action_menu',
+      env,
+      sessionSlugOverride: sessionSlug,
+      method,
+      messageId,
+      createdAt,
+    }), callbackQueryId);
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT) {
+    return attachCallbackQueryId(await buildCreateAgentResponse({
+      normalized,
+      command: 'callback:create_agent_account',
+      env,
+      sessionSlugOverride: sessionSlug,
+      method,
+      messageId,
+      createdAt,
+    }), callbackQueryId);
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS) {
+    return attachCallbackQueryId(await buildSettingsResponse({
+      normalized,
+      command: 'callback:view_agent_settings',
+      env,
+      sessionSlugOverride: sessionSlug,
+      method,
+      messageId,
+      createdAt,
+    }), callbackQueryId);
+  }
+  if (record.action === TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS) {
+    return attachCallbackQueryId(await buildSettingsEditResponse({
+      normalized,
+      command: 'callback:edit_agent_settings',
+      env,
+      sessionSlugOverride: sessionSlug,
+      method,
+      messageId,
+      createdAt,
+    }), callbackQueryId);
+  }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS) {
     return attachCallbackQueryId(await buildQuestionsResponse({
       normalized,
@@ -1947,6 +2494,30 @@ export async function buildTelegramCommandResponse({
         createdAt,
       })
       : buildHelpResponse({ normalized, command: parsed.command, env, createdAt });
+  }
+  if ([COMMANDS.ACTIONS, COMMANDS.AGENT].includes(parsed.command)) {
+    return buildAgentActionsResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      createdAt,
+    });
+  }
+  if (parsed.command === COMMANDS.CREATE_AGENT) {
+    return buildCreateAgentResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      createdAt,
+    });
+  }
+  if (parsed.command === COMMANDS.SETTINGS) {
+    return buildSettingsResponse({
+      normalized,
+      command: parsed.command,
+      env,
+      createdAt,
+    });
   }
   if (parsed.command === COMMANDS.JOIN) {
     return buildJoinResponse({
@@ -2095,6 +2666,7 @@ export async function handleTelegramWebhookUpdate({
 
 export {
   ACTION_KV_PREFIX,
+  AGENT_REQUEST_KV_PREFIX,
   ANSWER_DRAFT_KV_PREFIX,
   COMMANDS,
   loadQuestionsForSession,

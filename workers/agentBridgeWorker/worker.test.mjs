@@ -193,6 +193,48 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(JSON.stringify(state).includes(bytes32QuestionId), false);
   assert.match(state.questions[0].idShort, /^0x12121212\.\.\.121212$/);
   assert.match(state.questions[0].questionKey, /^cecb_[a-z0-9]{10,48}$/);
+  assert.equal(state.agent.actions.some((action) => action.id === 'agent.settings.update'), true);
+  assert.equal(state.agent.account.canonicalApiRequest.path, '/api/agent/accounts/create-request');
+  assert.equal(state.agent.settings.values.draftStyle, 'balanced');
+  assert.equal(state.agent.settings.edit.canonicalApiRequest.path, '/api/agent/settings/update-request');
+
+  const settingsResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/settings', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      launch,
+      settings: {
+        draftStyle: 'concise',
+        telegramReminders: true,
+      },
+    }),
+  }), env);
+  const settings = await settingsResponse.json();
+
+  assert.equal(settingsResponse.status, 200);
+  assert.equal(settings.ok, true);
+  assert.equal(settings.status, 'settings_update_request_created');
+  assert.equal(settings.settings.draftStyle, 'concise');
+  assert.equal(settings.request.canonicalApiRequest.path, '/api/agent/settings/update-request');
+  assert.equal(settings.request.canonicalApiRequest.body.settingsPatchSummary.telegramReminders, true);
+  assert.match(settings.request.requestId, /^ceab_[a-z0-9]{10,48}$/);
+
+  const secretSettingsResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/settings', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      launch,
+      settings: {
+        draftStyle: 'detailed',
+        privateKey: `0x${'99'.repeat(32)}`,
+      },
+    }),
+  }), env);
+  const secretSettings = await secretSettingsResponse.json();
+
+  assert.equal(secretSettingsResponse.status, 400);
+  assert.equal(secretSettings.ok, false);
+  assert.match(secretSettings.error, /settings payloads must not serialize secrets/);
 
   const draftResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
     method: 'POST',
@@ -235,6 +277,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   const replayedSubmitRequests = Array.from(kv.store.entries())
     .filter(([key]) => key.startsWith('telegram:submit-request:'));
   assert.equal(replayedSubmitRequests.length, 1);
+  assert.equal(Array.from(kv.store.keys()).filter((key) => key.startsWith('telegram:agent-request:')).length, 1);
   assert.equal(JSON.parse(replayedSubmitRequests[0][1]).answer.value, 8);
   assert.equal(
     JSON.parse(replayedSubmitRequests[0][1]).canonicalApiRequest.body.idempotencyKey,

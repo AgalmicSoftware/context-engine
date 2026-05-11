@@ -2,8 +2,17 @@ import {
   TELEGRAM_BRIDGE_ACTIONS,
   TELEGRAM_CHAT_LANES,
 } from './constants.mjs';
+import {
+  buildCanonicalAgentRequest,
+  listAgentApiCapabilities,
+} from './agentApiCatalog.mjs';
 import { buildOpaqueActionId, createTelegramCallbackAction, parseOpaqueActionId } from './opaqueActions.mjs';
-import { buildTelegramPoseQuestionState } from './questionUi.mjs';
+import {
+  buildTelegramAgentSettingsEditState,
+  buildTelegramAgentSettingsOverviewState,
+  buildTelegramPoseQuestionState,
+} from './questionUi.mjs';
+import { assertNoSecretShape } from './redaction.mjs';
 import {
   loadQuestionsForSession,
   persistActionRecord,
@@ -17,6 +26,7 @@ const DEFAULT_MINI_APP_AUTH_MAX_AGE_SECONDS = 24 * 60 * 60;
 const DEFAULT_MINI_APP_PAGE_SIZE = 5;
 const QUESTION_ACTION_TTL_SECONDS = 30 * 60;
 const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
+const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
 
@@ -278,6 +288,82 @@ function miniAppLaunchMatchesQuestion(launchRecord = {}, questionRef = {}) {
   return true;
 }
 
+function isValidMiniAppLaunchRecord(record = {}) {
+  return record?.miniAppLaunch === true && record?.lane === TELEGRAM_CHAT_LANES.MINI_APP;
+}
+
+function miniAppLaunchAllowsAgentWrite(record = {}) {
+  return isValidMiniAppLaunchRecord(record) && [
+    TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU,
+    TELEGRAM_BRIDGE_ACTIONS.CREATE_AGENT_ACCOUNT,
+    TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS,
+    TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS,
+    TELEGRAM_BRIDGE_ACTIONS.UPDATE_AGENT_SETTINGS,
+    TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS,
+    TELEGRAM_BRIDGE_ACTIONS.SUBMIT_RESPONSE,
+  ].includes(record.action);
+}
+
+function normalizeAgentSettingsInput(settings = {}) {
+  const input = settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {};
+  assertNoSecretShape(input, 'Telegram Mini App settings payloads must not serialize secrets.');
+  const patch = {};
+  if (Object.hasOwn(input, 'draftStyle')) {
+    const draftStyle = lower(input.draftStyle);
+    if (!['concise', 'balanced', 'detailed'].includes(draftStyle)) {
+      return { ok: false, reason: 'draft_style_invalid' };
+    }
+    patch.draftStyle = draftStyle;
+  }
+  if (Object.hasOwn(input, 'telegramReminders')) {
+    if (input.telegramReminders === true || input.telegramReminders === false) {
+      patch.telegramReminders = input.telegramReminders;
+    } else {
+      const normalized = lower(input.telegramReminders);
+      if (!['true', 'false', '1', '0', 'yes', 'no', 'on', 'off'].includes(normalized)) {
+        return { ok: false, reason: 'telegram_reminders_invalid' };
+      }
+      patch.telegramReminders = ['true', '1', 'yes', 'on'].includes(normalized);
+    }
+  }
+  if (!Object.keys(patch).length) {
+    return { ok: false, reason: 'settings_patch_required' };
+  }
+  return {
+    ok: true,
+    patch,
+    publicSummary: {
+      ...(Object.hasOwn(patch, 'draftStyle') ? { draftStyle: patch.draftStyle } : {}),
+      ...(Object.hasOwn(patch, 'telegramReminders') ? { telegramReminders: patch.telegramReminders } : {}),
+    },
+  };
+}
+
+function defaultAgentSettingsState({
+  sessionSlug = '',
+  createdAt = null,
+} = {}) {
+  const overview = buildTelegramAgentSettingsOverviewState({
+    settings: {
+      draftStyle: 'balanced',
+      telegramReminders: false,
+    },
+    sessionSlug,
+    createdAt,
+  });
+  const edit = buildTelegramAgentSettingsEditState({
+    settings: overview.settings,
+    sessionSlug,
+    createdAt,
+  });
+  return {
+    overview,
+    edit,
+    values: overview.settings,
+    editableFields: edit.fields,
+  };
+}
+
 async function persistMiniQuestionAction({
   env = {},
   sessionSlug = '',
@@ -411,6 +497,10 @@ async function buildMiniAppState({
       questionSourceReason: '',
       sourceOk: false,
       sourceError: auth.reason || 'telegram_init_data_invalid',
+      agent: {
+        actions: [],
+        settings: null,
+      },
     };
   }
   const launchRecord = await resolveLaunchRecord(env, launch);
@@ -438,6 +528,10 @@ async function buildMiniAppState({
       questionSourceReason: '',
       sourceOk: false,
       sourceError: 'mini_app_launch_invalid',
+      agent: {
+        actions: [],
+        settings: null,
+      },
     };
   }
   const sessionSlug = launchSessionSlug(launchRecord, env);
@@ -456,6 +550,7 @@ async function buildMiniAppState({
     questions.find((question) => question.canAnswer)?.questionKey ||
     questions[0]?.questionKey ||
     '';
+  const agentSettings = defaultAgentSettingsState({ sessionSlug, createdAt });
   return {
     ok: true,
     app: 'ce-telegram-mini-app',
@@ -477,6 +572,33 @@ async function buildMiniAppState({
     questionSourceReason: loaded.reason || '',
     sourceOk: loaded.ok !== false,
     sourceError: loaded.ok === false ? (loaded.reason || 'question_source_unavailable') : '',
+    agent: {
+      actions: listAgentApiCapabilities({ lane: TELEGRAM_CHAT_LANES.MINI_APP, includeGroupUnsafe: true })
+        .map((capability) => ({
+          id: capability.id,
+          label: capability.label,
+          category: capability.category,
+          method: capability.method,
+          path: capability.path,
+          handoffStatus: capability.handoffStatus,
+          requiredFields: capability.requiredFields,
+          miniAppRoutes: capability.miniAppRoutes,
+        })),
+      account: {
+        mode: 'managed_telegram_demo',
+        createAction: 'agent.account.create',
+        canonicalApiRequest: buildCanonicalAgentRequest({
+          capabilityId: 'agent.account.create',
+          body: {
+            telegramPrincipalRef: 'telegram_principal_ref',
+            accountMode: 'managed_telegram_demo',
+            session: sessionSlug,
+            idempotencyKey: 'provided_on_submit',
+          },
+        }),
+      },
+      settings: agentSettings,
+    },
   };
 }
 
@@ -496,7 +618,7 @@ function normalizeMiniAnswer(answer = {}, questionRef = {}) {
   const comments = normalizeText(answer.comments || answer.additionalComments, 1000);
   if (type === 'agree_unsure_disagree') {
     const value = lower(answer.value || answer.answer);
-    const labels = { agree: 'Agree', unsure: 'Unsure', disagree: 'Disagree' };
+    const labels = { agree: 'Agree', disagree: 'Disagree', unsure: 'Unsure' };
     if (!labels[value]) return { ok: false, reason: 'binary_answer_invalid' };
     return {
       ok: true,
@@ -614,6 +736,81 @@ async function persistSubmitRequest({
   };
 }
 
+async function persistSettingsUpdateRequest({
+  env = {},
+  auth = {},
+  sessionSlug = '',
+  patch = {},
+  createdAt = null,
+} = {}) {
+  if (!env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+    return { ok: false, reason: 'action_kv_unavailable' };
+  }
+  const telegramUserId = safeString(auth.user?.telegramUserId);
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!telegramUserId || !slug || !patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    return { ok: false, reason: 'settings_update_incomplete' };
+  }
+  assertNoSecretShape(patch, 'Telegram Mini App settings patch must not serialize secrets.');
+  const patchFingerprint = stableFingerprint(patch);
+  const idempotencyKey = buildOpaqueActionId(`telegram_mini_settings:${telegramUserId}:${slug}:${patchFingerprint}`);
+  const requestId = idempotencyKey;
+  const kvKey = `${AGENT_REQUEST_KV_PREFIX}${requestId}`;
+  const existing = env.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function'
+    ? safeJsonParse(await env.AGENT_ACTION_KV.get(kvKey).catch(() => null), null)
+    : null;
+  if (existing && typeof existing === 'object' && !Array.isArray(existing)) {
+    assertNoSecretShape(existing, 'Telegram agent settings requests must not serialize secrets.');
+    return {
+      ok: true,
+      requestId,
+      status: existing.status || 'settings_update_request_created',
+      canonicalApiRequest: existing.canonicalApiRequest || null,
+      idempotencyKey,
+      replayed: true,
+    };
+  }
+  const record = {
+    version: 1,
+    requestId,
+    idempotencyKey,
+    patchFingerprint,
+    action: TELEGRAM_BRIDGE_ACTIONS.UPDATE_AGENT_SETTINGS,
+    status: 'settings_update_request_created',
+    lane: TELEGRAM_CHAT_LANES.MINI_APP,
+    telegramUserId,
+    sessionSlug: slug,
+    settingsPatchSummary: patch,
+    settingsPatchRef: {
+      kind: 'telegram_agent_settings_patch',
+      requestId,
+    },
+    canonicalApiRequest: buildCanonicalAgentRequest({
+      capabilityId: 'agent.settings.update',
+      body: {
+        agentAccountRef: 'telegram_managed_agent_ref',
+        settingsPatchRef: 'telegram_settings_patch_ref',
+        settingsPatchSummary: patch,
+        session: slug,
+        idempotencyKey,
+      },
+    }),
+    createdAt,
+  };
+  assertNoSecretShape(record, 'Telegram agent settings requests must not serialize secrets.');
+  await env.AGENT_ACTION_KV.put(kvKey, JSON.stringify(record), {
+    expirationTtl: SUBMIT_REQUEST_TTL_SECONDS,
+  });
+  return {
+    ok: true,
+    requestId,
+    status: record.status,
+    canonicalApiRequest: record.canonicalApiRequest,
+    idempotencyKey,
+    replayed: false,
+  };
+}
+
 async function handleDraftRequest({
   request,
   env = {},
@@ -702,6 +899,60 @@ async function handleDraftRequest({
   });
 }
 
+async function handleSettingsRequest({
+  request,
+  env = {},
+  createdAt = new Date().toISOString(),
+} = {}) {
+  const auth = await authorizeMiniAppRequest(request, env);
+  if (!auth.ok) {
+    return json({ ok: false, error: auth.reason || 'telegram_init_data_invalid' }, { status: 401 });
+  }
+  if (!safeString(auth.user?.telegramUserId)) {
+    return json({ ok: false, error: 'telegram_user_missing' }, { status: 401 });
+  }
+  const body = await request.json().catch(() => ({}));
+  const url = new URL(request.url);
+  const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
+  const launchRecord = await resolveLaunchRecord(env, launch);
+  if (auth.authMode === 'telegram') {
+    if (!launchRecord) {
+      return json({ ok: false, error: 'mini_app_launch_invalid' }, { status: 404 });
+    }
+    if (!miniAppLaunchAllowsAgentWrite(launchRecord)) {
+      return json({ ok: false, error: 'mini_app_launch_mismatch' }, { status: 403 });
+    }
+  } else if (launchRecord && !miniAppLaunchAllowsAgentWrite(launchRecord)) {
+    return json({ ok: false, error: 'mini_app_launch_mismatch' }, { status: 403 });
+  }
+  let normalizedPatch;
+  try {
+    normalizedPatch = normalizeAgentSettingsInput(body.settings || body.patch || {});
+  } catch (error) {
+    return json({ ok: false, error: safeString(error?.message || error) || 'settings_patch_invalid' }, { status: 400 });
+  }
+  if (!normalizedPatch.ok) {
+    return json({ ok: false, error: normalizedPatch.reason || 'settings_patch_invalid' }, { status: 400 });
+  }
+  const sessionSlug = launchSessionSlug(launchRecord, env);
+  const requestRecord = await persistSettingsUpdateRequest({
+    env,
+    auth,
+    sessionSlug,
+    patch: normalizedPatch.publicSummary,
+    createdAt,
+  });
+  if (!requestRecord.ok) {
+    return json({ ok: false, error: requestRecord.reason || 'settings_update_request_failed' }, { status: 503 });
+  }
+  return json({
+    ok: true,
+    status: requestRecord.status,
+    settings: normalizedPatch.publicSummary,
+    request: requestRecord,
+  });
+}
+
 function telegramMiniAppHtml() {
   return `<!doctype html>
 <html lang="en">
@@ -744,6 +995,33 @@ function telegramMiniAppHtml() {
     h1 { margin: 0; font-size: 22px; line-height: 1.15; letter-spacing: 0; }
     .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; }
     .status { min-height: 20px; color: var(--muted); font-size: 13px; }
+    .agentBar {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .agentBar button, .settingsPanel select {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 8px 10px;
+    }
+    .settingsPanel {
+      display: none;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 12px;
+      gap: 10px;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      align-items: end;
+    }
+    .settingsPanel.open { display: grid; }
+    .field { display: grid; gap: 5px; }
+    .field label { color: var(--muted); font-size: 12px; }
+    .toggle { display: flex; align-items: center; gap: 8px; min-height: 38px; color: var(--text); }
     .layout { display: grid; grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.35fr); gap: 12px; min-height: 0; }
     .queue, .active { min-height: 0; }
     .queueList { display: grid; gap: 8px; }
@@ -836,15 +1114,32 @@ function telegramMiniAppHtml() {
       .layout { grid-template-columns: 1fr; }
       .card { min-height: 390px; }
       footer { grid-template-columns: 1fr; }
+      .agentBar, .settingsPanel { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <main class="app">
     <header>
-      <h1>Questions</h1>
+      <h1>CE Agent</h1>
       <div class="meta" id="meta"></div>
       <div class="status" id="status">Loading...</div>
+      <div class="agentBar">
+        <button id="showQuestions" type="button">Questions</button>
+        <button id="showSettings" type="button">Settings</button>
+        <button id="createAgent" type="button">Create Agent</button>
+      </div>
+      <section class="settingsPanel" id="settingsPanel" aria-label="Agent settings">
+        <div class="field">
+          <label for="draftStyle">Draft style</label>
+          <select id="draftStyle"></select>
+        </div>
+        <label class="toggle">
+          <input id="telegramReminders" type="checkbox">
+          <span>Reminders</span>
+        </label>
+        <button class="primary" id="saveSettings" type="button">Save</button>
+      </section>
     </header>
     <section class="layout">
       <aside class="queue">
@@ -867,7 +1162,7 @@ function telegramMiniAppHtml() {
     </section>
     <footer>
       <button class="secondary" id="save" type="button">Save Draft</button>
-      <button class="primary" id="submit" type="button">Queue Submit</button>
+      <button class="primary" id="submit" type="button">Submit</button>
     </footer>
   </main>
   <script>
@@ -891,6 +1186,13 @@ function telegramMiniAppHtml() {
       answer: document.getElementById('answer'),
       save: document.getElementById('save'),
       submit: document.getElementById('submit'),
+      showQuestions: document.getElementById('showQuestions'),
+      showSettings: document.getElementById('showSettings'),
+      createAgent: document.getElementById('createAgent'),
+      settingsPanel: document.getElementById('settingsPanel'),
+      draftStyle: document.getElementById('draftStyle'),
+      telegramReminders: document.getElementById('telegramReminders'),
+      saveSettings: document.getElementById('saveSettings'),
     };
     const headers = () => {
       const out = { 'content-type': 'application/json' };
@@ -983,7 +1285,7 @@ function telegramMiniAppHtml() {
       if (question.questionType === 'agree_unsure_disagree') {
         const row = document.createElement('div');
         row.className = 'segmented';
-        [['agree', 'Agree'], ['unsure', 'Unsure'], ['disagree', 'Disagree']].forEach(([value, label]) => {
+        [['agree', 'Agree'], ['disagree', 'Disagree'], ['unsure', 'Unsure']].forEach(([value, label]) => {
           const button = document.createElement('button');
           button.type = 'button';
           button.className = 'segment' + (draft.value === value ? ' selected' : '');
@@ -1034,8 +1336,26 @@ function telegramMiniAppHtml() {
     function render() {
       const data = state.data;
       el.meta.textContent = data ? [data.session.title, data.questionCount + ' questions'].join(' | ') : '';
+      renderAgentSettings();
       renderQueue();
       renderAnswer();
+    }
+    function renderAgentSettings() {
+      const settings = state.data?.agent?.settings || {};
+      const values = settings.values || {};
+      const draftField = (settings.editableFields || []).find((field) => field.field === 'draftStyle') || {};
+      const options = Array.isArray(draftField.options) && draftField.options.length
+        ? draftField.options
+        : ['concise', 'balanced', 'detailed'];
+      el.draftStyle.innerHTML = '';
+      options.forEach((option) => {
+        const opt = document.createElement('option');
+        opt.value = option;
+        opt.textContent = option;
+        if ((values.draftStyle || 'balanced') === option) opt.selected = true;
+        el.draftStyle.appendChild(opt);
+      });
+      el.telegramReminders.checked = values.telegramReminders === true;
     }
     function answerPayload(question) {
       const draft = activeDraft();
@@ -1046,7 +1366,7 @@ function telegramMiniAppHtml() {
     async function sendAnswer(submit) {
       const question = activeQuestion();
       if (!question) return;
-      setStatus(submit ? 'Creating submit request...' : 'Saving draft...');
+      setStatus(submit ? 'Submitting...' : 'Saving draft...');
       const response = await fetch('/telegram/mini-app/api/draft', {
         method: 'POST',
         headers: headers(),
@@ -1062,7 +1382,32 @@ function telegramMiniAppHtml() {
         setStatus(body.error || 'Could not save answer.', 'error');
         return;
       }
-      setStatus(body.status === 'submit_request_created' ? 'Submit request queued.' : 'Draft saved.', 'ok');
+      setStatus(body.status === 'submit_request_created' ? 'Submitted.' : 'Draft saved.', 'ok');
+      if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
+    }
+    async function sendSettings() {
+      setStatus('Saving settings...');
+      const response = await fetch('/telegram/mini-app/api/settings', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({
+          launch,
+          settings: {
+            draftStyle: el.draftStyle.value,
+            telegramReminders: el.telegramReminders.checked,
+          },
+        }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok || !body.ok) {
+        setStatus(body.error || 'Could not save settings.', 'error');
+        return;
+      }
+      state.data.agent.settings.values = {
+        ...state.data.agent.settings.values,
+        ...body.settings,
+      };
+      setStatus('Settings saved.', 'ok');
       if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     }
     async function load() {
@@ -1083,6 +1428,13 @@ function telegramMiniAppHtml() {
     el.next.onclick = () => { state.page += 1; renderQueue(); };
     el.save.onclick = () => sendAnswer(false);
     el.submit.onclick = () => sendAnswer(true);
+    el.showQuestions.onclick = () => { el.settingsPanel.classList.remove('open'); };
+    el.showSettings.onclick = () => { el.settingsPanel.classList.toggle('open'); };
+    el.createAgent.onclick = () => {
+      const request = state.data?.agent?.account?.canonicalApiRequest;
+      setStatus(request ? 'Agent create request scaffold is ready.' : 'Agent action unavailable.', request ? 'ok' : 'error');
+    };
+    el.saveSettings.onclick = () => sendSettings();
     load();
   </script>
 </body>
@@ -1109,12 +1461,17 @@ export async function handleTelegramMiniAppRequest({
   if (url.pathname === '/telegram/mini-app/api/draft' && request.method === 'POST') {
     return handleDraftRequest({ request, env });
   }
+  if (url.pathname === '/telegram/mini-app/api/settings' && request.method === 'POST') {
+    return handleSettingsRequest({ request, env });
+  }
   return json({ ok: false, error: 'not_found' }, { status: 404 });
 }
 
 export const __test__telegramMiniApp = {
+  AGENT_REQUEST_KV_PREFIX,
   SUBMIT_REQUEST_KV_PREFIX,
   buildMiniAppState,
+  normalizeAgentSettingsInput,
   normalizeMiniAnswer,
   validateTelegramMiniAppInitData,
 };

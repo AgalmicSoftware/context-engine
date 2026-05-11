@@ -5,6 +5,9 @@
 ## Boundary
 
 - `/api/agent/*` remains the canonical Context Engine agent contract.
+- `agentApiCatalog.mjs` is the Telegram-facing capability registry for
+  canonical `/api/agent/*` requests, required fields, safe lanes, and handoff
+  status.
 - Telegram group chats are public lobbies for safe session/question/doc summaries.
 - Private chat or Mini App surfaces are the account/action lane.
 - Callback data, deep-link payloads, CloudStorage, Mini App payloads, and persistent chat state use opaque action IDs or safe display text only.
@@ -16,6 +19,33 @@ Managed Telegram demo accounts are deterministic by Telegram principal plus work
 
 `export_demo_key` and `recover_demo_key` are explicit private-only demo actions. They reject passkey, Porto, CE-CC local, linked external wallet, and production modes.
 
+## Agent API Catalog
+
+The bridge exposes a scaffolded Telegram agent surface through
+`agentApiCatalog.mjs`. New Telegram/Web UX capabilities should be added by
+registering a catalog entry, then wiring a command or Mini App control to that
+entry. The worker should create or forward canonical request envelopes; it
+should not reimplement web UX business logic.
+
+Initial Telegram-facing capabilities:
+
+| Capability | Canonical request | Safe Telegram lanes | Status |
+| --- | --- | --- | --- |
+| Action menu | `GET /api/agent/actions` | group, private, Mini App | catalog scaffold |
+| Create agent account | `POST /api/agent/accounts/create-request` | private, Mini App | pending canonical handoff |
+| Account summary | `GET /api/agent/accounts/me` | private, Mini App | worker-local until canonical |
+| Settings overview | `GET /api/agent/settings` | private, Mini App | planned contract-only |
+| Settings update | `POST /api/agent/settings/update-request` | private, Mini App | pending canonical handoff |
+| Questions | `GET /api/agent/questions` | group, private, Mini App | worker-local index until canonical |
+| Response submit request | `POST /api/agent/responses/submit-request` | private, Mini App | pending canonical handoff |
+| SBT claim/create, decrypt, storage access, OpenClaw events | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only |
+
+Settings updates currently accept only safe structured fields such as
+`draftStyle` (`concise`, `balanced`, `detailed`) and `telegramReminders`.
+Freeform profile text, credentials, grants, keys, JWTs, gated content, and other
+private inputs must stay behind opaque refs collected in private chat or the
+Mini App.
+
 ## Telegram Screens
 
 Every `telegram_screen_state` carries launch metadata: a command, an opaque callback, or the `t.me/<bot>?start=<opaque-action-id>` deep link template.
@@ -23,6 +53,10 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | State | Launch |
 | --- | --- |
 | `setup_welcome`, `test_checklist` | `/start` |
+| `agent_action_menu` | `/ce_actions`, `/ce_agent`, or `callback:<opaque-action-id>` |
+| `agent_account_create` | `/ce_create_agent`, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>` |
+| `agent_settings_overview` | `/ce_settings`, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>` |
+| `agent_settings_edit` | `/ce_settings` edit callback or Mini App |
 | `group_session_card`, `account_created` | `/ce_join` |
 | `private_start` | `/start <opaque-action-id>` or `t.me/<bot>?start=<opaque-action-id>` |
 | `question_list` | `/ce_questions` |
@@ -53,6 +87,24 @@ Private or gated question text is never posed to the group; group output shows a
 locked state and routes eligible accounts to private chat or Mini App.
 
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
+
+## Bot Commands
+
+Core Telegram commands:
+
+- `/start` opens the help/action entry point or consumes an opaque private start
+  payload.
+- `/ce_actions` and `/ce_agent` open the generic agent action launcher. Group
+  chat shows only public-safe labels plus private/Mini App launch controls.
+- `/ce_create_agent` creates a private scaffold request for a
+  Telegram-managed demo agent account and records a canonical
+  `/api/agent/accounts/create-request` envelope. In group chat it returns only a
+  private-chat launch.
+- `/ce_settings` shows private settings state and an edit entry point. Group
+  chat returns only a private-chat launch.
+- `/ce_join <session>`, `/ce_sessions`, `/ce_questions`, `/q <number-or-id>`,
+  `/ce_attachments`, `/ce_docs`, `/ce_me`, and `/ce_account` keep their existing
+  session/question/document/account behavior.
 
 ## SBT and Account Screens
 
@@ -209,12 +261,13 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 The live webhook route is `/telegram/webhook`. It rejects requests unless
 `TELEGRAM_BRIDGE_ENABLED=true`, a bot token is configured, and Telegram supplies
 the configured webhook secret token. It parses real Telegram `message` and
-`callback_query` updates, handles `/start`, `/ce_join <session>`,
-`/ce_sessions`, `/ce_questions`, `/ce_pose_question`, `/q`, `/ce_attachments`
-or legacy `/ce_docs`, and `/ce_me`, answers callback queries to clear
-Telegram's inline-button loading state, and sends replies through an injected
-Telegram Bot API adapter. Unit tests use mocked `fetch` and fake bot tokens;
-real `TELEGRAM_BOT_TOKEN` is needed only for live Telegram smoke.
+`callback_query` updates, handles `/start`, `/ce_actions`, `/ce_agent`,
+`/ce_create_agent`, `/ce_settings`, `/ce_join <session>`, `/ce_sessions`,
+`/ce_questions`, `/ce_pose_question`, `/q`, `/ce_attachments` or legacy
+`/ce_docs`, and `/ce_me`, answers callback queries to clear Telegram's
+inline-button loading state, and sends replies through an injected Telegram Bot
+API adapter. Unit tests use mocked `fetch` and fake bot tokens; real
+`TELEGRAM_BOT_TOKEN` is needed only for live Telegram smoke.
 
 Callback data and private deep-link start payloads are opaque `cecb_*` or
 `cetg_*` identifiers. Private payloads, JWTs, worker tokens, account material,
@@ -320,6 +373,7 @@ The Worker serves a v0 Telegram Mini App at:
 GET  /telegram/mini-app
 GET  /telegram/mini-app/api/state?launch=<opaque-cecb-id>
 POST /telegram/mini-app/api/draft
+POST /telegram/mini-app/api/settings
 ```
 
 The bot opens the Mini App with Telegram inline `web_app` buttons in private
@@ -349,9 +403,15 @@ defaults to 24 hours.
 
 Current v0 scope:
 
+- Agent/account/settings action surface backed by the catalog, including safe
+  settings inputs for `draftStyle` and `telegramReminders`.
 - Native freeform, binary, rating, and multichoice answer forms with a
   five-question paged queue similar to the CE pile response flow.
 - Draft saves through `POST /telegram/mini-app/api/draft`.
+- Settings saves through `POST /telegram/mini-app/api/settings`, which creates a
+  Worker-local `telegram:agent-request:*` record and a planned canonical
+  `/api/agent/settings/update-request` envelope. It does not execute the live
+  settings backend yet.
 - `submit=true` creates a Worker-local submit request with an opaque request ID
   and a planned canonical `/api/agent/responses/submit-request` handoff. Exact
   answer replays for the same Telegram user, session, and question reuse the
@@ -492,9 +552,9 @@ IDs.
 7. Keep `--skip-telegram-webhook` or `--skip-health-check` only for diagnosis;
    the normal live smoke should run both.
 8. Confirm the deployed `/health` output reports `worker: agentBridgeWorker`.
-9. Smoke Telegram private chat `/start`, group `/ce_join <session>`,
-   `/ce_sessions`, `/ce_questions`, `/q <number-or-id>`, `/ce_attachments`, and
-   private `/ce_me`.
+9. Smoke Telegram private chat `/start`, `/ce_actions`, `/ce_create_agent`,
+   `/ce_settings`, group `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
+   `/q <number-or-id>`, `/ce_attachments`, and private `/ce_me`.
 10. Confirm replies contain only safe summaries and opaque `cecb_*` / `cetg_*`
     action IDs, no raw callback payloads, grants, JWTs, Cloudflare credentials,
     private keys, RPC secrets, document paths, or private/gated text.
@@ -534,6 +594,10 @@ Still mocked or contract-only for this first smoke:
 - Live public question reads use the Telegram worker-local cache for now; docs
   still use configured demo fixtures unless the canonical `/api/agent/*`
   session contract is wired for that route.
+- Agent account/settings endpoints are scaffolded request envelopes only:
+  `/api/agent/accounts/create-request`, `/api/agent/accounts/me`,
+  `/api/agent/settings`, and `/api/agent/settings/update-request` still need the
+  canonical backend implementation.
 - OpenClaw/MCP forwarding is contract-only; no real external OpenClaw HTTP/MCP
   transport is sent from this worker.
 - Broadcast remains disabled.
@@ -549,12 +613,13 @@ that direct path is denied, the worker creates a canonical submit request or
 draft. Group summaries include only status/count refs; response text and account
 state stay private.
 
-Bot v1 structured answer buttons now save a private Telegram answer draft, and
-the `Submit Draft` callback creates a Worker-local submit request under
+Bot v1 structured answer buttons now save a private Telegram answer draft and
+immediately create a Worker-local submit request under
 `telegram:submit-request:*` with a canonical
-`/api/agent/responses/submit-request` handoff body. This is the bot-side submit
-queue; direct smart-contract broadcast remains disabled until the canonical
-approval/signing path is wired.
+`/api/agent/responses/submit-request` handoff body. Older submit callbacks are
+still accepted for compatibility, but new bot messages submit on answer tap.
+This is the bot-side submit queue; direct smart-contract broadcast remains
+disabled until the canonical approval/signing path is wired.
 
 ## Mock OpenClaw Forwarding
 
@@ -571,16 +636,16 @@ Telegram question cards follow CE control conventions:
   `singleSelect`, and `sessionName`/`sessionSlug`; the worker cache prefix was
   bumped so stale freeform-only and payload-unavailable records are not reused
   after deploy.
-- Binary/agree-style questions use `Agree`, `Unsure`, and `Disagree` answer
-  buttons.
+- Binary/agree-style questions use `Agree`, `Disagree`, and `Unsure` answer
+  buttons, so the direct yes/no choices appear together first.
 - Rating questions render discrete `0` through `10` answer buttons.
 - Single-select multichoice questions render single-select option buttons.
 - Multi-select multichoice questions preserve per-option selected state.
 - Freeform questions expose `Type` and `Voice`.
-- Button answers save a Telegram worker-local draft keyed by user/session/question;
-  `Submit Draft` queues a bot-side submit request with an opaque request ID.
-  Final on-chain broadcast is still a canonical `/api/agent/*` approval/signing
-  handoff.
+- Button answers save a Telegram worker-local draft keyed by
+  user/session/question and immediately queue a bot-side submit request with an
+  opaque request ID. Final on-chain broadcast is still a canonical
+  `/api/agent/*` approval/signing handoff.
 - Additional comments are always present, microphone is present when supported,
   and docs/context appears only when docs exist or are relevant.
 
