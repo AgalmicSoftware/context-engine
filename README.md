@@ -82,16 +82,6 @@ For testing, run modes, and deeper setup:
 
 The top-level [`ai-discourse-corpus/`](ai-discourse-corpus/) directory contains reusable JSON sub-corpuses curated from AI policy, safety, governance, science fiction, practitioner interviews, evaluation work, debates, and enriched social-media discussion. Rights for that directory are described separately in [ai-discourse-corpus/LICENSE.md](ai-discourse-corpus/LICENSE.md): no ownership is claimed over upstream source material, and project-authored annotations are dedicated under CC0.
 
-## Video Production Notes
-
-For local Context Engine video work, use the shared VideoFactory tooling in
-`xoCortex/projects/video-factory` for ElevenLabs voice-over generation. Keep
-`ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in VideoFactory's gitignored
-`secrets/.env`, then call `scripts/voice-generation/generate_voice.py` from
-that repo or source `scripts/load_env.sh` before running custom assembly
-scripts. Do not use macOS `say` voices for review cuts that are intended to
-match the Jeanette/Jane ElevenLabs voice.
-
 ## Scaling
 
 The default public deployment supports hundreds to low thousands of concurrent participants per session. For larger deployments, see [docs/scaling.md](docs/scaling.md).
