@@ -1030,7 +1030,9 @@
 }
 
 .sbtMintStatusItem {
+  position: relative;
   margin-bottom: 8px;
+  padding-right: 54px;
   font-size: 1rem;
   /* slightly larger for readability */
   font-weight: 700;
@@ -1088,6 +1090,10 @@
 /* NEW: Globally-scoped close button for Reactstrap Alert */
 /* ===================================================== */
 :global(.sbt-alert-close-btn) {
+  position: absolute !important;
+  top: 50% !important;
+  right: 10px !important;
+  transform: translateY(-50%) !important;
   color: #222 !important;
   font-weight: 600 !important;
   font-size: 1.6rem !important;
