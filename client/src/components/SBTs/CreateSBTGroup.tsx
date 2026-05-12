@@ -3288,7 +3288,7 @@ class CreateSBTGroup extends Component<any, any> {
     } catch (error) {
       sbtLog.error('[CreateSBTGroup] Mint failed:', error);
       this.setState(buildCreateSbtMintResetFailurePatch({
-        error: getErrorMessage(error, `${t('minting')} failed.`),
+        error: getErrorMessage(error, 'Create failed.'),
       }));
     }
   }
@@ -3889,8 +3889,8 @@ class CreateSBTGroup extends Component<any, any> {
       createActionLabel,
       currentStep,
       deferredDeployMode,
-      mintedLabel: t('minted'),
-      mintingLabel: t('minting'),
+      mintedLabel: 'Created',
+      mintingLabel: 'Creating',
       sbtMinted,
     });
     const primaryButtonState = resolveCreateSbtPrimaryButtonState({
@@ -4172,7 +4172,7 @@ class CreateSBTGroup extends Component<any, any> {
         </div>
 
         <div className={styles.collapsibleSection}>
-          {this.renderCollapsibleHeader(`${t('mint')} Options`, 'mintOptionsCollapsed')}
+          {this.renderCollapsibleHeader('Create Options', 'mintOptionsCollapsed')}
           {!mintOptionsCollapsed && (
             <div className={styles.sbtTokenOptions}>
 
@@ -4531,7 +4531,7 @@ class CreateSBTGroup extends Component<any, any> {
                 icon={getCreateSbtProgressIcon(progressIndicatorState.mintStep.iconState)}
                 spin={progressIndicatorState.mintStep.spin}
               />
-              <span>{t('mint')}</span>
+              <span>Create</span>
             </div>
           </div>
         )}

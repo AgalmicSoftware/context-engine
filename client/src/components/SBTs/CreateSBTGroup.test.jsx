@@ -1598,7 +1598,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(screen.getByPlaceholderText('Name')).toBeInTheDocument();
     expect(screen.getByText('Image')).toBeInTheDocument();
     expect(mintOptionsHeader).toHaveAttribute('aria-expanded', 'false');
-    expect(within(mintOptionsHeader).getByText('Collect Options')).toBeInTheDocument();
+    expect(within(mintOptionsHeader).getByText('Create Options')).toBeInTheDocument();
   });
 
   it('groups the compact token info controls into shared desktop rows', () => {
@@ -3114,8 +3114,8 @@ describe('CreateSBTGroup cache helpers', () => {
     render(instance.render());
 
     expect(screen.getByRole('heading', { name: 'Created' })).toBeInTheDocument();
-    expect(screen.getByText(`${t('minted')}!`)).toBeInTheDocument();
-    expect(screen.getByText(t('mint'))).toBeInTheDocument();
+    expect(screen.getByText('Created!')).toBeInTheDocument();
+    expect(screen.getAllByText('Create').length).toBeGreaterThan(0);
     expect(screen.getByText('Contract Address:')).toBeInTheDocument();
     expect(screen.getByTitle('Copy Link to Page')).toBeInTheDocument();
     expect(screen.getByTitle('Bookmark')).toBeInTheDocument();
