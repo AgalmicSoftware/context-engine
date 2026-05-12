@@ -269,10 +269,10 @@ describe('SessionListeningPanel', () => {
   });
 
   it('finalizes active recorder audio before closing the panel', async () => {
-    let resolveFinalize: (() => void) | null = null;
+    const resolveFinalizeRef: { current: (() => void) | null } = { current: null };
     const finalizeRecording = jest.fn(() => (
       new Promise<void>((resolve) => {
-        resolveFinalize = resolve;
+        resolveFinalizeRef.current = resolve;
       })
     ));
     const onClose = jest.fn();
@@ -290,7 +290,7 @@ describe('SessionListeningPanel', () => {
     expect(finalizeRecording).toHaveBeenCalledWith({ waitForTranscription: true });
     expect(onClose).not.toHaveBeenCalled();
 
-    resolveFinalize?.();
+    resolveFinalizeRef.current?.();
     await waitFor(() => {
       expect(onClose).toHaveBeenCalledTimes(1);
     });
