@@ -18,7 +18,11 @@ type UseRollingTranscriptionRecorderOptions = {
   retainRawAudio?: boolean;
 };
 
-type RollingRecorderStatus = 'idle' | 'requesting' | 'recording' | 'stopping' | 'error';
+type FinalizeRecordingOptions = {
+  waitForTranscription?: boolean;
+};
+
+type RollingRecorderStatus = 'idle' | 'requesting' | 'recording' | 'paused' | 'stopping' | 'error';
 
 const pickSupportedMimeType = () => {
   if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
@@ -60,6 +64,7 @@ export const useRollingTranscriptionRecorder = ({
   const rotationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingActiveRef = useRef(false);
   const endingRecordersRef = useRef<Set<MediaRecorder>>(new Set());
+  const stopWaitersRef = useRef<Set<() => void>>(new Set());
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const rawChunksRef = useRef<Map<string, Blob>>(new Map());
 
@@ -109,6 +114,13 @@ export const useRollingTranscriptionRecorder = ({
     }
   }, []);
 
+  const startElapsedTimer = useCallback(() => {
+    stopTimer();
+    timerRef.current = setInterval(() => {
+      setElapsedSeconds((seconds) => seconds + 1);
+    }, 1000);
+  }, [stopTimer]);
+
   const stopTracks = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => {
@@ -154,12 +166,16 @@ export const useRollingTranscriptionRecorder = ({
             workerUrl,
           });
           if (!mountedRef.current) return;
+          const cleanedText = String(text || '').trim();
+          if (cleanedText) {
+            setErrorMessage('');
+          }
           updateSegments((previous) => previous.map((entry) => (
             entry.id === id
               ? {
                   ...entry,
                   status: 'complete',
-                  text: String(text || '').trim(),
+                  text: cleanedText,
                   completedAt: Date.now(),
                 }
               : entry
@@ -198,6 +214,12 @@ export const useRollingTranscriptionRecorder = ({
     }
   }, []);
 
+  const resolveStopWaiters = useCallback(() => {
+    const waiters = Array.from(stopWaitersRef.current);
+    stopWaitersRef.current.clear();
+    waiters.forEach((resolve) => resolve());
+  }, []);
+
   const createRecorder = useCallback((stream: MediaStream): MediaRecorder => {
     const mimeType = pickSupportedMimeType();
     const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -232,13 +254,14 @@ export const useRollingTranscriptionRecorder = ({
       if (mediaRecorderRef.current === recorder) {
         mediaRecorderRef.current = null;
       }
+      resolveStopWaiters();
       if (mountedRef.current) {
         setStatus((previous) => (previous === 'error' ? 'error' : 'idle'));
       }
     };
 
     return recorder;
-  }, [clearRotationTimer, processSegment, stopTimer, stopTracks]);
+  }, [clearRotationTimer, processSegment, resolveStopWaiters, stopTimer, stopTracks]);
 
   const rotateRecorder = useCallback(() => {
     if (!recordingActiveRef.current || !streamRef.current) return;
@@ -268,7 +291,7 @@ export const useRollingTranscriptionRecorder = ({
   }, [chunkDurationMs, clearRotationTimer, rotateRecorder]);
 
   const startRecording = useCallback(async () => {
-    if (status === 'recording' || status === 'requesting') return;
+    if (status === 'recording' || status === 'paused' || status === 'requesting') return;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setErrorMessage('Microphone recording is not available in this browser.');
       setStatus('error');
@@ -296,10 +319,7 @@ export const useRollingTranscriptionRecorder = ({
       recordingActiveRef.current = true;
       recorder.start();
       setElapsedSeconds(0);
-      stopTimer();
-      timerRef.current = setInterval(() => {
-        setElapsedSeconds((seconds) => seconds + 1);
-      }, 1000);
+      startElapsedTimer();
       startRotationTimer();
       setStatus('recording');
     } catch (error) {
@@ -310,30 +330,96 @@ export const useRollingTranscriptionRecorder = ({
       setErrorMessage(describeError(error));
       setStatus('error');
     }
-  }, [clearRotationTimer, createRecorder, startRotationTimer, status, stopTimer, stopTracks]);
+  }, [clearRotationTimer, createRecorder, startElapsedTimer, startRotationTimer, status, stopTimer, stopTracks]);
 
-  const stopRecording = useCallback(() => {
+  const pauseRecording = useCallback(() => {
+    if (status !== 'recording') return;
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state !== 'recording') return;
+    try {
+      recorder.pause();
+      clearRotationTimer();
+      stopTimer();
+      setStatus('paused');
+    } catch (error) {
+      setErrorMessage(describeError(error));
+      setStatus('error');
+    }
+  }, [clearRotationTimer, status, stopTimer]);
+
+  const resumeRecording = useCallback(() => {
+    if (status !== 'paused') return;
+    const recorder = mediaRecorderRef.current;
+    if (!recorder || recorder.state !== 'paused') return;
+    try {
+      recorder.resume();
+      startElapsedTimer();
+      startRotationTimer();
+      setStatus('recording');
+    } catch (error) {
+      setErrorMessage(describeError(error));
+      setStatus('error');
+    }
+  }, [startElapsedTimer, startRotationTimer, status]);
+
+  const finalizeRecording = useCallback(async ({
+    waitForTranscription = true,
+  }: FinalizeRecordingOptions = {}) => {
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state === 'inactive') {
       recordingActiveRef.current = false;
       clearRotationTimer();
       stopTimer();
       stopTracks();
-      setStatus('idle');
+      if (mountedRef.current) {
+        setStatus('idle');
+      }
+      if (waitForTranscription) {
+        await queueRef.current.catch(() => undefined);
+      }
       return;
     }
     setStatus('stopping');
     recordingActiveRef.current = false;
     clearRotationTimer();
-    const stopped = stopRecorder(recorder, true);
+
+    const stopped = await new Promise<boolean>((resolve) => {
+      let settled = false;
+      let timeout: ReturnType<typeof setTimeout> | null = null;
+      const settle = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (timeout) clearTimeout(timeout);
+        resolve(value);
+      };
+      const waiter = () => settle(true);
+      stopWaitersRef.current.add(waiter);
+      timeout = setTimeout(() => {
+        stopWaitersRef.current.delete(waiter);
+        settle(false);
+      }, 2000);
+      const stopStarted = stopRecorder(recorder, true);
+      if (!stopStarted) {
+        stopWaitersRef.current.delete(waiter);
+        settle(false);
+      }
+    });
+
     if (!stopped) {
       stopTimer();
       stopTracks();
     }
+    if (waitForTranscription) {
+      await queueRef.current.catch(() => undefined);
+    }
   }, [clearRotationTimer, stopRecorder, stopTimer, stopTracks]);
 
+  const stopRecording = useCallback(() => (
+    finalizeRecording({ waitForTranscription: false })
+  ), [finalizeRecording]);
+
   const clearDraft = useCallback(() => {
-    if (status === 'recording' || status === 'requesting' || status === 'stopping') return;
+    if (status === 'recording' || status === 'paused' || status === 'requesting' || status === 'stopping') return;
     rawChunksRef.current.clear();
     segmentIndexRef.current = 0;
     setSegments([]);
@@ -350,14 +436,13 @@ export const useRollingTranscriptionRecorder = ({
     stopTimer();
     try {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        endingRecordersRef.current.add(mediaRecorderRef.current);
-        mediaRecorderRef.current.stop();
+        stopRecorder(mediaRecorderRef.current, true);
       }
     } catch (_) {
       // cleanup best effort
     }
     stopTracks();
-  }, [clearRotationTimer, stopTimer, stopTracks]);
+  }, [clearRotationTimer, stopRecorder, stopTimer, stopTracks]);
 
   const pendingSegmentCount = segments.filter((segment) => (
     segment.status === 'queued' || segment.status === 'transcribing'
@@ -366,6 +451,7 @@ export const useRollingTranscriptionRecorder = ({
   return {
     status,
     isRecording: status === 'recording',
+    isPaused: status === 'paused',
     isStopping: status === 'stopping',
     isBusy: status === 'requesting' || status === 'stopping',
     elapsedSeconds,
@@ -373,8 +459,12 @@ export const useRollingTranscriptionRecorder = ({
     segments,
     pendingSegmentCount,
     errorMessage,
+    mediaStreamRef: streamRef,
     startRecording,
+    pauseRecording,
+    resumeRecording,
     stopRecording,
+    finalizeRecording,
     clearDraft,
   };
 };

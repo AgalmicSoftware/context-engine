@@ -186,8 +186,10 @@ Agent page UI: `client/src/components/Agent/AgentPage.tsx`
 | `ce-session-listening-panel` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Pile-adjacent listening panel opened by the microphone toggle or `?mode=listening`. | yes |  |
 | `ce-session-listening-start` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Starts the rolling microphone recording after a user gesture. | yes |  |
 | `ce-session-listening-stop` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Stops the active rolling recording session. | yes |  |
+| `ce-session-listening-clear` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Clears the current listening transcript/draft from the transcript overlay control. | yes |  |
+| `ce-session-listening-transcript-details` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Compact transcript character-count button that opens/closes the stitched transcript. | yes |  |
 | `ce-session-listening-transcript` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Read-only stitched transcript textarea. | yes |  |
-| `ce-session-listening-generate` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Generates draft questions from the stitched transcript. | yes |  |
+| `ce-session-listening-generate` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Generates draft questions from the stitched transcript. Hidden until transcript/audio content exists. | yes |  |
 | `ce-session-listening-suggestions` | `client/src/components/SurveyTool/SessionListeningPanel.tsx` | Wrapper around the generated-question review surface. | yes |  |
 | `ce-survey-additional-toggle` | `client/src/components/SurveyTool/SurveyTool.tsx` | Toggle that opens/closes the "Additional comments" section for a question. | yes | `data-ce-question-id` |
 | `ce-survey-additional-input` | `client/src/components/Shared/AudioInput/AudioInput.tsx` (wired from `SurveyTool.tsx`) | Textarea used for additional comments. | yes | `data-ce-question-id` |
