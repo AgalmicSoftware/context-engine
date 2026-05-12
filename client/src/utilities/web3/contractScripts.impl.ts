@@ -4580,8 +4580,43 @@ async getSurveyDataById(providerName, surveyId, groupKeyOrCfg, opts = {}) {
             if (Array.isArray(json.tags)) out.tags = json.tags;
             if ((out.tags == null) && out.tagsEncrypted) out.tags = [];
             if (out.tagsEncrypted) out.tagsLocked = true;
-            if (Array.isArray(json.documentURLs)) out.documentURLs = json.documentURLs.filter(Boolean);
-            if ((out.documentURLs == null) && out.documentURLsEncrypted) out.documentURLs = [];
+            const documentUrlValue =
+              json.documentURLs ||
+              json.documentUrls ||
+              json.docURLs ||
+              json.docUrls ||
+              json.documentURL ||
+              json.documentUrl ||
+              json.docURL ||
+              json.docUrl ||
+              null;
+            if (Array.isArray(documentUrlValue)) {
+              out.documentURLs = documentUrlValue.filter(Boolean);
+            } else if (typeof documentUrlValue === 'string' && documentUrlValue.trim()) {
+              out.documentURLs = [documentUrlValue.trim()];
+            } else if (Array.isArray(json.documents)) {
+              out.documentURLs = json.documents
+                .map((entry) => {
+                  if (typeof entry === 'string') return entry.trim();
+                  if (entry && typeof entry === 'object') {
+                    const record = entry as Record<string, unknown>;
+                    return String(
+                      record.url ||
+                      record.href ||
+                      record.link ||
+                      record.documentURL ||
+                      record.documentUrl ||
+                      record.docURL ||
+                      record.docUrl ||
+                      record.value ||
+                      ''
+                    ).trim();
+                  }
+                  return '';
+                })
+                .filter(Boolean);
+            }
+            if (out.documentURLs == null) out.documentURLs = [];
             if (out.documentURLsEncrypted) out.documentURLsLocked = true;
             if (typeof json.creator === 'string') out.creator = json.creator;
             if (typeof json.sessionSlug === 'string') out.sessionSlug = json.sessionSlug;

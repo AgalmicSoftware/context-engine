@@ -750,8 +750,17 @@ describe('sbtPageHelpers', () => {
     expect(needsSbtPageTokenUriFields(complete)).toBe(false);
     expect(needsSbtPageTokenUriFields({
       ...complete,
+      documentURLs: [],
+    })).toBe(false);
+    expect(needsSbtPageTokenUriFields({
+      ...complete,
       image: '',
+      documentURLs: [],
       encryptedFields: { image: { ciphertext: 'locked' } },
+    })).toBe(false);
+    expect(needsSbtPageTokenUriFields({
+      ...complete,
+      docURL: 'https://example.test/source',
     })).toBe(false);
     expect(needsSbtPageTokenUriFields({
       ...complete,
@@ -2422,6 +2431,15 @@ describe('sbtPageHelpers', () => {
       documentURLs: ['https://example.test/doc', '7'],
       tags: ['tag-a', ''],
     });
+    expect(resolveSbtPageRelevantInfoLists({
+      sbtInfo: {
+        docURL: 'https://example.test/single-doc',
+        documents: [{ href: 'https://example.test/object-doc' }],
+      },
+    }).documentURLs).toEqual([
+      'https://example.test/single-doc',
+      'https://example.test/object-doc',
+    ]);
     expect(resolveSbtPageRelevantInfoLists({
       sbtInfo: null,
     })).toEqual({
