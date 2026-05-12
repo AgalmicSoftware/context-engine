@@ -648,6 +648,40 @@ export const toStringList = (value: unknown): string[] => (
   Array.isArray(value) ? value.map((entry) => String(entry ?? '')) : []
 );
 
+export const toSbtPageDocumentUrlList = (...values: unknown[]): string[] => {
+  const out: string[] = [];
+  const visit = (value: unknown): void => {
+    if (value == null) return;
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) out.push(trimmed);
+      return;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      out.push(String(value));
+      return;
+    }
+    if (!isRecord(value)) return;
+    const nested = [
+      value.url,
+      value.href,
+      value.link,
+      value.documentURL,
+      value.documentUrl,
+      value.docURL,
+      value.docUrl,
+      value.value,
+    ].find((entry) => typeof entry === 'string' && entry.trim().length > 0);
+    if (typeof nested === 'string') out.push(nested.trim());
+  };
+  values.forEach(visit);
+  return out;
+};
+
 export const coerceSbtPageStringArrayValue = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map((entry: unknown) => String(entry));
   if (typeof value === 'string') {
@@ -1555,7 +1589,17 @@ export const resolveSbtPageRelevantInfoLists = ({
   const info = isRecord(sbtInfo) ? sbtInfo : {};
   return {
     documentIDHashes: toStringList(info.documentIDHashes),
-    documentURLs: toStringList(info.documentURLs),
+    documentURLs: toSbtPageDocumentUrlList(
+      info.documentURLs,
+      info.documentUrls,
+      info.documentURL,
+      info.documentUrl,
+      info.docURLs,
+      info.docUrls,
+      info.docURL,
+      info.docUrl,
+      info.documents,
+    ),
     tags: toStringList(info.tags),
   };
 };

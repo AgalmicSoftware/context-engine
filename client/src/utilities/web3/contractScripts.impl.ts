@@ -4610,7 +4610,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
               out.documentURLs = [documentUrlValue.trim()];
             } else if (Array.isArray(json.documents)) {
               out.documentURLs = json.documents
-                .map((entry: any) => {
+                .map((entry) => {
                   if (typeof entry === 'string') return entry.trim();
                   if (entry && typeof entry === 'object') {
                     const record = entry as Record<string, unknown>;
