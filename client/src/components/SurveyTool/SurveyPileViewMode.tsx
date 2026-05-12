@@ -543,8 +543,9 @@ export class PileViewMode extends SurveyQuestions {
     this._lastInitializeResponseSig = '';
     this._lastNotifiedPileSubmitRailVisible = null;
 
-    // Ref for auto-scrolling to Create section
+    // Refs for auto-scrolling to newly opened sections
     this.createSectionRef = React.createRef();
+    this.listeningPanelRef = React.createRef();
   }
 
   buildWarmPileSeedState(propsIn = this.props) {
@@ -1119,6 +1120,9 @@ export class PileViewMode extends SurveyQuestions {
     this.maybeRecoverUnhydratedGatedPile();
     this.syncLoadingElapsedTimer();
     this.notifyPileSubmitRailVisibility();
+    if (this.state.showListeningPanel) {
+      this.scrollListeningPanelIntoViewIfNeeded('auto');
+    }
     // Start long-loading timer
     this.loadingTimeout = setTimeout(() => {
       if (this.state.loading || !this.props.isQuestionCacheReady) {
@@ -1405,9 +1409,29 @@ export class PileViewMode extends SurveyQuestions {
     } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
   }
 
+  shouldUseMobileListeningScroll = () => {
+    if (typeof window === 'undefined') return false;
+    try {
+      if (typeof window.matchMedia === 'function') {
+        return window.matchMedia('(max-width: 1100px)').matches;
+      }
+    } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+    return Number(window.innerWidth || 0) > 0 && Number(window.innerWidth || 0) <= 1100;
+  }
+
+  scrollListeningPanelIntoViewIfNeeded = (behavior = 'smooth') => {
+    if (!this.state.showListeningPanel || !this.shouldUseMobileListeningScroll()) return;
+    const target = this.listeningPanelRef?.current;
+    if (!target || typeof target.scrollIntoView !== 'function') return;
+    try {
+      target.scrollIntoView({ behavior, block: 'start' });
+    } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+  }
+
   toggleListeningPanel = () => {
     this.setState((prev) => ({ showListeningPanel: !prev.showListeningPanel }), () => {
       this.syncListeningModeQuery(!!this.state.showListeningPanel);
+      this.scrollListeningPanelIntoViewIfNeeded('smooth');
     });
   }
 
@@ -2712,11 +2736,13 @@ export class PileViewMode extends SurveyQuestions {
             })}
           </div>
           {showListeningAside && (
-            <SessionListeningPanel
-              {...this.props}
-              {...this.getAudioInputWorkerProps()}
-              onClose={this.closeListeningPanel}
-            />
+            <div className={styles.sessionListeningPanelAnchor} ref={this.listeningPanelRef}>
+              <SessionListeningPanel
+                {...this.props}
+                {...this.getAudioInputWorkerProps()}
+                onClose={this.closeListeningPanel}
+              />
+            </div>
           )}
         </div>
 

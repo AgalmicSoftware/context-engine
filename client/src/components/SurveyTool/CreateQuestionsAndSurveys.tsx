@@ -648,6 +648,7 @@ interface CreateQuestionsAndSurveysProps {
     title?: string;
     [key: string]: unknown;
   } | null;
+  preformedMode?: 'questions' | 'survey';
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
   hideSurveyQuestionToggleUntilAuthoring?: boolean;
@@ -940,9 +941,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       });
 
       const nextState = this.state as CreateQuestionsAndSurveysState;
+      const preformedMode = String(props.preformedMode || '').trim().toLowerCase();
       if (props.preformedSurvey && props.preformedSurvey.title) {
         nextState.title = props.preformedSurvey.title;
+        nextState.isStandaloneQuestion = preformedMode === 'questions';
+      } else if (preformedMode === 'survey') {
         nextState.isStandaloneQuestion = false;
+      } else if (preformedMode === 'questions') {
+        nextState.isStandaloneQuestion = true;
       } else {
         nextState.isStandaloneQuestion = !props.preformedSurvey?.title;
       }

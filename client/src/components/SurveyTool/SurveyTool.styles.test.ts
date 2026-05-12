@@ -168,6 +168,52 @@ describe('SurveyTool styles', () => {
     expect(scss).toMatch(/\.binaryQuestionContainer,\s*\.ratingQuestionContainer,\s*\.freeformQuestionContainer\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?min-height:\s*0;/);
   });
 
+  it('keeps embedded listening-mode question authoring readable on the light panel', () => {
+    const scss = readSurveyToolScss();
+    const listeningCreateWrap = scss.match(/\.sessionListeningCreateWrap\s*{[\s\S]*?^}/m)?.[0] || '';
+
+    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="createSurveyContainer"\]\)\s*{[\s\S]*?background:\s*#edf2f7\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="questionPromptInput"\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="questionContainer"\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="toggleLabel"\]\),[\s\S]*?color:\s*#18243a\s*!important;[\s\S]*?opacity:\s*1\s*!important;/);
+    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="typeButton"\]\)\s*{[\s\S]*?background:\s*#f8fafc\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="removeQuestionButton"\]\),[\s\S]*?background:\s*#fff\s*!important;[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="tagInputField"\]\)\s*{[\s\S]*?color:\s*#18243a\s*!important;/);
+    expect(listeningCreateWrap).toMatch(/:global\(\[class\*="filterBubble"\]\)\s*{[\s\S]*?background:\s*#dff7ea\s*!important;[\s\S]*?color:\s*#123a2d\s*!important;/);
+  });
+
+  it('keeps listening mode from changing the pile card vertical layout', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(/\.pileListeningLayout\s*{[\s\S]*?position:\s*relative;[\s\S]*?width:\s*100%;[\s\S]*?margin:\s*0;[\s\S]*?padding:\s*0;/);
+    expect(scss).toMatch(/\.pileListeningLayout \.pileWrapper\s*{[\s\S]*?width:\s*100%;[\s\S]*?margin-bottom:\s*38px;/);
+    expect(scss).toMatch(/\.sessionListeningPanelAnchor\s*{[\s\S]*?position:\s*fixed;[\s\S]*?bottom:\s*clamp\(16px,\s*3vw,\s*36px\);[\s\S]*?pointer-events:\s*none;/);
+    expect(scss).toMatch(/\.sessionListeningPanel\s*{[\s\S]*?max-height:\s*calc\(100vh - 32px\);[\s\S]*?overflow-y:\s*auto;/);
+    expect(scss).toMatch(/@media \(max-width: 1100px\)\s*{[\s\S]*?\.sessionListeningPanelAnchor\s*{[\s\S]*?position:\s*static;[\s\S]*?pointer-events:\s*auto;/);
+  });
+
+  it('keeps listening mode record-first and uses copied HealthBot waveform controls while recording', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(/\.sessionListeningRecordButton\s*{[\s\S]*?width:\s*132px;[\s\S]*?height:\s*132px;[\s\S]*?border-radius:\s*50% !important;/);
+    expect(scss).toMatch(/\.sessionListeningActiveRecorder\s*{[\s\S]*?display:\s*flex;[\s\S]*?gap:\s*10px;[\s\S]*?background-color:\s*#f9f9f9;/);
+    expect(scss).toMatch(/\.sessionListeningWaveformShell\s*{[\s\S]*?height:\s*80px;[\s\S]*?border:\s*2px inset #808080;[\s\S]*?background-color:\s*#c0c0c0;/);
+    expect(scss).toMatch(/\.sessionListeningWaveformCanvas\s*{[\s\S]*?image-rendering:\s*pixelated;/);
+    expect(scss).toMatch(/\.sessionListeningAudioButton\s*{[\s\S]*?width:\s*61px;[\s\S]*?height:\s*61px;[\s\S]*?background:\s*linear-gradient\(#dfdfdf,\s*#ffffff\);/);
+    expect(scss).not.toMatch(/\.sessionListeningPrimary\s*{/);
+    expect(scss).not.toMatch(/\.sessionListeningControls\s*{/);
+  });
+
+  it('keeps listening transcripts behind a compact button and clearable from an overlay control', () => {
+    const scss = readSurveyToolScss();
+
+    expect(scss).toMatch(/\.sessionListeningTranscriptButton\s*{[\s\S]*?display:\s*inline-flex;[\s\S]*?border-radius:\s*var\(--ce-radius-pill\);[\s\S]*?cursor:\s*pointer;/);
+    expect(scss).toMatch(/\.sessionListeningTranscriptDetails\s*{[\s\S]*?background:\s*#fff;[\s\S]*?overflow:\s*hidden;/);
+    expect(scss).toMatch(/\.sessionListeningTranscriptShell\s*{[\s\S]*?position:\s*relative;/);
+    expect(scss).toMatch(/\.sessionListeningTranscript\s*{[\s\S]*?padding:\s*10px 42px 10px 12px;/);
+    expect(scss).toMatch(/\.sessionListeningClearTranscript\s*{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*8px;[\s\S]*?right:\s*18px;/);
+  });
+
   it('keeps pile multichoice options horizontally scrollable while anchoring the first column to the left edge', () => {
     const scss = readSurveyToolScss();
 
