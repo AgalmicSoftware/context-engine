@@ -149,6 +149,18 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(resolveCreateSurveyToggleKnobStyle(false)).toBe(CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE);
   });
 
+  it('can keep preformed survey-titled drafts in questions mode', () => {
+    const instance = makeInstance({
+      preformedQuestions: [{ type: 'freeform', prompt: 'What changed?', tags: [] }],
+      preformedSurvey: { title: 'Listening Follow-up' },
+      preformedMode: 'questions',
+    });
+
+    expect(instance.state.title).toBe('Listening Follow-up');
+    expect(instance.state.isStandaloneQuestion).toBe(true);
+    expect(instance.state.questions).toHaveLength(1);
+  });
+
   it('renders the survey title lock without SBT badge text or inline gate dots', () => {
     const instance = makeInstance();
     instance.resolveGateOptions = jest.fn(() => ({
