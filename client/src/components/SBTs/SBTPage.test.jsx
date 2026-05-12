@@ -15,6 +15,7 @@ import {
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
+import { render, screen } from '@testing-library/react';
 
 const mockIsCryptoMode = jest.fn(() => true);
 
@@ -1935,6 +1936,25 @@ describe('SBTPage modal holder optimizations', () => {
       documentURLs: ['https://doc.example.test/private'],
       documentURLsDecrypted: true,
     }));
+  });
+
+  it('renders legacy docURL aliases in the More section document list', () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Doc Alias Badge',
+        docURL: 'https://doc.example.test/alias',
+      },
+    };
+
+    render(subject.renderRelevantInfo());
+
+    expect(screen.getByText('Document URLs:')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'https://doc.example.test/alias' })).toHaveAttribute(
+      'href',
+      'https://doc.example.test/alias'
+    );
   });
 
   it('decrypts locked name, description, tags, document URLs, and uploaded image from encryptedFields metadata', async () => {

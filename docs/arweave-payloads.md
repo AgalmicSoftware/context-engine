@@ -68,6 +68,10 @@ Notes:
   - Runtime reads default to direct AR.IO-only routing (`https://ar-io.dev/<txId>`) and spend their retry budget there.
     Legacy multi-gateway fanout (`https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes) is available only when
     `REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO=false` or `window.CE_ARWEAVE_DIRECT_TO_AR_IO = false` is set intentionally.
+- `documentURLs` is the canonical source-reference field. Readers also tolerate
+  legacy aliases such as `docURL`, `docURLs`, `documentUrl`, and
+  `documents[].href`, then normalize them to `sbtInfo.documentURLs` before the
+  SBT detail page's More section renders document links.
 
 ```json
 {
