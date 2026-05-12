@@ -1604,6 +1604,13 @@ describe('OnePageSession view gating', () => {
     expect(link.getAttribute('href')).toBe(buildSbtDetailPath(sbtAddress.toLowerCase(), 'edge'));
   });
 
+  it('keeps the auto-join status close control on the same banner row', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.sbtMintStatusItem\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*54px;/);
+    expect(scss).toMatch(/:global\(\.sbt-alert-close-btn\)\s*{[\s\S]*?position:\s*absolute !important;[\s\S]*?top:\s*50% !important;[\s\S]*?right:\s*10px !important;[\s\S]*?transform:\s*translateY\(-50%\) !important;/);
+  });
+
   it('auto-mints public no-password SBTs through the session queue', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000b1';
     const subject = createSubject({
