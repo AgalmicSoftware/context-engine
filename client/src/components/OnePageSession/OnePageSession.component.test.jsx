@@ -1610,8 +1610,286 @@ describe('OnePageSession view gating', () => {
 
       fireEvent.click(screen.getByText(t('sbts')));
 
-      await waitFor(() => {
-        expect(screen.getByTestId('sbts-page')).toBeInTheDocument();
+    rerender(
+      <OnePageSession
+        {...props}
+        slug="next-session"
+        defaultFilterState={nextDefault}
+        sessionConfig={{ ...props.sessionConfig, slug: 'next-session', defaultFilterState: nextDefault }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(readLatestPileFilterState().selectedTags || []).toEqual(['beta']);
+    });
+  });
+
+  it('resyncs local filter state when defaultFilterState mutates in place with a stable prop reference', async () => {
+    const sharedDefault = { selectedTags: ['alpha'] };
+    const props = buildProps();
+    const { rerender } = render(
+      <OnePageSession
+        {...props}
+        slug="edge"
+        defaultFilterState={sharedDefault}
+        sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: sharedDefault }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+    });
+
+    const readLatestPileFilterState = () => {
+      const pileCalls = mockSurveyPage.mock.calls
+        .map((args) => args[0])
+        .filter((childProps) => childProps?.minifiedMode === 'pile');
+      return pileCalls[pileCalls.length - 1]?.filterState || {};
+    };
+
+    expect(readLatestPileFilterState().selectedTags || []).toEqual(['alpha']);
+
+    sharedDefault.selectedTags = ['beta'];
+    rerender(
+      <OnePageSession
+        {...props}
+        slug="edge"
+        defaultFilterState={sharedDefault}
+        sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: sharedDefault }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(readLatestPileFilterState().selectedTags || []).toEqual(['beta']);
+    });
+  });
+
+  it('runs login-transition auto mint even when filter state resyncs on the same update', async () => {
+    const initialDefault = { selectedTags: ['alpha'] };
+    const nextDefault = { selectedTags: ['beta'] };
+    const props = buildProps();
+    const kickoffSpy = jest
+      .spyOn(OnePageSession.prototype, 'kickoffAutoMintIfNeeded')
+      .mockImplementation(() => {});
+
+    const { rerender } = render(
+      <OnePageSession
+        {...props}
+        loginComplete={false}
+        slug="edge"
+        defaultFilterState={initialDefault}
+        sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: initialDefault }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
+    });
+    expect(kickoffSpy).not.toHaveBeenCalled();
+
+    rerender(
+      <OnePageSession
+        {...props}
+        loginComplete={true}
+        slug="next-session"
+        defaultFilterState={nextDefault}
+        sessionConfig={{ ...props.sessionConfig, slug: 'next-session', defaultFilterState: nextDefault }}
+      />
+    );
+
+    await waitFor(() => {
+      expect(kickoffSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('rebuilds results aggregator on session switch when default filter resyncs while results are open', () => {
+    jest.useFakeTimers();
+    jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('active');
+    const peekSpy = jest
+      .spyOn(cacheScripts, 'peekCacheSync')
+      .mockImplementation((namespace) => (namespace === 'questionsCache' ? { '84532': { questionResponses: {} } } : {}));
+    const initialDefault = { selectedTags: ['alpha'] };
+    const nextDefault = { selectedTags: ['beta'] };
+    const props = buildProps();
+    const { rerender } = render(
+      <OnePageSession
+        {...props}
+        slug="edge"
+        isQuestionCacheReady={true}
+        defaultFilterState={initialDefault}
+        sessionConfig={{ ...props.sessionConfig, slug: 'edge', defaultFilterState: initialDefault }}
+      />
+    );
+    const getQuestionsPeekCalls = () => peekSpy.mock.calls.filter((args) => args[0] === 'questionsCache').length;
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    jest.advanceTimersByTime(150);
+    expect(getQuestionsPeekCalls()).toBe(1);
+
+    rerender(
+      <OnePageSession
+        {...props}
+        slug="next-session"
+        isQuestionCacheReady={true}
+        questionResponsesNonce={props.questionResponsesNonce + 1}
+        defaultFilterState={nextDefault}
+        sessionConfig={{ ...props.sessionConfig, slug: 'next-session', defaultFilterState: nextDefault }}
+      />
+    );
+    jest.advanceTimersByTime(150);
+    expect(getQuestionsPeekCalls()).toBe(2);
+  });
+
+  it('uses getNativeBalance for auto-mint balance checks when the legacy getETHBalance alias is unavailable', async () => {
+    const subject = createSubject({
+      sessionConfig: {
+        ...buildProps().sessionConfig,
+        slug: 'demo-30',
+      },
+    });
+    const account = '0x00000000000000000000000000000000000000aa';
+    const nativeBalanceSpy = jest
+      .spyOn(contractScripts, 'getNativeBalance')
+      .mockResolvedValue(ethers.utils.parseEther('0.1'));
+    const originalLegacyReader = contractScripts.getETHBalance;
+
+    try {
+      delete contractScripts.getETHBalance;
+      const ok = await subject.waitForSufficientBalance(
+        'mock',
+        account,
+        ethers.utils.parseEther('0.00002'),
+        50,
+        1
+      );
+
+      expect(ok).toBe(true);
+      expect(nativeBalanceSpy).toHaveBeenCalledWith(account, expect.any(String));
+    } finally {
+      contractScripts.getETHBalance = originalLegacyReader;
+    }
+  });
+
+  it('pins the session slug on auto-mint status links', () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000b1';
+    const subject = createSubject({
+      slug: 'edge',
+      sessionConfig: {
+        ...buildProps().sessionConfig,
+        slug: 'edge',
+      },
+    });
+    subject.state = {
+      ...subject.state,
+      autoMintStatuses: {
+        [sbtAddress.toLowerCase()]: {
+          status: 'success',
+          name: 'Joined: Edge Badge',
+        },
+      },
+    };
+
+    render(subject.render());
+
+    const statusAlert = screen.getByTestId(E2E_TESTIDS.SESSION_AUTO_MINT_STATUS);
+    const link = within(statusAlert).getByRole('link', { name: 'Joined: Edge Badge' });
+    expect(link.getAttribute('href')).toBe(buildSbtDetailPath(sbtAddress.toLowerCase(), 'edge'));
+  });
+
+  it('keeps the auto-join status close control on the same banner row', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.sbtMintStatusItem\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*54px;/);
+    expect(scss).toMatch(/:global\(\.sbt-alert-close-btn\)\s*{[\s\S]*?position:\s*absolute !important;[\s\S]*?top:\s*50% !important;[\s\S]*?right:\s*10px !important;[\s\S]*?transform:\s*translateY\(-50%\) !important;/);
+  });
+
+  it('auto-mints public no-password SBTs through the session queue', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000b1';
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000b2',
+      loginComplete: true,
+      refreshSbtData: jest.fn(),
+      slug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      autoMintTargets: [{ sbt: sbtAddress }],
+    };
+
+    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+      name: 'Public Badge',
+      tokenURI: 'ar://public-badge',
+      hasPasswordMint: false,
+      maxTokens: '0',
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+    subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
+
+    await subject.runAutoMintQueue();
+
+    expect(claimSpy).toHaveBeenCalledWith('wagmi', sbtAddress);
+    expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
+      status: 'success',
+      name: 'Joined: Public Badge',
+    });
+    expect(subject.props.refreshSbtData).toHaveBeenCalledWith(sbtAddress, expect.any(String));
+  });
+
+  it('consumes successful public auto-mint targets so rerunning the queue does not claim twice', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000b3';
+    const sbtKey = sbtAddress.toLowerCase();
+    const account = '0x00000000000000000000000000000000000000b4';
+    const subject = createSubject({
+      account,
+      loginComplete: true,
+      refreshSbtData: jest.fn(),
+      slug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      autoMintTargets: [{ sbt: sbtAddress }],
+    };
+
+    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+      name: 'One Shot Badge',
+      tokenURI: 'ar://one-shot-badge',
+      hasPasswordMint: false,
+      maxTokens: '0',
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
+    subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
+
+    await subject.runAutoMintQueue();
+    await subject.runAutoMintQueue();
+
+    expect(claimSpy).toHaveBeenCalledTimes(1);
+    expect(window.sessionStorage.getItem(getAutoMintStorageKey(account, sbtAddress))).toBe('done');
+    expect(subject.state.autoMintStatuses[sbtKey]).toMatchObject({
+      status: 'success',
+      name: 'Joined: One Shot Badge',
+    });
+  });
+
+  it('re-evaluates cached auto-mint targets when the connected wallet changes', () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000be';
+    const accountA = '0x00000000000000000000000000000000000000bf';
+    const accountB = '0x00000000000000000000000000000000000000c0';
+    const originalUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+
+    try {
+      window.history.replaceState({}, '', `/?auto=1&sbt=${sbtAddress}`);
+      window.sessionStorage.setItem(getAutoMintStorageKey(accountA, sbtAddress), 'done');
+
+      const subject = createSubject({
+        account: accountA,
+        loginComplete: true,
+        slug: 'edge',
       });
 
       const latestSbtProps = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean).pop();
