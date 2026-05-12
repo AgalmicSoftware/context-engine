@@ -29,7 +29,7 @@ import styles from './CreateQuestionsAndSurveys.module.scss';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
-import { normalizeArweaveUrl, parseArweaveTxId } from '../../utilities/arweave/arweaveUrls.js';
+import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import contractScripts, { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import {
   buildSbtAccessControlConditions,
@@ -144,6 +144,79 @@ import {
   resolveQuestionSingleSelect,
   stableGateColor,
 } from './createQuestionsAndSurveysHelpers.js';
+import {
+  sanitizeDocumentUrls,
+} from './createQuestionsAndSurveysDocumentUrlHelpers';
+import {
+  hasSubmittedResourcesInManagedCache,
+  readManagedCacheSnapshot,
+  selectManagedNetBucketSnapshot,
+} from './createQuestionsAndSurveysCacheHelpers';
+import {
+  buildCreateSurveyHashValue,
+} from './createQuestionsAndSurveysSignatureHelpers';
+import {
+  CREATE_SURVEY_ACTION_ICON_STYLE,
+  CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE,
+  CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE,
+  CREATE_SURVEY_FREEFORM_PREVIEW_STYLE,
+  CREATE_SURVEY_HEADER_ICON_STYLE,
+  CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE,
+  CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE,
+  CREATE_SURVEY_SUBMIT_ICON_STYLE,
+  CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE,
+  CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE,
+  CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE,
+  CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE,
+  buildCreateSurveyActionLinkClassName,
+  buildCreateSurveyAiPromptCopyClassName,
+  buildCreateSurveyContainerClassName,
+  buildCreateSurveyProgressStepClassName,
+  buildCreateSurveySubmitButtonClassName,
+  buildCreateSurveyTypePillClassName,
+  resolveCreateSurveyBookmarkSurveyStyle,
+  resolveCreateSurveyProgressFillStyle,
+  resolveCreateSurveyQuestionBookmarkStyle,
+  resolveCreateSurveyToggleKnobStyle,
+} from './createQuestionsAndSurveysDisplayHelpers';
+export {
+  sanitizeDocumentUrls,
+} from './createQuestionsAndSurveysDocumentUrlHelpers';
+export {
+  hasSubmittedResourcesInManagedCache,
+  readManagedCacheSnapshot,
+  selectManagedNetBucketSnapshot,
+} from './createQuestionsAndSurveysCacheHelpers';
+export {
+  CREATE_SURVEY_ACTION_ICON_STYLE,
+  CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE,
+  CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE,
+  CREATE_SURVEY_FREEFORM_PREVIEW_STYLE,
+  CREATE_SURVEY_HEADER_ICON_STYLE,
+  CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE,
+  CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE,
+  CREATE_SURVEY_SUBMIT_ICON_STYLE,
+  CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE,
+  CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE,
+  CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE,
+  CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE,
+  CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE,
+  buildCreateSurveyActionLinkClassName,
+  buildCreateSurveyAiPromptCopyClassName,
+  buildCreateSurveyContainerClassName,
+  buildCreateSurveyProgressStepClassName,
+  buildCreateSurveySubmitButtonClassName,
+  buildCreateSurveyTypePillClassName,
+  resolveCreateSurveyBookmarkSurveyStyle,
+  resolveCreateSurveyProgressFillStyle,
+  resolveCreateSurveyQuestionBookmarkStyle,
+  resolveCreateSurveyToggleKnobStyle,
+} from './createQuestionsAndSurveysDisplayHelpers';
 
 type CreateSurveySha256Digest = {
   toString: () => string;
@@ -165,151 +238,6 @@ const getEffectiveAiConfigForCreateSurvey = getEffectiveAiConfig as (
   args?: GetEffectiveAiConfigForCreateSurveyArgs,
 ) => Promise<EffectiveAiConfigForCreateSurvey>;
 const surveyLog = createLogger('surveys');
-
-export const CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE: React.CSSProperties = {
-  border: '1px dashed #b0c4ff',
-  padding: 10,
-  borderRadius: 6,
-  marginTop: 6,
-  background: '#f6f8ff',
-};
-
-export const CREATE_SURVEY_TYPE_PREVIEW_PILL_STYLE: React.CSSProperties = {
-  display: 'inline-block',
-  padding: '3px 8px',
-  border: '1px solid #ccd',
-  borderRadius: 12,
-  marginRight: 6,
-  marginTop: 4,
-};
-
-export const CREATE_SURVEY_TYPE_PREVIEW_HEADING_STYLE: React.CSSProperties = {
-  fontWeight: 600,
-  marginBottom: 6,
-};
-
-export const CREATE_SURVEY_RATING_PREVIEW_TRACK_STYLE: React.CSSProperties = {
-  height: 6,
-  background: '#d9e1ff',
-  borderRadius: 4,
-  width: 240,
-};
-
-export const CREATE_SURVEY_FREEFORM_PREVIEW_STYLE: React.CSSProperties = {
-  height: 34,
-  border: '1px solid #ccd',
-  background: '#fff',
-  borderRadius: 4,
-};
-
-export const buildCreateSurveyTypePillClassName = (
-  styleMap: Record<string, string>,
-  variant: 'agree' | 'unsure' | 'disagree'
-) => {
-  const variantClassName = variant === 'agree'
-    ? styleMap.pillAgree
-    : variant === 'unsure'
-      ? styleMap.pillUnsure
-      : styleMap.pillDisagree;
-  return `${styleMap.pill} ${variantClassName}`;
-};
-
-export const CREATE_SURVEY_SUBMIT_ICON_STYLE: React.CSSProperties = {
-  marginRight: 8,
-};
-
-export const CREATE_SURVEY_UPLOADED_QUESTION_LINK_STYLE: React.CSSProperties = {
-  marginLeft: '10px',
-  marginRight: '5px',
-  textDecoration: 'none',
-  color: '#007bff',
-};
-
-export const CREATE_SURVEY_SMALL_ICON_BUTTON_STYLE: React.CSSProperties = {
-  padding: '0 5px',
-};
-
-export const CREATE_SURVEY_ACTION_ICON_STYLE: React.CSSProperties = {
-  marginRight: '5px',
-};
-
-export const buildCreateSurveySubmitButtonClassName = (
-  styleMap: Record<string, string>,
-  isSubmitting: unknown,
-  submissionError: unknown
-) => `${styleMap.createSurveyButton} ${styleMap.submitSurveyBtn} ${isSubmitting ? styleMap.submittingButton : ''} ${submissionError ? styleMap.errorButton : ''}`;
-
-export const resolveCreateSurveyProgressFillStyle = (
-  progress: unknown
-): React.CSSProperties => ({
-  width: `${Math.max(0, Math.min(100, Number(progress) || 0))}%`,
-});
-
-export const resolveCreateSurveyQuestionBookmarkStyle = (
-  bookmarked: unknown
-): React.CSSProperties => ({
-  color: bookmarked ? '#ffc107' : undefined,
-});
-
-export const resolveCreateSurveyBookmarkSurveyStyle = (
-  bookmarked: unknown
-): React.CSSProperties => ({
-  color: bookmarked ? '#ffe082' : undefined,
-});
-
-export const buildCreateSurveyActionLinkClassName = (
-  styleMap: Record<string, string>
-) => `${styleMap.actionBtn} ${styleMap.actionLink}`;
-
-export const CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE: React.CSSProperties = {
-  left: '31px',
-  backgroundColor: '#4caf50',
-};
-
-export const CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE: React.CSSProperties = {
-  left: '1px',
-  backgroundColor: '#fff',
-};
-
-export const CREATE_SURVEY_TRAILING_TOGGLE_LABEL_STYLE: React.CSSProperties = {
-  marginLeft: '10px',
-};
-
-export const CREATE_SURVEY_HEADER_ICON_STYLE: React.CSSProperties = {
-  marginRight: '6px',
-};
-
-export const CREATE_SURVEY_CLEAR_FORM_BUTTON_STYLE: React.CSSProperties = {
-  marginLeft: 'auto',
-};
-
-export const CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE: React.CSSProperties = {
-  marginTop: '20px',
-};
-
-export const buildCreateSurveyProgressStepClassName = (
-  styleMap: Record<string, string>,
-  submitStep: number,
-  step: number
-) => submitStep >= step ? styleMap.stepCompleted : styleMap.step;
-
-export const buildCreateSurveyAiPromptCopyClassName = (
-  styleMap: Record<string, string>,
-  copySuccess: unknown
-) => `${styleMap.aiPromptCopyCorner} ${copySuccess ? styleMap.aiPromptCopyCornerSuccess : ''}`;
-
-export const buildCreateSurveyContainerClassName = (
-  styleMap: Record<string, string>,
-  miniaturized: unknown
-) => `${styleMap.createSurveyContainer} ${miniaturized ? styleMap.miniaturized : ''}`;
-
-export const resolveCreateSurveyToggleKnobStyle = (
-  isStandaloneQuestion: unknown
-): React.CSSProperties => (
-  isStandaloneQuestion
-    ? CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE
-    : CREATE_SURVEY_TOGGLE_KNOB_SURVEY_STYLE
-);
 
 type UnknownRecord = Record<string, unknown>;
 type ManagedResourceMap = Record<string, unknown>;
@@ -425,14 +353,6 @@ type CreateSurveyCacheWriter = (
   slug: string,
   value: unknown
 ) => Promise<unknown>;
-type SubmittedResourcesCacheOptions = {
-  slug?: string;
-  netId?: unknown;
-  surveyAddedSuccessfully?: unknown;
-  questionsAddedSuccessfully?: unknown;
-  surveyId?: unknown;
-  questionIds?: unknown;
-};
 type CreateQuestionsCacheQuestionRow = UnknownRecord & {
   id?: unknown;
   questionId?: unknown;
@@ -723,92 +643,13 @@ const isObjectLikeRecord = (value: unknown): value is UnknownRecord => (
 const writeCreateSurveyCache = writeCache as unknown as CreateSurveyCacheWriter;
 const contractScriptsForSubmit = contractScripts as unknown as CreateSurveyContractScriptsWithSession;
 
-const getManagedResourceMap = (bucket: unknown, mapKey: 'questions' | 'surveys'): ManagedResourceMap => {
-  if (!isObjectLikeRecord(bucket)) return {};
-  const resourceMap = bucket[mapKey];
-  return isObjectLikeRecord(resourceMap) ? resourceMap : {};
-};
-
 const DOCUMENT_URL_ERROR_TEXT = 'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.';
-
-const normalizeDocumentUrl = (value: unknown) => {
-  const trimmed = String(value || '').trim();
-  if (!trimmed) return '';
-  if (litStorage.isLitArweaveUrl(trimmed)) return trimmed;
-  if (trimmed.startsWith('ar://')) {
-    return parseArweaveTxId(trimmed) ? trimmed : '';
-  }
-  if (trimmed.startsWith('/') && !trimmed.startsWith('//')) {
-    return trimmed;
-  }
-  try {
-    const parsed = new URL(trimmed);
-    const protocol = String(parsed.protocol || '').toLowerCase();
-    return protocol === 'http:' || protocol === 'https:' ? trimmed : '';
-  } catch (_) {
-    return '';
-  }
-};
-
-export const sanitizeDocumentUrls = (values: unknown[] = []) => {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  (Array.isArray(values) ? values : []).forEach((value) => {
-    const normalized = normalizeDocumentUrl(value);
-    if (!normalized) return;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    out.push(normalized);
-  });
-  return out;
-};
 
 const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
   default: 'default',
   questionResponses: 'questions',
   surveyResponses: 'survey',
 });
-
-export const readManagedCacheSnapshot = (namespace: string, slug = '') => {
-  return peekCacheSync(namespace, slug, { clone: false });
-};
-
-export const selectManagedNetBucketSnapshot = (namespace: string, slug: string, netKey: string) => {
-  const obj = readManagedCacheSnapshot(namespace, slug);
-  if (!obj || !netKey) return null;
-  return obj[netKey] || null;
-};
-
-export const hasSubmittedResourcesInManagedCache = ({
-  slug = '',
-  netId = '',
-  surveyAddedSuccessfully = false,
-  questionsAddedSuccessfully = false,
-  surveyId = '',
-  questionIds = [],
-}: SubmittedResourcesCacheOptions = {}) => {
-  const netKey = String(netId || '');
-  if (!netKey) return false;
-
-  const surveyIdLower = String(surveyId || '').toLowerCase();
-  const questionIdsLower = (Array.isArray(questionIds) ? questionIds : [])
-    .map((id: unknown) => String(id || '').toLowerCase())
-    .filter(Boolean);
-
-  if (surveyAddedSuccessfully && surveyIdLower) {
-    const netBucket = selectManagedNetBucketSnapshot('surveysCache', slug, netKey);
-    return !!getManagedResourceMap(netBucket, 'surveys')[surveyIdLower];
-  }
-
-  if (questionsAddedSuccessfully && questionIdsLower.length > 0) {
-    const netBucket = selectManagedNetBucketSnapshot('questionsCache', slug, netKey);
-    const map = getManagedResourceMap(netBucket, 'questions');
-    return questionIdsLower.every((id) => !!map[id]);
-  }
-
-  return false;
-};
 
 const ensureManagedSurveysNet = (current: unknown = {}, netId: unknown = ''): ManagedCacheSnapshot => {
   const next: ManagedCacheSnapshot = isObjectLikeRecord(current) ? { ...current } : {};
@@ -1847,14 +1688,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   updateSurveyHash: () => void = () => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
-    if (isStandaloneQuestion) {
-      this.setState(buildCreateSurveyHashPatch());
-    } else {
-      const urlsForHash = sanitizeDocumentUrls(documentURLs);
-      const surveyData = { title, documentURLs: urlsForHash };
-      const newHash = "0x" + sha256(JSON.stringify(surveyData)).toString();
-      this.setState(buildCreateSurveyHashPatch(newHash));
-    }
+    const newHash = buildCreateSurveyHashValue({
+      digest: sha256,
+      documentURLs,
+      isStandaloneQuestion,
+      title,
+    });
+    this.setState(buildCreateSurveyHashPatch(newHash));
   };
 
   getEncryptionConfig = (): CreateSurveyEncryptionConfig => {

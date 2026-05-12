@@ -73,6 +73,47 @@ describe('CreateSBTGroup cache helpers', () => {
     delete window.litHooks;
   });
 
+  it('initializes a blank authoring form with open mint defaults', () => {
+    const instance = makeInstance({ account: '0xAdmin' });
+
+    expect(instance.state).toEqual(expect.objectContaining({
+      sbtName: '',
+      sbtDescription: '',
+      sbtImageFile: null,
+      sbtImageUrl: '',
+      useImageUrl: false,
+      tags: [],
+      currentTagInput: '',
+      documentURLs: [],
+      documentUrl: '',
+      groupPassword: '',
+      metadataLockGateIds: {
+        name: [],
+        description: [],
+        tags: [],
+        documentURLs: [],
+        image: [],
+      },
+      sbtCodes: [],
+      groupSubmitted: false,
+      predictableAddressEnabled: false,
+      mintOptionsCollapsed: true,
+      distributionOptionsCollapsed: true,
+      numInviteLinks: 10,
+      exportFormat: 'json',
+    }));
+    expect(instance.state.sbtDistribution).toEqual(expect.objectContaining({
+      distributionOption: 'anyoneCanMint',
+      adminAddress: '0xAdmin',
+      burnAdmin: '0xAdmin',
+      isLimited: false,
+      isTimeLimited: false,
+      unlisted: false,
+      network: 'not connected',
+    }));
+    expect(instance.state.network).toBe('');
+  });
+
   it('buildCachePayload normalizes dates and network metadata', () => {
     const instance = makeInstance({ network: { id: 5, name: 'Goerli' } });
     instance.state.sbtName = 'Alpha';
