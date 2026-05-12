@@ -36,6 +36,9 @@ describe('useRollingTranscriptionRecorder', () => {
       });
     });
     stop = jest.fn(() => {
+      this.ondataavailable?.({
+        data: new Blob([new Uint8Array(256).fill(instances.indexOf(this) + 1)], { type: 'audio/webm' }),
+      });
       this.state = 'inactive';
       this.onstop?.();
     });
@@ -108,7 +111,7 @@ describe('useRollingTranscriptionRecorder', () => {
 
     expect(instances).toHaveLength(2);
     expect(instances[1].start).toHaveBeenCalledTimes(1);
-    expect(instances[0].requestData).toHaveBeenCalledTimes(1);
+    expect(instances[0].requestData).not.toHaveBeenCalled();
     expect(instances[0].stop).toHaveBeenCalledTimes(1);
     expect(transcribeAudio).toHaveBeenCalledTimes(1);
 
@@ -117,7 +120,7 @@ describe('useRollingTranscriptionRecorder', () => {
       await flushPromises();
     });
 
-    expect(instances[1].requestData).toHaveBeenCalledTimes(1);
+    expect(instances[1].requestData).not.toHaveBeenCalled();
     expect(instances[1].stop).toHaveBeenCalledTimes(1);
     expect(mockTrack.stop).toHaveBeenCalledTimes(1);
     expect(result.current.status).toBe('idle');
