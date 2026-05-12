@@ -65,6 +65,9 @@ import {
   resolveQuestionSingleSelect,
   stableGateColor,
 } from './createQuestionsAndSurveysHelpers.js';
+import {
+  buildCreateSurveyHashValue,
+} from './createQuestionsAndSurveysSignatureHelpers';
 
 describe('createQuestionsAndSurveysHelpers question options', () => {
   it('keeps empty authoring option rows for multichoice drafts', () => {
@@ -414,6 +417,43 @@ describe('createQuestionsAndSurveysHelpers AI prompt labels', () => {
     expect(formatAiPromptModelLabel({ provider: '', model: 'local-model' })).toBe('local-model');
     expect(formatAiPromptModelLabel({ provider: 'bespoke', model: 'model-a' })).toBe('Bespoke model-a');
     expect(formatAiPromptModelLabel({})).toBe('Configured model');
+  });
+});
+
+describe('createQuestionsAndSurveysHelpers survey signatures', () => {
+  it('builds survey hash values from title and sanitized document URLs', () => {
+    const digest = jest.fn((value: unknown) => ({
+      toString: () => `digest:${value}`,
+    }));
+
+    expect(buildCreateSurveyHashValue({
+      digest,
+      documentURLs: [
+        ' https://docs.example/a ',
+        'HTTPS://docs.example/a',
+        '/local/doc',
+        'javascript:alert(1)',
+      ],
+      title: 'Survey title',
+    })).toBe('0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a","/local/doc"]}');
+
+    expect(digest).toHaveBeenCalledWith(JSON.stringify({
+      title: 'Survey title',
+      documentURLs: ['https://docs.example/a', '/local/doc'],
+    }));
+  });
+
+  it('keeps standalone question mode hashless without calling the digest', () => {
+    const digest = jest.fn((value: unknown) => ({
+      toString: () => `digest:${value}`,
+    }));
+
+    expect(buildCreateSurveyHashValue({
+      digest,
+      isStandaloneQuestion: true,
+      title: 'Standalone prompt',
+    })).toBe('');
+    expect(digest).not.toHaveBeenCalled();
   });
 });
 

@@ -1,7 +1,5 @@
 import type { CSSProperties } from 'react';
 
-type CreateSurveyStyleMap = Record<string, string>;
-
 export const CREATE_SURVEY_TYPE_PREVIEW_BOX_STYLE: CSSProperties = {
   border: '1px dashed #b0c4ff',
   padding: 10,
@@ -39,9 +37,9 @@ export const CREATE_SURVEY_FREEFORM_PREVIEW_STYLE: CSSProperties = {
 };
 
 export const buildCreateSurveyTypePillClassName = (
-  styleMap: CreateSurveyStyleMap,
+  styleMap: Record<string, string>,
   variant: 'agree' | 'unsure' | 'disagree'
-): string => {
+) => {
   const variantClassName = variant === 'agree'
     ? styleMap.pillAgree
     : variant === 'unsure'
@@ -70,10 +68,10 @@ export const CREATE_SURVEY_ACTION_ICON_STYLE: CSSProperties = {
 };
 
 export const buildCreateSurveySubmitButtonClassName = (
-  styleMap: CreateSurveyStyleMap,
+  styleMap: Record<string, string>,
   isSubmitting: unknown,
   submissionError: unknown
-): string => `${styleMap.createSurveyButton} ${styleMap.submitSurveyBtn} ${isSubmitting ? styleMap.submittingButton : ''} ${submissionError ? styleMap.errorButton : ''}`;
+) => `${styleMap.createSurveyButton} ${styleMap.submitSurveyBtn} ${isSubmitting ? styleMap.submittingButton : ''} ${submissionError ? styleMap.errorButton : ''}`;
 
 export const resolveCreateSurveyProgressFillStyle = (
   progress: unknown
@@ -94,8 +92,8 @@ export const resolveCreateSurveyBookmarkSurveyStyle = (
 });
 
 export const buildCreateSurveyActionLinkClassName = (
-  styleMap: CreateSurveyStyleMap
-): string => `${styleMap.actionBtn} ${styleMap.actionLink}`;
+  styleMap: Record<string, string>
+) => `${styleMap.actionBtn} ${styleMap.actionLink}`;
 
 export const CREATE_SURVEY_TOGGLE_KNOB_QUESTION_STYLE: CSSProperties = {
   left: '31px',
@@ -124,20 +122,20 @@ export const CREATE_SURVEY_AUTO_TOOL_PANEL_STYLE: CSSProperties = {
 };
 
 export const buildCreateSurveyProgressStepClassName = (
-  styleMap: CreateSurveyStyleMap,
+  styleMap: Record<string, string>,
   submitStep: number,
   step: number
-): string => submitStep >= step ? styleMap.stepCompleted : styleMap.step;
+) => submitStep >= step ? styleMap.stepCompleted : styleMap.step;
 
 export const buildCreateSurveyAiPromptCopyClassName = (
-  styleMap: CreateSurveyStyleMap,
+  styleMap: Record<string, string>,
   copySuccess: unknown
-): string => `${styleMap.aiPromptCopyCorner} ${copySuccess ? styleMap.aiPromptCopyCornerSuccess : ''}`;
+) => `${styleMap.aiPromptCopyCorner} ${copySuccess ? styleMap.aiPromptCopyCornerSuccess : ''}`;
 
 export const buildCreateSurveyContainerClassName = (
-  styleMap: CreateSurveyStyleMap,
+  styleMap: Record<string, string>,
   miniaturized: unknown
-): string => `${styleMap.createSurveyContainer} ${miniaturized ? styleMap.miniaturized : ''}`;
+) => `${styleMap.createSurveyContainer} ${miniaturized ? styleMap.miniaturized : ''}`;
 
 export const resolveCreateSurveyToggleKnobStyle = (
   isStandaloneQuestion: unknown

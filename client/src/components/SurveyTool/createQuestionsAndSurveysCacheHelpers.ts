@@ -2,7 +2,6 @@ import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 
 type UnknownRecord = Record<string, unknown>;
 type ManagedResourceMap = Record<string, unknown>;
-type ManagedCacheSnapshot = UnknownRecord | null;
 
 type SubmittedResourcesCacheOptions = {
   slug?: string;
@@ -23,20 +22,14 @@ const getManagedResourceMap = (bucket: unknown, mapKey: 'questions' | 'surveys')
   return isObjectLikeRecord(resourceMap) ? resourceMap : {};
 };
 
-export const readManagedCacheSnapshot = (namespace: string, slug = ''): ManagedCacheSnapshot => {
-  const snapshot = peekCacheSync(namespace, slug, { clone: false });
-  return isObjectLikeRecord(snapshot) ? snapshot : null;
+export const readManagedCacheSnapshot = (namespace: string, slug = '') => {
+  return peekCacheSync(namespace, slug, { clone: false });
 };
 
-export const selectManagedNetBucketSnapshot = (
-  namespace: string,
-  slug: string,
-  netKey: string
-): ManagedCacheSnapshot => {
+export const selectManagedNetBucketSnapshot = (namespace: string, slug: string, netKey: string) => {
   const obj = readManagedCacheSnapshot(namespace, slug);
   if (!obj || !netKey) return null;
-  const netBucket = obj[netKey];
-  return isObjectLikeRecord(netBucket) ? netBucket : null;
+  return obj[netKey] || null;
 };
 
 export const hasSubmittedResourcesInManagedCache = ({
@@ -46,7 +39,7 @@ export const hasSubmittedResourcesInManagedCache = ({
   questionsAddedSuccessfully = false,
   surveyId = '',
   questionIds = [],
-}: SubmittedResourcesCacheOptions = {}): boolean => {
+}: SubmittedResourcesCacheOptions = {}) => {
   const netKey = String(netId || '');
   if (!netKey) return false;
 

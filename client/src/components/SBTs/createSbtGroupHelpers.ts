@@ -16,10 +16,6 @@ import type {
   CreateSbtAuthoringChainOption,
 } from './createSbtGroupAuthoringChainHelpers';
 import {
-  normalizeCreateSbtDocumentUrlDraft,
-} from './createSbtGroupContentAuthoringHelpers';
-import {
-  normalizeMetadataLockGateIds,
   resolveCreateSbtEncryptedFieldGateValue,
 } from './createSbtGroupMetadataLockHelpers';
 export {
@@ -48,6 +44,19 @@ export type {
   ResolveCreateSbtAuthoringChainOptionsArgs,
   ResolveCreateSbtPreferredAuthoringChainIdArgs,
 } from './createSbtGroupAuthoringChainHelpers';
+export {
+  buildCreateSbtAutoJoinUrl,
+  buildSessionRoutePath,
+  resolveCreateSbtEffectiveSessionSlug,
+  resolveCreateSbtMetadataSessionSlug,
+  resolveCreateSbtOpenMintAutoJoinUrl,
+} from './createSbtGroupRouteHelpers';
+export {
+  buildCreateSbtFormCachePayload,
+} from './createSbtGroupFormCachePayloadHelpers';
+export type {
+  CreateSbtFormCachePayload,
+} from './createSbtGroupFormCachePayloadHelpers';
 export {
   buildCreateSbtDefaultDistributionState,
   buildCreateSbtGroupPasswordPredictableEntryPatch,
@@ -123,6 +132,31 @@ export {
   resolveCreateSbtPrimaryButtonState,
   resolveCreateSbtSuccessDisplayState,
 } from './createSbtGroupRenderStateHelpers';
+export {
+  buildCreateSbtActiveClassName,
+  buildCreateSbtActionLinkClassName,
+  buildCreateSbtCollapseHeaderClassName,
+  buildCreateSbtCollapseTogglePatch,
+  buildCreateSbtInlineFieldLockClassName,
+  buildCreateSbtTokenInfoMetaCardClassName,
+  resolveCreateSbtActionIconStyle,
+  resolveCreateSbtCollapseHeaderDisplayState,
+  resolveCreateSbtFailureIconStyle,
+  resolveCreateSbtHiddenQrDisplayState,
+  resolveCreateSbtShareableTooltipIconStyle,
+  resolveCreateSbtTooltipIconStyle,
+} from './createSbtGroupDisplayHelpers';
+export type {
+  BuildCreateSbtActionLinkClassNameArgs,
+  BuildCreateSbtActiveClassNameArgs,
+  BuildCreateSbtCollapseHeaderClassNameArgs,
+  BuildCreateSbtCollapseTogglePatchArgs,
+  BuildCreateSbtInlineFieldLockClassNameArgs,
+  BuildCreateSbtTokenInfoMetaCardClassNameArgs,
+  CreateSbtCollapseHeaderDisplayState,
+  CreateSbtHiddenQrDisplayState,
+  ResolveCreateSbtCollapseHeaderDisplayStateArgs,
+} from './createSbtGroupDisplayHelpers';
 export {
   buildCreateSbtAccountDistributionSyncPatch,
   buildCreateSbtAccountDistributionSyncStatePatch,
@@ -327,10 +361,6 @@ export type CreateSbtGateOptionsResult = {
   gateMap: Record<string, CreateSbtMetadataLockGate>;
   gateOptions: CreateSbtMetadataLockGateOption[];
 };
-export type CreateSbtFormCachePayload = Record<string, unknown> & {
-  _imageDataUrl?: string;
-  sbtDistribution: Record<string, unknown>;
-};
 type ResolveCreateSbtErrorBannerStateArgs = {
   error?: unknown;
 };
@@ -339,7 +369,6 @@ type CreateSbtErrorBannerState = {
   shouldRenderErrorBanner: boolean;
   style: Record<string, string | number>;
 };
-type CreateSbtAutoJoinUrlBuilder = (sbtAddress: unknown) => unknown;
 type BuildCreateSbtJsonPreviewDataArgs = {
   authoringChain?: CreateSbtAuthoringChainOption | null;
   autoJoinUrl?: unknown;
@@ -350,12 +379,6 @@ type BuildCreateSbtJsonPreviewDataArgs = {
   sbtName?: unknown;
   shareableUrl?: unknown;
   tokenURI?: unknown;
-};
-type ResolveCreateSbtMetadataSessionSlugArgs = {
-  deferredDeployMode?: unknown;
-  effectiveSessionSlug?: unknown;
-  sbtLabel?: unknown;
-  sessionConfigSlug?: unknown;
 };
 type BuildCreateSbtGateOptionsFromConfigArgs = {
   chainIdFallback?: unknown;
@@ -396,47 +419,6 @@ type BuildCreateSbtGateOptionsFromSessionSourcesArgs = {
   chainIdFallback?: unknown;
   preferredSessionSlug?: unknown;
   sessionSources?: unknown[];
-};
-type BuildCreateSbtCollapseTogglePatchArgs = {
-  section?: unknown;
-  state?: unknown;
-};
-type ResolveCreateSbtCollapseHeaderDisplayStateArgs = {
-  isCollapsed?: unknown;
-  title?: unknown;
-};
-type BuildCreateSbtCollapseHeaderClassNameArgs = {
-  baseClassName?: unknown;
-  openClassName?: unknown;
-  shouldUseOpenClass?: unknown;
-};
-type BuildCreateSbtActiveClassNameArgs = {
-  activeClassName?: unknown;
-  baseClassNames?: unknown;
-  shouldUseActiveClass?: unknown;
-};
-type BuildCreateSbtActionLinkClassNameArgs = {
-  actionClassName?: unknown;
-  linkClassName?: unknown;
-};
-type BuildCreateSbtInlineFieldLockClassNameArgs = {
-  baseClassName?: unknown;
-  inlineClassName?: unknown;
-};
-type BuildCreateSbtTokenInfoMetaCardClassNameArgs = {
-  fieldSectionClassName?: unknown;
-  metaCardClassName?: unknown;
-};
-type CreateSbtHiddenQrDisplayState = {
-  hiddenStyle: Record<string, string | number>;
-};
-type CreateSbtCollapseHeaderDisplayState = {
-  ariaExpanded: boolean;
-  ariaLabel: string;
-  shouldRenderCollapsedTitle: boolean;
-  shouldRenderClosedIcon: boolean;
-  shouldRenderOpenIcon: boolean;
-  shouldUseOpenClass: boolean;
 };
 
 export const isPlainObject = (value: unknown): value is Record<string, unknown> => (
@@ -517,183 +499,6 @@ export const shouldFallbackCreateSbtDeferredDraftUpload = (error: unknown): bool
     message === 'invalid address.'
   );
 };
-
-export const buildSessionRoutePath = (slugRaw?: string, basePath?: string): string => {
-  const slug = normalizeSessionSlug(slugRaw || '');
-  const normalizedBasePath = String(basePath || '').replace(/\/+$/, '');
-  return normalizedBasePath + (slug ? `/session/${encodeURIComponent(slug)}` : '/session');
-};
-
-export const buildCreateSbtAutoJoinUrl = ({
-  basePath = '',
-  origin = '',
-  sbtAddress = '',
-  sessionSlug = '',
-}: {
-  basePath?: unknown;
-  origin?: unknown;
-  sbtAddress?: unknown;
-  sessionSlug?: unknown;
-} = {}): string => {
-  const normalizedOrigin = String(origin || '').replace(/\/+$/, '');
-  const normalizedAddress = String(sbtAddress || '').trim();
-  if (!normalizedOrigin || !normalizedAddress) return '';
-  const sessionPath = buildSessionRoutePath(String(sessionSlug || ''), String(basePath || ''));
-  return `${normalizedOrigin}${sessionPath}?sbt=${encodeURIComponent(normalizedAddress)}&auto=1`;
-};
-
-export const resolveCreateSbtOpenMintAutoJoinUrl = ({
-  autoJoinUrl = '',
-  buildSessionAutoJoinUrl = null,
-  distributionOption = '',
-  sbtAddress = '',
-}: {
-  autoJoinUrl?: unknown;
-  buildSessionAutoJoinUrl?: CreateSbtAutoJoinUrlBuilder | null;
-  distributionOption?: unknown;
-  sbtAddress?: unknown;
-} = {}): string => {
-  if (distributionOption !== 'anyoneCanMint') return '';
-  const cached = String(autoJoinUrl || '');
-  if (cached) return cached;
-  return typeof buildSessionAutoJoinUrl === 'function'
-    ? String(buildSessionAutoJoinUrl(sbtAddress) || '')
-    : '';
-};
-
-export const resolveCreateSbtEffectiveSessionSlug = ({
-  pathname = '',
-  props = {},
-}: {
-  pathname?: unknown;
-  props?: unknown;
-} = {}): string => {
-  const propsRecord = isPlainObject(props) ? props : {};
-  const slugFromProps = propsRecord.sessionSlug || propsRecord.slug || '';
-  if (slugFromProps) return String(slugFromProps);
-  const path = String(pathname || '');
-  const parts = path.split('/').filter(Boolean);
-  if (parts[0] === 'demo' && parts[1]) return parts[1];
-  if (parts[0] === 'sbts' && parts[1] && parts[1] !== 'new') return parts[1];
-  return '';
-};
-
-export const resolveCreateSbtMetadataSessionSlug = ({
-  deferredDeployMode = false,
-  effectiveSessionSlug = '',
-  sbtLabel = 'SBT',
-  sessionConfigSlug = '',
-}: ResolveCreateSbtMetadataSessionSlugArgs = {}): string => {
-  const metadataSessionSlug = normalizeSessionSlug(
-    effectiveSessionSlug || sessionConfigSlug || ''
-  );
-  if (deferredDeployMode && !metadataSessionSlug) {
-    throw new Error(`Set the session URL before adding this ${String(sbtLabel || 'SBT')} to the session.`);
-  }
-  return metadataSessionSlug;
-};
-
-export const buildCreateSbtCollapseTogglePatch = ({
-  section = '',
-  state = {},
-}: BuildCreateSbtCollapseTogglePatchArgs = {}): Record<string, boolean> => {
-  const sectionKey = String(section || '');
-  const source = isPlainObject(state) ? state : {};
-  return {
-    [sectionKey]: !source[sectionKey],
-  };
-};
-
-export const resolveCreateSbtCollapseHeaderDisplayState = ({
-  isCollapsed = false,
-  title = '',
-}: ResolveCreateSbtCollapseHeaderDisplayStateArgs = {}): CreateSbtCollapseHeaderDisplayState => {
-  const collapsed = !!isCollapsed;
-  const normalizedTitle = String(title || '');
-  return {
-    ariaExpanded: !collapsed,
-    ariaLabel: `${collapsed ? 'Expand' : 'Collapse'} ${normalizedTitle}`,
-    shouldRenderCollapsedTitle: collapsed,
-    shouldRenderClosedIcon: collapsed,
-    shouldRenderOpenIcon: !collapsed,
-    shouldUseOpenClass: !collapsed,
-  };
-};
-
-export const buildCreateSbtCollapseHeaderClassName = ({
-  baseClassName = '',
-  openClassName = '',
-  shouldUseOpenClass = false,
-}: BuildCreateSbtCollapseHeaderClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  shouldUseOpenClass ? String(openClassName || '') : '',
-].filter(Boolean).join(' '));
-
-export const buildCreateSbtActiveClassName = ({
-  activeClassName = '',
-  baseClassNames = [],
-  shouldUseActiveClass = false,
-}: BuildCreateSbtActiveClassNameArgs = {}): string => {
-  const baseNames = Array.isArray(baseClassNames) ? baseClassNames : [baseClassNames];
-  return [
-    ...baseNames.map((className) => String(className || '')),
-    shouldUseActiveClass ? String(activeClassName || '') : '',
-  ].filter(Boolean).join(' ');
-};
-
-export const resolveCreateSbtTooltipIconStyle = (): Record<string, number> => ({
-  opacity: 0.5,
-});
-
-export const resolveCreateSbtActionIconStyle = (): Record<string, string> => ({
-  marginRight: '5px',
-});
-
-export const resolveCreateSbtFailureIconStyle = (): Record<string, string> => ({
-  color: 'red',
-});
-
-export const resolveCreateSbtShareableTooltipIconStyle = (): Record<string, string | number> => ({
-  opacity: 0.5,
-  marginLeft: '8px',
-  fontSize: '0.8em',
-});
-
-export const buildCreateSbtActionLinkClassName = ({
-  actionClassName = '',
-  linkClassName = '',
-}: BuildCreateSbtActionLinkClassNameArgs = {}): string => ([
-  String(actionClassName || ''),
-  String(linkClassName || ''),
-].filter(Boolean).join(' '));
-
-export const buildCreateSbtInlineFieldLockClassName = ({
-  baseClassName = '',
-  inlineClassName = '',
-}: BuildCreateSbtInlineFieldLockClassNameArgs = {}): string => ([
-  String(baseClassName || ''),
-  String(inlineClassName || ''),
-].filter(Boolean).join(' '));
-
-export const buildCreateSbtTokenInfoMetaCardClassName = ({
-  fieldSectionClassName = '',
-  metaCardClassName = '',
-}: BuildCreateSbtTokenInfoMetaCardClassNameArgs = {}): string => ([
-  String(fieldSectionClassName || ''),
-  String(metaCardClassName || ''),
-].filter(Boolean).join(' '));
-
-export const resolveCreateSbtHiddenQrDisplayState = (): CreateSbtHiddenQrDisplayState => ({
-  hiddenStyle: {
-    position: 'absolute',
-    opacity: 0,
-    pointerEvents: 'none',
-    zIndex: -1,
-    width: '1px',
-    height: '1px',
-    overflow: 'hidden',
-  },
-});
 
 export const normalizeGateIds = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -1299,51 +1104,5 @@ export const buildCreateSbtGateOptionsFromSessionSources = ({
     gateMap,
     gateOptions,
     defaultGateId: preferredGateId || (gateOptions[0]?.id || ''),
-  };
-};
-
-export const buildCreateSbtFormCachePayload = ({
-  state = {},
-  selectedAuthoringChainId = null,
-  effectiveSessionSlug = '',
-}: {
-  state?: Record<string, unknown>;
-  selectedAuthoringChainId?: unknown;
-  effectiveSessionSlug?: unknown;
-} = {}): CreateSbtFormCachePayload => {
-  const {
-    sbtName, sbtDescription, sbtImageUrl, useImageUrl, sbtDistribution,
-    tags, documentIDHashes, documentURLs, documentUrl, groupPassword, numInviteLinks,
-    exportFormat, metadataLockGateIds, create2Salt, predictableAddressEnabled,
-    deferredCreate2Salt, autoAppliedDefaultTags, dismissedDefaultTags,
-  } = state;
-
-  const safeDist: Record<string, unknown> = { ...Object(sbtDistribution || {}) };
-  const rawMintingEndTime = safeDist.mintingEndTime;
-  safeDist.mintingEndTime = rawMintingEndTime
-    ? new Date(rawMintingEndTime as string | number | Date).toISOString()
-    : null;
-  safeDist.network = selectedAuthoringChainId || 'not connected';
-
-  return {
-    sbtName: ((sbtName as string) || '').trim(),
-    sbtDescription: ((sbtDescription as string) || '').trim(),
-    sbtImageUrl,
-    useImageUrl,
-    sbtDistribution: safeDist,
-    tags,
-    documentIDHashes,
-    documentURLs,
-    documentUrl: normalizeCreateSbtDocumentUrlDraft(documentUrl),
-    groupPassword,
-    metadataLockGateIds: normalizeMetadataLockGateIds(metadataLockGateIds),
-    predictableAddressEnabled: !!predictableAddressEnabled,
-    autoAppliedDefaultTags: Array.isArray(autoAppliedDefaultTags) ? autoAppliedDefaultTags : [],
-    dismissedDefaultTags: Array.isArray(dismissedDefaultTags) ? dismissedDefaultTags : [],
-    numInviteLinks,
-    exportFormat,
-    create2Salt,
-    deferredCreate2Salt,
-    _sessionSlug: effectiveSessionSlug || '',
   };
 };
