@@ -196,6 +196,8 @@ const E2E_TESTIDS = Object.freeze({
   SESSION_LISTENING_PANEL: 'ce-session-listening-panel',
   SESSION_LISTENING_START: 'ce-session-listening-start',
   SESSION_LISTENING_STOP: 'ce-session-listening-stop',
+  SESSION_LISTENING_CLEAR: 'ce-session-listening-clear',
+  SESSION_LISTENING_TRANSCRIPT_DETAILS: 'ce-session-listening-transcript-details',
   SESSION_LISTENING_TRANSCRIPT: 'ce-session-listening-transcript',
   SESSION_LISTENING_GENERATE: 'ce-session-listening-generate',
   SESSION_LISTENING_SUGGESTIONS: 'ce-session-listening-suggestions',

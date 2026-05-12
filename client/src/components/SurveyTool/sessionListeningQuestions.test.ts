@@ -17,7 +17,31 @@ describe('sessionListeningQuestions', () => {
     expect(prompt).toContain('numberOfSeedStatementsOrPrompts: 3');
     expect(prompt).toContain('Allowed Default Tags');
     expect(prompt).toContain('budget, planning');
+    expect(prompt).toContain('read the entire transcript');
+    expect(prompt).toContain('Do not overweight the opening topic');
     expect(prompt).toContain('Prefer operational questions.');
+  });
+
+  it('keeps late transcript topics in the prompt for full-session coverage', () => {
+    const earlyTopic = 'Early topic: procurement schedule and budget timing. ';
+    const lateTopic = 'Late topic: participants disagree about model accountability, evidence thresholds, and community trust.';
+    const prompt = buildListeningQuestionPrompt(`${earlyTopic.repeat(450)}\n\n${lateTopic}`, {
+      count: 5,
+    });
+
+    expect(prompt).toContain(earlyTopic.trim());
+    expect(prompt).toContain(lateTopic);
+    expect(prompt.indexOf(lateTopic)).toBeGreaterThan(prompt.indexOf(earlyTopic.trim()));
+  });
+
+  it('can build a document-source prompt after transcript summarization', () => {
+    const prompt = buildListeningQuestionPrompt('Concise transcript summary.', {
+      sourceTypeOverride: 'document',
+      multiSpeakerHintOverride: 'likely_multiple_speakers',
+    });
+
+    expect(prompt).toContain('* SourceType: document');
+    expect(prompt).toContain('* MultiSpeakerHint: likely_multiple_speakers');
   });
 
   it('parses AI JSON and builds reviewable question statements', () => {

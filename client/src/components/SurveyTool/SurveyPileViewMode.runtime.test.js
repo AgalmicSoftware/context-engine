@@ -144,26 +144,45 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('opens listening mode from the query string and keeps the URL synchronized', () => {
     window.history.pushState({}, '', '/session/demo?foo=1&mode=listening#pile');
-    const subject = new PileViewMode({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      account: '',
-      network: { id: 1 },
+    const originalMatchMedia = window.matchMedia;
+    const scrollIntoView = jest.fn();
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: jest.fn(() => ({ matches: true })),
     });
-    syncClassSetState(subject);
+    try {
+      const subject = new PileViewMode({
+        singleQuestionMode: false,
+        isStandalone: false,
+        surveyIndex: 0,
+        account: '',
+        network: { id: 1 },
+      });
+      subject.listeningPanelRef.current = { scrollIntoView };
+      syncClassSetState(subject);
 
-    expect(subject.state.showListeningPanel).toBe(true);
+      expect(subject.state.showListeningPanel).toBe(true);
+      subject.scrollListeningPanelIntoViewIfNeeded('auto');
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
 
-    subject.closeListeningPanel();
-    expect(subject.state.showListeningPanel).toBe(false);
-    expect(window.location.pathname).toBe('/session/demo');
-    expect(window.location.search).toBe('?foo=1');
-    expect(window.location.hash).toBe('#pile');
+      subject.closeListeningPanel();
+      expect(subject.state.showListeningPanel).toBe(false);
+      expect(window.location.pathname).toBe('/session/demo');
+      expect(window.location.search).toBe('?foo=1');
+      expect(window.location.hash).toBe('#pile');
 
-    subject.toggleListeningPanel();
-    expect(subject.state.showListeningPanel).toBe(true);
-    expect(window.location.search).toBe('?foo=1&mode=listening');
+      subject.toggleListeningPanel();
+      expect(subject.state.showListeningPanel).toBe(true);
+      expect(window.location.search).toBe('?foo=1&mode=listening');
+      expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'start' });
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
   });
 
   it('shows and clears the pile submit empty-state feedback without submitting', async () => {
