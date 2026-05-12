@@ -186,11 +186,6 @@ export const useRollingTranscriptionRecorder = ({
       endingRecordersRef.current.add(recorder);
     }
     try {
-      recorder.requestData();
-    } catch (_) {
-      // Some browsers throw if a request is already pending; stop still flushes.
-    }
-    try {
       recorder.stop();
       return true;
     } catch (error) {
