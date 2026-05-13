@@ -2,6 +2,8 @@
 
 The public release artifact is a copy of the repo with all private/internal content stripped. It is produced by `scripts/prepare-public-release.sh` (see PRD 374).
 
+The artifact exporter copies tracked files plus untracked files that are not ignored by git, then applies the private strip list. Ignored local files such as keys, caches, build output, generated media, and previous release folders are skipped before the strip phase.
+
 ## Quick start
 
 ```bash
@@ -60,8 +62,14 @@ The release script removes these paths from the exported copy:
 | `client/public/skill.md` | Private agent skill artifact |
 | `workers/agentBridgeWorker/` | Private Telegram agent bridge worker |
 | `CLAUDE.md` | Maintainer AI instructions |
-| `.claude/`, `.codex/` | AI agent skills and settings |
-| `artifacts/` | Local test artifacts |
+| `.claude/`, `.codex/`, `.codex-artifacts/`, `.codex-solc/`, `.codex-tmp/` | AI agent skills, settings, caches, and scratch artifacts |
+| `video-clickthrough-local/` | Durable local video workflow scripts and handoff notes |
+| `.tmp-review/` | Temporary review snapshots / scratch files |
+| `.env`, `.env.local`, `.env.*.local`, `.keys/`, `.e2e-secrets/`, `.e2e-cache/` | Local environment files, keys, and E2E secret/cache material |
+| `artifacts/`, `output/` | Local test and generated media artifacts |
+| `dist/`, `out/`, `cache/`, `broadcast/`, `coverage/`, `.npm-cache*`, `release-public/` | Generated build, dependency, and previous release outputs |
+| `.DS_Store`, `docs/codebase-*.md`, `docs/assets/codebase-*` | Local macOS metadata and ignored codebase audit exports |
+| `private-pack.manifest.json` (tracked repo copy) | Generated strip inventory should not ship from the dev tree |
 | `Demo Integration Package/` | Raw source data |
 | `scripts/test-*.js`, `scripts/lib/e2e/` | E2E test layer |
 | `whitepaper/Slides.pdf`, `whitepaper/IdeasMap.md` | Internal whitepaper assets |
