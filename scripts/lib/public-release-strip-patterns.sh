@@ -42,13 +42,9 @@ CLAUDE.md
 video-clickthrough-local
 .tmp-review
 .DS_Store
-.secrets.baseline
 .env
-.env.example
 .env.local
 .env.*.local
-.env.e2e
-.env.e2e.example
 .keys
 .e2e-secrets
 .e2e-cache
@@ -63,8 +59,6 @@ broadcast
 coverage
 docs/codebase-*.md
 docs/assets/codebase-*
-docs/*PRD*.md
-docs/*prd*.md
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/seed-*.js
@@ -101,6 +95,14 @@ ce_public_release_manifest_exclude_patterns() {
   cat <<'EOF'
 TODO
 contextEngine-cc/TODO
+.env
+.env.local
+.env.*.local
+.keys
+.e2e-secrets
+.e2e-cache
+docs/codebase-*.md
+docs/assets/codebase-*
 EOF
 }
 
@@ -112,6 +114,28 @@ outreach-and-applications
 grant-applications
 CLAUDE.md
 .claude
+.codex
+.codex-artifacts
+.codex-solc
+.codex-tmp
+.DS_Store
+.env
+.env.local
+.env.*.local
+.keys
+.e2e-secrets
+.e2e-cache
+.npm-cache
+.npm-cache-client*
+output
+release-public
+dist
+out
+cache
+broadcast
+coverage
+docs/codebase-*.md
+docs/assets/codebase-*
 docs/agent-native*.md
 client/public/skill.md
 workers/agentBridgeWorker

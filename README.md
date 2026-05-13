@@ -14,7 +14,8 @@ It helps teams capture the context behind important decisions: assumptions, pred
 
 Sessions can be public or private, with AI-assisted input and analysis, optional encryption, passkey-based login, and cryptographic group access control. The project also supports public deliberation, open civic use cases, and dataset creation, but normal participants do not need wallets or crypto knowledge to use it.
 
-Use it before decisions to surface hidden disagreement, during collection to preserve sensitive context, and after outcomes to review what a group believed, why it acted, and what it learned over time.
+- Public version: the hosted public app is available at [contextengine.xyz](https://contextengine.xyz).
+- Private mode: organizations can run Context Engine on their own infrastructure with self-hosted deployment options. See [docs/scaling.md](docs/scaling.md) for deployment profiles.
 
 ## Why Context Engine?
 
@@ -96,10 +97,10 @@ For testing, run modes, and deeper setup:
 - Summaries and analysis of survey results and response clusters
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
-### Low-Friction Identity
-- Passkey / biometric login using native PIN, fingerprint, or Face ID flows
-- The login flow handles the cryptographic account behind the scenes
-- Users do not need to know anything about Ethereum or crypto to participate
+### User and Deployer UX: Passkey Sign-On
+- Users log in with a simple passkey / biometric flow (native PIN, fingerprint, or Face ID on phones)
+- Login flow generates or handles an Ethereum account, which can be used easily with cryptography features
+   - Users do not need to know anything about Ethereum or crypto (or take any additional steps) to use the app
 
 ### Group Access Control
 - No-code creation of [Soulbound Tokens for Groups](https://www.radicalxchange.org/wiki/social-identity/) (SBTs)
@@ -116,6 +117,9 @@ For testing, run modes, and deeper setup:
 | Event / conference | Retreats, workshops, conferences, pop-up communities | Participant-only or public summary | Gated sessions, exports, AI summaries |
 | Research / dataset creation | Preference datasets, discourse corpuses, evaluation studies | Configurable | Structured exports and reusable records |
 
+### Deployer UX: Sponsored Bundles
+- Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API)
+  - Sensitive and organizational deployments can plug in existing AI keys, and use local or custom options for storage, encryption, and EVM network functionality
 
 ## AI Discourse Corpus
 

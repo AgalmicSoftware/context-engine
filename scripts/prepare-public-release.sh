@@ -158,6 +158,8 @@ STAGING_ROOT="$TMP_ROOT/release"
 MATCHED_PATHS_FILE="$TMP_ROOT/matched-paths.txt"
 STRIP_ENTRIES_FILE="$TMP_ROOT/strip-entries.txt"
 COPY_FILE_LIST="$TMP_ROOT/copy-file-list.txt"
+MANIFEST_PATH="$STAGING_ROOT/private-pack.manifest.json"
+
 mkdir -p "$STAGING_ROOT"
 
 (

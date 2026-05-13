@@ -61,10 +61,11 @@ Local development:
 - `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
 
-Design and public presentation:
-- `docs/design-system.md`: shared visual and interaction conventions.
-- `docs/visual-identity.md`: public visual identity and asset guidance.
-- `docs/reference-links.md`: background references used by the project documentation.
+Release:
+- `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
+
+Wallets:
+- `docs/porto-information.md`: Porto passkey wallet wiring and deterministic test wallet workflow.
 
 E2E workflows:
 - `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.
