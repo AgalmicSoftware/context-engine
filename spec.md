@@ -192,7 +192,7 @@ What users can do:
 What the system does:
 - Uses `SessionRegistry` as the single source of truth for access gates (Any/All, per-resource).
 - Worker login checks gates on `/auth/login` and issues a scoped token (`ai`, `arweave`, `transcribe`, `faucet`, `fetch`, `lit`).
-- Client-side decrypt uses Lit access control conditions that mirror the intended gate audience.
+- Gated encryption/decrypt uses the worker-mediated Lit Chipotle runtime for supported sessions; legacy Lit payload readers remain for compatibility.
 - Stores per-field metadata encryption decisions via `encryptedFieldGates` (values are `string | string[]`; 1 gate stays legacy `string`, 2+ gates become `string[]`).
 - Stores per-question/per-survey encryption audiences in the payload (`encryption.gates`), and SurveyTool derives response encryption recipients per question from that lock state (with fallback to session response gate policy when a question is not locked).
 
@@ -214,7 +214,8 @@ What the system does:
 - Enforces CORS and per-session allowlists.
 - Stores session config and secrets in KV.
 - Requires auth for secret-using endpoints by default, but `POST /ai` and `POST /transcribe` also support anonymous access when the session config allows it.
-- Supports admin-signed bootstrap paths for `POST /arweave/upload` and `POST /lit/payment-delegation` when no bearer token is present.
+- Supports admin-signed bootstrap paths for `POST /arweave/upload` when no bearer token is present.
+- Supports worker-mediated Lit Chipotle setup and execution through signed admin `lit-chipotle-*` actions and authenticated `/lit/chipotle-action` runtime requests.
 - Supports grant-backed sponsored setup flows via `/sponsor`, `POST /admin/issue-sponsored-grants`, `POST /sponsored/redeem-deploy`, and `POST /sponsored/redeem-faucet`.
 
 Deep-dive docs:
@@ -320,13 +321,15 @@ Worker API (selected endpoints):
 - `POST /ai`: AI proxy (provider-based); authenticated by default, with anonymous access supported when the session config allows it. Also supports `POST /` with `{ action: "ai", ... }`.
 - `POST /transcribe`: Transcription proxy; authenticated by default, with anonymous access supported when the session config allows it.
 - `POST /arweave/upload`: Authenticated Arweave upload (also supports an admin-signed bootstrap path when no auth header).
-- `POST /lit/payment-delegation`: Lit Protocol payment delegation handoff (supports authenticated member flow plus an unauthenticated, admin-signed bootstrap path).
+- `POST /lit/chipotle-action`: Authenticated worker-mediated Lit Chipotle execution for check/encrypt/decrypt requests.
 - `POST /sponsored/redeem-deploy`: Redeem a sponsored worker deploy grant.
 - `POST /sponsored/redeem-faucet`: Redeem a sponsored faucet grant.
 - `POST /admin/set-config`: Signed admin action to store session config in KV.
 - `POST /admin/set-secrets`: Signed admin action to store session secrets in KV.
 - `POST /admin/set-limits`: Signed admin action to update rate limits in KV.
-- `POST /admin/lit-status`: Signed admin action to check Lit Protocol delegation status.
+- `POST /admin/lit-chipotle-status`: Signed admin action to check worker-mediated Chipotle readiness without returning stored API keys.
+- `POST /admin/lit-chipotle-provision`: Signed admin action to register the default CE action in an existing Lit account.
+- `POST /admin/lit-chipotle-bootstrap-session`: Signed admin action to create or derive the session Chipotle group, PKP, usage key, and CE action metadata.
 - `POST /admin/issue-sponsored-grants`: Signed admin action to issue sponsored access grants.
 - `POST /`: Authenticated action-style requests using an `action` field: `request_test_eth` (testnet faucet), `fetch_url`, `fetch_image`.
 
