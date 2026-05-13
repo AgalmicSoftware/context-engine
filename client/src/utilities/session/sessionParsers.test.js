@@ -60,11 +60,36 @@ describe('sessionParsers', () => {
     expect(parsed.metadata.sessionName).toBe('Alpha Session');
     expect(parsed.metadata.sessionInfo).toBe('Fixture metadata for parser tests.');
     expect(parsed.metadata.tags).toEqual(['alpha', 'beta']);
-    expect(parsed.metadata.lit.network).toBe('naga-test');
+    expect(parsed.metadata.lit.network).toBe('chipotle');
     expect(parsed.metadata.lit.userMaxPrice).toBe('123');
     expect(parsed.metadata.sponsored).toBeUndefined();
     expect(parsed.metadata.sponsoredSbtAddress).toBeUndefined();
     expect(raw).toEqual(original);
+  });
+
+  it('preserves future public metadata fields while stripping internal parser fields', () => {
+    const parsed = parseSessionMetadata({
+      sessionName: ' Future Session ',
+      __fromCache: true,
+      display: {
+        accentColor: 'teal',
+        nested: {
+          mode: 'compact',
+        },
+      },
+      customList: ['alpha', { enabled: true }],
+    });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.metadata.sessionName).toBe('Future Session');
+    expect(parsed.metadata.__fromCache).toBeUndefined();
+    expect(parsed.metadata.display).toEqual({
+      accentColor: 'teal',
+      nested: {
+        mode: 'compact',
+      },
+    });
+    expect(parsed.metadata.customList).toEqual(['alpha', { enabled: true }]);
   });
 
   it('rejects corrupt metadata field types instead of coercing them', () => {
@@ -81,7 +106,7 @@ describe('sessionParsers', () => {
     ]));
     expect(parsed.metadata.sessionName).toBeUndefined();
     expect(parsed.metadata.tags).toBeUndefined();
-    expect(parsed.metadata.lit).toEqual({ network: 'naga-dev' });
+    expect(parsed.metadata.lit).toEqual({ network: 'chipotle' });
   });
 
   it('parses worker config fields and trims nested string values', () => {
@@ -99,6 +124,28 @@ describe('sessionParsers', () => {
       allowOrigins: ['https://example.com'],
       limits: { perWalletPerDay: '3' },
       rpcEndpoint: 'https://rpc.example.com',
+    });
+  });
+
+  it('parses public Lit credential fields from worker config without accepting secret API keys', () => {
+    const parsed = parseWorkerConfig({
+      corsWorkerUrl: 'https://worker.example.com',
+      litCredentials: {
+        litApiBase: ' https://api.chipotle.litprotocol.com ',
+        litGroupId: ' 7 ',
+        litPkpId: ' 0xpkp123 ',
+        litActionCid: ' QmAction123 ',
+        litAccountApiKey: 'secret-account-key',
+        litUsageApiKey: 'secret-usage-key',
+      },
+    });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.config.litCredentials).toEqual({
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: '7',
+      litPkpId: '0xpkp123',
+      litActionCid: 'QmAction123',
     });
   });
 

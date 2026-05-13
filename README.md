@@ -14,7 +14,7 @@ Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and n
 ## Deployment Modes
 
 - Public version: the hosted public app is available at [contextengine.xyz](https://contextengine.xyz).
-- Private mode: organizations can run Context Engine on their own infrastructure with self-hosted deployment options and the [`contextEngine-cc`](contextEngine-cc/README.md) Claude Code companion integration. See [docs/scaling.md](docs/scaling.md) for deployment profiles.
+- Private mode: organizations can run Context Engine on their own infrastructure with self-hosted deployment options. See [docs/scaling.md](docs/scaling.md) for deployment profiles.
 
 
 
@@ -69,29 +69,19 @@ For testing, run modes, and deeper setup:
 - Summaries and analysis of survey results and response clusters
 - OpenAI, Anthropic, OpenRouter, and custom provider paths
 
-### User and Deployer UX: Passkey sign-on UX
-- Users log in with a simple Passkey / Biometric flow (native pin, fingerprint, or faceID on phones)
+### User and Deployer UX: Passkey Sign-On
+- Users log in with a simple passkey / biometric flow (native PIN, fingerprint, or Face ID on phones)
 - Login flow generates or handles an Ethereum account, which can be used easily with cryptography features
    - Users do not need to know anything about Ethereum or crypto (or take any additional steps) to use the app
 
 
 ### Deployer UX: Sponsored Bundles
 - Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API)
-  - Senstive and organiztional deployments can plug in existing AI Keys, and use local or custom options for storage, encryption, and EVM network functionalities
+  - Sensitive and organizational deployments can plug in existing AI keys, and use local or custom options for storage, encryption, and EVM network functionality
 
 ## AI Discourse Corpus
 
 The top-level [`ai-discourse-corpus/`](ai-discourse-corpus/) directory contains reusable JSON sub-corpuses curated from AI policy, safety, governance, science fiction, practitioner interviews, evaluation work, debates, and enriched social-media discussion. Rights for that directory are described separately in [ai-discourse-corpus/LICENSE.md](ai-discourse-corpus/LICENSE.md): no ownership is claimed over upstream source material, and project-authored annotations are dedicated under CC0.
-
-## Video Production Notes
-
-For local Context Engine video work, use the shared VideoFactory tooling in
-`xoCortex/projects/video-factory` for ElevenLabs voice-over generation. Keep
-`ELEVENLABS_API_KEY` and `ELEVENLABS_VOICE_ID` in VideoFactory's gitignored
-`secrets/.env`, then call `scripts/voice-generation/generate_voice.py` from
-that repo or source `scripts/load_env.sh` before running custom assembly
-scripts. Do not use macOS `say` voices for review cuts that are intended to
-match the Jeanette/Jane ElevenLabs voice.
 
 ## Scaling
 
@@ -118,4 +108,4 @@ This repo is intentionally multi-license. The main client/app OSS surface in `cl
 
 ## Roadmap
 
-Known limitations and future development directions live in [ROADMAP.md](ROADMAP.md).
+Current priorities and future development directions live in [ROADMAP.md](ROADMAP.md).

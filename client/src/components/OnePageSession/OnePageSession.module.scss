@@ -356,6 +356,7 @@
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   color: var(--ce-color-white);
+  cursor: pointer;
   display: inline-flex;
   gap: 6px;
   font-size: 0.8rem;
@@ -369,6 +370,25 @@
   &:focus-visible {
     color: var(--ce-color-white);
     border-color: rgba(255, 255, 255, 0.32);
+    outline: none;
+  }
+}
+
+.sectionHeaderLinkButton {
+  appearance: none;
+  font-family: inherit;
+  white-space: nowrap;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.72;
+    transform: none;
+  }
+
+  &:disabled:hover,
+  &:disabled:focus-visible {
+    border-color: rgba(255, 255, 255, 0.16);
+    color: var(--ce-color-white);
     outline: none;
   }
 }
@@ -1010,7 +1030,9 @@
 }
 
 .sbtMintStatusItem {
+  position: relative;
   margin-bottom: 8px;
+  padding-right: 54px;
   font-size: 1rem;
   /* slightly larger for readability */
   font-weight: 700;
@@ -1068,6 +1090,10 @@
 /* NEW: Globally-scoped close button for Reactstrap Alert */
 /* ===================================================== */
 :global(.sbt-alert-close-btn) {
+  position: absolute !important;
+  top: 50% !important;
+  right: 10px !important;
+  transform: translateY(-50%) !important;
   color: #222 !important;
   font-weight: 600 !important;
   font-size: 1.6rem !important;

@@ -6,13 +6,42 @@
 ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
+docs/agent-native*.md
+client/public/skill.md
+workers/agentBridgeWorker
+client/src/components/TelegramDemoSetup
+docs/ai-agent-bootstrap.md
+.secrets.baseline
+test/contextEngineCc.sw-cache-policy.test.mjs
+workers/sessionCorsWorker/chipotleClient.test.mjs
 TODO
 local-private-version
 CLAUDE.md
 .claude
 .codex
+.codex-artifacts
+.codex-solc
+.codex-tmp
 video-clickthrough-local
 .tmp-review
+.DS_Store
+.env
+.env.local
+.env.*.local
+.keys
+.e2e-secrets
+.e2e-cache
+.npm-cache
+.npm-cache-client*
+output
+release-public
+dist
+out
+cache
+broadcast
+coverage
+docs/codebase-*.md
+docs/assets/codebase-*
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
@@ -33,10 +62,52 @@ client/src/utilities/web3/contractScripts.*.proxy.test.js
 EOF
 }
 
+ce_public_release_manifest_exclude_patterns() {
+  cat <<'EOF'
+TODO
+contextEngine-cc/TODO
+.env
+.env.local
+.env.*.local
+.keys
+.e2e-secrets
+.e2e-cache
+docs/codebase-*.md
+docs/assets/codebase-*
+EOF
+}
+
 ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
+TODO
+contextEngine-cc
 CLAUDE.md
 .claude
+.codex
+.codex-artifacts
+.codex-solc
+.codex-tmp
+.DS_Store
+.env
+.env.local
+.env.*.local
+.keys
+.e2e-secrets
+.e2e-cache
+.npm-cache
+.npm-cache-client*
+output
+release-public
+dist
+out
+cache
+broadcast
+coverage
+docs/codebase-*.md
+docs/assets/codebase-*
+docs/agent-native*.md
+client/public/skill.md
+workers/agentBridgeWorker
 video-clickthrough-local
 local-private-version
 scripts/test-*.js

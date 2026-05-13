@@ -163,6 +163,26 @@ describe('RiskMatrix', () => {
     });
   });
 
+  it('preserves the current route in standalone atlas scenario links', () => {
+    const priorUrl = window.location.href;
+
+    try {
+      window.history.replaceState({}, '', '/matrix?panel=capabilities#scenario');
+      render(<RiskMatrix />);
+
+      fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-capabilities-vs-labor'));
+
+      expect(
+        screen.getByTestId('ce-risk-matrix-atlas-link-labor-automation-capabilities-scaling')
+      ).toHaveAttribute(
+        'href',
+        '/atlas/0x4110000000000000000000000000000000000000000000000000000000000000?demo=1&returnTo=%2Fmatrix%3Fpanel%3Dcapabilities%23scenario'
+      );
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   it('shows linked crypto scenarios from the mirrored aggregate cell as well', () => {
     render(<RiskMatrix />);
 

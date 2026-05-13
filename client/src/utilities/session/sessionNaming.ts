@@ -13,9 +13,12 @@ import {
   isReservedSessionSlugKey,
   resolveCanonicalSessionConfig,
 } from './canonicalSessionContext.js';
+import type {
+  SessionConfig,
+  SessionContractRef as BoundarySessionContractRef,
+  UnknownRecord,
+} from './sessionTypes.js';
 
-type SessionInput = Record<string, any>;
-type SessionConfigLike = Record<string, any>;
 type SessionContractRef = {
   address?: string;
   chainId?: number;
@@ -23,7 +26,7 @@ type SessionContractRef = {
 type SessionContractMap = Record<string, SessionContractRef>;
 
 type ResolveSessionConfigAliasesOptions = {
-  defaults?: SessionInput;
+  defaults?: UnknownRecord;
   resolveBySlug?: ((slug: string) => unknown) | null;
   fallbackConfig?: unknown;
 };
@@ -31,13 +34,16 @@ type ResolveSessionConfigAliasesOptions = {
 type ResolvedSessionConfigAliases = {
   hasExplicitSessionSlug: boolean;
   sessionSlug: string;
-  sessionConfig: unknown;
+  sessionConfig: SessionConfig | null;
   sessionConfigSource: string;
-  warnings: unknown[];
-  provenance: unknown;
+  warnings: string[];
+  provenance: {
+    sessionSlug: string;
+    sessionConfig: string;
+  };
 };
 
-const isObj = (val: unknown): val is SessionInput => !!val && typeof val === 'object' && !Array.isArray(val);
+const isObj = (val: unknown): val is UnknownRecord => !!val && typeof val === 'object' && !Array.isArray(val);
 const REGISTRY_SESSION_SLUG_RE = /^[a-z0-9_-]+$/;
 const MAX_REGISTRY_SESSION_SLUG_LENGTH = 128;
 
@@ -152,27 +158,27 @@ export const resolveSessionSlugFromPathname = (pathname: unknown = ''): string |
   }
 };
 
-export const resolveActiveSessionSlug = (input: SessionInput = {}): string => normalizeSessionSlug(
+export const resolveActiveSessionSlug = (input: UnknownRecord = {}): string => normalizeSessionSlug(
   input.activeSessionSlug ??
   input.sessionSlug ??
   input.slug
 );
 
-export const resolveSessionSlug = (input: SessionInput = {}): string => normalizeSessionSlug(
+export const resolveSessionSlug = (input: UnknownRecord = {}): string => normalizeSessionSlug(
   input.sessionSlug ??
   input.activeSessionSlug ??
   input.slug
 );
 
-export const resolveSessionSlugPinned = (input: SessionInput = {}): boolean => (
+export const resolveSessionSlugPinned = (input: UnknownRecord = {}): boolean => (
   !!(input.sessionSlugPinned)
 );
 
-export const resolveSessionName = (input: SessionInput = {}): string => (
+export const resolveSessionName = (input: UnknownRecord = {}): string => (
   toStr(input.sessionName ?? '').trim()
 );
 
-export const resolveSessionAliases = (input: SessionInput = {}) => {
+export const resolveSessionAliases = (input: UnknownRecord = {}) => {
   const activeSessionSlug = resolveActiveSessionSlug(input);
   const sessionSlug = normalizeSessionSlug(input.sessionSlug ?? activeSessionSlug);
   const sessionSlugPinned = resolveSessionSlugPinned(input);
@@ -192,7 +198,7 @@ const normalizeContractRef = (value: unknown): SessionContractRef | null => {
     return address ? { address } : null;
   }
   if (!isObj(value)) return null;
-  const source = value as SessionConfigLike;
+  const source = value as BoundarySessionContractRef;
   const address = toStr(
     source.address ??
     source.contractAddress ??
@@ -266,18 +272,18 @@ export const mergeSessionContractMaps = (...maps: unknown[]): SessionContractMap
 };
 
 export const resolveSessionConfigAliases = (
-  input: SessionInput = {},
+  input: UnknownRecord = {},
   opts: ResolveSessionConfigAliasesOptions = {}
 ): ResolvedSessionConfigAliases => {
   const source = isObj(input) ? input : {};
   const defaults = isObj(opts.defaults) ? opts.defaults : {};
   const resolveBySlug = typeof opts.resolveBySlug === 'function' ? opts.resolveBySlug : null;
-  const resolved = (resolveCanonicalSessionConfig as any)({
+  const resolved = resolveCanonicalSessionConfig({
     source,
     defaults,
     resolveBySlug,
     fallbackConfig: opts.fallbackConfig,
-  }) as ResolvedSessionConfigAliases;
+  });
 
   return {
     hasExplicitSessionSlug: resolved.hasExplicitSessionSlug,
@@ -289,10 +295,12 @@ export const resolveSessionConfigAliases = (
   };
 };
 
-export const resolveSessionContractRef = (input: SessionInput = {}) => {
+export const resolveSessionContractRef = (input: UnknownRecord = {}) => {
   const aliases = resolveSessionConfigAliases(input, {
-    defaults: input.defaults,
-    resolveBySlug: input.resolveBySlug,
+    defaults: isObj(input.defaults) ? input.defaults : undefined,
+    resolveBySlug: typeof input.resolveBySlug === 'function'
+      ? input.resolveBySlug as (slug: string) => unknown
+      : null,
     fallbackConfig: input.fallbackConfig,
   });
   const cfg = isObj(aliases.sessionConfig) ? aliases.sessionConfig : null;

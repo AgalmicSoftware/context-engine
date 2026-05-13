@@ -33,6 +33,7 @@ const createBaseDeps = () => ({
   verifyAdminSignature: 'verifyAdminSignature',
   getSessionSecrets: 'getSessionSecrets',
   arweaveUpload: 'arweaveUpload',
+  storageRoute: 'storageRoute',
   validateBootstrapAdmin: 'validateBootstrapAdmin',
   validateAdmin: 'validateAdmin',
   mergeWorkerConfigRecords: 'mergeWorkerConfigRecords',
@@ -280,6 +281,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves bootstrap arweave handled s
           verifyAdminSignature: 'verifyAdminSignature',
           getSessionSecrets: 'getSessionSecrets',
           arweaveUpload: 'arweaveUpload',
+          storageRoute: 'storageRoute',
         });
         assert.deepEqual(value.constants, {
           missingSlugError: 'Missing sessionSlug.',
@@ -460,6 +462,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
           getSessionSecrets: 'getSessionSecrets',
           transcribe: 'transcribe',
           arweaveUpload: 'arweaveUpload',
+          storageRoute: 'storageRoute',
           fetchImage: 'fetchImage',
           fetchUrl: 'fetchUrl',
           normalizeAiRequestPayload: 'normalizeAiRequestPayload',

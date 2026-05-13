@@ -76,10 +76,11 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields keeps the worker URL compatibility mirror and sponsored flags only', () => {
+  test('buildSessionWizardRegistrySessionFields keeps compatibility mirrors and sponsored flags only', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {
         corsWorkerUrl: ' https://worker.example ',
+        rpcUrl: ' https://rpc.example ',
         unexpectedField: 'should-not-pass-through',
       },
       sponsoredFields: {
@@ -89,8 +90,36 @@ describe('sessionWizardWriteNormalization', () => {
       },
     })).toEqual({
       corsWorkerUrl: 'https://worker.example',
+      rpcUrl: 'https://rpc.example',
       sponsored_ai: '1',
       sponsored_arweave: '0',
+    });
+  });
+
+  test('buildSessionWizardRegistrySessionFields does not mirror uploaded custom RPC secrets into public fields', () => {
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {
+        rpcUrl: 'https://draft-rpc.example',
+      },
+      sponsoredFields: {
+        sponsored_rpc: '1',
+      },
+    })).toEqual({
+      rpcUrl: 'https://draft-rpc.example',
+      sponsored_rpc: '1',
+    });
+  });
+
+  test('buildSessionWizardRegistrySessionFields ignores worker-secret RPC values', () => {
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {},
+    })).toEqual({});
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {
+        rpcUrl: ' https://browser-visible-rpc.example ',
+      },
+    })).toEqual({
+      rpcUrl: 'https://browser-visible-rpc.example',
     });
   });
 
@@ -182,6 +211,13 @@ describe('sessionWizardWriteNormalization', () => {
           balanceThresholdEth: '0.001',
         },
       },
+      workerSecrets: {
+        litApiBase: ' https://api.chipotle.litprotocol.com ',
+        litGroupId: ' group_123 ',
+        litPkpId: ' pkp_123 ',
+        litActionCid: ' bafy123 ',
+        litUsageApiKey: 'lit-secret',
+      },
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
       workerUrl: ' https://worker.example/ ',
       latestChainBlock: 500,
@@ -201,6 +237,12 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.rpcUrl).toBe('https://rpc.example');
     expect(payload.blockLimits).toEqual({ start: 250, end: 275 });
     expect(payload.embeddedDeployHelperEnabled).toBe(false);
+    expect(payload.litCredentials).toEqual({
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    });
     expect(payload.sessionId).toBe('0x123e4567e89b12d3a456426614174000');
     expect(payload.contracts.surveys).toEqual({ address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID });
     expect(payload.contracts.sessionRegistry).toEqual({
@@ -209,4 +251,51 @@ describe('sessionWizardWriteNormalization', () => {
     });
     expect(payload.contracts.reputation).toBeUndefined();
   });
+  test('session storage profile is session-owned metadata and worker config, with Cloudflare secrets omitted', () => {
+    const metadata = sanitizeSessionWizardMetadataPayload({
+      slug: 'storage-edge',
+      sessionName: 'Storage Edge',
+      storageProfile: {
+        backend: 'cloudflare',
+        cloudflare: {
+          accountId: 'must-not-pass-through',
+          bucketName: 'private-bucket',
+          workerToken: 'cf-secret-token',
+        },
+      },
+    }, {
+      fieldOrder: ['slug', 'sessionName', 'storageProfile'],
+    });
+
+    expect(metadata.storageProfile.backend).toBe('cloudflare');
+    expect(metadata.storageProfile.sessionOwned).toBe(true);
+    expect(metadata.storageProfile.demoOwned).toBe(false);
+    expect(metadata.storageProfile.resources.docsContext).toBe('active');
+    expect(metadata.storageProfile.resources.questions).toBe('active');
+    expect(metadata.storageProfile.resources.surveys).toBe('active');
+    expect(metadata.storageProfile.resources.responses).toBe('active');
+    expect(metadata.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
+    expect(metadata.storageProfile.payloadAccessControl.resources.docsContext).toBe('docUploads');
+    expect(metadata.storageProfile.sbtGatedAccess.litRequired).toBe('not_required_worker_enforced');
+    expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('question_payloads');
+    expect(metadata.storageProfile.cloudflare.primitives.r2).toContain('response_payloads');
+    expect(metadata.storageProfile.cloudflare.payloadAccessMode).toBe('worker_sbt_gate');
+    expect(JSON.stringify(metadata)).not.toMatch(/private-bucket|cf-secret-token|must-not-pass-through/i);
+
+    const workerPayload = buildSessionWizardWorkerConfigPayload({
+      slug: 'storage-edge',
+      draft: {
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        storageProfile: { backend: 'cloudflare' },
+      },
+      deployPayload: {},
+    });
+
+    expect(workerPayload.storageProfile.backend).toBe('cloudflare');
+    expect(workerPayload.storageProfile.sessionOwned).toBe(true);
+    expect(workerPayload.storageProfile.demoOwned).toBe(false);
+    expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
+    expect(workerPayload.litCredentials).toEqual({});
+  });
+
 });

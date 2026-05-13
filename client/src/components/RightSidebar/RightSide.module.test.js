@@ -13,9 +13,9 @@ describe('RightSide desktop shell styles', () => {
   it('shows the empty right shell only on desktop breakpoints', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'RightSide.module.scss'), 'utf8');
 
-    expect(scss).toMatch(/#rightSideContainer\s*{\s*display:\s*none;\s*}/);
-    expect(scss).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?#rightSideContainer\s*{[\s\S]*?flex:\s*0 0 23%;[\s\S]*?display:\s*flex;/);
-    expect(scss).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?#rightSideContainer\s*{[\s\S]*?flex:\s*0 0 23%;[\s\S]*?display:\s*flex;/);
+    expect(scss).toMatch(/\.rightSideContainer\s*{\s*display:\s*none;\s*}/);
+    expect(scss).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.rightSideContainer\s*{[\s\S]*?flex:\s*0 0 23%;[\s\S]*?display:\s*flex;/);
+    expect(scss).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.rightSideContainer\s*{[\s\S]*?flex:\s*0 0 23%;[\s\S]*?display:\s*flex;/);
     expect(scss).toMatch(/\.rightSideCard\s*{[\s\S]*?background:\s*var\(--ce-color-bg\);[\s\S]*?box-shadow:/);
   });
 });

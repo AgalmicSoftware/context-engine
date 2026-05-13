@@ -51,6 +51,15 @@ while IFS= read -r pattern; do
   STRIP_PATTERNS+=("$pattern")
 done < <(ce_public_release_strip_patterns)
 
+PRIVATE_REPLAY_MESSAGE_TOKENS=(
+  "contextEngine-cc"
+  "docs/agent-native"
+  "agent-native"
+  "OpenClaw"
+  "Telegram bridge"
+  "TODO/"
+)
+
 TMP_ROOT=""
 TEMP_CLONE=""
 TARGET_BRANCH="$DEFAULT_BRANCH_NAME"
@@ -106,6 +115,34 @@ commit_is_empty_after_strip() {
   return 0
 }
 
+private_replay_message_token() {
+  local message_file="$1"
+  local token
+
+  for token in "${PRIVATE_REPLAY_MESSAGE_TOKENS[@]}"; do
+    if grep -Fiq -- "$token" "$message_file"; then
+      printf '%s\n' "$token"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+ensure_public_replay_message() {
+  local commit_sha="$1"
+  local subject="$2"
+  local message_file="$3"
+  local token
+
+  if token=$(private_replay_message_token "$message_file"); then
+    log_error "Refusing to replay $commit_sha | $subject"
+    log_error "Commit message mentions private release token: $token"
+    log_error "Split the private-only changes into a stripped commit or rewrite the replayed public commit message."
+    exit 2
+  fi
+}
+
 strip_private_paths_from_clone() {
   local pattern
   local matches=()
@@ -158,9 +195,52 @@ verify_strip_patterns_absent() {
   )
 }
 
+verify_private_planning_paths_absent() {
+  local findings
+
+  findings=$(
+    cd "$TEMP_CLONE"
+    git ls-files |
+      grep -E '(^|/)TODO(/|$)|(^|/)[^/]*PRDs?[^/]*(/|$)' || true
+  )
+
+  if [ -n "$findings" ]; then
+    printf '%s\n' "$findings"
+    return 1
+  fi
+
+  return 0
+}
+
 reset_clone_to_branch_head() {
+  git -C "$TEMP_CLONE" cherry-pick --abort >/dev/null 2>&1 || true
   git -C "$TEMP_CLONE" reset --hard --quiet HEAD
   git -C "$TEMP_CLONE" clean -fdq
+}
+
+resolve_private_cherry_pick_conflicts() {
+  local path
+  local found_conflict=0
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    found_conflict=1
+    if ! path_matches_strip_pattern "$path"; then
+      return 1
+    fi
+  done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
+
+  if [ "$found_conflict" -ne 1 ]; then
+    return 1
+  fi
+
+  strip_private_paths_from_clone
+
+  if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
+    return 1
+  fi
+
+  return 0
 }
 
 sync_branch_back_to_source_repo() {
@@ -321,6 +401,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
       SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
       log_info "DRY RUN skip  $commit_sha | $subject"
     else
+      message_file="$TMP_ROOT/commit-message.txt"
+      git -C "$REPO_ROOT" log -1 --format='%B' "$commit_sha" > "$message_file"
+      ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
       REPLAYED_COUNT=$((REPLAYED_COUNT + 1))
       log_info "DRY RUN replay $commit_sha | $subject"
     fi
@@ -343,11 +426,14 @@ for commit_sha in "${COMMITS[@]}"; do
 
   log_info "Replaying $commit_sha | $subject"
   if ! git -C "$TEMP_CLONE" cherry-pick --no-commit "$commit_sha" >/dev/null 2>&1; then
-    log_error "Cherry-pick failed for $commit_sha | $subject"
-    git -C "$TEMP_CLONE" cherry-pick --abort >/dev/null 2>&1 || true
-    reset_clone_to_branch_head
-    log_error "Resolve the conflict manually by replaying this commit onto a branch based on origin/main."
-    exit 1
+    if resolve_private_cherry_pick_conflicts; then
+      log_info "Resolved stripped-path cherry-pick conflicts for $commit_sha | $subject"
+    else
+      log_error "Cherry-pick failed for $commit_sha | $subject"
+      reset_clone_to_branch_head
+      log_error "Resolve the conflict manually by replaying this commit onto a branch based on origin/main."
+      exit 1
+    fi
   fi
 
   strip_private_paths_from_clone
@@ -358,6 +444,8 @@ for commit_sha in "${COMMITS[@]}"; do
     reset_clone_to_branch_head
     continue
   fi
+
+  ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
 
   GIT_AUTHOR_NAME="$PUBLIC_GIT_NAME" \
   GIT_AUTHOR_EMAIL="$PUBLIC_GIT_EMAIL" \
@@ -377,6 +465,14 @@ if strip_findings=$(verify_strip_patterns_absent); then
 else
   log_error "Strip verification failed; private paths are still present:"
   printf '%s\n' "$strip_findings" >&2
+  exit 2
+fi
+
+if planning_findings=$(verify_private_planning_paths_absent); then
+  :
+else
+  log_error "Private planning path verification failed; public branch still contains:"
+  printf '%s\n' "$planning_findings" >&2
   exit 2
 fi
 

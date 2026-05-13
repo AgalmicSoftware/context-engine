@@ -13,24 +13,31 @@ import {
   getVisibleSessionWizardContractKeys,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
+import { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS } from './sessionWizardOnChainCompat.js';
+import { buildWorkerLitCredentialsConfig } from './sessionWizardWorkerSecretSupport';
+import {
+  isWorkerSbtGateCloudflareStorageProfile,
+  normalizeSessionStorageProfileConfig,
+} from './sessionWizardStorageProfile';
 import type {
   AnyRecord,
   ChainIdLike,
   SessionContractLike,
   SessionContractsLike,
+  WorkerSecretsLike,
 } from '../shellTypes';
 
 const isObj = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const trimString = (value: unknown): string => toStr(value).trim();
-const cloneValue = (value: any): any => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
+const cloneValue = <T = unknown>(value: T): T => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry)) as T;
   if (isObj(value)) {
     return Object.keys(value).reduce<AnyRecord>((acc, key) => {
       acc[key] = cloneValue(value[key]);
       return acc;
-    }, {});
+    }, {}) as T;
   }
-  return typeof value === 'string' ? value.trim() : value;
+  return (typeof value === 'string' ? value.trim() : value) as T;
 };
 
 const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
@@ -41,11 +48,7 @@ const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
   'deployHelperEnabled',
 ]);
 
-// Stage-A compatibility mirror: worker URL reads have not fully migrated to Worker KV yet,
-// so new sessions keep an explicit registry mirror while metadata stops claiming authority.
-export const SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS = Object.freeze({
-  corsWorkerUrl: ['corsWorkerUrl'],
-});
+export { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS };
 
 const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
   if (!isObj(metadata)) return metadata;
@@ -160,6 +163,10 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(next, 'storageProfile')) {
+    next.storageProfile = normalizeSessionStorageProfileConfig(next.storageProfile);
+  }
+
   if (isObj(next.faucet)) {
     delete next.faucet.rpcUrl;
     delete next.faucet.privateKey;
@@ -228,6 +235,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
   slug = '',
   draft = {},
   deployPayload = {},
+  workerSecrets = {},
   account = '',
   registryAddress = '',
   registryChainId = 0,
@@ -243,6 +251,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
   slug?: string;
   draft?: AnyRecord;
   deployPayload?: AnyRecord;
+  workerSecrets?: WorkerSecretsLike;
   account?: string;
   registryAddress?: string;
   registryChainId?: ChainIdLike;
@@ -275,6 +284,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     };
   });
 
+  const storageProfile = normalizeSessionStorageProfileConfig(resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile);
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
@@ -294,6 +304,10 @@ export const buildSessionWizardWorkerConfigPayload = ({
     faucet: isObj(resolvedDeployPayload.faucet)
       ? cloneValue(resolvedDeployPayload.faucet)
       : cloneValue(resolveWorkerFaucetConfig()),
+    litCredentials: isWorkerSbtGateCloudflareStorageProfile(storageProfile)
+      ? {}
+      : buildWorkerLitCredentialsConfig(workerSecrets),
+    storageProfile,
   };
 
   if (

@@ -6,12 +6,13 @@ import {
 } from '../../utilities/session/sessionNaming.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import type {
-  AnyRecord,
   NetworkLike,
   ResolveSessionConfigBySlug,
   SessionConfigLike,
   SessionResolutionResult,
 } from '../shellTypes';
+
+type UnknownRecord = Record<string, unknown>;
 
 type SurveyToolSessionSource = {
   sessionSlug?: string;
@@ -39,7 +40,7 @@ type SurveyToolScopedContext = SessionResolutionResult & {
 };
 
 const hasNonBlankValue = (value: unknown): boolean => toStr(value).trim() !== '';
-const isPlainObject = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+const isPlainObject = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const readPositiveNumber = (value: unknown): number | null => {
   const num = Number(value || 0);
   return Number.isFinite(num) && num > 0 ? num : null;
@@ -203,7 +204,7 @@ const mergeSurveyToolResponseGateSessionConfig = ({
   // Some SurveyTool callers pass a display-only subset in props.sessionConfig.
   // Merge it on top of the strictly resolved config without reintroducing
   // default/general fallback for unresolved explicit slugs.
-  const merged: AnyRecord = { ...(canonicalConfig || {}), ...overlayConfig };
+  const merged: SessionConfigLike = { ...(canonicalConfig || {}), ...overlayConfig };
 
   if (canonicalConfig?.lit || overlayConfig?.lit) {
     merged.lit = { ...(canonicalConfig?.lit || {}), ...(overlayConfig?.lit || {}) };

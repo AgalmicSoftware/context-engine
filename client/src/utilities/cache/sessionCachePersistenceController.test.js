@@ -5,22 +5,22 @@ jest.mock('utilities/logging.js', () => ({
     warn: jest.fn(),
     error: jest.fn(),
   })),
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
   readCache: jest.fn(),
-}));
+}), { virtual: true });
 
 jest.mock('../../components/MainSite/cacheConstants.js', () => ({
   __esModule: true,
   DG_PRIMARY_ROUTE_CACHE_NAMES: ['surveysCache', 'questionsCache', 'sbtCache'],
-}));
+}), { virtual: true });
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   normalizeSessionSlug: jest.fn(),
-}));
+}), { virtual: true });
 
 const {
   createSessionCachePersistenceController,

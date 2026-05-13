@@ -94,4 +94,33 @@ describe('contractScripts metadata decrypt helpers', () => {
     expect(questionData.prompt).toBeUndefined();
     expect(decryptSpy).not.toHaveBeenCalled();
   });
+
+  it('prefers Lit recipients for non-creator question metadata decrypts', async () => {
+    const decryptSpy = jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockResolvedValue('SBT prompt');
+    const questionData = {
+      id: 'question-lit-first',
+      creator: '0x00000000000000000000000000000000000000bb',
+      promptEncrypted: '{"recipients":[{"type":"lit-sbt-v1","lit":{"ciphertext":"cipher"}}]}',
+    };
+
+    await contractScripts.decryptQuestionPayloadInPlace(
+      questionData,
+      GROUP_CFG,
+      {
+        decryptContext: {
+          account: ACCOUNT,
+          providerLike: 'porto_passkey',
+          chainId: 84532,
+          litHooks: { getKey: jest.fn() },
+        },
+      }
+    );
+
+    expect(questionData.prompt).toBe('SBT prompt');
+    expect(questionData.promptDecrypted).toBe(true);
+    expect(decryptSpy).toHaveBeenCalledWith(
+      questionData.promptEncrypted,
+      expect.objectContaining({ preferLitRecipients: true })
+    );
+  });
 });

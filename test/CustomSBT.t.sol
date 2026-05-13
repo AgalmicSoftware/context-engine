@@ -273,6 +273,70 @@ contract CustomSBTTest is TestUtils {
         assertFalse(ok, "configured deterministic deploy should reject non-zero group hash without deferred init");
     }
 
+    function testFactoryRejectsPasswordModeWithoutHashes() public {
+        bytes32[] memory empty = new bytes32[](0);
+        (bool ok,) = address(factory).call(
+            abi.encodeWithSelector(
+                factory.createSBT.selector,
+                "ContextEngine",
+                "CE-BAD-PW",
+                0,
+                admin,
+                0,
+                true,
+                MySBT.BurnAuth.Neither,
+                empty,
+                "",
+                bytes32(0)
+            )
+        );
+
+        assertFalse(ok, "password mode should require at least one hashed password");
+    }
+
+    function testFactoryRejectsPublicModeWithHashedPasswords() public {
+        bytes32[] memory hashed = new bytes32[](1);
+        hashed[0] = keccak256(abi.encodePacked("secret"));
+        (bool ok,) = address(factory).call(
+            abi.encodeWithSelector(
+                factory.createSBT.selector,
+                "ContextEngine",
+                "CE-BAD-PUB",
+                0,
+                admin,
+                0,
+                false,
+                MySBT.BurnAuth.Neither,
+                hashed,
+                "",
+                bytes32(0)
+            )
+        );
+
+        assertFalse(ok, "public mode should reject preloaded password hashes");
+    }
+
+    function testFactoryRejectsInviteModeWithoutSignerHash() public {
+        bytes32[] memory empty = new bytes32[](0);
+        (bool ok,) = address(factory).call(
+            abi.encodeWithSelector(
+                factory.createSBT.selector,
+                "ContextEngine",
+                "CE-BAD-INV",
+                1,
+                admin,
+                0,
+                true,
+                MySBT.BurnAuth.Neither,
+                empty,
+                "",
+                bytes32(0)
+            )
+        );
+
+        assertFalse(ok, "invite mode should require a signer hash");
+    }
+
     function testPublicClaimMints() public {
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, empty, bytes32(0));
@@ -420,6 +484,40 @@ contract CustomSBTTest is TestUtils {
         assertFalse(ok, "claim should revert when password mint enabled");
     }
 
+    function testFactoryDerivesExplicitMintModesForAllSupportedFlows() public {
+        bytes32[] memory empty = new bytes32[](0);
+        bytes32[] memory hashed = new bytes32[](1);
+        hashed[0] = keccak256(abi.encodePacked("secret"));
+        bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
+
+        MySBT publicSbt = deploySbt("ContextEngine", "CE-PUB", 0, false, empty, bytes32(0));
+        assertEq(uint256(publicSbt.mintMode()), uint256(MySBT.MintMode.PublicClaim), "public claim mode mismatch");
+
+        MySBT passwordSbt = deploySbt("ContextEngine", "CE-PW", 0, true, hashed, bytes32(0));
+        assertEq(
+            uint256(passwordSbt.mintMode()),
+            uint256(MySBT.MintMode.PasswordCommitReveal),
+            "password mode mismatch"
+        );
+        assertTrue(passwordSbt.hasPasswordMint(), "password mode should preserve legacy password flag");
+
+        MySBT groupSbt = deploySbt("ContextEngine", "CE-GRP", 0, false, empty, groupPasswordHash);
+        assertEq(
+            uint256(groupSbt.mintMode()),
+            uint256(MySBT.MintMode.UnlimitedGroupSignature),
+            "group signature mode mismatch"
+        );
+        assertFalse(groupSbt.hasPasswordMint(), "group signature mode should clear legacy password flag");
+
+        MySBT inviteSbt = deploySbt("ContextEngine", "CE-INV", 2, true, empty, groupPasswordHash);
+        assertEq(
+            uint256(inviteSbt.mintMode()),
+            uint256(MySBT.MintMode.LimitedInviteSignature),
+            "invite mode mismatch"
+        );
+        assertTrue(inviteSbt.hasPasswordMint(), "invite mode should preserve legacy password flag");
+    }
+
     function testPasswordClaimFlowConsumesPassword() public {
         string memory password = "invite-pass";
         bytes32[] memory hashed = new bytes32[](1);
@@ -466,10 +564,21 @@ contract CustomSBTTest is TestUtils {
         assertEq(sbt.getTokenIdByOwner(user), 1, "tokenId mismatch");
     }
 
+    function testGroupSignatureModeRejectsPublicClaim() public {
+        bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
+        bytes32[] memory empty = new bytes32[](0);
+        MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, empty, groupPasswordHash);
+
+        vm.prank(user);
+        (bool ok,) = address(sbt).call(abi.encodeWithSignature("claim()"));
+        assertFalse(ok, "group signature mode should reject public claim");
+        assertEq(sbt.mintedTokens(), 0, "mintedTokens should stay 0");
+    }
+
     function testInviteClaimMintsAndBlocksWrongNonce() public {
         bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
         bytes32[] memory empty = new bytes32[](0);
-        MySBT sbt = deploySbt("ContextEngine", "CE", 2, false, empty, groupPasswordHash);
+        MySBT sbt = deploySbt("ContextEngine", "CE", 2, true, empty, groupPasswordHash);
 
         uint256 nonce = 1;
         bytes memory signature = signInvite(sbt, nonce, signerKey);
@@ -485,6 +594,22 @@ contract CustomSBTTest is TestUtils {
 
         assertEq(sbt.mintedTokens(), 1, "mintedTokens should stay 1");
         assertEq(sbt.getTokenIdByOwner(userTwo), 0, "userTwo should not mint");
+    }
+
+    function testInviteModeRejectsPublicClaimAndGroupSignatureMint() public {
+        bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
+        bytes32[] memory empty = new bytes32[](0);
+        MySBT sbt = deploySbt("ContextEngine", "CE", 2, true, empty, groupPasswordHash);
+
+        vm.prank(user);
+        (bool claimOk,) = address(sbt).call(abi.encodeWithSignature("claim()"));
+        assertFalse(claimOk, "invite mode should reject public claim");
+
+        bytes memory signature = signGroupMint(sbt, user, signerKey);
+        vm.prank(user);
+        (bool groupSigOk,) = address(sbt).call(abi.encodeWithSignature("mintWithGroupSignature(bytes)", signature));
+        assertFalse(groupSigOk, "invite mode should reject reusable group signatures");
+        assertEq(sbt.mintedTokens(), 0, "mintedTokens should stay 0");
     }
 
     function testMintingEndTimeBlocksClaims() public {
@@ -639,8 +764,9 @@ contract CustomSBTTest is TestUtils {
     }
 
     function testAddHashedPasswordsOnlyAdmin() public {
-        bytes32[] memory empty = new bytes32[](0);
-        MySBT sbt = deploySbt("ContextEngine", "CE", 0, true, empty, bytes32(0));
+        bytes32[] memory initialHashed = new bytes32[](1);
+        initialHashed[0] = keccak256(abi.encodePacked("initial"));
+        MySBT sbt = deploySbt("ContextEngine", "CE", 0, true, initialHashed, bytes32(0));
         bytes32[] memory hashed = new bytes32[](1);
         hashed[0] = keccak256(abi.encodePacked("pw"));
 
@@ -670,13 +796,13 @@ contract CustomSBTTest is TestUtils {
         assertFalse(ok, "should not add passwords after max tokens");
     }
 
-    function testGroupSignatureRequiresGroupPasswordHash() public {
+    function testGroupSignatureRequiresGroupSignatureMode() public {
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, empty, bytes32(0));
 
         vm.prank(user);
         (bool ok,) = address(sbt).call(abi.encodeWithSignature("mintWithGroupSignature(bytes)", ""));
-        assertFalse(ok, "group signature should require group password hash");
+        assertFalse(ok, "group signature should reject public claim mode");
     }
 
     function testGroupSignatureRejectsWrongSigner() public {
@@ -692,13 +818,13 @@ contract CustomSBTTest is TestUtils {
         assertEq(sbt.mintedTokens(), 0, "mintedTokens should stay 0");
     }
 
-    function testInviteClaimNoGroupPasswordHash() public {
+    function testInviteClaimRequiresInviteMode() public {
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, empty, bytes32(0));
         bytes memory signature = signInvite(sbt, 1, signerKey);
 
         vm.prank(user);
-        vm.expectRevert(NoGroupPassword.selector);
+        vm.expectRevert(bytes("Invite mint not enabled"));
         sbt.claimWithInvite(1, signature);
 
         assertEq(sbt.mintedTokens(), 0, "mintedTokens should stay 0");
@@ -707,7 +833,7 @@ contract CustomSBTTest is TestUtils {
     function testInviteClaimRejectsWrongNonce() public {
         bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
         bytes32[] memory empty = new bytes32[](0);
-        MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, empty, groupPasswordHash);
+        MySBT sbt = deploySbt("ContextEngine", "CE", 1, true, empty, groupPasswordHash);
 
         bytes memory signature = signInvite(sbt, 2, signerKey);
 
@@ -721,7 +847,7 @@ contract CustomSBTTest is TestUtils {
     function testInviteClaimRejectsWrongSigner() public {
         bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
         bytes32[] memory empty = new bytes32[](0);
-        MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, empty, groupPasswordHash);
+        MySBT sbt = deploySbt("ContextEngine", "CE", 1, true, empty, groupPasswordHash);
 
         bytes memory signature = signInvite(sbt, 1, 0xB0C);
 
@@ -736,7 +862,7 @@ contract CustomSBTTest is TestUtils {
         bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
         bytes32[] memory empty = new bytes32[](0);
         MySBT sbt =
-            deploySbtWithConfig("ContextEngine", "CE", 1, false, empty, groupPasswordHash, MySBT.BurnAuth.Neither, 0);
+            deploySbtWithConfig("ContextEngine", "CE", 1, true, empty, groupPasswordHash, MySBT.BurnAuth.Neither, 0);
 
         bytes memory sig1 = signInvite(sbt, 1, signerKey);
         vm.prank(user);
@@ -753,7 +879,7 @@ contract CustomSBTTest is TestUtils {
     function testInviteClaimBlocksWhenAddressAlreadyOwns() public {
         bytes32 groupPasswordHash = keccak256(abi.encodePacked(signer));
         bytes32[] memory empty = new bytes32[](0);
-        MySBT sbt = deploySbt("ContextEngine", "CE", 0, false, empty, groupPasswordHash);
+        MySBT sbt = deploySbt("ContextEngine", "CE", 2, true, empty, groupPasswordHash);
 
         bytes memory sig1 = signInvite(sbt, 1, signerKey);
         vm.prank(user);

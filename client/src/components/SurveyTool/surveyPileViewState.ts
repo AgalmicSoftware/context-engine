@@ -41,6 +41,7 @@ export type PileWorkspaceViewState = {
   priorResponsesHydrating: boolean;
   hasScanOrHydrationWork: boolean;
   hasConcreteHiddenQuestions: boolean;
+  hasUnhydratedGatedQuestions: boolean;
   preferGatedEmptyState: boolean;
   showGatedEmptyState: boolean;
   showFilteredEmptyState: boolean;
@@ -48,6 +49,34 @@ export type PileWorkspaceViewState = {
   isStillLoading: boolean;
   showMiniBackgroundSpinner: boolean;
 };
+
+export const buildPileLoadingElapsedPatch = (loadingElapsedSec: unknown) => ({
+  loadingElapsedSec: Number(loadingElapsedSec || 0),
+});
+
+export const buildPileShowLongLoadingPatch = (showLongLoading: unknown) => ({
+  showLongLoading: !!showLongLoading,
+});
+
+export const buildPileLoadingPatch = (loading: unknown) => ({
+  loading: !!loading,
+});
+
+export const buildPileNavCounterVisiblePatch = (navCounterVisible: unknown) => ({
+  navCounterVisible: !!navCounterVisible,
+});
+
+export const buildPileSubmitTempTextPatch = (pileSubmitTempText: unknown) => ({
+  pileSubmitTempText,
+});
+
+export const buildPileFilterActivePatch = (isFilterActive: unknown) => ({
+  isFilterActive: !!isFilterActive,
+});
+
+export const buildPileSubmissionCompletePatch = (submissionComplete: unknown) => ({
+  submissionComplete: !!submissionComplete,
+});
 
 export const shouldPreferPileGatedEmptyState = ({
   hasConcreteHiddenQuestions = false,
@@ -92,6 +121,7 @@ export const buildPileWorkspaceViewState = ({
   isHydratingPriorResponses = false,
   isFilterActive = false,
   hasFilterBaseQuestions = false,
+  hasSessionQuestionGate = false,
 }: {
   pileQuestions?: unknown[] | null;
   activePileIndex?: number | null;
@@ -111,6 +141,7 @@ export const buildPileWorkspaceViewState = ({
   isHydratingPriorResponses?: boolean;
   isFilterActive?: boolean;
   hasFilterBaseQuestions?: boolean;
+  hasSessionQuestionGate?: boolean;
 } = {}): PileWorkspaceViewState => {
   const normalizedPileQuestions = Array.isArray(pileQuestions) ? pileQuestions : [];
   const normalizedActiveIndex = Math.max(0, Number(activePileIndex || 0));
@@ -150,6 +181,16 @@ export const buildPileWorkspaceViewState = ({
     !!hasHiddenGatedQuestions ||
     normalizedHiddenMaskedQuestionIds.length > 0
   );
+  const hasUnhydratedGatedQuestions = (
+    !!hasSessionQuestionGate &&
+    !hasVisibleQuestions &&
+    !hasConcreteHiddenQuestions &&
+    (
+      normalizedHydrateDiscovered > 0 ||
+      normalizedPendingMetadataCount > 0 ||
+      !!isQuestionCacheReady
+    )
+  );
   const preferGatedEmptyState = shouldPreferPileGatedEmptyState({
     hasConcreteHiddenQuestions,
     hasVisibleQuestions,
@@ -158,7 +199,11 @@ export const buildPileWorkspaceViewState = ({
     recentRateLimit,
     hasPendingMetadataRetries,
   });
-  const showGatedEmptyState = hasConcreteHiddenQuestions || preferGatedEmptyState;
+  const showGatedEmptyState = (
+    hasConcreteHiddenQuestions ||
+    hasUnhydratedGatedQuestions ||
+    preferGatedEmptyState
+  );
   const showFilteredEmptyState = (
     !hasVisibleQuestions &&
     !!isFilterActive &&
@@ -174,7 +219,7 @@ export const buildPileWorkspaceViewState = ({
     !hasScanOrHydrationWork &&
     !hasPendingMetadataRetries &&
     hydrationProgressSettled
-  ) || preferGatedEmptyState;
+  ) || preferGatedEmptyState || hasUnhydratedGatedQuestions;
   const isStillLoading = shouldShowPileFullLoadingState({
     loading,
     hasVisibleQuestions,
@@ -205,6 +250,7 @@ export const buildPileWorkspaceViewState = ({
     priorResponsesHydrating,
     hasScanOrHydrationWork,
     hasConcreteHiddenQuestions,
+    hasUnhydratedGatedQuestions,
     preferGatedEmptyState,
     showGatedEmptyState,
     showFilteredEmptyState,

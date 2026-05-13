@@ -2,10 +2,24 @@ import React from 'react';
 
 import PileHologramAssistant from './PileHologramAssistant';
 import {
+  PILE_LOADING_ICON_WRAP_STYLE,
+  PILE_SCAN_ERROR_DETAIL_STYLE,
+  buildPileCardClassName,
+  buildPileFilterButtonClassName,
+  buildPileFooterClassName,
+  buildPileHologramToggleClassName,
+  buildPileSubmitButtonClassName,
   renderPileInteractionSurface,
+  resolvePileCardStatusClassName,
+  resolvePileFilterButtonStyle,
+  resolvePileFilterIconStyle,
+  resolvePileLoadingProgressFillStyle,
+  resolvePileMiniLoaderStyle,
+  resolvePileNavCounterStyle,
   type PileInteractionSurfaceProps,
   type PileQuestionLike,
 } from './surveyPileInteractionSurface';
+import styles from './SurveyTool.module.scss';
 
 type TestTreeNode = React.ReactNode;
 type TestElementNode = React.ReactElement<{
@@ -136,6 +150,66 @@ const buildBaseProps = (): PileInteractionSurfaceProps => ({
 });
 
 describe('surveyPileInteractionSurface', () => {
+  it('builds pile display classes and styles', () => {
+    expect(PILE_SCAN_ERROR_DETAIL_STYLE).toEqual({ opacity: 0.8, marginTop: 8 });
+    expect(PILE_LOADING_ICON_WRAP_STYLE).toEqual({
+      fontSize: '2.5rem',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '15px',
+    });
+    expect(resolvePileNavCounterStyle(true)).toEqual({
+      opacity: 0.8,
+      transition: 'opacity 0.5s ease-in-out',
+    });
+    expect(resolvePileNavCounterStyle(false)).toEqual({
+      opacity: 0,
+      transition: 'opacity 0.5s ease-in-out',
+    });
+    expect(resolvePileFilterButtonStyle(true)).toEqual({
+      color: '#4cd964',
+      borderColor: '#4cd964',
+      opacity: 0.75,
+    });
+    expect(resolvePileFilterButtonStyle(false)).toEqual({});
+    expect(resolvePileFilterIconStyle(true)).toEqual({ color: '#4cd964' });
+    expect(resolvePileFilterIconStyle(false)).toEqual({});
+    expect(buildPileFilterButtonClassName(styles, true)).toBe(
+      `${styles.actionButton} ${styles.actionButtonActive}`
+    );
+    expect(buildPileFooterClassName(styles, false)).toBe(
+      `${styles.pileFooter} ${styles.pileFooterHidden}`
+    );
+    expect(buildPileSubmitButtonClassName(styles, true, true)).toBe(
+      `${styles.pileSubmitButton} ${styles.submitGlow} ${styles.pileSubmitButtonInactive}`
+    );
+    expect(resolvePileCardStatusClassName(styles, 0)).toBe(styles.pileCardActive);
+    expect(resolvePileCardStatusClassName(styles, 1)).toBe(styles.pileCardNext);
+    expect(resolvePileCardStatusClassName(styles, -1)).toBe(styles.pileCardPrev);
+    expect(resolvePileCardStatusClassName(styles, 2)).toBe(styles.pileCardAfter);
+    expect(resolvePileCardStatusClassName(styles, -2)).toBe(styles.pileCardBefore);
+    expect(buildPileCardClassName(styles, styles.pileCardActive)).toBe(
+      `${styles.pileCard} ${styles.pileCardActive}`
+    );
+    expect(resolvePileLoadingProgressFillStyle({
+      isHydrating: true,
+      hydrateDone: 3,
+      hydrateDiscovered: 5,
+      scanPercent: 80,
+    })).toEqual({ width: '60%' });
+    expect(resolvePileLoadingProgressFillStyle({
+      isHydrating: false,
+      hydrateDone: 0,
+      hydrateDiscovered: 0,
+      scanPercent: 72,
+    })).toEqual({ width: '72%' });
+    expect(buildPileHologramToggleClassName(styles, true)).toBe(
+      `${styles.pileHologramToggle} ${styles.pileHologramToggleActive}`
+    );
+    expect(resolvePileMiniLoaderStyle(true)).toEqual({ opacity: 0.5 });
+    expect(resolvePileMiniLoaderStyle(false)).toEqual({ opacity: 1 });
+  });
+
   it('renders the gated empty panel before the generic empty copy when gating is active', () => {
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),
@@ -189,9 +263,12 @@ describe('surveyPileInteractionSurface', () => {
     const renderActiveQuestion = jest.fn((question: PileQuestionLike) => (
       <div data-testid={`active-${question.id}`}>{question.prompt}</div>
     ));
+    const toggleListeningPanel = jest.fn();
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),
       showMiniBackgroundSpinner: true,
+      showListeningPanel: true,
+      toggleListeningPanel,
       pileQuestions: [
         { id: 'q1', prompt: 'Q1' },
         { id: 'q2', prompt: 'Q2' },
@@ -221,6 +298,15 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(controlsChildren[0], 'pileActions')).toBe(true);
     expect(nodeHasClassName(controlsChildren[1], 'pileFooter')).toBe(true);
     expect(nodeHasClassName(controlsChildren[2], 'pileNav')).toBe(true);
+
+    const listeningToggle = findElement(tree, (node) => (
+      isElementNode(node) && node.props['data-testid'] === 'ce-session-listening-toggle'
+    )) as TestElementNode | null;
+    expect(listeningToggle).not.toBeNull();
+    expect(listeningToggle?.props['aria-pressed']).toBe(true);
+    expect(nodeHasClassName(listeningToggle, 'actionButtonActive')).toBe(true);
+    (listeningToggle?.props.onClick as () => void)();
+    expect(toggleListeningPanel).toHaveBeenCalledTimes(1);
   });
 
   it('renders the hologram takeover instead of the pile controls when active', () => {

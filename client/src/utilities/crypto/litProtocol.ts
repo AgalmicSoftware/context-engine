@@ -9,18 +9,24 @@
 // @ts-nocheck
 import { Buffer } from 'buffer/';
 import { ethers } from 'ethers';
-import { createPublicClient, createWalletClient, custom, http } from 'viem';
 import { cryptoUtils } from './cryptography.js';
+import {
+  DEFAULT_CHIPOTLE_ACTION_CODE,
+} from './litChipotleCatalog.js';
+import {
+  buildLitChipotlePolicy,
+  fingerprintLitChipotlePolicy,
+  normalizeChipotleCekHex,
+  normalizeLitChipotleMetadataVersion,
+} from './litChipotlePolicy.js';
 import { arweaveScripts } from '../arweave/arweaveScripts.js';
 import { createLogger } from '../logging';
 import { perfDebugLitGetKey } from '../web3/rpcDebugStats.js';
 import { toStr } from '../shared/primitives.js';
 import {
   fetchWorkerWithAuth,
-  buildSignedBootstrapAdminAuth,
   normalizeWorkerUrl,
 } from '../worker/workerAuth.js';
-import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 
 /**
  * @typedef {import('ethers').providers.Provider} EthersProvider
@@ -93,7 +99,6 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
  *   providerLike?: LitProviderLike,
  *   resourceAbilityRequests?: unknown,
  *   userMaxPrice?: unknown,
- *   paymentDelegation?: Record<string, any>,
  *   account?: string,
  *   rpcUrl?: string
  * }) => Promise<LitEncryptResult>} saveKey
@@ -106,7 +111,6 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
  *   providerLike?: LitProviderLike,
  *   resourceAbilityRequests?: unknown,
  *   userMaxPrice?: unknown,
- *   paymentDelegation?: Record<string, any>,
  *   account?: string,
  *   requesterAddress?: string,
  *   ciphertext?: string,
@@ -124,7 +128,6 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
  * @property {number=} connectTimeout
  * @property {unknown=} resourceAbilityRequests
  * @property {unknown=} userMaxPrice
- * @property {Record<string, any>=} paymentDelegation
  * @property {boolean=} __e2eMock
  */
 
@@ -173,61 +176,10 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 
 const log = createLogger('sbt');
 
-const DEFAULT_LIT_NETWORK = 'naga-dev';
+const DEFAULT_LIT_NETWORK = 'chipotle';
 const DEFAULT_LIT_CHAIN = 'ethereum';
 const DEFAULT_LIT_CONNECT_TIMEOUT = 45000;
 const DEFAULT_LIT_SESSION_TTL_MS = 1000 * 60 * 10;
-const DEFAULT_LIT_PAYMENT_DELEGATION_TTL_MS = 1000 * 60 * 10;
-const LIT_AUTH_APP_NAME = 'context-engine';
-const NAGA_DEFAULT_KEY_SET_ID = 'naga-keyset1';
-const NAGA_ROOT_KEY_TYPE_SUBNET = 1;
-const NAGA_ROOT_KEY_TYPE_HD_ROOT = 2;
-const NAGA_HANDSHAKE_V1_NETWORKS = Object.freeze(new Set(['naga-dev']));
-
-let litClientModulePromise = null;
-let litAuthModulePromise = null;
-let litContractsModulePromise = null;
-let litNetworksModulePromise = null;
-
-const getLitClientModule = async () => {
-  if (!litClientModulePromise) {
-    litClientModulePromise = import('@lit-protocol/lit-client').catch((err) => {
-      litClientModulePromise = null;
-      throw err;
-    });
-  }
-  return litClientModulePromise;
-};
-
-const getLitAuthModule = async () => {
-  if (!litAuthModulePromise) {
-    litAuthModulePromise = import('@lit-protocol/auth').catch((err) => {
-      litAuthModulePromise = null;
-      throw err;
-    });
-  }
-  return litAuthModulePromise;
-};
-
-const getLitContractsModule = async () => {
-  if (!litContractsModulePromise) {
-    litContractsModulePromise = import('@lit-protocol/contracts').catch((err) => {
-      litContractsModulePromise = null;
-      throw err;
-    });
-  }
-  return litContractsModulePromise;
-};
-
-const getLitNetworksModule = async () => {
-  if (!litNetworksModulePromise) {
-    litNetworksModulePromise = import('@lit-protocol/networks').catch((err) => {
-      litNetworksModulePromise = null;
-      throw err;
-    });
-  }
-  return litNetworksModulePromise;
-};
 
 const getGlobalScope = () => {
   if (typeof globalThis !== 'undefined') return globalThis;
@@ -354,70 +306,6 @@ const isE2eLitMockEnabled = () => {
   return false;
 };
 
-const runWithTimeout = async ({ run, timeoutMs, timeoutMessage }) => {
-  let timeoutId = null;
-  let timedOut = false;
-  const taskPromise = Promise.resolve()
-    .then(() => run())
-    .catch((err) => {
-      // Avoid an unhandled rejection if the task fails after timeout wins the race.
-      if (timedOut) return null;
-      throw err;
-    });
-
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      timedOut = true;
-      reject(new Error(timeoutMessage));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([taskPromise, timeoutPromise]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-};
-
-const createLitClientWithTimeout = async ({ network, timeoutMs }) => {
-  let timeoutId = null;
-  let timedOut = false;
-  const createPromise = getLitClientModule()
-    .then((module) => {
-      const createLitClient = module?.createLitClient;
-      if (typeof createLitClient !== 'function') {
-        throw new Error('Lit client module missing createLitClient export.');
-      }
-      return createLitClient({ network });
-    })
-    .then((client) => {
-      if (timedOut && client && typeof client.disconnect === 'function') {
-        try {
-          client.disconnect();
-        } catch (e) { log.warn('litProtocol: cleanup', e); }
-      }
-      return client;
-    })
-    .catch((err) => {
-      // Avoid an unhandled rejection if createLitClient fails after timeout wins the race.
-      if (timedOut) return null;
-      throw err;
-    });
-
-  const timeoutPromise = new Promise((_, reject) => {
-    timeoutId = setTimeout(() => {
-      timedOut = true;
-      reject(new Error(`Lit connect timed out after ${timeoutMs}ms.`));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([createPromise, timeoutPromise]);
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId);
-  }
-};
-
 const LIT_CHAIN_BY_ID = Object.freeze({
   1: 'ethereum',
   10: 'optimism',
@@ -436,24 +324,32 @@ const LIT_WALLET_CHAIN_FALLBACKS = Object.freeze({
   optimismSepolia: 'sepolia',
 });
 
+const CHAIN_ID_BY_LIT_CHAIN = Object.freeze(
+  Object.entries(LIT_CHAIN_BY_ID).reduce((acc, [id, chain]) => {
+    acc[chain] = Number(id);
+    return acc;
+  }, {})
+);
+
 const LIT_UNSUPPORTED_CONTRACT_GATE_ERRORS = Object.freeze({
   optimismSepolia: 'Lit does not currently support OP Sepolia for SBT-gated encryption. Choose "only me" private encryption or move the gate to a supported chain such as Base Sepolia.',
 });
 
 const LIT_NETWORK_ALIASES = Object.freeze({
-  // Intentionally no datil-dev/datil-test aliases: datil is deprecated and
-  // this project is still in testing where strict backward compatibility is not required.
-  'naga-dev': 'naga-dev',
-  nagadev: 'naga-dev',
-  'naga-test': 'naga-test',
-  nagatest: 'naga-test',
-  'naga-mainnet': 'naga',
-  datil: 'naga',
+  chipotle: 'chipotle',
+  'chipotle-v3': 'chipotle',
+  'naga-dev': 'chipotle',
+  nagadev: 'chipotle',
+  'naga-test': 'chipotle',
+  nagatest: 'chipotle',
+  'naga-mainnet': 'chipotle',
+  naga: 'chipotle',
+  datil: 'chipotle',
   custom: 'custom',
 });
 
 /**
- * Normalizes Lit network aliases to the runtime identifier expected by the Lit client.
+ * Normalizes historical Lit network labels to the worker-mediated runtime label used by CE.
  *
  * @param {string | null | undefined} litNetwork
  * @returns {string}
@@ -462,7 +358,7 @@ export const resolveLitNetwork = (litNetwork) => {
   const raw = toStr(litNetwork || DEFAULT_LIT_NETWORK).trim();
   if (!raw) return DEFAULT_LIT_NETWORK;
   const normalized = raw.toLowerCase().replace(/_/g, '-');
-  return LIT_NETWORK_ALIASES[normalized] || raw;
+  return LIT_NETWORK_ALIASES[normalized] || DEFAULT_LIT_NETWORK;
 };
 
 const resolveLitCipherPayload = (value) => {
@@ -478,6 +374,147 @@ const resolveLitCipherPayload = (value) => {
   }
   return null;
 };
+
+const normalizeSbtAddressList = (values = []) => {
+  const out = [];
+  const seen = new Set();
+  (Array.isArray(values) ? values : []).forEach((raw) => {
+    const value = toStr(raw).trim();
+    if (!value || !ethers.utils.isAddress(value)) return;
+    const normalized = ethers.utils.getAddress(value);
+    const dedupeKey = normalized.toLowerCase();
+    if (seen.has(dedupeKey)) return;
+    seen.add(dedupeKey);
+    out.push(normalized);
+  });
+  return out;
+};
+
+const extractSbtGateFromAccessControlConditions = (conditions) => {
+  const entries = Array.isArray(conditions) ? conditions : [];
+  const sbtAddresses = [];
+  const seen = new Set();
+  let gateMode = 'any';
+  let litChain = '';
+
+  entries.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const operator = toStr(entry.operator).trim().toLowerCase();
+    if (operator === 'and') gateMode = 'all';
+    if (operator === 'or' && gateMode !== 'all') gateMode = 'any';
+
+    const contractAddress = toStr(entry.contractAddress).trim();
+    if (!ethers.utils.isAddress(contractAddress)) return;
+    if (toStr(entry.standardContractType).trim().toUpperCase() !== 'ERC721') return;
+    if (toStr(entry.method).trim() !== 'balanceOf') return;
+    const parameters = Array.isArray(entry.parameters) ? entry.parameters : [];
+    if (toStr(parameters[0]).trim() !== ':userAddress') return;
+    const comparator = toStr(entry.returnValueTest?.comparator).trim();
+    const value = toStr(entry.returnValueTest?.value).trim();
+    if (comparator !== '>' || value !== '0') return;
+
+    const normalized = ethers.utils.getAddress(contractAddress);
+    const dedupeKey = normalized.toLowerCase();
+    if (!seen.has(dedupeKey)) {
+      seen.add(dedupeKey);
+      sbtAddresses.push(normalized);
+    }
+    if (!litChain) litChain = toStr(entry.chain).trim();
+  });
+
+  if (!sbtAddresses.length) return null;
+  return {
+    sbtAddresses,
+    gateMode,
+    litChain,
+    chainId: Number(CHAIN_ID_BY_LIT_CHAIN[litChain] || 0) || null,
+  };
+};
+
+const encodeChipotleKeyMessage = (raw) => {
+  const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw || []);
+  return ethers.utils.hexlify(bytes);
+};
+
+const decodeChipotleKeyMessage = (value) => {
+  const normalized = normalizeChipotleCekHex(value);
+  const bytes = ethers.utils.arrayify(normalized);
+  if (bytes.length !== 32) {
+    throw new Error(`Lit Chipotle CEK had invalid length (${bytes.length}).`);
+  }
+  return bytes;
+};
+
+const parseChipotleActionResponse = (payload) => {
+  if (payload && typeof payload === 'object' && payload.response && typeof payload.response === 'object') {
+    if (payload.response.response && typeof payload.response.response === 'object') {
+      return payload.response.response;
+    }
+    return payload.response;
+  }
+  return payload && typeof payload === 'object' ? payload : {};
+};
+
+const buildChipotleDataHashSentinel = ({
+  litActionCid = '',
+  chainId = null,
+  gateMode = 'any',
+  sbtAddresses = [],
+  policyFingerprint = '',
+} = {}) => (
+  [
+    'chipotle-v3',
+    toStr(litActionCid).trim() || 'action',
+    Number(chainId || 0) || 0,
+    toStr(gateMode).trim() || 'any',
+    normalizeSbtAddressList(sbtAddresses).join(',').toLowerCase(),
+    toStr(policyFingerprint).trim().toLowerCase(),
+  ].join(':')
+);
+
+const buildChipotleGateFromOptions = ({
+  accessControlConditions,
+  chipotle = {},
+  chainId,
+} = {}) => {
+  const explicitGate = chipotle && typeof chipotle === 'object' ? chipotle : {};
+  const explicitPolicy = explicitGate.policy && typeof explicitGate.policy === 'object'
+    ? explicitGate.policy
+    : {};
+  const derivedGate = extractSbtGateFromAccessControlConditions(accessControlConditions) || {};
+  const sbtAddresses = normalizeSbtAddressList(
+    explicitGate.sbtAddresses || explicitPolicy.sbtAddresses || derivedGate.sbtAddresses || []
+  );
+  if (!sbtAddresses.length) {
+    throw new Error('Lit Chipotle requires at least one SBT gate address.');
+  }
+  const gateChainId = Number(
+    explicitGate.chainId ||
+    explicitPolicy.chainId ||
+    derivedGate.chainId ||
+    chainId ||
+    0
+  ) || null;
+  const gateMode = toStr(
+    explicitGate.gateMode ||
+    explicitPolicy.gateMode ||
+    derivedGate.gateMode ||
+    'any'
+  ).trim().toLowerCase() === 'all'
+    ? 'all'
+    : 'any';
+  return {
+    sbtAddresses,
+    gateChainId,
+    gateMode,
+    litChain: toStr(explicitGate.litChain || derivedGate.litChain).trim(),
+  };
+};
+
+const isChipotleRuntimeConfigured = (chipotle = {}) => (
+  !!toStr(chipotle?.workerUrl).trim() &&
+  !!toStr(chipotle?.sessionSlug).trim()
+);
 
 const resolveLitErrorMessage = (err) => {
   if (!err) return 'Unknown Lit error';
@@ -615,6 +652,7 @@ const buildLitGetKeyCacheKey = ({
   ciphertext,
   dataToEncryptHash,
   encryptedSymmetricKey,
+  chipotlePolicyFingerprint,
 } = {}) => {
   const requester = toStr(requesterAddress).trim().toLowerCase();
   const network = resolveLitNetwork(litNetwork);
@@ -625,6 +663,7 @@ const buildLitGetKeyCacheKey = ({
     ciphertext: toStr(ciphertext).trim(),
     dataToEncryptHash: toStr(dataToEncryptHash).trim(),
     encryptedSymmetricKey: toStr(encryptedSymmetricKey).trim(),
+    chipotlePolicyFingerprint: toStr(chipotlePolicyFingerprint).trim().toLowerCase(),
   });
   return hashStable([requester, network, resolvedChain, condsHash, resourceHash, cipherHash].join('|'));
 };
@@ -714,6 +753,7 @@ const wrapLitGetKeyWithCache = (getKeyUncached, context = {}) => {
       ciphertext: cipherPayload?.ciphertext || opts.ciphertext || '',
       dataToEncryptHash: cipherPayload?.dataToEncryptHash || opts.dataToEncryptHash || '',
       encryptedSymmetricKey: opts.encryptedSymmetricKey || opts.toDecrypt || '',
+      chipotlePolicyFingerprint: opts.chipotle?.policyFingerprint || opts.chipotle?.policy?.policyFingerprint || '',
     });
 
     const now = Date.now();
@@ -794,6 +834,7 @@ const wrapLitGetKeyWithCache = (getKeyUncached, context = {}) => {
 
 // Test-only export to validate caching and key scoping without initializing a real Lit client.
 export const __test__wrapLitGetKeyWithCache = wrapLitGetKeyWithCache;
+export const __test__extractSbtGateFromAccessControlConditions = extractSbtGateFromAccessControlConditions;
 
 const resolveLitChainFallbackWarnings = new Set();
 
@@ -967,563 +1008,6 @@ export const buildHatAccessControlConditions = ({
   ];
 };
 
-const createMemoryAuthStorage = (networkName) => {
-  const authDataByAddress = new Map();
-  const delegationSigByPublicKey = new Map();
-  const pkpTokenIdsByAuth = new Map();
-
-  return {
-    config: { appName: LIT_AUTH_APP_NAME, networkName, type: 'memory' },
-    read: async ({ address }) => authDataByAddress.get(String(address || '').toLowerCase()) || null,
-    write: async ({ address, authData }) => {
-      authDataByAddress.set(String(address || '').toLowerCase(), authData);
-    },
-    writeInnerDelegationAuthSig: async ({ publicKey, authSig }) => {
-      delegationSigByPublicKey.set(String(publicKey || ''), String(authSig || ''));
-    },
-    readInnerDelegationAuthSig: async ({ publicKey }) => (
-      delegationSigByPublicKey.get(String(publicKey || '')) || null
-    ),
-    writePKPTokens: async ({ authMethodType, authMethodId, tokenIds }) => {
-      const key = `${String(authMethodType)}:${String(authMethodId || '')}`;
-      pkpTokenIdsByAuth.set(key, Array.isArray(tokenIds) ? tokenIds : []);
-    },
-    readPKPTokens: async ({ authMethodType, authMethodId }) => {
-      const key = `${String(authMethodType)}:${String(authMethodId || '')}`;
-      return pkpTokenIdsByAuth.get(key) || null;
-    },
-  };
-};
-
-const authManagerByNetwork = new Map();
-
-const getAuthManager = async (networkName) => {
-  if (authManagerByNetwork.has(networkName)) {
-    return authManagerByNetwork.get(networkName);
-  }
-
-  const authModule = await getLitAuthModule();
-  const createAuthManager = authModule?.createAuthManager;
-  if (typeof createAuthManager !== 'function') {
-    throw new Error('Lit auth module missing createAuthManager export.');
-  }
-
-  // Keep Lit auth material in-memory only. The SDK localStorage plugin persists
-  // session keypairs and delegation auth signatures, which extends decryption
-  // capability beyond the current tab lifetime.
-  const storage = createMemoryAuthStorage(networkName);
-
-  const manager = createAuthManager({ storage });
-  authManagerByNetwork.set(networkName, manager);
-  return manager;
-};
-
-let litClientPromise = null;
-let litClientKey = null;
-let litClientInstance = null;
-const nagaRootKeyMaterialPromiseByNetwork = new Map();
-
-const resolveLitNetworkModule = async ({ litNetwork, rpcUrl } = {}) => {
-  const resolvedNetwork = resolveLitNetwork(litNetwork);
-  const networksModule = await getLitNetworksModule();
-  const naga = networksModule?.naga;
-  const nagaDev = networksModule?.nagaDev;
-  const nagaTest = networksModule?.nagaTest;
-  const networkByName = {
-    'naga-dev': nagaDev,
-    'naga-test': nagaTest,
-    naga,
-  };
-
-  if (resolvedNetwork === 'custom') {
-    if (!rpcUrl) {
-      throw new Error('Custom Lit network requires rpcUrl.');
-    }
-    if (!nagaDev || typeof nagaDev.withOverrides !== 'function') {
-      throw new Error('Lit networks module missing nagaDev.withOverrides.');
-    }
-    return nagaDev.withOverrides({ rpcUrl });
-  }
-  const baseNetwork = networkByName[resolvedNetwork];
-  if (!baseNetwork) {
-    throw new Error(`Unsupported Lit network "${resolvedNetwork}".`);
-  }
-  if (rpcUrl && typeof baseNetwork.withOverrides === 'function') {
-    return baseNetwork.withOverrides({ rpcUrl });
-  }
-  return baseNetwork;
-};
-
-const resolveNetworkRpcUrl = (networkModule) => {
-  try {
-    if (networkModule && typeof networkModule.getRpcUrl === 'function') {
-      return networkModule.getRpcUrl();
-    }
-  } catch (e) { log.warn('litProtocol: fallback', e); }
-  return null;
-};
-
-const normalizeHexNoPrefix = (value) => {
-  const raw = toStr(value).trim();
-  if (!raw) return '';
-  return raw.startsWith('0x') ? raw.slice(2) : raw;
-};
-
-const normalizeAddressLower = (value) => toStr(value).trim().toLowerCase();
-const NAGA_ROOT_KEY_LOG_SCAN_BLOCKS = 50000n;
-
-const normalizeBlockNumberBigInt = (value, fallback = 0n) => {
-  if (typeof value === 'bigint') return value >= 0n ? value : fallback;
-  const num = Number(value);
-  if (!Number.isFinite(num) || num < 0) return fallback;
-  const bigIntCtor = (
-    typeof globalThis !== 'undefined' &&
-    typeof globalThis.BigInt === 'function'
-  ) ? globalThis.BigInt : null;
-  if (!bigIntCtor) return fallback;
-  return bigIntCtor(Math.floor(num));
-};
-
-const readLatestRootKeyTypeFromLog = ({ log, latestByType, targetStaking } = {}) => {
-  if (!(latestByType instanceof Map)) return;
-  if (normalizeAddressLower(log?.args?.stakingContract) !== targetStaking) return;
-  const keyType = Number(log?.args?.rootKey?.keyType);
-  if (!Number.isFinite(keyType)) return;
-  const pubkey = normalizeHexNoPrefix(log?.args?.rootKey?.pubkey);
-  if (!pubkey) return;
-  const blockNumber = normalizeBlockNumberBigInt(log?.blockNumber, 0n);
-  const current = latestByType.get(keyType);
-  if (!current || blockNumber > current.blockNumber) {
-    latestByType.set(keyType, { blockNumber, values: [pubkey] });
-    return;
-  }
-  if (blockNumber === current.blockNumber) {
-    current.values.push(pubkey);
-  }
-};
-
-const hasLatestRootKeyTypes = (latestByType, types = []) => (
-  ensureArray(types)
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value))
-    .every((value) => latestByType.has(value))
-);
-
-const scanNagaRootKeySetLogsReverse = async ({
-  publicClient,
-  pubkeyRouterAddress,
-  rootKeySetEvent,
-  stakingAddress,
-  blockChunkSize = NAGA_ROOT_KEY_LOG_SCAN_BLOCKS,
-} = {}) => {
-  if (!publicClient || typeof publicClient.getBlockNumber !== 'function' || typeof publicClient.getLogs !== 'function') {
-    throw new Error('Lit root key scan requires a public client with getBlockNumber/getLogs.');
-  }
-
-  const chunkSize = normalizeBlockNumberBigInt(blockChunkSize, NAGA_ROOT_KEY_LOG_SCAN_BLOCKS) || NAGA_ROOT_KEY_LOG_SCAN_BLOCKS;
-  const latestByType = new Map();
-  const targetStaking = normalizeAddressLower(stakingAddress);
-  let toBlock = normalizeBlockNumberBigInt(await publicClient.getBlockNumber(), 0n);
-
-  while (toBlock >= 0n) {
-    const fromBlock = toBlock >= (chunkSize - 1n)
-      ? (toBlock - chunkSize + 1n)
-      : 0n;
-    const logs = await publicClient.getLogs({
-      address: pubkeyRouterAddress,
-      event: rootKeySetEvent,
-      fromBlock,
-      toBlock,
-    });
-
-    (Array.isArray(logs) ? logs : []).forEach((log) => {
-      readLatestRootKeyTypeFromLog({ log, latestByType, targetStaking });
-    });
-
-    if (hasLatestRootKeyTypes(latestByType, [NAGA_ROOT_KEY_TYPE_SUBNET, NAGA_ROOT_KEY_TYPE_HD_ROOT])) {
-      break;
-    }
-    if (fromBlock === 0n) break;
-    toBlock = fromBlock - 1n;
-  }
-
-  return latestByType;
-};
-
-const cloneLitNetworkModule = (networkModule) => {
-  if (!networkModule || typeof networkModule.withOverrides !== 'function') {
-    return networkModule;
-  }
-  try {
-    return networkModule.withOverrides({ rpcUrl: resolveNetworkRpcUrl(networkModule) || undefined });
-  } catch (_) {
-    return networkModule;
-  }
-};
-
-const resolveRootKeyMaterialFromChain = async ({ resolvedNetwork, networkModule }) => {
-  if (resolvedNetwork !== 'naga-dev') {
-    throw new Error(`Root key material resolver is unavailable for network "${resolvedNetwork}".`);
-  }
-  const contractsModule = await getLitContractsModule();
-  const signatures = contractsModule?.nagaDevSignatures;
-  const rootKeySetEvent = signatures?.PubkeyRouter?.events?.find((entry) => entry?.name === 'RootKeySet');
-  const pubkeyRouterAddress = signatures?.PubkeyRouter?.address;
-  const stakingAddress = signatures?.Staking?.address;
-  const rpcUrl = resolveNetworkRpcUrl(networkModule);
-  const chainConfig = networkModule?.getChainConfig?.();
-
-  if (!rootKeySetEvent || !pubkeyRouterAddress || !stakingAddress || !rpcUrl || !chainConfig) {
-    throw new Error('Unable to resolve naga-dev root key metadata from Lit contracts/network module.');
-  }
-
-  const publicClient = createPublicClient({
-    chain: chainConfig,
-    transport: http(rpcUrl),
-  });
-  const latestByType = await scanNagaRootKeySetLogsReverse({
-    publicClient,
-    pubkeyRouterAddress,
-    rootKeySetEvent,
-    stakingAddress,
-  });
-
-  const subnetKeys = Array.from(
-    new Set((latestByType.get(NAGA_ROOT_KEY_TYPE_SUBNET)?.values || []).filter(Boolean))
-  );
-  if (!subnetKeys.length) {
-    throw new Error('Lit naga-dev root key event logs are missing keyType=1 (subnet key).');
-  }
-  const hdRootPubkeys = Array.from(
-    new Set((latestByType.get(NAGA_ROOT_KEY_TYPE_HD_ROOT)?.values || []).filter(Boolean))
-  );
-
-  return {
-    subnetPublicKey: subnetKeys[0],
-    hdRootPubkeys,
-  };
-};
-
-export const __test__scanNagaRootKeySetLogsReverse = scanNagaRootKeySetLogsReverse;
-
-const getCachedRootKeyMaterial = async ({ resolvedNetwork, networkModule }) => {
-  const cacheKey = `${resolvedNetwork}::${resolveNetworkRpcUrl(networkModule) || ''}`;
-  if (nagaRootKeyMaterialPromiseByNetwork.has(cacheKey)) {
-    return nagaRootKeyMaterialPromiseByNetwork.get(cacheKey);
-  }
-  const loadPromise = resolveRootKeyMaterialFromChain({ resolvedNetwork, networkModule }).catch((err) => {
-    nagaRootKeyMaterialPromiseByNetwork.delete(cacheKey);
-    throw err;
-  });
-  nagaRootKeyMaterialPromiseByNetwork.set(cacheKey, loadPromise);
-  return loadPromise;
-};
-
-const createNagaHandshakeV1Schema = ({ rootKeys }) => ({
-  parse: (rawResponse) => {
-    const payload = rawResponse?.data && typeof rawResponse.data === 'object'
-      ? rawResponse.data
-      : rawResponse;
-    const latestBlockhash = toStr(payload?.latestBlockhash).trim();
-    const nodeIdentityKey = toStr(payload?.nodeIdentityKey).trim();
-    if (!latestBlockhash || !nodeIdentityKey) {
-      throw new Error('Lit handshake response is missing latestBlockhash or nodeIdentityKey.');
-    }
-
-    const keySetEpochRaw = payload?.keySets?.[NAGA_DEFAULT_KEY_SET_ID]?.epoch;
-    const keySetEpoch = Number(keySetEpochRaw ?? payload?.epoch ?? 0);
-    const subnetFromResponse = normalizeHexNoPrefix(
-      payload?.subnetPublicKey ||
-      payload?.serverPublicKey ||
-      payload?.networkPublicKey ||
-      payload?.networkPublicKeySet
-    );
-    const subnetPublicKey = (
-      subnetFromResponse && subnetFromResponse.toUpperCase() !== 'ERR'
-        ? subnetFromResponse
-        : rootKeys.subnetPublicKey
-    );
-    const hdRootPubkeys = Array.from(
-      new Set(
-        (
-          Array.isArray(payload?.hdRootPubkeys) && payload.hdRootPubkeys.length
-            ? payload.hdRootPubkeys
-            : rootKeys.hdRootPubkeys
-        )
-          .map(normalizeHexNoPrefix)
-          .filter(Boolean)
-      )
-    );
-
-    const normalized = {
-      serverPublicKey: subnetPublicKey,
-      subnetPublicKey,
-      networkPublicKey: subnetPublicKey,
-      networkPublicKeySet: subnetPublicKey,
-      clientSdkVersion: toStr(payload?.clientSdkVersion).trim() || '8.0.0-naga-dev',
-      hdRootPubkeys,
-      attestation: payload?.attestation ?? null,
-      latestBlockhash,
-      nodeVersion: toStr(payload?.nodeVersion).trim() || 'unknown',
-      nodeIdentityKey,
-      epoch: Number.isFinite(keySetEpoch) ? keySetEpoch : 0,
-    };
-
-    return {
-      parseData: () => normalized,
-    };
-  },
-});
-
-const withPatchedHandshakeFetch = async ({ handshakeKeySetId, run }) => {
-  if (!handshakeKeySetId || typeof globalThis.fetch !== 'function') {
-    return run();
-  }
-  const originalFetch = globalThis.fetch.bind(globalThis);
-  const patchedFetch = async (input, init) => {
-    const urlText = typeof input === 'string' ? input : (input?.url || '');
-    if (!urlText) return originalFetch(input, init);
-    let pathname = '';
-    try {
-      const base = typeof window !== 'undefined' ? window.location.origin : 'https://localhost';
-      pathname = new URL(urlText, base).pathname;
-    } catch (_) {
-      pathname = '';
-    }
-    if (!/\/web\/handshake\/v1\/?$/.test(pathname)) {
-      return originalFetch(input, init);
-    }
-
-    const method = toStr(init?.method || (typeof input === 'object' ? input?.method : '') || 'GET').toUpperCase();
-    if (method !== 'POST') {
-      return originalFetch(input, init);
-    }
-
-    if (typeof init?.body !== 'string') {
-      return originalFetch(input, init);
-    }
-
-    let parsedBody = null;
-    try {
-      parsedBody = JSON.parse(init.body);
-    } catch (_) {
-      parsedBody = null;
-    }
-    if (!parsedBody || typeof parsedBody !== 'object') {
-      return originalFetch(input, init);
-    }
-    if (!parsedBody.keySetId) parsedBody.keySetId = handshakeKeySetId;
-    if (!parsedBody.keySetIdentifier) parsedBody.keySetIdentifier = handshakeKeySetId;
-    return originalFetch(input, {
-      ...(init || {}),
-      body: JSON.stringify(parsedBody),
-    });
-  };
-
-  globalThis.fetch = patchedFetch;
-  if (typeof window !== 'undefined') {
-    window.fetch = patchedFetch;
-  }
-  try {
-    return await run();
-  } finally {
-    globalThis.fetch = originalFetch;
-    if (typeof window !== 'undefined') {
-      window.fetch = originalFetch;
-    }
-  }
-};
-
-const prepareNetworkModuleForHandshake = async ({ resolvedNetwork, networkModule }) => {
-  if (!NAGA_HANDSHAKE_V1_NETWORKS.has(resolvedNetwork)) {
-    return { networkModule, handshakeKeySetId: null };
-  }
-
-  const compatibleModule = cloneLitNetworkModule(networkModule);
-  const endpoints = compatibleModule?.getEndpoints?.();
-  const handshakeInput = compatibleModule?.api?.handshake?.schemas?.Input;
-  if (!endpoints?.HANDSHAKE || !handshakeInput) {
-    return { networkModule: compatibleModule, handshakeKeySetId: null };
-  }
-
-  const rootKeys = await getCachedRootKeyMaterial({
-    resolvedNetwork,
-    networkModule: compatibleModule,
-  });
-
-  endpoints.HANDSHAKE.version = '/v1';
-  handshakeInput.ResponseData = createNagaHandshakeV1Schema({ rootKeys });
-
-  logLit('info', '[lit] naga handshake compat enabled', {
-    litNetwork: resolvedNetwork,
-    handshakeVersion: '/v1',
-    keySetId: NAGA_DEFAULT_KEY_SET_ID,
-    hdRootCount: rootKeys.hdRootPubkeys.length,
-  });
-
-  return {
-    networkModule: compatibleModule,
-    handshakeKeySetId: NAGA_DEFAULT_KEY_SET_ID,
-  };
-};
-
-const getLitClient = async (opts = {}) => {
-  ensureLitBufferCompatibility();
-  const { litNetwork, connectTimeout, litConnectTimeout, rpcUrl } = opts || {};
-  const resolvedNetwork = resolveLitNetwork(litNetwork);
-  const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
-  const networkModule = await resolveLitNetworkModule({ litNetwork: resolvedNetwork, rpcUrl });
-  const rpc = resolveNetworkRpcUrl(networkModule);
-  const nextClientKey = `${resolvedNetwork}::${rpc || ''}`;
-
-  if (litClientPromise && litClientKey === nextClientKey) return litClientPromise;
-
-  if (litClientInstance && litClientKey && litClientKey !== nextClientKey) {
-    try {
-      if (typeof litClientInstance.disconnect === 'function') {
-        litClientInstance.disconnect();
-      }
-    } catch (e) { log.warn('litProtocol: cleanup', e); }
-  }
-
-  litClientKey = nextClientKey;
-  litClientPromise = (async () => {
-    const connectStartedAt = Date.now();
-    const getPhaseTimeout = (phaseLabel) => {
-      const elapsed = Date.now() - connectStartedAt;
-      const remaining = resolvedConnectTimeout - elapsed;
-      if (remaining <= 0) {
-        throw new Error(`Lit connect timed out during ${phaseLabel} after ${resolvedConnectTimeout}ms.`);
-      }
-      return Math.max(1, Math.ceil(remaining));
-    };
-
-    logLit('info', '[lit] connect start', {
-      litNetwork: resolvedNetwork,
-      connectTimeout: resolvedConnectTimeout,
-      rpcUrl: rpc || null,
-    });
-    const prepared = await runWithTimeout({
-      run: () => prepareNetworkModuleForHandshake({
-        resolvedNetwork,
-        networkModule,
-      }),
-      timeoutMs: getPhaseTimeout('handshake bootstrap'),
-      timeoutMessage: `Lit connect timed out during handshake bootstrap after ${resolvedConnectTimeout}ms.`,
-    });
-    const client = await withPatchedHandshakeFetch({
-      handshakeKeySetId: prepared.handshakeKeySetId,
-      run: () => createLitClientWithTimeout({
-        network: prepared.networkModule,
-        timeoutMs: getPhaseTimeout('client initialization'),
-      }),
-    });
-    litClientInstance = client;
-    logLit('info', '[lit] connect ok', { litNetwork: resolvedNetwork });
-    return client;
-  })().catch((err) => {
-    logLit('error', '[lit] connect failed', {
-      litNetwork: resolvedNetwork,
-      connectTimeout: resolvedConnectTimeout,
-      rpcUrl: rpc || null,
-      message: err?.message || err,
-    });
-    litClientPromise = null;
-    litClientKey = null;
-    litClientInstance = null;
-    throw err;
-  });
-  return litClientPromise;
-};
-
-const resolveProvider = (providerLike) => {
-  const provider = cryptoUtils._getProvider(providerLike);
-  if (!provider || typeof provider.request !== 'function') {
-    throw new Error('Lit requires an EIP-1193 provider to sign.');
-  }
-  return provider;
-};
-
-const resolveWalletClient = async (providerLike) => {
-  const provider = resolveProvider(providerLike);
-  const ethersProvider = new ethers.providers.Web3Provider(provider, 'any');
-  const signer = ethersProvider.getSigner();
-  const address = await signer.getAddress();
-  return createWalletClient({
-    account: address,
-    transport: custom(provider),
-  });
-};
-
-const LIT_ABILITY_ALIASES = Object.freeze({
-  'access-control-condition-decryption': 'access-control-condition-decryption',
-  accesscontrolconditiondecryption: 'access-control-condition-decryption',
-  AccessControlConditionDecryption: 'access-control-condition-decryption',
-  'access-control-condition-signing': 'access-control-condition-signing',
-  accesscontrolconditionsigning: 'access-control-condition-signing',
-  AccessControlConditionSigning: 'access-control-condition-signing',
-  'pkp-signing': 'pkp-signing',
-  pkpsigning: 'pkp-signing',
-  PKPSigning: 'pkp-signing',
-  'lit-payment-delegation': 'lit-payment-delegation',
-  paymentdelegation: 'lit-payment-delegation',
-  PaymentDelegation: 'lit-payment-delegation',
-  'lit-action-execution': 'lit-action-execution',
-  litactionexecution: 'lit-action-execution',
-  LitActionExecution: 'lit-action-execution',
-});
-
-const toLitAbility = (ability) => {
-  const raw = toStr(ability).trim();
-  if (!raw) return null;
-  return LIT_ABILITY_ALIASES[raw] || LIT_ABILITY_ALIASES[raw.replace(/[-_]/g, '')] || null;
-};
-
-const toResourceWildcard = (resource) => {
-  if (resource == null) return '*';
-  if (typeof resource === 'string') {
-    const trimmed = resource.trim();
-    return trimmed || '*';
-  }
-  if (typeof resource?.resource === 'string' && resource.resource.trim()) {
-    return resource.resource.trim();
-  }
-  if (typeof resource?.toString === 'function') {
-    const text = toStr(resource.toString()).trim();
-    if (text.includes('://')) return '*';
-    return text || '*';
-  }
-  return '*';
-};
-
-// Lit decrypt uses the ENCRYPTION_SIGN endpoint under the hood, which requires both
-// decryption and signing capabilities on the session.
-const DEFAULT_LIT_RESOURCES = Object.freeze([
-  ['access-control-condition-decryption', '*'],
-  ['access-control-condition-signing', '*'],
-]);
-
-const resolveLitResources = (resourceAbilityRequests) => {
-  if (!Array.isArray(resourceAbilityRequests) || !resourceAbilityRequests.length) {
-    return DEFAULT_LIT_RESOURCES;
-  }
-
-  const mapped = resourceAbilityRequests
-    .map((item) => {
-      if (Array.isArray(item)) {
-        const ability = toLitAbility(item[0]);
-        const resource = toResourceWildcard(item[1]);
-        return ability ? [ability, resource] : null;
-      }
-      const ability = toLitAbility(item?.ability);
-      const resource = toResourceWildcard(item?.resource);
-      return ability ? [ability, resource] : null;
-    })
-    .filter(Boolean);
-
-  return mapped.length ? mapped : DEFAULT_LIT_RESOURCES;
-};
-
 const normalizeUserMaxPrice = (value) => {
   if (typeof value === 'bigint') return value;
   const raw = toStr(value).trim();
@@ -1542,196 +1026,8 @@ const normalizeUserMaxPrice = (value) => {
   }
 };
 
-const shouldUseSponsoredLitDelegation = (paymentDelegation = {}) => {
-  if (!paymentDelegation || typeof paymentDelegation !== 'object') return false;
-  if (toStr(paymentDelegation.bootstrapLitPayerPrivateKey).trim()) return true;
-  return paymentDelegation.enabled === true || paymentDelegation.sponsored === true;
-};
-
-// Regression guard: createLitHooks can receive bootstrap payer keys for worker
-// delegation, but returned hooks may be published on window.__litHooks.
-// Strip secret-only fields before exposing hook metadata outside this module.
-const sanitizePublicPaymentDelegation = (paymentDelegation) => {
-  if (!paymentDelegation || typeof paymentDelegation !== 'object') return paymentDelegation;
-  const { bootstrapLitPayerPrivateKey, ...rest } = paymentDelegation;
-  return Object.keys(rest).length ? rest : undefined;
-};
-
 const sanitizePublicLitHooks = (hooks = {}) => {
-  if (!hooks || typeof hooks !== 'object') return hooks;
-  if (!Object.prototype.hasOwnProperty.call(hooks, 'paymentDelegation')) return hooks;
-  return {
-    ...hooks,
-    paymentDelegation: sanitizePublicPaymentDelegation(hooks.paymentDelegation),
-  };
-};
-
-const buildLitPaymentDelegationAudience = () => {
-  try {
-    if (typeof window !== 'undefined' && window.location?.origin) {
-      return toStr(window.location.origin).trim();
-    }
-  } catch (_) {}
-  return '';
-};
-
-const resolveDelegationWorkerUrl = (value) => {
-  if (typeof value !== 'string') return '';
-  const normalized = normalizeWorkerUrl(value);
-  if (!normalized) return '';
-  try {
-    return new URL(normalized).toString().replace(/\/+$/, '');
-  } catch {
-    return '';
-  }
-};
-
-const requestLitPaymentDelegationAuthSig = async ({
-  sessionPublicKey,
-  litNetwork,
-  paymentDelegation,
-  context,
-} = {}) => {
-  const delegation = paymentDelegation && typeof paymentDelegation === 'object' ? paymentDelegation : {};
-  if (!shouldUseSponsoredLitDelegation(delegation)) return null;
-
-  const sessionSlug = toStr(delegation.sessionSlug).trim();
-  const sessionConfig = delegation.sessionConfig && typeof delegation.sessionConfig === 'object'
-    ? delegation.sessionConfig
-    : null;
-  const bootstrapLitPayerPrivateKey = toStr(delegation.bootstrapLitPayerPrivateKey).trim();
-  const explicitWorkerUrl = resolveDelegationWorkerUrl(delegation.workerUrl);
-  const workerUrl = toStr(
-    explicitWorkerUrl || await getCorsProxyUrlOrThrow({
-      sessionSlug,
-      sessionConfig,
-      context,
-      allowDemoFallback: delegation.allowDemoFallback,
-    })
-  ).trim();
-  if (!workerUrl) {
-    throw new Error('Lit sponsorship worker URL is missing.');
-  }
-
-  const audience = buildLitPaymentDelegationAudience();
-  if (bootstrapLitPayerPrivateKey) {
-    const adminAuth = await buildSignedBootstrapAdminAuth({
-      slug: sessionSlug,
-      workerUrl,
-      statement: 'Admin request: bootstrap lit payment delegation',
-      context,
-    });
-    const response = await fetch(`${workerUrl.replace(/\/+$/, '')}/lit/payment-delegation`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...adminAuth,
-        sessionSlug,
-        sessionPublicKey,
-        litNetwork,
-        litPayerPrivateKey: bootstrapLitPayerPrivateKey,
-        expiresAt: new Date(Date.now() + DEFAULT_LIT_PAYMENT_DELEGATION_TTL_MS).toISOString(),
-        audience,
-      }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data?.error || 'Failed to bootstrap Lit payment delegation.');
-    }
-    return data?.capabilityAuthSig || null;
-  }
-
-  const response = await fetchWorkerWithAuth(
-    `${workerUrl.replace(/\/+$/, '')}/lit/payment-delegation`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionPublicKey,
-        litNetwork,
-        expiresAt: new Date(Date.now() + DEFAULT_LIT_PAYMENT_DELEGATION_TTL_MS).toISOString(),
-        audience,
-      }),
-    },
-    {
-      sessionSlug,
-      sessionConfig,
-      context,
-      workerUrl,
-      allowDemoFallback: delegation.allowDemoFallback,
-    },
-  );
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(data?.error || 'Failed to load Lit payment delegation.');
-  }
-  return data?.capabilityAuthSig || null;
-};
-
-const getAuthContext = async ({
-  litClient,
-  providerLike,
-  chain,
-  resourceAbilityRequests,
-  litNetwork,
-  paymentDelegation,
-  context,
-} = {}) => {
-  ensureLitBufferCompatibility();
-  const resources = resolveLitResources(resourceAbilityRequests);
-
-  logLit('info', '[lit] session start', {
-    litNetwork: litNetwork || null,
-    chain: chain || null,
-    resourceCount: resources.length,
-  });
-
-  try {
-    const walletClient = await resolveWalletClient(providerLike);
-    const authManager = await getAuthManager(litNetwork || DEFAULT_LIT_NETWORK);
-    const authContext = await authManager.createEoaAuthContext({
-      config: { account: walletClient },
-      authConfig: {
-        domain: (typeof window !== 'undefined' && window.location?.host) ? window.location.host : 'localhost',
-        statement: 'Authorize Lit session',
-        resources,
-        expiration: new Date(Date.now() + DEFAULT_LIT_SESSION_TTL_MS).toISOString(),
-      },
-      litClient,
-    });
-    const sessionPublicKey = toStr(authContext?.sessionKeyPair?.publicKey).trim();
-    const capabilityAuthSig = await requestLitPaymentDelegationAuthSig({
-      sessionPublicKey,
-      litNetwork: litNetwork || DEFAULT_LIT_NETWORK,
-      paymentDelegation,
-      context,
-    }).catch((error) => {
-      if (!shouldUseSponsoredLitDelegation(paymentDelegation)) return null;
-      throw error;
-    });
-    if (capabilityAuthSig) {
-      authContext.authConfig = {
-        ...(authContext.authConfig || {}),
-        capabilityAuthSigs: [
-          ...(
-            Array.isArray(authContext?.authConfig?.capabilityAuthSigs)
-              ? authContext.authConfig.capabilityAuthSigs
-              : []
-          ),
-          capabilityAuthSig,
-        ],
-      };
-    }
-    logLit('info', '[lit] session ok', { litNetwork: litNetwork || null, chain: chain || null });
-    return authContext;
-  } catch (err) {
-    logLit('error', '[lit] session failed', {
-      litNetwork: litNetwork || null,
-      chain: chain || null,
-      message: err?.message || err,
-    });
-    throw err;
-  }
+  return hooks && typeof hooks === 'object' ? hooks : hooks;
 };
 
 let e2eLitMockMasterKeyPromise = null;
@@ -1867,7 +1163,6 @@ const createE2eLitMockHooks = ({
   litChain,
   litNetwork,
   userMaxPrice,
-  paymentDelegation,
   accessControlConditions,
   resourceAbilityRequests,
   connectTimeout,
@@ -1945,8 +1240,198 @@ const createE2eLitMockHooks = ({
     connectTimeout: resolvedConnectTimeout,
     resourceAbilityRequests,
     userMaxPrice: normalizeUserMaxPrice(userMaxPrice),
-    paymentDelegation,
     __e2eMock: true,
+  });
+};
+
+const createLitChipotleHooks = ({
+  providerLike,
+  account,
+  chainId,
+  accessControlConditions,
+  connectTimeout,
+  chipotle,
+} = {}) => {
+  const normalizedWorkerUrl = normalizeWorkerUrl(chipotle?.workerUrl);
+  const sessionSlug = toStr(chipotle?.sessionSlug).trim();
+  const sessionConfig = chipotle?.sessionConfig && typeof chipotle.sessionConfig === 'object'
+    ? chipotle.sessionConfig
+    : null;
+  const litCredentials = chipotle?.litCredentials && typeof chipotle.litCredentials === 'object'
+    ? chipotle.litCredentials
+    : {};
+  const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
+
+  if (!isChipotleRuntimeConfigured({
+    workerUrl: normalizedWorkerUrl,
+    sessionSlug,
+    litCredentials,
+  })) {
+    return null;
+  }
+
+  const executeChipotleAction = async ({
+    op,
+    gate,
+    message,
+    ciphertext,
+    chipotleMetadata,
+  } = {}) => {
+    const chipotleActionUrl = `${normalizedWorkerUrl.replace(/\/+$/, '')}/lit/chipotle-action`;
+    const response = await fetchWorkerWithAuth(
+      chipotleActionUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'lit_chipotle_execute',
+          actionCode: DEFAULT_CHIPOTLE_ACTION_CODE,
+          op,
+          sbtAddresses: gate.sbtAddresses,
+          gateMode: gate.gateMode,
+          chainId: gate.gateChainId,
+          ...(chipotleMetadata ? { chipotle: chipotleMetadata } : {}),
+          ...(message ? { message } : {}),
+          ...(ciphertext ? { ciphertext } : {}),
+        }),
+      },
+      {
+        sessionSlug,
+        sessionConfig,
+        context: {
+          account,
+          providerLike,
+          chainId,
+        },
+        workerUrl: normalizedWorkerUrl,
+      },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || `Lit Chipotle request failed (${response.status}).`);
+    }
+    const actionResponse = parseChipotleActionResponse(payload);
+    if (actionResponse?.ok === false) {
+      throw new Error(actionResponse.reason || 'Lit Chipotle gate check failed.');
+    }
+    return actionResponse;
+  };
+
+  const saveKey = async (symmetricKey, opts = {}) => {
+    const gate = buildChipotleGateFromOptions({
+      accessControlConditions: Array.isArray(opts.accessControlConditions)
+        ? opts.accessControlConditions
+        : baseConditions,
+      chipotle: opts.chipotle || chipotle,
+      chainId: opts.chainId || chainId || null,
+    });
+    const wrapped = await executeChipotleAction({
+      op: 'encrypt',
+      gate,
+      message: encodeChipotleKeyMessage(symmetricKey),
+    });
+    const wrappedCiphertext = toStr(wrapped?.ciphertext).trim();
+    if (!wrappedCiphertext) {
+      throw new Error('Lit Chipotle encrypt did not return ciphertext.');
+    }
+    const responsePolicy = wrapped?.policy
+      ? buildLitChipotlePolicy(wrapped.policy)
+      : buildLitChipotlePolicy({
+        chainId: gate.gateChainId,
+        gateMode: gate.gateMode,
+        sbtAddresses: gate.sbtAddresses,
+        litActionCid: litCredentials.litActionCid,
+        litPkpId: litCredentials.litPkpId,
+      });
+    const policyFingerprint = toStr(
+      wrapped?.policyFingerprint || fingerprintLitChipotlePolicy(responsePolicy)
+    ).trim();
+    if (policyFingerprint.toLowerCase() !== fingerprintLitChipotlePolicy(responsePolicy).toLowerCase()) {
+      throw new Error('Lit Chipotle encrypt returned mismatched policy metadata.');
+    }
+    return {
+      ciphertext: wrappedCiphertext,
+      dataToEncryptHash: buildChipotleDataHashSentinel({
+        litActionCid: responsePolicy.litActionCid,
+        chainId: responsePolicy.chainId,
+        gateMode: responsePolicy.gateMode,
+        sbtAddresses: responsePolicy.sbtAddresses,
+        policyFingerprint,
+      }),
+      chipotle: {
+        version: 2,
+        litActionCid: responsePolicy.litActionCid,
+        litPkpId: responsePolicy.litPkpId,
+        sbtAddresses: responsePolicy.sbtAddresses,
+        gateMode: responsePolicy.gateMode,
+        chainId: responsePolicy.chainId,
+        policyFingerprint,
+        policy: responsePolicy,
+      },
+    };
+  };
+
+  const getKeyUncached = async (opts = {}) => {
+    const ciphertext = toStr(
+      opts.ciphertext ||
+      opts.encryptedSymmetricKey ||
+      opts.toDecrypt
+    ).trim();
+    if (!ciphertext) {
+      throw new Error('Lit Chipotle decrypt requires ciphertext.');
+    }
+    const metadataVersion = normalizeLitChipotleMetadataVersion(opts.chipotle || {});
+    if (opts.chipotle && metadataVersion !== 2) {
+      throw new Error('Lit Chipotle legacy wrapped keys are not supported.');
+    }
+    const gate = buildChipotleGateFromOptions({
+      accessControlConditions: Array.isArray(opts.accessControlConditions)
+        ? opts.accessControlConditions
+        : baseConditions,
+      chipotle: opts.chipotle || chipotle,
+      chainId: opts.chainId || chainId || null,
+    });
+    const unwrapped = await executeChipotleAction({
+      op: 'decrypt',
+      gate,
+      ciphertext,
+      chipotleMetadata: opts.chipotle || null,
+    });
+    const plaintext = toStr(unwrapped?.plaintext).trim();
+    if (!plaintext) {
+      throw new Error('Lit Chipotle decrypt did not return plaintext.');
+    }
+    return decodeChipotleKeyMessage(plaintext);
+  };
+
+  const { getKey, clearCache } = wrapLitGetKeyWithCache(getKeyUncached, {
+    account,
+    litNetwork: 'chipotle',
+    chain: '',
+    accessControlConditions: baseConditions,
+  });
+
+  return sanitizePublicLitHooks({
+    saveKey,
+    getKey,
+    clearCache,
+    accessControlConditions: baseConditions,
+    litChain: '',
+    litNetwork: 'chipotle',
+    chain: '',
+    providerLike,
+    connectTimeout,
+    chipotle: {
+      enabled: true,
+      workerUrl: normalizedWorkerUrl,
+      sessionSlug,
+      litCredentials: {
+        litApiBase: toStr(litCredentials.litApiBase).trim(),
+        litActionCid: toStr(litCredentials.litActionCid).trim(),
+        litGroupId: toStr(litCredentials.litGroupId).trim(),
+        litPkpId: toStr(litCredentials.litPkpId).trim(),
+      },
+    },
   });
 };
 
@@ -1960,11 +1445,11 @@ const createE2eLitMockHooks = ({
  *   litChain?: string | number | null,
  *   litNetwork?: string | null,
  *   userMaxPrice?: unknown,
- *   paymentDelegation?: Record<string, any>,
  *   accessControlConditions?: LitAccessControlCondition[],
  *   resourceAbilityRequests?: unknown,
  *   connectTimeout?: number | string | null,
- *   litConnectTimeout?: number | string | null
+ *   litConnectTimeout?: number | string | null,
+ *   chipotle?: Record<string, any>
  * }} [options={}]
  * @returns {LitHooksApi}
  */
@@ -1975,15 +1460,14 @@ export const createLitHooks = ({
   litChain,
   litNetwork,
   userMaxPrice,
-  paymentDelegation,
   accessControlConditions,
   resourceAbilityRequests,
   connectTimeout,
   litConnectTimeout,
+  chipotle,
 } = {}) => {
   ensureLitBufferCompatibility();
   const resolvedChain = resolveLitChain({ chainId, litChain });
-  const resolvedNetwork = resolveLitNetwork(litNetwork);
   const resolvedConnectTimeout = normalizeConnectTimeout(connectTimeout || litConnectTimeout);
   const resolvedUserMaxPrice = normalizeUserMaxPrice(userMaxPrice);
   const baseConditions = Array.isArray(accessControlConditions) ? accessControlConditions : null;
@@ -1994,341 +1478,32 @@ export const createLitHooks = ({
       account,
       chainId,
       litChain: resolvedChain,
-      litNetwork: resolvedNetwork,
+      litNetwork: resolveLitNetwork(litNetwork),
       userMaxPrice: resolvedUserMaxPrice,
-      paymentDelegation,
       accessControlConditions: baseConditions || undefined,
       resourceAbilityRequests,
       connectTimeout: resolvedConnectTimeout,
     });
   }
 
-  logLit('info', '[lit] hooks init', {
-    litNetwork: resolvedNetwork,
+  const chipotleHooks = createLitChipotleHooks({
+    providerLike,
+    account,
+    chainId,
+    accessControlConditions: baseConditions,
+    connectTimeout: resolvedConnectTimeout,
+    chipotle,
+  });
+  if (chipotleHooks) {
+    return chipotleHooks;
+  }
+
+  logLit('info', '[lit] chipotle runtime unavailable; no hooks published', {
     chain: resolvedChain,
     conditionCount: baseConditions ? baseConditions.length : 0,
     connectTimeout: resolvedConnectTimeout,
   });
-
-  const getSession = async (override = {}) => {
-    const effectiveNetwork = resolveLitNetwork(override.litNetwork || resolvedNetwork);
-    const client = await getLitClient({
-      litNetwork: effectiveNetwork,
-      connectTimeout: override.connectTimeout || resolvedConnectTimeout,
-      rpcUrl: override.rpcUrl,
-    });
-    return getAuthContext({
-      litClient: client,
-      providerLike: override.providerLike || providerLike,
-      chain: override.chain || resolvedChain,
-      resourceAbilityRequests: override.resourceAbilityRequests || resourceAbilityRequests,
-      litNetwork: effectiveNetwork,
-      paymentDelegation: override.paymentDelegation || paymentDelegation,
-      context: {
-        account: override.account || account,
-        providerLike: override.providerLike || providerLike,
-        chainId,
-      },
-    });
-  };
-
-  const saveKey = async (symmetricKey, opts = {}) => {
-    const conditions = Array.isArray(opts.accessControlConditions)
-      ? opts.accessControlConditions
-      : baseConditions;
-    if (!conditions || !conditions.length) {
-      throw new Error('Lit saveKey requires access control conditions.');
-    }
-    const chain = opts.chain || resolvedChain;
-    const timeout = normalizeConnectTimeout(opts.connectTimeout || resolvedConnectTimeout);
-    const effectiveNetwork = resolveLitNetwork(opts.litNetwork || resolvedNetwork);
-    const effectiveUserMaxPrice = normalizeUserMaxPrice(opts.userMaxPrice) ?? resolvedUserMaxPrice;
-    logLit('info', '[lit] saveKey start', {
-      litNetwork: effectiveNetwork,
-      chain,
-      connectTimeout: timeout,
-      conditionCount: conditions.length,
-      hasResourceId: !!opts.resourceId,
-    });
-    let client;
-    try {
-      client = await getLitClient({
-        litNetwork: effectiveNetwork,
-        connectTimeout: timeout,
-        rpcUrl: opts.rpcUrl,
-      });
-    } catch (err) {
-      logLit('error', '[lit] saveKey connect failed', {
-        litNetwork: effectiveNetwork,
-        chain,
-        connectTimeout: timeout,
-        message: err?.message || err,
-      });
-      throw err;
-    }
-    const keyBytes = symmetricKey instanceof Uint8Array ? symmetricKey : new Uint8Array(symmetricKey || []);
-
-    // Lit encrypt (saving the wrapped CEK) requires an authenticated session; without it Lit nodes
-    // can return 401s from the ENCRYPTION_SIGN endpoint (seen in no-mock E2E runs).
-    const authContext = await getSession({
-      chain,
-      connectTimeout: timeout,
-      providerLike: opts.providerLike,
-      resourceAbilityRequests: opts.resourceAbilityRequests,
-      litNetwork: effectiveNetwork,
-      rpcUrl: opts.rpcUrl,
-      paymentDelegation: opts.paymentDelegation || paymentDelegation,
-      account: opts.account || account,
-    });
-
-    try {
-      const { ciphertext, dataToEncryptHash } = await client.encrypt({
-        accessControlConditions: conditions,
-        chain,
-        dataToEncrypt: keyBytes,
-        ...(effectiveUserMaxPrice !== undefined ? { userMaxPrice: effectiveUserMaxPrice } : {}),
-        ...(opts.resourceId ? { resourceId: opts.resourceId } : {}),
-        authContext,
-      });
-      if (!ciphertext || !dataToEncryptHash) {
-        throw new Error('Lit encrypt did not return ciphertext/dataToEncryptHash.');
-      }
-      logLit('info', '[lit] saveKey ok', {
-        litNetwork: effectiveNetwork,
-        chain,
-        mode: 'ciphertext',
-      });
-      return { ciphertext, dataToEncryptHash };
-    } catch (err) {
-      logLit('error', '[lit] saveKey encrypt failed', {
-        litNetwork: effectiveNetwork,
-        chain,
-        connectTimeout: timeout,
-        message: err?.message || err,
-      });
-      throw err;
-    }
-  };
-
-  const getKeyUncached = async (opts = {}) => {
-    const conditions = normalizeAccessControlConditions(
-      Array.isArray(opts.accessControlConditions) ? opts.accessControlConditions : baseConditions,
-      opts.chain || resolvedChain
-    );
-    const toDecrypt = opts.encryptedSymmetricKey || opts.toDecrypt;
-    const cipherPayload = resolveLitCipherPayload(
-      opts.ciphertext && opts.dataToEncryptHash
-        ? { ciphertext: opts.ciphertext, dataToEncryptHash: opts.dataToEncryptHash }
-        : toDecrypt
-    );
-    if (!cipherPayload && !toDecrypt) {
-      throw new Error('Lit getKey requires ciphertext/dataToEncryptHash.');
-    }
-    const chain = opts.chain || resolvedChain;
-    const timeout = normalizeConnectTimeout(opts.connectTimeout || resolvedConnectTimeout);
-    const effectiveNetwork = resolveLitNetwork(opts.litNetwork || resolvedNetwork);
-    const effectiveUserMaxPrice = normalizeUserMaxPrice(opts.userMaxPrice) ?? resolvedUserMaxPrice;
-    const accSummary = summarizeAccConditions(conditions);
-    logLit('info', '[lit] getKey start', {
-      litNetwork: effectiveNetwork,
-      chain,
-      connectTimeout: timeout,
-      hasCiphertext: !!cipherPayload,
-      hasEncryptedSymmetricKey: !!toDecrypt,
-      hasConditions: accSummary.hasConditions,
-      conditionCount: accSummary.conditionCount,
-      firstConditionChain: accSummary.firstChain,
-      firstConditionMethod: accSummary.firstMethod,
-    });
-    let client;
-    try {
-      client = await getLitClient({
-        litNetwork: effectiveNetwork,
-        connectTimeout: timeout,
-        rpcUrl: opts.rpcUrl,
-      });
-    } catch (err) {
-      logLit('error', '[lit] getKey connect failed', {
-        litNetwork: effectiveNetwork,
-        chain,
-        connectTimeout: timeout,
-        message: err?.message || err,
-      });
-      throw err;
-    }
-
-    const authContext = await getSession({
-      chain,
-      connectTimeout: timeout,
-      providerLike: opts.providerLike,
-      resourceAbilityRequests: opts.resourceAbilityRequests,
-      litNetwork: effectiveNetwork,
-      rpcUrl: opts.rpcUrl,
-      paymentDelegation: opts.paymentDelegation || paymentDelegation,
-      account: opts.account || account,
-    });
-
-    if (cipherPayload && typeof client.decrypt === 'function') {
-      if (!accSummary.hasConditions) {
-        const missingConditionsError = new Error(
-          'Lit ciphertext payload is missing accessControlConditions.'
-        );
-        logLit('error', '[lit] getKey decrypt failed', {
-          litNetwork: effectiveNetwork,
-          chain,
-          connectTimeout: timeout,
-          hasCiphertext: true,
-          hasEncryptedSymmetricKey: !!toDecrypt,
-          hasConditions: false,
-          message: missingConditionsError.message,
-        });
-        if (!(typeof client.getEncryptionKey === 'function' && toDecrypt)) {
-          throw missingConditionsError;
-        }
-      }
-      try {
-        logLit('info', '[lit] decrypt start', {
-          litNetwork: effectiveNetwork,
-          chain,
-          conditionCount: accSummary.conditionCount,
-        });
-        const { decryptedData } = await client.decrypt({
-          accessControlConditions: conditions,
-          chain,
-          ciphertext: cipherPayload.ciphertext,
-          dataToEncryptHash: cipherPayload.dataToEncryptHash,
-          ...(effectiveUserMaxPrice !== undefined ? { userMaxPrice: effectiveUserMaxPrice } : {}),
-          authContext,
-        });
-        logLit('info', '[lit] decrypt ok', {
-          litNetwork: effectiveNetwork,
-          chain,
-        });
-        logLit('info', '[lit] getKey ok', {
-          litNetwork: effectiveNetwork,
-          chain,
-          mode: 'ciphertext',
-        });
-        return decryptedData;
-      } catch (err) {
-        const message = resolveLitErrorMessage(err);
-        logLit('error', '[lit] getKey decrypt failed', {
-          litNetwork: effectiveNetwork,
-          chain,
-          connectTimeout: timeout,
-          hasCiphertext: true,
-          hasEncryptedSymmetricKey: !!toDecrypt,
-          hasConditions: accSummary.hasConditions,
-          conditionCount: accSummary.conditionCount,
-          firstConditionChain: accSummary.firstChain,
-          firstConditionMethod: accSummary.firstMethod,
-          resourceId: opts.resourceId || null,
-          name: err?.name || null,
-          code: err?.code ?? err?.errorCode ?? null,
-          message,
-          cause: resolveLitErrorMessage(err?.cause || err?.error || ''),
-        });
-        if (typeof client.getEncryptionKey === 'function' && toDecrypt) {
-          try {
-            logLit('info', '[lit] decrypt fallback unwrap start', {
-              litNetwork: effectiveNetwork,
-              chain,
-            });
-            const fallbackKey = await client.getEncryptionKey({
-              accessControlConditions: conditions,
-              chain,
-              resourceId: opts.resourceId,
-              toDecrypt,
-              encryptedSymmetricKey: toDecrypt,
-              ...(effectiveUserMaxPrice !== undefined ? { userMaxPrice: effectiveUserMaxPrice } : {}),
-              authContext,
-            });
-            logLit('info', '[lit] decrypt fallback unwrap ok', {
-              litNetwork: effectiveNetwork,
-              chain,
-            });
-            return fallbackKey;
-          } catch (fallbackErr) {
-            logLit('error', '[lit] decrypt fallback unwrap failed', {
-              litNetwork: effectiveNetwork,
-              chain,
-              connectTimeout: timeout,
-              name: fallbackErr?.name || null,
-              code: fallbackErr?.code ?? fallbackErr?.errorCode ?? null,
-              message: resolveLitErrorMessage(fallbackErr),
-            });
-          }
-        }
-        throw err instanceof Error ? err : new Error(message);
-      }
-    }
-
-    if (typeof client.getEncryptionKey === 'function' && toDecrypt) {
-      try {
-        logLit('info', '[lit] unwrap start', {
-          litNetwork: effectiveNetwork,
-          chain,
-        });
-        const decryptedKey = await client.getEncryptionKey({
-          accessControlConditions: conditions,
-          chain,
-          resourceId: opts.resourceId,
-          toDecrypt,
-          encryptedSymmetricKey: toDecrypt,
-          ...(effectiveUserMaxPrice !== undefined ? { userMaxPrice: effectiveUserMaxPrice } : {}),
-          authContext,
-        });
-        logLit('info', '[lit] unwrap ok', {
-          litNetwork: effectiveNetwork,
-          chain,
-        });
-        logLit('info', '[lit] getKey ok', {
-          litNetwork: effectiveNetwork,
-          chain,
-          mode: 'encryptedSymmetricKey',
-        });
-        return decryptedKey;
-      } catch (err) {
-        logLit('error', '[lit] getKey key-unwrap failed', {
-          litNetwork: effectiveNetwork,
-          chain,
-          connectTimeout: timeout,
-          hasConditions: accSummary.hasConditions,
-          conditionCount: accSummary.conditionCount,
-          firstConditionChain: accSummary.firstChain,
-          firstConditionMethod: accSummary.firstMethod,
-          name: err?.name || null,
-          code: err?.code ?? err?.errorCode ?? null,
-          message: resolveLitErrorMessage(err),
-        });
-        throw err instanceof Error ? err : new Error(resolveLitErrorMessage(err));
-      }
-    }
-
-    if (toDecrypt && !cipherPayload) {
-      throw new Error('Legacy encryptedSymmetricKey payload requires re-encryption for Lit v8.');
-    }
-
-    throw new Error('Lit decrypt is unavailable on this client.');
-  };
-
-  const { getKey, clearCache } = wrapLitGetKeyWithCache(getKeyUncached, {
-    account,
-    litNetwork: resolvedNetwork,
-    chain: resolvedChain,
-    accessControlConditions: baseConditions,
-  });
-
-  return sanitizePublicLitHooks({
-    saveKey,
-    getKey,
-    clearCache,
-    accessControlConditions: baseConditions,
-    litChain: resolvedChain,
-    litNetwork: resolvedNetwork,
-    userMaxPrice: resolvedUserMaxPrice,
-    paymentDelegation,
-  });
+  return null;
 };
 
 /**
@@ -2628,7 +1803,8 @@ export const uploadEncryptedArweaveData = async ({
 };
 
 /**
- * Downloads an encrypted Lit payload from Arweave and decrypts it with the active Lit hooks.
+ * Downloads an encrypted Arweave envelope payload and decrypts it with self-recipient wallet
+ * signing, Lit hooks, or both when the envelope carries both recipient types.
  *
  * @param {{
  *   url?: string,
@@ -2652,9 +1828,6 @@ export const downloadEncryptedArweaveData = async ({
 } = {}) => {
   const resolvedTx = toStr(txId || '') || parseLitArweaveUrl(url);
   if (!resolvedTx) throw new Error('Missing Arweave transaction ID for Lit doc.');
-  if (!lit || typeof lit.getKey !== 'function') {
-    throw new Error('Lit getKey is required to decrypt Arweave data.');
-  }
 
   const arweaveOpts = (arweave && typeof arweave === 'object') ? { ...arweave } : {};
   const existingDebugContext = (
@@ -2669,11 +1842,12 @@ export const downloadEncryptedArweaveData = async ({
   };
 
   const envelopeJson = await arweaveScripts.downloadDataFromArweave(resolvedTx, arweaveOpts);
+  const litOpts = lit && typeof lit.getKey === 'function' ? { getKey: lit.getKey } : undefined;
   const payload = await cryptoUtils.decryptEnvelopeValue(envelopeJson, {
     account,
     chainId,
     providerLike,
-    litOpts: { getKey: lit.getKey },
+    ...(litOpts ? { litOpts } : {}),
   });
   return { payload, txId: resolvedTx, url: buildLitArweaveUrl(resolvedTx) };
 };

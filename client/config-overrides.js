@@ -101,13 +101,7 @@ const override = function override(config, env) {
       resource.request = path.join(base, 'dist', env, subpath);
     }),
 
-    // 🔁 Lit contracts custom-network-signatures subpath shim for webpack 4 (no "exports" support)
-    new webpack.NormalModuleReplacementPlugin(/^@lit-protocol\/contracts\/custom-network-signatures$/, (resource) => {
-      const rootBase = path.resolve(__dirname, 'node_modules', '@lit-protocol', 'contracts');
-      resource.request = path.join(rootBase, 'dist', 'custom-network-signatures.browser.js');
-    }),
-
-    // PRD 358 Phase 4 — resolver shim for utility .js → .ts rename sites.
+    // Resolver shim for utility .js -> .ts rename sites.
     // Existing callers across the repo import relative utility modules with an
     // explicit `.js` extension. As utilities are converted to TypeScript, their
     // callers cannot be touched in the same commit (too large a blast radius),
@@ -118,8 +112,8 @@ const override = function override(config, env) {
     // group consumes additional path segments). Skipped when either the
     // importing directory or the resolved `.ts` path contains a `node_modules`
     // segment, because some dependencies ship raw `.ts` sources alongside
-    // their compiled `.js` outputs (e.g. `@lit-protocol/contracts`) and a
-    // broad rewrite would route webpack into a Babel-unparseable asset.
+    // their compiled `.js` outputs and a broad rewrite would route webpack
+    // into a Babel-unparseable asset.
     new webpack.NormalModuleReplacementPlugin(/^\.\.?\/.+\.js$/, (resource) => {
       if (!resource || !resource.context || typeof resource.request !== 'string') return;
       if (resource.context.includes(`${path.sep}node_modules${path.sep}`)) return;
@@ -132,7 +126,7 @@ const override = function override(config, env) {
       }
     }),
 
-    // PRD 358 Phase 4 — extend the same `.js` → `.ts` compatibility shim to
+    // Extend the same `.js` -> `.ts` compatibility shim to
     // baseUrl-style utility imports such as `utilities/crypto/cryptography.js`.
     // These requests do not start with `./` or `../`, so the relative-only
     // rewrite above never sees them during full Jest/build flows.
@@ -153,28 +147,8 @@ const override = function override(config, env) {
   config.resolve = config.resolve || {};
   config.resolve.alias = config.resolve.alias || {};
 
-  // Lit contracts subpath alias for webpack 4 exports gaps
   // Force modern buffer implementation (node-libs-browser@buffer@4 lacks writeBigUInt64BE).
   config.resolve.alias.buffer = require.resolve('buffer/');
-
-  const litNestedBase = path.resolve(
-    __dirname,
-    'node_modules',
-    '@lit-protocol',
-    'access-control-conditions',
-    'node_modules',
-    '@lit-protocol',
-    'contracts'
-  );
-  const litRootBase = path.resolve(__dirname, 'node_modules', '@lit-protocol', 'contracts');
-  const litBase = fs.existsSync(path.join(litNestedBase, 'dist')) ? litNestedBase : litRootBase;
-  config.resolve.alias['@lit-protocol/contracts/prod'] = path.join(litBase, 'dist', 'prod');
-  config.resolve.alias['@lit-protocol/contracts/dev'] = path.join(litBase, 'dist', 'dev');
-  config.resolve.alias['@lit-protocol/contracts/custom-network-signatures'] = path.join(
-    litBase,
-    'dist',
-    'custom-network-signatures.browser.js'
-  );
 
   // ⛔️ Do NOT set config.resolve.alias['permissionless'] — we use the replacement plugin above.
 
@@ -277,7 +251,7 @@ override.jest = (config) => {
   const oxScopedPrefixes = '(erc\\d{4}|tempo|trusted-setups|window)';
   next.moduleNameMapper = {
     ...(next.moduleNameMapper || {}),
-    // PRD 358 Phase 4 — strip trailing `.js` on relative imports so Jest's
+    // Strip trailing `.js` on relative imports so Jest's
     // default moduleFileExtensions resolve `.ts` siblings of converted
     // utilities. Matches `./foo.js`, `../foo.js`, `./a/b.js`, etc. Existing
     // `.js` files continue to resolve because Jest's extension order still
@@ -288,30 +262,6 @@ override.jest = (config) => {
     '^(utilities/.+)\\.js$': '$1',
     '^node:os$': path.join('<rootDir>', 'src', 'shims', 'node-os.js'),
     '^node:events$': path.join('<rootDir>', 'src', 'shims', 'node-events.js'),
-    '^@lit-protocol/contracts/(prod|dev)/(.*)$': path.join(
-      '<rootDir>',
-      'src',
-      'shims',
-      'lit-contracts-stub.js'
-    ),
-    '^@lit-protocol/contracts/(prod|dev)$': path.join(
-      '<rootDir>',
-      'src',
-      'shims',
-      'lit-contracts-stub.js'
-    ),
-    '^@lit-protocol/contracts$': path.join(
-      '<rootDir>',
-      'src',
-      'shims',
-      'lit-contracts-stub.js'
-    ),
-    '^@lit-protocol/contracts/custom-network-signatures$': path.join(
-      '<rootDir>',
-      'src',
-      'shims',
-      'lit-custom-network-signatures-stub.js'
-    ),
     '^viem$': path.join('<rootDir>', 'node_modules', 'viem', '_cjs', 'index.js'),
     '^viem\\/(.*)$': path.join('<rootDir>', 'node_modules', 'viem', '_cjs', '$1'),
     '^ox$': `${oxCjsBase}/index.js`,

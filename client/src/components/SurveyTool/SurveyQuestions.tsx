@@ -122,6 +122,7 @@ import contractScripts, {
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
+import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { ethers, utils } from 'ethers';
 import CESlider from '../Shared/CESlider';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
@@ -184,7 +185,7 @@ import {
   buildGatedPromptNoticeState,
   buildLockAudienceButtonAction,
   buildLockAudienceDisplayState,
-  isQuestionPromptMasked as isQuestionPromptMaskedHelper,
+  isQuestionPromptMasked,
 } from './surveyToolViewState.js';
 import {
   buildResponseGateConfigSignature,
@@ -208,6 +209,7 @@ import {
   warmSbtDisplayNamesTargeted,
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { getLegacyArweaveTxId } from '../../utilities/storage/storageRefs.js';
 import {
   normalizeRatingValue,
   RATING_MAX,
@@ -392,6 +394,7 @@ import {
   resolveSingleQuestionCacheBootstrap,
 } from './surveyToolSingleQuestionCacheBootstrapController';
 import {
+  buildSingleQuestionEncryptedMetadataPlaceholder,
   fetchSingleQuestionMetadataCandidates,
   normalizeSingleQuestionMetadataForCache,
   resolveSingleQuestionCacheState,
@@ -464,12 +467,52 @@ import {
   normalizeTransientSubmitFeedbackDurationMs,
 } from './surveyQuestionSubmitFeedback.js';
 import {
+  buildActiveTagModalState,
   buildAutoDecryptDisabledState,
   buildBookmarkedQuestionsState,
+  buildBulkPromptReloadingState,
   buildCanDecryptOtherResponsesState,
   buildClearedSurveyQuestionPoolState,
+  buildCopiedQuestionsJsonState,
+  buildCopiedResponseJsonState,
+  buildCopiedSurveyJsonState,
+  buildClearedDecryptingByKeyState,
+  buildCurrentStepState,
+  buildDecryptEditFailureState,
+  buildDecryptEditStartState,
+  buildDisplayAnswerModeState,
+  buildEditingResponseModeState,
+  buildHasherState,
+  buildHydratingPriorResponsesState,
   buildInitialSurveyQuestionsState,
+  buildJsonPreviewState,
+  buildParsedViewAddressAnswersState,
+  buildPrefillQueuedAfterCacheState,
+  buildResponseEditCompleteState,
+  buildResponseLoadingResetState,
+  buildShowJsonState,
+  buildSubmitFailureState,
+  buildSubmitPreparationErrorState,
+  buildSubmitSuccessState,
+  buildStandaloneAuthResetState,
+  buildSubmissionErrorState,
+  buildSubmitStartState,
+  buildSurveysResponseStatePatch,
+  buildSurveyAccountViewResetState,
+  buildSurveyChangedResetState,
+  buildSurveyQuestionsJsonTreeItemStyle,
+  buildSurveyQuestionsLockAudienceGateClassName,
+  buildSurveyQuestionsLockAudiencePopoverClassName,
+  buildSurveyQuestionsLockAudienceToggleClassName,
+  buildSurveyQuestionsFullLoadingProgressFillStyle,
+  buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionPoolLoadState,
+  buildSurveyUserEditResponseStatePatch,
+  buildViewingResponseModeState,
+  resolveSurveyQuestionsIconGlowClassName,
+  SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
+  SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
+  toggleShowJsonState,
   type SurveyQuestionsProps,
   type SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
@@ -495,23 +538,38 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this.handleDecryptEdit = this.handleDecryptEdit.bind(this);
   }
 
-  // Auto-decrypt sweep control: blocks automatic decryption for providers that require
-  // user-facing signature popups (MetaMask, Porto passkey dialogs). Each decrypt operation
-  // triggers a wallet interaction, which is disruptive when done automatically.
-  //
-  // Per-provider rationale:
-  // - wagmi (MetaMask): Blocked - each decrypt requires a MetaMask popup. Keep blocked.
-  // - porto: Blocked - passkey prompts still interrupt flow. Consider enabling when
-  //   session keys or account abstraction (AA) allow frictionless auto-signing.
-  // - web3auth: Allowed (not blocked) - server-side key custody typically avoids popups,
-  //   though prompts may still occur on session expiry or certain config changes.
-  //
-  // Future: When session keys / AA are available for wagmi/porto, this can be relaxed
-  // to allow auto-decrypt without popups. Keep this path and comments for that transition.
+  isPortoAutoSignReady = () => {
+    try {
+      return !!(
+        typeof portoFunctions.isPortoAutoSignReady === 'function' &&
+        portoFunctions.isPortoAutoSignReady()
+      );
+    } catch (_) {
+      return false;
+    }
+  };
+
+  // Auto-decrypt sweep control: blocks automatic decryption for providers that would
+  // show a wallet/passkey prompt. Porto is allowed only after session-key mode has an
+  // in-memory signer, so decrypt/sign calls can run silently on the current page.
   isAutoDecryptBlocked = () => {
     try {
       const kind = cryptoUtils.getProviderKind(this.props.provider);
-      return kind === 'wagmi' || kind === 'porto';
+      if (kind === 'wagmi') return true;
+      if (kind === 'porto') return !this.isPortoAutoSignReady();
+      return false;
+    } catch (_) {
+      return false;
+    }
+  };
+
+  shouldAttemptAutomaticPromptDecrypt = () => {
+    if (!this.props.loginComplete || !this.props.account || !this.props.provider) return false;
+    try {
+      const kind = cryptoUtils.getProviderKind(this.props.provider);
+      if (kind === 'web3auth') return true;
+      if (kind === 'porto') return this.isPortoAutoSignReady();
+      return false;
     } catch (_) {
       return false;
     }
@@ -1545,7 +1603,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       try {
         const { poseidon } = await import('poseidon-lite');
         if (typeof poseidon === 'function' && this._isMounted) {
-          this.setState({ hasher: poseidon });
+          this.setState(buildHasherState(poseidon));
           surveyLog.log("✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite)");
         }
       } catch (e) {
@@ -1573,10 +1631,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         this.rehydrateLocalCacheAnswersForRenderedIds();
 
         if (this.props.responderAddress) {
-          this.setState({
-            displayAnswerMode: true,
-            isEditing: false
-          }, async () => {
+          this.setState(buildViewingResponseModeState(), async () => {
             if (this.props.account && this.props.account.toLowerCase() === this.props.responderAddress.toLowerCase()) {
               if (this.state.userHasResponse) {
                 // UI will show decrypt/edit or start fresh buttons
@@ -1584,9 +1639,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             }
           });
         } else {
-          this.setState({
-            displayAnswerMode: this.props.displayAnswerMode
-          });
+          this.setState(buildDisplayAnswerModeState(this.props.displayAnswerMode));
         }
       })();
     } else if (!this.props.isStandalone) { // Survey mode (multiple questions)
@@ -1609,7 +1662,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
               await this.fetchSurveyResponse();
               this.checkAndHandleStartFresh();
             } else {
-              this.setState({ prefillQueuedAfterCache: true });
+              this.setState(buildPrefillQueuedAfterCacheState(true));
             }
           }
         );
@@ -1782,12 +1835,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
       if (identityChanged) {
         // Reset submissionComplete when switching questions so fetch logic isn't blocked
-        this.setState({
-          isLoadingResponse: true,
-          submissionError: '',
-          submissionComplete: false,
-          submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-        });
+        this.setState(buildResponseLoadingResetState(
+          updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset')
+        ));
         await this.fetchSingleQuestionData(); // merge-safe
       } else if (cacheTick || groupContextChanged || retryMaskedOnReadiness || shouldRetrySingleQuestionBootstrap) {
         // Don’t rebuild while user has pending edits; keeps “Submit (X)” stable
@@ -1809,12 +1859,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         // We use a callback to ensure rehydration happens on the reset (empty) state,
         // followed by the fetch which merges on-chain data into the draft.
         this.resetFormStateForAccountChange(async () => {
-            this.setState({
-              isLoadingResponse: true,
-              submissionError: '',
-              submissionComplete: false,
-              submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-            });
+            this.setState(buildResponseLoadingResetState(
+              updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset')
+            ));
 
             // 1. Apply Draft (Anon answers) onto Empty
             this.rehydrateDraftForRenderedIds();
@@ -1840,10 +1887,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
               this.state.userHasResponse &&
               (isViewingOwnResponse || isViewingNoSpecificResponder)
             ) {
-              this.setState({
-                displayAnswerMode: false,
-                isEditing: true,
-              });
+              this.setState(buildEditingResponseModeState());
             }
         });
       }
@@ -1879,27 +1923,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady &&
           this.props.isResponsesCacheReady) ||
         (this.props.isQuestionCacheReady &&
-          prevProps.questionsCacheNonce !== this.props.questionsCacheNonce);
+          prevProps.questionsCacheNonce !== this.props.questionsCacheNonce) ||
+        (this.props.isResponsesCacheReady &&
+          prevProps.questionResponsesNonce !== this.props.questionResponsesNonce);
 
       if (surveyChanged) {
-        this.setState({
-          userHasResponse: false,
-          userAnswers: null,
-          parsedViewAddressAnswers: null,
-          noResponse: false,
-          questionPool: [],
-          questionPoolExpectedIds: [],
-          questionPoolPendingIds: [],
-          isEditing: false,
-          surveysResponseState: [],
-          jsonPreview: '',
-          submissionError: '',
-          submissionComplete: false,
-          submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-        });
+        this.setState(buildSurveyChangedResetState(
+          updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset')
+        ));
         await this.fetchQuestionPool();
         this.setState(
-          { surveysResponseState: this.initializeSurveyResponseState() },
+          buildSurveysResponseStatePatch(this.initializeSurveyResponseState()),
           async () => {
             await this.fetchSurveyResponse();
             this.checkAndHandleStartFresh();
@@ -1938,11 +1972,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       ) {
         // Clear live form state before reacting to new account/viewAddress
         this.resetFormStateForAccountChange(async () => {
-            this.setState({
-              isLoadingResponse: true,
-              userHasResponse: false,
-              userAnswers: null,
-              isEditing: false,
+            this.setState(buildSurveyAccountViewResetState({
               parsedViewAddressAnswers:
                 this.props.viewAddress !== prevProps.viewAddress
                   ? null
@@ -1951,10 +1981,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
                 this.props.viewAddress !== prevProps.viewAddress
                   ? false
                   : this.state.noResponse,
-              submissionError: '',
-              submissionComplete: false,
               submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-            });
+            }));
 
             // 1. Rehydrate draft immediately so it exists before fetch returns
             if (this.props.account && this.props.account !== prevProps.account) {
@@ -1975,10 +2003,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
               this.state.userHasResponse &&
               (isViewingOwnSurveyResponse || isViewingNoSpecificSurvey)
             ) {
-              this.setState({
-                displayAnswerMode: false,
-                isEditing: true,
-              });
+              this.setState(buildEditingResponseModeState());
             }
         });
       }
@@ -2015,7 +2040,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady &&
           this.props.isResponsesCacheReady) ||
         (this.props.isQuestionCacheReady &&
-          prevProps.questionsCacheNonce !== this.props.questionsCacheNonce)
+          prevProps.questionsCacheNonce !== this.props.questionsCacheNonce) ||
+        (this.props.isResponsesCacheReady &&
+          prevProps.questionResponsesNonce !== this.props.questionResponsesNonce)
       ) {
         this.rehydrateLocalCacheAnswersForRenderedIds();
       }
@@ -2028,12 +2055,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       if (this.props.account !== prevProps.account || standaloneAuthBecameReady) {
         // Clear live form state before reacting to new account
         this.resetFormStateForAccountChange(() => {
-             this.setState({
-              isEditing: false,
-              submissionError: '',
-              submissionComplete: false,
-              submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset'),
-            });
+             this.setState(buildStandaloneAuthResetState(
+              updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'reset')
+            ));
             // Standalone mode typically relies on local cache or props,
             // but we should also rerun cache/prior-response hydration when auth becomes ready.
             this.rehydrateDraftForRenderedIds();
@@ -2074,7 +2098,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       (this.props.isQuestionCacheReady || this.props.isResponsesCacheReady)
     ) {
       await this.fetchSurveyResponse();
-      this.setState({ prefillQueuedAfterCache: false });
+      this.setState(buildPrefillQueuedAfterCacheState(false));
     }
 
     if (
@@ -2205,6 +2229,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       litHooks,
       fallbackChainId: this.resolveSessionChainId(slug, cfg),
     });
+  };
+
+  buildAutomaticQuestionMetadataFetchOptions = (slugIn) => {
+    const decryptContext = this.buildQuestionDecryptContext(slugIn);
+    return this.shouldAttemptAutomaticPromptDecrypt()
+      ? { decryptContext }
+      : { decryptContext, skipDecrypt: true };
   };
 
   hasMaskedCurrentQuestionPayload = () => {
@@ -2526,14 +2557,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     ));
     if (!ids.length) return;
 
-    this.setState({ bulkPromptReloading: true });
+    this.setState(buildBulkPromptReloadingState(true));
     try {
       for (const qid of ids) {
         // eslint-disable-next-line no-await-in-loop
         await this.handleReloadMaskedPrompt(qid);
       }
     } finally {
-      this.setState({ bulkPromptReloading: false });
+      this.setState(buildBulkPromptReloadingState(false));
     }
   };
 
@@ -2602,11 +2633,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   handleQuestionTagSelect = (tag) => {
     const normalizedTag = String(tag || '').trim();
     if (!normalizedTag) return;
-    this.setState({ activeTagModalTag: normalizedTag });
+    this.setState(buildActiveTagModalState(normalizedTag));
   };
 
   closeQuestionTagModal = () => {
-    this.setState({ activeTagModalTag: '' });
+    this.setState(buildActiveTagModalState());
   };
 
   renderQuestionTagDropdownRow = (question) => (
@@ -3005,7 +3036,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
   };
 
-  isQuestionPromptMasked = (question) => isQuestionPromptMaskedHelper(question);
+  isQuestionPromptMasked = (question) => isQuestionPromptMasked(question);
 
   getAnswerLockDisplayState = ({
     field,
@@ -3040,12 +3071,24 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       tooltipIdSuffix,
       fallbackId,
     });
+    const qid = String(question?.id || '').trim().toLowerCase();
+    const promptReloading = qid ? this.isQuestionFieldBusy(qid, 'prompt') : false;
+    const canReloadPrompt = qid && this.isQuestionPromptMasked(question);
 
     return (
       <GatedPromptNotice
         questionId={question.id}
         tooltipId={tooltipId}
         tooltipText={tooltipText}
+        actionBusy={promptReloading}
+        actionDisabled={promptReloading}
+        actionTestId={E2E_TESTIDS.SURVEY_DECRYPT_PROMPT_NOTICE}
+        actionTitle={
+          !this.props.loginComplete || !this.props.account
+            ? 'Login required to decrypt gated prompts.'
+            : 'Decrypt gated prompt'
+        }
+        onAction={canReloadPrompt ? () => this.handleReloadMaskedPrompt(qid) : undefined}
       />
     );
   };
@@ -3167,19 +3210,22 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     question,
     showResponseLookupSpinner,
     isQuestionBookmarked,
-  }) => (
-    <QuestionCardLinks
-      showResponseLookupSpinner={showResponseLookupSpinner}
-      isQuestionBookmarked={isQuestionBookmarked}
-      onBookmarkToggle={() => this.handleBookmarkToggle(question.id)}
-      arweaveHref={question.arweaveTxId
-        ? normalizeArweaveUrl(question.arweaveTxId, { contextLabel: 'survey_tool_question_link' })
-        : ''}
-      questionHref={question.id
-        ? buildQuestionRoutePath(question.id, { sessionSlug: this._getEffectiveDraftSlug() })
-        : ''}
-    />
-  );
+  }) => {
+    const arweaveTxId = getLegacyArweaveTxId(question);
+    return (
+      <QuestionCardLinks
+        showResponseLookupSpinner={showResponseLookupSpinner}
+        isQuestionBookmarked={isQuestionBookmarked}
+        onBookmarkToggle={() => this.handleBookmarkToggle(question.id)}
+        arweaveHref={arweaveTxId
+          ? normalizeArweaveUrl(arweaveTxId, { contextLabel: 'survey_tool_question_link' })
+          : ''}
+        questionHref={question.id
+          ? buildQuestionRoutePath(question.id, { sessionSlug: this._getEffectiveDraftSlug() })
+          : ''}
+      />
+    );
+  };
 
   renderQuestionFieldDecryptControl = ({
     questionId,
@@ -4080,7 +4126,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         responder,
         slug: nextSlug,
       }),
-      setHydratingState: (active) => this.setState({ isHydratingPriorResponses: !!active }),
+      setHydratingState: (active) => this.setState(buildHydratingPriorResponsesState(active)),
       isMounted: this._isMounted,
       readQuestionsCacheAsync,
       resetLocalCacheMemo: () => {
@@ -4420,7 +4466,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           this._autoDecryptMaskedAttemptSignature = {};
           this.clearAutoDecryptSweepScheduling();
           if (Object.keys(this.state.decryptingByKey || {}).length > 0) {
-            this.setState({ decryptingByKey: {} });
+            this.setState(buildClearedDecryptingByKeyState());
           }
           return;
         }
@@ -5341,7 +5387,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           this.props.provider,
           questionId,
           candidateSlug,
-          { decryptContext: this.buildQuestionDecryptContext(candidateSlug) }
+          this.buildAutomaticQuestionMetadataFetchOptions(candidateSlug)
         ),
       }),
       pickBetterQuestionPayload,
@@ -5378,6 +5424,26 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         didScheduleRetry: !!didScheduleRetry,
         retryAttempt: bootstrapRetryAttempt,
       });
+      const placeholderQuestion = buildSingleQuestionEncryptedMetadataPlaceholder({
+        questionId,
+        sessionSlug: metadataBootstrapResult.effectiveSingleSlug || effectiveSingleSlug,
+        existingQuestionData: qData || recentPayloadForAccount || null,
+      });
+      if (placeholderQuestion) {
+        safeSetState((prev) => ({
+          questionPool: [placeholderQuestion],
+          surveysResponseState: this.mergeSurveyResponseState(
+            prev.surveysResponseState ||
+              [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+            [placeholderQuestion],
+            0
+          ),
+          isLoadingResponse: false,
+          noResponse: false,
+          responseLookupWarning: '',
+        }));
+        return;
+      }
       if (didScheduleRetry) {
         safeSetState({ isLoadingResponse: true });
         return;
@@ -5548,7 +5614,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
 
   async handleDecryptEdit() {
-    this.setState({ isDecrypting: true, submissionError: '', suppressPrefill: true });
+    this.setState(buildDecryptEditStartState());
     const surveyIndex =
       this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
 
@@ -5599,12 +5665,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         decryptedConvictionFromEnv,
       }), () => {
         const jsonPreview = this.prepareJsonAndHash(surveyIndex);
-        this.setState({ jsonPreview });
+        this.setState(buildJsonPreviewState(jsonPreview));
         this.persistDraftSafely && this.persistDraftSafely(0);
       });
     } catch (error) {
       surveyLog.error('Error decrypting answers:', error);
-      this.setState({ isDecrypting: false, submissionError: error.message || 'Decryption failed.' });
+      this.setState(buildDecryptEditFailureState(error.message));
     }
   }
 
@@ -5882,11 +5948,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     newSurveysResponseState[surveyIndex] = slice;
 
-    this.setState({
-      surveysResponseState: newSurveysResponseState,
-      isEditing: true,
-      submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'user_edit'),
-    }, () => {
+    this.setState(buildSurveyUserEditResponseStatePatch(
+      newSurveysResponseState,
+      updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'user_edit')
+    ), () => {
       this.scheduleJsonPreviewUpdate();
       if (shouldPersistDraft) this.persistDraftSafely();
       if (afterUpdate) afterUpdate();
@@ -5929,11 +5994,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     newSurveysResponseState[surveyIndex] = slice;
 
-    this.setState({
-      surveysResponseState: newSurveysResponseState,
-      isEditing: true,
-      submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'user_edit'),
-    }, () => {
+    this.setState(buildSurveyUserEditResponseStatePatch(
+      newSurveysResponseState,
+      updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'user_edit')
+    ), () => {
       this.scheduleJsonPreviewUpdate();
       this.persistDraftSafely();
     });
@@ -5955,11 +6019,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     slice.conviction = { ...(slice.conviction || {}), [questionId]: conviction };
     newSurveysResponseState[surveyIndex] = slice;
 
-    this.setState({
-      surveysResponseState: newSurveysResponseState,
-      isEditing: true,
-      submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'user_edit'),
-    }, () => {
+    this.setState(buildSurveyUserEditResponseStatePatch(
+      newSurveysResponseState,
+      updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'user_edit')
+    ), () => {
       this.scheduleJsonPreviewUpdate();
       if (shouldPersistDraft) this.persistDraftSafely();
       if (afterUpdate) afterUpdate();
@@ -5982,11 +6045,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     slice.importance = { ...(slice.importance || {}), [questionId]: importance };
     newSurveysResponseState[surveyIndex] = slice;
 
-    this.setState({
-      surveysResponseState: newSurveysResponseState,
-      isEditing: true,
-      submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'user_edit'),
-    }, () => {
+    this.setState(buildSurveyUserEditResponseStatePatch(
+      newSurveysResponseState,
+      updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'user_edit')
+    ), () => {
       this.scheduleJsonPreviewUpdate();
       if (shouldPersistDraft) this.persistDraftSafely();
       if (afterUpdate) afterUpdate();
@@ -6089,7 +6151,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
 
   toggleShowJson = () => {
-    this.setState(prevState => ({ showJson: !prevState.showJson }));
+    this.setState(toggleShowJsonState);
   };
 
   toggleDisplayAnswerMode = () => {
@@ -6106,7 +6168,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             await this.fetchSurveyResponse();
           }
         } else {
-          this.setState({ parsedViewAddressAnswers: null });
+          this.setState(buildParsedViewAddressAnswersState());
         }
         this.updateJsonPreview();
       }
@@ -6116,7 +6178,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   handleUpdateResponse = async () => {
     if (this.state.isEditing) {
       await this.encryptAndUpload();
-      this.setState({ isEditing: false, userHasResponse: true, userResponseEncrypted: true });
+      this.setState(buildResponseEditCompleteState());
     } else {
       this.handleDecryptEdit();
     }
@@ -6124,7 +6186,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   handleShowJsonAtBottom = () => {
     if (!this.state.showJson) {
-      this.setState({ showJson: true }, () => {
+      this.setState(buildShowJsonState(true), () => {
         if (this.bottomRef.current) {
           this.bottomRef.current.scrollIntoView({ behavior: 'smooth' });
         }
@@ -6138,7 +6200,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
   handleScrollToTop = () => {
     if (!this.state.showJson) {
-      this.setState({ showJson: true }, () => {
+      this.setState(buildShowJsonState(true), () => {
         if (this.topRef.current) {
           this.topRef.current.scrollIntoView({ behavior: 'smooth' });
         }
@@ -6236,9 +6298,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   updateJsonPreview = (force = false) => {
     if (!force && !this.isResponseJsonPreviewVisible()) return;
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
-    this.setState({
-      jsonPreview: this.prepareJsonAndHash(surveyIndex)
-    });
+    this.setState(buildJsonPreviewState(this.prepareJsonAndHash(surveyIndex)));
   };
 
   processJsonToTree = (json, level = 0) => {
@@ -6307,7 +6367,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           <li
             key={index}
             className={styles.treeItem}
-            style={{ marginLeft: `${node.level * 20}px` }}
+            style={buildSurveyQuestionsJsonTreeItemStyle(node.level)}
           >
             <span className={styles.keyValueContainer}>
               {node.type === 'arrayItemValue' && (
@@ -6462,19 +6522,19 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     navigator.clipboard.writeText(jsonString).then(() => {
       notify.success('Copied to clipboard');
       if (type === 'questions') {
-        this.setState({ copiedQuestionsJson: true });
+        this.setState(buildCopiedQuestionsJsonState(true));
         this.setManagedTimeout(() => {
-          this.setState({ copiedQuestionsJson: false });
+          this.setState(buildCopiedQuestionsJsonState(false));
         }, 2000);
       } else if (type === 'response') {
-        this.setState({ copiedResponseJson: true });
+        this.setState(buildCopiedResponseJsonState(true));
         this.setManagedTimeout(() => {
-          this.setState({ copiedResponseJson: false });
+          this.setState(buildCopiedResponseJsonState(false));
         }, 2000);
       } else if (type === 'survey') {
-        this.setState({ copiedSurveyJson: true });
+        this.setState(buildCopiedSurveyJsonState(true));
         this.setManagedTimeout(() => {
-          this.setState({ copiedSurveyJson: false });
+          this.setState(buildCopiedSurveyJsonState(false));
         }, 2000);
       }
     }).catch(error => {
@@ -6600,7 +6660,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         <div className={styles.lockAudienceGateRow}>
           <button
             type="button"
-            className={`${styles.convictionToggleLine} ${styles.lockAudienceGateButton} ${gateActive && currentGateId === option.gateId ? styles.convictionToggleButtonActive : ''}`}
+            className={buildSurveyQuestionsLockAudienceGateClassName(styles, gateActive && currentGateId === option.gateId)}
             onClick={() => onSelectAudience('gate', option.gateId)}
             data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE}
             data-ce-gate-id={option.gateId}
@@ -6664,11 +6724,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     showFollowOption = false,
     onSelectAudience,
   }) => (
-    <div className={`${styles.lockAudiencePopover} ${isPileVisualContext ? styles.pileLockAudiencePopover : ''}`}>
+    <div className={buildSurveyQuestionsLockAudiencePopoverClassName(styles, isPileVisualContext)}>
       {allowPlaintextOption && (
         <button
           type="button"
-          className={`${styles.convictionToggleLine} ${plaintextActive ? styles.convictionToggleButtonActive : ''}`}
+          className={buildSurveyQuestionsLockAudienceToggleClassName(styles, plaintextActive)}
           onClick={() => onSelectAudience('none')}
           data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE}
         >
@@ -6677,7 +6737,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       )}
       <button
         type="button"
-        className={`${styles.convictionToggleLine} ${selfActive ? styles.convictionToggleButtonActive : ''}`}
+        className={buildSurveyQuestionsLockAudienceToggleClassName(styles, selfActive)}
         onClick={() => onSelectAudience('self')}
         data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF}
       >
@@ -6695,7 +6755,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       {showFollowOption && (
         <button
           type="button"
-          className={`${styles.convictionToggleLine} ${followActive ? styles.convictionToggleButtonActive : ''}`}
+          className={buildSurveyQuestionsLockAudienceToggleClassName(styles, followActive)}
           onClick={() => onSelectAudience('follow')}
           data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW}
         >
@@ -6739,7 +6799,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     >
       <FontAwesomeIcon
         icon={(fieldState?.encrypted || forcedGate) ? faLock : faUnlock}
-        className={showBrightLockState ? styles.iconGlow : undefined}
+        className={resolveSurveyQuestionsIconGlowClassName(styles, showBrightLockState)}
       />
     </button>
   );
@@ -7097,7 +7157,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       return;
     }
     if (missingRecipients.length > 0) {
-      this.setState({ submissionError: `Missing Lit recipients for gated field(s): ${missingRecipients.join(', ')}` });
+      this.setState(buildSubmissionErrorState(`Missing Lit recipients for gated field(s): ${missingRecipients.join(', ')}`));
       return;
     }
 
@@ -7126,13 +7186,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
       updatedSurveysResponseState[surveyIndex] = base;
 
-      this.setState({ surveysResponseState: updatedSurveysResponseState }, () => {
+      this.setState(buildSurveysResponseStatePatch(updatedSurveysResponseState), () => {
         const jsonData = this.prepareJsonAndHash(surveyIndex);
-        this.setState({ jsonPreview: jsonData });
+        this.setState(buildJsonPreviewState(jsonData));
       });
     } catch (error) {
       surveyLog.error("Encryption error:", error);
-      this.setState({ submissionError: error.message || 'Encryption failed.' });
+      this.setState(buildSubmissionErrorState(error.message || 'Encryption failed.'));
     }
   };
 
@@ -8130,12 +8190,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       const answeredCount = this.getAnsweredQuestionsCount();
       if (answeredCount === 0) {
         this._submitGuard = false;
-        this.setState({ submissionError: 'No responses to submit.' });
+        this.setState(buildSubmissionErrorState('No responses to submit.'));
         if (this._emptySubmitTimer) {
           clearTimeout(this._emptySubmitTimer);
         }
         this._emptySubmitTimer = setTimeout(() => {
-          this.setState({ submissionError: '' });
+          this.setState(buildSubmissionErrorState(''));
           this._emptySubmitTimer = null;
         }, 2000);
         return;
@@ -8146,7 +8206,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         return;
       }
 
-      this.setState({ isSubmitting: true, submitProgress: 0, currentStep: 1, submissionError: '' });
+      this.setState(buildSubmitStartState());
 
       const providerKind = cryptoUtils.getProviderKind(this.props.provider);
 
@@ -8212,7 +8272,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           // Update local tracker AND React state
           activeSlice = base;
           newArr[surveyIndex] = base;
-          this.setState({ surveysResponseState: newArr });
+          this.setState(buildSurveysResponseStatePatch(newArr));
 
           // Verify against the freshly merged slice instead of immediately rereading
           // `this.state`, which can still hold the pre-encryption draft until React
@@ -8221,7 +8281,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         }
       }
 
-      this.setState({ currentStep: 2 });
+      this.setState(buildCurrentStepState(2));
 
       // Await the receipt to ensure transaction is confirmed before optimistic update
       const receipt = await this.submitSurveyResponse(activeSlice, changedQids);
@@ -8294,27 +8354,14 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this._userAnswersSliceCache = { source: null, value: null };
 
       this._submitGuard = false;
-      this.setState({
-        isSubmitting: false,
-        submitProgress: 100,
-        submissionComplete: true, // Locks fetchers from overwriting
-        submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_success'),
-        currentStep: 3,
-        suppressPrefill: false,
-        responseUrl,
-
-        // Force UI state and baseline to match exactly
-        surveysResponseState: nextSurveysResponseState,
+      this.setState(buildSubmitSuccessState({
         editBaseline: nextBaseline,
-
+        hasEncrypted,
+        responseUrl,
+        submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_success'),
+        surveysResponseState: nextSurveysResponseState,
         userAnswers: optimisticUserAnswers,
-        userHasResponse: true,
-        userResponseEncrypted: hasEncrypted,
-        isDirty: false,
-        modifiedCount: 0,
-        pileDiscardedEdits: false,
-        hasEncryptedChanges: false,
-      }, async () => {
+      }), async () => {
         try {
           const cacheWriteResult = await this.writeSubmittedResponsesToLocalCaches({
             receipt,
@@ -8352,13 +8399,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     } catch (error) {
       surveyLog.error('Failed to submit survey:', error);
       this._submitGuard = false;
-      this.setState({
-        isSubmitting: false,
-        submitProgress: 0,
-        submissionComplete: false,
+      this.setState(buildSubmitFailureState({
         submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_error'),
-        submissionError: error.message || 'Submission failed.'
-      });
+        submissionError: error.message || 'Submission failed.',
+      }));
     }
   };
 
@@ -8477,11 +8521,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     // If nothing actually changed, stop early (and throw so callers don't mark success)
     if (changedSet.size === 0) {
       this._submitGuard = false;
-      this.setState({
-        isSubmitting: false,
-        submitProgress: 0,
-        submissionError: 'No new or changed responses to submit.',
-      });
+      this.setState(buildSubmitPreparationErrorState());
       throw new Error('No new or changed responses to submit.');
     }
 
@@ -8497,11 +8537,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       });
     } catch (e) {
       this._submitGuard = false;
-      this.setState({
-        isSubmitting: false,
-        submitProgress: 0,
-        submissionError: e.message || 'No new or changed responses to submit.',
-      });
+      this.setState(buildSubmitPreparationErrorState(
+        e.message || 'No new or changed responses to submit.'
+      ));
       throw e;
     }
 
@@ -8832,11 +8870,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
                 <div className={styles.fullLoadingProgressBar}>
                   <div
                     className={styles.fullLoadingProgressFill}
-                    style={{
-                      width: `${isHydrating
-                        ? (hydrateDiscovered > 0 ? Math.round((Math.min(hydrateDone, hydrateDiscovered) / hydrateDiscovered) * 100) : 0)
-                        : scanPercent}%`,
-                    }}
+                    style={buildSurveyQuestionsFullLoadingProgressFillStyle({
+                      hydrateDiscovered,
+                      hydrateDone,
+                      isHydrating,
+                      scanPercent,
+                    })}
                   />
                 </div>
               </div>
@@ -8975,7 +9014,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         >
           {this.state.isSubmitting ? (
             <div id={styles.uploadingEncryptingText}>
-              <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: '10px' }} />
+              <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_QUESTIONS_SUBMIT_ICON_STYLE} />
               {this.state.currentStep === 1 && this.hasEncryptedAnswers()
                 ? 'Encrypting...'
                 : 'Uploading...'}
@@ -8989,9 +9028,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             </div>
           ) : this.state.submissionError ? (
             <div
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'red' }}
+              style={SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE}
             >
-              <FontAwesomeIcon icon={faExclamationCircle} style={{ marginRight: '10px' }} />
+              <FontAwesomeIcon icon={faExclamationCircle} style={SURVEY_QUESTIONS_SUBMIT_ICON_STYLE} />
               {this.state.submissionError.length > 50 ? this.state.submissionError.substring(0, 47) + '...' : this.state.submissionError}
             </div>
           ) : isSingleQuestionView ? (
@@ -9009,7 +9048,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             {_pendingStats.total > 0 && !this.state.isSubmitting && !singleQuestionSubmittedIndicatorActive && (
               <button
                 type="button"
-                className={`${styles.iconButton} ${isSingleQuestionView ? styles.singleQuestionSubmitIconButton : ''}`.trim() || undefined}
+                className={buildSurveyQuestionsSubmitAuxIconClassName(styles, isSingleQuestionView)}
                 onClick={this.handleRevertPendingChanges}
                 title="Clear changes"
                 aria-label="Clear pending changes"

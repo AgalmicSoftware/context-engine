@@ -34,7 +34,7 @@ describe('sessionMetadata gate handling', () => {
     expect(metadata.sponsoredSbtAddress).toBe('0x0000000000000000000000000000000000000001');
   });
 
-  it('normalizes naga network aliases to canonical names', () => {
+  it('rewrites legacy Lit network aliases onto the Chipotle runtime label', () => {
     const metadata = {
       lit: {
         network: 'NAGA_DEV',
@@ -44,7 +44,7 @@ describe('sessionMetadata gate handling', () => {
 
     const normalized = normalizeLitMetadataNetwork(metadata);
 
-    expect(normalized.lit.network).toBe('naga-dev');
+    expect(normalized.lit.network).toBe('chipotle');
     expect(normalized.lit.defaultGateId).toBe('gate-1');
     expect(metadata.lit.network).toBe('NAGA_DEV');
   });
@@ -60,7 +60,7 @@ describe('sessionMetadata gate handling', () => {
     const normalized = normalizeLitMetadataNetwork(metadata);
 
     expect(normalized.litNetwork).toBeUndefined();
-    expect(normalized.lit.network).toBe('naga-test');
+    expect(normalized.lit.network).toBe('chipotle');
     expect(normalized.lit.defaultGateId).toBe('gate-2');
     expect(metadata.litNetwork).toBe('naga_test');
   });

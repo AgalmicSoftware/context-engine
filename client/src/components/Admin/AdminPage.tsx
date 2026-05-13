@@ -8,7 +8,7 @@ import styles from './AdminPage.module.scss';
 import {
   USE_ONCHAIN_SESSION_REGISTRY,
 } from '../../variables/appConfig.js';
-import { getChainById, getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
+import { getDefaultHttpRpc } from '../../variables/chains.js';
 import { corsProxyUtils } from '../../utilities/worker/corsProxy.js';
 import {
   buildSiweMessage,
@@ -19,7 +19,7 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { encryptedFieldsUtils } from '../../utilities/crypto/encryptedFields.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
-import { normalizeBaseUrl, normalizeOriginList } from '../../utilities/urlUtils.js';
+import { normalizeOriginList } from '../../utilities/urlUtils.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { buildWorkerAllowOrigins } from '../../utilities/worker/workerCorsOrigins.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -39,12 +39,7 @@ import {
   buildSbtAccessControlConditions,
   getGlobalLitHooks,
   resolveLitChain,
-  resolveLitNetwork,
 } from '../../utilities/crypto/litProtocol.js';
-import {
-  createLitPayerWallet,
-  getLitPayerWalletStatus,
-} from '../../utilities/crypto/litPayerWallet.js';
 import {
   getCachedSessionWorkerConfig,
   upsertCachedSessionWorkerConfig,
@@ -54,7 +49,7 @@ import {
   hasUsableSessionWorkerConfig,
 } from '../../utilities/session/sessionWorkerAvailability.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
-import { toStr, normalizeSlug as _canonicalizeSlug } from '../../utilities/shared/primitives.js';
+import { toStr } from '../../utilities/shared/primitives.js';
 import AudioInput from '../Shared/AudioInput/AudioInput';
 import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
@@ -62,59 +57,52 @@ import { sanitizeSessionWizardMetadataPayload } from '../Sessions/sessionWizardW
 import CETooltip from '../Shared/CETooltip';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
+import {
+  buildTxExplorerUrl,
+  countSessionsForChain,
+  getChainName,
+  getErrorMessage,
+  inferAiProviderFromModel,
+  normalizeAiProvider,
+  normalizeSlug,
+  normalizeWorkerUrl,
+} from './adminPageHelpers';
+import {
+  ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
+  addSessionConfigHint,
+  buildHealthAuthMismatchState,
+  isRetryableAdminNonceFailure,
+  normalizeAdminWorkerFetchError,
+  shouldSeedWorkerConfigFromError,
+  sleep,
+} from './adminPageWorkerErrorHelpers';
+import {
+  buildUserPageUrl,
+  formatAllowOriginsDraft,
+  formatDefaultFilterStateDraft,
+  formatDelimitedDraftList,
+  formatPreviewValue,
+  parseAllowOriginsDraft,
+  parseDefaultFilterStateDraft,
+  parseDelimitedDraftList,
+} from './adminPageDraftFormattingHelpers';
+import {
+  buildSessionUrl,
+  collectEncryptedEntries,
+  getAdminSessionDisplayUrl,
+  shortAddress,
+} from './adminPageSessionDisplayHelpers';
+import {
+  dedupeSbtSelections,
+  normalizeGateMode,
+  resolveDefaultGateFromConfig,
+} from './adminPageSbtGateSelectionHelpers';
+import {
+  buildWorkerSessionConfigPayload,
+  getSessionReadRpcConfig,
+} from './adminPageWorkerSessionConfigHelpers';
 
 const log = createLogger('general');
-const getErrorMessage = (error: any, fallback = 'Unknown error') => (
-  typeof error?.message === 'string' && error.message.trim() ? error.message : fallback
-);
-
-const getChainName = (value: any) => {
-  const id = Number(value || 0);
-  if (!id) return '';
-  const chain = getChainById(id);
-  return toStr(chain?.name).trim();
-};
-
-const normalizeSlug = (raw: any) => {
-  const slug = _canonicalizeSlug(raw);
-  return slug === 'general' ? '' : slug;
-};
-
-const countSessionsForChain = (entries: any = [], chainId: any = null) => {
-  const list = Array.isArray(entries) ? entries : [];
-  if (!chainId) return list.length;
-  return list.filter(([, cfg]: any) => {
-    const cfgChainId = Number(cfg?.__registry?.registryChainId || cfg?.__registry?.chainId || 0) || 0;
-    return cfgChainId === chainId;
-  }).length;
-};
-
-const normalizeWorkerUrl = (url: any) => normalizeBaseUrl(url);
-const normalizeAiProvider = (raw: any, fallback: any = 'openai') => {
-  const provider = toStr(raw).trim().toLowerCase();
-  if (['openai', 'anthropic', 'openrouter', 'custom'].includes(provider)) return provider;
-  return fallback;
-};
-const inferAiProviderFromModel = (modelRaw: any) => {
-  const model = toStr(modelRaw).trim().toLowerCase();
-  if (!model) return '';
-  if (model.startsWith('claude')) return 'anthropic';
-  if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return 'openai';
-  if (model.includes('/')) return 'openrouter';
-  return '';
-};
-const buildTxExplorerUrl = (hash: any, chainId: any) => {
-  const base = toStr(getChainById(chainId)?.blockExplorers?.default?.url).trim();
-  if (!base || !hash) return '';
-  return `${base.replace(/\/+$/, '')}/tx/${hash}`;
-};
-const buildSessionUrl = (slug: any, { allowGeneral = false }: any = {}) => {
-  const hasExplicitSlug = slug !== undefined && slug !== null;
-  const normalized = normalizeSlug(slug);
-  const base = typeof window !== 'undefined' && window.location ? window.location.origin : '';
-  if (!normalized) return allowGeneral && hasExplicitSlug ? `${base}/session` : '';
-  return `${base}/session/${encodeURIComponent(normalized)}`;
-};
 const renderTestResult = (entry: any) => {
   if (!entry) return 'Not run';
   if (typeof entry === 'string') return entry;
@@ -130,102 +118,7 @@ const renderTestResult = (entry: any) => {
   return label || 'OK';
 };
 
-const shortAddress = (addr: any) => {
-  const s = toStr(addr);
-  if (!s) return '';
-  return `${s.slice(0, 6)}…${s.slice(-4)}`;
-};
-const getCurrentOrigin = () => {
-  try {
-    return typeof window !== 'undefined' ? toStr(window.location?.origin).trim() : '';
-  } catch (_) {
-    return '';
-  }
-};
-const buildAdminWorkerCorsMessage = (workerBase: any, detail: any = '') => {
-  const origin = getCurrentOrigin() || '<current-origin>';
-  const worker = toStr(workerBase).trim() || 'session worker';
-  const suffix = detail ? ` (${detail})` : '';
-  return `Worker request could not reach ${worker}${suffix}. This is usually CORS or worker availability; ensure ${origin} is in that worker session's allowOrigins. If this session still resolves an older worker URL, finish deploy/config sync or edit the worker URL override first.`;
-};
-const normalizeAdminWorkerFetchError = ({ error, workerBase, responseStatus = 0, responseError = '' }: any = {}) => {
-  const raw = toStr(error?.message || error).trim();
-  const lowered = raw.toLowerCase();
-  const detail = toStr(responseError).trim();
-  const detailLower = detail.toLowerCase();
-  if ((Number(responseStatus || 0) === 403 && detailLower.includes('origin')) || detailLower.includes('origin not allowed')) {
-    return buildAdminWorkerCorsMessage(workerBase, detail || 'Origin not allowed');
-  }
-  if (lowered.includes('origin not allowed')) {
-    return buildAdminWorkerCorsMessage(workerBase, raw);
-  }
-  if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
-    return buildAdminWorkerCorsMessage(workerBase);
-  }
-  return raw || 'Failed to update worker allowOrigins.';
-};
-const ADMIN_ACTION_NONCE_RETRY_ATTEMPTS = 3;
-const isRetryableAdminNonceFailure = ({ responseStatus = 0, responseError = '' }: any = {}) => {
-  const status = Number(responseStatus || 0);
-  const detail = toStr(responseError).trim().toLowerCase();
-  if (status !== 400 || !detail) return false;
-  return detail.includes('nonce mismatch or expired') || detail.includes('nonce already used');
-};
-const sleep = (ms: any) => new Promise((resolve: any) => setTimeout(resolve, ms));
-
 const deepClone = (value: any) => JSON.parse(JSON.stringify(value || {}));
-
-const getAdminSessionDisplayUrl = ({ selectedSlug, selectedConfig, groupMetadata }: any = {}) => {
-  if (!selectedConfig && !groupMetadata) return '';
-  const resolvedSlug = selectedConfig?.slug ?? groupMetadata?.slug ?? selectedSlug;
-  return buildSessionUrl(resolvedSlug, { allowGeneral: true });
-};
-
-const collectEncryptedEntries = (metadata: any) => {
-  const entries: Record<string, any> = {};
-  if (!metadata || typeof metadata !== 'object') return entries;
-  const fields = metadata.encryptedFields;
-  if (fields && typeof fields === 'object') {
-    Object.entries(fields).forEach(([key, value]: any) => {
-      if (value == null || value === '') return;
-      entries[key] = value;
-    });
-  }
-  const sessionInfoEncrypted = metadata.sessionInfoEncrypted;
-  if (sessionInfoEncrypted) {
-    entries.sessionInfo = sessionInfoEncrypted;
-  }
-  const aiProviders = metadata.ai?.providers;
-  if (aiProviders && typeof aiProviders === 'object') {
-    Object.entries(aiProviders).forEach(([key, cfg]: any) => {
-      const encrypted = cfg?.encryptedApiKey;
-      if (!encrypted) return;
-      const path = `ai.providers.${key}.apiKey`;
-      if (!entries[path]) entries[path] = encrypted;
-    });
-  }
-  const rpcProviders = metadata.rpc?.providers;
-  if (rpcProviders && typeof rpcProviders === 'object') {
-    Object.entries(rpcProviders).forEach(([key, cfg]: any) => {
-      const encrypted = cfg?.encryptedApiKey;
-      if (!encrypted) return;
-      const path = `rpc.providers.${key}.apiKey`;
-      if (!entries[path]) entries[path] = encrypted;
-    });
-  }
-  const arweaveEncrypted = metadata.arweave?.encryptedJwk;
-  if (arweaveEncrypted && !entries['arweave.jwk']) entries['arweave.jwk'] = arweaveEncrypted;
-  const faucetEncrypted = metadata.faucet?.encryptedPrivateKey;
-  if (faucetEncrypted && !entries['faucet.privateKey']) entries['faucet.privateKey'] = faucetEncrypted;
-  return entries;
-};
-
-const formatPreviewValue = (value: any, limit: any = 180) => {
-  const raw = toStr(value);
-  if (!raw) return '';
-  if (raw.length <= limit) return raw;
-  return `${raw.slice(0, limit)}…`;
-};
 
 const ADMIN_DEFAULT_AI_MODELS = Object.freeze({
   fast: 'gpt-5',
@@ -238,80 +131,6 @@ const ADMIN_AI_PROVIDER_OPTIONS = Object.freeze([
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'custom', label: 'Custom RPC' },
 ]);
-
-const dedupeTrimmedList = (values: any = []) => {
-  const out: any[] = [];
-  const seen: any = new Set();
-  (Array.isArray(values) ? values : []).forEach((value: any) => {
-    const trimmed = toStr(value).trim();
-    if (!trimmed) return;
-    const lower = trimmed.toLowerCase();
-    if (seen.has(lower)) return;
-    seen.add(lower);
-    out.push(trimmed);
-  });
-  return out;
-};
-
-const formatDelimitedDraftList = (value: any) => (
-  Array.isArray(value) ? dedupeTrimmedList(value).join('\n') : ''
-);
-
-const parseDelimitedDraftList = (raw: any) => {
-  if (Array.isArray(raw)) return dedupeTrimmedList(raw);
-  const trimmed = toStr(raw).trim();
-  if (!trimmed) return [];
-  if (trimmed.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (Array.isArray(parsed)) return dedupeTrimmedList(parsed);
-    } catch (_) {}
-  }
-  return dedupeTrimmedList(trimmed.split(/[\n,]+/));
-};
-
-const splitAllowOriginsInput = (value: any): any[] => {
-  if (Array.isArray(value)) {
-    return value.flatMap((entry: any) => splitAllowOriginsInput(entry));
-  }
-  return toStr(value)
-    .split(/[\n,]+/)
-    .map((entry: any) => entry.trim())
-    .filter(Boolean);
-};
-
-const parseAllowOriginsDraft = (raw: any) => normalizeOriginList(splitAllowOriginsInput(raw));
-
-const formatAllowOriginsDraft = (value: any) => parseAllowOriginsDraft(value).join('\n');
-
-const formatDefaultFilterStateDraft = (value: any) => {
-  if (value == null || value === '') return '';
-  if (typeof value === 'string') return value;
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch (_) {
-    return String(value);
-  }
-};
-
-const parseDefaultFilterStateDraft = (raw: any) => {
-  const trimmed = toStr(raw).trim();
-  if (!trimmed) return null;
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      return JSON.parse(trimmed);
-    } catch (error) {
-      throw new Error('Default filter state must be valid JSON or a plain query string.');
-    }
-  }
-  return trimmed;
-};
-
-const buildUserPageUrl = (address: any) => {
-  const trimmed = toStr(address).trim();
-  if (!trimmed) return '';
-  return `/u/${encodeURIComponent(trimmed)}`;
-};
 
 const ADMIN_EDITABLE_CONTRACT_FIELDS = Object.freeze([
   { contractKey: 'surveys', draftKey: 'contractSurveysAddress', label: 'Surveys contract' },
@@ -509,231 +328,10 @@ const shouldShowInlineResourceSummary = (resource: any = {}) => {
   return amount != null && amount > 0;
 };
 
-const normalizeSbtSelection = (value: any) => {
-  if (Array.isArray(value)) {
-    return value
-      .map((entry: any) => {
-        if (!entry) return null;
-        if (typeof entry === 'string') {
-          const address = entry.trim();
-          if (!address) return null;
-          return { address, name: address };
-        }
-        if (typeof entry === 'object') {
-          const address = toStr(entry.address || entry.sbtAddress || entry.value).trim();
-          if (!address) return null;
-          return { ...entry, address, name: entry.name || entry.label || address };
-        }
-        return null;
-      })
-      .filter(Boolean);
-  }
-  if (typeof value === 'string' && value.trim()) {
-    return value
-      .split(/[\n,]+/)
-      .map((addr: any) => addr.trim())
-      .filter(Boolean)
-      .map((addr: any) => ({ address: addr, name: addr }));
-  }
-  return [];
-};
-
-const dedupeSbtSelections = (value: any) => {
-  const out: any[] = [];
-  const seen: any = new Set();
-  normalizeSbtSelection(value).forEach((entry: any) => {
-    if (!ethers.utils.isAddress(entry.address)) return;
-    const checksum = ethers.utils.getAddress(entry.address);
-    const lower = checksum.toLowerCase();
-    if (seen.has(lower)) return;
-    seen.add(lower);
-    out.push({ ...entry, address: checksum, name: entry.name || checksum });
-  });
-  return out;
-};
-
-const normalizeGateMode = (raw: any) => {
-  const mode = toStr(raw).trim().toLowerCase();
-  if (mode === 'all' || mode === 'and') return 'all';
-  return 'any';
-};
-
 const parseChainIdInput = (raw: any) => {
   const matches = toStr(raw).match(/\d+/g);
   if (!matches || !matches.length) return 0;
   return Number(matches[matches.length - 1]) || 0;
-};
-const normalizeRpcUrlList = (value: any) => {
-  if (Array.isArray(value)) {
-    return value.map((entry: any) => toStr(entry).trim()).filter(Boolean);
-  }
-  const trimmed = toStr(value).trim();
-  return trimmed ? [trimmed] : [];
-};
-const sanitizeRpcUrlMap = (value: any) => {
-  if (!value || typeof value !== 'object') return {};
-  const out: Record<string, any> = {};
-  Object.entries(value).forEach(([chainKey, urls]: any) => {
-    const normalized = normalizeRpcUrlList(urls);
-    if (normalized.length) out[String(chainKey)] = normalized;
-  });
-  return out;
-};
-const pickFirstNonEmptyRpcUrlMap = (...candidates: any[]) => candidates.reduce((found: any, candidate: any) => {
-  if (found && Object.keys(found).length > 0) return found;
-  const sanitized = sanitizeRpcUrlMap(candidate);
-  return Object.keys(sanitized).length > 0 ? sanitized : found;
-}, {});
-const getSessionReadRpcConfig = ({
-  sessionConfig,
-  fallbackChainId,
-}: any = {}) => {
-  const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
-  const rpcRoot = cfg.rpc && typeof cfg.rpc === 'object' ? cfg.rpc : {};
-  const rpcProviders = rpcRoot.providers && typeof rpcRoot.providers === 'object' ? rpcRoot.providers : {};
-  const pathProvider = rpcProviders.path && typeof rpcProviders.path === 'object' ? rpcProviders.path : {};
-  const faucetCfg = cfg.faucet && typeof cfg.faucet === 'object' ? cfg.faucet : {};
-  const chainId = Number(
-    cfg.networkChainId ||
-    cfg.__registry?.chainId ||
-    cfg.__registry?.registryChainId ||
-    fallbackChainId ||
-    0
-  ) || 0;
-  const rpcUrlsByChainId = pickFirstNonEmptyRpcUrlMap(
-    pathProvider.rpcUrlsByChainId,
-    rpcRoot.rpcUrlsByChainId,
-    cfg.rpcUrlsByChainId
-  );
-  const chainRpcUrl = chainId
-    ? normalizeRpcUrlList(rpcUrlsByChainId[String(chainId)] || rpcUrlsByChainId[chainId])[0] || ''
-    : '';
-  const defaultRpcUrl = chainId
-    ? toStr(getDefaultHttpRpc(chainId, { allowPath: false }) || getDefaultHttpRpc(chainId)).trim()
-    : '';
-  const rpcUrl = (
-    normalizeRpcUrlList(faucetCfg.rpcUrl)[0] ||
-    chainRpcUrl ||
-    normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
-    normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
-    normalizeRpcUrlList(cfg.rpcUrl)[0] ||
-    defaultRpcUrl
-  );
-  return {
-    chainId,
-    rpcUrl: toStr(rpcUrl).trim(),
-  };
-};
-const buildWorkerSessionConfigPayload = ({
-  sessionConfig,
-  account,
-  fallbackChainId,
-}: any = {}) => {
-  const normalizeContractEntry = (entry: any, chainIdFallback: any) => {
-    if (!entry || typeof entry !== 'object') return null;
-    const address = toStr(entry.address || entry.contractAddress || '').trim();
-    const chainId = Number(entry.chainId || entry.networkChainId || chainIdFallback || 0) || 0;
-    if (!address) return null;
-    return {
-      address,
-      ...(chainId ? { chainId } : {}),
-    };
-  };
-  const cfg = sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {};
-  const registry = cfg.__registry && typeof cfg.__registry === 'object' ? cfg.__registry : {};
-  const rpcRoot = cfg.rpc && typeof cfg.rpc === 'object' ? cfg.rpc : {};
-  const rpcProviders = rpcRoot.providers && typeof rpcRoot.providers === 'object' ? rpcRoot.providers : {};
-  const pathProvider = rpcProviders.path && typeof rpcProviders.path === 'object' ? rpcProviders.path : {};
-  const inferredSessionChainId = Number(cfg.networkChainId || fallbackChainId || 0) || 0;
-  const registryChainId = Number(
-    registry.registryChainId ||
-    registry.chainId ||
-    inferredSessionChainId ||
-    0
-  ) || 0;
-  const rpcUrlFromConfig = (
-    normalizeRpcUrlList(pathProvider.rpcUrl)[0] ||
-    normalizeRpcUrlList(rpcRoot.rpcUrl)[0] ||
-    normalizeRpcUrlList(cfg.rpcUrl)[0] ||
-    normalizeRpcUrlList(cfg.faucet?.rpcUrl)[0] ||
-    ''
-  );
-  const rpcUrlsByChainId = pickFirstNonEmptyRpcUrlMap(
-    pathProvider.rpcUrlsByChainId,
-    cfg.rpcUrlsByChainId
-  );
-  const rpcUrlsForRegistryChain = normalizeRpcUrlList(
-    registryChainId ? (rpcUrlsByChainId[String(registryChainId)] || rpcUrlsByChainId[registryChainId]) : []
-  );
-  const defaultChainRpcUrl = registryChainId ? toStr(getDefaultHttpRpc(registryChainId)).trim() : '';
-  const resolvedRpcUrl = rpcUrlFromConfig || rpcUrlsForRegistryChain[0] || defaultChainRpcUrl;
-  const resolvedRpcUrlsByChainId = { ...rpcUrlsByChainId };
-  if (registryChainId && resolvedRpcUrl) {
-    const key = String(registryChainId);
-    if (!normalizeRpcUrlList(resolvedRpcUrlsByChainId[key]).length) {
-      resolvedRpcUrlsByChainId[key] = [resolvedRpcUrl];
-    }
-  }
-  const allowOriginsRaw = cfg.allowOrigins;
-  const allowOrigins = Array.isArray(allowOriginsRaw)
-    ? allowOriginsRaw.map((entry: any) => toStr(entry).trim()).filter(Boolean)
-    : toStr(allowOriginsRaw)
-      .split(/[\n,]+/)
-      .map((entry: any) => entry.trim())
-      .filter(Boolean);
-  const limits = cfg.limits && typeof cfg.limits === 'object' ? cfg.limits : {};
-  const scopes = cfg.scopes && typeof cfg.scopes === 'object' ? cfg.scopes : {};
-  const faucetCfg = cfg.faucet && typeof cfg.faucet === 'object' ? cfg.faucet : {};
-
-  const out: any = {
-    adminAddress: toStr(registry.adminAddress || cfg.adminAddress || account).trim(),
-  };
-  const slug = normalizeSlug(cfg.slug || '');
-  const registryAddress = toStr(registry.registryAddress || registry.address || '').trim();
-  const resolvedRegistryAddress = registryAddress || toStr(
-    registryChainId
-      ? (getSessionRegistryAddress(registryChainId) || sessionRegistryUtils.resolveRegistryAddress(registryChainId))
-      : ''
-  ).trim();
-  const hatsAddress = toStr(registry.hatsAddress || cfg.hatsAddress || '').trim();
-  const adminHatId = toStr(registry.adminHatId || cfg.adminHatId || '').trim();
-  if (slug || slug === '') out.slug = slug;
-  if (resolvedRegistryAddress) out.registryAddress = resolvedRegistryAddress;
-  if (registryChainId) out.registryChainId = registryChainId;
-  if (hatsAddress) out.hatsAddress = hatsAddress;
-  if (adminHatId) out.adminHatId = adminHatId;
-  if (inferredSessionChainId) {
-    out.networkChainId = inferredSessionChainId;
-  }
-  const sessionId = toStr(registry.sessionId || registry.sessionIdHex || cfg.sessionId || '').trim();
-  if (sessionId) out.sessionId = sessionId;
-  if (resolvedRpcUrl) out.rpcUrl = resolvedRpcUrl;
-  if (Object.keys(resolvedRpcUrlsByChainId).length) out.rpcUrlsByChainId = resolvedRpcUrlsByChainId;
-  if (allowOrigins.length) out.allowOrigins = allowOrigins;
-  if (Object.keys(limits).length) out.limits = limits;
-  if (Object.keys(scopes).length) out.scopes = scopes;
-  const blockLimits = normalizeBlockLimitsForConfig(cfg.blockLimits);
-  if (blockLimits) out.blockLimits = blockLimits;
-
-  const contractsObj = cfg.contracts && typeof cfg.contracts === 'object' ? cfg.contracts : {};
-  const normalizedContracts: Record<string, any> = {};
-  Object.entries(contractsObj).forEach(([key, value]: any) => {
-    const normalized = normalizeContractEntry(value, cfg.networkChainId || fallbackChainId);
-    if (!normalized) return;
-    normalizedContracts[key] = normalized;
-  });
-  if (Object.keys(normalizedContracts).length) out.contracts = normalizedContracts;
-
-  const faucet: Record<string, any> = {};
-  const faucetRpcUrl = normalizeRpcUrlList(faucetCfg.rpcUrl)[0] || resolvedRpcUrl;
-  const faucetAmountEth = toStr(faucetCfg.amountEth).trim();
-  const faucetBalanceThresholdEth = toStr(faucetCfg.balanceThresholdEth).trim();
-  if (faucetRpcUrl) faucet.rpcUrl = faucetRpcUrl;
-  if (faucetAmountEth) faucet.amountEth = faucetAmountEth;
-  if (faucetBalanceThresholdEth) faucet.balanceThresholdEth = faucetBalanceThresholdEth;
-  if (Object.keys(faucet).length) out.faucet = faucet;
-
-  return out;
 };
 
 const resolveAutoFeatureBySessionSlug = (metadata: any) => (
@@ -787,44 +385,6 @@ const buildEditableSessionMetadataPayload = ({
   }
   return sanitized;
 };
-const addSessionConfigHint = (message: any) => {
-  const raw = toStr(message).trim();
-  if (!raw) return 'Worker session config is missing. Run the AI test again as admin to seed it, or re-deploy for this slug.';
-  if (!raw.toLowerCase().includes('session config not found')) return raw;
-  return `${raw} Re-run this test while connected as the admin wallet to seed worker config, then verify the worker URL and selected session slug match.`;
-};
-
-const shouldSeedWorkerConfigFromError = (message: any) => {
-  const raw = toStr(message).toLowerCase();
-  if (!raw) return false;
-  if (raw.includes('session config not found')) return true;
-  return false;
-};
-
-const buildHealthAuthMismatchState = ({
-  unauthStatus,
-  unauthError = '',
-  authError = '',
-}: any = {}) => {
-  const status = Number(unauthStatus || 0) || 0;
-  const authMsg = toStr(authError).toLowerCase();
-  const unsupportedAuthRoute = (
-    status > 0 &&
-    (status === 401 || status === 403) &&
-    (
-      authMsg.includes('worker login failed (404)') ||
-      authMsg.includes('worker auth login route not supported')
-    )
-  );
-  if (!unsupportedAuthRoute) return null;
-  const detail = toStr(unauthError).trim();
-  const suffix = detail ? `: ${detail}` : '';
-  return {
-    healthLabel: `Auth required${suffix}; /auth/login unsupported (404)`,
-    statusMessage: 'Health endpoint is gated, but this worker URL does not expose /auth/login.',
-  };
-};
-
 export const __adminPageTestUtils = {
   applyAdminMetadataDraft,
   buildAdminMetadataDraft,
@@ -833,32 +393,6 @@ export const __adminPageTestUtils = {
   buildHealthAuthMismatchState,
   getAdminSessionDisplayUrl,
   getSessionReadRpcConfig,
-};
-
-const resolveDefaultGateFromConfig = (cfg: any = {}) => {
-  const sponsored = cfg?.sponsored && typeof cfg.sponsored === 'object' ? cfg.sponsored : {};
-  const gates = sponsored.gates && typeof sponsored.gates === 'object' ? sponsored.gates : {};
-  const defaultGateId = toStr(sponsored.defaultGateId || sponsored.defaultGate).trim();
-  const gate = defaultGateId ? gates[defaultGateId] : null;
-  const rawAddresses: any[] = [];
-  if (Array.isArray(gate?.sbtAddresses)) rawAddresses.push(...gate.sbtAddresses);
-  if (gate?.sbtAddress) rawAddresses.push(gate.sbtAddress);
-  if (!rawAddresses.length && Array.isArray(sponsored?.sbtAddresses)) rawAddresses.push(...sponsored.sbtAddresses);
-  if (!rawAddresses.length && sponsored?.sbtAddress) rawAddresses.push(sponsored.sbtAddress);
-  const sbtAddresses = dedupeSbtSelections(rawAddresses).map((entry: any) => entry.address);
-  const chainId = Number(
-    gate?.chainId ||
-    sponsored?.chainId ||
-    cfg?.networkChainId ||
-    cfg?.__registry?.chainId ||
-    0
-  ) || null;
-  return {
-    gateId: defaultGateId || '',
-    sbtAddresses,
-    mode: normalizeGateMode(gate?.mode || sponsored?.mode),
-    chainId,
-  };
 };
 
 const AdminPage = ({
@@ -947,7 +481,8 @@ const AdminPage = ({
     customRpcKey: '',
     arweaveJwk: '',
     faucetPrivateKey: '',
-    litPayerPrivateKey: '',
+    litAccountApiKey: '',
+    litUsageApiKey: '',
   });
   const [workerSecretsDirty, setWorkerSecretsDirty] = useState<any>(false);
   const [clearedSecretKeys, setClearedSecretKeys] = useState<any>(() => new Set());
@@ -966,8 +501,8 @@ const AdminPage = ({
   });
   const [litResource, setLitResource] = useState<any>({
     address: '',
-    display: 'No Lit payer key entered',
-    meta: 'Enter a Lit payer private key above or save one to the worker, then refresh status.',
+    display: 'Lit Chipotle not configured',
+    meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
     loading: false,
     manualRefreshAvailable: false,
   });
@@ -1318,14 +853,15 @@ const AdminPage = ({
       customRpcKey: '',
       arweaveJwk: '',
       faucetPrivateKey: '',
-      litPayerPrivateKey: '',
+      litAccountApiKey: '',
+      litUsageApiKey: '',
     });
     setWorkerSecretsDirty(false);
     setClearedSecretKeys(new Set());
     setLitResource({
       address: '',
-      display: 'No Lit payer key entered',
-      meta: 'Enter a Lit payer private key above or save one to the worker, then refresh status.',
+      display: 'Lit Chipotle not configured',
+      meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
       loading: false,
       manualRefreshAvailable: false,
     });
@@ -1827,29 +1363,31 @@ const AdminPage = ({
   const refreshLitResource = useCallback(async ({ includeSignedStatus = true }: any = {}) => {
     const requestId = litResourceRequestRef.current + 1;
     litResourceRequestRef.current = requestId;
-    const payerStatus = getLitPayerWalletStatus(secrets.litPayerPrivateKey);
     const baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
-    const hasPersistedLitSponsor = selectedConfig?.sponsoredKeys?.lit === true;
-    const litNetwork = resolveLitNetwork(
-      selectedConfig?.lit?.network || selectedConfig?.litNetwork || 'naga-dev'
+    const litCredentials = selectedConfig?.litCredentials
+      && typeof selectedConfig.litCredentials === 'object'
+      && !Array.isArray(selectedConfig.litCredentials)
+      ? selectedConfig.litCredentials
+      : {};
+    const accountApiKey = toStr(secrets.litAccountApiKey).trim();
+    const usageApiKey = toStr(secrets.litUsageApiKey).trim();
+    const configuredLitApiBase = toStr(litCredentials?.litApiBase).trim();
+    const configuredLitGroupId = toStr(litCredentials?.litGroupId).trim();
+    const configuredLitPkpId = toStr(litCredentials?.litPkpId).trim();
+    const configuredLitActionCid = toStr(litCredentials?.litActionCid).trim();
+    const hasChipotleConfig = !!(
+      configuredLitApiBase ||
+      configuredLitGroupId ||
+      configuredLitPkpId ||
+      configuredLitActionCid
     );
+    const useChipotlePath = !!(accountApiKey || usageApiKey || hasChipotleConfig);
 
-    if (!payerStatus.privateKey && !baseUrl) {
+    if (!useChipotlePath && !baseUrl) {
       setLitResource({
         address: '',
-        display: 'No Lit payer key entered',
-        meta: 'Enter a Lit payer private key above or save one to the worker, then refresh status.',
-        loading: false,
-        manualRefreshAvailable: false,
-      });
-      return;
-    }
-
-    if (payerStatus.privateKey && !payerStatus.valid) {
-      setLitResource({
-        address: '',
-        display: 'Invalid key',
-        meta: payerStatus.error || 'The private key could not be parsed.',
+        display: 'Lit Chipotle not configured',
+        meta: 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
         loading: false,
         manualRefreshAvailable: false,
       });
@@ -1859,11 +1397,11 @@ const AdminPage = ({
     if (!baseUrl || !selectedConfig) {
       if (requestId !== litResourceRequestRef.current) return;
       setLitResource({
-        address: payerStatus.address,
-        display: payerStatus.address ? 'Worker unavailable' : 'No Lit payer key entered',
-        meta: payerStatus.address
-          ? 'Resolve the worker URL to read PaymentManager status.'
-          : 'Enter a Lit payer private key above or save one to the worker, then refresh status.',
+        address: '',
+        display: useChipotlePath ? 'Worker unavailable' : 'Lit Chipotle not configured',
+        meta: useChipotlePath
+          ? 'Resolve the worker URL to read Lit Chipotle status.'
+          : 'Enter a Lit account API key or Lit usage API key above, or save Lit Chipotle config to the worker, then refresh status.',
         loading: false,
         manualRefreshAvailable: false,
       });
@@ -1873,15 +1411,18 @@ const AdminPage = ({
     if (!includeSignedStatus) {
       if (requestId !== litResourceRequestRef.current) return;
       setLitResource({
-        address: payerStatus.address,
+        address: '',
         display: 'Status not loaded',
-        // Regression guard: the worker route can resolve a saved payer key even
-        // before sponsored_lit has been synced on-chain or pasted into the form.
-        meta: payerStatus.address
-          ? `${shortAddress(payerStatus.address)} • Click refresh to load worker balance and delegation status.`
-          : (hasPersistedLitSponsor
-            ? `Saved to worker • Click refresh to load payer status for ${litNetwork}.`
-            : `Click refresh to query the worker for a saved Lit payer key on ${litNetwork}.`),
+        meta: [
+          accountApiKey ? 'Unsaved account key' : '',
+          usageApiKey ? 'Unsaved usage key' : '',
+          !accountApiKey && !usageApiKey ? 'Saved worker config' : '',
+          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
+          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
+          configuredLitPkpId ? 'PKP configured' : '',
+          configuredLitActionCid ? 'Action configured' : '',
+          'Click refresh to query the worker for Lit Chipotle status.',
+        ].filter(Boolean).join(' • '),
         loading: false,
         manualRefreshAvailable: true,
       });
@@ -1889,9 +1430,11 @@ const AdminPage = ({
     }
 
     setLitResource({
-      address: payerStatus.address,
+      address: '',
       display: 'Loading...',
-      meta: payerStatus.address ? shortAddress(payerStatus.address) : `Checking ${litNetwork}`,
+      meta: configuredLitGroupId
+        ? `Checking group ${formatPreviewValue(configuredLitGroupId, 20)}`
+        : 'Checking Lit Chipotle worker status',
       loading: true,
       manualRefreshAvailable: true,
     });
@@ -1900,46 +1443,74 @@ const AdminPage = ({
       const slug = normalizeSlug(selectedSlug);
       const requestBody = {
         sessionSlug: slug,
-        litNetwork,
-        ...(payerStatus.privateKey ? { litPayerPrivateKey: payerStatus.privateKey } : {}),
+        ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
+        ...(accountApiKey ? { apiKey: accountApiKey } : {}),
       };
       const { data } = await postSignedAdminRequest({
-        action: 'lit-status',
+        action: 'lit-chipotle-status',
         body: requestBody,
-        path: '/admin/lit-status',
+        path: '/admin/lit-chipotle-status',
         workerUrl: baseUrl,
       });
       if (requestId !== litResourceRequestRef.current) return;
 
-      const address = toStr(data?.payerAddress || payerStatus.address).trim();
-      const availableBalance = toStr(data?.balance?.availableBalance || '').trim();
-      const totalBalance = toStr(data?.balance?.totalBalance || '').trim();
       const ready = data?.ready === true;
-      const delegatedUsers = Number(data?.delegatedUsersCount || 0) || 0;
+      const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
+      const groupSummary = data?.groupSummary && typeof data.groupSummary === 'object'
+        ? data.groupSummary
+        : {};
+      const walletCount = groupSummary.walletCount == null ? null : Number(groupSummary.walletCount);
+      const actionCount = groupSummary.actionCount == null ? null : Number(groupSummary.actionCount);
+      const hasHardConfigMiss = (
+        groupSummary.hasConfiguredPkp === false ||
+        groupSummary.hasConfiguredAction === false
+      );
+      const balanceDisplay = toStr(data?.balance?.balance_display || '').trim();
       setLitResource({
-        address,
-        display: availableBalance ? `${Number(availableBalance).toFixed(4)} ETH` : 'Deposit required',
+        address: '',
+        display: ready
+          ? 'Ready'
+          : hasHardConfigMiss
+            ? 'Needs config'
+            : warnings.length
+              ? 'Needs review'
+              : 'Configured',
         meta: [
-          address ? shortAddress(address) : '',
-          ready ? 'Ready' : 'Needs funds',
-          totalBalance ? `total ${Number(totalBalance).toFixed(4)} ETH` : '',
-          delegatedUsers ? `${delegatedUsers} delegated user${delegatedUsers === 1 ? '' : 's'}` : '',
-        ].filter(Boolean).join(' • '),
+          configuredLitApiBase ? formatPreviewValue(configuredLitApiBase.replace(/^https?:\/\//, ''), 28) : '',
+          balanceDisplay ? `balance ${balanceDisplay}` : '',
+          configuredLitGroupId ? `group ${formatPreviewValue(configuredLitGroupId, 20)}` : '',
+          configuredLitPkpId
+            ? (groupSummary.hasConfiguredPkp === true
+              ? 'PKP ready'
+              : groupSummary.hasConfiguredPkp === false
+                ? 'PKP missing'
+                : 'PKP unchecked')
+            : (walletCount != null ? `${walletCount} wallet${walletCount === 1 ? '' : 's'}` : ''),
+          configuredLitActionCid
+            ? (groupSummary.hasConfiguredAction === true
+              ? 'Action ready'
+              : groupSummary.hasConfiguredAction === false
+                ? 'Action missing'
+                : 'Action unchecked')
+            : (actionCount != null ? `${actionCount} action${actionCount === 1 ? '' : 's'}` : ''),
+          warnings.length ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : '',
+        ].filter(Boolean).join(' • ') || 'Lit Chipotle status loaded.',
         loading: false,
         manualRefreshAvailable: true,
       });
     } catch (error: any) {
       if (requestId !== litResourceRequestRef.current) return;
       setLitResource({
-        address: payerStatus.address,
+        address: '',
         display: 'Unable to load status',
-        meta: getErrorMessage(error, 'Failed to load Lit payer status.'),
+        meta: getErrorMessage(error, 'Failed to load Lit Chipotle status.'),
         loading: false,
         manualRefreshAvailable: true,
       });
     }
   }, [
-    secrets.litPayerPrivateKey,
+    secrets.litAccountApiKey,
+    secrets.litUsageApiKey,
     selectedConfig,
     selectedConfigWorkerUrl,
     selectedSlug,
@@ -1953,6 +1524,22 @@ const AdminPage = ({
       litResourceRequestRef.current += 1;
     };
   }, [refreshLitResource]);
+
+  const litResourceLabel = useMemo(() => {
+    const litCredentials = selectedConfig?.litCredentials
+      && typeof selectedConfig.litCredentials === 'object'
+      && !Array.isArray(selectedConfig.litCredentials)
+      ? selectedConfig.litCredentials
+      : {};
+    return (
+      toStr(secrets.litAccountApiKey).trim() ||
+      toStr(secrets.litUsageApiKey).trim() ||
+      toStr(litCredentials?.litApiBase).trim() ||
+      toStr(litCredentials?.litGroupId).trim() ||
+      toStr(litCredentials?.litPkpId).trim() ||
+      toStr(litCredentials?.litActionCid).trim()
+    ) ? 'Lit Chipotle status' : 'Lit sponsorship status';
+  }, [selectedConfig, secrets.litAccountApiKey, secrets.litUsageApiKey]);
 
   const resolveSuggestedAllowOrigins = (extraOrigins: any = normalizedAllowOriginsDraft) => {
     let currentOrigin = '';
@@ -2085,8 +1672,10 @@ const AdminPage = ({
       ) || 0;
       const shouldPreserveSponsoredLit = (
         currentSponsoredLit &&
-        !clearedSecretKeys.has('litPayerPrivateKey') &&
-        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litPayerPrivateKey')
+        !clearedSecretKeys.has('litAccountApiKey') &&
+        !clearedSecretKeys.has('litUsageApiKey') &&
+        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
+        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey')
       );
       const sponsoredFields = buildSponsoredSessionFlagFields({
         secrets: secretsPayload,
@@ -2593,9 +2182,7 @@ const AdminPage = ({
       if (!hooks || typeof hooks.saveKey !== 'function') {
         throw new Error('Lit hooks not initialized.');
       }
-      const litNetwork = resolveLitNetwork(
-        groupMetadata?.lit?.network || groupMetadata?.litNetwork || hooks?.litNetwork || 'naga-dev'
-      );
+      const litNetwork = toStr(hooks?.litNetwork).trim() || 'chipotle';
       const gate = resolveDefaultGateFromConfig(groupMetadata);
       if (!gate.sbtAddresses.length) {
         throw new Error('Default gate has no SBT addresses.');
@@ -2646,9 +2233,7 @@ const AdminPage = ({
       if (!hooks || typeof hooks.getKey !== 'function') {
         throw new Error('Lit hooks not initialized.');
       }
-      const litNetwork = resolveLitNetwork(
-        groupMetadata?.lit?.network || groupMetadata?.litNetwork || hooks?.litNetwork || 'naga-dev'
-      );
+      const litNetwork = toStr(hooks?.litNetwork).trim() || 'chipotle';
       const chainId = Number(
         groupMetadata?.networkChainId || groupMetadata?.__registry?.chainId || network?.id || 0
       ) || null;
@@ -2673,7 +2258,7 @@ const AdminPage = ({
     { key: 'rpc', label: 'RPC', fields: ['customRpcUrl', 'customRpcKey'] },
     { key: 'arweave', label: 'Arweave', fields: ['arweaveJwk'] },
     { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
-    { key: 'lit', label: 'Lit', fields: ['litPayerPrivateKey'] },
+    { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
   ];
   const cardHasValue = (fields: any) => fields.some((f: any) => toStr(secrets[f]).trim());
   const currentBlockSummary = Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
@@ -3839,12 +3424,10 @@ const AdminPage = ({
                             customRpcKey: 'Custom RPC key',
                             arweaveJwk: 'Arweave JWK (JSON)',
                             faucetPrivateKey: 'Faucet private key',
-                            litPayerPrivateKey: 'Lit payer private key',
+                            litAccountApiKey: 'Lit account API key',
+                            litUsageApiKey: 'Lit usage API key',
                           };
                           const label = secretFieldLabels[secretFieldKey] || secretFieldKey;
-                          const litPayerStatus = secretFieldKey === 'litPayerPrivateKey'
-                            ? getLitPayerWalletStatus(secrets.litPayerPrivateKey)
-                            : null;
                           return (
                             <FormGroup key={secretFieldKey}>
                               <Label>{label}</Label>
@@ -3867,34 +3450,10 @@ const AdminPage = ({
                                   <FontAwesomeIcon icon={faTimes} />
                                 </button>
                               </div>
-                              {secretFieldKey === 'litPayerPrivateKey' ? (
-                                <>
-                                  <div className={styles.secretInputRow} style={{ marginTop: 8 }}>
-                                    <Input
-                                      type="text"
-                                      value={litPayerStatus?.address || ''}
-                                      placeholder="Derived payer address"
-                                      readOnly
-                                      disabled
-                                      className={styles.secretInput}
-                                    />
-                                    <Button
-                                      type="button"
-                                      color="secondary"
-                                      outline
-                                      className={styles.secretRemoveButton}
-                                      onClick={() => {
-                                        const nextWallet = createLitPayerWallet();
-                                        handleSecretChange('litPayerPrivateKey', nextWallet.privateKey);
-                                      }}
-                                    >
-                                      Generate
-                                    </Button>
-                                  </div>
-                                  <div className={styles.warningNote}>
-                                    Anyone with this key can spend the session&apos;s Lit sponsorship balance. Only bundle it when you intend to grant sponsored Lit usage.
-                                  </div>
-                                </>
+                              {secretFieldKey === 'litAccountApiKey' ? (
+                                <div className={styles.warningNote}>
+                                  Anyone with this key can create new Lit groups, PKPs, usage keys, and actions inside that bundle-owned Lit account. Use disposable per-bundle accounts instead of a shared deployment account.
+                                </div>
                               ) : null}
                             </FormGroup>
                           );
@@ -3915,7 +3474,7 @@ const AdminPage = ({
                         })}
                         {card.key === 'lit' && renderInlineResourceSummary({
                           key: 'lit-resource',
-                          label: 'Lit sponsorship status',
+                          label: litResourceLabel,
                           resource: litResource,
                           onRefresh: () => refreshLitResource({ includeSignedStatus: true }),
                           refreshLabel: 'Refresh Lit status',

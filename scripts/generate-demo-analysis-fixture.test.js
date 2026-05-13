@@ -193,4 +193,28 @@ test('buildDemoAnalysisFixture expands deterministic synthetic participants from
         && participant.xid === demoPolisData.participantsVotes[0].xid
     )
   );
+  assert.ok(
+    fixture.participantsVotes.some(
+      (participant) => participant.profileId === 'historical_baseline'
+        && participant.profileLabel === 'Historical persona baseline'
+        && participant.profileConfidence === 'High'
+    )
+  );
+  assert.ok(
+    fixture.participantsVotes.some(
+      (participant) => participant.profileId === 'consensus_echo'
+        && participant.profileLabel === 'Consensus echo'
+        && participant.profileConfidence === 'Medium'
+    )
+  );
+});
+
+test('buildDemoAnalysisFixture normalizes comment datetime strings from canonical timestamps', async () => {
+  const { buildDemoAnalysisFixture } = await import(generatorModuleUrl);
+
+  const fixture = buildDemoAnalysisFixture();
+
+  assert.equal(fixture.comments[0].datetime, 'Wed Mar 06 16:00:00 UTC 2024');
+  assert.equal(fixture.comments[16].datetime, 'Wed Mar 06 16:16:00 UTC 2024');
+  assert.equal(fixture.comments[41].datetime, 'Wed Mar 06 16:41:00 UTC 2024');
 });

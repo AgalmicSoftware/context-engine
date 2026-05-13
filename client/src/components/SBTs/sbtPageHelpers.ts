@@ -1,0 +1,1719 @@
+import {
+  getSessionSlugByName,
+  normalizeSessionSlug,
+} from '../../utilities/web3/contractScripts.js';
+import { ethers } from 'ethers';
+import {
+  sanitizeSbtPageMintedTokensOverride,
+} from './sbtPageAutoMintHelpers';
+import {
+  buildSbtPageHolderListSignature,
+  buildSbtPageNextFilteredHolderRows,
+  computeSbtPageNetCounts,
+  computeSbtPageNetHoldersList,
+} from './sbtPageHolderHelpers';
+
+export {
+  buildSbtPageAutoMintCleanPath,
+  collectAutoMintPairsFromSearchParams,
+  decodeSbtPageInviteInput,
+  hasSbtPageAutoMintFlag,
+  normalizeSbtInviteCode,
+  resolveSbtPageUrlAutoMintIntent,
+  sanitizeSbtPageMintedTokensOverride,
+  shouldRunSbtPagePropListAutoMint,
+  shouldRunSbtPagePropPasswordAutoMint,
+} from './sbtPageAutoMintHelpers';
+export type {
+  AutoMintPair,
+  AutoMintPairsResult,
+  SbtPageDecodedInviteInput,
+  SbtPageUrlAutoMintIntent,
+} from './sbtPageAutoMintHelpers';
+export {
+  buildSbtPageAddressChangeResetMintUiPatch,
+  buildSbtPageAdminInviteSuccessPatch,
+  buildSbtPageBookmarkedPatch,
+  buildSbtPageBooleanTogglePatch,
+  buildSbtPageBurnFailurePatch,
+  buildSbtPageBurnPendingPatch,
+  buildSbtPageBurnSearchInputPatch,
+  buildSbtPageBurnSearchResultPatch,
+  buildSbtPageBurnSuccessPatch,
+  buildSbtPageCachedPasswordsPatch,
+  buildSbtPageCopiedAddressPatch,
+  buildSbtPageCopiedErrorPatch,
+  buildSbtPageDocModalContentPatch,
+  buildSbtPageDocModalErrorPatch,
+  buildSbtPageDocModalOpenPatch,
+  buildSbtPageDocModalResetPatch,
+  buildSbtPageErrorPatch,
+  buildSbtPageExportFormatPatch,
+  buildSbtPageIncludePreviousPasswordsPatch,
+  buildSbtPageInitialState,
+  buildSbtPageIntervalIdPatch,
+  buildSbtPageLoadInfoLoadingStartPatch,
+  buildSbtPageLoadingMintersBurnersPatch,
+  buildSbtPageLogScanProgressPatch,
+  buildSbtPageMiniPasswordInputPatch,
+  buildSbtPageMintCountdownPatch,
+  buildSbtPageMintFailurePatch,
+  buildSbtPageMintPasswordClearPatch,
+  buildSbtPageMintPasswordPrefillPatch,
+  buildSbtPageMintPendingPatch,
+  buildSbtPageMintSuccessPatch,
+  buildSbtPageMintedModalInitialFilterPatch,
+  buildSbtPageMintedModalVisibilityPatch,
+  buildSbtPageNetworkUpdatePatch,
+  buildSbtPagePasswordClaimStartSuccessPatch,
+  buildSbtPagePasswordGenerationCountPatch,
+  buildSbtPagePasswordInputValuePatch,
+  buildSbtPagePasswordMintInputPatch,
+  buildSbtPageRelevantInfoPatch,
+  buildSbtPageResolvedSessionSlugPatch,
+  buildSbtPageSbtInfoPatch,
+} from './sbtPageStatePatchHelpers';
+export {
+  buildSbtPageAddressListSignatureMemoState,
+  buildSbtPageAddressOccurrenceMap,
+  buildSbtPageHolderListSignature,
+  buildSbtPageModalFilteredMintedUsersPatch,
+  buildSbtPageNetHoldersMemoState,
+  buildSbtPageNextFilteredHolderRows,
+  computeSbtPageNetCounts,
+  computeSbtPageNetHoldersList,
+  expandSbtPageAddressListFromCountMap,
+  mergeSbtPageBurnEvidenceIntoPreservedHolderState,
+  normalizeSbtPageCountMap,
+  normalizeSbtPageLoadInfoOptions,
+} from './sbtPageHolderHelpers';
+export {
+  buildSbtPagePasswordExportFile,
+  buildSbtPagePasswordExportRows,
+  buildSbtPagePasswordInviteLink,
+  decodeSbtPageJsonDataUri,
+  encodeSbtPageGroupPasswordForUrl,
+  generateSbtPageRandomPasswords,
+  resolveSbtPagePasswordExportControlsState,
+  resolveSbtPagePasswordExportSelection,
+  resolveSbtPagePasswordInventoryDisplayState,
+} from './sbtPagePasswordExportHelpers';
+export type {
+  SbtPagePasswordExportFile,
+  SbtPagePasswordExportFormat,
+  SbtPagePasswordExportRow,
+} from './sbtPagePasswordExportHelpers';
+export {
+  getDisplayImageFallbackCandidateCount,
+  getDisplayImageRenderState,
+  getDisplayImageUrlCandidates,
+  getNextDisplayImageFallbackState,
+  isSbtPageImageLikeUri,
+  normalizeSbtPageCanonicalMetadataHref,
+  resolveDisplayImageHref,
+  resolveSbtPageTokenMetadataHref,
+} from './sbtPageMediaHelpers';
+export {
+  buildSbtPageSectionHeaderClassName,
+  resolveSbtPageBookmarkButtonDisplayState,
+  resolveSbtPageCopyErrorButtonStyle,
+  resolveSbtPageCopyIconState,
+  resolveSbtPageFullViewShellState,
+  resolveSbtPageInlineLockIconStyle,
+  resolveSbtPageInteractiveCursorStyle,
+  resolveSbtPageItalicNoteStyle,
+  resolveSbtPageMutedInfoIconStyle,
+  resolveSbtPageQuestionIconStyle,
+  resolveSbtPageRefreshIndicatorStyle,
+  resolveSbtPageSectionToggleDisplayState,
+} from './sbtPageFullViewDisplayHelpers';
+export {
+  buildSbtPageClaimCountdownCompletePatch,
+  buildSbtPageClaimCountdownTickPatch,
+  buildSbtPageDetailsPayload,
+  buildSbtPageExplorerUrl,
+  getBlockExplorerBaseUrl,
+  resolveSbtChainId,
+  resolveSbtPageActiveBlockTimeMs,
+  resolveSbtPageActiveChainId,
+  resolveSbtPageCountdownDisplaySeconds,
+  resolveSbtPageRecoveryCacheChainId,
+} from './sbtPageChainRuntimeHelpers';
+export {
+  buildSbtPageActionButtonClassName,
+  resolveSbtPageActionFeedbackState,
+  resolveSbtPageAdminActionState,
+  resolveSbtPageAdminBurnButtonState,
+  resolveSbtPageBurnButtonState,
+  resolveSbtPageBurnStatusButtonState,
+  resolveSbtPageManualClaimButtonState,
+  resolveSbtPageMiniActionFailureState,
+  resolveSbtPageMiniActionStatusDisplayState,
+  resolveSbtPageMiniBurnButtonState,
+  resolveSbtPageMiniBurnPermission,
+  resolveSbtPageMiniControlDisplayState,
+  resolveSbtPageMiniMintFlowDisplayState,
+  resolveSbtPageMiniMintState,
+  resolveSbtPageMiniOpenMintButtonState,
+  resolveSbtPageMiniTokenActionDisplayState,
+  resolveSbtPageMintEndDisplayState,
+  resolveSbtPageMintFlowDisplayState,
+  resolveSbtPageOpenMintButtonState,
+  resolveSbtPagePasswordAlertState,
+  resolveSbtPagePasswordGenerationButtonState,
+  resolveSbtPagePasswordJoinButtonState,
+  resolveSbtPagePendingButtonContentState,
+  resolveSbtPageStatusButtonContentState,
+  shouldRenderSbtPageMintButton,
+} from './sbtPageActionDisplayHelpers';
+export type {
+  SbtPageMintEndDisplayState,
+} from './sbtPageActionDisplayHelpers';
+export {
+  appendSbtPageBookmark,
+  appendSbtPageTransactionHash,
+  readSbtPageQueuedOrStoredLocalStorageJson,
+  resolveSbtPageLocalStorageJsonWriteDecision,
+  serializeSbtPageLocalStorageJsonWrite,
+} from './sbtPageLocalStorageHelpers';
+export type {
+  AppendSbtPageBookmarkArgs,
+  AppendSbtPageBookmarkResult,
+  AppendSbtPageTransactionHashArgs,
+  AppendSbtPageTransactionHashResult,
+  ReadSbtPageQueuedOrStoredLocalStorageJsonArgs,
+  ResolveSbtPageLocalStorageJsonWriteDecisionArgs,
+  SbtPageLocalStorageJsonWriteDecision,
+  SbtPageSerializedLocalStorageJsonWrite,
+  SerializeSbtPageLocalStorageJsonWriteArgs,
+} from './sbtPageLocalStorageHelpers';
+export {
+  buildSbtPageEffectiveHolderScanProgress,
+  buildSbtPageParentSessionScanProgress,
+  formatSbtPageBlockCount,
+  hasUsableSbtPageScanProgress,
+  isActiveSbtPageScanProgress,
+  resolveSbtPageHolderScanActive,
+  resolveSbtPageRemainingBlocksCount,
+  resolveSbtPageScanProgressDisplay,
+  resolveSbtPageScanProgressFillStyle,
+  resolveSbtPageScanProgressPercent,
+  shouldShowSbtPageScanProgress,
+} from './sbtPageScanProgressHelpers';
+export type {
+  SbtPageScanProgressRecord,
+} from './sbtPageScanProgressHelpers';
+export type {
+  SbtPageDisplayImageState,
+  SbtPageInfoImageLike,
+} from './sbtPageMediaHelpers';
+
+type ClosestCapableTarget = {
+  closest?: (selectors: string) => unknown;
+};
+
+type BuildNextFilteredHolderRowsArgs = {
+  prevFilteredRows?: unknown;
+  prevNetHolders?: unknown;
+  nextNetHolders?: unknown;
+  replaceRows?: boolean;
+};
+type SbtPageRefreshOptions = Record<string, unknown> & {
+  countsOnly?: boolean;
+  forceCounts: true;
+  onProgress?: unknown;
+};
+type BuildSbtPageRefreshOptionsArgs = {
+  forceEventFetch?: unknown;
+  onProgress?: unknown;
+  preferCountsOnly?: unknown;
+};
+type ResolveSbtPageShouldRefreshCountsArgs = {
+  burnedAddresses?: unknown;
+  countsLoaded?: unknown;
+  forceEventFetch?: unknown;
+  mintedAddresses?: unknown;
+  mintedTokensOverride?: unknown;
+};
+type ResolveSbtPageOwnerLookupFallbackDecisionArgs = {
+  burnedAddresses?: unknown;
+  countsLoaded?: unknown;
+  mintedAddresses?: unknown;
+  ownerLookupTokenCount?: unknown;
+  preferCountsOnly?: unknown;
+  requireCountsNotLoaded?: unknown;
+};
+type ResolveSbtPageOwnerLookupTokenCountArgs = {
+  mintedTokensOverride?: unknown;
+  ownerLookupUpperBound?: unknown;
+};
+type ResolveSbtPageUserAdminStatusArgs = {
+  account?: unknown;
+  sbtInfo?: unknown;
+};
+type BuildSbtPagePrimaryMetadataStatePatchArgs = {
+  account?: unknown;
+  extraState?: Record<string, unknown>;
+  nextSbtInfo?: unknown;
+  prevSbtInfo?: unknown;
+};
+type BuildSbtPageAccountDerivedStatePatchArgs = {
+  account?: unknown;
+  state?: SbtPageAccountDerivedStateLike | null;
+};
+type BuildSbtPageLocalMintSuccessPatchArgs = {
+  addrLower?: unknown;
+  prevState?: SbtPageLocalHolderStateLike | null;
+};
+type BuildSbtPageLocalBurnSuccessPatchArgs = {
+  addrLower?: unknown;
+  buildAddressListSignature?: ((list: unknown) => unknown) | null;
+  buildNextFilteredHolderRows?: ((args: BuildNextFilteredHolderRowsArgs) => unknown) | null;
+  prevState?: SbtPageLocalHolderStateLike | null;
+};
+type SbtPageAccountDerivedStateLike = Record<string, unknown> & {
+  burnedAddresses?: unknown;
+  mintedAddresses?: unknown;
+  sbtInfo?: unknown;
+  userHasSBT?: unknown;
+  userIsSbtAdmin?: unknown;
+};
+type SbtPageLocalHolderStateLike = Record<string, unknown> & {
+  burnedAddresses?: unknown;
+  filteredMintedUsers?: unknown;
+  filteredMintedUsersSignature?: unknown;
+  mintedAddresses?: unknown;
+  mintingAddressesFilterInitialized?: unknown;
+  showModal?: unknown;
+};
+type BuildSbtPageEncryptedEnvelopeFingerprintArgs = {
+  descriptionEnvelope?: unknown;
+  documentUrlsEnvelope?: unknown;
+  imageEnvelope?: unknown;
+  nameEnvelope?: unknown;
+  tagsEnvelope?: unknown;
+};
+type BuildSbtPageEncryptedEnvelopeDecryptKeyArgs = {
+  activeAccount?: unknown;
+  envelopeFingerprint?: unknown;
+  metaKey?: unknown;
+};
+type ResolveSbtPageCachedGroupPasswordHashArgs = {
+  groupPasswordHash?: unknown;
+  groupPasswordHashLoaded?: unknown;
+  preferCountsOnly?: unknown;
+};
+type SbtPageCachedGroupPasswordHashState = {
+  groupPasswordHash: unknown;
+  shouldReuseCachedGroupPasswordHash: boolean;
+};
+type ResolveSbtPageGroupPasswordMintStateArgs = {
+  groupPasswordHash?: unknown;
+  hashZero?: unknown;
+  hasPasswordMint?: unknown;
+};
+type SbtPageGroupPasswordMintState = {
+  hasGroupHash: boolean;
+  hasGroupPasswordMint: boolean;
+  hasInviteMint: boolean;
+};
+type ResolveSbtPageChainMetadataReadNeedsArgs = {
+  info?: unknown;
+  zeroAddress?: unknown;
+};
+type SbtPageChainMetadataReadNeeds = {
+  needAdmin: boolean;
+  needBurn: boolean;
+  needEnd: boolean;
+  needHasPw: boolean;
+  needMax: boolean;
+  shouldRead: boolean;
+};
+export type SbtPageSessionDisplayConfig = Record<string, unknown> & {
+  blockLimits?: Record<string, unknown>;
+  sessionName?: unknown;
+};
+type SbtAddressPropsLike = {
+  SBTAddress?: unknown;
+  loginComplete?: unknown;
+};
+type SbtAddressInfo = {
+  lower: string;
+  original: unknown;
+};
+type ResolveSbtPageAddressLinkStateArgs = {
+  address?: unknown;
+  isAddress?: ((value: string) => boolean) | null;
+  zeroAddress?: unknown;
+};
+type SbtPageAddressLinkState = {
+  isRenderable: boolean;
+  isZeroAddress: boolean;
+  normalized: string;
+};
+type ResolveSbtPageEffectiveSessionSlugArgs = {
+  props?: SessionSlugPropsLike | null;
+  resolvedSessionSlug?: unknown;
+  sbtInfo?: unknown;
+};
+type SbtPageSessionConfigReader = (slug: string) => unknown;
+type SbtPageDemoSessionConfigReader = (
+  slug: string,
+  options?: { allowDemoFallback?: boolean }
+) => unknown;
+type ResolveSbtPageSessionDisplayConfigArgs = {
+  getDemoSessionConfigBySlug?: SbtPageDemoSessionConfigReader | null;
+  getSessionConfigBySlugOrDefault?: SbtPageSessionConfigReader | null;
+  sessionSlugRaw?: unknown;
+};
+type ResolveSbtPageSessionDisplayLabelArgs = {
+  sessionConfig?: unknown;
+  sessionSlugRaw?: unknown;
+};
+type SbtPageMetadataInfoLike = Record<string, unknown> & {
+  chainID?: unknown;
+  chainId?: unknown;
+};
+type SbtPageNetworkLike = Record<string, unknown> & {
+  id?: unknown;
+};
+type SbtPageLooseSessionChainIdReader = (slug: unknown) => unknown;
+type DeriveSbtPageCacheNetKeyArgs = {
+  currentNetwork?: unknown;
+  getSessionChainId?: SbtPageLooseSessionChainIdReader | null;
+  infoHint?: unknown;
+  netKeyHint?: unknown;
+  slugForCache?: unknown;
+};
+type BuildSbtPageDirectMetadataContextArgs = {
+  currentNetwork?: unknown;
+  getSessionChainId?: SbtPageLooseSessionChainIdReader | null;
+  infoHint?: unknown;
+  netKeyHint?: unknown;
+  slugForRead?: unknown;
+};
+type SbtPageCacheReader = (
+  namespace: string,
+  slug?: string
+) => Promise<unknown> | unknown;
+type SbtPageNamespaceEntriesReader = (
+  namespace: string,
+  options?: Record<string, unknown>
+) => unknown;
+type SbtPageCachedSbtEntry = Record<string, unknown> & {
+  sbtInfo?: unknown;
+  slug?: unknown;
+};
+type SbtPageCacheNetNode = Record<string, unknown> & {
+  sbtList?: Record<string, unknown>;
+};
+type SbtPageCacheByNet = Record<string, Record<string, unknown> | undefined>;
+type SbtPageCachedEntryHit = {
+  entry: SbtPageCachedSbtEntry;
+  netKey: string;
+  slug: string;
+};
+type ReadSbtPageCacheBySlugArgs = {
+  netKeyForCache?: unknown;
+  readCache?: SbtPageCacheReader | null;
+  slugForCache?: unknown;
+};
+type FindSbtPageCachedEntryAcrossGroupsArgs = {
+  addressLower?: unknown;
+  excludeSlug?: unknown;
+  listNamespaceEntriesSync?: SbtPageNamespaceEntriesReader | null;
+};
+type ResolveSbtPageMetadataHydrationModeArgs = {
+  forceEventFetch?: unknown;
+  isSBTCacheReady?: unknown;
+  refreshSbtData?: unknown;
+};
+type SbtPageMetadataHydrationMode = {
+  parentOwnsInitialRefresh: boolean;
+  usingCentralHydration: boolean;
+};
+type ResolveSbtPageHolderLoadingStateArgs = {
+  countsLoaded?: unknown;
+  hasComputedHolders?: unknown;
+  hasFilteredHolders?: unknown;
+  isScanActive?: unknown;
+  loadingMintersBurners?: unknown;
+  loadingMintedFilter?: unknown;
+  mintedTokensOverride?: unknown;
+  netHoldersCount?: unknown;
+  sbtScanInProgress?: unknown;
+  sbtScanPending?: unknown;
+};
+type ResolveSbtPageHolderResolutionStateArgs = {
+  isRefreshing?: unknown;
+  loadingMintersBurners?: unknown;
+  loadingMintedFilter?: unknown;
+  mintedAddresses?: unknown[];
+  mintedTokensOverride?: unknown;
+  showScanProgress?: unknown;
+};
+type ResolveSbtPageHoldersDisplayCountArgs = {
+  mintedTokensOverride?: unknown;
+  netHoldersCount?: unknown;
+  shouldOverrideMinted?: unknown;
+};
+type ResolveSbtPageRelevantInfoListsArgs = {
+  sbtInfo?: unknown;
+};
+type SbtPageRelevantInfoLists = {
+  documentIDHashes: string[];
+  documentURLs: string[];
+  tags: string[];
+};
+type ResolveSbtPageRelevantInfoDisplayStateArgs = {
+  documentIDHashes?: unknown;
+  documentURLs?: unknown;
+  tags?: unknown;
+};
+type SbtPageRelevantInfoDisplayState = {
+  shouldRenderDocumentIdHashes: boolean;
+  shouldRenderDocumentUrls: boolean;
+  shouldRenderTags: boolean;
+};
+type ResolveSbtPageHolderFilterItemsArgs = {
+  filteredMintedUsers?: unknown;
+  hasComputedHolders?: unknown;
+  hasFilteredHolders?: unknown;
+  isScanActive?: unknown;
+  netHolders?: unknown;
+};
+type ResolveSbtPageHolderModalDisplayStateArgs = {
+  addressesAreResolving?: unknown;
+  hasActiveScanProgress?: unknown;
+  hasComputedHolders?: unknown;
+  hasFilteredHolders?: unknown;
+  holdersReady?: unknown;
+  isInitialLoading?: unknown;
+  isRefreshing?: unknown;
+  isScanActive?: unknown;
+  loadingMintersBurners?: unknown;
+  loadingMintedFilter?: unknown;
+  shouldOverrideMinted?: unknown;
+  showModal?: unknown;
+  showScanProgress?: unknown;
+};
+type SbtPageHolderLoadingState = {
+  countsReady: boolean;
+  effectiveLoading: boolean;
+  holdersReady: boolean;
+  isGlobalLoading: boolean;
+  isLocalLoading: boolean;
+  netMinted: string;
+  shouldOverrideMinted: boolean;
+  terminalEmptyHoldersState: boolean;
+};
+type SbtPageHolderResolutionState = {
+  addressesAreResolving: boolean;
+  addressesNeedResolutionHint: boolean;
+};
+type SbtPageHolderFilterItems = {
+  filteredMintedUsers: unknown[];
+  holderItemsForFilter: unknown;
+  keepStaleFilterRowsWhileRefreshing: boolean;
+};
+type SbtPageHolderModalDisplayState = {
+  mintedCountTitle?: string;
+  showApproximateCountHint: boolean;
+  showCornerSpinner: boolean;
+  showEmptyStateInModal: boolean;
+  showHeaderCount: boolean;
+  showScanProgressInModal: boolean;
+  showSpinnerInModalBody: boolean;
+  waitingForHolderDetails: boolean;
+};
+type SbtPageLoadInfoRequestNetwork = {
+  id?: unknown;
+};
+type BuildSbtPageLoadInfoRequestKeyArgs = {
+  account?: unknown;
+  activeSlug?: unknown;
+  network?: SbtPageLoadInfoRequestNetwork | null;
+  sbtAddressInput?: unknown;
+  sbtCacheRevision?: unknown;
+};
+type BuildSbtPageLoadInfoStartLogContextArgs = {
+  account?: unknown;
+  addrLower?: unknown;
+  forceEventFetch?: unknown;
+  initialSlug?: unknown;
+  network?: SbtPageLoadInfoRequestNetwork | null;
+  normalizedExplicitSlug?: unknown;
+  preferCountsOnly?: unknown;
+  sbtAddressOriginalCase?: unknown;
+};
+type BuildSbtPageOpenMintAutoJoinUrlArgs = {
+  addressOverride?: unknown;
+  basePath?: unknown;
+  groupPasswordHash?: unknown;
+  hasGroupPasswordMint?: unknown;
+  hasInviteMint?: unknown;
+  origin?: unknown;
+  propSBTAddress?: unknown;
+  sbtInfo?: unknown;
+  sessionSlug?: unknown;
+};
+type SessionSlugPropsLike = {
+  sessionSlug?: unknown;
+  slug?: unknown;
+};
+type SbtPageSessionSbtAddressesConfig = Record<string, unknown> & {
+  defaultFeaturedSBTs?: unknown;
+  featured_SBTs_LIST?: unknown;
+};
+type BuildSbtPageSessionSbtAddressesArgs = {
+  propSBTAddress?: unknown;
+  routeSbtAddress?: unknown;
+  sessionConfig?: SbtPageSessionSbtAddressesConfig | null;
+  sessionSlug?: unknown;
+  stateSbtAddress?: unknown;
+};
+type BuildSbtPageSessionSbtAddressesResult = {
+  addresses: string[];
+  cacheKey: string;
+};
+type ResolveSbtPageSessionSbtAddressCacheArgs = {
+  addresses?: string[];
+  cacheKey?: string;
+  previousAddresses?: string[];
+  previousCacheKey?: string;
+};
+type ResolveSbtPageSessionSbtAddressCacheResult = {
+  addresses: string[];
+  cacheKey: string;
+  reusedPrevious: boolean;
+};
+type BuildSbtPageSessionSbtAddressesMemoStateArgs = BuildSbtPageSessionSbtAddressesArgs & {
+  previousAddresses?: string[];
+  previousCacheKey?: string;
+};
+type BuildSbtPageAdminFallbackPatchArgs = {
+  adminAddress?: unknown;
+  existingCreator?: unknown;
+  existingDeployer?: unknown;
+  ownerAddress?: unknown;
+  zeroAddress?: unknown;
+};
+export type SbtPageHistorySummary = {
+  activeSupply: string;
+  currentHolderCount: string;
+  historicalHolderCount: string;
+  totalBurned: string;
+  totalMinted: string;
+};
+export type SbtPageHistorySummaryInput = Record<string, unknown> & {
+  activeSupply?: unknown;
+  currentHolderCount?: unknown;
+  historicalHolderCount?: unknown;
+  totalBurned?: unknown;
+  totalMinted?: unknown;
+};
+type ApplySbtPageHistorySummaryFallbackArgs = {
+  mintedTokensOverride?: string | null;
+  mintedTokensSource?: string | null;
+  ownerLookupUpperBound?: string | null;
+  sourceLabel?: unknown;
+  summaryValue?: unknown;
+};
+type SbtPageHistorySummaryFallbackState = {
+  mintedTokensOverride: string | null;
+  mintedTokensSource: string | null;
+  ownerLookupUpperBound: string | null;
+};
+type SbtPageMetadataCompletenessInfo = Record<string, unknown> & {
+  admin?: unknown;
+  admin_?: unknown;
+  burnAuth?: unknown;
+  deployer?: unknown;
+  encryptedFields?: unknown;
+  encryptedImage?: unknown;
+  hasPasswordMint?: unknown;
+  image?: unknown;
+  imageEncrypted?: unknown;
+  imageLocked?: unknown;
+  maxTokens?: unknown;
+  mintingEndTime?: unknown;
+  tokenURI?: unknown;
+  tokenUri?: unknown;
+};
+export const isRecord = (value: unknown): value is Record<string, unknown> => (
+  !!value && typeof value === 'object'
+);
+
+export const toStringList = (value: unknown): string[] => (
+  Array.isArray(value) ? value.map((entry) => String(entry ?? '')) : []
+);
+
+export const toSbtPageDocumentUrlList = (...values: unknown[]): string[] => {
+  const out: string[] = [];
+  const visit = (value: unknown): void => {
+    if (value == null) return;
+    if (Array.isArray(value)) {
+      value.forEach(visit);
+      return;
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) out.push(trimmed);
+      return;
+    }
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      out.push(String(value));
+      return;
+    }
+    if (!isRecord(value)) return;
+    const nested = [
+      value.url,
+      value.href,
+      value.link,
+      value.documentURL,
+      value.documentUrl,
+      value.docURL,
+      value.docUrl,
+      value.value,
+    ].find((entry) => typeof entry === 'string' && entry.trim().length > 0);
+    if (typeof nested === 'string') out.push(nested.trim());
+  };
+  values.forEach(visit);
+  return out;
+};
+
+export const coerceSbtPageStringArrayValue = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value.map((entry: unknown) => String(entry));
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.map((entry: unknown) => String(entry));
+      } catch (_) {}
+    }
+    return [trimmed];
+  }
+  return [];
+};
+
+export const buildSbtPageEncryptedEnvelopeFingerprint = ({
+  descriptionEnvelope = null,
+  documentUrlsEnvelope = null,
+  imageEnvelope = null,
+  nameEnvelope = null,
+  tagsEnvelope = null,
+}: BuildSbtPageEncryptedEnvelopeFingerprintArgs = {}): string => (
+  [
+    nameEnvelope ? 'n' : '',
+    descriptionEnvelope ? 'd' : '',
+    tagsEnvelope ? 't' : '',
+    documentUrlsEnvelope ? 'u' : '',
+    imageEnvelope ? 'i' : '',
+  ].join('')
+);
+
+export const buildSbtPageEncryptedEnvelopeDecryptKey = ({
+  activeAccount = '',
+  envelopeFingerprint = '',
+  metaKey = '',
+}: BuildSbtPageEncryptedEnvelopeDecryptKeyArgs = {}): string => (
+  `${metaKey}:${activeAccount || ''}:${envelopeFingerprint || ''}`
+);
+
+export const resolveSbtPageCachedGroupPasswordHash = ({
+  groupPasswordHash = null,
+  groupPasswordHashLoaded = false,
+  preferCountsOnly = false,
+}: ResolveSbtPageCachedGroupPasswordHashArgs = {}): SbtPageCachedGroupPasswordHashState => {
+  const shouldReuseCachedGroupPasswordHash = (
+    !!preferCountsOnly &&
+    groupPasswordHashLoaded === true
+  );
+  return {
+    groupPasswordHash: shouldReuseCachedGroupPasswordHash ? groupPasswordHash : null,
+    shouldReuseCachedGroupPasswordHash,
+  };
+};
+
+export const resolveSbtPageGroupPasswordMintState = ({
+  groupPasswordHash = null,
+  hashZero = '',
+  hasPasswordMint = false,
+}: ResolveSbtPageGroupPasswordMintStateArgs = {}): SbtPageGroupPasswordMintState => {
+  const hasGroupHash = !!groupPasswordHash && groupPasswordHash !== hashZero;
+  return {
+    hasGroupHash,
+    hasInviteMint: hasGroupHash && !!hasPasswordMint,
+    hasGroupPasswordMint: hasGroupHash && !hasPasswordMint,
+  };
+};
+
+export const resolveSbtPageChainMetadataReadNeeds = ({
+  info = {},
+  zeroAddress = ethers.constants.AddressZero,
+}: ResolveSbtPageChainMetadataReadNeedsArgs = {}): SbtPageChainMetadataReadNeeds => {
+  const metadata = isRecord(info) ? info as SbtPageMetadataCompletenessInfo : {};
+  const zeroAddressLower = String(zeroAddress || '').toLowerCase();
+  const adminRaw = String(metadata.admin || metadata.admin_ || '').trim();
+  const needMax = metadata.maxTokens == null;
+  const needBurn = metadata.burnAuthNeedsOnChainRefresh === true || !Number.isFinite(Number(metadata.burnAuth));
+  const needEnd = !(Number(metadata.mintingEndTime) >= 0);
+  const needHasPw = typeof metadata.hasPasswordMint !== 'boolean';
+  const needAdmin = !adminRaw || adminRaw.toLowerCase() === zeroAddressLower;
+  return {
+    needAdmin,
+    needBurn,
+    needEnd,
+    needHasPw,
+    needMax,
+    shouldRead: needMax || needBurn || needEnd || needHasPw || needAdmin,
+  };
+};
+
+export const findNestedInteractiveElement = (target: EventTarget | null): unknown => {
+  const candidate = target as ClosestCapableTarget | null;
+  return typeof candidate?.closest === 'function'
+    ? candidate.closest('button, a, input, [role="button"]')
+    : null;
+};
+
+export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
+  const message = (
+    error !== null &&
+    (typeof error === 'object' || typeof error === 'function') &&
+    'message' in error
+  )
+    ? error.message
+    : undefined;
+  return error instanceof Error && error.message ? error.message : String(message || error || fallback);
+};
+
+export const resolveSbtPageCopyableErrorText = (error: unknown): string => (
+  (typeof error === 'string' && error)
+    ? error
+    : getErrorMessage(error, '')
+);
+
+export const coerceSbtPageEpochSeconds = (value: unknown): number => {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n > 1e12 ? Math.floor(n / 1000) : n;
+};
+
+export const normalizeSbtPageHistorySummary = (value: unknown): SbtPageHistorySummary | null => {
+  if (!isRecord(value)) return null;
+  const summary = value as SbtPageHistorySummaryInput;
+  const normalizeField = (fieldValue: unknown): string | null => {
+    const raw = String(fieldValue ?? '').trim();
+    if (!/^\d+$/.test(raw)) return null;
+    return raw.replace(/^0+(?=\d)/, '') || '0';
+  };
+  const totalMinted = normalizeField(summary.totalMinted);
+  const totalBurned = normalizeField(summary.totalBurned);
+  const activeSupply = normalizeField(summary.activeSupply);
+  const currentHolderCount = normalizeField(summary.currentHolderCount);
+  const historicalHolderCount = normalizeField(summary.historicalHolderCount);
+  if (
+    totalMinted == null ||
+    totalBurned == null ||
+    activeSupply == null ||
+    currentHolderCount == null ||
+    historicalHolderCount == null
+  ) {
+    return null;
+  }
+  return {
+    totalMinted,
+    totalBurned,
+    activeSupply,
+    currentHolderCount,
+    historicalHolderCount,
+  };
+};
+
+export const applySbtPageHistorySummaryFallback = ({
+  mintedTokensOverride = null,
+  mintedTokensSource = null,
+  ownerLookupUpperBound = null,
+  sourceLabel = '',
+  summaryValue = null,
+}: ApplySbtPageHistorySummaryFallbackArgs = {}): SbtPageHistorySummaryFallbackState => {
+  const summaryRecord = isRecord(summaryValue) ? summaryValue as SbtPageHistorySummaryInput : {};
+  const holderCount = sanitizeSbtPageMintedTokensOverride(summaryRecord.currentHolderCount);
+  const totalMinted = sanitizeSbtPageMintedTokensOverride(summaryRecord.totalMinted);
+  return {
+    mintedTokensOverride: holderCount != null ? holderCount : mintedTokensOverride,
+    mintedTokensSource: holderCount != null ? String(sourceLabel || '') : mintedTokensSource,
+    ownerLookupUpperBound: totalMinted != null ? totalMinted : ownerLookupUpperBound,
+  };
+};
+
+export const needsSbtPageTokenUriFields = (infoInput: unknown): boolean => {
+  if (!isRecord(infoInput)) return true;
+  const info = infoInput as SbtPageMetadataCompletenessInfo;
+  const has = (value: unknown): boolean => value !== undefined && value !== null && String(value).trim() !== '';
+  const tokenUri = info.tokenURI ?? info.tokenUri ?? null;
+  const image = info.image ?? null;
+  const hasImageMetadata =
+    has(image) ||
+    info.imageLocked === true ||
+    !!info.imageEncrypted ||
+    !!info.encryptedImage ||
+    !!(isRecord(info.encryptedFields) && info.encryptedFields.image);
+  const endOk = Number.isFinite(Number(info.mintingEndTime));
+  const burnOk = Number.isFinite(Number(info.burnAuth));
+  const hasPw = (typeof info.hasPasswordMint === 'boolean');
+  const maxTok = has(info.maxTokens);
+  const adminAddress = String(info.admin || info.admin_ || info.deployer || '').trim();
+  const adminOk =
+    !!adminAddress &&
+    adminAddress.toLowerCase() !== String(ethers.constants.AddressZero || '').toLowerCase();
+  return !(has(tokenUri) && hasImageMetadata && endOk && burnOk && hasPw && maxTok && adminOk);
+};
+
+export const needsSbtPageDirectMetadataHydration = (infoInput: unknown): boolean => {
+  if (!isRecord(infoInput)) return true;
+  return Object.keys(infoInput).length === 0;
+};
+
+export const buildSessionRoutePath = (slugRaw: unknown = '', basePath: unknown = ''): string => {
+  const slug = normalizeSessionSlug(slugRaw || '');
+  const normalizedBasePath = String(basePath || '').replace(/\/+$/, '');
+  return normalizedBasePath + (slug ? `/session/${encodeURIComponent(slug)}` : '/session');
+};
+
+export const resolveSbtAddress = (input: unknown): unknown | null => {
+  if (Array.isArray(input)) {
+    const found = input.find((entry) => isRecord(entry) && entry.sbtAddress !== undefined);
+    return found ? found.sbtAddress : null;
+  }
+  if (isRecord(input) && input.sbtAddress !== undefined) return input.sbtAddress;
+  return input || null;
+};
+
+export const resolveSbtAddressString = (input: unknown): string => {
+  const resolved = resolveSbtAddress(input);
+  return resolved ? String(resolved) : '';
+};
+
+export const resolveSbtPageAddressLinkState = ({
+  address = '',
+  isAddress = ethers.utils.isAddress,
+  zeroAddress = ethers.constants.AddressZero,
+}: ResolveSbtPageAddressLinkStateArgs = {}): SbtPageAddressLinkState => {
+  const normalized = String(address || '').trim();
+  const isZeroAddress =
+    normalized.toLowerCase() === String(zeroAddress || '').toLowerCase();
+  return {
+    isRenderable: !!normalized && !isZeroAddress && typeof isAddress === 'function' && isAddress(normalized),
+    isZeroAddress,
+    normalized,
+  };
+};
+
+export const buildSbtPageAdminFallbackPatch = ({
+  adminAddress = '',
+  existingCreator = '',
+  existingDeployer = '',
+  ownerAddress = '',
+  zeroAddress = ethers.constants.AddressZero,
+}: BuildSbtPageAdminFallbackPatchArgs = {}): Record<string, string> => {
+  const zeroAddressLower = String(zeroAddress || '').trim().toLowerCase();
+  const nextAdmin = [adminAddress, ownerAddress]
+    .map((value: unknown) => String(value || '').trim())
+    .find((value: string) => value && value.toLowerCase() !== zeroAddressLower);
+  if (!nextAdmin) return {};
+  return {
+    admin: nextAdmin,
+    admin_: nextAdmin,
+    ...(existingCreator ? {} : { creator: nextAdmin }),
+    ...(existingDeployer ? {} : { deployer: nextAdmin }),
+  };
+};
+
+export const buildSbtPageLoadInfoRequestKey = ({
+  account,
+  activeSlug,
+  network,
+  sbtAddressInput,
+  sbtCacheRevision,
+}: BuildSbtPageLoadInfoRequestKeyArgs = {}): string => {
+  const sbtAddress = resolveSbtAddress(sbtAddressInput);
+  return [
+    String(sbtAddress || '').trim().toLowerCase(),
+    normalizeSessionSlug(activeSlug || ''),
+    String(Number(network?.id || 0) || 0),
+    String(account || '').trim().toLowerCase(),
+    String(Number(sbtCacheRevision || 0) || 0),
+  ].join('|');
+};
+
+export const buildSbtPageLoadInfoStartLogContext = ({
+  account = null,
+  addrLower = '',
+  forceEventFetch = false,
+  initialSlug = '',
+  network = null,
+  normalizedExplicitSlug = null,
+  preferCountsOnly = false,
+  sbtAddressOriginalCase = '',
+}: BuildSbtPageLoadInfoStartLogContextArgs = {}): Record<string, unknown> => ({
+  address: sbtAddressOriginalCase,
+  addrLower,
+  explicitSlug: normalizedExplicitSlug,
+  initialSlug,
+  forceEventFetch,
+  preferCountsOnly,
+  account: account ? String(account).toLowerCase() : null,
+  networkId: network?.id ?? null,
+});
+
+const buildSbtPageAddressListSignature = (input: unknown): string => {
+  if (!Array.isArray(input)) return '';
+  return input
+    .map((entry) => String(entry || '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(',');
+};
+
+const pushSbtPageSessionAddress = (input: unknown, out: string[], seen: Set<string>): void => {
+  const raw = String(input || '').trim();
+  if (!raw || !ethers.utils.isAddress(raw)) return;
+  const lower = raw.toLowerCase();
+  if (seen.has(lower)) return;
+  seen.add(lower);
+  out.push(lower);
+};
+
+export const buildSbtPageSessionSbtAddresses = ({
+  propSBTAddress,
+  routeSbtAddress,
+  sessionConfig,
+  sessionSlug,
+  stateSbtAddress,
+}: BuildSbtPageSessionSbtAddressesArgs = {}): BuildSbtPageSessionSbtAddressesResult => {
+  const cacheKey = [
+    String(stateSbtAddress || '').trim().toLowerCase(),
+    String(routeSbtAddress || '').trim().toLowerCase(),
+    String(resolveSbtAddress(propSBTAddress) || '').trim().toLowerCase(),
+    String(sessionSlug || '').trim().toLowerCase(),
+    buildSbtPageAddressListSignature(sessionConfig?.defaultFeaturedSBTs),
+    buildSbtPageAddressListSignature(sessionConfig?.featured_SBTs_LIST),
+  ].join('|');
+
+  const addresses: string[] = [];
+  const seen = new Set<string>();
+
+  pushSbtPageSessionAddress(stateSbtAddress, addresses, seen);
+  pushSbtPageSessionAddress(routeSbtAddress, addresses, seen);
+  pushSbtPageSessionAddress(resolveSbtAddress(propSBTAddress), addresses, seen);
+
+  const fromSession = [
+    ...(Array.isArray(sessionConfig?.defaultFeaturedSBTs) ? sessionConfig.defaultFeaturedSBTs : []),
+    ...(Array.isArray(sessionConfig?.featured_SBTs_LIST) ? sessionConfig.featured_SBTs_LIST : []),
+  ];
+  fromSession.forEach((address) => pushSbtPageSessionAddress(address, addresses, seen));
+
+  return { addresses, cacheKey };
+};
+
+export const resolveSbtPageSessionSbtAddressCache = ({
+  addresses = [],
+  cacheKey = '',
+  previousAddresses = [],
+  previousCacheKey = '',
+}: ResolveSbtPageSessionSbtAddressCacheArgs = {}): ResolveSbtPageSessionSbtAddressCacheResult => {
+  if (previousCacheKey === cacheKey) {
+    return { addresses: previousAddresses, cacheKey, reusedPrevious: true };
+  }
+  return { addresses, cacheKey, reusedPrevious: false };
+};
+
+export const buildSbtPageSessionSbtAddressesMemoState = ({
+  previousAddresses = [],
+  previousCacheKey = '',
+  propSBTAddress,
+  routeSbtAddress,
+  sessionConfig,
+  sessionSlug,
+  stateSbtAddress,
+}: BuildSbtPageSessionSbtAddressesMemoStateArgs = {}): ResolveSbtPageSessionSbtAddressCacheResult => {
+  const { addresses, cacheKey } = buildSbtPageSessionSbtAddresses({
+    propSBTAddress,
+    routeSbtAddress,
+    sessionConfig,
+    sessionSlug,
+    stateSbtAddress,
+  });
+  return resolveSbtPageSessionSbtAddressCache({
+    addresses,
+    cacheKey,
+    previousAddresses,
+    previousCacheKey,
+  });
+};
+
+export const buildSbtPageOpenMintAutoJoinUrl = ({
+  addressOverride = null,
+  basePath = '',
+  groupPasswordHash = '',
+  hasGroupPasswordMint = false,
+  hasInviteMint = false,
+  origin = '',
+  propSBTAddress = null,
+  sbtInfo = null,
+  sessionSlug = '',
+}: BuildSbtPageOpenMintAutoJoinUrlArgs = {}): string => {
+  const sbtAddress = String(addressOverride || resolveSbtAddress(propSBTAddress) || '').trim();
+  if (!sbtAddress || !ethers.utils.isAddress(sbtAddress)) return '';
+
+  const info = isRecord(sbtInfo) ? sbtInfo : {};
+  const normalizedHash = String(groupPasswordHash || '').trim().toLowerCase();
+  const zeroHash = String(ethers.constants.HashZero || '').toLowerCase();
+  const hasGroupHash = !!normalizedHash && normalizedHash !== zeroHash;
+  if (info.hasPasswordMint || hasInviteMint || hasGroupPasswordMint || hasGroupHash) {
+    return '';
+  }
+
+  const normalizedOrigin = String(origin || '').replace(/\/+$/, '');
+  if (!normalizedOrigin) return '';
+
+  const demoPath = buildSessionRoutePath(sessionSlug, basePath);
+  return `${normalizedOrigin}${demoPath}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`;
+};
+
+export const getCurrentSbtAddressInfo = (propsIn: SbtAddressPropsLike = {}): SbtAddressInfo => {
+  const original = resolveSbtAddress(propsIn.SBTAddress) || '';
+  return {
+    original,
+    lower: String(original || '').toLowerCase(),
+  };
+};
+
+export const resolveSbtPageSessionSlugFromInfo = (info: unknown): string | null => {
+  const record = isRecord(info) ? info : {};
+  if (Object.prototype.hasOwnProperty.call(record, 'sessionSlug')) {
+    const hasExplicitFlag = Object.prototype.hasOwnProperty.call(record, 'sessionSlugExplicit');
+    const isExplicitSessionSlug = record.sessionSlugExplicit === true;
+    if (isExplicitSessionSlug || !hasExplicitFlag) {
+      return normalizeSessionSlug(record.sessionSlug || '');
+    }
+  }
+  const name = String(record.sessionName || '').trim();
+  if (!name) return null;
+  return getSessionSlugByName(name);
+};
+
+export const hasExplicitSbtPageSessionSlugProp = (props: SessionSlugPropsLike = {}): boolean => (
+  !!props && (
+    Object.prototype.hasOwnProperty.call(props, 'sessionSlug') ||
+    Object.prototype.hasOwnProperty.call(props, 'slug')
+  )
+);
+
+export const getExplicitSbtPageSessionSlug = (props: SessionSlugPropsLike = {}): string | null => {
+  if (!hasExplicitSbtPageSessionSlugProp(props)) return null;
+  const raw = Object.prototype.hasOwnProperty.call(props || {}, 'sessionSlug')
+    ? props.sessionSlug
+    : props.slug;
+  return normalizeSessionSlug(raw || '');
+};
+
+export const resolveSbtPageEffectiveSessionSlug = ({
+  props = {},
+  resolvedSessionSlug = null,
+  sbtInfo = null,
+}: ResolveSbtPageEffectiveSessionSlugArgs = {}): string => {
+  const propsIn = props || {};
+  const explicitSlug = getExplicitSbtPageSessionSlug(propsIn);
+  if (explicitSlug != null) return explicitSlug;
+  if (resolvedSessionSlug != null) return String(resolvedSessionSlug || '');
+  const fromInfo = resolveSbtPageSessionSlugFromInfo(sbtInfo);
+  if (fromInfo != null) return fromInfo;
+  return String(propsIn.sessionSlug || propsIn.slug || '');
+};
+
+export const resolveSbtPageSessionDisplayConfig = ({
+  getDemoSessionConfigBySlug: readDemoSessionConfig = null,
+  getSessionConfigBySlugOrDefault: readSessionConfig = null,
+  sessionSlugRaw = '',
+}: ResolveSbtPageSessionDisplayConfigArgs = {}): SbtPageSessionDisplayConfig | null => {
+  const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
+  try {
+    const config = (
+      (readSessionConfig ? readSessionConfig(sessionSlug || '') : null)
+      || (readDemoSessionConfig ? readDemoSessionConfig(sessionSlug || '', { allowDemoFallback: true }) : null)
+      || null
+    );
+    return isRecord(config) ? config as SbtPageSessionDisplayConfig : null;
+  } catch (_) {
+    return null;
+  }
+};
+
+export const resolveSbtPageSessionDisplayLabel = ({
+  sessionConfig = null,
+  sessionSlugRaw = '',
+}: ResolveSbtPageSessionDisplayLabelArgs = {}): string => {
+  const sessionSlug = normalizeSessionSlug(sessionSlugRaw || '');
+  const sessionName = String(
+    isRecord(sessionConfig) ? sessionConfig.sessionName || '' : ''
+  ).trim();
+  if (!sessionSlug) return sessionName || 'General';
+  return sessionName || sessionSlug;
+};
+
+export const deriveSbtPageCacheNetKey = ({
+  currentNetwork = null,
+  getSessionChainId: readSessionChainId = null,
+  infoHint = null,
+  netKeyHint = null,
+  slugForCache = '',
+}: DeriveSbtPageCacheNetKeyArgs = {}): string => {
+  const infoRecord = isRecord(infoHint) ? infoHint as SbtPageMetadataInfoLike : {};
+  const networkRecord = isRecord(currentNetwork) ? currentNetwork as SbtPageNetworkLike : {};
+  const chainIdHint =
+    infoRecord.chainID ||
+    infoRecord.chainId ||
+    netKeyHint;
+  const sessionChainId = typeof readSessionChainId === 'function'
+    ? readSessionChainId(slugForCache)
+    : null;
+  const chainId =
+    sessionChainId ||
+    (chainIdHint != null ? Number(chainIdHint) : null) ||
+    networkRecord.id ||
+    null;
+  return chainId != null ? String(chainId) : '';
+};
+
+export const buildSbtPageDirectMetadataContext = ({
+  currentNetwork = null,
+  getSessionChainId: readSessionChainId = null,
+  infoHint = null,
+  netKeyHint = null,
+  slugForRead = '',
+}: BuildSbtPageDirectMetadataContextArgs = {}): Record<string, unknown> | string => {
+  const normalizedSlug = normalizeSessionSlug(slugForRead || '');
+  const infoRecord = isRecord(infoHint) ? infoHint as SbtPageMetadataInfoLike : {};
+  const networkRecord = isRecord(currentNetwork) ? currentNetwork as SbtPageNetworkLike : {};
+  const chainId = Number(
+    (typeof readSessionChainId === 'function' ? readSessionChainId(normalizedSlug) : null) ||
+    infoRecord.chainID ||
+    infoRecord.chainId ||
+    netKeyHint ||
+    networkRecord.id ||
+    0
+  ) || null;
+  const ctx: Record<string, unknown> = {};
+  if (normalizedSlug) ctx.slug = normalizedSlug;
+  if (chainId) ctx.networkChainId = chainId;
+  return Object.keys(ctx).length ? ctx : (normalizedSlug || '');
+};
+
+export const readSbtPageCacheBySlug = async ({
+  netKeyForCache = '',
+  readCache: readCacheFn = null,
+  slugForCache = null,
+}: ReadSbtPageCacheBySlugArgs = {}): Promise<SbtPageCacheByNet> => {
+  try {
+    if (typeof readCacheFn !== 'function') return {};
+    const parsedRaw = await readCacheFn(
+      'sbtCache',
+      slugForCache == null ? undefined : String(slugForCache)
+    );
+    const parsed = isRecord(parsedRaw) ? parsedRaw as SbtPageCacheByNet : {};
+    const netKey = String(netKeyForCache);
+    if (parsed[netKey] == null) {
+      const legacy = Object.keys(parsed || {}).find((key: string) => (
+        key !== netKey && Number(key) === Number(netKey)
+      ));
+      if (legacy) {
+        parsed[netKey] = {
+          ...(isRecord(parsed[netKey]) ? parsed[netKey] : {}),
+          ...(isRecord(parsed[legacy]) ? parsed[legacy] : {}),
+        };
+      }
+    }
+    return parsed;
+  } catch (_) {
+    return {};
+  }
+};
+
+export const findSbtPageCachedEntryAcrossGroups = ({
+  addressLower = '',
+  excludeSlug = null,
+  listNamespaceEntriesSync: listEntries = null,
+}: FindSbtPageCachedEntryAcrossGroupsArgs = {}): SbtPageCachedEntryHit | null => {
+  const normalizedAddress = String(addressLower || '').toLowerCase();
+  if (!normalizedAddress || typeof listEntries !== 'function') return null;
+  const excludedSlug = normalizeSessionSlug(excludeSlug || '');
+  try {
+    const entries = listEntries('sbtCache', { cloneValues: false });
+    for (const item of Array.isArray(entries) ? entries : []) {
+      const namespaceEntry = isRecord(item) ? item : {};
+      const sourceSlug = namespaceEntry.slug || '';
+      const normalizedSourceSlug = normalizeSessionSlug(sourceSlug);
+      if (excludedSlug && normalizedSourceSlug === excludedSlug) continue;
+      const parsed = isRecord(namespaceEntry.value)
+        ? namespaceEntry.value as Record<string, SbtPageCacheNetNode | undefined>
+        : {};
+      for (const netKey of Object.keys(parsed || {})) {
+        const netNode = isRecord(parsed[netKey]) ? parsed[netKey] as SbtPageCacheNetNode : {};
+        const sbtList = isRecord(netNode.sbtList) ? netNode.sbtList : {};
+        const entry = sbtList[normalizedAddress];
+        const entryRecord = isRecord(entry) ? entry as SbtPageCachedSbtEntry : null;
+        if (!entryRecord) continue;
+        const candidateSlug = normalizeSessionSlug(entryRecord.slug != null ? entryRecord.slug : sourceSlug);
+        if (excludedSlug && candidateSlug === excludedSlug) continue;
+        return {
+          slug: candidateSlug,
+          entry: entryRecord,
+          netKey: String(netKey),
+        };
+      }
+    }
+  } catch (_) {
+    return null;
+  }
+  return null;
+};
+
+export const resolveSbtPageMetadataHydrationMode = ({
+  forceEventFetch = false,
+  isSBTCacheReady = undefined,
+  refreshSbtData = null,
+}: ResolveSbtPageMetadataHydrationModeArgs = {}): SbtPageMetadataHydrationMode => {
+  const usingCentralHydration = typeof refreshSbtData === 'function';
+  return {
+    usingCentralHydration,
+    parentOwnsInitialRefresh: (
+      usingCentralHydration &&
+      forceEventFetch !== true &&
+      isSBTCacheReady === false
+    ),
+  };
+};
+
+export const buildSbtPageRefreshOptions = ({
+  forceEventFetch = false,
+  onProgress = null,
+  preferCountsOnly = false,
+}: BuildSbtPageRefreshOptionsArgs = {}): SbtPageRefreshOptions | undefined => {
+  if (!forceEventFetch) return undefined;
+  const refreshOptions: SbtPageRefreshOptions = onProgress
+    ? { forceCounts: true, onProgress }
+    : { forceCounts: true };
+  if (preferCountsOnly) refreshOptions.countsOnly = true;
+  return refreshOptions;
+};
+
+export const resolveSbtPageShouldRefreshCounts = ({
+  burnedAddresses = [],
+  countsLoaded = false,
+  forceEventFetch = false,
+  mintedAddresses = [],
+  mintedTokensOverride = null,
+}: ResolveSbtPageShouldRefreshCountsArgs = {}): boolean => (
+  forceEventFetch === true ||
+  (
+    !countsLoaded &&
+    Array.isArray(mintedAddresses) &&
+    mintedAddresses.length === 0 &&
+    Array.isArray(burnedAddresses) &&
+    burnedAddresses.length === 0 &&
+    mintedTokensOverride == null
+  )
+);
+
+export const resolveSbtPageOwnerLookupFallbackDecision = ({
+  burnedAddresses = [],
+  countsLoaded = false,
+  mintedAddresses = [],
+  ownerLookupTokenCount = NaN,
+  preferCountsOnly = false,
+  requireCountsNotLoaded = false,
+}: ResolveSbtPageOwnerLookupFallbackDecisionArgs = {}): boolean => (
+  !preferCountsOnly &&
+  (!requireCountsNotLoaded || countsLoaded !== true) &&
+  Array.isArray(mintedAddresses) &&
+  mintedAddresses.length === 0 &&
+  Array.isArray(burnedAddresses) &&
+  burnedAddresses.length === 0 &&
+  Number.isFinite(Number(ownerLookupTokenCount)) &&
+  Number(ownerLookupTokenCount) > 0
+);
+
+export const resolveSbtPageOwnerLookupTokenCount = ({
+  mintedTokensOverride = null,
+  ownerLookupUpperBound = null,
+}: ResolveSbtPageOwnerLookupTokenCountArgs = {}): number => {
+  let ownerLookupTokenCount = ownerLookupUpperBound != null ? Number(ownerLookupUpperBound) : NaN;
+  if (!Number.isFinite(ownerLookupTokenCount) && mintedTokensOverride != null) {
+    ownerLookupTokenCount = Number(mintedTokensOverride);
+  }
+  return ownerLookupTokenCount;
+};
+
+export const resolveSbtPageUserAdminStatus = ({
+  account = '',
+  sbtInfo = null,
+}: ResolveSbtPageUserAdminStatusArgs = {}): unknown => {
+  const infoRecord = isRecord(sbtInfo) ? sbtInfo : null;
+  const adminAddr = infoRecord ? (infoRecord.admin || infoRecord.admin_ || '') : '';
+  const userLower = String(account || '').toLowerCase();
+  return userLower && adminAddr && (userLower === String(adminAddr).toLowerCase());
+};
+
+export const buildSbtPagePrimaryMetadataStatePatch = ({
+  account = '',
+  extraState = {},
+  nextSbtInfo = null,
+  prevSbtInfo = null,
+}: BuildSbtPagePrimaryMetadataStatePatchArgs = {}): Record<string, unknown> => {
+  const nextInfoRecord = isRecord(nextSbtInfo) ? nextSbtInfo : null;
+  const nextUserIsAdmin = resolveSbtPageUserAdminStatus({ account, sbtInfo: nextInfoRecord });
+  return {
+    sbtInfo: nextInfoRecord || prevSbtInfo || null,
+    userIsSbtAdmin: nextUserIsAdmin,
+    ...extraState,
+  };
+};
+
+export const buildSbtPageAccountDerivedStatePatch = ({
+  account = '',
+  state = null,
+}: BuildSbtPageAccountDerivedStatePatchArgs = {}): Record<string, unknown> | null => {
+  const stateRecord = isRecord(state) ? state : {};
+  const nextLower = String(account || '').toLowerCase();
+  const minted = Array.isArray(stateRecord.mintedAddresses) ? stateRecord.mintedAddresses : [];
+  const burned = Array.isArray(stateRecord.burnedAddresses) ? stateRecord.burnedAddresses : [];
+  const net = computeSbtPageNetCounts(minted, burned);
+  const nextUserHasSBT = nextLower ? ((net.get(nextLower) || 0) > 0) : false;
+  const sbtInfoRecord = isRecord(stateRecord.sbtInfo) ? stateRecord.sbtInfo : null;
+  const nextUserIsAdmin = resolveSbtPageUserAdminStatus({ account: nextLower, sbtInfo: sbtInfoRecord });
+  if (
+    nextUserHasSBT === stateRecord.userHasSBT &&
+    nextUserIsAdmin === stateRecord.userIsSbtAdmin
+  ) {
+    return null;
+  }
+  return {
+    userHasSBT: nextUserHasSBT,
+    userIsSbtAdmin: nextUserIsAdmin,
+  };
+};
+
+export const buildSbtPageLocalMintSuccessPatch = ({
+  addrLower = '',
+  prevState = null,
+}: BuildSbtPageLocalMintSuccessPatchArgs = {}): Record<string, unknown> | null => {
+  const addr = String(addrLower || '').toLowerCase();
+  if (!addr) return null;
+  const prev = isRecord(prevState) ? prevState : {};
+  const minted = (Array.isArray(prev.mintedAddresses) ? prev.mintedAddresses : []).concat(addr);
+  const burned = Array.isArray(prev.burnedAddresses) ? [...prev.burnedAddresses] : [];
+  const idx = burned.indexOf(addr);
+  if (idx !== -1) burned.splice(idx, 1);
+  const net = computeSbtPageNetCounts(minted, burned);
+  return {
+    mintedAddresses: minted,
+    burnedAddresses: burned,
+    userHasSBT: (net.get(addr) || 0) > 0,
+  };
+};
+
+export const buildSbtPageLocalBurnSuccessPatch = ({
+  addrLower = '',
+  buildAddressListSignature = buildSbtPageHolderListSignature,
+  buildNextFilteredHolderRows = buildSbtPageNextFilteredHolderRows,
+  prevState = null,
+}: BuildSbtPageLocalBurnSuccessPatchArgs = {}): Record<string, unknown> | null => {
+  const addr = String(addrLower || '').toLowerCase();
+  if (!addr) return null;
+  const prev = isRecord(prevState) ? prevState : {};
+  const minted = Array.isArray(prev.mintedAddresses) ? prev.mintedAddresses : [];
+  const burned = (Array.isArray(prev.burnedAddresses) ? prev.burnedAddresses : []).concat(addr);
+  const net = computeSbtPageNetCounts(minted, burned);
+  const prevNetHolders = computeSbtPageNetHoldersList(prev.mintedAddresses, prev.burnedAddresses);
+  const nextNetHolders = computeSbtPageNetHoldersList(minted, burned);
+  const shouldManageVisibleRows =
+    prev.showModal === true ||
+    prev.mintingAddressesFilterInitialized === true ||
+    (Array.isArray(prev.filteredMintedUsers) && prev.filteredMintedUsers.length > 0);
+  const resolveNextRows = typeof buildNextFilteredHolderRows === 'function'
+    ? buildNextFilteredHolderRows
+    : buildSbtPageNextFilteredHolderRows;
+  const filteredMintedUsers = shouldManageVisibleRows
+    ? resolveNextRows({
+      prevFilteredRows: prev.filteredMintedUsers,
+      prevNetHolders,
+      nextNetHolders,
+      replaceRows: false,
+    })
+    : (Array.isArray(prev.filteredMintedUsers) ? prev.filteredMintedUsers : []);
+  const nextFilteredRows = Array.isArray(filteredMintedUsers) ? filteredMintedUsers : [];
+  const resolveSignature = typeof buildAddressListSignature === 'function'
+    ? buildAddressListSignature
+    : buildSbtPageHolderListSignature;
+  return {
+    burnedAddresses: burned,
+    userHasSBT: (net.get(addr) || 0) > 0,
+    filteredMintedUsers: nextFilteredRows,
+    filteredMintedUsersSignature: shouldManageVisibleRows
+      ? resolveSignature(nextFilteredRows)
+      : prev.filteredMintedUsersSignature,
+  };
+};
+
+const SBT_PAGE_BURN_AUTH_LABELS = ['Admin Only', 'Owner Only', 'Both', 'Neither'];
+const SBT_PAGE_BURN_AUTH_INDEX_BY_NAME: Record<string, number> = {
+  AdminOnly: 0,
+  OwnerOnly: 1,
+  Both: 2,
+  Neither: 3,
+};
+
+export const resolveSbtPageBurnAuthLabel = (burnAuth: unknown): string => {
+  const burnIdx = typeof burnAuth === 'string'
+    ? (SBT_PAGE_BURN_AUTH_INDEX_BY_NAME[burnAuth] ?? undefined)
+    : (burnAuth != null ? Number(burnAuth) : undefined);
+  const normalizedBurnIdx = Number.isInteger(burnIdx) ? Number(burnIdx) : -1;
+  return (normalizedBurnIdx >= 0 && normalizedBurnIdx < SBT_PAGE_BURN_AUTH_LABELS.length)
+    ? SBT_PAGE_BURN_AUTH_LABELS[normalizedBurnIdx]
+    : '?';
+};
+
+export const resolveSbtPageMaxTokensDisplay = (maxTokens: unknown): string => (
+  maxTokens === '0'
+    ? '∞'
+    : (maxTokens != null ? String(maxTokens) : '-')
+);
+
+export const resolveSbtPageAdminCreatorAddresses = (sbtInfoInput: unknown): {
+  adminAddress: unknown;
+  creatorAddress: unknown;
+} => {
+  const sbtInfo = isRecord(sbtInfoInput) ? sbtInfoInput : {};
+  const adminAddress = sbtInfo.admin || sbtInfo.admin_ || sbtInfo.deployer || '';
+  const creatorAddress = sbtInfo.creator || adminAddress || sbtInfo.deployer || sbtInfo.admin_ || '';
+  return { adminAddress, creatorAddress };
+};
+
+export const resolveSbtPageHolderLoadingState = ({
+  countsLoaded = false,
+  hasComputedHolders = false,
+  hasFilteredHolders = false,
+  isScanActive = false,
+  loadingMintersBurners = false,
+  loadingMintedFilter = false,
+  mintedTokensOverride = null,
+  netHoldersCount = 0,
+  sbtScanInProgress = false,
+  sbtScanPending = false,
+}: ResolveSbtPageHolderLoadingStateArgs = {}): SbtPageHolderLoadingState => {
+  const hasComputed = !!hasComputedHolders;
+  const hasFiltered = !!hasFilteredHolders;
+  const terminalEmptyHoldersState =
+    !loadingMintersBurners &&
+    !loadingMintedFilter &&
+    !isScanActive &&
+    mintedTokensOverride == null &&
+    !hasComputed &&
+    !hasFiltered;
+  const holdersReady =
+    countsLoaded === true ||
+    hasComputed ||
+    hasFiltered ||
+    terminalEmptyHoldersState;
+  const holderCount = Number(netHoldersCount || 0);
+  const shouldOverrideMinted =
+    mintedTokensOverride != null &&
+    (!countsLoaded || holderCount === 0);
+  const netMinted = shouldOverrideMinted ? String(mintedTokensOverride) : String(holderCount);
+  const countsReady = countsLoaded === true || mintedTokensOverride != null || terminalEmptyHoldersState;
+  const isGlobalLoading = !!sbtScanInProgress || (!!sbtScanPending && !countsReady);
+  const isLocalLoading = !!loadingMintersBurners || !countsReady;
+  const effectiveLoading = isLocalLoading || isGlobalLoading;
+  return {
+    countsReady,
+    effectiveLoading,
+    holdersReady,
+    isGlobalLoading,
+    isLocalLoading,
+    netMinted,
+    shouldOverrideMinted,
+    terminalEmptyHoldersState,
+  };
+};
+
+export const resolveSbtPageHolderResolutionState = ({
+  isRefreshing = false,
+  loadingMintersBurners = false,
+  loadingMintedFilter = false,
+  mintedAddresses = [],
+  mintedTokensOverride = null,
+  showScanProgress = false,
+}: ResolveSbtPageHolderResolutionStateArgs = {}): SbtPageHolderResolutionState => {
+  const addressesNeedResolutionHint =
+    mintedTokensOverride != null &&
+    Number(mintedTokensOverride) > 0 &&
+    mintedAddresses.length === 0;
+  const addressesAreResolving =
+    addressesNeedResolutionHint &&
+    (
+      !!loadingMintersBurners ||
+      !!loadingMintedFilter ||
+      !!isRefreshing ||
+      !!showScanProgress
+  );
+  return { addressesAreResolving, addressesNeedResolutionHint };
+};
+
+export const resolveSbtPageHoldersDisplayCount = ({
+  mintedTokensOverride = null,
+  netHoldersCount = 0,
+  shouldOverrideMinted = false,
+}: ResolveSbtPageHoldersDisplayCountArgs = {}): string => (
+  shouldOverrideMinted
+    ? `~${mintedTokensOverride}`
+    : String(netHoldersCount || 0)
+);
+
+export const resolveSbtPageRelevantInfoLists = ({
+  sbtInfo = null,
+}: ResolveSbtPageRelevantInfoListsArgs = {}): SbtPageRelevantInfoLists => {
+  const info = isRecord(sbtInfo) ? sbtInfo : {};
+  return {
+    documentIDHashes: toStringList(info.documentIDHashes),
+    documentURLs: toSbtPageDocumentUrlList(
+      info.documentURLs,
+      info.documentUrls,
+      info.documentURL,
+      info.documentUrl,
+      info.docURLs,
+      info.docUrls,
+      info.docURL,
+      info.docUrl,
+      info.documents,
+    ),
+    tags: toStringList(info.tags),
+  };
+};
+
+export const resolveSbtPageRelevantInfoDisplayState = ({
+  documentIDHashes = [],
+  documentURLs = [],
+  tags = [],
+}: ResolveSbtPageRelevantInfoDisplayStateArgs = {}): SbtPageRelevantInfoDisplayState => ({
+  shouldRenderDocumentIdHashes: Array.isArray(documentIDHashes) && documentIDHashes.length > 0,
+  shouldRenderDocumentUrls: Array.isArray(documentURLs) && documentURLs.length > 0,
+  shouldRenderTags: Array.isArray(tags) && tags.length > 0,
+});
+
+export const resolveSbtPageHolderFilterItems = ({
+  filteredMintedUsers: filteredMintedUsersRaw = [],
+  hasComputedHolders = false,
+  hasFilteredHolders = false,
+  isScanActive = false,
+  netHolders = [],
+}: ResolveSbtPageHolderFilterItemsArgs = {}): SbtPageHolderFilterItems => {
+  const keepStaleFilterRowsWhileRefreshing =
+    !!hasFilteredHolders &&
+    !hasComputedHolders &&
+    !!isScanActive;
+  const holderItemsForFilter = hasComputedHolders
+    ? netHolders
+    : (keepStaleFilterRowsWhileRefreshing ? filteredMintedUsersRaw : []);
+  const filteredMintedUsers = Array.isArray(filteredMintedUsersRaw)
+    ? filteredMintedUsersRaw
+    : [];
+  return {
+    filteredMintedUsers,
+    holderItemsForFilter,
+    keepStaleFilterRowsWhileRefreshing,
+  };
+};
+
+const SBT_PAGE_MINTED_COUNT_ESTIMATE_TITLE = 'Holder list not loaded yet; showing an on-chain holder count estimate.';
+
+export const resolveSbtPageHolderModalDisplayState = ({
+  addressesAreResolving = false,
+  hasActiveScanProgress = false,
+  hasComputedHolders = false,
+  hasFilteredHolders = false,
+  holdersReady = false,
+  isInitialLoading = false,
+  isRefreshing = false,
+  isScanActive = false,
+  loadingMintersBurners = false,
+  loadingMintedFilter = false,
+  shouldOverrideMinted = false,
+  showModal = false,
+  showScanProgress = false,
+}: ResolveSbtPageHolderModalDisplayStateArgs = {}): SbtPageHolderModalDisplayState => {
+  const showEmptyStateInModal =
+    !hasFilteredHolders &&
+    !hasComputedHolders &&
+    !isInitialLoading &&
+    !loadingMintedFilter &&
+    !addressesAreResolving &&
+    !!holdersReady &&
+    !shouldOverrideMinted;
+  const waitingForHolderDetails =
+    !!addressesAreResolving ||
+    (
+      !!shouldOverrideMinted &&
+      !hasFilteredHolders &&
+      !hasComputedHolders &&
+      (
+        !!loadingMintersBurners ||
+        !!loadingMintedFilter ||
+        !!isRefreshing ||
+        !!showScanProgress
+      )
+    );
+  const showApproximateCountHint =
+    !hasFilteredHolders &&
+    !hasComputedHolders &&
+    !showEmptyStateInModal &&
+    !addressesAreResolving &&
+    !isScanActive &&
+    !!shouldOverrideMinted;
+  const showSpinnerInModalBody =
+    !hasFilteredHolders &&
+    !hasComputedHolders &&
+    !showEmptyStateInModal &&
+    (waitingForHolderDetails || !holdersReady || !!isInitialLoading || !!loadingMintedFilter);
+  const showScanProgressInModal =
+    !!showModal &&
+    !!hasActiveScanProgress &&
+    (
+      !!showScanProgress ||
+      showSpinnerInModalBody ||
+      !!loadingMintedFilter ||
+      !!hasActiveScanProgress
+    );
+  const showCornerSpinner =
+    (
+      !!hasActiveScanProgress ||
+      !!loadingMintedFilter ||
+      (!!loadingMintersBurners && (!!holdersReady || !!hasFilteredHolders)) ||
+      (!!isRefreshing && !!hasActiveScanProgress)
+    ) &&
+    (!!holdersReady || !!hasFilteredHolders);
+  const showHeaderCount = !!holdersReady || !!shouldOverrideMinted;
+  return {
+    mintedCountTitle: shouldOverrideMinted ? SBT_PAGE_MINTED_COUNT_ESTIMATE_TITLE : undefined,
+    showApproximateCountHint,
+    showCornerSpinner,
+    showEmptyStateInModal,
+    showHeaderCount,
+    showScanProgressInModal,
+    showSpinnerInModalBody,
+    waitingForHolderDetails,
+  };
+};

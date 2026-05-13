@@ -91,6 +91,51 @@ while IFS= read -r pattern; do
   STRIP_ASSERT_ABSENT+=("$pattern")
 done < <(ce_public_release_strip_assert_absent_patterns)
 
+MANIFEST_EXCLUDE_PATTERNS=()
+while IFS= read -r pattern; do
+  MANIFEST_EXCLUDE_PATTERNS+=("$pattern")
+done < <(ce_public_release_manifest_exclude_patterns)
+
+path_matches_manifest_exclude() {
+  local relative_path="$1"
+  local pattern
+
+  for pattern in "${MANIFEST_EXCLUDE_PATTERNS[@]}"; do
+    case "$pattern" in
+      *'*'*|*'?'*|*'['*)
+        if [[ "$relative_path" == $pattern ]]; then
+          return 0
+        fi
+        ;;
+      *)
+        if [[ "$relative_path" == "$pattern" || "$relative_path" == "$pattern/"* ]]; then
+          return 0
+        fi
+        ;;
+    esac
+  done
+
+  return 1
+}
+
+verify_private_planning_paths_absent() {
+  local findings
+
+  findings=$(
+    cd "$STAGING_ROOT"
+    find . -path './.git' -prune -o -print |
+      sed 's#^\./##' |
+      grep -E '(^|/)TODO(/|$)|(^|/)[^/]*PRDs?[^/]*(/|$)' || true
+  )
+
+  if [ -n "$findings" ]; then
+    printf 'Private planning paths are still visible in public release copy:\n%s\n' "$findings" >&2
+    return 1
+  fi
+
+  return 0
+}
+
 if [ "$OUTPUT_ABS" = "$REPO_ROOT" ]; then
   printf 'Refusing to overwrite the repo root.\n' >&2
   exit 1
@@ -126,20 +171,59 @@ TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/prepare-public-release.XXXXXX")
 STAGING_ROOT="$TMP_ROOT/release"
 MATCHED_PATHS_FILE="$TMP_ROOT/matched-paths.txt"
 STRIP_ENTRIES_FILE="$TMP_ROOT/strip-entries.txt"
+COPY_FILE_LIST="$TMP_ROOT/copy-file-list.txt"
 MANIFEST_PATH="$STAGING_ROOT/private-pack.manifest.json"
 
 mkdir -p "$STAGING_ROOT"
 
 (
   cd "$REPO_ROOT"
-  tar -cf - \
-    --exclude='./.git' \
-    --exclude='./*/.git' \
-    --exclude='./node_modules' \
-    --exclude='./*/node_modules' \
-    --exclude='./build' \
-    --exclude='./*/build' \
-    .
+  GIT_TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  if [ "$GIT_TOPLEVEL" = "$REPO_ROOT" ]; then
+    git ls-files -z --cached --others --exclude-standard |
+      while IFS= read -r -d '' path; do
+        if [ -e "$path" ] || [ -L "$path" ]; then
+          printf '%s\n' "$path"
+        fi
+      done > "$COPY_FILE_LIST"
+
+    tar -cf - -T "$COPY_FILE_LIST"
+  else
+    tar -cf - \
+      --exclude='./.git' \
+      --exclude='./*/.git' \
+      --exclude='./node_modules' \
+      --exclude='./*/node_modules' \
+      --exclude='./*/*/node_modules' \
+      --exclude='./*/*/*/node_modules' \
+      --exclude='./build' \
+      --exclude='./*/build' \
+      --exclude='./*/*/build' \
+      --exclude='./*/*/*/build' \
+      --exclude='./.codex-artifacts' \
+      --exclude='./.codex-solc' \
+      --exclude='./.codex-tmp' \
+      --exclude='./.DS_Store' \
+      --exclude='./*/.DS_Store' \
+      --exclude='./.env' \
+      --exclude='./.env.local' \
+      --exclude='./.env.*.local' \
+      --exclude='./.keys' \
+      --exclude='./.e2e-secrets' \
+      --exclude='./.e2e-cache' \
+      --exclude='./.npm-cache' \
+      --exclude='./.npm-cache-client*' \
+      --exclude='./output' \
+      --exclude='./release-public' \
+      --exclude='./dist' \
+      --exclude='./out' \
+      --exclude='./cache' \
+      --exclude='./broadcast' \
+      --exclude='./coverage' \
+      --exclude='./docs/codebase-*.md' \
+      --exclude='./docs/assets/codebase-*' \
+      .
+  fi
 ) | (
   cd "$STAGING_ROOT"
   tar -xf -
@@ -188,6 +272,10 @@ entry_index=0
   while IFS= read -r path; do
     [ -n "$path" ] || continue
 
+    if path_matches_manifest_exclude "$path"; then
+      continue
+    fi
+
     if [ "$entry_index" -gt 0 ]; then
       printf ',\n'
     fi
@@ -230,6 +318,8 @@ done < "$MATCHED_PATHS_FILE"
     done
   done
 )
+
+verify_private_planning_paths_absent
 
 mv "$STAGING_ROOT" "$OUTPUT_ABS"
 

@@ -1,4 +1,5 @@
 import { isModelAllowed } from './aiRequestNormalization.js';
+import { executeSessionLitChipotleAction } from './chipotleClient.js';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return 'claude-3-5-sonnet-20240620';
@@ -30,7 +31,8 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
 } = {}) => {
   const isFaucetAction = action === 'request_test_eth';
   const isAiAction = path === '/ai' || action === 'ai';
-  if (!isFaucetAction && !isAiAction) {
+  const isLitChipotleAction = path === '/lit/chipotle-action' || action === 'lit_chipotle_execute';
+  if (!isFaucetAction && !isAiAction && !isLitChipotleAction) {
     return { handled: false };
   }
 
@@ -94,10 +96,108 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     };
   }
 
+  if (isAiAction) {
+    const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
+      scopes,
+      scope: 'ai',
+      route: 'ai',
+      env,
+      slug,
+      address,
+      limit,
+      headers,
+      deps: {
+        checkRateLimit: deps?.checkRateLimit,
+        json: deps?.json,
+      },
+    });
+    if (!preflight?.ok) {
+      return {
+        handled: true,
+        response: preflight?.response,
+      };
+    }
+
+    const secretContext = await deps?.resolveAuthenticatedRouteSecrets?.({
+      env,
+      slug,
+      headers,
+      deps: {
+        getSessionSecrets: deps?.getSessionSecrets,
+        json: deps?.json,
+      },
+    });
+    if (!secretContext?.ok) {
+      return {
+        handled: true,
+        response: secretContext?.response,
+      };
+    }
+
+    const aiRequest = deps?.normalizeAiRequestPayload?.({ payload: body }) || {};
+    const provider = aiRequest.provider;
+    const model = resolveModelForProvider({ payload: aiRequest.payload || body, provider });
+    if (!isModelAllowed(model, provider)) {
+      return {
+        handled: true,
+        response: deps?.json?.({ error: 'Model not allowed for provider' }, 400, headers),
+      };
+    }
+    if (provider === 'anthropic') {
+      return {
+        handled: true,
+        response: await deps?.proxyAnthropic?.({
+          payload: body,
+          secrets: secretContext.secrets,
+          baseHeaders: headers,
+        }),
+      };
+    }
+    if (provider === 'openai') {
+      return {
+        handled: true,
+        response: await deps?.proxyOpenAI?.({
+          payload: body,
+          secrets: secretContext.secrets,
+          baseHeaders: headers,
+        }),
+      };
+    }
+    if (provider === 'openrouter') {
+      return {
+        handled: true,
+        response: await deps?.proxyOpenRouter?.({
+          payload: body,
+          secrets: secretContext.secrets,
+          baseHeaders: headers,
+        }),
+      };
+    }
+    if (provider === 'custom') {
+      return {
+        handled: true,
+        response: await deps?.proxyCustomRPC?.({
+          payload: body,
+          secrets: secretContext.secrets,
+          baseHeaders: headers,
+          auth: {
+            address,
+            scopes,
+          },
+        }),
+      };
+    }
+
+    return {
+      handled: true,
+      response: deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers),
+    };
+  }
+
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
-    scope: 'ai',
-    route: 'ai',
+    scope: 'lit',
+    route: 'lit',
     env,
     slug,
     address,
@@ -131,62 +231,35 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     };
   }
 
-  const aiRequest = deps?.normalizeAiRequestPayload?.({ payload: body }) || {};
-  const provider = aiRequest.provider;
-  const model = resolveModelForProvider({ payload: aiRequest.payload || body, provider });
-  if (!isModelAllowed(model, provider)) {
+  try {
+    const result = await (
+      deps?.executeSessionLitChipotleAction || executeSessionLitChipotleAction
+    )({
+      env,
+      config,
+      secrets: secretContext.secrets,
+      request: body,
+      requesterAddress: address,
+      fetchImpl: deps?.fetchImpl,
+    });
     return {
       handled: true,
-      response: deps?.json?.({ error: 'Model not allowed for provider' }, 400, headers),
+      response: deps?.json?.(result, 200, headers),
     };
-  }
-  if (provider === 'anthropic') {
+  } catch (error) {
+    const message = error?.message || 'Failed to execute Lit Chipotle action.';
+    const normalized = String(message).toLowerCase();
+    const status = (
+      normalized.includes('required') ||
+      normalized.includes('missing') ||
+      normalized.includes('invalid') ||
+      normalized.includes('must be') ||
+      normalized.includes('not configured') ||
+      normalized.includes('does not match')
+    ) ? 400 : 502;
     return {
       handled: true,
-      response: await deps?.proxyAnthropic?.({
-        payload: body,
-        secrets: secretContext.secrets,
-        baseHeaders: headers,
-      }),
+      response: deps?.json?.({ error: message }, status, headers),
     };
   }
-  if (provider === 'openai') {
-    return {
-      handled: true,
-      response: await deps?.proxyOpenAI?.({
-        payload: body,
-        secrets: secretContext.secrets,
-        baseHeaders: headers,
-      }),
-    };
-  }
-  if (provider === 'openrouter') {
-    return {
-      handled: true,
-      response: await deps?.proxyOpenRouter?.({
-        payload: body,
-        secrets: secretContext.secrets,
-        baseHeaders: headers,
-      }),
-    };
-  }
-  if (provider === 'custom') {
-    return {
-      handled: true,
-      response: await deps?.proxyCustomRPC?.({
-        payload: body,
-        secrets: secretContext.secrets,
-        baseHeaders: headers,
-        auth: {
-          address,
-          scopes,
-        },
-      }),
-    };
-  }
-
-  return {
-    handled: true,
-    response: deps?.json?.({ error: `Unsupported provider: ${provider}` }, 400, headers),
-  };
 };

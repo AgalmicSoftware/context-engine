@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import DecryptActionChip from './DecryptActionChip';
+import DecryptActionChip, {
+  resolveDecryptActionChipSpinnerStyle,
+} from './DecryptActionChip';
 
 describe('DecryptActionChip', () => {
   it('renders a button chip and forwards clicks', () => {
@@ -37,5 +39,9 @@ describe('DecryptActionChip', () => {
     );
 
     expect(screen.queryByText('Decrypting...')).not.toBeInTheDocument();
+  });
+
+  it('resolves spinner spacing style', () => {
+    expect(resolveDecryptActionChipSpinnerStyle()).toEqual({ marginRight: 8 });
   });
 });

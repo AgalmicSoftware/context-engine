@@ -246,6 +246,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     ...expandedComponent.data,
     account: props.account,
     provider: props.provider,
+    litHooks: props.litHooks,
     activeSessionSlug: props.activeSessionSlug,
     loginComplete: props.loginComplete,
     toggleLoginModal: props.toggleLoginModal,
@@ -253,6 +254,11 @@ const ToolExplorer = (props: ToolExplorerProps) => {
     isSBTCacheReady: props.isSBTCacheReady,
     isSurveyCacheReady: props.isSurveyCacheReady,
     isQuestionCacheReady: props.isQuestionCacheReady,
+    ...(expandedToolName === 'Questions'
+      ? {
+        preventUrlChange: true,
+      }
+      : {}),
     ...(expandedToolName === 'Debate Tree'
       ? { demoMode: demoSurfaceEnabled }
       : {}),

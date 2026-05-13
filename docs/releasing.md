@@ -9,6 +9,8 @@ Separately, `.github/workflows/publish-worker-bundles.yml` rebuilds the Cloudfla
 
 Use the history-sync flow when you want a public PR with preserved commit narrative. Use the artifact flow when you need a standalone stripped copy of the repo.
 
+The artifact exporter copies tracked files plus untracked files that are not ignored by git, then applies the private strip list. Ignored local files such as keys, caches, build output, generated media, and previous release folders are skipped before the strip phase.
+
 ## Quick start
 
 ```bash
@@ -42,6 +44,7 @@ Important behavior:
 - Existing local target branches still require `--force-with-lease` before the script rewrites them
 - `--force-with-lease` remains accepted explicitly, and is required whenever the local target branch already exists
 - Without `--push`, the script prints the follow-up `git push -u origin <branch>` command after importing the branch back into the local repo
+- Legacy internal planning identifiers in commit messages are allowed during replay when the commit still contains public-safe changes. Prefer rewriting new commit messages before sync, but do not force public-history replay to fail only because an old subject/body has a planning ID.
 
 Push safety:
 
@@ -60,19 +63,25 @@ Both workflows remove these paths from the public result:
 
 | Path | Reason |
 |------|--------|
-| `TODO/` | Internal planning and PRDs |
+| `TODO/` | Internal planning |
 | `contextEngine-cc/` | Claude Code extension (local dev tool) |
+| `docs/agent-native*.md` | Private agent-native contract docs |
+| `client/public/skill.md` | Private agent skill artifact |
+| `workers/agentBridgeWorker/` | Private agent bridge worker |
 | `CLAUDE.md` | Maintainer AI instructions |
-| `.claude/`, `.codex/` | AI agent skills and settings |
+| `.claude/`, `.codex/`, `.codex-artifacts/`, `.codex-solc/`, `.codex-tmp/` | AI agent skills, settings, caches, and scratch artifacts |
 | `video-clickthrough-local/` | Durable local video workflow scripts and handoff notes |
 | `.tmp-review/` | Temporary review snapshots / scratch files |
-| `artifacts/` | Local test artifacts |
+| `.env`, `.env.local`, `.env.*.local`, `.keys/`, `.e2e-secrets/`, `.e2e-cache/` | Local environment files, keys, and E2E secret/cache material |
+| `artifacts/`, `output/` | Local test and generated media artifacts |
+| `dist/`, `out/`, `cache/`, `broadcast/`, `coverage/`, `.npm-cache*`, `release-public/` | Generated build, dependency, and previous release outputs |
+| `.DS_Store`, `docs/codebase-*.md`, `docs/assets/codebase-*` | Local macOS metadata and ignored codebase audit exports |
 | `private-pack.manifest.json` (tracked repo copy) | Generated strip inventory should not ship from the dev tree |
 | `Demo Integration Package/` | Raw source data |
 | `scripts/test-*.js`, `scripts/lib/e2e/` | E2E test layer |
 | `whitepaper/Slides.pdf`, `whitepaper/IdeasMap.md` | Internal whitepaper assets |
 
-For the artifact workflow, a fresh `private-pack.manifest.json` is generated in the output listing every stripped file with its SHA-256 checksum, so the strip can be verified or reversed. Any tracked repo-root copy is stripped before publish.
+For the artifact workflow, a fresh `private-pack.manifest.json` is generated in the output listing stripped files with SHA-256 checksums, so the strip can be verified or reversed. Private planning paths are deliberately omitted from that public manifest so roadmap filenames and planning IDs are not exposed. Any tracked repo-root copy is stripped before publish.
 
 ## PII scan
 

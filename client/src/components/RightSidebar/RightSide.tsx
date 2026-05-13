@@ -3,7 +3,7 @@ import styles from './RightSide.module.scss';
 
 const RightSide = () => {
   return (
-    <aside id={styles.rightSideContainer} data-testid="ce-home-right-sidebar">
+    <aside className={styles.rightSideContainer} data-testid="ce-home-right-sidebar">
       <div className={styles.rightSideCard} aria-hidden="true" />
     </aside>
   );

@@ -1,0 +1,314 @@
+import {
+  isPlainAnalysisObject,
+  toAnalysisRecord,
+  type UserPageUnknownRecord,
+} from './userPageCoreHelpers';
+import {
+  compareUserPageResponseRecency,
+  extractUserPageResponseRecencyWithHints,
+  type UserPageResponseBucketMap,
+  type UserPageResponseRecencyBucketMap,
+} from './userPageResponseHelpers';
+
+export type UserPageCacheNetworkBucket = UserPageUnknownRecord & {
+  surveys?: unknown;
+  surveyResponses?: unknown;
+  questions?: unknown;
+  questionResponses?: unknown;
+  questionResponsesMeta?: unknown;
+  sbtList?: unknown;
+};
+type UserPageCacheNetworkMergeKey = (
+  'surveys' |
+  'surveyResponses' |
+  'questions' |
+  'questionResponses' |
+  'questionResponsesMeta'
+);
+
+const USER_PAGE_CACHE_NETWORK_MERGE_KEYS: UserPageCacheNetworkMergeKey[] = [
+  'surveys',
+  'surveyResponses',
+  'questions',
+  'questionResponses',
+  'questionResponsesMeta',
+];
+export type UserPagePrioritizedCacheNode = {
+  key: string;
+  value: UserPageCacheNetworkBucket;
+};
+export type UserPageUserChainNode = UserPageUnknownRecord & {
+  data?: unknown;
+};
+export type UserPagePrioritizedUserChainNode = {
+  chainKey: string;
+  node: UserPageUserChainNode;
+};
+export type UserPageOwnershipCountMaps = {
+  mintedCountMap: UserPageUnknownRecord | null;
+  burnedCountMap: UserPageUnknownRecord | null;
+};
+export type UserPageOwnershipSignalAggregate = {
+  mintedSet: Set<string>;
+  burnedSet: Set<string>;
+};
+export type UserPageSourceSlugMap = Record<string, string>;
+export type UserPageSourceSlugWriteOptions = {
+  replace?: unknown;
+};
+export type UpsertUserPageResponseByRecencyArgs = {
+  id?: unknown;
+  responder?: unknown;
+  responseRecencyMeta: UserPageResponseRecencyBucketMap;
+  responses: UserPageResponseBucketMap;
+  responseSourceSlugByKey: UserPageSourceSlugMap;
+  responseValue?: unknown;
+  sourceSlugById: UserPageSourceSlugMap;
+  metaValue?: unknown;
+  slug?: unknown;
+};
+export type UserPageUserCachePayload = UserPageUnknownRecord & {
+  sbts?: unknown;
+  createdSurveys?: unknown;
+  createdQuestions?: unknown;
+  surveyResponses?: unknown;
+  questionResponses?: unknown;
+};
+
+const normalizeUserPageCacheSourceSlug = (slug: unknown): string => {
+  const raw = String(slug || '').trim().toLowerCase();
+  return raw === 'general' ? '' : raw;
+};
+
+export const getUserPageOwnershipCountMaps = (
+  entry: unknown = {}
+): UserPageOwnershipCountMaps => {
+  const entryRecord = toAnalysisRecord(entry);
+  const mintedCountMap = isPlainAnalysisObject(entryRecord.mintedCountByAddress)
+    ? entryRecord.mintedCountByAddress
+    : null;
+  const burnedCountMap = isPlainAnalysisObject(entryRecord.burnedCountByAddress)
+    ? entryRecord.burnedCountByAddress
+    : null;
+  return { mintedCountMap, burnedCountMap };
+};
+
+export const hasMeaningfulUserPageOwnershipCounts = (
+  entry: unknown = {},
+  addressLower: unknown = ''
+): boolean => {
+  const entryRecord = toAnalysisRecord(entry);
+  const { mintedCountMap, burnedCountMap } = getUserPageOwnershipCountMaps(entry);
+  if (!mintedCountMap && !burnedCountMap) return false;
+  if (entryRecord.countsLoaded === true) return true;
+  const normalizedAddress = String(addressLower || '').toLowerCase();
+  if (!normalizedAddress) return false;
+  return (
+    Object.prototype.hasOwnProperty.call(mintedCountMap || {}, normalizedAddress) ||
+    Object.prototype.hasOwnProperty.call(burnedCountMap || {}, normalizedAddress)
+  );
+};
+
+export const readUserPageOwnershipCount = (
+  countMap: UserPageUnknownRecord | null,
+  addressLower: unknown
+): number => (
+  countMap
+    ? Math.max(0, Number(countMap[String(addressLower || '').toLowerCase()] || 0) || 0)
+    : 0
+);
+
+export const applyUserPageOwnershipSignal = (
+  aggEntry: UserPageOwnershipSignalAggregate,
+  entry: unknown,
+  addressLower: unknown
+): void => {
+  const addressKey = String(addressLower || '').toLowerCase();
+  if (!addressKey) return;
+  const { mintedCountMap, burnedCountMap } = getUserPageOwnershipCountMaps(entry);
+  if (!mintedCountMap && !burnedCountMap) return;
+  if (!hasMeaningfulUserPageOwnershipCounts(entry, addressKey)) return;
+
+  const mintedCount = readUserPageOwnershipCount(mintedCountMap, addressKey);
+  const burnedCount = readUserPageOwnershipCount(burnedCountMap, addressKey);
+  // Regression guard: count maps decide the viewer's current ownership;
+  // raw address sets remain bulk history for non-viewer aggregation.
+  if (mintedCount > burnedCount) {
+    aggEntry.mintedSet.add(addressKey);
+    aggEntry.burnedSet.delete(addressKey);
+  } else if (burnedCount > 0) {
+    aggEntry.burnedSet.add(addressKey);
+  }
+};
+
+export const writeUserPageSourceSlug = (
+  target: UserPageSourceSlugMap,
+  id: unknown,
+  slug: unknown,
+  opts: UserPageSourceSlugWriteOptions = {}
+): void => {
+  const key = String(id || '').toLowerCase();
+  if (!key) return;
+  const replace = !!(opts && opts.replace);
+  if (!replace && Object.prototype.hasOwnProperty.call(target, key)) return;
+  target[key] = normalizeUserPageCacheSourceSlug(slug || '');
+};
+
+export const writeUserPageResponseSourceSlug = (
+  target: UserPageSourceSlugMap,
+  id: unknown,
+  responder: unknown,
+  slug: unknown,
+  opts: UserPageSourceSlugWriteOptions = {}
+): void => {
+  const idKey = String(id || '').trim().toLowerCase();
+  const responderKey = String(responder || '').trim().toLowerCase();
+  if (!idKey || !responderKey) return;
+  const responseKey = `${idKey}|${responderKey}`;
+  const replace = !!(opts && opts.replace);
+  if (!replace && Object.prototype.hasOwnProperty.call(target, responseKey)) return;
+  target[responseKey] = normalizeUserPageCacheSourceSlug(slug || '');
+};
+
+export const upsertUserPageResponseByRecency = ({
+  id,
+  responder,
+  responseRecencyMeta,
+  responses,
+  responseSourceSlugByKey,
+  responseValue,
+  sourceSlugById,
+  metaValue = null,
+  slug = '',
+}: UpsertUserPageResponseByRecencyArgs): void => {
+  const idLower = String(id || '').trim().toLowerCase();
+  const responderLower = String(responder || '').trim().toLowerCase();
+  if (!idLower || !responderLower || responseValue == null) return;
+  if (!responses[idLower]) responses[idLower] = {};
+  if (!responseRecencyMeta[idLower]) responseRecencyMeta[idLower] = {};
+  const existingResponse = responses[idLower][responderLower];
+  const existingRecency = extractUserPageResponseRecencyWithHints(
+    existingResponse,
+    responseRecencyMeta[idLower][responderLower]
+  );
+  const incomingRecency = extractUserPageResponseRecencyWithHints(responseValue, metaValue);
+  const hasExisting = Object.prototype.hasOwnProperty.call(responses[idLower], responderLower);
+  let shouldReplace = !hasExisting;
+  if (!shouldReplace) {
+    const cmp = compareUserPageResponseRecency(incomingRecency, existingRecency);
+    shouldReplace = cmp > 0 || (cmp === 0 && incomingRecency.hasHints && !existingRecency.hasHints);
+  }
+  if (!shouldReplace) return;
+  responses[idLower][responderLower] = responseValue;
+  responseRecencyMeta[idLower][responderLower] = incomingRecency;
+  writeUserPageSourceSlug(sourceSlugById, idLower, slug, { replace: true });
+  writeUserPageResponseSourceSlug(responseSourceSlugByKey, idLower, responderLower, slug, { replace: true });
+};
+
+export const readUserPageNetworkCache = (
+  cacheObj: unknown,
+  networkID: unknown
+): UserPageCacheNetworkBucket => {
+  if (!isPlainAnalysisObject(cacheObj)) return {};
+  const mergeBucket = (target: UserPageCacheNetworkBucket, bucket: unknown): void => {
+    if (!isPlainAnalysisObject(bucket)) return;
+    USER_PAGE_CACHE_NETWORK_MERGE_KEYS.forEach((key) => {
+      const value = bucket[key];
+      if (!isPlainAnalysisObject(value)) return;
+      target[key] = {
+        ...toAnalysisRecord(target[key]),
+        ...value,
+      };
+    });
+  };
+
+  const merged: UserPageCacheNetworkBucket = {};
+  Object.keys(cacheObj).forEach((key: string) => {
+    mergeBucket(merged, cacheObj[key]);
+  });
+  if (networkID) {
+    mergeBucket(merged, cacheObj[String(networkID)]);
+  }
+  return merged;
+};
+
+export const getPrioritizedUserPageNetworkCacheNodes = (
+  cacheObj: unknown,
+  networkID: unknown
+): UserPagePrioritizedCacheNode[] => {
+  if (!isPlainAnalysisObject(cacheObj)) return [];
+  const out: UserPagePrioritizedCacheNode[] = [];
+  const seen = new Set<string>();
+  const push = (keyRaw: unknown): void => {
+    const key = String(keyRaw || '');
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    const value = cacheObj[key];
+    if (!isPlainAnalysisObject(value)) return;
+    out.push({ key, value });
+  };
+
+  if (networkID) {
+    push(networkID);
+  }
+  Object.keys(cacheObj).forEach(push);
+  return out;
+};
+
+export const getPrioritizedUserPageChainNodes = (
+  userNode: unknown,
+  networkID: unknown
+): UserPagePrioritizedUserChainNode[] => {
+  if (!isPlainAnalysisObject(userNode)) return [];
+  const out: UserPagePrioritizedUserChainNode[] = [];
+  const seen = new Set<string>();
+  const push = (keyRaw: unknown): void => {
+    const key = String(keyRaw || '');
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    const node = userNode[key];
+    if (!isPlainAnalysisObject(node)) return;
+    out.push({ chainKey: key, node });
+  };
+
+  if (networkID) {
+    push(networkID);
+  }
+  Object.keys(userNode).forEach(push);
+  return out;
+};
+
+export const getActiveUserPageChainNode = (
+  userNode: unknown,
+  networkID: unknown
+): UserPageUserChainNode | null => {
+  if (!isPlainAnalysisObject(userNode)) return null;
+  const mergedData = getPrioritizedUserPageChainNodes(userNode, networkID).reduce<UserPageUserCachePayload>(
+    (acc, { node }) => {
+      if (!isPlainAnalysisObject(node.data)) return acc;
+      const data = node.data as UserPageUserCachePayload;
+      return {
+        sbts: [...(Array.isArray(acc.sbts) ? acc.sbts : []), ...(Array.isArray(data.sbts) ? data.sbts : [])],
+        createdSurveys: [
+          ...(Array.isArray(acc.createdSurveys) ? acc.createdSurveys : []),
+          ...(Array.isArray(data.createdSurveys) ? data.createdSurveys : []),
+        ],
+        createdQuestions: [
+          ...(Array.isArray(acc.createdQuestions) ? acc.createdQuestions : []),
+          ...(Array.isArray(data.createdQuestions) ? data.createdQuestions : []),
+        ],
+        surveyResponses: [
+          ...(Array.isArray(acc.surveyResponses) ? acc.surveyResponses : []),
+          ...(Array.isArray(data.surveyResponses) ? data.surveyResponses : []),
+        ],
+        questionResponses: [
+          ...(Array.isArray(acc.questionResponses) ? acc.questionResponses : []),
+          ...(Array.isArray(data.questionResponses) ? data.questionResponses : []),
+        ],
+      };
+    },
+    {}
+  );
+  if (Object.keys(mergedData).length === 0) return null;
+  return { data: mergedData };
+};

@@ -1,5 +1,4 @@
 import { readArweaveUploadRequestPayload } from './arweaveUploadRequestNormalization.js';
-import { issueLitPaymentDelegation } from './litPaymentDelegation.js';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
   path,
@@ -16,17 +15,21 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 } = {}) => {
   const isTranscribeRoute = path === '/transcribe' && method === 'POST';
   const isArweaveUploadRoute = path === '/arweave/upload' && method === 'POST';
-  const isLitDelegationRoute = path === '/lit/payment-delegation' && method === 'POST';
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isLitDelegationRoute) {
+  const isStorageRoute = (
+    (path === '/storage/upload' && method === 'POST') ||
+    (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
+    (path === '/storage/list' && (method === 'GET' || method === 'POST'))
+  );
+  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute) {
     return { handled: false };
   }
 
   const route = isTranscribeRoute
     ? 'transcribe'
-    : (isArweaveUploadRoute ? 'arweave' : 'lit-payment-delegation');
+    : (isStorageRoute ? 'storage' : 'arweave');
   const scope = isTranscribeRoute
     ? 'transcribe'
-    : (isArweaveUploadRoute ? 'arweave' : 'lit');
+    : 'arweave';
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope,
@@ -45,6 +48,22 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     return {
       handled: true,
       response: preflight?.response,
+    };
+  }
+
+  if (isStorageRoute) {
+    return {
+      handled: true,
+      response: await deps?.storageRoute?.({
+        path,
+        method,
+        request,
+        env,
+        config,
+        slug,
+        uploaderAddress: address,
+        baseHeaders: headers,
+      }),
     };
   }
 
@@ -85,51 +104,6 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     };
   }
 
-  if (isLitDelegationRoute) {
-    let body = {};
-    try {
-      body = await request.clone().json();
-    } catch {
-      return {
-        handled: true,
-        response: deps?.json?.({ error: 'Invalid JSON.' }, 400, headers),
-      };
-    }
-
-    const litPayerPrivateKey = typeof secrets?.litPayerPrivateKey === 'string'
-      ? secrets.litPayerPrivateKey.trim()
-      : (secrets?.litPayerPrivateKey == null ? '' : String(secrets.litPayerPrivateKey).trim());
-    if (!litPayerPrivateKey) {
-      return {
-        handled: true,
-        response: deps?.json?.({ error: 'Lit payer key not configured.' }, 503, headers),
-      };
-    }
-
-    try {
-      const result = await (deps?.issueLitPaymentDelegation || issueLitPaymentDelegation)({
-        requesterAddress: address,
-        sessionPublicKey: body?.sessionPublicKey,
-        litNetwork: body?.litNetwork || config?.lit?.network || config?.litNetwork || 'naga-dev',
-        litPayerPrivateKey,
-        audience: request?.headers?.get?.('Origin') || '',
-        expiresAt: body?.expiresAt,
-      });
-      return {
-        handled: true,
-        response: deps?.json?.({ ok: true, ...result }, 200, headers),
-      };
-    } catch (error) {
-      return {
-        handled: true,
-        response: deps?.json?.(
-          { error: error?.message || 'Failed to issue Lit payment delegation.' },
-          502,
-          headers,
-        ),
-      };
-    }
-  }
   if (isTranscribeRoute) {
     return {
       handled: true,

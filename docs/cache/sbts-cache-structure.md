@@ -108,6 +108,8 @@ depends on:
 - `burnAuth`
 - `chainID`
 - `creator`
+- `documentURLs` (canonical document/source links; readers normalize legacy
+  aliases such as `docURL`, `docURLs`, `documentUrl`, and `documents[].href`)
 
 Session-linking fields may also appear:
 

@@ -46,8 +46,15 @@ Per request, the client resolves keys in this order:
 - If the worker has no fallback configured, it rejects the request and the
   client surfaces the error.
 
-## RPC key routing (pending)
+## RPC key routing
 
-RPC API keys are stored in settings and/or worker secrets, but the JSON-RPC proxy
-format (Authorization header vs URL template) still needs a decision before the
-client injects the key into on-chain JSON-RPC calls.
+Session-level Custom RPC URL values are stored as worker secrets and, when used
+for session publish/deploy, remain worker runtime config only. They are not
+mirrored to registry fields. Browser-visible `rpcUrl` mirrors are limited to
+explicit session `rpc.providers.path.rpcUrl` values that are safe for client
+question and SBT reads.
+
+Standalone RPC API-key injection without a URL template is still unsupported.
+The JSON-RPC proxy format (Authorization header vs URL template) needs a
+separate design before the client can inject a bare key into on-chain JSON-RPC
+calls.

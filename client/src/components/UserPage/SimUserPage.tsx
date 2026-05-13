@@ -11,53 +11,136 @@ import {
   getHistoricalFigureAvatarOrBlockie,
   getHistoricalFigureBlockie,
 } from '../../utilities/ui/historicalFigureAvatars.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { buildAtlasNodeRoute, buildPublicRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
+import {
+  buildSimFullProfileModalStatePatch,
+  buildSimUserInfoStatePatch,
+  buildSimUserPageRootClassName,
+  buildSimUserRelatedScoreClassName,
+  buildSimUserVoteIndicatorClassName,
+  resolveSimUserStanceMarkerStyle,
+} from './simUserPageHelpers';
 
 type SimUserPageProps = {
   simUsername?: string;
   minimized?: boolean;
 };
 
+type UnknownRecord = Record<string, unknown>;
+
+type SimQuestion = {
+  question?: string;
+  questionType?: string;
+  answer?: {
+    encrypted?: boolean;
+    value?: unknown;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
+type SimUserInfo = {
+  name: string;
+  username: string;
+  questions: SimQuestion[];
+  avatar?: string;
+  Karma?: number;
+  biggestHope?: string;
+  biggestFear?: string;
+  highlightedAdvice?: string;
+  bio?: string;
+  era?: string;
+  featuredQuote?: string;
+  [key: string]: unknown;
+};
+
+type AtlasVoteMap = Record<string, unknown>;
+
+type AtlasUserData = {
+  votes?: AtlasVoteMap;
+  questions?: UnknownRecord[];
+  comments?: UnknownRecord[];
+  [key: string]: unknown;
+};
+
+type TreeNode = {
+  id?: string;
+  name?: string;
+  children?: TreeNode[];
+  [key: string]: unknown;
+};
+
+type RelatedFigureScore = {
+  username: string;
+  agree: number;
+  disagree: number;
+  shared: number;
+};
+
+type SimQuestionCardData = {
+  question: {
+    prompt: string;
+    type: string;
+  };
+  response: {
+    answer: {
+      value: unknown;
+      encrypted: boolean;
+    };
+    additional: UnknownRecord;
+  };
+};
+
+type SingleQuestionResponseProps = SimQuestionCardData & {
+  isOwnResponse: boolean;
+  mode: string;
+  showImportance: boolean;
+  onDecryptQuestion: () => void;
+};
+
 type SimUserPageState = {
-  userInfo: any | null;
+  userInfo: SimUserInfo | null;
   showFullProfileModal: boolean;
 };
 
-const historicalFiguresData = historicalFigures as any[];
-const atlasDataByUser = atlasData as Record<string, any>;
-const treeDataNodes = treeData as any[];
-const SingleQuestionResponseComponent = SingleQuestionResponse as React.ComponentType<any>;
+const historicalFiguresData = historicalFigures as SimUserInfo[];
+const atlasDataByUser = atlasData as Record<string, AtlasUserData>;
+const treeDataNodes = treeData as TreeNode[];
+const SingleQuestionResponseComponent = SingleQuestionResponse as React.ComponentType<SingleQuestionResponseProps>;
 
 // Build node name lookup from tree
 const nodeNames: Record<string, string> = {};
-const buildNodeNames = (nodes: any[]) => {
-  nodes.forEach((n: any) => {
-    nodeNames[n.id] = n.name.replace(/^\d+\.\s*/, '');
-    if (n.children) buildNodeNames(n.children);
+const buildNodeNames = (nodes: TreeNode[]) => {
+  nodes.forEach((n) => {
+    const id = String(n?.id || '');
+    const name = String(n?.name || '');
+    if (id && name) nodeNames[id] = name.replace(/^\d+\.\s*/, '');
+    if (Array.isArray(n.children)) buildNodeNames(n.children);
   });
 };
 buildNodeNames(treeDataNodes);
 
 // Compute vote correlations between all figures
-const computeRelatedFigures = (username: string) => {
+const computeRelatedFigures = (username: string): { allies: RelatedFigureScore[]; opponents: RelatedFigureScore[] } => {
   const myData = atlasDataByUser[username];
   if (!myData || !myData.votes) return { allies: [], opponents: [] };
 
   const myVotes = myData.votes;
-  const scores: any[] = [];
+  const scores: RelatedFigureScore[] = [];
 
-  Object.entries(atlasDataByUser).forEach(([other, data]: [string, any]) => {
-    if (other === username || !data.votes) return;
+  Object.entries(atlasDataByUser).forEach(([other, data]) => {
+    const otherVotes = data.votes;
+    if (other === username || !otherVotes) return;
     let agree = 0;
     let disagree = 0;
     let shared = 0;
 
     Object.keys(myVotes).forEach((nodeId) => {
-      if (data.votes[nodeId] !== undefined) {
+      if (otherVotes[nodeId] !== undefined) {
         shared++;
         const myVal = parseInt(String(myVotes[nodeId]), 10);
-        const theirVal = parseInt(String(data.votes[nodeId]), 10);
+        const theirVal = parseInt(String(otherVotes[nodeId]), 10);
         if ((myVal > 0 && theirVal > 0) || (myVal < 0 && theirVal < 0)) {
           agree++;
         } else if ((myVal > 0 && theirVal < 0) || (myVal < 0 && theirVal > 0)) {
@@ -95,7 +178,7 @@ const computeStance = (username: string) => {
   return dimensions.map((dim) => {
     let score = 0;
     let count = 0;
-    Object.entries(data.votes as Record<string, any>).forEach(([nodeId, val]) => {
+    Object.entries(data.votes || {}).forEach(([nodeId, val]) => {
       const prefix = nodeId.substring(0, 4);
       const v = parseInt(String(val), 10);
       if (dim.positive.includes(prefix)) { score += v; count++; }
@@ -115,11 +198,17 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
 
   componentDidMount() {
     const { simUsername } = this.props;
-    const userInfo = historicalFiguresData.find((figure) => figure.username === simUsername);
-    this.setState({ userInfo });
+    this.setState(buildSimUserInfoStatePatch({
+      figures: historicalFiguresData,
+      simUsername,
+    }));
   }
 
-  buildQuestionCardData = (question: any) => ({
+  closeFullProfileModal = () => {
+    this.setState(buildSimFullProfileModalStatePatch());
+  };
+
+  buildQuestionCardData = (question: SimQuestion): SimQuestionCardData => ({
     question: {
       prompt: String(question?.question || '').trim() || 'Untitled question',
       type: String(question?.questionType || 'freeform').trim().toLowerCase() || 'freeform',
@@ -133,7 +222,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
     },
   });
 
-  renderQuestionResponse = (question: any, index: number, mode = 'mini') => {
+  renderQuestionResponse = (question: SimQuestion, index: number, mode = 'mini') => {
     const cardData = this.buildQuestionCardData(question);
     return (
       <SingleQuestionResponseComponent
@@ -182,7 +271,13 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
     const { allies, opponents } = computeRelatedFigures(userInfo.username);
 
     return (
-      <div className={`${styles.simUserPage} ${minimized ? styles.minimized : ''}`}>
+      <div
+        className={buildSimUserPageRootClassName({
+          baseClassName: styles.simUserPage,
+          minimized,
+          minimizedClassName: styles.minimized,
+        })}
+      >
         {/* === HERO SECTION === */}
         <div className={styles.heroQuoteRow}>
             <div className={styles.heroSection}>
@@ -235,7 +330,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                         <div className={styles.stanceTrack}>
                           <div
                             className={styles.stanceMarker}
-                            style={{ left: `${(dim.value + 1) / 2 * 100}%` }}
+                            style={resolveSimUserStanceMarkerStyle({ value: dim.value })}
                           />
                         </div>
                         <span className={styles.stanceEndpoint}>{dim.rightLabel}</span>
@@ -260,7 +355,10 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                     </p>
                     <div className={styles.positionList}>
                       {atlasPositions.map((pos) => {
-                        const atlasHref = buildPublicRoute(`/atlas/${pos.nodeId}?demo=1`);
+                        const atlasHref = buildAtlasNodeRoute(pos.nodeId, {
+                          demo: true,
+                          returnTo: readWindowLocationPath(),
+                        });
                         const voteDisplay = pos.vote > 0 ? `+${pos.vote}` : pos.vote;
                         const voteMeaning = pos.vote > 0 ? 'Agrees with the topic framing' : 'Challenges the topic framing';
 
@@ -273,7 +371,12 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                             aria-label={`Open ${pos.nodeName} in the atlas`}
                           >
                             <span
-                              className={`${styles.voteIndicator} ${pos.vote > 0 ? styles.positive : styles.negative}`}
+                              className={buildSimUserVoteIndicatorClassName({
+                                baseClassName: styles.voteIndicator,
+                                negativeClassName: styles.negative,
+                                positiveClassName: styles.positive,
+                                vote: pos.vote,
+                              })}
                               title={`${voteMeaning}: ${voteDisplay}`}
                             >
                               <FontAwesomeIcon icon={pos.vote > 0 ? faArrowUp : faArrowDown} />
@@ -291,7 +394,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                 <div className={styles.surveySection}>
                   <h2 className={styles.screenReaderOnly}>Question Responses</h2>
                   <div className={styles.questionDeck}>
-                    {userInfo.questions.map((question: any, index: number) => this.renderQuestionResponse(question, index))}
+                    {userInfo.questions.map((question, index) => this.renderQuestionResponse(question, index))}
                   </div>
                 </div>
               </div>
@@ -344,7 +447,14 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
                                 onError={(event) => this.handleHistoricalAvatarError(event, o.username, o.username)}
                               />
                               <span className={styles.relatedName}>{oppInfo?.name || o.username}</span>
-                              <span className={`${styles.relatedScore} ${styles.disagree}`}>{o.disagree}</span>
+                              <span
+                                className={buildSimUserRelatedScoreClassName({
+                                  baseClassName: styles.relatedScore,
+                                  disagreeClassName: styles.disagree,
+                                })}
+                              >
+                                {o.disagree}
+                              </span>
                             </a>
                           );
                         })}
@@ -375,8 +485,8 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
           </>
         )}
 
-        <Modal isOpen={this.state.showFullProfileModal} toggle={() => this.setState({ showFullProfileModal: false })} size="lg" className={styles.modalContent}>
-          <ModalHeader toggle={() => this.setState({ showFullProfileModal: false })} className={styles.modalHeader}>Full User Profile</ModalHeader>
+        <Modal isOpen={this.state.showFullProfileModal} toggle={this.closeFullProfileModal} size="lg" className={styles.modalContent}>
+          <ModalHeader toggle={this.closeFullProfileModal} className={styles.modalHeader}>Full User Profile</ModalHeader>
           <ModalBody className={styles.modalBody}>
             <div className={styles.modalSummary}>
               <h3>User Summary</h3>
@@ -385,7 +495,7 @@ class SimUserPage extends Component<SimUserPageProps, SimUserPageState> {
             <div className={styles.modalQuestions}>
               <h3>Question Responses</h3>
               <div className={styles.modalQuestionDeck}>
-                {userInfo.questions.map((question: any, index: number) => this.renderQuestionResponse(question, index, 'fullscreen'))}
+                {userInfo.questions.map((question, index) => this.renderQuestionResponse(question, index, 'fullscreen'))}
               </div>
             </div>
           </ModalBody>

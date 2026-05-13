@@ -100,7 +100,7 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     mustNotOverride: [AUTHORITY_SOURCES.BROWSER],
   },
   workerConfig: {
-    fields: ['corsWorkerUrl', 'allowOrigins', 'limits', 'rpcEndpoint'],
+    fields: ['corsWorkerUrl', 'allowOrigins', 'limits', 'rpcEndpoint', 'litCredentials'],
     authoritativeSource: AUTHORITY_SOURCES.WORKER_KV,
     allowedFallbacks: [],
     mustNotOverride: [
@@ -111,7 +111,13 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     ],
   },
   secrets: {
-    fields: ['arweaveJwk', 'apiKey', 'privateKey', 'litPayerPrivateKey', 'litPayerAddress', 'litCredentials'],
+    fields: [
+      'arweaveJwk',
+      'apiKey',
+      'privateKey',
+      'litAccountApiKey',
+      'litUsageApiKey',
+    ],
     authoritativeSource: AUTHORITY_SOURCES.WORKER_SECRETS,
     allowedFallbacks: [AUTHORITY_SOURCES.BROWSER],
     mustNotOverride: [

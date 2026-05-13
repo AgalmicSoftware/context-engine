@@ -1,8 +1,3 @@
-jest.mock('./sessionConfigResolvers.js', () => ({
-  normalizeSessionSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
-  resolveSessionByName: jest.fn(() => null),
-}));
-
 import {
   normalizeSessionNameFields,
   normalizeSbtSessionLinkFields,
@@ -13,6 +8,11 @@ import {
   normalizeSessionSlug,
   resolveSessionByName,
 } from './sessionConfigResolvers.js';
+
+jest.mock('./sessionConfigResolvers.js', () => ({
+  normalizeSessionSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
+  resolveSessionByName: jest.fn(() => null),
+}));
 
 describe('sessionMetadataFormatting helpers', () => {
   beforeEach(() => {

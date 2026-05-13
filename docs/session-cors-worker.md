@@ -4,6 +4,8 @@ This Worker handles AI proxying, transcription, Arweave uploads, fetch helpers, 
 Secrets live in Worker KV by default; when a user enables a local override, the client may send per-request credentials
 (`apiKey`, `rpcUrl`, `arweaveJwk`) and the worker will use them instead of KV secrets.
 
+It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, and `GET|POST /storage/list`. `/arweave/upload` remains supported for compatibility.
+
 ## OSS worker model
 
 - The project hosts one worker for the demo session; it can sponsor new sessions and includes the embedded deploy-helper path.
@@ -28,8 +30,12 @@ If you deploy via the Group Wizard and a deploy-helper:
 
 1) Fill in the Cloudflare API token and worker name.
    - The "Create API token" link opens a prefilled Cloudflare token template with the required
-     Workers KV + Workers Scripts + Account Settings permissions used by the deploy-helper.
+     Workers KV, Workers Scripts, R2, D1, and Durable Objects permissions used by the deploy-helper.
+     `Account Settings: Edit` is needed only when the helper must create or change the
+     account-level workers.dev subdomain.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
+     Add `--include-workers-dev-subdomain-setup` only when the account does not already have a
+     workers.dev subdomain or when intentionally changing it.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
    - The first-party wizard no longer asks for Cloudflare account ID; the deploy-helper resolves it from the API token.
 2) Fill worker secrets in the wizard (OpenAI key, Arweave JWK, RPC URL, Anthropic key only if any selected AI model uses Anthropic, and optional OpenRouter key) and then click "Deploy worker".
@@ -88,13 +94,22 @@ If you deploy via the Group Wizard and a deploy-helper:
   - `arweaveJwk`
   - `faucetPrivateKey`
   - `customRpcUrl`
-  - `litPayerPrivateKey`
-  - `litPayerAddress` (derived helper field)
+  - `litApiBase`
+  - `litGroupId`
+  - `litPkpId`
+  - `litActionCid`
+  - `litAccountApiKey`
+  - `litUsageApiKey`
   - `bootstrapWorkerUrl`
   - `deployGrantToken`
   - `faucetGrantToken`
   - `meta.label`, `meta.createdAt`, `meta.createdBy`, optional `meta.expiresAt`
   - `meta.sourceSessionSlug`, `meta.sourceWorkerUrl` (bootstrap funding/deploy provenance)
+- Agreed next sponsorship hard-cut:
+  - `litAccountApiKey` is the per-bundle authority field backed by one disposable Lit account per bundle
+  - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
+  - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
+- The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
 - The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
@@ -120,7 +135,8 @@ If you deploy via the Group Wizard and a deploy-helper:
   - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
   - `dist/sessionCorsWorker.bundle.js` remains a generated local/manual fallback bundle for upload retries, but the client build no longer serves `/worker/sessionCorsWorker.bundle.js`.
   - Advanced mode still keeps `Use URL` as the default path and preserves the manual `Upload file` override for testing.
-  - Lit payer secrets remain bundled/applied end-to-end, but they are still optional for deploy-readiness; they continue to drive `sponsored_lit` and payment delegation only when a valid Lit payer key is present.
+  - Scoped Chipotle identifiers and `litUsageApiKey` already flow end-to-end for worker-mediated Lit execution.
+  - Authority-bundle bootstrap now centers on `litAccountApiKey` rather than payer-wallet delegation.
 - Login-stage auto-funding now retries the faucet request against `meta.sourceSessionSlug` / `meta.sourceWorkerUrl` when the new sponsored session has not published its own worker yet, so the freshly connected wallet can still get publish gas from the originating sponsored session.
 - After that first worker deploy, later worker config/secrets adjustments are expected to flow through the signed `/admin/set-config` and `/admin/set-secrets` routes rather than the streamlined normal-mode auto-deploy banner.
 - `customRpcKey` is intentionally out of scope for this MVP and is ignored if present in a bundle payload.
@@ -128,7 +144,7 @@ If you deploy via the Group Wizard and a deploy-helper:
 Temporary standard-link fixture:
 - `client/public/standard-sponsored-links.json` is a tracked public manifest for up to ten disposable sponsored setup URLs.
 - It is intentionally operator-managed and does not read back worker KV or grant state. An active fixture entry is public because the operator chose to publish that bearer URL.
-- Fixture links should be created through `/sponsor` with disposable, resource-limited credentials: capped AI/provider keys, small faucet balances, short expirations, and revocable Arweave/Lit payer wallets.
+- Fixture links should be created through `/sponsor` with disposable, resource-limited credentials: capped AI/provider keys, small faucet balances, short expirations, revocable Arweave wallets, and either revocable Lit usage keys or disposable Lit bundle accounts.
 - Use it only for short-lived low-friction demos or launches. Replace it with a worker-backed claim service before treating sponsored-link inventory as durable availability infrastructure.
 
 Deploy error visibility:
@@ -176,7 +192,7 @@ Admin test panel:
 - The Session Admin page includes a Worker Tests panel to hit `/health`, run a basic AI call,
   upload a tiny JSON payload to Arweave, and record a short AudioInput transcription.
   Arweave and faucet test results include clickable tx links for quick verification.
-  Arweave links use the preferred gateway (`ARWEAVE_GATEWAY_URL`, now `https://ar-io.dev`, with `https://arweave.net` next in the fallback list). By default, reads stay ar.io-first but still fan out across the fallback gateways when the primary route is flaky. When `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, the client switches into explicit ar.io-only troubleshooting mode and uses `CE_ARWEAVE_AR_IO_URL` for links and Arweave read retries without fanning out to legacy gateways. Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
+  Arweave links use the preferred AR.IO gateway (`CE_ARWEAVE_AR_IO_URL` when set, otherwise `https://ar-io.dev`) while `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, which is the default. In this mode, read retries stay on AR.IO and do not fan out to legacy gateways. Set `CE_ARWEAVE_DIRECT_TO_AR_IO=false` only when a deployment intentionally wants fallback reads through `ARWEAVE_GATEWAY_URL`, `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes. Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
   Run these while signed in as a user who holds the sponsored SBT to confirm gating + secrets are wired correctly.
 - If tests fail with a browser network error like `Load failed` / `Failed to fetch`, the worker is often
   rejecting the browser origin via `allowOrigins` (CORS allowlist).
@@ -186,7 +202,7 @@ Admin test panel:
 - Static custom-domain frontend deploys must add the final browser origin (for
   example `https://app.example`) to the same `allowOrigins` list after DNS
   cutover. See the Netlify/static hosting checklist in
-  [`docs/public-client-config.md#static-frontend-deploy`](public-client-config.md#static-frontend-deploy).
+  [`docs/public-client-config.md#netlify-static-deploy`](public-client-config.md#netlify-static-deploy).
 - When AI/Arweave/Faucet tests hit `Session config not found.`, the panel now auto-attempts
   a signed `/admin/set-config` using the selected session metadata, then retries the test once.
   This recovery also covers login-stage 404s (`Worker login failed (404)`) so fresh workers can be
@@ -201,16 +217,41 @@ Admin test panel:
 - The faucet test sends a micro transfer (0.0000001) to a fresh random address; it does not fund the connected wallet.
 - The SBT gate negative tests expect a 403 on login when you connect a wallet without the sponsored SBT.
 
+## Session Storage Routes
+
+Authenticated clients can use the worker as the session storage boundary:
+
+- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings, returning an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
+- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after authenticated route preflight and the configured Cloudflare payload access check. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
+- `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode.
+
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+
+`storageProfile.payloadAccessControl.mode` controls Cloudflare payload access:
+
+- `worker_sbt_gate` is the default for Cloudflare-backed demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
+- `lit_encrypted` is the stronger scaffolded mode. Cloudflare stores only encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
+
+Lit credentials are required only for `lit-arweave` storage or Cloudflare `lit_encrypted` payload mode. Cloudflare `worker_sbt_gate` hides the `/new` Lit key input and relies on the session worker SBT check.
+
 ## Required bindings
 
 KV:
 - `GROUP_KV`
+- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows.
+
+R2/D1:
+- `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for Cloudflare payload blobs.
+- D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
+- Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
 - `DEFAULT_SESSION_SLUG` (optional; canonical)
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
+- `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
+- `LIT_API_BASE` (optional; only if you need a non-default Chipotle API base such as self-hosted/local dev)
 
 Runtime:
 - Enable Node.js compatibility when deploying from the dashboard.
@@ -221,6 +262,11 @@ Runtime:
 - `session:{slug}:config` JSON:
   ```json
   {
+    "storageProfile": {
+      "backend": "cloudflare",
+      "resources": { "docsContext": "active", "questions": "active", "surveys": "active", "responses": "active" },
+      "payloadAccessControl": { "mode": "worker_sbt_gate" }
+    },
     "slug": "test-72",
     "networkChainId": 11155420,
     "registryAddress": "0x...",
@@ -238,6 +284,10 @@ Runtime:
     "scopes": { "ai": true, "arweave": true, "transcribe": true, "faucet": true, "fetch": true }
   }
   ```
+  For `"backend": "cloudflare"`, new `/new` configs default canonical CE payload
+  resources (`docsContext`, `questions`, `surveys`, `responses`, media, and
+  generated artifacts) to `"active"` unless an advanced draft explicitly stages
+  a resource for legacy fallback.
   - `hatsAddress` / `adminHatId` are optional; leave blank/zero to use `adminAddress` only.
   - Worker KV config is normalized on read/write:
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array.
@@ -737,7 +787,7 @@ Admin requests require a fresh signed SIWE message (no session token):
 - `POST /admin/set-config`
 - `POST /admin/set-secrets`
 - `POST /admin/set-limits`
-- `POST /admin/lit-status`
+- `POST /admin/lit-chipotle-status`
 
 Never return secrets in responses.
 
@@ -770,12 +820,48 @@ Never return secrets in responses.
   `arweaveJwk`, scalar-to-string normalization, and the existing allowed-key
   filter before `set-secrets` persists session secrets.
 - Lit sponsorship now adds:
-  - `litPayerPrivateKey` / `litPayerAddress` as supported worker-secret fields
-  - runtime `POST /lit/payment-delegation` for authenticated member delegation handoff
-  - bootstrap `POST /lit/payment-delegation` (no bearer token, signed admin body)
-    when a temporary `litPayerPrivateKey` is supplied before session secrets exist
-  - admin `POST /admin/lit-status` to inspect derived payer address, ledger balance,
-    readiness, and restriction metadata without returning the stored private key.
+  - `litUsageApiKey` as a supported worker-secret field for scoped Chipotle execution
+  - `litAccountApiKey` as a server-only session secret for per-session-account provisioning and later action management
+  - `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid }` as worker config
+    metadata; these are not cryptographic secrets, but they stay worker-side by
+    default because they still reveal operational topology
+  - worker env fallback to `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY`) for
+    Chipotle-backed requests when a session-specific Lit account/usage key is not present
+  - `/lit/chipotle-action` now receives the worker `env` during authenticated
+    dispatch, so the deployment-level Lit env fallback applies to runtime
+    execution as well as status/provisioning paths
+  - v2 Chipotle wrapped keys bind `{ chainId, gateMode, sbtAddresses,
+    litActionCid, litPkpId }` into the encrypted plaintext via a policy
+    fingerprint; decrypt returns the CEK only when the embedded fingerprint
+    matches the worker-approved policy
+  - `encrypt` does not require target SBT ownership, while `check` and
+    `decrypt` still enforce the SBT gate
+  - `check` / `decrypt` derive RPC from worker-approved config, secrets, or
+    defaults. Request `rpcUrl` / `customRpcUrl` is rejected unless it exactly
+    matches that allowlist, and the Lit Action rejects endpoints whose reported
+    chain ID does not match the gate chain.
+  - stored Chipotle metadata omits RPC URLs; legacy v1 / bare-hex Chipotle
+    wrapped keys are rejected by default and must be recreated with v2 metadata
+  - admin `POST /admin/lit-chipotle-status` to query worker-mediated Chipotle
+    readiness, billing balance, and configured group/action/PKP membership
+    without returning the stored API key
+  - admin `POST /admin/lit-chipotle-provision` to register the default CE action
+    into an existing Lit account using a stored session `litAccountApiKey` or a
+    deployment-level fallback account key
+  - admin `POST /admin/lit-chipotle-bootstrap-session` to either create a
+    brand-new Lit account for the session or, when a session/deployment
+    `litAccountApiKey` already exists, derive the missing group / PKP / usage
+    key / CE action inside that account, then persist the returned
+    `litCredentials` plus any newly generated session secrets in the same
+    worker-side flow
+  - planned sponsored-bundle authority mode: carry a disposable per-bundle
+    `litAccountApiKey` in the encrypted `/sponsor` payload so `/new` can mint a
+    fresh group / PKP / usage key for each redeemed session, then keep using
+    only the scoped runtime during day-to-day execution
+  - after default action-source changes, operators must re-run
+    `lit-chipotle-provision` or `lit-chipotle-bootstrap-session` so session
+    `litCredentials.litActionCid` points at the newly derived action CID; there
+    is no compatibility fallback to the old action source
 
 ## Gating on login (on-chain)
 
@@ -1028,7 +1114,9 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
-  when none exists yet (falls back to a deterministic `ce-<accountId>` name).
+  when none exists yet (falls back to a deterministic `ce-<accountId>` name). This is the only
+  deploy-helper path that needs `Account Settings: Edit`; script-level Workers.dev enablement uses
+  the Workers script scope.
 - `allowOrigins` entries are normalized to origins (`https://host`, `http://localhost:3000`), and the
   helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard default seed list includes the hosted app plus local dev/E2E origins for ports `3000`, `3001`, and `7391`.
 - `/new` now uses the project helper by default at `https://ce-deploy-helper.agalmic.workers.dev/`.

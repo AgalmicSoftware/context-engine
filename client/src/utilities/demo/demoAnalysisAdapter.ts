@@ -16,6 +16,10 @@ export const DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS = Object.freeze([
   { label: 'Affiliation', field: 'affiliation' },
   { label: 'Atlas Category', field: 'atlasCategory' },
 ]);
+const DEFAULT_PROFILE_ID = 'historical_baseline';
+const DEFAULT_PROFILE_LABEL = 'Historical persona baseline';
+const DEFAULT_PROFILE_CONFIDENCE = 'High';
+const DEFAULT_PROFILE_RATIONALE = 'Original historical-figure vote row anchored to the canonical demo persona fixtures.';
 
 const VOTE_LABEL_BY_VALUE: Record<string, string> = Object.freeze({
   '-1': 'Disagree',
@@ -93,20 +97,24 @@ export const buildQuestionTags = (comment: LooseRecord = {}) => {
   return tags;
 };
 
+const buildQuestionSources = (comment: LooseRecord = {}) => String(comment?.sources || '')
+  .split(',')
+  .map((part) => String(part || '').trim())
+  .filter(Boolean);
+
 const buildQuestions = (comments: LooseRecord[] = []) => comments.map((comment, index) => ({
   id: String(index),
   commentId: String(comment?.commentId || index),
   index,
   text: String(comment?.commentBody || '').trim(),
   type: 'poll',
+  sourcePromptType: String(comment?.type || '').trim().toLowerCase() || 'binary',
   options: DEMO_ANALYSIS_RESPONSE_OPTIONS.slice(),
   semanticOrder: DEMO_ANALYSIS_RESPONSE_OPTIONS.slice(),
   participationCount: 0,
   category: String(comment?.category || '').trim(),
-  sources: String(comment?.sources || '')
-    .split(',')
-    .map((part) => String(part || '').trim())
-    .filter(Boolean),
+  keyTension: String(comment?.key_tension || comment?.keyTension || '').trim(),
+  sources: buildQuestionSources(comment),
 }));
 
 const incrementMapCount = (map: Map<string, number>, key: string): void => {
@@ -135,6 +143,17 @@ const getParticipantSegments = (participant: LooseRecord = {}, metadata: LooseRe
     });
   });
   return segments;
+};
+
+const buildParticipantProfileDescriptor = (participant: LooseRecord = {}) => {
+  const profileId = String(participant?.profileId || '').trim() || DEFAULT_PROFILE_ID;
+  return {
+    profileId,
+    label: String(participant?.profileLabel || '').trim() || DEFAULT_PROFILE_LABEL,
+    confidence: String(participant?.profileConfidence || '').trim() || DEFAULT_PROFILE_CONFIDENCE,
+    rationale: String(participant?.profileRationale || '').trim() || DEFAULT_PROFILE_RATIONALE,
+    sourceType: String(participant?.profileSourceType || '').trim() || 'historical_baseline',
+  };
 };
 
 const buildDemographicSummary = (participantsVotes: LooseRecord[] = [], metadataByXid: Record<string, LooseRecord> = {}) => {
@@ -194,6 +213,7 @@ export const buildDemoAnalysisData = (
   const flatResponses: LooseRecord[] = [];
   const segmentCounts: Record<string, Record<string, number>> = {};
   const questionTagsData: Record<string, any[]> = {};
+  const questionProfileSummaries: Record<string, any[]> = {};
 
   const unresolvedXids = participantsVotes
     .map((participant) => String(participant?.xid || '').trim())
@@ -207,6 +227,7 @@ export const buildDemoAnalysisData = (
     const responseCountsBySegment = new Map();
     const denominatorsBySegment = new Map();
     const uniqueParticipantKeysBySegment = new Map();
+    const profileCountsByQuestion = new Map();
 
     participantsVotes.forEach((participant, participantIndex) => {
       const xid = String(participant?.xid || '').trim();
@@ -219,6 +240,7 @@ export const buildDemoAnalysisData = (
       if (!responseLabel) return;
 
       const participantKey = getParticipantIdentityKey(participant, `row:${participantIndex}`);
+      const profileDescriptor = buildParticipantProfileDescriptor(participant);
       const segments = getParticipantSegments(participant, metadata);
       segments.forEach(({ segmentKey }) => {
         incrementMapCount(denominatorsBySegment, segmentKey);
@@ -231,11 +253,32 @@ export const buildDemoAnalysisData = (
         uniqueParticipantKeysBySegment.get(segmentKey).add(participantKey);
         incrementMapCount(responseCountsBySegment.get(segmentKey), responseLabel);
       });
+
+      if (!profileCountsByQuestion.has(profileDescriptor.profileId)) {
+        profileCountsByQuestion.set(profileDescriptor.profileId, {
+          ...profileDescriptor,
+          participantKeys: new Set(),
+        });
+      }
+      profileCountsByQuestion.get(profileDescriptor.profileId).participantKeys.add(participantKey);
     });
 
     question.participationCount = Number(uniqueParticipantKeysBySegment.get('All')?.size || 0);
     segmentCounts[questionId] = {};
     questionTagsData[questionId] = buildQuestionTags(comments[question.index]);
+    questionProfileSummaries[questionId] = Array.from(profileCountsByQuestion.values())
+      .map((profileSummary) => ({
+        profileId: profileSummary.profileId,
+        label: profileSummary.label,
+        confidence: profileSummary.confidence,
+        rationale: profileSummary.rationale,
+        sourceType: profileSummary.sourceType,
+        count: Number(profileSummary.participantKeys?.size || 0),
+      }))
+      .sort((left, right) => {
+        if (right.count !== left.count) return right.count - left.count;
+        return left.label.localeCompare(right.label);
+      });
 
     Array.from(denominatorsBySegment.entries())
       .sort(([left], [right]) => left.localeCompare(right))
@@ -264,6 +307,7 @@ export const buildDemoAnalysisData = (
     demographics: buildDemographicSummary(participantsVotes, metadataByXid),
     segmentCounts,
     questionTagsData,
+    questionProfileSummaries,
   };
 };
 

@@ -77,28 +77,6 @@ test('resolveTopLevelRouteSelection preserves raw authorization-header truthines
   );
 });
 
-test('resolveTopLevelRouteSelection routes unauthenticated Lit delegation through bootstrap handling', () => {
-  assert.deepEqual(
-    resolveTopLevelRouteSelection({
-      path: '/lit/payment-delegation',
-      method: 'POST',
-      request: createRequest(),
-      deps: { toStr: String },
-    }),
-    { kind: 'lit-payment-delegation-bootstrap' }
-  );
-
-  assert.deepEqual(
-    resolveTopLevelRouteSelection({
-      path: '/lit/payment-delegation',
-      method: 'POST',
-      request: createRequest({ Authorization: 'Bearer token' }),
-      deps: { toStr: String },
-    }),
-    { kind: 'authenticated' }
-  );
-});
-
 test('resolveTopLevelRouteSelection classifies sponsored bootstrap redeem routes before auth/admin handling', () => {
   assert.deepEqual(
     resolveTopLevelRouteSelection({

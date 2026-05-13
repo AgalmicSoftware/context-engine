@@ -26,7 +26,7 @@ import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper.js';
 import { createLogger } from '../../../utilities/logging.js';
 
 const surveyLog = createLogger('surveys');
-const LIVE_CONVERSATION_RECORDER_DISABLED_REASON = 'Recording is temporarily disabled while we move long-form conversation capture into a future PRD.';
+const LIVE_CONVERSATION_RECORDER_DISABLED_REASON = 'Recording is temporarily disabled while we move long-form conversation capture into a future workflow.';
 
 type SessionConfig = Record<string, unknown>;
 
@@ -81,6 +81,7 @@ type AudioInputProps = {
   showRecordingTimerInTextbox?: boolean;
   recordingDurationSeconds?: number | string | null;
   enableDownloads?: boolean;
+  style?: React.CSSProperties;
 };
 
 type PlaceholderStyle = React.CSSProperties & {

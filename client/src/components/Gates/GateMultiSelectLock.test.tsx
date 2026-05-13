@@ -103,6 +103,31 @@ describe('GateMultiSelectLock', () => {
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('aria-label', 'Edit locked access rule');
   });
 
+  it('marks selected gate rows with a visible selected-state affordance', () => {
+    render(
+      <GateMultiSelectLock
+        gateOptions={gateOptions}
+        selectedGateIds={['alpha']}
+        onChangeSelectedGateIds={jest.fn()}
+        open={true}
+        onToggleOpen={jest.fn()}
+        disabled={false}
+        showDots={false}
+      />
+    );
+
+    const rows = screen.getAllByTestId(E2E_TESTIDS.GATE_LOCK_ROW);
+    const alphaRow = rows.find((row) => row.getAttribute('data-ce-gate-id') === 'alpha');
+    const betaRow = rows.find((row) => row.getAttribute('data-ce-gate-id') === 'beta');
+
+    expect(alphaRow).toHaveClass(styles.rowActive);
+    expect(alphaRow).toHaveAttribute('aria-current', 'true');
+    expect(alphaRow?.querySelector(`.${styles.selectionMarkActive}`)).not.toBeNull();
+    expect(betaRow).not.toHaveClass(styles.rowActive);
+    expect(betaRow).not.toHaveAttribute('aria-current');
+    expect(betaRow?.querySelector(`.${styles.selectionMarkActive}`)).toBeNull();
+  });
+
   it('opens the single-gate popover from the lock button and toggles selection inside the menu', () => {
     const onToggleOpen = jest.fn();
     const onChangeSelectedGateIds = jest.fn();

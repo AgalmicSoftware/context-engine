@@ -1,11 +1,25 @@
 import { createLogger } from 'utilities/logging.js';
 
 const SURVEY_TOOL_PERF_SCOPE = 'surveyTool';
+type SurveyPerfCounterScope = Record<string, number>;
+type SurveyPerfCounters = Record<string, SurveyPerfCounterScope>;
+type SurveyRuntimeGlobal = typeof globalThis & {
+  ENABLE_CE_UI_PERF_STATS?: unknown;
+  ENABLE_CE_DEBUG_COUNTERS?: unknown;
+  __CE_DEBUG_COUNTERS__?: unknown;
+  __CE_PERF_COUNTERS__?: SurveyPerfCounters | unknown;
+};
+
+const getSurveyRuntimeGlobal = (): SurveyRuntimeGlobal | null => (
+  typeof globalThis !== 'undefined'
+    ? globalThis as unknown as SurveyRuntimeGlobal
+    : null
+);
 
 export const surveyLog = createLogger('surveys');
 export const GATE_SBT_HYDRATION_RETRY_MS = 45 * 1000;
 
-// Keep this dormant toggle path for PRD 135 voice-only interview mode.
+// Keep this dormant toggle path for future voice-only interview mode.
 // The pile hologram avatar is intentionally hidden for now, but the render/state
 // plumbing stays in place so future voice-mode work can re-enable it cleanly.
 export const SHOW_PILE_HOLOGRAM_TOGGLE = false;
@@ -18,10 +32,11 @@ export const QUESTION_TAG_DROPDOWN_ROW_STYLE = {
 
 export const isSurveyPerfCountersEnabled = (): boolean => {
   try {
-    return typeof globalThis !== 'undefined' && (
-      (globalThis as any).ENABLE_CE_UI_PERF_STATS === true ||
-      (globalThis as any).ENABLE_CE_DEBUG_COUNTERS === true ||
-      (globalThis as any).__CE_DEBUG_COUNTERS__ === true
+    const runtimeGlobal = getSurveyRuntimeGlobal();
+    return !!runtimeGlobal && (
+      runtimeGlobal.ENABLE_CE_UI_PERF_STATS === true ||
+      runtimeGlobal.ENABLE_CE_DEBUG_COUNTERS === true ||
+      runtimeGlobal.__CE_DEBUG_COUNTERS__ === true
     );
   } catch (_) {
     return false;
@@ -31,17 +46,21 @@ export const isSurveyPerfCountersEnabled = (): boolean => {
 export const bumpSurveyPerfCounter = (key: unknown, inc: unknown = 1): void => {
   if (!isSurveyPerfCountersEnabled()) return;
   try {
-    if (!(globalThis as any).__CE_PERF_COUNTERS__ || typeof (globalThis as any).__CE_PERF_COUNTERS__ !== 'object') {
-      (globalThis as any).__CE_PERF_COUNTERS__ = {};
+    const runtimeGlobal = getSurveyRuntimeGlobal();
+    if (!runtimeGlobal) return;
+    if (!runtimeGlobal.__CE_PERF_COUNTERS__ || typeof runtimeGlobal.__CE_PERF_COUNTERS__ !== 'object') {
+      runtimeGlobal.__CE_PERF_COUNTERS__ = {};
     }
+    const counters = runtimeGlobal.__CE_PERF_COUNTERS__ as SurveyPerfCounters;
     if (
-      !(globalThis as any).__CE_PERF_COUNTERS__[SURVEY_TOOL_PERF_SCOPE] ||
-      typeof (globalThis as any).__CE_PERF_COUNTERS__[SURVEY_TOOL_PERF_SCOPE] !== 'object'
+      !counters[SURVEY_TOOL_PERF_SCOPE] ||
+      typeof counters[SURVEY_TOOL_PERF_SCOPE] !== 'object'
     ) {
-      (globalThis as any).__CE_PERF_COUNTERS__[SURVEY_TOOL_PERF_SCOPE] = {};
+      counters[SURVEY_TOOL_PERF_SCOPE] = {};
     }
-    const scope = (globalThis as any).__CE_PERF_COUNTERS__[SURVEY_TOOL_PERF_SCOPE];
-    scope[key as any] = Number(scope[key as any] || 0) + Number(inc || 0);
+    const scope = counters[SURVEY_TOOL_PERF_SCOPE];
+    const keyName = String(key);
+    scope[keyName] = Number(scope[keyName] || 0) + Number(inc || 0);
   } catch (error) {
     void error;
   }

@@ -22,6 +22,13 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
+const originalFetch = global.fetch;
+const fullCrossCorpusPayload = JSON.parse(
+  fs.readFileSync(
+    path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'),
+    'utf8'
+  )
+);
 
 const extractMediaBlock = (scss, query, requiredSnippet = '') => {
   let searchFrom = 0;
@@ -155,6 +162,10 @@ describe('OnePageSession view gating', () => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     window.sessionStorage.clear();
+    Object.defineProperty(global, 'fetch', {
+      writable: true,
+      value: originalFetch,
+    });
   });
 
   const buildProps = () => ({
@@ -544,7 +555,7 @@ describe('OnePageSession view gating', () => {
 
   it('shows the demo Documents tooltip copy only when the section is expanded', async () => {
     const props = buildProps();
-    const documentsTooltipText = 'This corpus is evolving into a conversational layer for the session: you’ll be able to chat with the material, have it surface and pose relevant questions, and connect those prompts fluidly with responses.';
+    const documentsTooltipText = 'Allows the conversation to be enriched by data, and the formats can change per-session';
 
     render(
       <OnePageSession
@@ -565,6 +576,54 @@ describe('OnePageSession view gating', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/tree/main/ai-discourse-corpus'
     );
+    expect(screen.getByTestId('ce-demo-documents-load-full-corpus')).toHaveTextContent('Load full corpus');
+  });
+
+  it('renders the full corpus loader beside the GitHub link and drives the embedded corpus viewer from the header', async () => {
+    const props = buildProps();
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => fullCrossCorpusPayload,
+    });
+    Object.defineProperty(global, 'fetch', {
+      writable: true,
+      value: fetchMock,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/session/demo']}>
+        <OnePageSession
+          {...props}
+          slug="demo"
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+        />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+
+    const githubLink = screen.getByRole('link', { name: 'GitHub' });
+    const loadButton = screen.getByTestId('ce-demo-documents-load-full-corpus');
+
+    expect(loadButton).toHaveTextContent('Load full corpus');
+    expect(loadButton.parentElement).toBe(githubLink.parentElement);
+
+    fireEvent.click(loadButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json',
+        { cache: 'no-store' }
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('ce-demo-documents-load-full-corpus')).toHaveTextContent('Full corpus loaded');
+    });
+
+    expect(screen.getByTestId('ce-demo-documents-load-full-corpus')).toBeDisabled();
   });
 
   it('shows groups header actions only while expanded and drives embedded create state from the header', async () => {
@@ -1023,6 +1082,7 @@ describe('OnePageSession view gating', () => {
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+    fireEvent.click(screen.getByRole('button', { name: 'Tweets' }));
 
     const atlasIssueButtons = await screen.findAllByRole('button', { name: 'Exponential Progress Debate' });
     fireEvent.click(atlasIssueButtons[0]);
@@ -1092,6 +1152,30 @@ describe('OnePageSession view gating', () => {
     expect(reportButton).not.toHaveTextContent('🐝');
   });
 
+  it('orders Debate Map ahead of Breakdown in the demo results mode switcher', async () => {
+    const props = buildProps();
+
+    render(
+      <OnePageSession
+        {...props}
+        slug="demo"
+        sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+
+    const reportButton = await screen.findByRole('button', { name: /^Report$/i });
+    const debateMapButton = screen.getByRole('button', { name: /^Debate Map$/i });
+    const breakdownButton = screen.getByRole('button', { name: /^Breakdown$/i });
+    const riskMatrixButton = screen.getByRole('button', { name: /^Risk Matrix$/i });
+
+    expect(reportButton).toHaveAttribute('aria-pressed', 'true');
+    expect(reportButton.compareDocumentPosition(debateMapButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(debateMapButton.compareDocumentPosition(breakdownButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(breakdownButton.compareDocumentPosition(riskMatrixButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('renders the demo analysis workspace when the Breakdown mode is selected', async () => {
     const props = buildProps();
 
@@ -1108,6 +1192,14 @@ describe('OnePageSession view gating', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /^Breakdown$/i })).toBeInTheDocument();
     });
+
+    const resultsNav = screen.getByTestId('ce-session-results-view-nav');
+    expect(
+      within(resultsNav)
+        .getAllByRole('button')
+        .slice(0, 4)
+        .map((button) => button.getAttribute('title') || button.textContent?.trim())
+    ).toEqual(['Report', 'Debate Map', 'Breakdown', 'Risk Matrix']);
 
     const polisButton = screen.getByRole('button', { name: /^Report$/i });
     const analysisButton = screen.getByRole('button', { name: /^Breakdown$/i });
@@ -1510,6 +1602,13 @@ describe('OnePageSession view gating', () => {
     const statusAlert = screen.getByTestId(E2E_TESTIDS.SESSION_AUTO_MINT_STATUS);
     const link = within(statusAlert).getByRole('link', { name: 'Joined: Edge Badge' });
     expect(link.getAttribute('href')).toBe(buildSbtDetailPath(sbtAddress.toLowerCase(), 'edge'));
+  });
+
+  it('keeps the auto-join status close control on the same banner row', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.sbtMintStatusItem\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*54px;/);
+    expect(scss).toMatch(/:global\(\.sbt-alert-close-btn\)\s*{[\s\S]*?position:\s*absolute !important;[\s\S]*?top:\s*50% !important;[\s\S]*?right:\s*10px !important;[\s\S]*?transform:\s*translateY\(-50%\) !important;/);
   });
 
   it('auto-mints public no-password SBTs through the session queue', async () => {

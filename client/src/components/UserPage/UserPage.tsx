@@ -1,6 +1,176 @@
 /** @file UserPage.tsx */
 import React, { Component } from 'react';
 import styles from './UserPage.module.scss';
+import {
+  buildUserPageAnalysisAiOptions,
+  buildUserPageAnalysisErrorStatePatch,
+  buildUserPageAnalysisFingerprint,
+  applyUserPageBookmarkToggle,
+  applyUserPageBookmarkNicknameSave,
+  buildUserPageAnalysisCacheEntry,
+  buildUserPageAnalysisCacheWritePayload,
+  buildUserPageCacheRefreshOptions,
+  buildUserPageRefreshTelemetrySignature,
+  buildUserPageRefreshTelemetrySnapshot,
+  buildUserPageCacheSourcePresence,
+  buildUserPageAnalysisCreatedQuestions,
+  buildUserPageAnalysisCreatedSurveys,
+  buildUserPageAnalysisCandidateLogRows,
+  buildUserPageAnalysisExcludeSlugSet,
+  buildUserPageAnalysisElapsedStatePatch,
+  buildUserPageAnalysisModalStatePatch,
+  buildUserPageAnalysisQuestions,
+  buildUserPageAnalysisResetStatePatch,
+  buildUserPageAnalysisResultStatePatch,
+  buildUserPageAnalysisSbts,
+  buildUserPageAnalysisSurveys,
+  buildUserPageAddressContextResetStatePatch,
+  buildUserPageAiAvailabilityStatePatch,
+  buildUserPageAiSessionSlugCandidates,
+  buildUserPageBookmarkStatusStateUpdate,
+  buildUserPageBookmarkToggleStatePatch,
+  buildUserPageAiSessionScopeContext,
+  buildUserPageBooleanTogglePatch,
+  buildUserPageCacheRefreshInputSignature,
+  buildUserPageCacheLoadingHoldFlags,
+  buildUserPageCacheSourceSnapshot,
+  buildUserPageCopiedStatePatch,
+  buildUserPageDeepScanReportSignature,
+  buildUserPageDeepScanReportStatus,
+  buildUserPageDeepScanReportStatePatch,
+  buildUserPageDeepScanReportTelemetryPayloads,
+  buildUserPageDeepScanRefreshCarryPatch,
+  buildUserPageDeepScanTooltipDisplayState,
+  buildUserPageDeepScanProgressRowDisplayState,
+  buildUserPageDeepScanProgressStatePatch,
+  buildUserPageDeepScanPrioritySlugs,
+  buildUserPageDeepScanRequestStatePatch,
+  buildUserPageDeepScanTooltipInputSignature,
+  buildUserPageDeriveTelemetrySnapshot,
+  buildUserPageDecryptableResponseField,
+  buildUserPageDecryptedResponsePatch,
+  buildUserPageGateAccessCacheKey,
+  buildUserPageGatePendingKey,
+  buildUserPageFullProfileModalStatePatch,
+  buildUserPageMissingAddressCacheStatePatch,
+  buildUserPageMissingAddressCacheStateUpdate,
+  buildUserPageNicknameEditCancelStatePatch,
+  buildUserPageNicknameEditOpenStatePatch,
+  buildUserPageNicknameInputStatePatch,
+  buildUserPageNicknameSaveStatePatch,
+  buildUserPageNoSbtVisibleTelemetryState,
+  buildUserPageProfileEditVisibility,
+  buildUserPageResponseDecryptSurveyBindings,
+  buildUserPageResponseSectionDeriveSignature,
+  buildUserPageRenderLoadingState,
+  buildUserPageCreatedQuestionWrapperClassName,
+  buildUserPageHeaderBookmarkClassName,
+  buildUserPageSbtSection,
+  buildUserPageSbtSectionDeriveSignature,
+  buildUserPageSectionLoadingEmptyState,
+  buildUserPageSelectedTabStatePatch,
+  buildUserPageSurveyExpansionTogglePatch,
+  buildUserPageTooltipTargetIds,
+  buildUserPageUnifiedCacheAggregateMemoKey,
+  buildUserPageUncertainEmptyText,
+  buildUserPageUncertaintyLoadingFlags,
+  buildUserPageUserStatsMergePatch,
+  buildUserPageUsernameChangeStatePatch,
+  buildUserPageUsernameEditCancelStatePatch,
+  buildUserPageUsernameEditOpenStatePatch,
+  buildUserPageUsernameErrorStatePatch,
+  buildUserPageUsernameLoadedStatePatch,
+  buildUserPageUsernameSaveStatePatch,
+  buildUserPageViewAddressStatePatch,
+  applyUserPageOwnershipSignal,
+  deriveUserPageDeepScanProgressRows,
+  extractUserPageResponseRecency,
+  formatUserPageDeepScanBlockCount,
+  formatUserPageDeepScanTooltipLinesFromRows,
+  getActiveUserPageChainNode,
+  getPrioritizedUserPageChainNodes,
+  getPrioritizedUserPageNetworkCacheNodes,
+  getUserPageGateResourceKeysToCheck,
+  getUserPageErrorMessage,
+  hasDisplayableUserPageResponsePayload,
+  hasMeaningfulUserPageOwnershipCounts,
+  hasUserPageResponseSubmissionHints,
+  inferUserPageResponseEncryptionAudience,
+  inferUserPageResponseFieldEncryptionAudience,
+  isPlainAnalysisObject,
+  isUserPageAdditionalFieldEncrypted,
+  isUserPageAnswerFieldEncrypted,
+  isUserPageEncryptedResponseField,
+  isUserPageGateAccessContext,
+  isUserPageResponsePayloadEncrypted,
+  buildUserPageRootClassName,
+  normalizeUserPageDeepScanProgressRows,
+  normalizeUserPageDeepScanTooltipLines,
+  normalizeUserAnalysisResult,
+  normalizeUserPageBookmarksCache,
+  normalizeUserPageGateSlug,
+  normalizeUserPageQuestionResponseInfoOrder,
+  normalizeUserPageSingleQuestionResponsePayload,
+  mergeUserPageQueuedCacheRefreshFlags,
+  parseUserPageCachedResponsePayload,
+  readUserPageCacheSourcePresence,
+  readUserPageCacheSourceSnapshot,
+  readUserPageNamespaceSourceEntries,
+  readBoolishUserPageTelemetryFlag,
+  readUserPageAnalysisCacheEntry,
+  readUserPageNetworkCache,
+  resolveUserPageAnalysisAiContext,
+  resolveUserPageAnalysisCacheStatusState,
+  resolveUserPageAnalysisModalDisplayState,
+  resolveUserPageAnalysisSessionConfigForSlug,
+  resolveUserPageAnalysisSessionFallback,
+  resolveUserPageAddressDisplayState,
+  resolveUserPageAiActionAvailability,
+  resolveUserPageAiAvailabilityRefresh,
+  resolveUserPageAnalyzeButtonDisplayState,
+  resolveUserPageAvatarDisplayState,
+  resolveUserPageBlockieSeed,
+  resolveUserPageBookmarkButtonDisplayState,
+  resolveUserPageBookmarkNickname,
+  resolveUserPageBookmarkStatus,
+  resolveUserPageBookmarksLinkDisplayState,
+  resolveUserPageCompareButtonDisplayState,
+  resolveUserPageCopyIconDisplayState,
+  resolveUserPageInlineEnteredIndicatorDisplayState,
+  resolveUserPageFullProfileModalDisplayState,
+  resolveUserPageHeaderActionVisibility,
+  resolveUserPageQuestionSectionDisplayState,
+  resolveUserPageSbtDisplayState,
+  resolveUserPageSurveyCountDisplayState,
+  resolveUserPageSurveyCreatedCardState,
+  resolveUserPageSurveyPreviewDisplayState,
+  resolveUserPageSurveyResponseCardState,
+  resolveUserPageSurveySectionDisplayState,
+  resolveUserPageDeepScanSessionDisplayConfig,
+  resolveUserPageDeepScanProgressStateUpdate,
+  resolveUserPageAddressContextChange,
+  resolveUserPageCacheUpdateRefresh,
+  resolveUserPageManagedCacheUpdate,
+  resolveUserPageQuestionPromptText,
+  resolveUserPageQuestionSourceSessionSlug,
+  resolveUserPageResponseNonceRefresh,
+  resolveUserPageSectionToggleDisplayState,
+  resolveUserPageUsernameErrorDisplayState,
+  shortenUserPageQuestionId,
+  shouldApplyUserPageDeepScanResponse,
+  shouldRetryUserPageQuestionData,
+  toAnalysisCacheBucket,
+  toAnalysisRecord,
+  upsertUserPageResponseByRecency,
+  writeUserPageSourceSlug,
+  type UserPageAnalysisFingerprintInput,
+  type UserPageAiSessionScopeContext,
+  type UserPageBookmarksCache,
+  type UserPageEffectiveAiConfigRequest,
+  type UserPageEffectiveAiConfigResult,
+  type UserPageSourceSlugMap,
+  applyUserPageDecryptedPatchToResponseField,
+} from './userPageHelpers';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCopy,
@@ -36,6 +206,7 @@ import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   getSessionConfigBySlugOrDefault,
+  getSessionSlugByName,
   normalizeSessionSlug,
 } from '../../utilities/web3/contractScripts.js';
 import {
@@ -69,150 +240,534 @@ const USERPAGE_RESPONSE_PARSE_MEMO_LIMIT = 300;
 const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
 const USER_ANALYSIS_CACHE_VERSION = 1;
 const USER_ANALYSIS_TTL_MS = 24 * 60 * 60 * 1000;
-const globalState: any = globalThis as any;
 
-const getErrorMessage = (error: any, fallback = 'Unknown error') => (
-  error && typeof error === 'object' && typeof error.message === 'string'
-    ? error.message
-    : fallback
-);
-
-const isPlainAnalysisObject = (value: any) => (
-  value != null &&
-  typeof value === 'object' &&
-  !Array.isArray(value)
-);
-
-const sortUserAnalysisKeys = (value: any): any => {
-  if (Array.isArray(value)) {
-    return value.map((item: any) => sortUserAnalysisKeys(item));
-  }
-  if (!isPlainAnalysisObject(value)) return value;
-  return Object.keys(value)
-    .sort()
-    .reduce((acc: any, key: any) => {
-      acc[key] = sortUserAnalysisKeys(value[key]);
-      return acc;
-    }, {});
+type UnknownRecord = Record<string, unknown>;
+type UserPagePreviousProps = UnknownRecord & {
+  network?: {
+    id?: unknown;
+  } | null;
 };
 
-const digestUserAnalysisCanonicalString = async (canonical: any) => {
-  const subtle = globalThis?.crypto?.subtle;
-  if (subtle && typeof subtle.digest === 'function' && typeof TextEncoder !== 'undefined') {
-    const buffer = await subtle.digest('SHA-256', new TextEncoder().encode(canonical));
-    return Array.from(new Uint8Array(buffer))
-      .map((byte: any) => byte.toString(16).padStart(2, '0'))
-      .join('');
-  }
-
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < canonical.length; i += 1) {
-    hash ^= canonical.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return `fnv1a:${hash.toString(16).padStart(8, '0')}`;
+type UserPageGlobalState = typeof globalThis & {
+  CE_USER_PROFILE_DEEP_SCAN_LOADING?: unknown;
+  CE_PROFILE_SCAN_TELEMETRY?: unknown;
+  CE_PROFILE_SCAN_COLD_DIAG?: unknown;
+  CE_SESSION_SCAN_SCOPE?: unknown;
+  CE_SESSION_SCAN_SLUGS?: unknown;
+  [key: string]: unknown;
 };
 
-const buildUserAnalysisFingerprint = async ({
-  userData,
-  address,
-  networkId,
-  sessionSlug,
-  provider,
-  model,
-}: any) => {
-  const canonical = JSON.stringify(sortUserAnalysisKeys({
-    version: USER_ANALYSIS_CACHE_VERSION,
-    userData,
-    address: String(address || '').trim().toLowerCase(),
-    networkId: String(networkId || ''),
-    sessionSlug: String(sessionSlug || ''),
-    provider: String(provider || '').trim().toLowerCase(),
-    model: String(model || '').trim(),
-  }));
-  return digestUserAnalysisCanonicalString(canonical);
+type UserCacheSourceEntry = {
+  slug?: unknown;
+  data?: UnknownRecord;
+  [key: string]: unknown;
 };
 
-const deriveAnalysisAiContextFromSessionConfig = (sessionSlug: any, sessionConfig: any = {}) => {
-  const ai = (sessionConfig?.ai && typeof sessionConfig.ai === 'object') ? sessionConfig.ai : {};
-  const models = (ai.models && typeof ai.models === 'object') ? ai.models : {};
-  const modelProviders = (ai.modelProviders && typeof ai.modelProviders === 'object') ? ai.modelProviders : {};
-  const thinkingModel = models.thinking || models.reasoning || models.default;
-  const fallbackProvider = String(ai.mode || ai.provider || 'openai').trim().toLowerCase() || 'openai';
-  const provider = String(
-    (thinkingModel && typeof thinkingModel === 'object' ? thinkingModel.provider : '') ||
-    modelProviders.thinking ||
-    modelProviders.reasoning ||
-    modelProviders.default ||
-    fallbackProvider
-  ).trim().toLowerCase() || 'openai';
-  const model = String(
-    (thinkingModel && typeof thinkingModel === 'object'
-      ? (thinkingModel.model || thinkingModel.name || thinkingModel.value)
-      : thinkingModel) ||
-    'gpt-5'
-  ).trim() || 'gpt-5';
-  return {
-    sessionSlug: String(sessionSlug || ''),
-    provider,
-    model,
+type NamespaceCacheSourceEntry = {
+  slug: string;
+  data: UnknownRecord;
+};
+
+type CacheSourcePresence = {
+  hasSurveysCache: boolean;
+  hasQuestionsCache: boolean;
+  hasSbtCache: boolean;
+  hasUserCache: boolean;
+};
+
+type CacheSourceSnapshot = CacheSourcePresence & {
+  hasSurveySources: boolean;
+  hasQuestionSources: boolean;
+  hasSbtSources: boolean;
+  surveySourcesSignature: string;
+  questionSourcesSignature: string;
+  sbtSourcesSignature: string;
+  membershipSignature: string;
+};
+
+type UserPageTimerHandle = ReturnType<typeof setTimeout>;
+
+type UnifiedCacheAggregateMemoKeyInput = {
+  viewAddressLower?: unknown;
+  networkID?: unknown;
+  sourceMembershipSignature?: unknown;
+};
+
+type SectionDeriveSignatureInput = {
+  viewAddressLower?: unknown;
+  networkID?: unknown;
+  sourceSignature?: unknown;
+};
+
+type QueuedCacheRefreshOptions = {
+  force?: unknown;
+  markLoading?: unknown;
+  bypassSignature?: unknown;
+};
+
+type CacheRefreshOptions = {
+  force: boolean;
+  markLoading: boolean;
+  bypassSignature?: boolean;
+};
+
+type UnifiedCacheAggregateInput = {
+  networkID?: unknown;
+  viewAddressLower?: unknown;
+};
+
+type CacheNetworkBucket = UnknownRecord & {
+  surveys?: unknown;
+  surveyResponses?: unknown;
+  questions?: unknown;
+  questionResponses?: unknown;
+  questionResponsesMeta?: unknown;
+  sbtList?: unknown;
+};
+
+type PrioritizedCacheNode = {
+  key: string;
+  value: CacheNetworkBucket;
+};
+
+type UserCachePayload = UnknownRecord & {
+  sbts?: unknown;
+  createdSurveys?: unknown;
+  createdQuestions?: unknown;
+  surveyResponses?: unknown;
+  questionResponses?: unknown;
+};
+
+type UserChainNode = UnknownRecord & {
+  data?: unknown;
+};
+
+type PrioritizedUserChainNode = {
+  chainKey: string;
+  node: UserChainNode;
+};
+
+type GateAccessKeyInput = {
+  slug?: unknown;
+  resourceKey?: unknown;
+};
+
+type GateAccessStatusEntry = {
+  status: string;
+  ts: number;
+};
+
+type CacheRefreshInputSignatureInput = {
+  viewAddressLower?: unknown;
+  networkID?: unknown;
+  hasSurveySources?: unknown;
+  hasQuestionSources?: unknown;
+  hasSbtSources?: unknown;
+  sourceMembershipSignature?: unknown;
+};
+
+type SponsoredAccessResult = {
+  status?: unknown;
+  [key: string]: unknown;
+};
+
+type ResponseGateAccessCheckPromise = Promise<void>;
+
+type GateAccessContext = {
+  pendingKeys: Set<string>;
+  uncertainResources: Set<string>;
+};
+
+type GateAccessContextSnapshot = {
+  pendingKeys: string[];
+  uncertainResources: string[];
+};
+
+type GateAccessStatusByResource = {
+  resourceKey: string;
+  status: string;
+};
+
+type SourceSlugMap = UserPageSourceSlugMap;
+
+type EntityCacheMap = Record<string, UnknownRecord>;
+
+type ResponseByResponderMap = Record<string, unknown>;
+
+type ResponseBucketMap = Record<string, ResponseByResponderMap>;
+
+type ResponseRecencyWithHints = ResponseRecency & {
+  hasHints: boolean;
+};
+
+type ResponseRecencyBucketMap = Record<string, Record<string, ResponseRecencyWithHints>>;
+
+type SbtAggregateEntry = UnknownRecord & {
+  sbtAddress?: unknown;
+  sbtInfo?: unknown;
+  mintedSet: Set<string>;
+  burnedSet: Set<string>;
+  viewerCountsAuthoritative?: boolean;
+  blockNumber: number;
+  slug?: unknown;
+};
+
+type SbtAggregateMap = Record<string, SbtAggregateEntry>;
+
+type DerivedSbtListItem = {
+  sbtInfo: UnknownRecord;
+  slug?: unknown;
+};
+
+type UserPageRenderSurveyEntry = UnknownRecord & {
+  id: string;
+  title: React.ReactNode;
+  questionsCount: React.ReactNode;
+  slug?: string;
+  tags: React.ReactNode[];
+  documentURLs: string[];
+};
+
+type UserPageRenderQuestionEntry = UnknownRecord & {
+  id: string;
+  canDecryptOtherResponses?: unknown;
+  sessionSlug?: unknown;
+  slug?: unknown;
+};
+
+type UserPageSurveyPreviewEntry = {
+  id?: unknown;
+  text?: unknown;
+};
+
+type SbtSectionResult = {
+  sbtList: DerivedSbtListItem[];
+  badgesReceived: number;
+};
+
+type ResponseEncryptionSummary = {
+  answerEncrypted: boolean;
+  additionalEncrypted: boolean;
+};
+
+type SurveyQuestionResponseDetail = {
+  questionData: UnknownRecord;
+  responseData: NormalizedQuestionResponsePayload;
+  canDecryptOtherResponses: boolean;
+  responseEncryption: ResponseEncryptionSummary;
+};
+
+type SurveySectionResult = {
+  surveyResponseInfo: UnknownRecord[];
+  surveyCreationInfo: UnknownRecord[];
+  detailedSurveyResponses: Record<string, SurveyQuestionResponseDetail[]>;
+  surveysResponded: number;
+  surveysCreated: number;
+};
+
+type QuestionResponseInfoEntry = UnknownRecord & {
+  _responseRecency?: ResponseRecency;
+};
+
+type QuestionSectionResult = {
+  questionCreationInfo: UnknownRecord[];
+  questionResponseInfo: UnknownRecord[];
+  detailedQuestionResponses: Record<string, NormalizedQuestionResponsePayload>;
+  questionsCreated: number;
+  questionsResponded: number;
+};
+
+type SurveyResponseRecencyUpsertInput = {
+  sid?: unknown;
+  responder?: unknown;
+  responseValue?: unknown;
+  metaValue?: unknown;
+  slug?: unknown;
+};
+
+type QuestionResponseRecencyUpsertInput = {
+  qid?: unknown;
+  responder?: unknown;
+  responseValue?: unknown;
+  metaValue?: unknown;
+  slug?: unknown;
+};
+
+type EncryptedVisibilityInput = {
+  resourceKey?: unknown;
+  slug?: unknown;
+  viewAddressLower?: unknown;
+  encryptionAudience?: unknown;
+  gateContext?: GateAccessContext | null;
+};
+
+type EncryptedVisibilityResult = {
+  visible: boolean;
+  canDecryptOtherResponses: boolean;
+  uncertain?: boolean;
+};
+
+type DecryptableResponseField = UnknownRecord & {
+  value: unknown;
+  encrypted: boolean;
+};
+
+type DecryptedResponsePatchInput = {
+  responseObj?: unknown;
+  questionId?: unknown;
+  fieldToDecrypt?: unknown;
+  decryptedResult?: unknown;
+};
+
+type ResponseDecryptSurveyBindings = {
+  surveyId: string;
+  acceptedSurveyIds: string[];
+};
+
+type DecryptSingleFieldOptions = UnknownRecord & {
+  account: string;
+  provider?: unknown;
+  providerKind?: unknown;
+  chainId: number;
+  surveyId: string;
+  acceptedSurveyIds: string[];
+  lit: unknown;
+  throwOnError: boolean;
+};
+
+type CryptoUtilsWithSingleField = {
+  decryptSingleField: (
+    responseSlice: unknown,
+    questionId: string,
+    fieldToDecrypt: unknown,
+    options: DecryptSingleFieldOptions
+  ) => Promise<unknown>;
+};
+
+type SectionDeriveMemoEntry = {
+  signature: string;
+  result: unknown;
+  gateSnapshot?: GateAccessContextSnapshot;
+} | null;
+
+type SectionDeriveMemo = {
+  survey: SectionDeriveMemoEntry;
+  question: SectionDeriveMemoEntry;
+  sbt: SectionDeriveMemoEntry;
+};
+
+type DeepScanSessionDisplayConfig = UnknownRecord & {
+  sessionName?: unknown;
+  blockLimits?: UnknownRecord & {
+    start?: unknown;
   };
 };
 
-const resolveUserAnalysisAiContext = async (sessionSlug: any, sessionConfig: any = {}) => {
-  const fallback = deriveAnalysisAiContextFromSessionConfig(sessionSlug, sessionConfig);
-  try {
-    const effective = await getEffectiveAiConfig({
-      sessionSlug: String(sessionSlug || ''),
-      thinking: true,
-      resolveSecrets: false,
-    } as any);
-    return {
-      sessionSlug: String(sessionSlug || ''),
-      provider: String(effective?.provider || fallback.provider || 'openai').trim().toLowerCase() || 'openai',
-      model: String(effective?.model || fallback.model || 'gpt-5').trim() || 'gpt-5',
-    };
-  } catch (error) {
-    accountLog.warn('[UserPage] analysis AI context fallback:', error);
-    return fallback;
-  }
+type DeepScanProgressRow = {
+  slug: string;
+  chainId: number | null;
+  lastBlockScanned: number;
+  latestBlock: number | null;
+  remainingBlocks: number | null;
+  percentComplete: number | null;
+  isDeterminate: boolean;
+  label: string;
+  startBlock: number | null;
+  displayLastBlock: number;
 };
 
-const normalizeUserAnalysisResult = (result: any = {}) => ({
-  name: result?.name || 'User Analysis',
-  summary: result?.summary || '',
-  details: result?.details || '',
-  historicalAlignment: {
-    figure: result?.historicalAlignment?.figure || '',
-    reasoning: result?.historicalAlignment?.reasoning || '',
-  },
+type DeepScanProgressPanelOptions = {
+  headerText?: string;
+  showScannedText?: boolean;
+};
+
+type DeepScanProgressSnapshot = {
+  rows: DeepScanProgressRow[] | null;
+  lines: string[] | null;
+};
+
+type NormalizedResponseField = UnknownRecord & {
+  value?: unknown;
+};
+
+type NormalizedQuestionResponsePayload = UnknownRecord & {
+  answer: NormalizedResponseField;
+  additional: NormalizedResponseField;
+  __ceMalformedPayload?: boolean;
+};
+
+type ResponseRecency = {
+  bn: number;
+  txi: number;
+  li: number;
+  ts: number;
+};
+
+type ManagedCacheUpdateEvent = {
+  namespace?: unknown;
+  slug?: unknown;
+  [key: string]: unknown;
+} | null | undefined;
+
+type StoppableEvent = {
+  stopPropagation?: () => void;
+} | null | undefined;
+
+type BookmarkToggleMeta = UnknownRecord & {
+  nickname?: unknown;
+  username?: unknown;
+};
+
+type AiSessionCandidate = {
+  slug: string;
+  sessionConfig: UnknownRecord;
+  status: string;
+};
+
+type AiSessionResolution = AiSessionCandidate & {
+  reason: string;
+};
+
+type UserAnalysisAiContext = {
+  sessionSlug: string;
+  provider: string;
+  model: string;
+};
+
+type UserAnalysisCacheContextArgs = {
+  userData: unknown;
+  analysisSession: AiSessionResolution;
+  addressLower: string;
+  networkId: string;
+};
+
+type UserAnalysisCacheContext = {
+  sessionSlug: string;
+  aiContext: UserAnalysisAiContext;
+  fingerprint: string;
+};
+
+type UserAnalysisCacheEntry = UnknownRecord & {
+  version?: unknown;
+  fingerprint?: unknown;
+  cachedAt?: unknown;
+  expiresAt?: unknown;
+  address?: unknown;
+  networkId?: unknown;
+  result?: unknown;
+};
+
+type UserAnalysisCacheReadArgs = {
+  sessionSlug: string;
+  networkId: string;
+  addressLower: string;
+  fingerprint: string;
+};
+
+type UserAnalysisCacheWriteArgs = UserAnalysisCacheReadArgs & {
+  aiContext: UserAnalysisAiContext;
+  result: unknown;
+};
+
+type ProfileTelemetryEntry = UnknownRecord & {
+  ts: string;
+  seq: number;
+  source: 'UserPage';
+  event: string;
+};
+
+type ProfileDeepScanReport = UnknownRecord & {
+  targetAddress?: unknown;
+  attemptedSlugs?: unknown;
+  scannedSlugs?: unknown;
+  skippedSlugs?: unknown;
+  failedSlugs?: unknown;
+  failedActivitySlugs?: unknown;
+  hadRpcErrors?: unknown;
+  coverageComplete?: unknown;
+  coverageReason?: unknown;
+  anyNewData?: unknown;
+  usedAllSessions?: unknown;
+};
+
+type ProfileScanReportEvent = Event | {
+  detail?: unknown;
+} | null | undefined;
+
+type NicknameKeyEvent = {
+  key?: unknown;
+};
+
+type NicknameChangeEvent = {
+  target?: {
+    value?: unknown;
+  };
+};
+
+const globalState = globalThis as UserPageGlobalState;
+const getEffectiveAiConfigTyped = getEffectiveAiConfig as (
+  request: UserPageEffectiveAiConfigRequest
+) => Promise<UserPageEffectiveAiConfigResult | null | undefined>;
+const writeCacheTyped = writeCache as (
+  namespace: string,
+  slug?: string,
+  value?: unknown
+) => Promise<unknown>;
+
+const isGateAccessContext = (value: unknown): value is GateAccessContext => (
+  isUserPageGateAccessContext(value)
+);
+
+const buildUserAnalysisFingerprint = async (
+  input: Omit<UserPageAnalysisFingerprintInput, 'version'>
+) => buildUserPageAnalysisFingerprint({
+  ...input,
+  version: USER_ANALYSIS_CACHE_VERSION,
 });
 
-const formatAnalysisCacheAge = (cachedAt: any) => {
-  const ts = Number(cachedAt || 0);
-  if (!Number.isFinite(ts) || ts <= 0) return '';
-  const ageMs = Math.max(0, Date.now() - ts);
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  if (ageMs < minute) return 'just now';
-  if (ageMs < hour) return `${Math.max(1, Math.floor(ageMs / minute))}m ago`;
-  if (ageMs < day) return `${Math.max(1, Math.floor(ageMs / hour))}h ago`;
-  return `${Math.max(1, Math.floor(ageMs / day))}d ago`;
-};
-
-
-
-
-
+const resolveUserAnalysisAiContext = (
+  sessionSlug: unknown,
+  sessionConfig: UnknownRecord = {}
+) => resolveUserPageAnalysisAiContext({
+  getEffectiveAiConfig: getEffectiveAiConfigTyped,
+  logger: accountLog,
+  sessionConfig,
+  sessionSlug,
+});
 
 class UserPage extends Component<any, any> {
-  [key: string]: any;
-
-  _isMounted: any = false;
-  analysisTimer: any = null; // timer handle
-  _profileScanRequestSeq: any = 0;
-  constructor(props: any) {
+  _isMounted: boolean = false;
+  analysisTimer: UserPageTimerHandle | null = null;
+  _profileScanRequestSeq: number = 0;
+  _queuedCacheRefreshTimer: UserPageTimerHandle | null = null;
+  _queuedCacheRefreshForce: boolean = false;
+  _queuedCacheRefreshLoading: boolean = false;
+  _queuedCacheRefreshBypassSignature: boolean = false;
+  _responseGateRetryTimer: UserPageTimerHandle | null = null;
+  _responseGateRetryDueAt: number = 0;
+  _responseGateAccessStatusByKey: Map<string, GateAccessStatusEntry> = new Map();
+  _responseGateAccessInFlightByKey: Map<string, ResponseGateAccessCheckPromise> = new Map();
+  _responseGateAccessGeneration: number = 0;
+  _responseGateAccessStatusVersion: number = 0;
+  _lastCacheRefreshInputSignature: string = '';
+  _responsePayloadParseMemo: Map<string, unknown> = new Map();
+  _deepScanTooltipInputSignature: string | null = null;
+  _deepScanTooltipOutputSignature: string = '';
+  _profileTelemetrySeq: number = 0;
+  _lastProfileRefreshTelemetrySignature: string = '';
+  _lastProfileDeriveTelemetrySignature: string = '';
+  _lastNoSbtVisibleTelemetrySignature: string = '';
+  _lastProfileRefreshTelemetry: unknown = null;
+  _lastBackgroundDeepScanReportSignature: string = '';
+  _unifiedCacheAggregateMemoKey: string = '';
+  _unifiedCacheAggregateMemo: unknown = null;
+  _unsubscribeCacheUpdates: (() => void) | null = null;
+  _sectionDeriveMemo: SectionDeriveMemo = {
+    survey: null,
+    question: null,
+    sbt: null,
+  };
+  constructor(props: unknown) {
     super(props);
     this.state = {
       viewAddress: '', // Set from props
@@ -315,33 +870,30 @@ class UserPage extends Component<any, any> {
     };
   }
 
-  getActiveSessionSlug: any = () => resolveActiveSessionSlug({
+  getActiveSessionSlug = (): string => resolveActiveSessionSlug({
     activeSessionSlug: this.props.activeSessionSlug,
     sessionSlug: this.props.sessionSlug,
   }) || '';
 
-  getBookmarksSlug: any = () => this.getActiveSessionSlug();
+  getBookmarksSlug = (): string => this.getActiveSessionSlug();
 
-  getBookmarksCache: any = () => {
-    const defaultCache = { surveys: [], questions: [], users: [], filters: [] };
+  getBookmarksCache = (): UserPageBookmarksCache => {
     try {
       const slug = this.getBookmarksSlug();
       const parsed = peekCacheSync('bookmarksCache', slug, { clone: false });
-      if (!parsed || typeof parsed !== 'object') return { ...defaultCache };
-      const next = { ...defaultCache, ...parsed };
-      next.surveys = Array.isArray(next.surveys) ? [...next.surveys] : [];
-      next.questions = Array.isArray(next.questions) ? [...next.questions] : [];
-      next.users = Array.isArray(next.users) ? [...next.users] : [];
-      next.filters = Array.isArray(next.filters) ? [...next.filters] : [];
-      return next;
+      return normalizeUserPageBookmarksCache(parsed);
     } catch (_) {
-      return { ...defaultCache };
+      return normalizeUserPageBookmarksCache(null);
     }
   };
 
-  persistBookmarksCache: any = (cacheObj: any, source: any = '') => {
+  persistBookmarksCache = (cacheObj: unknown, source: unknown = ''): void => {
     const slug = this.getBookmarksSlug();
-    void writeCache('bookmarksCache', slug, cacheObj || {}).catch((error: any) => {
+    void (writeCache as (
+      namespace: string,
+      slug?: string,
+      value?: unknown
+    ) => Promise<boolean>)('bookmarksCache', slug, cacheObj || {}).catch((error: unknown) => {
       accountLog.error('UserPage: Error saving bookmarksCache:', error);
     });
     try {
@@ -351,24 +903,25 @@ class UserPage extends Component<any, any> {
     } catch (e) { accountLog.warn('UserPage: telemetry', e); }
   };
 
-  stopSpinnerEventPropagation: any = (event: any) => {
+  stopSpinnerEventPropagation = (event: StoppableEvent): void => {
     event?.stopPropagation?.();
   };
 
-  handleManagedCacheUpdate: any = (event: any = null) => {
+  handleManagedCacheUpdate = (event: ManagedCacheUpdateEvent = null): void => {
     if (!this._isMounted) return;
-    const namespace = String(event?.namespace || '').trim();
-    if (!namespace) return;
+    const cacheUpdate = resolveUserPageManagedCacheUpdate({
+      bookmarksSlug: this.getBookmarksSlug(),
+      namespace: event?.namespace,
+      slug: event?.slug,
+    });
 
-    if (namespace === 'bookmarksCache') {
-      const eventSlug = String(event?.slug || '');
-      if (eventSlug !== this.getBookmarksSlug()) return;
+    if (cacheUpdate.action === 'bookmarks') {
       this.checkIfBookmarked();
       this.loadNicknameFromCache();
       return;
     }
 
-    if (!['surveysCache', 'questionsCache', 'sbtCache', 'userCache'].includes(namespace)) {
+    if (cacheUpdate.action !== 'refresh') {
       return;
     }
 
@@ -377,68 +930,19 @@ class UserPage extends Component<any, any> {
     this.queueCacheRefresh({ markLoading: false, bypassSignature: true });
   };
 
-  _resolveQuestionPromptText: any = (questionData: any) => {
-    if (!questionData || typeof questionData !== 'object') return '';
-    const questionText = typeof questionData.question === 'string'
-      ? questionData.question.trim()
-      : '';
-    if (questionText) return questionText;
-    const promptText = typeof questionData.prompt === 'string'
-      ? questionData.prompt.trim()
-      : '';
-    if (promptText) return promptText;
-    return '';
+  _deepScanProgressTimer: ReturnType<typeof setInterval> | null = null;
+
+  _buildDeepScanTooltipInputSignature = (): string => {
+    return buildUserPageDeepScanTooltipInputSignature({
+      latestBlockNumber: this.props.latestBlockNumber,
+      listNamespaceSlugs: listNamespaceSlugsSync,
+      network: this.props.network,
+      peekCache: peekCacheSync,
+      viewAddress: this.props.viewAddress,
+    });
   };
 
-  _shortenQuestionId: any = (questionId: any) => {
-    const fullId = String(questionId || '');
-    if (fullId.length <= 20) return fullId;
-    return `${fullId.slice(0, 8)}...${fullId.slice(-6)}`;
-  };
-
-  _deepScanProgressTimer: any = null;
-
-  _buildDeepScanTooltipInputSignature: any = () => {
-    const viewLower = String(this.props.viewAddress || '').toLowerCase();
-    if (!viewLower) return '';
-    const latestBlockRaw = this.props.latestBlockNumber;
-    const latestBlockNum = Number.isFinite(Number(latestBlockRaw))
-      ? Number(latestBlockRaw)
-      : '';
-    const currentChainId = this.props.network?.id != null
-      ? Number(this.props.network.id)
-      : '';
-    const slugs = listNamespaceSlugsSync('userCache')
-      .map((slug: any) => String(slug || '').trim())
-      .sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0));
-    const slugProgress = slugs
-      .map((slug: any) => {
-        const cacheEntry = peekCacheSync('userCache', slug, { clone: false });
-        const userNode = cacheEntry?.[viewLower];
-        if (!userNode || typeof userNode !== 'object') return `${slug}:`;
-        const netParts = Object.keys(userNode)
-          .sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0))
-          .map((netKey: any) => {
-            const entry = userNode?.[netKey];
-            const lastBlock = Number(entry?.lastBlockScanned);
-            const lastScanTs = Number(entry?.lastScanTimestamp);
-            const blockToken = Number.isFinite(lastBlock) ? String(lastBlock) : '';
-            const tsToken = Number.isFinite(lastScanTs) ? String(lastScanTs) : '';
-            return `${netKey}:${blockToken}:${tsToken}`;
-          })
-          .join(',');
-        return `${slug}:${netParts}`;
-      })
-      .join(';');
-    return [
-      viewLower,
-      String(currentChainId),
-      String(latestBlockNum),
-      slugProgress,
-    ].join('|');
-  };
-
-  startDeepScanProgressTimer: any = () => {
+  startDeepScanProgressTimer = (): void => {
     if (this._deepScanProgressTimer) return;
     this._deepScanTooltipInputSignature = null;
     this._deepScanTooltipOutputSignature = '';
@@ -450,32 +954,25 @@ class UserPage extends Component<any, any> {
       const nextProgressSnapshot = this.computeDeepScanProgressSnapshot();
       const nextTooltipLines = nextProgressSnapshot?.lines || null;
       const nextProgressRows = nextProgressSnapshot?.rows || null;
-      const prevTooltipSig = [
-        Array.isArray(this.state.deepScanTooltipLines)
-          ? this.state.deepScanTooltipLines.join('|')
-          : '',
-        this._buildDeepScanProgressRowsSignature(this.state.deepScanProgressRows),
-      ].join('||');
-      const nextTooltipSig = [
-        Array.isArray(nextTooltipLines)
-          ? nextTooltipLines.join('|')
-          : '',
-        this._buildDeepScanProgressRowsSignature(nextProgressRows),
-      ].join('||');
-      if (prevTooltipSig === nextTooltipSig) {
-        this._deepScanTooltipOutputSignature = nextTooltipSig;
+      const progressUpdate = resolveUserPageDeepScanProgressStateUpdate({
+        currentDeepScanProgressRows: this.state.deepScanProgressRows,
+        currentDeepScanTooltipLines: this.state.deepScanTooltipLines,
+        nextDeepScanProgressRows: nextProgressRows,
+        nextDeepScanTooltipLines: nextTooltipLines,
+      });
+      if (!progressUpdate.shouldUpdate) {
+        this._deepScanTooltipOutputSignature = progressUpdate.nextOutputSignature;
         return;
       }
-      this._deepScanTooltipOutputSignature = nextTooltipSig;
-      this.setState({
-        deepScanProgressTick: Date.now(),
-        deepScanTooltipLines: nextTooltipLines,
+      this._deepScanTooltipOutputSignature = progressUpdate.nextOutputSignature;
+      this.setState(buildUserPageDeepScanProgressStatePatch({
         deepScanProgressRows: nextProgressRows,
-      });
+        deepScanTooltipLines: nextTooltipLines,
+      }));
     }, 2000);
   };
 
-  stopDeepScanProgressTimer: any = () => {
+  stopDeepScanProgressTimer = (): void => {
     if (this._deepScanProgressTimer) {
       clearInterval(this._deepScanProgressTimer);
       this._deepScanProgressTimer = null;
@@ -484,32 +981,28 @@ class UserPage extends Component<any, any> {
     this._deepScanTooltipOutputSignature = '';
   };
 
-  buildDeepScanProgressTooltip: any = () => {
-    const lines = this.state.deepScanTooltipLines;
-    if (!Array.isArray(lines) || lines.length === 0) return null;
-    return lines;
+  buildDeepScanProgressTooltip = (): string[] | null => {
+    return normalizeUserPageDeepScanTooltipLines(this.state.deepScanTooltipLines);
   };
 
-  buildDeepScanProgressRows: any = () => {
-    const rows = this.state.deepScanProgressRows;
-    if (!Array.isArray(rows) || rows.length === 0) return null;
-    return rows;
+  buildDeepScanProgressRows = (): DeepScanProgressRow[] | null => {
+    return normalizeUserPageDeepScanProgressRows(this.state.deepScanProgressRows) as DeepScanProgressRow[] | null;
   };
 
-  computeDeepScanProgressSnapshot: any = () => {
+  computeDeepScanProgressSnapshot = (): DeepScanProgressSnapshot => {
     const rows = this.computeDeepScanProgressRows();
     return {
       rows,
-      lines: this._formatDeepScanTooltipLinesFromRows(rows),
+      lines: formatUserPageDeepScanTooltipLinesFromRows(rows, formatUserPageDeepScanBlockCount),
     };
   };
 
-  computeDeepScanTooltipLines: any = () => {
+  computeDeepScanTooltipLines = (): string[] | null => {
     const snapshot = this.computeDeepScanProgressSnapshot();
     return snapshot?.lines || null;
   };
 
-  computeDeepScanProgressRows: any = () => {
+  computeDeepScanProgressRows = (): DeepScanProgressRow[] | null => {
     const viewLower = String(this.props.viewAddress || '').toLowerCase();
     if (!viewLower) return null;
     const latestBlockRaw = this.props.latestBlockNumber;
@@ -519,7 +1012,7 @@ class UserPage extends Component<any, any> {
     const currentChainId = this.props.network?.id != null
       ? Number(this.props.network.id)
       : null;
-    const userCaches = this._dgReadAll('userCache');
+    const userCaches = this._dgReadAll('userCache') as UserCacheSourceEntry[];
     return this._deriveDeepScanProgressRows(
       userCaches,
       viewLower,
@@ -528,242 +1021,48 @@ class UserPage extends Component<any, any> {
     );
   };
 
-  _getDeepScanSessionDisplayConfig: any = (slugIn: any = '') => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    if (!slug) {
-      const cfg = getSessionConfigBySlugOrDefault('')
-        || getDemoSessionConfigBySlug('', { allowDemoFallback: true });
-      return (cfg && typeof cfg === 'object') ? cfg : null;
-    }
-    const cfg = getSessionConfigBySlug(slug)
-      || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true });
-    return (cfg && typeof cfg === 'object') ? cfg : null;
+  _getDeepScanSessionDisplayConfig = (slugIn: unknown = ''): DeepScanSessionDisplayConfig | null => {
+    return resolveUserPageDeepScanSessionDisplayConfig({
+      getDemoSessionConfigBySlug,
+      getSessionConfigBySlug,
+      getSessionConfigBySlugOrDefault,
+      slugIn,
+    }) as DeepScanSessionDisplayConfig | null;
   };
 
-  _formatDeepScanBlockCount: any = (value: any) => {
-    const numericValue = Number(value);
-    if (!Number.isFinite(numericValue)) return '0';
-    return Math.max(0, Math.floor(numericValue)).toLocaleString();
-  };
-
-  _getDeepScanPrioritySlugs: any = () => {
-    const activeSlug = normalizeSessionSlug(this.props.activeSessionSlug || '');
-    const scope = readSessionScanScope();
-    const shouldUseScopedOrder = (
-      scope === 'list' ||
-      scope === 'general' ||
-      (scope === 'active' && !!activeSlug)
-    );
-    const scopedSlugs = shouldUseScopedOrder
-      ? getAllowedSessionSlugs(scope, readSessionScanSlugs(), activeSlug)
-      : [];
-    const ordered: any[] = [];
-    const seen: any = new Set();
-    const push = (rawSlug: any) => {
-      const slug = normalizeSessionSlug(rawSlug || '');
-      if (seen.has(slug)) return;
-      seen.add(slug);
-      ordered.push(slug);
-    };
-
-    if (scope === 'list') {
-      const normalizedScopeSlugs = scopedSlugs.map((slug: any) => normalizeSessionSlug(slug || ''));
-      const activeInScope = !!(activeSlug && normalizedScopeSlugs.includes(activeSlug));
-      if (activeSlug && !activeInScope) {
-        push(activeSlug);
-      }
-      normalizedScopeSlugs.forEach((slug: any) => push(slug));
-      return ordered;
-    }
-
-    if (activeSlug) {
-      push(activeSlug);
-    }
-    scopedSlugs.forEach((slug: any) => push(slug));
-    return ordered;
-  };
-
-  _sortDeepScanProgressRows: any = (rows: any) => {
-    if (!Array.isArray(rows) || rows.length === 0) return null;
-    const prioritySlugs = this._getDeepScanPrioritySlugs();
-    const priorityBySlug: any = new Map();
-    prioritySlugs.forEach((slug: any, index: any) => {
-      priorityBySlug.set(normalizeSessionSlug(slug || ''), index);
+  _getDeepScanPrioritySlugs = (): string[] => {
+    return buildUserPageDeepScanPrioritySlugs({
+      activeSessionSlug: this.props.activeSessionSlug,
+      getAllowedSessionSlugs,
+      readSessionScanScope,
+      readSessionScanSlugs,
     });
-
-    return rows
-      .map((row: any, index: any) => ({ ...row, __sourceIndex: index }))
-      .sort((left: any, right: any) => {
-        const leftSlug = normalizeSessionSlug(left?.slug || '');
-        const rightSlug = normalizeSessionSlug(right?.slug || '');
-        const leftPriority = priorityBySlug.has(leftSlug)
-          ? priorityBySlug.get(leftSlug)
-          : Number.MAX_SAFE_INTEGER;
-        const rightPriority = priorityBySlug.has(rightSlug)
-          ? priorityBySlug.get(rightSlug)
-          : Number.MAX_SAFE_INTEGER;
-        if (leftPriority !== rightPriority) return leftPriority - rightPriority;
-
-        const leftNeedsAttention = left?.latestBlock == null || Number(left?.remainingBlocks || 0) > 0;
-        const rightNeedsAttention = right?.latestBlock == null || Number(right?.remainingBlocks || 0) > 0;
-        if (leftNeedsAttention !== rightNeedsAttention) {
-          return leftNeedsAttention ? -1 : 1;
-        }
-
-        const leftLastBlock = Number(left?.lastBlockScanned || 0);
-        const rightLastBlock = Number(right?.lastBlockScanned || 0);
-        if (rightLastBlock !== leftLastBlock) return rightLastBlock - leftLastBlock;
-
-        const leftLabel = String(left?.label || leftSlug || '');
-        const rightLabel = String(right?.label || rightSlug || '');
-        const labelCmp = leftLabel.localeCompare(rightLabel);
-        if (labelCmp !== 0) return labelCmp;
-
-        const leftChain = Number(left?.chainId || 0);
-        const rightChain = Number(right?.chainId || 0);
-        if (leftChain !== rightChain) return leftChain - rightChain;
-
-        return Number(left.__sourceIndex || 0) - Number(right.__sourceIndex || 0);
-      })
-      .map(({ __sourceIndex, ...row }: any) => row);
   };
 
-  _formatDeepScanTooltipLinesFromRows: any = (rows: any) => {
-    if (!Array.isArray(rows) || rows.length === 0) return null;
-    const lines: any[] = [];
-    rows.forEach((row: any, index: any) => {
-      lines.push(`Session: ${row.label}`);
-      if (row.latestBlock != null) {
-        if (Number(row.remainingBlocks || 0) <= 100) {
-          lines.push('Up to date');
-        } else {
-          lines.push(`${this._formatDeepScanBlockCount(row.remainingBlocks)} blocks remaining`);
-        }
-      } else {
-        lines.push(`${this._formatDeepScanBlockCount(row.lastBlockScanned)} scanned`);
-      }
-      if (index < rows.length - 1) lines.push('');
-    });
-    return lines;
-  };
-
-  _buildDeepScanProgressRowsSignature: any = (rows: any) => {
-    if (!Array.isArray(rows) || rows.length === 0) return '';
-    return rows
-      .map((row: any) => [
-        String(row?.slug || ''),
-        String(row?.chainId ?? ''),
-        String(row?.lastBlockScanned ?? ''),
-        String(row?.latestBlock ?? ''),
-        String(row?.remainingBlocks ?? ''),
-        String(row?.percentComplete ?? ''),
-        row?.isDeterminate ? '1' : '0',
-        String(row?.label || ''),
-      ].join(':'))
-      .join('|');
-  };
-
-  _deriveDeepScanProgressRows: any = (userCaches: any, viewLower: any, currentChainId: any, latestBlockNum: any) => (
+  _deriveDeepScanProgressRows = (
+    userCaches: UserCacheSourceEntry[] | null | undefined,
+    viewLower: string,
+    currentChainId: number | null,
+    latestBlockNum: number | null,
+  ): DeepScanProgressRow[] | null => (
     measureSync('ce.userPage.deepScanTooltipRows', () => {
-      if (!Array.isArray(userCaches) || userCaches.length === 0 || !viewLower) return null;
-      const entries: any[] = [];
-      const sessionConfigMemo: any = new Map();
-
-      userCaches.forEach(({ slug, data }: any) => {
-        const userNode = data?.[viewLower];
-        if (!userNode || typeof userNode !== 'object') return;
-        Object.keys(userNode).forEach((netKey: any) => {
-          const chainEntry = userNode?.[netKey];
-          const lastBlock = Number(chainEntry?.lastBlockScanned);
-          if (!Number.isFinite(lastBlock) || lastBlock <= 0) return;
-
-          let latestForPct: any = null;
-          if (latestBlockNum != null && currentChainId != null && Number(netKey) === Number(currentChainId) && latestBlockNum > 0) {
-            latestForPct = latestBlockNum;
-          }
-
-          const normalizedSlug = normalizeSessionSlug(slug || '');
-          const sessionMemoKey = normalizedSlug || '__general__';
-          let sessionConfig: any = null;
-          if (sessionConfigMemo.has(sessionMemoKey)) {
-            sessionConfig = sessionConfigMemo.get(sessionMemoKey);
-          } else {
-            sessionConfig = this._getDeepScanSessionDisplayConfig(normalizedSlug);
-            sessionConfigMemo.set(sessionMemoKey, sessionConfig);
-          }
-
-          const startRaw = Number(sessionConfig?.blockLimits?.start);
-          const startBlock = Number.isFinite(startRaw) && startRaw > 0
-            ? Math.floor(startRaw)
-            : null;
-
-          entries.push({
-            slug: slug || 'general',
-            chainId: Number.isFinite(Number(netKey)) ? Number(netKey) : null,
-            lastBlock,
-            latestBlock: latestForPct,
-            startBlock,
-            sessionConfig,
-          });
-        });
-      });
-
-      if (entries.length === 0) return null;
-      entries.sort((a: any, b: any) => b.lastBlock - a.lastBlock);
-      const slugCounts = entries.reduce((counts: any, entry: any) => {
-        counts.set(entry.slug, (counts.get(entry.slug) || 0) + 1);
-        return counts;
-      }, new Map());
-      const rows = entries.map((entry: any) => {
-        const slugHasMultipleNetworks = (slugCounts.get(entry.slug) || 0) > 1;
-        const slugLabel = normalizeSessionSlug(entry.slug || '') || 'general';
-        const sessionName = String(entry.sessionConfig?.sessionName || '').trim();
-        const baseLabel = sessionName && sessionName.toLowerCase() !== slugLabel.toLowerCase()
-          ? `${sessionName} (${slugLabel})`
-          : (sessionName || entry.slug || 'General');
-        const label = slugHasMultipleNetworks && entry.chainId != null
-          ? `${baseLabel} (chain ${entry.chainId})`
-          : baseLabel;
-        const latestBlock = entry.latestBlock != null
-          ? Math.max(0, Math.floor(Number(entry.latestBlock)))
-          : null;
-        const lastBlockScanned = Math.max(0, Math.floor(Number(entry.lastBlock)));
-        const displayLastBlock = entry.startBlock != null
-          ? Math.max(entry.startBlock, lastBlockScanned)
-          : lastBlockScanned;
-        const remainingBlocks = latestBlock != null
-          ? Math.max(0, latestBlock - displayLastBlock)
-          : null;
-        let percentComplete: any = null;
-        let isDeterminate = false;
-
-        if (latestBlock != null && entry.startBlock != null) {
-          const totalSpan = Math.max(0, latestBlock - entry.startBlock);
-          const completedSpan = Math.max(0, displayLastBlock - entry.startBlock);
-          percentComplete = totalSpan <= 0
-            ? 100
-            : Math.max(0, Math.min(100, Math.round((completedSpan / totalSpan) * 100)));
-          isDeterminate = true;
-        }
-
-        return {
-          slug: entry.slug,
-          chainId: entry.chainId,
-          lastBlockScanned,
-          latestBlock,
-          remainingBlocks,
-          percentComplete,
-          isDeterminate,
-          label,
-          startBlock: entry.startBlock,
-          displayLastBlock,
-        };
-      });
-      return this._sortDeepScanProgressRows(rows);
-    })
+      return deriveUserPageDeepScanProgressRows({
+        currentChainId,
+        getSessionDisplayConfig: (slug: string) => this._getDeepScanSessionDisplayConfig(slug),
+        latestBlockNum,
+        prioritySlugs: this._getDeepScanPrioritySlugs(),
+        userCaches,
+        viewLower,
+      }) as DeepScanProgressRow[] | null;
+    }) || null
   );
 
-  _deriveDeepScanProgressTooltipFromCaches: any = (userCaches: any, viewLower: any, currentChainId: any, latestBlockNum: any) => (
+  _deriveDeepScanProgressTooltipFromCaches = (
+    userCaches: UserCacheSourceEntry[] | null | undefined,
+    viewLower: string,
+    currentChainId: number | null,
+    latestBlockNum: number | null,
+  ): string[] | null => (
     measureSync('ce.userPage.deepScanTooltip', () => {
       const rows = this._deriveDeepScanProgressRows(
         userCaches,
@@ -771,11 +1070,14 @@ class UserPage extends Component<any, any> {
         currentChainId,
         latestBlockNum
       );
-      return this._formatDeepScanTooltipLinesFromRows(rows);
-    })
+      return formatUserPageDeepScanTooltipLinesFromRows(rows, formatUserPageDeepScanBlockCount);
+    }) || null
   );
 
-  renderDeepScanProgressPanel: any = (progressRows: any, options: any = {}) => {
+  renderDeepScanProgressPanel = (
+    progressRows: DeepScanProgressRow[] | null | undefined,
+    options: DeepScanProgressPanelOptions = {},
+  ): React.ReactNode => {
     if (!Array.isArray(progressRows) || progressRows.length === 0) return null;
     const {
       headerText = 'Deep scan in progress',
@@ -787,20 +1089,19 @@ class UserPage extends Component<any, any> {
         {headerText ? (
           <div className={styles.deepScanProgressHeader}>{headerText}</div>
         ) : null}
-        {progressRows.map((row: any, index: any) => {
-          const rowKey = `${row.slug || 'general'}_${row.chainId || 'na'}_${index}`;
-          const progressWidth = Number.isFinite(Number(row.percentComplete))
-            ? `${Math.max(0, Math.min(100, Number(row.percentComplete)))}%`
-            : '0%';
-          const remainingText = Number(row.remainingBlocks || 0) <= 0
-            ? 'Up to date'
-            : `${this._formatDeepScanBlockCount(row.remainingBlocks)} blocks remaining`;
-          const scannedText = row.latestBlock != null
-            ? `${this._formatDeepScanBlockCount(row.displayLastBlock)} / ${this._formatDeepScanBlockCount(row.latestBlock)} scanned`
-            : '';
-          const indeterminateText = showScannedText
-            ? `${this._formatDeepScanBlockCount(row.lastBlockScanned)} scanned`
-            : 'Syncing... latest block pending';
+        {progressRows.map((row, index) => {
+          const {
+            indeterminateText,
+            progressFillStyle,
+            remainingText,
+            rowKey,
+            scannedText,
+            shouldRenderScannedText,
+          } = buildUserPageDeepScanProgressRowDisplayState({
+            index,
+            row,
+            showScannedText,
+          });
 
           return (
             <div key={rowKey} className={styles.deepScanProgressRow}>
@@ -810,11 +1111,11 @@ class UserPage extends Component<any, any> {
                   <div className={styles.deepScanProgressBar}>
                     <div
                       className={styles.deepScanProgressFill}
-                      style={{ width: progressWidth }}
+                      style={progressFillStyle}
                     />
                   </div>
                   <div className={styles.deepScanProgressStats}>{remainingText}</div>
-                  {showScannedText && scannedText ? (
+                  {shouldRenderScannedText ? (
                     <div className={styles.deepScanProgressStats}>{scannedText}</div>
                   ) : null}
                 </>
@@ -828,7 +1129,10 @@ class UserPage extends Component<any, any> {
     );
   };
 
-  renderDeepScanTooltipContent: any = (tooltipLines: any, progressRows: any) => {
+  renderDeepScanTooltipContent = (
+    tooltipLines: string[] | null | undefined,
+    progressRows: DeepScanProgressRow[] | null | undefined,
+  ): React.ReactNode => {
     if (Array.isArray(progressRows) && progressRows.length > 0) {
       return this.renderDeepScanProgressPanel(progressRows, {
         headerText: 'Deep scan in progress',
@@ -837,12 +1141,16 @@ class UserPage extends Component<any, any> {
     }
 
     if (!Array.isArray(tooltipLines) || tooltipLines.length === 0) return null;
-    return tooltipLines.map((line: any, idx: any) => (
+    return tooltipLines.map((line, idx) => (
       <div key={`deepScanTextLine_${idx}`}>{line}</div>
     ));
   };
 
-  renderDeepScanTooltip: any = (targetId: any, tooltipLines: any, progressRows: any) => {
+  renderDeepScanTooltip = (
+    targetId: string,
+    tooltipLines: string[] | null | undefined,
+    progressRows: DeepScanProgressRow[] | null | undefined,
+  ): React.ReactNode => {
     if ((!Array.isArray(tooltipLines) || tooltipLines.length === 0) &&
         (!Array.isArray(progressRows) || progressRows.length === 0)) return null;
     return (
@@ -859,7 +1167,12 @@ class UserPage extends Component<any, any> {
     );
   };
 
-  renderDeepScanStatusIndicator: any = (targetId: any, tooltipLines: any, progressRows: any, titleText: any) => (
+  renderDeepScanStatusIndicator = (
+    targetId: string,
+    tooltipLines: string[] | null | undefined,
+    progressRows: DeepScanProgressRow[] | null | undefined,
+    titleText: string,
+  ): React.ReactNode => (
     <>
       <span
         className={styles.cornerLoadingStatus}
@@ -880,234 +1193,30 @@ class UserPage extends Component<any, any> {
     </>
   );
 
-  cloneParsedResponsePayload: any = (value: any) => {
-    if (value == null || typeof value !== 'object') return value;
-    if (Array.isArray(value)) {
-      return value.map((item: any) => this.cloneParsedResponsePayload(item));
-    }
-    const clone: Record<string, any> = {};
-    Object.keys(value).forEach((key: any) => {
-      Object.defineProperty(clone, key, {
-        value: this.cloneParsedResponsePayload(value[key]),
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
-    });
-    return clone;
-  };
-
-  parseCachedResponsePayload: any = (rawValue: any) => {
-    if (typeof rawValue !== 'string') return this.cloneParsedResponsePayload(rawValue);
-    const memo = this._responsePayloadParseMemo;
-    if (memo && memo.has(rawValue)) {
-      return this.cloneParsedResponsePayload(memo.get(rawValue));
-    }
-    let parsed: any = null;
-    try {
-      parsed = JSON.parse(rawValue);
-    } catch (_) {
-      // Fail-open for malformed legacy payloads so UI can still surface a deterministic state.
-      parsed = rawValue;
-    }
-    if (memo) {
-      memo.set(rawValue, parsed);
-      if (memo.size > USERPAGE_RESPONSE_PARSE_MEMO_LIMIT) {
-        const oldestKey = memo.keys().next().value;
-        if (oldestKey !== undefined) memo.delete(oldestKey);
-      }
-    }
-    return this.cloneParsedResponsePayload(parsed);
-  };
-
-  _extractFirstDefinedValue: any = (...values: any[]) => {
-    for (let i = 0; i < values.length; i += 1) {
-      if (values[i] !== undefined) return values[i];
-    }
-    return undefined;
-  };
-
-  _normalizeResponseField: any = (rawField: any, fallbackValues: any = []) => {
-    const base = (rawField && typeof rawField === 'object' && !Array.isArray(rawField))
-      ? { ...rawField }
-      : {};
-    const scalarFallback = (rawField != null && typeof rawField !== 'object')
-      ? rawField
-      : undefined;
-    const nextValue = this._extractFirstDefinedValue(
-      base.value,
-      scalarFallback,
-      ...(Array.isArray(fallbackValues) ? fallbackValues : [])
-    );
-    if (nextValue !== undefined) base.value = nextValue;
-    return base;
-  };
-
-  _normalizeSingleQuestionResponsePayload: any = (rawResponse: any = null) => {
-    if (rawResponse == null) return null;
-
-    if (typeof rawResponse !== 'object' || Array.isArray(rawResponse)) {
-      return {
-        answer: { value: rawResponse },
-        additional: { value: '' },
-      };
-    }
-
-    const nestedResponse = (
-      rawResponse.response &&
-      typeof rawResponse.response === 'object' &&
-      !Array.isArray(rawResponse.response)
-    ) ? rawResponse.response : null;
-    const base = nestedResponse
-      ? { ...rawResponse, ...nestedResponse }
-      : { ...rawResponse };
-
-    const answerFallback = this._extractFirstDefinedValue(
-      base.answerValue,
-      base.value,
-      base.responseValue,
-      base.answerText,
-      base.responseText,
-      (
-        base.answer == null &&
-        (typeof base.response === 'string' || typeof base.response === 'number' || typeof base.response === 'boolean')
-      ) ? base.response : undefined
-    );
-    const additionalFallback = this._extractFirstDefinedValue(
-      base.additionalComment,
-      base.additionalComments,
-      base.comment,
-      base.comments,
-      base.additionalText
-    );
-
-    const normalized = {
-      ...base,
-      answer: this._normalizeResponseField(base.answer, [answerFallback]),
-      additional: this._normalizeResponseField(base.additional, [additionalFallback]),
-    };
-
-    const hasShapeHints = !!(
-      base.answer !== undefined ||
-      base.additional !== undefined ||
-      answerFallback !== undefined ||
-      additionalFallback !== undefined ||
-      base.importance !== undefined ||
-      base.conviction !== undefined ||
-      base.blockNumber !== undefined ||
-      base.transactionIndex !== undefined ||
-      base.logIndex !== undefined ||
-      base.timestamp !== undefined ||
-      base.arweaveTxId ||
-      base.transactionHash ||
-      base.txHash
-    );
-    if (!hasShapeHints) {
-      normalized.__ceMalformedPayload = true;
-    }
-    return normalized;
-  };
-
-  _isDisplayableResponseValue: any = (value: any) => {
-    if (Array.isArray(value)) {
-      return value.some((entry: any) => this._isDisplayableResponseValue(entry));
-    }
-    if (value && typeof value === 'object') {
-      if (Object.prototype.hasOwnProperty.call(value, 'value')) {
-        return this._isDisplayableResponseValue(value.value);
-      }
-      return Object.keys(value).length > 0;
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      return trimmed !== '' && trimmed !== '*';
-    }
-    return value !== undefined && value !== null && value !== '*';
-  };
-
-  _hasDisplayableResponsePayload: any = (responseObj: any = null) => {
-    if (!responseObj || typeof responseObj !== 'object') return false;
-    return (
-      this._isDisplayableResponseValue(responseObj?.answer?.value) ||
-      this._isDisplayableResponseValue(responseObj?.additional?.value)
+  parseCachedResponsePayload = (rawValue: unknown): unknown => {
+    return parseUserPageCachedResponsePayload(
+      rawValue,
+      this._responsePayloadParseMemo,
+      USERPAGE_RESPONSE_PARSE_MEMO_LIMIT
     );
   };
 
-  _hasResponseSubmissionHints: any = (value: any = null) => {
-    if (value == null) return false;
-    if (typeof value !== 'object') {
-      return String(value).trim() !== '';
-    }
-    const src = value;
-    return !!(
-      src.__ceMalformedPayload === true ||
-      Object.prototype.hasOwnProperty.call(src, 'answer') ||
-      Object.prototype.hasOwnProperty.call(src, 'additional') ||
-      src.questionId ||
-      src.questionID ||
-      src.arweaveTxId ||
-      src.transactionHash ||
-      src.txHash ||
-      src.blockNumber !== undefined ||
-      src.transactionIndex !== undefined ||
-      src.logIndex !== undefined ||
-      src.timestamp !== undefined
-    );
-  };
-
-  _extractResponseRecency: any = (responseObj: any = null, recencyMeta: any = null) => {
-    const meta = (recencyMeta && typeof recencyMeta === 'object') ? recencyMeta : {};
-    const src = (responseObj && typeof responseObj === 'object') ? responseObj : {};
-    return {
-      bn: Number(meta.bn ?? meta.blockNumber ?? src.blockNumber ?? src.bn ?? 0) || 0,
-      txi: Number(
-        meta.txi ??
-        meta.transactionIndex ??
-        meta.txIndex ??
-        src.txi ??
-        src.transactionIndex ??
-        src.txIndex ??
-        0
-      ) || 0,
-      li: Number(meta.li ?? meta.logIndex ?? src.logIndex ?? src.li ?? 0) || 0,
-      ts: Number(meta.ts ?? meta.timestamp ?? src.ts ?? src.timestamp ?? 0) || 0,
-    };
-  };
-
-  _compareResponseRecency: any = (left: any, right: any) => {
-    const a = this._extractResponseRecency(left);
-    const b = this._extractResponseRecency(right);
-    if (a.bn !== b.bn) return a.bn - b.bn;
-    if (a.txi !== b.txi) return a.txi - b.txi;
-    if (a.li !== b.li) return a.li - b.li;
-    if (a.ts !== b.ts) return a.ts - b.ts;
-    return 0;
-  };
-
-  _readBoolishTelemetryFlag: any = (raw: any, fallback: any = false) => {
-    if (typeof raw === 'boolean') return raw;
-    const val = (raw == null ? '' : String(raw)).trim().toLowerCase();
-    if (val === '1' || val === 'true' || val === 'yes' || val === 'on') return true;
-    if (val === '0' || val === 'false' || val === 'no' || val === 'off') return false;
-    return !!fallback;
-  };
-
-  isDeepScanLoadingEnabledForSection: any = () => {
+  isDeepScanLoadingEnabledForSection = (_section?: unknown): boolean => {
     try {
       if (typeof globalThis === 'undefined') return true;
       if (typeof globalState.CE_USER_PROFILE_DEEP_SCAN_LOADING !== 'undefined') {
-        const enabled = this._readBoolishTelemetryFlag(globalState.CE_USER_PROFILE_DEEP_SCAN_LOADING, true);
+        const enabled = readBoolishUserPageTelemetryFlag(globalState.CE_USER_PROFILE_DEEP_SCAN_LOADING, true);
         if (!enabled) return false;
       }
     } catch (e) { accountLog.warn('UserPage: telemetry', e); }
     return true;
   };
 
-  isProfileTelemetryEnabled: any = () => {
+  isProfileTelemetryEnabled = (): boolean => {
     try {
       if (typeof globalThis === 'undefined') return false;
       if (typeof globalState.CE_PROFILE_SCAN_TELEMETRY !== 'undefined') {
-        return this._readBoolishTelemetryFlag(globalState.CE_PROFILE_SCAN_TELEMETRY, true);
+        return readBoolishUserPageTelemetryFlag(globalState.CE_PROFILE_SCAN_TELEMETRY, true);
       }
       const pathname = String(globalState.location?.pathname || '');
       return pathname.startsWith('/u/');
@@ -1116,16 +1225,16 @@ class UserPage extends Component<any, any> {
     }
   };
 
-  emitProfileTelemetry: any = (event: any, payload: any = {}) => {
+  emitProfileTelemetry = (event: unknown, payload: unknown = {}): void => {
     if (!this.isProfileTelemetryEnabled()) return;
     try {
       const safeEvent = String(event || '').trim() || 'unknown';
-      const safePayload = (payload && typeof payload === 'object')
+      const safePayload: UnknownRecord = isPlainAnalysisObject(payload)
         ? payload
         : { value: payload };
       const seq = Number(this._profileTelemetrySeq || 0) + 1;
       this._profileTelemetrySeq = seq;
-      const entry = {
+      const entry: ProfileTelemetryEntry = {
         ts: new Date().toISOString(),
         seq,
         source: 'UserPage',
@@ -1133,7 +1242,9 @@ class UserPage extends Component<any, any> {
         ...safePayload,
       };
       const key = '__CE_PROFILE_SCAN_TELEMETRY__';
-      const bucket = Array.isArray(globalState[key]) ? globalState[key] : [];
+      const bucket = Array.isArray(globalState[key])
+        ? globalState[key] as ProfileTelemetryEntry[]
+        : [];
       bucket.push(entry);
       if (bucket.length > 800) bucket.splice(0, bucket.length - 800);
       globalState[key] = bucket;
@@ -1141,191 +1252,95 @@ class UserPage extends Component<any, any> {
     } catch (e) { accountLog.warn('UserPage: telemetry', e); }
   };
 
-  isProfileColdDiagEnabled: any = () => {
+  isProfileColdDiagEnabled = (): boolean => {
     try {
       if (typeof globalThis === 'undefined') return false;
       if (typeof globalState.CE_PROFILE_SCAN_COLD_DIAG !== 'undefined') {
-        return this._readBoolishTelemetryFlag(globalState.CE_PROFILE_SCAN_COLD_DIAG, false);
+        return readBoolishUserPageTelemetryFlag(globalState.CE_PROFILE_SCAN_COLD_DIAG, false);
       }
     } catch (e) { accountLog.warn('UserPage: telemetry', e); }
     return false;
   };
 
-  emitProfileColdDiag: any = (event: any, payload: any = {}) => {
+  emitProfileColdDiag = (event: unknown, payload: unknown = {}): void => {
     if (!this.isProfileColdDiagEnabled()) return;
     const name = String(event || '').trim().toLowerCase() || 'unknown';
     this.emitProfileTelemetry(`cold-diag:${name}`, payload);
   };
 
-  emitNoSbtVisibleTelemetry: any = () => {
+  emitNoSbtVisibleTelemetry = (): void => {
     if (!this.isProfileTelemetryEnabled()) return;
-    const viewAddressLower = String(this.props.viewAddress || '').toLowerCase();
-    const isSBTReady = !!this.props.isSBTCacheReady;
-    const isSbtLoadingAny = !!(this.state.loadingSBTs || !isSBTReady || this.state.isDeepScanning);
-    const sbtListCount = Array.isArray(this.state.sbtList) ? this.state.sbtList.length : 0;
-    if (isSbtLoadingAny || sbtListCount > 0) return;
-
-    const latestRefresh = this._lastProfileRefreshTelemetry || {};
-    const sig = [
-      viewAddressLower,
-      String(this.props.network?.id || ''),
-      String(this.state.loadingSBTs ? 1 : 0),
-      String(isSBTReady ? 1 : 0),
-      String(this.state.isDeepScanning ? 1 : 0),
-      String(this.state.hasUncertainUserData ? 1 : 0),
-      String(this.state.hasUncertainSbtData ? 1 : 0),
-      String(this.state.hasUncertainGateAccess ? 1 : 0),
-      String(sbtListCount),
-      String(latestRefresh.aggregateSbtAddresses || 0),
-      String(latestRefresh.heldAggregateSbtCount || 0),
-      String(latestRefresh.derivedSbtCount ?? ''),
-    ].join('|');
-    if (sig === this._lastNoSbtVisibleTelemetrySignature) return;
-    this._lastNoSbtVisibleTelemetrySignature = sig;
-
-    this.emitProfileTelemetry('no-sbt-visible', {
-      viewAddress: viewAddressLower,
-      networkID: String(this.props.network?.id || ''),
-      loadingSBTs: !!this.state.loadingSBTs,
-      isSBTReady,
-      isDeepScanning: !!this.state.isDeepScanning,
-      hasUncertainUserData: !!this.state.hasUncertainUserData,
-      hasUncertainSbtData: !!this.state.hasUncertainSbtData,
-      hasUncertainGateAccess: !!this.state.hasUncertainGateAccess,
-      sbtListCount,
-      refreshSnapshot: latestRefresh,
+    const telemetryState = buildUserPageNoSbtVisibleTelemetryState({
+      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
+      hasUncertainSbtData: this.state.hasUncertainSbtData,
+      hasUncertainUserData: this.state.hasUncertainUserData,
+      isDeepScanning: this.state.isDeepScanning,
+      isSBTReady: this.props.isSBTCacheReady,
+      latestRefreshTelemetry: this._lastProfileRefreshTelemetry,
+      loadingSBTs: this.state.loadingSBTs,
+      networkID: this.props.network?.id,
+      sbtList: this.state.sbtList,
+      viewAddress: this.props.viewAddress,
     });
+    if (!telemetryState.shouldEmit || !telemetryState.payload) return;
+    if (telemetryState.signature === this._lastNoSbtVisibleTelemetrySignature) return;
+    this._lastNoSbtVisibleTelemetrySignature = telemetryState.signature;
+
+    this.emitProfileTelemetry('no-sbt-visible', telemetryState.payload);
   };
 
-  applyDeepScanReport: any = (scanReport: any) => {
+  applyDeepScanReport = (scanReport: unknown): void => {
     if (!this._isMounted) return;
+    const report = toAnalysisRecord(scanReport) as ProfileDeepScanReport;
     const viewAddressLower = String(this.props.viewAddress || '').toLowerCase();
-    const reportTargetLower = String(scanReport?.targetAddress || '').toLowerCase();
+    const reportTargetLower = String(report.targetAddress || '').toLowerCase();
     if (reportTargetLower && viewAddressLower && reportTargetLower !== viewAddressLower) return;
-    const attemptedSlugs = Array.isArray(scanReport?.attemptedSlugs) ? [...scanReport.attemptedSlugs] : [];
-    const scannedSlugs = Array.isArray(scanReport?.scannedSlugs) ? [...scanReport.scannedSlugs] : [];
-    const skippedSlugs = Array.isArray(scanReport?.skippedSlugs) ? [...scanReport.skippedSlugs] : [];
-    const failedSlugs = Array.isArray(scanReport?.failedSlugs) ? [...scanReport.failedSlugs] : [];
-    const failedActivitySlugs = Array.isArray(scanReport?.failedActivitySlugs) ? [...scanReport.failedActivitySlugs] : [];
-    const rawHadRpcErrors = !!(scanReport && scanReport.hadRpcErrors);
-    const totalActivityFailure = (
-      attemptedSlugs.length > 0 &&
-      scannedSlugs.length === 0 &&
-      failedActivitySlugs.length >= attemptedSlugs.length
-    );
-    const totalSbtFailure = (
-      attemptedSlugs.length > 0 &&
-      scannedSlugs.length === 0 &&
-      failedSlugs.length >= attemptedSlugs.length
-    );
-    const totalSkippedScan = (
-      attemptedSlugs.length > 0 &&
-      scannedSlugs.length === 0 &&
-      skippedSlugs.length >= attemptedSlugs.length
-    );
-    const hasCoverageGap = scanReport && Object.prototype.hasOwnProperty.call(scanReport, 'coverageComplete')
-      ? scanReport.coverageComplete === false
-      : false;
-    const hasPartialRpcFailureEvidence = !!(
-      rawHadRpcErrors &&
-      !totalActivityFailure &&
-      !totalSbtFailure &&
-      !totalSkippedScan &&
-      (
-        failedSlugs.length > 0 ||
-        failedActivitySlugs.length > 0 ||
-        (attemptedSlugs.length > 0 && scannedSlugs.length < attemptedSlugs.length)
-      )
-    );
-    const hasPartialSbtFailureEvidence = !!(
-      rawHadRpcErrors &&
-      failedSlugs.length > 0 &&
-      !totalSbtFailure &&
-      !totalSkippedScan
-    );
-    const hasUncertainUserData = !!(
-      hasCoverageGap ||
-      totalActivityFailure ||
-      totalSbtFailure ||
-      totalSkippedScan ||
-      hasPartialRpcFailureEvidence
-    );
-    const hasUncertainSbtData = !!(
-      totalSbtFailure ||
-      totalSkippedScan ||
-      hasPartialSbtFailureEvidence ||
-      (hasCoverageGap && !totalActivityFailure && !totalSbtFailure && !totalSkippedScan)
-    );
-    this.emitProfileColdDiag('scan-report', {
-      viewAddress: String(this.props.viewAddress || '').toLowerCase(),
-      attemptedSlugs, scannedSlugs, skippedSlugs, failedSlugs, failedActivitySlugs,
-      anyNewData: !!scanReport?.anyNewData,
-      coverageComplete: scanReport?.coverageComplete,
-      coverageReason: scanReport?.coverageReason,
-      hasUncertainUserData,
-      hasUncertainSbtData,
-      totalActivityFailure, totalSbtFailure, totalSkippedScan, hasCoverageGap,
-      totalSbtContractsFound: scanReport?.totalSbtContractsFound,
-      totalCreatedSurveysFound: scanReport?.totalCreatedSurveysFound,
-      totalCreatedQuestionsFound: scanReport?.totalCreatedQuestionsFound,
-      totalSurveyResponsesFound: scanReport?.totalSurveyResponsesFound,
-      totalQuestionResponsesFound: scanReport?.totalQuestionResponsesFound,
-    });
-    this.emitProfileTelemetry('deep-scan-report', {
-      viewAddress: String(this.props.viewAddress || '').toLowerCase(),
-      hadRpcErrors: rawHadRpcErrors,
-      hasUncertainUserData,
-      hasUncertainSbtData,
-      totalActivityFailure,
-      totalSbtFailure,
-      totalSkippedScan,
-      usedAllSessions: !!(scanReport && scanReport.usedAllSessions),
-      coverageComplete: scanReport && Object.prototype.hasOwnProperty.call(scanReport, 'coverageComplete')
-        ? !!scanReport.coverageComplete
-        : null,
-      coverageReason: String(scanReport?.coverageReason || ''),
+    const {
       attemptedSlugs,
       scannedSlugs,
       skippedSlugs,
       failedSlugs,
       failedActivitySlugs,
-      registryEntryCount: Number(scanReport?.registryEntryCount || 0),
-      anyNewData: !!scanReport?.anyNewData,
-      totalSbtContractsFound: Number(scanReport?.totalSbtContractsFound || 0),
-      totalCreatedSurveysFound: Number(scanReport?.totalCreatedSurveysFound || 0),
-      totalCreatedQuestionsFound: Number(scanReport?.totalCreatedQuestionsFound || 0),
-      totalSurveyResponsesFound: Number(scanReport?.totalSurveyResponsesFound || 0),
-      totalQuestionResponsesFound: Number(scanReport?.totalQuestionResponsesFound || 0),
-      sampleSbtAddresses: Array.isArray(scanReport?.sampleSbtAddresses)
-        ? scanReport.sampleSbtAddresses.slice(0, 12)
-        : [],
-      sampleCreatedSurveyIds: Array.isArray(scanReport?.sampleCreatedSurveyIds)
-        ? scanReport.sampleCreatedSurveyIds.slice(0, 12)
-        : [],
-      sampleCreatedQuestionIds: Array.isArray(scanReport?.sampleCreatedQuestionIds)
-        ? scanReport.sampleCreatedQuestionIds.slice(0, 12)
-        : [],
-      sampleSurveyResponseIds: Array.isArray(scanReport?.sampleSurveyResponseIds)
-        ? scanReport.sampleSurveyResponseIds.slice(0, 12)
-        : [],
-      sampleQuestionResponseIds: Array.isArray(scanReport?.sampleQuestionResponseIds)
-        ? scanReport.sampleQuestionResponseIds.slice(0, 12)
-        : [],
-    });
-    this.setState(
-      {
-        isDeepScanning: false,
+      rawHadRpcErrors,
+      totalActivityFailure,
+      totalSbtFailure,
+      totalSkippedScan,
+      hasCoverageGap,
+      hasUncertainUserData,
+      hasUncertainSbtData,
+    } = buildUserPageDeepScanReportStatus({ report });
+    const reportTelemetryPayloads = buildUserPageDeepScanReportTelemetryPayloads({
+      report,
+      status: {
+        attemptedSlugs,
+        scannedSlugs,
+        skippedSlugs,
+        failedSlugs,
+        failedActivitySlugs,
+        rawHadRpcErrors,
+        totalActivityFailure,
+        totalSbtFailure,
+        totalSkippedScan,
+        hasCoverageGap,
         hasUncertainUserData,
         hasUncertainSbtData,
-        hasUncertainGateAccess: false,
       },
+      viewAddress: this.props.viewAddress,
+    });
+    this.emitProfileColdDiag('scan-report', reportTelemetryPayloads.coldDiagPayload);
+    this.emitProfileTelemetry('deep-scan-report', reportTelemetryPayloads.telemetryPayload);
+    this.setState(
+      buildUserPageDeepScanReportStatePatch({
+        hasUncertainUserData,
+        hasUncertainSbtData,
+      }),
       () => {
         this.loadDataFromCache();
       }
     );
   };
 
-  startProfileDeepScan: any = (phase: any = 'mount') => {
+  startProfileDeepScan = (phase: unknown = 'mount'): void => {
     const targetAddress = String(this.props.viewAddress || '').trim();
     if (!this._isMounted || !this.props.scanSpecificUserProfile || !targetAddress) return;
 
@@ -1337,33 +1352,36 @@ class UserPage extends Component<any, any> {
       viewAddress: targetLower,
       phase,
     });
-    this.setState({
-      isDeepScanning: true,
-      hasUncertainUserData: false,
-      hasUncertainSbtData: false,
-      hasUncertainGateAccess: false,
-    });
+    this.setState(buildUserPageDeepScanRequestStatePatch());
 
     this.props.scanSpecificUserProfile(targetAddress)
-      .then((scanReport: any) => {
-        if (!this._isMounted || requestSeq !== this._profileScanRequestSeq) return;
-        const currentViewLower = String(this.props.viewAddress || '').toLowerCase();
-        if (!currentViewLower || currentViewLower !== targetLower) return;
-        const safeReport = (scanReport && typeof scanReport === 'object')
+      .then((scanReport: unknown) => {
+        if (!shouldApplyUserPageDeepScanResponse({
+          activeRequestSeq: this._profileScanRequestSeq,
+          currentViewAddress: this.props.viewAddress,
+          isMounted: this._isMounted,
+          requestSeq,
+          targetLower,
+        })) return;
+        const safeReport: ProfileDeepScanReport = isPlainAnalysisObject(scanReport)
           ? { ...scanReport }
           : {};
         if (!safeReport.targetAddress) safeReport.targetAddress = targetAddress;
         this.applyDeepScanReport(safeReport);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         accountLog.error(`[UserPage] Deep search failed${phase === 'update' ? ' on update' : ''}:`, err);
-        if (!this._isMounted || requestSeq !== this._profileScanRequestSeq) return;
-        const currentViewLower = String(this.props.viewAddress || '').toLowerCase();
-        if (!currentViewLower || currentViewLower !== targetLower) return;
+        if (!shouldApplyUserPageDeepScanResponse({
+          activeRequestSeq: this._profileScanRequestSeq,
+          currentViewAddress: this.props.viewAddress,
+          isMounted: this._isMounted,
+          requestSeq,
+          targetLower,
+        })) return;
         this.emitProfileTelemetry('deep-scan-failed', {
           viewAddress: targetLower,
           phase,
-          error: String(err?.message || err),
+          error: getUserPageErrorMessage(err, String(err)),
         });
         this.applyDeepScanReport({
           targetAddress,
@@ -1374,46 +1392,22 @@ class UserPage extends Component<any, any> {
       });
   };
 
-  handleBackgroundProfileScanReport: any = (event: any) => {
+  handleBackgroundProfileScanReport = (event: ProfileScanReportEvent): void => {
     if (!this._isMounted) return;
-    const detail = event && typeof event === 'object' ? event.detail : null;
-    const scanReport = detail && typeof detail === 'object'
-      ? (detail.scanReport || null)
+    const detailSource = event && typeof event === 'object' && 'detail' in event
+      ? event.detail
       : null;
-    if (!scanReport || typeof scanReport !== 'object') return;
+    const detail = toAnalysisRecord(detailSource);
+    const scanReport = toAnalysisRecord(detail.scanReport) as ProfileDeepScanReport;
+    if (!Object.keys(scanReport).length) return;
     const viewAddressLower = String(this.props.viewAddress || '').toLowerCase();
     const reportTargetLower = String(scanReport.targetAddress || '').toLowerCase();
     if (!viewAddressLower || !reportTargetLower || reportTargetLower !== viewAddressLower) return;
 
-    const scannedSlugs = Array.isArray(scanReport.scannedSlugs)
-      ? scanReport.scannedSlugs.join(',')
-      : '';
-    const attemptedSlugs = Array.isArray(scanReport.attemptedSlugs)
-      ? scanReport.attemptedSlugs.join(',')
-      : '';
-    const skippedSlugs = Array.isArray(scanReport.skippedSlugs)
-      ? scanReport.skippedSlugs.join(',')
-      : '';
-    const failedSlugs = Array.isArray(scanReport.failedSlugs)
-      ? scanReport.failedSlugs.join(',')
-      : '';
-    const failedActivitySlugs = Array.isArray(scanReport.failedActivitySlugs)
-      ? scanReport.failedActivitySlugs.join(',')
-      : '';
-    const coverageComplete = Object.prototype.hasOwnProperty.call(scanReport, 'coverageComplete')
-      ? String(scanReport.coverageComplete === true ? 1 : 0)
-      : '';
-    const signature = [
+    const signature = buildUserPageDeepScanReportSignature({
+      report: scanReport,
       reportTargetLower,
-      String(scanReport.hadRpcErrors ? 1 : 0),
-      String(scanReport.coverageReason || ''),
-      coverageComplete,
-      attemptedSlugs,
-      scannedSlugs,
-      skippedSlugs,
-      failedSlugs,
-      failedActivitySlugs,
-    ].join('|');
+    });
     if (signature === this._lastBackgroundDeepScanReportSignature) return;
     this._lastBackgroundDeepScanReportSignature = signature;
 
@@ -1431,12 +1425,12 @@ class UserPage extends Component<any, any> {
     try {
       this._unsubscribeCacheUpdates = subscribeCacheUpdates(this.handleManagedCacheUpdate);
     } catch (e) { accountLog.warn('UserPage: fallback', e); }
-    this.setState({ viewAddress: this.props.viewAddress }, () => {
+    this.setState(buildUserPageViewAddressStatePatch({ viewAddress: this.props.viewAddress }), () => {
       // Honor optional defaultTab prop (e.g., 'surveys')
       try {
         const dt = String(this.props.defaultTab || '').toLowerCase();
         if (dt === 'surveys' || dt === 'questions') {
-          this.setState({ selectedTab: dt });
+          this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: dt }));
         }
       } catch (e) { accountLog.warn('UserPage: fallback', e); }
 
@@ -1485,25 +1479,31 @@ class UserPage extends Component<any, any> {
     this._clearSectionDeriveMemo();
   }
 
-  componentDidUpdate(prevProps: any, prevState: any) {
+  componentDidUpdate(prevProps: UserPagePreviousProps, prevState: UnknownRecord) {
     // Fast-path: nonce changed → force immediate cache re-read (bypasses signature dedup)
-    const responseNonceChanged = prevProps.questionResponsesNonce !== this.props.questionResponsesNonce;
-    if (responseNonceChanged) {
-      const viewAddrLower = String(this.props.viewAddress || '').toLowerCase();
-      const connAddrLower = String(this.props.connectedAddress || this.props.account || '').toLowerCase();
-      const isOwnProfile = !!(viewAddrLower && connAddrLower && viewAddrLower === connAddrLower);
-      if (isOwnProfile) {
+    const responseNonceRefresh = resolveUserPageResponseNonceRefresh({
+      account: this.props.account,
+      connectedAddress: this.props.connectedAddress,
+      nextNonce: this.props.questionResponsesNonce,
+      prevNonce: prevProps.questionResponsesNonce,
+      viewAddress: this.props.viewAddress,
+    });
+    if (responseNonceRefresh) {
+      if (responseNonceRefresh.isOwnProfile) {
         // eslint-disable-next-line no-console
         console.debug('[UserPage] questionResponsesNonce changed, forcing cache refresh for own profile');
-        this.queueCacheRefresh({ force: true, markLoading: false, bypassSignature: true });
-      } else {
-        this.queueCacheRefresh({ markLoading: false });
       }
+      this.queueCacheRefresh(responseNonceRefresh.options);
     }
 
     // React to address or network changes
-    if (prevProps.viewAddress !== this.props.viewAddress ||
-        prevProps.network?.id !== this.props.network?.id) {
+    const addressContextChange = resolveUserPageAddressContextChange({
+      prevViewAddress: prevProps.viewAddress,
+      nextViewAddress: this.props.viewAddress,
+      prevNetwork: prevProps.network,
+      nextNetwork: this.props.network,
+    });
+    if (addressContextChange.shouldReset) {
       if (this._isMounted) {
         this._lastBackgroundDeepScanReportSignature = '';
         this._responsePayloadParseMemo.clear();
@@ -1513,45 +1513,9 @@ class UserPage extends Component<any, any> {
         this._clearSectionDeriveMemo();
         this._deepScanTooltipInputSignature = null;
         this._deepScanTooltipOutputSignature = '';
-        this.setState({
-          // Reset data related to the previous user/network
-          surveyResponseInfo: [],
-          surveyCreationInfo: [],
-          questionCreationInfo: [],
-          questionResponseInfo: [],
-          detailedSurveyResponses: {},
-          detailedQuestionResponses: {},
-          sbtList: [],
-          userStats: { // Reset stats or ensure they are recalculated
-            surveysResponded: 0,
-            surveysCreated: 0,
-            questionsResponded: 0,
-            questionsCreated: 0,
-            mostUniqueIdea: ' ... ',
-            badgesReceived: 0,
-            worryScore: 'x%',
-            enthusiasmScore: 'y%',
-            topTags: ['#cybersecurity', '#ubi', '#mechinterp'],
-          },
-          loadingSurveys: true,
-          loadingQuestions: true,
-          loadingSBTs: true,
-          username: '', // Reset username for the new viewAddress
-          usernameError: '',
-          isEditingUsername: false, // Reset username edit mode
-          bookmarked: false, // Re-check for new address
-          expandedSurveyResponses: {}, // Reset expanded state for surveys
-          expandedSurveysCreated: {},
-          viewAddress: this.props.viewAddress, // Ensure viewAddress in state is also updated
-          nicknameInput: '', // NEW: clear previous nickname input when switching addresses
-          isEditingNickname: false, // NEW: exit edit mode on route/network change
-          isDeepScanning: false, // Reset deep scan flag
-          hasUncertainUserData: false,
-          hasUncertainSbtData: false,
-          hasUncertainGateAccess: false,
-          deepScanTooltipLines: null,
-          deepScanProgressRows: null,
-        }, () => {
+        this.setState(buildUserPageAddressContextResetStatePatch({
+          viewAddress: addressContextChange.nextViewAddress,
+        }), () => {
           this.loadPersistedUsername(); // Load username for the new context
           this.loadDataFromCache();     // Load all data from cache for the new context
           this.checkIfBookmarked();     // Check bookmark status for the new context
@@ -1574,41 +1538,41 @@ class UserPage extends Component<any, any> {
     }
 
     // NEW: Reactivity to MainSite cache updates (no contract calls here)
-    const sbtRevisionChanged = prevProps.sbtCacheRevision !== this.props.sbtCacheRevision;
-    const accountChanged = prevProps.account !== this.props.account;
-    if (sbtRevisionChanged || accountChanged) {
+    const cacheUpdateRefresh = resolveUserPageCacheUpdateRefresh({
+      prevSbtCacheRevision: prevProps.sbtCacheRevision,
+      nextSbtCacheRevision: this.props.sbtCacheRevision,
+      prevAccount: prevProps.account,
+      nextAccount: this.props.account,
+    });
+    if (cacheUpdateRefresh.shouldResetGateAccess) {
       this._resetResponseGateAccess();
     }
-    if (sbtRevisionChanged || accountChanged) {
+    if (cacheUpdateRefresh.shouldQueueCacheRefresh) {
       this.queueCacheRefresh({ markLoading: false });
     }
 
-    // Check AI availability once all caches are ready
-    const allCachesReady = !!(
-      this.props.isSBTCacheReady &&
-      this.props.isSurveyCacheReady &&
-      this.props.isQuestionCacheReady &&
-      this.props.isResponsesCacheReady
-    );
-    const prevAllCachesReady = !!(
-      prevProps.isSBTCacheReady &&
-      prevProps.isSurveyCacheReady &&
-      prevProps.isQuestionCacheReady &&
-      prevProps.isResponsesCacheReady
-    );
-
-    // Reset + re-check AI availability on context changes
-    const contextChanged = (
-      prevProps.account !== this.props.account ||
-      prevProps.viewAddress !== this.props.viewAddress ||
-      prevProps.network?.id !== this.props.network?.id
-    );
-    if (contextChanged) {
+    const aiAvailabilityRefresh = resolveUserPageAiAvailabilityRefresh({
+      nextAccount: this.props.account,
+      nextIsQuestionCacheReady: this.props.isQuestionCacheReady,
+      nextIsResponsesCacheReady: this.props.isResponsesCacheReady,
+      nextIsSBTCacheReady: this.props.isSBTCacheReady,
+      nextIsSurveyCacheReady: this.props.isSurveyCacheReady,
+      nextNetworkId: this.props.network?.id,
+      nextViewAddress: this.props.viewAddress,
+      prevAccount: prevProps.account,
+      prevIsQuestionCacheReady: prevProps.isQuestionCacheReady,
+      prevIsResponsesCacheReady: prevProps.isResponsesCacheReady,
+      prevIsSBTCacheReady: prevProps.isSBTCacheReady,
+      prevIsSurveyCacheReady: prevProps.isSurveyCacheReady,
+      prevNetworkId: prevProps.network?.id,
+      prevViewAddress: prevProps.viewAddress,
+    });
+    if (aiAvailabilityRefresh.contextChanged) {
       // Reset and immediately re-check if caches are ready
-      this.setState({ aiAvailable: null }, () => {
-        if (allCachesReady) this._checkAiAvailability();
+      this.setState(buildUserPageAiAvailabilityStatePatch(), () => {
+        if (aiAvailabilityRefresh.shouldCheckAfterReset) this._checkAiAvailability();
       });
-    } else if (allCachesReady && !prevAllCachesReady) {
+    } else if (aiAvailabilityRefresh.shouldCheckNow) {
       // Caches just became ready — initial check
       this._checkAiAvailability();
     }
@@ -1617,17 +1581,17 @@ class UserPage extends Component<any, any> {
   }
 
 
-  handleNicknameKeyDown: any = (e: any) => {
-    if (e.key === 'Enter') {
+  handleNicknameKeyDown = (event: NicknameKeyEvent): void => {
+    if (event.key === 'Enter') {
       this.saveNickname();
-    } else if (e.key === 'Escape') {
+    } else if (event.key === 'Escape') {
       this.cancelNicknameEdit();
     }
   }
 
-  onPenClick: any = () => {
+  onPenClick = (): void => {
     if (!this._isMounted) return;
-    this.setState({ isEditingNickname: true }, () => {
+    this.setState(buildUserPageNicknameEditOpenStatePatch(), () => {
       // focus the input when it shows (best-effort via microtask)
       setTimeout(() => {
         try {
@@ -1638,131 +1602,82 @@ class UserPage extends Component<any, any> {
     });
   }
 
-  cancelNicknameEdit: any = () => {
+  cancelNicknameEdit = (): void => {
     if (!this._isMounted) return;
     const rawAddr = this.props.viewAddress;
-    const currentLower = String(rawAddr || '').toLowerCase();
     let cachedNick = '';
     try {
       const parsed = this.getBookmarksCache();
-      const users = Array.isArray(parsed?.users) ? parsed.users : [];
-      const obj = users.find((u: any) =>
-        u && typeof u === 'object' &&
-        String(u.address || '').toLowerCase() === currentLower
-      );
-      if (obj && typeof obj.nickname === 'string' && obj.nickname.trim()) {
-        cachedNick = obj.nickname.trim();
-      }
+      cachedNick = resolveUserPageBookmarkNickname({
+        address: rawAddr,
+        trim: true,
+        users: parsed?.users,
+      });
     } catch (e) { accountLog.warn('UserPage: fallback', e); }
-    this.setState({ isEditingNickname: false, nicknameInput: cachedNick || '' });
+    this.setState(buildUserPageNicknameEditCancelStatePatch({ nicknameInput: cachedNick }));
   }
 
-  handleNicknameChange: any = (event: any) => {
+  handleNicknameChange = (event: NicknameChangeEvent): void => {
     if (this._isMounted) {
-      this.setState({ nicknameInput: event.target.value || '' });
+      this.setState(buildUserPageNicknameInputStatePatch({ nicknameInput: event.target?.value }));
     }
   }
 
 
-  getOnchainUsername: any = (_address: any, _network: any) => {
+  getOnchainUsername = (_address: unknown, _network: unknown): string | null => {
     return null;
     // should go in contractScripts.js when enabled
   }
 
-  saveNickname: any = () => {
+  saveNickname = (): void => {
     const rawAddr = this.props.viewAddress;
     if (!rawAddr || !this._isMounted) return;
 
-    const addrLower = String(rawAddr).toLowerCase();
     const nickname = (this.state.nicknameInput || '').trim();
-    const networkIdStr = this.props.network?.id != null ? String(this.props.network.id) : null;
     const onchainUsername = this.getOnchainUsername(rawAddr, this.props.network); // returns null for now
 
     let bookmarksCache = this.getBookmarksCache();
-
-    // Heal arrays
-    bookmarksCache.surveys = Array.isArray(bookmarksCache.surveys) ? bookmarksCache.surveys : [];
-    bookmarksCache.questions = Array.isArray(bookmarksCache.questions) ? bookmarksCache.questions : [];
-    bookmarksCache.users = Array.isArray(bookmarksCache.users) ? bookmarksCache.users : [];
-    bookmarksCache.filters = Array.isArray(bookmarksCache.filters) ? bookmarksCache.filters : [];
-
-    const users = bookmarksCache.users;
-    const objIdx = users.findIndex((u: any) =>
-      u && typeof u === 'object' && String(u.address || '').toLowerCase() === addrLower
-    );
-    const strIdx = users.findIndex((u: any) =>
-      typeof u === 'string' && String(u).toLowerCase() === addrLower
-    );
-
-    const baseObj: any = { address: addrLower, ...(nickname ? { nickname } : {}) };
-    if (onchainUsername) baseObj.username = onchainUsername;
-    if (networkIdStr) baseObj.networkId = networkIdStr;
-
-    if (objIdx > -1) {
-      // Update existing object entry — preserve other fields
-      const existing = users[objIdx] && typeof users[objIdx] === 'object' ? users[objIdx] : {};
-      const merged = {
-        ...existing,
-        address: addrLower,
-        ...(onchainUsername ? { username: onchainUsername } : {}),
-        ...(networkIdStr ? { networkId: networkIdStr } : {})
-      };
-      if (nickname) {
-        merged.nickname = nickname;
-      } else {
-        if ('nickname' in merged) delete merged.nickname; // clearing nickname
-      }
-      users[objIdx] = merged;
-    } else if (strIdx > -1) {
-      // Legacy string entry
-      if (nickname) {
-        users[strIdx] = baseObj; // upgrade only if setting non-empty nickname
-      }
-    } else {
-      if (nickname) {
-        users.push(baseObj); // auto-bookmark when setting a nickname
-      }
-    }
+    const saveResult = applyUserPageBookmarkNicknameSave({
+      address: rawAddr,
+      bookmarksCache,
+      networkId: this.props.network?.id,
+      nickname,
+      onchainUsername,
+    });
+    bookmarksCache = saveResult.bookmarksCache;
 
     this.persistBookmarksCache(bookmarksCache, 'saveNickname');
     if (this._isMounted) {
-      const stillBookmarked = users.some((u: any) =>
-        (typeof u === 'string' && String(u).toLowerCase() === addrLower) ||
-        (u && typeof u === 'object' && String(u.address || '').toLowerCase() === addrLower)
-      );
-      this.setState({
-        nicknameInput: nickname,
-        bookmarked: stillBookmarked,
-        isEditingNickname: false
-      });
+      this.setState(buildUserPageNicknameSaveStatePatch({
+        nickname: saveResult.nickname,
+        bookmarked: saveResult.stillBookmarked,
+      }));
     }
   }
 
-  loadNicknameFromCache: any = () => {
+  loadNicknameFromCache = (): void => {
     const rawAddr = this.props.viewAddress;
     if (!rawAddr || !this._isMounted) return;
 
-    const addrLower = String(rawAddr).toLowerCase();
     const bookmarksCache = this.getBookmarksCache();
-
-    const users = Array.isArray(bookmarksCache.users) ? bookmarksCache.users : [];
-    const obj = users.find((u: any) =>
-      u && typeof u === 'object' && String(u.address || '').toLowerCase() === addrLower
-    );
+    const nicknameInput = resolveUserPageBookmarkNickname({
+      address: rawAddr,
+      users: bookmarksCache.users,
+    });
 
     if (this._isMounted) {
-      this.setState({ nicknameInput: (obj && typeof obj.nickname === 'string') ? obj.nickname : '' });
+      this.setState(buildUserPageNicknameInputStatePatch({ nicknameInput }));
     }
   }
 
-  loadPersistedUsername: any = () => {
+  loadPersistedUsername = (): void => {
     const { viewAddress, account, network } = this.props;
     if (account && viewAddress && network?.id && account.toLowerCase() === viewAddress.toLowerCase()) {
         const networkID = network.id.toString();
         try {
             const storedUsername = localStorage.getItem(`userPageUsername_${networkID}_${viewAddress.toLowerCase()}`);
             if (storedUsername && this._isMounted) {
-                this.setState({ username: storedUsername });
+                this.setState(buildUserPageUsernameLoadedStatePatch({ username: storedUsername }));
             }
         } catch (error) {
             accountLog.error("Error loading username from localStorage:", error);
@@ -1770,20 +1685,13 @@ class UserPage extends Component<any, any> {
     }
   }
 
-  loadDataFromCache: any = () => {
+  loadDataFromCache = (): void => {
     if (!this._isMounted) return;
     const currentViewAddress = this.props.viewAddress;
     if (!currentViewAddress) {
       accountLog.warn("UserPage: viewAddress is not set, cannot load data from cache.");
       if (this._isMounted) {
-        this.setState({
-          loadingSurveys: false,
-          loadingQuestions: false,
-          loadingSBTs: false,
-          hasUncertainGateAccess: false,
-          deepScanTooltipLines: null,
-          deepScanProgressRows: null,
-        });
+        this.setState(buildUserPageMissingAddressCacheStatePatch());
       }
       return;
     }
@@ -1791,77 +1699,35 @@ class UserPage extends Component<any, any> {
   }
 
   // --- helpers: group-aware multi-cache reads (union across all groups) ---
-  _dgReadAll: any = (name: any) => {
-    return listNamespaceSlugsSync(name)
-      .map((slug: any) => String(slug || ''))
-      .map((slug: any) => ({
-        slug,
-        data: peekCacheSync(name, slug, { clone: false }),
-      }))
-      .filter((entry: any) => entry && entry.data && typeof entry.data === 'object');
+  _dgReadAll = (name: unknown): NamespaceCacheSourceEntry[] => {
+    return readUserPageNamespaceSourceEntries({
+      listNamespaceSlugs: listNamespaceSlugsSync,
+      namespace: name,
+      peekCache: peekCacheSync,
+    }) as NamespaceCacheSourceEntry[];
   };
 
-  _dgHasAny: any = (name: any) => hasNamespaceEntriesSync(name);
+  _dgHasAny = (name: unknown): boolean => hasNamespaceEntriesSync(String(name || ''));
 
-  _readCacheSourcePresence: any = () => {
-    const hasSurveysCache = this._dgHasAny('surveysCache');
-    const hasQuestionsCache = this._dgHasAny('questionsCache');
-    const hasSbtCache = this._dgHasAny('sbtCache');
-    const hasUserCache = this._dgHasAny('userCache');
-    return {
-      hasSurveysCache,
-      hasQuestionsCache,
-      hasSbtCache,
-      hasUserCache,
-    };
+  _readCacheSourcePresence = (): CacheSourcePresence => {
+    return readUserPageCacheSourcePresence({
+      hasNamespaceEntries: this._dgHasAny,
+    });
   };
 
-  _normalizeSourceSlugForSignature: any = (rawSlug: any) => {
-    const normalized = this._normalizeGateSlug(rawSlug || '');
-    return normalized || 'general';
+  _readCacheSourceSnapshot = (): CacheSourceSnapshot => {
+    return readUserPageCacheSourceSnapshot({
+      hasNamespaceEntries: this._dgHasAny,
+      listNamespaceSlugs: listNamespaceSlugsSync,
+    }) as CacheSourceSnapshot;
   };
 
-  _buildNamespaceSourceMembershipSignature: any = (namespace: any = '') => {
-    const rawSlugs = listNamespaceSlugsSync(namespace);
-    const slugs = (Array.isArray(rawSlugs) ? rawSlugs : [])
-      .map((slug: any) => this._normalizeSourceSlugForSignature(slug))
-      .sort((a: any, b: any) => (a < b ? -1 : a > b ? 1 : 0));
-    return slugs.join(',');
-  };
-
-  _readCacheSourceSnapshot: any = () => {
-    const presence = this._readCacheSourcePresence();
-    const surveysNamespaceSignature = this._buildNamespaceSourceMembershipSignature('surveysCache');
-    const questionsNamespaceSignature = this._buildNamespaceSourceMembershipSignature('questionsCache');
-    const sbtNamespaceSignature = this._buildNamespaceSourceMembershipSignature('sbtCache');
-    const userNamespaceSignature = this._buildNamespaceSourceMembershipSignature('userCache');
-    const hasSurveySources = presence.hasSurveysCache || presence.hasQuestionsCache || presence.hasUserCache;
-    const hasQuestionSources = presence.hasQuestionsCache || presence.hasUserCache;
-    const hasSbtSources = presence.hasSbtCache || presence.hasUserCache;
-
-    return {
-      ...presence,
-      hasSurveySources,
-      hasQuestionSources,
-      hasSbtSources,
-      surveySourcesSignature: [surveysNamespaceSignature, questionsNamespaceSignature, userNamespaceSignature].join('|'),
-      questionSourcesSignature: [questionsNamespaceSignature, userNamespaceSignature].join('|'),
-      sbtSourcesSignature: [sbtNamespaceSignature, userNamespaceSignature].join('|'),
-      membershipSignature: [
-        surveysNamespaceSignature,
-        questionsNamespaceSignature,
-        sbtNamespaceSignature,
-        userNamespaceSignature,
-      ].join('||'),
-    };
-  };
-
-  _clearUnifiedCacheAggregateMemo: any = () => {
+  _clearUnifiedCacheAggregateMemo = (): void => {
     this._unifiedCacheAggregateMemoKey = '';
     this._unifiedCacheAggregateMemo = null;
   };
 
-  _clearSectionDeriveMemo: any = () => {
+  _clearSectionDeriveMemo = (): void => {
     this._sectionDeriveMemo = {
       survey: null,
       question: null,
@@ -1869,66 +1735,66 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _buildUnifiedCacheAggregateMemoKey: any = ({
+  _buildUnifiedCacheAggregateMemoKey = ({
     viewAddressLower = '',
     networkID = '',
     sourceMembershipSignature = '',
-  }: any = {}) => (
-    [
-      String(viewAddressLower || ''),
-      String(networkID || ''),
-      String(this.props.questionResponsesNonce || 0),
-      String(this.props.sbtCacheRevision || 0),
-      String(sourceMembershipSignature || ''),
-    ].join('|')
+  }: UnifiedCacheAggregateMemoKeyInput = {}): string => (
+    buildUserPageUnifiedCacheAggregateMemoKey({
+      networkID,
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      sourceMembershipSignature,
+      viewAddressLower,
+    })
   );
 
-  _buildSurveyDeriveSignature: any = ({
+  _buildSurveyDeriveSignature = ({
     viewAddressLower = '',
     networkID = '',
     sourceSignature = '',
-  }: any = {}) => (
-    [
-      String(viewAddressLower || ''),
-      String(networkID || ''),
-      String(sourceSignature || ''),
-      String(this.props.questionResponsesNonce || 0),
-      String(this.props.account || '').trim().toLowerCase(),
-      String(this._responseGateAccessGeneration || 0),
-      String(this._responseGateAccessStatusVersion || 0),
-    ].join('|')
+  }: SectionDeriveSignatureInput = {}): string => (
+    buildUserPageResponseSectionDeriveSignature({
+      account: this.props.account,
+      networkID,
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      responseGateAccessGeneration: this._responseGateAccessGeneration,
+      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
+      sourceSignature,
+      viewAddressLower,
+    })
   );
 
-  _buildQuestionDeriveSignature: any = ({
+  _buildQuestionDeriveSignature = ({
     viewAddressLower = '',
     networkID = '',
     sourceSignature = '',
-  }: any = {}) => (
-    [
-      String(viewAddressLower || ''),
-      String(networkID || ''),
-      String(sourceSignature || ''),
-      String(this.props.questionResponsesNonce || 0),
-      String(this.props.account || '').trim().toLowerCase(),
-      String(this._responseGateAccessGeneration || 0),
-      String(this._responseGateAccessStatusVersion || 0),
-    ].join('|')
+  }: SectionDeriveSignatureInput = {}): string => (
+    buildUserPageResponseSectionDeriveSignature({
+      account: this.props.account,
+      networkID,
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      responseGateAccessGeneration: this._responseGateAccessGeneration,
+      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
+      sourceSignature,
+      viewAddressLower,
+    })
   );
 
-  _buildSbtDeriveSignature: any = ({
+  _buildSbtDeriveSignature = ({
     viewAddressLower = '',
     networkID = '',
     sourceSignature = '',
-  }: any = {}) => (
-    [
-      String(viewAddressLower || ''),
-      String(networkID || ''),
-      String(sourceSignature || ''),
-      String(this.props.sbtCacheRevision || 0),
-    ].join('|')
+  }: SectionDeriveSignatureInput = {}): string => (
+    buildUserPageSbtSectionDeriveSignature({
+      networkID,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      sourceSignature,
+      viewAddressLower,
+    })
   );
 
-  clearQueuedCacheRefresh: any = () => {
+  clearQueuedCacheRefresh = (): void => {
     if (this._queuedCacheRefreshTimer) {
       clearTimeout(this._queuedCacheRefreshTimer);
       this._queuedCacheRefreshTimer = null;
@@ -1938,7 +1804,7 @@ class UserPage extends Component<any, any> {
     this._queuedCacheRefreshBypassSignature = false;
   };
 
-  clearResponseGateRetryTimer: any = () => {
+  clearResponseGateRetryTimer = (): void => {
     if (this._responseGateRetryTimer) {
       clearTimeout(this._responseGateRetryTimer);
       this._responseGateRetryTimer = null;
@@ -1946,7 +1812,7 @@ class UserPage extends Component<any, any> {
     this._responseGateRetryDueAt = 0;
   };
 
-  scheduleResponseGateRetry: any = (delayMs: any = USERPAGE_GATE_UNKNOWN_RETRY_MS) => {
+  scheduleResponseGateRetry = (delayMs: unknown = USERPAGE_GATE_UNKNOWN_RETRY_MS): void => {
     if (!this._isMounted) return;
     const safeDelay = Math.max(1000, Number(delayMs) || USERPAGE_GATE_UNKNOWN_RETRY_MS);
     const nextDueAt = Date.now() + safeDelay;
@@ -1965,11 +1831,23 @@ class UserPage extends Component<any, any> {
     }, safeDelay);
   };
 
-  queueCacheRefresh: any = ({ force = false, markLoading = false, bypassSignature = false }: any = {}) => {
+  queueCacheRefresh = ({
+    force = false,
+    markLoading = false,
+    bypassSignature = false,
+  }: QueuedCacheRefreshOptions = {}): void => {
     if (!this._isMounted) return;
-    this._queuedCacheRefreshForce = this._queuedCacheRefreshForce || !!force;
-    this._queuedCacheRefreshLoading = this._queuedCacheRefreshLoading || !!markLoading;
-    this._queuedCacheRefreshBypassSignature = this._queuedCacheRefreshBypassSignature || !!bypassSignature;
+    const nextFlags = mergeUserPageQueuedCacheRefreshFlags({
+      bypassSignature,
+      currentBypassSignature: this._queuedCacheRefreshBypassSignature,
+      currentForce: this._queuedCacheRefreshForce,
+      currentMarkLoading: this._queuedCacheRefreshLoading,
+      force,
+      markLoading,
+    });
+    this._queuedCacheRefreshForce = nextFlags.force;
+    this._queuedCacheRefreshLoading = nextFlags.markLoading;
+    this._queuedCacheRefreshBypassSignature = nextFlags.bypassSignature;
     if (this._queuedCacheRefreshTimer) return;
     this._queuedCacheRefreshTimer = setTimeout(() => {
       this._queuedCacheRefreshTimer = null;
@@ -1977,153 +1855,47 @@ class UserPage extends Component<any, any> {
     }, 16);
   };
 
-  flushQueuedCacheRefresh: any = () => {
+  flushQueuedCacheRefresh = (): void => {
     if (!this._isMounted) return;
-    const force = this._queuedCacheRefreshForce;
-    const markLoading = this._queuedCacheRefreshLoading;
-    const bypassSignature = this._queuedCacheRefreshBypassSignature;
+    const force = !!this._queuedCacheRefreshForce;
+    const markLoading = !!this._queuedCacheRefreshLoading;
+    const bypassSignature = !!this._queuedCacheRefreshBypassSignature;
     this._queuedCacheRefreshForce = false;
     this._queuedCacheRefreshLoading = false;
     this._queuedCacheRefreshBypassSignature = false;
-    const refreshOpts: any = { force, markLoading };
-    if (bypassSignature) refreshOpts.bypassSignature = true;
+    const refreshOpts = buildUserPageCacheRefreshOptions({
+      bypassSignature,
+      force,
+      markLoading,
+    }) as CacheRefreshOptions;
     this._refreshAllDataFromCache(refreshOpts);
   };
 
-  _readNetworkCache: any = (cacheObj: any, networkID: any) => {
-    if (!cacheObj || typeof cacheObj !== 'object') return {};
-    const mergeBucket = (target: any, bucket: any) => {
-      if (!bucket || typeof bucket !== 'object') return;
-      ['surveys', 'surveyResponses', 'questions', 'questionResponses', 'questionResponsesMeta']
-        .forEach((key: any) => {
-          const value = bucket[key];
-          if (!value || typeof value !== 'object') return;
-          target[key] = {
-            ...(target[key] || {}),
-            ...value,
-          };
-        });
-    };
-
-    const merged: Record<string, any> = {};
-    Object.keys(cacheObj).forEach((key: any) => {
-      mergeBucket(merged, cacheObj[key]);
+  _buildGateAccessCacheKey = ({
+    slug = '',
+    resourceKey = '',
+  }: GateAccessKeyInput = {}): string => {
+    return buildUserPageGateAccessCacheKey({
+      account: this.props.account,
+      networkID: this.props.network?.id,
+      resourceKey,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      slug,
     });
-    if (networkID) {
-      mergeBucket(merged, cacheObj[networkID]);
-    }
-    return merged;
   };
 
-  _getPrioritizedNetworkCacheNodes: any = (cacheObj: any, networkID: any) => {
-    if (!cacheObj || typeof cacheObj !== 'object') return [];
-    const out: any[] = [];
-    const seen: any = new Set();
-    const push = (keyRaw: any) => {
-      const key = String(keyRaw || '');
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      const value = cacheObj[key];
-      if (!value || typeof value !== 'object') return;
-      out.push({ key, value });
-    };
-
-    if (networkID) {
-      push(networkID);
-    }
-    Object.keys(cacheObj).forEach(push);
-    return out;
-  };
-
-  _getActiveUserChainNode: any = (userNode: any, networkID: any) => {
-    if (!userNode || typeof userNode !== 'object') return null;
-    const orderedKeys: any[] = [];
-    const seen: any = new Set();
-    const pushKey = (keyRaw: any) => {
-      const key = String(keyRaw || '');
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      if (!userNode[key] || typeof userNode[key] !== 'object') return;
-      orderedKeys.push(key);
-    };
-    if (networkID) {
-      pushKey(networkID);
-    }
-    Object.keys(userNode).forEach(pushKey);
-
-    const mergedData = orderedKeys.reduce((acc: any, chainKey: any) => {
-      const chainObj = userNode[chainKey];
-      if (!chainObj || !chainObj.data || typeof chainObj.data !== 'object') return acc;
-      const data = chainObj.data;
-      return {
-        sbts: [...(acc.sbts || []), ...(Array.isArray(data.sbts) ? data.sbts : [])],
-        createdSurveys: [
-          ...(acc.createdSurveys || []),
-          ...(Array.isArray(data.createdSurveys) ? data.createdSurveys : []),
-        ],
-        createdQuestions: [
-          ...(acc.createdQuestions || []),
-          ...(Array.isArray(data.createdQuestions) ? data.createdQuestions : []),
-        ],
-        surveyResponses: [
-          ...(acc.surveyResponses || []),
-          ...(Array.isArray(data.surveyResponses) ? data.surveyResponses : []),
-        ],
-        questionResponses: [
-          ...(acc.questionResponses || []),
-          ...(Array.isArray(data.questionResponses) ? data.questionResponses : []),
-        ],
-      };
-    }, {});
-    if (Object.keys(mergedData).length === 0) return null;
-    return { data: mergedData };
-  };
-
-  _getPrioritizedUserChainNodes: any = (userNode: any, networkID: any) => {
-    if (!userNode || typeof userNode !== 'object') return [];
-    const out: any[] = [];
-    const seen: any = new Set();
-    const push = (keyRaw: any) => {
-      const key = String(keyRaw || '');
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      const node = userNode[key];
-      if (!node || typeof node !== 'object') return;
-      out.push({ chainKey: key, node });
-    };
-
-    if (networkID) {
-      push(networkID);
-    }
-    Object.keys(userNode).forEach(push);
-    return out;
-  };
-
-  _normalizeGateSlug: any = (slug: any) => {
-    const raw = String(slug || '').trim().toLowerCase();
-    return raw === 'general' ? '' : raw;
-  };
-
-  _buildGateAccessCacheKey: any = ({ slug = '', resourceKey = '' }: any = {}) => {
-    const accountLower = String(this.props.account || '').trim().toLowerCase();
-    const networkID = String(this.props.network?.id || '');
-    const sbtRevision = String(this.props.sbtCacheRevision || 0);
-    const normalizedSlug = this._normalizeGateSlug(slug);
-    const normalizedResource = String(resourceKey || '').trim() || 'default';
-    return [
-      accountLower || 'anon',
-      networkID,
-      sbtRevision,
-      normalizedSlug,
-      normalizedResource,
-    ].join('|');
-  };
-
-  _buildGatePendingKey: any = ({ slug = '', resourceKey = '' }: any = {}) => (
-    `${this._normalizeGateSlug(slug)}::${String(resourceKey || '').trim() || 'default'}`
+  _buildGatePendingKey = ({
+    slug = '',
+    resourceKey = '',
+  }: GateAccessKeyInput = {}): string => (
+    buildUserPageGatePendingKey({ resourceKey, slug })
   );
 
-  _setResponseGateAccessStatus: any = (cacheKey: any, status: any, ts: any = Date.now()) => {
+  _setResponseGateAccessStatus = (
+    cacheKey: unknown,
+    status: unknown,
+    ts: unknown = Date.now()
+  ): void => {
     const key = String(cacheKey || '').trim();
     if (!key) return;
     const nextStatus = String(status || 'missing');
@@ -2135,52 +1907,40 @@ class UserPage extends Component<any, any> {
     this._responseGateAccessStatusByKey.set(key, { status: nextStatus, ts: nowTs });
   };
 
-  _buildCacheRefreshInputSignature: any = ({
+  _buildCacheRefreshInputSignature = ({
     viewAddressLower = '',
     networkID = '',
     hasSurveySources = false,
     hasQuestionSources = false,
     hasSbtSources = false,
     sourceMembershipSignature = '',
-  }: any = {}) => {
-    const readinessSignature = [
-      this.props.isSurveyCacheReady ? '1' : '0',
-      this.props.isQuestionCacheReady ? '1' : '0',
-      this.props.isResponsesCacheReady ? '1' : '0',
-      this.props.isSBTCacheReady ? '1' : '0',
-    ].join('');
-    const sourceSignature = [
-      hasSurveySources ? '1' : '0',
-      hasQuestionSources ? '1' : '0',
-      hasSbtSources ? '1' : '0',
-    ].join('');
+  }: CacheRefreshInputSignatureInput = {}): string => {
     const gateRecheckEpoch = this._responseGateAccessStatusByKey.size > 0
       ? Math.floor(Date.now() / USERPAGE_GATE_UNKNOWN_RETRY_MS)
       : 0;
-    return [
+    return buildUserPageCacheRefreshInputSignature({
+      account: this.props.account,
+      gateRecheckEpoch,
+      hasQuestionSources,
+      hasSbtSources,
+      hasSurveySources,
+      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
+      hasUncertainUserData: this.state.hasUncertainUserData,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      isResponsesCacheReady: this.props.isResponsesCacheReady,
+      isSBTCacheReady: this.props.isSBTCacheReady,
+      isSurveyCacheReady: this.props.isSurveyCacheReady,
+      networkID,
+      questionResponsesNonce: this.props.questionResponsesNonce,
+      responseGateAccessGeneration: this._responseGateAccessGeneration,
+      responseGateAccessStatusVersion: this._responseGateAccessStatusVersion,
+      sbtCacheRevision: this.props.sbtCacheRevision,
+      sourceMembershipSignature,
       viewAddressLower,
-      String(networkID || ''),
-      String(this.props.account || '').trim().toLowerCase(),
-      readinessSignature,
-      sourceSignature,
-      String(sourceMembershipSignature || ''),
-      String(this.props.questionResponsesNonce || 0),
-      String(this.props.sbtCacheRevision || 0),
-      this.state.hasUncertainUserData ? '1' : '0',
-      this.state.hasUncertainGateAccess ? '1' : '0',
-      String(this._responseGateAccessGeneration || 0),
-      String(this._responseGateAccessStatusVersion || 0),
-      String(gateRecheckEpoch),
-    ].join('|');
+    });
   };
 
-  _getGateResourceKeysToCheck: any = (resourceKey: any = 'default') => {
-    const normalized = String(resourceKey || '').trim() || 'default';
-    if (normalized === 'default') return ['default'];
-    return [normalized, 'default'];
-  };
-
-  _resetResponseGateAccess: any = () => {
+  _resetResponseGateAccess = (): void => {
     this._responseGateAccessGeneration += 1;
     this._responseGateAccessStatusVersion += 1;
     this._responseGateAccessStatusByKey.clear();
@@ -2188,7 +1948,10 @@ class UserPage extends Component<any, any> {
     this.clearResponseGateRetryTimer();
   };
 
-  _getResponseGateAccessStatus: any = ({ slug = '', resourceKey = '' }: any = {}) => {
+  _getResponseGateAccessStatus = ({
+    slug = '',
+    resourceKey = '',
+  }: GateAccessKeyInput = {}): string => {
     const account = String(this.props.account || '').trim();
     if (!account) return 'needs-wallet';
     const key = this._buildGateAccessCacheKey({ slug, resourceKey });
@@ -2196,16 +1959,16 @@ class UserPage extends Component<any, any> {
     return cached?.status || 'missing';
   };
 
-  _queueResponseGateAccessChecks: any = (pendingKeys: any = new Set()) => {
+  _queueResponseGateAccessChecks = (pendingKeys: Set<unknown> | null = new Set()): void => {
     const account = String(this.props.account || '').trim();
     if (!account || !pendingKeys || pendingKeys.size === 0) return;
     const generation = this._responseGateAccessGeneration;
     const now = Date.now();
-    const terminalStatuses: any = new Set(['granted', 'denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
+    const terminalStatuses = new Set<string>(['granted', 'denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
 
-    pendingKeys.forEach((pendingKey: any) => {
+    pendingKeys.forEach((pendingKey: unknown) => {
       const [slugRaw, resourceRaw] = String(pendingKey || '').split('::');
-      const slug = this._normalizeGateSlug(slugRaw || '');
+      const slug = normalizeUserPageGateSlug(slugRaw || '');
       const resourceKey = String(resourceRaw || '').trim() || 'default';
       const cacheKey = this._buildGateAccessCacheKey({ slug, resourceKey });
       const cached = this._responseGateAccessStatusByKey.get(cacheKey);
@@ -2215,7 +1978,7 @@ class UserPage extends Component<any, any> {
         : Number.POSITIVE_INFINITY;
       if (
         cached &&
-        terminalStatuses.has(cached.status) &&
+        terminalStatuses.has(String(cached.status || '')) &&
         cachedAgeMs < USERPAGE_GATE_TERMINAL_RECHECK_MS
       ) {
         return;
@@ -2240,14 +2003,14 @@ class UserPage extends Component<any, any> {
         this._setResponseGateAccessStatus(cacheKey, 'checking', now);
       }
       const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-      let tracked: any = null;
-      tracked = checkSponsoredAccess({
+      let tracked: ResponseGateAccessCheckPromise | null = null;
+      tracked = (checkSponsoredAccess({
         sessionConfig: cfg,
         sessionSlug: slug,
         account,
         resourceKey,
-      })
-        .then((result: any) => {
+      }) as Promise<SponsoredAccessResult>)
+        .then((result: SponsoredAccessResult) => {
           if (!this._isMounted || generation !== this._responseGateAccessGeneration) return;
           const nextStatus = String(result?.status || 'unknown');
           this._setResponseGateAccessStatus(cacheKey, nextStatus, Date.now());
@@ -2277,178 +2040,93 @@ class UserPage extends Component<any, any> {
     });
   };
 
-  _isQuestionPayloadEncrypted: any = (questionObj: any = null) => {
-    if (!questionObj || typeof questionObj !== 'object') return false;
-    if (isMaskedQuestionPayload(questionObj)) return true;
+  _isQuestionPayloadEncrypted = (questionObj: unknown = null): boolean => {
+    const questionRecord = toAnalysisRecord(questionObj);
+    if (!Object.keys(questionRecord).length) return false;
+    if (isMaskedQuestionPayload(questionRecord)) return true;
     return !!(
-      questionObj.promptEncrypted ||
-      questionObj.encryptedPrompt ||
-      questionObj.optionsEncrypted ||
-      questionObj.encryptedOptions ||
-      questionObj.tagsEncrypted ||
-      questionObj.encryptedTags
+      questionRecord.promptEncrypted ||
+      questionRecord.encryptedPrompt ||
+      questionRecord.optionsEncrypted ||
+      questionRecord.encryptedOptions ||
+      questionRecord.tagsEncrypted ||
+      questionRecord.encryptedTags
     );
   };
 
-  _isEncryptedResponseField: any = (fieldObj: any = null) => {
-    if (!fieldObj || typeof fieldObj !== 'object') return false;
-    return !!(
-      fieldObj?.encrypted ||
-      fieldObj?.encryptedPortion ||
-      (fieldObj?.value === '*' && (fieldObj?.encryptionAudience || fieldObj?.encrypted || fieldObj?.encryptedPortion))
-    );
+  _isEncryptedResponseField = (fieldObj: unknown = null): boolean => {
+    return isUserPageEncryptedResponseField(fieldObj);
   };
 
-  _isAnswerFieldEncrypted: any = (responseObj: any = null) => {
-    if (!responseObj || typeof responseObj !== 'object') return false;
-    return this._isEncryptedResponseField(responseObj.answer || {});
+  _isAnswerFieldEncrypted = (responseObj: unknown = null): boolean => {
+    return isUserPageAnswerFieldEncrypted(responseObj);
   };
 
-  _isAdditionalFieldEncrypted: any = (responseObj: any = null) => {
-    if (!responseObj || typeof responseObj !== 'object') return false;
-    return this._isEncryptedResponseField(responseObj.additional || {});
+  _isAdditionalFieldEncrypted = (responseObj: unknown = null): boolean => {
+    return isUserPageAdditionalFieldEncrypted(responseObj);
   };
 
-  _isResponsePayloadEncrypted: any = (responseObj: any = null) => {
-    return this._isAnswerFieldEncrypted(responseObj) || this._isAdditionalFieldEncrypted(responseObj);
+  _isResponsePayloadEncrypted = (responseObj: unknown = null): boolean => {
+    return isUserPageResponsePayloadEncrypted(responseObj);
   };
 
-  _inferResponseFieldEncryptionAudience: any = (responseObj: any = null, fieldKey: any = 'answer', fallback: any = 'gate') => {
-    const rawAudience = String(responseObj?.[fieldKey]?.encryptionAudience || '').trim().toLowerCase();
-    if (rawAudience === 'gate' || rawAudience === 'self') return rawAudience;
-    return String(fallback || 'gate').trim().toLowerCase() || 'gate';
+  _inferResponseFieldEncryptionAudience = (
+    responseObj: unknown = null,
+    fieldKey: unknown = 'answer',
+    fallback: unknown = 'gate'
+  ): string => {
+    return inferUserPageResponseFieldEncryptionAudience(responseObj, fieldKey, fallback);
   };
 
-  _inferResponseEncryptionAudience: any = (responseObj: any = null, fallback: any = 'gate') => {
-    const answerAudience = this._inferResponseFieldEncryptionAudience(responseObj, 'answer', fallback);
-    const additionalAudience = this._inferResponseFieldEncryptionAudience(responseObj, 'additional', fallback);
-    if (answerAudience === 'self' && additionalAudience === 'self') return 'self';
-    if (answerAudience === 'gate' || additionalAudience === 'gate') return 'gate';
-    if (answerAudience === 'self' || additionalAudience === 'self') return 'self';
-    return String(fallback || 'gate').trim().toLowerCase() || 'gate';
+  _inferResponseEncryptionAudience = (responseObj: unknown = null, fallback: unknown = 'gate'): string => {
+    return inferUserPageResponseEncryptionAudience(responseObj, fallback);
   };
 
-  buildDecryptableResponseField: any = (field: any = null) => {
-    const safeField = field && typeof field === 'object' ? field : {};
-    return {
-      ...(safeField || {}),
-      value: Object.prototype.hasOwnProperty.call(safeField, 'value')
-        ? safeField.value
-        : '',
-      encrypted: !!(safeField.encrypted || safeField.encryptedPortion),
-    };
+  buildDecryptableResponseField = (field: unknown = null): DecryptableResponseField => {
+    return buildUserPageDecryptableResponseField(field);
   };
 
-  applyDecryptedPatchToResponseField: any = (field: any = null, decryptedPatch: any = null) => {
-    if (!decryptedPatch || !Object.prototype.hasOwnProperty.call(decryptedPatch, 'value')) {
-      return field;
-    }
-    const nextField = {
-      ...(field && typeof field === 'object' ? field : {}),
-      value: decryptedPatch.value,
-      encrypted: false,
-    };
-    if (Object.prototype.hasOwnProperty.call(decryptedPatch, 'zkSalt')) {
-      nextField.zkSalt = decryptedPatch.zkSalt;
-    }
-    delete nextField.encryptedPortion;
-    return nextField;
+  applyDecryptedPatchToResponseField = (field: unknown = null, decryptedPatch: unknown = null): unknown => {
+    return applyUserPageDecryptedPatchToResponseField(field, decryptedPatch);
   };
 
-  buildDecryptedResponsePatch: any = ({
+  buildDecryptedResponsePatch = ({
     responseObj = null,
     questionId = '',
     fieldToDecrypt = 'both',
     decryptedResult = null,
-  }: any = {}) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    if (!responseObj || typeof responseObj !== 'object' || !qid) return null;
-    const decryptedAnswer = decryptedResult?.answers?.[qid] || null;
-    const decryptedAdditional = decryptedResult?.additionalComments?.[qid] || null;
-    const shouldPatchAnswer =
-      (fieldToDecrypt === 'answer' || fieldToDecrypt === 'both') &&
-      !!decryptedAnswer &&
-      Object.prototype.hasOwnProperty.call(decryptedAnswer, 'value');
-    const shouldPatchAdditional =
-      (fieldToDecrypt === 'additional' || fieldToDecrypt === 'both') &&
-      !!decryptedAdditional &&
-      Object.prototype.hasOwnProperty.call(decryptedAdditional, 'value');
-
-    if (!shouldPatchAnswer && !shouldPatchAdditional) return null;
-
-    const nextResponse = {
-      ...responseObj,
-    };
-    if (shouldPatchAnswer) {
-      nextResponse.answer = this.applyDecryptedPatchToResponseField(
-        responseObj.answer,
-        decryptedAnswer
-      );
-    }
-    if (shouldPatchAdditional) {
-      nextResponse.additional = this.applyDecryptedPatchToResponseField(
-        responseObj.additional,
-        decryptedAdditional
-      );
-    }
-    return nextResponse;
+  }: DecryptedResponsePatchInput = {}): UnknownRecord | null => {
+    return buildUserPageDecryptedResponsePatch({
+      responseObj,
+      questionId,
+      fieldToDecrypt,
+      decryptedResult,
+    });
   };
 
-  getResponseDecryptSurveyBindings: any = (questionId: any, responseOverride: any = null) => {
-    const qid = String(questionId || '').trim().toLowerCase();
-    const surveyIds: any[] = [];
-    const seen: any = new Set();
-    const pushSurveyId = (value: any) => {
-      const normalized = String(value || '').trim().toLowerCase();
-      if (!normalized || seen.has(normalized)) return;
-      seen.add(normalized);
-      surveyIds.push(normalized);
-    };
-    const addFromEntry = (entry: any) => {
-      if (!entry || typeof entry !== 'object') return;
-      pushSurveyId(entry.associatedSurveyId);
-      pushSurveyId(entry.surveyId);
-      pushSurveyId(entry.surveyID);
-    };
-
-    addFromEntry(responseOverride);
-
-    const questionResponseInfo = Array.isArray(this.state.questionResponseInfo)
-      ? this.state.questionResponseInfo
-      : [];
-    questionResponseInfo.forEach((entry: any) => {
-      if (String(entry?.id || '').trim().toLowerCase() !== qid) return;
-      addFromEntry(entry);
+  getResponseDecryptSurveyBindings = (
+    questionId: unknown,
+    responseOverride: unknown = null
+  ): ResponseDecryptSurveyBindings => {
+    return buildUserPageResponseDecryptSurveyBindings({
+      detailedSurveyResponses: this.state.detailedSurveyResponses,
+      hashZero: ethers.constants.HashZero,
+      questionId,
+      questionResponseInfo: this.state.questionResponseInfo,
+      responseOverride,
     });
-
-    const detailedSurveyResponses = this.state.detailedSurveyResponses || {};
-    Object.keys(detailedSurveyResponses).forEach((surveyId: any) => {
-      const entries = Array.isArray(detailedSurveyResponses[surveyId])
-        ? detailedSurveyResponses[surveyId]
-        : [];
-      entries.forEach((entry: any) => {
-        if (!entry || typeof entry !== 'object') return;
-        const responseData = entry.responseData;
-        const entryQid = String(entry?.questionData?.id || entry?.questionData?.questionID || '').trim().toLowerCase();
-        if (responseData !== responseOverride && entryQid !== qid) return;
-        pushSurveyId(surveyId);
-        addFromEntry(entry?.questionData);
-        addFromEntry(responseData);
-      });
-    });
-
-    pushSurveyId(ethers.constants.HashZero);
-    return {
-      surveyId: surveyIds[0] || ethers.constants.HashZero,
-      acceptedSurveyIds: surveyIds,
-    };
   };
 
-  handleDecryptQuestionAnswer: any = async (questionId: any, fieldToDecrypt: any = 'both', responseOverride: any = null) => {
+  handleDecryptQuestionAnswer = async (
+    questionId: unknown,
+    fieldToDecrypt: unknown = 'both',
+    responseOverride: unknown = null
+  ): Promise<boolean> => {
     const qid = String(questionId || '').trim().toLowerCase();
     const account = String(this.props.account || '').trim();
     if (!qid || !account) return false;
-    if (!responseOverride || typeof responseOverride !== 'object') return false;
+    const responseRecord = toAnalysisRecord(responseOverride);
+    if (!Object.keys(responseRecord).length) return false;
 
     const litHooks = getGlobalLitHooks();
     const lit = litHooks && typeof litHooks.getKey === 'function'
@@ -2462,18 +2140,18 @@ class UserPage extends Component<any, any> {
 
     const responseSlice = {
       answers: {
-        [qid]: this.buildDecryptableResponseField(responseOverride.answer),
+        [qid]: this.buildDecryptableResponseField(responseRecord.answer),
       },
       additionalComments: {
-        [qid]: this.buildDecryptableResponseField(responseOverride.additional),
+        [qid]: this.buildDecryptableResponseField(responseRecord.additional),
       },
       importance: {},
       conviction: {},
     };
 
-    let decryptedResult: any = null;
+    let decryptedResult: unknown = null;
     try {
-      decryptedResult = await (cryptoUtils as any).decryptSingleField(responseSlice, qid, fieldToDecrypt, {
+      decryptedResult = await (cryptoUtils as unknown as CryptoUtilsWithSingleField).decryptSingleField(responseSlice, qid, fieldToDecrypt, {
         account,
         provider: this.props.provider,
         providerKind: this.props.provider,
@@ -2497,13 +2175,13 @@ class UserPage extends Component<any, any> {
     if (!patchedResponse) return false;
 
     let didUpdate = false;
-    this.setState((prevState: any) => {
-      const prevDetailedQuestionResponses = prevState.detailedQuestionResponses || {};
-      const prevDetailedSurveyResponses = prevState.detailedSurveyResponses || {};
-      const nextDetailedQuestionResponses = { ...prevDetailedQuestionResponses };
-      const nextDetailedSurveyResponses = { ...prevDetailedSurveyResponses };
+    this.setState((prevState: UnknownRecord) => {
+      const prevDetailedQuestionResponses = toAnalysisRecord(prevState.detailedQuestionResponses);
+      const prevDetailedSurveyResponses = toAnalysisRecord(prevState.detailedSurveyResponses);
+      const nextDetailedQuestionResponses: UnknownRecord = { ...prevDetailedQuestionResponses };
+      const nextDetailedSurveyResponses: UnknownRecord = { ...prevDetailedSurveyResponses };
 
-      Object.keys(nextDetailedQuestionResponses).forEach((questionKey: any) => {
+      Object.keys(nextDetailedQuestionResponses).forEach((questionKey: string) => {
         if (nextDetailedQuestionResponses[questionKey] === responseOverride) {
           nextDetailedQuestionResponses[questionKey] = patchedResponse;
           didUpdate = true;
@@ -2518,16 +2196,17 @@ class UserPage extends Component<any, any> {
         didUpdate = true;
       }
 
-      Object.keys(nextDetailedSurveyResponses).forEach((surveyId: any) => {
+      Object.keys(nextDetailedSurveyResponses).forEach((surveyId: string) => {
         const surveyEntries = nextDetailedSurveyResponses[surveyId];
         if (!Array.isArray(surveyEntries)) return;
         let surveyEntriesChanged = false;
-        const updatedEntries = surveyEntries.map((entry: any) => {
-          if (!entry || typeof entry !== 'object') return entry;
-          if (entry.responseData !== responseOverride) return entry;
+        const updatedEntries = surveyEntries.map((entry: unknown) => {
+          const entryRecord = toAnalysisRecord(entry);
+          if (!Object.keys(entryRecord).length) return entry;
+          if (entryRecord.responseData !== responseOverride) return entry;
           surveyEntriesChanged = true;
           return {
-            ...entry,
+            ...entryRecord,
             responseData: patchedResponse,
           };
         });
@@ -2547,33 +2226,36 @@ class UserPage extends Component<any, any> {
     return didUpdate;
   };
 
-  _createGateAccessContext: any = () => ({
+  _createGateAccessContext = (): GateAccessContext => ({
     pendingKeys: new Set(),
     uncertainResources: new Set(),
   });
 
-  _captureGateContextSnapshot: any = (gateContext: any = null) => ({
-    pendingKeys: Array.from(gateContext?.pendingKeys || []),
-    uncertainResources: Array.from(gateContext?.uncertainResources || []),
+  _captureGateContextSnapshot = (gateContext: GateAccessContext | null = null): GateAccessContextSnapshot => ({
+    pendingKeys: isGateAccessContext(gateContext) ? Array.from(gateContext.pendingKeys) : [],
+    uncertainResources: isGateAccessContext(gateContext) ? Array.from(gateContext.uncertainResources) : [],
   });
 
-  _mergeGateContextSnapshot: any = (targetContext: any, snapshot: any = null) => {
-    if (!targetContext || !snapshot) return;
-    (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: any) => {
-      targetContext.pendingKeys.add(item);
+  _mergeGateContextSnapshot = (
+    targetContext: GateAccessContext | null,
+    snapshot: GateAccessContextSnapshot | null = null
+  ): void => {
+    if (!isGateAccessContext(targetContext) || !snapshot) return;
+    (Array.isArray(snapshot.pendingKeys) ? snapshot.pendingKeys : []).forEach((item: string) => {
+      targetContext.pendingKeys.add(String(item || ''));
     });
-    (Array.isArray(snapshot.uncertainResources) ? snapshot.uncertainResources : []).forEach((item: any) => {
-      targetContext.uncertainResources.add(item);
+    (Array.isArray(snapshot.uncertainResources) ? snapshot.uncertainResources : []).forEach((item: string) => {
+      targetContext.uncertainResources.add(String(item || ''));
     });
   };
 
-  _evaluateEncryptedVisibility: any = ({
+  _evaluateEncryptedVisibility = ({
     resourceKey = 'default',
     slug = '',
     viewAddressLower = '',
     encryptionAudience = 'gate',
     gateContext = null,
-  }: any = {}) => {
+  }: EncryptedVisibilityInput = {}): EncryptedVisibilityResult => {
     const viewerAccountLower = String(this.props.account || '').trim().toLowerCase();
     const isOwnProfileViewer = !!viewerAccountLower && viewerAccountLower === String(viewAddressLower || '').toLowerCase();
     if (isOwnProfileViewer) {
@@ -2585,128 +2267,69 @@ class UserPage extends Component<any, any> {
       return { visible: false, canDecryptOtherResponses: false };
     }
 
-    const resourceKeysToCheck = this._getGateResourceKeysToCheck(resourceKey);
-    const statusByResource = resourceKeysToCheck.map((key: any) => ({
+    const resourceKeysToCheck = getUserPageGateResourceKeysToCheck(resourceKey);
+    const statusByResource: GateAccessStatusByResource[] = resourceKeysToCheck.map((key: string) => ({
       resourceKey: key,
       status: this._getResponseGateAccessStatus({ slug, resourceKey: key }),
     }));
-    if (gateContext && viewerAccountLower) {
-      statusByResource.forEach((entry: any) => {
+    if (isGateAccessContext(gateContext) && viewerAccountLower) {
+      statusByResource.forEach((entry) => {
         gateContext.pendingKeys.add(this._buildGatePendingKey({ slug, resourceKey: entry.resourceKey }));
       });
     }
-    if (statusByResource.some((entry: any) => entry.status === 'granted')) {
+    if (statusByResource.some((entry) => entry.status === 'granted')) {
       return { visible: true, canDecryptOtherResponses: true };
     }
-    const terminalDeniedStatuses: any = new Set(['denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
-    const hasUncertainStatus = statusByResource.some((entry: any) => !terminalDeniedStatuses.has(entry.status));
+    const terminalDeniedStatuses = new Set<string>(['denied', 'needs-wallet', 'no-gate', 'invalid-gate']);
+    const hasUncertainStatus = statusByResource.some((entry) => !terminalDeniedStatuses.has(entry.status));
     if (!hasUncertainStatus) {
       return { visible: false, canDecryptOtherResponses: false };
     }
 
-    if (gateContext) {
+    if (isGateAccessContext(gateContext)) {
       gateContext.uncertainResources.add(String(resourceKey || '').trim() || 'default');
     }
     return { visible: false, canDecryptOtherResponses: false, uncertain: true };
   };
 
-  _collectUnifiedCacheData: any = ({ networkID, viewAddressLower }: any) => measureSync('ce.userPage.aggregateCacheData', () => {
+  _collectUnifiedCacheData = ({ networkID, viewAddressLower }: UnifiedCacheAggregateInput): unknown => measureSync('ce.userPage.aggregateCacheData', () => {
     const surveysCaches = this._dgReadAll('surveysCache');
     const questionsCaches = this._dgReadAll('questionsCache');
     const sbtCaches = this._dgReadAll('sbtCache');
     const userCaches = this._dgReadAll('userCache');
+    const viewAddressKey = String(viewAddressLower || '').toLowerCase();
 
-    const combinedSurveys: Record<string, any> = {};
-    const combinedSurveyResponses: Record<string, any> = {};
-    const combinedSurveyResponsesMeta: Record<string, any> = {};
-    const combinedQuestions: Record<string, any> = {};
-    const combinedQuestionResponses: Record<string, any> = {};
-    const combinedQuestionResponsesMeta: Record<string, any> = {};
-    const sbtAggregate: Record<string, any> = {};
-    const surveySourceSlugById: Record<string, any> = {};
-    const surveyResponseSourceSlugById: Record<string, any> = {};
-    const surveyResponseSourceSlugByKey: Record<string, any> = {};
-    const questionSourceSlugById: Record<string, any> = {};
-    const questionResponseSourceSlugById: Record<string, any> = {};
-    const questionResponseSourceSlugByKey: Record<string, any> = {};
-    const setSourceSlug = (target: any, id: any, slug: any, opts: any = {}) => {
-      const key = String(id || '').toLowerCase();
-      if (!key) return;
-      const replace = !!(opts && opts.replace);
-      if (!replace && Object.prototype.hasOwnProperty.call(target, key)) return;
-      target[key] = this._normalizeGateSlug(slug || '');
-    };
-    const setResponseSourceSlug = (target: any, id: any, responder: any, slug: any, opts: any = {}) => {
-      const idKey = String(id || '').trim().toLowerCase();
-      const responderKey = String(responder || '').trim().toLowerCase();
-      if (!idKey || !responderKey) return;
-      const responseKey = `${idKey}|${responderKey}`;
-      const replace = !!(opts && opts.replace);
-      if (!replace && Object.prototype.hasOwnProperty.call(target, responseKey)) return;
-      target[responseKey] = this._normalizeGateSlug(slug || '');
-    };
-    const readResponseRecency = (metaValue: any = null, responseValue: any = null) => {
-      const src = (metaValue && typeof metaValue === 'object') ? metaValue : {};
-      const responseObj = (responseValue && typeof responseValue === 'object') ? responseValue : {};
-      const bn = Number(src.bn ?? src.blockNumber ?? responseObj.blockNumber ?? responseObj.bn ?? 0) || 0;
-      const txi = Number(
-        src.txi ??
-        src.transactionIndex ??
-        src.txIndex ??
-        responseObj.transactionIndex ??
-        responseObj.txIndex ??
-        0
-      ) || 0;
-      const li = Number(src.li ?? src.logIndex ?? responseObj.logIndex ?? responseObj.li ?? 0) || 0;
-      const ts = Number(src.ts ?? src.timestamp ?? responseObj.timestamp ?? 0) || 0;
-      return {
-        bn,
-        txi,
-        li,
-        ts,
-        hasHints: (bn > 0) || (txi > 0) || (li > 0) || (ts > 0),
-      };
-    };
-    const compareResponseRecency = (incoming: any, existing: any) => {
-      if (incoming.bn > existing.bn) return 1;
-      if (incoming.bn < existing.bn) return -1;
-      if (incoming.txi > existing.txi) return 1;
-      if (incoming.txi < existing.txi) return -1;
-      if (incoming.li > existing.li) return 1;
-      if (incoming.li < existing.li) return -1;
-      if (incoming.ts > existing.ts) return 1;
-      if (incoming.ts < existing.ts) return -1;
-      return 0;
-    };
+    const combinedSurveys: EntityCacheMap = {};
+    const combinedSurveyResponses: ResponseBucketMap = {};
+    const combinedSurveyResponsesMeta: ResponseRecencyBucketMap = {};
+    const combinedQuestions: EntityCacheMap = {};
+    const combinedQuestionResponses: ResponseBucketMap = {};
+    const combinedQuestionResponsesMeta: ResponseRecencyBucketMap = {};
+    const sbtAggregate: SbtAggregateMap = {};
+    const surveySourceSlugById: SourceSlugMap = {};
+    const surveyResponseSourceSlugById: SourceSlugMap = {};
+    const surveyResponseSourceSlugByKey: SourceSlugMap = {};
+    const questionSourceSlugById: SourceSlugMap = {};
+    const questionResponseSourceSlugById: SourceSlugMap = {};
+    const questionResponseSourceSlugByKey: SourceSlugMap = {};
     const upsertSurveyResponseByRecency = ({
       sid,
       responder,
       responseValue,
       metaValue = null,
       slug = '',
-    }: any) => {
-      const sidLower = String(sid || '').trim().toLowerCase();
-      const responderLower = String(responder || '').trim().toLowerCase();
-      if (!sidLower || !responderLower || responseValue == null) return;
-      if (!combinedSurveyResponses[sidLower]) combinedSurveyResponses[sidLower] = {};
-      if (!combinedSurveyResponsesMeta[sidLower]) combinedSurveyResponsesMeta[sidLower] = {};
-      const existingResponse = combinedSurveyResponses[sidLower][responderLower];
-      const existingRecency = readResponseRecency(
-        combinedSurveyResponsesMeta[sidLower][responderLower],
-        existingResponse
-      );
-      const incomingRecency = readResponseRecency(metaValue, responseValue);
-      const hasExisting = Object.prototype.hasOwnProperty.call(combinedSurveyResponses[sidLower], responderLower);
-      let shouldReplace = !hasExisting;
-      if (!shouldReplace) {
-        const cmp = compareResponseRecency(incomingRecency, existingRecency);
-        shouldReplace = cmp > 0 || (cmp === 0 && incomingRecency.hasHints && !existingRecency.hasHints);
-      }
-      if (!shouldReplace) return;
-      combinedSurveyResponses[sidLower][responderLower] = responseValue;
-      combinedSurveyResponsesMeta[sidLower][responderLower] = incomingRecency;
-      setSourceSlug(surveyResponseSourceSlugById, sidLower, slug, { replace: true });
-      setResponseSourceSlug(surveyResponseSourceSlugByKey, sidLower, responderLower, slug, { replace: true });
+    }: SurveyResponseRecencyUpsertInput): void => {
+      upsertUserPageResponseByRecency({
+        id: sid,
+        responder,
+        responseRecencyMeta: combinedSurveyResponsesMeta,
+        responses: combinedSurveyResponses,
+        responseSourceSlugByKey: surveyResponseSourceSlugByKey,
+        responseValue,
+        sourceSlugById: surveyResponseSourceSlugById,
+        metaValue,
+        slug,
+      });
     };
     const upsertQuestionResponseByRecency = ({
       qid,
@@ -2714,91 +2337,37 @@ class UserPage extends Component<any, any> {
       responseValue,
       metaValue = null,
       slug = '',
-    }: any) => {
-      const qidLower = String(qid || '').trim().toLowerCase();
-      const responderLower = String(responder || '').trim().toLowerCase();
-      if (!qidLower || !responderLower || responseValue == null) return;
-      if (!combinedQuestionResponses[qidLower]) combinedQuestionResponses[qidLower] = {};
-      if (!combinedQuestionResponsesMeta[qidLower]) combinedQuestionResponsesMeta[qidLower] = {};
-      const existingResponse = combinedQuestionResponses[qidLower][responderLower];
-      const existingRecency = readResponseRecency(
-        combinedQuestionResponsesMeta[qidLower][responderLower],
-        existingResponse
-      );
-      const incomingRecency = readResponseRecency(metaValue, responseValue);
-      const hasExisting = Object.prototype.hasOwnProperty.call(combinedQuestionResponses[qidLower], responderLower);
-      let shouldReplace = !hasExisting;
-      if (!shouldReplace) {
-        const cmp = compareResponseRecency(incomingRecency, existingRecency);
-        shouldReplace = cmp > 0 || (cmp === 0 && incomingRecency.hasHints && !existingRecency.hasHints);
-      }
-      if (!shouldReplace) return;
-      combinedQuestionResponses[qidLower][responderLower] = responseValue;
-      combinedQuestionResponsesMeta[qidLower][responderLower] = incomingRecency;
-      setSourceSlug(questionResponseSourceSlugById, qidLower, slug, { replace: true });
-      setResponseSourceSlug(questionResponseSourceSlugByKey, qidLower, responderLower, slug, { replace: true });
+    }: QuestionResponseRecencyUpsertInput): void => {
+      upsertUserPageResponseByRecency({
+        id: qid,
+        responder,
+        responseRecencyMeta: combinedQuestionResponsesMeta,
+        responses: combinedQuestionResponses,
+        responseSourceSlugByKey: questionResponseSourceSlugByKey,
+        responseValue,
+        sourceSlugById: questionResponseSourceSlugById,
+        metaValue,
+        slug,
+      });
     };
-    const getOwnershipCountMaps = (entry: any = {}) => {
-      const mintedCountMap = (entry?.mintedCountByAddress && typeof entry.mintedCountByAddress === 'object')
-        ? entry.mintedCountByAddress
-        : null;
-      const burnedCountMap = (entry?.burnedCountByAddress && typeof entry.burnedCountByAddress === 'object')
-        ? entry.burnedCountByAddress
-        : null;
-      return { mintedCountMap, burnedCountMap };
-    };
-    const hasMeaningfulOwnershipCounts = (entry: any = {}, addressLower: any = '') => {
-      const { mintedCountMap, burnedCountMap } = getOwnershipCountMaps(entry);
-      if (!mintedCountMap && !burnedCountMap) return false;
-      if (entry?.countsLoaded === true) return true;
-      const normalizedAddress = String(addressLower || '').toLowerCase();
-      if (!normalizedAddress) return false;
-      return (
-        Object.prototype.hasOwnProperty.call(mintedCountMap || {}, normalizedAddress) ||
-        Object.prototype.hasOwnProperty.call(burnedCountMap || {}, normalizedAddress)
-      );
-    };
-    const hasExplicitOwnershipCounts = (entry: any = {}, addressLower: any = '') => (
-      hasMeaningfulOwnershipCounts(entry, addressLower)
-    );
-    const readOwnershipCount = (countMap: any, addressLower: any) => (
-      countMap
-        ? Math.max(0, Number(countMap[addressLower] || 0) || 0)
-        : 0
-    );
-    const applyOwnershipSignal = (aggEntry: any, entry: any, addressLower: any) => {
-      const { mintedCountMap, burnedCountMap } = getOwnershipCountMaps(entry);
-      if (!mintedCountMap && !burnedCountMap) return;
-      if (!hasMeaningfulOwnershipCounts(entry, addressLower)) return;
-
-      const mintedCount = readOwnershipCount(mintedCountMap, addressLower);
-      const burnedCount = readOwnershipCount(burnedCountMap, addressLower);
-      // Regression guard (PRD 336): count maps decide the viewer's current ownership;
-      // raw address sets remain bulk history for non-viewer aggregation.
-      if (mintedCount > burnedCount) {
-        aggEntry.mintedSet.add(addressLower);
-        aggEntry.burnedSet.delete(addressLower);
-      } else if (burnedCount > 0) {
-        aggEntry.burnedSet.add(addressLower);
-      }
-    };
-
-    surveysCaches.forEach(({ slug, data: cacheObj }: any) => {
-      const netObj = this._readNetworkCache(cacheObj, networkID);
-      const surveysMap = netObj.surveys || {};
-      Object.keys(surveysMap).forEach((sidRaw: any) => {
+    surveysCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
+      const netObj = readUserPageNetworkCache(cacheObj, networkID) as CacheNetworkBucket;
+      const surveysMap = toAnalysisRecord(netObj.surveys);
+      Object.keys(surveysMap).forEach((sidRaw: string) => {
         const sid = String(sidRaw || '').toLowerCase();
         if (!sid) return;
-        if (!combinedSurveys[sid]) combinedSurveys[sid] = surveysMap[sidRaw] || surveysMap[sid] || {};
-        setSourceSlug(surveySourceSlugById, sid, slug);
+        if (!combinedSurveys[sid]) {
+          combinedSurveys[sid] = toAnalysisRecord(surveysMap[sidRaw] || surveysMap[sid]);
+        }
+        writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
       });
 
-      const responseMap = netObj.surveyResponses || {};
-      Object.keys(responseMap).forEach((sidRaw: any) => {
+      const responseMap = toAnalysisRecord(netObj.surveyResponses);
+      Object.keys(responseMap).forEach((sidRaw: string) => {
         const sid = String(sidRaw || '').toLowerCase();
         if (!sid) return;
-        const perSurvey = responseMap[sidRaw] || responseMap[sid] || {};
-        Object.keys(perSurvey).forEach((resAddrRaw: any) => {
+        const perSurvey = toAnalysisRecord(responseMap[sidRaw] || responseMap[sid]);
+        Object.keys(perSurvey).forEach((resAddrRaw: string) => {
           const responder = String(resAddrRaw || '').toLowerCase();
           if (!responder) return;
           const responseValue = (
@@ -2820,30 +2389,32 @@ class UserPage extends Component<any, any> {
       });
     });
 
-    questionsCaches.forEach(({ slug, data: cacheObj }: any) => {
-      const netObj = this._readNetworkCache(cacheObj, networkID);
-      const questionsMap = netObj.questions || {};
-      Object.keys(questionsMap).forEach((qidRaw: any) => {
+    questionsCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
+      const netObj = readUserPageNetworkCache(cacheObj, networkID) as CacheNetworkBucket;
+      const questionsMap = toAnalysisRecord(netObj.questions);
+      Object.keys(questionsMap).forEach((qidRaw: string) => {
         const qid = String(qidRaw || '').toLowerCase();
         if (!qid) return;
-        if (!combinedQuestions[qid]) combinedQuestions[qid] = questionsMap[qidRaw] || questionsMap[qid] || {};
-        setSourceSlug(questionSourceSlugById, qid, slug);
+        if (!combinedQuestions[qid]) {
+          combinedQuestions[qid] = toAnalysisRecord(questionsMap[qidRaw] || questionsMap[qid]);
+        }
+        writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
       });
 
-      const responseMap = netObj.questionResponses || {};
-      const responseMetaMap = netObj.questionResponsesMeta || {};
-      Object.keys(responseMap).forEach((qidRaw: any) => {
+      const responseMap = toAnalysisRecord(netObj.questionResponses);
+      const responseMetaMap = toAnalysisRecord(netObj.questionResponsesMeta);
+      Object.keys(responseMap).forEach((qidRaw: string) => {
         const qid = String(qidRaw || '').toLowerCase();
         if (!qid) return;
-        const perQuestion = responseMap[qidRaw] || responseMap[qid] || {};
+        const perQuestion = toAnalysisRecord(responseMap[qidRaw] || responseMap[qid]);
         const perQuestionMeta = (
-          (responseMetaMap[qidRaw] && typeof responseMetaMap[qidRaw] === 'object')
+          isPlainAnalysisObject(responseMetaMap[qidRaw])
             ? responseMetaMap[qidRaw]
-            : (responseMetaMap[qid] && typeof responseMetaMap[qid] === 'object')
+            : isPlainAnalysisObject(responseMetaMap[qid])
               ? responseMetaMap[qid]
               : {}
         );
-        Object.keys(perQuestion).forEach((resAddrRaw: any) => {
+        Object.keys(perQuestion).forEach((resAddrRaw: string) => {
           const responder = String(resAddrRaw || '').toLowerCase();
           if (!responder) return;
           const responseValue = (
@@ -2867,16 +2438,16 @@ class UserPage extends Component<any, any> {
       });
     });
 
-    sbtCaches.forEach(({ slug, data: cacheObj }: any) => {
-      const netEntries = this._getPrioritizedNetworkCacheNodes(cacheObj, networkID);
-      netEntries.forEach(({ value: netObj }: any) => {
-        const sbtList = netObj.sbtList || {};
-        Object.keys(sbtList).forEach((addrLowerKey: any) => {
-          const entry = sbtList[addrLowerKey] || {};
+    sbtCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
+      const netEntries = getPrioritizedUserPageNetworkCacheNodes(cacheObj, networkID) as PrioritizedCacheNode[];
+      netEntries.forEach(({ value: netObj }) => {
+        const sbtList = toAnalysisRecord(netObj.sbtList);
+        Object.keys(sbtList).forEach((addrLowerKey: string) => {
+          const entry = toAnalysisRecord(sbtList[addrLowerKey]);
           const key = String(addrLowerKey || '').toLowerCase();
           if (!key) return;
 
-          const aggEntry = sbtAggregate[key] || {
+          const aggEntry: SbtAggregateEntry = sbtAggregate[key] || {
             sbtAddress: entry.sbtAddress || key,
             sbtInfo: null,
             mintedSet: new Set(),
@@ -2888,28 +2459,33 @@ class UserPage extends Component<any, any> {
 
           if (slug && !aggEntry.slug) aggEntry.slug = slug;
           if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
-          if (aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = { ...aggEntry.sbtInfo, ...entry.sbtInfo };
-          const hasExplicitCounts = hasExplicitOwnershipCounts(entry, viewAddressLower);
+          if (aggEntry.sbtInfo && entry.sbtInfo) {
+            aggEntry.sbtInfo = {
+              ...(aggEntry.sbtInfo as UnknownRecord),
+              ...(entry.sbtInfo as UnknownRecord),
+            };
+          }
+          const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(entry, viewAddressKey);
           if (hasExplicitCounts) {
-            aggEntry.mintedSet.delete(viewAddressLower);
-            aggEntry.burnedSet.delete(viewAddressLower);
+            aggEntry.mintedSet.delete(viewAddressKey);
+            aggEntry.burnedSet.delete(viewAddressKey);
             aggEntry.viewerCountsAuthoritative = true;
           }
           (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
-            .forEach((address: any) => {
+            .forEach((address: unknown) => {
               const addressLower = String(address || '').toLowerCase();
               if (!addressLower) return;
-              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressLower) return;
+              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressKey) return;
               aggEntry.mintedSet.add(addressLower);
             });
           (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [])
-            .forEach((address: any) => {
+            .forEach((address: unknown) => {
               const addressLower = String(address || '').toLowerCase();
               if (!addressLower) return;
-              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressLower) return;
+              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressKey) return;
               aggEntry.burnedSet.add(addressLower);
             });
-          applyOwnershipSignal(aggEntry, entry, viewAddressLower);
+          applyUserPageOwnershipSignal(aggEntry, entry, viewAddressKey);
           aggEntry.blockNumber = Math.max(aggEntry.blockNumber || 0, Number(entry.blockNumber || 0));
           if (entry.sbtAddress) aggEntry.sbtAddress = entry.sbtAddress;
           sbtAggregate[key] = aggEntry;
@@ -2917,75 +2493,84 @@ class UserPage extends Component<any, any> {
       });
     });
 
-    userCaches.forEach(({ slug, data: userCacheObj }: any) => {
-      const userNode = userCacheObj?.[viewAddressLower];
-      if (!userNode || typeof userNode !== 'object') return;
-      const chainNode = this._getActiveUserChainNode(userNode, networkID);
-      const payload = chainNode?.data;
-      if (!payload || typeof payload !== 'object') return;
+    userCaches.forEach(({ slug, data: userCacheObj }: NamespaceCacheSourceEntry) => {
+      const userNode = toAnalysisRecord(userCacheObj)[viewAddressKey];
+      if (!isPlainAnalysisObject(userNode)) return;
+      const chainNode = getActiveUserPageChainNode(userNode, networkID) as UserChainNode | null;
+      const payload = isPlainAnalysisObject(chainNode?.data)
+        ? chainNode.data as UserCachePayload
+        : null;
+      if (!payload) return;
 
-      (payload.createdSurveys || []).forEach((item: any) => {
-        if (!item?.id || !item?.data) return;
-        const sid = String(item.id || '').toLowerCase();
+      (Array.isArray(payload.createdSurveys) ? payload.createdSurveys : []).forEach((item: unknown) => {
+        const itemRecord = toAnalysisRecord(item);
+        if (!itemRecord.id || !itemRecord.data) return;
+        const sid = String(itemRecord.id || '').toLowerCase();
         if (!sid) return;
-        if (!combinedSurveys[sid]) combinedSurveys[sid] = item.data;
-        if (!combinedSurveys[sid].creator) combinedSurveys[sid].creator = viewAddressLower;
-        setSourceSlug(surveySourceSlugById, sid, slug);
+        if (!combinedSurveys[sid]) combinedSurveys[sid] = toAnalysisRecord(itemRecord.data);
+        if (!combinedSurveys[sid].creator) combinedSurveys[sid].creator = viewAddressKey;
+        writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
       });
 
-      (payload.surveyResponses || []).forEach((item: any) => {
-        if (!item?.surveyId || !item?.response) return;
-        const sid = String(item.surveyId || '').toLowerCase();
+      (Array.isArray(payload.surveyResponses) ? payload.surveyResponses : []).forEach((item: unknown) => {
+        const itemRecord = toAnalysisRecord(item);
+        if (!itemRecord.surveyId || !itemRecord.response) return;
+        const sid = String(itemRecord.surveyId || '').toLowerCase();
         if (!sid) return;
         upsertSurveyResponseByRecency({
           sid,
-          responder: String(item.responder || viewAddressLower).toLowerCase(),
-          responseValue: item.response,
+          responder: String(itemRecord.responder || viewAddressKey).toLowerCase(),
+          responseValue: itemRecord.response,
           metaValue: {
-            bn: Number(item.blockNumber ?? item.bn ?? 0) || 0,
-            txi: Number(item.transactionIndex ?? item.txIndex ?? item.txi ?? 0) || 0,
-            li: Number(item.logIndex ?? item.li ?? 0) || 0,
-            ts: Number(item.timestamp ?? item.ts ?? 0) || 0,
+            bn: Number(itemRecord.blockNumber ?? itemRecord.bn ?? 0) || 0,
+            txi: Number(itemRecord.transactionIndex ?? itemRecord.txIndex ?? itemRecord.txi ?? 0) || 0,
+            li: Number(itemRecord.logIndex ?? itemRecord.li ?? 0) || 0,
+            ts: Number(itemRecord.timestamp ?? itemRecord.ts ?? 0) || 0,
           },
           slug,
         });
       });
 
-      (payload.createdQuestions || []).forEach((item: any) => {
-        if (!item?.id || !item?.data) return;
-        const qid = String(item.id || '').toLowerCase();
+      (Array.isArray(payload.createdQuestions) ? payload.createdQuestions : []).forEach((item: unknown) => {
+        const itemRecord = toAnalysisRecord(item);
+        if (!itemRecord.id || !itemRecord.data) return;
+        const qid = String(itemRecord.id || '').toLowerCase();
         if (!qid) return;
-        if (!combinedQuestions[qid]) combinedQuestions[qid] = item.data;
-        if (!combinedQuestions[qid].creator) combinedQuestions[qid].creator = viewAddressLower;
-        setSourceSlug(questionSourceSlugById, qid, slug);
+        if (!combinedQuestions[qid]) combinedQuestions[qid] = toAnalysisRecord(itemRecord.data);
+        if (!combinedQuestions[qid].creator) combinedQuestions[qid].creator = viewAddressKey;
+        writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
       });
 
-      (payload.questionResponses || []).forEach((item: any) => {
-        if (!item?.questionId || !item?.response) return;
-        const qid = String(item.questionId || '').toLowerCase();
+      (Array.isArray(payload.questionResponses) ? payload.questionResponses : []).forEach((item: unknown) => {
+        const itemRecord = toAnalysisRecord(item);
+        if (!itemRecord.questionId || !itemRecord.response) return;
+        const qid = String(itemRecord.questionId || '').toLowerCase();
         if (!qid) return;
         upsertQuestionResponseByRecency({
           qid,
-          responder: String(item.responder || viewAddressLower).toLowerCase(),
-          responseValue: item.response,
+          responder: String(itemRecord.responder || viewAddressKey).toLowerCase(),
+          responseValue: itemRecord.response,
           metaValue: {
-            bn: Number(item.blockNumber ?? item.bn ?? 0) || 0,
-            txi: Number(item.transactionIndex ?? item.txIndex ?? item.txi ?? 0) || 0,
-            li: Number(item.logIndex ?? item.li ?? 0) || 0,
-            ts: Number(item.timestamp ?? item.ts ?? 0) || 0,
+            bn: Number(itemRecord.blockNumber ?? itemRecord.bn ?? 0) || 0,
+            txi: Number(itemRecord.transactionIndex ?? itemRecord.txIndex ?? itemRecord.txi ?? 0) || 0,
+            li: Number(itemRecord.logIndex ?? itemRecord.li ?? 0) || 0,
+            ts: Number(itemRecord.timestamp ?? itemRecord.ts ?? 0) || 0,
           },
           slug,
         });
       });
 
-      this._getPrioritizedUserChainNodes(userNode, networkID).forEach(({ node }: any) => {
-        const chainPayload = node?.data;
-        if (!chainPayload || typeof chainPayload !== 'object') return;
-        (chainPayload.sbts || []).forEach((item: any) => {
-          const key = String(item?.sbtAddress || '').toLowerCase();
+      (getPrioritizedUserPageChainNodes(userNode, networkID) as PrioritizedUserChainNode[]).forEach(({ node }) => {
+        const chainPayload = isPlainAnalysisObject(node.data)
+          ? node.data as UserCachePayload
+          : null;
+        if (!chainPayload) return;
+        (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
+          const itemRecord = toAnalysisRecord(item);
+          const key = String(itemRecord.sbtAddress || '').toLowerCase();
           if (!key) return;
-          const aggEntry = sbtAggregate[key] || {
-            sbtAddress: item.sbtAddress || key,
+          const aggEntry: SbtAggregateEntry = sbtAggregate[key] || {
+            sbtAddress: itemRecord.sbtAddress || key,
             sbtInfo: null,
             mintedSet: new Set(),
             burnedSet: new Set(),
@@ -2993,35 +2578,23 @@ class UserPage extends Component<any, any> {
             slug: slug || '',
           };
           if (slug && !aggEntry.slug) aggEntry.slug = slug;
-          if (!aggEntry.sbtInfo && item.sbtInfo) aggEntry.sbtInfo = item.sbtInfo;
-          if (aggEntry.sbtInfo && item.sbtInfo) aggEntry.sbtInfo = { ...aggEntry.sbtInfo, ...item.sbtInfo };
-          const mintedCountMap = (item?.mintedCountByAddress && typeof item.mintedCountByAddress === 'object')
-            ? item.mintedCountByAddress
-            : null;
-          const burnedCountMap = (item?.burnedCountByAddress && typeof item.burnedCountByAddress === 'object')
-            ? item.burnedCountByAddress
-            : null;
-          const mintedCount = mintedCountMap
-            ? Math.max(0, Number(mintedCountMap[viewAddressLower] || 0) || 0)
-            : 0;
-          const burnedCount = burnedCountMap
-            ? Math.max(0, Number(burnedCountMap[viewAddressLower] || 0) || 0)
-            : 0;
+          if (!aggEntry.sbtInfo && itemRecord.sbtInfo) aggEntry.sbtInfo = itemRecord.sbtInfo;
+          if (aggEntry.sbtInfo && itemRecord.sbtInfo) {
+            aggEntry.sbtInfo = {
+              ...(aggEntry.sbtInfo as UnknownRecord),
+              ...(itemRecord.sbtInfo as UnknownRecord),
+            };
+          }
           const hasAggregateOwnershipSignal = (
-            aggEntry.mintedSet.has(viewAddressLower) ||
-            aggEntry.burnedSet.has(viewAddressLower)
+            aggEntry.mintedSet.has(viewAddressKey) ||
+            aggEntry.burnedSet.has(viewAddressKey)
           );
-          const hasExplicitCounts = hasExplicitOwnershipCounts(item, viewAddressLower);
+          const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(itemRecord, viewAddressKey);
           if (hasExplicitCounts) {
-            if (mintedCount > burnedCount) {
-              aggEntry.mintedSet.add(viewAddressLower);
-              aggEntry.burnedSet.delete(viewAddressLower);
-            } else if (burnedCount > 0) {
-              aggEntry.burnedSet.add(viewAddressLower);
-            }
+            applyUserPageOwnershipSignal(aggEntry, itemRecord, viewAddressKey);
           } else if (!hasAggregateOwnershipSignal) {
             // userCache SBT rows are a fallback signal only; do not override fresher sbtCache burns.
-            aggEntry.mintedSet.add(viewAddressLower);
+            aggEntry.mintedSet.add(viewAddressKey);
           }
           sbtAggregate[key] = aggEntry;
         });
@@ -3046,30 +2619,35 @@ class UserPage extends Component<any, any> {
     };
   })
 
-  _deriveSurveySection: any = (aggregate: any, viewAddressLower: any, gateContext: any = null) => measureSync('ce.userPage.deriveSurveySection', () => {
-    const userSurveyResponses: any[] = [];
-    const userCreatedSurveys: any[] = [];
-    const detailedResponses: Record<string, any> = {};
-    const combinedSurveys = aggregate?.combinedSurveys || {};
-    const combinedSurveyResponses = aggregate?.combinedSurveyResponses || {};
-    const combinedQuestions = aggregate?.combinedQuestions || {};
-    const surveySourceSlugById = aggregate?.surveySourceSlugById || {};
-    const surveyResponseSourceSlugById = aggregate?.surveyResponseSourceSlugById || {};
-    const surveyResponseSourceSlugByKey = aggregate?.surveyResponseSourceSlugByKey || {};
+  _deriveSurveySection = (
+    aggregate: unknown,
+    viewAddressLower: unknown,
+    gateContext: GateAccessContext | null = null
+  ): unknown => measureSync('ce.userPage.deriveSurveySection', () => {
+    const userSurveyResponses: UnknownRecord[] = [];
+    const userCreatedSurveys: UnknownRecord[] = [];
+    const detailedResponses: Record<string, SurveyQuestionResponseDetail[]> = {};
+    const viewAddressKey = String(viewAddressLower || '').toLowerCase();
+    const aggregateRecord = toAnalysisRecord(aggregate);
+    const combinedSurveys = toAnalysisRecord(aggregateRecord.combinedSurveys);
+    const combinedSurveyResponses = toAnalysisRecord(aggregateRecord.combinedSurveyResponses);
+    const combinedQuestions = toAnalysisRecord(aggregateRecord.combinedQuestions);
+    const surveySourceSlugById = toAnalysisRecord(aggregateRecord.surveySourceSlugById);
+    const surveyResponseSourceSlugById = toAnalysisRecord(aggregateRecord.surveyResponseSourceSlugById);
+    const surveyResponseSourceSlugByKey = toAnalysisRecord(aggregateRecord.surveyResponseSourceSlugByKey);
 
-    Object.keys(combinedSurveyResponses).forEach((surveyIdLower: any) => {
-      const surveyResponsesForThisSurvey = combinedSurveyResponses[surveyIdLower];
-      if (!surveyResponsesForThisSurvey) return;
-      const raw = surveyResponsesForThisSurvey[viewAddressLower];
+    Object.keys(combinedSurveyResponses).forEach((surveyIdLower: string) => {
+      const surveyResponsesForThisSurvey = toAnalysisRecord(combinedSurveyResponses[surveyIdLower]);
+      const raw = surveyResponsesForThisSurvey[viewAddressKey];
       if (!raw) return;
 
-      const userFullResponseObject = this.parseCachedResponsePayload(raw);
-      if (!userFullResponseObject || !Array.isArray(userFullResponseObject.responses)) return;
-      const surveyData = (
-        combinedSurveys[surveyIdLower] &&
-        typeof combinedSurveys[surveyIdLower] === 'object'
-      ) ? combinedSurveys[surveyIdLower] : {};
-      const responseSourceKey = `${surveyIdLower}|${viewAddressLower}`;
+      const userFullResponseObject = toAnalysisRecord(this.parseCachedResponsePayload(raw));
+      const surveyResponses = Array.isArray(userFullResponseObject.responses)
+        ? userFullResponseObject.responses
+        : null;
+      if (!surveyResponses) return;
+      const surveyData = toAnalysisRecord(combinedSurveys[surveyIdLower]);
+      const responseSourceKey = `${surveyIdLower}|${viewAddressKey}`;
       const sourceSlug = (
         surveyResponseSourceSlugByKey[responseSourceKey] ||
         surveyResponseSourceSlugById[surveyIdLower] ||
@@ -3077,19 +2655,19 @@ class UserPage extends Component<any, any> {
         ''
       );
 
-      const detailedQuestionArray: any[] = [];
+      const detailedQuestionArray: SurveyQuestionResponseDetail[] = [];
       let hasNonBlank = false;
-      userFullResponseObject.responses.forEach((resp: any) => {
-        const normalizedResponse = this._normalizeSingleQuestionResponsePayload(resp);
+      surveyResponses.forEach((resp: unknown) => {
+        const normalizedResponse = normalizeUserPageSingleQuestionResponsePayload(resp);
         if (!normalizedResponse) return;
         const questionIDLower = normalizedResponse.questionID
           ? String(normalizedResponse.questionID).toLowerCase()
           : 'unknown_question_id';
-        const qData = combinedQuestions[questionIDLower] || {
+        const qData = toAnalysisRecord(combinedQuestions[questionIDLower] || {
           id: normalizedResponse.questionID || 'unknown_question_id',
           type: normalizedResponse.type || 'unknown',
           prompt: normalizedResponse.prompt || 'Unknown Question',
-        };
+        });
         const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
         const answerEncrypted = this._isAnswerFieldEncrypted(normalizedResponse);
         const additionalEncrypted = this._isAdditionalFieldEncrypted(normalizedResponse);
@@ -3119,7 +2697,7 @@ class UserPage extends Component<any, any> {
           canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
         }
 
-        const nonBlank = this._hasDisplayableResponsePayload(normalizedResponse);
+        const nonBlank = hasDisplayableUserPageResponsePayload(normalizedResponse);
         if (nonBlank || responseEncrypted) hasNonBlank = true;
 
         detailedQuestionArray.push({
@@ -3149,16 +2727,16 @@ class UserPage extends Component<any, any> {
       detailedResponses[surveyIdLower] = detailedQuestionArray;
     });
 
-    Object.keys(combinedSurveys).forEach((surveyIdLower: any) => {
-      const surveyData = combinedSurveys[surveyIdLower];
-      if (surveyData?.creator && String(surveyData.creator).toLowerCase() === viewAddressLower) {
+    Object.keys(combinedSurveys).forEach((surveyIdLower: string) => {
+      const surveyData = toAnalysisRecord(combinedSurveys[surveyIdLower]);
+      if (surveyData.creator && String(surveyData.creator).toLowerCase() === viewAddressKey) {
         const questionIDs = Array.isArray(surveyData?.questionIDs) ? surveyData.questionIDs : [];
-        const questionPreviews = questionIDs.map((qidRaw: any) => {
+        const questionPreviews = questionIDs.map((qidRaw: unknown) => {
           const fullQuestionId = String(qidRaw || '');
-          const qData = combinedQuestions[fullQuestionId.toLowerCase()] || {};
+          const qData = toAnalysisRecord(combinedQuestions[fullQuestionId.toLowerCase()]);
           return {
             id: fullQuestionId,
-            text: this._resolveQuestionPromptText(qData),
+            text: resolveUserPageQuestionPromptText(qData),
           };
         });
         userCreatedSurveys.push({
@@ -3180,29 +2758,39 @@ class UserPage extends Component<any, any> {
       detailedSurveyResponses: detailedResponses,
       surveysResponded: userSurveyResponses.length,
       surveysCreated: userCreatedSurveys.length,
-    };
+    } satisfies SurveySectionResult;
   })
 
-  _deriveQuestionSection: any = (aggregate: any, viewAddressLower: any, gateContext: any = null) => measureSync('ce.userPage.deriveQuestionSection', () => {
-    const userCreatedQuestions: any[] = [];
-    const userQuestionResponsesInfo: any[] = [];
-    const detailedSingleQuestionResponses: Record<string, any> = {};
-    const combinedQuestions = aggregate?.combinedQuestions || {};
-    const combinedQuestionResponses = aggregate?.combinedQuestionResponses || {};
-    const combinedQuestionResponsesMeta = aggregate?.combinedQuestionResponsesMeta || {};
-    const questionSourceSlugById = aggregate?.questionSourceSlugById || {};
-    const questionResponseSourceSlugById = aggregate?.questionResponseSourceSlugById || {};
-    const questionResponseSourceSlugByKey = aggregate?.questionResponseSourceSlugByKey || {};
+  _deriveQuestionSection = (
+    aggregate: unknown,
+    viewAddressLower: unknown,
+    gateContext: GateAccessContext | null = null
+  ): unknown => measureSync('ce.userPage.deriveQuestionSection', () => {
+    const userCreatedQuestions: UnknownRecord[] = [];
+    const userQuestionResponsesInfo: QuestionResponseInfoEntry[] = [];
+    const detailedSingleQuestionResponses: Record<string, NormalizedQuestionResponsePayload> = {};
+    const viewAddressKey = String(viewAddressLower || '').toLowerCase();
+    const aggregateRecord = toAnalysisRecord(aggregate);
+    const combinedQuestions = toAnalysisRecord(aggregateRecord.combinedQuestions);
+    const combinedQuestionResponses = toAnalysisRecord(aggregateRecord.combinedQuestionResponses);
+    const combinedQuestionResponsesMeta = toAnalysisRecord(aggregateRecord.combinedQuestionResponsesMeta);
+    const questionSourceSlugById = toAnalysisRecord(aggregateRecord.questionSourceSlugById);
+    const questionResponseSourceSlugById = toAnalysisRecord(aggregateRecord.questionResponseSourceSlugById);
+    const questionResponseSourceSlugByKey = toAnalysisRecord(aggregateRecord.questionResponseSourceSlugByKey);
 
-    Object.keys(combinedQuestions).forEach((qid: any) => {
-      const qData = combinedQuestions[qid];
-      const sourceSlug = questionSourceSlugById[qid] || questionResponseSourceSlugById[qid] || '';
-      if (qData?.creator && String(qData.creator).toLowerCase() === viewAddressLower) {
+    Object.keys(combinedQuestions).forEach((qid: string) => {
+      const qData = toAnalysisRecord(combinedQuestions[qid]);
+      const sourceSlug = resolveUserPageQuestionSourceSessionSlug({
+        fallbackSlug: questionSourceSlugById[qid] || questionResponseSourceSlugById[qid] || '',
+        getSessionSlugByName,
+        questionData: qData,
+      });
+      if (qData.creator && String(qData.creator).toLowerCase() === viewAddressKey) {
         if (this._isQuestionPayloadEncrypted(qData)) {
           const visibility = this._evaluateEncryptedVisibility({
             resourceKey: 'questionResponses',
             slug: sourceSlug,
-            viewAddressLower,
+            viewAddressLower: viewAddressKey,
             encryptionAudience: 'gate',
             gateContext,
           });
@@ -3212,70 +2800,79 @@ class UserPage extends Component<any, any> {
           prompt: qData.prompt || 'Unknown Prompt',
           type: qData.type || 'unknown',
           id: qid,
+          slug: sourceSlug,
+          sessionSlug: sourceSlug,
         });
       }
     });
 
-    Object.keys(combinedQuestionResponses).forEach((qid: any) => {
-      const perQ = combinedQuestionResponses[qid] || {};
-      const candidate = perQ[viewAddressLower];
+    Object.keys(combinedQuestionResponses).forEach((qid: string) => {
+      const perQ = toAnalysisRecord(combinedQuestionResponses[qid]);
+      const candidate = perQ[viewAddressKey];
       if (!candidate) return;
-      const responseMeta = combinedQuestionResponsesMeta?.[qid]?.[viewAddressLower] || null;
+      const responseMeta = toAnalysisRecord(
+        toAnalysisRecord(combinedQuestionResponsesMeta[qid])[viewAddressKey]
+      );
 
       const parsedResponse = this.parseCachedResponsePayload(candidate);
+      const parsedResponseRecord = toAnalysisRecord(parsedResponse);
+      const responseMetaRecord = toAnalysisRecord(responseMeta);
       const normalizedInput = (
-        parsedResponse && typeof parsedResponse === 'object' && !Array.isArray(parsedResponse)
+        isPlainAnalysisObject(parsedResponse)
       )
         ? {
-          ...parsedResponse,
-          ...(responseMeta && typeof responseMeta === 'object'
+          ...parsedResponseRecord,
+          ...(Object.keys(responseMetaRecord).length > 0
             ? {
               blockNumber: Number(
-                parsedResponse.blockNumber ??
-                responseMeta.bn ??
-                responseMeta.blockNumber ??
+                parsedResponseRecord.blockNumber ??
+                responseMetaRecord.bn ??
+                responseMetaRecord.blockNumber ??
                 0
               ) || 0,
               transactionIndex: Number(
-                parsedResponse.transactionIndex ??
-                parsedResponse.txIndex ??
-                responseMeta.txi ??
-                responseMeta.transactionIndex ??
-                responseMeta.txIndex ??
+                parsedResponseRecord.transactionIndex ??
+                parsedResponseRecord.txIndex ??
+                responseMetaRecord.txi ??
+                responseMetaRecord.transactionIndex ??
+                responseMetaRecord.txIndex ??
                 0
               ) || 0,
               logIndex: Number(
-                parsedResponse.logIndex ??
-                responseMeta.li ??
-                responseMeta.logIndex ??
+                parsedResponseRecord.logIndex ??
+                responseMetaRecord.li ??
+                responseMetaRecord.logIndex ??
                 0
               ) || 0,
               timestamp: Number(
-                parsedResponse.timestamp ??
-                responseMeta.ts ??
-                responseMeta.timestamp ??
+                parsedResponseRecord.timestamp ??
+                responseMetaRecord.ts ??
+                responseMetaRecord.timestamp ??
                 0
               ) || 0,
             }
             : {}),
         }
         : parsedResponse;
-      const userResponseObject = this._normalizeSingleQuestionResponsePayload(normalizedInput);
+      const userResponseObject = normalizeUserPageSingleQuestionResponsePayload(normalizedInput);
       if (!userResponseObject) return;
 
-      const qData = combinedQuestions[qid] || {
+      const qData = toAnalysisRecord(combinedQuestions[qid] || {
         id: qid,
         type: userResponseObject?.type || 'unknown',
         prompt: userResponseObject?.prompt || 'Unknown Prompt',
-      };
+      });
 
-      const responseSourceKey = `${qid}|${viewAddressLower}`;
-      const sourceSlug = (
-        questionResponseSourceSlugByKey[responseSourceKey] ||
-        questionResponseSourceSlugById[qid] ||
-        questionSourceSlugById[qid] ||
-        ''
-      );
+      const responseSourceKey = `${qid}|${viewAddressKey}`;
+      const sourceSlug = resolveUserPageQuestionSourceSessionSlug({
+        fallbackSlug:
+          questionResponseSourceSlugByKey[responseSourceKey] ||
+          questionResponseSourceSlugById[qid] ||
+          questionSourceSlugById[qid] ||
+          '',
+        getSessionSlugByName,
+        questionData: qData,
+      });
       const questionEncrypted = this._isQuestionPayloadEncrypted(qData);
       const answerEncrypted = this._isAnswerFieldEncrypted(userResponseObject);
       const additionalEncrypted = this._isAdditionalFieldEncrypted(userResponseObject);
@@ -3285,7 +2882,7 @@ class UserPage extends Component<any, any> {
         const visibility = this._evaluateEncryptedVisibility({
           resourceKey: 'questionResponses',
           slug: sourceSlug,
-          viewAddressLower,
+          viewAddressLower: viewAddressKey,
           encryptionAudience: answerEncrypted
             ? this._inferResponseFieldEncryptionAudience(userResponseObject, 'answer', 'gate')
             : 'gate',
@@ -3297,27 +2894,29 @@ class UserPage extends Component<any, any> {
         const visibility = this._evaluateEncryptedVisibility({
           resourceKey: 'questionResponses',
           slug: sourceSlug,
-          viewAddressLower,
+          viewAddressLower: viewAddressKey,
           encryptionAudience: this._inferResponseFieldEncryptionAudience(userResponseObject, 'additional', 'gate'),
           gateContext,
         });
         canDecryptOtherResponses = !!(visibility.visible && visibility.canDecryptOtherResponses);
       }
 
-      const nonBlank = this._hasDisplayableResponsePayload(userResponseObject);
+      const nonBlank = hasDisplayableUserPageResponsePayload(userResponseObject);
       const hasSubmissionHints = (
-        this._hasResponseSubmissionHints(userResponseObject) ||
-        this._hasResponseSubmissionHints(parsedResponse) ||
-        this._hasResponseSubmissionHints(candidate)
+        hasUserPageResponseSubmissionHints(userResponseObject) ||
+        hasUserPageResponseSubmissionHints(parsedResponse) ||
+        hasUserPageResponseSubmissionHints(candidate)
       );
       const hasDisplayableResponse = nonBlank || responseEncrypted || hasSubmissionHints;
       if (!hasDisplayableResponse) return;
-      const responseRecency = this._extractResponseRecency(userResponseObject, responseMeta);
+      const responseRecency = extractUserPageResponseRecency(userResponseObject, responseMeta);
 
       userQuestionResponsesInfo.push({
         prompt: qData.prompt || 'Unknown Prompt',
         type: qData.type || 'unknown',
         id: qid,
+        slug: sourceSlug,
+        sessionSlug: sourceSlug,
         canDecryptOtherResponses,
         responseEncryption: {
           answerEncrypted,
@@ -3328,20 +2927,7 @@ class UserPage extends Component<any, any> {
       detailedSingleQuestionResponses[qid] = userResponseObject;
     });
 
-    userQuestionResponsesInfo.sort((a: any, b: any) => {
-      const cmp = this._compareResponseRecency(a?._responseRecency, b?._responseRecency);
-      if (cmp !== 0) return cmp > 0 ? -1 : 1;
-      const aId = String(a?.id || '');
-      const bId = String(b?.id || '');
-      if (aId < bId) return -1;
-      if (aId > bId) return 1;
-      return 0;
-    });
-    const normalizedQuestionResponseInfo = userQuestionResponsesInfo.map((entry: any) => {
-      const next = { ...entry };
-      delete next._responseRecency;
-      return next;
-    });
+    const normalizedQuestionResponseInfo = normalizeUserPageQuestionResponseInfoOrder(userQuestionResponsesInfo);
 
     return {
       questionCreationInfo: userCreatedQuestions,
@@ -3349,68 +2935,34 @@ class UserPage extends Component<any, any> {
       detailedQuestionResponses: detailedSingleQuestionResponses,
       questionsCreated: userCreatedQuestions.length,
       questionsResponded: normalizedQuestionResponseInfo.length,
-    };
+    } satisfies QuestionSectionResult;
   })
 
-  _deriveSbtSection: any = (aggregate: any, viewAddressLower: any) => measureSync('ce.userPage.deriveSbtSection', () => {
-    const userSBTs: any[] = [];
-    const sbtAggregate = aggregate?.sbtAggregate || {};
-    Object.keys(sbtAggregate).forEach((key: any) => {
-      const entry = sbtAggregate[key];
-      const sbtInfo = (entry && entry.sbtInfo && typeof entry.sbtInfo === 'object')
-        ? entry.sbtInfo
-        : {};
-      if (sbtInfo.unlisted === true) return;
-      if (entry.mintedSet.has(viewAddressLower) && !entry.burnedSet.has(viewAddressLower)) {
-        const sbtAddress = String(entry.sbtAddress || key || sbtInfo.sbtAddress || '');
-        const preferredName = String(getSbtDisplayName(sbtInfo) || '').trim();
-        const shortenedAddress = (sbtAddress && sbtAddress.length > 10)
-          ? getShortenedAddress(sbtAddress, false)
-          : sbtAddress;
-        const fallbackName = shortenedAddress ? `${t('sbt')} ${shortenedAddress}` : t('sbt');
-        userSBTs.push({
-          sbtInfo: {
-            ...sbtInfo,
-            name: preferredName || fallbackName,
-            sbtAddress: sbtAddress || key,
-          },
-          slug: entry.slug,
-        });
-      }
+  _deriveSbtSection = (aggregate: unknown, viewAddressLower: unknown): unknown => measureSync('ce.userPage.deriveSbtSection', () => {
+    const sbtSection = buildUserPageSbtSection({
+      aggregate,
+      viewAddressLower,
+      getSbtDisplayName,
+      getShortenedAddress,
+      translate: t,
     });
-    const aggregateKeys = Object.keys(sbtAggregate);
-    if (aggregateKeys.length > 0) {
-      const heldCandidateCount = aggregateKeys.filter((key: any) => {
-        const entry = sbtAggregate[key];
-        return !!(entry && entry.mintedSet?.has(viewAddressLower) && !entry.burnedSet?.has(viewAddressLower));
-      }).length;
-      const deriveSig = [
-        viewAddressLower,
-        String(aggregateKeys.length),
-        String(heldCandidateCount),
-        String(userSBTs.length),
-      ].join('|');
-      if (deriveSig !== this._lastProfileDeriveTelemetrySignature) {
-        this._lastProfileDeriveTelemetrySignature = deriveSig;
-        this.emitProfileTelemetry('derive-sbt-section', {
-          viewAddress: viewAddressLower,
-          aggregateSbtAddresses: aggregateKeys.length,
-          heldAggregateSbtCount: heldCandidateCount,
-          derivedSbtCount: userSBTs.length,
-          derivedSbtSample: userSBTs
-            .map((item: any) => String(item?.sbtInfo?.sbtAddress || '').toLowerCase())
-            .filter(Boolean)
-            .slice(0, 12),
-        });
+    if (sbtSection.telemetry) {
+      if (sbtSection.telemetry.signature !== this._lastProfileDeriveTelemetrySignature) {
+        this._lastProfileDeriveTelemetrySignature = sbtSection.telemetry.signature;
+        this.emitProfileTelemetry('derive-sbt-section', sbtSection.telemetry.payload);
       }
     }
     return {
-      sbtList: userSBTs,
-      badgesReceived: userSBTs.length,
-    };
+      sbtList: sbtSection.sbtList,
+      badgesReceived: sbtSection.badgesReceived,
+    } satisfies SbtSectionResult;
   })
 
-  _refreshAllDataFromCache: any = ({ force = false, markLoading = false, bypassSignature = false }: any = {}) => {
+  _refreshAllDataFromCache = ({
+    force = false,
+    markLoading = false,
+    bypassSignature = false,
+  }: Partial<CacheRefreshOptions> = {}): void => {
     if (!this._isMounted) return;
     const viewAddress = this.props.viewAddress;
     const networkID = this.props.network?.id != null
@@ -3421,26 +2973,7 @@ class UserPage extends Component<any, any> {
       this._lastCacheRefreshInputSignature = '';
       this._clearUnifiedCacheAggregateMemo();
       this._clearSectionDeriveMemo();
-      this.setState((prevState: any) => {
-        if (
-          prevState.loadingSurveys === false &&
-          prevState.loadingQuestions === false &&
-          prevState.loadingSBTs === false &&
-          prevState.hasUncertainGateAccess === false &&
-          prevState.deepScanTooltipLines == null &&
-          prevState.deepScanProgressRows == null
-        ) {
-          return null;
-        }
-        return {
-          loadingSurveys: false,
-          loadingQuestions: false,
-          loadingSBTs: false,
-          hasUncertainGateAccess: false,
-          deepScanTooltipLines: null,
-          deepScanProgressRows: null,
-        };
-      });
+      this.setState((prevState: UnknownRecord) => buildUserPageMissingAddressCacheStateUpdate(prevState));
       return;
     }
 
@@ -3451,12 +2984,7 @@ class UserPage extends Component<any, any> {
     const sbtReady = !!this.props.isSBTCacheReady;
 
     const sourceSnapshot = this._readCacheSourceSnapshot();
-    const sourcePresence = {
-      hasSurveysCache: sourceSnapshot.hasSurveysCache,
-      hasQuestionsCache: sourceSnapshot.hasQuestionsCache,
-      hasSbtCache: sourceSnapshot.hasSbtCache,
-      hasUserCache: sourceSnapshot.hasUserCache,
-    };
+    const sourcePresence = buildUserPageCacheSourcePresence(sourceSnapshot);
     const hasSurveySources = sourceSnapshot.hasSurveySources;
     const hasQuestionSources = sourceSnapshot.hasQuestionSources;
     const hasSbtSources = sourceSnapshot.hasSbtSources;
@@ -3479,9 +3007,20 @@ class UserPage extends Component<any, any> {
     }
     this._lastCacheRefreshInputSignature = refreshInputSignature;
 
-    const holdSurveyLoading = !force && ((!surveysReady || !responsesReady) && !hasSurveySources);
-    const holdQuestionLoading = !force && ((!questionsReady || !responsesReady) && !hasQuestionSources);
-    const holdSbtLoading = !force && (!sbtReady && !hasSbtSources);
+    const {
+      holdQuestionLoading,
+      holdSbtLoading,
+      holdSurveyLoading,
+    } = buildUserPageCacheLoadingHoldFlags({
+      force,
+      hasQuestionSources,
+      hasSbtSources,
+      hasSurveySources,
+      questionsReady,
+      responsesReady,
+      sbtReady,
+      surveysReady,
+    });
 
     this.emitProfileColdDiag('refresh', {
       viewAddress: viewAddressLower,
@@ -3505,12 +3044,12 @@ class UserPage extends Component<any, any> {
       sourceMembership: sourceSnapshot.membershipSignature,
     });
 
-    let aggregate: any = null;
-    let surveySection: any = null;
-    let questionSection: any = null;
-    let sbtSection: any = null;
-    let deepScanTooltipLines: any = null;
-    let deepScanProgressRows: any = null;
+    let aggregate: UnknownRecord | null = null;
+    let surveySection: SurveySectionResult | null = null;
+    let questionSection: QuestionSectionResult | null = null;
+    let sbtSection: SbtSectionResult | null = null;
+    let deepScanTooltipLines: string[] | null = null;
+    let deepScanProgressRows: DeepScanProgressRow[] | null = null;
     const gateContext = this._createGateAccessContext();
 
     try {
@@ -3524,9 +3063,9 @@ class UserPage extends Component<any, any> {
         this._unifiedCacheAggregateMemoKey === aggregateMemoKey
       );
       if (canReuseAggregate) {
-        aggregate = this._unifiedCacheAggregateMemo;
+        aggregate = this._unifiedCacheAggregateMemo as UnknownRecord;
       } else {
-        aggregate = this._collectUnifiedCacheData({ networkID, viewAddressLower });
+        aggregate = this._collectUnifiedCacheData({ networkID, viewAddressLower }) as UnknownRecord;
         this._unifiedCacheAggregateMemo = aggregate;
         this._unifiedCacheAggregateMemoKey = aggregateMemoKey;
       }
@@ -3534,12 +3073,15 @@ class UserPage extends Component<any, any> {
       const latestBlockNum = Number.isFinite(Number(latestBlockRaw)) ? Number(latestBlockRaw) : null;
       const currentChainId = this.props.network?.id != null ? Number(this.props.network.id) : null;
       deepScanProgressRows = this._deriveDeepScanProgressRows(
-        aggregate.userCaches,
+        aggregate.userCaches as UserCacheSourceEntry[] | null | undefined,
         viewAddressLower,
         currentChainId,
         latestBlockNum
       );
-      deepScanTooltipLines = this._formatDeepScanTooltipLinesFromRows(deepScanProgressRows);
+      deepScanTooltipLines = formatUserPageDeepScanTooltipLinesFromRows(
+        deepScanProgressRows,
+        formatUserPageDeepScanBlockCount
+      );
 
       if (!holdSurveyLoading) {
         const surveySignature = this._buildSurveyDeriveSignature({
@@ -3549,11 +3091,11 @@ class UserPage extends Component<any, any> {
         });
         const surveyMemo = this._sectionDeriveMemo?.survey;
         if (!force && surveyMemo && surveyMemo.signature === surveySignature) {
-          surveySection = surveyMemo.result;
+          surveySection = surveyMemo.result as SurveySectionResult;
           this._mergeGateContextSnapshot(gateContext, surveyMemo.gateSnapshot);
         } else {
           const surveyGateContext = this._createGateAccessContext();
-          surveySection = this._deriveSurveySection(aggregate, viewAddressLower, surveyGateContext);
+          surveySection = this._deriveSurveySection(aggregate, viewAddressLower, surveyGateContext) as SurveySectionResult;
           const surveyGateSnapshot = this._captureGateContextSnapshot(surveyGateContext);
           this._mergeGateContextSnapshot(gateContext, surveyGateSnapshot);
           this._sectionDeriveMemo.survey = {
@@ -3571,11 +3113,11 @@ class UserPage extends Component<any, any> {
         });
         const questionMemo = this._sectionDeriveMemo?.question;
         if (!force && questionMemo && questionMemo.signature === questionSignature) {
-          questionSection = questionMemo.result;
+          questionSection = questionMemo.result as QuestionSectionResult;
           this._mergeGateContextSnapshot(gateContext, questionMemo.gateSnapshot);
         } else {
           const questionGateContext = this._createGateAccessContext();
-          questionSection = this._deriveQuestionSection(aggregate, viewAddressLower, questionGateContext);
+          questionSection = this._deriveQuestionSection(aggregate, viewAddressLower, questionGateContext) as QuestionSectionResult;
           const questionGateSnapshot = this._captureGateContextSnapshot(questionGateContext);
           this._mergeGateContextSnapshot(gateContext, questionGateSnapshot);
           this._sectionDeriveMemo.question = {
@@ -3593,9 +3135,9 @@ class UserPage extends Component<any, any> {
         });
         const sbtMemo = this._sectionDeriveMemo?.sbt;
         if (!force && sbtMemo && sbtMemo.signature === sbtSignature) {
-          sbtSection = sbtMemo.result;
+          sbtSection = sbtMemo.result as SbtSectionResult;
         } else {
-          sbtSection = this._deriveSbtSection(aggregate, viewAddressLower);
+          sbtSection = this._deriveSbtSection(aggregate, viewAddressLower) as SbtSectionResult;
           this._sectionDeriveMemo.sbt = {
             signature: sbtSignature,
             result: sbtSection,
@@ -3606,105 +3148,42 @@ class UserPage extends Component<any, any> {
       accountLog.error('Error processing user data from cache:', error);
     }
 
-    this.emitProfileColdDiag('derive', {
-      aggregateBuilt: !!aggregate,
-      combinedSurveys: aggregate ? Object.keys(aggregate.combinedSurveys || {}).length : 0,
-      combinedQuestions: aggregate ? Object.keys(aggregate.combinedQuestions || {}).length : 0,
-      combinedSurveyResponses: aggregate ? Object.keys(aggregate.combinedSurveyResponses || {}).length : 0,
-      combinedQuestionResponses: aggregate ? Object.keys(aggregate.combinedQuestionResponses || {}).length : 0,
-      sbtAggregateKeys: aggregate ? Object.keys(aggregate.sbtAggregate || {}).length : 0,
-      surveySection: surveySection ? {
-        responseCount: surveySection.surveyResponseInfo?.length,
-        createdCount: surveySection.surveyCreationInfo?.length,
-      } : null,
-      questionSection: questionSection ? {
-        responseCount: questionSection.questionResponseInfo?.length,
-        createdCount: questionSection.questionCreationInfo?.length,
-      } : null,
-      sbtSection: sbtSection ? { sbtCount: sbtSection.sbtList?.length } : null,
-    });
+    this.emitProfileColdDiag('derive', buildUserPageDeriveTelemetrySnapshot({
+      aggregate,
+      questionSection,
+      sbtSection,
+      surveySection,
+    }));
 
-    const aggregateSbt = aggregate?.sbtAggregate || {};
-    const aggregateSbtKeys = Object.keys(aggregateSbt);
-    const heldAggregateSbtKeys = aggregateSbtKeys.filter((key: any) => {
-      const entry = aggregateSbt[key];
-      return !!(entry && entry.mintedSet?.has(viewAddressLower) && !entry.burnedSet?.has(viewAddressLower));
-    });
-    const aggregateSurveyMap = aggregate?.combinedSurveys || {};
-    const aggregateQuestionMap = aggregate?.combinedQuestions || {};
-    const aggregateSurveyResponseMap = aggregate?.combinedSurveyResponses || {};
-    const aggregateQuestionResponseMap = aggregate?.combinedQuestionResponses || {};
-    const aggregateSurveyResponseIds = Object.keys(aggregateSurveyResponseMap).filter((sidRaw: any) => {
-      const sid = String(sidRaw || '').toLowerCase();
-      if (!sid) return false;
-      const row = aggregateSurveyResponseMap[sidRaw] || aggregateSurveyResponseMap[sid] || {};
-      return !!(row && Object.prototype.hasOwnProperty.call(row, viewAddressLower));
-    });
-    const aggregateQuestionResponseIds = Object.keys(aggregateQuestionResponseMap).filter((qidRaw: any) => {
-      const qid = String(qidRaw || '').toLowerCase();
-      if (!qid) return false;
-      const row = aggregateQuestionResponseMap[qidRaw] || aggregateQuestionResponseMap[qid] || {};
-      return !!(row && Object.prototype.hasOwnProperty.call(row, viewAddressLower));
-    });
-    const refreshTelemetry = {
-      viewAddress: viewAddressLower,
-      networkID: String(networkID || ''),
-      force: !!force,
-      markLoading: !!markLoading,
-      bypassSignature: !!bypassSignature,
-      isDeepScanning: !!this.state.isDeepScanning,
-      hasUncertainUserData: !!this.state.hasUncertainUserData,
-      hasUncertainGateAccess: !!this.state.hasUncertainGateAccess,
-      sbtReady,
-      holdSbtLoading,
+    const refreshTelemetry = buildUserPageRefreshTelemetrySnapshot({
+      aggregate,
+      bypassSignature,
+      deepScanTooltipLines,
+      force,
       hasSbtSources,
-      aggregateSbtAddresses: aggregateSbtKeys.length,
-      heldAggregateSbtCount: heldAggregateSbtKeys.length,
-      heldAggregateSbtSample: heldAggregateSbtKeys.slice(0, 12),
-      aggregateSurveyCount: Object.keys(aggregateSurveyMap).length,
-      aggregateQuestionCount: Object.keys(aggregateQuestionMap).length,
-      aggregateSurveyResponseCount: aggregateSurveyResponseIds.length,
-      aggregateQuestionResponseCount: aggregateQuestionResponseIds.length,
-      aggregateSurveyResponseSample: aggregateSurveyResponseIds.slice(0, 12),
-      aggregateQuestionResponseSample: aggregateQuestionResponseIds.slice(0, 12),
-      derivedSbtCount: Array.isArray(sbtSection?.sbtList) ? sbtSection.sbtList.length : null,
+      hasUncertainGateAccess: this.state.hasUncertainGateAccess,
+      hasUncertainUserData: this.state.hasUncertainUserData,
+      holdSbtLoading,
+      isDeepScanning: this.state.isDeepScanning,
+      markLoading,
+      networkID,
+      sbtReady,
+      sbtSection,
       sourcePresence,
-      deepScanTooltipLines: Array.isArray(deepScanTooltipLines)
-        ? deepScanTooltipLines.slice(0, 8)
-        : [],
-    };
-    const refreshSig = [
-      refreshTelemetry.viewAddress,
-      refreshTelemetry.networkID,
-      String(refreshTelemetry.isDeepScanning ? 1 : 0),
-      String(refreshTelemetry.hasUncertainUserData ? 1 : 0),
-      String(refreshTelemetry.sbtReady ? 1 : 0),
-      String(refreshTelemetry.holdSbtLoading ? 1 : 0),
-      String(refreshTelemetry.hasSbtSources ? 1 : 0),
-      String(refreshTelemetry.aggregateSbtAddresses),
-      String(refreshTelemetry.heldAggregateSbtCount),
-      String(refreshTelemetry.aggregateSurveyCount || 0),
-      String(refreshTelemetry.aggregateQuestionCount || 0),
-      String(refreshTelemetry.aggregateSurveyResponseCount || 0),
-      String(refreshTelemetry.aggregateQuestionResponseCount || 0),
-      String(refreshTelemetry.derivedSbtCount ?? ''),
-      refreshTelemetry.deepScanTooltipLines.join('|'),
-    ].join('|');
+      viewAddressLower,
+    });
+    const refreshSig = buildUserPageRefreshTelemetrySignature(refreshTelemetry);
     if (refreshSig !== this._lastProfileRefreshTelemetrySignature) {
       this._lastProfileRefreshTelemetrySignature = refreshSig;
       this._lastProfileRefreshTelemetry = refreshTelemetry;
       this.emitProfileTelemetry('refresh-cache-snapshot', refreshTelemetry);
     }
 
-    const shouldRetryQuestionData = !!(
-      this.state.hasUncertainUserData &&
-      (
-        holdQuestionLoading ||
-        !questionSection ||
-        !Array.isArray(questionSection.questionResponseInfo) ||
-        questionSection.questionResponseInfo.length === 0
-      )
-    );
+    const shouldRetryQuestionData = shouldRetryUserPageQuestionData({
+      hasUncertainUserData: this.state.hasUncertainUserData,
+      holdQuestionLoading,
+      questionSection,
+    });
     this._queueResponseGateAccessChecks(gateContext.pendingKeys);
     if (gateContext.uncertainResources.size > 0 || shouldRetryQuestionData) {
       this.scheduleResponseGateRetry(USERPAGE_GATE_UNKNOWN_RETRY_MS);
@@ -3712,27 +3191,28 @@ class UserPage extends Component<any, any> {
       this.clearResponseGateRetryTimer();
     }
 
-    this.setState((prevState: any) => {
-      const next: Record<string, any> = {};
-      const userStatsPatch: Record<string, any> = {};
-      const preserveUserDataUncertainty = !!prevState.hasUncertainUserData;
-      const hasSurveyGateUncertainty = gateContext.uncertainResources.has('surveyResponses');
-      const hasQuestionGateUncertainty = gateContext.uncertainResources.has('questionResponses');
-      const hasGateUncertainty = hasSurveyGateUncertainty || hasQuestionGateUncertainty;
+    this.setState((prevState: UnknownRecord) => {
+      const next: UnknownRecord = {};
+      const userStatsPatch: UnknownRecord = {};
       const keepSurveyLoadingDuringDeepScan = this.isDeepScanLoadingEnabledForSection('surveys');
       const keepQuestionLoadingDuringDeepScan = this.isDeepScanLoadingEnabledForSection('questions');
-      const keepSurveyLoadingFromUserUncertainty = preserveUserDataUncertainty && (
-        prevState.isDeepScanning ||
-        !hasSurveySources
-      );
-      const keepQuestionLoadingFromUserUncertainty = preserveUserDataUncertainty && (
-        prevState.isDeepScanning ||
-        !hasQuestionSources
-      );
-      const keepSbtLoadingFromUserUncertainty = preserveUserDataUncertainty && (
-        prevState.isDeepScanning ||
-        !hasSbtSources
-      );
+      const {
+        hasGateUncertainty,
+        hasQuestionGateUncertainty,
+        hasSurveyGateUncertainty,
+        keepQuestionLoadingFromUserUncertainty,
+        keepSbtLoadingFromUserUncertainty,
+        keepSurveyLoadingFromUserUncertainty,
+        preserveUserDataUncertainty,
+      } = buildUserPageUncertaintyLoadingFlags({
+        hasQuestionSources,
+        hasSbtSources,
+        hasSurveySources,
+        keepQuestionLoadingDuringDeepScan,
+        keepSurveyLoadingDuringDeepScan,
+        prevState,
+        uncertainResources: gateContext.uncertainResources,
+      });
       next.hasUncertainGateAccess = hasGateUncertainty;
 
       if (surveySection) {
@@ -3773,15 +3253,18 @@ class UserPage extends Component<any, any> {
         next.loadingSBTs = true;
       }
 
-      if (deepScanTooltipLines != null || (Array.isArray(prevState.deepScanTooltipLines) && prevState.deepScanTooltipLines.length > 0)) {
-        next.deepScanTooltipLines = deepScanTooltipLines;
-      }
-      if (deepScanProgressRows != null || (Array.isArray(prevState.deepScanProgressRows) && prevState.deepScanProgressRows.length > 0)) {
-        next.deepScanProgressRows = deepScanProgressRows;
-      }
+      Object.assign(next, buildUserPageDeepScanRefreshCarryPatch({
+        deepScanProgressRows,
+        deepScanTooltipLines,
+        prevState,
+      }));
 
-      if (Object.keys(userStatsPatch).length > 0) {
-        next.userStats = { ...prevState.userStats, ...userStatsPatch };
+      const userStatsMergePatch = buildUserPageUserStatsMergePatch({
+        prevUserStats: prevState.userStats,
+        userStatsPatch,
+      });
+      if (userStatsMergePatch) {
+        next.userStats = userStatsMergePatch;
       }
 
       this.emitProfileColdDiag('loading-flags', {
@@ -3809,15 +3292,15 @@ class UserPage extends Component<any, any> {
   // -----------------------------------------------------------
   //                    SECTION REFRESH WRAPPERS
   // -----------------------------------------------------------
-  getSurveyDataFromCache: any = () => {
+  getSurveyDataFromCache = (): void => {
     this.queueCacheRefresh({ markLoading: false });
   };
 
-  getQuestionDataFromCache: any = () => {
+  getQuestionDataFromCache = (): void => {
     this.queueCacheRefresh({ markLoading: false });
   }
 
-  getSBTsFromCache: any = () => {
+  getSBTsFromCache = (): void => {
     this.queueCacheRefresh({ markLoading: false });
   }
 
@@ -3827,14 +3310,14 @@ class UserPage extends Component<any, any> {
   //        COPY / BOOKMARK / COLLAPSE / USERNAME
   // -----------------------------------------------------------
 
-  copyToClipboard: any = () => {
+  copyToClipboard = (): void => {
     navigator.clipboard.writeText(this.props.viewAddress).then(() => {
       notify.success('Copied to clipboard');
       if (this._isMounted) {
-        this.setState({ copied: true }, () => {
+        this.setState(buildUserPageCopiedStatePatch({ copied: true }), () => {
           setTimeout(() => {
             if (this._isMounted) {
-              this.setState({ copied: false });
+              this.setState(buildUserPageCopiedStatePatch());
             }
           }, 2500);
         });
@@ -3842,27 +3325,28 @@ class UserPage extends Component<any, any> {
     });
   }
 
-  toggleCollapse: any = () => {
+  toggleCollapse = (): void => {
     if (this._isMounted) {
-        this.setState((prevState: any) => ({
-            collapseOpen: !prevState.collapseOpen
+        this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
+          state: prevState,
+          stateKey: 'collapseOpen',
         }));
     }
   }
 
-  openFullPage: any = () => {
+  openFullPage = (): void => {
     window.open(`/u/${this.props.viewAddress}`);
   }
 
-  handleUsernameChange: any = (event: any) => {
+  handleUsernameChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     if (this._isMounted) {
-        this.setState({ username: event.target.value, usernameError: '' });
+        this.setState(buildUserPageUsernameChangeStatePatch({ username: event.target.value }));
     }
   }
 
-  onUsernamePenClick: any = () => {
+  onUsernamePenClick = (): void => {
     if (!this._isMounted) return;
-    this.setState({ isEditingUsername: true }, () => {
+    this.setState(buildUserPageUsernameEditOpenStatePatch(), () => {
       // focus the input when it shows (best-effort via microtask)
       setTimeout(() => {
         try {
@@ -3873,13 +3357,13 @@ class UserPage extends Component<any, any> {
     });
   }
 
-  cancelUsernameEdit: any = () => {
+  cancelUsernameEdit = (): void => {
     if (!this._isMounted) return;
-    this.setState({ isEditingUsername: false });
+    this.setState(buildUserPageUsernameEditCancelStatePatch());
     this.loadPersistedUsername(); // Revert to saved value
   }
 
-  handleUsernameKeyDown: any = (e: any) => {
+  handleUsernameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === 'Enter') {
       this.setUsername();
     } else if (e.key === 'Escape') {
@@ -3887,14 +3371,14 @@ class UserPage extends Component<any, any> {
     }
   }
 
-  setUsername: any = () => {
+  setUsername = (): void => {
     const newUsernameToSet = this.state.username;
     const { account, viewAddress, network } = this.props;
 
     if (account && viewAddress && account.toLowerCase() === viewAddress.toLowerCase()) {
       if (this._isMounted) {
         // Optimistically update and close edit mode
-        this.setState({ username: newUsernameToSet, usernameError: '', isEditingUsername: false });
+        this.setState(buildUserPageUsernameSaveStatePatch({ username: newUsernameToSet }));
         if (network?.id) {
           const networkID = network.id.toString();
           try {
@@ -3902,122 +3386,59 @@ class UserPage extends Component<any, any> {
           } catch (error) {
             accountLog.error("Error saving username to localStorage:", error);
             if (this._isMounted) {
-                this.setState({ usernameError: 'Failed to save username locally.' });
+                this.setState(buildUserPageUsernameErrorStatePatch({ usernameError: 'Failed to save username locally.' }));
             }
           }
         } else {
           if (this._isMounted) {
-            this.setState({ usernameError: "Cannot persist username: network information is missing." });
+            this.setState(buildUserPageUsernameErrorStatePatch({ usernameError: "Cannot persist username: network information is missing." }));
           }
         }
       }
     } else {
       if (this._isMounted) {
-        this.setState({ usernameError: "Can only set username for your own account." });
+        this.setState(buildUserPageUsernameErrorStatePatch({ usernameError: "Can only set username for your own account." }));
       }
     }
   }
 
-  toggleBookmark: any = (optionalMeta: any = {}) => {
+  toggleBookmark = (optionalMeta: BookmarkToggleMeta | React.MouseEvent<HTMLElement> = {}): void => {
     if (!this.props.viewAddress) return;
+    const bookmarkMeta = optionalMeta as BookmarkToggleMeta;
     let bookmarksCache = this.getBookmarksCache();
-
-    // Heal missing arrays (e.g., filters)
-    if (!Array.isArray(bookmarksCache.filters)) bookmarksCache.filters = [];
-
-    const addrRaw = this.props.viewAddress;
-    const addrLower = String(addrRaw).toLowerCase();
-
-    // Find entry (string or object) for this address
-    const users = bookmarksCache.users;
-    const idx = users.findIndex((u: any) =>
-      (typeof u === 'string' && String(u).toLowerCase() === addrLower) ||
-      (u && typeof u === 'object' && String(u.address || '').toLowerCase() === addrLower)
-    );
-
-    let nextBookmarked = false;
-    const nextState: Record<string, any> = {};
-    if (idx > -1) {
-        // Remove (match either shape)
-        users.splice(idx, 1);
-        nextBookmarked = false;
-        nextState.isEditingNickname = false;
-        nextState.nicknameInput = '';
-    } else {
-        // Add: object if meta present or nickname exists; otherwise keep legacy string for b/c
-        const onchainUsername = this.getOnchainUsername(addrRaw, this.props.network);
-        const shouldUseObject =
-          (!!optionalMeta && (optionalMeta.nickname || optionalMeta.username)) ||
-          !!this.state.nicknameInput ||
-          !!onchainUsername;
-
-        if (shouldUseObject) {
-          const obj = {
-            address: addrLower,
-            ...(this.state.nicknameInput ? { nickname: this.state.nicknameInput } : {}),
-            ...(onchainUsername ? { username: onchainUsername } : {}),
-            ...(this.props.network?.id != null ? { networkId: String(this.props.network.id) } : {})
-          };
-          if (optionalMeta && typeof optionalMeta === 'object') {
-            if (optionalMeta.nickname != null) obj.nickname = optionalMeta.nickname;
-            if (optionalMeta.username != null) obj.username = optionalMeta.username;
-          }
-          users.push(obj);
-        } else {
-          // Legacy string entry keeps original-case address for maximum compatibility
-          users.push(addrRaw);
-        }
-        nextBookmarked = true;
-
-    }
+    const toggleResult = applyUserPageBookmarkToggle({
+      address: this.props.viewAddress,
+      bookmarkMeta,
+      bookmarksCache,
+      currentNickname: this.state.nicknameInput,
+      networkId: this.props.network?.id,
+      onchainUsername: this.getOnchainUsername(this.props.viewAddress, this.props.network),
+    });
+    bookmarksCache = toggleResult.bookmarksCache;
 
     this.persistBookmarksCache(bookmarksCache, 'toggleBookmark');
     if (this._isMounted) {
-      this.setState({
-        bookmarked: nextBookmarked,
-        ...nextState,
-      });
+      this.setState(buildUserPageBookmarkToggleStatePatch(toggleResult));
     }
   }
 
 
-  checkIfBookmarked: any = () => {
+  checkIfBookmarked = (): void => {
     if (!this.props.viewAddress) return;
     const bookmarksCache = this.getBookmarksCache();
 
-    const users = Array.isArray(bookmarksCache.users) ? bookmarksCache.users : [];
-    const addrLower = String(this.props.viewAddress).toLowerCase();
-
-    let found = false;
-    let objNickname: any = null;
-
-    for (const u of users) {
-      if (typeof u === 'string') {
-        if (String(u).toLowerCase() === addrLower) {
-          found = true;
-        }
-      } else if (u && typeof u === 'object') {
-        const a = String(u.address || '').toLowerCase();
-        if (a === addrLower) {
-          found = true;
-          if (typeof u.nickname === 'string' && u.nickname) {
-            objNickname = u.nickname;
-          }
-        }
-      }
-      if (found && objNickname) break;
-    }
+    const { bookmarked: found, nickname: objNickname } = resolveUserPageBookmarkStatus({
+      address: this.props.viewAddress,
+      users: bookmarksCache.users,
+    });
 
     if (this._isMounted) {
-      const nextState: Record<string, any> = {};
-      if (this.state.bookmarked !== found) {
-        nextState.bookmarked = found;
-      }
-      // If an object entry exists for this address, prefill nickname
-      if (objNickname != null && this.state.nicknameInput !== objNickname) {
-        nextState.nicknameInput = objNickname;
-      }
-      if (Object.keys(nextState).length > 0) {
+      const nextState = buildUserPageBookmarkStatusStateUpdate({
+        bookmarked: found,
+        nickname: objNickname,
+        state: this.state,
+      });
+      if (nextState) {
         this.setState(nextState);
       }
     }
@@ -4025,97 +3446,59 @@ class UserPage extends Component<any, any> {
 
 
   // ---- Analyze helpers (timer management) ----
-  startAnalysisTimer: any = () => {
+  startAnalysisTimer = (): void => {
     this.clearAnalysisTimer();
     const startedAt = Date.now();
     this.analysisTimer = setInterval(() => {
       if (!this._isMounted) return;
-      this.setState({ analysisElapsedMs: Date.now() - startedAt });
+      this.setState(buildUserPageAnalysisElapsedStatePatch({
+        nowMs: Date.now(),
+        startedAt,
+      }));
     }, 250);
   };
 
-  clearAnalysisTimer: any = () => {
+  clearAnalysisTimer = (): void => {
     if (this.analysisTimer) {
       clearInterval(this.analysisTimer);
       this.analysisTimer = null;
     }
   };
 
-  _getAiSessionScopeContext: any = () => {
-    const mode = String(globalState?.CE_SESSION_SCAN_SCOPE || '').trim().toLowerCase();
-    const activeSlug = normalizeSessionSlug(this.props.activeSessionSlug || '');
-    const toList = (raw: any) => (
-      Array.isArray(raw)
-        ? Array.from(new Set(raw.map((item: any) => normalizeSessionSlug(item || ''))))
-        : []
-    );
-    if (mode === 'general') {
-      return { mode, strict: true, allowedSlugs: [''] };
-    }
-    if (mode === 'active') {
-      return { mode, strict: !!activeSlug, allowedSlugs: activeSlug ? [activeSlug] : [] };
-    }
-    if (mode === 'list') {
-      const list = toList(globalState?.CE_SESSION_SCAN_SLUGS);
-      return { mode, strict: list.length > 0, allowedSlugs: list };
-    }
-    return { mode: mode || 'all', strict: false, allowedSlugs: [] };
-  };
-
-  _getAiSessionSlugCandidates: any = () => {
-    const ordered: any[] = [];
-    const seen: any = new Set();
-    const push = (rawSlug: any) => {
-      const slug = normalizeSessionSlug(rawSlug || '');
-      if (seen.has(slug)) return;
-      seen.add(slug);
-      ordered.push(slug);
-    };
-
-    const activeSlug = normalizeSessionSlug(this.props.activeSessionSlug || '');
-    const scopeContext = this._getAiSessionScopeContext();
-    // Intentionally keep the actively navigated session eligible even in strict list/general
-    // scope so analysis can use the session the user is currently viewing (e.g. out-of-list
-    // sessions where the user still has access/decryption rights).
-    push(activeSlug);
-    scopeContext.allowedSlugs.forEach((slug: any) => push(slug));
-    ['userCache', 'surveysCache', 'questionsCache', 'sbtCache'].forEach((namespace: any) => {
-      listNamespaceSlugsSync(namespace).forEach((slug: any) => push(slug));
+  _getAiSessionScopeContext = (): UserPageAiSessionScopeContext => {
+    return buildUserPageAiSessionScopeContext({
+      activeSessionSlug: this.props.activeSessionSlug,
+      scanScope: globalState?.CE_SESSION_SCAN_SCOPE,
+      scanSlugs: globalState?.CE_SESSION_SCAN_SLUGS,
     });
-    (Array.isArray(this.state.sbtList) ? this.state.sbtList : []).forEach((item: any) => {
-      push(item?.slug);
+  };
+
+  _getAiSessionSlugCandidates = (): string[] => {
+    return buildUserPageAiSessionSlugCandidates({
+      activeSessionSlug: this.props.activeSessionSlug,
+      listNamespaceSlugs: listNamespaceSlugsSync,
+      sbtList: this.state.sbtList,
+      scopeContext: this._getAiSessionScopeContext(),
     });
-    if (!ordered.length) push('');
-    if (!scopeContext.strict) return ordered;
-
-    const allowed: any = new Set(scopeContext.allowedSlugs);
-    if (activeSlug) allowed.add(activeSlug);
-    const filtered = ordered.filter((slug: any) => allowed.has(slug));
-    return filtered.length > 0 ? filtered : ordered;
   };
 
-  _getSessionConfigForSlugExact: any = (slugIn: any = '') => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    if (!slug) {
-      const cfg = getSessionConfigBySlugOrDefault('');
-      return (cfg && typeof cfg === 'object') ? cfg : null;
-    }
-    // Strict lookup for non-general slugs: allow known alias keys/names, but block
-    // unknown slugs from silently falling back to default/general config.
-    const cfg = getSessionConfigBySlug(slug);
-    return (cfg && typeof cfg === 'object') ? cfg : null;
+  _getSessionConfigForSlugExact = (slugIn: unknown = ''): UnknownRecord | null => {
+    return resolveUserPageAnalysisSessionConfigForSlug({
+      getSessionConfigBySlug,
+      getSessionConfigBySlugOrDefault,
+      slugIn,
+    });
   };
 
-  resolveAnalysisSessionContext: any = async (excludeSlugs: any = []) => {
-    const list = Array.isArray(excludeSlugs) ? excludeSlugs.filter((s: any) => s != null) : [];
-    const excludeSet: any = new Set(list.map((s: any) => normalizeSessionSlug(s || '')));
+  resolveAnalysisSessionContext = async (excludeSlugs: unknown = []): Promise<AiSessionResolution | null> => {
+    const excludeSet = buildUserPageAnalysisExcludeSlugSet({ excludeSlugs });
     const activeSlug = normalizeSessionSlug(this.props.activeSessionSlug || '');
     const account = String(this.props.account || '').trim();
     const candidates = this._getAiSessionSlugCandidates();
     const scopeContext = this._getAiSessionScopeContext();
-    const checked: any[] = [];
-    let activeCandidate: any = null;
-    let firstUsable: any = null;
+    const checked: AiSessionCandidate[] = [];
+    let activeCandidate: AiSessionCandidate | null = null;
+    let firstUsable: AiSessionCandidate | null = null;
 
     for (const slug of candidates) {
       if (excludeSet.has(slug)) continue;
@@ -4149,32 +3532,27 @@ class UserPage extends Component<any, any> {
           status,
           reason,
           scopeMode: scopeContext.mode,
-          candidates: checked.map((entry: any) => ({
-            slug: entry.slug || 'general',
-            status: entry.status,
-          })),
+          candidates: buildUserPageAnalysisCandidateLogRows(checked),
         });
         return { ...row, reason };
       }
     }
 
-    const fallback = activeCandidate || firstUsable || checked[0] || null;
-    if (fallback) {
-      const reason = fallback === activeCandidate
-        ? 'fallback-active-session'
-        : fallback === firstUsable
-          ? 'fallback-first-usable-session'
-          : 'fallback-first-checked-session';
+    const fallbackSelection = resolveUserPageAnalysisSessionFallback({
+      activeCandidate,
+      checked,
+      firstUsable,
+    });
+    if (fallbackSelection) {
+      const { candidate: fallbackRaw, reason } = fallbackSelection;
+      const fallback = fallbackRaw as AiSessionCandidate;
       accountLog.log('[UserPage] analyze session fallback', {
         activeSlug,
         selectedSlug: fallback.slug,
         status: fallback.status,
         reason,
         scopeMode: scopeContext.mode,
-        candidates: checked.map((entry: any) => ({
-          slug: entry.slug || 'general',
-          status: entry.status,
-        })),
+        candidates: buildUserPageAnalysisCandidateLogRows(checked),
       });
       return { ...fallback, reason };
     }
@@ -4186,29 +3564,29 @@ class UserPage extends Component<any, any> {
     return null;
   };
 
-  _aiCheckSeq: any = 0;
+  _aiCheckSeq: number = 0;
 
-  _checkAiAvailability: any = async () => {
+  _checkAiAvailability = async (): Promise<void> => {
     if (!this._isMounted) return;
     const seq = ++this._aiCheckSeq;
     try {
       const session = await this.resolveAnalysisSessionContext();
       if (this._isMounted && seq === this._aiCheckSeq) {
-        this.setState({ aiAvailable: session !== null });
+        this.setState(buildUserPageAiAvailabilityStatePatch({ available: session !== null }));
       }
     } catch (_) {
       if (this._isMounted && seq === this._aiCheckSeq) {
-        this.setState({ aiAvailable: false });
+        this.setState(buildUserPageAiAvailabilityStatePatch({ available: false }));
       }
     }
   };
 
-  _buildAnalysisCacheContext: any = async ({
+  _buildAnalysisCacheContext = async ({
     userData,
     analysisSession,
     addressLower,
     networkId,
-  }: any) => {
+  }: UserAnalysisCacheContextArgs): Promise<UserAnalysisCacheContext> => {
     const sessionSlug = String(analysisSession?.slug || '');
     const aiContext = await resolveUserAnalysisAiContext(
       sessionSlug,
@@ -4229,216 +3607,105 @@ class UserPage extends Component<any, any> {
     };
   };
 
-  _readAnalysisCacheEntry: any = ({
+  _readAnalysisCacheEntry = ({
     sessionSlug,
     networkId,
     addressLower,
     fingerprint,
-  }: any) => {
-    const cacheObj = peekCacheSync('analysisCache', sessionSlug, { clone: false });
-    const entry = cacheObj?.[networkId]?.[addressLower]?.[fingerprint];
-    if (!entry || typeof entry !== 'object') return null;
-    if (entry.version !== USER_ANALYSIS_CACHE_VERSION) return null;
-    if (entry.fingerprint !== fingerprint) return null;
-    if (String(entry.networkId || '') !== String(networkId || '')) return null;
-    if (String(entry.address || '').toLowerCase() !== addressLower) return null;
-    if (Date.now() >= Number(entry.expiresAt || 0)) return null;
-    return entry;
+  }: UserAnalysisCacheReadArgs): UserAnalysisCacheEntry | null => {
+    const cacheObj = toAnalysisCacheBucket(peekCacheSync('analysisCache', sessionSlug, { clone: false }));
+    return readUserPageAnalysisCacheEntry({
+      addressLower,
+      cacheObj,
+      cacheVersion: USER_ANALYSIS_CACHE_VERSION,
+      fingerprint,
+      networkId,
+      now: Date.now(),
+    }) as UserAnalysisCacheEntry | null;
   };
 
-  _hydrateAnalysisFromCache: any = (entry: any) => {
-    const result = normalizeUserAnalysisResult(entry?.result || {});
+  _hydrateAnalysisFromCache = (entry: UserAnalysisCacheEntry): void => {
     this.clearAnalysisTimer();
-    this.setState({
-      showAnalysisModal: true,
-      aiAnalysis: result.summary,
-      analysisDetails: result.details,
-      analysisName: result.name,
-      analysisHistoricalFigure: result.historicalAlignment.figure,
-      analysisHistoricalReasoning: result.historicalAlignment.reasoning,
-      analysisElapsedMs: 0,
-      analysisError: '',
-      analyzing: false,
-      analysisServedFromCache: true,
-      analysisCachedAt: Number(entry?.cachedAt || 0) || null,
-    });
+    this.setState(buildUserPageAnalysisResultStatePatch({
+      cachedAt: entry?.cachedAt,
+      includeElapsed: true,
+      includeError: true,
+      includeModal: true,
+      result: entry?.result || {},
+      servedFromCache: true,
+    }));
   };
 
-  _writeAnalysisCacheEntry: any = async ({
+  _writeAnalysisCacheEntry = async ({
     sessionSlug,
     networkId,
     addressLower,
     fingerprint,
     aiContext,
     result,
-  }: any) => {
+  }: UserAnalysisCacheWriteArgs): Promise<UserAnalysisCacheEntry> => {
     const cachedAt = Date.now();
-    const entry = {
-      version: USER_ANALYSIS_CACHE_VERSION,
+    const entry = buildUserPageAnalysisCacheEntry({
+      addressLower,
+      aiContext,
       fingerprint,
+      cacheVersion: USER_ANALYSIS_CACHE_VERSION,
       cachedAt,
-      expiresAt: cachedAt + USER_ANALYSIS_TTL_MS,
-      address: addressLower,
       networkId,
-      aiContext: {
-        sessionSlug,
-        provider: aiContext.provider,
-        model: aiContext.model,
-      },
-      result: normalizeUserAnalysisResult(result),
-    };
+      result,
+      sessionSlug,
+      ttlMs: USER_ANALYSIS_TTL_MS,
+    }) as UserAnalysisCacheEntry;
 
     const current = peekCacheSync('analysisCache', sessionSlug, { clone: false });
-    const next = (current && typeof current === 'object') ? { ...current } : {};
-    const networkBucket = (next[networkId] && typeof next[networkId] === 'object')
-      ? { ...next[networkId] }
-      : {};
-    const addressBucketSource = (
-      networkBucket[addressLower] &&
-      typeof networkBucket[addressLower] === 'object'
-    )
-      ? networkBucket[addressLower]
-      : {};
-    const addressBucket: Record<string, any> = {};
-    Object.entries(addressBucketSource).forEach(([key, sibling]: any) => {
-      if (sibling && Number(sibling.expiresAt || 0) > cachedAt) {
-        addressBucket[key] = sibling;
-      }
+    const next = buildUserPageAnalysisCacheWritePayload({
+      addressLower,
+      cachedAt,
+      currentCache: current,
+      entry,
+      fingerprint,
+      networkId,
     });
-    addressBucket[fingerprint] = entry;
-    networkBucket[addressLower] = addressBucket;
-    next[networkId] = networkBucket;
-    await writeCache('analysisCache', sessionSlug, next);
+    await writeCacheTyped('analysisCache', sessionSlug, next);
     return entry;
   };
 
-  analyzeUser: any = async (forceRefresh: any = false) => {
+  analyzeUser = async (forceRefresh: unknown = false): Promise<void> => {
     if (!this._isMounted) return;
 
-    // Helper: pull a visible additional comment string from various possible shapes
-    const extractAdditionalComment = (obj: any) => {
-      if (!obj) return null;
-      const candidates = [
-        obj.additionalComment,
-        obj.additionalComments,
-        obj.comment,
-        obj.comments
-      ];
-      for (const c of candidates) {
-        if (c == null) continue;
-        const val = typeof c === 'string' ? c : (c.value ?? c.text ?? null);
-        const enc = typeof c === 'object' && c.encrypted === true;
-        if (val && val !== '*' && !enc && String(val).trim() !== '*') return String(val);
-      }
-      return null;
-    };
-
-    const extractImportance = (obj: any) => {
-      const cand =
-        obj?.conviction ??
-        obj?.importance ??
-        obj?.meta?.conviction ??
-        obj?.meta?.importance ??
-        obj?.answer?.conviction ??
-        obj?.answer?.importance;
-      return (cand === '*' || (cand && cand.encrypted === true)) ? undefined : cand;
-    };
-
     // --- Assemble inputs strictly from current state (already hydrated from other caches) ---
-    const sbts = (this.state.sbtList || [])
-      .map((item: any) => ({
-        name: getSbtDisplayName(item?.sbtInfo) || item?.name || '',
-        address: item?.sbtInfo?.sbtAddress
-      }))
-      .filter((s: any) => s && s.name && s.address);
+    const sbts = buildUserPageAnalysisSbts({
+      getSbtDisplayName,
+      sbtList: this.state.sbtList,
+    });
 
     // Question-level responses (all types; only visible)
-    const questions = (this.state.questionResponseInfo || [])
-      .map((q: any) => {
-        const resp = this.state.detailedQuestionResponses?.[q.id] || {};
-        const ans = resp?.answer?.value;
-        if (ans === '*' || ans === '' || ans == null) return null; // skip encrypted/blank
-        return {
-          id: q.id,
-          type: q.type,
-          prompt: q.prompt,
-          answer: Array.isArray(ans) ? ans : ans, // keep native type (bool/number/string/array)
-          importance: extractImportance(resp),
-          additionalComment: extractAdditionalComment(resp) || undefined
-        };
-      })
-      .filter(Boolean);
+    const questions = buildUserPageAnalysisQuestions({
+      detailedQuestionResponses: this.state.detailedQuestionResponses,
+      questionResponseInfo: this.state.questionResponseInfo,
+    });
 
     // Survey-level summaries + samples of answered items (with types & additional comments)
-    const surveys = (this.state.surveyResponseInfo || []).map((s: any) => {
-      const arr = this.state.detailedSurveyResponses?.[s.id] || [];
-      const answered = arr.filter((it: any) => {
-        const v = it?.responseData?.answer?.value;
-        return v && v !== '*';
-      });
-
-      const sample = answered.slice(0, 3).map((it: any) => {
-        const v = it?.responseData?.answer?.value;
-        return {
-          prompt: it?.questionData?.prompt,
-          type: it?.questionData?.type || it?.responseData?.type || 'unknown',
-          answer: Array.isArray(v) ? v : v,
-          importance: extractImportance(it?.responseData),
-          additionalComment: extractAdditionalComment(it?.responseData) || undefined
-        };
-      });
-
-      const additionalCommentsSample = answered
-        .map((it: any) => extractAdditionalComment(it?.responseData))
-        .filter(Boolean)
-        .slice(0, 3);
-
-      return {
-        surveyId: s.id,
-        title: s.title,
-        answeredCount: answered.length,
-        sample,
-        additionalCommentsSample: additionalCommentsSample.length > 0 ? additionalCommentsSample : undefined
-      };
+    const surveys = buildUserPageAnalysisSurveys({
+      detailedSurveyResponses: this.state.detailedSurveyResponses,
+      surveyResponseInfo: this.state.surveyResponseInfo,
     });
 
     // Created content (counts + actual items)
-    const questionsCreated = (this.state.questionCreationInfo || []).map((q: any) => ({
-      id: q.id,
-      type: q.type,
-      prompt: q.prompt
-    }));
+    const questionsCreated = buildUserPageAnalysisCreatedQuestions(this.state.questionCreationInfo);
 
     // For surveys the user created, include title + a small sample of question prompts/types
-    let surveysCreated: any[] = [];
+    let surveysCreated: unknown[] = [];
     try {
       const networkID = this.props.network?.id?.toString();
       const slug = (this.props.activeSessionSlug == null ? '' : this.props.activeSessionSlug);
       const surveysCache = peekCacheSync('surveysCache', slug, { clone: false }) || {};
       const questionsCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
-      const readNetCache = (cacheObj: any, netKey: any) => {
-        if (!cacheObj || typeof cacheObj !== 'object' || !netKey) return {};
-        return cacheObj[netKey] || {};
-      };
-
-      const netSurv = readNetCache(surveysCache, networkID);
-      const netQs = readNetCache(questionsCache, networkID);
-
-      surveysCreated = (this.state.surveyCreationInfo || []).map((sv: any) => {
-        const sData = netSurv?.surveys?.[sv.id];
-        const qIds = Array.isArray(sData?.questionIDs) ? sData.questionIDs : [];
-        const sampleQuestions = qIds.slice(0, 5).map((qid: any) => {
-          const q = netQs?.questions?.[qid.toLowerCase()];
-          return q
-            ? { id: (q.id || qid.toLowerCase()), type: q.type, prompt: q.prompt }
-            : { id: qid.toLowerCase() };
-        });
-        return {
-          surveyId: sv.id,
-          title: sv.title,
-          questionsCount: sv.questionsCount,
-          sampleQuestions
-        };
+      surveysCreated = buildUserPageAnalysisCreatedSurveys({
+        networkID,
+        questionsCache,
+        surveyCreationInfo: this.state.surveyCreationInfo,
+        surveysCache,
       });
     } catch (e) { accountLog.warn('UserPage: fallback', e); }
 
@@ -4466,19 +3733,7 @@ class UserPage extends Component<any, any> {
     );
 
     try {
-      this.setState({
-        showAnalysisModal: true,
-        analysisError: '',
-        aiAnalysis: '',
-        analysisDetails: '',
-        analysisName: '',
-        analysisElapsedMs: 0,
-        analysisHistoricalFigure: '',
-        analysisHistoricalReasoning: '',
-        analyzing: false,
-        analysisServedFromCache: false,
-        analysisCachedAt: null,
-      });
+      this.setState(buildUserPageAnalysisResetStatePatch());
 
       const analysisSession = await this.resolveAnalysisSessionContext();
       if (!analysisSession?.sessionConfig) {
@@ -4505,34 +3760,15 @@ class UserPage extends Component<any, any> {
       }
 
       if (!this._isMounted) return;
-      this.setState({
-        showAnalysisModal: true,
-        analyzing: true,
-        analysisError: '',
-        aiAnalysis: '',
-        analysisDetails: '',
-        analysisName: '',
-        analysisElapsedMs: 0,
-        analysisHistoricalFigure: '',
-        analysisHistoricalReasoning: '',
-        analysisServedFromCache: false,
-        analysisCachedAt: null,
-      });
+      this.setState(buildUserPageAnalysisResetStatePatch({ analyzing: true }));
       this.startAnalysisTimer();
 
-      const aiOptions = {
-        sessionSlug: String(analysisSession.slug || ''),
-        sessionConfig: analysisSession.sessionConfig,
-        sessionSelection: {
-          gateStatus: String(analysisSession.status || 'unknown'),
-          reason: String(analysisSession.reason || 'unknown'),
-        },
-      };
+      const aiOptions = buildUserPageAnalysisAiOptions({ analysisSession });
       let result;
       try {
         result = await analyzeUserOpinions(userData, aiOptions);
-      } catch (err: any) {
-        const isGateUnavailable = /on-chain gate data unavailable/i.test(getErrorMessage(err, ''));
+      } catch (err: unknown) {
+        const isGateUnavailable = /on-chain gate data unavailable/i.test(getUserPageErrorMessage(err, ''));
         if (!isGateUnavailable) throw err;
         accountLog.warn('[UserPage] gate data unavailable for session, trying fallback', {
           failedSlug: analysisSession.slug,
@@ -4559,30 +3795,20 @@ class UserPage extends Component<any, any> {
             return;
           }
         }
-        const fallbackOpts = {
-          sessionSlug: String(fallbackSession.slug || ''),
-          sessionConfig: fallbackSession.sessionConfig,
-          sessionSelection: {
-            gateStatus: String(fallbackSession.status || 'unknown'),
-            reason: String(fallbackSession.reason || 'fallback-gate-unavailable'),
-          },
-        };
+        const fallbackOpts = buildUserPageAnalysisAiOptions({
+          analysisSession: fallbackSession,
+          defaultReason: 'fallback-gate-unavailable',
+        });
         result = await analyzeUserOpinions(userData, fallbackOpts);
       }
       if (!this._isMounted) return;
 
       // Update UI
       const normalizedResult = normalizeUserAnalysisResult(result);
-      this.setState({
-        aiAnalysis: normalizedResult.summary,
-        analysisDetails: normalizedResult.details,
-        analysisName: normalizedResult.name,
-        analysisHistoricalFigure: normalizedResult.historicalAlignment.figure,
-        analysisHistoricalReasoning: normalizedResult.historicalAlignment.reasoning,
-        analyzing: false,
-        analysisServedFromCache: false,
-        analysisCachedAt: null,
-      });
+      this.setState(buildUserPageAnalysisResultStatePatch({
+        result: normalizedResult,
+        servedFromCache: false,
+      }));
       this.clearAnalysisTimer();
       try {
         await this._writeAnalysisCacheEntry({
@@ -4599,19 +3825,13 @@ class UserPage extends Component<any, any> {
     } catch (e) {
       accountLog.error('[UserPage] analyzeUser failed:', e);
       if (!this._isMounted) return;
-      this.setState({
-        analyzing: false,
-        analysisError: 'Unable to generate analysis right now. Please try again later.',
-        showAnalysisModal: true,
-        analysisServedFromCache: false,
-        analysisCachedAt: null,
-      });
+      this.setState(buildUserPageAnalysisErrorStatePatch());
       this.clearAnalysisTimer();
     }
   };
 
 
-  getExplorerUrl: any = () => {
+  getExplorerUrl = (): string | null => {
     const network = this.props.network;
     const address = String(this.props.viewAddress || '').trim();
     if (!address) return null;
@@ -4623,23 +3843,49 @@ class UserPage extends Component<any, any> {
     return explorerUrl;
   }
 
-  toggleSurveyResponses: any = (surveyId: any) => {
+  toggleSurveyResponses = (surveyId: unknown): void => {
     if (this._isMounted) {
-        this.setState((prevState: any) => ({
-        expandedSurveyResponses: {
-            ...prevState.expandedSurveyResponses,
-            [surveyId]: !prevState.expandedSurveyResponses[surveyId],
-        },
+        this.setState((prevState: UnknownRecord) => buildUserPageSurveyExpansionTogglePatch({
+          state: prevState,
+          stateKey: 'expandedSurveyResponses',
+          surveyId,
         }));
     }
   };
 
-  toggleSurveyCreated: any = (surveyId: any) => {
-    this.setState((prevState: any) => ({
-      expandedSurveysCreated: {
-        ...prevState.expandedSurveysCreated,
-        [surveyId]: !prevState.expandedSurveysCreated[surveyId],
-      },
+  toggleSurveyCreated = (surveyId: unknown): void => {
+    this.setState((prevState: UnknownRecord) => buildUserPageSurveyExpansionTogglePatch({
+      state: prevState,
+      stateKey: 'expandedSurveysCreated',
+      surveyId,
+    }));
+  };
+
+  toggleSurveyResponsesSection = (): void => {
+    this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
+      state: prevState,
+      stateKey: 'showSectionSurveyResponsesOpen',
+    }));
+  };
+
+  toggleSurveysCreatedSection = (): void => {
+    this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
+      state: prevState,
+      stateKey: 'showSectionSurveysCreatedOpen',
+    }));
+  };
+
+  toggleQuestionResponsesSection = (): void => {
+    this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
+      state: prevState,
+      stateKey: 'showSectionQuestionResponsesOpen',
+    }));
+  };
+
+  toggleQuestionsCreatedSection = (): void => {
+    this.setState((prevState: UnknownRecord) => buildUserPageBooleanTogglePatch({
+      state: prevState,
+      stateKey: 'showSectionQuestionsCreatedOpen',
     }));
   };
 
@@ -4689,40 +3935,47 @@ class UserPage extends Component<any, any> {
     } = this.state;
 
     const { minimized, account, viewAddress: propViewAddress, provider, network, loginComplete } = this.props;
+    const surveyResponseEntries = surveyResponseInfo as UserPageRenderSurveyEntry[];
+    const surveyCreationEntries = surveyCreationInfo as UserPageRenderSurveyEntry[];
+    const questionResponseEntries = questionResponseInfo as UserPageRenderQuestionEntry[];
+    const questionCreationEntries = questionCreationInfo as UserPageRenderQuestionEntry[];
+    const sbtEntries = sbtList as DerivedSbtListItem[];
+    const expandedSurveyResponseMap = expandedSurveyResponses as Record<string, boolean | undefined>;
+    const expandedSurveyCreatedMap = expandedSurveysCreated as Record<string, boolean | undefined>;
+    const detailedSurveyResponseMap = detailedSurveyResponses as Record<string, SurveyQuestionResponseDetail[] | undefined>;
+    const detailedQuestionResponseMap = detailedQuestionResponses as Record<string, NormalizedQuestionResponsePayload | null | undefined>;
 
     // === Compute display label with nickname priority (scoped strictly to current viewAddress) ===
-    const currentLower = String(propViewAddress || '').toLowerCase();
     let cachedNicknameForThis = '';
     try {
       const parsed = this.getBookmarksCache();
-      const users = Array.isArray(parsed?.users) ? parsed.users : [];
-      const obj = users.find((u: any) =>
-        u && typeof u === 'object' &&
-        String(u.address || '').toLowerCase() === currentLower
-      );
-      if (obj && typeof obj.nickname === 'string' && obj.nickname.trim()) {
-        cachedNicknameForThis = obj.nickname.trim();
-      }
+      cachedNicknameForThis = resolveUserPageBookmarkNickname({
+        address: propViewAddress,
+        trim: true,
+        users: parsed?.users,
+      });
     } catch (e) { accountLog.warn('UserPage: fallback', e); }
-    const pendingNick = (this.state.nicknameInput || '').trim();
-    const stateViewLower = String(this.state.viewAddress || '').toLowerCase();
-    const pendingForThis = (
-      stateViewLower === currentLower &&
-      (this.state.isEditingNickname || bookmarked)
-    ) ? pendingNick : '';
-    const nicknameToUse = cachedNicknameForThis || pendingForThis;
 
     const explorerUrl = this.getExplorerUrl();
-    const profileUrl = propViewAddress ? `/u/${propViewAddress}` : '';
-    const addressLabel = nicknameToUse
-      ? nicknameToUse
-      : (isSimulated && username)
-        ? username
-        : (username && !isSimulated)
-          ? username
-          : (propViewAddress ? getShortenedAddress(propViewAddress, false) : '');
-    const addressHref = minimized ? profileUrl : explorerUrl;
-    const shouldLinkAddressLabel = !!addressHref;
+    const {
+      addressHref,
+      addressLabel,
+      nicknameToUse,
+      pendingNicknameForThis: pendingForThis,
+      shouldLinkAddressLabel,
+    } = resolveUserPageAddressDisplayState({
+      bookmarked,
+      cachedNickname: cachedNicknameForThis,
+      explorerUrl,
+      getShortenedAddress,
+      isEditingNickname: this.state.isEditingNickname,
+      isSimulated,
+      minimized,
+      nicknameInput: this.state.nicknameInput,
+      propViewAddress,
+      stateViewAddress: this.state.viewAddress,
+      username,
+    });
     const addressDisplay = shouldLinkAddressLabel
       ? (
         <a
@@ -4739,95 +3992,214 @@ class UserPage extends Component<any, any> {
       : addressLabel;
 
     // === Blockie seed & URL (deterministic across minimized/maximized) ===
-    const blockieSeed =
-      propViewAddress || (username ? username : 'contextengine-default-seed');
+    const blockieSeed = resolveUserPageBlockieSeed({ propViewAddress, username });
     const blockieUrl = generateBlockieDataUrl(blockieSeed, 8, 4);
 
     // --------- NEW: Readiness & spinner glue (defensive) ----------
-    const isSBTReady       = !!this.props.isSBTCacheReady;
-    const isSurveyReady    = !!this.props.isSurveyCacheReady;
-    const isQuestionReady  = !!this.props.isQuestionCacheReady;
-    const isResponsesReady = !!this.props.isResponsesCacheReady;
-
-    // Gate Analyze/Compare until *all* user caches are ready (surveys incl. responses)
-    const disabledByCache = !(isSBTReady && isSurveyReady && isQuestionReady && isResponsesReady);
-    const analysisCacheAge = analysisServedFromCache
-      ? formatAnalysisCacheAge(analysisCachedAt)
-      : '';
+    const {
+      disabledByCache,
+      isQuestionLoadingAny,
+      isQuestionReady,
+      isSBTReady,
+      isSbtLoadingAny,
+      isSurveyLoadingAny,
+      isSurveyReady,
+      questionDeepScanLoadingActive,
+      surveyDeepScanLoadingActive,
+    } = buildUserPageRenderLoadingState({
+      isDeepScanLoadingEnabledForSection: this.isDeepScanLoadingEnabledForSection,
+      isDeepScanning,
+      isQuestionCacheReady: this.props.isQuestionCacheReady,
+      isResponsesCacheReady: this.props.isResponsesCacheReady,
+      isSBTCacheReady: this.props.isSBTCacheReady,
+      isSurveyCacheReady: this.props.isSurveyCacheReady,
+      loadingQuestions,
+      loadingSBTs,
+      loadingSurveys,
+    });
+    const aiActionAvailability = resolveUserPageAiActionAvailability({
+      aiAvailable: this.state.aiAvailable,
+      disabledByCache,
+      walletLabel: t('walletLower'),
+    });
+    const analyzeButtonDisplayState = resolveUserPageAnalyzeButtonDisplayState({
+      aiActionAvailability,
+      analyzing,
+    });
+    const compareButtonDisplayState = resolveUserPageCompareButtonDisplayState({
+      aiActionAvailability,
+      collapseOpen,
+    });
+    const analysisCacheStatusState = resolveUserPageAnalysisCacheStatusState({
+      analysisCachedAt,
+      analysisServedFromCache,
+    });
+    const analysisModalDisplayState = resolveUserPageAnalysisModalDisplayState({
+      analysisDetails,
+      analysisError,
+      analysisHistoricalFigure,
+      analysisHistoricalReasoning,
+      analyzing,
+    });
 
     // --- Loading States Logic ---
-    const surveyDeepScanLoadingActive = this.isDeepScanLoadingEnabledForSection('surveys') && isDeepScanning;
-    const questionDeepScanLoadingActive = this.isDeepScanLoadingEnabledForSection('questions') && isDeepScanning;
-    // 1. "Any" flags: Used for the Green Corner Spinner (shows if doing *anything*, initial or background)
-    const isSbtLoadingAny = loadingSBTs || !isSBTReady || isDeepScanning;
-    const isSurveyLoadingAny = loadingSurveys || !isSurveyReady || !isResponsesReady || surveyDeepScanLoadingActive;
-    const isQuestionLoadingAny = loadingQuestions || !isQuestionReady || !isResponsesReady || questionDeepScanLoadingActive;
-
     // 2. "Empty" flags: Used to determine if we show the "No items" message.
     // NOTE: We suppress the large white body spinner in favor of the green corner spinner.
-    const sbtSectionLoadingEmpty = isSbtLoadingAny && sbtList.length === 0;
-    const surveyResponsesLoadingEmpty = isSurveyLoadingAny && surveyResponseInfo.length === 0;
-    const surveysCreatedLoadingEmpty = (loadingSurveys || !isSurveyReady || surveyDeepScanLoadingActive) && surveyCreationInfo.length === 0;
-    const questionResponsesLoadingEmpty = isQuestionLoadingAny && questionResponseInfo.length === 0;
-    const questionsCreatedLoadingEmpty = (loadingQuestions || !isQuestionReady || questionDeepScanLoadingActive) && questionCreationInfo.length === 0;
-    const questionResponsesEmptyText = this.state.hasUncertainUserData
-      ? 'Question responses may be incomplete due scan/RPC issues. Try refresh.'
-      : 'No question responses found.';
-    const sbtEmptyText = this.state.hasUncertainSbtData
-      ? `${t('sbt')} results may be incomplete due scan/RPC issues. Try refresh.`
-      : `No ${t('sbtsLower')} found.`;
+    const {
+      sbtSectionLoadingEmpty,
+      surveyResponsesLoadingEmpty,
+      surveysCreatedLoadingEmpty,
+      questionResponsesLoadingEmpty,
+      questionsCreatedLoadingEmpty,
+    } = buildUserPageSectionLoadingEmptyState({
+      isQuestionLoadingAny,
+      isQuestionReady,
+      isSbtLoadingAny,
+      isSurveyLoadingAny,
+      isSurveyReady,
+      loadingQuestions,
+      loadingSurveys,
+      questionCreationInfo,
+      questionDeepScanLoadingActive,
+      questionResponseInfo,
+      sbtList,
+      surveyCreationInfo,
+      surveyDeepScanLoadingActive,
+      surveyResponseInfo,
+    });
+    const {
+      questionResponsesEmptyText,
+      sbtEmptyText,
+    } = buildUserPageUncertainEmptyText({
+      hasUncertainSbtData: this.state.hasUncertainSbtData,
+      hasUncertainUserData: this.state.hasUncertainUserData,
+      sbtLabel: t('sbt'),
+      sbtsLowerLabel: t('sbtsLower'),
+    });
+    const questionSectionDisplayState = resolveUserPageQuestionSectionDisplayState({
+      questionCreationInfo,
+      questionResponseInfo,
+      questionResponsesLoadingEmpty,
+      questionsCreatedLoadingEmpty,
+    });
+    const surveySectionDisplayState = resolveUserPageSurveySectionDisplayState({
+      isDeepScanning: this.state.isDeepScanning,
+      surveyCreationInfo,
+      surveyResponseInfo,
+      surveyResponsesLoadingEmpty,
+      surveysCreatedLoadingEmpty,
+    });
+    const sbtDisplayState = resolveUserPageSbtDisplayState({
+      isSBTCacheReady: this.props.isSBTCacheReady,
+      loadingSBTs,
+      sbtList,
+      sbtSectionLoadingEmpty,
+    });
 
     // Old “tabs/breadcrumb” toggle is now in-section; keep reference but render nothing.
-    const surveysQuestionsToggle: any = null;
+    const surveysQuestionsToggle: React.ReactNode = null;
 
     // Unique tooltip targets (wrapping spans) for disabled buttons.
     // Sanitize route-derived values to avoid invalid selector chars (e.g. "/")
     // in reactstrap tooltip `target` selectors.
-    const rawAddrSeed = String(propViewAddress || 'addr');
-    const sanitizedAddrSeed = rawAddrSeed.replace(/[^A-Za-z0-9_-]/g, '');
-    const normalizedAddrSeed = sanitizedAddrSeed.toLowerCase();
-    const addrFragment = (
-      normalizedAddrSeed.startsWith('0x')
-        ? normalizedAddrSeed.slice(2)
-        : normalizedAddrSeed
-    ).slice(0, 6) || 'addr';
-    const analyzeBtnWrapId = `analyzeBtnWrap_${addrFragment}`;
-    const compareBtnWrapId = `compareBtnWrap_${addrFragment}`;
+    const {
+      analyzeBtnWrapId,
+      compareBtnWrapId,
+      questionSpinnerId,
+      questionsCreatedSpinnerId,
+      sbtSpinnerId,
+      surveySpinnerId,
+      surveysCreatedSpinnerId,
+    } = buildUserPageTooltipTargetIds(propViewAddress);
     const deepScanTooltipLines = this.buildDeepScanProgressTooltip();
     const deepScanProgressRows = this.buildDeepScanProgressRows();
-    const deepScanTooltipContent =
-      isDeepScanning ||
-      (Array.isArray(deepScanTooltipLines) && deepScanTooltipLines.length > 0) ||
-      (Array.isArray(deepScanProgressRows) && deepScanProgressRows.length > 0)
-        ? (deepScanTooltipLines || ['Deep scan in progress...'])
-        : null;
-    const deepScanTooltipText = Array.isArray(deepScanTooltipContent)
-      ? deepScanTooltipContent
-        .filter((line: any) => line && line.trim().length > 0)
-        .join(' | ')
-      : '';
-    const deepScanTooltipTitle = deepScanTooltipText
-      ? `Deep scan: ${deepScanTooltipText}`
-      : '';
-    const surveySpinnerId = `surveySpinner_${addrFragment}`;
-    const surveysCreatedSpinnerId = `surveysCreatedSpinner_${addrFragment}`;
-    const questionSpinnerId = `questionSpinner_${addrFragment}`;
-    const questionsCreatedSpinnerId = `questionsCreatedSpinner_${addrFragment}`;
-    const sbtSpinnerId = `sbtSpinner_${addrFragment}`;
+    const {
+      deepScanTooltipContent,
+      deepScanTooltipTitle,
+    } = buildUserPageDeepScanTooltipDisplayState({
+      deepScanProgressRows,
+      deepScanTooltipLines,
+      isDeepScanning,
+    });
 
-    // --- NEW: pen/edit icon visibility rules ---
-    const isOwner = account && propViewAddress && account.toLowerCase() === String(propViewAddress).toLowerCase();
-    const notOwnPage = !isOwner;
-    const hasNickForThis = Boolean(cachedNicknameForThis || pendingForThis);
-
-    // Always show pen if it's not own page, so users can add a nickname even if none exists yet
-    const showPen = !minimized && notOwnPage && !this.state.isEditingNickname;
-
-    // Show username pen if owner, not minimized, and not currently editing
-    const showUsernamePen = !minimized && isOwner && !this.state.isEditingUsername;
+    const {
+      hasNickForThis,
+      isOwner,
+      notOwnPage,
+      showPen,
+      showUsernamePen,
+    } = buildUserPageProfileEditVisibility({
+      account,
+      cachedNickname: cachedNicknameForThis,
+      isEditingNickname: this.state.isEditingNickname,
+      isEditingUsername: this.state.isEditingUsername,
+      minimized,
+      pendingNickname: pendingForThis,
+      viewAddress: propViewAddress,
+    });
+    const headerActionVisibility = resolveUserPageHeaderActionVisibility({
+      explorerUrl,
+      isEditingNickname: this.state.isEditingNickname,
+      isOwner,
+      isSimulated,
+      minimized,
+      notOwnPage,
+      propViewAddress,
+    });
+    const copyIconDisplayState = resolveUserPageCopyIconDisplayState({ copied });
+    const bookmarkButtonDisplayState = resolveUserPageBookmarkButtonDisplayState({ bookmarked });
+    const nicknameEnteredIndicatorDisplayState = resolveUserPageInlineEnteredIndicatorDisplayState({
+      value: this.state.nicknameInput,
+    });
+    const usernameEnteredIndicatorDisplayState = resolveUserPageInlineEnteredIndicatorDisplayState({
+      value: this.state.username,
+    });
+    const usernameErrorDisplayState = resolveUserPageUsernameErrorDisplayState({
+      usernameError,
+    });
+    const surveyResponsesSectionToggleState = resolveUserPageSectionToggleDisplayState({
+      open: showSectionSurveyResponsesOpen,
+    });
+    const surveysCreatedSectionToggleState = resolveUserPageSectionToggleDisplayState({
+      open: showSectionSurveysCreatedOpen,
+    });
+    const questionResponsesSectionToggleState = resolveUserPageSectionToggleDisplayState({
+      open: showSectionQuestionResponsesOpen,
+    });
+    const questionsCreatedSectionToggleState = resolveUserPageSectionToggleDisplayState({
+      open: showSectionQuestionsCreatedOpen,
+    });
+    const fullProfileModalDisplayState = resolveUserPageFullProfileModalDisplayState({
+      account,
+      explorerUrl,
+      minimized,
+      propViewAddress,
+      surveyResponseInfo,
+      surveyResponsesLoadingEmpty,
+    });
+    const rootClassName = buildUserPageRootClassName({
+      baseClassName: styles.userPage,
+      minimized,
+      minimizedClassName: styles.minimized,
+    });
+    const headerBookmarkClassName = buildUserPageHeaderBookmarkClassName({
+      baseClassName: styles.bookmarkButton,
+      headerClassName: styles.headerBookmark,
+    });
+    const avatarDisplayState = resolveUserPageAvatarDisplayState({
+      blockieUrl,
+    });
+    const bookmarksLinkDisplayState = resolveUserPageBookmarksLinkDisplayState({
+      baseClassName: styles.bookmarksLink,
+      inlineClassName: styles.bookmarksLinkInline,
+    });
+    const createdQuestionWrapperClassName = buildUserPageCreatedQuestionWrapperClassName({
+      baseClassName: styles.createdQuestionWrapper,
+      bolderClassName: styles.createdQuestionBolder,
+    });
 
     return (
-      <div className={`${styles.userPage} ${minimized ? styles.minimized : ''}`}>
+      <div className={rootClassName}>
         <div className={styles.header}>
           <div className={styles.addressAndActionsContainer}>
             <div className={styles.userInfo}>
@@ -4835,11 +4207,7 @@ class UserPage extends Component<any, any> {
                 {/* Use background-image on the existing avatar div to avoid structural changes */}
                 <div
                   className={styles.avatar}
-                  style={{
-                    backgroundImage: `url(${blockieUrl})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                  }}
+                  style={avatarDisplayState.avatarStyle}
                   aria-label="User avatar"
                   role="img"
                 ></div>
@@ -4868,25 +4236,25 @@ class UserPage extends Component<any, any> {
                     <FontAwesomeIcon icon={faPen} />
                   </button>
                 )}
-                {isSimulated && (
+                {headerActionVisibility.showSimulatedBadge && (
                   <span className={styles.simulatedBadge} id="simulatedUserTooltip">
                     <FontAwesomeIcon icon={faExclamationTriangle} />
                   </span>
                 )}
-                {isSimulated && (
+                {headerActionVisibility.showSimulatedBadge && (
                   <CETooltip placement="right" target="simulatedUserTooltip">
                     This is a simulated user whose answers are generated based on documents.
                   </CETooltip>
                 )}
-                {!isSimulated && propViewAddress && (
+                {headerActionVisibility.showCopyAddressButton && (
                   <button onClick={this.copyToClipboard} className={styles.copyButton}>
-                    <FontAwesomeIcon icon={faCheck} style={{ display: copied ? 'inline' : 'none' }} />
-                    <FontAwesomeIcon icon={faCopy} style={{ display: copied ? 'none' : 'inline' }} />
+                    <FontAwesomeIcon icon={faCheck} style={copyIconDisplayState.copiedIconStyle} />
+                    <FontAwesomeIcon icon={faCopy} style={copyIconDisplayState.defaultIconStyle} />
                   </button>
                 )}
-                {minimized && explorerUrl && (
+                {headerActionVisibility.showExplorerLink && (
                   <a
-                    href={explorerUrl}
+                    href={explorerUrl || undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={styles.expandButton}
@@ -4898,13 +4266,13 @@ class UserPage extends Component<any, any> {
                 )}
 
                 {/* NEW: Bookmark Icon Logic */}
-                {!isSimulated && propViewAddress && !isOwner && (
+                {headerActionVisibility.showBookmarkButton && (
                   <button
                     onClick={this.toggleBookmark}
-                    className={`${styles.bookmarkButton} ${styles.headerBookmark}`}
-                    style={{ color: bookmarked ? 'yellow' : undefined }}
-                    aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark user'}
-                    title={bookmarked ? 'Remove bookmark' : 'Bookmark user'}
+                    className={headerBookmarkClassName}
+                    style={bookmarkButtonDisplayState.iconStyle}
+                    aria-label={bookmarkButtonDisplayState.ariaLabel}
+                    title={bookmarkButtonDisplayState.title}
                   >
                     <FontAwesomeIcon icon={faBookmark} />
                   </button>
@@ -4912,18 +4280,18 @@ class UserPage extends Component<any, any> {
               </h1>
 
               {/* My Bookmarks Link (Owner Only) - Moved here from headerActionsRight */}
-              {isOwner && !minimized && (
+              {headerActionVisibility.showBookmarksLink && (
                 <a
                   href="/bookmarks"
-                  className={`${styles.bookmarksLink} ${styles.bookmarksLinkInline}`}
-                  style={{ marginLeft: '12px' }}
+                  className={bookmarksLinkDisplayState.className}
+                  style={bookmarksLinkDisplayState.style}
                 >
                   My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
                 </a>
               )}
 
               {/* RELOCATED: Inline nickname field — shown only when editing */}
-              {notOwnPage && this.state.isEditingNickname && (
+              {headerActionVisibility.showNicknameEditor && (
                 <div className={styles.usernameInline}>
                   <input
                     type="text"
@@ -4935,10 +4303,10 @@ class UserPage extends Component<any, any> {
                     aria-label="Set nickname"
                     // BUG FIX: Removed el.select() from render cycle.
                     // Focus/select is handled once in onPenClick.
-                    ref={(el: any) => { if (el && this.state.isEditingNickname) { /* just render ref */ } }}
+                    ref={(el: HTMLInputElement | null) => { if (el && this.state.isEditingNickname) { /* just render ref */ } }}
                     autoFocus
                   />
-                  {(this.state.nicknameInput || '').length > 0 && (
+                  {nicknameEnteredIndicatorDisplayState.shouldRenderEnteredIndicator && (
                     <button
                       type="button"
                       className={styles.usernameCheck}
@@ -4966,7 +4334,7 @@ class UserPage extends Component<any, any> {
                     aria-label="Set username"
                     autoFocus
                   />
-                  {this.state.username && (
+                  {usernameEnteredIndicatorDisplayState.shouldRenderEnteredIndicator && (
                     <button
                       type="button"
                       className={styles.usernameCheck}
@@ -4988,34 +4356,22 @@ class UserPage extends Component<any, any> {
                 {/* Username input moved to .userInfo above */}
                 {/* Bookmarks link moved to .userInfo above */}
 
-                {this.state.usernameError && <span className={styles.error}>{this.state.usernameError}</span>}
+                {usernameErrorDisplayState.shouldRenderUsernameError && (
+                  <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
+                )}
 
                 {/* Compare (gated until all caches are ready) */}
                 <button
                   onClick={this.toggleCollapse}
                   className={styles.collapseButton}
-                  disabled={
-                    this.state.aiAvailable === false ||
-                    !(!!this.props.isSBTCacheReady &&
-                      !!this.props.isSurveyCacheReady &&
-                      !!this.props.isQuestionCacheReady &&
-                      !!this.props.isResponsesCacheReady)
-                  }
-                  title={
-                    this.state.aiAvailable === false
-                      ? `AI not available — connect a ${t('walletLower')} or use a session with sponsored AI`
-                      : !(!!this.props.isSBTCacheReady &&
-                          !!this.props.isSurveyCacheReady &&
-                          !!this.props.isQuestionCacheReady &&
-                          !!this.props.isResponsesCacheReady)
-                        ? 'Available when the user page fully loads.'
-                        : undefined
-                  }
+                  disabled={compareButtonDisplayState.disabled}
+                  title={compareButtonDisplayState.title}
                 >
                   Compare{' '}
-                  {collapseOpen ? (
+                  {compareButtonDisplayState.shouldRenderCollapseOpenIcon && (
                     <FontAwesomeIcon icon={faChevronUp} />
-                  ) : (
+                  )}
+                  {compareButtonDisplayState.shouldRenderCollapseClosedIcon && (
                     <FontAwesomeIcon icon={faChevronDown} />
                   )}
                 </button>
@@ -5024,32 +4380,16 @@ class UserPage extends Component<any, any> {
                 <button
                   onClick={this.analyzeUser}
                   className={styles.analyzeButton}
-                  disabled={
-                    this.state.analyzing ||
-                    this.state.aiAvailable === false ||
-                    !(!!this.props.isSBTCacheReady &&
-                      !!this.props.isSurveyCacheReady &&
-                      !!this.props.isQuestionCacheReady &&
-                      !!this.props.isResponsesCacheReady)
-                  }
-                  aria-busy={this.state.analyzing ? 'true' : 'false'}
-                  title={
-                    this.state.aiAvailable === false
-                      ? `AI not available — connect a ${t('walletLower')} or use a session with sponsored AI`
-                      : !(!!this.props.isSBTCacheReady &&
-                          !!this.props.isSurveyCacheReady &&
-                          !!this.props.isQuestionCacheReady &&
-                          !!this.props.isResponsesCacheReady)
-                        ? 'Available when the user page fully loads.'
-                        : undefined
-                  }
+                  disabled={analyzeButtonDisplayState.disabled}
+                  aria-busy={analyzeButtonDisplayState.ariaBusy}
+                  title={analyzeButtonDisplayState.title}
                 >
-                  {this.state.analyzing ? (
+                  {analyzeButtonDisplayState.shouldRenderAnalyzing ? (
                     <>
-                      <FontAwesomeIcon icon={faSpinner} spin />&nbsp;Analyzing
+                      <FontAwesomeIcon icon={faSpinner} spin />&nbsp;{analyzeButtonDisplayState.label}
                     </>
                   ) : (
-                    'Analyze'
+                    analyzeButtonDisplayState.label
                   )}
                 </button>
               </div>
@@ -5059,7 +4399,9 @@ class UserPage extends Component<any, any> {
             {minimized && (
               <div className={styles.headerActionsRight}>
                  {/* Empty for now, but keeping container for layout stability if needed */}
-                 {this.state.usernameError && <span className={styles.error}>{this.state.usernameError}</span>}
+                 {usernameErrorDisplayState.shouldRenderUsernameError && (
+                   <span className={styles.error}>{usernameErrorDisplayState.usernameErrorText}</span>
+                 )}
               </div>
             )}
           </div>
@@ -5086,15 +4428,20 @@ class UserPage extends Component<any, any> {
                 {surveysQuestionsToggle}
                 <div className={styles.surveySection}>
                   <h2
-                    onClick={() => this.setState({ showSectionSurveyResponsesOpen: !this.state.showSectionSurveyResponsesOpen })}
+                    onClick={this.toggleSurveyResponsesSection}
                     className={styles.sectionHeader}
                   >
-                    <FontAwesomeIcon icon={this.state.showSectionSurveyResponsesOpen ? faChevronUp : faChevronDown} className={styles.headerChevron} />{' '}
+                    {surveyResponsesSectionToggleState.shouldRenderOpenIcon && (
+                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
+                    )}
+                    {surveyResponsesSectionToggleState.shouldRenderClosedIcon && (
+                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
+                    )}{' '}
                     <span className={styles.sectionSwitcher}>
                       <button
                         type="button"
                         className={styles.switchWordInactive}
-                        onClick={(e: any) => { e.stopPropagation(); if (this._isMounted) this.setState({ selectedTab: 'questions' }); }}
+                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
                         aria-label="Show Questions"
                       >
                         Questions
@@ -5112,19 +4459,30 @@ class UserPage extends Component<any, any> {
                         )
                     )}
                   </h2>
-                  <Collapse isOpen={this.state.showSectionSurveyResponsesOpen}>
-                    {surveyResponseInfo.length > 0 ? (
-                      surveyResponseInfo.map((survey: any, index: any) => {
-                        const isExpanded = expandedSurveyResponses[survey.id] || false;
-                        const questionArray = detailedSurveyResponses[survey.id] || [];
-                        const hasResponses = questionArray.length > 0;
+                  <Collapse isOpen={surveyResponsesSectionToggleState.isOpen}>
+                    {surveySectionDisplayState.hasSurveyResponses ? (
+                      surveyResponseEntries.map((survey, index: number) => {
+                        const isExpanded = expandedSurveyResponseMap[survey.id] || false;
+                        const questionArray = detailedSurveyResponseMap[survey.id] || [];
+                        const surveyResponseCardToggleState = resolveUserPageSectionToggleDisplayState({
+                          open: isExpanded,
+                        });
+                        const surveyResponseCardState = resolveUserPageSurveyResponseCardState({
+                          questionArray,
+                          survey,
+                        });
+                        const surveyResponsePreviewDisplayState = resolveUserPageSurveyPreviewDisplayState({
+                          actionsClassName: styles.surveyPreviewWithActions,
+                          baseClassName: styles.surveyPreview,
+                          interactive: true,
+                        });
 
                         return (
                           <div key={index} className={styles.surveyWrapper}>
                             <div
-                              className={`${styles.surveyPreview} ${styles.surveyPreviewWithActions}`}
+                              className={surveyResponsePreviewDisplayState.className}
                               onClick={() => this.toggleSurveyResponses(survey.id)}
-                              style={{ cursor: 'pointer' }}
+                              style={surveyResponsePreviewDisplayState.style}
                             >
                               <div className={styles.surveyTitle}>{survey.title}</div>
                               <div className={styles.surveyInfo}>
@@ -5136,7 +4494,7 @@ class UserPage extends Component<any, any> {
                                   className={styles.surveyExpandIcon}
                                   title='Open full survey page'
                                   aria-label='Open full survey page'
-                                  onClick={(e: any) => {
+                                  onClick={(e: React.MouseEvent<HTMLElement>) => {
                                     e.stopPropagation();
                                     const surveyUrlParams = new URLSearchParams();
                                     if (survey.slug) {
@@ -5154,34 +4512,36 @@ class UserPage extends Component<any, any> {
                                 </button>
                               )}
                               <div className={styles.chevronContainer}>
-                                <FontAwesomeIcon
-                                  icon={isExpanded ? faChevronUp : faChevronDown}
-                                  className={styles.chevronIcon}
-                                />
+                                {surveyResponseCardToggleState.shouldRenderOpenIcon && (
+                                  <FontAwesomeIcon icon={faChevronUp} className={styles.chevronIcon} />
+                                )}
+                                {surveyResponseCardToggleState.shouldRenderClosedIcon && (
+                                  <FontAwesomeIcon icon={faChevronDown} className={styles.chevronIcon} />
+                                )}
                               </div>
                             </div>
 
-                            {isExpanded && hasResponses && (
+                            {surveyResponseCardToggleState.isOpen && surveyResponseCardState.hasResponses && (
                               <div className={styles.responsesContainer}>
-                                {(Array.isArray(survey.tags) && survey.tags.length > 0) && (
+                                {surveyResponseCardState.hasTags && (
                                   <div className={styles.surveyDetailRow}>
                                     <span className={styles.surveyDetailLabel}>Tags:</span>{' '}
-                                    {survey.tags.map((tag: any, ti: any) => (
+                                    {survey.tags.map((tag: React.ReactNode, ti: number) => (
                                       <span key={ti} className={styles.surveyTag}>{tag}</span>
                                     ))}
                                   </div>
                                 )}
-                                {(Array.isArray(survey.documentURLs) && survey.documentURLs.length > 0) && (
+                                {surveyResponseCardState.hasDocURLs && (
                                   <div className={styles.surveyDetailRow}>
                                     <span className={styles.surveyDetailLabel}>Documents:</span>
-                                    {survey.documentURLs.map((url: any, ui: any) => (
+                                    {survey.documentURLs.map((url: string, ui: number) => (
                                       <a key={ui} href={url} target='_blank' rel='noopener noreferrer' className={styles.surveyDocLink}>
                                         {url.length > 60 ? url.slice(0, 57) + '...' : url}
                                       </a>
                                     ))}
                                   </div>
                                 )}
-                                {questionArray.map((qObj: any, qIndex: any) => (
+                                {questionArray.map((qObj: SurveyQuestionResponseDetail, qIndex: number) => (
                                   <div key={qIndex} className={styles.responseItemWrapper}>
                                     <SingleQuestionResponse
                                       question={qObj.questionData}
@@ -5202,7 +4562,7 @@ class UserPage extends Component<any, any> {
                                 ))}
                               </div>
                             )}
-                            {isExpanded && !hasResponses && (
+                            {surveyResponseCardToggleState.isOpen && !surveyResponseCardState.hasResponses && (
                               <div className={styles.noResponsesMsg}>
                                 No non-empty responses recorded for this survey.
                               </div>
@@ -5210,24 +4570,29 @@ class UserPage extends Component<any, any> {
                           </div>
                         );
                       })
-                    ) : (surveyResponsesLoadingEmpty) ? (
+                    ) : surveySectionDisplayState.shouldRenderSurveyResponsesEmptyText ? (
+                      <p>No survey responses found.</p>
+                    ) : (
                       // Suppress white spinner; rely on green corner spinner
                       null
-                    ) : (
-                      <p>No survey responses found.</p>
                     )}
                   </Collapse>
 
                   <h2
-                    onClick={() => this.setState({ showSectionSurveysCreatedOpen: !this.state.showSectionSurveysCreatedOpen })}
+                    onClick={this.toggleSurveysCreatedSection}
                     className={styles.sectionHeaderWithMargin}
                   >
-                    <FontAwesomeIcon icon={this.state.showSectionSurveysCreatedOpen ? faChevronUp : faChevronDown} className={styles.headerChevron} />{' '}
+                    {surveysCreatedSectionToggleState.shouldRenderOpenIcon && (
+                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
+                    )}
+                    {surveysCreatedSectionToggleState.shouldRenderClosedIcon && (
+                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
+                    )}{' '}
                     <span className={styles.sectionSwitcher}>
                       <button
                         type="button"
                         className={styles.switchWordInactive}
-                        onClick={(e: any) => { e.stopPropagation(); if (this._isMounted) this.setState({ selectedTab: 'questions' }); }}
+                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'questions' })); }}
                         aria-label="Show Questions"
                       >
                         Questions
@@ -5245,59 +4610,72 @@ class UserPage extends Component<any, any> {
                         )
                     )}
                   </h2>
-                  <Collapse isOpen={this.state.showSectionSurveysCreatedOpen}>
-                    {surveyCreationInfo.length > 0 ? (
-                      surveyCreationInfo.map((survey: any, index: any) => {
-                        const isCreatedExpanded = expandedSurveysCreated[survey.id] || false;
-                        const hasTags = Array.isArray(survey.tags) && survey.tags.length > 0;
-                        const hasDocURLs = Array.isArray(survey.documentURLs) && survey.documentURLs.length > 0;
-                        const hasQuestionIDs = Array.isArray(survey.questionIDs) && survey.questionIDs.length > 0;
-                        const questionPreviewEntries = (
-                          Array.isArray(survey.questionPreviews) && survey.questionPreviews.length > 0
-                        )
-                          ? survey.questionPreviews
-                          : (survey.questionIDs || []).map((qid: any) => ({ id: String(qid || ''), text: '' }));
-                        const hasExpandContent = hasTags || hasDocURLs || hasQuestionIDs;
-                        const surveyLinkSlug = normalizeSessionSlug(survey.slug || '');
+                  <Collapse isOpen={surveysCreatedSectionToggleState.isOpen}>
+                    {surveySectionDisplayState.hasCreatedSurveys ? (
+                      surveyCreationEntries.map((survey, index: number) => {
+                        const isCreatedExpanded = expandedSurveyCreatedMap[survey.id] || false;
+                        const surveyCreatedCardToggleState = resolveUserPageSectionToggleDisplayState({
+                          open: isCreatedExpanded,
+                        });
+                        const {
+                          hasDocURLs,
+                          hasExpandContent,
+                          hasQuestionIDs,
+                          hasTags,
+                          questionPreviewEntries,
+                          surveyLinkSlug,
+                        } = resolveUserPageSurveyCreatedCardState({ survey });
+                        const surveyCreatedPreviewDisplayState = resolveUserPageSurveyPreviewDisplayState({
+                          actionsClassName: styles.surveyPreviewWithActions,
+                          baseClassName: styles.surveyPreview,
+                          interactive: hasExpandContent,
+                        });
+                        const surveyCountDisplayState = resolveUserPageSurveyCountDisplayState({
+                          count: survey.questionsCount,
+                          countOnlyClassName: styles.surveyCountOnly,
+                          infoClassName: styles.surveyInfo,
+                        });
 
                         return (
                           <div key={index} className={styles.surveyWrapper}>
                             <div
-                              className={`${styles.surveyPreview} ${styles.surveyPreviewWithActions}`}
+                              className={surveyCreatedPreviewDisplayState.className}
                               onClick={() => hasExpandContent && this.toggleSurveyCreated(survey.id)}
-                              style={{ cursor: hasExpandContent ? 'pointer' : 'default' }}
+                              style={surveyCreatedPreviewDisplayState.style}
                             >
                               <a
                                 href={`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(surveyLinkSlug)}` : ''}`}
                                 target='_blank'
                                 rel='noopener noreferrer'
                                 className={styles.surveyTitleLink}
-                                onClick={(e: any) => e.stopPropagation()}
+                                onClick={(e: React.MouseEvent<HTMLElement>) => e.stopPropagation()}
                               >
                                 <div className={styles.surveyTitle}>{survey.title}</div>
                               </a>
                               <div
-                                className={`${styles.surveyInfo} ${styles.surveyCountOnly}`}
-                                aria-label={`${survey.questionsCount} questions`}
-                                title={`${survey.questionsCount} questions`}
+                                className={surveyCountDisplayState.className}
+                                aria-label={surveyCountDisplayState.ariaLabel}
+                                title={surveyCountDisplayState.title}
                               >
                                 {survey.questionsCount}
                               </div>
                               {hasExpandContent && (
                                 <div className={styles.chevronContainer}>
-                                  <FontAwesomeIcon
-                                    icon={isCreatedExpanded ? faChevronUp : faChevronDown}
-                                    className={styles.chevronIcon}
-                                  />
+                                  {surveyCreatedCardToggleState.shouldRenderOpenIcon && (
+                                    <FontAwesomeIcon icon={faChevronUp} className={styles.chevronIcon} />
+                                  )}
+                                  {surveyCreatedCardToggleState.shouldRenderClosedIcon && (
+                                    <FontAwesomeIcon icon={faChevronDown} className={styles.chevronIcon} />
+                                  )}
                                 </div>
                               )}
                             </div>
-                            {isCreatedExpanded && hasExpandContent && (
+                            {surveyCreatedCardToggleState.isOpen && hasExpandContent && (
                               <div className={styles.responsesContainer}>
                                 {hasTags && (
                                   <div className={styles.surveyDetailRow}>
                                     <span className={styles.surveyDetailLabel}>Tags:</span>{' '}
-                                    {survey.tags.map((tag: any, ti: any) => (
+                                    {survey.tags.map((tag: React.ReactNode, ti: number) => (
                                       <span key={ti} className={styles.surveyTag}>{tag}</span>
                                     ))}
                                   </div>
@@ -5305,7 +4683,7 @@ class UserPage extends Component<any, any> {
                                 {hasDocURLs && (
                                   <div className={styles.surveyDetailRow}>
                                     <span className={styles.surveyDetailLabel}>Documents:</span>
-                                    {survey.documentURLs.map((url: any, ui: any) => (
+                                    {survey.documentURLs.map((url: string, ui: number) => (
                                       <a key={ui} href={url} target='_blank' rel='noopener noreferrer' className={styles.surveyDocLink}>
                                         {url.length > 60 ? url.slice(0, 57) + '...' : url}
                                       </a>
@@ -5316,7 +4694,7 @@ class UserPage extends Component<any, any> {
                                   <div className={styles.surveyDetailRow}>
                                     <span className={styles.surveyDetailLabel}>Questions:</span>
                                     <ul className={styles.surveyQuestionList}>
-                                      {questionPreviewEntries.map((entry: any, qi: any) => {
+                                      {(questionPreviewEntries as UserPageSurveyPreviewEntry[]).map((entry, qi: number) => {
                                         const fullQuestionId = String(entry?.id || '');
                                         const resolvedText = String(entry?.text || '').trim();
                                         return (
@@ -5326,7 +4704,7 @@ class UserPage extends Component<any, any> {
                                                 className={styles.surveyQuestionFallbackId}
                                                 title={fullQuestionId}
                                               >
-                                                {this._shortenQuestionId(fullQuestionId)}
+                                                {shortenUserPageQuestionId(fullQuestionId)}
                                               </span>
                                             )}
                                           </li>
@@ -5340,11 +4718,11 @@ class UserPage extends Component<any, any> {
                           </div>
                         );
                       })
-                    ) : (surveysCreatedLoadingEmpty || (this.state.isDeepScanning && surveyCreationInfo.length === 0)) ? (
+                    ) : surveySectionDisplayState.shouldRenderSurveysCreatedEmptyText ? (
+                      <p>No surveys created.</p>
+                    ) : (
                       // Suppress white spinner; rely on green corner spinner
                       null
-                    ) : (
-                      <p>No surveys created.</p>
                     )}
                   </Collapse>
                 </div>
@@ -5356,15 +4734,20 @@ class UserPage extends Component<any, any> {
                 {surveysQuestionsToggle}
                 <div className={styles.questionSection}>
                   <h2
-                    onClick={() => this.setState({ showSectionQuestionResponsesOpen: !this.state.showSectionQuestionResponsesOpen })}
+                    onClick={this.toggleQuestionResponsesSection}
                     className={styles.sectionHeader}
                   >
-                    <FontAwesomeIcon icon={this.state.showSectionQuestionResponsesOpen ? faChevronUp : faChevronDown} className={styles.headerChevron} />{' '}
+                    {questionResponsesSectionToggleState.shouldRenderOpenIcon && (
+                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
+                    )}
+                    {questionResponsesSectionToggleState.shouldRenderClosedIcon && (
+                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
+                    )}{' '}
                     <span className={styles.sectionSwitcher}>
                       <button
                         type="button"
                         className={styles.switchWordInactive}
-                        onClick={(e: any) => { e.stopPropagation(); if (this._isMounted) this.setState({ selectedTab: 'surveys' }); }}
+                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
                         aria-label="Show Surveys"
                       >
                         Survey
@@ -5382,10 +4765,10 @@ class UserPage extends Component<any, any> {
                         )
                     )}
                   </h2>
-                  <Collapse isOpen={this.state.showSectionQuestionResponsesOpen}>
-                    {questionResponseInfo.length > 0 ? (
-                      questionResponseInfo.map((question: any, index: any) => {
-                        const userResp = detailedQuestionResponses[question.id];
+                  <Collapse isOpen={questionResponsesSectionToggleState.isOpen}>
+                    {questionSectionDisplayState.hasQuestionResponses ? (
+                      questionResponseEntries.map((question, index: number) => {
+                        const userResp = detailedQuestionResponseMap[question.id];
                         if (!userResp) return null;
                         return (
                           <div key={index} className={styles.questionWrapper}>
@@ -5401,31 +4784,36 @@ class UserPage extends Component<any, any> {
                               canDecryptOtherResponses={!!question?.canDecryptOtherResponses}
                               responderAddress={propViewAddress}
                               network={network}
-                              sessionSlug={this.props.activeSessionSlug}
+                              sessionSlug={question?.sessionSlug || question?.slug || this.props.activeSessionSlug}
                               questionResponsesNonce={this.props.questionResponsesNonce}
                               sbtCacheRevision={this.props.sbtCacheRevision}
                             />
                           </div>
                         );
                       })
-                    ) : (questionResponsesLoadingEmpty) ? (
+                    ) : questionSectionDisplayState.shouldRenderQuestionResponsesEmptyText ? (
+                      <p>{questionResponsesEmptyText}</p>
+                    ) : (
                       // Suppress white spinner; rely on green corner spinner
                       null
-                    ) : (
-                      <p>{questionResponsesEmptyText}</p>
                     )}
                   </Collapse>
 
                   <h2
-                    onClick={() => this.setState({ showSectionQuestionsCreatedOpen: !this.state.showSectionQuestionsCreatedOpen })}
+                    onClick={this.toggleQuestionsCreatedSection}
                     className={styles.sectionHeaderWithMargin}
                   >
-                    <FontAwesomeIcon icon={this.state.showSectionQuestionsCreatedOpen ? faChevronUp : faChevronDown} className={styles.headerChevron} />{' '}
+                    {questionsCreatedSectionToggleState.shouldRenderOpenIcon && (
+                      <FontAwesomeIcon icon={faChevronUp} className={styles.headerChevron} />
+                    )}
+                    {questionsCreatedSectionToggleState.shouldRenderClosedIcon && (
+                      <FontAwesomeIcon icon={faChevronDown} className={styles.headerChevron} />
+                    )}{' '}
                     <span className={styles.sectionSwitcher}>
                       <button
                         type="button"
                         className={styles.switchWordInactive}
-                        onClick={(e: any) => { e.stopPropagation(); if (this._isMounted) this.setState({ selectedTab: 'surveys' }); }}
+                        onClick={(e: React.MouseEvent<HTMLElement>) => { e.stopPropagation(); if (this._isMounted) this.setState(buildUserPageSelectedTabStatePatch({ selectedTab: 'surveys' })); }}
                         aria-label="Show Surveys"
                       >
                         Surveys
@@ -5443,10 +4831,10 @@ class UserPage extends Component<any, any> {
                         )
                     )}
                   </h2>
-                  <Collapse isOpen={this.state.showSectionQuestionsCreatedOpen}>
-                    {questionCreationInfo.length > 0 ? (
-                      questionCreationInfo.map((question: any, index: any) => (
-                        <div key={index} className={`${styles.createdQuestionWrapper} ${styles.createdQuestionBolder}`}>
+                  <Collapse isOpen={questionsCreatedSectionToggleState.isOpen}>
+                    {questionSectionDisplayState.hasCreatedQuestions ? (
+                      questionCreationEntries.map((question, index: number) => (
+                        <div key={index} className={createdQuestionWrapperClassName}>
                           <SingleQuestionResponse
                             question={question}
                             response={null}
@@ -5457,17 +4845,17 @@ class UserPage extends Component<any, any> {
                             /* NEW: non-interactive render for created questions */
                             questionOnly={true}
                             network={network}
-                            sessionSlug={this.props.activeSessionSlug}
+                            sessionSlug={question?.sessionSlug || question?.slug || this.props.activeSessionSlug}
                             questionResponsesNonce={this.props.questionResponsesNonce}
                             sbtCacheRevision={this.props.sbtCacheRevision}
                           />
                         </div>
                       ))
-                    ) : (questionsCreatedLoadingEmpty) ? (
+                    ) : questionSectionDisplayState.shouldRenderQuestionsCreatedEmptyText ? (
+                      <p>No questions created.</p>
+                    ) : (
                       // Suppress white spinner; rely on green corner spinner
                       null
-                    ) : (
-                      <p>No questions created.</p>
                     )}
                   </Collapse>
                 </div>
@@ -5488,9 +4876,9 @@ class UserPage extends Component<any, any> {
                       )
                   )}
                 </h2>
-                {sbtList.length > 0 ? (
+                {sbtDisplayState.hasSbts ? (
                   <div className={styles.sbtGrid}>
-                    {sbtList.map((sbtItem: any, index: any) => (
+                    {sbtEntries.map((sbtItem, index: number) => (
                       <SBTPage
                         key={index}
                         SBTAddress={sbtItem.sbtInfo.sbtAddress}
@@ -5505,15 +4893,15 @@ class UserPage extends Component<any, any> {
                         metadataOnly={true}
                         /* NEW: Pass the source slug to allow cross-group hydration */
                         sessionSlug={sbtItem.slug}
-                        refreshSbtData={(addr: any) => this.props.refreshSbtData(addr, sbtItem.slug)}
+                        refreshSbtData={(addr: unknown) => this.props.refreshSbtData(addr, sbtItem.slug)}
                       />
                     ))}
                   </div>
-                ) : (sbtSectionLoadingEmpty) ? (
+                ) : sbtDisplayState.shouldRenderMainEmptyText ? (
+                  <p>{sbtEmptyText}</p>
+                ) : (
                    // Suppress white spinner; rely on green corner spinner
                    null
-                ) : (
-                  <p>{sbtEmptyText}</p>
                 )}
               </div>
             </div>
@@ -5522,7 +4910,7 @@ class UserPage extends Component<any, any> {
 
         {isSimulated && (
           <div className={styles.simulatedUserActions}>
-            <button onClick={() => { if (this._isMounted) this.setState({ showFullProfileModal: true }); }}>
+            <button onClick={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch({ open: true })); }}>
               View Simulated Responses
             </button>
           </div>
@@ -5530,11 +4918,11 @@ class UserPage extends Component<any, any> {
 
         <Modal
           isOpen={showAnalysisModal}
-          toggle={() => { if (this._isMounted) { this.setState({ showAnalysisModal: false }); this.clearAnalysisTimer(); } }}
+          toggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
           className={styles.modalContent}
         >
           <ModalHeader
-            toggle={() => { if (this._isMounted) { this.setState({ showAnalysisModal: false }); this.clearAnalysisTimer(); } }}
+            toggle={() => { if (this._isMounted) { this.setState(buildUserPageAnalysisModalStatePatch()); this.clearAnalysisTimer(); } }}
             className={styles.modalHeader}
           >
             {/* Close “X” is intentionally hidden via CSS; do not delete this feature. */}
@@ -5551,14 +4939,14 @@ class UserPage extends Component<any, any> {
                 <FontAwesomeIcon icon={faSync} spin={analyzing} id={styles.refreshAnalysisIcon} />
               </button>
             </div>
-            {analysisCacheAge && (
+            {analysisCacheStatusState.shouldRenderAnalysisCacheStatus && (
               <div className={styles.analysisCacheStatus}>
-                Cached analysis from {analysisCacheAge}
+                Cached analysis from {analysisCacheStatusState.analysisCacheAge}
               </div>
             )}
           </ModalHeader>
           <ModalBody className={styles.modalBody}>
-            {analyzing && (
+            {analysisModalDisplayState.shouldRenderAnalyzing && (
               <div className={styles.analyzingContainer}>
                 <FontAwesomeIcon icon={faSpinner} spin />
                 <span>
@@ -5566,20 +4954,20 @@ class UserPage extends Component<any, any> {
                 </span>
               </div>
             )}
-            {!analyzing && analysisError && (
+            {analysisModalDisplayState.shouldRenderError && (
               <p className={styles.placeholderNote}>{analysisError}</p>
             )}
-            {!analyzing && !analysisError && (
+            {analysisModalDisplayState.shouldRenderAnalysisBody && (
               <>
                 <p className={styles.placeholderNote}>{aiAnalysis}</p>
-                {analysisDetails && <p className={styles.analysisDetails}>{analysisDetails}</p>}
-                {(analysisHistoricalFigure || analysisHistoricalReasoning) && (
+                {analysisModalDisplayState.shouldRenderDetails && <p className={styles.analysisDetails}>{analysisDetails}</p>}
+                {analysisModalDisplayState.shouldRenderHistoricalAlignment && (
                   <div className={styles.historicalAlignment}>
                     <h4>Historical Alignment</h4>
-                    {analysisHistoricalFigure && (
+                    {analysisModalDisplayState.shouldRenderHistoricalFigure && (
                       <p>{analysisHistoricalFigure}</p>
                     )}
-                    {analysisHistoricalReasoning && (
+                    {analysisModalDisplayState.shouldRenderHistoricalReasoning && (
                       <p className={styles.placeholderNote}>{analysisHistoricalReasoning}</p>
                     )}
                   </div>
@@ -5592,12 +4980,12 @@ class UserPage extends Component<any, any> {
 
         <Modal
           isOpen={showFullProfileModal}
-          toggle={() => { if (this._isMounted) this.setState({ showFullProfileModal: false }); }}
+          toggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
           size="lg"
           className={styles.modalContent}
         >
           <ModalHeader
-            toggle={() => { if (this._isMounted) this.setState({ showFullProfileModal: false }); }}
+            toggle={() => { if (this._isMounted) this.setState(buildUserPageFullProfileModalStatePatch()); }}
             className={styles.modalHeader}
           >
             Full User Profile
@@ -5614,27 +5002,29 @@ class UserPage extends Component<any, any> {
             />
             <div className={styles.modalSurveys}>
               <h3>Survey Responses</h3>
-              {surveyResponsesLoadingEmpty ? (
+              {fullProfileModalDisplayState.shouldRenderSurveySpinner ? (
                 // If loading empty, rely on spinner logic or show nothing
                 <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
-              ) : surveyResponseInfo.length === 0 ? <p>No survey responses.</p> : (
-                surveyResponseInfo.map((survey: any, index: any) => (
-                  <div key={index} className={styles.surveyPreview}>
-                    <div className={styles.surveyTitle}>{survey.title}</div>
-                    <div className={styles.surveyInfo}>
-                      Questions: {survey.questionsCount}
+              ) : fullProfileModalDisplayState.shouldRenderSurveyEmptyText ? <p>No survey responses.</p> : (
+                fullProfileModalDisplayState.shouldRenderSurveyList ? (
+                  surveyResponseEntries.map((survey, index: number) => (
+                    <div key={index} className={styles.surveyPreview}>
+                      <div className={styles.surveyTitle}>{survey.title}</div>
+                      <div className={styles.surveyInfo}>
+                        Questions: {survey.questionsCount}
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))
+                ) : null
               )}
             </div>
             <div className={styles.modalSBTs}>
               <h3>{`${t('minted')} ${t('sbts')}`}</h3>
               {/* In modal, we can keep the spinner since there's no header spinner here */}
-              {(loadingSBTs || !this.props.isSBTCacheReady) ? (
+              {sbtDisplayState.shouldRenderModalSpinner ? (
                 <FontAwesomeIcon icon={faSpinner} spin id={styles.loadingIcon} />
-              ) : sbtList.length === 0 ? <p>{sbtEmptyText}</p> : (
-                sbtList.map((sbtItem: any, index: any) => (
+              ) : sbtDisplayState.shouldRenderModalEmptyText ? <p>{sbtEmptyText}</p> : (
+                sbtEntries.map((sbtItem, index: number) => (
                   <SBTPage
                     key={index}
                     SBTAddress={sbtItem.sbtInfo.sbtAddress}
@@ -5648,20 +5038,20 @@ class UserPage extends Component<any, any> {
                     metadataOnly={true}
                     /* NEW: Pass source slug */
                     sessionSlug={sbtItem.slug}
-                    refreshSbtData={(addr: any) => this.props.refreshSbtData(addr, sbtItem.slug)}
+                    refreshSbtData={(addr: unknown) => this.props.refreshSbtData(addr, sbtItem.slug)}
                   />
                 ))
               )}
             </div>
-            {!minimized && propViewAddress && explorerUrl && (
+            {fullProfileModalDisplayState.shouldRenderModalActions && (
               <div className={styles.modalActions}>
-                {account && propViewAddress && account.toLowerCase() === propViewAddress.toLowerCase() && (
+                {fullProfileModalDisplayState.shouldRenderBookmarksLink && (
                   <a href="/bookmarks" className={styles.bookmarksLink}>
                     My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
                   </a>
                 )}
                 <a
-                  href={explorerUrl}
+                  href={explorerUrl || undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.explorerLink}

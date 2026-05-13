@@ -15,9 +15,6 @@ import {
   dispatchBootstrapArweaveUploadWithWorkerDeps as dispatchBootstrapArweaveUploadWithWorkerDepsBoundary,
 } from './bootstrapArweaveUploadBinding.js';
 import {
-  dispatchBootstrapLitPaymentDelegationWithWorkerDeps as dispatchBootstrapLitPaymentDelegationWithWorkerDepsBoundary,
-} from './bootstrapLitPaymentDelegationBinding.js';
-import {
   dispatchSponsoredBootstrapRedeem as dispatchSponsoredBootstrapRedeemBoundary,
 } from './sponsoredBootstrapRedeemDispatch.js';
 import {
@@ -49,10 +46,6 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   );
   const dispatchBootstrapArweaveUploadWithWorkerDeps = (
     deps?.dispatchBootstrapArweaveUploadWithWorkerDeps || dispatchBootstrapArweaveUploadWithWorkerDepsBoundary
-  );
-  const dispatchBootstrapLitPaymentDelegationWithWorkerDeps = (
-    deps?.dispatchBootstrapLitPaymentDelegationWithWorkerDeps ||
-    dispatchBootstrapLitPaymentDelegationWithWorkerDepsBoundary
   );
   const dispatchSponsoredBootstrapRedeem = (
     deps?.dispatchSponsoredBootstrapRedeem || dispatchSponsoredBootstrapRedeemBoundary
@@ -179,6 +172,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           verifyAdminSignature: deps?.verifyAdminSignature,
           getSessionSecrets: deps?.getSessionSecrets,
           arweaveUpload: deps?.arweaveUpload,
+          storageRoute: deps?.storageRoute,
         },
         constants: {
           missingSlugError: constants?.missingSlugError,
@@ -186,26 +180,6 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         },
       });
         if (bootstrapUpload.handled) return bootstrapUpload.response;
-      }
-
-      if (routeSelection.kind === 'lit-payment-delegation-bootstrap') {
-        const bootstrapDelegation = await dispatchBootstrapLitPaymentDelegationWithWorkerDeps({
-        request,
-        env,
-        deps: {
-          corsHeaders: deps?.corsHeaders,
-          json: deps?.json,
-          resolveWorkerBodySlugContext: deps?.resolveWorkerBodySlugContext,
-          getSessionConfig: deps?.getSessionConfig,
-          getCorsContext: deps?.getCorsContext,
-          verifyAdminSignature: deps?.verifyAdminSignature,
-          getSessionSecrets: deps?.getSessionSecrets,
-        },
-        constants: {
-          missingSlugError: constants?.missingSlugError,
-        },
-      });
-        if (bootstrapDelegation.handled) return bootstrapDelegation.response;
       }
 
       if (routeSelection.kind === 'sponsored-bootstrap-redeem') {
@@ -316,6 +290,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           getSessionSecrets: deps?.getSessionSecrets,
           transcribe: deps?.transcribe,
           arweaveUpload: deps?.arweaveUpload,
+          storageRoute: deps?.storageRoute,
           fetchImage: deps?.fetchImage,
           fetchUrl: deps?.fetchUrl,
           normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,

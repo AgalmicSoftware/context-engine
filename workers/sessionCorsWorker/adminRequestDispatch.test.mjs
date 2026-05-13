@@ -186,7 +186,8 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
         secrets: {
           openaiKey: '  sk-new  ',
           arweaveJwk: { kty: 'RSA' },
-          litPayerPrivateKey: '  0xlit  ',
+          litAccountApiKey: '  account-secret  ',
+          litUsageApiKey: '  lit-secret  ',
           ignoredSecret: 'skip-me',
         },
       }),
@@ -217,12 +218,14 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
   assert.deepEqual(calls, [
     ['normalizeSecretValue', '  sk-new  '],
     ['normalizeSecretValue', { kty: 'RSA' }],
-    ['normalizeSecretValue', '  0xlit  '],
+    ['normalizeSecretValue', '  account-secret  '],
+    ['normalizeSecretValue', '  lit-secret  '],
     ['putSessionSecrets', { GROUP_KV: {} }, 'session-a', {
       openaiKey: 'sk-new',
       customRpcUrl: 'https://rpc.example.test',
       arweaveJwk: '{"kty":"RSA"}',
-      litPayerPrivateKey: '0xlit',
+      litAccountApiKey: 'account-secret',
+      litUsageApiKey: 'lit-secret',
     }],
   ]);
   assert.deepEqual(result, {
@@ -232,46 +235,53 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
   });
 });
 
-test('dispatchAdminRequest reads Lit payer status via the helper route', async () => {
+test('dispatchAdminRequest reads Lit Chipotle status from worker config plus session secrets', async () => {
   const result = await dispatchAdminRequest({
     request: {
-      json: async () => createSignedBody({
-        litNetwork: 'naga-test',
-      }),
+      json: async () => createSignedBody({}),
     },
-    env: { GROUP_KV: {} },
+    env: { GROUP_KV: {}, LIT_ACCOUNT_API_KEY: 'env-key' },
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
     slug: '',
-    action: 'lit-status',
+    action: 'lit-chipotle-status',
     deps: createAdminDeps({
-      getSessionSecrets: async () => ({ litPayerPrivateKey: '0xlit' }),
-      readLitPayerStatus: async (value) => {
-        assert.deepEqual(value, {
-          litNetwork: 'naga-test',
-          litPayerPrivateKey: '0xlit',
-        });
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: {
+          adminAddress: '0xabc',
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: 'group_123',
+            litPkpId: 'pkp_123',
+            litActionCid: 'bafy123',
+          },
+        },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets: async () => ({ litUsageApiKey: 'lit-secret' }),
+      resolveLitChipotleRuntime: ({ env, config, secrets }) => {
+        assert.equal(env.LIT_ACCOUNT_API_KEY, 'env-key');
+        assert.equal(config.litCredentials.litGroupId, 'group_123');
+        assert.equal(secrets.litUsageApiKey, 'lit-secret');
         return {
-          payerAddress: '0x00000000000000000000000000000000000000bb',
-          ready: true,
-          balance: { totalBalance: '1.0', availableBalance: '0.5' },
-          restriction: null,
-          delegatedUsersCount: 2,
-          litNetwork: 'naga-test',
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litUsageApiKey: 'lit-secret',
+          apiKeySource: 'session-secret',
+          litGroupId: 'group_123',
+          litPkpId: 'pkp_123',
+          litActionCid: 'bafy123',
         };
+      },
+      readLitChipotleStatus: async ({ runtime }) => {
+        assert.equal(runtime.litActionCid, 'bafy123');
+        return { ok: true, ready: true, apiKeySource: 'session-secret' };
       },
     }),
   });
 
   assert.deepEqual(result, {
-    body: {
-      ok: true,
-      payerAddress: '0x00000000000000000000000000000000000000bb',
-      ready: true,
-      balance: { totalBalance: '1.0', availableBalance: '0.5' },
-      restriction: null,
-      delegatedUsersCount: 2,
-      litNetwork: 'naga-test',
-    },
+    body: { ok: true, ready: true, apiKeySource: 'session-secret' },
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
@@ -598,6 +608,233 @@ test('dispatchAdminRequest returns explicit unknown-action failures after admin 
   assert.deepEqual(result, {
     body: { error: 'Unknown admin action.' },
     status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+
+test('dispatchAdminRequest provisions Lit Chipotle actions through the worker adapter', async () => {
+  let persistedConfig = null;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        actionCode: 'async function main() { return { ok: true }; }',
+        actionName: 'ce-sbt-gated-crypto-v3',
+      }),
+    },
+    env: { GROUP_KV: {}, LIT_ACCOUNT_API_KEY: 'account-key' },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'lit-chipotle-provision',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: {
+          adminAddress: '0xabc',
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litGroupId: 'ce-session-content-prod',
+            litPkpId: '0xpkp123',
+          },
+        },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets: async () => ({
+        litAccountApiKey: 'session-account-key',
+      }),
+      resolveLitChipotleProvisioningRuntime: ({ config, body, env }) => {
+        assert.equal(config.litCredentials.litGroupId, 'ce-session-content-prod');
+        assert.equal(body.actionName, 'ce-sbt-gated-crypto-v3');
+        assert.equal(env.LIT_ACCOUNT_API_KEY, 'account-key');
+        return {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litManagementApiKey: 'session-account-key',
+          apiKeySource: 'session-secret',
+          litGroupId: 'ce-session-content-prod',
+          litPkpId: '0xpkp123',
+        };
+      },
+      provisionLitChipotleAction: async ({ runtime, request }) => {
+        assert.equal(runtime.litManagementApiKey, 'session-account-key');
+        assert.equal(request.actionCode, 'async function main() { return { ok: true }; }');
+        return {
+          ok: true,
+          apiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmAction123',
+          litGroupId: '7',
+          litPkpId: '0xpkp123',
+        };
+      },
+      putSessionConfig: async (_env, _slug, value) => {
+        persistedConfig = value;
+      },
+    }),
+  });
+
+  assert.deepEqual(persistedConfig?.incomingConfig?.litCredentials, {
+    litApiBase: 'https://api.chipotle.litprotocol.com',
+    litGroupId: '7',
+    litPkpId: '0xpkp123',
+    litActionCid: 'QmAction123',
+  });
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      apiBase: 'https://api.chipotle.litprotocol.com',
+      litActionCid: 'QmAction123',
+      litGroupId: '7',
+      litPkpId: '0xpkp123',
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest bootstraps a per-session Lit account and writes both config and secrets', async () => {
+  const calls = [];
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        sessionName: 'Session A',
+        actionCode: 'async function main() { return { ok: true }; }',
+        actionName: 'ce-sbt-gated-crypto-v3',
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: {
+          adminAddress: '0xabc',
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+          },
+        },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets: async () => ({ openaiKey: 'sk-existing' }),
+      bootstrapLitChipotleSession: async ({ config, secrets, request, sessionSlug }) => {
+        assert.equal(config.litCredentials.litApiBase, 'https://api.chipotle.litprotocol.com');
+        assert.equal(secrets.openaiKey, 'sk-existing');
+        assert.equal(request.actionName, 'ce-sbt-gated-crypto-v3');
+        assert.equal(sessionSlug, 'session-a');
+        return {
+          ok: true,
+          bootstrapMode: 'session-account',
+          apiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmAction123',
+          litGroupId: '7',
+          litPkpId: '0xpkp123',
+          accountWalletAddress: '0xmasterwallet',
+          billingBalance: {
+            balance_cents: 0,
+            balance_display: '$0.00',
+          },
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litActionCid: 'QmAction123',
+            litGroupId: '7',
+            litPkpId: '0xpkp123',
+          },
+          secretOutputs: {
+            litAccountApiKey: 'account-key',
+            litUsageApiKey: 'usage-key',
+          },
+          steps: {
+            createdAccount: true,
+            createdGroup: true,
+            createdWallet: true,
+            derivedCid: true,
+            registeredAction: true,
+            addedActionToGroup: true,
+            addedPkpToGroup: true,
+            createdUsageKey: true,
+          },
+        };
+      },
+      normalizeSecretValue: (value) => {
+        calls.push(['normalizeSecretValue', value]);
+        return value;
+      },
+      putSessionSecrets: async (envArg, targetSlugArg, nextSecrets) => {
+        calls.push(['putSessionSecrets', envArg, targetSlugArg, nextSecrets]);
+      },
+      mergeWorkerConfigRecords: ({ existingConfig, incomingConfig, slug }) => {
+        calls.push(['mergeWorkerConfigRecords', existingConfig, incomingConfig, slug]);
+        return { merged: true, incomingConfig, slug };
+      },
+      putSessionConfig: async (envArg, targetSlugArg, nextConfig) => {
+        calls.push(['putSessionConfig', envArg, targetSlugArg, nextConfig]);
+      },
+    }),
+  });
+
+  assert.deepEqual(calls, [
+    ['normalizeSecretValue', 'account-key'],
+    ['normalizeSecretValue', 'usage-key'],
+    ['putSessionSecrets', { GROUP_KV: {} }, 'session-a', {
+      openaiKey: 'sk-existing',
+      litAccountApiKey: 'account-key',
+      litUsageApiKey: 'usage-key',
+    }],
+    ['mergeWorkerConfigRecords', {
+      adminAddress: '0xabc',
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+      },
+    }, {
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litGroupId: '7',
+        litPkpId: '0xpkp123',
+      },
+    }, 'session-a'],
+    ['putSessionConfig', { GROUP_KV: {} }, 'session-a', {
+      merged: true,
+      incomingConfig: {
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmAction123',
+          litGroupId: '7',
+          litPkpId: '0xpkp123',
+        },
+      },
+      slug: 'session-a',
+    }],
+  ]);
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      bootstrapMode: 'session-account',
+      apiBase: 'https://api.chipotle.litprotocol.com',
+      litActionCid: 'QmAction123',
+      litGroupId: '7',
+      litPkpId: '0xpkp123',
+      accountWalletAddress: '0xmasterwallet',
+      billingBalance: {
+        balance_cents: 0,
+        balance_display: '$0.00',
+      },
+      steps: {
+        createdAccount: true,
+        createdGroup: true,
+        createdWallet: true,
+        derivedCid: true,
+        registeredAction: true,
+        addedActionToGroup: true,
+        addedPkpToGroup: true,
+        createdUsageKey: true,
+      },
+    },
+    status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
 });

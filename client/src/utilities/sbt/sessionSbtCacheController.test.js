@@ -84,36 +84,7 @@ jest.mock('../../components/MainSite/progressHelpers.js', () => ({
       : 1;
     return Math.floor(start + ((end - start) * ratio));
   }),
-  mergeSbtLiveProgressEntry: jest.fn(({
-    prevEntry = null,
-    nextPatch = null,
-    nowMs = Date.now(),
-  }) => {
-    const prev = (prevEntry && typeof prevEntry === 'object') ? prevEntry : {};
-    const patch = (nextPatch && typeof nextPatch === 'object') ? nextPatch : {};
-    const rawCurrentBlock = Number(
-      patch.currentBlock != null ? patch.currentBlock : prev.currentBlock
-    );
-    const rawLatestBlock = Number(
-      patch.latestBlock != null ? patch.latestBlock : prev.latestBlock
-    );
-    const currentBlock = Math.max(
-      Math.floor(Number(prev.currentBlock || 0)),
-      Number.isFinite(rawCurrentBlock) ? Math.floor(rawCurrentBlock) : 0
-    );
-    const latestBlock = Math.max(
-      currentBlock,
-      Math.floor(Number(prev.latestBlock || 0)),
-      Number.isFinite(rawLatestBlock) ? Math.floor(rawLatestBlock) : 0
-    );
-    return {
-      ...prev,
-      ...patch,
-      currentBlock,
-      latestBlock,
-      updatedAtMs: Math.max(0, Math.floor(Number(patch.updatedAtMs || nowMs) || 0)),
-    };
-  }),
+  mergeSbtLiveProgressEntry: jest.fn(),
   SBT_FULL_SCAN_DISCOVERY_UNITS: 60,
   SBT_FULL_SCAN_PROCESS_UNITS: 40,
   SBT_LIGHT_DISCOVERY_HYDRATION_UNITS: 30,
@@ -133,6 +104,7 @@ const {
   isForcedSbtSelectorDebugEnabled,
 } = require('../../components/MainSite/mainSiteUtils.js');
 const {
+  mergeSbtLiveProgressEntry,
   shouldCommitThrottledProgress,
 } = require('../../components/MainSite/progressHelpers.js');
 
@@ -177,6 +149,38 @@ const hasMockCoreSbtMetadata = (info) => {
 const deepClone = (value) => (
   value == null ? value : JSON.parse(JSON.stringify(value))
 );
+
+const buildSbtLiveProgressEntryForTests = (input = {}) => {
+  const {
+    prevEntry = null,
+    nextPatch = null,
+    nowMs = Date.now(),
+  } = (input && typeof input === 'object') ? input : {};
+  const prev = (prevEntry && typeof prevEntry === 'object') ? prevEntry : {};
+  const patch = (nextPatch && typeof nextPatch === 'object') ? nextPatch : {};
+  const rawCurrentBlock = Number(
+    patch.currentBlock != null ? patch.currentBlock : prev.currentBlock
+  );
+  const rawLatestBlock = Number(
+    patch.latestBlock != null ? patch.latestBlock : prev.latestBlock
+  );
+  const currentBlock = Math.max(
+    Math.floor(Number(prev.currentBlock || 0)),
+    Number.isFinite(rawCurrentBlock) ? Math.floor(rawCurrentBlock) : 0
+  );
+  const latestBlock = Math.max(
+    currentBlock,
+    Math.floor(Number(prev.latestBlock || 0)),
+    Number.isFinite(rawLatestBlock) ? Math.floor(rawLatestBlock) : 0
+  );
+  return {
+    ...prev,
+    ...patch,
+    currentBlock,
+    latestBlock,
+    updatedAtMs: Math.max(0, Math.floor(Number(patch.updatedAtMs || nowMs) || 0)),
+  };
+};
 
 const createDeferred = () => {
   let resolve;
@@ -318,6 +322,7 @@ describe('createSessionSbtCacheController', () => {
     contractScripts.getSbtCreationBlockByAddress.mockResolvedValue(null);
     hasCoreSbtMetadata.mockImplementation(hasMockCoreSbtMetadata);
     isForcedSbtSelectorDebugEnabled.mockReturnValue(false);
+    mergeSbtLiveProgressEntry.mockImplementation(buildSbtLiveProgressEntryForTests);
     shouldCommitThrottledProgress.mockReturnValue(true);
     if (typeof window !== 'undefined') {
       window.ENABLE_RPC_DEBUG_LOGGING = false;

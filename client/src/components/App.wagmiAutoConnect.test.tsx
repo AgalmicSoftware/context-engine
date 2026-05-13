@@ -1,8 +1,34 @@
 import React from 'react';
 import { act, cleanup, render } from '@testing-library/react';
 
+const buildMockConfigureChainsResult = (_chains: unknown[], _providers: unknown[]) => ({
+  chains: [{ id: 84532, chainId: 84532, name: 'Base Sepolia' }],
+  provider: {},
+  webSocketProvider: {},
+});
+const buildMockJsonRpcProvider = ({ rpc }: { rpc: (chain: any) => { http: string } | null }) => (
+  (chain: any) => {
+    const rpcConfig = rpc(chain);
+    if (!rpcConfig?.http) return null;
+    const provider = jest.fn(() => ({ send: jest.fn(), rpcUrl: rpcConfig.http }));
+    return {
+      chain: {
+        ...chain,
+        rpcUrls: {
+          ...(chain?.rpcUrls || {}),
+          default: { http: [rpcConfig.http] },
+          public: { http: [rpcConfig.http] },
+        },
+      },
+      provider,
+    };
+  }
+);
 const mockCreateClient = jest.fn(() => ({}));
+const mockConfigureChains = jest.fn(buildMockConfigureChainsResult);
 const mockConnectorsForWallets = jest.fn(() => []);
+const mockJsonRpcProvider = jest.fn(buildMockJsonRpcProvider);
+const mockWrapEthersJsonRpcSend = jest.fn((provider: any, _meta: any) => provider);
 const mockMetaMaskWalletCreateConnector = jest.fn(() => ({
   connector: { id: 'walletConnect-fallback' },
 }));
@@ -24,6 +50,7 @@ const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage) => ({
 const mockStoreDispatch = jest.fn();
 const mockSyncPublicPageHead = jest.fn();
 const mockToaster = jest.fn((_props?: any) => null);
+let MockMainSiteComponent: React.ComponentType<any> = () => null;
 let routeProps: any[] = [];
 let mockWalletConnectFallbackEnabled = false;
 
@@ -97,7 +124,7 @@ const mockAppDependencies = () => {
   }));
   jest.doMock('./MainSite/MainSite', () => ({
     __esModule: true,
-    default: () => null,
+    default: (props: any) => <MockMainSiteComponent {...props} />,
   }));
   jest.doMock('./Onboarding/onboardingConfig.js', () => ({
     readColdLoadOnboardingState: mockReadColdLoadOnboardingState,
@@ -115,11 +142,7 @@ const mockAppDependencies = () => {
   }));
 
   jest.doMock('wagmi', () => ({
-    configureChains: jest.fn(() => ({
-      chains: [{ id: 84532, chainId: 84532, name: 'Base Sepolia' }],
-      provider: {},
-      webSocketProvider: {},
-    })),
+    configureChains: mockConfigureChains,
     createClient: mockCreateClient,
     createStorage: jest.fn(({ storage }: { storage: unknown }) => ({ storage })),
     WagmiConfig: ({ children }: { children: React.ReactNode }) => children,
@@ -142,7 +165,10 @@ const mockAppDependencies = () => {
     InjectedConnector: jest.fn(),
   }));
   jest.doMock('wagmi/providers/jsonRpc', () => ({
-    jsonRpcProvider: jest.fn(() => ({})),
+    jsonRpcProvider: mockJsonRpcProvider,
+  }));
+  jest.doMock('../utilities/web3/rpcReadCache.js', () => ({
+    wrapEthersJsonRpcSend: mockWrapEthersJsonRpcSend,
   }));
 
   jest.doMock('../utilities/web3/rpcSelection.js', () => ({
@@ -178,7 +204,15 @@ describe('App wagmi auto-connect persistence', () => {
     sessionStorage.clear();
     window.history.replaceState({}, '', '/');
     routeProps = [];
+    MockMainSiteComponent = () => null;
     mockWalletConnectFallbackEnabled = false;
+    mockCreateClient.mockImplementation(() => ({}));
+    mockConfigureChains.mockImplementation(buildMockConfigureChainsResult);
+    mockJsonRpcProvider.mockImplementation(buildMockJsonRpcProvider);
+    mockWrapEthersJsonRpcSend.mockImplementation((provider: any, _meta: any) => provider);
+    mockConfigureChains.mockClear();
+    mockJsonRpcProvider.mockClear();
+    mockWrapEthersJsonRpcSend.mockClear();
     mockConnectorsForWallets.mockReturnValue([]);
     mockMetaMaskWalletCreateConnector.mockReturnValue({
       connector: { id: 'walletConnect-fallback' },
@@ -262,6 +296,37 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockMetaMaskWalletCreateConnector).toHaveBeenCalledTimes(1);
     expect(mockMetaMaskConnector).not.toHaveBeenCalled();
     expect(connectorConfig.connector).toEqual({ id: 'walletConnect-fallback' });
+  });
+
+  it('wraps wagmi JSON-RPC providers with RPC rate-limit backoff metadata', () => {
+    loadAppModule();
+
+    const providerFactories = mockConfigureChains.mock.calls[0]?.[1] as Array<(chain: any) => any>;
+    const chain = { id: 11155420, chainId: 11155420, name: 'OP Sepolia' };
+    const primaryConfig = providerFactories[0](chain);
+    const fallbackConfig = providerFactories[1](chain);
+
+    primaryConfig.provider();
+    fallbackConfig.provider();
+
+    expect(mockWrapEthersJsonRpcSend).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ rpcUrl: 'https://primary.example' }),
+      expect.objectContaining({
+        chainId: 11155420,
+        providerKey: 'wagmi-primary',
+        url: 'https://primary.example',
+      })
+    );
+    expect(mockWrapEthersJsonRpcSend).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ rpcUrl: 'https://fallback.example' }),
+      expect.objectContaining({
+        chainId: 11155420,
+        providerKey: 'wagmi-fallback',
+        url: 'https://fallback.example',
+      })
+    );
   });
 
   it('passes firstVisit to MainSite during the initial render', () => {
@@ -365,6 +430,26 @@ describe('App wagmi auto-connect persistence', () => {
 
     expect(mockSyncPublicPageHead).toHaveBeenCalledTimes(2);
     expect(mockSyncPublicPageHead).toHaveBeenLastCalledWith();
+  });
+
+  it('re-renders MainSite with the browser path after direct history.replaceState updates', () => {
+    const { default: App } = loadAppModule();
+
+    render(
+      <App
+        params={{}}
+        location={{ search: '', pathname: '/' }}
+        navigate={jest.fn()}
+      />
+    );
+
+    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/');
+
+    act(() => {
+      window.history.replaceState({}, '', '/session/demo?view=results');
+    });
+
+    expect(routeProps[routeProps.length - 1].element.props.path).toBe('/session/demo');
   });
 
   it('reuses the cold-load onboarding snapshot on mount', () => {

@@ -11,10 +11,10 @@
  * the WebAuthn credential rawId. This means the key is recoverable by any
  * same-origin script that can trigger a WebAuthn assertion. The passkey
  * ceremony provides physical-presence verification but NOT a hard cryptographic
- * boundary around the key material. For a true hardware-backed wallet, see
- * PRD 247 (ERC-4337 WebAuthn account abstraction).
+ * boundary around the key material. For a true hardware-backed wallet, use a
+ * future account-abstraction design.
  *
- * Mitigations applied (PRD 246):
+ * Mitigations applied:
  * - No plaintext localStorage fallback
  * - Session restore can hydrate stored wallet metadata silently, but a fresh
  *   WebAuthn assertion is still required before unwrapping key material
@@ -758,6 +758,14 @@ export async function restoreSession(options: RestoreSessionOptions = {}): Promi
       const session: any = JSON.parse(stored);
       const restoredSession = buildValidatedPortoSession(session);
       if (restoredSession) {
+        if (!requireSigner) {
+          const hydratedAddress = adoptHydratedPortoSession({
+            credentialId: restoredSession.credentialId,
+            address: restoredSession.address,
+          });
+          if (hydratedAddress) return hydratedAddress;
+        }
+
         try {
           await promptForPasskey(restoredSession.credentialId);
         } catch (e: any) {
@@ -810,6 +818,14 @@ export function setPortoSessionKeyEnabled(enabled: any): void {
 
 export function getPortoSessionKeyEnabled(): boolean {
   return sessionKeyEnabled;
+}
+
+export function hasPortoSessionSigner(): boolean {
+  return hasCurrentPortoSessionSigner();
+}
+
+export function isPortoAutoSignReady(): boolean {
+  return !!(sessionKeyEnabled && hasCurrentPortoSessionMetadata() && hasCurrentPortoSessionSigner());
 }
 
 export async function sendPortoTransaction(txRequest: AnyObj): Promise<any> {

@@ -130,6 +130,6 @@ describe('PoliticalCompass tooltip hover behavior', () => {
     expect(hypatiaAvatar.style.width).toBe('4%');
 
     expect(screen.queryByTestId('ce-political-compass-point-no-comment-point-avatar')).toBeNull();
-    expect(container.querySelector('[data-testid=\"ce-political-compass-point-no-comment-point\"] circle')).not.toBeNull();
+    expect(container.querySelector('[data-testid="ce-political-compass-point-no-comment-point"] circle')).not.toBeNull();
   });
 });

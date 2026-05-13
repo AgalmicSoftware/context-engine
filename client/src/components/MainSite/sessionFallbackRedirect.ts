@@ -1,0 +1,184 @@
+export type SessionFallbackRedirectTarget = {
+  slug: string;
+  path: string;
+};
+
+type SessionFallbackRedirectStorageTarget = {
+  slug?: string;
+  path?: string;
+} | null;
+
+type SessionRegistryStoreLike = {
+  getAllSessionEntries: () => unknown;
+};
+
+type NormalizeSessionSlugFn = (slug: unknown) => string;
+
+const isGeneralSessionSlug = (slug: unknown, defaultAlias: string): boolean => (
+  slug === '' || slug === defaultAlias
+);
+
+const dedupeNormalizedSessionSlugs = (
+  values: unknown,
+  normalizeSessionSlug: NormalizeSessionSlugFn
+): string[] => {
+  if (!Array.isArray(values)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  values.forEach((value) => {
+    const normalized = normalizeSessionSlug(value || '');
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    out.push(normalized);
+  });
+
+  return out;
+};
+
+export const getSessionFallbackScopeSlugs = (deps: {
+  readSessionScanScope: () => unknown;
+  readSessionScanSlugs: () => unknown;
+  sessionRegistryStore: SessionRegistryStoreLike;
+  normalizeSessionSlug: NormalizeSessionSlugFn;
+}): string[] => {
+  const scope = String(deps.readSessionScanScope() || '').trim().toLowerCase();
+  if (scope !== 'list') return [];
+
+  const runtimeScopeSlugs = dedupeNormalizedSessionSlugs(
+    deps.readSessionScanSlugs(),
+    deps.normalizeSessionSlug
+  );
+  if (runtimeScopeSlugs.length) return runtimeScopeSlugs;
+
+  try {
+    const entries = deps.sessionRegistryStore.getAllSessionEntries();
+    if (!Array.isArray(entries) || !entries.length) return [];
+
+    return dedupeNormalizedSessionSlugs(
+      entries.map((entry) => {
+        const cfg = (Array.isArray(entry) ? entry[1] : entry) as {
+          slug?: unknown;
+          sessionSlug?: unknown;
+        } | null | undefined;
+        return cfg?.slug || cfg?.sessionSlug || '';
+      }),
+      deps.normalizeSessionSlug
+    );
+  } catch (_) {
+    return [];
+  }
+};
+
+export const getSessionFallbackPreferredTarget = (
+  scopeSlugs: string[],
+  deps: { DEFAULT_SESSION_SLUG_ALIAS: string }
+): SessionFallbackRedirectTarget | null => {
+  if (!scopeSlugs.length) return null;
+
+  const generalInScope = scopeSlugs.some(
+    (slug) => isGeneralSessionSlug(slug, deps.DEFAULT_SESSION_SLUG_ALIAS)
+  );
+  if (generalInScope) return null;
+
+  const firstScopedSlug = scopeSlugs.find(
+    (slug) => slug && !isGeneralSessionSlug(slug, deps.DEFAULT_SESSION_SLUG_ALIAS)
+  );
+  if (!firstScopedSlug) return null;
+
+  return {
+    slug: firstScopedSlug,
+    path: `/session/${firstScopedSlug}`,
+  };
+};
+
+export const isFirstVisitRootRedirectEnabled = (deps: {
+  readBoolishRuntimeFlag: (raw: unknown, fallback?: boolean) => boolean;
+  CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED: unknown;
+}): boolean => {
+  const buildTimeFallback = !!deps.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED;
+
+  try {
+    if (typeof globalThis !== 'undefined') {
+      const runtimeGlobals = globalThis as Record<string, unknown>;
+      if (typeof runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED !== 'undefined') {
+        return deps.readBoolishRuntimeFlag(
+          runtimeGlobals.CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
+          buildTimeFallback
+        );
+      }
+    }
+  } catch (_) {}
+
+  return buildTimeFallback;
+};
+
+export const getFirstVisitRootRedirectTarget = (deps: {
+  isFirstVisitRootRedirectEnabled: () => boolean;
+  readSessionScanScope: () => unknown;
+  getSessionFallbackScopeSlugs: () => string[];
+  derivePrimarySessionSlugFromList: (slugs: unknown[]) => string;
+}): SessionFallbackRedirectTarget | null => {
+  if (!deps.isFirstVisitRootRedirectEnabled()) return null;
+
+  if (String(deps.readSessionScanScope() || '').trim().toLowerCase() === 'list') {
+    const firstScopedSlug = deps.derivePrimarySessionSlugFromList(
+      deps.getSessionFallbackScopeSlugs()
+    );
+    if (firstScopedSlug) {
+      return {
+        slug: firstScopedSlug,
+        path: `/session/${firstScopedSlug}`,
+      };
+    }
+  }
+
+  return {
+    slug: 'demo',
+    path: '/session/demo',
+  };
+};
+
+export const getSessionFallbackRedirectStorageKey = (
+  slugIn: unknown,
+  deps: {
+    normalizeSessionSlug: NormalizeSessionSlugFn;
+    DEFAULT_SESSION_SLUG_ALIAS: string;
+    SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX: string;
+  }
+): string => {
+  const normalizedSlug = deps.normalizeSessionSlug(slugIn || '');
+  const storageSlug = normalizedSlug || deps.DEFAULT_SESSION_SLUG_ALIAS;
+  return `${deps.SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX}${storageSlug}`;
+};
+
+export const hasConsumedSessionFallbackRedirect = (
+  target: SessionFallbackRedirectStorageTarget,
+  deps: { getStorageKey: (slug: unknown) => string }
+): boolean => {
+  if (typeof window === 'undefined' || !window.sessionStorage || !target?.path) {
+    return false;
+  }
+
+  try {
+    return window.sessionStorage.getItem(deps.getStorageKey(target.slug)) === 'true';
+  } catch (_) {
+    return false;
+  }
+};
+
+export const consumeSessionFallbackRedirect = (
+  target: SessionFallbackRedirectStorageTarget,
+  deps: { getStorageKey: (slug: unknown) => string }
+): boolean => {
+  if (typeof window === 'undefined' || !window.sessionStorage || !target?.path) {
+    return false;
+  }
+
+  try {
+    window.sessionStorage.setItem(deps.getStorageKey(target.slug), 'true');
+    return true;
+  } catch (_) {
+    return false;
+  }
+};

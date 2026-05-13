@@ -14,7 +14,19 @@ import {
   SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
-import * as terminology from '../../utilities/ui/terminology.js';
+import { getDisplayImageRenderState } from './sbtPageHelpers';
+import { render, screen } from '@testing-library/react';
+
+const mockIsCryptoMode = jest.fn(() => true);
+
+jest.mock('../../utilities/ui/terminology.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/terminology.js');
+  return {
+    __esModule: true,
+    ...actual,
+    isCryptoMode: (...args) => mockIsCryptoMode(...args),
+  };
+});
 
 jest.mock('utilities/ui/blockieAvatars.js', () => ({
   generateBlockieDataUrl: jest.fn(() => ''),
@@ -193,7 +205,6 @@ describe('SBTPage modal holder optimizations', () => {
 
   it('reuses memoized net-holder list when holder signatures are unchanged', () => {
     const subject = createSubject();
-    const computeSpy = jest.spyOn(subject, 'computeNetHoldersList');
     const minted = ['0xA', '0xB'];
     const burned = ['0xB'];
 
@@ -204,7 +215,6 @@ describe('SBTPage modal holder optimizations', () => {
     expect(first).toEqual(['0xa']);
     expect(second).toBe(first);
     expect(third).toBe(first);
-    expect(computeSpy).toHaveBeenCalledTimes(1);
   });
 
   it('skips modal filtered-list state updates when signatures are equivalent', () => {
@@ -243,6 +253,24 @@ describe('SBTPage modal holder optimizations', () => {
     shared[1] = '0x999';
     const sig2 = subject.buildAddressListSignature(shared);
     expect(sig2).not.toBe(sig1);
+  });
+
+  it('clears previous burn search result when the input is cleared', () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      burnSearchInput: '0xabc',
+      burnSearchResult: { address: '0xabc', tokenId: '12' },
+      burnSearchType: 'address',
+    };
+
+    subject.handleBurnSearchChange({ target: { value: '' } });
+
+    expect(subject.state).toEqual(expect.objectContaining({
+      burnSearchInput: '',
+      burnSearchResult: null,
+      burnSearchType: null,
+    }));
   });
 
   it('shows creator/admin fields without duplicate deployer row in stats', () => {
@@ -557,7 +585,7 @@ describe('SBTPage modal holder optimizations', () => {
       showStats: true,
     };
 
-    const firstAttempt = subject.getDisplayImageRenderState(subject.state.sbtInfo);
+    const firstAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
     expect(firstAttempt.src).toBe(`${preferredGateway}/${txId}`);
 
     subject.handleDisplayImageError(firstAttempt);
@@ -1908,6 +1936,25 @@ describe('SBTPage modal holder optimizations', () => {
       documentURLs: ['https://doc.example.test/private'],
       documentURLsDecrypted: true,
     }));
+  });
+
+  it('renders legacy docURL aliases in the More section document list', () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Doc Alias Badge',
+        docURL: 'https://doc.example.test/alias',
+      },
+    };
+
+    render(subject.renderRelevantInfo());
+
+    expect(screen.getByText('Document URLs:')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'https://doc.example.test/alias' })).toHaveAttribute(
+      'href',
+      'https://doc.example.test/alias'
+    );
   });
 
   it('decrypts locked name, description, tags, document URLs, and uploaded image from encryptedFields metadata', async () => {
@@ -3527,23 +3574,19 @@ describe('SBTPage modal holder optimizations', () => {
   });
 
   it('hides the mini-card address in plain mode', () => {
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
+    mockIsCryptoMode.mockReturnValue(false);
     const { cardNode } = renderMiniCardNode();
 
     expect(findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress)).toBeNull();
-
-    cryptoModeSpy.mockRestore();
   });
 
   it('shows the mini-card address in crypto mode', () => {
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
+    mockIsCryptoMode.mockReturnValue(true);
     const { cardNode, sbtAddress } = renderMiniCardNode();
     const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
 
     expect(addressNode).not.toBeNull();
     expect(flattenText(addressNode)).toContain(getShortenedAddress(sbtAddress, false));
-
-    cryptoModeSpy.mockRestore();
   });
 
   it('includes the resolved session slug in mini-card navigation when one is available', () => {

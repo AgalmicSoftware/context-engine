@@ -719,6 +719,79 @@ describe('registerSessionOnChain creation fee overrides', () => {
     expect(result).toEqual({ txs: [{ action: 'createSession', hash: '0xcreatenonce' }] });
   });
 
+  it('advances tracked nonces across multi-step session registration when public RPC lags', async () => {
+    const txHashes = ['0xcreate', '0xfields', '0xgates'];
+    const walletProvider = {
+      request: jest.fn(async ({ method }) => {
+        if (method === 'eth_sendTransaction') {
+          return txHashes.shift();
+        }
+        return null;
+      }),
+    };
+    const signer = {
+      provider: {
+        getTransactionCount: jest.fn(),
+      },
+      getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS),
+    };
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['createSession', 'setSessionFields', 'setResourceGates'],
+    });
+    const readContractMock = {
+      SESSION_CREATION_FEE: jest.fn().mockResolvedValue(null),
+      sessionIdExists: jest.fn().mockResolvedValue(false),
+      sessionExists: jest.fn().mockResolvedValue(false),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    const publicRpcProviderMock = installPublicRpcFeeMocks();
+    publicRpcProviderMock.getTransactionCount.mockResolvedValue(6);
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: '0xreceipt' },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      return readContractMock;
+    });
+
+    const result = await registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'nonce-tracker',
+      sessionId: '0x99999999999999999999999999999999',
+      metadataURI: 'ar://example',
+      encryptedMetadataURI: '',
+      sessionFields: { sponsored_lit: true },
+      gateSelections: {
+        default: {
+          sbts: [{ address: '0x0000000000000000000000000000000000000002' }],
+          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          mode: 'any',
+        },
+      },
+    });
+
+    const sendCalls = walletProvider.request.mock.calls.filter(
+      ([payload]) => payload?.method === 'eth_sendTransaction'
+    );
+    expect(sendCalls).toHaveLength(3);
+    expect(sendCalls.map(([payload]) => payload.params[0].nonce)).toEqual([
+      ethers.BigNumber.from('6').toHexString(),
+      ethers.BigNumber.from('7').toHexString(),
+      ethers.BigNumber.from('8').toHexString(),
+    ]);
+    expect(publicRpcProviderMock.getTransactionCount).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      txs: [
+        { action: 'createSession', hash: '0xcreate' },
+        { action: 'setSessionFields', hash: '0xfields' },
+        { action: 'setResourceGates', hash: '0xgates' },
+      ],
+    });
+  });
+
   it('reports the createSession tx hash before the receipt wait resolves', async () => {
     const txHash = '0xcreatepending';
     const walletProvider = makeWalletProvider({ txHash });
@@ -1101,6 +1174,64 @@ describe('registerSessionOnChain creation fee overrides', () => {
     }));
     expect(result).toEqual({ ok: true, txs: [{ action: 'setResourceGates', hash: '0xsetgates-send-retry' }] });
   });
+
+  it('retries setResourceGatesOnChain with the next nonce from a wallet nonce-too-low error', async () => {
+    const signerProvider = { getTransactionCount: jest.fn().mockResolvedValue(7) };
+    const signer = {
+      provider: signerProvider,
+      getAddress: jest.fn().mockResolvedValue('0x0000000000000000000000000000000000000001'),
+    };
+    const nonceError = new Error('Nonce provided for the transaction (7) is lower than the current nonce of the account. Details: nonce too low: next nonce 8, tx nonce 7');
+    nonceError.shortMessage = 'Nonce provided for the transaction (7) is lower than the current nonce of the account.';
+    nonceError.details = 'nonce too low: next nonce 8, tx nonce 7';
+    let sendAttempts = 0;
+    const walletProvider = {
+      request: jest.fn(async ({ method }) => {
+        if (method === 'eth_sendTransaction') {
+          sendAttempts += 1;
+          if (sendAttempts === 1) throw nonceError;
+          return '0xsetgates-nonce-retry';
+        }
+        return null;
+      }),
+    };
+    const signerContractMock = makeRegistryWriteContractMock({
+      methods: ['setResourceGates'],
+    });
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+    const publicRpcProviderMock = installPublicRpcFeeMocks();
+    publicRpcProviderMock.getTransactionCount.mockResolvedValue(7);
+
+    installWeb3ProviderMock({
+      signer,
+      receipt: { status: 1, transactionHash: '0xsetgates-nonce-retry' },
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract(address, abi, providerOrSigner) {
+      if (providerOrSigner === signer) return signerContractMock;
+      throw new Error('Unexpected non-signer contract construction in setResourceGatesOnChain nonce test');
+    });
+
+    const result = await setResourceGatesOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'gate-nonce-retry',
+      gates: [{
+        resourceKey: 'default',
+        sbtAddresses: ['0x0000000000000000000000000000000000000002'],
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        mode: 0,
+        perMemberLimit: 0,
+      }],
+    });
+
+    const sendCalls = walletProvider.request.mock.calls.filter(
+      ([payload]) => payload?.method === 'eth_sendTransaction'
+    );
+    expect(sendCalls).toHaveLength(2);
+    expect(sendCalls[0][0].params[0].nonce).toBe(ethers.BigNumber.from('7').toHexString());
+    expect(sendCalls[1][0].params[0].nonce).toBe(ethers.BigNumber.from('8').toHexString());
+    expect(result).toEqual({ ok: true, txs: [{ action: 'setResourceGates', hash: '0xsetgates-nonce-retry' }] });
+  });
 });
 
 describe('sessionRegistry contract defaults', () => {
@@ -1191,6 +1322,40 @@ describe('sessionRegistry contract defaults', () => {
       sbtAddresses: ['0x00000000000000000000000000000000000000f1'],
     }));
     expect(config).not.toHaveProperty('sponsoredSbtAddress');
+  });
+
+  it('hydrates registry rpcUrl fields into the client read-provider path config', () => {
+    const config = __sessionRegistryTestUtils.buildSessionConfigFromRegistry({
+      session: {
+        slug: 'rpc-sponsored-edge',
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        metadataURI: 'ar://tx',
+        encryptedMetadataURI: '',
+        adminAddress: '0x0000000000000000000000000000000000000001',
+        updatedAt: 1,
+        sessionId: '0xb20bcc6d40274759b4a5cd94d949b579',
+        sessionIdHex: '0xb20bcc6d40274759b4a5cd94d949b579',
+      },
+      metadata: {},
+      gatesByResource: {
+        rpc: {
+          lookupStatus: 'ok',
+          sbtAddresses: [],
+          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          mode: 'any',
+        },
+      },
+      fieldsByKey: {
+        rpcUrl: ' https://browser-safe-rpc.example ',
+        sponsored_rpc: '1',
+      },
+      registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      metadataLoadState: 'loaded',
+    });
+
+    expect(config.rpc.providers.path.rpcUrl).toBe('https://browser-safe-rpc.example');
+    expect(config.sponsoredKeys.rpc).toBe(true);
+    expect(config.__registry.gatesByResource.rpc.lookupStatus).toBe('ok');
   });
 
   it('marks synthesized contract defaults when registry metadata could not be loaded', () => {

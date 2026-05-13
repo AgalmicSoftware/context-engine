@@ -206,6 +206,109 @@ test('dispatchAuthenticatedSecretActionRoute preserves unsupported ai provider f
   });
 });
 
+test('dispatchAuthenticatedSecretActionRoute preserves lit preflight failure passthrough', async () => {
+  const response = new Response(JSON.stringify({ error: 'Token missing lit scope.' }), {
+    status: 403,
+  });
+
+  const result = await dispatchAuthenticatedSecretActionRoute({
+    path: '/',
+    action: 'lit_chipotle_execute',
+    body: { op: 'check' },
+    config: { litCredentials: { litActionCid: 'QmAction123' } },
+    slug: 'session-a',
+    address: '0xabc',
+    env: { GROUP_KV: {} },
+    limit: 3,
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    scopes: { lit: false },
+    deps: {
+      evaluateAuthenticatedRoutePreflight: async (value) => {
+        assert.equal(value.scope, 'lit');
+        assert.equal(value.route, 'lit');
+        return { ok: false, response };
+      },
+      resolveAuthenticatedRouteSecrets: async () => {
+        throw new Error('should not resolve secrets');
+      },
+      json: () => null,
+    },
+  });
+
+  assert.equal(result.handled, true);
+  assert.equal(result.response, response);
+});
+
+test('dispatchAuthenticatedSecretActionRoute executes session-scoped Lit Chipotle actions with session secrets', async () => {
+  const headers = { 'Access-Control-Allow-Origin': '*' };
+  const secrets = { litUsageApiKey: 'usage-key' };
+  const env = { GROUP_KV: {}, LIT_USAGE_API_KEY: 'env-usage-key' };
+
+  const result = await dispatchAuthenticatedSecretActionRoute({
+    path: '/',
+    action: 'lit_chipotle_execute',
+    body: { op: 'encrypt', message: '0x1234' },
+    config: {
+      litCredentials: {
+        litActionCid: 'QmAction123',
+        litPkpId: '0xpkp123',
+      },
+    },
+    slug: 'session-a',
+    address: '0xabc',
+    env,
+    limit: 3,
+    headers,
+    scopes: { lit: true },
+    deps: {
+      evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
+      resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets }),
+      executeSessionLitChipotleAction: async (value) => {
+        assert.deepEqual(value, {
+          env,
+          config: {
+            litCredentials: {
+              litActionCid: 'QmAction123',
+              litPkpId: '0xpkp123',
+            },
+          },
+          secrets,
+          request: { op: 'encrypt', message: '0x1234' },
+          requesterAddress: '0xabc',
+          fetchImpl: undefined,
+        });
+        return {
+          ok: true,
+          response: {
+            response: {
+              ok: true,
+              ciphertext: 'wrapped-cek',
+            },
+          },
+        };
+      },
+      json: (body, status, responseHeaders) => ({ body, status, headers: responseHeaders }),
+    },
+  });
+
+  assert.deepEqual(result, {
+    handled: true,
+    response: {
+      body: {
+        ok: true,
+        response: {
+          response: {
+            ok: true,
+            ciphertext: 'wrapped-cek',
+          },
+        },
+      },
+      status: 200,
+      headers,
+    },
+  });
+});
+
 test('dispatchAuthenticatedSecretActionRoute preserves faucet secret failure passthrough', async () => {
   const response = new Response(JSON.stringify({ error: 'Session secrets not configured.' }), {
     status: 401,

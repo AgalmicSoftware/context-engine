@@ -1,6 +1,5 @@
 import bufferModule from 'buffer/';
 import { cryptoUtils } from '../crypto/cryptography.js';
-import { deriveLitPayerAddress } from '../crypto/litPayerWallet.js';
 import { toStr } from '../shared/primitives.js';
 import { buildPublicRoute } from '../ui/publicUrl.js';
 import { arweaveScripts } from './arweaveScripts.js';
@@ -18,8 +17,12 @@ export const SPONSORED_BUNDLE_SUPPORTED_FIELDS = Object.freeze([
   'arweaveJwk',
   'faucetPrivateKey',
   'customRpcUrl',
-  'litPayerPrivateKey',
-  'litPayerAddress',
+  'litApiBase',
+  'litGroupId',
+  'litPkpId',
+  'litActionCid',
+  'litAccountApiKey',
+  'litUsageApiKey',
   'bootstrapWorkerUrl',
   'deployGrantToken',
   'faucetGrantToken',
@@ -99,7 +102,7 @@ export const normalizeSparseSponsoredBundlePayload = (raw: unknown) => {
 
 export const hasSponsoredBundleFields = (bundle: LooseRecord = {}): boolean => (
   SPONSORED_BUNDLE_SUPPORTED_FIELDS.some((key) => {
-    if (key === 'litPayerAddress' || key === 'bootstrapWorkerUrl') {
+    if (key === 'bootstrapWorkerUrl') {
       return false;
     }
     return !!toStr(bundle?.[key] || '').trim();
@@ -113,8 +116,12 @@ export const buildSponsoredBundlePlaintext = ({
   arweaveJwk = '',
   faucetPrivateKey = '',
   customRpcUrl = '',
-  litPayerPrivateKey = '',
-  litPayerAddress = '',
+  litApiBase = '',
+  litGroupId = '',
+  litPkpId = '',
+  litActionCid = '',
+  litAccountApiKey = '',
+  litUsageApiKey = '',
   bootstrapWorkerUrl = '',
   deployGrantToken = '',
   faucetGrantToken = '',
@@ -126,15 +133,17 @@ export const buildSponsoredBundlePlaintext = ({
   arweaveJwk?: unknown;
   faucetPrivateKey?: unknown;
   customRpcUrl?: unknown;
-  litPayerPrivateKey?: unknown;
-  litPayerAddress?: unknown;
+  litApiBase?: unknown;
+  litGroupId?: unknown;
+  litPkpId?: unknown;
+  litActionCid?: unknown;
+  litAccountApiKey?: unknown;
+  litUsageApiKey?: unknown;
   bootstrapWorkerUrl?: unknown;
   deployGrantToken?: unknown;
   faucetGrantToken?: unknown;
   meta?: LooseRecord;
 } = {}) => {
-  const payerPrivateKey = toStr(litPayerPrivateKey).trim();
-  const payerAddress = toStr(litPayerAddress).trim() || deriveLitPayerAddress(payerPrivateKey);
   return normalizeSparseSponsoredBundlePayload({
     openaiKey,
     anthropicKey,
@@ -143,8 +152,12 @@ export const buildSponsoredBundlePlaintext = ({
     faucetPrivateKey,
     // `customRpcKey` is intentionally unsupported in sponsored bundles for now.
     customRpcUrl,
-    ...(payerPrivateKey ? { litPayerPrivateKey: payerPrivateKey } : {}),
-    ...(payerPrivateKey && payerAddress ? { litPayerAddress: payerAddress } : {}),
+    ...(toStr(litApiBase).trim() ? { litApiBase } : {}),
+    ...(toStr(litGroupId).trim() ? { litGroupId } : {}),
+    ...(toStr(litPkpId).trim() ? { litPkpId } : {}),
+    ...(toStr(litActionCid).trim() ? { litActionCid } : {}),
+    ...(toStr(litAccountApiKey).trim() ? { litAccountApiKey } : {}),
+    ...(toStr(litUsageApiKey).trim() ? { litUsageApiKey } : {}),
     bootstrapWorkerUrl,
     deployGrantToken,
     faucetGrantToken,

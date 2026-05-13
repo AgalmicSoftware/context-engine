@@ -44,6 +44,7 @@ import {
   getFallbackRpcUrlForChain,
   getPrimaryRpcUrlForChain,
 } from '../utilities/web3/rpcSelection.js';
+import { wrapEthersJsonRpcSend } from '../utilities/web3/rpcReadCache.js';
 import { wasUserExplicitlyDisconnected } from '../utilities/web3/wagmiDisconnectState.js';
 import { jsonRpcProvider } from 'wagmi/providers/jsonRpc';
 
@@ -71,6 +72,38 @@ type ColdLoadSnapshot = {
   shouldStartOnboarding: boolean;
 };
 
+const buildBackoffJsonRpcProvider = (
+  providerKey: string,
+  resolveUrl: (chain: any) => string,
+): any => {
+  const baseProvider: any = jsonRpcProvider({
+    rpc: (chain: any) => {
+      const url = resolveUrl(chain);
+      return url ? { http: url } : null;
+    },
+  });
+
+  return (chain: any): any => {
+    const config = typeof baseProvider === 'function' ? baseProvider(chain) : null;
+    if (!config || typeof config.provider !== 'function') return config;
+    const selectedUrl = (
+      config?.chain?.rpcUrls?.default?.http?.[0]
+      || config?.chain?.rpcUrls?.public?.http?.[0]
+      || resolveUrl(chain)
+      || ''
+    );
+    return {
+      ...config,
+      provider: (): any => wrapEthersJsonRpcSend(config.provider() as any, {
+        chainId: Number(chain?.id || config?.chain?.id || 0) || 0,
+        providerKey,
+        providerLabel: providerKey,
+        url: selectedUrl,
+      }) as any,
+    };
+  };
+};
+
 const { chains, provider, webSocketProvider } = configureChains(
   [
     mainnet,
@@ -87,18 +120,8 @@ const { chains, provider, webSocketProvider } = configureChains(
     // NOTE: `publicProvider()` is intentionally not used here.
     // We keep deterministic ordering by resolving primary/fallback RPC URLs ourselves
     // (from chains.js + chain rpcUrls public/default lists) via jsonRpcProvider.
-    jsonRpcProvider({
-      rpc: (chain: any) => {
-        const url = getPrimaryRpcUrlForChain(chain);
-        return url ? { http: url } : null;
-      },
-    }),
-    jsonRpcProvider({
-      rpc: (chain: any) => {
-        const url = getFallbackRpcUrlForChain(chain);
-        return url ? { http: url } : null;
-      },
-    }),
+    buildBackoffJsonRpcProvider('wagmi-primary', getPrimaryRpcUrlForChain),
+    buildBackoffJsonRpcProvider('wagmi-fallback', getFallbackRpcUrlForChain),
   ]
 );
 
@@ -268,6 +291,13 @@ class App extends React.Component<AppProps, AppState> {
     }
   };
 
+  didBrowserRouteChangeSinceRender = () => {
+    if (typeof window === 'undefined' || !window.location) return false;
+    const browserKey = `${window.location.pathname || ''}${window.location.search || ''}`;
+    const propsKey = `${this.props.location?.pathname || ''}${this.props.location?.search || ''}`;
+    return browserKey !== propsKey;
+  };
+
   componentDidMount() {
     document.body.classList.add("index-page");
 
@@ -279,7 +309,13 @@ class App extends React.Component<AppProps, AppState> {
     try { installCeAgent(); } catch (e) { log.warn('App: fallback', e); }
     // React Router updates do not cover direct history.replaceState/pushState calls,
     // so bridge the History API back into the same head-sync path.
-    this.unsubscribeHistorySync = subscribeToHistorySync(this.syncRouteHead);
+    this.unsubscribeHistorySync = subscribeToHistorySync(() => {
+      this.forceUpdate();
+      this.syncRouteHead();
+    });
+    if (this.didBrowserRouteChangeSinceRender()) {
+      this.forceUpdate();
+    }
     this.syncRouteHead();
 
   }
@@ -303,7 +339,14 @@ class App extends React.Component<AppProps, AppState> {
   }
 
   render() {
-    const location = this.props.location || { pathname: '', search: '' }
+    const location = (
+      typeof window !== 'undefined' && window.location
+        ? {
+          pathname: window.location.pathname || this.props.location?.pathname || '',
+          search: window.location.search || this.props.location?.search || '',
+        }
+        : (this.props.location || { pathname: '', search: '' })
+    );
 
     const search = location.search || ''
     const nftCode = search.substring(search.indexOf("=") + 1);

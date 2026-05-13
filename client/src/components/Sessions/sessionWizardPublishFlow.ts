@@ -322,13 +322,17 @@ const isSessionWizardRemoteBundleUrlFetchFailure = ({
   err,
   effectiveBundleMode = 'upload',
 }: {
-  err?: AnyRecord | null;
+  err?: unknown;
   effectiveBundleMode?: string;
 } = {}) => {
   if (effectiveBundleMode !== 'url') {
     return false;
   }
-  const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
+  const error = (err && typeof err === 'object') ? err as AnyRecord : {};
+  const combined = `${toStr(
+    error?.message ||
+    (typeof err === 'string' || typeof err === 'number' ? err : '')
+  ).trim()} ${toStr(error?.responseError).trim()}`.toLowerCase();
   return combined.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR);
 };
 
@@ -336,15 +340,19 @@ const isSessionWizardRemoteBundleUrlMissingHandlerFailure = ({
   err,
   effectiveBundleMode = 'upload',
 }: {
-  err?: AnyRecord | null;
+  err?: unknown;
   effectiveBundleMode?: string;
 } = {}) => {
   if (effectiveBundleMode !== 'url') {
     return false;
   }
-  const combined = `${toStr(err?.message).trim()} ${toStr(err?.responseError).trim()}`.toLowerCase();
+  const error = (err && typeof err === 'object') ? err as AnyRecord : {};
+  const combined = `${toStr(
+    error?.message ||
+    (typeof err === 'string' || typeof err === 'number' ? err : '')
+  ).trim()} ${toStr(error?.responseError).trim()}`.toLowerCase();
   return combined.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) &&
-    hasSessionWizardBundleDiagnostics(err?.responseBundleDiagnostics);
+    hasSessionWizardBundleDiagnostics(error?.responseBundleDiagnostics);
 };
 
 export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
@@ -353,7 +361,7 @@ export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
   effectiveBundleMode = 'upload',
   hasBundleFile = false,
 }: {
-  err?: AnyRecord | null;
+  err?: unknown;
   wizardMode?: string;
   effectiveBundleMode?: string;
   hasBundleFile?: boolean;

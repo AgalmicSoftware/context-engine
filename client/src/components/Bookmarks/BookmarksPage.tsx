@@ -4,6 +4,7 @@ import { faCaretDown, faCaretUp, faCheck, faCopy, faSync } from '@fortawesome/fr
 import { deserializeFilterState, serializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { listNamespaceEntriesSync, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
+import { buildAtlasNodeRoute, readWindowLocationPath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { sbtBasePath, t } from '../../utilities/ui/terminology.js';
 import styles from './BookmarksPage.module.scss';
@@ -695,7 +696,12 @@ const BookmarksPage = () => {
                       data.atlasNodes.map((nodeId) => (
                         <li key={nodeId} className={styles.listItem}>
                           <div className={styles.itemRow}>
-                            <a href={`/atlas/${nodeId}`} className={styles.itemLink}>
+                            <a
+                              href={buildAtlasNodeRoute(nodeId, {
+                                returnTo: readWindowLocationPath(),
+                              })}
+                              className={styles.itemLink}
+                            >
                               {shortenId(nodeId)}
                             </a>
                           </div>

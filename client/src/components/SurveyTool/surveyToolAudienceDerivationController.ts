@@ -1,18 +1,46 @@
-export const getQuestionEncryptionGates = (question: any): any[] => {
-  const enc = question?.encryption;
-  if (!enc || typeof enc !== 'object') return [];
+import type { UnknownRecord } from './surveyToolTypes';
+
+export type ResponseFieldState = UnknownRecord & {
+  audienceMode?: unknown;
+  encrypted?: unknown;
+  encryptedPortion?: unknown;
+  encryptionAudience?: unknown;
+  hash?: unknown;
+  value?: unknown;
+};
+
+type EncryptionConfig = UnknownRecord & {
+  enabled?: unknown;
+  gate?: unknown;
+  gates?: unknown;
+};
+
+const isObjectRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
+const asResponseFieldState = (value: unknown): ResponseFieldState => (
+  isObjectRecord(value) ? value as ResponseFieldState : {}
+);
+
+export const getQuestionEncryptionGates = (question: unknown): UnknownRecord[] => {
+  const questionRecord = isObjectRecord(question) ? question : {};
+  const enc = isObjectRecord(questionRecord.encryption)
+    ? questionRecord.encryption as EncryptionConfig
+    : null;
+  if (!enc) return [];
   if (enc.enabled === false) return [];
   const gates = Array.isArray(enc.gates)
     ? enc.gates
-    : (enc.gate && typeof enc.gate === 'object' ? [enc.gate] : []);
-  return gates.filter((gate: any) => gate && typeof gate === 'object');
+    : (isObjectRecord(enc.gate) ? [enc.gate] : []);
+  return gates.filter(isObjectRecord);
 };
 
 export const normalizeFieldAudienceMode = (
-  value: any,
+  value: unknown,
   fieldKey: string,
-  field: any,
-  hasMeaningfulFieldValue: (v: any) => boolean,
+  field: unknown,
+  hasMeaningfulFieldValue: (v: unknown) => boolean,
 ): string => {
   const normalizedFieldKey = String(fieldKey || '').trim().toLowerCase() === 'additional'
     ? 'additional'
@@ -22,37 +50,41 @@ export const normalizeFieldAudienceMode = (
   const raw = String(value || '').trim().toLowerCase();
   if (raw === 'inherit' || raw === 'follow' || raw === 'follow-answer') return 'inherit';
   if (raw === 'explicit') return 'explicit';
+  const fieldState = asResponseFieldState(field);
 
   const hasPersistedState =
     hasMeaningfulFieldValue(field) ||
-    !!field?.encrypted ||
-    !!field?.encryptedPortion ||
-    !!field?.hash;
+    !!fieldState.encrypted ||
+    !!fieldState.encryptedPortion ||
+    !!fieldState.hash;
   return hasPersistedState ? 'explicit' : 'inherit';
 };
 
 export const buildInheritedAdditionalFieldState = (
-  additionalField: any,
-  answerField: any,
+  additionalField: unknown,
+  answerField: unknown,
   questionId: string | null,
   deps: {
-    resolveFieldEncryptionAudience: (field: any, qid: string | null, fieldKey: string) => string;
-    resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => any;
+    resolveFieldEncryptionAudience: (field: ResponseFieldState, qid: string | null, fieldKey: string) => string;
+    resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => unknown;
   },
-): Record<string, any> => ({
-  ...(additionalField && typeof additionalField === 'object' ? additionalField : {}),
-  encrypted: !!answerField?.encrypted,
-  encryptionAudience: deps.resolveFieldEncryptionAudience(answerField || {}, questionId, 'answer'),
-  encryptionGateId: deps.resolveFieldEncryptionGateId(answerField || {}, questionId, 'answer'),
-  audienceMode: 'inherit',
-});
+): ResponseFieldState => {
+  const answerState = asResponseFieldState(answerField);
+  return {
+    ...(isObjectRecord(additionalField) ? additionalField : {}),
+    encrypted: !!answerState.encrypted,
+    encryptionAudience: deps.resolveFieldEncryptionAudience(answerState, questionId, 'answer'),
+    encryptionGateId: deps.resolveFieldEncryptionGateId(answerState, questionId, 'answer'),
+    audienceMode: 'inherit',
+  };
+};
 
 export const normalizeResponseEncryptionAudience = (
-  value: any,
+  value: unknown,
   questionId: string | null,
   deps: {
     isQuestionLocked: (qid: string) => boolean;
-    getEffectiveRecipientsForQid: (qid: string) => any[];
+    getEffectiveRecipientsForQid: (qid: string) => unknown[];
     hasDefaultGateRecipients: () => boolean;
   },
 ): string => {
@@ -75,10 +107,10 @@ export const buildEmptyResponseFieldState = (
   deps: {
     getDefaultAudienceForQid: (qid: string) => string;
     getDefaultAudience: () => string;
-    resolveFieldEncryptionGateId: (field: any, qid: string | null, fieldKey: string) => any;
-    normalizeFieldAudienceMode: (value: any, fieldKey: string, field: any) => string;
+    resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => unknown;
+    normalizeFieldAudienceMode: (value: unknown, fieldKey: string, field: ResponseFieldState) => string;
   },
-): Record<string, any> => {
+): ResponseFieldState => {
   const qid = questionId ? String(questionId).toLowerCase() : '';
   const audience = qid
     ? deps.getDefaultAudienceForQid(qid)
@@ -98,25 +130,26 @@ export const buildEmptyResponseFieldState = (
 };
 
 export const resolveFieldEncryptionAudience = (
-  field: any,
+  field: unknown,
   questionId: string | null,
   fieldKey: string,
   deps: {
-    normalizeAudience: (value: any, qid: string | null) => string;
+    normalizeAudience: (value: unknown, qid: string | null) => string;
     getDefaultAudienceForQid: (qid: string) => string;
     getDefaultAudience: () => string;
   },
 ): string => {
   const qid = questionId ? String(questionId).toLowerCase() : '';
-  if (field && typeof field === 'object' && field.encryptionAudience) {
-    return deps.normalizeAudience(field.encryptionAudience, qid || null);
+  const fieldState = asResponseFieldState(field);
+  if (fieldState.encryptionAudience) {
+    return deps.normalizeAudience(fieldState.encryptionAudience, qid || null);
   }
   return qid
     ? deps.getDefaultAudienceForQid(qid)
     : deps.getDefaultAudience();
 };
 
-export const normalizeGateLabelText = (value: any): string => {
+export const normalizeGateLabelText = (value: unknown): string => {
   const raw = (typeof value === 'string' ? value : value == null ? '' : String(value)).trim();
   if (!raw) return '';
   if (/^\[object\s+object\]$/i.test(raw)) return '';

@@ -9,7 +9,6 @@ import contractScripts from '../../utilities/web3/contractScripts.js';
 import { getDemoSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
-import * as imageScripts from '../../utilities/ui/imageScripts.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
@@ -21,6 +20,17 @@ import {
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+
+const mockFetchImageFromURL = jest.fn();
+
+jest.mock('../../utilities/ui/imageScripts.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/imageScripts.js');
+  return {
+    __esModule: true,
+    ...actual,
+    fetchImageFromURL: (...args) => mockFetchImageFromURL(...args),
+  };
+});
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
 const SBT_FACTORY_RECEIPT_TEST_IFACE = new ethers.utils.Interface([
@@ -53,6 +63,7 @@ const makeInstance = (props = {}) => {
 describe('CreateSBTGroup cache helpers', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    mockFetchImageFromURL.mockReset();
   });
 
   afterEach(() => {
@@ -60,6 +71,47 @@ describe('CreateSBTGroup cache helpers', () => {
     delete window.ethereum;
     delete window.__litHooks;
     delete window.litHooks;
+  });
+
+  it('initializes a blank authoring form with open mint defaults', () => {
+    const instance = makeInstance({ account: '0xAdmin' });
+
+    expect(instance.state).toEqual(expect.objectContaining({
+      sbtName: '',
+      sbtDescription: '',
+      sbtImageFile: null,
+      sbtImageUrl: '',
+      useImageUrl: false,
+      tags: [],
+      currentTagInput: '',
+      documentURLs: [],
+      documentUrl: '',
+      groupPassword: '',
+      metadataLockGateIds: {
+        name: [],
+        description: [],
+        tags: [],
+        documentURLs: [],
+        image: [],
+      },
+      sbtCodes: [],
+      groupSubmitted: false,
+      predictableAddressEnabled: false,
+      mintOptionsCollapsed: true,
+      distributionOptionsCollapsed: true,
+      numInviteLinks: 10,
+      exportFormat: 'json',
+    }));
+    expect(instance.state.sbtDistribution).toEqual(expect.objectContaining({
+      distributionOption: 'anyoneCanMint',
+      adminAddress: '0xAdmin',
+      burnAdmin: '0xAdmin',
+      isLimited: false,
+      isTimeLimited: false,
+      unlisted: false,
+      network: 'not connected',
+    }));
+    expect(instance.state.network).toBe('');
   });
 
   it('buildCachePayload normalizes dates and network metadata', () => {
@@ -139,6 +191,71 @@ describe('CreateSBTGroup cache helpers', () => {
       sbtAddress: sbtAddress.toLowerCase(),
       passwords: ['code-one', 'code-two'],
     }));
+  });
+
+  it('skips recovery-code persistence when the SBT has no password mint path', () => {
+    localStorage.clear();
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'test',
+    });
+
+    const result = instance.persistCreatedSbtCodes({
+      sbtAddress: '0xABC0000000000000000000000000000000000000',
+      hasPasswordMintOnChain: false,
+      codesToStore: ['unused-code'],
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      status: 'empty-recovery-payload',
+    }));
+    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+  });
+
+  it('renders a QR SVG into a PNG blob for download and copy helpers', async () => {
+    const instance = makeInstance();
+    document.body.innerHTML = '<svg id="hidden-page-qr" xmlns="http://www.w3.org/2000/svg"></svg>';
+    const qrBlob = new Blob(['qr'], { type: 'image/png' });
+    const originalCreateElement = document.createElement.bind(document);
+    const originalImage = global.Image;
+    const canvasContext = {
+      fillStyle: '',
+      fillRect: jest.fn(),
+      drawImage: jest.fn(),
+    };
+    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+      const element = originalCreateElement(tagName, options);
+      if (String(tagName).toLowerCase() === 'canvas') {
+        element.getContext = jest.fn(() => canvasContext);
+        element.toBlob = jest.fn((callback) => callback(qrBlob));
+      }
+      return element;
+    });
+    class MockImage {
+      constructor() {
+        this.width = 24;
+        this.height = 24;
+        this.onload = null;
+      }
+
+      set src(_value) {
+        setTimeout(() => {
+          if (this.onload) this.onload();
+        }, 0);
+      }
+    }
+
+    global.Image = MockImage;
+    try {
+      await expect(instance.processQrImage('hidden-page-qr')).resolves.toBe(qrBlob);
+      expect(canvasContext.fillRect).toHaveBeenCalledWith(0, 0, 24, 24);
+      expect(canvasContext.drawImage).toHaveBeenCalled();
+    } finally {
+      createElementSpy.mockRestore();
+      global.Image = originalImage;
+      document.body.innerHTML = '';
+    }
   });
 
   it('loadFormCache restores tags and dates, then updates hash', () => {
@@ -397,6 +514,38 @@ describe('CreateSBTGroup cache helpers', () => {
       maskedValue: '[encrypted]',
       recipients: [],
     })).rejects.toThrow('Selected access rule does not provide any Lit recipients.');
+  });
+
+  it('uses scoped Lit hooks for locked metadata encryption when global hooks are absent', async () => {
+    const scopedSaveKey = jest.fn();
+    const encryptSpy = jest.spyOn(cryptoUtils, 'encryptEnvelopeValue').mockResolvedValue({ encrypted: true });
+    const instance = makeInstance({
+      provider: 'mock-provider',
+      account: '0xCreator',
+      litHooks: { saveKey: scopedSaveKey },
+    });
+
+    await expect(instance.encryptValueWithRecipients({
+      value: 'secret',
+      maskedValue: '[encrypted]',
+      contextLabel: 'sbt:test:name',
+      chainIdFallback: 11155420,
+      recipients: [
+        {
+          chain: 'optimismSepolia',
+          accessControlConditions: [{ contractAddress: '0x00000000000000000000000000000000000000aa' }],
+        },
+      ],
+    })).resolves.toEqual({
+      value: '[encrypted]',
+      encrypted: { encrypted: true },
+    });
+
+    expect(encryptSpy).toHaveBeenCalledWith('secret', expect.objectContaining({
+      lit: expect.objectContaining({
+        saveKey: scopedSaveKey,
+      }),
+    }));
   });
 
   it('uses terminology-aware access rule errors when metadata locks reference missing gates', async () => {
@@ -1490,7 +1639,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(screen.getByPlaceholderText('Name')).toBeInTheDocument();
     expect(screen.getByText('Image')).toBeInTheDocument();
     expect(mintOptionsHeader).toHaveAttribute('aria-expanded', 'false');
-    expect(within(mintOptionsHeader).getByText('Collect Options')).toBeInTheDocument();
+    expect(within(mintOptionsHeader).getByText('Create Options')).toBeInTheDocument();
   });
 
   it('groups the compact token info controls into shared desktop rows', () => {
@@ -1600,7 +1749,7 @@ describe('CreateSBTGroup cache helpers', () => {
     });
     instance.state.tokenInfoCollapsed = false;
     const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
-    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+    mockFetchImageFromURL.mockResolvedValue(fetchedFile);
 
     try {
       Object.defineProperty(navigator, 'clipboard', {
@@ -1618,7 +1767,7 @@ describe('CreateSBTGroup cache helpers', () => {
       });
 
       await waitFor(() => {
-        expect(fetchImageSpy).toHaveBeenCalledWith('https://example.com/sbt-image.png');
+        expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/sbt-image.png');
         expect(instance.state.sbtImageFile).toBe(fetchedFile);
       });
 
@@ -1645,7 +1794,7 @@ describe('CreateSBTGroup cache helpers', () => {
     const arweaveRef = `ar://${'a'.repeat(43)}`;
     const normalizedArweaveUrl = normalizeArweaveUrl(arweaveRef);
     const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
-    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+    mockFetchImageFromURL.mockResolvedValue(fetchedFile);
     instance.state.tokenInfoCollapsed = false;
     instance.state.useImageUrl = true;
 
@@ -1662,7 +1811,7 @@ describe('CreateSBTGroup cache helpers', () => {
     });
 
     await waitFor(() => {
-      expect(fetchImageSpy).toHaveBeenCalledWith(normalizedArweaveUrl);
+      expect(mockFetchImageFromURL).toHaveBeenCalledWith(normalizedArweaveUrl);
       expect(instance.state.sbtImageFile).toBe(fetchedFile);
     });
 
@@ -1683,7 +1832,7 @@ describe('CreateSBTGroup cache helpers', () => {
     const arweaveRef = `ar://${'b'.repeat(43)}`;
     const normalizedArweaveUrl = normalizeArweaveUrl(arweaveRef);
     const fetchedFile = new File(['remote-image'], 'remote.png', { type: 'image/png' });
-    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockResolvedValue(fetchedFile);
+    mockFetchImageFromURL.mockResolvedValue(fetchedFile);
     instance.commitPendingDocumentUrl = jest.fn(async () => false);
     instance.uploadImageToArweave = jest.fn(async () => null);
     instance.uploadTokenUriToArweave = jest.fn(async () => null);
@@ -1697,7 +1846,7 @@ describe('CreateSBTGroup cache helpers', () => {
       await instance.handleMintClick();
     });
 
-    expect(fetchImageSpy).toHaveBeenCalledWith(normalizedArweaveUrl);
+    expect(mockFetchImageFromURL).toHaveBeenCalledWith(normalizedArweaveUrl);
     expect(instance.state.sbtImageFile).toBe(fetchedFile);
     expect(instance.uploadImageToArweave).toHaveBeenCalledTimes(1);
     expect(instance.uploadTokenUriToArweave).toHaveBeenCalledTimes(1);
@@ -1786,7 +1935,7 @@ describe('CreateSBTGroup cache helpers', () => {
     instance.state.useImageUrl = false;
     URL.createObjectURL = jest.fn(() => 'blob:existing-sbt-preview');
     URL.revokeObjectURL = jest.fn();
-    const fetchImageSpy = jest.spyOn(imageScripts, 'fetchImageFromURL').mockRejectedValue(
+    mockFetchImageFromURL.mockRejectedValue(
       new Error('Invalid image type')
     );
 
@@ -1807,7 +1956,7 @@ describe('CreateSBTGroup cache helpers', () => {
 
       view.rerender(instance.render());
 
-      expect(fetchImageSpy).toHaveBeenCalledWith('https://example.com/not-an-image');
+      expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/not-an-image');
       expect(instance.state.useImageUrl).toBe(false);
       expect(instance.state.sbtImageFile).toBe(existingFile);
       expect(screen.queryByTestId(E2E_TESTIDS.SBT_CREATE_IMAGE_URL_INPUT)).not.toBeInTheDocument();
@@ -1824,7 +1973,6 @@ describe('CreateSBTGroup cache helpers', () => {
       });
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
-      fetchImageSpy.mockRestore();
     }
   });
 
@@ -2814,6 +2962,7 @@ describe('CreateSBTGroup cache helpers', () => {
       sbtAddress: freshPredictedAddress,
     });
     expect(payload.predictedAddress).toBe(freshPredictedAddress);
+    expect(payload.mintModeOnChain).toBe(2);
     expect(payload.finalGroupPasswordHash).toBe(`0x${'55'.repeat(32)}`);
   });
 
@@ -2855,6 +3004,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(payload).toEqual(expect.objectContaining({
       predictedAddress: '0x00000000000000000000000000000000000000d4',
       displayName: 'Deferred Group',
+      mintModeOnChain: 2,
       tokenURI: 'ar://metadata',
       finalGroupPasswordHash: `0x${'44'.repeat(32)}`,
       createOptions: {
@@ -3005,8 +3155,8 @@ describe('CreateSBTGroup cache helpers', () => {
     render(instance.render());
 
     expect(screen.getByRole('heading', { name: 'Created' })).toBeInTheDocument();
-    expect(screen.getByText(`${t('minted')}!`)).toBeInTheDocument();
-    expect(screen.getByText(t('mint'))).toBeInTheDocument();
+    expect(screen.getByText('Created!')).toBeInTheDocument();
+    expect(screen.getAllByText('Create').length).toBeGreaterThan(0);
     expect(screen.getByText('Contract Address:')).toBeInTheDocument();
     expect(screen.getByTitle('Copy Link to Page')).toBeInTheDocument();
     expect(screen.getByTitle('Bookmark')).toBeInTheDocument();

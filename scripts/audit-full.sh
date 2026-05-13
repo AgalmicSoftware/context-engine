@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PRD 240 — Full codebase security audit via Codex
+# Full codebase security audit via Codex
 # Usage: bash scripts/audit-full.sh [--domain <worker|crypto|client|cecc|rpc|arweave|userpage|sbts|porto|contracts|ai|survey|all>]
 set -euo pipefail
 
@@ -20,7 +20,7 @@ TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 declare -A DOMAINS
 DOMAINS[worker]="workers/sessionCorsWorker/worker.js workers/deploy-helper/worker.js"
 DOMAINS[crypto]="client/src/utilities/crypto/ client/src/utilities/web3/contractScripts.impl.ts client/src/utilities/web3/sessionRegistry.ts"
-DOMAINS[client]="client/src/reducers/ client/src/utilities/session/ client/src/utilities/worker/ client/src/components/SBTs/SBTPage.jsx client/src/components/SurveyTool/SurveyTool.jsx"
+DOMAINS[client]="client/src/reducers/ client/src/utilities/session/ client/src/utilities/worker/ client/src/components/SBTs/SBTPage.tsx client/src/components/SurveyTool/SurveyTool.tsx"
 DOMAINS[cecc]="contextEngine-cc/lib/ contextEngine-cc/hook/"
 DOMAINS[rpc]="client/src/utilities/web3/rpcReadCache.ts client/src/utilities/web3/rpcSelection.ts client/src/utilities/web3/rpcDebugStats.ts"
 DOMAINS[arweave]="client/src/utilities/arweave/"
@@ -28,7 +28,7 @@ DOMAINS[userpage]="client/src/components/UserPage/ client/src/utilities/cache/"
 DOMAINS[sbts]="client/src/components/SBTs/ client/src/utilities/sbt/"
 DOMAINS[porto]="client/src/utilities/web3/portoFunctions.ts client/src/utilities/web3/sponsoredAccess.ts"
 DOMAINS[contracts]="contracts/CustomSBT.sol contracts/SessionRegistry.sol contracts/Surveys.sol contracts/SBTFactory.sol"
-DOMAINS[ai]="client/src/utilities/ai/ client/src/components/Shared/AudioInput/AudioInput.jsx"
+DOMAINS[ai]="client/src/utilities/ai/ client/src/components/Shared/AudioInput/AudioInput.tsx"
 DOMAINS[survey]="client/src/components/SurveyTool/ client/src/utilities/survey/"
 
 if [ "$DOMAIN" = "all" ]; then

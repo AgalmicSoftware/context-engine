@@ -1,0 +1,87 @@
+import { toStr } from '../../utilities/shared/primitives.js';
+import { normalizeSlug } from './adminPageHelpers';
+
+type SessionDisplayUrlArgs = {
+  selectedSlug?: unknown;
+  selectedConfig?: Record<string, unknown> | null;
+  groupMetadata?: Record<string, unknown> | null;
+};
+
+type BuildSessionUrlOptions = {
+  allowGeneral?: boolean;
+};
+
+type AdminEncryptedEntry = string | Record<string, unknown>;
+
+const asRecord = (value: unknown): Record<string, unknown> => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+);
+
+export const buildSessionUrl = (slug: unknown, { allowGeneral = false }: BuildSessionUrlOptions = {}): string => {
+  const hasExplicitSlug = slug !== undefined && slug !== null;
+  const normalized = normalizeSlug(slug);
+  const base = typeof window !== 'undefined' && window.location ? window.location.origin : '';
+  if (!normalized) return allowGeneral && hasExplicitSlug ? `${base}/session` : '';
+  return `${base}/session/${encodeURIComponent(normalized)}`;
+};
+
+export const shortAddress = (addr: unknown): string => {
+  const s = toStr(addr);
+  if (!s) return '';
+  return `${s.slice(0, 6)}…${s.slice(-4)}`;
+};
+
+export const getAdminSessionDisplayUrl = ({
+  selectedSlug,
+  selectedConfig,
+  groupMetadata,
+}: SessionDisplayUrlArgs = {}): string => {
+  if (!selectedConfig && !groupMetadata) return '';
+  const resolvedSlug = selectedConfig?.slug ?? groupMetadata?.slug ?? selectedSlug;
+  return buildSessionUrl(resolvedSlug, { allowGeneral: true });
+};
+
+export const collectEncryptedEntries = (metadata: unknown): Record<string, AdminEncryptedEntry> => {
+  const metadataRecord = asRecord(metadata);
+  const entries: Record<string, AdminEncryptedEntry> = {};
+  if (!Object.keys(metadataRecord).length) return entries;
+
+  const fields = asRecord(metadataRecord.encryptedFields);
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value == null || value === '') return;
+    entries[key] = value as AdminEncryptedEntry;
+  });
+
+  const sessionInfoEncrypted = metadataRecord.sessionInfoEncrypted;
+  if (sessionInfoEncrypted) {
+    entries.sessionInfo = sessionInfoEncrypted as AdminEncryptedEntry;
+  }
+
+  const ai = asRecord(metadataRecord.ai);
+  const aiProviders = asRecord(ai.providers);
+  Object.entries(aiProviders).forEach(([key, cfg]) => {
+    const encrypted = asRecord(cfg).encryptedApiKey;
+    if (!encrypted) return;
+    const path = `ai.providers.${key}.apiKey`;
+    if (!entries[path]) entries[path] = encrypted as AdminEncryptedEntry;
+  });
+
+  const rpc = asRecord(metadataRecord.rpc);
+  const rpcProviders = asRecord(rpc.providers);
+  Object.entries(rpcProviders).forEach(([key, cfg]) => {
+    const encrypted = asRecord(cfg).encryptedApiKey;
+    if (!encrypted) return;
+    const path = `rpc.providers.${key}.apiKey`;
+    if (!entries[path]) entries[path] = encrypted as AdminEncryptedEntry;
+  });
+
+  const arweaveEncrypted = asRecord(metadataRecord.arweave).encryptedJwk;
+  if (arweaveEncrypted && !entries['arweave.jwk']) entries['arweave.jwk'] = arweaveEncrypted as AdminEncryptedEntry;
+
+  const faucetEncrypted = asRecord(metadataRecord.faucet).encryptedPrivateKey;
+  if (faucetEncrypted && !entries['faucet.privateKey']) entries['faucet.privateKey'] = faucetEncrypted as AdminEncryptedEntry;
+
+  return entries;
+};

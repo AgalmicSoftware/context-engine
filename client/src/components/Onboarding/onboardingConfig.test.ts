@@ -17,7 +17,7 @@ const createStorageMock = (seed: Record<string, string> = {}) => {
 };
 
 describe('readColdLoadOnboardingState', () => {
-  it('keeps cold-load onboarding disabled by default on first visit', () => {
+  it('does not auto-open cold-load onboarding by default on first visit', () => {
     const storage = createStorageMock();
 
     expect(readColdLoadOnboardingState(storage)).toEqual({
@@ -27,7 +27,18 @@ describe('readColdLoadOnboardingState', () => {
     expect(storage.setItem).toHaveBeenCalledWith(FIRST_VISIT_STORAGE_KEY, 'true');
   });
 
-  it('allows explicitly forcing the cold-load onboarding back on for testing', () => {
+  it('allows explicitly disabling the cold-load onboarding for testing', () => {
+    const storage = createStorageMock({
+      [COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY]: 'false',
+    });
+
+    expect(readColdLoadOnboardingState(storage)).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: false,
+    });
+  });
+
+  it('allows explicitly forcing the cold-load onboarding on for testing', () => {
     const storage = createStorageMock({
       [COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY]: 'true',
     });
@@ -48,5 +59,17 @@ describe('readColdLoadOnboardingState', () => {
       firstVisit: true,
       shouldStartOnboarding: false,
     });
+  });
+
+  it('does not auto-open after the first visit has already been recorded', () => {
+    const storage = createStorageMock({
+      [FIRST_VISIT_STORAGE_KEY]: 'true',
+    });
+
+    expect(readColdLoadOnboardingState(storage)).toEqual({
+      firstVisit: false,
+      shouldStartOnboarding: false,
+    });
+    expect(storage.setItem).toHaveBeenCalledWith(FIRST_VISIT_STORAGE_KEY, 'false');
   });
 });

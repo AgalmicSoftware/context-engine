@@ -1,6 +1,6 @@
 /* @file RightSide.module.scss */
 
-#rightSideContainer {
+.rightSideContainer {
   display: none;
 }
 
@@ -15,7 +15,7 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #rightSideContainer {
+  .rightSideContainer {
     flex: 0 0 23%;
     display: flex;
     align-self: stretch;
@@ -28,7 +28,7 @@
 }
 
 @media (min-width: 1367px) {
-  #rightSideContainer {
+  .rightSideContainer {
     flex: 0 0 23%;
     display: flex;
     align-self: stretch;

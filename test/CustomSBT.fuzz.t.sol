@@ -47,7 +47,7 @@ contract CustomSBTFuzzTest is TestUtils {
         nonce = (nonce % type(uint64).max) + 2;
 
         bytes32[] memory empty = new bytes32[](0);
-        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, empty, keccak256(abi.encodePacked(signer)));
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 100, true, empty, keccak256(abi.encodePacked(signer)));
         bytes memory signature = signInvite(sbt, nonce, signerKey);
 
         vm.prank(user);
@@ -59,7 +59,7 @@ contract CustomSBTFuzzTest is TestUtils {
 
     function fuzz_claimWithInvite_randomSignature(bytes memory sig) internal {
         bytes32[] memory empty = new bytes32[](0);
-        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 0, false, empty, keccak256(abi.encodePacked(signer)));
+        MySBT sbt = deploySbtWithConfig("ContextEngine", "CE", 100, true, empty, keccak256(abi.encodePacked(signer)));
         bytes32 digest = keccak256(abi.encodePacked(address(sbt), uint256(1))).toEthSignedMessageHash();
 
         if (sig.length == 65) {

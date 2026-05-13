@@ -539,6 +539,29 @@ describe('createSessionQuestionCacheController', () => {
       }));
     });
 
+    it('resets empty discovery watermarks when a gated empty recovery forces a rescan', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope({}, {
+              questionsLatestBlock: 12,
+              questionsDiscoveryCheckpointBlock: 12,
+            }),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      await controller.initializeQuestionCacheForGroup(SESSION_SLUG, { forceDiscoveryRescan: true });
+
+      expect(contractScripts.fetchUserSubmittedQuestionIDs).toHaveBeenCalledWith(
+        'none',
+        10,
+        12,
+        SESSION_SLUG
+      );
+    });
+
     it('fetches question IDs via contractScripts.fetchUserSubmittedQuestionIDs', async () => {
       const controller = createSessionQuestionCacheController(createMockHost());
 
@@ -584,6 +607,46 @@ describe('createSessionQuestionCacheController', () => {
       });
     });
 
+    it('persists discovered question IDs as pending before slow metadata hydration completes', async () => {
+      const host = createMockHost();
+      const controller = createSessionQuestionCacheController(host);
+      const metadataDeferred = createDeferred();
+
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([
+        { questionId: 'Q1', creationBlock: 11 },
+      ]);
+      contractScripts.getQuestionDataById.mockReturnValue(metadataDeferred.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+
+      await flushMicrotasks(10);
+
+      const pendingDuringHydration = host
+        .getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.pendingQuestionMetadata?.q1;
+
+      expect(pendingDuringHydration).toMatchObject({
+        attempts: 0,
+        nextRetryAtMs: 0,
+        state: 'discovered',
+        lastStatus: null,
+      });
+      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionsLatestBlock).toBe(12);
+
+      metadataDeferred.resolve({
+        creator: '0xCreator',
+        prompt: 'Late prompt',
+      });
+      await initPromise;
+
+      const stored = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
+      expect(stored?.pendingQuestionMetadata?.q1).toBeUndefined();
+      expect(stored?.questions?.q1).toMatchObject({
+        id: 'q1',
+        creator: '0xCreator',
+        prompt: 'Late prompt',
+      });
+    });
+
     it('handles question metadata fetch failure by marking the question pending', async () => {
       const nowRef = { value: 1000 };
       jest.spyOn(Date, 'now').mockImplementation(() => nowRef.value);
@@ -607,6 +670,15 @@ describe('createSessionQuestionCacheController', () => {
         message: 'retry later',
       });
       expect(pendingEntry.nextRetryAtMs).toBe(2000);
+      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questions?.q1).toMatchObject({
+        id: 'q1',
+        prompt: '[encrypted]',
+        sessionName: SESSION_SLUG,
+        __ceQuestionMetadataPending: true,
+      });
+      expect(host.getStateSnapshot()).toMatchObject({
+        isQuestionCacheReady: true,
+      });
 
       controller.destroy();
     });
@@ -736,6 +808,11 @@ describe('createSessionQuestionCacheController', () => {
         attempts: 1,
         nextRetryAtMs: 2000,
       });
+      expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questions?.q1).toMatchObject({
+        id: 'q1',
+        prompt: '[encrypted]',
+        __ceQuestionMetadataPending: true,
+      });
 
       nowRef.value = firstPending.nextRetryAtMs + 1;
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG, {
@@ -751,6 +828,7 @@ describe('createSessionQuestionCacheController', () => {
         creator: '0xRecovered',
         prompt: 'Recovered prompt',
       });
+      expect(stored?.questions?.q1?.__ceQuestionMetadataPending).toBeUndefined();
       expect(stored?.pendingQuestionMetadata?.q1).toBeUndefined();
 
       controller.destroy();
@@ -958,6 +1036,33 @@ describe('createSessionQuestionCacheController', () => {
       expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
         needsQuestionResponsesNonce: true,
       });
+    });
+
+    it('preserves backoff entries created across multiple refresh batches', async () => {
+      const nowRef = { value: 1000 };
+      jest.spyOn(Date, 'now').mockImplementation(() => nowRef.value);
+      const questions = {};
+      for (let index = 1; index <= 5; index += 1) {
+        questions[`q${index}`] = createMaskedQuestion(`q${index}`);
+      }
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(questions),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      contractScripts.decryptQuestionPayloadInPlace.mockRejectedValue(new Error('decrypt failed'));
+
+      await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG, { force: true });
+
+      contractScripts.decryptQuestionPayloadInPlace.mockClear();
+      nowRef.value = 2000;
+      await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG);
+
+      expect(contractScripts.decryptQuestionPayloadInPlace).not.toHaveBeenCalled();
     });
   });
 

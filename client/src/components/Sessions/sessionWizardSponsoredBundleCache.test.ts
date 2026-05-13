@@ -20,6 +20,23 @@ type IndexedDbMockOptions = {
   abortAfterRequestSuccess?: boolean;
 };
 
+type MockDbRequest<T> = {
+  onsuccess: ((event?: unknown) => void) | null;
+  onerror: ((event?: unknown) => void) | null;
+  result: T | undefined;
+  error: Error | null;
+};
+
+type MockDbTransaction = {
+  oncomplete: ((event?: unknown) => void) | null;
+  onerror: ((event?: unknown) => void) | null;
+  onabort: ((event?: unknown) => void) | null;
+  error: Error | null;
+  objectStore: jest.Mock;
+};
+
+const asEvent = (target: unknown): Event => ({ target } as unknown as Event);
+
 const originalIndexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
 
 const createIndexedDbMock = ({ abortAfterRequestSuccess = false }: IndexedDbMockOptions = {}) => {
@@ -33,8 +50,8 @@ const createIndexedDbMock = ({ abortAfterRequestSuccess = false }: IndexedDbMock
     return stores.get(key) as Map<string, unknown>;
   };
 
-  const createRequest = <T,>(tx: IDBTransaction, run: () => T) => {
-    const request = {
+  const createRequest = <T,>(tx: MockDbTransaction, run: () => T) => {
+    const request: MockDbRequest<T> = {
       onsuccess: null as ((event?: unknown) => void) | null,
       onerror: null as ((event?: unknown) => void) | null,
       result: undefined as T | undefined,
@@ -49,28 +66,28 @@ const createIndexedDbMock = ({ abortAfterRequestSuccess = false }: IndexedDbMock
         }
         if (abortAfterRequestSuccess) {
           const error = new Error('IndexedDB transaction aborted');
-          (tx as IDBTransaction & { error?: Error | null }).error = error;
+          tx.error = error;
           if (typeof tx.onabort === 'function') {
-            tx.onabort({ target: tx } as Event);
+            tx.onabort(asEvent(tx));
           }
           return;
         }
         if (typeof tx.oncomplete === 'function') {
-          tx.oncomplete({ target: tx } as Event);
+          tx.oncomplete(asEvent(tx));
         }
       } catch (error) {
         request.error = error as Error;
-        (tx as IDBTransaction & { error?: Error | null }).error = error as Error;
+        tx.error = error as Error;
         if (typeof request.onerror === 'function') {
           request.onerror({ target: request });
         }
         if (typeof tx.onerror === 'function') {
-          tx.onerror({ target: tx } as Event);
+          tx.onerror(asEvent(tx));
         }
       }
     }, 0);
 
-    return request as IDBRequest<T>;
+    return request as unknown as IDBRequest<T>;
   };
 
   const db = {
@@ -83,19 +100,20 @@ const createIndexedDbMock = ({ abortAfterRequestSuccess = false }: IndexedDbMock
     }),
     close: jest.fn(),
     transaction: jest.fn((storeName: string) => {
-      const tx = {
+      const tx: MockDbTransaction = {
         oncomplete: null as ((event?: unknown) => void) | null,
         onerror: null as ((event?: unknown) => void) | null,
         onabort: null as ((event?: unknown) => void) | null,
         error: null as Error | null,
-        objectStore: jest.fn(() => ({
-          put: jest.fn((value: unknown, key: string) => createRequest(tx as unknown as IDBTransaction, () => {
-            ensureStore(storeName).set(key, value);
-            return key;
-          })),
-        })),
+        objectStore: jest.fn(),
       };
-      return tx;
+      tx.objectStore.mockImplementation(() => ({
+        put: jest.fn((value: unknown, key: string) => createRequest(tx, () => {
+          ensureStore(storeName).set(key, value);
+          return key;
+        })),
+      }));
+      return tx as unknown as IDBTransaction;
     }),
   };
 
@@ -131,7 +149,7 @@ describe('sessionWizardSponsoredBundleCache IndexedDB transaction helper', () =>
     if (originalIndexedDbDescriptor) {
       Object.defineProperty(globalThis, 'indexedDB', originalIndexedDbDescriptor);
     } else {
-      delete (globalThis as typeof globalThis & { indexedDB?: IDBFactory }).indexedDB;
+      Reflect.deleteProperty(globalThis as Record<string, unknown>, 'indexedDB');
     }
   });
 

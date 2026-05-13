@@ -38,6 +38,23 @@ describe('sessionQuestionDecryption', () => {
     });
   });
 
+  it('preserves object-shaped providerLike values without coercing them', () => {
+    const providerLike = { provider: true, request: jest.fn() };
+
+    expect(buildQuestionDecryptContextForSession({
+      cfg: { networkChainId: 84532 },
+      account: '0xabc',
+      providerLike,
+      litHooks: null,
+    })).toEqual({
+      account: '0xabc',
+      providerLike,
+      chainId: 84532,
+      litHooks: null,
+      litOpts: null,
+    });
+  });
+
   it('treats newly decrypted prompt/options/tags payloads as improvements', () => {
     expect(hasMaskedQuestionPayloadImproved(
       {

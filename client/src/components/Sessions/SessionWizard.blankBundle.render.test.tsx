@@ -38,6 +38,7 @@ const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
+  litAccountApiKey: 'sponsored-lit-account-key',
   faucetGrantToken: 'sponsored-faucet-grant',
   customRpcUrl: 'https://sponsored-rpc.example.test',
   deployGrantToken: 'sponsored-deploy-grant',
@@ -65,7 +66,7 @@ jest.mock('../ContractPage/contractViewerUtils.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: jest.fn(() => []),
-  createLitHooks: jest.fn(() => ({ saveKey: jest.fn(), getKey: jest.fn(), litNetwork: 'naga-dev' })),
+  createLitHooks: jest.fn(() => ({ saveKey: jest.fn(), getKey: jest.fn(), litNetwork: 'chipotle' })),
   resolveLitChain: jest.fn(() => 'baseSepolia'),
   getGlobalLitHooks: jest.fn(() => null),
   setGlobalLitHooks: jest.fn(),
@@ -178,7 +179,6 @@ jest.mock('../../variables/appConfig.js', () => {
   const actual = jest.requireActual('../../variables/appConfig.js');
   return {
     ...actual,
-    ENABLE_LIT_SESSION_PAYER_WALLET_INPUT: true,
     CLOUDFLARE_WORKER_BUNDLE_URL: '',
   };
 });
@@ -318,7 +318,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit account key, deploy access.'
       );
     });
 
@@ -398,7 +398,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit account key, deploy access.'
       );
     });
 

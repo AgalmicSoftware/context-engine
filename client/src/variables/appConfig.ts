@@ -243,13 +243,6 @@ export const CE_RPC_TESTING_MODE = readPublicBoolEnv(
   'REACT_APP_CE_RPC_TESTING_MODE',
   false
 );
-// Temporary Lit sponsorship rollout toggle for SessionWizard while CE is still on the
-// Naga-era Lit path. Default false keeps the Lit payer-wallet UI hidden in `/new`
-// until the funded/payer flow is intentionally enabled for the Chipotle migration path.
-export const ENABLE_LIT_SESSION_PAYER_WALLET_INPUT = readPublicBoolEnv(
-  'REACT_APP_ENABLE_LIT_SESSION_PAYER_WALLET_INPUT',
-  false
-);
 // On-chain session registry (kept off by default during the migration).
 export const USE_ONCHAIN_SESSION_REGISTRY = readPublicBoolEnv(
   'REACT_APP_USE_ONCHAIN_SESSION_REGISTRY',
@@ -291,7 +284,7 @@ export const ARWEAVE_GATEWAY_URL = readPublicEnv(
 // Override at runtime with `window.CE_ARWEAVE_DIRECT_TO_AR_IO`.
 export const CE_ARWEAVE_DIRECT_TO_AR_IO = readPublicBoolEnv(
   'REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO',
-  false
+  true
 );
 // Default ar.io gateway base when troubleshooting mode is enabled.
 // Override at runtime with `window.CE_ARWEAVE_AR_IO_URL`.

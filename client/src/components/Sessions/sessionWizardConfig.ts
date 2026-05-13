@@ -40,6 +40,7 @@ export const METADATA_FIELD_ORDER = [
   'sessionInfo',
   'sessionHeaderImg',
   'corsWorkerUrl',
+  'storageProfile',
   'defaultTags',
   'questionsGenPrompt',
   'defaultSbtTags',

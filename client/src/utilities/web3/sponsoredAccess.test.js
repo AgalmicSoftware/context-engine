@@ -4,6 +4,7 @@ import {
   primeSponsoredAccessCheck,
   readCachedSponsoredAccess,
   resolveSponsoredGateForResource,
+  resolveSponsoredGateStateForResource,
 } from './sponsoredAccess.js';
 import contractScripts from './contractScripts.js';
 
@@ -91,6 +92,62 @@ describe('sponsoredAccess on-chain precedence', () => {
 
     const gate = resolveSponsoredGateForResource(cfg, 'default');
     expect(gate).toBeNull();
+  });
+
+  it('falls back to the default on-chain gate for sponsored RPC when no resource gate is set', () => {
+    const cfg = {
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: [onChainSbt],
+            mode: 'all',
+            chainId: 84532,
+          },
+          rpc: {
+            lookupStatus: 'ok',
+            sbtAddresses: [],
+            mode: 'any',
+            chainId: 84532,
+          },
+        },
+      },
+    };
+
+    const state = resolveSponsoredGateStateForResource(cfg, 'rpc');
+
+    expect(state.status).toBe('restricted');
+    expect(state.resourceKey).toBe('rpc');
+    expect(state.gate?.sbtAddress).toBe(onChainSbt);
+    expect(state.gate?.mode).toBe('all');
+  });
+
+  it('does not apply the default-gate fallback to non-RPC resources', () => {
+    const cfg = {
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: [onChainSbt],
+            mode: 'all',
+            chainId: 84532,
+          },
+          arweave: {
+            lookupStatus: 'ok',
+            sbtAddresses: [],
+            mode: 'any',
+            chainId: 84532,
+          },
+        },
+      },
+    };
+
+    const state = resolveSponsoredGateStateForResource(cfg, 'arweave');
+
+    expect(state.status).toBe('open');
+    expect(state.gate).toBeNull();
   });
 });
 

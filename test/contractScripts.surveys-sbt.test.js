@@ -218,6 +218,8 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       _tokenUri,
       groupPasswordHash,
       groupCfgArg,
+      create2Salt = '',
+      createOptions = {},
     ] = args;
     const receipt = await contractScripts.createSBT(
       providerName,
@@ -231,7 +233,9 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       hashedPasswords,
       txId,
       groupPasswordHash,
-      groupCfgArg
+      groupCfgArg,
+      create2Salt,
+      createOptions
     );
     expect(receipt).toBeTruthy();
 
@@ -244,6 +248,58 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     const parsed = log ? iface.parseLog(log) : null;
     expect(parsed).toBeTruthy();
     return parsed.args.sbtAddress || parsed.args[0];
+  };
+
+  const createScopedSignatureSbtAndGetAddress = async ({
+    name,
+    symbol,
+    limitedNumber = 0,
+    hasPasswordMint = false,
+    groupPassword,
+    tokenUriOverrides = {},
+    create2Salt = `test/${symbol.toLowerCase()}`,
+  }) => {
+    const predictedAddress = await contractScripts.predictSBTAddress(
+      'none',
+      name,
+      symbol,
+      limitedNumber,
+      account,
+      0,
+      hasPasswordMint,
+      3,
+      [],
+      '',
+      ethers.constants.HashZero,
+      groupCfg,
+      create2Salt,
+      { useConfiguredDeterministic: true, initializeGroupPasswordHash: true }
+    );
+
+    const groupPasswordHash = contractScripts.computeGroupPasswordHash({
+      password: groupPassword,
+      sbtAddress: predictedAddress,
+    });
+
+    const sbtAddress = await createSbtAndGetAddress([
+      'wagmi',
+      name,
+      symbol,
+      limitedNumber,
+      account,
+      0,
+      hasPasswordMint,
+      3,
+      [],
+      '',
+      groupPasswordHash,
+      groupCfg,
+      create2Salt,
+      { useConfiguredDeterministic: true, initializeGroupPasswordHash: true },
+    ], tokenUriOverrides);
+
+    expect(sbtAddress).toBe(predictedAddress);
+    return { sbtAddress, groupPasswordHash };
   };
 
   it('creates surveys, questions, and responses on-chain', async () => {
@@ -507,6 +563,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('adds hashed passwords after creation and mints', async () => {
     const password = 'gamma-pass';
+    const initialHashed = utils.keccak256(utils.toUtf8Bytes('starter-pass'));
     const hashed = utils.keccak256(utils.toUtf8Bytes(password));
 
     const sbtAddress = await createSbtAndGetAddress([
@@ -518,7 +575,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       0,
       true,
       3,
-      [],
+      [initialHashed],
       '',
       ethers.constants.HashZero,
       groupCfg,
@@ -545,26 +602,16 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('mints with group-password signature', async () => {
     const groupPassword = 'group-secret';
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({ password: groupPassword });
-
-    const sbtAddress = await createSbtAndGetAddress([
-      'wagmi',
-      'ContextEngine Group',
-      'CEGRP',
-      0,
-      account,
-      0,
-      false,
-      3,
-      [],
-      '',
-      groupPasswordHash,
-      groupCfg,
-    ], {
+    const { sbtAddress, groupPasswordHash } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Group',
+      symbol: 'CEGRP',
+      groupPassword,
+      tokenUriOverrides: {
       name: 'ContextEngine Group',
       hasPasswordMint: false,
       maxTokens: 0,
       tags: ['contextEngine', 'group'],
+      },
     });
 
     const onchainHash = await contractScripts.getGroupPasswordHash('none', sbtAddress, groupCfg);
@@ -582,28 +629,37 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     expect(Number(minted)).toBe(1);
   });
 
+  it('rejects public claim when the SBT is in group-signature mode', async () => {
+    const groupPassword = 'group-claim-blocked';
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Group Locked',
+      symbol: 'CEGRLOCK',
+      groupPassword,
+      tokenUriOverrides: {
+      name: 'ContextEngine Group Locked',
+      hasPasswordMint: false,
+      maxTokens: 0,
+      tags: ['contextEngine', 'group'],
+      },
+    });
+
+    await expect(contractScripts.claim('wagmi', sbtAddress)).rejects.toThrow(/Public claim not enabled/);
+  });
+
   it('mints with invite signature payloads', async () => {
     const groupPassword = 'invite-secret';
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({ password: groupPassword });
-
-    const sbtAddress = await createSbtAndGetAddress([
-      'wagmi',
-      'ContextEngine Invite',
-      'CEINV2',
-      5,
-      account,
-      0,
-      false,
-      3,
-      [],
-      '',
-      groupPasswordHash,
-      groupCfg,
-    ], {
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Invite',
+      symbol: 'CEINV2',
+      limitedNumber: 5,
+      hasPasswordMint: true,
+      groupPassword,
+      tokenUriOverrides: {
       name: 'ContextEngine Invite',
       hasPasswordMint: true,
       maxTokens: 5,
       tags: ['contextEngine', 'invite'],
+      },
     });
 
     const invites = await contractScripts.generateInvitePayloads({
@@ -623,6 +679,25 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
     const minted = await contractScripts.getMintedTokens('none', sbtAddress, groupCfg);
     expect(Number(minted)).toBe(1);
+  });
+
+  it('rejects public claim when the SBT is in invite mode', async () => {
+    const groupPassword = 'invite-claim-blocked';
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Invite Locked',
+      symbol: 'CEINVLOCK',
+      limitedNumber: 2,
+      hasPasswordMint: true,
+      groupPassword,
+      tokenUriOverrides: {
+      name: 'ContextEngine Invite Locked',
+      hasPasswordMint: true,
+      maxTokens: 2,
+      tags: ['contextEngine', 'invite'],
+      },
+    });
+
+    await expect(contractScripts.claim('wagmi', sbtAddress)).rejects.toThrow(/Public claim not enabled/);
   });
 
   it('rejects startClaim when password mint is disabled', async () => {
@@ -677,26 +752,18 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('does not mint on invalid invite nonce', async () => {
     const groupPassword = 'invite-bad-nonce';
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({ password: groupPassword });
-
-    const sbtAddress = await createSbtAndGetAddress([
-      'wagmi',
-      'ContextEngine Invite Bad',
-      'CEINVX',
-      0,
-      account,
-      0,
-      false,
-      3,
-      [],
-      '',
-      groupPasswordHash,
-      groupCfg,
-    ], {
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Invite Bad',
+      symbol: 'CEINVX',
+      limitedNumber: 1,
+      hasPasswordMint: true,
+      groupPassword,
+      tokenUriOverrides: {
       name: 'ContextEngine Invite Bad',
       hasPasswordMint: true,
       maxTokens: 0,
       tags: ['contextEngine', 'invite'],
+      },
     });
 
     const invites = await contractScripts.generateInvitePayloads({
@@ -804,7 +871,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
     await expect(contractScripts.claimWithPassword('wagmi', sbtAddress, password)).rejects.toThrow(/Claim not started/);
   });
 
-  it('rejects group signature mint without group password', async () => {
+  it('rejects group signature mint outside group-signature mode', async () => {
     const sbtAddress = await createSbtAndGetAddress([
       'wagmi',
       'ContextEngine No Group',
@@ -827,31 +894,21 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
     await expect(
       contractScripts.mintWithGroupSignature('wagmi', sbtAddress, '0x')
-    ).rejects.toThrow(/No group password set/);
+    ).rejects.toThrow(/Group signature mint not enabled/);
   });
 
   it('rejects group signature mint with wrong password', async () => {
     const groupPassword = 'group-right';
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({ password: groupPassword });
-
-    const sbtAddress = await createSbtAndGetAddress([
-      'wagmi',
-      'ContextEngine Group Wrong',
-      'CEGRW',
-      0,
-      account,
-      0,
-      false,
-      3,
-      [],
-      '',
-      groupPasswordHash,
-      groupCfg,
-    ], {
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Group Wrong',
+      symbol: 'CEGRW',
+      groupPassword,
+      tokenUriOverrides: {
       name: 'ContextEngine Group Wrong',
       hasPasswordMint: false,
       maxTokens: 0,
       tags: ['contextEngine', 'group'],
+      },
     });
 
     const signature = await contractScripts.signGroupMintAuthorization({
@@ -867,26 +924,17 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('enforces maxTokens for group signature mints', async () => {
     const groupPassword = 'group-limit';
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({ password: groupPassword });
-
-    const sbtAddress = await createSbtAndGetAddress([
-      'wagmi',
-      'ContextEngine Group Limit',
-      'CEGRL',
-      1,
-      account,
-      0,
-      false,
-      3,
-      [],
-      '',
-      groupPasswordHash,
-      groupCfg,
-    ], {
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Group Limit',
+      symbol: 'CEGRL',
+      limitedNumber: 1,
+      groupPassword,
+      tokenUriOverrides: {
       name: 'ContextEngine Group Limit',
       hasPasswordMint: false,
       maxTokens: 1,
       tags: ['contextEngine', 'group'],
+      },
     });
 
     const signatureOne = await contractScripts.signGroupMintAuthorization({
@@ -909,26 +957,18 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('rejects invite with wrong signature', async () => {
     const groupPassword = 'invite-good';
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({ password: groupPassword });
-
-    const sbtAddress = await createSbtAndGetAddress([
-      'wagmi',
-      'ContextEngine Invite Wrong',
-      'CEINVW',
-      0,
-      account,
-      0,
-      false,
-      3,
-      [],
-      '',
-      groupPasswordHash,
-      groupCfg,
-    ], {
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Invite Wrong',
+      symbol: 'CEINVW',
+      limitedNumber: 1,
+      hasPasswordMint: true,
+      groupPassword,
+      tokenUriOverrides: {
       name: 'ContextEngine Invite Wrong',
       hasPasswordMint: true,
       maxTokens: 0,
       tags: ['contextEngine', 'invite'],
+      },
     });
 
     const invites = await contractScripts.generateInvitePayloads({
@@ -949,26 +989,18 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('rejects invite when maxTokens is reached', async () => {
     const groupPassword = 'invite-limit';
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({ password: groupPassword });
-
-    const sbtAddress = await createSbtAndGetAddress([
-      'wagmi',
-      'ContextEngine Invite Limit',
-      'CEINVL',
-      1,
-      account,
-      0,
-      false,
-      3,
-      [],
-      '',
-      groupPasswordHash,
-      groupCfg,
-    ], {
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Invite Limit',
+      symbol: 'CEINVL',
+      limitedNumber: 1,
+      hasPasswordMint: true,
+      groupPassword,
+      tokenUriOverrides: {
       name: 'ContextEngine Invite Limit',
       hasPasswordMint: true,
       maxTokens: 1,
       tags: ['contextEngine', 'invite'],
+      },
     });
 
     const inviteOne = await contractScripts.generateInvitePayloads({
@@ -1003,26 +1035,18 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
 
   it('rejects invite when address already owns an SBT', async () => {
     const groupPassword = 'invite-own';
-    const groupPasswordHash = contractScripts.computeGroupPasswordHash({ password: groupPassword });
-
-    const sbtAddress = await createSbtAndGetAddress([
-      'wagmi',
-      'ContextEngine Invite Own',
-      'CEINVO',
-      0,
-      account,
-      0,
-      false,
-      3,
-      [],
-      '',
-      groupPasswordHash,
-      groupCfg,
-    ], {
+    const { sbtAddress } = await createScopedSignatureSbtAndGetAddress({
+      name: 'ContextEngine Invite Own',
+      symbol: 'CEINVO',
+      limitedNumber: 2,
+      hasPasswordMint: true,
+      groupPassword,
+      tokenUriOverrides: {
       name: 'ContextEngine Invite Own',
       hasPasswordMint: true,
       maxTokens: 0,
       tags: ['contextEngine', 'invite'],
+      },
     });
 
     const inviteOne = await contractScripts.generateInvitePayloads({
@@ -1064,7 +1088,7 @@ describeLocal('contractScripts surveys + SBT (local)', () => {
       0,
       true,
       3,
-      [],
+      [utils.keccak256(utils.toUtf8Bytes('seed-pass'))],
       '',
       ethers.constants.HashZero,
       groupCfg,

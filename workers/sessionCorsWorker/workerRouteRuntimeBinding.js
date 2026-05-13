@@ -175,6 +175,9 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       consumeNonce: deps?.consumeNonce,
       validateAdmin: authCorsAdminAdapters.validateAdmin,
       log: deps?.log,
+      now: deps?.now,
+      randomUUID: deps?.randomUUID,
+      getSessionSecrets: deps?.getSessionSecrets,
     },
     constants: {
       openAiTranscribeUrl: constants?.openAiTranscribeUrl,
@@ -228,6 +231,7 @@ export const createWorkerRouteRuntimeWithWorkerDeps = ({
       verifyAdminSignature: executionServices.verifyAdminSignature,
       getSessionSecrets: deps?.getSessionSecrets,
       arweaveUpload: executionServices.arweaveUpload,
+      storageRoute: executionServices.storageRoute,
       validateBootstrapAdmin: registryLoginBootstrapAdapters.validateBootstrapAdmin,
       validateAdmin: authCorsAdminAdapters.validateAdmin,
       mergeWorkerConfigRecords: deps?.mergeWorkerConfigRecords,

@@ -54,6 +54,7 @@ type MainAreaTabsProps = {
   provider?: unknown;
   network?: unknown;
   account?: string;
+  litHooks?: unknown;
   activeSessionSlug?: string;
   loginComplete?: boolean;
   loginInProgress?: boolean;
@@ -201,6 +202,7 @@ class MainAreaTabs extends Component<MainAreaTabsProps, MainAreaTabsState> {
                           //
                           account={this.props.account}
                           provider={this.props.provider}
+                          litHooks={this.props.litHooks}
                           activeSessionSlug={this.props.activeSessionSlug}
                           network={this.props.network}
                           loginComplete={this.props.loginComplete}

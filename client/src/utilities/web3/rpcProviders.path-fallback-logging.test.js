@@ -1,3 +1,6 @@
+import { ethers } from 'ethers';
+import { getReadProviderForGroup } from './rpcProviders.js';
+
 jest.mock('../logging.js', () => ({
   __mockRpcLogger: {
     log: jest.fn(),
@@ -23,9 +26,6 @@ jest.mock('../logging.js', () => ({
 }));
 
 const { __mockRpcLogger: mockRpcLogger } = jest.requireMock('../logging.js');
-
-import { ethers } from 'ethers';
-import { getReadProviderForGroup } from './rpcProviders.js';
 
 const PATH_DEFAULT_OP_SEPOLIA = 'https://op-sepolia-testnet.api.pocket.network';
 

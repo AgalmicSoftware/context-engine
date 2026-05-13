@@ -9,10 +9,12 @@ import { ReactReduxContext } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faCheck, faCog, faCopy, faExclamationCircle, faExternalLinkAlt, faImage, faQuestionCircle, faRedoAlt, faSpinner, faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
+import { renderAiOrGateSelect } from './AiFieldSelect';
 import LockableFieldFrame from './LockableFieldFrame';
 import BlockLimitsField from './BlockLimitsField';
 import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeaderField';
 import FeaturedSbtField from './FeaturedSbtField';
+import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import ContractsSection from './ContractsSection';
 import EncryptionPanel from './EncryptionPanel';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
@@ -29,18 +31,12 @@ import {
   getGlobalLitHooks,
   setGlobalLitHooks,
 } from '../../utilities/crypto/litProtocol.js';
-import {
-  createLitPayerWallet,
-} from '../../utilities/crypto/litPayerWallet.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { resolvePublishArweaveUploadOptions } from '../../utilities/arweave/publishUploadAuth.js';
 import {
   hasSponsoredBundleFields,
-  isSponsoredBundleExpired,
   normalizeSparseSponsoredBundlePayload,
-  readSponsoredBundleFromArweave,
-  SPONSORED_BUNDLE_SUPPORTED_FIELDS,
 } from '../../utilities/arweave/sponsoredBundles.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import { sessionRegistryUtils, registerSessionOnChain } from '../../utilities/web3/sessionRegistry.js';
@@ -51,7 +47,6 @@ import {
   CLOUDFLARE_WORKER_BUNDLE_URL,
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
   DEFAULT_CHAIN_ID,
-  ENABLE_LIT_SESSION_PAYER_WALLET_INPUT,
 } from '../../variables/appConfig.js';
 import {
   getChainById,
@@ -70,6 +65,7 @@ import {
   normalizeLitMetadataNetwork,
   normalizeSessionNaming,
 } from '../../utilities/session/sessionMetadata.js';
+import type { UnknownRecord } from '../../utilities/session/sessionTypes.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
@@ -106,11 +102,6 @@ import {
   sanitizeSessionWizardMetadataPayload,
 } from './sessionWizardWriteNormalization.js';
 import {
-  clearSponsoredBootstrapFundingContext,
-  normalizeSponsoredBootstrapFundingContext,
-  writeSponsoredBootstrapFundingContext,
-} from '../../utilities/session/sponsoredBootstrapFunding.js';
-import {
   buildContractsPageHref,
   getContractExplainer,
   getSessionWizardContractModalTriggerTestId,
@@ -122,10 +113,16 @@ import usePendingSbtDrafts, {
   normalizePendingSbtDrafts,
   type PendingSbtDraft,
 } from './hooks/usePendingSbtDrafts.js';
+import useSponsoredBundleLifecycle from './hooks/useSponsoredBundleLifecycle';
+import useSessionWizardWorkerDeploy from './hooks/useSessionWizardWorkerDeploy';
 import useSessionSlugState from './hooks/useSessionSlugState.js';
 import SessionMetadataEditor from './SessionMetadataEditor';
 import SessionWizardModals from './SessionWizardModals';
 import SessionPublishSummary from './SessionPublishSummary';
+import {
+  buildNormalModeCards,
+  buildNormalModePublishSummary,
+} from './sessionWizardNormalModeCards';
 import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
   buildSessionWizardPublishPlan,
@@ -156,9 +153,13 @@ import {
   isSessionWizardDefaultWorkerPlaceholderUrl,
 } from './sessionWizardWorkerDefaults';
 import {
-  AI_PROVIDER_OPTIONS,
+  SESSION_STORAGE_BACKENDS,
+  SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
+  isWorkerSbtGateCloudflareStorageProfile,
+  normalizeSessionStorageProfileConfig,
+} from './sessionWizardStorageProfile';
+import {
   DEFAULT_AI_MODELS,
-  getAiModelOptions,
   normalizeAiModelForProvider,
   normalizeAiModels,
   normalizeAiProvider,
@@ -199,23 +200,18 @@ import {
   shouldLockable,
 } from './sessionWizardGateUtils';
 import {
-  buildSponsoredBundleAppliedStatusMessage,
   cacheSessionWorkerConfigAfterDeploy,
   resolveSponsoredBundleAdvancedFieldNotices,
   resolveSponsoredBundleBootstrapWorkerUrl,
 } from './sessionWizardSponsoredBundleSupport';
 import {
   __test__resetSessionWizardSponsoredBundleCacheKey,
-  readSessionWizardSponsoredBundleCache,
-  writeSessionWizardSponsoredBundleCache,
 } from './sessionWizardSponsoredBundleCache';
 import {
+  CHIPOTLE_LIT_CONFIG_FIELDS,
   DEFAULT_WORKER_SECRETS,
+  buildWorkerLitCredentialsConfig,
   getSessionWizardWorkerResourceKeys,
-  mergeSponsoredBundleDeployForm,
-  mergeSponsoredBundleWorkerSecrets,
-  normalizeWorkerSecrets,
-  resolveSessionWizardLitPaymentDelegation,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -263,7 +259,6 @@ import {
 import {
   RESOURCE_LABELS,
   RESOURCE_SECTION_TOOLTIPS,
-  resolveSessionWizardAiModelProviders,
   resolveSessionWizardResourceSecretFields,
 } from './sessionWizardResourceConfig';
 import {
@@ -316,7 +311,6 @@ import {
   splitSessionWizardDraftEntries,
 } from './sessionWizardFieldDescriptors';
 import type {
-  AnyRecord,
   ChainIdLike,
   NetworkLike,
   SessionConfigLike,
@@ -372,7 +366,6 @@ export { __test__resetSessionWizardSponsoredBundleCacheKey } from './sessionWiza
 export {
   mergeSponsoredBundleDeployForm,
   mergeSponsoredBundleWorkerSecrets,
-  resolveSessionWizardLitPaymentDelegation,
 } from './sessionWizardWorkerSecretSupport';
 export {
   buildSessionWizardWorkerRpcUrlMap,
@@ -425,28 +418,59 @@ export const buildPublishedPendingSbtLinks = ({
     .filter((entry): entry is PublishedPendingSbtLink => !!entry && entry.href !== '#');
 };
 
+export const resolveSessionWizardChipotleHookConfig = ({
+  workerSecretsEnabled = true,
+  workerSecrets = {},
+  resolvedWorkerUrl = '',
+  draft = null,
+}: {
+  workerSecretsEnabled?: boolean;
+  workerSecrets?: WorkerSecretsLike | UnknownRecord;
+  resolvedWorkerUrl?: string;
+  draft?: UnknownRecord | null;
+} = {}) => {
+  if (!workerSecretsEnabled) return null;
+  const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
+  const normalizedWorkerUrl = normalizeWorkerAuthUrl(resolvedWorkerUrl);
+  if (
+    !normalizedWorkerUrl ||
+    !toStr(litCredentials?.litApiBase).trim() ||
+    !toStr(litCredentials?.litPkpId).trim() ||
+    !toStr(litCredentials?.litActionCid).trim()
+  ) {
+    return null;
+  }
+  return {
+    enabled: true,
+    workerUrl: normalizedWorkerUrl,
+    sessionSlug: normalizeSlug(draft?.slug || ''),
+    litCredentials,
+    sessionConfig: {
+      ...(draft && typeof draft === 'object' ? draft : {}),
+      corsWorkerUrl: normalizedWorkerUrl,
+      litCredentials,
+    },
+  };
+};
+
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   accountId?: string;
   bundleUrl?: string;
 };
 
-type DraftState = AnyRecord & NonNullable<WorkerPanelProps['draft']> & {
+type DraftState = UnknownRecord & NonNullable<WorkerPanelProps['draft']> & {
   sessionName?: string;
   sessionInfo?: string;
   sessionHeader?: string;
   sessionHeaderImg?: string;
   slug?: string;
   networkChainId?: ChainIdLike;
-  blockLimits?: AnyRecord;
+  blockLimits?: UnknownRecord;
   contracts?: SessionContractsLike;
-  featuredSBTs?: AnyRecord[];
-  faucet?: AnyRecord;
-  ai?: AnyRecord;
-  lit?: AnyRecord;
-};
-
-type SponsoredBundleLike = AnyRecord & {
-  meta?: AnyRecord;
+  featuredSBTs?: UnknownRecord[];
+  faucet?: UnknownRecord;
+  ai?: UnknownRecord;
+  lit?: UnknownRecord;
 };
 
 type TooltipRenderOptions = {
@@ -459,7 +483,7 @@ type TooltipRenderOptions = {
 
 type SessionWizardProps = {
   account?: string;
-  provider?: AnyRecord | null;
+  provider?: UnknownRecord | null;
   network?: NetworkLike;
   activeSessionSlug?: string;
   ensureLightSbtUniverse?: (() => unknown) | null;
@@ -471,7 +495,7 @@ type SessionWizardProps = {
   initialRegistryChainId?: ChainIdLike;
   initialSponsoredBundleId?: string | null;
   initialSponsoredBundleKey?: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type CreateSbtModalState = {
@@ -487,12 +511,6 @@ type ContractViewerModalState = {
   contractKey: string;
 };
 
-type SponsoredBundleStatusState = {
-  tone?: string;
-  message?: string;
-  retryable?: boolean;
-};
-
 type CollapsedSectionsState = Record<string, boolean> & {
   worker: boolean;
   encryption: boolean;
@@ -505,12 +523,19 @@ type MetadataObjectCollapsedState = Record<string, boolean> & {
   faucet: boolean;
   ai: boolean;
   lit: boolean;
+  storageProfile: boolean;
 };
 
 type SessionHeaderUploadStatusTone = SessionHeaderFieldProps['sessionHeaderUploadStatusTone'] | string;
 
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
+const NEW_SESSION_RESOURCE_LINKS = Object.freeze({
+  openaiApiKey: 'https://platform.openai.com/api-keys',
+  litApiKeys: 'https://developer.litprotocol.com/management/api_keys',
+  arweaveWallet: 'https://docs.arweave.org/developers/wallets/arweave-wallet',
+  optimismSepoliaFaucet: 'https://console.optimism.io/faucet',
+});
 
 const pathKey = (path: string[]): string => path.join('.');
 const ONCHAIN_FIELD_PATHS = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS;
@@ -547,11 +572,6 @@ const SessionWizard = ({
   const resolvedActiveSessionSlug = sessionRegistryUtils.normalizeSlug(
     activeSessionSlug ?? ''
   );
-  const hasSponsoredBundleLink = (
-    !!toStr(initialSponsoredBundleId || '').trim() ||
-    !!toStr(initialSponsoredBundleKey || '').trim()
-  );
-  const litPayerWalletInputEnabled = ENABLE_LIT_SESSION_PAYER_WALLET_INPUT === true;
   const cachedWizard = useMemo(() => readSessionWizardCache(), []);
   const cachedDraftHasEmbeddedDeployHelperEnabled = (
     typeof cachedWizard?.draft?.embeddedDeployHelperEnabled === 'boolean'
@@ -624,7 +644,7 @@ const SessionWizard = ({
   const [isSessionIdRegenerating, setIsSessionIdRegenerating] = useState(false);
   const [privateSlugMode, setPrivateSlugMode] = useState(() => !!cachedWizard?.privateSlugMode);
   const lastManualSlugRef = useRef(toStr(cachedWizard?.lastManualSlug).trim());
-  const [encryptedFieldGates, setEncryptedFieldGates] = useState<AnyRecord>(() => (
+  const [encryptedFieldGates, setEncryptedFieldGates] = useState<UnknownRecord>(() => (
     cachedWizard?.encryptedFieldGates && typeof cachedWizard.encryptedFieldGates === 'object'
       ? cachedWizard.encryptedFieldGates
       : {}
@@ -647,8 +667,8 @@ const SessionWizard = ({
   const [manualMaxPriorityFeePerGasGwei, setManualMaxPriorityFeePerGasGwei] = useState(() => (
     toStr(cachedWizard?.manualMaxPriorityFeePerGasGwei || '').trim()
   ));
-  const [registerTxs, setRegisterTxs] = useState<AnyRecord[]>([]);
-  const [pendingOnChainFields, setPendingOnChainFields] = useState<AnyRecord>({});
+  const [registerTxs, setRegisterTxs] = useState<UnknownRecord[]>([]);
+  const [pendingOnChainFields, setPendingOnChainFields] = useState<UnknownRecord>({});
   const [status, setStatus] = useState('');
   const [sessionUrl, setSessionUrl] = useState('');
   const [adminUrl, setAdminUrl] = useState('');
@@ -706,7 +726,7 @@ const SessionWizard = ({
     open: false,
     contractKey: '',
   }));
-  const [pendingCreateSbtLaunch, setPendingCreateSbtLaunch] = useState<AnyRecord | null>(null);
+  const [pendingCreateSbtLaunch, setPendingCreateSbtLaunch] = useState<UnknownRecord | null>(null);
   const hasPrivateSbtName = useMemo(() => {
     const gates = Array.isArray(encryptionGates) ? encryptionGates : [];
     return gates.some((gate) => normalizeSbtSelection(gate?.sbts || []).some((sbt) => (
@@ -714,7 +734,7 @@ const SessionWizard = ({
     )));
   }, [encryptionGates]);
   const lastHasPrivateSbtNameRef = useRef(false);
-  const [gateSelections, setGateSelections] = useState<AnyRecord>(() => initialGateSelections);
+  const [gateSelections, setGateSelections] = useState<UnknownRecord>(() => initialGateSelections);
   const [defaultGateId, setDefaultGateId] = useState(() => initialDefaultGateId || initialGateRef.current.id);
   const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(
     () => initialDefaultGateId || initialGateRef.current?.id || ''
@@ -844,24 +864,19 @@ const SessionWizard = ({
   const [deployInFlight, setDeployInFlight] = useState(false);
   const [deployComplete, setDeployComplete] = useState(() => !!cachedWizard?.deployComplete);
   const [deployWorkerUrl, setDeployWorkerUrl] = useState(() => normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
-  const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<AnyRecord>(() => ({
+  const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<UnknownRecord>(() => ({
     ...buildEmptyProvisionedSponsoredContext(),
     sessionSlug: sessionRegistryUtils.normalizeSlug(cachedWizard?.provisionedSponsoredContext?.sessionSlug),
     workerUrl: normalizeWorkerAuthUrl(toStr(cachedWizard?.provisionedSponsoredContext?.workerUrl).trim()),
-    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
-      cachedWizard?.provisionedSponsoredContext?.fields,
-      { litPayerWalletInputEnabled }
-    ),
+    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(cachedWizard?.provisionedSponsoredContext?.fields),
   }));
-  const [sponsoredBundleStatus, setSponsoredBundleStatus] = useState<SponsoredBundleStatusState | null>(null);
-  const [sponsoredBundleRetryNonce, setSponsoredBundleRetryNonce] = useState(0);
   const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() => (
     readSessionWizardNewSessionBannerDismissed()
   ));
   const [newSessionBannerDismissedContext, setNewSessionBannerDismissedContext] = useState('');
   const [workerSecrets, setWorkerSecrets] = useState<WorkerSecretsLike>(() => {
     const cached = cachedWizard?.workerSecrets;
-    return sanitizeSessionWizardWorkerSecretsForLitMode(cached, { litPayerWalletInputEnabled });
+    return sanitizeSessionWizardWorkerSecretsForLitMode(cached);
   });
   const deployFormRef = useRef<DeployFormState>(deployForm);
   const resolvedWalletAccountRef = useRef(toStr(account).trim());
@@ -874,20 +889,15 @@ const SessionWizard = ({
     ...buildEmptyProvisionedSponsoredContext(),
     sessionSlug: sessionRegistryUtils.normalizeSlug(cachedWizard?.provisionedSponsoredContext?.sessionSlug),
     workerUrl: normalizeWorkerAuthUrl(toStr(cachedWizard?.provisionedSponsoredContext?.workerUrl).trim()),
-    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
-      cachedWizard?.provisionedSponsoredContext?.fields,
-      { litPayerWalletInputEnabled }
-    ),
+    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(cachedWizard?.provisionedSponsoredContext?.fields),
   });
   const workerSecretsEnabledRef = useRef(workerSecretsEnabled);
   const persistWorkerSecretsRef = useRef(persistWorkerSecrets);
   const workerSecretsRef = useRef<WorkerSecretsLike>(
-    sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets, { litPayerWalletInputEnabled })
+    sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets)
   );
-  const sponsoredBundleApplyRef = useRef('');
-  const sponsoredBundleBaselineRef = useRef<AnyRecord | null>(null);
-  const sponsoredBundleAppliedBundleRef = useRef<SponsoredBundleLike | null>(null);
-  const sponsoredBundleTerminalTxIdRef = useRef('');
+  const workerDeployRuntimeRef = useRef(null);
+  const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const defaultSponsoredSbtLookupInFlightRef = useRef('');
   const pendingSbtDeployContextSignature = useMemo(() => (
     buildPendingSbtDeployContextSignature(
@@ -921,9 +931,8 @@ const SessionWizard = ({
     resolveWorkerSecretsSnapshot({
       workerSecretsRef,
       defaults: DEFAULT_WORKER_SECRETS,
-    }),
-    { litPayerWalletInputEnabled }
-  ), [litPayerWalletInputEnabled]);
+    })
+  ), []);
   const applyWorkerSecretsUpdate = useCallback((nextValueOrUpdater) => {
     const current = resolveWorkerSecretsSnapshot({
       workerSecretsRef,
@@ -936,13 +945,100 @@ const SessionWizard = ({
       {
         ...DEFAULT_WORKER_SECRETS,
         ...((nextValue && typeof nextValue === 'object') ? nextValue : {}),
-      },
-      { litPayerWalletInputEnabled }
+      }
     );
     workerSecretsRef.current = next;
     setWorkerSecrets(next);
     return next;
-  }, [litPayerWalletInputEnabled]);
+  }, []);
+  const updateSponsoredBundleDraftCorsWorkerUrl = useCallback((nextCorsWorkerUrl = '') => {
+    setDraft((prev) => {
+      const desiredWorkerUrl = toStr(nextCorsWorkerUrl || '').trim();
+      if (toStr(prev?.corsWorkerUrl || '').trim() === desiredWorkerUrl) return prev;
+      const next = deepClone(prev);
+      next.corsWorkerUrl = desiredWorkerUrl;
+      return next;
+    });
+  }, []);
+  const updateSponsoredBundleDeploymentState = useCallback(({
+    deployForm: nextDeployForm,
+    deployStatus: nextDeployStatus,
+    deployInFlight: nextDeployInFlight,
+    deployComplete: nextDeployComplete,
+    workerMode: nextWorkerMode,
+    deployWorkerUrl: nextDeployWorkerUrl,
+    provisionedSponsoredContext: nextProvisionedSponsoredContext,
+    forceManualBundleFile: nextForceManualBundleFile,
+    normalModeBundleUrlOverride: nextNormalModeBundleUrlOverride,
+    workerUrlAutoFilled: nextWorkerUrlAutoFilled,
+  } = {}) => {
+    if (nextDeployForm !== undefined) {
+      setDeployForm(nextDeployForm);
+    }
+    if (typeof nextDeployStatus === 'string') {
+      setDeployStatus(nextDeployStatus);
+    }
+    if (typeof nextDeployInFlight === 'boolean') {
+      setDeployInFlight(nextDeployInFlight);
+    }
+    if (typeof nextDeployComplete === 'boolean') {
+      setDeployComplete(nextDeployComplete);
+    }
+    if (typeof nextWorkerMode === 'string') {
+      setWorkerMode(nextWorkerMode);
+    }
+    if (typeof nextDeployWorkerUrl === 'string') {
+      setDeployWorkerUrl(nextDeployWorkerUrl);
+    }
+    if (nextProvisionedSponsoredContext !== undefined) {
+      setProvisionedSponsoredContext(nextProvisionedSponsoredContext);
+    }
+    if (typeof nextForceManualBundleFile === 'boolean') {
+      setForceManualBundleFile(nextForceManualBundleFile);
+    }
+    if (typeof nextNormalModeBundleUrlOverride === 'string') {
+      setNormalModeBundleUrlOverride(nextNormalModeBundleUrlOverride);
+    }
+    if (typeof nextWorkerUrlAutoFilled === 'boolean') {
+      setWorkerUrlAutoFilled(nextWorkerUrlAutoFilled);
+    }
+  }, []);
+  const updateSponsoredBundleWorkerSecretState = useCallback(({
+    workerSecretsEnabled: nextWorkerSecretsEnabled,
+    persistWorkerSecrets: nextPersistWorkerSecrets,
+  } = {}) => {
+    if (typeof nextWorkerSecretsEnabled === 'boolean') {
+      setWorkerSecretsEnabled(nextWorkerSecretsEnabled);
+    }
+    if (typeof nextPersistWorkerSecrets === 'boolean') {
+      setPersistWorkerSecrets(nextPersistWorkerSecrets);
+    }
+  }, []);
+  const {
+    sponsoredBundleStatus,
+    sponsoredBundleRetryNonce,
+    setSponsoredBundleRetryNonce,
+    sponsoredBundleAppliedBundleRef,
+    hasSponsoredBundleLink,
+  } = useSponsoredBundleLifecycle({
+    initialSponsoredBundleId,
+    initialSponsoredBundleKey,
+    draftSlug: draft?.slug,
+    refs: {
+      draftRef,
+      deployFormRef,
+      deployCompleteRef,
+      deployWorkerUrlRef,
+      provisionedSponsoredContextRef,
+      workerSecretsEnabledRef,
+      persistWorkerSecretsRef,
+    },
+    getCurrentWorkerSecrets,
+    applyWorkerSecretsUpdate,
+    updateDraftCorsWorkerUrl: updateSponsoredBundleDraftCorsWorkerUrl,
+    updateDeploymentState: updateSponsoredBundleDeploymentState,
+    updateWorkerSecretState: updateSponsoredBundleWorkerSecretState,
+  });
   const clearSelectedBundleFile = useCallback(() => {
     setBundleFile(null);
     [
@@ -955,240 +1051,6 @@ const SessionWizard = ({
       }
     });
   }, []);
-  const buildRestoredSponsoredWorkerSecrets = useCallback(({
-    currentSecrets = {},
-    baselineSecrets = {},
-    appliedBundle = {},
-  } = {}) => {
-    const next = normalizeWorkerSecrets(currentSecrets);
-    const baseline = normalizeWorkerSecrets(baselineSecrets);
-    const normalizedApplied = normalizeSparseSponsoredBundlePayload(appliedBundle);
-    SPONSORED_BUNDLE_SUPPORTED_FIELDS.forEach((key) => {
-      if (!Object.prototype.hasOwnProperty.call(next, key)) return;
-      const appliedValue = toStr(normalizedApplied?.[key] || '').trim();
-      if (!appliedValue) return;
-      if (toStr(next[key] || '').trim() !== appliedValue) return;
-      next[key] = toStr(baseline[key] || '').trim();
-    });
-    const appliedRpcUrl = toStr(normalizedApplied?.customRpcUrl || '').trim();
-    if (
-      appliedRpcUrl &&
-      toStr(currentSecrets?.customRpcUrl || '').trim() === appliedRpcUrl &&
-      !toStr(currentSecrets?.customRpcKey || '').trim()
-    ) {
-      next.customRpcKey = toStr(baseline.customRpcKey || '').trim();
-    }
-    return next;
-  }, []);
-  const resolveSponsoredBundleRestoreState = useCallback(({
-    currentSecrets = {},
-    currentDeployForm = {},
-    currentDeployComplete = false,
-    currentDeployWorkerUrl = '',
-    currentCorsWorkerUrl = '',
-    currentProvisionedSponsoredContext = buildEmptyProvisionedSponsoredContext(),
-    currentWorkerSecretsEnabled = true,
-    currentPersistWorkerSecrets = false,
-    baseline = {},
-    appliedBundle = {},
-  } = {}) => {
-    const resolvedBaseline = (baseline && typeof baseline === 'object') ? baseline : {};
-    const normalizedApplied = normalizeSparseSponsoredBundlePayload(appliedBundle);
-    const nextSecrets = buildRestoredSponsoredWorkerSecrets({
-      currentSecrets,
-      baselineSecrets: resolvedBaseline.workerSecrets,
-      appliedBundle: normalizedApplied,
-    });
-    return {
-      workerSecrets: nextSecrets,
-      workerSecretsEnabled: currentWorkerSecretsEnabled === true
-        ? !!resolvedBaseline.workerSecretsEnabled
-        : currentWorkerSecretsEnabled,
-      persistWorkerSecrets: currentPersistWorkerSecrets === false
-        ? !!resolvedBaseline.persistWorkerSecrets
-        : currentPersistWorkerSecrets,
-      deployForm: currentDeployForm,
-      deployComplete: currentDeployComplete === false
-        ? !!resolvedBaseline.deployComplete
-        : currentDeployComplete,
-      deployWorkerUrl: toStr(currentDeployWorkerUrl).trim()
-        ? currentDeployWorkerUrl
-        : toStr(resolvedBaseline.deployWorkerUrl || '').trim(),
-      corsWorkerUrl: toStr(currentCorsWorkerUrl).trim()
-        ? currentCorsWorkerUrl
-        : toStr(resolvedBaseline.corsWorkerUrl || '').trim(),
-      provisionedSponsoredContext: (
-        toStr(currentProvisionedSponsoredContext?.sessionSlug || '').trim() ||
-        toStr(currentProvisionedSponsoredContext?.workerUrl || '').trim()
-      )
-        ? currentProvisionedSponsoredContext
-        : {
-            ...buildEmptyProvisionedSponsoredContext(),
-            ...(resolvedBaseline.provisionedSponsoredContext && typeof resolvedBaseline.provisionedSponsoredContext === 'object'
-              ? resolvedBaseline.provisionedSponsoredContext
-              : {}),
-          },
-    };
-  }, [buildRestoredSponsoredWorkerSecrets]);
-  const clearSponsoredBundleTracking = useCallback(() => {
-    sponsoredBundleApplyRef.current = '';
-    sponsoredBundleBaselineRef.current = null;
-    sponsoredBundleAppliedBundleRef.current = null;
-    sponsoredBundleTerminalTxIdRef.current = '';
-    clearSponsoredBootstrapFundingContext();
-  }, []);
-  const syncSponsoredBootstrapFundingContext = useCallback((bundle = null, targetSessionSlugOverride = undefined) => {
-    const sourceBundle = (
-      bundle &&
-      typeof bundle === 'object'
-    ) ? bundle : sponsoredBundleAppliedBundleRef.current;
-    const sponsoredFundingContext = normalizeSponsoredBootstrapFundingContext({
-      sessionSlug: sourceBundle?.meta?.sourceSessionSlug,
-      workerUrl: sourceBundle?.bootstrapWorkerUrl || sourceBundle?.meta?.sourceWorkerUrl,
-      targetSessionSlug: targetSessionSlugOverride ?? draftRef.current?.slug ?? '',
-      faucetGrantToken: sourceBundle?.faucetGrantToken,
-    });
-    if (sponsoredFundingContext.sessionSlug || sponsoredFundingContext.workerUrl) {
-      writeSponsoredBootstrapFundingContext(sponsoredFundingContext);
-    } else {
-      clearSponsoredBootstrapFundingContext();
-    }
-    return sponsoredFundingContext;
-  }, []);
-  const restoreSponsoredBundleOverrides = useCallback(() => {
-    const baseline = sponsoredBundleBaselineRef.current;
-    const appliedBundle = sponsoredBundleAppliedBundleRef.current;
-    if (!baseline || !appliedBundle) {
-      clearSponsoredBundleTracking();
-      return;
-    }
-    const restored = resolveSponsoredBundleRestoreState({
-      currentSecrets: getCurrentWorkerSecrets(),
-      currentDeployForm: deployFormRef.current,
-      currentDeployComplete: deployCompleteRef.current,
-      currentDeployWorkerUrl: deployWorkerUrlRef.current,
-      currentCorsWorkerUrl: toStr(draftRef.current?.corsWorkerUrl || '').trim(),
-      currentProvisionedSponsoredContext: provisionedSponsoredContextRef.current,
-      currentWorkerSecretsEnabled: workerSecretsEnabledRef.current,
-      currentPersistWorkerSecrets: persistWorkerSecretsRef.current,
-      baseline,
-      appliedBundle,
-    });
-    applyWorkerSecretsUpdate(restored.workerSecrets);
-    setDeployForm(restored.deployForm);
-    setDeployComplete(!!restored.deployComplete);
-    setDeployWorkerUrl(normalizeBaseUrl(toStr(restored.deployWorkerUrl).trim()));
-    setProvisionedSponsoredContext({
-      ...buildEmptyProvisionedSponsoredContext(),
-      ...(restored.provisionedSponsoredContext && typeof restored.provisionedSponsoredContext === 'object'
-        ? restored.provisionedSponsoredContext
-        : {}),
-      fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
-        restored.provisionedSponsoredContext?.fields,
-        { litPayerWalletInputEnabled }
-      ),
-    });
-    setDraft((prev) => {
-      const desiredWorkerUrl = toStr(restored.corsWorkerUrl || '').trim();
-      if (toStr(prev?.corsWorkerUrl || '').trim() === desiredWorkerUrl) return prev;
-      const next = deepClone(prev);
-      next.corsWorkerUrl = desiredWorkerUrl;
-      return next;
-    });
-    setWorkerSecretsEnabled(restored.workerSecretsEnabled);
-    setPersistWorkerSecrets(restored.persistWorkerSecrets);
-    clearSponsoredBundleTracking();
-  }, [
-    applyWorkerSecretsUpdate,
-    clearSponsoredBundleTracking,
-    getCurrentWorkerSecrets,
-    litPayerWalletInputEnabled,
-    resolveSponsoredBundleRestoreState,
-  ]);
-  const applySponsoredBundleOverrides = useCallback((bundle = {}, applyKey = '', terminalTxId = '') => {
-    const normalizedBundle = normalizeSparseSponsoredBundlePayload(bundle);
-    let baselineSource = {
-      workerSecrets: getCurrentWorkerSecrets(),
-      deployForm: deployFormRef.current,
-      deployComplete: deployCompleteRef.current,
-      deployWorkerUrl: deployWorkerUrlRef.current,
-      corsWorkerUrl: toStr(draftRef.current?.corsWorkerUrl || '').trim(),
-      provisionedSponsoredContext: provisionedSponsoredContextRef.current,
-      workerSecretsEnabled: workerSecretsEnabledRef.current,
-      persistWorkerSecrets: persistWorkerSecretsRef.current,
-    };
-    if (
-      sponsoredBundleBaselineRef.current &&
-      sponsoredBundleAppliedBundleRef.current &&
-      sponsoredBundleApplyRef.current &&
-      sponsoredBundleApplyRef.current !== applyKey
-    ) {
-      baselineSource = resolveSponsoredBundleRestoreState({
-        currentSecrets: baselineSource.workerSecrets,
-        currentDeployForm: baselineSource.deployForm,
-        currentDeployComplete: baselineSource.deployComplete,
-        currentDeployWorkerUrl: baselineSource.deployWorkerUrl,
-        currentCorsWorkerUrl: baselineSource.corsWorkerUrl,
-        currentProvisionedSponsoredContext: baselineSource.provisionedSponsoredContext,
-        currentWorkerSecretsEnabled: baselineSource.workerSecretsEnabled,
-        currentPersistWorkerSecrets: baselineSource.persistWorkerSecrets,
-        baseline: sponsoredBundleBaselineRef.current,
-        appliedBundle: sponsoredBundleAppliedBundleRef.current,
-      });
-    }
-    sponsoredBundleBaselineRef.current = {
-      workerSecrets: baselineSource.workerSecrets,
-      deployApiToken: toStr(baselineSource.deployForm?.apiToken || '').trim(),
-      deployComplete: !!baselineSource.deployComplete,
-      deployWorkerUrl: toStr(baselineSource.deployWorkerUrl || '').trim(),
-      corsWorkerUrl: toStr(baselineSource.corsWorkerUrl || '').trim(),
-      provisionedSponsoredContext: {
-        ...buildEmptyProvisionedSponsoredContext(),
-        ...(baselineSource.provisionedSponsoredContext && typeof baselineSource.provisionedSponsoredContext === 'object'
-          ? baselineSource.provisionedSponsoredContext
-          : {}),
-        fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
-          baselineSource.provisionedSponsoredContext?.fields,
-          { litPayerWalletInputEnabled }
-        ),
-      },
-      workerSecretsEnabled: baselineSource.workerSecretsEnabled,
-      persistWorkerSecrets: baselineSource.persistWorkerSecrets,
-    };
-    sponsoredBundleAppliedBundleRef.current = normalizedBundle;
-    setPersistWorkerSecrets(false);
-    setWorkerSecretsEnabled(true);
-    applyWorkerSecretsUpdate(
-      mergeSponsoredBundleWorkerSecrets(baselineSource.workerSecrets, normalizedBundle)
-    );
-    setDeployForm(
-      mergeSponsoredBundleDeployForm(baselineSource.deployForm, normalizedBundle)
-    );
-    syncSponsoredBootstrapFundingContext(normalizedBundle);
-    setDeployComplete(false);
-    setDeployWorkerUrl('');
-    setWorkerUrlAutoFilled(false);
-    setProvisionedSponsoredContext(buildEmptyProvisionedSponsoredContext());
-    setDraft((prev) => {
-      if (!toStr(prev?.corsWorkerUrl || '').trim()) return prev;
-      const next = deepClone(prev);
-      next.corsWorkerUrl = '';
-      return next;
-    });
-    sponsoredBundleApplyRef.current = applyKey;
-    sponsoredBundleTerminalTxIdRef.current = terminalTxId;
-  }, [
-    applyWorkerSecretsUpdate,
-    getCurrentWorkerSecrets,
-    litPayerWalletInputEnabled,
-    resolveSponsoredBundleRestoreState,
-    syncSponsoredBootstrapFundingContext,
-  ]);
-  useEffect(() => {
-    if (!sponsoredBundleAppliedBundleRef.current) return;
-    syncSponsoredBootstrapFundingContext();
-  }, [draft.slug, syncSponsoredBootstrapFundingContext]);
-  const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const DEFAULT_ALLOWED_ORIGINS = buildSessionWizardDefaultAllowedOrigins().join('\n');
   const [workerAllowOrigins, setWorkerAllowOrigins] = useState(DEFAULT_ALLOWED_ORIGINS);
   const [workerLimitPerWallet, setWorkerLimitPerWallet] = useState('');
@@ -1205,6 +1067,7 @@ const SessionWizard = ({
     faucet: true,
     ai: true,
     lit: true,
+    storageProfile: true,
   });
   const [collapsedSections, setCollapsedSections] = useState<CollapsedSectionsState>(() => ({
     worker: true,
@@ -1213,8 +1076,17 @@ const SessionWizard = ({
     publish: true,
   }));
   const workerResourceKeys = useMemo(
-    () => getSessionWizardWorkerResourceKeys({ litPayerWalletInputEnabled }),
-    [litPayerWalletInputEnabled]
+    () => getSessionWizardWorkerResourceKeys(),
+    []
+  );
+  const normalizedDraftStorageProfile = useMemo(
+    () => normalizeSessionStorageProfileConfig(draft?.storageProfile),
+    [draft?.storageProfile]
+  );
+  const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
+  const visibleWorkerResourceKeys = useMemo(
+    () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
+    [cloudflareWorkerSbtGateMode, workerResourceKeys]
   );
   const setSessionHeaderStatus = useCallback((text = '', tone = 'default') => {
     setSessionHeaderUploadStatus(text);
@@ -1266,6 +1138,9 @@ const SessionWizard = ({
     const chainSymbol = toStr(newSessionFundingChain?.nativeCurrency?.symbol).trim() || 'ETH';
     return `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`;
   }, [newSessionFundingChain]);
+  const newSessionFundingRequirementHref = Number(newSessionFundingChain?.id || 0) === 11155420
+    ? NEW_SESSION_RESOURCE_LINKS.optimismSepoliaFaucet
+    : '';
 
   const buildWorkerName = (rawName) => {
     const base = toStr(rawName)
@@ -1294,125 +1169,6 @@ const SessionWizard = ({
     // For now we assume session chain === registry chain; if this diverges, split these values.
     setRegistryChainId((prev) => (Number(prev || 0) === desiredChain ? prev : desiredChain));
   }, [initialRegistryChainId]);
-
-  useEffect(() => {
-    const bundleId = toStr(initialSponsoredBundleId || '').trim();
-    const bundleKey = toStr(initialSponsoredBundleKey || '').trim();
-    if (!bundleId && !bundleKey) {
-      // Regression guard: query-only route changes do not remount SessionWizard,
-      // so removing `?sponsored=` must explicitly roll back sponsor-applied state.
-      restoreSponsoredBundleOverrides();
-      setSponsoredBundleStatus(null);
-      return;
-    }
-    const applyKey = bundleKey ? `${bundleId}::${bundleKey}` : `${bundleId}::__session_cache__`;
-    const activeApplyKey = sponsoredBundleRetryNonce > 0
-      ? `${applyKey}::retry:${sponsoredBundleRetryNonce}`
-      : applyKey;
-    if (sponsoredBundleApplyRef.current === activeApplyKey) return;
-    let cancelled = false;
-    const run = async () => {
-      const cachedSponsoredBundle = await readSessionWizardSponsoredBundleCache(bundleId);
-      if (cancelled) return;
-      if (!bundleKey && cachedSponsoredBundle) {
-        if (isSponsoredBundleExpired(cachedSponsoredBundle)) {
-          await writeSessionWizardSponsoredBundleCache(bundleId, null);
-          if (cancelled) return;
-          restoreSponsoredBundleOverrides();
-          sponsoredBundleTerminalTxIdRef.current = bundleId;
-          setSponsoredBundleStatus({ tone: 'error', message: 'Sponsored bundle expired.', retryable: false });
-          return;
-        }
-        applySponsoredBundleOverrides(cachedSponsoredBundle, activeApplyKey, bundleId);
-        setSponsoredBundleStatus({
-          tone: 'success',
-          message: buildSponsoredBundleAppliedStatusMessage(cachedSponsoredBundle),
-          retryable: false,
-        });
-        return;
-      }
-      if (!bundleKey && sponsoredBundleTerminalTxIdRef.current === bundleId) return;
-
-      if (!bundleId || !bundleKey) {
-        restoreSponsoredBundleOverrides();
-        scrubSponsoredBundleHashSecret();
-        setSponsoredBundleStatus({ tone: 'error', message: 'Malformed sponsored link.', retryable: false });
-        return;
-      }
-
-      setSponsoredBundleStatus({ tone: 'info', message: 'Loading sponsored bundle…', retryable: false });
-      try {
-        const result = await readSponsoredBundleFromArweave({
-          txId: bundleId,
-          secret: bundleKey,
-          arweaveOpts: {
-            debugContext: {
-              caller: 'SessionWizard.sponsoredBundle',
-              source: 'session_wizard',
-            },
-            ...(sponsoredBundleRetryNonce > 0 ? { bypassFailureCache: true } : {}),
-          },
-        });
-        if (cancelled) return;
-        applySponsoredBundleOverrides(result.bundle, activeApplyKey, bundleId);
-        await writeSessionWizardSponsoredBundleCache(bundleId, result.bundle);
-        if (cancelled) return;
-        scrubSponsoredBundleHashSecret();
-        setSponsoredBundleStatus({
-          tone: 'success',
-          message: buildSponsoredBundleAppliedStatusMessage(result.bundle),
-          retryable: false,
-        });
-      } catch (error) {
-        if (cancelled) return;
-        restoreSponsoredBundleOverrides();
-        const code = toStr(error?.code || '').trim().toLowerCase();
-        if (code === 'expired_bundle') {
-          await writeSessionWizardSponsoredBundleCache(bundleId, null);
-          if (cancelled) return;
-          scrubSponsoredBundleHashSecret();
-          sponsoredBundleTerminalTxIdRef.current = bundleId;
-          setSponsoredBundleStatus({ tone: 'error', message: 'Sponsored bundle expired.', retryable: false });
-          return;
-        }
-        if (code === 'decrypt_failed') {
-          await writeSessionWizardSponsoredBundleCache(bundleId, null);
-          if (cancelled) return;
-          scrubSponsoredBundleHashSecret();
-          sponsoredBundleTerminalTxIdRef.current = bundleId;
-          setSponsoredBundleStatus({ tone: 'error', message: 'Failed to decrypt sponsored bundle.', retryable: false });
-          return;
-        }
-        if (code === 'malformed_link') {
-          await writeSessionWizardSponsoredBundleCache(bundleId, null);
-          if (cancelled) return;
-          scrubSponsoredBundleHashSecret();
-          sponsoredBundleTerminalTxIdRef.current = bundleId;
-          setSponsoredBundleStatus({ tone: 'error', message: 'Malformed sponsored link.', retryable: false });
-          return;
-        }
-        if (code === 'invalid_bundle' || code === 'empty_bundle') {
-          await writeSessionWizardSponsoredBundleCache(bundleId, null);
-          if (cancelled) return;
-          scrubSponsoredBundleHashSecret();
-          sponsoredBundleTerminalTxIdRef.current = bundleId;
-          setSponsoredBundleStatus({ tone: 'error', message: 'Invalid sponsored bundle.', retryable: false });
-          return;
-        }
-        setSponsoredBundleStatus({ tone: 'error', message: 'Failed to load sponsored bundle.', retryable: true });
-      }
-    };
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    applySponsoredBundleOverrides,
-    initialSponsoredBundleId,
-    initialSponsoredBundleKey,
-    restoreSponsoredBundleOverrides,
-    sponsoredBundleRetryNonce,
-  ]);
 
   useEffect(() => {
     const raw = toStr(initialSessionId).trim();
@@ -1587,7 +1343,7 @@ const SessionWizard = ({
         // NOTE: For now we assume session chain === registry chain; split these when they diverge.
         next.networkChainId = chainId;
       }
-      // Contract defaults currently come from bundled per-chain config; ENS discovery is tracked in PRD 060 / 096.
+      // Contract defaults currently come from bundled per-chain config; ENS discovery remains future work.
       const defaults = getSessionWizardContractDefaults(chainId);
       if (!next.contracts || typeof next.contracts !== 'object') {
         next.contracts = {};
@@ -1606,7 +1362,7 @@ const SessionWizard = ({
         }
         next.contracts[key].chainId = chainId;
       });
-      // Auto-fill the current PATH public RPC; dedicated gateway/provider-tier work is tracked in PRD 198 / 354.
+      // Auto-fill the current PATH public RPC; dedicated gateway/provider-tier support remains future work.
       const pathRpc = getDefaultHttpRpc(chainId);
       if (pathRpc) {
         if (!next.rpc || typeof next.rpc !== 'object') next.rpc = {};
@@ -2661,7 +2417,7 @@ const SessionWizard = ({
     const isSecretPath = isSecretFieldPath(currentPath);
     const canLock = shouldLockable(value) && (!isSecretPath || !workerSecretsEnabled);
     if (!forceShow && isSecretPath && workerSecretsEnabled) return null;
-    // PRD 423 tracks a user-facing builder for serialized defaultFilterState presets.
+    // Hide serialized defaultFilterState presets until a user-facing builder exists.
     const isDefaultFilterState = keyString === 'defaultFilterState';
     const isQuestionsPrompt = keyString === 'questionsGenPrompt';
     const isSessionHeaderField = keyString === 'sessionHeader';
@@ -2762,129 +2518,19 @@ const SessionWizard = ({
       gateLockProps: fieldGateLockProps,
     };
 
-    if (keyString === 'ai.models.transcription.provider') {
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <Input
-            type="select"
-            value={toStr(value).trim() || 'openai'}
-            onChange={(e) => updateDraftValue(currentPath, e.target.value)}
-          >
-            <option value="openai">OpenAI</option>
-            <option value="local" disabled>Local (coming soon)</option>
-          </Input>
-        </FormGroup>
-      );
-    }
-
-    if (keyString === 'ai.models.fast.provider' || keyString === 'ai.models.thinking.provider') {
-      const aiProviderModelType = keyString === 'ai.models.fast.provider' ? 'fast' : 'thinking';
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <Input
-            type="select"
-            value={normalizeAiProvider(value)}
-            onChange={(e) => {
-              const nextProvider = normalizeAiProvider(e.target.value, 'openai');
-              updateDraftValue(currentPath, nextProvider);
-              const currentModel = toStr(draft?.ai?.models?.[aiProviderModelType]?.model).trim();
-              const nextModel = normalizeAiModelForProvider(aiProviderModelType, nextProvider, currentModel);
-              if (nextModel !== currentModel) {
-                updateDraftValue(['ai', 'models', aiProviderModelType, 'model'], nextModel);
-              }
-            }}
-          >
-            {AI_PROVIDER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value} disabled={!!option.disabled}>{option.label}</option>
-            ))}
-          </Input>
-        </FormGroup>
-      );
-    }
-
-    const modelType =
-      keyString === 'ai.models.fast.model'
-        ? 'fast'
-        : keyString === 'ai.models.thinking.model'
-          ? 'thinking'
-          : keyString === 'ai.models.transcription.model'
-            ? 'transcription'
-            : null;
-    const providerMode = modelType
-      ? normalizeAiProvider(draft?.ai?.models?.[modelType]?.provider || 'openai')
-      : normalizeAiProvider(draft?.ai?.mode || 'openai');
-    const modelOptions =
-      modelType === 'transcription'
-        ? getAiModelOptions('transcription', 'openai')
-        : modelType
-          ? getAiModelOptions(modelType, providerMode)
-          : null;
-    if (modelOptions && modelOptions.length) {
-      const options = Array.from(new Set(modelOptions.filter(Boolean)));
-      const selectedModel = normalizeAiModelForProvider(modelType, providerMode, value);
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <Input
-            type="select"
-            value={selectedModel}
-            onChange={(e) => updateDraftValue(currentPath, e.target.value)}
-          >
-            {options.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </Input>
-        </FormGroup>
-      );
-    }
-
-    if (keyString === 'lit.defaultGateId' || keyString === 'lit.defaultGate') {
-      const activeGate = encryptionGates.find((gate) => gate.id === defaultGateId) || encryptionGates[0] || null;
-      const gateValue = activeGate?.id || '';
-      return (
-        <FormGroup key={keyString} className={styles.fieldGroup}>
-          <div className={styles.fieldHeader}>
-            <div className={styles.fieldLabelRow}>
-              <Label>{displayLabelText}</Label>
-              {fieldTooltipControl}
-            </div>
-          </div>
-          <div className={styles.defaultGateControl}>
-            {activeGate && (
-              <span className={styles.gateColor} style={{ background: activeGate.color }} />
-            )}
-            <Input
-              type="select"
-              className={styles.defaultGateSelect}
-              value={gateValue}
-              onChange={(e) => setDefaultGateId(e.target.value)}
-              disabled={!encryptionGates.length}
-            >
-              {encryptionGates.map((gate) => (
-                <option key={gate.id} value={gate.id}>{gate.label || gate.id}</option>
-              ))}
-            </Input>
-          </div>
-        </FormGroup>
-      );
-    }
+    const aiOrGateSelect = renderAiOrGateSelect({
+      keyString,
+      value,
+      currentPath,
+      displayLabelText,
+      fieldTooltipControl,
+      onUpdateDraftValue: updateDraftValue,
+      draft,
+      encryptionGates,
+      defaultGateId,
+      onSetDefaultGateId: setDefaultGateId,
+    });
+    if (aiOrGateSelect) return aiOrGateSelect;
 
     if (keyString === 'defaultFeaturedSBTs') {
       const selections = normalizeSbtSelection(value);
@@ -2985,27 +2631,19 @@ const SessionWizard = ({
       const faucet = value && typeof value === 'object' ? value : {};
       const isCollapsed = metadataObjectCollapsed.faucet;
       return (
-        <div key={keyString} className={styles.objectGroup}>
-          <div className={styles.objectHeader}>
-            <div className={styles.objectTitle}>{displayLabel}</div>
-            <button
-              type="button"
-              className={styles.objectToggle}
-              onClick={() =>
-                setMetadataObjectCollapsed((prev) => ({ ...prev, faucet: !prev.faucet }))
-              }
-            >
-              <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-            </button>
-          </div>
-          {!isCollapsed && (
-            <div className={styles.objectBody}>
-              {Object.entries(faucet).map(([childKey, childValue]) =>
-                renderField(childKey, childValue, currentPath)
-              )}
-            </div>
+        <CollapsibleFieldGroup
+          key={keyString}
+          title={displayLabel}
+          isCollapsed={isCollapsed}
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, faucet: !prev.faucet }))
+          }
+        >
+          {!isCollapsed && Object.entries(faucet).map(([childKey, childValue]) =>
+            renderField(childKey, childValue, currentPath)
           )}
-        </div>
+        </CollapsibleFieldGroup>
       );
     }
 
@@ -3013,27 +2651,19 @@ const SessionWizard = ({
       const ai = value && typeof value === 'object' ? value : {};
       const isCollapsed = metadataObjectCollapsed.ai;
       return (
-        <div key={keyString} className={styles.objectGroup}>
-          <div className={styles.objectHeader}>
-            <div className={styles.objectTitle}>{displayLabel}</div>
-            <button
-              type="button"
-              className={styles.objectToggle}
-              onClick={() =>
-                setMetadataObjectCollapsed((prev) => ({ ...prev, ai: !prev.ai }))
-              }
-            >
-              <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-            </button>
-          </div>
-          {!isCollapsed && (
-            <div className={styles.objectBody}>
-              {Object.entries(ai).map(([childKey, childValue]) =>
-                renderField(childKey, childValue, currentPath)
-              )}
-            </div>
+        <CollapsibleFieldGroup
+          key={keyString}
+          title={displayLabel}
+          isCollapsed={isCollapsed}
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, ai: !prev.ai }))
+          }
+        >
+          {!isCollapsed && Object.entries(ai).map(([childKey, childValue]) =>
+            renderField(childKey, childValue, currentPath)
           )}
-        </div>
+        </CollapsibleFieldGroup>
       );
     }
 
@@ -3042,27 +2672,141 @@ const SessionWizard = ({
       const lit = value && typeof value === 'object' ? value : {};
       const isCollapsed = metadataObjectCollapsed.lit;
       return (
-        <div key={keyString} className={styles.objectGroup}>
-          <div className={styles.objectHeader}>
-            <div className={styles.objectTitle}>{displayLabel}</div>
-            <button
-              type="button"
-              className={styles.objectToggle}
-              onClick={() =>
-                setMetadataObjectCollapsed((prev) => ({ ...prev, lit: !prev.lit }))
-              }
-            >
-              <FontAwesomeIcon icon={isCollapsed ? faCaretDown : faCaretUp} />
-            </button>
-          </div>
-          {!isCollapsed && (
-            <div className={styles.objectBody}>
-              {Object.entries(lit).map(([childKey, childValue]) =>
-                renderField(childKey, childValue, currentPath)
-              )}
-            </div>
+        <CollapsibleFieldGroup
+          key={keyString}
+          title={displayLabel}
+          isCollapsed={isCollapsed}
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, lit: !prev.lit }))
+          }
+        >
+          {!isCollapsed && Object.entries(lit).map(([childKey, childValue]) =>
+            renderField(childKey, childValue, currentPath)
           )}
-        </div>
+        </CollapsibleFieldGroup>
+      );
+    }
+
+    if (path.length === 0 && key === 'storageProfile') {
+      if (wizardMode !== 'advanced') return null;
+      const storageProfile = normalizeSessionStorageProfileConfig(value);
+      const isCollapsed = metadataObjectCollapsed.storageProfile;
+      const updateStorageBackend = (backend) => {
+        updateDraftValue(
+          ['storageProfile'],
+          normalizeSessionStorageProfileConfig({
+            ...(value && typeof value === 'object' ? value : {}),
+            backend,
+          })
+        );
+      };
+      const updateCloudflarePayloadAccessMode = (mode) => {
+        updateDraftValue(
+          ['storageProfile'],
+          normalizeSessionStorageProfileConfig({
+            ...(value && typeof value === 'object' ? value : {}),
+            backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE,
+            payloadAccessControl: {
+              ...(storageProfile.payloadAccessControl && typeof storageProfile.payloadAccessControl === 'object'
+                ? storageProfile.payloadAccessControl
+                : {}),
+              mode,
+            },
+          })
+        );
+      };
+      return (
+        <CollapsibleFieldGroup
+          key={keyString}
+          title={displayLabel}
+          isCollapsed={isCollapsed}
+          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
+          onToggleCollapsed={() =>
+            setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
+          }
+        >
+          {!isCollapsed && (
+            <>
+              <div
+                className={styles.inlineToggleRow}
+                role="radiogroup"
+                aria-label="Session storage profile"
+              >
+                {[
+                  { backend: SESSION_STORAGE_BACKENDS.ARWEAVE, label: 'Arweave' },
+                  { backend: SESSION_STORAGE_BACKENDS.LIT_ARWEAVE, label: 'Lit-Arweave' },
+                  { backend: SESSION_STORAGE_BACKENDS.CLOUDFLARE, label: 'Cloudflare' },
+                ].map((option) => {
+                  const selected = storageProfile.backend === option.backend;
+                  return (
+                    <Button
+                      key={option.backend}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={`${styles.workerModePill} ${selected ? styles.workerModePillActive : ''}`}
+                      onClick={() => updateStorageBackend(option.backend)}
+                    >
+                      {option.label}
+                    </Button>
+                  );
+                })}
+              </div>
+              {storageProfile.backend === SESSION_STORAGE_BACKENDS.LIT_ARWEAVE ? (
+                <div className={styles.helperText}>
+                  Lit-Arweave stores encrypted Arweave payloads for session documents and context.
+                </div>
+              ) : null}
+              {storageProfile.backend === SESSION_STORAGE_BACKENDS.CLOUDFLARE ? (
+                <>
+                  <div className={styles.helperText}>
+                    Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.
+                  </div>
+                  <div
+                    className={styles.inlineToggleRow}
+                    role="radiogroup"
+                    aria-label="Cloudflare payload access mode"
+                  >
+                    {[
+                      {
+                        mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE,
+                        label: 'Worker SBT gate',
+                      },
+                      {
+                        mode: SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED,
+                        label: 'Lit encrypted',
+                      },
+                    ].map((option) => {
+                      const selected = storageProfile.payloadAccessControl?.mode === option.mode;
+                      return (
+                        <Button
+                          key={option.mode}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          className={`${styles.workerModePill} ${selected ? styles.workerModePillActive : ''}`}
+                          onClick={() => updateCloudflarePayloadAccessMode(option.mode)}
+                        >
+                          {option.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  {storageProfile.payloadAccessControl?.mode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED ? (
+                    <div className={styles.helperText}>
+                      Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes. Lit credentials are required; plaintext Cloudflare uploads are rejected until the Lit envelope path supplies payloadEncrypted data.
+                    </div>
+                  ) : (
+                    <div className={styles.helperText}>
+                      Worker SBT gate mode is worker-enforced access control, not end-to-end encryption. The session worker checks the requester&apos;s SBT on the configured chain/RPC before serving Cloudflare objects.
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </>
+          )}
+        </CollapsibleFieldGroup>
       );
     }
 
@@ -3111,23 +2855,6 @@ const SessionWizard = ({
       const childNodes = Object.entries(value)
         .map(([childKey, childValue]) => renderField(childKey, childValue, currentPath))
         .filter(Boolean);
-      const isContractsBlock = path.length === 0 && key === 'contracts';
-      const isCollapsed = isContractsBlock && metadataObjectCollapsed.contracts;
-      if (isContractsBlock) {
-        return (
-          <ContractsSection
-            key={keyString}
-            title={displayLabel}
-            variant="object"
-            childNodes={childNodes}
-            emptyMessage="No editable fields in this section yet."
-            isCollapsed={isCollapsed}
-            onToggleCollapsed={() =>
-              setMetadataObjectCollapsed((prev) => ({ ...prev, contracts: !prev.contracts }))
-            }
-          />
-        );
-      }
       return (
         <div key={keyString} className={styles.objectGroup}>
           <div className={styles.objectHeader}>
@@ -3702,7 +3429,7 @@ const SessionWizard = ({
     if (metadata.lit && typeof metadata.lit === 'object') {
       metadata.lit.defaultGateId = defaultGateId || metadata.lit.defaultGateId;
     }
-    // PRD 424 tracks per-member budget semantics and enforcement. Keep the field hidden until then.
+    // Keep per-member budget fields hidden until semantics and enforcement are implemented.
     metadata.perMemberSpendLimits = {
       ...(metadata.perMemberSpendLimits || {}),
       ai: gateSelections.ai?.perMemberLimit || metadata.perMemberSpendLimits?.ai || '',
@@ -3718,9 +3445,10 @@ const SessionWizard = ({
       normalizeAiModelForProvider,
       defaultAiModels: DEFAULT_AI_MODELS,
     });
+    const sponsoredFields = buildSponsoredFlagFields();
     result.onChainFields = buildSessionWizardRegistrySessionFields({
       onChainFields: result.onChainFields,
-      sponsoredFields: buildSponsoredFlagFields(),
+      sponsoredFields,
     });
     return { ...result };
   };
@@ -4237,7 +3965,6 @@ const SessionWizard = ({
     scheduleAdminUrlStatusReset();
   };
 
-  const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
   const sessionIdDisplay = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
 
   const handleCopySessionId = async () => {
@@ -4254,26 +3981,6 @@ const SessionWizard = ({
       setSessionIdStatus('Copy failed.');
     }
     scheduleSessionIdStatusReset();
-  };
-
-  const handleCopyLitPayerAddress = async (value) => {
-    const nextValue = toStr(value).trim();
-    if (!nextValue) return;
-    try {
-      await navigator.clipboard.writeText(nextValue);
-      notify.success('Copied to clipboard');
-    } catch {
-      notify.warn('Copy failed');
-    }
-  };
-
-  const handleGenerateLitPayer = () => {
-    const nextWallet = createLitPayerWallet();
-    applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
-      ...prev,
-      litPayerPrivateKey: nextWallet.privateKey,
-      litPayerAddress: nextWallet.address,
-    }));
   };
 
   const handleRegenerateSessionId = () => {
@@ -4318,18 +4025,21 @@ const SessionWizard = ({
     draft,
     registryChainId,
     networkId: network?.id,
+    workerSecrets: getCurrentWorkerSecrets(),
   });
 
   const resolveWorkerRpcUrlMap = () => resolveSessionWizardWorkerRpcUrlMapFromDraft({
     draft,
     registryChainId,
     networkId: network?.id,
+    workerSecrets: getCurrentWorkerSecrets(),
   });
 
   const resolveWorkerFaucetConfig = () => resolveSessionWizardWorkerFaucetConfigFromDraft({
     draft,
     registryChainId,
     networkId: network?.id,
+    workerSecrets: getCurrentWorkerSecrets(),
   });
   const effectiveDefaultWorkerRpcUrl = toStr(resolveWorkerRpcUrl()).trim();
   const resolvedWorkerBaseUrlForDelegation = resolveWorkerBaseUrl();
@@ -4353,12 +4063,10 @@ const SessionWizard = ({
 
     return buildSponsoredSessionFlagFields({
       secrets: sanitizeSessionWizardWorkerSecretsForLitMode(
-        secretsSnapshot,
-        { litPayerWalletInputEnabled }
+        secretsSnapshot
       ),
       fallbackFields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(
-        fallbackFields,
-        { litPayerWalletInputEnabled }
+        fallbackFields
       ),
       workerSecretsEnabled,
     });
@@ -4395,43 +4103,74 @@ const SessionWizard = ({
 
   const getMissingWorkerSecretsForDeploy = (secretsSnapshot = getCurrentWorkerSecrets()) => {
     const missing = [];
-    const { fastProvider, thinkingProvider } = resolveSessionWizardAiModelProviders(draft?.ai);
-    if ((fastProvider === 'openai' || thinkingProvider === 'openai') && !toStr(secretsSnapshot.openaiKey).trim()) {
+    if (!toStr(secretsSnapshot.openaiKey).trim()) {
       missing.push('OpenAI key');
-    }
-    if ((fastProvider === 'anthropic' || thinkingProvider === 'anthropic') && !toStr(secretsSnapshot.anthropicKey).trim()) {
-      missing.push('Anthropic key');
-    }
-    if ((fastProvider === 'openrouter' || thinkingProvider === 'openrouter') && !toStr(secretsSnapshot.openrouterKey).trim()) {
-      missing.push('OpenRouter key');
     }
     if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
     const rpcUrl = resolveWorkerRpcUrl();
     if (!rpcUrl) missing.push('RPC URL (include key in URL)');
+    const hasAnyChipotleField = (
+      CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
+      !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
+      !!toStr(secretsSnapshot?.litUsageApiKey).trim()
+    );
+    const accountKeyOnlyChipotleConfig = !!toStr(secretsSnapshot?.litAccountApiKey).trim();
+    const bootstrapOnlyChipotleConfig = (
+      accountKeyOnlyChipotleConfig ||
+      (
+        !!toStr(secretsSnapshot?.litApiBase).trim() &&
+        !toStr(secretsSnapshot?.litGroupId).trim() &&
+        !toStr(secretsSnapshot?.litPkpId).trim() &&
+        !toStr(secretsSnapshot?.litActionCid).trim() &&
+        !toStr(secretsSnapshot?.litUsageApiKey).trim()
+      )
+    );
+    if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
+      const requiredChipotleFields = [
+        ['litApiBase', 'Lit API base'],
+        ['litGroupId', 'Lit group ID'],
+        ['litPkpId', 'Lit PKP ID'],
+      ];
+      requiredChipotleFields.forEach(([key, label]) => {
+        if (!toStr(secretsSnapshot?.[key]).trim()) missing.push(label);
+      });
+    }
     return missing;
   };
+
+  const chipotleHookWorkerSecrets = useMemo<WorkerSecretsLike>(() => ({
+    litApiBase: workerSecrets.litApiBase,
+    litGroupId: workerSecrets.litGroupId,
+    litPkpId: workerSecrets.litPkpId,
+    litActionCid: workerSecrets.litActionCid,
+    litAccountApiKey: workerSecrets.litAccountApiKey,
+    litUsageApiKey: workerSecrets.litUsageApiKey,
+  }), [
+    workerSecrets.litAccountApiKey,
+    workerSecrets.litActionCid,
+    workerSecrets.litApiBase,
+    workerSecrets.litGroupId,
+    workerSecrets.litPkpId,
+    workerSecrets.litUsageApiKey,
+  ]);
 
   useEffect(() => {
     const previousHooks = getGlobalLitHooks();
     const chainId = Number(registryChainId || draft?.networkChainId || network?.id || 0) || null;
-    const litPayerPrivateKeyForWizard = litPayerWalletInputEnabled
-      ? toStr(workerSecrets.litPayerPrivateKey).trim()
-      : '';
-    const paymentDelegation = resolveSessionWizardLitPaymentDelegation({
+    const chipotle = resolveSessionWizardChipotleHookConfig({
       workerSecretsEnabled,
+      workerSecrets: chipotleHookWorkerSecrets,
       resolvedWorkerUrl: resolvedWorkerBaseUrlForDelegation,
-      litPayerPrivateKey: litPayerPrivateKeyForWizard,
       draft,
-      chainId,
     });
-    const nextHooks = createLitHooks({
+    const nextHooks = chipotle ? createLitHooks({
       providerLike: provider,
       account,
       chainId,
       litChain: resolveLitChain({ chainId }),
-      litNetwork: draft?.lit?.network || draft?.litNetwork || previousHooks?.litNetwork || 'naga-dev',
-      paymentDelegation,
-    });
+      litNetwork: 'chipotle',
+      chipotle,
+    }) : null;
     setGlobalLitHooks(nextHooks);
     return () => {
       setGlobalLitHooks(previousHooks);
@@ -4443,9 +4182,8 @@ const SessionWizard = ({
     provider,
     registryChainId,
     resolvedWorkerBaseUrlForDelegation,
-    litPayerWalletInputEnabled,
+    chipotleHookWorkerSecrets,
     workerSecretsEnabled,
-    workerSecrets.litPayerPrivateKey,
   ]);
 
   const clearWorkerSecretFields = () => {
@@ -4538,397 +4276,60 @@ const SessionWizard = ({
     });
   };
 
-  const resolveConnectedAdminAddress = async () => {
-    const cachedResolved = toStr(resolvedWalletAccountRef.current || account).trim();
-    if (cachedResolved) return cachedResolved;
+  const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);
+  const embeddedDeployHelperEnabled = typeof draft.embeddedDeployHelperEnabled === 'boolean'
+    ? draft.embeddedDeployHelperEnabled
+    : (CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false);
 
-    const providerObj = cryptoUtils._getProvider(provider || 'wagmi');
-    if (!providerObj) return '';
-
-    let resolvedAddress = toStr(providerObj?.selectedAddress || providerObj?.address).trim();
-    if (typeof providerObj.request === 'function') {
-      try {
-        const accounts = await providerObj.request({ method: 'eth_accounts' });
-        if (Array.isArray(accounts) && accounts[0]) {
-          resolvedAddress = toStr(accounts[0]).trim();
-        }
-      } catch (_) {}
-    }
-
-    if (resolvedAddress) {
-      resolvedWalletAccountRef.current = resolvedAddress;
-      setDeployForm((prev) => (
-        toStr(prev?.adminAddress).trim()
-          ? prev
-          : { ...prev, adminAddress: resolvedAddress }
-      ));
-    }
-    return resolvedAddress;
+  workerDeployRuntimeRef.current = {
+    account,
+    provider,
+    network,
+    loginComplete,
+    loginInProgress,
+    toggleLoginModal,
+    registryAddress,
+    registryChainId,
+    wizardMode,
+    workerMode,
+    bundleMode,
+    bundleFile,
+    forceManualBundleFile,
+    normalModeBundleUrlOverride,
+    workerSecretsEnabled,
+    workerLimitPerWallet,
+    embeddedDeployHelperEnabled,
+    deployHelperUrl,
+    latestChainBlock,
+    sessionId,
+    sessionIdHex,
+    draft,
+    deployForm,
   };
 
-  const handleDeployWorker = async (options = {}) => {
-    let helperBase = '';
-    const forceSponsoredAutoDeploy = options?.forceSponsoredAutoDeploy === true;
-    let effectiveBundleMode = 'upload';
-    try {
-      const currentDeployForm = (
-        deployFormRef.current &&
-        typeof deployFormRef.current === 'object'
-      ) ? deployFormRef.current : deployForm;
-      const rawSlug = toStr(draft.slug).trim();
-      const slugValidationError = getSessionSlugValidationError(rawSlug);
-      if (slugValidationError) {
-        setDeployStatus(slugValidationError);
-        return { ok: false, error: slugValidationError };
-      }
-      if (loginComplete !== true) {
-        const loginMessage = (
-          loginInProgress
-            ? 'Finish logging in before deploying the worker.'
-            : 'Connect your wallet to set the admin address.'
-        );
-        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
-        setDeployStatus(loginMessage);
-        return { ok: false, error: loginMessage };
-      }
-      setDeployStatus('Deploying worker…');
-      setDeployInFlight(true);
-      setDeployComplete(false);
-      setWorkerUrlAutoFilled(false);
-      const slug = normalizeSlug(rawSlug) || 'general';
-      const resolvedAdmin = await resolveConnectedAdminAddress();
-      if (!resolvedAdmin) {
-        if (typeof toggleLoginModal === 'function') toggleLoginModal(true);
-        throw new Error('Connect your wallet to set the admin address.');
-      }
-      const configuredWorkerUrlBeforeDeploy = normalizeWorkerUrl(toStr(draft.corsWorkerUrl).trim());
-      const workerConfigError = getSessionWizardWorkerDeployValidationError({
-        registryAddress,
-        registryChainId,
-        networkChainId: draft.networkChainId,
-        pathProvider: draft?.rpc?.providers?.path || draft?.rpc?.path || {},
-        faucetRpcUrl: draft?.faucet?.rpcUrl,
-      });
-      if (workerConfigError) {
-        throw new Error(workerConfigError);
-      }
-      const currentWorkerSecrets = getCurrentWorkerSecrets();
-      if (workerSecretsEnabled) {
-        const missing = getMissingWorkerSecretsForDeploy(currentWorkerSecrets);
-        if (missing.length) {
-          throw new Error(`Missing required secrets before deploy: ${missing.join(', ')}`);
-        }
-      }
-      // Regression guard: deploy-ready sponsored links still force the URL path
-      // in normal mode, but manual retry must still be able to override that
-      // path with an uploaded bundle file after a remote fetch failure.
-      const sponsoredAutoDeployReady = (
-        workerMode !== 'default' &&
-        resolveSessionWizardSponsoredAutoDeployReadiness({
-          wizardMode,
-          sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
-          deployForm: currentDeployForm,
-          workerSecretsEnabled,
-          currentWorkerSecrets,
-          getMissingWorkerSecretsForDeploy,
-          hasBundleFile: !!bundleFile,
-          normalModeBundleUrlOverride,
-        }).ready
-      );
-      effectiveBundleMode = resolveSessionWizardDeployBundleMode({
-        wizardMode,
-        bundleMode,
-        bundleUrl: currentDeployForm.bundleUrl,
-        sponsoredAutoDeployReady: forceSponsoredAutoDeploy || sponsoredAutoDeployReady,
-        forceSponsoredAutoDeploy,
-        forceManualBundleFile,
-        hasBundleFile: !!bundleFile,
-        normalModeBundleUrlOverride,
-      });
-      if (effectiveBundleMode === 'upload' && !bundleFile) {
-        throw new Error(
-          effectiveBundleMode === 'upload' && wizardMode === 'normal'
-            ? 'Upload a worker bundle file before deploy.'
-            : 'Upload a worker bundle file or switch to bundle URL.'
-        );
-      }
-      const requestedBundleUrl = resolveSessionWizardBundleUrlForMode({
-        wizardMode,
-        bundleUrl: currentDeployForm.bundleUrl,
-        normalModeBundleUrlOverride,
-      });
-      const {
-        bundleText,
-        bundleUrl,
-      } = await resolveSessionWizardDeployBundlePayload({
-        effectiveBundleMode,
-        bundleFile,
-        bundleUrl: requestedBundleUrl,
-      });
-      const deploySecrets = workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
-      const deployBlockLimits = normalizeBlockLimitsForConfig(draft?.blockLimits, latestChainBlock);
-      const payload = {
-        workerName: currentDeployForm.workerName,
-        sessionSlug: slug,
-        bundleUrl,
-        bundleText: bundleText || undefined,
-        registryAddress: toStr(registryAddress).trim(),
-        registryChainId: Number(registryChainId || draft.networkChainId || 0) || 0,
-        adminAddress: resolvedAdmin,
-        rpcUrl: resolveWorkerRpcUrl(),
-        rpcUrlsByChainId: resolveWorkerRpcUrlMap(),
-        allowOrigins: parseAllowOriginsInput(),
-        limits: Number(workerLimitPerWallet || 0) ? { perWalletPerDay: Number(workerLimitPerWallet) } : {},
-        scopes: {},
-        faucet: resolveWorkerFaucetConfig(),
-        embeddedDeployHelperEnabled,
-      };
-      if (deployBlockLimits) {
-        payload.blockLimits = deployBlockLimits;
-      }
-      if (Object.keys(deploySecrets).length) {
-        payload.secrets = deploySecrets;
-      }
-      const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundleAppliedBundleRef.current);
-      const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
-      const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
-      const submitDeployPayload = async (deployPayload) => {
-        if ((forceSponsoredAutoDeploy || sponsoredAutoDeployReady) && sponsoredDeployGrantToken && sponsoredBootstrapWorkerUrl) {
-          helperBase = sponsoredBootstrapWorkerUrl;
-          const sponsoredDeployRes = await fetch(`${sponsoredBootstrapWorkerUrl}/sponsored/redeem-deploy`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              deployGrantToken: sponsoredDeployGrantToken,
-              deployPayload,
-            }),
-          });
-          const nextDeployStatusCode = sponsoredDeployRes.status;
-          const nextData = await sponsoredDeployRes.json().catch(() => ({}));
-          if (!sponsoredDeployRes.ok) {
-            const err = new Error(nextData?.error || `Worker deploy failed (${sponsoredDeployRes.status}).`);
-            err.statusCode = sponsoredDeployRes.status;
-            err.responseError = nextData?.error || '';
-            err.responseBundleDiagnostics = nextData?.bundleDiagnostics || null;
-            throw err;
-          }
-          return {
-            deployStatusCode: nextDeployStatusCode,
-            data: nextData,
-          };
-        }
-
-        helperBase = normalizeWorkerUrl(deployHelperUrl);
-        if (!helperBase) throw new Error('Deploy-helper URL is missing.');
-        if (!currentDeployForm.apiToken || !currentDeployForm.workerName) {
-          throw new Error('Fill in API token and worker name.');
-        }
-        const res = await fetch(`${helperBase}/deploy`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...deployPayload,
-            apiToken: currentDeployForm.apiToken,
-            accountId: toStr(currentDeployForm.accountId || '').trim() || undefined,
-          }),
-        });
-        const nextDeployStatusCode = res.status;
-        const nextData = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          const err = new Error(nextData?.error || `Worker deploy failed (${res.status}).`);
-          err.statusCode = res.status;
-          err.responseError = nextData?.error || '';
-          err.responseBundleDiagnostics = nextData?.bundleDiagnostics || null;
-          throw err;
-        }
-        return {
-          deployStatusCode: nextDeployStatusCode,
-          data: nextData,
-        };
-      };
-      let deployStatusCode = 0;
-      let data = {};
-      ({ deployStatusCode, data } = await submitDeployPayload(payload));
-      const {
-        resolvedDeployWorkerUrl,
-        displayWorkerUrl,
-        deployComplete: isDeployVerified,
-      } = resolveDeployWorkerState({
-        responseWorkerUrl: data?.workerUrl,
-        configuredWorkerUrl: configuredWorkerUrlBeforeDeploy,
-      });
-      if (data?.workerUrl && resolvedDeployWorkerUrl) {
-        updateDraftValue(['corsWorkerUrl'], resolvedDeployWorkerUrl);
-        setWorkerMode('custom');
-        setWorkerUrlAutoFilled(true);
-      }
-      const workerConfigPayload = {
-        ...buildSessionWizardWorkerConfigPayload({
-          slug,
-          draft,
-          deployPayload: payload,
-          account: toStr(resolvedAdmin || currentDeployForm.adminAddress || account).trim(),
-          registryAddress,
-          registryChainId,
-          networkChainId: network?.id,
-          sessionId,
-          latestChainBlock,
-          workerUrl: resolvedDeployWorkerUrl,
-          resolveWorkerFaucetConfig,
-        }),
-        corsWorkerUrl: resolvedDeployWorkerUrl,
-      };
-      const ensureWorkerSessionConfig = async ({ workerUrl, slug: targetSlug }) => {
-        const requestBody = {
-          sessionSlug: targetSlug,
-          adminAddress: workerConfigPayload.adminAddress || account || '',
-          config: workerConfigPayload,
-        };
-        const auth = await signTypedAdminAction({
-          action: 'set-config',
-          body: requestBody,
-          targetSlug,
-          workerUrl,
-          accountOverride: resolvedAdmin,
-        });
-        const configRes = await fetch(`${workerUrl}/admin/set-config`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...requestBody,
-            adminAddress: requestBody.adminAddress || auth.address,
-            ...auth,
-          }),
-        });
-        const configData = await configRes.json().catch(() => ({}));
-        if (!configRes.ok) {
-          throw new Error(configData?.error || 'Failed to sync worker config after deploy.');
-        }
-      };
-      let configSyncStatus = { warning: '', note: '', synced: false, skipped: true };
-      if (resolvedDeployWorkerUrl) {
-        configSyncStatus = await syncWorkerConfigAfterPartialDeploy({
-          deployResponse: data,
-          workerUrl: resolvedDeployWorkerUrl,
-          account: resolvedAdmin,
-          slug,
-          ensureSessionConfig: ensureWorkerSessionConfig,
-        });
-      } else {
-        configSyncStatus = {
-          warning: 'Worker URL unavailable - skipped config sync.',
-          note: '',
-          synced: false,
-          skipped: true,
-        };
-      }
-      let secretsSyncStatus = { warning: '', note: '' };
-      let helperWritesSecrets = false;
-      if (resolvedDeployWorkerUrl && workerSecretsEnabled && Object.keys(deploySecrets).length) {
-        helperWritesSecrets = (
-          data?.writesSessionSecrets === true ||
-          toStr(data?.sessionSecretsKey).startsWith('session:')
-        );
-        secretsSyncStatus = await syncWorkerSecretsAfterDeploy({
-          workerUrl: resolvedDeployWorkerUrl,
-          account: resolvedAdmin,
-          slug,
-          deploySecrets,
-          // Older deploy-helper revisions may not write session-prefixed keys.
-          // If unknown, force a real sync attempt instead of assuming helper success.
-          helperWritesSecrets,
-          signAdminAction: ({ targetSlug, workerUrl, body }) => signTypedAdminAction({
-            action: 'set-secrets',
-            body,
-            targetSlug,
-            workerUrl,
-            accountOverride: resolvedAdmin,
-          }),
-          ensureSessionConfig: ensureWorkerSessionConfig,
-          postSecrets: async ({ auth, secrets, workerUrl, slug }) => {
-            const requestBody = {
-              sessionSlug: slug,
-              secrets,
-            };
-            const secretsRes = await fetch(`${workerUrl}/admin/set-secrets`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...requestBody, ...auth }),
-            });
-            const secretsData = await secretsRes.json().catch(() => ({}));
-            if (!secretsRes.ok) {
-              throw new Error(secretsData?.error || 'Failed to sync worker secrets after deploy.');
-            }
-          },
-        });
-      }
-      cacheSessionWorkerConfigAfterDeploy({
-        deployStatusCode,
-        configSyncStatus,
-        workerUrl: resolvedDeployWorkerUrl,
-        slug,
-        sessionIdHex,
-        registryChainId,
-        config: workerConfigPayload,
-      });
-      if (
-        resolvedDeployWorkerUrl &&
-        workerSecretsEnabled &&
-        Object.keys(deploySecrets).length &&
-        (helperWritesSecrets || secretsSyncStatus?.synced === true || secretsSyncStatus?.deferred === true)
-      ) {
-        setProvisionedSponsoredContext({
-          sessionSlug: slug,
-          workerUrl: resolvedDeployWorkerUrl,
-          fields: buildSponsoredSessionFlagFields({
-            secrets: sanitizeSessionWizardWorkerSecretsForLitMode(
-              deploySecrets,
-              { litPayerWalletInputEnabled }
-            ),
-            workerSecretsEnabled: true,
-          }),
-        });
-      }
-      setDeployWorkerUrl(displayWorkerUrl);
-      const baseDeployStatus = withSessionWizardDeployHelperWorkersDevStatus(
-        data?.workerUrl ? 'Worker deployed.' : 'Worker deployed (URL unavailable).',
-        data,
-      );
-      setDeployStatus(withWorkerConfigSyncWarning(
-        withSecretsSyncStatus(baseDeployStatus, secretsSyncStatus),
-        configSyncStatus.warning,
-      ));
-      setDeployComplete(isDeployVerified);
-      // Manual bundle uploads are one-off retries; clear the cached file so
-      // later URL-mode deploys and sponsored publish flows don't reuse stale bytes.
-      setForceManualBundleFile(false);
-      clearSelectedBundleFile();
-      setNormalModeBundleUrlOverride('');
-      clearCachedWorkerSecretsAfterDeploy();
-      return {
-        ok: true,
-        workerUrl: resolvedDeployWorkerUrl,
-        deployComplete: isDeployVerified,
-      };
-    } catch (err) {
-      if (shouldForceSessionWizardNormalModeManualBundleRetry({
-        err,
-        wizardMode,
-        effectiveBundleMode,
-        hasBundleFile: !!bundleFile,
-      })) {
-        setForceManualBundleFile(true);
-      }
-      const errorMessage = normalizeSessionWizardDeployErrorMessage({ err, helperBase });
-      setDeployStatus(errorMessage);
-      return {
-        ok: false,
-        error: errorMessage,
-      };
-    } finally {
-      setDeployInFlight(false);
-    }
-  };
+  const {
+    handleDeployWorker,
+    resolveConnectedAdminAddress,
+  } = useSessionWizardWorkerDeploy({
+    refs: {
+      runtimeRef: workerDeployRuntimeRef,
+      resolvedWalletAccountRef,
+      sponsoredBundleAppliedBundleRef,
+    },
+    getCurrentWorkerSecrets,
+    applyWorkerSecretsUpdate,
+    getMissingWorkerSecretsForDeploy,
+    resolveWorkerRpcUrl,
+    resolveWorkerRpcUrlMap,
+    resolveWorkerFaucetConfig,
+    parseAllowOriginsInput,
+    signTypedAdminAction,
+    setDeployForm,
+    updateDraftValue,
+    updateDeploymentState: updateSponsoredBundleDeploymentState,
+    clearSelectedBundleFile,
+    clearCachedWorkerSecretsAfterDeploy,
+  });
 
   const resourceGateOptions = useMemo(
     () => encryptionGates.map((gate) => ({ value: gate.id, label: gate.label || gate.id })),
@@ -5000,13 +4401,10 @@ const SessionWizard = ({
         isNormalMode={isNormalMode}
         showSponsoredFaucetNotice={showSponsoredFaucetNotice}
         effectiveDefaultWorkerRpcUrl={effectiveDefaultWorkerRpcUrl}
-        walletLabel={t('wallet')}
         getSecretFieldTestId={getSessionWizardSecretFieldTestId}
         onUpdateSecret={(fieldKey: string, nextValue: string) => {
           applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, [fieldKey]: nextValue }));
         }}
-        onGenerateLitPayer={handleGenerateLitPayer}
-        onCopyLitPayerAddress={handleCopyLitPayerAddress}
       />
     );
   };
@@ -5057,9 +4455,6 @@ const SessionWizard = ({
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
   const isNormalMode = wizardMode !== 'advanced';
-  const embeddedDeployHelperEnabled = typeof draft.embeddedDeployHelperEnabled === 'boolean'
-    ? draft.embeddedDeployHelperEnabled
-    : (CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED !== false);
   const hasConfiguredDeployHelperUrl = !!normalizeWorkerAuthUrl(toStr(CLOUDFLARE_DEPLOY_HELPER_URL).trim());
   const shouldShowDeployHelperUrlInput = !isNormalMode || !hasConfiguredDeployHelperUrl;
 
@@ -5195,12 +4590,13 @@ const SessionWizard = ({
     sponsoredBundleAppliedBundleRef.current
   );
   const sponsoredBundleStatusTone = toStr(sponsoredBundleStatus?.tone).trim().toLowerCase();
-  const hasNewSessionAiRequirementCovered = !!(
-    toStr(currentWorkerSecrets?.openaiKey).trim() ||
-    toStr(currentWorkerSecrets?.anthropicKey).trim() ||
-    toStr(currentWorkerSecrets?.openrouterKey).trim()
-  );
+  const hasNewSessionAiRequirementCovered = !!toStr(currentWorkerSecrets?.openaiKey).trim();
   const hasNewSessionArweaveRequirementCovered = !!toStr(currentWorkerSecrets?.arweaveJwk).trim();
+  const newSessionRequiresLitCredential = !cloudflareWorkerSbtGateMode;
+  const hasNewSessionLitRequirementCovered = (
+    !newSessionRequiresLitCredential ||
+    !!toStr(currentWorkerSecrets?.litAccountApiKey).trim()
+  );
   const hasNewSessionFundingRequirementCovered = !!(
     toStr(currentWorkerSecrets?.faucetPrivateKey).trim() ||
     toStr(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
@@ -5212,6 +4608,7 @@ const SessionWizard = ({
     sponsoredBundleStatusTone === 'success' &&
     hasNewSessionAiRequirementCovered &&
     hasNewSessionArweaveRequirementCovered &&
+    hasNewSessionLitRequirementCovered &&
     hasNewSessionFundingRequirementCovered &&
     hasNewSessionDeployRequirementCovered
   );
@@ -5258,82 +4655,35 @@ const SessionWizard = ({
   const configuredPrivateGateCount = encryptionGates.filter(
     (gate) => normalizeSbtSelection(gate?.sbts || []).length > 0
   ).length;
-  const normalModeCards = [
-    {
-      key: 'metadata',
-      title: 'Session Details',
-      summary: toStr(draft?.sessionName).trim()
-        ? toStr(draft.sessionName).trim()
-        : '',
-      tone: sessionDetailsComplete ? 'ready' : 'pending',
-    },
-    {
-      key: 'encryption',
-      title: 'Privacy',
-      summary: configuredPrivateGateCount
-        ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
-        : (privateSlugMode ? 'Private URL enabled' : 'Open link by default'),
-      tone: configuredPrivateGateCount || privateSlugMode ? 'ready' : 'neutral',
-    },
-    ...(showNormalModeWorkerStep ? [{
-      key: 'worker',
-      title: 'Worker',
-      summary: normalModeRequiresCustomWorker
-        ? (resolvedWorkerBaseUrl
-          ? 'Your worker URL is configured.'
-          : 'Deploy or paste your own worker URL.')
-        : workerMode === 'default'
-          ? 'Using the shared default worker.'
-          : (deployVerifiedInUi ? 'Custom worker deployed in this run.' : 'Custom worker setup is available here.'),
-      tone: normalModeRequiresCustomWorker
-        ? (resolvedWorkerBaseUrl ? 'ready' : 'pending')
-        : (workerMode === 'default' || deployVerifiedInUi ? 'ready' : 'neutral'),
-    }] : []),
-    {
-      key: 'publish',
-      title: 'Deploy Session',
-      summary: canPublishNow
-        ? (canUseSponsoredAutoDeployNow
-          ? 'Publish will deploy the sponsored worker before uploading metadata.'
-          : 'Review the setup and deploy when ready.')
-        : uploadBlockedReason,
-      tone: canPublishNow ? 'ready' : 'pending',
-    },
-  ].map((card, index) => ({
-    ...card,
-    stepNumber: index + 1,
-  }));
+  const normalModeCards = buildNormalModeCards({
+    sessionName: toStr(draft?.sessionName),
+    sessionDetailsComplete,
+    configuredPrivateGateCount,
+    privateSlugMode,
+    showNormalModeWorkerStep,
+    normalModeRequiresCustomWorker,
+    resolvedWorkerBaseUrl,
+    workerMode,
+    deployVerifiedInUi,
+    canPublishNow,
+    canUseSponsoredAutoDeployNow,
+    uploadBlockedReason,
+    t,
+  });
   const activeNormalModeIndex = normalModeCards.findIndex((card) => collapsedSections[card.key] === false);
-  const normalModePublishSummary = [
-    {
-      label: 'Session',
-      value: toStr(draft?.sessionName).trim() || 'Add a session name',
-    },
-    {
-      label: 'Privacy',
-      value: configuredPrivateGateCount
-        ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? t('gate') : t('gates')} configured`
-        : (privateSlugMode ? 'Private URL mode' : 'Open access'),
-    },
-    {
-      label: 'Worker',
-      value: canUseSponsoredAutoDeployNow
-        ? 'Sponsored auto-deploy on Publish'
-        : shouldUseSponsoredAutoDeployFlow
-        ? 'Sponsored auto-deploy waiting for the hosted bundle URL'
-        : normalModeRequiresCustomWorker
-        ? (resolvedWorkerBaseUrl ? 'Custom worker ready' : 'Bring your own worker')
-        : workerMode === 'default'
-          ? 'Shared hosted worker'
-          : (deployVerifiedInUi ? 'Custom worker deployed' : 'Custom worker setup'),
-    },
-    {
-      label: `Pending ${t('sbts')}`,
-      value: pendingDraftCount
-        ? `${pendingDraftCount} draft${pendingDraftCount === 1 ? '' : 's'} ready`
-        : 'None',
-    },
-  ];
+  const normalModePublishSummary = buildNormalModePublishSummary({
+    sessionName: toStr(draft?.sessionName),
+    configuredPrivateGateCount,
+    privateSlugMode,
+    canUseSponsoredAutoDeployNow,
+    shouldUseSponsoredAutoDeployFlow,
+    normalModeRequiresCustomWorker,
+    resolvedWorkerBaseUrl,
+    workerMode,
+    deployVerifiedInUi,
+    pendingDraftCount,
+    t,
+  });
   useEffect(() => {
     if (!isNormalMode) return;
     const visibleSectionOrder = showNormalModeWorkerStep
@@ -5603,9 +4953,55 @@ const SessionWizard = ({
           </div>
           <div className={styles.newSessionBannerBody}>
             <ul className={styles.newSessionBannerList}>
-              <li>An AI API key (OpenAI, Anthropic, or OpenRouter)</li>
-              <li>An Arweave wallet (JWK) for permanent storage</li>
-              <li>{newSessionFundingRequirementLabel}</li>
+              <li>
+                <a
+                  href={NEW_SESSION_RESOURCE_LINKS.openaiApiKey}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.newSessionBannerLink}
+                >
+                  OpenAI API key
+                </a>
+                {' '}for text and transcription
+              </li>
+              <li>
+                {newSessionRequiresLitCredential ? (
+                  <>
+                    <a
+                      href={NEW_SESSION_RESOURCE_LINKS.litApiKeys}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.newSessionBannerLink}
+                    >
+                      Lit account API key
+                    </a>
+                    {' '}for encrypted access automation
+                  </>
+                ) : 'No Lit key is required for Cloudflare worker-enforced SBT access control'}
+              </li>
+              <li>
+                <a
+                  href={NEW_SESSION_RESOURCE_LINKS.arweaveWallet}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.newSessionBannerLink}
+                >
+                  Arweave wallet (JWK)
+                </a>
+                {' '}for permanent storage
+              </li>
+              <li>
+                {newSessionFundingRequirementHref ? (
+                  <a
+                    href={newSessionFundingRequirementHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.newSessionBannerLink}
+                  >
+                    {newSessionFundingRequirementLabel}
+                  </a>
+                ) : newSessionFundingRequirementLabel}
+              </li>
               <li>(Optional) A faucet private key for sponsoring user gas</li>
             </ul>
             <p className={styles.newSessionBannerCopy}>
@@ -5762,7 +5158,7 @@ const SessionWizard = ({
           setWorkerSecretsEnabled={setWorkerSecretsEnabled}
           clearWorkerSecretFields={clearWorkerSecretFields}
           effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
-          workerResourceKeys={workerResourceKeys}
+          workerResourceKeys={visibleWorkerResourceKeys}
           renderResourceCard={renderResourceCard}
           workerAllowOrigins={workerAllowOrigins}
           setWorkerAllowOrigins={setWorkerAllowOrigins}

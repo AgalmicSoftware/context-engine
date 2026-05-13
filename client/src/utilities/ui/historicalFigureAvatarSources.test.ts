@@ -18,7 +18,7 @@ const APPROVED_REMOTE_PREFIXES = [
 const getDuplicateTopLevelManifestKeys = (manifestFilename: string): string[] => {
   const manifestPath = path.resolve(__dirname, manifestFilename);
   const manifestRaw = fs.readFileSync(manifestPath, 'utf8');
-  const topLevelKeyPattern = /^  "([^"]+)": \{$/gm;
+  const topLevelKeyPattern = /^ {2}"([^"]+)": \{$/gm;
   const counts = new Map();
   let match = null;
 

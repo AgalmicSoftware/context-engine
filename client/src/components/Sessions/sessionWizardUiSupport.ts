@@ -1,6 +1,5 @@
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import type { AnyRecord } from '../shellTypes';
 
 const SESSION_HEADER_IMAGE_MIME_TO_EXT = Object.freeze({
   'image/png': 'png',
@@ -9,14 +8,33 @@ const SESSION_HEADER_IMAGE_MIME_TO_EXT = Object.freeze({
   'image/gif': 'gif',
 });
 
-export const readSessionWizardTooltipsEnabled = (
-  reduxStore: AnyRecord | null | undefined
-): boolean => (
-  reduxStore?.getState?.()?.sessionState?.tooltipsEnabled !== false
+type SessionWizardUiRecord = Record<string, unknown>;
+
+type SessionWizardReduxStoreLike = SessionWizardUiRecord & {
+  getState?: () => unknown;
+};
+
+type SessionWizardFileLike = SessionWizardUiRecord & {
+  name?: unknown;
+  type?: unknown;
+};
+
+const isUiRecord = (value: unknown): value is SessionWizardUiRecord => (
+  value !== null && typeof value === 'object'
 );
 
+export const readSessionWizardTooltipsEnabled = (
+  reduxStore: unknown
+): boolean => {
+  const store = isUiRecord(reduxStore) ? reduxStore as SessionWizardReduxStoreLike : null;
+  const rawState = store?.getState?.();
+  const state = isUiRecord(rawState) ? rawState : {};
+  const sessionState = isUiRecord(state.sessionState) ? state.sessionState : {};
+  return sessionState.tooltipsEnabled !== false;
+};
+
 export const resolveSessionHeaderImageFormat = (
-  fileLike: AnyRecord | File | null | undefined
+  fileLike: SessionWizardFileLike | File | null | undefined
 ): string => {
   const fileName = toStr(fileLike?.name).trim().toLowerCase();
   const fromName = fileName.split('.').pop()?.trim() || '';
@@ -31,7 +49,11 @@ export const getSessionWizardSecretFieldTestId = (fieldKey: string): string | un
   if (fieldKey === 'openrouterKey') return E2E_TESTIDS.WIZARD_SECRET_OPENROUTER_KEY;
   if (fieldKey === 'arweaveJwk') return E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK;
   if (fieldKey === 'faucetPrivateKey') return E2E_TESTIDS.WIZARD_SECRET_FAUCET_PRIVATE_KEY;
-  if (fieldKey === 'litPayerPrivateKey') return E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY;
-  if (fieldKey === 'litPayerAddress') return E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_ADDRESS;
+  if (fieldKey === 'litApiBase') return E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE;
+  if (fieldKey === 'litGroupId') return E2E_TESTIDS.WIZARD_SECRET_LIT_GROUP_ID;
+  if (fieldKey === 'litPkpId') return E2E_TESTIDS.WIZARD_SECRET_LIT_PKP_ID;
+  if (fieldKey === 'litActionCid') return E2E_TESTIDS.WIZARD_SECRET_LIT_ACTION_CID;
+  if (fieldKey === 'litAccountApiKey') return E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY;
+  if (fieldKey === 'litUsageApiKey') return E2E_TESTIDS.WIZARD_SECRET_LIT_USAGE_API_KEY;
   return undefined;
 };

@@ -1,3 +1,12 @@
+import {
+  defaultCorsProxyAllowDemoFallback,
+  defaultStrictAllowDemoFallback,
+  defaultWorkerAuthAllowDemoFallback,
+  resolveWorkerAllowDemoFallback,
+  resolveWorkerSessionConfigBySlug,
+  resolveWorkerSessionContext,
+} from './workerSessionResolution.js';
+
 const mockGetState = jest.fn();
 const mockGetRegistrySessionConfig = jest.fn();
 
@@ -28,15 +37,6 @@ jest.mock('../../variables/demo/demo_sessions.json', () => ({
     corsWorkerUrl: 'https://demo-edge.example',
   },
 }));
-
-import {
-  defaultCorsProxyAllowDemoFallback,
-  defaultStrictAllowDemoFallback,
-  defaultWorkerAuthAllowDemoFallback,
-  resolveWorkerAllowDemoFallback,
-  resolveWorkerSessionConfigBySlug,
-  resolveWorkerSessionContext,
-} from './workerSessionResolution.js';
 
 describe('workerSessionResolution', () => {
   beforeEach(() => {
@@ -75,7 +75,7 @@ describe('workerSessionResolution', () => {
     })).toBe(false);
   });
 
-  it('defaults to mode-aware demo fallback when no policy is provided (PRD 238 Stage-C)', () => {
+  it('defaults to mode-aware demo fallback when no policy is provided', () => {
     expect(resolveWorkerAllowDemoFallback({})).toBe(false);
     expect(resolveWorkerAllowDemoFallback()).toBe(false);
     expect(resolveWorkerAllowDemoFallback({ sessionSlug: 'edge' })).toBe(false);

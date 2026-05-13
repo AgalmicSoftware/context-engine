@@ -39,10 +39,10 @@ npm run ai:seed-survey:question-types            # seed question type data
 ## Project map
 | Path | What it is |
 |------|------------|
-| `client/src/components/MainSite/MainSite.jsx` | See [`docs/MainSite.MAP.md`](docs/MainSite.MAP.md) for the MainSite section index |
+| `client/src/components/MainSite/MainSite.tsx` | See [`docs/MainSite.MAP.md`](docs/MainSite.MAP.md) for the MainSite section index |
 | `client/src/components/MainContent/` | Home tab surface: `MainAreaTabs.tsx`, `ToolExplorer.tsx`, `OnboardingWalkthrough.tsx`, `RiskMatrix.tsx` |
 | `client/src/components/Account/` | Account/login/settings surface: `LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
-| `client/src/components/SurveyTool/SurveyTool.jsx` | See [`docs/SurveyTool.MAP.md`](docs/SurveyTool.MAP.md) for the SurveyTool component hierarchy |
+| `client/src/components/SurveyTool/SurveyTool.tsx` | See [`docs/SurveyTool.MAP.md`](docs/SurveyTool.MAP.md) for the SurveyTool component hierarchy |
 | `client/src/components/About/` | About page components |
 | `client/src/components/OnePageSession/` | Session page shell: `OnePageSession.tsx` plus its co-located styles/tests |
 | `client/src/components/DemoViews/` | Demo-only route surfaces: `CorpusViewer.tsx`, `DemosIndex.tsx`, `RiskMatrixDemo.tsx`, `DemoAnalysis/`, `DebateHUD/` |
@@ -59,7 +59,6 @@ npm run ai:seed-survey:question-types            # seed question type data
 | `client/src/contractsABI/` | Contract ABI JSON files |
 | `contracts/` | Solidity smart contracts |
 | `scripts/test-*.ui.js` | Playwright E2E tests |
-| `contextEngine-cc/` | Claude Code integration (hook + passkey auth) |
 | `ARCHITECTURE.md` | System diagram, data flows, contract addresses |
 
 ### Generated / do-not-edit
@@ -83,7 +82,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | [`docs/lit-protocol-information.md`](docs/lit-protocol-information.md) | Lit Protocol docs |
 | [`LICENSING.md`](LICENSING.md) | CPAL/MIT split license |
 | [`CHANGELOG.md`](CHANGELOG.md) | Shipped changes |
-| [`TODO/README.md`](TODO/README.md) | Public roadmap |
+| [`ROADMAP.md`](ROADMAP.md) | Public roadmap |
 
 ## Conventions
 - Default testnet: OP Sepolia (`11155420`)
@@ -92,12 +91,15 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Tooltip pattern: `<FontAwesomeIcon icon={faQuestionCircle}/>` + `<UncontrolledTooltip>` (reactstrap)
 
 ## Workflow
+- Create any new git worktrees for this repo under the repo-local scratch area,
+  typically `.codex/scratch/<descriptive-name>`. Do not create sibling worktree
+  directories directly under `/Users/charlie/Desktop/xoCortex/projects/`.
 - Commit convention for automated changes: `<type>(autocoder): <short imperative summary>` (for example, `fix(autocoder): guard empty response payload`). Use `feat`, `fix`, `refactor`, `test`, `docs`, or `chore` as the type.
-- Keep commit messages concise: imperative subject, no trailing period, no internal PRD identifiers, and an optional body capped at 0-3 short lines when helpful.
-- Commit messages must not reference internal PRD identifiers (e.g. `PRD 334`, `PRDs 329-336`). Describe the change by what it does, not by the tracking ID — PRDs churn (merged, renumbered, deprecated) and referencing them ties public commit history to internal bookkeeping.
+- Keep commit messages concise: imperative subject, no trailing period, no internal planning identifiers, and an optional body capped at 0-3 short lines when helpful.
+- Commit messages must describe the change by what it does, not by internal planning IDs or tracking names. Planning IDs churn and referencing them ties public commit history to internal bookkeeping.
 - Keep fixture/test data non-identifying (no real names, emails, API keys)
 - New user-facing workflow/features should add or update related automated E2E smoke coverage when relevant, especially for UI, encryption, gating, worker, or Arweave flows
-- Park PRDs and other planned-work writeups under `TODO/` (typically `TODO/PRDs/`), not `docs/`
+- Keep internal planning writeups local under ignored private paths such as `TODO/`; do not stage or force-add them. Public docs should describe shipped behavior and active public contracts without linking to internal planning files.
 
 ## Guardrails
 - **MUST NOT**: commit secrets, API keys, or private keys to the repo

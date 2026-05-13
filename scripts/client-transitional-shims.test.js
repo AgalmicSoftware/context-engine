@@ -13,7 +13,9 @@ const EXPECTED_COMPONENT_SHIM_CLUSTERS = Object.freeze({
     'cacheConstants.js',
     'debugTelemetry.js',
     'litSessionConfig.js',
+    'mainSiteUtils.js',
     'progressHelpers.js',
+    'reloadWindowLocation.js',
     'routeConfig.js',
     'routeLazyComponents.js',
     'routeStyles.js',
@@ -38,6 +40,7 @@ const EXPECTED_COMPONENT_SHIM_CLUSTERS = Object.freeze({
     'surveyToolRuntimeSupport.js',
     'surveyToolScope.js',
     'surveyToolSignatures.js',
+    'surveyToolSliderState.js',
     'surveyToolSlugLookup.js',
     'surveyToolViewState.js',
   ]),
@@ -54,7 +57,7 @@ const readPureTsReexportShims = (relativeDir) => {
     .sort();
 };
 
-test('active component shim clusters stay explicitly inventoried during PRD 512 sequencing', () => {
+test('active component shim clusters stay explicitly inventoried during sequencing', () => {
   Object.entries(EXPECTED_COMPONENT_SHIM_CLUSTERS).forEach(([relativeDir, expectedEntries]) => {
     const actualEntries = readPureTsReexportShims(relativeDir);
     const expectedSorted = [...expectedEntries].sort();
@@ -62,7 +65,7 @@ test('active component shim clusters stay explicitly inventoried during PRD 512 
     assert.deepEqual(
       actualEntries,
       expectedSorted,
-      `${relativeDir} shim inventory changed; update PRD 512 cleanup tracking before adding or removing wrappers`,
+      `${relativeDir} shim inventory changed; update cleanup tracking before adding or removing wrappers`,
     );
 
     expectedSorted.forEach((entry) => {

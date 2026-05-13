@@ -31,8 +31,9 @@ import {
   PREFER_PATH_RPC,
   SHOW_DEMO_SESSIONS,
 } from '../../variables/appConfig';
+import type { UnknownRecord } from './sessionTypes.js';
 
-type RuntimeGlobals = Record<string, any>;
+type RuntimeGlobals = typeof globalThis & UnknownRecord;
 
 const getRuntimeGlobals = (): RuntimeGlobals => globalThis as RuntimeGlobals;
 

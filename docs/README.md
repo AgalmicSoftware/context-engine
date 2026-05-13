@@ -4,14 +4,14 @@ Primary product and system specification:
 - `spec.md` (repo root)
 
 Canonical reference set:
-- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `CLAUDE.md`, `spec.md`
+- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
 - the `docs/` reference docs listed below
 
 Non-canonical / historical planning material:
-- `TODO/`
+- private planning files under ignored local paths
 - one-off debug prompts or migration notes unless they are explicitly linked below as current reference
 
-Planning docs should be added under `TODO/`, not `docs/`.
+Private planning docs should stay in ignored local paths, not in public docs.
 
 ## How To Keep Docs Updated
 
@@ -23,7 +23,6 @@ When you add or change a feature, update documentation in the same PR:
 ## Core Docs
 
 Code navigation maps:
-- `docs/ai-agent-bootstrap.md`: current AI-agent entry points, supported contracts, and the PRD map for broader agent usability work.
 - `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
 - `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
 - `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
@@ -31,6 +30,7 @@ Code navigation maps:
 
 Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
+- `docs/session-listening-mode.md`: `?mode=listening` pile-adjacent microphone workflow, rolling 3-minute transcription, local recovery metadata, and question-generation output.
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
@@ -44,6 +44,7 @@ Keys and RPCs:
 
 Encryption:
 - `docs/lit-protocol-information.md`: Lit protocol wiring and current runtime status (v8).
+- `docs/lit-v3-design.md`: Worker-mediated Chipotle runtime design, provisioning flow, and migration notes.
 - `docs/doc-library.md`: Doc Library for Sessions + SBT groups (tag schema, listing queries, encryption UX).
 
 Payload schemas:
@@ -53,6 +54,9 @@ Local development:
 - `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
 - `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
+
+Release:
+- `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
 
 Wallets:
 - `docs/porto-information.md`: Porto passkey wallet wiring and deterministic test wallet workflow.

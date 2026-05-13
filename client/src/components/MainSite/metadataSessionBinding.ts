@@ -9,7 +9,11 @@ export type MetadataSessionBinding = {
 };
 
 export type MetadataSessionCacheEnvelope = {
-  metadata: Record<string, any>;
+  metadata: MetadataRecord & {
+    sessionSlug: string;
+    sessionSlugExplicit: boolean;
+    slug?: string;
+  };
   targetSlug: string;
   authority: MetadataSessionAuthority;
 };
@@ -19,7 +23,7 @@ export type BuildEnvelopeOptions = {
   includeSlugField?: boolean;
 };
 
-type MetadataRecord = Record<string, any>;
+export type MetadataRecord = Record<string, unknown>;
 
 const isMetadataRecord = (value: unknown): value is MetadataRecord => (
   value !== null && typeof value === 'object'
@@ -99,9 +103,11 @@ export const buildMetadataSessionCacheEnvelope = (
   const targetSlug = scoped
     ? resolveScopedMetadataSessionSlug(metadata, fallbackSlug)
     : normalizeSessionSlug(binding.sessionSlug || '');
-  const next = isMetadataRecord(metadata) ? { ...metadata } : {};
-  next.sessionSlug = targetSlug;
-  next.sessionSlugExplicit = binding.authority === 'explicit';
+  const next: MetadataSessionCacheEnvelope['metadata'] = {
+    ...(isMetadataRecord(metadata) ? metadata : {}),
+    sessionSlug: targetSlug,
+    sessionSlugExplicit: binding.authority === 'explicit',
+  };
   if (includeSlugField) next.slug = targetSlug;
   return {
     metadata: next,

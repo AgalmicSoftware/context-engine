@@ -253,6 +253,58 @@ describe('cryptoUtils Lit multi-gate envelopes', () => {
     expect(getKey).toHaveBeenCalledTimes(1);
   });
 
+  it('can prefer Lit recipients without first asking the self signer', async () => {
+    const providerEncrypt = makeProvider(SIG_A);
+    const providerDecrypt = makeProvider(SIG_B);
+    const cekByCiphertext = new Map();
+    const saveKey = jest.fn(async (cekRaw) => {
+      const ciphertext = 'preferred-lit-cipher';
+      cekByCiphertext.set(ciphertext, new Uint8Array(cekRaw));
+      return {
+        ciphertext,
+        dataToEncryptHash: 'preferred-lit-hash',
+      };
+    });
+    const envelopeJson = await cryptoUtils.encryptEnvelopeValue('Lit-first secret', {
+      providerKind: providerEncrypt,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      surveyId: SURVEY_ID,
+      qId: 'q-lit-first',
+      lit: {
+        saveKey,
+        recipients: [{
+          accessControlConditions: buildSbtAccessControlConditions({
+            sbtAddresses: [GATE_A],
+            chainId: CHAIN_ID,
+            litChain: 'baseSepolia',
+            mode: 'any',
+          }),
+          chain: 'baseSepolia',
+        }],
+      },
+    });
+    const getKey = jest.fn(async ({ ciphertext }) => {
+      const key = cekByCiphertext.get(ciphertext);
+      if (!key) throw new Error('missing CEK');
+      return key;
+    });
+
+    const value = await cryptoUtils.decryptEnvelopeValue(envelopeJson, {
+      providerLike: providerDecrypt,
+      account: ACCOUNT,
+      chainId: CHAIN_ID,
+      litOpts: { getKey },
+      preferLitRecipients: true,
+    });
+
+    expect(value).toBe('Lit-first secret');
+    expect(getKey).toHaveBeenCalledTimes(1);
+    expect(
+      providerDecrypt.request.mock.calls.some(([req]) => req?.method === 'eth_signTypedData_v4')
+    ).toBe(false);
+  });
+
   it('rejects envelopes with a non-12-byte IV', async () => {
     const envelopeJson = await makeEnvelopeJson({ iv: 'AQIDBAUGBwg=' });
 

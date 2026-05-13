@@ -13,6 +13,7 @@ import contractScripts from '../../utilities/web3/contractScripts.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { getChainById, getDefaultHttpRpc } from '../../variables/chains.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => null),
@@ -139,6 +140,34 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       questionsAddedSuccessfully: true,
       questionIds: ['q1', 'q2'],
     })).toBe(true);
+  });
+
+  it('rejects incomplete submitted resource cache hits', () => {
+    peekCacheSyncMock.mockReturnValue({
+      '84532': {
+        questions: { q1: { id: 'q1' } },
+      },
+    });
+
+    expect(hasSubmittedResourcesInManagedCache({
+      slug: 'edge',
+      questionsAddedSuccessfully: true,
+      questionIds: ['q1'],
+    })).toBe(false);
+
+    expect(hasSubmittedResourcesInManagedCache({
+      slug: 'edge',
+      netId: '84532',
+      questionsAddedSuccessfully: true,
+      questionIds: ['q1', 'q2'],
+    })).toBe(false);
+
+    expect(hasSubmittedResourcesInManagedCache({
+      slug: 'edge',
+      netId: '84532',
+      questionsAddedSuccessfully: true,
+      questionIds: 'q1' as unknown as string[],
+    })).toBe(false);
   });
 
   it('copies survey links with session query params when an active session slug exists', () => {
@@ -500,6 +529,55 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     );
   });
 
+  it('seeds uploaded question cache with storageRef-first compatibility fields', async () => {
+    peekCacheSyncMock.mockReturnValue({
+      '84532': {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
+
+    const instance = makeInstance();
+    instance.getSessionConfig = jest.fn(() => ({
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: { surveys: { chainId: 84532 } },
+    }));
+
+    await expect(instance.seedUploadedQuestionsCache({
+      questionDataArray: [
+        {
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          creator: '0xabc',
+          arweaveTxId: 'legacy-tx',
+        },
+      ],
+      uploadedQuestions: [
+        {
+          questionId: 'q1',
+          storageRef: { backend: 'arweave', id: 'preferred-tx', resource: 'questions' },
+        },
+      ],
+      sourceQuestions: [
+        { id: 'q1', type: 'freeform', prompt: 'Question 1' },
+      ],
+    })).resolves.toBe(true);
+
+    const cacheWrite = writeCacheOptimisticMock.mock.calls.find(([namespace]) => namespace === 'questionsCache');
+    const writtenQuestions = cacheWrite?.[2]?.['84532']?.questions || {};
+    expect(writtenQuestions.q1.arweaveTxId).toBe('preferred-tx');
+    expect(writtenQuestions.q1.storageRef).toEqual({
+      backend: 'arweave',
+      id: 'preferred-tx',
+      uri: 'ar://preferred-tx',
+      resource: 'questions',
+    });
+  });
+
   it('still writes question cache through the general bucket for general-session authoring', async () => {
     peekCacheSyncMock.mockReturnValue({
       '84532': {
@@ -747,6 +825,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
     const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions').mockResolvedValue({
+      uploadedQuestions: [],
       receipt: { status: 1 },
     });
     const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
@@ -811,6 +890,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
     const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions').mockResolvedValue({
+      uploadedQuestions: [],
       receipt: { status: 1 },
     });
     const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
@@ -1103,6 +1183,258 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
 
     expect(instance.state.needsNetworkSwitch).toBe(true);
     expect(instance.state.isSubmitting).toBe(false);
+  });
+
+  it('updates associated survey ids without regenerating question ids', () => {
+    const instance = makeInstance();
+    instance.saveToLocalStorage = jest.fn();
+    instance.generateQuestionId = jest.fn(() => 'regenerated-id');
+    instance.state = {
+      ...instance.state,
+      questions: [{
+        id: 'existing-id',
+        type: 'multichoice',
+        prompt: 'Pick one',
+        options: ['Alpha'],
+        singleSelect: false,
+        associatedSurveyId: '',
+      }],
+    };
+
+    instance.handleAssociatedSurveyIdChange(0, 'survey-2');
+
+    expect(instance.generateQuestionId).not.toHaveBeenCalled();
+    expect(instance.state.questions[0]).toMatchObject({
+      id: 'existing-id',
+      associatedSurveyId: 'survey-2',
+    });
+    expect(instance.saveToLocalStorage).toHaveBeenCalled();
+  });
+
+  it('uses scoped litHooks props for locked question submits when global hooks are absent', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const stopAfterLitGuard = new Error('passed lit hook guard');
+    try {
+      try { delete (window as any).__litHooks; } catch (_) {}
+      try { delete (window as any).litHooks; } catch (_) {}
+      const instance = makeInstance({
+        provider: 'web3auth',
+        loginComplete: true,
+        account: '0xabc',
+        activeSessionSlug: 'demo-2',
+        sessionSlug: 'demo-2',
+        network: { id: 84532, chainId: 84532 },
+        networkChainId: 84532,
+        litHooks: { saveKey: jest.fn() },
+        sessionConfig: {
+          slug: 'demo-2',
+          networkChainId: 84532,
+        },
+      });
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'demo-2',
+        networkChainId: 84532,
+      });
+      instance.resolveGateOptions = jest.fn(() => ({
+        gateMap: {
+          default: {
+            id: 'default',
+            gateId: 'default',
+            label: 'Default gate',
+            sbtAddress: '0x0000000000000000000000000000000000000101',
+            chainId: 84532,
+            mode: 'any',
+          },
+        },
+      }));
+      instance.removeDuplicateQuestions = jest.fn(() => {
+        throw stopAfterLitGuard;
+      });
+      instance.state = {
+        ...instance.state,
+        isStandaloneQuestion: true,
+        questions: [{
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          tags: [],
+          lockGateIds: ['default'],
+        }],
+      };
+
+      await instance.createSurvey();
+
+      expect(instance.state.submissionError).toBe('passed lit hook guard');
+      expect(instance.state.submissionError).not.toContain('Lit hooks not initialized');
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it('applies the default session gate to untouched standalone questions before upload', async () => {
+    const encryptedPromptEnvelope = {
+      version: 'ce-envelope-v1',
+      ciphertext: 'ciphertext',
+      recipients: [{ type: 'lit-sbt-v1' }],
+    };
+    const encryptSpy = jest.spyOn(cryptoUtils, 'encryptEnvelopeValue')
+      .mockResolvedValue(encryptedPromptEnvelope as any);
+    const addQuestionsSpy = jest.spyOn(contractScripts, 'addQuestions').mockResolvedValue({
+      receipt: { status: 1 },
+      uploadedQuestions: [{ questionId: 'q1', arweaveTxId: 'tx-1' }],
+    });
+
+    try {
+      const instance = makeInstance({
+        provider: 'web3auth',
+        loginComplete: true,
+        account: '0xabc',
+        activeSessionSlug: 'demo-2',
+        sessionSlug: 'demo-2',
+        network: { id: 84532, chainId: 84532 },
+        networkChainId: 84532,
+        litHooks: { saveKey: jest.fn() },
+      });
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'demo-2',
+        sessionName: 'demo 2',
+        networkChainId: 84532,
+        contracts: { surveys: { chainId: 84532 } },
+      });
+      instance.resolveGateOptions = jest.fn(() => ({
+        gateMap: {
+          default_gate: {
+            id: 'default_gate',
+            gateId: 'default_gate',
+            label: 'Default gate',
+            sbtAddress: '0x0000000000000000000000000000000000000101',
+            chainId: 84532,
+            mode: 'any',
+          },
+        },
+        gateOptions: [{
+          id: 'default_gate',
+          label: 'demo 2',
+          badgeLabel: 'demo 2',
+          color: '#5affc2',
+        }],
+        defaultGateId: 'default_gate',
+      }));
+      instance.clearUnfinishedSurveyDraft = jest.fn();
+      instance.seedUploadedQuestionsCache = jest.fn().mockResolvedValue(true);
+      instance.startCacheWatch = jest.fn();
+      instance.state = {
+        ...instance.state,
+        isStandaloneQuestion: true,
+        title: '',
+        questions: [{
+          id: 'q1',
+          type: 'binary',
+          prompt: 'Test Q Encrypted',
+          tags: [],
+          lockGateIds: [],
+        }],
+        documentURLs: [],
+        surveyHash: '',
+      };
+
+      await instance.createSurvey();
+
+      expect(addQuestionsSpy).toHaveBeenCalledTimes(1);
+      const uploadedQuestion = addQuestionsSpy.mock.calls[0][2][0];
+      expect(uploadedQuestion).toEqual(expect.objectContaining({
+        prompt: '[encrypted]',
+        promptEncrypted: encryptedPromptEnvelope,
+        encryption: expect.objectContaining({
+          enabled: true,
+          targets: { questions: true, questionTags: true },
+        }),
+      }));
+      expect(uploadedQuestion.prompt).not.toBe('Test Q Encrypted');
+      expect(encryptSpy).toHaveBeenCalledWith(
+        'Test Q Encrypted',
+        expect.objectContaining({
+          lit: expect.objectContaining({
+            recipients: expect.arrayContaining([
+              expect.objectContaining({
+                chain: expect.any(String),
+                accessControlConditions: expect.any(Array),
+              }),
+            ]),
+          }),
+        })
+      );
+    } finally {
+      encryptSpy.mockRestore();
+      addQuestionsSpy.mockRestore();
+    }
+  });
+
+  it('blocks default-gated standalone question submits when Lit hooks are missing', async () => {
+    const addQuestionsSpy = jest.spyOn(contractScripts, 'addQuestions').mockResolvedValue({
+      receipt: { status: 1 },
+      uploadedQuestions: [{ questionId: 'q1', arweaveTxId: 'tx-1' }],
+    });
+
+    try {
+      try { delete (window as any).__litHooks; } catch (_) {}
+      try { delete (window as any).litHooks; } catch (_) {}
+      const instance = makeInstance({
+        provider: 'web3auth',
+        loginComplete: true,
+        account: '0xabc',
+        activeSessionSlug: 'demo-2',
+        sessionSlug: 'demo-2',
+        network: { id: 84532, chainId: 84532 },
+        networkChainId: 84532,
+      });
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'demo-2',
+        sessionName: 'demo 2',
+        networkChainId: 84532,
+        contracts: { surveys: { chainId: 84532 } },
+      });
+      instance.resolveGateOptions = jest.fn(() => ({
+        gateMap: {
+          default_gate: {
+            id: 'default_gate',
+            gateId: 'default_gate',
+            label: 'Default gate',
+            sbtAddress: '0x0000000000000000000000000000000000000101',
+            chainId: 84532,
+            mode: 'any',
+          },
+        },
+        gateOptions: [{
+          id: 'default_gate',
+          label: 'demo 2',
+          badgeLabel: 'demo 2',
+          color: '#5affc2',
+        }],
+        defaultGateId: 'default_gate',
+      }));
+      instance.state = {
+        ...instance.state,
+        isStandaloneQuestion: true,
+        title: '',
+        questions: [{
+          id: 'q1',
+          type: 'binary',
+          prompt: 'Test Q Encrypted',
+          tags: [],
+          lockGateIds: [],
+        }],
+        documentURLs: [],
+        surveyHash: '',
+      };
+
+      await instance.createSurvey();
+
+      expect(addQuestionsSpy).not.toHaveBeenCalled();
+      expect(instance.state.submissionError).toContain('Lit hooks not initialized');
+    } finally {
+      addQuestionsSpy.mockRestore();
+    }
   });
 
   it('uses __registry.registryChainId for wagmi network guard when sessionConfig omits networkChainId', async () => {

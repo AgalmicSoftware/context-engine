@@ -1,15 +1,32 @@
+import type { UnknownRecord } from './surveyToolTypes';
+
+type QuestionPayload = UnknownRecord & {
+  creator?: unknown;
+  id?: string;
+  tags?: unknown;
+};
+
+type QuestionsCache = Record<string, {
+  questions: Record<string, QuestionPayload>;
+} & UnknownRecord>;
+
+type CacheState = {
+  netIdStr: string;
+  questionsCache: QuestionsCache;
+};
+
 export type CacheBootstrapReady = {
   status: 'ready';
-  cacheState: { netIdStr: string; questionsCache: Record<string, any> };
-  questionData: any;
-  recentPayloadForAccount: any;
+  cacheState: CacheState;
+  questionData: QuestionPayload | null;
+  recentPayloadForAccount: QuestionPayload | null;
 };
 
 export type CacheBootstrapSeeded = {
   status: 'seeded-from-recent';
-  cacheState: { netIdStr: string; questionsCache: Record<string, any> } | null;
-  questionData: any;
-  recentPayloadForAccount: any;
+  cacheState: CacheState | null;
+  questionData: QuestionPayload;
+  recentPayloadForAccount: QuestionPayload;
   shouldBootstrapViewedResponse: boolean;
   fallbackNetId: string;
 };
@@ -33,7 +50,7 @@ export const resolveSingleQuestionCacheBootstrap = async ({
   canUseRecentPayload = () => false,
   resolveBootstrapNetworkId = () => '',
   updateCacheAtomic = async () => null,
-  ensureQuestionsNet = (cache, _netId) => cache,
+  ensureQuestionsNet = (cache, _netId) => cache as QuestionsCache,
   pickBetterQuestionPayload = (_current, next) => next,
   areQuestionPayloadsEquivalent = (left, right) => left === right,
   writeQuestionsCache = async () => {},
@@ -42,20 +59,20 @@ export const resolveSingleQuestionCacheBootstrap = async ({
   effectiveSingleSlug?: string;
   responderAddress?: string;
   account?: string;
-  resolveCacheState?: (slug: string) => Promise<{ netIdStr: string; questionsCache: Record<string, any> } | null>;
-  readRecentPayload?: (questionId: string) => any;
-  canUseRecentPayload?: (payload: any, account: string) => boolean;
+  resolveCacheState?: (slug: string) => Promise<CacheState | null>;
+  readRecentPayload?: (questionId: string) => unknown;
+  canUseRecentPayload?: (payload: unknown, account: string) => boolean;
   resolveBootstrapNetworkId?: (slug: string) => string;
-  updateCacheAtomic?: (key: string, slug: string, updater: (current: any) => any) => Promise<any>;
-  ensureQuestionsNet?: (cache: any, netId: string) => any;
-  pickBetterQuestionPayload?: (current: any, next: any) => any;
-  areQuestionPayloadsEquivalent?: (left: any, right: any) => boolean;
-  writeQuestionsCache?: (slug: string, cache: any) => Promise<any>;
+  updateCacheAtomic?: (key: string, slug: string, updater: (current: unknown) => QuestionsCache) => Promise<unknown>;
+  ensureQuestionsNet?: (cache: unknown, netId: string) => QuestionsCache;
+  pickBetterQuestionPayload?: (current: QuestionPayload | null, next: QuestionPayload) => QuestionPayload | null;
+  areQuestionPayloadsEquivalent?: (left: QuestionPayload | null, right: QuestionPayload) => boolean;
+  writeQuestionsCache?: (slug: string, cache: QuestionsCache) => Promise<unknown>;
 } = {}): Promise<CacheBootstrapResult> => {
-  let qData: any = null;
+  let qData: QuestionPayload | null = null;
   const recentPayload = readRecentPayload(questionId);
   const recentPayloadForAccount = canUseRecentPayload(recentPayload, account)
-    ? { ...recentPayload, id: questionId }
+    ? { ...(recentPayload as UnknownRecord), id: questionId }
     : null;
   let cacheState = await resolveCacheState(effectiveSingleSlug);
 

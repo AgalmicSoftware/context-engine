@@ -64,10 +64,14 @@ Notes:
   - If the request is to your app origin (for example `http://localhost:3000/<txId>`), some UI is rendering a bare txId as a relative URL.
     Normalize before rendering.
   - If the request is to an Arweave gateway (for example `https://ar-io.dev/<txId>` or `https://arweave.net/<txId>`), the content itself is missing (bad txId or still propagating).
-    Verify the tx exists (try multiple gateways) or fix the underlying metadata pointer. Also check
-    `https://ar-io.dev/tx/<txId>/data` in case the direct `<txId>` route is stale on an edge node.
-  - Runtime reads now prefer the configured gateway order (`https://ar-io.dev`, then `https://arweave.net`, then the remaining fallbacks),
-    trying `<gateway>/<txId>`, `<gateway>/raw/<txId>`, and `<gateway>/tx/<txId>/data` before moving to the next gateway.
+    Verify the tx exists on the configured gateway or fix the underlying metadata pointer.
+  - Runtime reads default to direct AR.IO-only routing (`https://ar-io.dev/<txId>`) and spend their retry budget there.
+    Legacy multi-gateway fanout (`https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes) is available only when
+    `REACT_APP_CE_ARWEAVE_DIRECT_TO_AR_IO=false` or `window.CE_ARWEAVE_DIRECT_TO_AR_IO = false` is set intentionally.
+- `documentURLs` is the canonical source-reference field. Readers also tolerate
+  legacy aliases such as `docURL`, `docURLs`, `documentUrl`, and
+  `documents[].href`, then normalize them to `sbtInfo.documentURLs` before the
+  SBT detail page's More section renders document links.
 
 ```json
 {
@@ -299,6 +303,7 @@ Notes:
 - Question tag encryption is controlled by `encryption.targets.questionTags` and defaults to enabled when prompt encryption is enabled in CreateQuestionsAndSurveys.
 - `encryption.gate` can mirror the first entry in `encryption.gates`; this compatibility alias is expected for mixed old/new readers.
 - Survey/question/response payloads use `sessionName` as the canonical session identity key; legacy `groupName` is still normalized on reads.
+- Off-chain/client/agent records should carry `storageRef` as the backend-agnostic payload pointer and preserve `arweaveTxId` for Arweave compatibility. Readers prefer `storageRef` and fall back to `arweaveTxId`. Cloudflare-backed records use opaque worker refs and do not synthesize Arweave ids.
 - New survey/question writes keep `groupName` as a blank reserved field (`""`) so it no longer duplicates `sessionName`; this reserved field can be repurposed later for SBT association metadata.
 - Response payloads may include `surveyTitle` and `prompt` for public metadata, but locked survey titles and locked question prompts are copied as `"[encrypted]"` so decrypted UI state is not re-uploaded.
 - Question payloads are cached client-side in the managed `questionsCache` namespace (logical key `dg:questionsCache:<slug>`) via `cacheScripts` (IndexedDB primary, localStorage fallback), and fields such as `singleSelect` are preserved for consistent rendering.

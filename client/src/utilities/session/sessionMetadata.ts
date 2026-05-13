@@ -5,29 +5,19 @@
  *
  * Key exports: stripAuthoritativeSessionGateFields, normalizeSessionNaming, normalizeLitMetadataNetwork
  */
+import type { SessionMetadata, UnknownRecord } from './sessionTypes.js';
 
-export type SessionMetadata = Record<string, any> & {
-  gates?: Array<Record<string, any>> | Record<string, any>;
-  lit?: Record<string, any> | null;
-  litNetwork?: string;
-  orgInfo?: string;
-  orgInfoEncrypted?: string | Record<string, any> | null;
-  orgName?: string;
-  sessionInfo?: string;
-  sessionInfoEncrypted?: string | Record<string, any> | null;
-  sessionName?: string;
-  sponsored?: boolean | Record<string, any>;
-  sponsoredSbtAddress?: string;
-};
-
-const DEFAULT_LIT_NETWORK = 'naga-dev';
+const DEFAULT_LIT_NETWORK = 'chipotle';
 const LEGACY_LIT_NETWORK_ALIASES = Object.freeze({
-  'naga-dev': 'naga-dev',
-  nagadev: 'naga-dev',
-  'naga-test': 'naga-test',
-  nagatest: 'naga-test',
-  'naga-mainnet': 'naga',
-  datil: 'naga',
+  chipotle: 'chipotle',
+  'chipotle-v3': 'chipotle',
+  'naga-dev': 'chipotle',
+  nagadev: 'chipotle',
+  'naga-test': 'chipotle',
+  nagatest: 'chipotle',
+  'naga-mainnet': 'chipotle',
+  naga: 'chipotle',
+  datil: 'chipotle',
 } as const);
 
 const isObj = (value: unknown): value is SessionMetadata => (
@@ -110,7 +100,7 @@ export const normalizeLitMetadataNetwork = (metadata: unknown): unknown => {
   const hasLitSection = !!litObj || !!legacyLitNetwork;
   if (!hasLitSection) return next;
 
-  const nextLit = litObj ? { ...litObj } : {};
+  const nextLit: UnknownRecord = litObj ? { ...litObj } : {};
   nextLit.network = resolveCanonicalLitNetwork(litNetwork || legacyLitNetwork || DEFAULT_LIT_NETWORK);
   next.lit = nextLit;
   delete next.litNetwork;

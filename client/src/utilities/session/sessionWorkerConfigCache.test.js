@@ -153,6 +153,57 @@ describe('sessionWorkerConfigCache', () => {
     });
   });
 
+  it('preserves cached public Lit credentials so worker-mediated hooks can initialize after deploy', () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
+    upsertCachedSessionWorkerConfig({
+      slug: 'edge',
+      config: {
+        corsWorkerUrl: 'https://worker.example',
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: '7',
+          litPkpId: '0xpkp123',
+          litActionCid: 'QmAction123',
+          litUsageApiKey: 'secret-usage-key',
+        },
+      },
+    });
+    nowSpy.mockRestore();
+
+    expect(getCachedSessionWorkerConfig('edge')).toEqual({
+      corsWorkerUrl: 'https://worker.example',
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: '7',
+        litPkpId: '0xpkp123',
+        litActionCid: 'QmAction123',
+      },
+    });
+    expect(overlayCachedSessionWorkerConfig({
+      slug: 'edge',
+      sessionConfig: {
+        slug: 'edge',
+        sessionName: 'Edge Session',
+        __registry: {
+          updatedAt: 1699999999,
+        },
+      },
+    })).toEqual({
+      slug: 'edge',
+      sessionName: 'Edge Session',
+      corsWorkerUrl: 'https://worker.example',
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: '7',
+        litPkpId: '0xpkp123',
+        litActionCid: 'QmAction123',
+      },
+      __registry: {
+        updatedAt: 1699999999,
+      },
+    });
+  });
+
   it('preserves embedded deploy-helper flags in cached worker config payloads', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
     upsertCachedSessionWorkerConfig({

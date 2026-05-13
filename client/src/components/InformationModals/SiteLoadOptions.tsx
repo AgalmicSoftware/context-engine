@@ -3,7 +3,7 @@ import React, { Component } from "react";
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { fetchSessionState } from '../../actions/sessionStateActions.js';
-import { getWelcomeSlide } from '../MainContent/welcomeSlides.js';
+import type { RootState } from '../../reducers/index.js';
 
 // CSS and images
 import "assets/css/contextEngine.scss";
@@ -18,9 +18,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faWindowClose, faQuestionCircle } from '@fortawesome/free-solid-svg-icons'
 
 import { createLogger } from 'utilities/logging.js';
+import WelcomeSlideRenderer from './WelcomeSlideRenderer';
 
 const uiLog = createLogger('ui');
 
+const buildClassName = (classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(' ');
 
 type SiteLoadOptionsProps = {
   fetchSessionState: () => void;
@@ -38,13 +40,6 @@ type SiteLoadOptionsState = {
   sidebarNotClosed: boolean;
   userOptsOutMetrics: boolean;
   metricsDetailsSelected: boolean;
-};
-
-type RootState = {
-  profile: {
-    account?: string | null;
-    provider?: string | null;
-  };
 };
 
 class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsState> {
@@ -115,69 +110,12 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
     this.setState({ metricsDetailsSelected: !this.state.metricsDetailsSelected });
   }
 
-  getExplainerText = () => {
-    const currentSlide = getWelcomeSlide(this.props.arrowIndex);
-    const isTitlelessSlide = !String(currentSlide?.title || '').trim();
-
-    // Create an empty array to hold JSX elements
-    const bulletPointElements: React.ReactNode[] = [];
-    let allEmpty = true;
-
-    // Loop through bulletPoints and create JSX elements
-    if (currentSlide?.bulletPoints) {
-      for (let i = 0; i < currentSlide.bulletPoints.length; i++) {
-        const point = currentSlide.bulletPoints[i];
-
-        if (point.bold !== '' || point.text !== '') {
-          allEmpty = false;
-        }
-
-        const displayStyle = point.bold === '' && point.text === '' ? 'none' : 'list-item';
-        const element = (
-          <li key={i} style={{ display: displayStyle }}>
-            <h4 id={styles.betaExplainerBulletText}>
-              {point.bold ? <strong>{point.bold}</strong> : null}
-              {point.bold && point.text ? ' ' : null}
-              {point.text ? (
-                <span className={styles.betaExplainerBulletTrailingText}>
-                  {point.text}
-                </span>
-              ) : null}
-            </h4>
-          </li>
-        );
-        bulletPointElements.push(element);
-      }
-    }
-
-    const listDisplayStyle = allEmpty ? 'none' : 'flex';
-
-    // Log the resulting JSX to the console for inspection
-    uiLog.log("Bullet Point JSX Elements:", bulletPointElements);
-
-    // Return JSX
-    return (
-      <>
-        <div
-          id={styles.betaExaplainerList}
-          className={isTitlelessSlide ? styles.titlelessBulletListContainer : ''}
-          style={{ display: listDisplayStyle }}
-        >
-          <ul id={styles.betaExplainerBulletpoint}>
-            { bulletPointElements }
-          </ul>
-        </div>
-      </>
-    );
-  };
-
-
   render() {
 
     // If exit button is hit, sidebar disappears
     const sidebarExited = !this.state.sidebarNotClosed;
 
-    const sidebarVisibleClassname = sidebarExited ? styles.betaSidebarDisappeared : styles.betaTabSideBar;
+    const sidebarVisibleClassName = sidebarExited ? styles.isSidebarCollapsed : styles.welcomeSlideSidebar;
 
     // Explanation modal (only seen on first site-load)
 
@@ -185,70 +123,34 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
     const closeMetricsDetailsIcon = faWindowClose;
     const questionMarkMetricsIcon =
-    <button id={styles.metricDetailsButton} onClick={this.toggleMetricsDetails}>
-      <FontAwesomeIcon icon={faQuestionCircle} id={styles.metricsInfoIcon} />
+    <button className={styles.metricDetailsButton} onClick={this.toggleMetricsDetails}>
+      <FontAwesomeIcon icon={faQuestionCircle} className={styles.metricsInfoIcon} />
     </button>
 
-    const metricsDetailsID = this.state.metricsDetailsSelected ? styles.visibleMetricsDetails : styles.invisibleMetricsDetails;
+    const metricsDetailsClassName = this.state.metricsDetailsSelected ? styles.metricsDetailsPanel : styles.isHidden;
 
-    // Style here because it overlaps with another style (#siteExplainer) in .scss module
-    const explainerButtonStyle = {
-      marginTop: "0px",
-      backgroundSize: "contain",
-      backgroundRepeat: "no-repeat",
-      backgroundPosition: "center",
-      padding: "0px",
-    };
-
-    const currentSlide = getWelcomeSlide(this.props.arrowIndex) as any;
-    const slideLayout = currentSlide?.mediaLayout || 'default';
     const slideButtonClickHandler = this.props.arrowIndex === 0
       ? this.props.clickRightArrow
       : () => this.toggleExplainerModal(this.props.arrowIndex);
-    const siteExplainerButton = currentSlide ? (
-      <button
-        id={styles[currentSlide.buttonStyleId]}
-        className={styles.siteExplainerButton}
-        style={explainerButtonStyle}
-        data-slide-key={currentSlide.key}
-        data-slide-layout={slideLayout}
-        onClick={slideButtonClickHandler}
-      >
-        <img
-          src={currentSlide.image}
-          alt={currentSlide.imageAlt || currentSlide.overlayTitle || currentSlide.title || 'Welcome slide'}
-          id={styles[currentSlide.imageStyleId]}
-          data-slide-layout={slideLayout}
-        />
-      </button>
-    ) : null;
-    uiLog.log("uiLog.log(currentSlide.bulletPoints)");
-    uiLog.log(currentSlide?.bulletPoints);
-
-    const siteExplainerText = this.getExplainerText();
-    uiLog.log("uiLog.log(siteExplainerText)");
-    uiLog.log(siteExplainerText);
-
-    const explainerStyle = currentSlide?.textAlign === "right" ?  styles.explainerAndUpdates : styles.explainerAndUpdates;
 
 
     const metricsDetailExplainer =
-    <Card id={metricsDetailsID}>
-      <div id={styles.metricsDetailsTitle}>
-        <div id={styles.emailFormLabel}>
+    <Card className={metricsDetailsClassName}>
+      <div className={styles.metricsDetailsTitle}>
+        <div className={styles.emailFormLabel}>
           Web3 = control over your data
 
-          <div id={styles.metricsDetailsSubtitle}>
+          <div className={styles.metricsDetailsSubtitle}>
           </div>
         </div>
         </div>
 
 
-    <div id={styles.metricsDetailsPoints}>
+    <div className={styles.metricsDetailsPoints}>
 
-      <div id={styles.emailSubjects}>
+      <div className={styles.emailSubjects}>
 
-      <div id={styles.metricsCollectedText}>
+      <div className={styles.metricsCollectedText}>
                 Metrics:
       </div>
 
@@ -266,11 +168,11 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
 
       </div>
 
-      <div id={styles.metricsDetailsButtons}>
+      <div className={styles.metricsDetailsButtons}>
 
 
-        <button id={styles.closeModalButton} aria-label="Close" className="close" data-dismiss="modal" type="button" onClick={this.toggleMetricsDetails}>
-                <FontAwesomeIcon icon={closeMetricsDetailsIcon} id={styles.closeModalIcon}  />
+        <button className={buildClassName([styles.closeModalButton, 'close'])} aria-label="Close" data-dismiss="modal" type="button" onClick={this.toggleMetricsDetails}>
+                <FontAwesomeIcon icon={closeMetricsDetailsIcon} className={styles.closeModalIcon}  />
         </button>
 
       </div>
@@ -282,33 +184,32 @@ class SiteLoadOptions extends Component<SiteLoadOptionsProps, SiteLoadOptionsSta
     const explainModal =
     <>
     <GreetingModal visible={this.state.explainerModalOpen} closeExplainerFunction={this.closeExplainerModal}/>
-        <div id={styles.betaInfoEmbed}>
+        <div className={styles.welcomeSlideEmbed}>
 
-          <CardFooter id={explainerStyle}>
-
-      <div id={sidebarVisibleClassname}>
+          <CardFooter>
+            <WelcomeSlideRenderer
+              slideIndex={this.props.arrowIndex}
+              onSlideClick={slideButtonClickHandler}
+              leadingContent={
+      <div className={sidebarVisibleClassName} data-testid="ce-site-load-sidebar">
 
 
           { metricsDetailExplainer }
 
           <button
-            id={styles.closeModalButton}
+            className={buildClassName([styles.closeModalButton, 'close'])}
             data-testid="ce-site-load-close-sidebar"
             aria-label="Close"
-            className="close"
             data-dismiss="modal"
             type="button"
             onClick={this.closeBetaSidebar}
           >
-              <FontAwesomeIcon icon={closeModalIcon} id={styles.closeModalIcon} />
+              <FontAwesomeIcon icon={closeModalIcon} className={styles.closeModalIcon} />
           </button>
 
           </div>
-
-            {siteExplainerButton}
-
-            {siteExplainerText}
-
+              }
+            />
           </CardFooter>
         </div>
         </>

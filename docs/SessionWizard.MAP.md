@@ -3,28 +3,41 @@
 ## Quick Reference
 
 - File: `client/src/components/Sessions/SessionWizard.tsx`
-- Current length: **5,901 lines**
+- Current length: **~5,115 lines**
 - Component type: **React function component**
 - Hook inventory: **50 `useEffect` calls**, **32 `useMemo` calls**, **15 `useCallback` calls**
 - Named export count before default export: **39**
 - Summary: `SessionWizard` is the session-creation and publish orchestrator. It bootstraps editable session metadata, manages encryption gates and pending SBT drafts, handles sponsored-bundle overrides, deploys or verifies worker configuration, uploads session metadata, and finally registers the session on-chain.
 - Status note: the section ranges below were captured from an earlier snapshot and need a fuller refresh; use the live file for exact line anchors.
+- Recent extraction note: bounded follow-up work extracted `CollapsibleFieldGroup.tsx`, `AiFieldSelect.tsx`, `sessionWizardNormalModeCards.ts`, `hooks/useSponsoredBundleLifecycle.ts`, and `hooks/useSessionWizardWorkerDeploy.ts`. The remaining high-risk seam is the publish path.
 
 ## Navigation Rules
 
 - Start in `SessionWizard.tsx` only if you need the top-level UI flow or the full publish pipeline.
+- Start in `CollapsibleFieldGroup.tsx` for collapsible advanced-section chrome.
+- Start in `AiFieldSelect.tsx` for AI/gate select field rendering and its option/placeholder behavior.
+- Start in `hooks/useSponsoredBundleLifecycle.ts` for sponsored-bundle loading, apply/restore, and baseline override behavior.
+- Start in `hooks/useSessionWizardWorkerDeploy.ts` for deploy-button orchestration, worker verification, and deploy helper lifecycle.
+- Start in `sessionWizardNormalModeCards.ts` for normal-mode card and publish-summary view-model builders.
 - Start in `sessionWizardContracts.js` for contract defaults, visible contract keys, or registry-address resolution.
 - Start in `sessionWizardSecrets.ts` for post-deploy worker config sync, secrets sync, or deploy warning/status handling.
 - Start in `sessionWizardWriteNormalization.ts` for worker payload normalization, on-chain compatibility fields, or metadata serialization rules.
+- Start in `sessionWizardStorageProfile.ts` for `/new` Advanced session storage profile defaults and Cloudflare primitive metadata.
 - Start in `CreateSBTGroup.tsx` only when the issue is inside the deferred SBT authoring modal itself; `SessionWizard.tsx` mainly launches and reconciles that flow.
 
 ## Practical Hierarchy
 
 ```text
 SessionWizard.tsx
+  -> CollapsibleFieldGroup.tsx
+  -> AiFieldSelect.tsx
+  -> sessionWizardNormalModeCards.ts
+  -> hooks/useSponsoredBundleLifecycle.ts
+  -> hooks/useSessionWizardWorkerDeploy.ts
   -> sessionWizardContracts.js
   -> sessionWizardSecrets.ts
   -> sessionWizardWriteNormalization.ts
+  -> sessionWizardStorageProfile.ts
   -> CreateSBTGroup.tsx
   -> ContractViewer.tsx
 ```
@@ -33,7 +46,7 @@ SessionWizard.tsx
 
 | Section | Lines | Purpose | Key Exports / Helpers |
 |---|---:|---|---|
-| Imports, constants, pure helpers | 1-2327 | File-level helpers, worker deploy validation, sponsored-bundle helpers, session ID generation, cache helpers | `getSessionSlugValidationError`, `resolveSessionWizardDeployBundlePayload`, `buildSessionWizardPublishPlan`, `resolveSessionWizardLitPaymentDelegation` |
+| Imports, constants, pure helpers | 1-2327 | File-level helpers, worker deploy validation, sponsored-bundle helpers, session ID generation, cache helpers | `getSessionSlugValidationError`, `resolveSessionWizardDeployBundlePayload`, `buildSessionWizardPublishPlan`, `resolveSessionWizardChipotleHookConfig` |
 | Component bootstrap and cached draft hydration | 2329-3006 | Initializes persisted wizard state, session metadata draft, gate state, worker state, sponsored-bundle state, and refs used across async flows | `SessionWizard`, `resolveSessionWizardSelectorSourceConfig`, `applyWorkerSecretsUpdate` |
 | Derived config and synchronization effects | 3010-4054 | Keeps chain defaults, gate/resource snapshots, header preview state, and source-session inheritance aligned with the active draft | registry-chain effects, gate sync effects, session-header preview effects |
 | Draft mutation and modal orchestration | 4070-4655 | Core draft updates, gate editing, resource-gate resolution, create-SBT modal wiring, contract viewer controls | `updateDraftValue`, `updateEncryptionGate`, `handleGateAddSbt`, `handleSavePendingSbtDraft` |
@@ -93,6 +106,7 @@ bundle link / imported bundle
 | `encryptionGates` | Session-level gate definitions | Drives lock UI, sponsored resource gates, and Lit defaults |
 | `pendingSbtDrafts` | Deferred SBT drafts waiting for publish-time finalize/deploy | Pins slug-sensitive state and injects deploy work into publish flow |
 | `workerSecrets` / `workerSecretsEnabled` | Worker-side secrets and whether the wizard should manage them | Controls deploy validation and post-deploy secret sync |
+| `draft.storageProfile` | Advanced-mode session-owned storage profile | Defaults to Arweave; Lit-Arweave keeps encrypted Arweave docs/context available; Cloudflare mode records worker-enforced R2/D1/KV/Durable Object primitives without making `/worker-setup` own storage policy |
 | `deployForm` / `deployWorkerUrl` / `deployComplete` | Worker deploy input and result state | Drives worker verification UI and publish readiness |
 | `publishStep` / `publishBusy` | Publish progress state | Feeds progress UI and controls which step label is shown |
 | `slugAvailability` | Async slug-check result | Blocks invalid publish/deploy attempts early |
