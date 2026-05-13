@@ -3445,9 +3445,10 @@ const SessionWizard = ({
       normalizeAiModelForProvider,
       defaultAiModels: DEFAULT_AI_MODELS,
     });
+    const sponsoredFields = buildSponsoredFlagFields();
     result.onChainFields = buildSessionWizardRegistrySessionFields({
       onChainFields: result.onChainFields,
-      sponsoredFields: buildSponsoredFlagFields(),
+      sponsoredFields,
     });
     return { ...result };
   };
@@ -4024,18 +4025,21 @@ const SessionWizard = ({
     draft,
     registryChainId,
     networkId: network?.id,
+    workerSecrets: getCurrentWorkerSecrets(),
   });
 
   const resolveWorkerRpcUrlMap = () => resolveSessionWizardWorkerRpcUrlMapFromDraft({
     draft,
     registryChainId,
     networkId: network?.id,
+    workerSecrets: getCurrentWorkerSecrets(),
   });
 
   const resolveWorkerFaucetConfig = () => resolveSessionWizardWorkerFaucetConfigFromDraft({
     draft,
     registryChainId,
     networkId: network?.id,
+    workerSecrets: getCurrentWorkerSecrets(),
   });
   const effectiveDefaultWorkerRpcUrl = toStr(resolveWorkerRpcUrl()).trim();
   const resolvedWorkerBaseUrlForDelegation = resolveWorkerBaseUrl();

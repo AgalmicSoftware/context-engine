@@ -40,7 +40,7 @@ const CAPABILITIES = Object.freeze([
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: true,
-    botCommands: ['/ce_actions', '/ce_agent'],
+    botCommands: ['/actions', '/agent'],
     miniAppRoutes: ['agent/actions'],
     notes: [
       'Group chat may show only action labels and private/Mini App launch controls.',
@@ -61,7 +61,7 @@ const CAPABILITIES = Object.freeze([
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: false,
-    botCommands: ['/ce_create_agent'],
+    botCommands: ['/create_agent'],
     miniAppRoutes: ['agent/account/create'],
     notes: [
       'The bridge can derive a managed demo account locally, but canonical account creation remains an /api/agent/* request.',
@@ -82,7 +82,7 @@ const CAPABILITIES = Object.freeze([
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: false,
-    botCommands: ['/ce_me', '/ce_account'],
+    botCommands: ['/me', '/account'],
     miniAppRoutes: ['agent/account'],
   }),
   freezeEntry({
@@ -100,7 +100,7 @@ const CAPABILITIES = Object.freeze([
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: false,
-    botCommands: ['/ce_settings'],
+    botCommands: ['/settings'],
     miniAppRoutes: ['agent/settings'],
   }),
   freezeEntry({
@@ -118,7 +118,7 @@ const CAPABILITIES = Object.freeze([
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: false,
-    botCommands: ['/ce_settings'],
+    botCommands: ['/settings'],
     miniAppRoutes: ['agent/settings/edit'],
     notes: [
       'The scaffold accepts safe enum/boolean settings only; freeform private inputs should be stored behind opaque refs.',
@@ -139,7 +139,7 @@ const CAPABILITIES = Object.freeze([
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: true,
-    botCommands: ['/ce_questions'],
+    botCommands: ['/questions'],
     miniAppRoutes: ['questions'],
   }),
   freezeEntry({
@@ -174,7 +174,7 @@ const CAPABILITIES = Object.freeze([
       TELEGRAM_CHAT_LANES.MINI_APP,
     ],
     groupSafe: false,
-    botCommands: ['/ce_join_sbt'],
+    botCommands: ['/join_sbt'],
     miniAppRoutes: ['sbt/claim'],
   }),
   freezeEntry({
@@ -189,7 +189,7 @@ const CAPABILITIES = Object.freeze([
     optionalFields: ['description', 'image', 'visibility', 'credentialRef'],
     safeTelegramLanes: [TELEGRAM_CHAT_LANES.MINI_APP],
     groupSafe: false,
-    botCommands: ['/ce_create_sbt_group'],
+    botCommands: ['/create_sbt_group'],
     miniAppRoutes: ['sbt/create'],
   }),
   freezeEntry({

@@ -22,6 +22,19 @@ const DEFAULT_ENTRYPOINT = 'worker.js';
 const SCRIPT_CONTENT_TYPE = 'application/javascript+module';
 const TRUE_STRINGS = new Set(['1', 'true', 'yes', 'on']);
 const require = createRequire(import.meta.url);
+const TELEGRAM_BOT_COMMANDS = Object.freeze([
+  { command: 'start', description: 'Open the Context Engine bot' },
+  { command: 'actions', description: 'Open the action menu' },
+  { command: 'settings', description: 'View or edit bot settings' },
+  { command: 'join', description: 'Link this chat to a session' },
+  { command: 'sessions', description: 'List available sessions' },
+  { command: 'questions', description: 'View session questions' },
+  { command: 'q', description: 'Pose a question by number' },
+  { command: 'attachments', description: 'View session files' },
+  { command: 'docs', description: 'View session files' },
+  { command: 'me', description: 'View your account' },
+  { command: 'account', description: 'View your account' },
+]);
 
 function safeString(value) {
   return String(value || '').trim();
@@ -604,6 +617,42 @@ export async function setAgentBridgeTelegramWebhook({
   };
 }
 
+export async function setAgentBridgeTelegramBotCommands({
+  botToken = '',
+  commands = TELEGRAM_BOT_COMMANDS,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  let response;
+  try {
+    response = await fetchImpl(`https://api.telegram.org/bot${safeString(botToken)}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commands }),
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      step: 'telegram_set_commands',
+      status: 502,
+      error: `Telegram setMyCommands request failed: ${safeString(error?.message || error) || 'unknown error'}`,
+    };
+  }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body?.ok !== true) {
+    return {
+      ok: false,
+      step: 'telegram_set_commands',
+      status: response.status || 502,
+      error: safeString(body?.description) || `Telegram setMyCommands failed (${response.status || 502})`,
+    };
+  }
+  return {
+    ok: true,
+    count: commands.length,
+    commands: commands.map((command) => command.command),
+  };
+}
+
 export async function verifyAgentBridgeHealth({
   publicUrl = '',
   fetchImpl = globalThis.fetch,
@@ -770,12 +819,26 @@ export async function executeAgentBridgeDeployApply({
 
   const telegram = flags['skip-telegram-webhook'] === true
     ? { ok: true, skipped: true }
-    : await setAgentBridgeTelegramWebhook({
+    : await (async () => {
+      const webhook = await setAgentBridgeTelegramWebhook({
         botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
         webhookUrl,
         webhookSecret: resolvedEnv.TELEGRAM_WEBHOOK_SECRET,
         fetchImpl,
       });
+      if (!webhook.ok) return webhook;
+      const commands = await setAgentBridgeTelegramBotCommands({
+        botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
+        fetchImpl,
+      });
+      if (!commands.ok) return commands;
+      return {
+        ok: true,
+        description: webhook.description,
+        webhook,
+        commands,
+      };
+    })();
   if (!telegram.ok) return telegram;
 
   const health = flags['skip-health-check'] === true
@@ -835,10 +898,10 @@ function printUsage() {
     '  Keep TELEGRAM_BOT_TOKEN, CLOUDFLARE_API_TOKEN, TELEGRAM_WEBHOOK_SECRET, and DEMO_SIGNER_ROOT_SECRET out of git.',
     '',
     'Flags:',
-    '  --apply                         Execute live Cloudflare upload, Worker secret writes, webhook setup, and health check',
+    '  --apply                         Execute live Cloudflare upload, Worker secret writes, Telegram setup, and health check',
     '  --enable-doc-storage            Also provision and bind bridge-owned R2/D1 demo storage resources',
     '  --env-file <path>               Read a different dotenv-style env file',
-    '  --skip-telegram-webhook         Deploy without setting Telegram setWebhook',
+    '  --skip-telegram-webhook         Deploy without setting Telegram setWebhook or bot commands',
     '  --skip-health-check             Deploy without verifying /health',
     '  --include-workers-dev-subdomain-setup',
     '                                  Allow account-level workers.dev subdomain create/change when needed',

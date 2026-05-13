@@ -165,6 +165,7 @@ async function callWithRpcFallback({
 export async function listRegistrySessionsForBridge({
   env = {},
   fetchImpl = env.REGISTRY_FETCH || globalThis.fetch,
+  forceRefresh = false,
 } = {}) {
   const registryAddress = resolveSessionRegistryAddress(env);
   const rpcUrls = resolveRegistryRpcUrls(env);
@@ -173,7 +174,7 @@ export async function listRegistrySessionsForBridge({
   const cacheKey = `${chainId}|${registryAddress.toLowerCase()}|${rpcUrls.join('|')}|${maxSessions}`;
   const kvCacheKey = `${REGISTRY_SESSION_KV_PREFIX}${chainId}:${registryAddress.toLowerCase()}:${maxSessions}`;
   const cached = registrySessionCache.get(cacheKey);
-  if (cached && Date.now() - cached.cachedAt < REGISTRY_SESSION_CACHE_TTL_MS) {
+  if (!forceRefresh && cached && Date.now() - cached.cachedAt < REGISTRY_SESSION_CACHE_TTL_MS) {
     return { ...cached.result, cached: true, cacheLayer: 'memory' };
   }
   if (!registryAddress) {
@@ -182,7 +183,7 @@ export async function listRegistrySessionsForBridge({
   if (!rpcUrls.length) {
     return { ok: false, reason: 'registry_rpc_url_missing', sessions: [] };
   }
-  if (env?.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function') {
+  if (!forceRefresh && env?.AGENT_ACTION_KV && typeof env.AGENT_ACTION_KV.get === 'function') {
     const kvCached = safeJsonParse(await env.AGENT_ACTION_KV.get(kvCacheKey), null);
     if (kvCached && Array.isArray(kvCached.sessions)) {
       registrySessionCache.set(cacheKey, { cachedAt: Date.now(), result: kvCached });
@@ -201,8 +202,9 @@ export async function listRegistrySessionsForBridge({
   }
   const count = Number(decodeUint256Word(countResult.result));
   const limit = Math.min(count, maxSessions);
+  const startIndex = Math.max(0, count - limit);
   const sessions = [];
-  for (let index = 0; index < limit; index += 1) {
+  for (let index = startIndex; index < count; index += 1) {
     const slugResult = await callWithRpcFallback({
       rpcUrls,
       registryAddress,
@@ -234,6 +236,7 @@ export async function listRegistrySessionsForBridge({
     sessions,
     count,
     limit,
+    startIndex,
     chainId,
     registryAddress,
     rpcFallbackCount: rpcUrls.length,

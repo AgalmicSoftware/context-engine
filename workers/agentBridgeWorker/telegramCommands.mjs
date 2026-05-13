@@ -65,19 +65,36 @@ const DEFAULT_QUESTION = Object.freeze({
 
 const COMMANDS = Object.freeze({
   START: '/start',
-  ACTIONS: '/ce_actions',
-  AGENT: '/ce_agent',
-  CREATE_AGENT: '/ce_create_agent',
-  SETTINGS: '/ce_settings',
-  JOIN: '/ce_join',
-  SESSIONS: '/ce_sessions',
-  QUESTIONS: '/ce_questions',
-  POSE_QUESTION: '/ce_pose_question',
+  ACTIONS: '/actions',
+  AGENT: '/agent',
+  CREATE_AGENT: '/create_agent',
+  SETTINGS: '/settings',
+  JOIN: '/join',
+  SESSIONS: '/sessions',
+  QUESTIONS: '/questions',
+  POSE_QUESTION: '/pose_question',
   POSE_QUESTION_SHORT: '/q',
-  ATTACHMENTS: '/ce_attachments',
-  DOCS: '/ce_docs',
-  ME: '/ce_me',
-  ACCOUNT: '/ce_account',
+  ATTACHMENTS: '/attachments',
+  DOCS: '/docs',
+  ME: '/me',
+  ACCOUNT: '/account',
+});
+
+const LEGACY_COMMAND_ALIASES = Object.freeze({
+  '/ce_actions': COMMANDS.ACTIONS,
+  '/ce_agent': COMMANDS.AGENT,
+  '/ce_create_agent': COMMANDS.CREATE_AGENT,
+  '/ce_settings': COMMANDS.SETTINGS,
+  '/ce_join': COMMANDS.JOIN,
+  '/ce_sessions': COMMANDS.SESSIONS,
+  '/ce_questions': COMMANDS.QUESTIONS,
+  '/ce_pose_question': COMMANDS.POSE_QUESTION,
+  '/ce_drop_question': COMMANDS.POSE_QUESTION,
+  '/drop_question': COMMANDS.POSE_QUESTION,
+  '/ce_attachments': COMMANDS.ATTACHMENTS,
+  '/ce_docs': COMMANDS.DOCS,
+  '/ce_me': COMMANDS.ME,
+  '/ce_account': COMMANDS.ACCOUNT,
 });
 
 function safeString(value) {
@@ -197,12 +214,14 @@ function onChainAnswerFromDraft(draft = {}) {
   };
 }
 
-async function loadSessionPolicy(env = {}) {
+async function loadSessionPolicy(env = {}, {
+  forceRefresh = false,
+} = {}) {
   const configured = safeJsonParse(env.AGENT_BRIDGE_SESSION_POLICY_JSON, null);
   if (configured && typeof configured === 'object' && !Array.isArray(configured)) {
     return normalizeSessionPolicy(configured);
   }
-  const registry = await listRegistrySessionsForBridge({ env }).catch((error) => ({
+  const registry = await listRegistrySessionsForBridge({ env, forceRefresh }).catch((error) => ({
     ok: false,
     reason: 'session_registry_unavailable',
     error: safeString(error?.message || error),
@@ -340,7 +359,7 @@ function questionLoadIssueText(result = {}) {
     return 'Question source could not read the latest block. Try again shortly.';
   }
   if (reason === 'live_questions_indexing') {
-    return 'Questions are indexing. Run /ce_questions again shortly.';
+    return 'Questions are indexing. Run /questions again shortly.';
   }
   return 'Questions could not be loaded. Try again shortly.';
 }
@@ -416,9 +435,10 @@ function parseTelegramCommandText(text = '', {
   const [rawCommand = '', rawMention = ''] = rawHead.split('@');
   const expectedUsername = normalizeBotUsername(botUsername);
   const mention = normalizeBotUsername(rawMention);
+  const command = lower(rawCommand);
   return {
     isCommand: true,
-    command: lower(rawCommand),
+    command: LEGACY_COMMAND_ALIASES[command] || command,
     args,
     argText: args.join(' '),
     mention: mention || null,
@@ -1120,7 +1140,7 @@ function errorReply({
     method,
     chatId: normalized.chat?.chatId,
     messageId,
-    text: text || 'That action is not available. Try /ce_sessions or /start.',
+    text: text || 'That action is not available. Try /sessions or /start.',
     command,
     normalized,
     extra: {
@@ -1148,14 +1168,14 @@ function formatHelpText() {
   return [
     'Context Engine',
     '',
-    '/ce_actions - open the agent action menu',
-    '/ce_settings - view or edit agent settings',
-    '/ce_join <session> - link this chat to a session',
-    '/ce_sessions - list linked sessions',
-    '/ce_questions - view session questions',
+    '/actions - open the agent action menu',
+    '/settings - view or edit agent settings',
+    '/join <session> - link this chat to a session',
+    '/sessions - list linked sessions',
+    '/questions - view session questions',
     '/q <number> - pose a question',
-    '/ce_attachments - view attachments',
-    '/ce_me - view your account',
+    '/attachments - view attachments',
+    '/me - view your account',
   ].join('\n');
 }
 
@@ -1203,7 +1223,7 @@ async function buildHelpResponse({ normalized, command = COMMANDS.START, env, cr
 }
 
 async function buildSessionsResponse({ normalized, command, env, createdAt }) {
-  const policy = await loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env, { forceRefresh: true });
   const sessions = policy.linkedSessions.length ? policy.linkedSessions : [{
     sessionSlug: policy.defaultSessionSlug || 'general',
     sessionName: policy.defaultSessionSlug || 'general',
@@ -1226,7 +1246,7 @@ async function buildSessionsResponse({ normalized, command, env, createdAt }) {
       'Available sessions:',
       ...sessions.map((session) => `- ${session.sessionSlug} (${sessionLabel(session)})`),
       '',
-      'Use /ce_join <session> to switch sessions.',
+      'Use /join <session> to switch sessions.',
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
     screen: 'group_session_card',
@@ -1334,7 +1354,7 @@ async function buildJoinResponse({
   sessionSlugOverride = '',
   createdAt,
 } = {}) {
-  const policy = await loadSessionPolicy(env);
+  const policy = await loadSessionPolicy(env, { forceRefresh: true });
   const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || args[0] || policy.defaultSessionSlug || 'general') || 'general';
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
@@ -1342,7 +1362,7 @@ async function buildJoinResponse({
       normalized,
       command,
       reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not available. Run /ce_sessions to see sessions.`,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
     });
   }
 
@@ -1388,7 +1408,7 @@ async function buildJoinResponse({
         `Account: ${shortAddress(account.accountAddress)}`,
         `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
         '',
-        'Use /ce_attachments for session files.',
+        'Use /attachments for session files.',
       ].join('\n'),
       replyMarkup: {
         inline_keyboard: [[
@@ -1478,7 +1498,7 @@ async function buildJoinResponse({
     text: [
       state.text,
       '',
-      'Use /ce_attachments for session files.',
+      'Use /attachments for session files.',
     ].join('\n'),
     replyMarkup: { inline_keyboard: [buttons] },
     screen: state.screen,
@@ -1513,7 +1533,7 @@ async function buildQuestionsResponse({
       normalized,
       command,
       reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not available. Run /ce_sessions to see sessions.`,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
       method,
       messageId,
     });
@@ -1571,14 +1591,14 @@ async function buildQuestionsResponse({
         : ['No public questions are available yet.'])),
       '',
       loadFailed
-        ? 'Run /ce_questions again after the source is fixed.'
+        ? 'Run /questions again after the source is fixed.'
         : (state.questions.length
         ? (state.questions.length > displayQuestions.length
           ? 'Tap Pose, send /q <number>, or open the Mini App.'
           : 'Tap Pose, or send /q <number>.')
         : (loadedQuestions.reason === 'live_questions_indexing'
-          ? 'Run /ce_questions again shortly.'
-          : 'Create questions in the CE client, then run /ce_questions again.')),
+          ? 'Run /questions again shortly.'
+          : 'Create questions in the CE client, then run /questions again.')),
     ].join('\n'),
     replyMarkup: rows.length ? { inline_keyboard: rows } : null,
     screen: state.screen,
@@ -1618,7 +1638,7 @@ async function buildPoseQuestionResponse({
       normalized,
       command,
       reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not available. Run /ce_sessions to see sessions.`,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
     });
   }
 
@@ -1678,7 +1698,7 @@ async function buildPoseQuestionResponse({
   const text = payloadUnavailable
     ? [
       'Question is unavailable.',
-      'The public payload could not be loaded yet. Try /ce_questions again later.',
+      'The public payload could not be loaded yet. Try /questions again later.',
     ].join('\n')
     : group.locked
     ? 'This question is locked. Open it in the Mini App.'
@@ -1885,7 +1905,7 @@ async function buildDocsResponse({
       normalized,
       command,
       reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not available. Run /ce_sessions to see sessions.`,
+      text: `Session "${sessionSlug}" is not available. Run /sessions to see sessions.`,
       method,
       messageId,
     });
@@ -1956,7 +1976,7 @@ async function buildMeResponse({ normalized, command, env, createdAt, method = '
       `Chain: ${safeString(env.DEFAULT_CHAIN_ID || '11155420')}`,
       `Joined sessions: ${joinedSessions.map((session) => session.sessionSlug).join(', ') || 'none'}`,
       '',
-      'Use /ce_questions or /ce_attachments.',
+      'Use /questions or /attachments.',
     ].join('\n'),
     replyMarkup: {
       inline_keyboard: [[
@@ -2293,7 +2313,7 @@ function buildMiniAppStartResponse({
       text: [
         'Open the Mini App from a private chat with the bot.',
         '',
-        'Use /ce_join <session> in private chat to continue.',
+        'Use /join <session> in private chat to continue.',
       ].join('\n'),
       screen: 'private_start',
       command,
@@ -2307,7 +2327,7 @@ function buildMiniAppStartResponse({
       text: [
         'The Mini App URL is not configured for this worker.',
         '',
-        'Use /ce_questions to answer from Telegram for now.',
+        'Use /questions to answer from Telegram for now.',
       ].join('\n'),
       screen: 'private_start',
       command,
@@ -2353,7 +2373,7 @@ async function buildStartPayloadResponse({
       text: [
         'This private start link is no longer active.',
         '',
-        'Run /ce_sessions or /ce_join <session> to continue.',
+        'Run /sessions or /join <session> to continue.',
       ].join('\n'),
       screen: 'private_start',
       command,
@@ -2436,7 +2456,7 @@ async function buildCallbackResponse({
       normalized,
       command: 'callback',
       reason: 'action_not_found',
-      text: 'This action expired. Run /ce_sessions or /start to refresh the buttons.',
+      text: 'This action expired. Run /sessions or /start to refresh the buttons.',
       method,
       messageId,
     }), callbackQueryId);

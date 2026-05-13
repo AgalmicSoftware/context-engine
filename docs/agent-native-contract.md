@@ -320,12 +320,12 @@ for Workers, KV, R2, D1, Durable Objects, and account settings; it does not
 embed account ids, bucket names, or tokens.
 
 Telegram screen/message helpers expose launch metadata on every
-`telegram_screen_state`: `/start`, `/ce_join`, `/ce_questions`,
-`/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, `/ce_docs`,
-`/ce_generate_questions`, `/ce_me`, `/ce_account`,
-`/ce_sbt <sbt-address-or-group-id-or-link>`,
-`/ce_join_sbt <sbt-address-or-invite-code-or-link>`,
-`/ce_create_sbt_group [session-slug]`, `/ce_onboarding`, `/ce_export_key`, `/ce_recover_key`,
+`telegram_screen_state`: `/start`, `/join`, `/questions`,
+`/pose_question`, `/q`, deprecated `/drop_question`, `/docs`,
+`/generate_questions`, `/me`, `/account`,
+`/sbt <sbt-address-or-group-id-or-link>`,
+`/join_sbt <sbt-address-or-invite-code-or-link>`,
+`/create_sbt_group [session-slug]`, `/onboarding`, `/export_key`, `/recover_key`,
 opaque callback actions, `callback:<pose_question_action>`, or the
 `t.me/<bot>?start=<opaque-action-id>` template. The group session-linked card
 uses the safe public copy `Context Engine session linked: <session>` and the
@@ -561,10 +561,10 @@ Rules:
 - `workers/agentBridgeWorker/` validates
   `X-Telegram-Bot-Api-Secret-Token` against `TELEGRAM_WEBHOOK_SECRET` before
   handling live webhook updates. The first live demo handles `/start`,
-  `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
-  `/ce_pose_question`, `/q`, `/ce_docs`, and `/ce_me` through the
+  `/join <session>`, `/sessions`, `/questions`,
+  `/pose_question`, `/q`, `/attachments`, `/docs`, and `/me` through the
   `https://<worker-name>.<workers-subdomain>.workers.dev/telegram/webhook`
-  endpoint.
+  endpoint. Legacy `/ce_*` command names remain hidden compatibility aliases.
 - Mini App `initData` must be validated server-side before trusting Telegram
   identity. The helper follows Telegram's official Mini App HMAC validation
   flow: https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app

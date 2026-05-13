@@ -68,44 +68,44 @@ export const TELEGRAM_SCREEN_IDS = Object.freeze([
 export const TELEGRAM_SCREEN_LAUNCHES = Object.freeze({
   setup_welcome: { command: '/start', deepLink: OPAQUE_DEEP_LINK_LAUNCH },
   test_checklist: { command: '/start' },
-  agent_action_menu: { command: '/ce_actions', aliases: ['/ce_agent'], callback: OPAQUE_CALLBACK_LAUNCH },
-  agent_account_create: { command: '/ce_create_agent', callback: OPAQUE_CALLBACK_LAUNCH, deepLink: OPAQUE_DEEP_LINK_LAUNCH },
-  agent_settings_overview: { command: '/ce_settings', callback: OPAQUE_CALLBACK_LAUNCH, deepLink: OPAQUE_DEEP_LINK_LAUNCH },
-  agent_settings_edit: { command: '/ce_settings', callback: OPAQUE_CALLBACK_LAUNCH },
-  group_session_card: { command: '/ce_join', callback: OPAQUE_CALLBACK_LAUNCH },
+  agent_action_menu: { command: '/actions', aliases: ['/agent'], callback: OPAQUE_CALLBACK_LAUNCH },
+  agent_account_create: { command: '/create_agent', callback: OPAQUE_CALLBACK_LAUNCH, deepLink: OPAQUE_DEEP_LINK_LAUNCH },
+  agent_settings_overview: { command: '/settings', callback: OPAQUE_CALLBACK_LAUNCH, deepLink: OPAQUE_DEEP_LINK_LAUNCH },
+  agent_settings_edit: { command: '/settings', callback: OPAQUE_CALLBACK_LAUNCH },
+  group_session_card: { command: '/join', callback: OPAQUE_CALLBACK_LAUNCH },
   private_start: { command: '/start <opaque-action-id>', deepLink: OPAQUE_DEEP_LINK_LAUNCH },
-  question_list: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  question_list: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
   pose_question: {
-    command: '/ce_pose_question',
+    command: '/pose_question',
     aliases: ['/q'],
-    deprecatedAliases: ['/ce_drop_question'],
+    deprecatedAliases: ['/drop_question'],
     callback: POSE_QUESTION_CALLBACK_LAUNCH,
   },
-  generated_question_candidates: { command: '/ce_generate_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  account_created: { command: '/ce_join', callback: OPAQUE_CALLBACK_LAUNCH },
-  account_recovered: { command: '/ce_recover_key', callback: OPAQUE_CALLBACK_LAUNCH },
-  my_account: { command: '/ce_account', callback: OPAQUE_CALLBACK_LAUNCH },
-  joined_sbts: { command: '/ce_account', callback: OPAQUE_CALLBACK_LAUNCH },
-  onboarding: { command: '/ce_onboarding', callback: OPAQUE_CALLBACK_LAUNCH },
-  sbt_group_card: { command: '/ce_sbt <sbt-address-or-group-id-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
-  join_public_sbt: { command: '/ce_join_sbt <sbt-address-or-invite-code-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
-  join_password_sbt: { command: '/ce_join_sbt <sbt-address-or-invite-code-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
-  create_sbt_group: { command: '/ce_create_sbt_group [session-slug]', callback: OPAQUE_CALLBACK_LAUNCH },
-  session_join_sbt_gate: { command: '/ce_join', callback: OPAQUE_CALLBACK_LAUNCH },
-  freeform_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  agree_unsure_disagree_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  rating_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  multichoice_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  locked_private_question: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  private_question_read: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  doc_library: { command: '/ce_attachments', aliases: ['/ce_docs'], callback: OPAQUE_CALLBACK_LAUNCH },
-  doc_detail: { command: '/ce_attachments', aliases: ['/ce_docs'], callback: OPAQUE_CALLBACK_LAUNCH },
-  generate_questions: { command: '/ce_generate_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  generated_question_candidates: { command: '/generate_questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  account_created: { command: '/join', callback: OPAQUE_CALLBACK_LAUNCH },
+  account_recovered: { command: '/recover_key', callback: OPAQUE_CALLBACK_LAUNCH },
+  my_account: { command: '/account', callback: OPAQUE_CALLBACK_LAUNCH },
+  joined_sbts: { command: '/account', callback: OPAQUE_CALLBACK_LAUNCH },
+  onboarding: { command: '/onboarding', callback: OPAQUE_CALLBACK_LAUNCH },
+  sbt_group_card: { command: '/sbt <sbt-address-or-group-id-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
+  join_public_sbt: { command: '/join_sbt <sbt-address-or-invite-code-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
+  join_password_sbt: { command: '/join_sbt <sbt-address-or-invite-code-or-link>', callback: OPAQUE_CALLBACK_LAUNCH },
+  create_sbt_group: { command: '/create_sbt_group [session-slug]', callback: OPAQUE_CALLBACK_LAUNCH },
+  session_join_sbt_gate: { command: '/join', callback: OPAQUE_CALLBACK_LAUNCH },
+  freeform_question: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  agree_unsure_disagree_question: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  rating_question: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  multichoice_question: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  locked_private_question: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  private_question_read: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  doc_library: { command: '/attachments', aliases: ['/docs'], callback: OPAQUE_CALLBACK_LAUNCH },
+  doc_detail: { command: '/attachments', aliases: ['/docs'], callback: OPAQUE_CALLBACK_LAUNCH },
+  generate_questions: { command: '/generate_questions', callback: OPAQUE_CALLBACK_LAUNCH },
   submit_response: { callback: OPAQUE_CALLBACK_LAUNCH },
   confirmation_signing: { callback: OPAQUE_CALLBACK_LAUNCH },
-  submitted: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  draft_saved: { command: '/ce_questions', callback: OPAQUE_CALLBACK_LAUNCH },
-  event_log_summary: { command: '/ce_events', callback: OPAQUE_CALLBACK_LAUNCH },
+  submitted: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  draft_saved: { command: '/questions', callback: OPAQUE_CALLBACK_LAUNCH },
+  event_log_summary: { command: '/events', callback: OPAQUE_CALLBACK_LAUNCH },
   error_retry: { callback: OPAQUE_CALLBACK_LAUNCH },
 });
 
@@ -126,6 +126,15 @@ function splitCommandText(text = '') {
     args,
     argText: args.join(' '),
   };
+}
+
+function normalizeBotCommand(command = '') {
+  const normalized = safeString(command).toLowerCase();
+  return ({
+    '/ce_sbt': '/sbt',
+    '/ce_join_sbt': '/join_sbt',
+    '/ce_create_sbt_group': '/create_sbt_group',
+  })[normalized] || normalized;
 }
 
 function looksLikePublicLink(value = '') {
@@ -169,8 +178,10 @@ function privateCredentialCommandResult({ command = '', commandFamily = '', lane
 export function parseTelegramSbtCommand(text = '', {
   lane = TELEGRAM_CHAT_LANES.GROUP_LOBBY,
 } = {}) {
-  const { command, args, argText } = splitCommandText(text);
-  if (!['/ce_sbt', '/ce_join_sbt', '/ce_create_sbt_group'].includes(command)) {
+  const parsed = splitCommandText(text);
+  const command = normalizeBotCommand(parsed.command);
+  const { args, argText } = parsed;
+  if (!['/sbt', '/join_sbt', '/create_sbt_group'].includes(command)) {
     return sanitizeForGroup({
       ok: false,
       command,
@@ -178,7 +189,7 @@ export function parseTelegramSbtCommand(text = '', {
     });
   }
 
-  if (command === '/ce_create_sbt_group') {
+  if (command === '/create_sbt_group') {
     const sessionSlug = safeString(args[0] || '');
     if (SBT_PRIVATE_CREDENTIAL_RE.test(sessionSlug) || SBT_PRIVATE_LINK_VALUE_RE.test(sessionSlug)) {
       return privateCredentialCommandResult({ command, commandFamily: 'create_sbt_group', lane });
@@ -206,29 +217,29 @@ export function parseTelegramSbtCommand(text = '', {
     return sanitizeForGroup({
       ok: false,
       command,
-      commandFamily: command === '/ce_sbt' ? 'view_sbt' : 'join_sbt',
+      commandFamily: command === '/sbt' ? 'view_sbt' : 'join_sbt',
       reason: 'sbt_target_required',
     });
   }
   if (classified.targetKind === 'private_credential') {
     return privateCredentialCommandResult({
       command,
-      commandFamily: command === '/ce_sbt' ? 'view_sbt' : 'join_sbt',
+      commandFamily: command === '/sbt' ? 'view_sbt' : 'join_sbt',
       lane,
     });
   }
   return sanitizeForGroup({
     ok: true,
     command,
-    commandFamily: command === '/ce_sbt' ? 'view_sbt' : 'join_sbt',
+    commandFamily: command === '/sbt' ? 'view_sbt' : 'join_sbt',
     targetKind: classified.targetKind,
     target: classified.target,
     publicTarget: true,
     publicCommandTargetAllowed: true,
-    targetLane: command === '/ce_sbt'
+    targetLane: command === '/sbt'
       ? TELEGRAM_CHAT_LANES.GROUP_LOBBY
       : TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-    launch: getTelegramScreenLaunch(command === '/ce_sbt' ? 'sbt_group_card' : 'join_public_sbt'),
+    launch: getTelegramScreenLaunch(command === '/sbt' ? 'sbt_group_card' : 'join_public_sbt'),
   });
 }
 
@@ -304,20 +315,20 @@ function buildDefaultScreenButtons(screen) {
   if (screen === 'agent_action_menu') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS, 'Settings', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/ce_settings',
+        command: '/settings',
       }),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-        command: '/ce_questions',
+        command: '/questions',
       }),
     ];
   }
   if (screen === 'agent_account_create') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_AGENT_SETTINGS, 'Settings', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/ce_settings',
+        command: '/settings',
       }),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU, 'Actions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/ce_actions',
+        command: '/actions',
       }),
     ];
   }
@@ -325,7 +336,7 @@ function buildDefaultScreenButtons(screen) {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.EDIT_AGENT_SETTINGS, 'Edit Settings', TELEGRAM_CHAT_LANES.MINI_APP),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU, 'Actions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/ce_actions',
+        command: '/actions',
       }),
     ];
   }
@@ -337,21 +348,21 @@ function buildDefaultScreenButtons(screen) {
   if (screen === 'question_list') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-        command: '/ce_questions',
+        command: '/questions',
       }),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION, 'Pose Question', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-        command: '/ce_pose_question',
+        command: '/pose_question',
         aliases: ['/q'],
       }),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/ce_generate_questions',
+        command: '/generate_questions',
       }),
     ];
   }
   if (screen === 'pose_question') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION, 'Pose Question', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-        command: '/ce_pose_question',
+        command: '/pose_question',
         aliases: ['/q'],
       }),
     ];
@@ -360,7 +371,7 @@ function buildDefaultScreenButtons(screen) {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.SAVE_GENERATED_QUESTION, 'Save', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION, 'Pose Question', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-        command: '/ce_pose_question',
+        command: '/pose_question',
         aliases: ['/q'],
       }),
     ];
@@ -417,7 +428,7 @@ function buildDefaultScreenButtons(screen) {
   if (screen === 'session_join_sbt_gate') {
     return [
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN, 'Retry Join Session', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-        command: '/ce_join',
+        command: '/join',
       }),
       buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.MY_ACCOUNT, 'My Account', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT),
     ];
@@ -616,21 +627,21 @@ export function buildTelegramGroupSessionCardState({
   const sessionLabel = safeString(sessionName || sessionSlug || 'general');
   const buttons = [
     buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.JOIN_SESSION, 'Join Session', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-      command: '/ce_join',
+      command: '/join',
       deepLink: OPAQUE_DEEP_LINK_LAUNCH,
     }),
     buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS, 'View Questions', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-      command: '/ce_questions',
+      command: '/questions',
       default: true,
     }),
     buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.LIST_DOCS, 'Attachments', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-      command: '/ce_attachments',
-      aliases: ['/ce_docs'],
+      command: '/attachments',
+      aliases: ['/docs'],
     }),
   ];
   if (policy.allowPoseQuestion !== false) {
     buttons.push(buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION, 'Pose Question', TELEGRAM_CHAT_LANES.GROUP_LOBBY, {
-      command: '/ce_pose_question',
+      command: '/pose_question',
       aliases: ['/q'],
     }));
   }
@@ -640,7 +651,7 @@ export function buildTelegramGroupSessionCardState({
   }
   if (policy.allowGenerateQuestion === true || policy.allowQuestionGeneration === true) {
     policyActions.push(buildScreenButton(TELEGRAM_BRIDGE_ACTIONS.GENERATE_QUESTION, 'Generate Questions', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-      command: '/ce_generate_questions',
+      command: '/generate_questions',
     }));
   }
   return buildTelegramScreenState('group_session_card', {
@@ -777,11 +788,11 @@ function buildRequiredSbtGateGroup(group = {}, {
 
   if (joined) {
     action = buildSbtGateAction(group, TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN, 'Retry Join Session', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-      command: '/ce_join',
+      command: '/join',
     });
   } else if (publicOpen && publicJoinEligible === true) {
     action = buildSbtGateAction(group, TELEGRAM_BRIDGE_ACTIONS.JOIN_PUBLIC_SBT, 'Join SBT', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-      command: '/ce_join_sbt <sbt-address-or-invite-code-or-link>',
+      command: '/join_sbt <sbt-address-or-invite-code-or-link>',
       publicCommandTarget: publicTarget || null,
       publicCommandTargetAllowed: Boolean(publicTarget),
       privateEligibilityCheckLane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
@@ -799,7 +810,7 @@ function buildRequiredSbtGateGroup(group = {}, {
     });
   } else if (credentialType) {
     action = buildSbtGateAction(group, TELEGRAM_BRIDGE_ACTIONS.JOIN_PASSWORD_SBT, 'Join SBT', TELEGRAM_CHAT_LANES.MINI_APP, {
-      command: '/ce_join_sbt <sbt-address-or-invite-code-or-link>',
+      command: '/join_sbt <sbt-address-or-invite-code-or-link>',
       credentialType,
       credentialRequired: true,
       credentialInputLane: TELEGRAM_CHAT_LANES.MINI_APP,
@@ -1049,9 +1060,9 @@ export function createTelegramPoseQuestionAction({
     actionId: buildOpaqueActionId(`pose_question|${sessionSlug}|${safeOpaqueSeedPart(questionId)}|${source}`),
     action: TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION,
     label: 'Pose Question',
-    command: '/ce_pose_question',
+    command: '/pose_question',
     aliases: ['/q'],
-    deprecatedAliases: ['/ce_drop_question'],
+    deprecatedAliases: ['/drop_question'],
     callback: POSE_QUESTION_CALLBACK_LAUNCH,
     targetLane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
     sessionSlug: safeString(sessionSlug),
@@ -1172,7 +1183,7 @@ export function buildTelegramSessionSbtGateJoinState({
   }));
   const retryAction = evaluation.allSatisfied === true
     ? buildSbtGateAction({ sbtId: sessionSlug || 'session', joinMode: 'retry' }, TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN, 'Retry Join Session', TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, {
-      command: '/ce_join',
+      command: '/join',
       deepLink: OPAQUE_DEEP_LINK_LAUNCH,
     })
     : null;
