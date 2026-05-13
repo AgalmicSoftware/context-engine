@@ -5,6 +5,48 @@ import {
   shouldCommitThrottledProgress,
 } from '../../components/MainSite/progressHelpers.js';
 
+export const buildSbtCountsInitialProgress = ({
+  startBlock,
+  toBlock,
+  seedBlock,
+} = {}) => {
+  const scanStartBlock = Number(startBlock);
+  const scanToBlock = Number(toBlock);
+  const progressSeedBlock = Number(seedBlock);
+  if (
+    !Number.isFinite(scanStartBlock) ||
+    !Number.isFinite(scanToBlock) ||
+    !Number.isFinite(progressSeedBlock)
+  ) {
+    return null;
+  }
+
+  const nextScanFrom = Math.max(progressSeedBlock + 1, scanStartBlock);
+  if (nextScanFrom > scanToBlock) return null;
+
+  const totalBlocks = Math.max(0, scanToBlock - scanStartBlock + 1);
+  const scannedBlocks = Math.max(
+    0,
+    Math.min(totalBlocks, progressSeedBlock - scanStartBlock + 1)
+  );
+  const lastScannedBlock = scannedBlocks > 0
+    ? Math.min(scanToBlock, scanStartBlock + scannedBlocks - 1)
+    : scanStartBlock - 1;
+
+  return {
+    phase: 'activity',
+    fromBlock: scanStartBlock,
+    toBlock: scanToBlock,
+    totalBlocks,
+    scannedBlocks,
+    remainingBlocks: Math.max(0, totalBlocks - scannedBlocks),
+    completionRatio: totalBlocks > 0 ? (scannedBlocks / totalBlocks) : 1,
+    scanFrom: scanStartBlock,
+    scanTo: lastScannedBlock,
+    lastScannedBlock,
+  };
+};
+
 export const createSbtLiveProgressController = ({
   mergeProgressEntry = mergeSbtLiveProgressEntry,
   setState = null,

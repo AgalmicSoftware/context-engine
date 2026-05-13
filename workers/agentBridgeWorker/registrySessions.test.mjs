@@ -143,6 +143,35 @@ test('listRegistrySessionsForBridge lists real registry slugs through additive R
   assert.equal(calls[1][0], 'https://infura.example/op-sepolia');
 });
 
+test('listRegistrySessionsForBridge reads the newest registry window when capped', async () => {
+  const defaultRpc = 'https://latest-window-rpc.example';
+  const { calls, fetchImpl } = registryFetchMock({
+    slugs: ['alpha', 'beta', 'gamma', 'delta', 'epsilon'],
+    defaultRpc,
+  });
+
+  const result = await listRegistrySessionsForBridge({
+    env: {
+      DEFAULT_CHAIN_ID: '11155420',
+      DEFAULT_RPC_URL: defaultRpc,
+      AGENT_BRIDGE_MAX_REGISTRY_SESSIONS: '3',
+    },
+    fetchImpl,
+  });
+
+  const slugIndices = calls
+    .map(([, init]) => JSON.parse(init.body || '{}').params?.[0]?.data || '')
+    .filter((data) => String(data).startsWith('0x27916a76'))
+    .map(decodeIndexFromCallData);
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.sessions.map((session) => session.sessionSlug), ['gamma', 'delta', 'epsilon']);
+  assert.equal(result.count, 5);
+  assert.equal(result.limit, 3);
+  assert.equal(result.startIndex, 2);
+  assert.deepEqual(slugIndices, [2, 3, 4]);
+});
+
 test('listRegistrySessionsForBridge stays disabled without explicit RPC URL', async () => {
   const result = await listRegistrySessionsForBridge({
     env: { DEFAULT_CHAIN_ID: '11155420' },
@@ -192,4 +221,35 @@ test('listRegistrySessionsForBridge writes and reads KV cache without storing RP
   assert.equal(cached.ok, true);
   assert.equal(cached.cacheLayer, 'kv');
   assert.deepEqual(cached.sessions.map((session) => session.sessionSlug), ['kv-alpha']);
+});
+
+test('listRegistrySessionsForBridge forceRefresh bypasses stale memory and KV cache', async () => {
+  const defaultRpc = 'https://force-refresh-rpc.example';
+  const kv = new MemoryKv();
+  const initial = registryFetchMock({ slugs: ['old-alpha'], defaultRpc });
+
+  const loaded = await listRegistrySessionsForBridge({
+    env: {
+      DEFAULT_CHAIN_ID: '11155420',
+      DEFAULT_RPC_URL: defaultRpc,
+      AGENT_ACTION_KV: kv,
+    },
+    fetchImpl: initial.fetchImpl,
+  });
+  assert.deepEqual(loaded.sessions.map((session) => session.sessionSlug), ['old-alpha']);
+
+  const fresh = registryFetchMock({ slugs: ['fresh-alpha', 'fresh-beta'], defaultRpc });
+  const refreshed = await listRegistrySessionsForBridge({
+    env: {
+      DEFAULT_CHAIN_ID: '11155420',
+      DEFAULT_RPC_URL: defaultRpc,
+      AGENT_ACTION_KV: kv,
+    },
+    fetchImpl: fresh.fetchImpl,
+    forceRefresh: true,
+  });
+
+  assert.equal(refreshed.ok, true);
+  assert.deepEqual(refreshed.sessions.map((session) => session.sessionSlug), ['fresh-alpha', 'fresh-beta']);
+  assert.equal(fresh.calls.length > 0, true);
 });

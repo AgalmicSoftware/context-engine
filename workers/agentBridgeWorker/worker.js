@@ -109,22 +109,22 @@ function telegramPreviewHtml() {
       </select>
       <div class="commands">
         <button data-command="/start">/start</button>
-        <button data-command="/ce_actions">/ce_actions</button>
-        <button data-command="/ce_settings">/ce_settings</button>
-        <button data-command="/ce_join alpha">/ce_join alpha</button>
-        <button data-command="/ce_sessions">/ce_sessions</button>
-        <button data-command="/ce_questions">/ce_questions</button>
-        <button data-command="/ce_pose_question">/ce_pose_question</button>
+        <button data-command="/actions">/actions</button>
+        <button data-command="/settings">/settings</button>
+        <button data-command="/join alpha">/join alpha</button>
+        <button data-command="/sessions">/sessions</button>
+        <button data-command="/questions">/questions</button>
+        <button data-command="/pose_question">/pose_question</button>
         <button data-command="/q 1">/q 1</button>
-        <button data-command="/ce_attachments">/ce_attachments</button>
-        <button data-command="/ce_me">/ce_me</button>
+        <button data-command="/attachments">/attachments</button>
+        <button data-command="/me">/me</button>
       </div>
     </aside>
     <section>
       <div class="toolbar">
         <div>
           <label for="command">Command</label>
-          <input id="command" value="/ce_join alpha" autocomplete="off">
+          <input id="command" value="/join alpha" autocomplete="off">
         </div>
         <button id="send" class="primary">Send</button>
       </div>

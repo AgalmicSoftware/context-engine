@@ -76,10 +76,11 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields keeps the worker URL compatibility mirror and sponsored flags only', () => {
+  test('buildSessionWizardRegistrySessionFields keeps compatibility mirrors and sponsored flags only', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {
         corsWorkerUrl: ' https://worker.example ',
+        rpcUrl: ' https://rpc.example ',
         unexpectedField: 'should-not-pass-through',
       },
       sponsoredFields: {
@@ -89,8 +90,36 @@ describe('sessionWizardWriteNormalization', () => {
       },
     })).toEqual({
       corsWorkerUrl: 'https://worker.example',
+      rpcUrl: 'https://rpc.example',
       sponsored_ai: '1',
       sponsored_arweave: '0',
+    });
+  });
+
+  test('buildSessionWizardRegistrySessionFields does not mirror uploaded custom RPC secrets into public fields', () => {
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {
+        rpcUrl: 'https://draft-rpc.example',
+      },
+      sponsoredFields: {
+        sponsored_rpc: '1',
+      },
+    })).toEqual({
+      rpcUrl: 'https://draft-rpc.example',
+      sponsored_rpc: '1',
+    });
+  });
+
+  test('buildSessionWizardRegistrySessionFields ignores worker-secret RPC values', () => {
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {},
+    })).toEqual({});
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {
+        rpcUrl: ' https://browser-visible-rpc.example ',
+      },
+    })).toEqual({
+      rpcUrl: 'https://browser-visible-rpc.example',
     });
   });
 

@@ -186,6 +186,12 @@ test('worker preview route renders an interactive mock Telegram surface when ena
   assert.match(response.headers.get('content-type'), /text\/html/);
   assert.match(text, /CE Telegram Preview/);
   assert.match(text, /mock\/telegram\/preview-update/);
+  assert.match(text, /data-command="\/join alpha"/);
+  assert.match(text, /data-command="\/questions"/);
+  assert.match(text, /data-command="\/attachments"/);
+  assert.equal(text.includes('data-command="/ce_join alpha"'), false);
+  assert.equal(text.includes('data-command="/ce_questions"'), false);
+  assert.equal(text.includes('data-command="/ce_attachments"'), false);
 });
 
 test('worker serves Telegram Mini App shell', async () => {
@@ -208,7 +214,7 @@ test('worker preview update is disabled unless explicitly enabled and does not m
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       chatType: 'supergroup',
-      text: '/ce_pose_question',
+      text: '/pose_question',
     }),
   }), {
     AGENT_ACTION_KV: kv,
@@ -227,7 +233,7 @@ test('worker preview update exercises command builder without Telegram network c
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       chatType: 'supergroup',
-      text: '/ce_pose_question',
+      text: '/pose_question',
     }),
   }), {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
@@ -275,7 +281,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'private', text: '/ce_questions alpha' }),
+    body: JSON.stringify({ chatType: 'private', text: '/questions alpha' }),
   }), env);
   const preview = await previewResponse.json();
   const miniButton = preview.preview.response.replyMarkup.inline_keyboard
@@ -461,7 +467,7 @@ test('worker Mini App direct submit broadcasts on-chain when worker and policy a
   const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'private', text: '/ce_questions alpha' }),
+    body: JSON.stringify({ chatType: 'private', text: '/questions alpha' }),
   }), env);
   const preview = await previewResponse.json();
   const miniButton = preview.preview.response.replyMarkup.inline_keyboard
@@ -680,7 +686,7 @@ test('worker Mini App draft endpoint requires a matching opaque launch in Telegr
   const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'supergroup', text: '/ce_questions alpha' }),
+    body: JSON.stringify({ chatType: 'supergroup', text: '/questions alpha' }),
   }), env);
   const preview = await previewResponse.json();
   const launch = launchFromMiniButton(preview.preview.response.replyMarkup.inline_keyboard
@@ -914,13 +920,13 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   };
   const commands = [
     { text: '/start', chatType: 'private', chatId: 42, userId: 42, username: 'participant' },
-    { text: '/ce_join alpha', chatType: 'supergroup' },
-    { text: '/ce_sessions', chatType: 'supergroup' },
-    { text: '/ce_questions', chatType: 'supergroup' },
+    { text: '/join alpha', chatType: 'supergroup' },
+    { text: '/sessions', chatType: 'supergroup' },
+    { text: '/questions', chatType: 'supergroup' },
     { text: '/q 1', chatType: 'supergroup' },
-    { text: '/ce_attachments', chatType: 'supergroup' },
-    { text: '/ce_docs', chatType: 'supergroup' },
-    { text: '/ce_me', chatType: 'private', chatId: 42, userId: 42, username: 'participant' },
+    { text: '/attachments', chatType: 'supergroup' },
+    { text: '/docs', chatType: 'supergroup' },
+    { text: '/me', chatType: 'private', chatId: 42, userId: 42, username: 'participant' },
   ];
   const bodies = [];
   for (const [index, command] of commands.entries()) {
@@ -961,30 +967,30 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   }
 
   assert.match(byCommand['/start'].text, /Context Engine/);
-  assert.match(byCommand['/ce_join alpha'].text, /Session: Alpha Session/);
-  assert.match(byCommand['/ce_join alpha'].text, /Use \/ce_attachments for session files/);
-  assert.match(byCommand['/ce_sessions'].text, /Available sessions:/);
-  assert.match(byCommand['/ce_questions'].text, /Questions for alpha:/);
-  assert.match(byCommand['/ce_questions'].text, /1\. What should Alpha decide next\?\n\n2\. Locked question/);
-  assert.equal(byCommand['/ce_questions'].text.includes('q-readiness'), false);
-  assert.equal(byCommand['/ce_questions'].text.includes('q-locked'), false);
+  assert.match(byCommand['/join alpha'].text, /Session: Alpha Session/);
+  assert.match(byCommand['/join alpha'].text, /Use \/attachments for session files/);
+  assert.match(byCommand['/sessions'].text, /Available sessions:/);
+  assert.match(byCommand['/questions'].text, /Questions for alpha:/);
+  assert.match(byCommand['/questions'].text, /1\. What should Alpha decide next\?\n\n2\. Locked question/);
+  assert.equal(byCommand['/questions'].text.includes('q-readiness'), false);
+  assert.equal(byCommand['/questions'].text.includes('q-locked'), false);
   assert.match(byCommand['/q 1'].text, /Question for alpha:/);
   assert.match(byCommand['/q 1'].text, /What should Alpha decide next/);
-  assert.match(byCommand['/ce_attachments'].text, /Attachments for alpha:/);
-  assert.match(byCommand['/ce_docs'].text, /Attachments for alpha:/);
-  assert.match(byCommand['/ce_me'].text, /Account/);
-  assert.match(byCommand['/ce_me'].text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/);
+  assert.match(byCommand['/attachments'].text, /Attachments for alpha:/);
+  assert.match(byCommand['/docs'].text, /Attachments for alpha:/);
+  assert.match(byCommand['/me'].text, /Account/);
+  assert.match(byCommand['/me'].text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/);
 
-  for (const command of ['/ce_join alpha', '/ce_sessions', '/ce_questions', '/q 1', '/ce_attachments', '/ce_docs']) {
+  for (const command of ['/join alpha', '/sessions', '/questions', '/q 1', '/attachments', '/docs']) {
     assertGroupSafeText(byCommand[command].text);
   }
   assert.equal(JSON.stringify(payloads).includes('unit-root'), false);
   assert.equal(JSON.stringify(payloads).includes('r2://private'), false);
   assert.equal(JSON.stringify(payloads).includes('Private prompt must not leak'), false);
 
-  const joinButtons = flattenButtons(byCommand['/ce_join alpha'].reply_markup);
+  const joinButtons = flattenButtons(byCommand['/join alpha'].reply_markup);
   const joinStart = joinButtons.find((button) => button.text === 'Join Session');
-  const questionButtons = flattenButtons(byCommand['/ce_questions'].reply_markup);
+  const questionButtons = flattenButtons(byCommand['/questions'].reply_markup);
   const miniApp = questionButtons.find((button) => button.text === 'Open Mini App');
 
   assert.match(joinStart.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
@@ -1003,7 +1009,7 @@ test('worker Telegram webhook handles command send errors without leaking token 
     body: JSON.stringify({
       update_id: 102,
       message: {
-        text: '/ce_questions',
+        text: '/questions',
         chat: { id: -10055, type: 'supergroup' },
         from: { id: 77, username: 'demo_user' },
       },

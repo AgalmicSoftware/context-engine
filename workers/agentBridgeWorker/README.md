@@ -58,22 +58,22 @@ Every `telegram_screen_state` carries launch metadata: a command, an opaque call
 | State | Launch |
 | --- | --- |
 | `setup_welcome`, `test_checklist` | `/start` |
-| `agent_action_menu` | `/ce_actions`, `/ce_agent`, or `callback:<opaque-action-id>` |
-| `agent_account_create` | hidden `/ce_create_agent` compatibility command, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>` |
-| `agent_settings_overview` | `/ce_settings`, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>` |
-| `agent_settings_edit` | `/ce_settings` edit callback or Mini App |
-| `group_session_card`, `account_created` | `/ce_join` |
+| `agent_action_menu` | `/actions`, `/agent`, or `callback:<opaque-action-id>` |
+| `agent_account_create` | hidden `/create_agent` compatibility command, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>` |
+| `agent_settings_overview` | `/settings`, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>` |
+| `agent_settings_edit` | `/settings` edit callback or Mini App |
+| `group_session_card`, `account_created` | `/join` |
 | `private_start` | `/start <opaque-action-id>` or `t.me/<bot>?start=<opaque-action-id>` |
-| `question_list` | `/ce_questions` |
-| `pose_question` | `/ce_pose_question`, `/q`, deprecated `/ce_drop_question`, or `callback:<pose_question_action>` |
-| `generated_question_candidates` | `/ce_generate_questions` |
-| `my_account`, `joined_sbts` | `/ce_me` or `/ce_account` |
-| SBT join/create states | `/ce_sbt <sbt-address-or-group-id-or-link>`, `/ce_join_sbt <sbt-address-or-invite-code-or-link>`, `/ce_create_sbt_group [session-slug]` |
-| `onboarding` | `/ce_onboarding` |
-| question cards | `/ce_questions` |
-| `doc_library`, `doc_detail` | `/ce_attachments`; legacy alias `/ce_docs` |
-| `generate_questions` | `/ce_generate_questions` |
-| `account_recovered` | `/ce_recover_key` |
+| `question_list` | `/questions` |
+| `pose_question` | `/pose_question`, `/q`, deprecated `/drop_question`, or `callback:<pose_question_action>` |
+| `generated_question_candidates` | `/generate_questions` |
+| `my_account`, `joined_sbts` | `/me` or `/account` |
+| SBT join/create states | `/sbt <sbt-address-or-group-id-or-link>`, `/join_sbt <sbt-address-or-invite-code-or-link>`, `/create_sbt_group [session-slug]` |
+| `onboarding` | `/onboarding` |
+| question cards | `/questions` |
+| `doc_library`, `doc_detail` | `/attachments`; alias `/docs` |
+| `generate_questions` | `/generate_questions` |
+| `account_recovered` | `/recover_key` |
 | confirmation, submitted, draft, retry states | opaque callback actions |
 
 The group session-linked card says `Session: <session>` and exposes `Join Session`, `View Questions`, `Attachments`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
@@ -82,12 +82,12 @@ The group session-linked card says `Session: <session>` and exposes `Join Sessio
 materialized question index for now. Canonical `GET /api/agent/questions`
 remains the target contract once a reachable agent API base is deployed for the
 bridge.
-`Pose Question` uses `/ce_pose_question` or `/q` to pose one existing or
+`Pose Question` uses `/pose_question` or `/q` to pose one existing or
 generated question to the group. If no selector is provided, the action opens a
 choose-question menu instead of silently posing the first question. Anyone in
 the linked group may pose a question; the worker still enforces session
 linkage, opaque action ids, idempotent action refs, and public-safe output. The
-old `/ce_drop_question` command is only a deprecated compatibility alias.
+old `/drop_question` command is only a deprecated compatibility alias.
 Private or gated question text is never posed to the group; group output shows a
 locked state and routes eligible accounts to private chat or Mini App.
 
@@ -99,17 +99,21 @@ Core Telegram commands:
 
 - `/start` opens the help/action entry point or consumes an opaque private start
   payload.
-- `/ce_actions` and `/ce_agent` open the generic agent action launcher. Group
+- `/actions` and `/agent` open the generic agent action launcher. Group
   chat shows only public-safe labels plus private/Mini App launch controls.
-- `/ce_settings` shows private settings state and an edit entry point. Group
+- `/settings` shows private settings state and an edit entry point. Group
   chat returns only a private-chat launch.
-- `/ce_join <session>`, `/ce_sessions`, `/ce_questions`, `/q <number>`,
-  `/ce_attachments`, `/ce_docs`, `/ce_me`, and `/ce_account` keep their existing
+- `/join <session>`, `/sessions`, `/questions`, `/q <number>`,
+  `/attachments`, `/docs`, `/me`, and `/account` keep their existing
   session/question/document/account behavior.
 
-`/ce_create_agent` remains accepted as a compatibility command, but the bot and
+`/create_agent` remains accepted as a compatibility command, but the bot and
 Mini App no longer advertise a `Create Agent` button. Joining a session derives
 the managed demo account when needed.
+
+Legacy `/ce_*` command names are still accepted as hidden aliases during the
+bot-v1 transition, but help text and launch metadata use the unprefixed command
+names above.
 
 ## SBT and Account Screens
 
@@ -124,9 +128,9 @@ in private chat or Mini App and pass an opaque private-input ref to the planned
 canonical request shape. Create SBT Group is Mini App first and targets the
 planned `POST /api/agent/sbt-groups/create-request` contract.
 
-SBT commands accept explicit public targets: `/ce_sbt <sbt-address-or-group-id-or-link>`,
-`/ce_join_sbt <sbt-address-or-invite-code-or-link>`, and
-`/ce_create_sbt_group [session-slug]`. Public SBT addresses, group ids, and share
+SBT commands accept explicit public targets: `/sbt <sbt-address-or-group-id-or-link>`,
+`/join_sbt <sbt-address-or-invite-code-or-link>`, and
+`/create_sbt_group [session-slug]`. Public SBT addresses, group ids, and share
 links can appear in group commands. Passwords, invite credentials, wallet proofs,
 and private eligibility checks stay in private chat or Mini App and are represented
 only by opaque private-input refs.
@@ -159,8 +163,8 @@ The worker contract models R2 document bytes, D1 metadata/index status, and KV s
 Public summaries include titles, file types, visibility, and index status.
 Private or SBT-gated contents are never included in group-safe summaries.
 
-The attachment button copy is `Attachments`. `/ce_attachments` is the preferred
-command; `/ce_docs` remains a legacy alias during bot-v1 smoke. Selected files
+The attachment button copy is `Attachments`. `/attachments` is the preferred
+command; `/docs` remains an alias during bot-v1 smoke. Selected files
 are recorded as inputs for `Generate Questions` and as future `Use as Answer
 Context` candidates. Private or gated files should open through the Mini App
 once that surface is wired. Generating questions without selected files returns
@@ -250,8 +254,8 @@ Required values:
 | Durable Object binding | `deploy:apply -- --apply` binds `MANAGED_DEMO_SIGNER` and includes the SQLite-backed `ManagedDemoSignerDurableObject` migration |
 | Draft-generation AI policy | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker |
 
-`deploy:apply -- --apply` sets the webhook automatically. For manual diagnosis,
-the equivalent Telegram API call is:
+`deploy:apply -- --apply` sets the webhook and Telegram slash-command menu
+automatically. For manual webhook diagnosis, the equivalent Telegram API call is:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
@@ -266,10 +270,10 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 The live webhook route is `/telegram/webhook`. It rejects requests unless
 `TELEGRAM_BRIDGE_ENABLED=true`, a bot token is configured, and Telegram supplies
 the configured webhook secret token. It parses real Telegram `message` and
-`callback_query` updates, handles `/start`, `/ce_actions`, `/ce_agent`,
-hidden `/ce_create_agent` compatibility commands, `/ce_settings`, `/ce_join <session>`, `/ce_sessions`,
-`/ce_questions`, `/ce_pose_question`, `/q`, `/ce_attachments` or legacy
-`/ce_docs`, and `/ce_me`, answers callback queries to clear Telegram's
+`callback_query` updates, handles `/start`, `/actions`, `/agent`,
+hidden `/create_agent` compatibility commands, `/settings`, `/join <session>`, `/sessions`,
+`/questions`, `/pose_question`, `/q`, `/attachments` or alias
+`/docs`, and `/me`, answers callback queries to clear Telegram's
 inline-button loading state, and sends replies through an injected Telegram Bot
 API adapter. Unit tests use mocked `fetch` and fake bot tokens; real
 `TELEGRAM_BOT_TOKEN` is needed only for live Telegram smoke.
@@ -283,12 +287,14 @@ The command handler uses `AGENT_BRIDGE_SESSION_POLICY_JSON` as an explicit
 demo/session-policy override when it is configured. Without that override, the
 live Worker reads the real OP Sepolia `SessionRegistry` over `DEFAULT_RPC_URL`
 plus optional `ADDITIONAL_RPC_URL` fallback and uses the returned slugs for
-`/ce_sessions` and `/ce_join`. Group `/ce_join <session>` also persists the
-chat's selected session in `AGENT_ACTION_KV`, so later `/ce_questions`,
-`/q <number>`, and `/ce_attachments` use that session without repeating
-the slug. Private `/ce_join <session>` persists the selected session for that
-Telegram user as well, so private `/ce_questions` and `/q <number>` use
-the same session unless a command supplies an explicit slug. `/ce_docs` remains
+`/sessions` and `/join`. Those commands force a fresh registry read so new
+sessions are not hidden behind the short-lived Worker cache; capped registry
+lists use the newest session window. Group `/join <session>` also persists the
+chat's selected session in `AGENT_ACTION_KV`, so later `/questions`,
+`/q <number>`, and `/attachments` use that session without repeating
+the slug. Private `/join <session>` persists the selected session for that
+Telegram user as well, so private `/questions` and `/q <number>` use
+the same session unless a command supplies an explicit slug. `/docs` remains
 a compatibility alias.
 
 Question lists default to live mode. Bot messages show at most five question
@@ -518,7 +524,7 @@ npm run deploy:apply -- --apply
 `deploy:plan`: account lookup when needed, workers.dev subdomain lookup, KV
 create-or-reuse, optional R2/D1 create-or-reuse for doc storage, module worker
 upload, Worker secret writes, workers.dev script enablement, Telegram
-`setWebhook`, and `/health` verification. Tests keep these network calls mocked
+`setWebhook` plus `setMyCommands`, and `/health` verification. Tests keep these network calls mocked
 unless the operator runs the command with `--apply`.
 
 Useful guarded variants:
@@ -565,9 +571,9 @@ IDs.
 7. Keep `--skip-telegram-webhook` or `--skip-health-check` only for diagnosis;
    the normal live smoke should run both.
 8. Confirm the deployed `/health` output reports `worker: agentBridgeWorker`.
-9. Smoke Telegram private chat `/start`, `/ce_actions`,
-   `/ce_settings`, group `/ce_join <session>`, `/ce_sessions`, `/ce_questions`,
-   `/q <number>`, `/ce_attachments`, and private `/ce_me`.
+9. Smoke Telegram private chat `/start`, `/actions`,
+   `/settings`, group `/join <session>`, `/sessions`, `/questions`,
+   `/q <number>`, `/attachments`, and private `/me`.
 10. Confirm replies contain only safe summaries and opaque `cecb_*` / `cetg_*`
     action IDs, no raw callback payloads, grants, JWTs, Cloudflare credentials,
     private keys, RPC secrets, document paths, or private/gated text.
@@ -580,7 +586,7 @@ IDs.
   plain Worker vars, enables workers.dev, sets the Telegram webhook, and checks
   `/health`.
 - After a deploy, old Telegram inline messages can still show old buttons or
-  copy. Send a fresh `/ce_questions` or `/q <number>` command instead of
+  copy. Send a fresh `/questions` or `/q <number>` command instead of
   testing from an old edited message.
 - If the bot receives no updates, check `getWebhookInfo`, then rerun
   `npm run deploy:apply -- --apply` so the helper resets the webhook URL and
@@ -592,7 +598,7 @@ IDs.
   the slug's `SessionCreated` event, or explicit
   `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK`.
 - If questions from another session appear, confirm the group has a fresh
-  `/ce_join <session>` after the latest deploy and that the loaded question
+  `/join <session>` after the latest deploy and that the loaded question
   payload includes matching `sessionSlug`/`sessionName` metadata when available.
 - Keep `AGENT_BRIDGE_QUESTION_SOURCE=fixture` for preview/copy work only. Live
   smoke should omit it, or use `live_or_fixture` only when a temporary fallback
@@ -639,7 +645,7 @@ direct path uses only deterministic managed Telegram demo accounts on testnets;
 passkey, Porto, CE-CC local, linked external wallet, and production modes remain
 blocked from worker-side signing.
 
-Private `/ce_join <session>` also requests faucet gas for the managed Telegram
+Private `/join <session>` also requests faucet gas for the managed Telegram
 account when the session policy sets `sponsoredFaucetAllowed=true` and a session
 worker URL is configured. Faucet results are kept in response metadata and logs
 rather than shown in Telegram copy. If policy or worker configuration does not

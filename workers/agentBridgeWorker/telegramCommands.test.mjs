@@ -182,26 +182,35 @@ function launchFromButton(button = {}) {
 }
 
 test('parseTelegramCommandText handles mentions without accepting commands for another bot', () => {
-  assert.deepEqual(parseTelegramCommandText('/ce_join@ce_demo_bot alpha', {
+  assert.deepEqual(parseTelegramCommandText('/join@ce_demo_bot alpha', {
     botUsername: 'ce_demo_bot',
   }), {
     isCommand: true,
-    command: '/ce_join',
+    command: '/join',
     args: ['alpha'],
     argText: 'alpha',
     mention: 'ce_demo_bot',
     addressedToOtherBot: false,
   });
-  assert.equal(parseTelegramCommandText('/ce_join@other_bot alpha', {
+  assert.equal(parseTelegramCommandText('/join@other_bot alpha', {
     botUsername: 'ce_demo_bot',
   }).addressedToOtherBot, true);
+  assert.equal(parseTelegramCommandText('/ce_join@ce_demo_bot alpha', {
+    botUsername: 'ce_demo_bot',
+  }).command, '/join');
+  assert.equal(parseTelegramCommandText('/drop_question 2', {
+    botUsername: 'ce_demo_bot',
+  }).command, '/pose_question');
+  assert.equal(parseTelegramCommandText('/ce_drop_question 2', {
+    botUsername: 'ce_demo_bot',
+  }).command, '/pose_question');
   assert.equal(parseTelegramCommandText('hello').isCommand, false);
 });
 
 test('agent action menu is group-safe and persists only opaque launch records', async () => {
   const env = baseEnv();
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_actions'),
+    update: groupMessage('/actions'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -228,22 +237,22 @@ test('agent action menu is group-safe and persists only opaque launch records', 
 test('agent create and settings commands route group inputs private and model canonical requests', async () => {
   const env = baseEnv();
   const groupCreate = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_create_agent'),
+    update: groupMessage('/create_agent'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
   const privateCreate = await buildTelegramCommandResponse({
-    update: privateMessage('/ce_create_agent'),
+    update: privateMessage('/create_agent'),
     env,
     now: '2026-05-08T12:00:01.000Z',
   });
   const groupSettings = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_settings'),
+    update: groupMessage('/settings'),
     env,
     now: '2026-05-08T12:00:02.000Z',
   });
   const privateSettings = await buildTelegramCommandResponse({
-    update: privateMessage('/ce_settings'),
+    update: privateMessage('/settings'),
     env,
     now: '2026-05-08T12:00:03.000Z',
   });
@@ -280,7 +289,7 @@ test('agent create and settings commands route group inputs private and model ca
 test('settings edit callback stays private and points input collection at Mini App scaffold', async () => {
   const env = baseEnv();
   const settings = await buildTelegramCommandResponse({
-    update: privateMessage('/ce_settings'),
+    update: privateMessage('/settings'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -312,22 +321,22 @@ test('settings edit callback stays private and points input collection at Mini A
   assert.equal(callback.canonicalApiRequest.body.idempotencyKey, 'provided_on_submit');
 });
 
-test('group /ce_join returns a Workers-safe session card with opaque buttons only', async () => {
+test('group /join returns a Workers-safe session card with opaque buttons only', async () => {
   const env = baseEnv();
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_join alpha'),
+    update: groupMessage('/join alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.command, '/ce_join');
+  assert.equal(result.command, '/join');
   assert.equal(result.screen, 'group_session_card');
   assert.equal(result.response.chatId, '-100123');
   assert.match(result.response.text, /Session: Alpha Session/);
-  assert.match(result.response.text, /Use \/ce_attachments for session files/);
-  assert.equal(result.response.text.includes('/ce_me'), false);
-  assert.equal(result.response.text.includes('Use /ce_questions'), false);
+  assert.match(result.response.text, /Use \/attachments for session files/);
+  assert.equal(result.response.text.includes('/me'), false);
+  assert.equal(result.response.text.includes('Use /questions'), false);
 
   const buttons = flattenButtons(result.response.replyMarkup);
   const startButton = buttons.find((button) => button.text === 'Join Session');
@@ -342,9 +351,9 @@ test('group /ce_join returns a Workers-safe session card with opaque buttons onl
   }
 });
 
-test('/ce_sessions uses live SessionRegistry slugs when no demo session policy is configured', async () => {
+test('/sessions uses live SessionRegistry slugs when no demo session policy is configured', async () => {
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_sessions'),
+    update: groupMessage('/sessions'),
     env: {
       TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
       DEFAULT_CHAIN_ID: '11155420',
@@ -363,10 +372,37 @@ test('/ce_sessions uses live SessionRegistry slugs when no demo session policy i
   assert.equal(result.response.text.includes('general'), false);
 });
 
-test('/ce_questions and callback dispatch list questions without leaking locked prompts', async () => {
+test('/sessions bypasses stale registry cache so newly registered sessions show up', async () => {
+  const env = {
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    DEFAULT_CHAIN_ID: '11155420',
+    DEFAULT_RPC_URL: 'https://fresh-sessions-rpc.example',
+    REGISTRY_FETCH: registryFetchForSlugs(['old-alpha']),
+    AGENT_ACTION_KV: new MemoryKv(),
+  };
+  const stale = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+  });
+
+  env.REGISTRY_FETCH = registryFetchForSlugs(['old-alpha', 'new-beta']);
+  const fresh = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:01.000Z',
+  });
+
+  assert.match(stale.response.text, /- old-alpha \(old-alpha\)/);
+  assert.equal(stale.response.text.includes('new-beta'), false);
+  assert.match(fresh.response.text, /- old-alpha \(old-alpha\)/);
+  assert.match(fresh.response.text, /- new-beta \(new-beta\)/);
+});
+
+test('/questions and callback dispatch list questions without leaking locked prompts', async () => {
   const env = baseEnv();
   const joined = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_join alpha'),
+    update: groupMessage('/join alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -398,11 +434,11 @@ test('/ce_questions and callback dispatch list questions without leaking locked 
   assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
 });
 
-test('/ce_questions handles bytes32 question IDs without putting them in opaque seeds', async () => {
+test('/questions handles bytes32 question IDs without putting them in opaque seeds', async () => {
   const publicQuestionId = `0x${'12'.repeat(32)}`;
   const lockedQuestionId = `0x${'34'.repeat(32)}`;
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions alpha'),
+    update: groupMessage('/questions alpha'),
     env: baseEnv({
       AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
         {
@@ -436,7 +472,7 @@ test('/ce_questions handles bytes32 question IDs without putting them in opaque 
   }
 });
 
-test('/ce_questions caps Telegram rows at five and deep-links group Mini App launches through private chat', async () => {
+test('/questions caps Telegram rows at five and deep-links group Mini App launches through private chat', async () => {
   const questions = Array.from({ length: 7 }, (_value, index) => ({
     questionId: `q-${index + 1}`,
     questionType: index % 2 === 0 ? 'freeform' : 'rating',
@@ -447,7 +483,7 @@ test('/ce_questions caps Telegram rows at five and deep-links group Mini App lau
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify(questions),
   });
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions alpha'),
+    update: groupMessage('/questions alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -474,7 +510,7 @@ test('/ce_questions caps Telegram rows at five and deep-links group Mini App lau
 
   const launch = launchFromButton(miniApp);
   const repeated = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions alpha'),
+    update: groupMessage('/questions alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -497,9 +533,9 @@ test('/ce_questions caps Telegram rows at five and deep-links group Mini App lau
   assert.equal(new URL(privateMiniApp.web_app.url).searchParams.get('launch'), launch);
 });
 
-test('/ce_questions uses Telegram web_app buttons directly in private chat', async () => {
+test('/questions uses Telegram web_app buttons directly in private chat', async () => {
   const result = await buildTelegramCommandResponse({
-    update: privateMessage('/ce_questions alpha'),
+    update: privateMessage('/questions alpha'),
     env: baseEnv({
       AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
       AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -516,11 +552,11 @@ test('/ce_questions uses Telegram web_app buttons directly in private chat', asy
   assert.match(miniApp.web_app.url, /^https:\/\/bridge\.example\/telegram\/mini-app\?launch=cecb_[a-z0-9]{10,48}$/);
 });
 
-test('/ce_questions prioritizes answerable questions before payload-unavailable rows', async () => {
+test('/questions prioritizes answerable questions before payload-unavailable rows', async () => {
   const unavailableQuestionId = `0x${'11'.repeat(32)}`;
   const answerableQuestionId = `0x${'22'.repeat(32)}`;
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions alpha'),
+    update: groupMessage('/questions alpha'),
     env: baseEnv({
       AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
       AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
@@ -593,7 +629,7 @@ test('payload-unavailable question rows do not render as encrypted locks', async
     ]),
   });
   const list = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions alpha'),
+    update: groupMessage('/questions alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -620,7 +656,7 @@ test('payload-unavailable question rows do not render as encrypted locks', async
   assert.equal(posed.posed, false);
 });
 
-test('/ce_questions does not invent demo questions when live question cache is empty', async () => {
+test('/questions does not invent demo questions when live question cache is empty', async () => {
   __test__sessionQuestions.clearCaches();
   const questionFetch = async (_url, init = {}) => {
     const body = JSON.parse(init.body || '{}');
@@ -639,7 +675,7 @@ test('/ce_questions does not invent demo questions when live question cache is e
     throw new Error(`unexpected ${body.method}`);
   };
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions alpha'),
+    update: groupMessage('/questions alpha'),
     env: baseEnv({
       AGENT_BRIDGE_QUESTION_SOURCE: 'live',
       AGENT_BRIDGE_QUESTION_SKIP_SESSION_REGISTRY: '1',
@@ -658,10 +694,10 @@ test('/ce_questions does not invent demo questions when live question cache is e
   assert.equal(result.response.text.includes('What should Alpha decide next'), false);
 });
 
-test('/ce_questions reports live source failures without caching them as empty lists', async () => {
+test('/questions reports live source failures without caching them as empty lists', async () => {
   __test__sessionQuestions.clearCaches();
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions alpha'),
+    update: groupMessage('/questions alpha'),
     env: baseEnv({
       AGENT_BRIDGE_QUESTION_SOURCE: 'live',
       DEFAULT_RPC_URL: '',
@@ -721,12 +757,12 @@ test('group session binding makes later question and doc commands use the joined
   });
 
   const joined = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_join demo'),
+    update: groupMessage('/join demo'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
   const questions = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions'),
+    update: groupMessage('/questions'),
     env,
     now: '2026-05-08T12:00:01.000Z',
   });
@@ -736,15 +772,15 @@ test('group session binding makes later question and doc commands use the joined
     now: '2026-05-08T12:00:02.000Z',
   });
   const docs = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_attachments'),
+    update: groupMessage('/attachments'),
     env,
     now: '2026-05-08T12:00:03.000Z',
   });
 
   assert.equal(joined.sessionSlug, 'demo');
-  assert.match(joined.response.text, /Use \/ce_attachments for session files/);
-  assert.equal(joined.response.text.includes('/ce_me'), false);
-  assert.equal(joined.response.text.includes('Use /ce_questions'), false);
+  assert.match(joined.response.text, /Use \/attachments for session files/);
+  assert.equal(joined.response.text.includes('/me'), false);
+  assert.equal(joined.response.text.includes('Use /questions'), false);
   assert.match(questions.response.text, /Questions for demo/);
   assert.match(questions.response.text, /1\. What should Demo decide next/);
   assert.equal(questions.response.text.includes('q-demo'), false);
@@ -791,12 +827,12 @@ test('private session join makes later question commands use the selected sessio
   });
 
   const joined = await buildTelegramCommandResponse({
-    update: privateMessage('/ce_join demo'),
+    update: privateMessage('/join demo'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
   const questions = await buildTelegramCommandResponse({
-    update: privateMessage('/ce_questions'),
+    update: privateMessage('/questions'),
     env,
     now: '2026-05-08T12:00:01.000Z',
   });
@@ -835,7 +871,7 @@ test('private session join requests faucet funding when session policy allows it
   });
 
   const joined = await buildTelegramCommandResponse({
-    update: privateMessage('/ce_join alpha'),
+    update: privateMessage('/join alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -852,7 +888,7 @@ test('private session join requests faucet funding when session policy allows it
   assert.equal(JSON.stringify(joined).includes('unit-root'), false);
 });
 
-test('/ce_sessions callback switches the group session used by later question commands', async () => {
+test('/sessions callback switches the group session used by later question commands', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
@@ -889,7 +925,7 @@ test('/ce_sessions callback switches the group session used by later question co
     ]),
   });
   const sessions = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_sessions'),
+    update: groupMessage('/sessions'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -913,7 +949,7 @@ test('/ce_sessions callback switches the group session used by later question co
     now: '2026-05-08T12:00:01.000Z',
   });
   const questions = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_questions'),
+    update: groupMessage('/questions'),
     env,
     now: '2026-05-08T12:00:02.000Z',
   });
@@ -928,7 +964,7 @@ test('/ce_sessions callback switches the group session used by later question co
 test('group Pose Question callback opens a choose-question menu instead of posing the first question', async () => {
   const env = baseEnv();
   const joined = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_join alpha'),
+    update: groupMessage('/join alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -1173,7 +1209,7 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
 test('callback dispatch answers callback queries before editing messages', async () => {
   const env = baseEnv();
   const joined = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_join alpha'),
+    update: groupMessage('/join alpha'),
     env,
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -1222,9 +1258,9 @@ test('callback dispatch answers callback queries before editing messages', async
   assert.equal(calls[1][0], 'https://api.telegram.org/bot123456:test-token/editMessageText');
 });
 
-test('/ce_attachments lists public metadata and hides private storage refs', async () => {
+test('/attachments lists public metadata and hides private storage refs', async () => {
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_attachments alpha'),
+    update: groupMessage('/attachments alpha'),
     env: baseEnv(),
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -1238,9 +1274,9 @@ test('/ce_attachments lists public metadata and hides private storage refs', asy
   assert.equal(result.response.text.includes('r2://private'), false);
 });
 
-test('/ce_docs remains a legacy alias for attachments', async () => {
+test('/docs remains a legacy alias for attachments', async () => {
   const result = await buildTelegramCommandResponse({
-    update: groupMessage('/ce_docs alpha'),
+    update: groupMessage('/docs alpha'),
     env: baseEnv(),
     now: '2026-05-08T12:00:00.000Z',
   });
@@ -1250,9 +1286,9 @@ test('/ce_docs remains a legacy alias for attachments', async () => {
   assert.match(result.response.text, /Attachments for alpha/);
 });
 
-test('/ce_me returns managed demo account metadata without the root secret', async () => {
+test('/me returns managed demo account metadata without the root secret', async () => {
   const result = await buildTelegramCommandResponse({
-    update: privateMessage('/ce_me'),
+    update: privateMessage('/me'),
     env: baseEnv(),
     now: '2026-05-08T12:00:00.000Z',
   });

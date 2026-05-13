@@ -134,7 +134,7 @@ test('view questions lists existing session questions and pose question posts gr
     'Locked question',
   ]);
   assert.equal(posed.poseState.action.action, TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION);
-  assert.equal(posed.poseState.action.command, '/ce_pose_question');
+  assert.equal(posed.poseState.action.command, '/pose_question');
   assert.deepEqual(posed.poseState.action.aliases, ['/q']);
   assert.equal(posed.groupSafeOutput.questionText, 'What should Alpha decide next?');
   assert.equal(locked.groupSafeOutput.questionText, null);

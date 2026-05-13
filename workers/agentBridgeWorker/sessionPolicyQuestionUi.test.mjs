@@ -221,45 +221,45 @@ test('screen states expose launch commands and current UX copy', () => {
   const docLibrary = states.find((state) => state.screen === 'doc_library');
   assert.equal(docLibrary.title, 'Attachments');
   assert.equal(docLibrary.buttonLabel, 'Attachments');
-  assert.equal(docLibrary.launch.command, '/ce_attachments');
-  assert.deepEqual(docLibrary.launch.aliases, ['/ce_docs']);
+  assert.equal(docLibrary.launch.command, '/attachments');
+  assert.deepEqual(docLibrary.launch.aliases, ['/docs']);
 
   const onboarding = states.find((state) => state.screen === 'onboarding');
   assert.equal(onboarding.text, 'Enter startup info so I can suggest answers for you.');
-  assert.equal(onboarding.launch.command, '/ce_onboarding');
+  assert.equal(onboarding.launch.command, '/onboarding');
 
   const accountCreated = states.find((state) => state.screen === 'account_created');
   assert.equal(JSON.stringify(accountCreated).includes('Open in CE'), false);
 
   const actionMenu = states.find((state) => state.screen === 'agent_action_menu');
   assert.equal(actionMenu.title, 'Agent Actions');
-  assert.equal(actionMenu.launch.command, '/ce_actions');
-  assert.deepEqual(actionMenu.launch.aliases, ['/ce_agent']);
+  assert.equal(actionMenu.launch.command, '/actions');
+  assert.deepEqual(actionMenu.launch.aliases, ['/agent']);
   assert.deepEqual(actionMenu.buttons.map((button) => button.label), ['Settings', 'View Questions']);
 
   const agentCreate = states.find((state) => state.screen === 'agent_account_create');
-  assert.equal(agentCreate.launch.command, '/ce_create_agent');
+  assert.equal(agentCreate.launch.command, '/create_agent');
   assert.equal(agentCreate.launch.deepLink, 't.me/<bot>?start=<opaque-action-id>');
 
   const settings = states.find((state) => state.screen === 'agent_settings_overview');
-  assert.equal(settings.launch.command, '/ce_settings');
+  assert.equal(settings.launch.command, '/settings');
   assert.equal(settings.buttons.find((button) => button.label === 'Edit Settings').targetLane, 'telegram_mini_app');
 
   const poseQuestion = states.find((state) => state.screen === 'pose_question');
   assert.equal(poseQuestion.title, 'Pose Question');
-  assert.equal(poseQuestion.launch.command, '/ce_pose_question');
+  assert.equal(poseQuestion.launch.command, '/pose_question');
   assert.deepEqual(poseQuestion.launch.aliases, ['/q']);
-  assert.deepEqual(poseQuestion.launch.deprecatedAliases, ['/ce_drop_question']);
+  assert.deepEqual(poseQuestion.launch.deprecatedAliases, ['/drop_question']);
   assert.equal(poseQuestion.launch.callback, 'callback:<pose_question_action>');
 
   const sbtGroup = states.find((state) => state.screen === 'sbt_group_card');
-  assert.equal(sbtGroup.launch.command, '/ce_sbt <sbt-address-or-group-id-or-link>');
+  assert.equal(sbtGroup.launch.command, '/sbt <sbt-address-or-group-id-or-link>');
   const joinSbt = states.find((state) => state.screen === 'join_public_sbt');
-  assert.equal(joinSbt.launch.command, '/ce_join_sbt <sbt-address-or-invite-code-or-link>');
+  assert.equal(joinSbt.launch.command, '/join_sbt <sbt-address-or-invite-code-or-link>');
   const createSbt = states.find((state) => state.screen === 'create_sbt_group');
-  assert.equal(createSbt.launch.command, '/ce_create_sbt_group [session-slug]');
-  assert.equal(JSON.stringify(launches).includes('/ce_sbt_join'), false);
-  assert.equal(JSON.stringify(launches).includes('/ce_sbt_create'), false);
+  assert.equal(createSbt.launch.command, '/create_sbt_group [session-slug]');
+  assert.equal(JSON.stringify(launches).includes('/sbt_join'), false);
+  assert.equal(JSON.stringify(launches).includes('/sbt_create'), false);
 
   const submitResponse = states.find((state) => state.screen === 'submit_response');
   assert.equal(submitResponse.title, 'Submit Response');
@@ -287,7 +287,7 @@ test('group session card uses safe public copy and required lobby buttons', () =
     'Attachments',
     'Pose Question',
   ]);
-  assert.equal(card.buttons.find((button) => button.label === 'Pose Question').command, '/ce_pose_question');
+  assert.equal(card.buttons.find((button) => button.label === 'Pose Question').command, '/pose_question');
   assert.equal(card.buttons.some((button) => button.label === 'Answer Privately'), false);
   assert.equal(card.defaultAction, TELEGRAM_BRIDGE_ACTIONS.VIEW_QUESTIONS);
   assert.deepEqual(card.policyActions.map((button) => button.action), [
@@ -298,28 +298,32 @@ test('group session card uses safe public copy and required lobby buttons', () =
 
 test('SBT command parser accepts explicit public targets and keeps credentials private', () => {
   const address = '0x1111111111111111111111111111111111111111';
-  const byAddress = parseTelegramSbtCommand(`/ce_sbt ${address}`);
-  const byGroupId = parseTelegramSbtCommand('/ce_sbt alpha-contributors');
-  const joinPublic = parseTelegramSbtCommand(`/ce_join_sbt ${address}`);
-  const joinInviteFromGroup = parseTelegramSbtCommand('/ce_join_sbt invite:alpha-invite-code', {
+  const byAddress = parseTelegramSbtCommand(`/sbt ${address}`);
+  const legacyByAddress = parseTelegramSbtCommand(`/ce_sbt ${address}`);
+  const byGroupId = parseTelegramSbtCommand('/sbt alpha-contributors');
+  const joinPublic = parseTelegramSbtCommand(`/join_sbt ${address}`);
+  const joinInviteFromGroup = parseTelegramSbtCommand('/join_sbt invite:alpha-invite-code', {
     lane: 'telegram_group_lobby',
   });
-  const joinInvitePrivately = parseTelegramSbtCommand('/ce_join_sbt invite:alpha-invite-code', {
+  const joinInvitePrivately = parseTelegramSbtCommand('/join_sbt invite:alpha-invite-code', {
     lane: 'telegram_mini_app',
   });
-  const createForSession = parseTelegramSbtCommand('/ce_create_sbt_group alpha');
-  const createWithCredential = parseTelegramSbtCommand('/ce_create_sbt_group password:do-not-serialize', {
+  const createForSession = parseTelegramSbtCommand('/create_sbt_group alpha');
+  const createWithCredential = parseTelegramSbtCommand('/create_sbt_group password:do-not-serialize', {
     lane: 'telegram_group_lobby',
   });
 
   assert.equal(byAddress.ok, true);
   assert.equal(byAddress.targetKind, 'sbt_address');
   assert.equal(byAddress.target, address);
+  assert.equal(legacyByAddress.ok, true);
+  assert.equal(legacyByAddress.command, '/sbt');
+  assert.equal(legacyByAddress.target, address);
   assert.equal(byGroupId.ok, true);
   assert.equal(byGroupId.targetKind, 'sbt_group_id');
   assert.equal(byGroupId.publicCommandTargetAllowed, true);
   assert.equal(joinPublic.ok, true);
-  assert.equal(joinPublic.command, '/ce_join_sbt');
+  assert.equal(joinPublic.command, '/join_sbt');
   assert.equal(joinPublic.targetLane, 'telegram_private_account');
   assert.equal(joinInviteFromGroup.ok, false);
   assert.equal(joinInviteFromGroup.reason, 'private_sbt_credential_required');
@@ -330,7 +334,7 @@ test('SBT command parser accepts explicit public targets and keeps credentials p
   assert.equal(joinInvitePrivately.credentialRef, 'telegram_private_input_ref');
   assert.equal(JSON.stringify(joinInvitePrivately).includes('alpha-invite-code'), false);
   assert.equal(createForSession.ok, true);
-  assert.equal(createForSession.command, '/ce_create_sbt_group');
+  assert.equal(createForSession.command, '/create_sbt_group');
   assert.equal(createForSession.sessionSlug, 'alpha');
   assert.equal(createWithCredential.ok, false);
   assert.equal(createWithCredential.requiresPrivateLane, true);
@@ -382,7 +386,7 @@ test('question list pulls existing session questions and pose action is group-sa
   assert.equal(list.questions[2].payloadUnavailable, true);
   assert.equal(list.questions[2].retryable, true);
   assert.equal(posed.action.action, TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION);
-  assert.equal(posed.action.command, '/ce_pose_question');
+  assert.equal(posed.action.command, '/pose_question');
   assert.deepEqual(posed.action.aliases, ['/q']);
   assert.equal(posed.groupSafeOutput.questionText, 'What should the group discuss next?');
   assert.equal(locked.groupSafeOutput.questionText, null);
@@ -517,7 +521,7 @@ test('session join flow models required SBT gates without leaking private eligib
   assert.equal(satisfiedState.status, 'ready_to_retry_session_join');
   assert.equal(satisfiedState.joinAvailable, true);
   assert.equal(satisfiedState.retryAction.action, TELEGRAM_BRIDGE_ACTIONS.RETRY_SESSION_JOIN);
-  assert.equal(satisfiedState.retryAction.command, '/ce_join');
+  assert.equal(satisfiedState.retryAction.command, '/join');
 });
 
 test('create SBT group uses planned canonical agent contract and Mini App fields', () => {

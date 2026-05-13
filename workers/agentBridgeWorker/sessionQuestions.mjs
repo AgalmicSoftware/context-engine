@@ -1272,24 +1272,25 @@ export async function listCachedSessionQuestionsForBridge({
   sessionSlug = '',
   fetchImpl = env.QUESTION_FETCH || env.REGISTRY_FETCH || globalThis.fetch,
   waitUntil = null,
+  forceRefresh = false,
 } = {}) {
   const slug = lower(sessionSlug) || lower(env.AGENT_BRIDGE_DEFAULT_SESSION_SLUG || env.DEFAULT_SESSION_SLUG) || 'general';
   const ttlSeconds = cacheTtlSeconds(env);
   const key = cacheKey(slug);
   const memory = scopedCachedIndexForReturn(questionMemoryCache.get(key), 'memory', slug);
-  if (memory && isFreshQuestionIndex(memory, ttlSeconds)) {
+  if (!forceRefresh && memory && isFreshQuestionIndex(memory, ttlSeconds)) {
     scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: memory, fetchImpl });
     return memory;
   }
   const kv = await readKvQuestionIndex(env, key);
-  if (kv && isFreshQuestionIndex(kv, ttlSeconds)) {
+  if (!forceRefresh && kv && isFreshQuestionIndex(kv, ttlSeconds)) {
     questionMemoryCache.set(key, kv);
     const cached = scopedCachedIndexForReturn(kv, 'kv', slug);
     scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: cached, fetchImpl });
     return cached;
   }
   const durableCached = scopedCachedIndexForReturn(kv || memory, kv ? 'kv' : 'memory', slug);
-  if (durableCached && typeof waitUntil === 'function' && !hasPayloadUnavailableQuestions(durableCached)) {
+  if (!forceRefresh && durableCached && typeof waitUntil === 'function' && !hasPayloadUnavailableQuestions(durableCached)) {
     scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: durableCached, fetchImpl });
     return durableCached;
   }
@@ -1298,7 +1299,7 @@ export async function listCachedSessionQuestionsForBridge({
     env,
     sessionSlug: slug,
     existingIndex: durableCached,
-    mode: typeof waitUntil === 'function' ? 'until_first_available' : 'complete',
+    mode: forceRefresh || typeof waitUntil !== 'function' ? 'complete' : 'until_first_available',
     fetchImpl,
   });
   if (

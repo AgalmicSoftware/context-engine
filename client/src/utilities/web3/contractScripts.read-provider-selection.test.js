@@ -246,4 +246,30 @@ describe('contractScripts getReadProviderForGroup', () => {
       expect(urls[0]).toBe(SESSION_RPC_URL);
     });
   });
+
+  it('uses browser-visible session RPC path mirrors for survey and SBT read providers', () => {
+    try { globalThis.CE_PREFER_PATH_RPC = false; } catch (_) {}
+    const cfg = buildGroupCfg({
+      provider: 'path',
+      providers: {
+        path: {
+          rpcUrl: SESSION_RPC_URL,
+        },
+      },
+    });
+
+    const surveyProvider = getReadProviderForGroup(cfg, { contractKey: 'surveys' });
+    const sbtProvider = getReadProviderForGroup(cfg, { contractKey: 'sbtFactory' });
+
+    [surveyProvider, sbtProvider].forEach((provider) => {
+      const urls = Array.isArray(provider?.providerConfigs)
+        ? provider.providerConfigs.map((entry) => entry?.provider?.connection?.url).filter(Boolean)
+        : [];
+      expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
+        providerLabel: 'path',
+        preferredUrls: expect.arrayContaining([SESSION_RPC_URL]),
+      }));
+      expect(urls[0]).toBe(SESSION_RPC_URL);
+    });
+  });
 });
