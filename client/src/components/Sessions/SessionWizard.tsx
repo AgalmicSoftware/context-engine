@@ -3993,21 +3993,21 @@ const SessionWizard = ({
     draft,
     registryChainId,
     networkId: network?.id,
-    workerSecrets: getCurrentEnabledWorkerSecrets(),
+    workerSecrets: getCurrentWorkerSecrets(),
   });
 
   const resolveWorkerRpcUrlMap = () => resolveSessionWizardWorkerRpcUrlMapFromDraft({
     draft,
     registryChainId,
     networkId: network?.id,
-    workerSecrets: getCurrentEnabledWorkerSecrets(),
+    workerSecrets: getCurrentWorkerSecrets(),
   });
 
   const resolveWorkerFaucetConfig = () => resolveSessionWizardWorkerFaucetConfigFromDraft({
     draft,
     registryChainId,
     networkId: network?.id,
-    workerSecrets: getCurrentEnabledWorkerSecrets(),
+    workerSecrets: getCurrentWorkerSecrets(),
   });
   const effectiveDefaultWorkerRpcUrl = toStr(resolveWorkerRpcUrl()).trim();
   const resolvedWorkerBaseUrlForDelegation = resolveWorkerBaseUrl();

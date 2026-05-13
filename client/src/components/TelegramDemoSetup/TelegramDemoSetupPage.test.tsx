@@ -73,6 +73,10 @@ describe('TelegramDemoSetupPage', () => {
     expect(screen.getByText('RPC Settings')).toBeInTheDocument();
     expect(screen.getByText('Generated Secrets')).toBeInTheDocument();
     expect(screen.getByText('Deploy / Test Checklist')).toBeInTheDocument();
+    expect(screen.getByText('Smoke /start, /join, /questions, /docs, /me')).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('/ce_join');
+    expect(document.body.textContent).not.toContain('/ce_questions');
+    expect(document.body.textContent).not.toContain('/ce_docs');
 
     expect(screen.getByText('https://session-worker.example.test')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.TELEGRAM_DEMO_DEFAULT_RPC_URL)).toHaveTextContent(

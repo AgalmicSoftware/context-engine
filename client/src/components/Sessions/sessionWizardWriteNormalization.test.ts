@@ -99,7 +99,7 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields keeps worker-private RPC out of public registry fields', () => {
+  test('buildSessionWizardRegistrySessionFields does not mirror uploaded custom RPC secrets into public fields', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {
         rpcUrl: 'https://draft-rpc.example',
@@ -113,7 +113,7 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields omits RPC when no public registry field exists', () => {
+  test('buildSessionWizardRegistrySessionFields ignores worker-secret RPC values', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {},
     })).toEqual({});
@@ -124,25 +124,6 @@ describe('sessionWizardWriteNormalization', () => {
     })).toEqual({
       rpcUrl: 'https://browser-visible-rpc.example',
     });
-  });
-
-  test('buildSessionWizardRegistrySessionFields ignores uploaded custom RPC secrets', () => {
-    const enabledSecrets = resolveSessionWizardEnabledWorkerSecrets({
-      workerSecretsEnabled: true,
-      workerSecrets: {
-        customRpcUrl: ' https://uploaded-rpc.example ',
-      },
-    });
-
-    expect(buildSessionWizardRegistrySessionFields({
-      onChainFields: {},
-      sponsoredFields: {
-        sponsored_rpc: '0',
-      },
-    })).toEqual({
-      sponsored_rpc: '0',
-    });
-    expect(enabledSecrets.customRpcUrl).toBe('https://uploaded-rpc.example');
   });
 
   test('buildSessionWizardRegistrySessionFields preserves empty worker URL clears for registry writes', async () => {

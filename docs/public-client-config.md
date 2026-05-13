@@ -156,6 +156,10 @@ SPA fallback concept, but their redirect config syntax differs.
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values are used only
   when the on-chain `rpc` gate is open or the current wallet already has a
   verified restricted grant.
+- Browser-safe RPC values authored in the session `rpc.providers.path.rpcUrl`
+  field may be mirrored into the registry `rpcUrl` field for client question and
+  SBT reads. Uploaded sponsored Custom RPC URLs are worker runtime secrets and
+  are not mirrored into browser-visible registry fields.
 - OP Sepolia browser fallbacks intentionally avoid leading with
   `https://sepolia.optimism.io`; it remains available later in the list, but the
   wallet/RainbowKit primary URL should prefer less rate-limited public mirrors
