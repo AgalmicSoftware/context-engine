@@ -17,12 +17,12 @@ const createStorageMock = (seed: Record<string, string> = {}) => {
 };
 
 describe('readColdLoadOnboardingState', () => {
-  it('auto-opens cold-load onboarding by default on first visit', () => {
+  it('does not auto-open cold-load onboarding by default on first visit', () => {
     const storage = createStorageMock();
 
     expect(readColdLoadOnboardingState(storage)).toEqual({
       firstVisit: true,
-      shouldStartOnboarding: true,
+      shouldStartOnboarding: false,
     });
     expect(storage.setItem).toHaveBeenCalledWith(FIRST_VISIT_STORAGE_KEY, 'true');
   });

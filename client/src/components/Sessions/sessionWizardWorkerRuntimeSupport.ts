@@ -67,11 +67,15 @@ export const resolveSessionWizardWorkerRpcUrlFromDraft = ({
   draft,
   registryChainId,
   networkId,
+  workerSecrets = null,
 }: {
   draft?: AnyRecord | null;
   registryChainId?: unknown;
   networkId?: unknown;
+  workerSecrets?: AnyRecord | null;
 } = {}): string => {
+  const secretRpcUrl = toStr(workerSecrets?.customRpcUrl).trim();
+  if (secretRpcUrl) return secretRpcUrl;
   const chainId = resolveSessionWizardWorkerRuntimeChainId({ draft, registryChainId, networkId });
   const providers = draft?.rpc?.providers || {};
   const pathProvider = providers.path || draft?.rpc?.path || {};
@@ -86,25 +90,44 @@ export const resolveSessionWizardWorkerRpcUrlMapFromDraft = ({
   draft,
   registryChainId,
   networkId,
+  workerSecrets = null,
 }: {
   draft?: AnyRecord | null;
   registryChainId?: unknown;
   networkId?: unknown;
+  workerSecrets?: AnyRecord | null;
 } = {}): Record<string, string[]> => {
   const providers = draft?.rpc?.providers || {};
   const pathProvider = providers.path || draft?.rpc?.path || {};
   const chainId = resolveSessionWizardWorkerRuntimeChainId({ draft, registryChainId, networkId });
-  return buildSessionWizardWorkerRpcUrlMap({ chainId, pathProvider });
+  const map = buildSessionWizardWorkerRpcUrlMap({ chainId, pathProvider });
+  const secretRpcUrl = toStr(workerSecrets?.customRpcUrl).trim();
+  if (!secretRpcUrl || !chainId) return map;
+  const key = String(chainId);
+  const existing = Array.isArray(map[key]) ? map[key] : [];
+  const seen = new Set<string>();
+  const merged = [secretRpcUrl, ...existing].filter((url) => {
+    const cleaned = toStr(url).trim();
+    if (!cleaned || seen.has(cleaned)) return false;
+    seen.add(cleaned);
+    return true;
+  });
+  return {
+    ...map,
+    [key]: merged,
+  };
 };
 
 export const resolveSessionWizardWorkerFaucetConfigFromDraft = ({
   draft,
   registryChainId,
   networkId,
+  workerSecrets = null,
 }: {
   draft?: AnyRecord | null;
   registryChainId?: unknown;
   networkId?: unknown;
+  workerSecrets?: AnyRecord | null;
 } = {}): {
   rpcUrl: string;
   amountEth: string;
@@ -116,7 +139,7 @@ export const resolveSessionWizardWorkerFaucetConfigFromDraft = ({
     return cleaned ? cleaned : toStr(fallback).trim();
   };
   const chainId = resolveSessionWizardWorkerRuntimeChainId({ draft, registryChainId, networkId });
-  const defaultRpcUrl = resolveSessionWizardWorkerRpcUrlFromDraft({ draft, registryChainId, networkId })
+  const defaultRpcUrl = resolveSessionWizardWorkerRpcUrlFromDraft({ draft, registryChainId, networkId, workerSecrets })
     || getDefaultHttpRpc(chainId)
     || resolveFallbackRpcUrl(chainId);
   return {

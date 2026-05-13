@@ -349,6 +349,74 @@ describe('rpcProviders session-sponsored reads', () => {
     expect(provider?.__CE_RPC_META?.preferredUrls).toContain(PATH_DEFAULT_BASE_SEPOLIA);
   });
 
+  it('uses the default session gate for sponsored RPC when the rpc resource gate is unset', async () => {
+    const account = '0x00000000000000000000000000000000000000c1';
+    jest.spyOn(store, 'getState').mockReturnValue({
+      profile: {
+        account,
+      },
+    });
+    contractScripts.userHasSBT.mockResolvedValue(true);
+
+    const cfg = buildGroupCfg({
+      slug: 'session-sponsored-rpc-default-gate',
+      rpcUrl: ROOT_RPC_URL,
+      sponsoredKeys: { rpc: true },
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: [RESTRICTED_SBT],
+            mode: 'any',
+            chainId: 84532,
+          },
+          rpc: {
+            lookupStatus: 'ok',
+            sbtAddresses: [],
+            mode: 'any',
+            chainId: 84532,
+          },
+        },
+      },
+    });
+
+    const initialProvider = getReadProviderForGroup(cfg);
+
+    expect(initialProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
+      providerLabel: 'path',
+      sessionAccessStatus: 'checking',
+      sessionAccessMode: 'sponsored-restricted',
+      sessionRpcSource: 'default-path',
+    }));
+    expect(initialProvider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
+
+    const access = await checkSponsoredAccess({
+      sessionConfig: cfg,
+      sessionSlug: cfg.slug,
+      account,
+      resourceKey: 'rpc',
+    });
+    const provider = getReadProviderForGroup(cfg);
+
+    expect(access.status).toBe('granted');
+    expect(contractScripts.userHasSBT).toHaveBeenCalledWith(
+      'none',
+      RESTRICTED_SBT,
+      account,
+      0,
+      'latest',
+      cfg
+    );
+    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
+      providerLabel: 'session',
+      sessionAccessStatus: 'granted',
+      sessionAccessMode: 'sponsored-restricted',
+      sessionRpcSource: 'root',
+      preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
+    }));
+  });
+
   it('keeps sponsored-restricted session cache keys isolated by slug', () => {
     const account = '0x00000000000000000000000000000000000000aa';
     jest.spyOn(store, 'getState').mockReturnValue({

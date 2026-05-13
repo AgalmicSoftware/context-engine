@@ -3,7 +3,10 @@ jest.mock('../web3/contractScripts.js', () => ({
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
 }));
 
-const { createSbtLiveProgressController } = require('./sbtLiveProgressController.js');
+const {
+  buildSbtCountsInitialProgress,
+  createSbtLiveProgressController,
+} = require('./sbtLiveProgressController.js');
 const { normalizeSessionSlug } = require('../web3/contractScripts.js');
 
 const createStateHost = () => {
@@ -129,5 +132,61 @@ describe('createSbtLiveProgressController', () => {
       currentBlock: 1,
       latestBlock: 2,
     });
+  });
+});
+
+describe('buildSbtCountsInitialProgress', () => {
+  it('returns null when the resumed scan already covers the target block', () => {
+    expect(buildSbtCountsInitialProgress({
+      startBlock: 10,
+      toBlock: 12,
+      seedBlock: 12,
+    })).toBeNull();
+  });
+
+  it('builds a pre-scan progress payload when no blocks have been scanned', () => {
+    expect(buildSbtCountsInitialProgress({
+      startBlock: 10,
+      toBlock: 12,
+      seedBlock: 9,
+    })).toEqual({
+      phase: 'activity',
+      fromBlock: 10,
+      toBlock: 12,
+      totalBlocks: 3,
+      scannedBlocks: 0,
+      remainingBlocks: 3,
+      completionRatio: 0,
+      scanFrom: 10,
+      scanTo: 9,
+      lastScannedBlock: 9,
+    });
+  });
+
+  it('builds a partial progress payload from a checkpoint seed block', () => {
+    expect(buildSbtCountsInitialProgress({
+      startBlock: 10,
+      toBlock: 14,
+      seedBlock: 12,
+    })).toEqual({
+      phase: 'activity',
+      fromBlock: 10,
+      toBlock: 14,
+      totalBlocks: 5,
+      scannedBlocks: 3,
+      remainingBlocks: 2,
+      completionRatio: 0.6,
+      scanFrom: 10,
+      scanTo: 12,
+      lastScannedBlock: 12,
+    });
+  });
+
+  it('rejects non-finite block inputs', () => {
+    expect(buildSbtCountsInitialProgress({
+      startBlock: 'bad',
+      toBlock: 14,
+      seedBlock: 12,
+    })).toBeNull();
   });
 });

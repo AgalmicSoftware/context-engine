@@ -48,9 +48,11 @@ Per request, the client resolves keys in this order:
 
 ## RPC key routing
 
-Session-level Custom RPC URL values that are supplied as worker secrets stay
-worker-private during session publish/deploy. Browser read providers only use
-explicit browser-visible registry `rpcUrl` / `rpcUrlsByChainId` values.
+Session-level Custom RPC URL values are stored as worker secrets and, when used
+for session publish/deploy, remain worker runtime config only. They are not
+mirrored to registry fields. Browser-visible `rpcUrl` mirrors are limited to
+explicit session `rpc.providers.path.rpcUrl` values that are safe for client
+question and SBT reads.
 
 Standalone RPC API-key injection without a URL template is still unsupported.
 The JSON-RPC proxy format (Authorization header vs URL template) needs a

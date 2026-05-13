@@ -68,6 +68,10 @@ the current wallet, client Survey contract reads use the session-sponsored
 `rpcUrl` / `rpcUrlsByChainId` before anonymous defaults. Restricted sponsored
 RPC still fails closed to the normal fallback stack until the wallet grant is
 verified.
+Session publish/deploy does not mirror uploaded sponsored Custom RPC URLs into
+`rpcUrl`; those values remain worker runtime secrets. Browser-visible `rpcUrl`
+mirrors are reserved for explicit session path RPC values that are safe for
+client question and SBT reads.
 
 Multi-tx flow:
 - `createSession(slug, sessionId, chainId, ...)` creates the session.
