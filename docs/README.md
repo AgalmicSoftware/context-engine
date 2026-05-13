@@ -45,6 +45,7 @@ Keys and RPCs:
 
 Encryption:
 - `docs/lit-protocol-information.md`: Lit protocol wiring and current runtime status (v8).
+- `docs/lit-v3-design.md`: Worker-mediated Chipotle runtime design, provisioning flow, and migration notes.
 - `docs/doc-library.md`: Doc Library for Sessions + SBT groups (tag schema, listing queries, encryption UX).
 
 Payload schemas:
@@ -54,6 +55,9 @@ Local development:
 - `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
 - `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
+
+Release:
+- `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
 
 Wallets:
 - `docs/porto-information.md`: Porto passkey wallet wiring and deterministic test wallet workflow.

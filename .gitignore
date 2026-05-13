@@ -132,6 +132,7 @@ broadcast/
 .codex-artifacts/
 .codex-solc/
 .codex-tmp/
+/output/
 
 # Private content - present locally for dev, never committed
 /TODO/
