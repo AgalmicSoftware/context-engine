@@ -171,20 +171,59 @@ TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/prepare-public-release.XXXXXX")
 STAGING_ROOT="$TMP_ROOT/release"
 MATCHED_PATHS_FILE="$TMP_ROOT/matched-paths.txt"
 STRIP_ENTRIES_FILE="$TMP_ROOT/strip-entries.txt"
+COPY_FILE_LIST="$TMP_ROOT/copy-file-list.txt"
 MANIFEST_PATH="$STAGING_ROOT/private-pack.manifest.json"
 
 mkdir -p "$STAGING_ROOT"
 
 (
   cd "$REPO_ROOT"
-  tar -cf - \
-    --exclude='./.git' \
-    --exclude='./*/.git' \
-    --exclude='./node_modules' \
-    --exclude='./*/node_modules' \
-    --exclude='./build' \
-    --exclude='./*/build' \
-    .
+  GIT_TOPLEVEL=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  if [ "$GIT_TOPLEVEL" = "$REPO_ROOT" ]; then
+    git ls-files -z --cached --others --exclude-standard |
+      while IFS= read -r -d '' path; do
+        if [ -e "$path" ] || [ -L "$path" ]; then
+          printf '%s\n' "$path"
+        fi
+      done > "$COPY_FILE_LIST"
+
+    tar -cf - -T "$COPY_FILE_LIST"
+  else
+    tar -cf - \
+      --exclude='./.git' \
+      --exclude='./*/.git' \
+      --exclude='./node_modules' \
+      --exclude='./*/node_modules' \
+      --exclude='./*/*/node_modules' \
+      --exclude='./*/*/*/node_modules' \
+      --exclude='./build' \
+      --exclude='./*/build' \
+      --exclude='./*/*/build' \
+      --exclude='./*/*/*/build' \
+      --exclude='./.codex-artifacts' \
+      --exclude='./.codex-solc' \
+      --exclude='./.codex-tmp' \
+      --exclude='./.DS_Store' \
+      --exclude='./*/.DS_Store' \
+      --exclude='./.env' \
+      --exclude='./.env.local' \
+      --exclude='./.env.*.local' \
+      --exclude='./.keys' \
+      --exclude='./.e2e-secrets' \
+      --exclude='./.e2e-cache' \
+      --exclude='./.npm-cache' \
+      --exclude='./.npm-cache-client*' \
+      --exclude='./output' \
+      --exclude='./release-public' \
+      --exclude='./dist' \
+      --exclude='./out' \
+      --exclude='./cache' \
+      --exclude='./broadcast' \
+      --exclude='./coverage' \
+      --exclude='./docs/codebase-*.md' \
+      --exclude='./docs/assets/codebase-*' \
+      .
+  fi
 ) | (
   cd "$STAGING_ROOT"
   tar -xf -
