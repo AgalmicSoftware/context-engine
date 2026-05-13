@@ -21,12 +21,21 @@ import {
   seedSbtCountMapFromLegacyAddresses,
   hydrateLegacySbtCountState,
   getCurrentHolderAddressesFromCounts,
+  normalizeSbtCountsScanCheckpoint,
 } from './sbtCountHelpers.js';
-import { buildSbtCountsResumePlan, normalizeSbtCountsScanCheckpoint } from './sbtCountsCheckpointContract.js';
-import { normalizeSbtHistorySummary, buildSbtHistorySummaryFromCounts } from './sbtHistoryHelpers.js';
+import {
+  normalizeSbtHistorySummary,
+  buildSbtHistorySummaryFromCounts,
+} from './sbtHistoryHelpers.js';
 import { resolveSbtCreationBlock } from './sbtCacheEntryHelpers.js';
-import { normalizeSbtRealtimeEventCursor, compareSbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
-import { buildSbtCountsInitialProgress, createSbtLiveProgressController } from './sbtLiveProgressController.js';
+import {
+  normalizeSbtRealtimeEventCursor,
+  compareSbtRealtimeEventCursor,
+} from './sbtRealtimeCursorHelpers.js';
+import {
+  buildSbtCountsInitialProgress,
+  createSbtLiveProgressController,
+} from './sbtLiveProgressController.js';
 import { createSbtRealtimeCoverageController } from './sbtRealtimeCoverageController.js';
 import { createSbtRealtimeListenerCleanupController } from './sbtRealtimeListenerCleanupController.js';
 import { getSbtInstanceListenerPlan } from './sbtRealtimeListenerPlan.js';
@@ -1002,7 +1011,11 @@ export const createSessionSbtCacheController = (host = {}) => {
             const cachedCreation = sbtAlreadyInMap?.creationBlock ?? sbtAlreadyInMap?.sbtInfo?.creationBlock;
             const discoveryCreation = discoveryEntry?.creationBlock;
             const metaCreation = sbtInfoToUse?.creationBlock;
-            const creationBlock = resolveSbtCreationBlock(cachedCreation, discoveryCreation, metaCreation);
+            const creationBlock = resolveSbtCreationBlock(
+              cachedCreation,
+              discoveryCreation,
+              metaCreation
+            );
 
             const historyFromBlock = Number.isFinite(creationBlock)
               ? Math.max(sbtHistoryFromBlock, creationBlock)
@@ -1288,7 +1301,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       let cachedCreationBlock = resolveSbtCreationBlock(
         existing?.creationBlock,
         existing?.sbtInfo?.creationBlock,
-        info?.creationBlock,
+        info?.creationBlock
       );
       const loadHistorySummary = async () => {
         try {
@@ -1311,7 +1324,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         const creationBlock = resolveSbtCreationBlock(
           existing?.creationBlock,
           existing?.sbtInfo?.creationBlock,
-          sbtInfo?.creationBlock,
+          sbtInfo?.creationBlock
         );
         const historySummary = !forceCounts
           ? (await loadHistorySummary()) || existingHistorySummary
@@ -1351,7 +1364,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         const creationBlock = resolveSbtCreationBlock(
           existing?.creationBlock,
           existing?.sbtInfo?.creationBlock,
-          sbtInfo?.creationBlock,
+          sbtInfo?.creationBlock
         );
         const historySummary = (await loadHistorySummary()) || existingHistorySummary;
         cache[networkID].sbtList[sbtLower] = hydrateSbtActivityCacheEntry({
@@ -1407,8 +1420,10 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
 
       const startBlock = cachedCreationBlock != null ? Math.max(baseFrom, cachedCreationBlock) : baseFrom;
-      const normalizeCountsScanCheckpoint = (checkpointIn) =>
-        normalizeSbtCountsScanCheckpoint(checkpointIn, { startBlock, toBlock: baseTo });
+      const normalizeCountsScanCheckpoint = (checkpointIn) => normalizeSbtCountsScanCheckpoint(
+        checkpointIn,
+        { startBlock, toBlock: baseTo }
+      );
       let latestCountsCheckpoint = normalizeCountsScanCheckpoint(existing?.countsScanCheckpoint);
       let hasPendingCountsCheckpointWrite = false;
       let lastCountsCheckpointWriteMs = 0;
@@ -1487,14 +1502,22 @@ export const createSessionSbtCacheController = (host = {}) => {
       };
       const countOptions = Object.keys(countOptionsBase).length > 0 ? countOptionsBase : null;
       const resumeCheckpoint = latestCountsCheckpoint;
-      const { checkpointAlreadyCoversWindow, canResumeFromCheckpoint, initialProgressSeedBlock } =
-        buildSbtCountsResumePlan({
-          countsLoaded: existing?.countsLoaded === true,
-          existingBlock,
-          resumeCheckpoint,
-          startBlock,
-          toBlock: baseTo,
-        });
+      const checkpointAlreadyCoversWindow =
+        !existing?.countsLoaded &&
+        resumeCheckpoint &&
+        resumeCheckpoint.phase === 'activity' &&
+        Number.isFinite(Number(resumeCheckpoint.blockNumber)) &&
+        Number(resumeCheckpoint.blockNumber) >= baseTo;
+      const canResumeFromCheckpoint =
+        !existing?.countsLoaded &&
+        resumeCheckpoint &&
+        Number.isFinite(Number(resumeCheckpoint.blockNumber)) &&
+        Number(resumeCheckpoint.blockNumber) >= (startBlock - 1) &&
+        Number(resumeCheckpoint.blockNumber) < baseTo;
+      const initialProgressSeedBlock =
+        (existing?.countsLoaded === true && Number.isFinite(existingBlock))
+          ? existingBlock
+          : Number(resumeCheckpoint?.blockNumber ?? (startBlock - 1));
       const initialProgress = buildSbtCountsInitialProgress({
         startBlock,
         toBlock: baseTo,
@@ -1588,16 +1611,16 @@ export const createSessionSbtCacheController = (host = {}) => {
         : existingHistorySummary || null;
       const finalCountsBlock = countsOk
         ? countsBlock
-        : Number.isFinite(Number(existing?.blockNumber))
-          ? Number(existing.blockNumber)
-          : Number.isFinite(existingBlock)
-            ? existingBlock
-            : null;
+        : (
+          Number.isFinite(Number(existing?.blockNumber))
+            ? Number(existing.blockNumber)
+            : (Number.isFinite(existingBlock) ? existingBlock : null)
+        );
       const creationBlock = resolveSbtCreationBlock(
         creationBlockFromLookup,
         existing?.creationBlock,
         existing?.sbtInfo?.creationBlock,
-        sbtInfo?.creationBlock,
+        sbtInfo?.creationBlock
       );
 
       cache[networkID].sbtList[sbtLower] = hydrateSbtActivityCacheEntry({

@@ -417,14 +417,12 @@ describe('rpcProviders session-sponsored reads', () => {
 
     const initialProvider = getReadProviderForGroup(cfg);
 
-    expect(initialProvider?.__CE_RPC_META).toEqual(
-      expect.objectContaining({
-        providerLabel: 'path',
-        sessionAccessStatus: 'checking',
-        sessionAccessMode: 'sponsored-restricted',
-        sessionRpcSource: 'default-path',
-      }),
-    );
+    expect(initialProvider?.__CE_RPC_META).toEqual(expect.objectContaining({
+      providerLabel: 'path',
+      sessionAccessStatus: 'checking',
+      sessionAccessMode: 'sponsored-restricted',
+      sessionRpcSource: 'default-path',
+    }));
     expect(initialProvider?.__CE_RPC_META?.preferredUrls).not.toContain(ROOT_RPC_URL);
 
     const access = await checkSponsoredAccess({
@@ -436,16 +434,21 @@ describe('rpcProviders session-sponsored reads', () => {
     const provider = getReadProviderForGroup(cfg);
 
     expect(access.status).toBe('granted');
-    expect(contractScripts.userHasSBT).toHaveBeenCalledWith('none', RESTRICTED_SBT, account, 0, 'latest', cfg);
-    expect(provider?.__CE_RPC_META).toEqual(
-      expect.objectContaining({
-        providerLabel: 'session',
-        sessionAccessStatus: 'granted',
-        sessionAccessMode: 'sponsored-restricted',
-        sessionRpcSource: 'root',
-        preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
-      }),
+    expect(contractScripts.userHasSBT).toHaveBeenCalledWith(
+      'none',
+      RESTRICTED_SBT,
+      account,
+      0,
+      'latest',
+      cfg
     );
+    expect(provider?.__CE_RPC_META).toEqual(expect.objectContaining({
+      providerLabel: 'session',
+      sessionAccessStatus: 'granted',
+      sessionAccessMode: 'sponsored-restricted',
+      sessionRpcSource: 'root',
+      preferredUrls: expect.arrayContaining([ROOT_RPC_URL]),
+    }));
   });
 
   it('keeps sponsored-restricted session cache keys isolated by slug', () => {

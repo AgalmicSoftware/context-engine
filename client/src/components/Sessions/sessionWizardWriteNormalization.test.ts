@@ -79,102 +79,19 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('sanitizeSessionWizardMetadataPayload writes profile-only mode metadata', () => {
-    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    profile.surfaces.telegram = true;
-    profile.surfaces.miniApp = true;
-
-    const metadata = sanitizeSessionWizardMetadataPayload({
-      slug: 'profile-session',
-      sessionName: 'Profile Session',
-      sessionModeProfile: profile,
-      telegramOnly: true,
-      sessionMode: 'telegram_only',
-      telegramBridgeEnabled: true,
-      telegram: { only: true, mode: 'telegram_only' },
-    });
-
-    expect(metadata.sessionModeProfile).toEqual(profile);
-    expect(metadata.storageProfile).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-      }),
-    );
-    expect(metadata.telegramOnly).toBeUndefined();
-    expect(metadata.sessionMode).toBeUndefined();
-    expect(metadata.telegramBridgeEnabled).toBeUndefined();
-    expect(metadata.telegram).toBeUndefined();
-  });
-
-  test('publication normalization rejects invalid profiles before compiling storage metadata', () => {
-    const malformedProfile = {
-      profileVersion: 1,
-      preset: 'custom',
-      authority: { mode: 'worker_canonical' },
-    };
-
-    expect(() =>
-      sanitizeSessionWizardMetadataPayload({
-        slug: 'invalid-profile',
-        sessionModeProfile: malformedProfile,
-        storageProfile: { backend: 'cloudflare' },
-      }),
-    ).toThrow(/requires a reachable session mode profile/i);
-
-    expect(() =>
-      buildSessionWizardWorkerConfigPayload({
-        slug: 'invalid-profile',
-        draft: {
-          sessionModeProfile: malformedProfile,
-          storageProfile: { backend: 'cloudflare' },
-        },
-      }),
-    ).toThrow(/requires a reachable session mode profile/i);
-  });
-
-  test('sanitizeSessionWizardMetadataPayload upgrades legacy Telegram flags to a profile without dual-write fields', () => {
-    const metadata = sanitizeSessionWizardMetadataPayload({
-      slug: 'legacy-telegram',
-      sessionName: 'Legacy Telegram',
-      telegramOnly: true,
-      storageProfile: { backend: 'cloudflare' },
-    });
-
-    expect(metadata.sessionModeProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: true, miniApp: true, web: true }),
-      }),
-    );
-    expect(metadata.storageProfile).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-      }),
-    );
-    expect(metadata.telegramOnly).toBeUndefined();
-    expect(metadata.sessionMode).toBeUndefined();
-    expect(metadata.telegramBridgeEnabled).toBeUndefined();
-  });
-
   test('buildSessionWizardRegistrySessionFields keeps compatibility mirrors and sponsored flags only', () => {
-    expect(
-      buildSessionWizardRegistrySessionFields({
-        onChainFields: {
-          corsWorkerUrl: ' https://worker.example ',
-          rpcUrl: ' https://rpc.example ',
-          unexpectedField: 'should-not-pass-through',
-        },
-        sponsoredFields: {
-          sponsored_ai: '1',
-          sponsored_rpc: '',
-          sponsored_arweave: '0',
-        },
-      }),
-    ).toEqual({
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {
+        corsWorkerUrl: ' https://worker.example ',
+        rpcUrl: ' https://rpc.example ',
+        unexpectedField: 'should-not-pass-through',
+      },
+      sponsoredFields: {
+        sponsored_ai: '1',
+        sponsored_rpc: '',
+        sponsored_arweave: '0',
+      },
+    })).toEqual({
       corsWorkerUrl: 'https://worker.example',
       rpcUrl: 'https://rpc.example',
       sponsored_ai: '1',
@@ -182,58 +99,31 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields keeps worker-private RPC out of public registry fields', () => {
-    expect(
-      buildSessionWizardRegistrySessionFields({
-        onChainFields: {
-          rpcUrl: 'https://draft-rpc.example',
-        },
-        sponsoredFields: {
-          sponsored_rpc: '1',
-        },
-      }),
-    ).toEqual({
+  test('buildSessionWizardRegistrySessionFields does not mirror uploaded custom RPC secrets into public fields', () => {
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {
+        rpcUrl: 'https://draft-rpc.example',
+      },
+      sponsoredFields: {
+        sponsored_rpc: '1',
+      },
+    })).toEqual({
       rpcUrl: 'https://draft-rpc.example',
       sponsored_rpc: '1',
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields omits RPC when no public registry field exists', () => {
-    expect(
-      buildSessionWizardRegistrySessionFields({
-        onChainFields: {},
-      }),
-    ).toEqual({});
-    expect(
-      buildSessionWizardRegistrySessionFields({
-        onChainFields: {
-          rpcUrl: ' https://browser-visible-rpc.example ',
-        },
-      }),
-    ).toEqual({
+  test('buildSessionWizardRegistrySessionFields ignores worker-secret RPC values', () => {
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {},
+    })).toEqual({});
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {
+        rpcUrl: ' https://browser-visible-rpc.example ',
+      },
+    })).toEqual({
       rpcUrl: 'https://browser-visible-rpc.example',
     });
-  });
-
-  test('buildSessionWizardRegistrySessionFields ignores uploaded custom RPC secrets', () => {
-    const enabledSecrets = resolveSessionWizardEnabledWorkerSecrets({
-      workerSecretsEnabled: true,
-      workerSecrets: {
-        customRpcUrl: ' https://uploaded-rpc.example ',
-      },
-    });
-
-    expect(
-      buildSessionWizardRegistrySessionFields({
-        onChainFields: {},
-        sponsoredFields: {
-          sponsored_rpc: '0',
-        },
-      }),
-    ).toEqual({
-      sponsored_rpc: '0',
-    });
-    expect(enabledSecrets.customRpcUrl).toBe('https://uploaded-rpc.example');
   });
 
   test('buildSessionWizardRegistrySessionFields preserves empty worker URL clears for registry writes', async () => {

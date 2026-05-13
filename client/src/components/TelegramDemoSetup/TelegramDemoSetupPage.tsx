@@ -323,7 +323,7 @@ export default function TelegramDemoSetupPage({ activeSessionSlug = '', sessionO
               'Create or reuse KV, R2, D1, and Durable Object binding',
               'Upload worker vars and redacted secrets',
               'Enable Workers.dev route and set Telegram webhook',
-              'Smoke /start, /ce_join, /ce_questions, /ce_docs, /ce_me',
+              'Smoke /start, /join, /questions, /docs, /me',
             ].map((item) => (
               <div key={item} className={styles.checkRow}>
                 <span>{item}</span>

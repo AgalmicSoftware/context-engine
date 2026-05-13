@@ -173,6 +173,44 @@ describe('sessionWizardWorkerRuntimeSupport', () => {
     ).toBe('https://uploaded-rpc.example');
   });
 
+  it('prefers uploaded custom RPC secrets for worker runtime config', () => {
+    const draft = {
+      networkChainId: 84532,
+      rpc: {
+        providers: {
+          path: {
+            rpcUrl: 'https://draft-rpc.example',
+            rpcUrlsByChainId: {
+              84532: ['https://draft-rpc.example', 'https://rpc-backup.example'],
+            },
+          },
+        },
+      },
+      faucet: {},
+    };
+    const workerSecrets = { customRpcUrl: ' https://uploaded-rpc.example ' };
+
+    expect(resolveSessionWizardWorkerRpcUrlFromDraft({
+      draft,
+      workerSecrets,
+    })).toBe('https://uploaded-rpc.example');
+
+    const rpcUrlMap = resolveSessionWizardWorkerRpcUrlMapFromDraft({
+      draft,
+      workerSecrets,
+    });
+    expect(rpcUrlMap['84532'].slice(0, 3)).toEqual([
+      'https://uploaded-rpc.example',
+      'https://draft-rpc.example',
+      'https://rpc-backup.example',
+    ]);
+
+    expect(resolveSessionWizardWorkerFaucetConfigFromDraft({
+      draft,
+      workerSecrets,
+    }).rpcUrl).toBe('https://uploaded-rpc.example');
+  });
+
   it('resolves faucet defaults from rpc fallbacks when values are unset', () => {
     expect(
       resolveSessionWizardWorkerFaucetConfigFromDraft({
