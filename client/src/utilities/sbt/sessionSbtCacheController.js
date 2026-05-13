@@ -25,16 +25,21 @@ import {
   seedSbtCountMapFromLegacyAddresses,
   hydrateLegacySbtCountState,
   getCurrentHolderAddressesFromCounts,
+  normalizeSbtCountsScanCheckpoint,
 } from './sbtCountHelpers.js';
 import {
   normalizeSbtHistorySummary,
   buildSbtHistorySummaryFromCounts,
 } from './sbtHistoryHelpers.js';
+import { resolveSbtCreationBlock } from './sbtCacheEntryHelpers.js';
 import {
   normalizeSbtRealtimeEventCursor,
   compareSbtRealtimeEventCursor,
 } from './sbtRealtimeCursorHelpers.js';
-import { createSbtLiveProgressController } from './sbtLiveProgressController.js';
+import {
+  buildSbtCountsInitialProgress,
+  createSbtLiveProgressController,
+} from './sbtLiveProgressController.js';
 import { createSbtRealtimeCoverageController } from './sbtRealtimeCoverageController.js';
 import { createSbtRealtimeListenerCleanupController } from './sbtRealtimeListenerCleanupController.js';
 import { getSbtInstanceListenerPlan } from './sbtRealtimeListenerPlan.js';
@@ -983,14 +988,11 @@ export const createSessionSbtCacheController = (host = {}) => {
             const cachedCreation = sbtAlreadyInMap?.creationBlock ?? sbtAlreadyInMap?.sbtInfo?.creationBlock;
             const discoveryCreation = discoveryEntry?.creationBlock;
             const metaCreation = sbtInfoToUse?.creationBlock;
-            const creationBlock = [cachedCreation, discoveryCreation, metaCreation]
-              .reduce((best, v) => {
-                if (v == null) return best;
-                const n = Number(v);
-                if (!Number.isFinite(n) || n < 0) return best;
-                const floored = Math.floor(n);
-                return (best == null || floored < best) ? floored : best;
-              }, null);
+            const creationBlock = resolveSbtCreationBlock(
+              cachedCreation,
+              discoveryCreation,
+              metaCreation
+            );
 
             const historyFromBlock = Number.isFinite(creationBlock)
               ? Math.max(sbtHistoryFromBlock, creationBlock)
@@ -1268,24 +1270,11 @@ export const createSessionSbtCacheController = (host = {}) => {
       const needsTokenUriFields = (i) => !hasCoreSbtMetadata(i);
       const metadataMarkedStale = info?.burnAuthNeedsOnChainRefresh === true;
 
-      const resolveCreationBlock = (entry, meta, extra) => {
-        const candidates = [
-          extra,
-          entry?.creationBlock,
-          entry?.sbtInfo?.creationBlock,
-          meta?.creationBlock
-        ];
-        let best = null;
-        for (const v of candidates) {
-          if (v == null) continue;
-          const n = Number(v);
-          if (!Number.isFinite(n) || n < 0) continue;
-          const floored = Math.floor(n);
-          if (best == null || floored < best) best = floored;
-        }
-        return best;
-      };
-      let cachedCreationBlock = resolveCreationBlock(existing, info);
+      let cachedCreationBlock = resolveSbtCreationBlock(
+        existing?.creationBlock,
+        existing?.sbtInfo?.creationBlock,
+        info?.creationBlock
+      );
       const loadHistorySummary = async () => {
         try {
           const summary = await contractScripts.getSbtHistorySummary('none', sbtAddressOriginalCase, slug);
@@ -1304,7 +1293,11 @@ export const createSessionSbtCacheController = (host = {}) => {
           mainSiteLog.warn(`[refreshSbtDataForGroup] No metadata for ${sbtAddressOriginalCase}; aborting hydration.`);
           return;
         }
-        const creationBlock = resolveCreationBlock(existing, sbtInfo);
+        const creationBlock = resolveSbtCreationBlock(
+          existing?.creationBlock,
+          existing?.sbtInfo?.creationBlock,
+          sbtInfo?.creationBlock
+        );
         const historySummary = !forceCounts
           ? (await loadHistorySummary()) || existingHistorySummary
           : existingHistorySummary;
@@ -1344,7 +1337,11 @@ export const createSessionSbtCacheController = (host = {}) => {
           mainSiteLog.warn(`[refreshSbtDataForGroup] No metadata for ${sbtAddressOriginalCase}; aborting refresh.`);
           return;
         }
-        const creationBlock = resolveCreationBlock(existing, sbtInfo);
+        const creationBlock = resolveSbtCreationBlock(
+          existing?.creationBlock,
+          existing?.sbtInfo?.creationBlock,
+          sbtInfo?.creationBlock
+        );
         const historySummary = (await loadHistorySummary()) || existingHistorySummary;
         cache[networkID].sbtList[sbtLower] = {
           ...existing,
@@ -1398,29 +1395,10 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
 
       const startBlock = cachedCreationBlock != null ? Math.max(baseFrom, cachedCreationBlock) : baseFrom;
-      const normalizeCountsScanCheckpoint = (checkpointIn) => {
-        if (!checkpointIn || typeof checkpointIn !== 'object') return null;
-        const phase = String(checkpointIn.phase || '').trim();
-        if (phase !== 'activity') return null;
-        const blockNumber = Math.max(
-          startBlock - 1,
-          Math.min(baseTo, Math.floor(Number(checkpointIn.blockNumber ?? (startBlock - 1))))
-        );
-        const mintedCountByAddress = normalizeSbtCountMap(checkpointIn.mintedCountByAddress);
-        const burnedCountByAddress = normalizeSbtCountMap(checkpointIn.burnedCountByAddress);
-        const mintedEventCountRaw = Math.floor(Number(checkpointIn.mintedEventCount || 0));
-        const burnedEventCountRaw = Math.floor(Number(checkpointIn.burnedEventCount || 0));
-        return {
-          phase,
-          blockNumber,
-          scanStartBlock: startBlock,
-          scanToBlock: baseTo,
-          mintedCountByAddress,
-          burnedCountByAddress,
-          mintedEventCount: mintedEventCountRaw > 0 ? mintedEventCountRaw : sumSbtCountMap(mintedCountByAddress),
-          burnedEventCount: burnedEventCountRaw > 0 ? burnedEventCountRaw : sumSbtCountMap(burnedCountByAddress),
-        };
-      };
+      const normalizeCountsScanCheckpoint = (checkpointIn) => normalizeSbtCountsScanCheckpoint(
+        checkpointIn,
+        { startBlock, toBlock: baseTo }
+      );
       let latestCountsCheckpoint = normalizeCountsScanCheckpoint(existing?.countsScanCheckpoint);
       let hasPendingCountsCheckpointWrite = false;
       let lastCountsCheckpointWriteMs = 0;
@@ -1512,29 +1490,13 @@ export const createSessionSbtCacheController = (host = {}) => {
         (existing?.countsLoaded === true && Number.isFinite(existingBlock))
           ? existingBlock
           : Number(resumeCheckpoint?.blockNumber ?? (startBlock - 1));
-      const initialProgressScanFrom = Math.max(initialProgressSeedBlock + 1, Number(startBlock));
-      if (progressHandler && initialProgressScanFrom <= Number(baseTo)) {
-        const totalBlocks = Math.max(0, Number(baseTo) - Number(startBlock) + 1);
-        const initialScannedBlocks = Math.max(
-          0,
-          Math.min(totalBlocks, initialProgressSeedBlock - Number(startBlock) + 1)
-        );
-        progressHandler({
-          phase: 'activity',
-          fromBlock: Number(startBlock),
-          toBlock: Number(baseTo),
-          totalBlocks,
-          scannedBlocks: initialScannedBlocks,
-          remainingBlocks: Math.max(0, totalBlocks - initialScannedBlocks),
-          completionRatio: totalBlocks > 0 ? (initialScannedBlocks / totalBlocks) : 1,
-          scanFrom: Number(startBlock),
-          scanTo: initialScannedBlocks > 0
-            ? Math.min(Number(baseTo), Number(startBlock) + initialScannedBlocks - 1)
-            : Number(startBlock) - 1,
-          lastScannedBlock: initialScannedBlocks > 0
-            ? Math.min(Number(baseTo), Number(startBlock) + initialScannedBlocks - 1)
-            : Number(startBlock) - 1,
-        });
+      const initialProgress = buildSbtCountsInitialProgress({
+        startBlock,
+        toBlock: baseTo,
+        seedBlock: initialProgressSeedBlock,
+      });
+      if (progressHandler && initialProgress) {
+        progressHandler(initialProgress);
       }
 
       if (existing?.countsLoaded && Number.isFinite(existingBlock)) {
@@ -1627,7 +1589,12 @@ export const createSessionSbtCacheController = (host = {}) => {
             ? Number(existing.blockNumber)
             : (Number.isFinite(existingBlock) ? existingBlock : null)
         );
-      const creationBlock = resolveCreationBlock(existing, sbtInfo, creationBlockFromLookup);
+      const creationBlock = resolveSbtCreationBlock(
+        creationBlockFromLookup,
+        existing?.creationBlock,
+        existing?.sbtInfo?.creationBlock,
+        sbtInfo?.creationBlock
+      );
 
       cache[networkID].sbtList[sbtLower] = {
         ...(cache[networkID].sbtList[sbtLower] || {}),

@@ -2,8 +2,8 @@ export const FIRST_VISIT_STORAGE_KEY = 'firstVisit';
 export const ONBOARDING_COMPLETE_STORAGE_KEY = 'ce_onboarding_complete';
 export const COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY = 'ce:forceColdLoadWelcomeSlides';
 
-// Auto-open the welcome slides on the first visit only unless an override disables them.
-export const COLD_LOAD_ONBOARDING_ENABLED = true;
+// Keep welcome slides manual by default; tests/dev can still force the cold-load overlay on.
+export const COLD_LOAD_ONBOARDING_ENABLED = false;
 
 type OnboardingStorage = {
   getItem: (key: string) => string | null;
