@@ -9,6 +9,11 @@ contextEngine-cc
 docs/agent-native*.md
 client/public/skill.md
 workers/agentBridgeWorker
+client/src/components/TelegramDemoSetup
+docs/ai-agent-bootstrap.md
+.secrets.baseline
+test/contextEngineCc.sw-cache-policy.test.mjs
+workers/sessionCorsWorker/chipotleClient.test.mjs
 TODO
 local-private-version
 CLAUDE.md
