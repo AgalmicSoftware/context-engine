@@ -2110,11 +2110,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         });
         return;
       }
-      this.setState(
-        buildCreateSurveySubmitFailurePatch(
-          `Log in to create ${this.state.isStandaloneQuestion ? 'questions' : 'this survey'}.`,
-        ),
-      );
+      this.setState(buildCreateSurveySubmitFailurePatch(
+        `Log in to create ${this.state.isStandaloneQuestion ? 'questions' : 'this survey'}.`
+      ));
       return;
     }
 
