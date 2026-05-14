@@ -166,9 +166,8 @@ export const resolveSurveyResultsQuestionReadScope = ({
       routeSlug ??
       '',
   );
-  const shouldFanOut =
+  const shouldFanOut = (
     sessionSlugPinned !== true &&
-    !hasRouteSessionPin &&
     !hasExplicitSessionQueryPin(search) &&
     String(viewMode || '')
       .trim()
