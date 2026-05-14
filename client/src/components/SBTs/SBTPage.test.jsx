@@ -12,10 +12,37 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as terminology from '../../utilities/ui/terminology.js';
 
-const renderBurnActionSurfaceTree = (tree) => {
-  const surface = findElementInTree(tree, (node) => node?.type === SbtPageBurnActionSurface);
-  expect(surface).not.toBeNull();
-  return SbtPageBurnActionSurface(surface.props);
+// Remaining broad SBTPage coverage owns holders-modal refresh, metadata hydration,
+// ownerOf fallback, cache writes, and password/open-mint flows.
+const mockIsCryptoMode = jest.fn(() => true);
+
+jest.mock('../../utilities/ui/terminology.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/terminology.js');
+  return {
+    __esModule: true,
+    ...actual,
+    isCryptoMode: (...args) => mockIsCryptoMode(...args),
+  };
+});
+
+jest.mock('utilities/ui/blockieAvatars.js', () => ({
+  generateBlockieDataUrl: jest.fn(() => ''),
+}));
+
+const createSubject = (props = {}) => {
+  const subject = new SBTPage({
+    network: { id: 84532, name: 'Base Sepolia' },
+    provider: 'mock',
+    ...props,
+  });
+  subject._isMounted = true;
+  subject.setState = jest.fn((next, cb) => {
+    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+    subject.state = { ...subject.state, ...(patch || {}) };
+    if (typeof cb === 'function') cb();
+    return patch;
+  });
+  return subject;
 };
 
 const renderMintActionSurfaceTree = (tree) => {
@@ -52,22 +79,50 @@ describe('SBTPage session routing and holder loading', () => {
         delete navigator.clipboard;
       }
     }
-  });
+    return null;
+  }
+  if (children) return findElementInTree(children, predicate);
+  return null;
+};
 
-  it('does not mark an error copied when error clipboard write rejects', async () => {
-    const subject = createSubject();
-    subject.state = {
-      ...subject.state,
-      error: 'Mint failed: denied',
-    };
-    const originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
-    const writeText = jest.fn().mockRejectedValue(new Error('clipboard denied'));
-    const warnSpy = jest.spyOn(notify, 'warn').mockImplementation(() => undefined);
-    const successSpy = jest.spyOn(notify, 'success').mockImplementation(() => undefined);
-    Object.defineProperty(navigator, 'clipboard', {
-      configurable: true,
-      value: { writeText },
-    });
+const treeIncludesText = (node, text) => {
+  if (node == null) return false;
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node).includes(text);
+  }
+  if (Array.isArray(node)) {
+    return node.some((entry) => treeIncludesText(entry, text));
+  }
+  if (typeof node === 'object') {
+    return treeIncludesText(node?.props?.children, text);
+  }
+  return false;
+};
+
+const flattenText = (node) => {
+  if (node == null) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map((entry) => flattenText(entry)).join('');
+  if (typeof node === 'object') return flattenText(node?.props?.children);
+  return '';
+};
+
+const mockObjectUrlApis = (blobUrl = 'blob:mock') => {
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  const createObjectURL = jest.fn(() => blobUrl);
+  const revokeObjectURL = jest.fn();
+  URL.createObjectURL = createObjectURL;
+  URL.revokeObjectURL = revokeObjectURL;
+  return {
+    createObjectURL,
+    revokeObjectURL,
+    restore: () => {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    },
+  };
+};
 
     try {
       await subject.copyErrorToClipboard();
@@ -3167,100 +3222,6 @@ describe('SBTPage session routing and holder loading', () => {
     const txCache = JSON.parse(localStorage.getItem('transactions') || '{}');
     expect(txCache['0xabc']).toEqual(['0xtx1', '0xtx2']);
     jest.useRealTimers();
-  });
-
-  it('opens mini-card navigation when click originates from the card itself', () => {
-    const { cardNode, sbtAddress } = renderMiniCardNode();
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    const preventDefault = jest.fn();
-    const stopPropagation = jest.fn();
-    const cardTarget = { closest: jest.fn(() => cardTarget) };
-
-    cardNode.props.onClick({
-      target: cardTarget,
-      currentTarget: cardTarget,
-      preventDefault,
-      stopPropagation,
-    });
-
-    expect(openSpy).toHaveBeenCalledWith(
-      `${window.location.origin}${buildSbtDetailPath(sbtAddress)}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
-    expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(stopPropagation).toHaveBeenCalledTimes(1);
-    openSpy.mockRestore();
-  });
-
-  it('hides the mini-card address in plain mode', () => {
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
-    const { cardNode } = renderMiniCardNode();
-
-    expect(findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress)).toBeNull();
-
-    cryptoModeSpy.mockRestore();
-  });
-
-  it('shows the mini-card address in crypto mode', () => {
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
-    const { cardNode, sbtAddress } = renderMiniCardNode();
-    const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
-
-    expect(addressNode).not.toBeNull();
-    expect(flattenText(addressNode)).toContain(proposalScripts.getShortenedAddress(sbtAddress, false));
-
-    cryptoModeSpy.mockRestore();
-  });
-
-  it('includes the resolved session slug in mini-card navigation when one is available', () => {
-    const { cardNode, sbtAddress } = renderMiniCardNode({ sessionSlug: 'edge-private' });
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    const preventDefault = jest.fn();
-    const stopPropagation = jest.fn();
-    const cardTarget = { closest: jest.fn(() => cardTarget) };
-
-    cardNode.props.onClick({
-      target: cardTarget,
-      currentTarget: cardTarget,
-      preventDefault,
-      stopPropagation,
-    });
-
-    expect(openSpy).toHaveBeenCalledWith(
-      `${window.location.origin}${buildSbtDetailPath(sbtAddress, 'edge-private')}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
-    expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(stopPropagation).toHaveBeenCalledTimes(1);
-    openSpy.mockRestore();
-  });
-
-  it('ignores mini-card click and Enter key events from nested interactive elements', () => {
-    const { cardNode } = renderMiniCardNode();
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    const preventDefault = jest.fn();
-    const nestedInteractive = {};
-    const nestedTarget = { closest: jest.fn(() => nestedInteractive) };
-    const currentTarget = {};
-
-    cardNode.props.onClick({
-      target: nestedTarget,
-      currentTarget,
-      preventDefault,
-      stopPropagation: jest.fn(),
-    });
-    cardNode.props.onKeyDown({
-      key: 'Enter',
-      target: nestedTarget,
-      currentTarget,
-      preventDefault,
-    });
-
-    expect(openSpy).not.toHaveBeenCalled();
-    expect(preventDefault).not.toHaveBeenCalled();
-    openSpy.mockRestore();
   });
 
   it('fails password mint pre-validation before startClaim when the claim code is invalid', async () => {
