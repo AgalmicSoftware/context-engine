@@ -254,13 +254,6 @@ describe('sbtPageHelpers status and display helpers', () => {
       isIdle: false,
       isMinted: true,
       isPending: false,
-      readinessDescriptor: {
-        canOpenMintTx: true,
-        hasMintTransactionHash: true,
-        isBurnCleared: false,
-        isMinted: true,
-        isPending: false,
-      },
       title: 'View collect transaction',
     });
     expect(resolveSbtPageOpenMintButtonState({
@@ -274,13 +267,6 @@ describe('sbtPageHelpers status and display helpers', () => {
       isIdle: false,
       isMinted: true,
       isPending: false,
-      readinessDescriptor: {
-        canOpenMintTx: false,
-        hasMintTransactionHash: false,
-        isBurnCleared: false,
-        isMinted: true,
-        isPending: false,
-      },
       title: undefined,
     });
     expect(resolveSbtPageOpenMintButtonState({
@@ -294,13 +280,6 @@ describe('sbtPageHelpers status and display helpers', () => {
       isIdle: false,
       isMinted: false,
       isPending: false,
-      readinessDescriptor: {
-        canOpenMintTx: false,
-        hasMintTransactionHash: true,
-        isBurnCleared: true,
-        isMinted: false,
-        isPending: false,
-      },
       title: undefined,
     });
     expect(resolveSbtPageOpenMintButtonState({
