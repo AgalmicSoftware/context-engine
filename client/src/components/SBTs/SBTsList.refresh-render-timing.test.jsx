@@ -34,10 +34,13 @@ jest.mock('./SBTPage', () => (props) => {
   mockSBTPage(props);
   return (
     <div data-testid="mock-sbt-page">
-      <button type="button" data-testid="mock-sbt-nested-button">
-        Nested Action
-      </button>
-      <div role="button" tabIndex={0} data-testid="mock-sbt-ignore-nav" data-featured-card-ignore-nav="true">
+      <button type="button" data-testid="mock-sbt-nested-button">Nested Action</button>
+      <div
+        role="button"
+        tabIndex={0}
+        data-testid="mock-sbt-ignore-nav"
+        data-featured-card-ignore-nav="true"
+      >
         Nested Custom Action
       </div>
     </div>
@@ -53,10 +56,14 @@ jest.mock('./CreateSBTGroup', () => {
 jest.mock('../TagPage/TagModal', () => (props) => {
   mockTagModal(props);
   if (!props.isOpen) return null;
-  return <div data-testid="mock-tag-modal">{props.activeTag}</div>;
+  return (
+    <div data-testid="mock-tag-modal">
+      {props.activeTag}
+    </div>
+  );
 });
 
-jest.mock('../../utilities/web3/chainGateway.js', () => ({
+jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   default: {
     getRelevantBlockWindowForFilter: (...args) => mockGetRelevantBlockWindowForFilter(...args),
@@ -80,7 +87,6 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 jest.mock('../../utilities/arweave/arweaveUrls.js', () => ({
-  buildArweaveGatewayUrlCandidates: jest.fn((value = '') => [String(value || '').trim()]),
   normalizeArweaveUrl: jest.fn((value = '') => String(value || '').trim()),
 }));
 
@@ -125,11 +131,7 @@ jest.mock('../../utilities/session/sessionDemoCompat.js', () => {
 });
 
 const setupGroupMocks = () => {
-  mockNormalizeSessionSlug.mockImplementation((value = '') =>
-    String(value || '')
-      .trim()
-      .toLowerCase(),
-  );
+  mockNormalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
   mockGetAllSessionEntries.mockReturnValue([
     ['alpha', { slug: 'alpha' }],
     ['beta', { slug: 'beta' }],
@@ -153,18 +155,14 @@ const setupGroupMocks = () => {
   mockReadSessionScanScope.mockReturnValue('all');
   mockReadSessionScanSlugs.mockReturnValue([]);
   mockGetSessionSlugByName.mockImplementation((sessionName) => {
-    const normalized = String(sessionName || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(sessionName || '').trim().toLowerCase();
     if (normalized === 'alpha') return 'alpha';
     if (normalized === 'beta') return 'beta';
     if (normalized === 'general' || normalized === 'context engine') return '';
     return '';
   });
   mockGetDemoSessionConfigBySlug.mockImplementation((slug) => {
-    const normalized = String(slug || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(slug || '').trim().toLowerCase();
     if (normalized === 'edge') {
       return {
         slug: 'edge',
@@ -174,9 +172,7 @@ const setupGroupMocks = () => {
     return null;
   });
   mockGetSessionConfigBySlug.mockImplementation((slug) => {
-    const normalized = String(slug || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(slug || '').trim().toLowerCase();
     if (normalized === 'alpha') {
       return {
         sessionName: 'Alpha',
@@ -205,34 +201,34 @@ const setupGroupMocks = () => {
     };
   });
   mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-    const normalized = String(slug || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(slug || '').trim().toLowerCase();
     if (normalized === 'alpha') {
       return {
-        84532: { lastBlock: 1050, sbtList: {} },
+        '84532': { lastBlock: 1050, sbtList: {} },
       };
     }
     if (normalized === 'beta') {
       return {
-        84532: { lastBlock: 2060, sbtList: {} },
+        '84532': { lastBlock: 2060, sbtList: {} },
       };
     }
     return {
-      84532: { lastBlock: 0, sbtList: {} },
+      '84532': { lastBlock: 0, sbtList: {} },
     };
   });
   mockReadCache.mockResolvedValue({
-    84532: {
+    '84532': {
       sbtList: {},
       lastBlock: 0,
     },
   });
   mockListNamespaceEntriesSync.mockReturnValue([]);
   mockGetRelevantBlockWindowForFilter.mockImplementation(async (slugInput) => {
-    const normalized = String(slugInput && typeof slugInput === 'object' ? slugInput.slug || '' : slugInput || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(
+      slugInput && typeof slugInput === 'object'
+        ? (slugInput.slug || '')
+        : (slugInput || '')
+    ).trim().toLowerCase();
     if (normalized === 'alpha') return { fromBlock: 1000, toBlock: 1100 };
     if (normalized === 'beta') return { fromBlock: 2000, toBlock: 2200 };
     return { fromBlock: 1, toBlock: 1 };
@@ -276,9 +272,7 @@ describe('SBTsList refresh render timing', () => {
 
   afterAll(() => {
     if (typeof ORIGINAL_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP === 'undefined') {
-      try {
-        delete globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP;
-      } catch (_) {}
+      try { delete globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP; } catch (_) {}
     } else {
       globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP = ORIGINAL_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP;
     }
@@ -288,7 +282,7 @@ describe('SBTsList refresh render timing', () => {
     localStorage.removeItem('dg:sbt:deferredFullScanNeeded:alpha');
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const liveCache = {
-      84532: {
+      '84532': {
         sbtList: {
           [alphaAddress.toLowerCase()]: {
             sbtAddress: alphaAddress,
@@ -316,10 +310,8 @@ describe('SBTsList refresh render timing', () => {
     });
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
-      if (normalized !== 'alpha') return { 84532: { sbtList: {}, lastBlock: 0 } };
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized !== 'alpha') return { '84532': { sbtList: {}, lastBlock: 0 } };
       alphaReadCount += 1;
       if (alphaReadCount === 1) return liveCache;
       return secondRead;
@@ -341,7 +333,7 @@ describe('SBTsList refresh render timing', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -364,7 +356,7 @@ describe('SBTsList refresh render timing', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -391,13 +383,10 @@ describe('SBTsList refresh render timing', () => {
     });
     expect(screen.getByTestId('section-spinner-live')).toBeInTheDocument();
 
-    await waitFor(
-      () => {
-        expect(screen.queryByTestId('section-spinner-live')).not.toBeInTheDocument();
-        expect(screen.getByText('Alpha Live Badge')).toBeInTheDocument();
-      },
-      { timeout: 2500 },
-    );
+    await waitFor(() => {
+      expect(screen.queryByTestId('section-spinner-live')).not.toBeInTheDocument();
+      expect(screen.getByText('Alpha Live Badge')).toBeInTheDocument();
+    }, { timeout: 2500 });
   });
 
   it('does not disable admin refresh controls during revision-only cache refresh ticks', async () => {
@@ -405,7 +394,7 @@ describe('SBTsList refresh render timing', () => {
     localStorage.removeItem('dg:sbt:deferredFullScanNeeded:alpha');
     const alphaAddress = '0x00000000000000000000000000000000000000a1';
     const liveCache = {
-      84532: {
+      '84532': {
         sbtList: {
           [alphaAddress.toLowerCase()]: {
             sbtAddress: alphaAddress,
@@ -433,10 +422,8 @@ describe('SBTsList refresh render timing', () => {
     });
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
-      if (normalized !== 'alpha') return { 84532: { sbtList: {}, lastBlock: 0 } };
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized !== 'alpha') return { '84532': { sbtList: {}, lastBlock: 0 } };
       alphaReadCount += 1;
       if (alphaReadCount === 1) return liveCache;
       return secondRead;
@@ -457,7 +444,7 @@ describe('SBTsList refresh render timing', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -485,7 +472,7 @@ describe('SBTsList refresh render timing', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -504,7 +491,7 @@ describe('SBTsList refresh render timing', () => {
     localStorage.removeItem('dg:sbt:fullScanInProgress:alpha');
     localStorage.removeItem('dg:sbt:deferredFullScanNeeded:alpha');
     const emptyCache = {
-      84532: {
+      '84532': {
         sbtList: {},
         lastBlock: 1100,
       },
@@ -516,9 +503,7 @@ describe('SBTsList refresh render timing', () => {
     });
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
+      const normalized = String(slug || '').trim().toLowerCase();
       if (normalized !== 'alpha') return emptyCache;
       alphaReadCount += 1;
       if (alphaReadCount === 1) return emptyCache;
@@ -541,18 +526,15 @@ describe('SBTsList refresh render timing', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await waitFor(() => {
       expect(screen.getAllByText('Loading…').length).toBeGreaterThan(0);
     });
-    await waitFor(
-      () => {
-        expect(screen.getByText('No live groups.')).toBeInTheDocument();
-      },
-      { timeout: 2500 },
-    );
+    await waitFor(() => {
+      expect(screen.getByText('No live groups.')).toBeInTheDocument();
+    }, { timeout: 2500 });
 
     rerender(
       <SBTsList
@@ -570,7 +552,7 @@ describe('SBTsList refresh render timing', () => {
         refreshSbtData={jest.fn()}
         latestBlockNumber={0}
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -592,17 +574,15 @@ describe('SBTsList refresh render timing', () => {
     mockReadSessionScanSlugs.mockReturnValue(['alpha']);
 
     const watermarkEmptyCache = {
-      84532: {
+      '84532': {
         sbtList: {},
         lastBlock: 1100,
       },
     };
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
-      if (normalized !== 'alpha') return { 84532: { sbtList: {}, lastBlock: 0 } };
+      const normalized = String(slug || '').trim().toLowerCase();
+      if (normalized !== 'alpha') return { '84532': { sbtList: {}, lastBlock: 0 } };
       return watermarkEmptyCache;
     });
 
@@ -623,7 +603,7 @@ describe('SBTsList refresh render timing', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await openSessionSelector();
@@ -648,7 +628,7 @@ describe('SBTsList refresh render timing', () => {
     mockReadSessionScanSlugs.mockReturnValue(['alpha']);
 
     const emptyCache = {
-      84532: {
+      '84532': {
         sbtList: {},
         lastBlock: 1100,
       },
@@ -660,9 +640,7 @@ describe('SBTsList refresh render timing', () => {
     });
 
     mockReadCache.mockImplementation(async (_namespace, slug) => {
-      const normalized = String(slug || '')
-        .trim()
-        .toLowerCase();
+      const normalized = String(slug || '').trim().toLowerCase();
       if (normalized !== 'alpha') return emptyCache;
       alphaReadCount += 1;
       if (alphaReadCount === 1) return emptyCache;
@@ -686,15 +664,12 @@ describe('SBTsList refresh render timing', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
-    await waitFor(
-      () => {
-        expect(screen.getByText('No live groups.')).toBeInTheDocument();
-      },
-      { timeout: 2500 },
-    );
+    await waitFor(() => {
+      expect(screen.getByText('No live groups.')).toBeInTheDocument();
+    }, { timeout: 2500 });
 
     rerender(
       <SBTsList
@@ -713,7 +688,7 @@ describe('SBTsList refresh render timing', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await waitFor(() => {
