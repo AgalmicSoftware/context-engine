@@ -147,14 +147,6 @@ const override = function override(config, env) {
     __dirname, 'src', 'shims', 'metamask-superstruct.js'
   );
 
-  // existing ffmpeg mock
-  config.resolve.alias['@ffmpeg/ffmpeg'] = path.join(
-    __dirname,
-    '__mocks__',
-    '@ffmpeg',
-    'ffmpeg'
-  );
-
   // Force CJS build to avoid webpack 4 named-export checks against ESM-only entry
   config.resolve.alias['zod-validation-error$'] = path.resolve(
     __dirname,
