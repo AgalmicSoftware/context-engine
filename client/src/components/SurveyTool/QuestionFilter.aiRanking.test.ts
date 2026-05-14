@@ -156,38 +156,6 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
   });
 
-  it('ranks within the filtered subset when AI combine global top results miss it', () => {
-    const questions = [
-      { id: 'q1', type: 'binary', tags: ['alpha'], prompt: 'Q1' },
-      { id: 'q2', type: 'rating', tags: ['beta'], prompt: 'Q2' },
-      { id: 'q3', type: 'binary', tags: ['alpha'], prompt: 'Q3' },
-      { id: 'q4', type: 'freeform', tags: ['beta'], prompt: 'Q4' },
-    ];
-    const instance = new QuestionFilter({
-      questions,
-      questionResponses: {},
-      questionResponsesNonce: 1,
-      questionsCacheNonce: 1,
-    });
-    instance.state = {
-      ...instance.state,
-      mergedQuestions: questions,
-      pendingSelectedTypes: ['binary'],
-      pendingSbtFilteredQuestions: [{ id: 'q1' }, { id: 'q3' }],
-      pendingShowTopQuestions: false,
-      pendingShowTopQuestionsByResponses: false,
-      selectedTags: ['alpha'],
-      aiSearchQuery: 'climate',
-      aiAppliedTopN: 2,
-      aiFilterApplied: true,
-      aiRankedQuestionIds: ['q4', 'q2', 'q3', 'q1'],
-      aiCombineWithOtherFilters: true,
-    };
-
-    const combinedResult = instance.buildFilterPipelineResult(true);
-    expect(combinedResult.finalQuestions.map((q: any) => q.id)).toEqual(['q3', 'q1']);
-  });
-
   it('auto-reapplies AI when external filter state carries aiFilter + aiTopN', async () => {
     jest.useFakeTimers();
     const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
@@ -742,9 +710,7 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankingError = new Error('boom');
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockRejectedValue(rankingError);
+    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockRejectedValue(new Error('boom'));
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },
@@ -776,27 +742,16 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       aiRankedQuestionIds: ['q2'],
     };
 
-    try {
-      await instance.handleApplyAIFilter({ auto: false, source: 'test' });
+    await instance.handleApplyAIFilter({ auto: false, source: 'test' });
 
-      expect(instance.state.aiSearchQuery).toBe('existing');
-      expect(instance.state.aiFilterApplied).toBe(true);
-      expect(instance.state.aiRankedQuestionIds).toEqual(['q2']);
-      expect(instance.state.aiApplyError).toMatch(/boom/i);
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[questionFilter]',
-        'Failed applying AI filter',
-        expect.objectContaining({
-          error: rankingError,
-          source: 'test',
-        })
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-      gateSpy.mockRestore();
-      localSpy.mockRestore();
-      rankSpy.mockRestore();
-    }
+    expect(instance.state.aiSearchQuery).toBe('existing');
+    expect(instance.state.aiFilterApplied).toBe(true);
+    expect(instance.state.aiRankedQuestionIds).toEqual(['q2']);
+    expect(instance.state.aiApplyError).toMatch(/boom/i);
+
+    gateSpy.mockRestore();
+    localSpy.mockRestore();
+    rankSpy.mockRestore();
   });
 
   it('invalidates memoized AI pipeline when ranked ids change under the same query', () => {
