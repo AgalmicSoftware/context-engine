@@ -94,7 +94,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Create any new git worktrees for this repo under the repo-local scratch area,
   typically `.codex/scratch/<descriptive-name>`. Do not create sibling worktree
   directories directly under `/Users/charlie/Desktop/xoCortex/projects/`.
-- Commit convention for automated changes: `<type>(autocoder): <short imperative summary>` (for example, `fix(autocoder): guard empty response payload`). Use `feat`, `fix`, `refactor`, `test`, `docs`, or `chore` as the type.
+- Commit convention for automated changes: `<type>: <short imperative summary>` (for example, `fix: guard empty response payload`). Use `feat`, `fix`, `refactor`, `test`, `docs`, or `chore` as the type.
 - Keep commit messages concise: imperative subject, no trailing period, no internal planning identifiers, and an optional body capped at 0-3 short lines when helpful.
 - Commit messages must describe the change by what it does, not by internal planning IDs or tracking names. Planning IDs churn and referencing them ties public commit history to internal bookkeeping.
 - Keep fixture/test data non-identifying (no real names, emails, API keys)
