@@ -7,8 +7,9 @@
 - Pile helper cluster: `client/src/components/SurveyTool/surveyPile*.ts(x)`
 - Current lengths:
   - `SurveyTool.tsx`: **1,225 lines**
-  - `SurveyQuestions.tsx`: **9,326 lines**
+  - `SurveyQuestions.tsx`: **9,375 lines**
   - `SurveyPileViewMode.tsx`: **2,587 lines**
+  - `surveyQuestionsJsonDerivation.ts`: **119 lines**
 - Summary: the runtime is no longer one monolithic file, but `SurveyQuestions.tsx` is still the dominant shared state machine. `PileViewMode` now owns much more of the pile-specific orchestration, while still intentionally reusing shared hydration, draft, decrypt, and submit semantics from `SurveyQuestions`.
 
 ## Current Runtime Hierarchy
@@ -144,6 +145,11 @@ The first shared-core move is no longer hypothetical. The following seams are al
   - pure response payload builder for `prepareJsonAndHash`
   - `buildResponsePayload` — builds canonical response JSON for single-question, standalone, and survey modes
   - handles answered-question filtering, importance-to-conviction fallback, encryption gate resolution
+- `surveyQuestionsJsonDerivation.ts`
+  - pure JSON-display derivation for the response-copy/preview surface
+  - `buildSurveyQuestionsJson` — selects question JSON for full vs single-question mode
+  - `shouldUseSubmittedResponseJson` and `buildSubmittedResponseJson` — choose and normalize submitted response JSON without touching submit/decrypt state
+  - `buildSurveyDefinitionJson` — expands survey `questionIDs` into question objects for survey JSON display
 - `surveyToolAudienceDerivationController.ts`
   - audience/gate derivation for encryption policy resolution
   - `getQuestionEncryptionGates` — encryption gate array extraction from question config
