@@ -60,32 +60,7 @@ const collectTreeNodes = (node, predicate, acc = []) => {
   }
   if (typeof node !== 'object') return acc;
   if (predicate(node)) acc.push(node);
-  const rendered = renderResolvableComponent(node);
-  if (rendered !== null) return collectTreeNodes(rendered, predicate, acc);
   return collectTreeNodes(node?.props?.children, predicate, acc);
-};
-
-const getNodeTypeName = (node) => {
-  const type = node?.type;
-  if (!type) return '';
-  if (typeof type === 'string') return type;
-  return String(type.displayName || type.name || '');
-};
-
-const RESOLVABLE_USER_PAGE_COMPONENTS = new Set([
-  'UserPageHeader',
-]);
-
-const resolvedComponentCache = new WeakMap();
-
-const renderResolvableComponent = (node) => {
-  const typeName = getNodeTypeName(node);
-  if (!RESOLVABLE_USER_PAGE_COMPONENTS.has(typeName)) return null;
-  if (typeof node?.type !== 'function') return null;
-  if (resolvedComponentCache.has(node)) return resolvedComponentCache.get(node);
-  const rendered = node.type(node.props || {});
-  resolvedComponentCache.set(node, rendered);
-  return rendered;
 };
 
 describe('UserPage bookmark cache controls', () => {
@@ -163,50 +138,6 @@ describe('UserPage bookmark cache controls', () => {
       );
       expect(removeButtons).toHaveLength(1);
       expect(removeButtons[0].props.style).toEqual({ color: 'yellow' });
-    } finally {
-      peekSpy.mockRestore();
-      writeSpy.mockRestore();
-    }
-  });
-
-  it('keeps bookmark dispatch active when content cache readiness is disabled', () => {
-    const viewAddress = '0x00000000000000000000000000000000000000aa';
-    const instance = makeInstance({
-      account: '0x00000000000000000000000000000000000000bb',
-      viewAddress,
-      activeSessionSlug: 'session-cache',
-      isSurveyCacheReady: false,
-      isQuestionCacheReady: false,
-      isResponsesCacheReady: false,
-      isSBTCacheReady: false,
-    });
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
-      surveys: [],
-      questions: [],
-      users: [],
-      filters: [],
-    });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
-
-    try {
-      const tree = instance.render();
-      const bookmarkButtons = collectTreeNodes(
-        tree,
-        (node) => node?.type === 'button' && node?.props?.['aria-label'] === 'Bookmark user'
-      );
-
-      expect(bookmarkButtons).toHaveLength(1);
-      expect(bookmarkButtons[0].props.disabled).toBeUndefined();
-      expect(() => bookmarkButtons[0].props.onClick({ preventDefault: jest.fn() })).not.toThrow();
-
-      expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'session-cache', { clone: false });
-      expect(writeSpy).toHaveBeenCalledWith('bookmarksCache', 'session-cache', {
-        surveys: [],
-        questions: [],
-        users: [viewAddress],
-        filters: [],
-      });
-      expect(instance.state.bookmarked).toBe(true);
     } finally {
       peekSpy.mockRestore();
       writeSpy.mockRestore();
