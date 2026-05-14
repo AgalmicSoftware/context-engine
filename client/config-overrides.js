@@ -22,9 +22,6 @@ const override = function override(config, env) {
 
   // Contract sources use explicit raw-loader imports, and the worker bundle is
   // served via CopyPlugin, so the repo no longer injects global .sol/.html/.txt rules.
-  // Web Workers
-  config.module.rules.push({ test: /\.worker\.js$/, use: { loader: 'worker-loader' } });
-
   // ESM tweak for webpack 4 (.mjs in node_modules)
   config.module.rules.push({ test: /\.mjs$/, include: /node_modules/, type: 'javascript/auto' });
 
@@ -74,11 +71,6 @@ const override = function override(config, env) {
     new webpack.ProvidePlugin({
       process: 'process/browser',
       Buffer: ['buffer/', 'Buffer'],
-    }),
-
-    // 🔁 One-file shim for *all* `permissionless` imports
-    new webpack.NormalModuleReplacementPlugin(/^permissionless(\/.*)?$/, (resource) => {
-      resource.request = path.resolve(__dirname, 'src/shims/permissionless-all.js');
     }),
 
     // 🔁 Lit contracts subpath shim for webpack 4 (no "exports" support)
@@ -150,22 +142,9 @@ const override = function override(config, env) {
   // Force modern buffer implementation (node-libs-browser@buffer@4 lacks writeBigUInt64BE).
   config.resolve.alias.buffer = require.resolve('buffer/');
 
-  // ⛔️ Do NOT set config.resolve.alias['permissionless'] — we use the replacement plugin above.
-
   // MetaMask shims
   config.resolve.alias['@metamask/superstruct'] = path.resolve(
     __dirname, 'src', 'shims', 'metamask-superstruct.js'
-  );
-  config.resolve.alias['@metamask/delegation-utils'] = path.resolve(
-    __dirname, 'src', 'shims', 'metamask-delegation-utils.js'
-  );
-
-  // existing ffmpeg mock
-  config.resolve.alias['@ffmpeg/ffmpeg'] = path.join(
-    __dirname,
-    '__mocks__',
-    '@ffmpeg',
-    'ffmpeg'
   );
 
   // Force CJS build to avoid webpack 4 named-export checks against ESM-only entry
@@ -192,25 +171,6 @@ const override = function override(config, env) {
     'node-worker-threads.js'
   );
 
-  // OpenTelemetry exporter subpath shims for webpack 4 (no package "exports" subpath support).
-  config.resolve.alias['@opentelemetry/otlp-exporter-base/browser-http$'] = path.resolve(
-    __dirname,
-    'node_modules',
-    '@opentelemetry',
-    'otlp-exporter-base',
-    'build',
-    'esm',
-    'index-browser-http.js'
-  );
-  config.resolve.alias['@opentelemetry/otlp-exporter-base/node-http$'] = path.resolve(
-    __dirname,
-    'node_modules',
-    '@opentelemetry',
-    'otlp-exporter-base',
-    'build',
-    'esm',
-    'index-node-http.js'
-  );
   config.resolve.alias['source-map-support/register$'] = path.resolve(
     __dirname,
     'src',
@@ -269,24 +229,6 @@ override.jest = (config) => {
     [`^ox\\/${oxScopedPrefixes}$`]: `${oxCjsBase}/$1/index.js`,
     [`^ox\\/${oxScopedPrefixes}\\/(.*)$`]: `${oxCjsBase}/$1/$2.js`,
     '^ox\\/([A-Z].*)$': `${oxCjsBase}/core/$1.js`,
-    '^@opentelemetry/otlp-exporter-base/browser-http$': path.join(
-      '<rootDir>',
-      'node_modules',
-      '@opentelemetry',
-      'otlp-exporter-base',
-      'build',
-      'esm',
-      'index-browser-http.js'
-    ),
-    '^@opentelemetry/otlp-exporter-base/node-http$': path.join(
-      '<rootDir>',
-      'node_modules',
-      '@opentelemetry',
-      'otlp-exporter-base',
-      'build',
-      'esm',
-      'index-node-http.js'
-    ),
   };
   return next;
 };
