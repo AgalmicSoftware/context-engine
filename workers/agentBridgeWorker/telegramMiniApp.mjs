@@ -639,6 +639,26 @@ function normalizeText(value = '', maxLength = 4000) {
   return safeString(value).slice(0, maxLength);
 }
 
+function submitFailureMessage(result = {}) {
+  const reason = safeString(result.reason || result.status || 'submit_request_failed');
+  const detail = safeString(result.error || result.onChain?.error || result.onChain?.reason || '');
+  let message = 'Could not submit this answer.';
+  if (reason === 'worker_auth_failed') {
+    message = 'Could not authenticate the managed Telegram account with the session worker.';
+  } else if (reason === 'direct_submit_failed') {
+    message = 'Could not broadcast the response transaction.';
+  } else if (reason === 'submit_request_incomplete') {
+    message = 'Submit request is missing the session, user, or question reference.';
+  } else if (reason === 'action_kv_unavailable') {
+    message = 'Submit request storage is unavailable.';
+  }
+  return {
+    reason,
+    detail,
+    message: detail ? `${message} Detail: ${detail}` : message,
+  };
+}
+
 function normalizeChoiceValues(answer = {}) {
   const raw = Array.isArray(answer.values)
     ? answer.values
@@ -996,7 +1016,15 @@ async function handleDraftRequest({
     })
     : null;
   if (submitRequest && !submitRequest.ok) {
-    return json({ ok: false, error: submitRequest.reason || 'submit_request_failed' }, { status: 503 });
+    const failure = submitFailureMessage(submitRequest);
+    return json({
+      ok: false,
+      error: failure.reason,
+      reason: failure.reason,
+      message: failure.message,
+      detail: failure.detail,
+      status: submitRequest.status || '',
+    }, { status: 503 });
   }
 
   return json({
@@ -1366,9 +1394,13 @@ function telegramMiniAppHtml() {
     };
     function shouldRetryQuestions(data) {
       const questions = Array.isArray(data?.questions) ? data.questions : [];
-      return data?.sourceOk === false ||
+      const answerableCount = questions.filter((question) => question?.canAnswer).length;
+      const unavailableCount = questions.filter((question) => question?.payloadUnavailable === true).length;
+      return answerableCount === 0 && (
+        data?.sourceOk === false ||
         Number(data?.questionCount || 0) === 0 ||
-        questions.some((question) => question.payloadUnavailable === true);
+        unavailableCount > 0
+      );
     }
     function clearQuestionRetry() {
       if (state.retryTimer) window.clearTimeout(state.retryTimer);
@@ -1604,7 +1636,7 @@ function telegramMiniAppHtml() {
       }
       if (submit) setSubmitBusy(false, triggerButton);
       if (!response.ok || !body.ok) {
-        setStatus(body.error || 'Could not save answer.', 'error');
+        setStatus(body.message || body.error || 'Could not save answer.', 'error');
         return;
       }
       setStatus(['submit_request_created', 'direct_submitted'].includes(body.status) ? 'Submitted.' : 'Draft saved.', 'ok');

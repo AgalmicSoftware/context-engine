@@ -108,6 +108,7 @@ function makeQuestionFetch({
   questionId = `0x${'11'.repeat(32)}`,
   pointerBytes = `0x${'22'.repeat(32)}`,
   prompt = 'Should the demo use real session questions?',
+  sessionSlug = 'demo',
 } = {}) {
   const calls = [];
   const txId = __test__sessionQuestions.hexToBase64url(pointerBytes);
@@ -117,6 +118,7 @@ function makeQuestionFetch({
       assert.equal(String(url), `https://ar-io.dev/${txId}`);
       return new Response(JSON.stringify({
         id: questionId,
+        sessionSlug,
         type: 'freeform',
         prompt,
       }), {
@@ -200,6 +202,7 @@ test('normalizeQuestionPayload preserves CE question type and treats sessionName
       options: [{ label: 'Mini App' }, { text: 'Bot only' }, 'Both'],
       singleSelect: true,
       sessionName: 'demo-4',
+      sessionSlug: 'fallback',
     },
   }, {
     questionId,
@@ -236,6 +239,7 @@ test('normalizeQuestionPayload classifies encrypted question metadata with requi
         }],
       },
       sessionName: 'demo-4',
+      sessionSlug: 'fallback',
     },
   }, {
     questionId,
@@ -252,7 +256,32 @@ test('normalizeQuestionPayload classifies encrypted question metadata with requi
   assert.equal(normalized.encryption.gates[0].label, 'Member Gate');
 });
 
-test('listCachedSessionQuestionsForBridge skips payloads that belong to another session', async () => {
+test('normalizeQuestionPayload leaves empty encryption gates public without encrypted fields', () => {
+  const questionId = `0x${'95'.repeat(32)}`;
+  const normalized = __test__sessionQuestions.normalizeQuestionPayload({
+    questionData: {
+      id: questionId,
+      type: 'freeform',
+      prompt: 'Public question with empty gate metadata',
+      sessionSlug: 'demo',
+      encryption: {
+        enabled: true,
+        gates: [],
+      },
+    },
+  }, {
+    questionId,
+    pointerId: __test__sessionQuestions.hexToBase64url(`0x${'96'.repeat(32)}`),
+    sessionSlug: 'demo',
+  });
+
+  assert.equal(normalized.visibility, 'public');
+  assert.equal(normalized.encrypted, undefined);
+  assert.equal(normalized.prompt, 'Public question with empty gate metadata');
+  assert.equal(normalized.encryption, undefined);
+});
+
+test('listCachedSessionQuestionsForBridge skips payloads missing canonical sessionSlug', async () => {
   __test__sessionQuestions.questionMemoryCache.clear();
   const alphaQuestionId = `0x${'a1'.repeat(32)}`;
   const demoQuestionId = `0x${'b2'.repeat(32)}`;
@@ -274,11 +303,11 @@ test('listCachedSessionQuestionsForBridge skips payloads that belong to another 
       const isDemo = txId === txByPointer[demoPointer];
       return new Response(JSON.stringify({
         id: isDemo ? demoQuestionId : alphaQuestionId,
-        sessionSlug: isDemo ? 'demo' : 'alpha',
+        ...(isDemo ? { sessionSlug: 'demo' } : {}),
         type: 'freeform',
         prompt: isDemo
           ? 'Question scoped to Demo?'
-          : 'Question scoped to Alpha?',
+          : 'Question missing a canonical slug?',
       }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -363,6 +392,7 @@ test('listCachedSessionQuestionsForBridge serves first available questions while
       const txId = String(url).split('/').pop();
       return new Response(JSON.stringify({
         id: txId === txByPointer[recentPointer] ? recentQuestionId : olderQuestionId,
+        sessionSlug: 'demo',
         type: 'freeform',
         prompt: promptByTx[txId],
       }), {
@@ -451,6 +481,7 @@ test('listCachedSessionQuestionsForBridge replies after bounded foreground index
       assert.equal(String(url), `https://ar-io.dev/${olderTx}`);
       return new Response(JSON.stringify({
         id: olderQuestionId,
+        sessionSlug: 'demo',
         type: 'freeform',
         prompt: 'Older question appears after background indexing',
       }), {
@@ -552,6 +583,7 @@ test('listCachedSessionQuestionsForBridge schedules background refresh for fresh
       assert.equal(String(url), `https://ar-io.dev/${olderTx}`);
       return new Response(JSON.stringify({
         id: olderQuestionId,
+        sessionSlug: 'demo',
         type: 'freeform',
         prompt: 'Fresh partial cache continued in background',
       }), {
@@ -669,6 +701,7 @@ test('listCachedSessionQuestionsForBridge uses registry metadata block limits fo
       assert.equal(String(url), `https://ar-io.dev/${txId}`);
       return new Response(JSON.stringify({
         id: questionId,
+        sessionSlug: 'demo',
         type: 'freeform',
         prompt: 'Question from scoped metadata?',
       }), {
@@ -758,6 +791,7 @@ test('listCachedSessionQuestionsForBridge falls through empty registry tuples to
       assert.equal(String(url), `https://ar-io.dev/${txId}`);
       return new Response(JSON.stringify({
         id: questionId,
+        sessionSlug: 'demo-4',
         type: 'freeform',
         prompt: 'Question after stale RPC fallback?',
       }), {
@@ -853,6 +887,7 @@ test('listCachedSessionQuestionsForBridge falls back across Arweave gateways for
       assert.equal(urlText, `https://arweave.net/${txId}`);
       return new Response(JSON.stringify({
         id: questionId,
+        sessionSlug: 'demo',
         type: 'freeform',
         prompt: 'Question from fallback gateway?',
       }), {
@@ -945,6 +980,7 @@ test('listCachedSessionQuestionsForBridge reads Arweave raw payload fallback bef
       if (urlText === `https://ar-io.dev/raw/${txId}`) {
         return new Response(JSON.stringify({
           id: questionId,
+          sessionSlug: 'demo',
           type: 'binary',
           prompt: 'Raw gateway payload is usable?',
         }), {
@@ -1128,6 +1164,7 @@ test('listCachedSessionQuestionsForBridge honors session metadata Surveys addres
       assert.equal(String(url), `https://ar-io.dev/${txId}`);
       return new Response(JSON.stringify({
         id: questionId,
+        sessionSlug: 'demo',
         type: 'freeform',
         prompt: 'Question from metadata contract?',
       }), {
@@ -1471,6 +1508,7 @@ test('listCachedSessionQuestionsForBridge serves KV cache without RPC calls', as
       questionId: `0x${'33'.repeat(32)}`,
       id: `0x${'33'.repeat(32)}`,
       questionType: 'freeform',
+      sessionSlug: 'demo',
       prompt: 'Cached question?',
       visibility: 'public',
       source: 'live_session_question',
@@ -1494,6 +1532,64 @@ test('listCachedSessionQuestionsForBridge serves KV cache without RPC calls', as
   assert.equal(result.ok, true);
   assert.equal(result.cacheLayer, 'kv');
   assert.equal(result.questions[0].prompt, 'Cached question?');
+});
+
+test('listCachedSessionQuestionsForBridge refreshes fresh cache when all cached questions are scoped out', async () => {
+  __test__sessionQuestions.questionMemoryCache.clear();
+  const legacyQuestionId = `0x${'43'.repeat(32)}`;
+  const freshQuestionId = `0x${'45'.repeat(32)}`;
+  const cached = {
+    ok: true,
+    reason: 'live_questions_loaded',
+    sessionSlug: 'demo',
+    source: 'live_session_question_cache',
+    cachedAtMs: Date.now(),
+    complete: true,
+    indexedFromBlock: 90,
+    indexedToBlock: 100,
+    targetFromBlock: 90,
+    targetToBlock: 100,
+    questions: [{
+      questionId: legacyQuestionId,
+      id: legacyQuestionId,
+      questionType: 'freeform',
+      prompt: 'Cached legacy no-slug question?',
+      visibility: 'public',
+      source: 'live_session_question',
+    }],
+    questionCount: 1,
+  };
+  const { calls, fetchImpl } = makeQuestionFetch({
+    questionId: freshQuestionId,
+    prompt: 'Fresh scoped replacement question?',
+    sessionSlug: 'demo',
+  });
+  const env = baseEnv({
+    AGENT_ACTION_KV: new MemoryKv({
+      'telegram:questions:v5:demo': JSON.stringify(cached),
+    }),
+  });
+
+  const result = await listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug: 'demo',
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.cacheLayer, 'fresh');
+  assert.equal(result.questionCount, 1);
+  assert.equal(result.questions[0].questionId, freshQuestionId);
+  assert.equal(result.questions[0].sessionSlug, 'demo');
+  assert.equal(result.questions[0].prompt, 'Fresh scoped replacement question?');
+  assert.equal(calls.some(([, init = {}]) => {
+    const body = JSON.parse(init.body || '{}');
+    return body.method === 'eth_getLogs';
+  }), true);
+  const stored = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v5:demo'));
+  assert.equal(stored.questionCount, 1);
+  assert.equal(stored.questions[0].questionId, freshQuestionId);
+  assert.equal(stored.questions[0].sessionSlug, 'demo');
 });
 
 test('listCachedSessionQuestionsForBridge filters stale KV cache records from other sessions', async () => {
@@ -1523,8 +1619,16 @@ test('listCachedSessionQuestionsForBridge filters stale KV cache records from ot
         visibility: 'public',
         source: 'live_session_question',
       },
+      {
+        questionId: `0x${'66'.repeat(32)}`,
+        id: `0x${'66'.repeat(32)}`,
+        questionType: 'freeform',
+        prompt: 'Cached legacy no-slug question?',
+        visibility: 'public',
+        source: 'live_session_question',
+      },
     ],
-    questionCount: 2,
+    questionCount: 3,
   };
   const env = baseEnv({
     AGENT_ACTION_KV: new MemoryKv({
@@ -1543,6 +1647,6 @@ test('listCachedSessionQuestionsForBridge filters stale KV cache records from ot
   assert.equal(result.ok, true);
   assert.equal(result.cacheLayer, 'kv');
   assert.equal(result.questionCount, 1);
-  assert.equal(result.skippedSessionMismatchCount, 1);
+  assert.equal(result.skippedSessionMismatchCount, 2);
   assert.equal(result.questions[0].prompt, 'Cached demo question?');
 });

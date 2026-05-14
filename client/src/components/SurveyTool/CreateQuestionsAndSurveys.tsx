@@ -2342,7 +2342,18 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
 
     if (!this.props.loginComplete) {
-      this.props.toggleLoginModal!(true);
+      if (typeof this.props.toggleLoginModal === 'function') {
+        this.props.toggleLoginModal(true);
+        this.setState({
+          ...buildCreateSurveySubmitResetPatch(),
+          submissionError: '',
+          formValidationError: '',
+        });
+        return;
+      }
+      this.setState(buildCreateSurveySubmitFailurePatch(
+        `Log in to create ${this.state.isStandaloneQuestion ? 'questions' : 'this survey'}.`
+      ));
       return;
     }
 
@@ -2639,6 +2650,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               creator: this.props.account,
               associatedSurveyId: surveyContextId,
               sessionName: _sessionName,
+              sessionSlug: sessionSlug || '',
             };
             if (questionEncryption && questionEncryption.recipients.length) {
               qD.encryption = buildAuthoringEncryptionPayload({
@@ -2795,6 +2807,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               creator: this.props.account,
               associatedSurveyId: surveyIDForUpload,
               sessionName: _sessionName,
+              sessionSlug: sessionSlug || '',
             };
             if (questionEncryption && questionEncryption.recipients.length) {
               base.encryption = buildAuthoringEncryptionPayload({
