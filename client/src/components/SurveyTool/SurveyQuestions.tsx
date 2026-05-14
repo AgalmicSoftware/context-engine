@@ -9037,7 +9037,7 @@ export class SurveyQuestions extends Component {
       });
     });
 
-    return Array.from(detailsByKey.values()).map((detail) => ({
+    const questionGateDetails = Array.from(detailsByKey.values()).map((detail) => ({
       ...detail,
       questionCount: detail.questionIds.size,
       sbts: detail.sbtAddresses.map((address) => ({
@@ -9046,6 +9046,8 @@ export class SurveyQuestions extends Component {
         href: buildSbtDetailPath(address, detail.sessionSlug || slug),
       })),
     }));
+    if (questionGateDetails.length > 0) return questionGateDetails;
+    return this.buildSessionQuestionGateDetails(hiddenIds.size || 1);
   };
 
   getLockedQuestionGateSourcePool = (hiddenMaskedQuestionIds = []) => {
@@ -9117,6 +9119,54 @@ export class SurveyQuestions extends Component {
       value: nextValue,
     };
     return nextValue;
+  };
+
+  buildSessionQuestionGateDetails = (questionCount = 0) => {
+    const count = Math.max(1, Number(questionCount || 0) || 1);
+    const slug = String(
+      (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : '') ||
+      resolveEffectiveSlug(this.props) ||
+      ''
+    ).trim().toLowerCase();
+    const options = this.getResponseGateOptions(null);
+    return (Array.isArray(options) ? options : [])
+      .map((option, index) => {
+        const sbtAddresses = Array.from(new Set(
+          (Array.isArray(option?.sbtAddresses) ? option.sbtAddresses : [])
+            .map((address) => String(address || '').trim())
+            .filter(Boolean)
+        ));
+        if (!sbtAddresses.length) return null;
+        const id = `session:${option.gateId || index}:${sbtAddresses.map((address) => address.toLowerCase()).sort().join('|')}`;
+        const sessionSlug = slug || normalizeSessionSlugValue(option?.sessionSlug || '');
+        return {
+          id,
+          label: option.label || t('gate'),
+          sbtAddresses,
+          questionIds: new Set(),
+          questionCount: count,
+          sessionSlug,
+          sbts: sbtAddresses.map((address) => ({
+            address,
+            label: this.resolveSbtGateLabel(address, sessionSlug) || getShortenedAddress(address, false),
+            href: buildSbtDetailPath(address, sessionSlug),
+          })),
+        };
+      })
+      .filter(Boolean);
+  };
+
+  getLockedGateRequirementSentence = (lockedGateDetails = []) => {
+    const labels = Array.from(new Set(
+      (Array.isArray(lockedGateDetails) ? lockedGateDetails : [])
+        .flatMap((gate) => Array.isArray(gate?.sbts) ? gate.sbts : [])
+        .map((sbt) => String(sbt?.label || sbt?.address || '').trim())
+        .filter(Boolean)
+    ));
+    if (!labels.length) return '';
+    const shown = labels.slice(0, 3);
+    const extra = labels.length > shown.length ? ` +${labels.length - shown.length} more` : '';
+    return `${t('sbt')}${labels.length === 1 ? '' : 's'} required: ${shown.join(', ')}${extra}.`;
   };
 
   renderLockedQuestionsDecryptButton = (questionIds = []) => (
