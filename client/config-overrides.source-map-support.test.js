@@ -159,6 +159,32 @@ test('webpack override no longer aliases an absent ffmpeg mock', () => {
   assert.equal(next.resolve.alias['@ffmpeg/ffmpeg'], undefined);
 });
 
+test('webpack and Jest overrides no longer alias absent OpenTelemetry subpaths', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.equal(next.resolve.alias['@opentelemetry/otlp-exporter-base/browser-http$'], undefined);
+  assert.equal(next.resolve.alias['@opentelemetry/otlp-exporter-base/node-http$'], undefined);
+
+  const jestConfig = override.jest({ moduleNameMapper: {} });
+
+  assert.equal(jestConfig.moduleNameMapper['^@opentelemetry/otlp-exporter-base/browser-http$'], undefined);
+  assert.equal(jestConfig.moduleNameMapper['^@opentelemetry/otlp-exporter-base/node-http$'], undefined);
+});
+
 test('webpack override no longer redirects CRA away from tsconfig.json', () => {
   assert.equal(override.paths, undefined);
 });
