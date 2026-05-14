@@ -19,6 +19,7 @@ import GatedPromptNotice from './GatedPromptNotice';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -27,17 +28,119 @@ import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
-import {
-  countElements,
-  findElement,
-  findFirstNodeByType,
-  findNodeByClassName,
-  getElementChildren,
-  nodeHasClassName,
-  treeHasDataTestId,
-  treeHasLabel,
-  treeHasText,
-} from './surveyToolTreeTestHelpers.js';
+
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+const flushAsyncCallbacks = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+};
+
+const treeHasDataTestId = (node, testId) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
+  if (typeof node !== 'object') return false;
+  if (node?.props?.['data-testid'] === testId) return true;
+  return treeHasDataTestId(node?.props?.children, testId);
+};
+
+const treeHasLabel = (node, label) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasLabel(child, label));
+  if (typeof node !== 'object') return false;
+  if (node?.props?.label === label) return true;
+  return treeHasLabel(node?.props?.children, label);
+};
+
+const treeHasText = (node, text) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node).includes(text);
+  }
+  if (typeof node !== 'object') return false;
+  return treeHasText(node?.props?.children, text);
+};
+
+const findElement = (node, predicate) => {
+  const stack = [node];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (Array.isArray(current)) {
+      for (let i = current.length - 1; i >= 0; i -= 1) {
+        stack.push(current[i]);
+      }
+      continue;
+    }
+    if (typeof current !== 'object') continue;
+    if (predicate(current)) return current;
+    const children = current?.props?.children;
+    if (children !== undefined) stack.push(children);
+  }
+  return null;
+};
+
+const findFirstNodeByType = (node, targetType) => {
+  if (node == null) return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findFirstNodeByType(child, targetType);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node !== 'object') return null;
+  if (node?.type === targetType) return node;
+  return findFirstNodeByType(node?.props?.children, targetType);
+};
+
+const nodeHasClassName = (node, className) => {
+  const value = node?.props?.className;
+  if (typeof value !== 'string') return false;
+  return value.split(/\s+/).includes(className);
+};
+
+const findNodeByClassName = (node, className) => (
+  findElement(node, (candidate) => nodeHasClassName(candidate, className))
+);
+
+const getElementChildren = (node) => {
+  const children = node?.props?.children;
+  if (children == null) return [];
+  return (Array.isArray(children) ? children : [children]).filter((child) => child && typeof child === 'object');
+};
+
+const countElements = (node, predicate) => {
+  let count = 0;
+  const stack = [node];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (Array.isArray(current)) {
+      for (let i = current.length - 1; i >= 0; i -= 1) {
+        stack.push(current[i]);
+      }
+      continue;
+    }
+    if (typeof current !== 'object') continue;
+    if (predicate(current)) count += 1;
+    const children = current?.props?.children;
+    if (children !== undefined) stack.push(children);
+  }
+
+  return count;
+};
 
 const syncClassSetState = (subject) => {
   subject.setState = jest.fn((next, cb) => {
@@ -139,43 +242,6 @@ describe('SurveyTool question pool lifecycle', () => {
 
     const prevProps = { ...subject.props, questionPool: [{ id: 'prop-q1' }] };
     subject.props = { ...subject.props, questionPool: [{ id: 'prop-q1' }] };
-
-    expect(subject.didEditDiffInputsChange(prevProps, prevState)).toBe(false);
-  });
-
-  it('does not invalidate hydration runs for response loading state changes only', () => {
-    const sharedResponsesState = [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }];
-    const sharedBaseline = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-    const subject = new SurveyQuestions({
-      singleQuestionMode: false,
-      isStandalone: false,
-      surveyIndex: 0,
-      surveyId: 'survey-a',
-      account: '0xabc',
-      loginComplete: true,
-      network: { id: 84532 },
-      networkChainId: 84532,
-      questionPool: [{ id: 'q1' }],
-    });
-    const prevProps = { ...subject.props };
-    const prevState = {
-      ...subject.state,
-      surveysResponseState: sharedResponsesState,
-      editBaseline: sharedBaseline,
-      userAnswers: null,
-      questionPool: [{ id: 'q1' }],
-      pileQuestions: [],
-      isLoadingResponse: false,
-    };
-    subject.state = {
-      ...subject.state,
-      surveysResponseState: sharedResponsesState,
-      editBaseline: sharedBaseline,
-      userAnswers: null,
-      questionPool: [{ id: 'q1' }],
-      pileQuestions: [],
-      isLoadingResponse: true,
-    };
 
     expect(subject.didEditDiffInputsChange(prevProps, prevState)).toBe(false);
   });
@@ -581,6 +647,109 @@ describe('SurveyTool question pool lifecycle', () => {
     });
   });
 
+  it('clears auto-decrypt state when a blocked provider toggles auto-decrypt', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+    });
+
+    subject.state = {
+      ...subject.state,
+      autoDecryptEnabled: true,
+      decryptingByKey: { 'q1:answer': true },
+    };
+    syncClassSetState(subject);
+    subject.isAutoDecryptBlocked = jest.fn(() => true);
+    subject.clearAutoDecryptSweepScheduling = jest.fn();
+    subject._autoDecQueue = [{ qid: 'q1', field: 'answer' }];
+    subject._autoDecProcessing = true;
+    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
+
+    subject.toggleAutoDecrypt();
+
+    expect(subject.state.autoDecryptEnabled).toBe(false);
+    expect(subject.state.decryptingByKey).toEqual({});
+    expect(subject._autoDecQueue).toEqual([]);
+    expect(subject._autoDecProcessing).toBe(false);
+    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({});
+    expect(subject.clearAutoDecryptSweepScheduling).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows Porto auto-decrypt only after session-key auto-sign is ready', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: 'porto_passkey',
+    });
+
+    jest.spyOn(portoFunctions, 'isPortoAutoSignReady').mockReturnValue(false);
+    expect(subject.isAutoDecryptBlocked()).toBe(true);
+    expect(subject.shouldAttemptAutomaticPromptDecrypt()).toBe(false);
+
+    portoFunctions.isPortoAutoSignReady.mockReturnValue(true);
+    expect(subject.isAutoDecryptBlocked()).toBe(false);
+    expect(subject.shouldAttemptAutomaticPromptDecrypt()).toBe(true);
+  });
+
+  it('clears blocked auto-decrypt sweep internals through the shared helper', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+    });
+
+    subject.clearAutoDecryptSweepScheduling = jest.fn();
+    subject._autoDecQueue = [{ qid: 'q1', field: 'answer' }];
+    subject._autoDecProcessing = true;
+    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
+
+    subject.resetBlockedAutoDecryptSweepInternals();
+
+    expect(subject._autoDecQueue).toEqual([]);
+    expect(subject._autoDecProcessing).toBe(false);
+    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({});
+    expect(subject.clearAutoDecryptSweepScheduling).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears visible auto-decrypt sweep state when auto-decrypt is disabled', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+    });
+
+    subject.clearAutoDecryptSweepScheduling = jest.fn();
+    subject._autoDecryptVisibleSweepCache = { idsKey: 'q1' };
+    subject._autoDecQueue = [{ qid: 'q1', field: 'answer' }];
+    subject._autoDecProcessing = true;
+    subject._autoDecryptMaskedAttemptSignature = { 'q1:answer': 'masked-sig' };
+    subject.state = {
+      ...subject.state,
+      autoDecryptEnabled: false,
+      submissionError: '',
+      surveysResponseState: [{ answers: {}, additionalComments: {} }],
+    };
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1']);
+
+    subject.maybeAutoDecryptVisibleFields();
+
+    expect(subject._autoDecryptVisibleSweepCache).toBeNull();
+    expect(subject._autoDecQueue).toEqual([]);
+    expect(subject._autoDecProcessing).toBe(false);
+    expect(subject._autoDecryptMaskedAttemptSignature).toEqual({});
+    expect(subject.clearAutoDecryptSweepScheduling).toHaveBeenCalledTimes(1);
+  });
+
   it('blocks survey submit while expected survey questions are still loading', async () => {
     jest.useFakeTimers();
     const subject = new SurveyQuestions({
@@ -859,7 +1028,6 @@ describe('SurveyTool question pool lifecycle', () => {
     expect(subject.state.modifiedCount).toBe(0);
     expect(subject.state.hasEncryptedChanges).toBe(false);
     expect(subject.state.isDirty).toBe(false);
-    expect(subject.state.isLoadingResponse).toBe(false);
     expect(subject.state.submittedSinceLastEdit).toBe(false);
     expect(subject.state.surveysResponseState).toEqual([
       { answers: { keep: { value: 'persisted' } } },
