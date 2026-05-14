@@ -212,6 +212,7 @@ import {
   DEFAULT_WORKER_SECRETS,
   buildWorkerLitCredentialsConfig,
   getSessionWizardWorkerResourceKeys,
+  resolveSessionWizardEnabledWorkerSecrets,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -946,6 +947,10 @@ const SessionWizard = ({
       defaults: DEFAULT_WORKER_SECRETS,
     })
   ), []);
+  const getCurrentEnabledWorkerSecrets = useCallback(() => resolveSessionWizardEnabledWorkerSecrets({
+    workerSecrets: getCurrentWorkerSecrets(),
+    workerSecretsEnabled,
+  }), [getCurrentWorkerSecrets, workerSecretsEnabled]);
   const applyWorkerSecretsUpdate = useCallback((nextValueOrUpdater) => {
     const current = resolveWorkerSecretsSnapshot({
       workerSecretsRef,
@@ -3455,6 +3460,7 @@ const SessionWizard = ({
     result.onChainFields = buildSessionWizardRegistrySessionFields({
       onChainFields: result.onChainFields,
       sponsoredFields,
+      clientRpcUrl: getCurrentEnabledWorkerSecrets().customRpcUrl,
     });
     return { ...result };
   };
@@ -3993,21 +3999,21 @@ const SessionWizard = ({
     draft,
     registryChainId,
     networkId: network?.id,
-    workerSecrets: getCurrentWorkerSecrets(),
+    workerSecrets: getCurrentEnabledWorkerSecrets(),
   });
 
   const resolveWorkerRpcUrlMap = () => resolveSessionWizardWorkerRpcUrlMapFromDraft({
     draft,
     registryChainId,
     networkId: network?.id,
-    workerSecrets: getCurrentWorkerSecrets(),
+    workerSecrets: getCurrentEnabledWorkerSecrets(),
   });
 
   const resolveWorkerFaucetConfig = () => resolveSessionWizardWorkerFaucetConfigFromDraft({
     draft,
     registryChainId,
     networkId: network?.id,
-    workerSecrets: getCurrentWorkerSecrets(),
+    workerSecrets: getCurrentEnabledWorkerSecrets(),
   });
   const effectiveDefaultWorkerRpcUrl = toStr(resolveWorkerRpcUrl()).trim();
   const resolvedWorkerBaseUrlForDelegation = resolveWorkerBaseUrl();

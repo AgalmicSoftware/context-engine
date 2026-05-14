@@ -201,15 +201,18 @@ export const sanitizeSessionWizardMetadataPayload = (metadata: AnyRecord, {
 export const buildSessionWizardRegistrySessionFields = ({
   onChainFields = {},
   sponsoredFields = {},
+  clientRpcUrl = '',
   compatibilityFieldPaths = SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS,
 }: {
   onChainFields?: AnyRecord;
   sponsoredFields?: AnyRecord;
+  clientRpcUrl?: unknown;
   compatibilityFieldPaths?: Record<string, string[]>;
 } = {}): AnyRecord => {
   const next: AnyRecord = {};
   const compatPaths = isObj(compatibilityFieldPaths) ? compatibilityFieldPaths : {};
   const rawOnChainFields = isObj(onChainFields) ? onChainFields : {};
+  const normalizedClientRpcUrl = trimString(clientRpcUrl);
 
   Object.keys(compatPaths).forEach((fieldKey) => {
     if (!Object.prototype.hasOwnProperty.call(rawOnChainFields, fieldKey)) return;
@@ -227,6 +230,10 @@ export const buildSessionWizardRegistrySessionFields = ({
     const trimmed = trimString(value);
     if (trimmed) next[key] = trimmed;
   });
+
+  if (normalizedClientRpcUrl) {
+    next.rpcUrl = normalizedClientRpcUrl;
+  }
 
   return next;
 };

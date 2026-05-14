@@ -21,8 +21,6 @@ import { resolveSessionWizardEnabledWorkerSecrets } from './sessionWizardWorkerS
 
 const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
 
-const DEFAULT_CONFIG_CHAIN_ID = DEFAULT_CHAIN_ID;
-
 describe('sessionWizardWriteNormalization', () => {
   beforeEach(() => {
     const getProviderMock = cryptoUtils._getProvider as jest.Mock;
@@ -99,30 +97,52 @@ describe('sessionWizardWriteNormalization', () => {
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields does not mirror uploaded custom RPC secrets into public fields', () => {
+  test('buildSessionWizardRegistrySessionFields mirrors uploaded custom RPC for client reads', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {
         rpcUrl: 'https://draft-rpc.example',
       },
+      clientRpcUrl: ' https://uploaded-rpc.example ',
       sponsoredFields: {
         sponsored_rpc: '1',
       },
     })).toEqual({
-      rpcUrl: 'https://draft-rpc.example',
+      rpcUrl: 'https://uploaded-rpc.example',
       sponsored_rpc: '1',
     });
   });
 
-  test('buildSessionWizardRegistrySessionFields ignores worker-secret RPC values', () => {
+  test('buildSessionWizardRegistrySessionFields omits client RPC when enabled secrets are empty', () => {
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {},
+      clientRpcUrl: '',
     })).toEqual({});
     expect(buildSessionWizardRegistrySessionFields({
       onChainFields: {
         rpcUrl: ' https://browser-visible-rpc.example ',
       },
+      clientRpcUrl: '',
     })).toEqual({
       rpcUrl: 'https://browser-visible-rpc.example',
+    });
+  });
+
+  test('buildSessionWizardRegistrySessionFields omits disabled uploaded custom RPC secrets', () => {
+    const enabledSecrets = resolveSessionWizardEnabledWorkerSecrets({
+      workerSecretsEnabled: false,
+      workerSecrets: {
+        customRpcUrl: ' https://uploaded-rpc.example ',
+      },
+    });
+
+    expect(buildSessionWizardRegistrySessionFields({
+      onChainFields: {},
+      clientRpcUrl: enabledSecrets.customRpcUrl,
+      sponsoredFields: {
+        sponsored_rpc: '0',
+      },
+    })).toEqual({
+      sponsored_rpc: '0',
     });
   });
 

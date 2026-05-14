@@ -65,6 +65,26 @@ describe('sessionWizardWorkerSecretSupport', () => {
     }));
   });
 
+  it('drops uploaded worker secrets when sponsored worker secrets are disabled', () => {
+    expect(resolveSessionWizardEnabledWorkerSecrets({
+      workerSecretsEnabled: false,
+      workerSecrets: {
+        openaiKey: 'sk-openai',
+        customRpcUrl: 'https://uploaded-rpc.example',
+        arweaveJwk: '{"kty":"RSA"}',
+      },
+    })).toEqual(DEFAULT_WORKER_SECRETS);
+
+    expect(resolveSessionWizardEnabledWorkerSecrets({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        customRpcUrl: ' https://uploaded-rpc.example ',
+      },
+    })).toEqual(expect.objectContaining({
+      customRpcUrl: 'https://uploaded-rpc.example',
+    }));
+  });
+
   it('preserves the Lit resource bucket and sponsored flags in Chipotle-only mode', () => {
     expect(sanitizeSessionWizardSponsoredFieldSnapshotForLitMode({
       sponsored_lit: '1',
