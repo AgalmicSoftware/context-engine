@@ -1,20 +1,19 @@
-import { getConvictionFromResponse, getImportanceFromResponse } from './surveyToolUtils';
+import {
+  getConvictionFromResponse,
+  getImportanceFromResponse,
+} from './surveyToolUtils.js';
 
-type UnknownRecord = Record<string, unknown>;
-type IndexedValue = Record<string | number, unknown>;
-
-const isRecord = (value: unknown): value is UnknownRecord =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
+type UnknownRecord = Record<string, any>;
 
 export const buildSurveyQuestionsJson = ({
   singleQuestionMode = false,
   questionPool = [],
 }: {
   singleQuestionMode?: boolean;
-  questionPool?: unknown;
+  questionPool?: any;
 } = {}) => {
   if (singleQuestionMode) {
-    return (questionPool as IndexedValue | null | undefined)?.[0] || {};
+    return questionPool?.[0] || {};
   }
   return questionPool || [];
 };
@@ -26,12 +25,15 @@ export const shouldUseSubmittedResponseJson = ({
   isEditing = true,
   userAnswers = null,
 }: {
-  viewAddress?: unknown;
-  responderAddress?: unknown;
-  parsedViewAddressAnswers?: unknown;
-  isEditing?: unknown;
-  userAnswers?: unknown;
-} = {}) => !!(((viewAddress || responderAddress) && parsedViewAddressAnswers) || (!isEditing && userAnswers));
+  viewAddress?: any;
+  responderAddress?: any;
+  parsedViewAddressAnswers?: any;
+  isEditing?: any;
+  userAnswers?: any;
+} = {}) => !!(
+  ((viewAddress || responderAddress) && parsedViewAddressAnswers) ||
+  (!isEditing && userAnswers)
+);
 
 const withConvictionImportance = (response: UnknownRecord) => {
   const convictionValue = getConvictionFromResponse(response);
@@ -47,28 +49,24 @@ export const buildSubmittedResponseJson = ({
   rawResponse = null,
   singleQuestionMode = false,
 }: {
-  rawResponse?: unknown;
+  rawResponse?: any;
   singleQuestionMode?: boolean;
 } = {}) => {
   if (!rawResponse) return {};
 
   if (singleQuestionMode) {
-    if (isRecord(rawResponse)) {
+    if (typeof rawResponse === 'object' && rawResponse !== null && !Array.isArray(rawResponse)) {
       return withConvictionImportance(rawResponse);
     }
     return rawResponse;
   }
 
-  if (isRecord(rawResponse) && Array.isArray(rawResponse.responses)) {
+  if (rawResponse && Array.isArray(rawResponse.responses)) {
     const baseConviction = getConvictionFromResponse(rawResponse);
     const baseImportance = getImportanceFromResponse(rawResponse);
-    const processed: UnknownRecord & {
-      conviction?: unknown;
-      importance?: unknown;
-      responses: unknown[];
-    } = {
+    const processed = {
       ...rawResponse,
-      responses: rawResponse.responses.map((response) => withConvictionImportance(response as UnknownRecord)),
+      responses: rawResponse.responses.map((response: UnknownRecord) => withConvictionImportance(response)),
     };
     if (baseConviction !== null && processed.conviction === undefined) {
       processed.conviction = baseConviction;
@@ -91,31 +89,26 @@ export const buildSurveyDefinitionJson = ({
 }: {
   isStandalone?: boolean;
   singleQuestionMode?: boolean;
-  surveys?: unknown;
-  surveyIndex?: unknown;
-  questionPool?: unknown;
+  surveys?: any;
+  surveyIndex?: any;
+  questionPool?: any;
 } = {}) => {
   if (isStandalone || singleQuestionMode || !surveys || surveyIndex === null) {
     return {};
   }
 
-  const currentSurvey = (surveys as IndexedValue)[surveyIndex as string | number];
+  const currentSurvey = surveys[surveyIndex];
   if (!currentSurvey) {
     return {};
   }
 
-  const surveyDetails = { ...(currentSurvey as UnknownRecord) };
+  const surveyDetails = { ...currentSurvey };
 
   if (Array.isArray(surveyDetails.questionIDs) && Array.isArray(questionPool)) {
-    const questionMap = new Map(
-      questionPool.map((question) => {
-        const questionRecord = question as UnknownRecord & { id: { toLowerCase: () => string } };
-        return [questionRecord.id.toLowerCase(), question];
-      }),
-    );
+    const questionMap = new Map(questionPool.map((question) => [question.id.toLowerCase(), question]));
 
-    surveyDetails.questions = surveyDetails.questionIDs.map((id) => {
-      const questionData = questionMap.get((id as { toLowerCase: () => string }).toLowerCase());
+    surveyDetails.questions = surveyDetails.questionIDs.map((id: any) => {
+      const questionData = questionMap.get(id.toLowerCase());
       return questionData || { id, error: 'Question details not found in pool' };
     });
 
