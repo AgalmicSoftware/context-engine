@@ -139,6 +139,26 @@ test('webpack override no longer aliases unused MetaMask delegation utilities', 
   assert.equal(next.resolve.alias['@metamask/delegation-utils'], undefined);
 });
 
+test('webpack override no longer aliases an absent ffmpeg mock', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.equal(next.resolve.alias['@ffmpeg/ffmpeg'], undefined);
+});
+
 test('webpack override no longer redirects CRA away from tsconfig.json', () => {
   assert.equal(override.paths, undefined);
 });
