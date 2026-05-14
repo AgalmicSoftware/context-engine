@@ -425,8 +425,10 @@ Current v0 scope:
   on each displayed question card, with a five-question pager styled after the
   CE pile response flow. The Mini App does not render question IDs or a
   `Create Agent` launcher; settings are opened from the top-right gear button.
-- The Mini App keeps polling state while questions are still empty, the question
-  source reports an error, or payload-unavailable question rows are present.
+- The Mini App keeps polling state while no answerable questions are available
+  and questions are still empty, the question source reports an error, or only
+  payload-unavailable question rows are present. Mixed answerable/unavailable
+  lists stay usable without a foreground retry loop.
 - Draft saves through `POST /telegram/mini-app/api/draft`.
 - Settings saves through `POST /telegram/mini-app/api/settings`, which creates a
   Worker-local `telegram:agent-request:*` record and a planned canonical
@@ -442,6 +444,11 @@ Current v0 scope:
   `/api/agent/responses/submit-request` handoff as before. Exact answer replays
   for the same Telegram user, session, and question reuse the same idempotent
   request ID; changed answers create distinct records.
+- Worker login uses `AGENT_BRIDGE_WORKER_LOGIN_ORIGIN`, then
+  `LOCAL_AUTH_ORIGIN`, then `AGENT_BRIDGE_PUBLIC_URL`, before falling back to
+  `http://localhost:7391`. Direct-submit auth failures return a stable reason
+  plus the upstream worker stage/detail so deployment origin or gate mistakes are
+  visible in the Mini App without exposing secrets.
 - Payload-unavailable questions stay retryable/unanswered; true private or gated
   questions stay locked until the canonical private/gated decrypt path is
   available.
@@ -603,6 +610,10 @@ IDs.
   gateway, then verify the session scan is scoped by metadata `blockLimits.start`,
   the slug's `SessionCreated` event, or explicit
   `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK`.
+  New live question payloads must include canonical `sessionSlug`; no-slug
+  payloads from global scans are treated as ambiguous unless
+  `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_PAYLOADS=true` is explicitly set for a
+  legacy recovery run.
 - If questions from another session appear, confirm the group has a fresh
   `/join <session>` after the latest deploy and that the loaded question
   payload includes matching `sessionSlug`/`sessionName` metadata when available.
@@ -670,9 +681,9 @@ OpenClaw HTTP/MCP transport is deferred.
 Telegram question cards follow CE control conventions:
 
 - Live CE metadata is normalized from `type`, `prompt`, `options`,
-  `singleSelect`, and `sessionName`/`sessionSlug`; the worker cache prefix was
-  bumped so stale freeform-only and payload-unavailable records are not reused
-  after deploy.
+  `singleSelect`, `sessionName`, and canonical `sessionSlug`. `sessionName` is
+  display metadata only; global live scans require `sessionSlug` to bind a
+  question to the requested session.
 - Binary/agree-style questions use `Agree`, `Unsure`, and `Disagree` answer
   buttons, matching the main client order and colors.
 - Rating questions render discrete `0` through `10` answer buttons.

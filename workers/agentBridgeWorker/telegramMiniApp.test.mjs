@@ -106,9 +106,10 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.equal(html.includes("setStatus(submit ? 'Submitting...' : 'Saving draft...');"), false);
   assert.match(html, /button\.textContent = isBusy \? 'Submitting\.\.\.' : 'Submit';/);
   assert.match(html, /const QUESTION_RETRY_DELAY_MS = 4000;/);
-  assert.match(html, /data\?\.sourceOk === false/);
-  assert.match(html, /Number\(data\?\.questionCount \|\| 0\) === 0/);
-  assert.match(html, /questions\.some\(\(question\) => question\.payloadUnavailable === true\)/);
+  assert.match(html, /const answerableCount = questions\.filter\(\(question\) => question\?\.canAnswer\)\.length;/);
+  assert.match(html, /const unavailableCount = questions\.filter\(\(question\) => question\?\.payloadUnavailable === true\)\.length;/);
+  assert.match(html, /answerableCount === 0 && \(/);
+  assert.match(html, /unavailableCount > 0/);
   assert.match(html, /window\.setTimeout\(\(\) => \{[\s\S]*load\(\{ retry: true \}\);[\s\S]*\}, QUESTION_RETRY_DELAY_MS\);/);
 });
 

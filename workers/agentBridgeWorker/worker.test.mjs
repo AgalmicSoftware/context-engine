@@ -200,7 +200,7 @@ test('worker serves Telegram Mini App shell', async () => {
 
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type'), /text\/html/);
-  assert.match(text, /CE Mini App/);
+  assert.match(text, /Context Engine/);
   assert.match(text, /telegram-web-app\.js/);
   assert.match(text, /telegram\/mini-app\/api\/state/);
   assert.equal(text.includes('button.innerHTML'), false);
@@ -507,6 +507,79 @@ test('worker Mini App direct submit broadcasts on-chain when worker and policy a
   assert.equal(storedSubmitRequests[0].status, 'direct_submitted');
   assert.equal(storedSubmitRequests[0].canonicalApiRequest.status, 'executed_direct_onchain');
   assert.equal(JSON.stringify(storedSubmitRequests[0]).includes('unit-root'), false);
+});
+
+test('worker Mini App submit returns actionable worker auth failure details', async () => {
+  const kv = new MemoryKv();
+  const calls = [];
+  const bytes32QuestionId = `0x${'24'.repeat(32)}`;
+  const env = {
+    BROADCAST_ENABLED: 'true',
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    DEFAULT_CHAIN_ID: '11155420',
+    DEFAULT_RPC_URL: 'https://rpc.example',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        surveysAddress: '0x1111111111111111111111111111111111111111',
+      }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: bytes32QuestionId, questionType: 'rating', prompt: 'How strong is the signal?' },
+    ]),
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_FETCH: async (url, init = {}) => {
+      calls.push({ url: String(url), init });
+      if (String(url).endsWith('/auth/nonce')) {
+        return new Response(JSON.stringify({ error: 'Untrusted worker login origin.' }), {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected session worker call ${url}`);
+    },
+  };
+  const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chatType: 'private', text: '/questions alpha' }),
+  }), env);
+  const preview = await previewResponse.json();
+  const launch = launchFromMiniButton(preview.preview.response.replyMarkup.inline_keyboard
+    .flat()
+    .find((button) => button.text === 'Open Mini App'));
+  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`), env);
+  const state = await stateResponse.json();
+
+  const draftResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      launch,
+      questionKey: state.questions[0].questionKey,
+      answer: { value: 6 },
+      submit: true,
+    }),
+  }), env);
+  const draft = await draftResponse.json();
+
+  assert.equal(draftResponse.status, 503);
+  assert.equal(draft.ok, false);
+  assert.equal(draft.error, 'worker_auth_failed');
+  assert.equal(draft.reason, 'worker_auth_failed');
+  assert.match(draft.message, /managed Telegram account/);
+  assert.match(draft.message, /worker_nonce_failed: Untrusted worker login origin\./);
+  assert.equal(calls[0].init.headers.Origin, 'https://bridge.example');
 });
 
 test('worker Mini App handoff keeps question-specific group launches opaque through private start', async () => {
@@ -971,7 +1044,7 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   assert.match(byCommand['/join alpha'].text, /Use \/attachments for session files/);
   assert.match(byCommand['/sessions'].text, /Available sessions:/);
   assert.match(byCommand['/questions'].text, /Questions for alpha:/);
-  assert.match(byCommand['/questions'].text, /1\. What should Alpha decide next\?\n\n2\. Locked question/);
+  assert.match(byCommand['/questions'].text, /1\. What should Alpha decide next\?\n\n2\. Encrypted question/);
   assert.equal(byCommand['/questions'].text.includes('q-readiness'), false);
   assert.equal(byCommand['/questions'].text.includes('q-locked'), false);
   assert.match(byCommand['/q 1'].text, /Question for alpha:/);

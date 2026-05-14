@@ -52,7 +52,11 @@ function normalizeBaseUrl(value = '') {
 }
 
 function resolveLoginOrigin(env = {}) {
-  const configured = safeString(env.AGENT_BRIDGE_WORKER_LOGIN_ORIGIN || env.LOCAL_AUTH_ORIGIN);
+  const configured = safeString(
+    env.AGENT_BRIDGE_WORKER_LOGIN_ORIGIN ||
+    env.LOCAL_AUTH_ORIGIN ||
+    env.AGENT_BRIDGE_PUBLIC_URL
+  );
   const origin = configured || DEFAULT_LOGIN_ORIGIN;
   try {
     return new URL(origin).origin;
