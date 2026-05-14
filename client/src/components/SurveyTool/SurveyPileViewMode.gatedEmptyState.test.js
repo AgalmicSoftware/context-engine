@@ -170,10 +170,11 @@ describe('SurveyPileViewMode gated empty states', () => {
       decryptingByKey: {},
       canDecryptOtherResponsesStatus: 'needs-wallet',
     };
+    subject.resolveSbtGateLabel = jest.fn(() => 'Session SBT');
 
     const tree = subject.render();
     expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}.`)).toBe(true);
-    expect(treeHasText(tree, `These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`)).toBe(true);
+    expect(treeHasText(tree, `${t('sbt')} required: Session SBT. Connect an eligible ${t('walletLower')} to decrypt.`)).toBe(true);
     expect(treeHasText(tree, 'No questions available.')).toBe(false);
     expect(treeHasText(tree, 'Loading Metadata')).toBe(false);
   });
@@ -433,9 +434,9 @@ describe('SurveyPileViewMode gated empty states', () => {
     const tree = subject.render();
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBe(true);
     expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}`)).toBe(true);
-    expect(treeHasText(tree, `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
+    expect(treeHasText(tree, `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
     expect(treeHasText(tree, 'VIP Gate')).toBe(false);
-    expect(treeHasText(tree, 'VIP SBT')).toBe(false);
+    expect(treeHasText(tree, 'VIP SBT')).toBe(true);
     expect(treeHasText(tree, 'Retry decrypt')).toBe(false);
     expect(treeHasText(tree, 'Decrypt')).toBe(true);
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET)).toBe(true);
