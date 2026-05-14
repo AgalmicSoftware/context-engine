@@ -98,10 +98,10 @@
     "test:cache-guard": "bash ./scripts/check-managed-cache-localstorage.sh"
   },
   "devDependencies": {
-    "@openzeppelin/contracts": "^5.0.2",
-    "arweave": "^1.14.4",
+    "@openzeppelin/contracts": "5.4.0",
+    "arweave": "1.15.7",
     "ethers": "5.7.2",
-    "esbuild": "^0.25.9",
-    "playwright": "^1.57.0"
+    "esbuild": "0.25.12",
+    "playwright": "1.58.2"
   }
 }
