@@ -70,6 +70,29 @@ test('webpack override no longer injects the legacy global .sol/.html/.txt loade
   );
 });
 
+test('webpack override no longer injects the legacy worker-loader rule', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.ok(
+    !next.module.rules.some((rule) => String(rule?.test) === '/\\.worker\\.js$/'),
+    'expected no global worker-loader rule in the webpack override',
+  );
+});
+
 test('webpack override no longer redirects CRA away from tsconfig.json', () => {
   assert.equal(override.paths, undefined);
 });
