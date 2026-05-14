@@ -171,25 +171,6 @@ const override = function override(config, env) {
     'node-worker-threads.js'
   );
 
-  // OpenTelemetry exporter subpath shims for webpack 4 (no package "exports" subpath support).
-  config.resolve.alias['@opentelemetry/otlp-exporter-base/browser-http$'] = path.resolve(
-    __dirname,
-    'node_modules',
-    '@opentelemetry',
-    'otlp-exporter-base',
-    'build',
-    'esm',
-    'index-browser-http.js'
-  );
-  config.resolve.alias['@opentelemetry/otlp-exporter-base/node-http$'] = path.resolve(
-    __dirname,
-    'node_modules',
-    '@opentelemetry',
-    'otlp-exporter-base',
-    'build',
-    'esm',
-    'index-node-http.js'
-  );
   config.resolve.alias['source-map-support/register$'] = path.resolve(
     __dirname,
     'src',
@@ -248,24 +229,6 @@ override.jest = (config) => {
     [`^ox\\/${oxScopedPrefixes}$`]: `${oxCjsBase}/$1/index.js`,
     [`^ox\\/${oxScopedPrefixes}\\/(.*)$`]: `${oxCjsBase}/$1/$2.js`,
     '^ox\\/([A-Z].*)$': `${oxCjsBase}/core/$1.js`,
-    '^@opentelemetry/otlp-exporter-base/browser-http$': path.join(
-      '<rootDir>',
-      'node_modules',
-      '@opentelemetry',
-      'otlp-exporter-base',
-      'build',
-      'esm',
-      'index-browser-http.js'
-    ),
-    '^@opentelemetry/otlp-exporter-base/node-http$': path.join(
-      '<rootDir>',
-      'node_modules',
-      '@opentelemetry',
-      'otlp-exporter-base',
-      'build',
-      'esm',
-      'index-node-http.js'
-    ),
   };
   return next;
 };
