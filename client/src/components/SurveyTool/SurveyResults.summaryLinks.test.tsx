@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { MemoryRouter } from 'react-router-dom';
 import ConnectedSurveyResults, {
   SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
   SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
