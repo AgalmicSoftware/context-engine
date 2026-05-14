@@ -2655,6 +2655,11 @@ export class PileViewMode extends SurveyQuestions {
     });
 
     const gatedEmptyHasDetails = lockedGateDetails.length > 0;
+    const gatedEmptyRequirementSentence = this.getLockedGateRequirementSentence(lockedGateDetails);
+    const sessionGateDetails = gatedEmptyHasDetails
+      ? lockedGateDetails
+      : this.buildSessionQuestionGateDetails(1);
+    const sessionGateRequirementSentence = this.getLockedGateRequirementSentence(sessionGateDetails);
     const gatedEmptyPanel = hiddenMaskedQuestionIds.length > 0
       ? (
         <div className={styles.gatedEmptyPanelShell}>
@@ -2663,7 +2668,7 @@ export class PileViewMode extends SurveyQuestions {
             lockedGateDetails,
             title: `This session's questions are ${t('gatedLower')}`,
             subtitle: gatedEmptyHasDetails
-              ? `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`
+              ? `${gatedEmptyRequirementSentence ? `${gatedEmptyRequirementSentence} ` : ''}Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`
               : `Connect an eligible ${t('walletLower')} and decrypt to view the questions.`,
             forceExpanded: false,
             surface: 'dark',
@@ -2675,7 +2680,9 @@ export class PileViewMode extends SurveyQuestions {
         <>
           <div className={styles.gatedEmptyHeadline}>{`This session's questions are ${t('gatedLower')}.`}</div>
           <div className={styles.gatedEmptyCopy}>
-            {`These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`}
+            {sessionGateRequirementSentence
+              ? `${sessionGateRequirementSentence} Connect an eligible ${t('walletLower')} to decrypt.`
+              : `These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`}
           </div>
         </>
       );
