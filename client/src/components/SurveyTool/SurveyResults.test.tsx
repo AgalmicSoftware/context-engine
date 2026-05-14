@@ -495,8 +495,8 @@ describe('SurveyResults session resolution', () => {
       };
 
       await subject.fetchQuestionModeResponses();
-      expect(subject.getQuestionReadSlugs('questions')).toEqual(['edge', 'alpha']);
-      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['q1', 'q2']);
+      expect(subject.getQuestionReadSlugs('questions')).toEqual(['edge']);
+      expect(Object.keys(subject.state.aggregatorQuestionResponses).sort()).toEqual(['q1']);
       expect(findElement(
         subject.render(),
         (node) => node?.props?.['data-testid'] === 'ce-surveyresults-session-selector-toggle'
@@ -1003,7 +1003,7 @@ describe('SurveyResults session resolution', () => {
     expect(subject.state.totalResponsesCount).toBe(0);
     expect(subject.state.filteredResponsesCount).toBe(0);
     expect(subject.state.filteredQuestionsCount).toBe(0);
-    expect(subject.getQuestionReadSlugs('questions')).toEqual(['beta', 'edge', 'alpha']);
+    expect(subject.getQuestionReadSlugs('questions')).toEqual(['beta']);
     expect(subject.queueResultsRefresh).toHaveBeenCalledWith(expect.stringContaining('question-scope-change'));
   });
 
