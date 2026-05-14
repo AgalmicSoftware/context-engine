@@ -1,5 +1,20 @@
 import SBTPage from './SBTPage';
 
+const mockIsCryptoMode = jest.fn(() => true);
+
+jest.mock('../../utilities/ui/terminology.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/terminology.js');
+  return {
+    __esModule: true,
+    ...actual,
+    isCryptoMode: (...args) => mockIsCryptoMode(...args),
+  };
+});
+
+jest.mock('utilities/ui/blockieAvatars.js', () => ({
+  generateBlockieDataUrl: jest.fn(() => ''),
+}));
+
 const createSubject = (props = {}) => {
   const subject = new SBTPage({
     network: { id: 84532, name: 'Base Sepolia' },
@@ -16,10 +31,9 @@ const createSubject = (props = {}) => {
   return subject;
 };
 
-describe('SBTPage holder signatures', () => {
-  afterEach(() => {
+describe('SBTPage holder signature helpers', () => {
+  beforeEach(() => {
     jest.clearAllMocks();
-    jest.restoreAllMocks();
   });
 
   it('reuses memoized net-holder list when holder signatures are unchanged', () => {
@@ -72,5 +86,23 @@ describe('SBTPage holder signatures', () => {
     shared[1] = '0x999';
     const sig2 = subject.buildAddressListSignature(shared);
     expect(sig2).not.toBe(sig1);
+  });
+
+  it('clears previous burn search result when the input is cleared', () => {
+    const subject = createSubject();
+    subject.state = {
+      ...subject.state,
+      burnSearchInput: '0xabc',
+      burnSearchResult: { address: '0xabc', tokenId: '12' },
+      burnSearchType: 'address',
+    };
+
+    subject.handleBurnSearchChange({ target: { value: '' } });
+
+    expect(subject.state).toEqual(expect.objectContaining({
+      burnSearchInput: '',
+      burnSearchResult: null,
+      burnSearchType: null,
+    }));
   });
 });
