@@ -138,7 +138,11 @@ const cacheLog = createLogger('cache');
 const DEFAULT_QUESTION_COUNT = 10;
 const QUESTION_COUNT_STEP = 5;
 const CONTEXT_SAVE_LOGIN_REQUIRED_CODE = 'context_save_login_required';
-const generateSurveyGeneratorQuestionId = (type: string, prompt: string, options: string[] = []): string => {
+const generateSurveyGeneratorQuestionId = (
+  type: string,
+  prompt: string,
+  options: string[] = [],
+): string => {
   return generateSharedQuestionId(type, prompt, options);
 };
 type SurveyGeneratorQuestionTypeKey = 'binary' | 'multichoice' | 'rating' | 'freeform';
@@ -1333,9 +1337,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       }
 
       const photoAnalysisBySourceId = await analyzeQueuedPhotoSources(effectiveSources);
-      if (abortedRef.current) return;
       const savedDocRefs = await saveQueuedSourcesToDocLibrary(effectiveSources, photoAnalysisBySourceId);
-      if (abortedRef.current) return;
       const savedDocRefsBySourceId = new Map(
         savedDocRefs
           .filter((entry: UploadedSourceDocRef) => entry?.sourceId)
@@ -1618,10 +1620,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   );
   const effectiveSurveyTitle = hasUploadedFileSources ? toStr(surveyTitle).trim() : '';
   const hasTypedUrlSource = toStr(additionalUrlInput).trim().length > 0;
-  const hasTranscriptModeInput = toStr(pastedText).trim().length > 0 || hasTypedUrlSource;
   const shouldShowSaveExtraSourcesControl = additionalSources.length > 0 || hasTypedUrlSource;
-  const saveDocAudienceLabel =
-    saveDocAudience === 'session' && docSaveSessionAudienceAvailable ? docSaveSessionLabel : 'only me';
+  const saveDocAudienceLabel = saveDocAudience === 'session' && docSaveSessionAudienceAvailable
+    ? docSaveSessionLabel
+    : 'only me';
   const isExplorerViewMode = !minified && explorerMode === 'view';
   const showDemoCorpusPanel = demoSurfaceEnabled && showDemoCorpusView;
   const showViewModeToolbar = demoSurfaceEnabled;
@@ -1861,7 +1863,72 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                         const hasExpandedAnalysis =
                           statusKey === 'ready' && item?.analysisExpanded && toStr(item?.analysisText).trim();
 
-                        return (
+          {(additionalSources.length > 0 || shouldShowSaveExtraSourcesControl || (transcriptMode && uploadSummaryToArweave && encryptSummary)) && (
+            <div className={styles.additionalContextSection}>
+              {queuedPhotoSources.length > 0 && (
+                <div className={styles.photoCardGrid}>
+                  {queuedPhotoSources.map((item) => {
+                    const statusKey = toStr(item?.analysisStatus || 'queued').trim().toLowerCase();
+                    const statusLabel = getPhotoStatusLabel(item);
+                    const analysisBodyId = `database-photo-analysis-${item?.id || 'unknown'}`;
+                    const hasExpandedAnalysis = statusKey === 'ready' && item?.analysisExpanded && toStr(item?.analysisText).trim();
+
+                    return (
+                      <div
+                        key={item?.id}
+                        className={styles.photoCard}
+                        data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_CARD}
+                        data-ce-source-id={item?.id}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => removeAdditionalSource(item?.id)}
+                          className={styles.photoRemoveBtn}
+                          aria-label={`Remove photo ${item?.name || ''}`.trim()}
+                        >
+                          ×
+                        </button>
+
+                        <div className={styles.photoCardTop}>
+                          <div className={styles.photoPreviewFrame}>
+                            <QueuedPhotoPreview
+                              file={item?.value}
+                              photoName={item?.name}
+                              sourceId={item?.id}
+                            />
+                          </div>
+
+                          <div className={styles.photoCardMeta}>
+                            <div className={styles.photoName} title={item?.name}>{item?.name}</div>
+                            <div className={styles.photoCardStatusRow}>
+                              {statusKey === 'ready' ? (
+                                <button
+                                  type="button"
+                                  className={buildSurveyGeneratorPhotoStatusToggleClassName(styles)}
+                                  onClick={() => togglePhotoAnalysisExpanded(item?.id)}
+                                  aria-expanded={Boolean(item?.analysisExpanded)}
+                                  aria-controls={analysisBodyId}
+                                  data-testid={E2E_TESTIDS.DATABASE_PHOTO_SOURCE_ANALYSIS_TOGGLE}
+                                  data-ce-source-id={item?.id}
+                                >
+                                  <span>{PHOTO_ANALYSIS_STATUS_LABELS.ready}</span>
+                                  <FontAwesomeIcon icon={item?.analysisExpanded ? faCaretUp : faCaretDown} />
+                                </button>
+                              ) : (
+                                <span
+                                  className={buildSurveyGeneratorPhotoStatusChipClassName(styles, statusKey)}
+                                >
+                                  {statusKey === 'error' ? PHOTO_ANALYSIS_STATUS_LABELS.error : statusLabel}
+                                </span>
+                              )}
+                            </div>
+                            {statusKey === 'error' && toStr(item?.analysisError).trim() ? (
+                              <div className={styles.photoErrorText}>{item.analysisError}</div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {hasExpandedAnalysis ? (
                           <div
                             key={item?.id}
                             className={styles.photoCard}
@@ -1928,14 +1995,79 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                     </div>
                   )}
 
-                  {queuedNonPhotoSources.length > 0 && (
-                    <ul className={styles.sourceList}>
-                      {queuedNonPhotoSources.map((item) => (
-                        <li key={item?.id} className={styles.sourceItem}>
-                          <span className={styles.sourceTypeLabel}>[{item.type}]</span>
-                          <div className={styles.sourceMeta}>
-                            <span className={styles.sourceName}>{item.name}</span>
-                          </div>
+              {queuedNonPhotoSources.length > 0 && (
+                <ul className={styles.sourceList}>
+                  {queuedNonPhotoSources.map((item) => (
+                    <li key={item?.id} className={styles.sourceItem}>
+                      <span className={styles.sourceTypeLabel}>[{item.type}]</span>
+                      <div className={styles.sourceMeta}>
+                        <span className={styles.sourceName}>{item.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeAdditionalSource(item?.id)}
+                        className={styles.removeSourceBtn}
+                        aria-label={`Remove ${item?.type || 'source'} ${item?.name || ''}`.trim()}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {shouldShowSaveExtraSourcesControl && (
+                <div className={styles.docSaveRow}>
+                  <label className={styles.docSaveToggle} htmlFor={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}>
+                    <input
+                      id={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
+                      type="checkbox"
+                      checked={saveExtraSourcesToDocLibrary}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                        setSaveExtraSourcesToDocLibrary(event.target.checked);
+                        if (!event.target.checked) {
+                          setShowSaveDocAudienceMenu(false);
+                        }
+                      }}
+                      data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}
+                    />
+                    <span>Add to session context</span>
+                  </label>
+
+                  <div className={styles.docSaveAudienceWrap}>
+                    <button
+                      type="button"
+                      className={styles.docSaveAudienceButton}
+                      onClick={() => setShowSaveDocAudienceMenu((value: boolean) => !value)}
+                      data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}
+                      data-ce-doc-save-audience={saveDocAudience}
+                      aria-label={`Session context visibility: ${saveDocAudienceLabel}`}
+                      aria-haspopup="menu"
+                      aria-expanded={showSaveDocAudienceMenu}
+                      title={`Session context visibility: ${saveDocAudienceLabel}`}
+                    >
+                      <FontAwesomeIcon icon={faLock} />
+                    </button>
+
+                    {showSaveDocAudienceMenu && (
+                      <div
+                        className={styles.docSaveAudienceMenu}
+                        data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_MENU}
+                      >
+                        <button
+                          type="button"
+                          className={buildSurveyGeneratorDocSaveAudienceOptionClassName(styles, saveDocAudience === 'self')}
+                          onClick={() => {
+                            setSaveDocAudience('self');
+                            setShowSaveDocAudienceMenu(false);
+                          }}
+                          data-testid={E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SELF}
+                        >
+                          <FontAwesomeIcon icon={faLock} />
+                          <span>only me</span>
+                        </button>
+
+                        {docSaveSessionAudienceAvailable ? (
                           <button
                             type="button"
                             onClick={() => removeAdditionalSource(item?.id)}
@@ -2210,13 +2342,137 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             </div>
           )}
 
-          <div className={styles.aiPromptSection}>
-            <button type="button" className={styles.aiPromptToggleBtn} onClick={toggleAIPrompt}>
-              {showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
-              <FontAwesomeIcon
-                icon={showAIPrompt ? faCaretUp : faCaretDown}
-                style={SURVEY_GENERATOR_AI_PROMPT_ICON_STYLE}
-              />
+        <div className={styles.formSection}>
+          <h3 className={styles.sectionTitle}>Types</h3>
+
+          <div className={styles.questionTypeGrid}>
+            <div
+              className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.binary)}
+              onClick={() => toggleQuestionType('binary')}
+            >
+              <div className={styles.typeTitle}>Binary</div>
+              <div className={styles.typePreviewRow}>
+                <span className={buildSurveyGeneratorTypePillClassName(styles, 'agree')}>Agree</span>
+                <span className={buildSurveyGeneratorTypePillClassName(styles, 'unsure')}>Unsure</span>
+                <span className={buildSurveyGeneratorTypePillClassName(styles, 'disagree')}>Disagree</span>
+              </div>
+            </div>
+
+            <div
+              className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.multichoice)}
+              onClick={() => toggleQuestionType('multichoice')}
+            >
+              <div className={styles.typeTitle}>Multichoice</div>
+              <div className={styles.typePreviewRow}>
+                <span className={styles.pill}>Opt 1</span>
+                <span className={styles.pill}>Opt 2</span>
+                <span className={styles.pill}>Opt 3</span>
+              </div>
+            </div>
+
+            <div
+              className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.rating)}
+              onClick={() => toggleQuestionType('rating')}
+            >
+              <div className={styles.typeTitle}>Rating</div>
+              <div className={styles.ratingPreviewWrap}>
+                <div className={styles.ratingPreviewFill} />
+                <div className={styles.ratingPreviewHandle} />
+              </div>
+            </div>
+
+            <div
+              className={buildSurveyGeneratorTypeButtonClassName(styles, questionTypes.freeform)}
+              onClick={() => toggleQuestionType('freeform')}
+            >
+              <div className={styles.typeTitle}>Freeform</div>
+              <div className={styles.freeformPreview}>...</div>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.formSection}>
+          <div className={styles.countControlRow} role="group" aria-label="Number of questions">
+            <span className={styles.countInlineLabel} aria-hidden="true"># Questions</span>
+            <div
+              className={styles.countReadout}
+              aria-label={`Number of questions: ${count}`}
+              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span>{count}</span>
+            </div>
+            <Button
+              type="button"
+              color="secondary"
+              className={styles.countAdjustButton}
+              onClick={() => adjustQuestionCount(-QUESTION_COUNT_STEP)}
+              disabled={count <= MIN_QUESTION_COUNT || loading}
+              aria-label="Decrease question count"
+              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_DECREMENT}
+            >
+              -
+            </Button>
+            <Button
+              type="button"
+              color="secondary"
+              className={styles.countAdjustButton}
+              onClick={() => adjustQuestionCount(QUESTION_COUNT_STEP)}
+              disabled={count >= MAX_QUESTION_COUNT || loading}
+              aria-label="Increase question count"
+              data-testid={E2E_TESTIDS.DATABASE_QUESTION_COUNT_INCREMENT}
+            >
+              +
+            </Button>
+          </div>
+        </div>
+
+        {shouldShowGenerateButton && (
+          <div className={styles.actionRow}>
+            <Button
+              type="submit"
+              className={styles.generateButton}
+              disabled={loading}
+            >
+              {loading && activeAction === 'generate' ? (
+                <>
+                  {isTranscribing ? 'Transcribing... ' : 'Processing... '}
+                  {waitingSeconds}s <FontAwesomeIcon icon={faSpinner} spin />
+                </>
+              ) : (
+                'Generate Questions'
+              )}
+            </Button>
+          </div>
+        )}
+      </form>
+
+      {error && !loading && (
+        <div className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
+          {error}
+        </div>
+      )}
+
+      <div className={styles.aiPromptSection}>
+        <button
+          type="button"
+          className={styles.aiPromptToggleBtn}
+          onClick={toggleAIPrompt}
+        >
+          {showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
+          <FontAwesomeIcon icon={showAIPrompt ? faCaretUp : faCaretDown} style={SURVEY_GENERATOR_AI_PROMPT_ICON_STYLE} />
+        </button>
+
+        {showAIPrompt && (
+          <div className={styles.aiPromptWrapper}>
+            <button
+              type="button"
+              className={buildSurveyGeneratorAiPromptCopyClassName(styles, aiPromptCopySuccess)}
+              onClick={copyAIPromptToClipboard}
+              title="Copy prompt"
+            >
+              <FontAwesomeIcon icon={aiPromptCopySuccess ? faCheck : faClipboard} />
             </button>
 
             {showAIPrompt && (
