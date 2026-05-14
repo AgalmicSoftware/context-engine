@@ -13,6 +13,6 @@
     "test": "node --test *.test.mjs"
   },
   "devDependencies": {
-    "wrangler": "^4.33.2"
+    "wrangler": "4.33.2"
   }
 }
