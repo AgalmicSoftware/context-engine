@@ -108,12 +108,69 @@ describe('SurveyPileViewMode gated empty states', () => {
       sessionConfig: createDefaultGatedSessionConfig(),
     });
 
-    expect(await screen.findByText(`This session's questions are ${t('gatedLower')}.`)).toBeInTheDocument();
-    expect(
-      screen.getByText(`${t('sbt')} required: Session SBT. Connect an eligible ${t('walletLower')} to decrypt.`),
-    ).toBeInTheDocument();
-    expect(screen.queryByText('No questions available.')).toBeNull();
-    expect(screen.queryByText(/Loading Metadata/)).toBeNull();
+    const sessionConfig = {
+      slug: 'edge',
+      networkChainId: 84532,
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+            chainId: 84532,
+            mode: 'any',
+          },
+        },
+      },
+    };
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      loginComplete: false,
+      sessionSlug: 'edge',
+      sessionConfig,
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      questionResponsesNonce: 2,
+      questionsCacheNonce: 2,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'hydrate',
+        discoveredQuestions: 1,
+        hydratedQuestions: 0,
+        pendingMetadataCount: 0,
+        remainingBlocks: 0,
+      },
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
+
+    subject.state = {
+      ...subject.state,
+      loading: true,
+      pileQuestions: [],
+      allQuestionsForFilter: [],
+      activePileIndex: 0,
+      filterState: {},
+      isFilterActive: false,
+      hasHiddenGatedQuestions: false,
+      submissionComplete: false,
+      autoDecryptEnabled: false,
+      autoDecryptAttempted: {},
+      decryptingByKey: {},
+      canDecryptOtherResponsesStatus: 'needs-wallet',
+    };
+    subject.resolveSbtGateLabel = jest.fn(() => 'Session SBT');
+
+    const tree = subject.render();
+    expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}.`)).toBe(true);
+    expect(treeHasText(tree, `${t('sbt')} required: Session SBT. Connect an eligible ${t('walletLower')} to decrypt.`)).toBe(true);
+    expect(treeHasText(tree, 'No questions available.')).toBe(false);
+    expect(treeHasText(tree, 'Loading Metadata')).toBe(false);
   });
 
   it('keeps a default-gated empty pile fail-closed after the cache reports ready', async () => {
@@ -227,5 +284,56 @@ describe('SurveyPileViewMode gated empty states', () => {
     screen.getAllByRole('link', { name: /VIP SBT/i }).forEach((link) => {
       expect(link).toHaveAttribute('href', expectedSbtHref);
     });
+    subject.scheduleLoadAndSortQuestions = jest.fn();
+    subject.initializeResponseState = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn((cb) => {
+      if (typeof cb === 'function') cb();
+    });
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+
+    await subject.loadAndSortQuestions();
+    subject.state = {
+      ...subject.state,
+      questionPool: [{
+        id: 'q1',
+        prompt: '[encrypted]',
+        type: 'freeform',
+        encryption: {
+          enabled: true,
+          gates: [],
+        },
+      }],
+      allQuestionsForFilter: [{
+        id: 'q1',
+        prompt: '[encrypted]',
+        type: 'freeform',
+        encryption: {
+          enabled: true,
+          gates: [{ label: 'VIP Gate', sbtAddress: gateSbt }],
+        },
+      }],
+      hasHiddenGatedQuestions: true,
+    };
+
+    const tree = subject.render();
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBe(true);
+    expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}`)).toBe(true);
+    expect(treeHasText(tree, `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
+    expect(treeHasText(tree, 'VIP Gate')).toBe(false);
+    expect(treeHasText(tree, 'VIP SBT')).toBe(true);
+    expect(treeHasText(tree, 'Retry decrypt')).toBe(false);
+    expect(treeHasText(tree, 'Decrypt')).toBe(true);
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET)).toBe(true);
+
+    subject.state = {
+      ...subject.state,
+      lockedGateDetailsExpanded: true,
+    };
+
+    const expandedTree = subject.render();
+    expect(treeHasText(expandedTree, 'VIP Gate')).toBe(true);
+    expect(treeHasText(expandedTree, 'VIP SBT')).toBe(true);
   });
 });

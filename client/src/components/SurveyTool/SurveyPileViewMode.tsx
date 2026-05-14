@@ -2874,66 +2874,128 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
 
   const showListeningAside = showListeningPanel && !showHologramAssistant;
 
-  return (
-    <div className={styles.pileViewContainer}>
-      <div className={showListeningAside ? styles.pileListeningLayout : undefined}>
-        <div className={styles.pileWrapper}>
-          {renderPileInteractionSurface({
-            showHologramAssistant,
-            toggleHologramAssistant: engine.toggleHologramAssistant,
-            showMiniBackgroundSpinner,
-            priorResponsesHydrating,
-            showLongLoading,
-            loadingElapsedSec: engine.state.loadingElapsedSec,
-            pileQuestions,
-            activePileIndex: effectiveActivePileIndex,
-            renderActiveQuestion: engine.renderActiveQuestion,
-            hasTerminalScanError,
-            scanErrorMessage,
-            hasError,
-            isStillLoading,
-            hydrateDone,
-            hydrateDiscovered,
-            isHydrating,
-            scanTotalBlocks,
-            pileScanDisplay,
-            scanPercent,
-            showFilteredEmptyState,
-            showGatedEmptyState,
-            gatedEmptyPanel,
-            isFilterActive,
-            toggleFilterModal: engine.toggleFilterModal,
-            showCreate,
-            toggleCreate: engine.toggleCreate,
-            showListeningPanel,
-            toggleListeningPanel: engine.toggleListeningPanel,
-            onViewAllClick: engine.props.onViewAllClick,
-            handleViewAllFromPile: engine.handleViewAllFromPile,
-            pileTopRailVisible,
-            showSuccessBadgeLink,
-            pileSubmitResponderHref,
-            showSuccessBadgeStatus,
-            showSubmitButton,
-            handlePileSubmitClick: engine.handlePileSubmitClick,
-            hasPendingPileChanges,
-            shouldHidePileSubmitButton,
-            isSubmitting: engine.state.isSubmitting,
-            activePromptMasked,
-            finalSubmitText,
-            showClearPendingButton,
-            handleRevertPendingChanges: engine.handleRevertPendingChanges,
-            navCounterVisible,
-            handlePrev: engine.handlePrev,
-            handleNext: engine.handleNext,
+    /**
+     * PILE MODE — Submit button label (central helper)
+     */
+    const _pileStats = this.getPendingStatsSnapshot();
+    const pileSubmitLabel = (this.props.computeSubmitLabel || computeSubmitLabel)(this, {
+      pendingStats: _pileStats,
+    });
+    const {
+      hasPendingPileChanges,
+      shouldHidePileSubmitButton,
+      finalSubmitText,
+      pileSubmitResponderHref,
+      pileTopRailVisible,
+      showSubmitButton,
+      showSuccessBadgeLink,
+      showSuccessBadgeStatus,
+      showClearPendingButton,
+    } = buildPileSubmitRailViewState({
+      pendingStats: _pileStats,
+      isSubmitting: this.state.isSubmitting,
+      submittedSinceLastEdit: this.state.submittedSinceLastEdit,
+      submissionComplete: this.state.submissionComplete,
+      pileSubmitTempText: this.state.pileSubmitTempText,
+      pileSubmitLabel,
+      account: this.props.account,
+      isAddress: utils.isAddress,
+    });
+
+    const gatedEmptyHasDetails = lockedGateDetails.length > 0;
+    const gatedEmptyRequirementSentence = this.getLockedGateRequirementSentence(lockedGateDetails);
+    const sessionGateDetails = gatedEmptyHasDetails
+      ? lockedGateDetails
+      : this.buildSessionQuestionGateDetails(1);
+    const sessionGateRequirementSentence = this.getLockedGateRequirementSentence(sessionGateDetails);
+    const gatedEmptyPanel = hiddenMaskedQuestionIds.length > 0
+      ? (
+        <div className={styles.gatedEmptyPanelShell}>
+          {this.renderLockedQuestionsPanel({
+            hiddenMaskedQuestionIds,
+            lockedGateDetails,
+            title: `This session's questions are ${t('gatedLower')}`,
+            subtitle: gatedEmptyHasDetails
+              ? `${gatedEmptyRequirementSentence ? `${gatedEmptyRequirementSentence} ` : ''}Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`
+              : `Connect an eligible ${t('walletLower')} and decrypt to view the questions.`,
+            forceExpanded: false,
+            surface: 'dark',
+            showCaret: true,
           })}
         </div>
-        {showListeningAside && (
-          <div className={styles.sessionListeningPanelAnchor} ref={engine.listeningPanelRef}>
-            <React.Suspense fallback={<LazyFallback label="Loading Listening Panel..." minHeight="160px" />}>
-              <LazySessionListeningPanel
-                {...engine.props}
-                {...engine.getAudioInputWorkerProps()}
-                onClose={engine.closeListeningPanel}
+      )
+      : (
+        <>
+          <div className={styles.gatedEmptyHeadline}>{`This session's questions are ${t('gatedLower')}.`}</div>
+          <div className={styles.gatedEmptyCopy}>
+            {sessionGateRequirementSentence
+              ? `${sessionGateRequirementSentence} Connect an eligible ${t('walletLower')} to decrypt.`
+              : `These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`}
+          </div>
+        </>
+      );
+
+    const showListeningAside = showListeningPanel && !showHologramAssistant;
+
+    return (
+      <div className={styles.pileViewContainer}>
+        <div className={showListeningAside ? styles.pileListeningLayout : undefined}>
+          <div className={styles.pileWrapper}>
+            {renderPileInteractionSurface({
+              showHologramAssistant,
+              toggleHologramAssistant: this.toggleHologramAssistant,
+              showMiniBackgroundSpinner,
+              priorResponsesHydrating,
+              showLongLoading,
+              loadingElapsedSec: this.state.loadingElapsedSec,
+              pileQuestions,
+              activePileIndex,
+              renderActiveQuestion: this.renderActiveQuestion,
+              hasTerminalScanError,
+              scanErrorMessage,
+              hasError,
+              isStillLoading,
+              hydrateDone,
+              hydrateDiscovered,
+              isHydrating,
+              scanTotalBlocks,
+              pileScanDisplay,
+              scanPercent,
+              showFilteredEmptyState,
+              showGatedEmptyState,
+              gatedEmptyPanel,
+              isFilterActive,
+              toggleFilterModal: this.toggleFilterModal,
+              showCreate,
+              toggleCreate: this.toggleCreate,
+              showListeningPanel,
+              toggleListeningPanel: this.toggleListeningPanel,
+              onViewAllClick: this.props.onViewAllClick,
+              handleViewAllFromPile: this.handleViewAllFromPile,
+              pileTopRailVisible,
+              showSuccessBadgeLink,
+              pileSubmitResponderHref,
+              showSuccessBadgeStatus,
+              showSubmitButton,
+              handlePileSubmitClick: this.handlePileSubmitClick,
+              hasPendingPileChanges,
+              shouldHidePileSubmitButton,
+              isSubmitting: this.state.isSubmitting,
+              activePromptMasked,
+              finalSubmitText,
+              showClearPendingButton,
+              handleRevertPendingChanges: this.handleRevertPendingChanges,
+              navCounterVisible,
+              handlePrev: this.handlePrev,
+              handleNext: this.handleNext,
+            })}
+          </div>
+          {showListeningAside && (
+            <div className={styles.sessionListeningPanelAnchor} ref={this.listeningPanelRef}>
+              <SessionListeningPanel
+                {...this.props}
+                {...this.getAudioInputWorkerProps()}
+                onClose={this.closeListeningPanel}
               />
             </React.Suspense>
           </div>

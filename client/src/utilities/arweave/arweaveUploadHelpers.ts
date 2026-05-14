@@ -92,24 +92,21 @@ export const resolveArweaveUploadOpts = async (
   try {
     const result = await getEffectiveArweaveKey({ sessionSlug: slug, sessionConfig: cfg });
     arweaveJwk = result?.arweaveJwk || '';
-    arweaveJwkSource = String(result?.source || '')
-      .trim()
-      .toLowerCase();
+    arweaveJwkSource = String(result?.source || '').trim().toLowerCase();
   } catch (_) {
     arweaveJwk = '';
     arweaveJwkSource = '';
   }
   const forceDirectArweaveUpload = !!arweaveJwk && arweaveJwkSource === 'local';
 
-  const bootstrapAuth =
-    arweaveJwk && !forceDirectArweaveUpload
-      ? await buildArweaveUploadBootstrapAuth({
-          signer: signer as LooseRecord | null,
-          providerLike,
-          sessionSlug: slug,
-          sessionConfig: cfg,
-        })
-      : null;
+  const bootstrapAuth = arweaveJwk && !forceDirectArweaveUpload
+    ? await buildArweaveUploadBootstrapAuth({
+        signer: signer as LooseRecord | null,
+        providerLike,
+        sessionSlug: slug,
+        sessionConfig: cfg,
+      })
+    : null;
 
   return {
     arweaveJwk,
