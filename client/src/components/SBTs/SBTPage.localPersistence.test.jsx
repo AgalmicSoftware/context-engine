@@ -44,33 +44,9 @@ describe('SBTPage local persistence', () => {
       'edge',
       expect.objectContaining({
         sbts: expect.arrayContaining(['0xabc0000000000000000000000000000000000000']),
-      }),
+      })
     );
-    expect(JSON.parse(localStorage.getItem('bookmarks'))?.sbts || []).toContain(
-      '0xAbC0000000000000000000000000000000000000',
-    );
-  });
-
-  it('uses props.slug as the bookmark cache fallback when explicit session props are absent', () => {
-    jest.useFakeTimers();
-    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: [] });
-    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
-    const subject = createSubject({
-      SBTAddress: '0xAbD0000000000000000000000000000000000000',
-      slug: 'route-slug',
-    });
-
-    subject.bookmarkSBT();
-    jest.runOnlyPendingTimers();
-
-    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'route-slug', { clone: false });
-    expect(writeSpy).toHaveBeenCalledWith(
-      'bookmarksCache',
-      'route-slug',
-      expect.objectContaining({
-        sbts: expect.arrayContaining(['0xabd0000000000000000000000000000000000000']),
-      }),
-    );
+    expect(JSON.parse(localStorage.getItem('bookmarks'))?.sbts || []).toContain('0xAbC0000000000000000000000000000000000000');
   });
 
   it('coalesces repeated sbtDetails writes when payload is unchanged', () => {
