@@ -146,6 +146,12 @@ describe('client package modernization contract', () => {
     });
   });
 
+  it('keeps stale dependency overrides out of the client package contract', () => {
+    const pkg = readClientPackageJson();
+
+    expect(pkg.overrides['@solana/web3.js']).toBeUndefined();
+  });
+
   it('keeps build, test, lint, analyze, and static serving tools out of production dependencies', () => {
     const pkg = readClientPackageJson();
     const devOnlyPackages = [

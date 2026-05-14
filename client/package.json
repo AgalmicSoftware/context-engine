@@ -106,7 +106,6 @@
   },
   "overrides": {
     "webpack": "4.44.2",
-    "@solana/web3.js": "1.95.8",
     "@metamask/utils": "9.2.0"
   },
   "babel": {
