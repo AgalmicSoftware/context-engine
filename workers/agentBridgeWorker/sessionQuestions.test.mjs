@@ -118,7 +118,7 @@ function makeQuestionFetch({
       assert.equal(String(url), `https://ar-io.dev/${txId}`);
       return new Response(JSON.stringify({
         id: questionId,
-        sessionSlug,
+        ...(sessionSlug == null ? {} : { sessionSlug }),
         type: 'freeform',
         prompt,
       }), {
@@ -362,6 +362,50 @@ test('listCachedSessionQuestionsForBridge skips payloads missing canonical sessi
   assert.equal(result.questions[0].questionId, demoQuestionId);
   assert.equal(result.questions[0].sessionSlug, 'demo');
   assert.equal(result.questions[0].prompt, 'Question scoped to Demo?');
+});
+
+test('listCachedSessionQuestionsForBridge stamps explicitly allowed no-slug payloads for cache reuse', async () => {
+  __test__sessionQuestions.questionMemoryCache.clear();
+  const questionId = `0x${'c5'.repeat(32)}`;
+  const { calls, fetchImpl } = makeQuestionFetch({
+    questionId,
+    prompt: 'Legacy no-slug question?',
+    sessionSlug: null,
+  });
+  const env = baseEnv({
+    AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_PAYLOADS: 'true',
+  });
+
+  const first = await listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug: 'demo',
+    fetchImpl,
+  });
+
+  assert.equal(first.ok, true);
+  assert.equal(first.cacheLayer, 'fresh');
+  assert.equal(first.questionCount, 1);
+  assert.equal(first.questions[0].questionId, questionId);
+  assert.equal(first.questions[0].sessionSlug, 'demo');
+  assert.equal(first.questions[0].prompt, 'Legacy no-slug question?');
+  const stored = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v5:demo'));
+  assert.equal(stored.questions[0].sessionSlug, 'demo');
+  const callCountAfterFirstLoad = calls.length;
+
+  const second = await listCachedSessionQuestionsForBridge({
+    env,
+    sessionSlug: 'demo',
+    fetchImpl: async () => {
+      throw new Error('cached legacy question should not require a live refresh');
+    },
+  });
+
+  assert.equal(second.ok, true);
+  assert.equal(second.cacheLayer, 'memory');
+  assert.equal(second.questionCount, 1);
+  assert.equal(second.questions[0].questionId, questionId);
+  assert.equal(second.questions[0].sessionSlug, 'demo');
+  assert.equal(calls.length, callCountAfterFirstLoad);
 });
 
 test('listCachedSessionQuestionsForBridge serves first available questions while background indexes remaining blocks', async () => {
