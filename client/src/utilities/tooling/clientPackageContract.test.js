@@ -20,7 +20,7 @@ describe('client package modernization contract', () => {
     const pkg = readClientPackageJson();
 
     expect(pkg.dependencies.ethers).toBe('5.7.2');
-    expect(pkg.devDependencies['react-scripts']).toBe('^4.0.3');
+    expect(pkg.devDependencies['react-scripts']).toBe('4.0.3');
     expect(pkg.devDependencies.webpack).toBe('4.44.2');
     expect(pkg.overrides.webpack).toBe('4.44.2');
   });
