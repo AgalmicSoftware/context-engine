@@ -79,15 +79,18 @@ export const normalizeSessionNameFields = (
   fallbackSessionName = '',
   options: AnyRecord = {}
 ): unknown => {
-  void options;
   if (!metadata || typeof metadata !== 'object') return metadata;
   const next = metadata as AnyRecord;
   const fallback = toStr(fallbackSessionName).trim();
   const sessionName = resolveSessionNameValue(next) || fallback;
+  const sessionSlug = normalizeSessionSlug(
+    toStr(options?.sessionSlug ?? next.sessionSlug ?? '').trim()
+  );
   if (sessionName) {
     next.sessionName = sessionName;
   } else {
     if (typeof next.sessionName !== 'string') next.sessionName = '';
   }
+  if (sessionSlug) next.sessionSlug = sessionSlug;
   return next;
 };
