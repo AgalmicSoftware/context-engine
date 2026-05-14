@@ -1,14 +1,16 @@
 import {
-  resolveSbtPageHolderFilterItems,
-  resolveSbtPageHolderLoadingState,
-  resolveSbtPageHolderModalDisplayState,
-  resolveSbtPageHolderResolutionState,
-  resolveSbtPageHoldersDisplayCount,
   resolveSbtPageScanProgressDisplay,
   resolveSbtPageScanProgressFillStyle,
   resolveSbtPageScanProgressPercent,
   shouldShowSbtPageScanProgress,
 } from './sbtPageHelpers';
+import {
+  resolveSbtPageHolderFilterItems,
+  resolveSbtPageHolderLoadingState,
+  resolveSbtPageHolderModalDisplayState,
+  resolveSbtPageHolderResolutionState,
+  resolveSbtPageHoldersDisplayCount,
+} from './sbtPageHolderDisplayHelpers';
 
 describe('sbtPageHelpers holder display helpers', () => {
   it('resolves holder loading display state without changing fallback rules', () => {
