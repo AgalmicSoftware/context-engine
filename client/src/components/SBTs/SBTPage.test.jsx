@@ -164,7 +164,13 @@ const createCachedSbtInfo = (overrides = {}) => ({
       subject.startMintingEndCountdown();
       expect(subject.state.intervalId).toBeTruthy();
 
-      jest.advanceTimersByTime(1000);
+  afterEach(() => {
+    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
+    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try { delete window.__litHooks; } catch (_) {}
+    jest.restoreAllMocks();
+  });
 
   it('shows creator/admin fields without duplicate deployer row in stats', () => {
     const subject = createSubject({
