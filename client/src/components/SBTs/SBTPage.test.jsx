@@ -12,8 +12,527 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as terminology from '../../utilities/ui/terminology.js';
 
-describe('SBTPage session routing and holder loading', () => {
-  setupSBTPageTestLifecycle();
+const mockIsCryptoMode = jest.fn(() => true);
+
+jest.mock('../../utilities/ui/terminology.js', () => {
+  const actual = jest.requireActual('../../utilities/ui/terminology.js');
+  return {
+    __esModule: true,
+    ...actual,
+    isCryptoMode: (...args) => mockIsCryptoMode(...args),
+  };
+});
+
+jest.mock('utilities/ui/blockieAvatars.js', () => ({
+  generateBlockieDataUrl: jest.fn(() => ''),
+}));
+
+const createSubject = (props = {}) => {
+  const subject = new SBTPage({
+    network: { id: 84532, name: 'Base Sepolia' },
+    provider: 'mock',
+    ...props,
+  });
+  subject._isMounted = true;
+  subject.setState = jest.fn((next, cb) => {
+    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+    subject.state = { ...subject.state, ...(patch || {}) };
+    if (typeof cb === 'function') cb();
+    return patch;
+  });
+  return subject;
+};
+
+const findElementInTree = (node, predicate) => {
+  if (!node || typeof node !== 'object') return null;
+  if (predicate(node)) return node;
+  const children = node?.props?.children;
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      const found = findElementInTree(child, predicate);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (children) return findElementInTree(children, predicate);
+  return null;
+};
+
+const treeIncludesText = (node, text) => {
+  if (node == null) return false;
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node).includes(text);
+  }
+  if (Array.isArray(node)) {
+    return node.some((entry) => treeIncludesText(entry, text));
+  }
+  if (typeof node === 'object') {
+    return treeIncludesText(node?.props?.children, text);
+  }
+  return false;
+};
+
+const flattenText = (node) => {
+  if (node == null) return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map((entry) => flattenText(entry)).join('');
+  if (typeof node === 'object') return flattenText(node?.props?.children);
+  return '';
+};
+
+const renderMiniCardNode = (props = {}) => {
+  const sbtAddress = '0x00000000000000000000000000000000000000f1';
+  const subject = createSubject({
+    miniaturized: true,
+    miniMintable: true,
+    SBTAddress: sbtAddress,
+    ...props,
+  });
+  subject.state = {
+    ...subject.state,
+    sbtInfo: {
+      name: 'Badge',
+      image: 'https://example.example.test/badge.png',
+      mintingEndTime: 0,
+      burnAuth: 0,
+      hasPasswordMint: false,
+      maxTokens: '0',
+      admin: '0x00000000000000000000000000000000000000a2',
+    },
+    userHasSBT: false,
+    userIsSbtAdmin: false,
+    mintingStatus: 'idle',
+    burningStatus: 'idle',
+    hasGroupPasswordMint: false,
+    hasInviteMint: false,
+  };
+  const tree = subject.render();
+  const cardNode = findElementInTree(
+    tree,
+    (element) => element?.props?.role === 'button' && typeof element?.props?.onClick === 'function'
+  );
+  return { cardNode, sbtAddress };
+};
+
+const mockObjectUrlApis = (blobUrl = 'blob:mock') => {
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  const createObjectURL = jest.fn(() => blobUrl);
+  const revokeObjectURL = jest.fn();
+  URL.createObjectURL = createObjectURL;
+  URL.revokeObjectURL = revokeObjectURL;
+  return {
+    createObjectURL,
+    revokeObjectURL,
+    restore: () => {
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
+    },
+  };
+};
+
+const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
+const createCachedSbtInfo = (overrides = {}) => ({
+  tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+  image: 'https://example.example.test/badge.png',
+  mintingEndTime: 0,
+  burnAuth: 0,
+  hasPasswordMint: false,
+  maxTokens: '0',
+  admin: '0x00000000000000000000000000000000000000a2',
+  chainID: 84532,
+  ...overrides,
+});
+
+const createReadCachePayload = ({
+  sbtAddress,
+  mintedAddresses = [],
+  burnedAddresses = [],
+  countsLoaded = false,
+  blockNumber = 1234,
+  netId = '84532',
+  lastBlock = blockNumber,
+  sbtInfoOverrides = {},
+}) => {
+  const sbtLower = sbtAddress.toLowerCase();
+  return {
+    [netId]: {
+      sbtList: {
+        [sbtLower]: {
+          sbtAddress,
+          sbtInfo: createCachedSbtInfo(sbtInfoOverrides),
+          mintedAddresses,
+          burnedAddresses,
+          countsLoaded,
+          blockNumber,
+        },
+      },
+      lastBlock,
+    },
+  };
+};
+
+describe('SBTPage modal holder optimizations', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    window.sessionStorage.clear();
+    jest.spyOn(contractScripts, 'getSbtHistorySummary').mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    try { delete globalThis.CE_ARWEAVE_GATEWAY_URL; } catch (_) {}
+    try { delete globalThis.CE_ARWEAVE_AR_IO_URL; } catch (_) {}
+    try { delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO; } catch (_) {}
+    try { delete window.__litHooks; } catch (_) {}
+    jest.restoreAllMocks();
+  });
+
+  it('shows creator/admin fields without duplicate deployer row in stats', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+        creator: '0x00000000000000000000000000000000000000a3',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    expect(treeIncludesText(tree, 'Admin:')).toBe(true);
+    expect(treeIncludesText(tree, 'Creator:')).toBe(true);
+    expect(treeIncludesText(tree, 'Deployer:')).toBe(false);
+  });
+
+  it('hides the docs entry section in UX while keeping the rest of the page visible', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+      account: '0x00000000000000000000000000000000000000a4',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://arweave.example.test/example',
+        image: defaultSbtImage,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+      showActions: true,
+      showMoreDetails: false,
+      showAdminSection: false,
+      showDocsSection: true,
+    };
+
+    const tree = subject.render();
+    expect(treeIncludesText(tree, 'DOCS')).toBe(false);
+    expect(treeIncludesText(tree, 'MORE')).toBe(true);
+  });
+
+  it('uses Arweave metadata URL for token link when tokenURI is embedded data JSON', () => {
+    const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
+    const dataUriPayload = Buffer
+      .from(JSON.stringify({ metadataUri: `ar://${txId}` }), 'utf8')
+      .toString('base64');
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `data:application/json;base64,${dataUriPayload}`,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeTruthy();
+    expect(metadataLink.props.href).toContain(txId);
+    expect(String(metadataLink.props.href || '').startsWith('data:')).toBe(false);
+  });
+
+  it('normalizes subdomain arweave tokenURI links to the preferred gateway URL', () => {
+    const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
+    const subdomainGateway = 'https://nknrqljpprb2ncdidz57t6g5o346sreaimrxm7qp3ybzitf7bvya.arweave.net'; // intentional: real URL — tests allowlist enforcement
+    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway normalization
+    const subdomainUrl = `${subdomainGateway}/${txId}`;
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: subdomainUrl,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeTruthy();
+    expect(metadataLink.props.href).toBe(`${preferredGateway}/${txId}`);
+  });
+
+  it('prefers canonical metadata pointer over image-like fields in embedded tokenURI JSON', () => {
+    const txId = '4kpvO6qf-tN4l0R9vQh-Sz6ekU2xq9j5qM4R1X3vZkA';
+    const dataUriPayload = Buffer.from(JSON.stringify({
+      metadataUri: `ar://${txId}`,
+      external_url: 'https://cdn.example.test/preview.png',
+      tokenURI: 'https://cdn.example.test/also-image.jpg',
+      uri: 'https://cdn.example.test/banner.webp',
+    }), 'utf8').toString('base64');
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `data:application/json;base64,${dataUriPayload}`,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeTruthy();
+    expect(metadataLink.props.href).toContain(txId);
+    expect(metadataLink.props.href).not.toContain('preview.png');
+    expect(metadataLink.props.href).not.toContain('also-image.jpg');
+  });
+
+  it('prefers embedded tokenURI over metadataUri when both are present', () => {
+    const sbtTxId = 'GfaX7MhJndTePSYdECj8VJmFQ5m2KDtDMU8fHgUTw24';
+    const sessionTxId = 'ue3Ek_Mh1ypNvvCaGlfrntt_8HxJ9CDiwDlG06uoTpY';
+    const dataUriPayload = Buffer.from(JSON.stringify({
+      tokenURI: `ar://${sbtTxId}`,
+      metadataUri: `ar://${sessionTxId}`,
+      sessionSlug: 'general3',
+    }), 'utf8').toString('base64');
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `data:application/json;base64,${dataUriPayload}`,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeTruthy();
+    expect(metadataLink.props.href).toContain(sbtTxId);
+    expect(metadataLink.props.href).not.toContain(sessionTxId);
+  });
+
+  it('hides metadata icon when embedded tokenURI JSON only contains image-like links', () => {
+    const dataUriPayload = Buffer.from(JSON.stringify({
+      external_url: 'https://cdn.example.test/preview.png',
+      tokenURI: 'https://cdn.example.test/also-image.jpg',
+      uri: 'https://cdn.example.test/banner.webp',
+    }), 'utf8').toString('base64');
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `data:application/json;base64,${dataUriPayload}`,
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const metadataLink = findElementInTree(
+      tree,
+      (element) => element?.props?.title === 'Open token metadata'
+    );
+
+    expect(metadataLink).toBeNull();
+  });
+
+  it('uses default fallback image when metadata image is missing', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'https://example.example.test/metadata/sbt.json',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const tree = subject.render();
+    const sbtImage = findElementInTree(
+      tree,
+      (element) => element?.type === 'img' && element?.props?.alt === 'Badge'
+    );
+
+    expect(sbtImage).toBeTruthy();
+    expect(sbtImage.props.src).toBe(defaultSbtImage);
+  });
+
+  it('falls back to the next Arweave gateway when the preferred image URL fails', () => {
+    const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
+    const canonicalArweaveGateway = 'https://arweave.net'; // intentional: real URL — tests allowlist enforcement
+    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway fallback order
+    const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: `ar://${txId}`,
+        image: `${arIoSubdomainGateway}/${txId}?`,
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      loadingMintersBurners: false,
+      showStats: true,
+    };
+
+    const firstAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
+    expect(firstAttempt.src).toBe(`${preferredGateway}/${txId}`);
+
+    subject.handleDisplayImageError(firstAttempt);
+    subject.handleDisplayImageError(firstAttempt);
+
+    expect(subject.state.displayImageFallbackIndex).toBe(1);
+
+    const tree = subject.render();
+    const sbtImage = findElementInTree(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_IMAGE
+    );
+
+    expect(sbtImage).toBeTruthy();
+    expect(sbtImage.props.src).toBe(`${canonicalArweaveGateway}/${txId}`);
+  });
+
+  it('returns N/A for zero/invalid actor addresses', () => {
+    const subject = createSubject();
+    expect(subject.renderAddressLink(ethers.constants.AddressZero, 'admin')).toBe('N/A');
+    expect(subject.renderAddressLink('not-an-address', 'admin')).toBe('N/A');
+  });
 
   it('uses sessionSlug routing only when metadata marks it explicit', () => {
     const subject = createSubject();
