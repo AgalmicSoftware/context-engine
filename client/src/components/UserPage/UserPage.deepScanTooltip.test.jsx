@@ -1,6 +1,7 @@
 /** @file UserPage.deepScanTooltip.test.jsx */
 import UserPage from './UserPage';
 import styles from './UserPage.module.scss';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
@@ -425,6 +426,127 @@ describe('UserPage deep scan tooltip formatting', () => {
       'session-c',
       'session-z',
     ]);
+  });
+
+  it('returns memoized deep-scan tooltip lines without re-scanning cache in render path', () => {
+    const instance = makeInstance();
+    instance.state.deepScanTooltipLines = ['edge / 84532: 120'];
+    const scanSpy = jest.spyOn(instance, '_dgReadAll');
+
+    const first = instance.buildDeepScanProgressTooltip();
+    const second = instance.buildDeepScanProgressTooltip();
+
+    expect(first).toEqual(['edge / 84532: 120']);
+    expect(second).toEqual(['edge / 84532: 120']);
+    expect(scanSpy).not.toHaveBeenCalled();
+  });
+
+  it('includes general-slug progress in deep-scan timer input signatures', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const viewLower = viewAddress.toLowerCase();
+    const instance = makeInstance({
+      viewAddress,
+      network: { id: 84532 },
+      latestBlockNumber: 120,
+    });
+    const listSpy = jest
+      .spyOn(cacheScripts, 'listNamespaceSlugsSync')
+      .mockReturnValue(['']);
+    const peekSpy = jest
+      .spyOn(cacheScripts, 'peekCacheSync')
+      .mockReturnValueOnce({
+        [viewLower]: {
+          '84532': {
+            lastBlockScanned: 10,
+            lastScanTimestamp: 1,
+          },
+        },
+      })
+      .mockReturnValueOnce({
+        [viewLower]: {
+          '84532': {
+            lastBlockScanned: 11,
+            lastScanTimestamp: 2,
+          },
+        },
+      });
+
+    const first = instance._buildDeepScanTooltipInputSignature();
+    const second = instance._buildDeepScanTooltipInputSignature();
+
+    expect(first).not.toEqual(second);
+    expect(first).toContain(':84532:10:1');
+    expect(second).toContain(':84532:11:2');
+
+    listSpy.mockRestore();
+    peekSpy.mockRestore();
+  });
+
+  it('refreshes deep-scan tooltip lines on timer ticks while deep scanning', () => {
+    jest.useFakeTimers();
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      isDeepScanning: true,
+      deepScanTooltipLines: ['edge / 84532: 10'],
+    };
+    jest
+      .spyOn(instance, '_buildDeepScanTooltipInputSignature')
+      .mockReturnValueOnce('sig-1')
+      .mockReturnValueOnce('sig-2');
+    jest
+      .spyOn(instance, 'computeDeepScanProgressSnapshot')
+      .mockReturnValueOnce({ lines: ['edge / 84532: 11'], rows: null })
+      .mockReturnValueOnce({ lines: ['edge / 84532: 12'], rows: null });
+
+    instance.startDeepScanProgressTimer();
+    jest.advanceTimersByTime(2000);
+    expect(instance.state.deepScanTooltipLines).toEqual(['edge / 84532: 11']);
+    jest.advanceTimersByTime(2000);
+    expect(instance.state.deepScanTooltipLines).toEqual(['edge / 84532: 12']);
+    instance.stopDeepScanProgressTimer();
+  });
+
+  it('skips deep-scan tooltip recompute when timer inputs are unchanged', () => {
+    jest.useFakeTimers();
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      isDeepScanning: true,
+      deepScanTooltipLines: ['edge / 84532: 10'],
+    };
+    jest.spyOn(instance, '_buildDeepScanTooltipInputSignature').mockReturnValue('stable');
+    const computeSpy = jest
+      .spyOn(instance, 'computeDeepScanProgressSnapshot')
+      .mockReturnValue({ lines: ['edge / 84532: 10'], rows: null });
+
+    instance.startDeepScanProgressTimer();
+    jest.advanceTimersByTime(2000);
+    jest.advanceTimersByTime(2000);
+
+    expect(computeSpy).toHaveBeenCalledTimes(1);
+    instance.stopDeepScanProgressTimer();
+  });
+
+  it('skips deep-scan timer state writes when tooltip output is unchanged', () => {
+    jest.useFakeTimers();
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      isDeepScanning: true,
+      deepScanTooltipLines: ['edge / 84532: 10'],
+    };
+    jest.spyOn(instance, '_buildDeepScanTooltipInputSignature').mockReturnValue('sig-1');
+    jest
+      .spyOn(instance, 'computeDeepScanProgressSnapshot')
+      .mockReturnValue({ lines: ['edge / 84532: 10'], rows: null });
+    instance.setState.mockClear();
+
+    instance.startDeepScanProgressTimer();
+    jest.advanceTimersByTime(2000);
+
+    expect(instance.setState).not.toHaveBeenCalled();
+    instance.stopDeepScanProgressTimer();
   });
 
   it('links the minimized address text to the profile page and keeps the icon on the block explorer', () => {
