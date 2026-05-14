@@ -1,10 +1,8 @@
 import SBTPage from './SBTPage';
-import contractScripts from '../../utilities/web3/chainGateway.js';
-import * as sbtEncryptedRecoveryUi from './SbtEncryptedRecoveryControl';
+import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
+  SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
-  clearAllSbtPasswordRecoveryMemory,
-  upsertSbtPasswordRecoveryCodes,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
@@ -42,30 +40,45 @@ describe('SBTPage scoped password recovery store', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
-    sessionStorage.clear();
-    clearAllSbtPasswordRecoveryMemory();
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('loads codes from the scoped tab-memory recovery store', async () => {
+  it('loads cached passwords from the scoped recovery store', () => {
     const sbtAddress = '0x0000000000000000000000000000000000000201';
+    const sbtLower = sbtAddress.toLowerCase();
     const subject = createSubject({
       SBTAddress: sbtAddress,
       network: { id: 84532, name: 'Base Sepolia' },
     });
-    upsertSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress, passwords: ['scoped-code'] });
+    const now = Date.now();
+    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
+      v: 1,
+      kind: SBT_PASSWORD_RECOVERY_KIND,
+      updatedAt: now,
+      entries: {
+        [`84532:${sbtLower}`]: {
+          chainId: 84532,
+          sbtAddress: sbtLower,
+          passwords: ['scoped-code'],
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + 60_000,
+        },
+      },
+    }));
 
-    await subject.loadCachedPasswords();
+    subject.loadCachedPasswords();
 
     expect(subject.state.cachedPasswords).toEqual(['scoped-code']);
-    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
   });
 
-  it('prefers the viewed SBT chain over the connected network when loading tab-memory codes', async () => {
+  it('prefers the viewed SBT chain over the connected network when loading cached passwords', () => {
     const sbtAddress = '0x0000000000000000000000000000000000000203';
+    const sbtLower = sbtAddress.toLowerCase();
+    const now = Date.now();
     const subject = createSubject({
       SBTAddress: sbtAddress,
       network: { id: 11155420, name: 'OP Sepolia' },
@@ -76,15 +89,30 @@ describe('SBTPage scoped password recovery store', () => {
         chainID: 84532,
       },
     };
-    upsertSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress, passwords: ['base-only-code'] });
+    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
+      v: 1,
+      kind: SBT_PASSWORD_RECOVERY_KIND,
+      updatedAt: now,
+      entries: {
+        [`84532:${sbtLower}`]: {
+          chainId: 84532,
+          sbtAddress: sbtLower,
+          passwords: ['base-only-code'],
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + 60_000,
+        },
+      },
+    }));
 
-    await subject.loadCachedPasswords();
+    subject.loadCachedPasswords();
 
     expect(subject.state.cachedPasswords).toEqual(['base-only-code']);
   });
 
-  it('keeps admin-generated invite codes export-only by default', async () => {
+  it('persists admin-generated invite codes to the scoped recovery store', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000202';
+    const sbtLower = sbtAddress.toLowerCase();
     const subject = createSubject({
       SBTAddress: sbtAddress,
       network: { id: 84532, name: 'Base Sepolia' },
@@ -101,47 +129,13 @@ describe('SBTPage scoped password recovery store', () => {
 
     await subject.handleGenerateAdminInvites();
 
-    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    expect(recoveryStore.entries[`84532:${sbtLower}`]).toEqual(expect.objectContaining({
+      chainId: 84532,
+      sbtAddress: sbtLower,
+      passwords: ['admin-one', 'admin-two'],
+    }));
     expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
-    expect(subject.state.cachedPasswords).toEqual([]);
-  });
-
-  it('keeps admin-generated invite codes in tab memory when recovery is opted in', async () => {
-    const subject = createSubject({
-      SBTAddress: '0x0000000000000000000000000000000000000204',
-      network: { id: 84532, name: 'Base Sepolia' },
-    });
-    subject.state = {
-      ...subject.state,
-      encryptedRecoveryEnabled: true,
-      passwordGenerationCount: 1,
-    };
-    jest.spyOn(subject, 'generateRandomPasswords').mockReturnValue(['admin-encrypted']);
-    jest.spyOn(subject, 'cacheTransactionHash').mockImplementation(() => {});
-    const persist = jest
-      .spyOn(sbtEncryptedRecoveryUi, 'appendEncryptedSbtRecovery')
-      .mockResolvedValue({ ok: true, status: 'ok' });
-    jest.spyOn(contractScripts, 'addHashedPasswords').mockResolvedValue({ transactionHash: '0x204' });
-
-    await subject.handleGenerateAdminInvites();
-
-    expect(persist).toHaveBeenCalledWith(expect.objectContaining({ passwords: ['admin-encrypted'] }));
-    expect(subject.state.encryptedRecoveryStatus).toBe('saved');
-  });
-
-  it('applies the tab-memory recovery snapshot', async () => {
-    const sbtAddress = '0x0000000000000000000000000000000000000205';
-    const subject = createSubject({ SBTAddress: sbtAddress, network: { id: 84532 } });
-    jest.spyOn(sbtEncryptedRecoveryUi, 'loadSbtRecoverySnapshot').mockResolvedValue({
-      cachedPasswords: ['memory-code'],
-      encryptedRecoveryEnabled: true,
-      encryptedRecoveryStatus: 'saved',
-    });
-
-    await subject.loadCachedPasswords();
-
-    expect(subject.state.cachedPasswords).toEqual(['memory-code']);
-    expect(subject.state.encryptedRecoveryEnabled).toBe(true);
-    expect(subject.state.encryptedRecoveryStatus).toBe('saved');
+    expect(subject.state.cachedPasswords).toEqual(['admin-one', 'admin-two']);
   });
 });
