@@ -1,191 +1,157 @@
+import SurveyTool from './SurveyTool';
 import {
-  buildIndexedQuestionEntryKeys,
-  computePendingEditStats,
-  orchestrateGetChangedQidsAndFields,
-} from './surveyToolChangedFieldsController.js';
-import { buildAnswerUpdatePlan } from './surveyToolResponseMutationController.js';
-import { buildResponsePayload } from './surveyToolResponsePayloadController.js';
-import {
-  buildEditStatsState,
-  buildResponseJsonToggleState,
-  buildSurveyQuestionsPrimarySubmitPlan,
-} from './surveyQuestionsTypes.js';
-import { runSurveyQuestionsSubmitController } from './surveyQuestionsSubmitController';
-import { buildSliderPersistOptions } from './surveyToolSliderState';
-import {
-  buildSurveyResponseSliceSignature,
-  normalizeQuestionIdKey,
-} from './surveyToolSignatures.js';
-import {
-  executeSurveyExitEditing,
-  executeSurveyPendingRevert,
-} from './surveyToolResponseResetController';
-import {
-  getConvictionFromSlice,
-  getImportanceFromSlice,
-} from './surveyToolResponseState';
+  computeSubmitLabel,
+  doesQuestionProgressMatchSlug,
+  normalizeSurveyToolFilterState,
+  shouldShowPileFullLoadingState,
+  buildSurveyDraftSemanticSignature,
+} from './surveyToolUtils.js';
+import { SurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
+import { QuestionsDashboard } from './SurveySelector';
+import DeferredRatingSlider from './DeferredRatingSlider';
+import FullQuestionRatingInput from './FullQuestionRatingInput';
+import SurveyQuestionTagControl from './SurveyQuestionTagControl';
+import { DeferredCommitSlider } from './DeferredCommitSlider';
+import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
+import TagModal from '../TagPage/TagModal';
+import GatedPromptNotice from './GatedPromptNotice';
+import styles from './SurveyTool.module.scss';
+import { renderToStaticMarkup } from 'react-dom/server';
+import contractScripts, * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
+import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
+import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
+import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
+import * as sponsoredAccess from '../../utilities/web3/sponsoredAccess.js';
+import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { t } from '../../utilities/ui/terminology.js';
 
-const cloneValue = (value) => JSON.parse(JSON.stringify(value));
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
 
-const emptyField = (value = '', overrides = {}) => ({
-  value,
-  encrypted: false,
-  encryptionAudience: 'self',
-  ...overrides,
-});
+const flushAsyncCallbacks = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+};
 
-const createSlice = (overrides = {}) => ({
-  answers: {},
-  importance: {},
-  conviction: {},
-  additionalComments: {},
-  ...overrides,
-});
+const treeHasDataTestId = (node, testId) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
+  if (typeof node !== 'object') return false;
+  if (node?.props?.['data-testid'] === testId) return true;
+  return treeHasDataTestId(node?.props?.children, testId);
+};
 
-const valuesEqual = (left, right) => {
-  if (Array.isArray(left) || Array.isArray(right)) {
-    return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+const treeHasLabel = (node, label) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasLabel(child, label));
+  if (typeof node !== 'object') return false;
+  if (node?.props?.label === label) return true;
+  return treeHasLabel(node?.props?.children, label);
+};
+
+const treeHasText = (node, text) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node).includes(text);
   }
-  return left === right;
+  if (typeof node !== 'object') return false;
+  return treeHasText(node?.props?.children, text);
 };
 
-const hasMeaningfulFieldValue = (value) => {
-  if (!value || typeof value !== 'object') {
-    if (Array.isArray(value)) return value.length > 0;
-    return value !== undefined && value !== null && value !== '';
+const findElement = (node, predicate) => {
+  const stack = [node];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (Array.isArray(current)) {
+      for (let i = current.length - 1; i >= 0; i -= 1) {
+        stack.push(current[i]);
+      }
+      continue;
+    }
+    if (typeof current !== 'object') continue;
+    if (predicate(current)) return current;
+    const children = current?.props?.children;
+    if (children !== undefined) stack.push(children);
   }
-  if (value.encrypted || value.encryptedPortion) return true;
-  const fieldValue = value.value;
-  if (Array.isArray(fieldValue)) return fieldValue.length > 0;
-  return fieldValue !== undefined && fieldValue !== null && fieldValue !== '';
+  return null;
 };
 
-const buildChangedDeps = (baselineSlice, overrides = {}) => ({
-  resolveDiffBaselineSlice: () => baselineSlice,
-  getIndexedQuestionEntryKeys: (source) => buildIndexedQuestionEntryKeys(source, normalizeQuestionIdKey),
-  getDefaultResponseEncryptionAudience: () => 'self',
-  normalizeResponseEncryptionAudience: (audience) => audience || 'self',
-  getDefaultResponseEncryptionAudienceForQid: () => 'self',
-  resolveFieldEncryptionGateId: (field) => field?.encryptionGateId || null,
-  normalizeFieldAudienceMode: (mode, fieldKey) => mode || (fieldKey === 'additional' ? 'inherit' : 'explicit'),
-  valuesEqual,
-  buildSurveyResponseSliceSignature,
-  buildRatingEnvelopeQidSetFromUserAnswers: () => new Set(),
-  hasMeaningfulFieldValue,
-  bumpPerfCounter: jest.fn(),
-  ...overrides,
-});
-
-const runChangedQids = ({
-  baselineSlice,
-  currentSlice,
-  existingCache = null,
-  scopedIds = null,
-  userAnswers = null,
-  depsOverrides = {},
-}) => {
-  const deps = buildChangedDeps(baselineSlice, depsOverrides);
-  const outcome = orchestrateGetChangedQidsAndFields(
-    {
-      surveyIndex: 0,
-      currentSlice,
-      isLoggedIn: true,
-      isLoadingResponse: false,
-      scopedIds: scopedIds || new Set([
-        ...Object.keys(currentSlice.answers || {}),
-        ...Object.keys(currentSlice.additionalComments || {}),
-        ...Object.keys(currentSlice.importance || {}),
-        ...Object.keys(currentSlice.conviction || {}),
-      ].map(normalizeQuestionIdKey).filter(Boolean)),
-      userAnswers,
-    },
-    deps,
-    existingCache,
-  );
-  return { ...outcome, deps };
+const findFirstNodeByType = (node, targetType) => {
+  if (node == null) return null;
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = findFirstNodeByType(child, targetType);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof node !== 'object') return null;
+  if (node?.type === targetType) return node;
+  return findFirstNodeByType(node?.props?.children, targetType);
 };
 
-const pendingStatsFromChanged = ({
-  currentSlice,
-  changedResult,
-  questionPool = [],
-  pileQuestions = [],
-  userAnswers = null,
-  depsOverrides = {},
-}) => computePendingEditStats(
-  {
-    idx: 0,
-    currentSlice,
-    userAnswers,
-    existingCache: null,
-    diffCacheRef: {},
-    questionPool,
-    pileQuestions,
-    questionId: null,
-  },
-  {
-    getChangedQidsAndFields: () => changedResult,
-    isQuestionLockedForResponse: () => false,
-    buildRatingEnvelopeQidSetFromUserAnswers: () => new Set(),
-    ...depsOverrides,
-  },
-).result;
+const nodeHasClassName = (node, className) => {
+  const value = node?.props?.className;
+  if (typeof value !== 'string') return false;
+  return value.split(/\s+/).includes(className);
+};
 
-const mutationDeps = (questions = []) => ({
-  buildEmptyResponseFieldState: (qid, fieldKey = 'answer') => emptyField('', { questionId: qid, fieldKey }),
-  resolveFieldEncryptionAudience: (field) => field?.encryptionAudience || 'self',
-  resolveFieldEncryptionGateId: (field) => field?.encryptionGateId || null,
-  isQuestionLockedForResponse: () => false,
-  getEffectiveRecipientsForQid: jest.fn(() => []),
-  normalizeFieldAudienceMode: (mode, fieldKey) => mode || (fieldKey === 'additional' ? 'inherit' : 'explicit'),
-  buildInheritedAdditionalFieldState: (additionalField, answerField) => ({
-    ...additionalField,
-    encrypted: !!answerField.encrypted,
-    encryptionAudience: answerField.encryptionAudience || 'self',
-    encryptionGateId: answerField.encryptionGateId || null,
-    audienceMode: 'inherit',
-  }),
-  valuesEqual,
-  getQuestionById: (qid) => questions.find((question) => normalizeQuestionIdKey(question.id) === normalizeQuestionIdKey(qid)),
-  computeHash: jest.fn((value) => `hash:${value}`),
-});
+const findNodeByClassName = (node, className) => (
+  findElement(node, (candidate) => nodeHasClassName(candidate, className))
+);
 
-const responsePayload = (overrides = {}) => buildResponsePayload({
-  account: '0xabc',
-  isStandalone: false,
-  singleQuestionMode: true,
-  surveyId: '',
-  surveyIndex: 0,
-  surveyResponseState: createSlice(),
-  questionPool: [],
-  pileQuestions: [],
-  resolveFieldEncryptionAudience: (field) => field?.encryptionAudience || 'self',
-  getQuestionEncryptionGates: (question) => (question?.promptEncrypted ? ['gate'] : []),
-  resolveFieldEncryptionGateId: (field) => field?.encryptionGateId || null,
-  normalizeFieldAudienceMode: (mode, fieldKey) => mode || (fieldKey === 'additional' ? 'inherit' : 'explicit'),
-  getSurveyMetadataForJson: () => null,
-  resolveSessionContext: () => ({ sessionName: '' }),
-  getConvictionFromSlice,
-  getImportanceFromSlice,
-  sanitizeQuestionPromptForResponsePayload: (question, { isLocked }) => (
-    isLocked ? '[encrypted]' : (question.prompt || '')
-  ),
-  ...overrides,
-});
+const getElementChildren = (node) => {
+  const children = node?.props?.children;
+  if (children == null) return [];
+  return (Array.isArray(children) ? children : [children]).filter((child) => child && typeof child === 'object');
+};
 
-const createStateHarness = (initialState) => {
-  let currentState = initialState;
-  return {
-    get state() {
-      return currentState;
-    },
-    setState: (update, callback) => {
-      const patch = typeof update === 'function' ? update(currentState) : update;
-      currentState = { ...currentState, ...(patch || {}) };
-      if (typeof callback === 'function') callback();
-      return patch;
-    },
-  };
+const countElements = (node, predicate) => {
+  let count = 0;
+  const stack = [node];
+
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current) continue;
+    if (Array.isArray(current)) {
+      for (let i = current.length - 1; i >= 0; i -= 1) {
+        stack.push(current[i]);
+      }
+      continue;
+    }
+    if (typeof current !== 'object') continue;
+    if (predicate(current)) count += 1;
+    const children = current?.props?.children;
+    if (children !== undefined) stack.push(children);
+  }
+
+  return count;
+};
+
+const syncClassSetState = (subject) => {
+  subject.setState = jest.fn((next, cb) => {
+    const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+    if (patch && typeof patch === 'object') {
+      subject.state = { ...subject.state, ...patch };
+    }
+    if (typeof cb === 'function') cb();
+    return patch;
+  });
+  return subject.setState;
 };
 
 describe('SurveyTool pending edit accounting', () => {
@@ -194,290 +160,588 @@ describe('SurveyTool pending edit accounting', () => {
     jest.restoreAllMocks();
     jest.useRealTimers();
   });
-
   it('ignores out-of-scope baseline keys and clears pending count after undo in full mode', () => {
-    const baseline = createSlice({
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+    subject.getDefaultResponseEncryptionAudience = () => 'self';
+    subject.isQuestionLockedForResponse = () => false;
+
+    const baseline = {
       answers: {
-        q1: emptyField('base'),
-        orphan: emptyField('stale'),
+        q1: { value: 'base', encrypted: false, encryptionAudience: 'self' },
+        orphan: { value: 'stale', encrypted: false, encryptionAudience: 'self' },
       },
       additionalComments: {
-        q1: emptyField(),
-        orphan: emptyField(),
+        q1: { value: '', encrypted: false, encryptionAudience: 'self' },
+        orphan: { value: '', encrypted: false, encryptionAudience: 'self' },
       },
-    });
-    const current = createSlice({
-      answers: { q1: emptyField('base') },
-      additionalComments: { q1: emptyField() },
-    });
-    const scopedIds = new Set(['q1']);
+      importance: {},
+      conviction: {},
+    };
+    const current = {
+      answers: {
+        q1: { value: 'base', encrypted: false, encryptionAudience: 'self' },
+      },
+      additionalComments: {
+        q1: { value: '', encrypted: false, encryptionAudience: 'self' },
+      },
+      importance: {},
+      conviction: {},
+    };
 
-    const unchanged = runChangedQids({ baselineSlice: baseline, currentSlice: current, scopedIds }).result;
-    expect(pendingStatsFromChanged({ currentSlice: current, changedResult: unchanged }).total).toBe(0);
+    subject.state = {
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      surveysResponseState: [current],
+      editBaseline: baseline,
+      userAnswers: null,
+      isLoadingResponse: false,
+    };
 
-    const edited = createSlice({
-      answers: { q1: emptyField('base + edit') },
-      additionalComments: { q1: emptyField() },
-    });
-    const changed = runChangedQids({ baselineSlice: baseline, currentSlice: edited, scopedIds }).result;
-    expect(pendingStatsFromChanged({ currentSlice: edited, changedResult: changed }).total).toBe(1);
+    expect(subject.getPendingEditStats(0).total).toBe(0);
 
-    const reverted = runChangedQids({ baselineSlice: baseline, currentSlice: current, scopedIds }).result;
-    expect(pendingStatsFromChanged({ currentSlice: current, changedResult: reverted }).total).toBe(0);
+    subject.state.surveysResponseState[0].answers.q1 = {
+      ...subject.state.surveysResponseState[0].answers.q1,
+      value: 'base + edit',
+    };
+    subject._changedQidsAndFieldsCache = null;
+    expect(subject.getPendingEditStats(0).total).toBe(1);
+
+    subject.state.surveysResponseState[0].answers.q1 = {
+      ...subject.state.surveysResponseState[0].answers.q1,
+      value: 'base',
+    };
+    subject._changedQidsAndFieldsCache = null;
+    expect(subject.getPendingEditStats(0).total).toBe(0);
   });
 
   it('uses pile question scope for pending diffs so one edit counts as one', () => {
-    const baseline = createSlice({
-      answers: {
-        'pile-q1': emptyField('same'),
-        orphan: emptyField('stale'),
-      },
-      additionalComments: {
-        'pile-q1': emptyField(),
-        orphan: emptyField(),
-      },
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
     });
-    const current = createSlice({
-      answers: { 'pile-q1': emptyField('same') },
-      additionalComments: { 'pile-q1': emptyField() },
-    });
-    const scopedIds = new Set(['pile-q1']);
+    subject.getDefaultResponseEncryptionAudience = () => 'self';
+    subject.isQuestionLockedForResponse = () => false;
 
-    const unchanged = runChangedQids({ baselineSlice: baseline, currentSlice: current, scopedIds }).result;
-    expect(pendingStatsFromChanged({ currentSlice: current, changedResult: unchanged }).total).toBe(0);
-
-    const edited = createSlice({
-      answers: { 'pile-q1': emptyField('edited') },
-      additionalComments: { 'pile-q1': emptyField() },
-    });
-    const changed = runChangedQids({ baselineSlice: baseline, currentSlice: edited, scopedIds }).result;
-    expect(pendingStatsFromChanged({
-      currentSlice: edited,
-      changedResult: changed,
+    subject.state = {
+      questionPool: [],
       pileQuestions: [{ id: 'pile-q1' }],
-    }).total).toBe(1);
+      surveysResponseState: [
+        {
+          answers: { 'pile-q1': { value: 'same', encrypted: false, encryptionAudience: 'self' } },
+          additionalComments: { 'pile-q1': { value: '', encrypted: false, encryptionAudience: 'self' } },
+          importance: {},
+          conviction: {},
+        },
+      ],
+      editBaseline: {
+        answers: {
+          'pile-q1': { value: 'same', encrypted: false, encryptionAudience: 'self' },
+          orphan: { value: 'stale', encrypted: false, encryptionAudience: 'self' },
+        },
+        additionalComments: {
+          'pile-q1': { value: '', encrypted: false, encryptionAudience: 'self' },
+          orphan: { value: '', encrypted: false, encryptionAudience: 'self' },
+        },
+        importance: {},
+        conviction: {},
+      },
+      userAnswers: null,
+      isLoadingResponse: false,
+    };
+
+    expect(subject.getPendingEditStats(0).total).toBe(0);
+
+    subject.state.surveysResponseState[0].answers['pile-q1'] = {
+      ...subject.state.surveysResponseState[0].answers['pile-q1'],
+      value: 'edited',
+    };
+    subject._changedQidsAndFieldsCache = null;
+    expect(subject.getPendingEditStats(0).total).toBe(1);
   });
 
   it('tracks visible and off-screen edits from response slices while keeping unchanged baseline at zero', () => {
-    const baseline = createSlice({
-      answers: {
-        q1: emptyField('same'),
-        q2: emptyField('other'),
-      },
-      additionalComments: { q1: emptyField(), q2: emptyField() },
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
     });
-    const current = createSlice({
-      answers: {
-        q1: emptyField('same'),
-        q2: emptyField('other'),
-      },
-      additionalComments: { q1: emptyField(), q2: emptyField() },
-    });
+    subject.getDefaultResponseEncryptionAudience = () => 'self';
+    subject.isQuestionLockedForResponse = () => false;
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1']);
 
-    const unchanged = runChangedQids({ baselineSlice: baseline, currentSlice: current }).result;
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+    subject.state = {
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      surveysResponseState: [
+        {
+          answers: {
+            q1: { value: 'same', encrypted: false, encryptionAudience: 'self' },
+            q2: { value: 'other', encrypted: false, encryptionAudience: 'self' },
+          },
+          additionalComments: { q1: { ...emptyField }, q2: { ...emptyField } },
+          importance: {},
+          conviction: {},
+        },
+      ],
+      editBaseline: {
+        answers: {
+          q1: { value: 'same', encrypted: false, encryptionAudience: 'self' },
+          q2: { value: 'other', encrypted: false, encryptionAudience: 'self' },
+        },
+        additionalComments: { q1: { ...emptyField }, q2: { ...emptyField } },
+        importance: {},
+        conviction: {},
+      },
+      userAnswers: null,
+      isLoadingResponse: false,
+    };
+
+    const unchanged = subject.getChangedQidsAndFields(0);
     expect(unchanged.changedQids.size).toBe(0);
 
-    const visibleEdit = runChangedQids({
-      baselineSlice: baseline,
-      currentSlice: createSlice({
-        answers: {
-          q1: emptyField('edited-visible'),
-          q2: emptyField('other'),
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          ...subject.state.surveysResponseState[0],
+          answers: {
+            ...subject.state.surveysResponseState[0].answers,
+            q1: { value: 'edited-visible', encrypted: false, encryptionAudience: 'self' },
+          },
         },
-        additionalComments: { q1: emptyField(), q2: emptyField() },
-      }),
-    }).result;
+      ],
+    };
+    subject._changedQidsAndFieldsCache = null;
+    const visibleEdit = subject.getChangedQidsAndFields(0);
     expect(visibleEdit.changedQids.has('q1')).toBe(true);
     expect(visibleEdit.changedQids.has('q2')).toBe(false);
 
-    const offscreenEdit = runChangedQids({
-      baselineSlice: baseline,
-      currentSlice: createSlice({
-        answers: {
-          q1: emptyField('same'),
-          q2: emptyField('edited-offscreen'),
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          ...subject.state.surveysResponseState[0],
+          answers: {
+            ...subject.state.surveysResponseState[0].answers,
+            q1: { value: 'same', encrypted: false, encryptionAudience: 'self' },
+            q2: { value: 'edited-offscreen', encrypted: false, encryptionAudience: 'self' },
+          },
         },
-        additionalComments: { q1: emptyField(), q2: emptyField() },
-      }),
-    }).result;
+      ],
+    };
+    subject._changedQidsAndFieldsCache = null;
+    const offscreenEdit = subject.getChangedQidsAndFields(0);
     expect(offscreenEdit.changedQids.has('q1')).toBe(false);
     expect(offscreenEdit.changedQids.has('q2')).toBe(true);
   });
 
   it('reuses changed-qids cache when slice refs churn but semantic content is unchanged', () => {
-    const baseline = createSlice({
-      answers: { q1: emptyField('same') },
-      additionalComments: { q1: emptyField() },
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
     });
-    const current = createSlice({
-      answers: { q1: emptyField('same') },
-      additionalComments: { q1: emptyField() },
-    });
+    subject.getDefaultResponseEncryptionAudience = () => 'self';
+    subject.isQuestionLockedForResponse = () => false;
 
-    const first = runChangedQids({ baselineSlice: baseline, currentSlice: current });
-    expect(first.result.changedQids.size).toBe(0);
+    const baseline = {
+      answers: { q1: { value: 'same', encrypted: false, encryptionAudience: 'self' } },
+      additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+      importance: {},
+      conviction: {},
+    };
+    const current = {
+      answers: { q1: { value: 'same', encrypted: false, encryptionAudience: 'self' } },
+      additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+      importance: {},
+      conviction: {},
+    };
 
-    const sameBaseline = createSlice({
-      answers: { q1: { ...baseline.answers.q1 } },
-      additionalComments: { q1: { ...baseline.additionalComments.q1 } },
-    });
-    const sameCurrent = createSlice({
-      answers: { q1: { ...current.answers.q1 } },
-      additionalComments: { q1: { ...current.additionalComments.q1 } },
-    });
-    const second = runChangedQids({
-      baselineSlice: sameBaseline,
-      currentSlice: sameCurrent,
-      existingCache: first.newCache,
-    });
+    subject.state = {
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      surveysResponseState: [current],
+      editBaseline: baseline,
+      userAnswers: null,
+      isLoadingResponse: false,
+    };
 
-    expect(second.result).toBe(first.result);
-    expect(second.newCache).toBe(first.newCache);
+    const indexSpy = jest.spyOn(subject, 'getIndexedQuestionEntryKeys');
+    const first = subject.getChangedQidsAndFields(0);
+    expect(first.changedQids.size).toBe(0);
+    expect(indexSpy).toHaveBeenCalled();
+
+    indexSpy.mockClear();
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { ...current.answers.q1 } },
+        additionalComments: { q1: { ...current.additionalComments.q1 } },
+        importance: {},
+        conviction: {},
+      }],
+      editBaseline: {
+        answers: { q1: { ...baseline.answers.q1 } },
+        additionalComments: { q1: { ...baseline.additionalComments.q1 } },
+        importance: {},
+        conviction: {},
+      },
+    };
+
+    const second = subject.getChangedQidsAndFields(0);
+    expect(second).toBe(first);
+    expect(indexSpy).not.toHaveBeenCalled();
   });
 
   it('recomputes changed-qids cache when a middle array value changes', () => {
-    const baseline = createSlice({
-      answers: { q1: emptyField(['A', 'B', 'C']) },
-      additionalComments: { q1: emptyField() },
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
     });
-    const current = createSlice({
-      answers: { q1: emptyField(['A', 'B', 'C']) },
-      additionalComments: { q1: emptyField() },
-    });
+    subject.getDefaultResponseEncryptionAudience = () => 'self';
+    subject.isQuestionLockedForResponse = () => false;
 
-    const first = runChangedQids({ baselineSlice: baseline, currentSlice: current });
-    expect(first.result.changedQids.size).toBe(0);
+    const baseline = {
+      answers: {
+        q1: {
+          value: ['A', 'B', 'C'],
+          encrypted: false,
+          encryptionAudience: 'self',
+        },
+      },
+      additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+      importance: {},
+      conviction: {},
+    };
+    const current = {
+      answers: {
+        q1: {
+          value: ['A', 'B', 'C'],
+          encrypted: false,
+          encryptionAudience: 'self',
+        },
+      },
+      additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+      importance: {},
+      conviction: {},
+    };
 
-    const edited = createSlice({
-      answers: { q1: emptyField(['A', 'D', 'C']) },
-      additionalComments: { q1: emptyField() },
-    });
-    const second = runChangedQids({
-      baselineSlice: baseline,
-      currentSlice: edited,
-      existingCache: first.newCache,
-    });
+    subject.state = {
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      surveysResponseState: [current],
+      editBaseline: baseline,
+      userAnswers: null,
+      isLoadingResponse: false,
+    };
 
-    expect(second.result).not.toBe(first.result);
-    expect(second.result.changedQids.has('q1')).toBe(true);
+    const first = subject.getChangedQidsAndFields(0);
+    expect(first.changedQids.size).toBe(0);
+
+    const indexSpy = jest.spyOn(subject, 'getIndexedQuestionEntryKeys');
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: {
+          q1: {
+            ...current.answers.q1,
+            value: ['A', 'D', 'C'],
+          },
+        },
+        additionalComments: { q1: { ...current.additionalComments.q1 } },
+        importance: {},
+        conviction: {},
+      }],
+      editBaseline: {
+        answers: { q1: { ...baseline.answers.q1 } },
+        additionalComments: { q1: { ...baseline.additionalComments.q1 } },
+        importance: {},
+        conviction: {},
+      },
+    };
+
+    const second = subject.getChangedQidsAndFields(0);
+    expect(second).not.toBe(first);
+    expect(second.changedQids.has('q1')).toBe(true);
+    expect(indexSpy).toHaveBeenCalled();
   });
 
   it('counts encrypted rating edits when baseline has missing plaintext rating', () => {
-    const current = createSlice({
-      answers: { q1: emptyField('*', { encrypted: true }) },
-      additionalComments: { q1: emptyField() },
-      importance: { q1: 7 },
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
     });
-    const baseline = createSlice({
-      answers: { q1: emptyField('*', { encrypted: true }) },
-      additionalComments: { q1: emptyField() },
-    });
+    subject.getDefaultResponseEncryptionAudience = () => 'self';
+    subject.isQuestionLockedForResponse = () => false;
 
-    const changed = runChangedQids({ baselineSlice: baseline, currentSlice: current }).result;
-    const stats = pendingStatsFromChanged({
-      currentSlice: current,
-      changedResult: changed,
-    });
-    expect(stats.total).toBe(1);
-    expect(stats.encrypted).toBe(1);
+    subject.state = {
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      surveysResponseState: [
+        {
+          answers: { q1: { value: '*', encrypted: true, encryptionAudience: 'self' } },
+          additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+          importance: { q1: 7 },
+          conviction: {},
+        },
+      ],
+      editBaseline: {
+        answers: { q1: { value: '*', encrypted: true, encryptionAudience: 'self' } },
+        additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+        importance: {},
+        conviction: {},
+      },
+      userAnswers: null,
+      isLoadingResponse: false,
+    };
+
+    expect(subject.getPendingEditStats(0).total).toBe(1);
   });
 
   it('clears binary answer when selecting the same option again', () => {
-    const deps = mutationDeps([{ id: 'q1', type: 'binary' }]);
-    const plan = buildAnswerUpdatePlan(
-      'q1',
-      'Agree',
-      createSlice({
-        answers: { q1: emptyField('Agree') },
-        additionalComments: {},
-      }),
-      deps,
-    );
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
 
-    expect(plan.changed).toBe(true);
-    expect(plan.nextAnswerState.value).toBe('');
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+    subject.scheduleJsonPreviewUpdate = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.getEffectiveRecipientsForQid = () => [];
+    subject.resolveFieldEncryptionAudience = () => 'self';
+    subject.isQuestionLockedForResponse = () => false;
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1', type: 'binary' }],
+      pileQuestions: [],
+      surveysResponseState: [
+        {
+          answers: { q1: { value: 'Agree', encrypted: false, encryptionAudience: 'self' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    subject.handleAnswer(0, 'q1', 'Agree');
+    expect(subject.state.surveysResponseState[0].answers.q1.value).toBe('');
   });
 
   it('skips no-op answer updates for repeated freeform values with stable encryption state', () => {
-    const deps = mutationDeps([{ id: 'q1', type: 'freeform' }]);
-    const plan = buildAnswerUpdatePlan(
-      'q1',
-      'same',
-      createSlice({
-        answers: {
-          q1: emptyField('same', {
-            hash: '0xabc',
-          }),
-        },
-        additionalComments: {},
-      }),
-      deps,
-    );
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
 
-    expect(plan.changed).toBe(false);
-    expect(deps.getEffectiveRecipientsForQid).not.toHaveBeenCalled();
-    expect(deps.computeHash).not.toHaveBeenCalled();
+    subject.setState = jest.fn();
+    subject.scheduleJsonPreviewUpdate = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.getEffectiveRecipientsForQid = jest.fn(() => []);
+    subject.resolveFieldEncryptionAudience = (field) => field?.encryptionAudience || 'self';
+    subject.isQuestionLockedForResponse = () => false;
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1', type: 'freeform' }],
+      pileQuestions: [],
+      surveysResponseState: [
+        {
+          answers: {
+            q1: {
+              value: 'same',
+              encrypted: false,
+              encryptionAudience: 'self',
+              hash: '0xabc',
+            },
+          },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    subject.handleAnswer(0, 'q1', 'same');
+    expect(subject.setState).not.toHaveBeenCalled();
+    expect(subject.getEffectiveRecipientsForQid).not.toHaveBeenCalled();
   });
 
   it('defers draft persistence for slider-driven rating updates until the drag completes', () => {
-    const deps = mutationDeps([{ id: 'q1', type: 'rating' }]);
-    const plan = buildAnswerUpdatePlan(
-      'q1',
-      6,
-      createSlice({
-        answers: { q1: emptyField(2) },
-        additionalComments: {},
-      }),
-      deps,
-    );
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
 
-    expect(buildSliderPersistOptions({ type: 'mousemove' }).persistDraft).toBe(false);
-    expect(buildSliderPersistOptions({ type: 'keydown' }).persistDraft).toBe(true);
-    expect(plan.changed).toBe(true);
-    expect(plan.nextAnswerState.value).toBe(6);
-    // port note: the old final assertion called the private class
-    // flushDraftPersistAfterSliderChange wrapper; the portable contract is that
-    // slider drag events suppress immediate persistence and commit paths opt in.
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+    };
+    subject.scheduleJsonPreviewUpdate = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.getEffectiveRecipientsForQid = jest.fn(() => []);
+    subject.resolveFieldEncryptionAudience = (field) => field?.encryptionAudience || 'self';
+    subject.isQuestionLockedForResponse = () => false;
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1', type: 'rating' }],
+      pileQuestions: [],
+      surveysResponseState: [
+        {
+          answers: { q1: { value: 2, encrypted: false, encryptionAudience: 'self' } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    subject.handleAnswer(0, 'q1', 6, { persistDraft: false });
+
+    expect(subject.state.surveysResponseState[0].answers.q1.value).toBe(6);
+    expect(subject.scheduleJsonPreviewUpdate).toHaveBeenCalledTimes(1);
+    expect(subject.persistDraftSafely).not.toHaveBeenCalled();
+
+    subject.flushDraftPersistAfterSliderChange();
+    expect(subject.persistDraftSafely).toHaveBeenCalledWith(0);
   });
 
   it('gates deferred json preview updates when response preview is hidden', () => {
-    const updateJsonPreview = jest.fn();
-    const scheduleIfVisible = (state, force = false) => {
-      if (!force && !state.showResponseJson) return;
-      updateJsonPreview(force);
-    };
+    jest.useFakeTimers();
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
 
-    scheduleIfVisible({ showResponseJson: false });
-    expect(updateJsonPreview).not.toHaveBeenCalled();
+    subject.updateJsonPreview = jest.fn();
+    subject.state = { ...subject.state, showResponseJson: false };
 
-    scheduleIfVisible({ showResponseJson: true });
-    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
-    // port note: timer ownership lives in the class shell; the extracted
-    // response-json state seam still preserves the visible-panel gate.
+    subject.scheduleJsonPreviewUpdate(40);
+    jest.advanceTimersByTime(50);
+    expect(subject.updateJsonPreview).not.toHaveBeenCalled();
+
+    subject.state = { ...subject.state, showResponseJson: true };
+    subject.scheduleJsonPreviewUpdate(40);
+    jest.advanceTimersByTime(50);
+    expect(subject.updateJsonPreview).toHaveBeenCalledTimes(1);
   });
 
   it('refreshes json preview immediately when response json panel is opened', () => {
-    const updateJsonPreview = jest.fn();
-    const patch = buildResponseJsonToggleState({ showResponseJson: false });
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
 
-    if (patch.showResponseJson) updateJsonPreview(true);
+    subject.updateJsonPreview = jest.fn();
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    };
+    subject.state = { ...subject.state, showResponseJson: false };
 
-    expect(patch.showResponseJson).toBe(true);
-    expect(updateJsonPreview).toHaveBeenCalledWith(true);
-    // port note: the immediate preview refresh is still a shell callback after
-    // buildResponseJsonToggleState opens the panel.
+    subject.toggleShowResponseJson();
+
+    expect(subject.state.showResponseJson).toBe(true);
+    expect(subject.updateJsonPreview).toHaveBeenCalledWith(true);
   });
 
   it('does not inherit the general session name in single-question response json when the slug is unresolved', () => {
-    const json = responsePayload({
+    const generalCfg = {
+      slug: '',
+      networkChainId: 84532,
+      sessionName: 'General Session',
+    };
+    const strictLookup = (slug) => (
+      String(slug || '').trim().toLowerCase() === ''
+        ? generalCfg
+        : null
+    );
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation((slug) => (
+      strictLookup(slug) || generalCfg
+    ));
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'missing-session-slug',
+      activeSessionSlug: '',
       account: '0xabc',
-      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt without session name' }],
-      resolveSessionContext: () => ({ sessionName: '' }),
-      surveyResponseState: createSlice({
-        answers: { q1: emptyField('hello') },
-        additionalComments: { q1: emptyField() },
-      }),
+      loginComplete: true,
+      provider: {},
     });
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt without session name' }],
+      surveysResponseState: [{
+        answers: {
+          q1: { value: 'hello', encrypted: false, encryptionAudience: 'self' },
+        },
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: { value: '', encrypted: false, encryptionAudience: 'self' },
+        },
+      }],
+    };
+
+    const json = subject.prepareJsonAndHash(0);
 
     expect(json).toEqual(expect.objectContaining({
       questionID: 'q1',
@@ -488,145 +752,172 @@ describe('SurveyTool pending edit accounting', () => {
   });
 
   it('masks locked question prompts in response json payloads', () => {
-    const json = responsePayload({
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
       account: '0xabc',
+      loginComplete: true,
+      provider: {},
+    });
+    subject.state = {
+      ...subject.state,
       questionPool: [{
         id: 'q1',
         type: 'freeform',
         prompt: 'Secret locked prompt',
         promptEncrypted: '{"ciphertext":"prompt-cipher"}',
       }],
-      surveyResponseState: createSlice({
-        answers: { q1: emptyField('answer') },
-        additionalComments: { q1: emptyField() },
-      }),
-    });
+      surveysResponseState: [{
+        answers: {
+          q1: { value: 'answer', encrypted: false, encryptionAudience: 'self' },
+        },
+        importance: {},
+        conviction: {},
+        additionalComments: {
+          q1: { value: '', encrypted: false, encryptionAudience: 'self' },
+        },
+      }],
+    };
+
+    const json = subject.prepareJsonAndHash(0);
 
     expect(json.prompt).toBe('[encrypted]');
     expect(JSON.stringify(json)).not.toContain('Secret locked prompt');
   });
 
   it('allows submit click when submitted latch is active but pending edits exist', () => {
-    const plan = buildSurveyQuestionsPrimarySubmitPlan({
-      account: '0xabc',
-      isStandalone: false,
-      isSubmitting: false,
-      pendingEditCount: 1,
-      questionID: '',
+    const subject = new SurveyQuestions({
       singleQuestionMode: false,
-      submissionComplete: false,
-      submitGuardActive: false,
-      submittedSinceLastEdit: true,
-      surveyId: 'survey-1',
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
     });
-    const ports = {
-      activateSubmitGuard: jest.fn(),
-      dispatchSubmit: jest.fn(),
-      navigateToResponse: jest.fn(),
+    const uploadSpy = jest.fn();
+    subject.encryptAndUpload = uploadSpy;
+    subject.getPendingEditStats = () => ({ total: 1, encrypted: 0 });
+    subject.state = {
+      isSubmitting: false,
+      submittedSinceLastEdit: true,
+      submissionComplete: false,
+      modifiedCount: 1,
     };
-    const result = runSurveyQuestionsSubmitController({ plan, ports });
 
-    expect(plan.action).toBe('submit');
-    expect(result.status).toBe('dispatched');
-    expect(ports.dispatchSubmit).toHaveBeenCalledTimes(1);
+    subject.handlePrimarySubmitClick();
+    expect(uploadSpy).toHaveBeenCalledTimes(1);
   });
 
   it('blocks rapid double submit clicks until encryptAndUpload releases the guard', async () => {
-    let submitGuardActive = false;
-    const dispatchSubmit = jest.fn();
-    const firstPlan = buildSurveyQuestionsPrimarySubmitPlan({
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
       account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+    const deferred = createDeferred();
+    const uploadSpy = jest.fn(() => deferred.promise);
+    subject.encryptAndUpload = uploadSpy;
+    subject.getPendingEditStats = () => ({ total: 1, encrypted: 0 });
+    subject.state = {
+      ...subject.state,
       isSubmitting: false,
-      pendingEditCount: 1,
-      submissionComplete: false,
-      submitGuardActive,
       submittedSinceLastEdit: false,
-      surveyId: 'survey-1',
-    });
-    runSurveyQuestionsSubmitController({
-      plan: firstPlan,
-      ports: {
-        activateSubmitGuard: () => {
-          submitGuardActive = true;
-        },
-        dispatchSubmit,
-      },
-    });
+      submissionComplete: false,
+      modifiedCount: 1,
+    };
 
-    const secondPlan = buildSurveyQuestionsPrimarySubmitPlan({
-      isSubmitting: false,
-      submitGuardActive,
-    });
-    const secondResult = runSurveyQuestionsSubmitController({
-      plan: secondPlan,
-      ports: {
-        activateSubmitGuard: () => {
-          submitGuardActive = true;
-        },
-        dispatchSubmit,
-      },
-    });
+    subject.handlePrimarySubmitClick();
+    subject.handlePrimarySubmitClick();
 
-    expect(dispatchSubmit).toHaveBeenCalledTimes(1);
-    expect(submitGuardActive).toBe(true);
-    expect(secondResult.status).toBe('inert');
-    expect(secondResult.reason).toBe('submit_guard');
+    expect(uploadSpy).toHaveBeenCalledTimes(1);
+    expect(subject._submitGuard).toBe(true);
+
+    deferred.resolve();
+    await flushAsyncCallbacks();
   });
 
   it('revert X only seeds empty structures for currently rendered ids', () => {
-    const stateHarness = createStateHarness({
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1' }],
       surveysResponseState: [
-        createSlice({
-          answers: { q1: emptyField('dirty') },
-          additionalComments: { q1: emptyField() },
-        }),
+        {
+          answers: { q1: { value: 'dirty', encrypted: false, encryptionAudience: 'self' } },
+          additionalComments: { q1: { ...emptyField } },
+          importance: {},
+          conviction: {},
+        },
       ],
-      editBaseline: createSlice({
-        answers: { q1: emptyField('saved') },
-        additionalComments: { q1: emptyField() },
-      }),
-    });
-    const clearDraft = jest.fn();
-    const recalculateEditStats = jest.fn();
-    const updateJsonPreview = jest.fn();
-
-    executeSurveyPendingRevert({
-      props: {
-        account: '0xabc',
-        loginComplete: true,
-        surveyIndex: 0,
+      editBaseline: {
+        answers: { q1: { value: 'saved', encrypted: false, encryptionAudience: 'self' } },
+        additionalComments: { q1: { ...emptyField } },
+        importance: {},
+        conviction: {},
       },
-      state: stateHarness.state,
-      getRenderedQuestionIds: () => ['q1'],
-      cloneFieldState: cloneValue,
-      buildEmptyResponseFieldState: (questionId, fieldKey = 'answer') => emptyField('', { questionId, fieldKey }),
-      setState: stateHarness.setState,
-      clearDraft,
-      recalculateEditStats,
-      updateJsonPreview,
-    });
+    };
+    subject.getCurrentRenderedQuestionIds = jest.fn().mockReturnValue(['q1']);
+    subject.getHydrationQuestionIds = jest.fn().mockReturnValue(['q1', 'q2']);
+    subject.clearDraft = jest.fn();
+    subject.recalculateEditStats = jest.fn();
+    subject.updateJsonPreview = jest.fn();
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    };
 
-    const reverted = stateHarness.state.surveysResponseState?.[0];
+    subject.handleRevertPendingChanges();
+
+    const reverted = subject.state.surveysResponseState?.[0];
     expect(reverted?.answers?.q1?.value).toBe('saved');
     expect(reverted?.answers?.q2).toBeUndefined();
     expect(reverted?.additionalComments?.q2).toBeUndefined();
-    expect(clearDraft).toHaveBeenCalledTimes(1);
-    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
-    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
   });
 
   it('revert X re-latches submitted state when no pending edits remain', () => {
-    const stateHarness = createStateHarness({
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1' }],
       surveysResponseState: [
-        createSlice({
-          answers: { q1: emptyField('dirty') },
-          additionalComments: { q1: emptyField() },
-        }),
+        {
+          answers: { q1: { value: 'dirty', encrypted: false, encryptionAudience: 'self' } },
+          additionalComments: { q1: { ...emptyField } },
+          importance: {},
+          conviction: {},
+        },
       ],
-      editBaseline: createSlice({
-        answers: { q1: emptyField('saved') },
-        additionalComments: { q1: emptyField() },
-      }),
+      editBaseline: {
+        answers: { q1: { value: 'saved', encrypted: false, encryptionAudience: 'self' } },
+        additionalComments: { q1: { ...emptyField } },
+        importance: {},
+        conviction: {},
+      },
       userHasResponse: true,
       submittedSinceLastEdit: false,
       submissionComplete: false,
@@ -636,85 +927,76 @@ describe('SurveyTool pending edit accounting', () => {
       modifiedCount: 1,
       encryptedModifiedCount: 0,
       hasEncryptedChanges: false,
-    });
-    const recalculateEditStats = jest.fn(() => {
-      stateHarness.setState(buildEditStatsState({
-        encryptedModifiedCount: 0,
-        hasEncryptedChanges: false,
-        isDirty: false,
-        modifiedCount: 0,
-        shouldRelatchSubmitted: true,
-      }));
-    });
+    };
+    subject.getCurrentRenderedQuestionIds = jest.fn().mockReturnValue(['q1']);
+    subject.getPendingEditStats = jest.fn().mockReturnValue({ total: 0, encrypted: 0 });
+    subject.clearDraft = jest.fn();
+    subject.updateJsonPreview = jest.fn();
+    subject.setState = (next, cb) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof cb === 'function') cb();
+      return patch;
+    };
 
-    executeSurveyPendingRevert({
-      props: {
-        account: '0xabc',
-        loginComplete: true,
-        surveyIndex: 0,
-      },
-      state: stateHarness.state,
-      getRenderedQuestionIds: () => ['q1'],
-      cloneFieldState: cloneValue,
-      buildEmptyResponseFieldState: (questionId, fieldKey = 'answer') => emptyField('', { questionId, fieldKey }),
-      setState: stateHarness.setState,
-      clearDraft: jest.fn(),
-      recalculateEditStats,
-      updateJsonPreview: jest.fn(),
-    });
+    subject.handleRevertPendingChanges();
 
-    expect(stateHarness.state.pileDiscardedEdits).toBe(false);
-    expect(stateHarness.state.submittedSinceLastEdit).toBe(true);
-    expect(stateHarness.state.modifiedCount).toBe(0);
-    expect(stateHarness.state.isDirty).toBe(false);
+    expect(subject.state.pileDiscardedEdits).toBe(false);
+    expect(subject.state.submittedSinceLastEdit).toBe(true);
+    expect(subject.state.modifiedCount).toBe(0);
+    expect(subject.state.isDirty).toBe(false);
   });
 
   it('restores the viewed-response slice when exiting edit mode', () => {
-    const stateHarness = createStateHarness({
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 2,
+      responderAddress: '0xdef',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+
+    subject.state = {
+      ...subject.state,
       surveysResponseState: [{ answers: { keep: { value: 'persisted' } } }],
       parsedViewAddressAnswers: { answer: { value: 'viewed' } },
       userAnswers: { answer: { value: 'self' } },
       submittedSinceLastEdit: true,
-    });
-    const buildSliceFromUserAnswers = jest.fn(() => createSlice({
+    };
+    syncClassSetState(subject);
+    subject.buildSliceFromUserAnswers = jest.fn(() => ({
       answers: { q1: { value: 'viewed' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
     }));
-    const buildSliceFromLocalCache = jest.fn(() => createSlice({
+    subject.buildSliceFromLocalCache = jest.fn(() => ({
       answers: { q9: { value: 'cached' } },
+      importance: {},
+      conviction: {},
+      additionalComments: {},
     }));
-    const clearDraft = jest.fn();
-    const recalculateEditStats = jest.fn();
-    const persistDraftSafely = jest.fn();
-    const updateJsonPreview = jest.fn();
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1', 'q2']);
+    subject.buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
+      value: '',
+      questionId,
+      fieldKey,
+    }));
+    subject.deepClone = jest.fn((value) => JSON.parse(JSON.stringify(value)));
+    subject.recalculateEditStats = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+    subject.updateJsonPreview = jest.fn();
+    subject.clearDraft = jest.fn();
 
-    executeSurveyExitEditing({
-      props: {
-        surveyIndex: 2,
-        responderAddress: '0xdef',
-      },
-      state: stateHarness.state,
-      buildSliceFromUserAnswers,
-      buildSliceFromLocalCache,
-      getRenderedQuestionIds: () => ['q1', 'q2'],
-      buildEmptyResponseFieldState: (questionId, fieldKey = 'answer') => ({
-        value: '',
-        questionId,
-        fieldKey,
-      }),
-      cloneValue,
-      setState: stateHarness.setState,
-      recalculateEditStats,
-      persistDraftSafely,
-      updateJsonPreview,
-      clearDraft,
-      updateSubmittedSinceLastEdit: () => false,
-    });
+    subject.handleExitEditing();
 
-    expect(stateHarness.state.displayAnswerMode).toBe(true);
-    expect(stateHarness.state.isEditing).toBe(false);
-    expect(stateHarness.state.startFresh).toBe(false);
-    expect(stateHarness.state.submittedSinceLastEdit).toBe(false);
-    expect(stateHarness.state.surveysResponseState).toEqual([
+    expect(subject.state.displayAnswerMode).toBe(true);
+    expect(subject.state.isEditing).toBe(false);
+    expect(subject.state.startFresh).toBe(false);
+    expect(subject.state.submittedSinceLastEdit).toBe(false);
+    expect(subject.state.surveysResponseState).toEqual([
       { answers: { keep: { value: 'persisted' } } },
       {
         answers: {},
@@ -735,7 +1017,7 @@ describe('SurveyTool pending edit accounting', () => {
         },
       },
     ]);
-    expect(stateHarness.state.editBaseline).toEqual({
+    expect(subject.state.editBaseline).toEqual({
       answers: {
         q1: { value: 'viewed' },
         q2: { value: '', questionId: 'q2', fieldKey: 'answer' },
@@ -747,11 +1029,361 @@ describe('SurveyTool pending edit accounting', () => {
         q2: { value: '', questionId: 'q2', fieldKey: 'additional' },
       },
     });
-    expect(buildSliceFromUserAnswers).toHaveBeenCalledWith({ answer: { value: 'viewed' } });
-    expect(buildSliceFromLocalCache).not.toHaveBeenCalled();
-    expect(clearDraft).toHaveBeenCalledTimes(1);
-    expect(recalculateEditStats).toHaveBeenCalledTimes(1);
-    expect(persistDraftSafely).toHaveBeenCalledTimes(1);
-    expect(updateJsonPreview).toHaveBeenCalledTimes(1);
+    expect(subject.buildSliceFromUserAnswers).toHaveBeenCalledWith({ answer: { value: 'viewed' } });
+    expect(subject.clearDraft).toHaveBeenCalledTimes(1);
+    expect(subject.recalculateEditStats).toHaveBeenCalledTimes(1);
+    expect(subject.persistDraftSafely).toHaveBeenCalledTimes(1);
+    expect(subject.updateJsonPreview).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders submitted indicator test id when submitted latch is active', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submittedSinceLastEdit: true,
+      submissionComplete: false,
+      submissionError: '',
+      userHasResponse: false,
+      startFresh: false,
+      isEditing: false,
+      questionPool: [],
+      surveysResponseState: [
+        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+    };
+
+    const tree = subject.render();
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBe(true);
+  });
+
+  it('keeps inline submitted indicator visible after submit when userHasResponse is true', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submittedSinceLastEdit: true,
+      submissionComplete: false,
+      submissionError: '',
+      userHasResponse: true,
+      startFresh: false,
+      isEditing: false,
+      displayAnswerMode: false,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
+      surveysResponseState: [
+        {
+          answers: { q1: { ...emptyField } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { ...emptyField } },
+        },
+      ],
+      userAnswers: null,
+    };
+
+    const tree = subject.render();
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBe(true);
+  });
+
+  it('does not render existing-response notice in single-question mode', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submissionError: '',
+      userHasResponse: true,
+      userResponseEncrypted: true,
+      startFresh: false,
+      isEditing: false,
+      displayAnswerMode: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
+      surveysResponseState: [
+        {
+          answers: { q1: { ...emptyField } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { ...emptyField } },
+        },
+      ],
+      userAnswers: { answer: { ...emptyField } },
+    };
+
+    const tree = subject.render();
+
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBe(false);
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL)).toBe(false);
+  });
+
+  it('keeps existing-response notice available in survey mode for bulk decrypt actions', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submissionError: '',
+      userHasResponse: true,
+      userResponseEncrypted: true,
+      startFresh: false,
+      isEditing: false,
+      displayAnswerMode: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
+      surveysResponseState: [
+        {
+          answers: { q1: { ...emptyField } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { ...emptyField } },
+        },
+      ],
+      userAnswers: { responses: [] },
+    };
+
+    const tree = subject.render();
+
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_EXISTING_RESPONSE_NOTICE)).toBe(true);
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_DECRYPT_EDIT_ALL)).toBe(true);
+  });
+
+  it('renders the single-question inline submit below the question when edits are pending', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submittedSinceLastEdit: false,
+      submissionComplete: false,
+      submissionError: '',
+      userHasResponse: false,
+      startFresh: false,
+      isEditing: false,
+      displayAnswerMode: false,
+      isDirty: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
+      surveysResponseState: [
+        {
+          answers: { q1: { ...emptyField, value: 'Answer' } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { ...emptyField } },
+        },
+      ],
+    };
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.renderQuestion = jest.fn(() => <div key="q1" data-testid="question-card-stub">Question Card</div>);
+
+    const tree = subject.render();
+    const markup = renderToStaticMarkup(tree);
+
+    expect(markup).not.toContain('singleQuestionSubmitLayout');
+    expect(markup).not.toContain('singleQuestionSubmitRail');
+    expect(markup).toContain('Question Card');
+    expect(markup).toContain('SUBMIT');
+    expect(markup).toContain(E2E_TESTIDS.SURVEY_SUBMIT);
+    expect(markup).not.toContain('Clear pending changes');
+    expect(subject.renderQuestion).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render single-question submit controls before pending edits appear', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submittedSinceLastEdit: false,
+      submissionComplete: false,
+      submissionError: '',
+      userHasResponse: false,
+      startFresh: false,
+      isEditing: false,
+      displayAnswerMode: false,
+      isDirty: false,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
+      surveysResponseState: [
+        {
+          answers: { q1: { ...emptyField, value: '' } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { ...emptyField } },
+        },
+      ],
+    };
+    subject.getPendingStatsSnapshot = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.renderQuestion = jest.fn(() => <div key="q1" data-testid="question-card-stub">Question Card</div>);
+
+    const tree = subject.render();
+    const markup = renderToStaticMarkup(tree);
+
+    expect(markup).not.toContain('singleQuestionSubmitLayout');
+    expect(markup).not.toContain('singleQuestionSubmitRail');
+    expect(markup).not.toContain(E2E_TESTIDS.SURVEY_SUBMIT);
+    expect(subject.renderQuestion).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render submitted CTA state in single-question mode when no pending edits remain', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+    subject.state = {
+      ...subject.state,
+      isSubmitting: false,
+      submittedSinceLastEdit: true,
+      submissionComplete: false,
+      submissionError: '',
+      userHasResponse: true,
+      startFresh: false,
+      isEditing: true,
+      displayAnswerMode: false,
+      isDirty: false,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
+      surveysResponseState: [
+        {
+          answers: { q1: { ...emptyField, value: 'Answer' } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { ...emptyField } },
+        },
+      ],
+    };
+    subject.renderQuestion = jest.fn(() => <div key="q1" data-testid="question-card-stub">Question Card</div>);
+
+    const tree = subject.render();
+
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_SUBMIT)).toBe(false);
+    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBe(false);
+  });
+
+  it('applies single-question response page wrappers in read mode', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      responderAddress: '0xdef',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+    subject.state = {
+      ...subject.state,
+      isLoadingResponse: false,
+      noResponse: false,
+      displayAnswerMode: true,
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt' }],
+      parsedViewAddressAnswers: { answer: { value: '*', encrypted: true } },
+      surveysResponseState: [
+        { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      ],
+    };
+    subject.renderQuestionAnswer = jest.fn(() => <div key="resp" data-testid="response-card-stub">Response Card</div>);
+
+    const tree = subject.render();
+    const pageRoot = findElement(
+      tree,
+      (node) => String(node?.props?.className || '').includes('singleQuestionPage')
+    );
+    const responseView = findElement(
+      tree,
+      (node) => String(node?.props?.className || '').includes('singleQuestionResponseView')
+    );
+    const addressLink = findElement(
+      tree,
+      (node) => node?.type === 'a' && node?.props?.href === '/u/0xdef'
+    );
+
+    expect(pageRoot).not.toBeNull();
+    expect(responseView).not.toBeNull();
+    expect(addressLink).not.toBeNull();
+    expect(treeHasLabel(tree, 'question .json')).toBe(true);
+    expect(treeHasLabel(tree, 'response .json')).toBe(true);
+    expect(subject.renderQuestionAnswer).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call getPendingEditStats during SurveyQuestions.render', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 1 },
+    });
+    const emptyField = { value: '', encrypted: false, encryptionAudience: 'self' };
+    subject.getPendingEditStats = jest.fn(() => ({ total: 9, encrypted: 4 }));
+    subject.state = {
+      ...subject.state,
+      displayAnswerMode: false,
+      surveysResponseState: [
+        {
+          answers: { q1: { ...emptyField } },
+          importance: {},
+          conviction: {},
+          additionalComments: { q1: { ...emptyField } },
+        },
+      ],
+      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Prompt' }],
+      modifiedCount: 2,
+      encryptedModifiedCount: 1,
+      hasEncryptedChanges: true,
+      showComments: {},
+    };
+
+    subject.render();
+
+    expect(subject.getPendingEditStats).not.toHaveBeenCalled();
   });
 });
