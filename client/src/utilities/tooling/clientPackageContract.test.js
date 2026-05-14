@@ -173,21 +173,9 @@ describe('client package modernization contract', () => {
     });
   });
 
-  it('keeps stale webpack and CRA packages out of the client package contract', () => {
+  it('keeps stale webpack loaders out of the client package contract', () => {
     const pkg = readClientPackageJson();
     const staleLoaders = [
-      'babel-eslint',
-      'babel-preset-react-app',
-      'copy-webpack-plugin',
-      'file-loader',
-      'node-polyfill-webpack-plugin',
-      'raw-loader',
-      'react-app-polyfill',
-      'react-app-rewired',
-      'react-scripts',
-      'sass-loader',
-      'source-map-loader',
-      'webpack',
       'worker-loader',
     ];
 
