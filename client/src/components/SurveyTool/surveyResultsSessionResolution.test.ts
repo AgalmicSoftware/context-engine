@@ -164,6 +164,24 @@ describe('surveyResultsSessionResolution', () => {
     });
   });
 
+  it('treats pinned session props as an explicit question-results scope pin', () => {
+    expect(resolveSurveyResultsQuestionReadScope({
+      pathname: '/questions/results',
+      search: '',
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      sessionSlugPinned: true,
+      viewMode: 'questions',
+      readSessionScanScope: () => 'list',
+      readSessionScanSlugs: () => ['edge', 'alpha', 'beta'],
+    })).toEqual({
+      baseSlug: 'edge',
+      questionReadSlugs: ['edge'],
+      extraQuestionReadSlugs: [],
+      storageKeyPrefix: 'dg:filters:edge',
+    });
+  });
+
   it('fans out generic question-mode results across list scope when no explicit session pin is present', () => {
     expect(resolveSurveyResultsQuestionReadScope({
       pathname: '/questions/results',

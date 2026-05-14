@@ -1361,6 +1361,7 @@ class SurveyResults extends Component<any, any> {
       search: (typeof window !== 'undefined' && window.location?.search) || '',
       sessionSlug: props.sessionSlug,
       activeSessionSlug: props.activeSessionSlug,
+      sessionSlugPinned: props.sessionSlugPinned,
       viewMode,
       readSessionScanScope: readSessionScanScope as () => unknown,
       readSessionScanSlugs: readSessionScanSlugs as () => unknown,
