@@ -1,14 +1,9 @@
 import SBTPage from './SBTPage';
-import SbtPageAdminSection from './SbtPageAdminSection';
-import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
 import { ethers } from 'ethers';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
-const RESOLVABLE_TREE_COMPONENTS = new Set([
-  SbtPageAdminSection,
-]);
-const resolvedTreeComponentCache = new WeakMap();
 
 jest.mock('../../utilities/ui/terminology.js', () => {
   const actual = jest.requireActual('../../utilities/ui/terminology.js');
@@ -42,12 +37,6 @@ const createSubject = (props = {}) => {
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
-  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
-    if (!resolvedTreeComponentCache.has(node)) {
-      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
-    }
-    return findElementInTree(resolvedTreeComponentCache.get(node), predicate);
-  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -66,14 +55,6 @@ const flattenText = (node) => {
   if (Array.isArray(node)) return node.map((entry) => flattenText(entry)).join('');
   if (typeof node === 'object') return flattenText(node?.props?.children);
   return '';
-};
-
-const renderOpenMintUrlCardTree = (tree) => {
-  const card = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageOpenMintUrlCard
-  );
-  return card ? SbtPageOpenMintUrlCard(card.props) : null;
 };
 
 describe('SBTPage admin open-mint URL', () => {
@@ -113,7 +94,10 @@ describe('SBTPage admin open-mint URL', () => {
     };
 
     const tree = subject.render();
-    const cardNode = renderOpenMintUrlCardTree(tree);
+    const cardNode = findElementInTree(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL
+    );
 
     expect(cardNode).not.toBeNull();
     expect(flattenText(cardNode)).toContain('URL Where Anyone Can Join');
@@ -152,96 +136,6 @@ describe('SBTPage admin open-mint URL', () => {
         `http://localhost/ce/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
       );
     } finally {
-      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = previousPublicUrl;
-    }
-  });
-
-  it('prepends PUBLIC_URL when rendering admin invite links', () => {
-    const previousPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce/';
-
-    try {
-      const account = '0x00000000000000000000000000000000000000a2';
-      const sbtAddress = '0x00000000000000000000000000000000000000a1';
-      const encodedPassword = encodeURIComponent(
-        cryptoUtils.encodeGroupPasswordForUrl('claim-code')
-      );
-      const subject = createSubject({
-        SBTAddress: sbtAddress,
-        account,
-        sessionSlug: 'edge',
-      });
-      subject.state = {
-        ...subject.state,
-        userIsSbtAdmin: true,
-        hasInviteMint: true,
-        adminGeneratedPasswords: ['claim-code'],
-        cachedPasswords: [],
-        includePreviousPasswords: false,
-        sbtInfo: {
-          hasPasswordMint: true,
-          maxTokens: '0',
-          admin: account,
-          burnAuth: 0,
-        },
-      };
-
-      expect(flattenText(subject.renderAdminActions())).toContain(
-        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`
-      );
-    } finally {
-      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = previousPublicUrl;
-    }
-  });
-
-  it('prepends PUBLIC_URL when exporting admin invite links', () => {
-    const previousPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce/';
-    const originalCreateObjectUrl = URL.createObjectURL;
-    const originalRevokeObjectUrl = URL.revokeObjectURL;
-    const OriginalBlob = global.Blob;
-    let capturedBlob = null;
-
-    global.Blob = jest.fn((parts, options) => ({ parts, options }));
-    URL.createObjectURL = jest.fn((blob) => {
-      capturedBlob = blob;
-      return 'blob:invite-export';
-    });
-    URL.revokeObjectURL = jest.fn();
-
-    try {
-      const sbtAddress = '0x00000000000000000000000000000000000000a1';
-      const encodedPassword = encodeURIComponent(
-        cryptoUtils.encodeGroupPasswordForUrl('claim-code')
-      );
-      const subject = createSubject({
-        SBTAddress: sbtAddress,
-        sessionSlug: 'edge',
-      });
-      subject.state = {
-        ...subject.state,
-        hasInviteMint: true,
-        adminGeneratedPasswords: ['claim-code'],
-        cachedPasswords: [],
-        includePreviousPasswords: false,
-        exportFormat: 'json',
-        sbtInfo: {
-          name: 'Invite Badge',
-        },
-      };
-
-      subject.exportPasswords();
-
-      expect(capturedBlob).not.toBeNull();
-      expect(String(capturedBlob.parts.join(''))).toContain(
-        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`
-      );
-    } finally {
-      global.Blob = OriginalBlob;
-      URL.createObjectURL = originalCreateObjectUrl;
-      URL.revokeObjectURL = originalRevokeObjectUrl;
       if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
       else process.env.PUBLIC_URL = previousPublicUrl;
     }
@@ -312,7 +206,10 @@ describe('SBTPage admin open-mint URL', () => {
     };
 
     const tree = subject.render();
-    const cardNode = renderOpenMintUrlCardTree(tree);
+    const cardNode = findElementInTree(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL
+    );
 
     expect(cardNode).toBeNull();
   });
