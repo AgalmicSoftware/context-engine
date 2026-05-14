@@ -398,6 +398,20 @@ async function loadQuestionsForSession(env = {}, sessionSlug = '', {
   };
 }
 
+function prefetchQuestionsForJoinedSession({
+  env = {},
+  sessionSlug = '',
+  waitUntil = null,
+} = {}) {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  if (!slug) return { scheduled: false, reason: 'session_slug_missing' };
+  const prefetch = loadQuestionsForSession(env, slug, { waitUntil }).catch(() => null);
+  if (typeof waitUntil === 'function') {
+    waitUntil(prefetch);
+  }
+  return { scheduled: true, sessionSlug: slug };
+}
+
 function loadDemoDocuments(env = {}) {
   const parsed = safeJsonParse(env.AGENT_BRIDGE_DEMO_DOCS_JSON, null);
   const docs = Array.isArray(parsed) ? parsed : [];
@@ -1353,6 +1367,7 @@ async function buildJoinResponse({
   args = [],
   sessionSlugOverride = '',
   createdAt,
+  waitUntil = null,
 } = {}) {
   const policy = await loadSessionPolicy(env, { forceRefresh: true });
   const sessionSlug = sanitizeSessionSlug(sessionSlugOverride || args[0] || policy.defaultSessionSlug || 'general') || 'general';
@@ -1372,6 +1387,11 @@ async function buildJoinResponse({
       normalized,
       session: resolved.session,
       createdAt,
+    });
+    const questionPrefetch = prefetchQuestionsForJoinedSession({
+      env,
+      sessionSlug: resolved.session.sessionSlug,
+      waitUntil,
     });
     const account = await deriveManagedDemoAccount({
       principal: normalizeTelegramPrincipal(normalized),
@@ -1435,7 +1455,7 @@ async function buildJoinResponse({
       screen: accountState.screen,
       command,
       normalized,
-      extra: { sessionSlug: resolved.session.sessionSlug, faucet },
+      extra: { sessionSlug: resolved.session.sessionSlug, faucet, questionPrefetch },
     });
   }
 
@@ -1445,6 +1465,11 @@ async function buildJoinResponse({
     normalized,
     session: resolved.session,
     createdAt,
+  });
+  const questionPrefetch = prefetchQuestionsForJoinedSession({
+    env,
+    sessionSlug: resolved.session.sessionSlug,
+    waitUntil,
   });
   const state = buildTelegramGroupSessionCardState({
     sessionSlug: resolved.session.sessionSlug,
@@ -1504,7 +1529,7 @@ async function buildJoinResponse({
     screen: state.screen,
     command,
     normalized,
-    extra: { sessionSlug: resolved.session.sessionSlug },
+    extra: { sessionSlug: resolved.session.sessionSlug, questionPrefetch },
   });
 }
 
@@ -2361,6 +2386,7 @@ async function buildStartPayloadResponse({
   env,
   payload = '',
   createdAt,
+  waitUntil = null,
 } = {}) {
   const parsed = parseOpaqueActionId(payload);
   if (!parsed.ok) {
@@ -2424,6 +2450,7 @@ async function buildStartPayloadResponse({
     env,
     sessionSlugOverride: record.serverContextRef?.sessionSlug || '',
     createdAt,
+    waitUntil,
   });
 }
 
@@ -2580,6 +2607,7 @@ async function buildCallbackResponse({
       env,
       sessionSlugOverride: sessionSlug,
       createdAt,
+      waitUntil,
     }), callbackQueryId);
   }
   return attachCallbackQueryId(errorReply({
@@ -2635,6 +2663,7 @@ export async function buildTelegramCommandResponse({
         env,
         payload: parsed.args[0],
         createdAt,
+        waitUntil,
       })
       : buildHelpResponse({ normalized, command: parsed.command, env, createdAt });
   }
@@ -2669,6 +2698,7 @@ export async function buildTelegramCommandResponse({
       env,
       args: parsed.args,
       createdAt,
+      waitUntil,
     });
   }
   if (parsed.command === COMMANDS.SESSIONS) {

@@ -163,7 +163,7 @@ test('Telegram question cards preserve CE rating/comment/mic/doc conventions by 
     binary.controls
       .filter((control) => control.controlType === 'agree_unsure_disagree')
       .map((control) => control.label),
-    ['Agree', 'Disagree', 'Unsure'],
+    ['Agree', 'Unsure', 'Disagree'],
   );
   assert.equal(singleChoice.selectionMode, 'single');
   assert.equal(singleChoice.controls.filter((control) => control.controlType === 'single_select').length, 2);
@@ -379,7 +379,7 @@ test('question list pulls existing session questions and pose action is group-sa
   assert.equal(list.canonicalApiRequest.path, '/api/agent/questions');
   assert.deepEqual(list.questions.map((question) => question.title), [
     'What should the group discuss next?',
-    'Locked question',
+    'Encrypted question',
     'Question unavailable',
   ]);
   assert.equal(list.questions[2].locked, false);
@@ -390,6 +390,7 @@ test('question list pulls existing session questions and pose action is group-sa
   assert.deepEqual(posed.action.aliases, ['/q']);
   assert.equal(posed.groupSafeOutput.questionText, 'What should the group discuss next?');
   assert.equal(locked.groupSafeOutput.questionText, null);
+  assert.equal(locked.groupSafeOutput.encrypted, true);
   assert.equal(JSON.stringify(locked).includes('Private prompt must stay out of group summaries'), false);
   const unavailable = buildTelegramPoseQuestionState({
     sessionSlug: 'alpha',

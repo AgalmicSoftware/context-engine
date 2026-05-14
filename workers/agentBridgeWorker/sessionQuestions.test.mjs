@@ -187,10 +187,10 @@ test('listCachedSessionQuestionsForBridge reads live public questions and writes
   assert.equal(result.questions[0].arweaveTxId, txId);
   assert.equal(result.questions[0].source, 'live_session_question');
   assert.equal(calls.some(([url]) => String(url).startsWith('https://ar-io.dev/')), true);
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v4:demo'), true);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v5:demo'), true);
 });
 
-test('normalizeQuestionPayload preserves CE question type, options, and session name metadata', () => {
+test('normalizeQuestionPayload preserves CE question type and treats sessionName as display metadata', () => {
   const questionId = `0x${'91'.repeat(32)}`;
   const normalized = __test__sessionQuestions.normalizeQuestionPayload({
     questionData: {
@@ -213,8 +213,43 @@ test('normalizeQuestionPayload preserves CE question type, options, and session 
   assert.equal(normalized.prompt, 'Which launch path should Demo prioritize?');
   assert.deepEqual(normalized.options, ['Mini App', 'Bot only', 'Both']);
   assert.equal(normalized.singleSelect, true);
-  assert.equal(normalized.sessionSlug, 'demo-4');
+  assert.equal(normalized.sessionSlug, 'fallback');
   assert.equal(normalized.visibility, 'public');
+});
+
+test('normalizeQuestionPayload classifies encrypted question metadata with required SBTs', () => {
+  const questionId = `0x${'93'.repeat(32)}`;
+  const sbtAddress = '0x1111111111111111111111111111111111111111';
+  const normalized = __test__sessionQuestions.normalizeQuestionPayload({
+    questionData: {
+      id: questionId,
+      type: 'freeform',
+      prompt: '[encrypted]',
+      promptEncrypted: { envelope: 'lit-v1' },
+      encryption: {
+        enabled: true,
+        mode: 'all',
+        gates: [{
+          label: 'Member Gate',
+          sbtAddress,
+          mode: 'all',
+        }],
+      },
+      sessionName: 'demo-4',
+    },
+  }, {
+    questionId,
+    pointerId: __test__sessionQuestions.hexToBase64url(`0x${'94'.repeat(32)}`),
+    sessionSlug: 'fallback',
+  });
+
+  assert.equal(normalized.visibility, 'lit_encrypted');
+  assert.equal(normalized.encrypted, true);
+  assert.equal(normalized.prompt, '');
+  assert.equal(normalized.title, 'Locked question');
+  assert.deepEqual(normalized.requiredSbtAddresses, [sbtAddress]);
+  assert.equal(normalized.gateMode, 'all');
+  assert.equal(normalized.encryption.gates[0].label, 'Member Gate');
 });
 
 test('listCachedSessionQuestionsForBridge skips payloads that belong to another session', async () => {
@@ -391,7 +426,7 @@ test('listCachedSessionQuestionsForBridge serves first available questions while
   assert.equal(background.length, 1);
 
   await Promise.all(background);
-  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v4:demo'));
+  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v5:demo'));
   assert.equal(cached.complete, true);
   assert.deepEqual(cached.questions.map((question) => question.prompt), [
     'Recent question should show first',
@@ -476,7 +511,7 @@ test('listCachedSessionQuestionsForBridge replies after bounded foreground index
   assert.equal(background.length, 1);
 
   await Promise.all(background);
-  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v4:demo'));
+  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v5:demo'));
   assert.equal(cached.complete, true);
   assert.deepEqual(cached.questions.map((question) => question.prompt), [
     'Older question appears after background indexing',
@@ -507,7 +542,7 @@ test('listCachedSessionQuestionsForBridge schedules background refresh for fresh
   const env = baseEnv({
     AGENT_BRIDGE_QUESTION_LOG_CHUNK_SIZE: '5',
     AGENT_ACTION_KV: new MemoryKv({
-      'telegram:questions:v4:demo': JSON.stringify(partial),
+      'telegram:questions:v5:demo': JSON.stringify(partial),
     }),
   });
   const background = [];
@@ -575,7 +610,7 @@ test('listCachedSessionQuestionsForBridge schedules background refresh for fresh
   assert.equal(background.length, 1);
 
   await Promise.all(background);
-  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v4:demo'));
+  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v5:demo'));
   assert.equal(cached.complete, true);
   assert.deepEqual(cached.questions.map((question) => question.prompt), [
     'Fresh partial cache continued in background',
@@ -612,7 +647,7 @@ test('listCachedSessionQuestionsForBridge refuses unscoped fallback scans by def
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'question_scan_window_unscoped');
   assert.equal(result.scanWindow.source, 'fallback_recent_blocks');
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v4:demo'), false);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v5:demo'), false);
   assert.equal(calls.some(([, init]) => JSON.parse(init.body || '{}').method === 'eth_getLogs'), false);
 });
 
@@ -1192,7 +1227,7 @@ test('listCachedSessionQuestionsForBridge does not cache failed log scans', asyn
   assert.equal(result.ok, false);
   assert.equal(result.reason, 'question_log_scan_failed');
   assert.equal(result.scan.chunksFailed, 1);
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v4:demo'), false);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v5:demo'), false);
 });
 
 test('listCachedSessionQuestionsForBridge does not cache payload load failures as empty results', async () => {
@@ -1247,7 +1282,7 @@ test('listCachedSessionQuestionsForBridge does not cache payload load failures a
   assert.equal(result.reason, 'question_payload_load_failed');
   assert.equal(result.discoveredCount, 1);
   assert.equal(result.payloadFailureCount, 1);
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v4:demo'), false);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v5:demo'), false);
 });
 
 test('listCachedSessionQuestionsForBridge keeps on-chain question IDs when payload gateways fail', async () => {
@@ -1305,7 +1340,7 @@ test('listCachedSessionQuestionsForBridge keeps on-chain question IDs when paylo
   assert.equal(result.questions[0].locked, false);
   assert.equal(result.questions[0].payloadUnavailable, true);
   assert.equal(result.questions[0].title, 'Question unavailable');
-  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v4:demo'), true);
+  assert.equal(env.AGENT_ACTION_KV.store.has('telegram:questions:v5:demo'), true);
 });
 
 test('listCachedSessionQuestionsForBridge retries payload-unavailable cache records before returning stale cache', async () => {
@@ -1351,7 +1386,7 @@ test('listCachedSessionQuestionsForBridge retries payload-unavailable cache reco
   };
   const env = baseEnv({
     AGENT_ACTION_KV: new MemoryKv({
-      'telegram:questions:v4:demo': JSON.stringify(stale),
+      'telegram:questions:v5:demo': JSON.stringify(stale),
     }),
   });
   const calls = {
@@ -1419,7 +1454,7 @@ test('listCachedSessionQuestionsForBridge retries payload-unavailable cache reco
   assert.equal(calls.getLogs, 0);
   assert.equal(calls.payload, 1);
   assert.equal(calls.waitUntil, 0);
-  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v4:demo'));
+  const cached = JSON.parse(env.AGENT_ACTION_KV.store.get('telegram:questions:v5:demo'));
   assert.equal(cached.questions[0].questionType, 'rating');
   assert.equal(cached.questions[0].prompt, 'Recovered rating?');
 });
@@ -1444,7 +1479,7 @@ test('listCachedSessionQuestionsForBridge serves KV cache without RPC calls', as
   };
   const env = baseEnv({
     AGENT_ACTION_KV: new MemoryKv({
-      'telegram:questions:v4:demo': JSON.stringify(cached),
+      'telegram:questions:v5:demo': JSON.stringify(cached),
     }),
   });
 
@@ -1493,7 +1528,7 @@ test('listCachedSessionQuestionsForBridge filters stale KV cache records from ot
   };
   const env = baseEnv({
     AGENT_ACTION_KV: new MemoryKv({
-      'telegram:questions:v4:demo': JSON.stringify(cached),
+      'telegram:questions:v5:demo': JSON.stringify(cached),
     }),
   });
 

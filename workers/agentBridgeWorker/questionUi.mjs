@@ -686,11 +686,64 @@ function isGroupSafeQuestionVisible(question = {}) {
   return normalizeQuestionVisibility(question) === QUESTION_VISIBILITY.PUBLIC;
 }
 
+function normalizeQuestionSbtAddresses(question = {}) {
+  const encryption = question.encryption && typeof question.encryption === 'object' && !Array.isArray(question.encryption)
+    ? question.encryption
+    : {};
+  const gates = [
+    ...(Array.isArray(encryption.gates) ? encryption.gates : []),
+    ...(Array.isArray(question.gates) ? question.gates : []),
+    question.gate,
+    encryption.gate,
+  ].filter(Boolean);
+  const raw = [
+    ...(Array.isArray(question.requiredSbtAddresses) ? question.requiredSbtAddresses : []),
+    ...(Array.isArray(question.sbtAddresses) ? question.sbtAddresses : []),
+    question.sbtAddress,
+    ...(Array.isArray(encryption.sbtAddresses) ? encryption.sbtAddresses : []),
+    encryption.sbtAddress,
+    ...gates.flatMap((gate) => [
+      ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
+      gate?.sbtAddress,
+      gate?.address,
+    ]),
+  ];
+  const seen = new Set();
+  const out = [];
+  raw.forEach((value) => {
+    const text = safeString(value);
+    if (!SBT_ADDRESS_RE.test(text)) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(text);
+  });
+  return out;
+}
+
+function isQuestionEncryptedForTelegram(question = {}, visibility = normalizeQuestionVisibility(question)) {
+  return visibility === QUESTION_VISIBILITY.LIT_ENCRYPTED ||
+    visibility === QUESTION_VISIBILITY.SBT_GATED ||
+    question.encrypted === true ||
+    question.litEncrypted === true ||
+    Boolean(question.promptEncrypted || question.optionsEncrypted || question.tagsEncrypted);
+}
+
+function questionGateMode(question = {}) {
+  const encryption = question.encryption && typeof question.encryption === 'object' && !Array.isArray(question.encryption)
+    ? question.encryption
+    : {};
+  const raw = safeString(question.gateMode || encryption.mode || question.mode).toLowerCase();
+  return raw === 'all' ? 'all' : (raw === 'any' ? 'any' : '');
+}
+
 function summarizeQuestionForList(question = {}, index = 0) {
   const questionId = safeString(question.questionId || question.id);
   const visibility = normalizeQuestionVisibility(question);
   const payloadUnavailable = question.payloadUnavailable === true || visibility === QUESTION_VISIBILITY.PAYLOAD_UNAVAILABLE;
   const visible = visibility === QUESTION_VISIBILITY.PUBLIC && !payloadUnavailable;
+  const encrypted = isQuestionEncryptedForTelegram(question, visibility);
+  const requiredSbtAddresses = normalizeQuestionSbtAddresses(question);
   return sanitizeForGroup({
     type: 'telegram_question_list_item',
     displayIndex: index + 1,
@@ -700,9 +753,12 @@ function summarizeQuestionForList(question = {}, index = 0) {
       ? 'Question unavailable'
       : visible
       ? safeString(question.title || question.questionText || question.prompt)
-      : 'Locked question',
+      : encrypted ? 'Encrypted question' : 'Locked question',
     visibility,
     locked: !visible && !payloadUnavailable,
+    encrypted,
+    requiredSbtAddresses,
+    gateMode: questionGateMode(question),
     payloadUnavailable,
     unavailableInGroup: !visible && !payloadUnavailable,
     retryable: payloadUnavailable,
@@ -729,15 +785,20 @@ function groupSafeQuestionForPose(question = {}) {
     });
   }
   const visible = visibility === QUESTION_VISIBILITY.PUBLIC;
+  const encrypted = isQuestionEncryptedForTelegram(question, visibility);
+  const requiredSbtAddresses = normalizeQuestionSbtAddresses(question);
   return sanitizeForGroup({
     type: 'telegram_group_posed_question',
     questionId: safeString(question.questionId || question.id),
     questionType: normalizeQuestionType(question.questionType || question.type),
     visibility,
     locked: !visible,
+    encrypted,
+    requiredSbtAddresses,
+    gateMode: questionGateMode(question),
     questionText: visible ? safeString(question.questionText || question.prompt || question.title) : null,
     answerLabels: visible ? normalizeOptions(question) : [],
-    status: visible ? 'posed' : 'locked_unavailable_in_group',
+    status: visible ? 'posed' : (encrypted ? 'encrypted_unavailable_in_group' : 'locked_unavailable_in_group'),
   });
 }
 
@@ -1487,8 +1548,8 @@ export function buildTelegramQuestionControls(question = {}, {
   if (questionType === QUESTION_TYPES.AGREE_UNSURE_DISAGREE) {
     controls.push(
       baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Agree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'agree', selectionMode: 'single' }),
-      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Disagree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'disagree', selectionMode: 'single' }),
       baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Unsure', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'unsure', selectionMode: 'single' }),
+      baseControl(TELEGRAM_BRIDGE_ACTIONS.DRAFT_RESPONSE, 'Disagree', questionId, TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT, { controlType: 'agree_unsure_disagree', value: 'disagree', selectionMode: 'single' }),
     );
   } else if (questionType === QUESTION_TYPES.RATING) {
     const scale = {

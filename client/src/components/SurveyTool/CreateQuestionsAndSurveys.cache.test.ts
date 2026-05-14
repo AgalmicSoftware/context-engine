@@ -886,6 +886,81 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     }
   });
 
+  it('forces direct Arweave for survey metadata when the effective key is local', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
+    const addSurveySpy = jest.spyOn(contractScripts, 'addSurveyWithQuestions').mockResolvedValue({
+      uploadedQuestions: [],
+      receipt: { status: 1 },
+    });
+    const keySpy = jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({
+      arweaveJwk: '{"kty":"RSA"}',
+      source: 'local',
+    } as any);
+    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockResolvedValue('survey-arweave-tx');
+    writeCacheOptimisticMock.mockResolvedValue(undefined);
+    peekCacheSyncMock.mockReturnValue({});
+
+    try {
+      const instance = makeInstance({
+        loginComplete: true,
+        provider: 'web3auth',
+        account: '0xabc',
+        activeSessionSlug: 'demo-session-2',
+        sessionSlug: 'demo-session-2',
+        network: { id: 8453, chainId: 8453 },
+        networkChainId: 84532,
+      });
+
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'demo-session-2',
+        sessionName: 'Demo Session 2',
+        networkChainId: 84532,
+        contracts: { surveys: { chainId: 84532 } },
+      });
+      instance.resolveGateOptions = jest.fn(() => ({ gateMap: {} }));
+      instance.clearUnfinishedSurveyDraft = jest.fn();
+      instance.startCacheWatch = jest.fn();
+      instance.state = {
+        ...instance.state,
+        showAutoTool: false,
+        isStandaloneQuestion: false,
+        title: 'Fresh Survey',
+        surveyHash: '0xsurvey',
+        questions: [{
+          id: 'q1',
+          uiKey: 'q1',
+          type: 'freeform',
+          prompt: 'Question 1',
+          tags: [],
+          currentTagInputValue: '',
+          aiGeneratedTagsFromSource: [],
+          isGeneratingTags: false,
+        }],
+        documentURLs: ['https://safe.example/doc'],
+      };
+
+      await instance.createSurvey();
+
+      expect(uploadSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        'json',
+        expect.objectContaining({
+          arweaveJwk: '{"kty":"RSA"}',
+          forceDirectArweaveUpload: true,
+          sessionSlug: 'demo-session-2',
+        })
+      );
+      expect(addSurveySpy).toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+      latestBlockSpy.mockRestore();
+      addSurveySpy.mockRestore();
+      keySpy.mockRestore();
+      uploadSpy.mockRestore();
+    }
+  });
+
   it('seeds surveys and questions caches after survey creation so deep links can resolve immediately', async () => {
     const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const latestBlockSpy = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(123);
