@@ -12,6 +12,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import * as terminology from '../../utilities/ui/terminology.js';
 
+// Remaining broad SBTPage coverage owns holders-modal refresh, metadata hydration,
+// ownerOf fallback, cache writes, and password/open-mint flows.
 const mockIsCryptoMode = jest.fn(() => true);
 
 jest.mock('../../utilities/ui/terminology.js', () => {
@@ -78,40 +80,6 @@ const flattenText = (node) => {
   if (Array.isArray(node)) return node.map((entry) => flattenText(entry)).join('');
   if (typeof node === 'object') return flattenText(node?.props?.children);
   return '';
-};
-
-const renderMiniCardNode = (props = {}) => {
-  const sbtAddress = '0x00000000000000000000000000000000000000f1';
-  const subject = createSubject({
-    miniaturized: true,
-    miniMintable: true,
-    SBTAddress: sbtAddress,
-    ...props,
-  });
-  subject.state = {
-    ...subject.state,
-    sbtInfo: {
-      name: 'Badge',
-      image: 'https://example.example.test/badge.png',
-      mintingEndTime: 0,
-      burnAuth: 0,
-      hasPasswordMint: false,
-      maxTokens: '0',
-      admin: '0x00000000000000000000000000000000000000a2',
-    },
-    userHasSBT: false,
-    userIsSbtAdmin: false,
-    mintingStatus: 'idle',
-    burningStatus: 'idle',
-    hasGroupPasswordMint: false,
-    hasInviteMint: false,
-  };
-  const tree = subject.render();
-  const cardNode = findElementInTree(
-    tree,
-    (element) => element?.props?.role === 'button' && typeof element?.props?.onClick === 'function'
-  );
-  return { cardNode, sbtAddress };
 };
 
 const mockObjectUrlApis = (blobUrl = 'blob:mock') => {
@@ -2858,100 +2826,6 @@ describe('SBTPage modal holder optimizations', () => {
     const txCache = JSON.parse(localStorage.getItem('transactions') || '{}');
     expect(txCache['0xabc']).toEqual(['0xtx1', '0xtx2']);
     jest.useRealTimers();
-  });
-
-  it('opens mini-card navigation when click originates from the card itself', () => {
-    const { cardNode, sbtAddress } = renderMiniCardNode();
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    const preventDefault = jest.fn();
-    const stopPropagation = jest.fn();
-    const cardTarget = { closest: jest.fn(() => cardTarget) };
-
-    cardNode.props.onClick({
-      target: cardTarget,
-      currentTarget: cardTarget,
-      preventDefault,
-      stopPropagation,
-    });
-
-    expect(openSpy).toHaveBeenCalledWith(
-      `${window.location.origin}${buildSbtDetailPath(sbtAddress)}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
-    expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(stopPropagation).toHaveBeenCalledTimes(1);
-    openSpy.mockRestore();
-  });
-
-  it('hides the mini-card address in plain mode', () => {
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(false);
-    const { cardNode } = renderMiniCardNode();
-
-    expect(findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress)).toBeNull();
-
-    cryptoModeSpy.mockRestore();
-  });
-
-  it('shows the mini-card address in crypto mode', () => {
-    const cryptoModeSpy = jest.spyOn(terminology, 'isCryptoMode').mockReturnValue(true);
-    const { cardNode, sbtAddress } = renderMiniCardNode();
-    const addressNode = findElementInTree(cardNode, (element) => element?.props?.id === styles.miniSbtAddress);
-
-    expect(addressNode).not.toBeNull();
-    expect(flattenText(addressNode)).toContain(proposalScripts.getShortenedAddress(sbtAddress, false));
-
-    cryptoModeSpy.mockRestore();
-  });
-
-  it('includes the resolved session slug in mini-card navigation when one is available', () => {
-    const { cardNode, sbtAddress } = renderMiniCardNode({ sessionSlug: 'edge-private' });
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    const preventDefault = jest.fn();
-    const stopPropagation = jest.fn();
-    const cardTarget = { closest: jest.fn(() => cardTarget) };
-
-    cardNode.props.onClick({
-      target: cardTarget,
-      currentTarget: cardTarget,
-      preventDefault,
-      stopPropagation,
-    });
-
-    expect(openSpy).toHaveBeenCalledWith(
-      `${window.location.origin}${buildSbtDetailPath(sbtAddress, 'edge-private')}`,
-      '_blank',
-      'noopener,noreferrer'
-    );
-    expect(preventDefault).toHaveBeenCalledTimes(1);
-    expect(stopPropagation).toHaveBeenCalledTimes(1);
-    openSpy.mockRestore();
-  });
-
-  it('ignores mini-card click and Enter key events from nested interactive elements', () => {
-    const { cardNode } = renderMiniCardNode();
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-    const preventDefault = jest.fn();
-    const nestedInteractive = {};
-    const nestedTarget = { closest: jest.fn(() => nestedInteractive) };
-    const currentTarget = {};
-
-    cardNode.props.onClick({
-      target: nestedTarget,
-      currentTarget,
-      preventDefault,
-      stopPropagation: jest.fn(),
-    });
-    cardNode.props.onKeyDown({
-      key: 'Enter',
-      target: nestedTarget,
-      currentTarget,
-      preventDefault,
-    });
-
-    expect(openSpy).not.toHaveBeenCalled();
-    expect(preventDefault).not.toHaveBeenCalled();
-    openSpy.mockRestore();
   });
 
   it('fails password mint pre-validation before startClaim when the claim code is invalid', async () => {
