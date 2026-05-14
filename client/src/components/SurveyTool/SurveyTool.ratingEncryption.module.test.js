@@ -11,6 +11,7 @@ import { PileViewMode } from './SurveyPileViewMode';
 import { QuestionsDashboard } from './SurveySelector';
 import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionRatingInput from './FullQuestionRatingInput';
+import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import { DeferredCommitSlider } from './DeferredCommitSlider';
 import { QuestionFilter as RawQuestionFilter } from './QuestionFilter';
@@ -66,6 +67,15 @@ const syncClassSetState = (subject) => {
     return patch;
   });
   return subject.setState;
+};
+
+const renderFullQuestionResponseInput = (fullQuestionCard) => {
+  const responseInput = findFirstNodeByType(
+    fullQuestionCard?.props?.mainContent,
+    SurveyQuestionsFullQuestionResponseInput
+  );
+  expect(responseInput).not.toBeNull();
+  return SurveyQuestionsFullQuestionResponseInput(responseInput.props);
 };
 
 describe('SurveyTool rating encryption controller', () => {
@@ -269,8 +279,8 @@ describe('SurveyTool rating encryption controller', () => {
       conviction: {},
     };
     let fullQuestionCard = subject.renderQuestion(question, 0, withNumericString);
-    let ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
-    expect(ratingInput).not.toBeNull();
+    let ratingInput = renderFullQuestionResponseInput(fullQuestionCard);
+    expect(ratingInput.type).toBe(FullQuestionRatingInput);
     expect(ratingInput.props.value).toBe(8);
     expect(ratingInput.props.disabled).toBe(false);
     expect(typeof ratingInput.props.onChange).toBe('function');
@@ -284,8 +294,8 @@ describe('SurveyTool rating encryption controller', () => {
       conviction: {},
     };
     fullQuestionCard = subject.renderQuestion(question, 0, withOverflowValue);
-    ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
-    expect(ratingInput).not.toBeNull();
+    ratingInput = renderFullQuestionResponseInput(fullQuestionCard);
+    expect(ratingInput.type).toBe(FullQuestionRatingInput);
     expect(ratingInput.props.value).toBe(10);
     expect(renderToStaticMarkup(ratingInput)).toContain('10');
 
@@ -296,8 +306,8 @@ describe('SurveyTool rating encryption controller', () => {
       conviction: {},
     };
     fullQuestionCard = subject.renderQuestion(question, 0, withNonNumericValue);
-    ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
-    expect(ratingInput).not.toBeNull();
+    ratingInput = renderFullQuestionResponseInput(fullQuestionCard);
+    expect(ratingInput.type).toBe(FullQuestionRatingInput);
     expect(ratingInput.props.value).toBe(0);
     expect(renderToStaticMarkup(ratingInput)).toContain('0');
   });
@@ -344,9 +354,8 @@ describe('SurveyTool rating encryption controller', () => {
     };
 
     const fullQuestionCard = subject.renderQuestion(question, 0, subject.state.surveysResponseState[0]);
-    const ratingInput = findFirstNodeByType(fullQuestionCard, FullQuestionRatingInput);
-
-    expect(ratingInput).not.toBeNull();
+    const ratingInput = renderFullQuestionResponseInput(fullQuestionCard);
+    expect(ratingInput.type).toBe(FullQuestionRatingInput);
 
     ratingInput.props.onChange(6, { type: 'keydown' });
 
@@ -379,9 +388,8 @@ describe('SurveyTool rating encryption controller', () => {
     };
 
     const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
-    const deferredSlider = findElement(fullQuestionCard, (node) => node?.type === DeferredRatingSlider);
-
-    expect(deferredSlider).not.toBeNull();
+    const deferredSlider = renderFullQuestionResponseInput(fullQuestionCard);
+    expect(deferredSlider.type).toBe(DeferredRatingSlider);
     expect(deferredSlider.props.value).toBe(8);
     expect(typeof deferredSlider.props.onCommit).toBe('function');
   });
