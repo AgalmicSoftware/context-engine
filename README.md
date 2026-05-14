@@ -3,7 +3,7 @@
 ![License: CPAL-1.0](https://img.shields.io/badge/License-CPAL--1.0-blue.svg)
 
 <p align="center">
-  <img src="client/src/assets/img/readme-header.png" alt="Context Engine interface showing a survey card with Agree, Unsure, and Disagree options." />
+  <img src="client/src/assets/img/readme-header.png" alt="Context Engine interface showing a survey card asking whether humans and agents need better tools for debate, negotiation, and sensemaking, with Agree selected." />
 </p>
 
 **Live demo:** [contextengine.xyz](https://contextengine.xyz)
