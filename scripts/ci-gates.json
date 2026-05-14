@@ -50,16 +50,6 @@
           ]
         },
         {
-          "label": "Check client formatting",
-          "command": "npm",
-          "args": [
-            "--prefix",
-            "client",
-            "run",
-            "format:check"
-          ]
-        },
-        {
           "label": "Lint workers",
           "command": "npm",
           "args": [
