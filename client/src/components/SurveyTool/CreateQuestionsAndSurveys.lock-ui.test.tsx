@@ -413,6 +413,47 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     alertSpy.mockRestore();
   });
 
+  it('opens the login modal and clears stale submit errors before submit work', async () => {
+    const toggleLoginModal = jest.fn();
+    const instance = makeInstance({
+      loginComplete: false,
+      toggleLoginModal,
+    });
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+      title: 'Survey title',
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+      isSubmitting: true,
+      submissionError: 'stale submit error',
+      formValidationError: 'stale validation error',
+    };
+
+    await instance.createSurvey();
+
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(instance.state.isSubmitting).toBe(false);
+    expect(instance.state.submissionError).toBe('');
+    expect(instance.state.formValidationError).toBe('');
+  });
+
+  it('shows an inline login error when no login modal callback is available', async () => {
+    const instance = makeInstance({
+      loginComplete: false,
+    });
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+      title: 'Survey title',
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+      submissionError: '',
+    };
+
+    await instance.createSurvey();
+
+    expect(instance.state.submissionError).toBe('Log in to create this survey.');
+  });
+
   it('shows blank question prompt validation inline instead of calling window.alert', async () => {
     const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
     const instance = makeInstance({

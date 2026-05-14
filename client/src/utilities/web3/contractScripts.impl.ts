@@ -2756,7 +2756,7 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
     const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS)
       || isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
     if (ARWEAVE_ACTIVE || canUseSessionStorage) {
-      // Safety net: inject sessionName if caller omitted it
+      // Safety net: inject sessionName/sessionSlug if caller omitted it
       const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
       const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
       const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
@@ -2924,11 +2924,11 @@ async getSurveyDataById(providerName: any, surveyId: any, groupKeyOrCfg: any, op
 
     const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
     if (ARWEAVE_ACTIVE || canUseSessionStorage) {
-      // Safety net: inject sessionName if caller omitted it
+      // Safety net: inject sessionName/sessionSlug if caller omitted it
       const _sessionName = String((cfg?.sessionName || cfg?.slug || '') || '');
       const _sessionSlug = resolveStorageSessionSlug(groupKeyOrCfg, cfg);
       const _sessionMetadataOptions = _sessionSlug ? { sessionSlug: _sessionSlug } : {};
-      const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q: any) => (
+      const qArrayToUpload = (Array.isArray(questionDataArray) ? questionDataArray : []).map((q) => (
         normalizeSessionNameFields({
           ...(q || {}),
         }, _sessionName, _sessionMetadataOptions)
