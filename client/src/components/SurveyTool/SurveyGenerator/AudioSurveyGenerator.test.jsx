@@ -624,6 +624,61 @@ describe('AudioSurveyGenerator', () => {
     expect(container.textContent).toContain('Analysis ready');
   });
 
+  it('expands and collapses inline photo analysis from the Analysis complete toggle', async () => {
+    const photo = new File(['photo-source'], 'whiteboard.png', { type: 'image/png' });
+    mockAnalyzePhotoForQuestionGeneration.mockResolvedValueOnce({
+      text: 'This screenshot shows a policy whiteboard with three budget scenarios, two risk warnings, and a recommendation to phase in disclosure requirements over six months.',
+    });
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Photo Survey',
+      questions: [
+        {
+          prompt: 'Should the phased disclosure plan move forward?',
+          questionType: 'binary',
+          tags: ['photo'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig()}
+      />
+    );
+
+    addAdditionalPhoto(photo);
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    const photoCard = getPhotoCardByName('whiteboard.png');
+    const sourceId = getPhotoSourceId(photoCard);
+    const analysisToggle = getPhotoAnalysisToggleBySourceId(sourceId);
+
+    expect(analysisToggle).toBeTruthy();
+    expect(analysisToggle.textContent).toContain('Analysis complete');
+    expect(analysisToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(getPhotoAnalysisBodyBySourceId(sourceId)).toBeNull();
+
+    toggleCheckbox(analysisToggle);
+    expect(getPhotoAnalysisToggleBySourceId(sourceId).getAttribute('aria-expanded')).toBe('true');
+    expect(getPhotoAnalysisBodyBySourceId(sourceId).textContent).toContain(
+      'phase in disclosure requirements over six months'
+    );
+
+    toggleCheckbox(getPhotoAnalysisToggleBySourceId(sourceId));
+    expect(getPhotoAnalysisToggleBySourceId(sourceId).getAttribute('aria-expanded')).toBe('false');
+    expect(getPhotoAnalysisBodyBySourceId(sourceId)).toBeNull();
+  });
+
   it('hides the session-context checkbox until a file or URL source is present', async () => {
     await renderSubject(
       <AudioSurveyGenerator
