@@ -73,11 +73,6 @@ const override = function override(config, env) {
       Buffer: ['buffer/', 'Buffer'],
     }),
 
-    // 🔁 One-file shim for *all* `permissionless` imports
-    new webpack.NormalModuleReplacementPlugin(/^permissionless(\/.*)?$/, (resource) => {
-      resource.request = path.resolve(__dirname, 'src/shims/permissionless-all.js');
-    }),
-
     // 🔁 Lit contracts subpath shim for webpack 4 (no "exports" support)
     new webpack.NormalModuleReplacementPlugin(/^@lit-protocol\/contracts\/(prod|dev)\/(.+)$/, (resource) => {
       const nestedBase = path.resolve(
@@ -146,8 +141,6 @@ const override = function override(config, env) {
 
   // Force modern buffer implementation (node-libs-browser@buffer@4 lacks writeBigUInt64BE).
   config.resolve.alias.buffer = require.resolve('buffer/');
-
-  // ⛔️ Do NOT set config.resolve.alias['permissionless'] — we use the replacement plugin above.
 
   // MetaMask shims
   config.resolve.alias['@metamask/superstruct'] = path.resolve(
