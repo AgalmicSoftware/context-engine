@@ -572,15 +572,24 @@ function normalizeQuestionVisibility(payload = {}) {
   const encryption = payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
     ? payload.encryption
     : null;
-  if (
+  const hasEncryptedField = (
     payload.litEncrypted === true ||
     payload.encrypted === true ||
     payload.promptEncrypted ||
     payload.optionsEncrypted ||
-    payload.tagsEncrypted ||
-    encryption?.enabled === true ||
-    Array.isArray(encryption?.gates)
-  ) {
+    payload.tagsEncrypted
+  );
+  const encryptionGateCandidates = [
+    ...(Array.isArray(encryption?.gates) ? encryption.gates : []),
+    encryption?.gate,
+    {
+      sbtAddress: encryption?.sbtAddress,
+      sbtAddresses: encryption?.sbtAddresses,
+    },
+  ].filter(Boolean);
+  const hasEncryptionGate = encryptionGateCandidates
+    .some((gate, index) => normalizeQuestionGate(gate, index));
+  if (hasEncryptedField || hasEncryptionGate) {
     return 'lit_encrypted';
   }
   return 'public';
@@ -687,6 +696,10 @@ function normalizePayloadSessionSlug(payload = {}) {
   return '';
 }
 
+function allowUnscopedQuestionPayloads(env = {}) {
+  return envFlagEnabled(env.AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_PAYLOADS);
+}
+
 function skippedQuestionPayload(reason = 'session_mismatch') {
   return {
     [QUESTION_PAYLOAD_SKIP]: true,
@@ -746,6 +759,7 @@ function normalizeQuestionPayload(payload = {}, {
   questionId = '',
   pointerId = '',
   sessionSlug = '',
+  fallbackSessionSlug = '',
 } = {}) {
   const root = normalizeQuestionPayloadRoot(payload);
   if (!root || typeof root !== 'object' || Array.isArray(root)) return null;
@@ -783,7 +797,7 @@ function normalizeQuestionPayload(payload = {}, {
         }
       : {}),
     source: 'live_session_question',
-    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower(sessionSlug),
+    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower(fallbackSessionSlug),
     arweaveTxId: pointerId,
     storageRef: pointerId ? { backend: 'arweave', id: pointerId, resource: 'questions', uri: `ar://${pointerId}` } : null,
   };
@@ -822,6 +836,7 @@ async function fetchQuestionPayload({
   surveysAddress = '',
   questionId = '',
   sessionSlug = '',
+  env = {},
   fetchImpl = globalThis.fetch,
   timeoutMs = DEFAULT_RPC_TIMEOUT_MS,
 } = {}) {
@@ -840,12 +855,26 @@ async function fetchQuestionPayload({
   const pointerId = hexToBase64url(pointerBytes);
   if (!/^[a-zA-Z0-9_-]{43}$/.test(pointerId)) return null;
   const payload = await fetchArweaveJson(pointerId, { fetchImpl, timeoutMs });
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return lockedQuestionPlaceholder({ questionId: id, pointerId, sessionSlug });
+  }
   const payloadSessionSlug = normalizePayloadSessionSlug(payload);
   const requestedSessionSlug = lower(sessionSlug);
   if (payloadSessionSlug && requestedSessionSlug && payloadSessionSlug !== requestedSessionSlug) {
     return skippedQuestionPayload('session_mismatch');
   }
-  return normalizeQuestionPayload(payload, { questionId: id, pointerId, sessionSlug }) ||
+  const shouldStampUnscopedPayload = !payloadSessionSlug &&
+    requestedSessionSlug &&
+    allowUnscopedQuestionPayloads(env);
+  if (!payloadSessionSlug && requestedSessionSlug && !shouldStampUnscopedPayload) {
+    return skippedQuestionPayload('session_slug_missing');
+  }
+  return normalizeQuestionPayload(payload, {
+    questionId: id,
+    pointerId,
+    sessionSlug,
+    fallbackSessionSlug: shouldStampUnscopedPayload ? requestedSessionSlug : '',
+  }) ||
     lockedQuestionPlaceholder({ questionId: id, pointerId, sessionSlug });
 }
 
@@ -909,7 +938,7 @@ function cachedIndexForReturn(value = {}, cacheLayer = 'kv') {
 function questionRecordMatchesSession(question = {}, sessionSlug = '') {
   const selectedSlug = lower(sessionSlug);
   const recordSlug = normalizePayloadSessionSlug(question);
-  return !selectedSlug || !recordSlug || recordSlug === selectedSlug;
+  return !selectedSlug || recordSlug === selectedSlug;
 }
 
 function filterQuestionRecordsForSession(questions = [], sessionSlug = '') {
@@ -934,8 +963,14 @@ function scopedCachedIndexForReturn(value = {}, cacheLayer = 'kv', sessionSlug =
     ...index,
     questions: scopedQuestions,
     questionCount: scopedQuestions.length,
+    scopedOutQuestionCount: skippedFromCache,
     skippedSessionMismatchCount: Number(index.skippedSessionMismatchCount || 0) + skippedFromCache,
   };
+}
+
+function cacheNeedsImmediateScopeRefresh(index = {}) {
+  return Number(index?.questionCount || 0) === 0 &&
+    Number(index?.scopedOutQuestionCount || 0) > 0;
 }
 
 function scheduleIndexRefresh({
@@ -1020,6 +1055,7 @@ async function fetchQuestionPayloads({
         surveysAddress,
         questionId: id,
         sessionSlug,
+        env,
         fetchImpl,
         timeoutMs: questionPayloadTimeoutMs(env),
       }).catch(() => null);
@@ -1384,7 +1420,7 @@ export async function listCachedSessionQuestionsForBridge({
   const ttlSeconds = cacheTtlSeconds(env);
   const key = cacheKey(slug);
   const memory = scopedCachedIndexForReturn(questionMemoryCache.get(key), 'memory', slug);
-  if (!forceRefresh && memory && isFreshQuestionIndex(memory, ttlSeconds)) {
+  if (!forceRefresh && memory && isFreshQuestionIndex(memory, ttlSeconds) && !cacheNeedsImmediateScopeRefresh(memory)) {
     scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: memory, fetchImpl });
     return memory;
   }
@@ -1392,19 +1428,22 @@ export async function listCachedSessionQuestionsForBridge({
   if (!forceRefresh && kv && isFreshQuestionIndex(kv, ttlSeconds)) {
     questionMemoryCache.set(key, kv);
     const cached = scopedCachedIndexForReturn(kv, 'kv', slug);
-    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: cached, fetchImpl });
-    return cached;
+    if (!cacheNeedsImmediateScopeRefresh(cached)) {
+      scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: cached, fetchImpl });
+      return cached;
+    }
   }
   const durableCached = scopedCachedIndexForReturn(kv || memory, kv ? 'kv' : 'memory', slug);
-  if (!forceRefresh && durableCached && typeof waitUntil === 'function' && !hasPayloadUnavailableQuestions(durableCached)) {
-    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: durableCached, fetchImpl });
-    return durableCached;
+  const refreshBaseIndex = cacheNeedsImmediateScopeRefresh(durableCached) ? null : durableCached;
+  if (!forceRefresh && refreshBaseIndex && typeof waitUntil === 'function' && !hasPayloadUnavailableQuestions(refreshBaseIndex)) {
+    scheduleIndexRefresh({ waitUntil, env, sessionSlug: slug, existingIndex: refreshBaseIndex, fetchImpl });
+    return refreshBaseIndex;
   }
 
   const firstResult = await refreshSessionQuestionIndex({
     env,
     sessionSlug: slug,
-    existingIndex: durableCached,
+    existingIndex: refreshBaseIndex,
     mode: forceRefresh || typeof waitUntil !== 'function' ? 'complete' : 'until_first_available',
     fetchImpl,
   });
