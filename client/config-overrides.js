@@ -22,9 +22,6 @@ const override = function override(config, env) {
 
   // Contract sources use explicit raw-loader imports, and the worker bundle is
   // served via CopyPlugin, so the repo no longer injects global .sol/.html/.txt rules.
-  // Web Workers
-  config.module.rules.push({ test: /\.worker\.js$/, use: { loader: 'worker-loader' } });
-
   // ESM tweak for webpack 4 (.mjs in node_modules)
   config.module.rules.push({ test: /\.mjs$/, include: /node_modules/, type: 'javascript/auto' });
 
