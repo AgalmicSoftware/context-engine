@@ -392,6 +392,73 @@ import {
 } from './surveyToolUtils.js';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
+import {
+  buildInitialSurveyResponseQuestionIds,
+  buildRenderedQuestionIdsFromQuestionPools,
+  readRenderedQuestionIds,
+} from './surveyQuestionScope.js';
+import {
+  buildSubmittedResponseJson,
+  buildSurveyDefinitionJson,
+  buildSurveyQuestionsJson,
+  shouldUseSubmittedResponseJson,
+} from './surveyQuestionsJsonDerivation.js';
+import {
+  buildClearedTransientSubmitFeedbackState,
+  buildQuestionPoolPendingSubmitFeedbackMessage,
+  buildTransientSubmitFeedbackState,
+  normalizeTransientSubmitFeedbackDurationMs,
+} from './surveyQuestionSubmitFeedback.js';
+import {
+  buildActiveTagModalState,
+  buildAutoDecryptDisabledState,
+  buildBookmarkedQuestionsState,
+  buildBulkPromptReloadingState,
+  buildCanDecryptOtherResponsesState,
+  buildClearedSurveyQuestionPoolState,
+  buildCopiedQuestionsJsonState,
+  buildCopiedResponseJsonState,
+  buildCopiedSurveyJsonState,
+  buildClearedDecryptingByKeyState,
+  buildCurrentStepState,
+  buildDecryptEditFailureState,
+  buildDecryptEditStartState,
+  buildDisplayAnswerModeState,
+  buildEditingResponseModeState,
+  buildHasherState,
+  buildHydratingPriorResponsesState,
+  buildInitialSurveyQuestionsState,
+  buildJsonPreviewState,
+  buildParsedViewAddressAnswersState,
+  buildPrefillQueuedAfterCacheState,
+  buildResponseEditCompleteState,
+  buildResponseLoadingResetState,
+  buildShowJsonState,
+  buildSubmitFailureState,
+  buildSubmitPreparationErrorState,
+  buildSubmitSuccessState,
+  buildStandaloneAuthResetState,
+  buildSubmissionErrorState,
+  buildSubmitStartState,
+  buildSurveysResponseStatePatch,
+  buildSurveyAccountViewResetState,
+  buildSurveyChangedResetState,
+  buildSurveyQuestionsJsonTreeItemStyle,
+  buildSurveyQuestionsLockAudienceGateClassName,
+  buildSurveyQuestionsLockAudiencePopoverClassName,
+  buildSurveyQuestionsLockAudienceToggleClassName,
+  buildSurveyQuestionsFullLoadingProgressFillStyle,
+  buildSurveyQuestionsSubmitAuxIconClassName,
+  buildSurveyQuestionPoolLoadState,
+  buildSurveyUserEditResponseStatePatch,
+  buildViewingResponseModeState,
+  resolveSurveyQuestionsIconGlowClassName,
+  SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
+  SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
+  toggleShowJsonState,
+  type SurveyQuestionsProps,
+  type SurveyQuestionsState,
+} from './surveyQuestionsTypes.js';
 
 
 export class SurveyQuestions extends Component {
@@ -7541,56 +7608,26 @@ export class SurveyQuestions extends Component {
   };
 
   getQuestionsJson = () => {
-    if (this.props.singleQuestionMode) {
-        return this.state.questionPool[0] || {};
-    }
-    return this.state.questionPool || [];
+    return buildSurveyQuestionsJson({
+      singleQuestionMode: this.props.singleQuestionMode,
+      questionPool: this.state.questionPool,
+    });
   };
 
   getResponseJson = () => {
-    const isViewingSubmitted =
-      ((this.props.viewAddress || this.props.responderAddress) && this.state.parsedViewAddressAnswers) ||
-      (!this.state.isEditing && this.state.userAnswers);
+    const isViewingSubmitted = shouldUseSubmittedResponseJson({
+      viewAddress: this.props.viewAddress,
+      responderAddress: this.props.responderAddress,
+      parsedViewAddressAnswers: this.state.parsedViewAddressAnswers,
+      isEditing: this.state.isEditing,
+      userAnswers: this.state.userAnswers,
+    });
 
     if (isViewingSubmitted) {
-        const rawResponse = this.state.parsedViewAddressAnswers || this.state.userAnswers;
-
-        if (!rawResponse) return {};
-
-        if (this.props.singleQuestionMode) {
-            if (typeof rawResponse === 'object' && rawResponse !== null && !Array.isArray(rawResponse)) {
-                const convictionValue = getConvictionFromResponse(rawResponse);
-                const importanceValue = getImportanceFromResponse(rawResponse);
-                return {
-                    ...rawResponse,
-                    conviction: convictionValue !== null ? convictionValue : null,
-                    importance: importanceValue !== null ? importanceValue : null
-                };
-            }
-            return rawResponse;
-        }
-
-        if (rawResponse && Array.isArray(rawResponse.responses)) {
-            const baseConviction = getConvictionFromResponse(rawResponse);
-            const baseImportance = getImportanceFromResponse(rawResponse);
-            const processed = {
-                ...rawResponse,
-                responses: rawResponse.responses.map(resp => ({
-                    ...resp,
-                    conviction: getConvictionFromResponse(resp) !== null ? getConvictionFromResponse(resp) : null,
-                    importance: getImportanceFromResponse(resp) !== null ? getImportanceFromResponse(resp) : null
-                }))
-            };
-            if (baseConviction !== null && processed.conviction === undefined) {
-                processed.conviction = baseConviction;
-            }
-            if (baseImportance !== null && processed.importance === undefined) {
-                processed.importance = baseImportance;
-            }
-            return processed;
-        }
-
-        return rawResponse;
+      return buildSubmittedResponseJson({
+        rawResponse: this.state.parsedViewAddressAnswers || this.state.userAnswers,
+        singleQuestionMode: this.props.singleQuestionMode,
+      });
     }
 
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
@@ -7598,29 +7635,13 @@ export class SurveyQuestions extends Component {
   };
 
   getSurveyJson = () => {
-    if (this.props.isStandalone || this.props.singleQuestionMode || !this.props.surveys || this.props.surveyIndex === null) {
-        return {};
-    }
-
-    const currentSurvey = this.props.surveys[this.props.surveyIndex];
-    if (!currentSurvey) {
-        return {};
-    }
-
-    const surveyDetails = { ...currentSurvey };
-
-    if (Array.isArray(surveyDetails.questionIDs) && Array.isArray(this.state.questionPool)) {
-        const questionMap = new Map(this.state.questionPool.map(q => [q.id.toLowerCase(), q]));
-
-        surveyDetails.questions = surveyDetails.questionIDs.map(id => {
-            const questionData = questionMap.get(id.toLowerCase());
-            return questionData || { id: id, error: "Question details not found in pool" };
-        });
-
-        delete surveyDetails.questionIDs;
-    }
-
-    return surveyDetails;
+    return buildSurveyDefinitionJson({
+      isStandalone: this.props.isStandalone,
+      singleQuestionMode: this.props.singleQuestionMode,
+      surveys: this.props.surveys,
+      surveyIndex: this.props.surveyIndex,
+      questionPool: this.state.questionPool,
+    });
   };
 
   copyJsonToClipboard = (json, type) => {
