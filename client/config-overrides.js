@@ -146,9 +146,6 @@ const override = function override(config, env) {
   config.resolve.alias['@metamask/superstruct'] = path.resolve(
     __dirname, 'src', 'shims', 'metamask-superstruct.js'
   );
-  config.resolve.alias['@metamask/delegation-utils'] = path.resolve(
-    __dirname, 'src', 'shims', 'metamask-delegation-utils.js'
-  );
 
   // existing ffmpeg mock
   config.resolve.alias['@ffmpeg/ffmpeg'] = path.join(
