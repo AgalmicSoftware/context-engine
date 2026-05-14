@@ -70,6 +70,121 @@ test('webpack override no longer injects the legacy global .sol/.html/.txt loade
   );
 });
 
+test('webpack override no longer injects the legacy worker-loader rule', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.ok(
+    !next.module.rules.some((rule) => String(rule?.test) === '/\\.worker\\.js$/'),
+    'expected no global worker-loader rule in the webpack override',
+  );
+});
+
+test('webpack override no longer redirects permissionless imports to a shim', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.ok(
+    !next.plugins.some((plugin) => (
+      plugin?.constructor?.name === 'NormalModuleReplacementPlugin' &&
+      String(plugin.resourceRegExp) === '/^permissionless(\\/.*)?$/'
+    )),
+    'expected no permissionless NormalModuleReplacementPlugin',
+  );
+});
+
+test('webpack override no longer aliases unused MetaMask delegation utilities', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.equal(next.resolve.alias['@metamask/delegation-utils'], undefined);
+});
+
+test('webpack override no longer aliases an absent ffmpeg mock', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.equal(next.resolve.alias['@ffmpeg/ffmpeg'], undefined);
+});
+
+test('webpack and Jest overrides no longer alias absent OpenTelemetry subpaths', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.equal(next.resolve.alias['@opentelemetry/otlp-exporter-base/browser-http$'], undefined);
+  assert.equal(next.resolve.alias['@opentelemetry/otlp-exporter-base/node-http$'], undefined);
+
+  const jestConfig = override.jest({ moduleNameMapper: {} });
+
+  assert.equal(jestConfig.moduleNameMapper['^@opentelemetry/otlp-exporter-base/browser-http$'], undefined);
+  assert.equal(jestConfig.moduleNameMapper['^@opentelemetry/otlp-exporter-base/node-http$'], undefined);
+});
+
 test('webpack override no longer redirects CRA away from tsconfig.json', () => {
   assert.equal(override.paths, undefined);
 });
