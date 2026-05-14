@@ -3460,6 +3460,7 @@ const SessionWizard = ({
     result.onChainFields = buildSessionWizardRegistrySessionFields({
       onChainFields: result.onChainFields,
       sponsoredFields,
+      clientRpcUrl: getCurrentEnabledWorkerSecrets().customRpcUrl,
     });
     return { ...result };
   };
