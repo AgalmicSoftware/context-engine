@@ -624,7 +624,7 @@ describe('AudioSurveyGenerator', () => {
     expect(container.textContent).toContain('Analysis ready');
   });
 
-  it('hides the save-to-doc-library toggle until an additional source is queued', async () => {
+  it('hides the session-context checkbox until a file or URL source is present', async () => {
     await renderSubject(
       <AudioSurveyGenerator
         provider={{}}
@@ -638,10 +638,260 @@ describe('AudioSurveyGenerator', () => {
     );
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeNull();
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeNull();
 
-    addAdditionalUrl('https://example.com/source');
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/source');
 
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeTruthy();
+    expect(container.textContent).toContain('Add to session context');
+    expect(container.textContent).not.toContain('Session Doc Library');
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeNull();
+
+    await act(async () => {
+      container
+        .querySelector('button[title="Add URL"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeTruthy();
+  });
+
+  it('queues image URLs through the shared Add URL field', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    mockFetchImageFromURL.mockResolvedValueOnce(
+      new File(['remote-image'], 'remote_image.png', { type: 'image/png' })
+    );
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/context.png');
+
+    await act(async () => {
+      container
+        .querySelector('button[title="Add URL"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/context.png');
+    expect(getPhotoCards()).toHaveLength(1);
+    expect(container.textContent).toContain('remote_image.png');
+  });
+
+  it('treats extensionless image URLs as photos when the fetched content is an image', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    mockFetchImageFromURL.mockResolvedValueOnce(
+      new File(['remote-image'], 'remote_asset.webp', { type: 'image/webp' })
+    );
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/assets/render?id=123');
+
+    await act(async () => {
+      container
+        .querySelector('button[title="Add URL"]')
+        .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(mockFetchImageFromURL).toHaveBeenCalledWith('https://example.com/assets/render?id=123');
+    expect(getPhotoCards()).toHaveLength(1);
+    expect(container.textContent).toContain('remote_asset.webp');
+  });
+
+  it('keeps Add mode on a single URL entry path', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    expect(container.querySelectorAll('input[placeholder="Add URL"]')).toHaveLength(1);
+    expect(
+      Array.from(container.querySelectorAll('button')).filter((node) => node.textContent.trim() === 'URL')
+    ).toHaveLength(0);
+  });
+
+  it('shows the title field only after an uploaded file source is queued', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`)).toBeNull();
+
+    addAdditionalPhoto(new File(['photo-source'], 'briefing.jpeg', { type: 'image/jpeg' }));
+
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`)).toBeTruthy();
+  });
+
+  it('accepts both docs and jpeg images in the shared upload chooser', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    const fileInput = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}"]`);
+    expect(fileInput.getAttribute('accept')).toContain('.pdf');
+    expect(fileInput.getAttribute('accept')).toContain('.jpeg');
+    expect(fileInput.getAttribute('accept')).toContain('.jpg');
+  });
+
+  it('does not expose direct session-context upload controls for pasted text-only input', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionId: '0xSessionToken',
+          sessionIdHex: `0x${'8'.repeat(32)}`,
+        })}
+      />
+    );
+
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_TITLE_INPUT}"]`)).toBeNull();
+    setAudioInputValue('These are durable context notes that should generate questions without exposing a direct context upload action.');
+
+    expect(findGenerateQuestionsButton()).toBeTruthy();
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_ADD_LIBRARY_BUTTON}"]`)).toBeNull();
+    expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`)).toBeNull();
+    expect(container.textContent).not.toContain('Add to Library');
+    expect(container.textContent).not.toContain('Add to session context');
+    expect(mockUploadDocLibraryFile).not.toHaveBeenCalled();
+  });
+
+  it('defaults generate-time session context saves to only-me when the session doc gate uses OP Sepolia', async () => {
+    delete window.__litHooks;
+    const onQuestionsGenerated = jest.fn();
+    mockProcessAdditionalSources.mockResolvedValue(
+      'This additional source content is long enough to drive question generation on its own.'
+    );
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Private Context Survey',
+      questions: [
+        {
+          prompt: 'Should private context stay wallet-scoped?',
+          questionType: 'binary',
+          tags: ['docs'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 11155420 }}
+        account="0x0000000000000000000000000000000000000123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionIdHex: `0x${'8'.repeat(32)}`,
+          docUploadsGate: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+            chainId: 11155420,
+            mode: 0,
+          },
+        })}
+        onQuestionsGenerated={onQuestionsGenerated}
+      />
+    );
+
+    await addAdditionalUrl('https://example.com/private-context');
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
+
+    const audienceButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`);
+    expect(audienceButton.getAttribute('data-ce-doc-save-audience')).toBe('self');
+    expect(audienceButton.getAttribute('aria-label')).toContain('only me');
+    expect(audienceButton.textContent).not.toContain('only me');
+
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(1);
+    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).toEqual(expect.objectContaining({
+      recipientType: 'self-eip712-v1',
+      selfRecipient: true,
+      contextLabel: 'doc-link:edge',
+    }));
+    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).not.toHaveProperty('saveKey');
+    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).not.toHaveProperty('accessControlConditions');
+    expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
+  });
+
+  it('can skip photo-analysis sidecar uploads when adding images to session context during generation', async () => {
+    const photo = new File(['photo-source'], 'briefing.png', { type: 'image/png' });
+    const onQuestionsGenerated = jest.fn();
+    mockAnalyzePhotoForQuestionGeneration.mockResolvedValue('Briefing image analysis for generated questions.');
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Photo Context Survey',
+      questions: [
+        {
+          prompt: 'Should photo context be saved without an analysis sidecar?',
+          questionType: 'binary',
+          tags: ['photo'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionIdHex: `0x${'8'.repeat(32)}`,
+        })}
+        onQuestionsGenerated={onQuestionsGenerated}
+      />
+    );
+
+    setAudioInputValue('This primary source text is long enough to generate questions while a photo source is also saved as context.');
+    addAdditionalPhoto(photo);
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_LIBRARY_ANALYZE_TOGGLE}"]`));
+
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+    expect(mockUploadDocLibraryFile.mock.calls[0][0].file).toBe(photo);
+    expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
   });
 
   it('resolves the active session config by slug before saving extra doc sources', async () => {
@@ -874,7 +1124,36 @@ describe('AudioSurveyGenerator', () => {
     ]);
   });
 
-  it('defaults saved-doc audience to the session name and shows both audience options when the doc gate exists', async () => {
+  it('removing one queued photo leaves the other queued photo intact', async () => {
+    const firstPhoto = new File(['photo-one'], 'memo.png', { type: 'image/png' });
+    const secondPhoto = new File(['photo-two'], 'diagram.webp', { type: 'image/webp' });
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{}}
+        network={{}}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+      />
+    );
+
+    addAdditionalPhoto([firstPhoto, secondPhoto]);
+
+    const firstCard = getPhotoCardByName('memo.png');
+    const secondCard = getPhotoCardByName('diagram.webp');
+
+    expect(firstCard).toBeTruthy();
+    expect(secondCard).toBeTruthy();
+
+    toggleCheckbox(firstCard.querySelector('button[aria-label="Remove photo memo.png"]'));
+
+    expect(getPhotoCards()).toHaveLength(1);
+    expect(getPhotoCardByName('memo.png')).toBeUndefined();
+    expect(getPhotoCardByName('diagram.webp')).toBeTruthy();
+  });
+
+  it('keeps the saved-context audience label behind an icon-only lock when the doc gate exists', async () => {
     await renderSubject(
       <AudioSurveyGenerator
         provider={{ request: jest.fn() }}
@@ -891,7 +1170,9 @@ describe('AudioSurveyGenerator', () => {
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const audienceButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`);
-    expect(audienceButton.textContent).toContain('Edge Session');
+    expect(audienceButton.getAttribute('data-ce-doc-save-audience')).toBe('session');
+    expect(audienceButton.getAttribute('aria-label')).toContain('Edge Session');
+    expect(audienceButton.textContent).not.toContain('Edge Session');
 
     act(() => {
       audienceButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -901,7 +1182,7 @@ describe('AudioSurveyGenerator', () => {
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_SESSION}"]`)).toBeTruthy();
   });
 
-  it('falls back to only-me audience when the session docUploads gate is unavailable', async () => {
+  it('falls back to only-me audience behind the lock when the session docUploads gate is unavailable', async () => {
     await renderSubject(
       <AudioSurveyGenerator
         provider={{ request: jest.fn() }}
@@ -918,7 +1199,9 @@ describe('AudioSurveyGenerator', () => {
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const audienceButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`);
-    expect(audienceButton.textContent).toContain('only me');
+    expect(audienceButton.getAttribute('data-ce-doc-save-audience')).toBe('self');
+    expect(audienceButton.getAttribute('aria-label')).toContain('only me');
+    expect(audienceButton.textContent).not.toContain('only me');
 
     act(() => {
       audienceButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -949,7 +1232,7 @@ describe('AudioSurveyGenerator', () => {
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     expect(
-      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).textContent
+      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).getAttribute('aria-label')
     ).toContain('only me');
 
     await renderSubject(
@@ -973,7 +1256,7 @@ describe('AudioSurveyGenerator', () => {
     );
 
     expect(
-      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).textContent
+      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).getAttribute('aria-label')
     ).toContain('Edge Session');
   });
 
@@ -1029,6 +1312,124 @@ describe('AudioSurveyGenerator', () => {
     expect(onQuestionsGenerated.mock.calls[0][1][0]).not.toBe('https://example.com/to-save');
   });
 
+  it('saves a typed URL source into session context during generation without requiring the add-url click', async () => {
+    const onQuestionsGenerated = jest.fn();
+    mockProcessAdditionalSources.mockResolvedValue(
+      'This typed URL source content is long enough to drive question generation on its own.'
+    );
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Typed URL Saved Sources Survey',
+      questions: [
+        {
+          prompt: 'Should typed URLs be saved as context before generation?',
+          questionType: 'binary',
+          tags: ['docs'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionId: '0xSessionToken',
+          sessionIdHex: `0x${'4'.repeat(32)}`,
+        })}
+        onQuestionsGenerated={onQuestionsGenerated}
+      />
+    );
+
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/typed-to-save');
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(1);
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://example.com/typed-to-save',
+    }));
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
+    expect(onQuestionsGenerated.mock.calls[0][1]).toEqual([
+      expect.stringContaining('/session/0xSessionToken/docs?'),
+    ]);
+    expect(onQuestionsGenerated.mock.calls[0][1][0]).toContain(`__ceDocTx=${'A'.repeat(43)}`);
+    expect(onQuestionsGenerated.mock.calls[0][1][0]).not.toBe('https://example.com/typed-to-save');
+    expect(container.querySelector('input[placeholder="Add URL"]').value).toBe('');
+  });
+
+  it('uses scoped Lit hooks for OP Sepolia session-context saves when Chipotle credentials stay server-side', async () => {
+    delete window.__litHooks;
+    const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
+    const onQuestionsGenerated = jest.fn();
+    mockProcessAdditionalSources.mockResolvedValue(
+      'This additional source content is long enough to drive question generation on its own.'
+    );
+    mockCallAI.mockResolvedValue(JSON.stringify({
+      surveyTitle: 'Worker Runtime Survey',
+      questions: [
+        {
+          prompt: 'Can server-side Lit runtime save session-gated context?',
+          questionType: 'binary',
+          tags: ['docs'],
+        },
+      ],
+    }));
+
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 11155420 }}
+        account="0x123"
+        litHooks={{ saveKey: scopedSaveKey }}
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig({
+          sessionId: '0xSessionToken',
+          sessionIdHex: `0x${'7'.repeat(32)}`,
+          corsWorkerUrl: 'https://worker.example.test',
+          docUploadsGate: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+            chainId: 11155420,
+            mode: 0,
+          },
+        })}
+        onQuestionsGenerated={onQuestionsGenerated}
+      />
+    );
+
+    await addAdditionalUrl('https://example.com/to-save-with-worker-runtime');
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
+
+    expect(
+      container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`).getAttribute('aria-label')
+    ).toContain('Edge Session');
+
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
+      encryption: expect.objectContaining({
+        enabled: true,
+        saveKey: scopedSaveKey,
+        chainId: 11155420,
+      }),
+    }));
+    expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps raw extra-source URLs when doc-library saving is not enabled', async () => {
     const onQuestionsGenerated = jest.fn();
     mockProcessAdditionalSources.mockResolvedValue(
@@ -1071,6 +1472,35 @@ describe('AudioSurveyGenerator', () => {
       ['https://example.com/raw-source'],
       'Raw URL Survey'
     );
+  });
+
+  it('opens login without showing the old library error when session-context generation needs auth', async () => {
+    const toggleLoginModal = jest.fn();
+    await renderSubject(
+      <AudioSurveyGenerator
+        provider={{ request: jest.fn() }}
+        network={{ id: 84532 }}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={toggleLoginModal}
+        activeSessionSlug="edge"
+        sessionConfig={makeSessionConfig()}
+      />
+    );
+
+    setInputValue('input[placeholder="Add URL"]', 'https://example.com/auth-required');
+    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
+
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(mockUploadDocLibraryUrlRecord).not.toHaveBeenCalled();
+    expect(mockProcessAdditionalSources).not.toHaveBeenCalled();
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain('Connect a wallet to save sources to the session doc library');
+    expect(container.textContent).not.toContain('Generation failed');
   });
 
   it('blocks question generation when saving queued doc sources fails', async () => {
