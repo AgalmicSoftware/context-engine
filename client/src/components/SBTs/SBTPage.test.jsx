@@ -13,6 +13,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
 import { render, screen } from '@testing-library/react';
 
+// Remaining broad SBTPage coverage owns holders-modal refresh, metadata hydration,
+// ownerOf fallback, cache writes, and password/open-mint flows.
 const mockIsCryptoMode = jest.fn(() => true);
 
 jest.mock('../../utilities/ui/terminology.js', () => {
@@ -2285,4 +2287,812 @@ describe('SBTPage modal holder optimizations', () => {
     expect(subject.state.userHasSBT).toBe(false);
   });
 
+  it('shows net holder count when burns create a holder gap', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [
+        '0x00000000000000000000000000000000000000b1',
+        '0x00000000000000000000000000000000000000b2',
+        '0x00000000000000000000000000000000000000b3',
+        '0x00000000000000000000000000000000000000b4',
+        '0x00000000000000000000000000000000000000b5',
+        '0x00000000000000000000000000000000000000b6',
+        '0x00000000000000000000000000000000000000b7',
+      ],
+      burnedAddresses: [
+        '0x00000000000000000000000000000000000000b6',
+        '0x00000000000000000000000000000000000000b7',
+      ],
+      countsLoaded: true,
+      mintedTokensOverride: '7',
+      showModal: true,
+      loadingMintersBurners: false,
+    };
+
+    const tree = subject.render();
+    const modalCount = findElementInTree(
+      tree,
+      (element) => element?.props?.className === styles.modalTitleCount
+    );
+    expect(modalCount).toBeTruthy();
+    expect(flattenText(modalCount)).toBe('(5)');
+  });
+
+  it('shows approximate holder count from mintedTokens override even after local loading flags clear', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [],
+      burnedAddresses: [],
+      countsLoaded: true,
+      mintedTokensOverride: '1',
+      showModal: true,
+      loadingMintersBurners: false,
+    };
+
+    const tree = subject.render();
+    expect(treeIncludesText(tree, '~1')).toBe(true);
+    expect(treeIncludesText(tree, 'No holders found.')).toBe(false);
+  });
+
+  it('shows net holder count from mint history when override is absent', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [
+        '0x00000000000000000000000000000000000000b1',
+        '0x00000000000000000000000000000000000000b2',
+        '0x00000000000000000000000000000000000000b3',
+        '0x00000000000000000000000000000000000000b4',
+      ],
+      burnedAddresses: [
+        '0x00000000000000000000000000000000000000b3',
+      ],
+      countsLoaded: true,
+      mintedTokensOverride: null,
+      showModal: true,
+      loadingMintersBurners: false,
+    };
+
+    const tree = subject.render();
+    const modalCount = findElementInTree(
+      tree,
+      (element) => element?.props?.className === styles.modalTitleCount
+    );
+    expect(modalCount).toBeTruthy();
+    expect(flattenText(modalCount)).toBe('(3)');
+  });
+
+  it('shows zero holders when all tokens are burned', () => {
+    const subject = createSubject({
+      SBTAddress: '0x00000000000000000000000000000000000000a1',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Badge',
+        tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        maxTokens: '0',
+        admin: '0x00000000000000000000000000000000000000a2',
+      },
+      mintedAddresses: [
+        '0x00000000000000000000000000000000000000b1',
+        '0x00000000000000000000000000000000000000b2',
+      ],
+      burnedAddresses: [
+        '0x00000000000000000000000000000000000000b1',
+        '0x00000000000000000000000000000000000000b2',
+      ],
+      countsLoaded: true,
+      mintedTokensOverride: null,
+      showModal: true,
+      loadingMintersBurners: false,
+    };
+
+    const tree = subject.render();
+    const modalCount = findElementInTree(
+      tree,
+      (element) => element?.props?.className === styles.modalTitleCount
+    );
+    expect(modalCount).toBeTruthy();
+    expect(flattenText(modalCount)).toBe('(0)');
+  });
+
+  it.each(['NaN', 'bad string'])(
+    'sanitizes malformed mintedTokensOverride values before persisting (%s)',
+    async (malformedOverride) => {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const sbtLower = sbtAddress.toLowerCase();
+      const cacheEntry = {
+        '84532': {
+          sbtList: {
+            [sbtLower]: {
+              sbtAddress,
+              sbtInfo: {
+                tokenURI: 'ar://HLDsCm3ALbbgjVTCPVLhU8aF9taAdKyD1DyB7A8zkaXM',
+                mintingEndTime: 0,
+                burnAuth: 0,
+                hasPasswordMint: false,
+                maxTokens: '0',
+                admin: '0x00000000000000000000000000000000000000a2',
+                chainID: 84532,
+              },
+              mintedAddresses: [],
+              burnedAddresses: [],
+              countsLoaded: false,
+              blockNumber: 1234,
+            },
+          },
+          lastBlock: 1234,
+        },
+      };
+
+      jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+      jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(malformedOverride);
+      const ownerSpy = jest.spyOn(contractScripts, 'getOwnerByTokenId').mockResolvedValue(null);
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug: 'edge',
+      });
+      subject.state = {
+        ...subject.state,
+        network: { id: 84532, name: 'Base Sepolia' },
+      };
+
+      await subject.loadSBTInfo(false);
+
+      expect(subject.state.mintedTokensOverride).toBeNull();
+      expect(ownerSpy).not.toHaveBeenCalled();
+    }
+  );
+
+  it('writes bookmark updates to managed cache and legacy localStorage', () => {
+    jest.useFakeTimers();
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ sbts: [] });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCache').mockResolvedValue(true);
+    const subject = createSubject({
+      SBTAddress: '0xAbC0000000000000000000000000000000000000',
+      activeSessionSlug: 'edge',
+    });
+
+    subject.bookmarkSBT();
+    jest.runOnlyPendingTimers();
+
+    expect(peekSpy).toHaveBeenCalledWith('bookmarksCache', 'edge', { clone: false });
+    expect(writeSpy).toHaveBeenCalledWith(
+      'bookmarksCache',
+      'edge',
+      expect.objectContaining({
+        sbts: expect.arrayContaining(['0xabc0000000000000000000000000000000000000']),
+      })
+    );
+    expect(JSON.parse(localStorage.getItem('bookmarks'))?.sbts || []).toContain('0xAbC0000000000000000000000000000000000000');
+    jest.useRealTimers();
+  });
+
+  it('coalesces repeated sbtDetails writes when payload is unchanged', () => {
+    jest.useFakeTimers();
+    const setSpy = jest.spyOn(Storage.prototype, 'setItem');
+    const subject = createSubject({
+      SBTAddress: '0xdef0000000000000000000000000000000000000',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { name: 'Badge', creator: '0xabc' },
+    };
+
+    subject.storeSBTDetails();
+    subject.storeSBTDetails();
+    jest.runOnlyPendingTimers();
+
+    expect(setSpy.mock.calls.filter((call) => call[0] === 'sbtDetails')).toHaveLength(1);
+    setSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  it('retains queued transaction hashes when multiple writes happen before flush', () => {
+    jest.useFakeTimers();
+    const subject = createSubject({ account: '0xABC' });
+
+    subject.cacheTransactionHash('0xtx1');
+    subject.cacheTransactionHash('0xtx2');
+    jest.runOnlyPendingTimers();
+
+    const txCache = JSON.parse(localStorage.getItem('transactions') || '{}');
+    expect(txCache['0xabc']).toEqual(['0xtx1', '0xtx2']);
+    jest.useRealTimers();
+  });
+
+  it('fails password mint pre-validation before startClaim when the claim code is invalid', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000d1';
+    const account = '0x00000000000000000000000000000000000000d2';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { hasPasswordMint: true },
+      manualPasswordInput: 'invalid-code',
+      mintStep: 0,
+    };
+
+    const isPasswordValidSpy = jest.spyOn(contractScripts, 'isPasswordValid').mockResolvedValue(false);
+    const startClaimSpy = jest.spyOn(contractScripts, 'startClaim').mockResolvedValue({ transactionHash: '0xstart' });
+
+    await subject.handleMint(false);
+
+    expect(isPasswordValidSpy).toHaveBeenCalledWith(
+      'mock',
+      sbtAddress,
+      ethers.utils.keccak256(ethers.utils.toUtf8Bytes('invalid-code')),
+      'edge'
+    );
+    expect(startClaimSpy).not.toHaveBeenCalled();
+    expect(subject.state.error).toBe('Invalid password.');
+    expect(subject.state.mintingStatus).toBe('failure');
+  });
+
+  it('starts the password claim after pre-validation succeeds', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000e1';
+    const account = '0x00000000000000000000000000000000000000e2';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { hasPasswordMint: true },
+      manualPasswordInput: 'valid-code',
+      mintStep: 0,
+    };
+    subject.startClaimCountdown = jest.fn();
+    subject.cacheTransactionHash = jest.fn();
+
+    jest.spyOn(contractScripts, 'isPasswordValid').mockResolvedValue(true);
+    const startClaimSpy = jest.spyOn(contractScripts, 'startClaim').mockResolvedValue({ transactionHash: '0xstart' });
+
+    await subject.handleMint(false);
+
+    expect(startClaimSpy).toHaveBeenCalledWith(
+      'mock',
+      sbtAddress,
+      ethers.utils.solidityKeccak256(['string', 'address'], ['valid-code', account])
+    );
+    expect(subject.state.mintStep).toBe(1);
+    expect(subject.state.mintingStatus).toBe('idle');
+    expect(subject.startClaimCountdown).toHaveBeenCalledTimes(1);
+    expect(subject.cacheTransactionHash).toHaveBeenCalledWith('0xstart');
+  });
+
+  it('uses the zero wallet scope for invite generation when the on-chain hash was created predeploy', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f1';
+    const password = 'shared-secret';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: '0x00000000000000000000000000000000000000f2',
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { maxTokens: '5' },
+      groupPasswordHash: cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: '' }),
+    };
+    subject.claimWithInvitePayload = jest.fn().mockResolvedValue({ ok: true });
+
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
+    const inviteSpy = jest.spyOn(contractScripts, 'generateInvitePayloads').mockResolvedValue([
+      { nonce: '1', signature: '0xinvite' },
+    ]);
+
+    await subject.claimWithGroupPassword(password);
+
+    expect(inviteSpy).toHaveBeenCalledWith({
+      password,
+      sbtAddress,
+      nonces: ['1'],
+      walletScopeSbtAddress: '',
+    });
+  });
+
+  it('uses the zero wallet scope for manual group-signature mint when the on-chain hash was created predeploy', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000f3';
+    const account = '0x00000000000000000000000000000000000000f4';
+    const password = 'shared-secret';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      groupPasswordInput: password,
+    };
+    subject.loadSBTInfo = jest.fn().mockResolvedValue(undefined);
+    subject.applyLocalMintSuccess = jest.fn();
+    subject.refreshSbtDataWithSlug = jest.fn();
+    subject.clearAutoMintUrlIntent = jest.fn();
+
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(
+      cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: '' })
+    );
+    const signSpy = jest
+      .spyOn(contractScripts, 'signGroupMintAuthorization')
+      .mockResolvedValue('0xsignature');
+    jest.spyOn(contractScripts, 'mintWithGroupSignature').mockResolvedValue({ transactionHash: '0xtx' });
+
+    await subject.mintUnlimitedWithGroupPassword();
+
+    expect(signSpy).toHaveBeenCalledWith({
+      password,
+      sbtAddress,
+      userAddress: account,
+      walletScopeSbtAddress: '',
+    });
+  });
+
+  it('routes public auto-mint URLs to the dedicated public mint helper', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000101';
+    const previousHref = window.location.href;
+    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      const publicMintSpy = jest.spyOn(subject, 'autoMintPublicIfAllowed').mockResolvedValue(true);
+
+      await subject.handleUrlAutoMintIntent();
+      await flushPromises();
+
+      expect(publicMintSpy).toHaveBeenCalledWith(sbtAddress);
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('defers prop-driven auto-mint on mount until sbtInfo is loaded', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000105';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      autoMintingMode: true,
+      sbtMintPassword: 'claim-code',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: null,
+      userHasSBT: false,
+      mintingStatus: 'idle',
+    };
+
+    jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+    jest.spyOn(subject, 'startMintingEndCountdown').mockImplementation(() => {});
+    jest.spyOn(subject, 'checkForMintPassword').mockImplementation(() => {});
+    jest.spyOn(subject, 'fetchRelevantInfo').mockImplementation(() => {});
+    jest.spyOn(subject, 'loadCachedPasswords').mockImplementation(() => {});
+    jest.spyOn(subject, 'handleUrlAutoMintIntent').mockResolvedValue(false);
+    const handleMintSpy = jest.spyOn(subject, 'handleMint').mockResolvedValue(undefined);
+
+    subject.componentDidMount();
+    await flushPromises();
+
+    expect(handleMintSpy).not.toHaveBeenCalled();
+  });
+
+  it('retries prop-driven auto-mint during updates once sbtInfo is available', () => {
+    const subject = createSubject({
+      autoMintingMode: true,
+      sbtMintPassword: 'claim-code',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: null,
+      userHasSBT: false,
+      mintingStatus: 'idle',
+    };
+    const handleMintSpy = jest.spyOn(subject, 'handleMint').mockResolvedValue(undefined);
+
+    subject.componentDidUpdate(subject.props, {
+      ...subject.state,
+      mintingStatus: 'pending',
+    });
+    expect(handleMintSpy).not.toHaveBeenCalled();
+
+    const prevState = { ...subject.state };
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { hasPasswordMint: true },
+    };
+
+    subject.componentDidUpdate(subject.props, prevState);
+
+    expect(handleMintSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads cached passwords from the scoped recovery store', () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000201';
+    const sbtLower = sbtAddress.toLowerCase();
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      network: { id: 84532, name: 'Base Sepolia' },
+    });
+    const now = Date.now();
+    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
+      v: 1,
+      kind: SBT_PASSWORD_RECOVERY_KIND,
+      updatedAt: now,
+      entries: {
+        [`84532:${sbtLower}`]: {
+          chainId: 84532,
+          sbtAddress: sbtLower,
+          passwords: ['scoped-code'],
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + 60_000,
+        },
+      },
+    }));
+
+    subject.loadCachedPasswords();
+
+    expect(subject.state.cachedPasswords).toEqual(['scoped-code']);
+  });
+
+  it('prefers the viewed SBT chain over the connected network when loading cached passwords', () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000203';
+    const sbtLower = sbtAddress.toLowerCase();
+    const now = Date.now();
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      network: { id: 11155420, name: 'OP Sepolia' },
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        chainID: 84532,
+      },
+    };
+    localStorage.setItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY, JSON.stringify({
+      v: 1,
+      kind: SBT_PASSWORD_RECOVERY_KIND,
+      updatedAt: now,
+      entries: {
+        [`84532:${sbtLower}`]: {
+          chainId: 84532,
+          sbtAddress: sbtLower,
+          passwords: ['base-only-code'],
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: now + 60_000,
+        },
+      },
+    }));
+
+    subject.loadCachedPasswords();
+
+    expect(subject.state.cachedPasswords).toEqual(['base-only-code']);
+  });
+
+  it('persists admin-generated invite codes to the scoped recovery store', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000202';
+    const sbtLower = sbtAddress.toLowerCase();
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      network: { id: 84532, name: 'Base Sepolia' },
+    });
+    subject.state = {
+      ...subject.state,
+      passwordGenerationCount: 2,
+    };
+    jest.spyOn(subject, 'generateRandomPasswords').mockReturnValue(['admin-one', 'admin-two']);
+    jest.spyOn(subject, 'cacheTransactionHash').mockImplementation(() => {});
+    jest.spyOn(contractScripts, 'addHashedPasswords').mockResolvedValue({
+      transactionHash: '0x0000000000000000000000000000000000000000000000000000000000000202',
+    });
+
+    await subject.handleGenerateAdminInvites();
+
+    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
+    expect(recoveryStore.entries[`84532:${sbtLower}`]).toEqual(expect.objectContaining({
+      chainId: 84532,
+      sbtAddress: sbtLower,
+      passwords: ['admin-one', 'admin-two'],
+    }));
+    expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
+    expect(subject.state.cachedPasswords).toEqual(['admin-one', 'admin-two']);
+  });
+
+  it('routes invite auto-mint URLs to invite claiming on the dedicated page', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000102';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&inv=invite-token`
+    );
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      const inviteSpy = jest.spyOn(subject, 'claimWithInviteCode').mockResolvedValue(undefined);
+
+      await subject.handleUrlAutoMintIntent();
+      await flushPromises();
+
+      expect(subject.state.groupPasswordInput).toBe('invite-token');
+      expect(inviteSpy).toHaveBeenCalledWith('invite-token', sbtAddress);
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('routes claim-code auto-mint URLs to the password claim helper even without an on-chain group password hash', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000103';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=claim-code`
+    );
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: { hasPasswordMint: true },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      const claimSpy = jest.spyOn(subject, 'claimWithGroupPassword').mockResolvedValue(undefined);
+
+      await subject.handleUrlAutoMintIntent();
+      await flushPromises();
+
+      expect(subject.state.groupPasswordInput).toBe('claim-code');
+      expect(claimSpy).toHaveBeenCalledWith('claim-code', sbtAddress);
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('routes unlimited group-password auto-mint URLs to the signature-mint helper', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000104';
+    const previousHref = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1&gp=shared-secret`
+    );
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: { hasPasswordMint: false },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      jest
+        .spyOn(contractScripts, 'getGroupPasswordHash')
+        .mockResolvedValue('0x1111111111111111111111111111111111111111111111111111111111111111');
+      const mintSpy = jest.spyOn(subject, 'mintUnlimitedWithGroupPassword').mockResolvedValue(undefined);
+
+      await subject.handleUrlAutoMintIntent();
+      await flushPromises();
+
+      expect(subject.state.groupPasswordInput).toBe('shared-secret');
+      expect(mintSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('renders the admin open-mint URL card for eligible public SBTs', () => {
+    const account = '0x00000000000000000000000000000000000000a2';
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      sessionSlug: 'edge',
+    });
+
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Open Badge',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        hasPasswordMint: false,
+        maxTokens: '0',
+        admin: account,
+        chainID: 84532,
+      },
+      userIsSbtAdmin: true,
+      showAdminSection: true,
+      hasInviteMint: false,
+      hasGroupPasswordMint: false,
+      groupPasswordHash: ethers.constants.HashZero,
+    };
+
+    const tree = subject.render();
+    const cardNode = findElementInTree(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL
+    );
+
+    expect(cardNode).not.toBeNull();
+    expect(flattenText(cardNode)).toContain('URL Where Anyone Can Join');
+    expect(flattenText(cardNode)).toContain('http://localhost/session/edge?sbt=');
+  });
+
+  it('prepends PUBLIC_URL when building the admin open-mint URL', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+
+    try {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug: 'edge',
+      });
+
+      subject.state = {
+        ...subject.state,
+        sbtInfo: {
+          name: 'Open Badge',
+          image: 'https://example.example.test/badge.png',
+          mintingEndTime: 0,
+          burnAuth: 0,
+          hasPasswordMint: false,
+          maxTokens: '0',
+          admin: '0x00000000000000000000000000000000000000a2',
+          chainID: 84532,
+        },
+        hasInviteMint: false,
+        hasGroupPasswordMint: false,
+        groupPasswordHash: ethers.constants.HashZero,
+      };
+
+      expect(subject.getOpenMintAutoJoinUrl()).toBe(
+        `http://localhost/ce/session/edge?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+      );
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
+  it('canonicalizes reserved session aliases when building the admin open-mint URL', () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+
+    const buildEligibleSubject = (sessionSlug) => {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug,
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: {
+          name: 'Open Badge',
+          image: 'https://example.example.test/badge.png',
+          mintingEndTime: 0,
+          burnAuth: 0,
+          hasPasswordMint: false,
+          maxTokens: '0',
+          admin: '0x00000000000000000000000000000000000000a2',
+          chainID: 84532,
+        },
+        hasInviteMint: false,
+        hasGroupPasswordMint: false,
+        groupPasswordHash: ethers.constants.HashZero,
+      };
+      return subject;
+    };
+
+    expect(buildEligibleSubject('general').getOpenMintAutoJoinUrl()).toBe(
+      `http://localhost/session?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+    );
+    expect(buildEligibleSubject('debate').getOpenMintAutoJoinUrl()).toBe(
+      `http://localhost/session/debate?sbt=${encodeURIComponent(sbtAddress)}&auto=1`
+    );
+  });
+
+  it('hides the admin open-mint URL card when the SBT has an on-chain group password hash', () => {
+    const account = '0x00000000000000000000000000000000000000a2';
+    const sbtAddress = '0x00000000000000000000000000000000000000a1';
+    const password = 'shared-secret';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      sessionSlug: 'edge',
+    });
+
+    subject.state = {
+      ...subject.state,
+      sbtInfo: {
+        name: 'Private Badge',
+        image: 'https://example.example.test/badge.png',
+        mintingEndTime: 0,
+        burnAuth: 0,
+        hasPasswordMint: false,
+        maxTokens: '0',
+        admin: account,
+        chainID: 84532,
+      },
+      userIsSbtAdmin: true,
+      showAdminSection: true,
+      hasInviteMint: false,
+      hasGroupPasswordMint: false,
+      groupPasswordHash: cryptoUtils.computeGroupPasswordHash({ password, sbtAddress: '' }),
+    };
+
+    const tree = subject.render();
+    const cardNode = findElementInTree(
+      tree,
+      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_OPEN_MINT_URL
+    );
+
+    expect(cardNode).toBeNull();
+  });
 });
