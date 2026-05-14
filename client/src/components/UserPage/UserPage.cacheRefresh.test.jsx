@@ -2132,6 +2132,337 @@ describe('UserPage cache refresh pipeline', () => {
     expect(section.sbtList[0].sbtInfo.name).toBe('[encrypted]');
   });
 
+  it('renders full deep-scan tooltip line lists without abbreviation', () => {
+    const instance = makeInstance();
+    const deepLines = Array.from({ length: 10 }, (_, idx) => `session-${idx + 1} / 84532: ${120 + idx}`);
+    instance.state = {
+      ...instance.state,
+      selectedTab: 'surveys',
+      isDeepScanning: true,
+      deepScanTooltipLines: deepLines,
+      loadingSurveys: true,
+      loadingSBTs: true,
+    };
+
+    const tree = instance.render();
+    const tooltips = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
+        String(node?.props?.target || '').includes('surveySpinner_')
+    );
+    expect(tooltips.length).toBeGreaterThan(0);
+
+    const tooltipChildren = normalizeChildrenArray(tooltips[0]?.props?.children);
+    expect(tooltipChildren).toHaveLength(deepLines.length);
+    expect(tooltipChildren[deepLines.length - 1]?.props?.children).toBe(deepLines[deepLines.length - 1]);
+  });
+
+  it('renders compact progress-bar rows when structured deep-scan progress is available', () => {
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      selectedTab: 'surveys',
+      isDeepScanning: true,
+      loadingSurveys: true,
+      deepScanTooltipLines: [
+        'Session: Edge Session',
+        '400 blocks remaining',
+      ],
+      deepScanProgressRows: [
+        {
+          slug: 'edge',
+          chainId: 84532,
+          lastBlockScanned: 1600,
+          latestBlock: 2000,
+          remainingBlocks: 400,
+          percentComplete: 60,
+          isDeterminate: true,
+          label: 'Edge Session',
+          displayLastBlock: 1600,
+        },
+      ],
+    };
+
+    const tree = instance.render();
+    const tooltips = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
+        String(node?.props?.target || '').includes('surveySpinner_')
+    );
+    expect(tooltips.length).toBeGreaterThan(0);
+    expect(treeHasText(tooltips[0]?.props?.children, 'Deep scan in progress')).toBe(true);
+    expect(treeHasText(tooltips[0]?.props?.children, 'Edge Session')).toBe(true);
+    expect(treeHasText(tooltips[0]?.props?.children, '400 blocks remaining')).toBe(true);
+    expect(treeHasText(tooltips[0]?.props?.children, '1,600 / 2,000 scanned')).toBe(true);
+
+    const fills = collectTreeNodes(
+      tooltips[0]?.props?.children,
+      (node) => node?.props?.className === styles.deepScanProgressFill
+    );
+    expect(fills).toHaveLength(1);
+    expect(fills[0]?.props?.style).toEqual(expect.objectContaining({ width: '60%' }));
+  });
+
+  it('renders indeterminate fallback rows when latest block is unavailable', () => {
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      selectedTab: 'surveys',
+      isDeepScanning: true,
+      loadingSurveys: true,
+      deepScanTooltipLines: [
+        'Session: Edge Session',
+        '1,600 scanned',
+      ],
+      deepScanProgressRows: [
+        {
+          slug: 'edge',
+          chainId: 84532,
+          lastBlockScanned: 1600,
+          latestBlock: null,
+          remainingBlocks: null,
+          percentComplete: null,
+          isDeterminate: false,
+          label: 'Edge Session',
+          displayLastBlock: 1600,
+        },
+      ],
+    };
+
+    const tree = instance.render();
+    const tooltips = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
+        String(node?.props?.target || '').includes('surveySpinner_')
+    );
+    expect(tooltips.length).toBeGreaterThan(0);
+    expect(treeHasText(tooltips[0]?.props?.children, 'Deep scan in progress')).toBe(true);
+    expect(treeHasText(tooltips[0]?.props?.children, 'Edge Session')).toBe(true);
+    expect(treeHasText(tooltips[0]?.props?.children, '1,600 scanned')).toBe(true);
+
+    const fills = collectTreeNodes(
+      tooltips[0]?.props?.children,
+      (node) => node?.props?.className === styles.deepScanProgressFill
+    );
+    expect(fills).toHaveLength(0);
+  });
+
+  it('filters blank separator lines from spinner title text while preserving tooltip spacing', () => {
+    const instance = makeInstance();
+    const deepLines = [
+      'Session: alpha',
+      '100 scanned',
+      '',
+      'Session: beta',
+      '200 scanned',
+      '   ',
+    ];
+    instance.state = {
+      ...instance.state,
+      selectedTab: 'surveys',
+      isDeepScanning: true,
+      deepScanTooltipLines: deepLines,
+      loadingSurveys: true,
+    };
+
+    const tree = instance.render();
+    const surveySpinners = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'FontAwesomeIcon' &&
+        String(node?.props?.id || '').includes('surveySpinner_')
+    );
+    expect(surveySpinners.length).toBeGreaterThan(0);
+    expect(surveySpinners[0]?.props?.title).toBe(
+      'Deep scan: Session: alpha | 100 scanned | Session: beta | 200 scanned'
+    );
+
+    const tooltips = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
+        String(node?.props?.target || '').includes('surveySpinner_')
+    );
+    expect(tooltips.length).toBeGreaterThan(0);
+    const tooltipChildren = normalizeChildrenArray(tooltips[0]?.props?.children);
+    expect(tooltipChildren.map((child) => child?.props?.children)).toEqual(deepLines);
+  });
+
+  it('keeps deep-scan progress details hover-only instead of rendering inline summary copy', () => {
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      selectedTab: 'surveys',
+      isDeepScanning: true,
+      loadingSurveys: true,
+      deepScanTooltipLines: [
+        'Session: Edge Session',
+        'Up to date',
+        '',
+        'Session: Beta Session',
+        '400 blocks remaining',
+      ],
+      deepScanProgressRows: [
+        {
+          slug: 'edge',
+          chainId: 84532,
+          lastBlockScanned: 2000,
+          latestBlock: 2000,
+          remainingBlocks: 0,
+          percentComplete: 100,
+          isDeterminate: true,
+          label: 'Edge Session',
+          displayLastBlock: 2000,
+        },
+        {
+          slug: 'beta',
+          chainId: 84532,
+          lastBlockScanned: 1600,
+          latestBlock: 2000,
+          remainingBlocks: 400,
+          percentComplete: 60,
+          isDeterminate: true,
+          label: 'Beta Session',
+          displayLastBlock: 1600,
+        },
+      ],
+    };
+
+    const tree = instance.render();
+    expect(treeHasText(tree, 'Syncing profile history')).toBe(false);
+    expect(treeHasText(tree, 'Beta Session: 400 blocks left')).toBe(false);
+
+    const tooltips = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
+        String(node?.props?.target || '').includes('surveySpinner_')
+    );
+    expect(tooltips.length).toBeGreaterThan(0);
+    expect(treeHasText(tooltips[0]?.props?.children, 'Deep scan in progress')).toBe(true);
+    expect(treeHasText(tooltips[0]?.props?.children, 'Beta Session')).toBe(true);
+    expect(treeHasText(tooltips[0]?.props?.children, '400 blocks remaining')).toBe(true);
+  });
+
+  it('sets hover/focus/click + non-autohide props on all section spinner tooltips and exposes the loading panel on each target', () => {
+    const instance = makeInstance();
+    const deepLines = ['Session: Edge Session', '400 blocks remaining'];
+    const progressRows = [{
+      slug: 'edge',
+      chainId: 84532,
+      lastBlockScanned: 1600,
+      latestBlock: 2000,
+      remainingBlocks: 400,
+      percentComplete: 60,
+      isDeterminate: true,
+      label: 'Edge Session',
+      displayLastBlock: 1600,
+    }];
+    const spinnerTargetPattern = /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
+    const collectSpinnerTooltips = (tab) => {
+      instance.state = {
+        ...instance.state,
+        selectedTab: tab,
+        isDeepScanning: true,
+        deepScanTooltipLines: deepLines,
+        deepScanProgressRows: progressRows,
+        loadingSurveys: true,
+        loadingQuestions: true,
+        loadingSBTs: true,
+      };
+      const tree = instance.render();
+      return collectTreeNodes(
+        tree,
+        (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
+          spinnerTargetPattern.test(String(node?.props?.target || ''))
+      );
+    };
+
+    const surveyTabTips = collectSpinnerTooltips('surveys');
+    const questionTabTips = collectSpinnerTooltips('questions');
+    const allTips = [...surveyTabTips, ...questionTabTips];
+
+    allTips.forEach((tip) => {
+      expect(tip.props.trigger).toBe('hover focus click');
+      expect(tip.props.autohide).toBe(false);
+      expect(treeHasText(tip.props.children, 'Deep scan in progress')).toBe(true);
+      expect(treeHasText(tip.props.children, 'Edge Session')).toBe(true);
+    });
+
+    const allTargets = allTips.map((tip) => String(tip.props.target || '')).join('|');
+    expect(allTargets).toContain('surveySpinner_');
+    expect(allTargets).toContain('surveysCreatedSpinner_');
+    expect(allTargets).toContain('questionSpinner_');
+    expect(allTargets).toContain('questionsCreatedSpinner_');
+    expect(allTargets).toContain('sbtSpinner_');
+  });
+
+  it('sanitizes spinner tooltip target IDs when viewAddress contains route characters', () => {
+    const instance = makeInstance({
+      viewAddress: '/session/test-10/survey/0xad3f',
+    });
+    instance.state = {
+      ...instance.state,
+      selectedTab: 'surveys',
+      isDeepScanning: true,
+      deepScanTooltipLines: ['edge / 84532: 150'],
+      loadingSurveys: true,
+      loadingQuestions: true,
+      loadingSBTs: true,
+    };
+    const spinnerTargetPattern = /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
+    const tree = instance.render();
+    const tooltipTargets = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UncontrolledTooltip' &&
+        spinnerTargetPattern.test(String(node?.props?.target || ''))
+    ).map((node) => String(node?.props?.target || ''));
+
+    expect(tooltipTargets.length).toBeGreaterThan(0);
+    tooltipTargets.forEach((target) => {
+      expect(target).not.toContain('/');
+      expect(target).toMatch(/^[A-Za-z0-9_-]+$/);
+    });
+  });
+
+  it('stops spinner interactions from bubbling so section headers do not collapse on tooltip click', () => {
+    const instance = makeInstance();
+    const deepLines = ['edge / 84532: 150'];
+    const spinnerTargetPattern = /(surveySpinner_|surveysCreatedSpinner_|questionSpinner_|questionsCreatedSpinner_|sbtSpinner_)/;
+    const collectSpinnerIcons = (tab) => {
+      instance.state = {
+        ...instance.state,
+        selectedTab: tab,
+        isDeepScanning: true,
+        deepScanTooltipLines: deepLines,
+        loadingSurveys: true,
+        loadingQuestions: true,
+        loadingSBTs: true,
+      };
+      const tree = instance.render();
+      return collectTreeNodes(
+        tree,
+        (node) => getNodeTypeName(node) === 'FontAwesomeIcon' &&
+          spinnerTargetPattern.test(String(node?.props?.id || ''))
+      );
+    };
+
+    const surveyTabIcons = collectSpinnerIcons('surveys');
+    const questionTabIcons = collectSpinnerIcons('questions');
+    const allIcons = [...surveyTabIcons, ...questionTabIcons];
+    expect(allIcons.length).toBeGreaterThan(0);
+
+    allIcons.forEach((iconNode) => {
+      expect(typeof iconNode?.props?.onClick).toBe('function');
+      expect(typeof iconNode?.props?.onMouseDown).toBe('function');
+
+      const clickStop = jest.fn();
+      iconNode.props.onClick({ stopPropagation: clickStop });
+      expect(clickStop).toHaveBeenCalledTimes(1);
+
+      const mouseDownStop = jest.fn();
+      iconNode.props.onMouseDown({ stopPropagation: mouseDownStop });
+      expect(mouseDownStop).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('uses clone:false when reading survey and question creation caches for analysis payloads', async () => {
     const instance = makeInstance({
       activeSessionSlug: 'edge',
