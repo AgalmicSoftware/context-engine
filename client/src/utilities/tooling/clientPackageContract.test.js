@@ -172,4 +172,16 @@ describe('client package modernization contract', () => {
       expect(pkg.devDependencies[name]).toBeDefined();
     });
   });
+
+  it('keeps stale webpack loaders out of the client package contract', () => {
+    const pkg = readClientPackageJson();
+    const staleLoaders = [
+      'worker-loader',
+    ];
+
+    staleLoaders.forEach((name) => {
+      expect(pkg.dependencies[name]).toBeUndefined();
+      expect(pkg.devDependencies[name]).toBeUndefined();
+    });
+  });
 });
