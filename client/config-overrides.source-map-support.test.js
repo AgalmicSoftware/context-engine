@@ -93,6 +93,32 @@ test('webpack override no longer injects the legacy worker-loader rule', () => {
   );
 });
 
+test('webpack override no longer redirects permissionless imports to a shim', () => {
+  const config = {
+    resolve: {
+      plugins: [],
+      alias: {},
+    },
+    module: {
+      rules: [{}, {}],
+    },
+    plugins: [],
+    optimization: {
+      minimizer: [],
+    },
+  };
+
+  const next = override(config, 'development');
+
+  assert.ok(
+    !next.plugins.some((plugin) => (
+      plugin?.constructor?.name === 'NormalModuleReplacementPlugin' &&
+      String(plugin.resourceRegExp) === '/^permissionless(\\/.*)?$/'
+    )),
+    'expected no permissionless NormalModuleReplacementPlugin',
+  );
+});
+
 test('webpack override no longer redirects CRA away from tsconfig.json', () => {
   assert.equal(override.paths, undefined);
 });
