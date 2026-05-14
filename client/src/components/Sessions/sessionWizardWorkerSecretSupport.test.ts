@@ -4,6 +4,7 @@ import {
   DEFAULT_WORKER_SECRETS,
   getSessionWizardWorkerResourceKeys,
   normalizeWorkerSecrets,
+  resolveSessionWizardEnabledWorkerSecrets,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -59,6 +60,26 @@ describe('sessionWizardWorkerSecretSupport', () => {
       litActionCid: '',
       litAccountApiKey: 'account-secret',
       litUsageApiKey: '',
+    }));
+  });
+
+  it('drops uploaded worker secrets when sponsored worker secrets are disabled', () => {
+    expect(resolveSessionWizardEnabledWorkerSecrets({
+      workerSecretsEnabled: false,
+      workerSecrets: {
+        openaiKey: 'sk-openai',
+        customRpcUrl: 'https://uploaded-rpc.example',
+        arweaveJwk: '{"kty":"RSA"}',
+      },
+    })).toEqual(DEFAULT_WORKER_SECRETS);
+
+    expect(resolveSessionWizardEnabledWorkerSecrets({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        customRpcUrl: ' https://uploaded-rpc.example ',
+      },
+    })).toEqual(expect.objectContaining({
+      customRpcUrl: 'https://uploaded-rpc.example',
     }));
   });
 
