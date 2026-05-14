@@ -12,10 +12,10 @@
     "tail": "wrangler tail"
   },
   "dependencies": {
-    "arweave": "^1.14.4",
+    "arweave": "1.15.7",
     "ethers": "6.15.0"
   },
   "devDependencies": {
-    "wrangler": "^4.33.2"
+    "wrangler": "4.33.2"
   }
 }
