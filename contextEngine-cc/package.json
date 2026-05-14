@@ -12,6 +12,6 @@
     "test": "node --test"
   },
   "dependencies": {
-    "ethers": "5.8.0"
+    "ethers": "5.7.2"
   }
 }
