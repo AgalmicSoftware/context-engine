@@ -476,6 +476,31 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     alertSpy.mockRestore();
   });
 
+  it('opens the login modal instead of surfacing a submit error for valid unauthenticated drafts', async () => {
+    const toggleLoginModal = jest.fn();
+    const instance = makeInstance({
+      loginComplete: false,
+      toggleLoginModal,
+    });
+    instance.ensureResolvedSessionConfigForSubmit = jest.fn();
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: true,
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+      submissionError: 'stale error',
+      formValidationError: 'stale validation',
+      isSubmitting: true,
+    };
+
+    await instance.createSurvey();
+
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
+    expect(instance.state.submissionError).toBe('');
+    expect(instance.state.formValidationError).toBe('');
+    expect(instance.state.isSubmitting).toBe(false);
+  });
+
   it('renders form validation feedback with a stable test id', () => {
     const instance = makeInstance();
     instance.state = {

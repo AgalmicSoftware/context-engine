@@ -759,6 +759,7 @@ function normalizeQuestionPayload(payload = {}, {
   questionId = '',
   pointerId = '',
   sessionSlug = '',
+  fallbackSessionSlug = '',
 } = {}) {
   const root = normalizeQuestionPayloadRoot(payload);
   if (!root || typeof root !== 'object' || Array.isArray(root)) return null;
@@ -796,7 +797,7 @@ function normalizeQuestionPayload(payload = {}, {
         }
       : {}),
     source: 'live_session_question',
-    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload),
+    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower(fallbackSessionSlug),
     arweaveTxId: pointerId,
     storageRef: pointerId ? { backend: 'arweave', id: pointerId, resource: 'questions', uri: `ar://${pointerId}` } : null,
   };
@@ -862,10 +863,18 @@ async function fetchQuestionPayload({
   if (payloadSessionSlug && requestedSessionSlug && payloadSessionSlug !== requestedSessionSlug) {
     return skippedQuestionPayload('session_mismatch');
   }
-  if (!payloadSessionSlug && requestedSessionSlug && !allowUnscopedQuestionPayloads(env)) {
+  const shouldStampUnscopedPayload = !payloadSessionSlug &&
+    requestedSessionSlug &&
+    allowUnscopedQuestionPayloads(env);
+  if (!payloadSessionSlug && requestedSessionSlug && !shouldStampUnscopedPayload) {
     return skippedQuestionPayload('session_slug_missing');
   }
-  return normalizeQuestionPayload(payload, { questionId: id, pointerId, sessionSlug }) ||
+  return normalizeQuestionPayload(payload, {
+    questionId: id,
+    pointerId,
+    sessionSlug,
+    fallbackSessionSlug: shouldStampUnscopedPayload ? requestedSessionSlug : '',
+  }) ||
     lockedQuestionPlaceholder({ questionId: id, pointerId, sessionSlug });
 }
 
