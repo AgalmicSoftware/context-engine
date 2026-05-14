@@ -34,6 +34,11 @@ const SUBMIT_REQUEST_KV_PREFIX = 'telegram:submit-request:';
 const AGENT_REQUEST_KV_PREFIX = 'telegram:agent-request:';
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
 const BYTES32_RE = /^0x[0-9a-fA-F]{64}$/;
+const AGREE_UNSURE_DISAGREE_LABELS = Object.freeze({
+  agree: 'Agree',
+  unsure: 'Unsure',
+  disagree: 'Disagree',
+});
 
 function safeString(value) {
   return String(value || '').trim();
@@ -399,6 +404,18 @@ async function persistMiniQuestionAction({
   return stored.ok ? callback.callbackData : '';
 }
 
+function formatRequiredSbtSummary(addresses = []) {
+  const list = (Array.isArray(addresses) ? addresses : [])
+    .map(safeString)
+    .filter(Boolean)
+    .slice(0, 4);
+  if (!list.length) return '';
+  const short = list.map((address) => (
+    address.length > 14 ? `${address.slice(0, 6)}...${address.slice(-4)}` : address
+  ));
+  return `Required SBT${list.length === 1 ? '' : 's'}: ${short.join(', ')}`;
+}
+
 async function miniQuestionFromRecord({
   env = {},
   sessionSlug = '',
@@ -418,6 +435,14 @@ async function miniQuestionFromRecord({
   const qid = safeString(group.questionId || readQuestionId(question));
   const locked = group.locked === true;
   const payloadUnavailable = group.payloadUnavailable === true;
+  const encrypted = group.encrypted === true;
+  const requiredSbtAddresses = Array.isArray(group.requiredSbtAddresses) ? group.requiredSbtAddresses : [];
+  const requiredSbtSummary = formatRequiredSbtSummary(requiredSbtAddresses);
+  const lockMessage = payloadUnavailable
+    ? 'Question payload is not available yet. The app will keep retrying.'
+    : encrypted
+      ? ['This question is encrypted.', requiredSbtSummary].filter(Boolean).join(' ')
+      : 'This question is locked in Telegram.';
   const questionKey = locked || payloadUnavailable ? '' : await persistMiniQuestionAction({
     env,
     sessionSlug,
@@ -436,11 +461,15 @@ async function miniQuestionFromRecord({
     title: payloadUnavailable
       ? 'Question unavailable'
       : locked
-      ? 'Locked question'
+      ? encrypted ? 'Encrypted question' : 'Locked question'
       : safeString(card.questionText || group.questionText || 'Untitled question'),
     prompt: locked || payloadUnavailable ? '' : safeString(card.questionText || group.questionText || 'Untitled question'),
     options: locked || payloadUnavailable ? [] : (Array.isArray(card.answerLabels) ? card.answerLabels : []),
     locked,
+    encrypted,
+    requiredSbtAddresses,
+    requiredSbtSummary,
+    lockMessage,
     payloadUnavailable,
     canAnswer: !locked && !payloadUnavailable && Boolean(questionKey),
     status: payloadUnavailable
@@ -622,13 +651,12 @@ function normalizeMiniAnswer(answer = {}, questionRef = {}) {
   const comments = normalizeText(answer.comments || answer.additionalComments, 1000);
   if (type === 'agree_unsure_disagree') {
     const value = lower(answer.value || answer.answer);
-    const labels = { agree: 'Agree', disagree: 'Disagree', unsure: 'Unsure' };
-    if (!labels[value]) return { ok: false, reason: 'binary_answer_invalid' };
+    if (!AGREE_UNSURE_DISAGREE_LABELS[value]) return { ok: false, reason: 'binary_answer_invalid' };
     return {
       ok: true,
-      label: labels[value],
+      label: AGREE_UNSURE_DISAGREE_LABELS[value],
       value,
-      answer: { questionType: type, value, label: labels[value], comments },
+      answer: { questionType: type, value, label: AGREE_UNSURE_DISAGREE_LABELS[value], comments },
     };
   }
   if (type === 'rating') {
@@ -1044,7 +1072,7 @@ function telegramMiniAppHtml() {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>CE Mini App</title>
+  <title>Context Engine</title>
   <script src="https://telegram.org/js/telegram-web-app.js?62"></script>
   <style>
     :root {
@@ -1081,7 +1109,31 @@ function telegramMiniAppHtml() {
       gap: 14px;
     }
     header { display: grid; gap: 8px; }
+    .headerBar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
     h1 { margin: 0; font-size: 20px; line-height: 1.15; letter-spacing: 0; }
+    .iconButton {
+      width: 40px;
+      height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .iconButton svg {
+      width: 17px;
+      height: 17px;
+      fill: currentColor;
+      display: block;
+    }
     .meta { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 8px; }
     .status { min-height: 20px; color: var(--muted); font-size: 13px; }
     .settingsPanel select {
@@ -1150,11 +1202,45 @@ function telegramMiniAppHtml() {
       color: var(--text);
       text-align: center;
     }
-    .choice.selected, .segment.selected {
+    .choice.selected {
       background: var(--accent);
       border-color: var(--accent);
       color: var(--accent-text);
       box-shadow: 0 0 14px rgba(98, 255, 191, 0.28);
+    }
+    .segment.agree {
+      background: rgba(76, 175, 80, 0.3);
+      border-color: #4caf50;
+      color: #81c784;
+    }
+    .segment.unsure {
+      background: rgba(255, 235, 59, 0.2);
+      border-color: #fdd835;
+      color: #fff176;
+    }
+    .segment.disagree {
+      background: rgba(244, 67, 54, 0.3);
+      border-color: #f44336;
+      color: #e57373;
+    }
+    .segment.selected {
+      font-weight: 800;
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.18);
+    }
+    .segment.agree.selected {
+      background: #4caf50;
+      border-color: #4caf50;
+      color: #ffffff;
+    }
+    .segment.unsure.selected {
+      background: #ffeb3b;
+      border-color: #fdd835;
+      color: #202458;
+    }
+    .segment.disagree.selected {
+      background: #f44336;
+      border-color: #f44336;
+      color: #ffffff;
     }
     .ratingValue { font-size: 34px; font-weight: 700; letter-spacing: 0; color: var(--accent); }
     input[type="range"] { width: 100%; accent-color: var(--accent); }
@@ -1173,7 +1259,7 @@ function telegramMiniAppHtml() {
       position: sticky;
       bottom: 0;
       display: grid;
-      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 10px;
       padding-top: 6px;
       background: var(--bg);
@@ -1200,7 +1286,14 @@ function telegramMiniAppHtml() {
 <body>
   <main class="app">
     <header>
-      <h1>CE Agent</h1>
+      <div class="headerBar">
+        <h1>Context Engine</h1>
+        <button class="iconButton" id="showSettings" type="button" aria-label="Settings" title="Settings">
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 512 512">
+            <path d="M487.4 315.7l-42.6-24.6c4.3-23.2 4.3-47 0-70.2l42.6-24.6c4.9-2.8 7.1-8.6 5.5-14-11.1-35.6-30-67.8-54.7-94.6-3.8-4.1-10-5.1-14.8-2.3L380.8 110c-17.9-15.4-38.5-27.3-60.8-35.1V25.8c0-5.6-3.9-10.5-9.4-11.7-36.7-8.2-74.3-7.8-109.2 0-5.5 1.2-9.4 6.1-9.4 11.7V75c-22.2 7.9-42.8 19.8-60.8 35.1L88.7 85.5c-4.9-2.8-11-1.9-14.8 2.3-24.7 26.7-43.6 58.9-54.7 94.6-1.7 5.4.6 11.2 5.5 14L67.3 221c-4.3 23.2-4.3 47 0 70.2l-42.6 24.6c-4.9 2.8-7.1 8.6-5.5 14 11.1 35.6 30 67.8 54.7 94.6 3.8 4.1 10 5.1 14.8 2.3l42.6-24.6c17.9 15.4 38.5 27.3 60.8 35.1v49.2c0 5.6 3.9 10.5 9.4 11.7 36.7 8.2 74.3 7.8 109.2 0 5.5-1.2 9.4-6.1 9.4-11.7v-49.2c22.2-7.9 42.8-19.8 60.8-35.1l42.6 24.6c4.9 2.8 11 1.9 14.8-2.3 24.7-26.7 43.6-58.9 54.7-94.6 1.5-5.5-.7-11.3-5.6-14.1zM256 336c-44.1 0-80-35.9-80-80s35.9-80 80-80 80 35.9 80 80-35.9 80-80 80z"></path>
+          </svg>
+        </button>
+      </div>
       <div class="meta" id="meta"></div>
       <div class="status" id="status">Loading...</div>
       <section class="settingsPanel" id="settingsPanel" aria-label="Agent settings">
@@ -1224,7 +1317,6 @@ function telegramMiniAppHtml() {
       </section>
     </section>
     <footer>
-      <button class="secondary" id="showSettings" type="button">Settings</button>
       <button class="secondary" id="save" type="button">Save Draft</button>
       <button class="primary" id="submit" type="button">Submit</button>
     </footer>
@@ -1237,7 +1329,8 @@ function telegramMiniAppHtml() {
     }
     const params = new URLSearchParams(location.search);
     const launch = params.get('launch') || params.get('tgWebAppStartParam') || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';
-    const state = { data: null, activeKey: '', page: 0, drafts: {} };
+    const QUESTION_RETRY_DELAY_MS = 4000;
+    const state = { data: null, activeKey: '', page: 0, drafts: {}, retryTimer: null, submitting: false };
     const el = {
       meta: document.getElementById('meta'),
       status: document.getElementById('status'),
@@ -1271,6 +1364,32 @@ function telegramMiniAppHtml() {
       el.status.className = 'status ' + kind;
       el.status.textContent = message || '';
     };
+    function shouldRetryQuestions(data) {
+      const questions = Array.isArray(data?.questions) ? data.questions : [];
+      return data?.sourceOk === false ||
+        Number(data?.questionCount || 0) === 0 ||
+        questions.some((question) => question.payloadUnavailable === true);
+    }
+    function clearQuestionRetry() {
+      if (state.retryTimer) window.clearTimeout(state.retryTimer);
+      state.retryTimer = null;
+    }
+    function scheduleQuestionRetry() {
+      clearQuestionRetry();
+      state.retryTimer = window.setTimeout(() => {
+        state.retryTimer = null;
+        load({ retry: true });
+      }, QUESTION_RETRY_DELAY_MS);
+    }
+    function setSubmitBusy(isBusy, triggerButton = null) {
+      state.submitting = isBusy;
+      [el.submit, triggerButton].filter(Boolean).forEach((button) => {
+        button.disabled = isBusy || !activeQuestion()?.canAnswer;
+        button.textContent = isBusy ? 'Submitting...' : 'Submit';
+        button.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+      });
+      if (!isBusy) updateFooterControls();
+    }
     function renderQuestionStack() {
       const questions = state.data?.questions || [];
       const pageSize = state.data?.pageSize || 5;
@@ -1323,7 +1442,13 @@ function telegramMiniAppHtml() {
       if (question.locked || !question.canAnswer) {
         const locked = document.createElement('div');
         locked.className = 'locked';
-        locked.textContent = 'This question is locked or unavailable in Telegram.';
+        locked.textContent = question.lockMessage || (
+          question.payloadUnavailable
+            ? 'Question payload is not available yet. Retrying...'
+            : question.encrypted
+              ? 'This question is encrypted.'
+              : 'This question is locked in Telegram.'
+        );
         mount.appendChild(locked);
         return;
       }
@@ -1331,10 +1456,11 @@ function telegramMiniAppHtml() {
       if (question.questionType === 'agree_unsure_disagree') {
         const row = document.createElement('div');
         row.className = 'segmented';
-        [['agree', 'Agree'], ['disagree', 'Disagree'], ['unsure', 'Unsure']].forEach(([value, label]) => {
+        [['agree', 'Agree'], ['unsure', 'Unsure'], ['disagree', 'Disagree']].forEach(([value, label]) => {
           const button = document.createElement('button');
           button.type = 'button';
-          button.className = 'segment' + (draft.value === value ? ' selected' : '');
+          button.className = 'segment ' + value + (draft.value === value ? ' selected' : '');
+          button.setAttribute('aria-pressed', draft.value === value ? 'true' : 'false');
           button.textContent = label;
           button.onclick = () => selectValue(question, value);
           row.appendChild(button);
@@ -1407,7 +1533,7 @@ function telegramMiniAppHtml() {
       submit.textContent = 'Submit';
       submit.onclick = (event) => {
         event.stopPropagation();
-        sendAnswer(true, question);
+        sendAnswer(true, question, submit);
       };
       actions.append(save, submit);
       mount.appendChild(actions);
@@ -1416,7 +1542,7 @@ function telegramMiniAppHtml() {
       const question = activeQuestion();
       const disabled = !question?.canAnswer;
       el.save.disabled = disabled;
-      el.submit.disabled = disabled;
+      el.submit.disabled = disabled || state.submitting;
     }
     function render() {
       const data = state.data;
@@ -1447,22 +1573,36 @@ function telegramMiniAppHtml() {
       if (question.questionType === 'freeform') return { text: draft.text || '', comments: draft.comments || '' };
       return { value: draft.value, comments: draft.comments || '' };
     }
-    async function sendAnswer(submit, question = activeQuestion()) {
+    async function sendAnswer(submit, question = activeQuestion(), triggerButton = null) {
       if (!question) return;
       activate(question);
       updateFooterControls();
-      setStatus(submit ? 'Submitting...' : 'Saving draft...');
-      const response = await fetch('/telegram/mini-app/api/draft', {
-        method: 'POST',
-        headers: headers(),
-        body: JSON.stringify({
-          launch,
-          questionKey: question.questionKey,
-          answer: answerPayload(question),
-          submit,
-        }),
-      });
-      const body = await response.json().catch(() => ({}));
+      if (submit) {
+        setStatus('');
+        setSubmitBusy(true, triggerButton);
+      } else {
+        setStatus('Saving draft...');
+      }
+      let response;
+      let body;
+      try {
+        response = await fetch('/telegram/mini-app/api/draft', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({
+            launch,
+            questionKey: question.questionKey,
+            answer: answerPayload(question),
+            submit,
+          }),
+        });
+        body = await response.json().catch(() => ({}));
+      } catch (error) {
+        if (submit) setSubmitBusy(false, triggerButton);
+        setStatus('Could not save answer.', 'error');
+        return;
+      }
+      if (submit) setSubmitBusy(false, triggerButton);
       if (!response.ok || !body.ok) {
         setStatus(body.error || 'Could not save answer.', 'error');
         return;
@@ -1495,24 +1635,42 @@ function telegramMiniAppHtml() {
       setStatus('Settings saved.', 'ok');
       if (tg?.HapticFeedback?.notificationOccurred) tg.HapticFeedback.notificationOccurred('success');
     }
-    async function load() {
-      const response = await fetch('/telegram/mini-app/api/state?launch=' + encodeURIComponent(launch), {
-        headers: headers(),
-      });
-      const body = await response.json().catch(() => ({}));
+    async function load({ retry = false } = {}) {
+      let response;
+      let body;
+      try {
+        response = await fetch('/telegram/mini-app/api/state?launch=' + encodeURIComponent(launch), {
+          headers: headers(),
+        });
+        body = await response.json().catch(() => ({}));
+      } catch (error) {
+        setStatus('Could not load Mini App. Retrying...', 'error');
+        scheduleQuestionRetry();
+        return;
+      }
       if (!response.ok || !body.ok) {
         setStatus(body.error || 'Could not load Mini App.', 'error');
+        clearQuestionRetry();
         return;
       }
       state.data = body;
-      state.activeKey = body.activeQuestionKey || '';
-      setStatus(body.sourceOk ? '' : body.sourceError, body.sourceOk ? '' : 'error');
+      const questions = Array.isArray(body.questions) ? body.questions : [];
+      if (!questions.some((question) => question.questionKey === state.activeKey)) {
+        state.activeKey = body.activeQuestionKey || '';
+      }
+      if (shouldRetryQuestions(body)) {
+        setStatus(body.sourceError || (retry ? 'Questions are still loading. Retrying...' : 'Questions are loading. Retrying...'), body.sourceOk ? '' : 'error');
+        scheduleQuestionRetry();
+      } else {
+        clearQuestionRetry();
+        setStatus('');
+      }
       render();
     }
     el.prev.onclick = () => { state.page -= 1; render(); };
     el.next.onclick = () => { state.page += 1; render(); };
     el.save.onclick = () => sendAnswer(false);
-    el.submit.onclick = () => sendAnswer(true);
+    el.submit.onclick = () => sendAnswer(true, activeQuestion(), el.submit);
     el.showSettings.onclick = () => { el.settingsPanel.classList.toggle('open'); };
     el.saveSettings.onclick = () => sendSettings();
     load();
@@ -1551,7 +1709,9 @@ export const __test__telegramMiniApp = {
   AGENT_REQUEST_KV_PREFIX,
   SUBMIT_REQUEST_KV_PREFIX,
   buildMiniAppState,
+  miniQuestionFromRecord,
   normalizeAgentSettingsInput,
   normalizeMiniAnswer,
+  telegramMiniAppHtml,
   validateTelegramMiniAppInitData,
 };

@@ -428,7 +428,7 @@ test('/questions and callback dispatch list questions without leaking locked pro
   assert.equal(callback.ok, true);
   assert.equal(callback.response.method, 'editMessageText');
   assert.match(callback.response.text, /Questions for alpha/);
-  assert.match(callback.response.text, /1\. What should Alpha decide next\?\n\n2\. Locked question/);
+  assert.match(callback.response.text, /1\. What should Alpha decide next\?\n\n2\. Encrypted question/);
   assert.equal(callback.response.text.includes('q-readiness'), false);
   assert.equal(callback.response.text.includes('q-locked'), false);
   assert.equal(callback.response.text.includes('Private prompt must not leak'), false);
@@ -459,7 +459,7 @@ test('/questions handles bytes32 question IDs without putting them in opaque see
 
   assert.equal(result.ok, true);
   assert.equal(result.screen, 'question_list');
-  assert.match(result.response.text, /1\. Can bytes32 question IDs render\?\n\n2\. Locked question/);
+  assert.match(result.response.text, /1\. Can bytes32 question IDs render\?\n\n2\. Encrypted question/);
   assert.equal(result.response.text.includes('0x12121212'), false);
   assert.equal(result.response.text.includes('0x34343434'), false);
   assert.equal(result.response.text.includes('Locked bytes32 prompt must not leak'), false);
@@ -640,7 +640,7 @@ test('payload-unavailable question rows do not render as encrypted locks', async
   });
 
   assert.equal(list.ok, true);
-  assert.match(list.response.text, /1\. Locked question/);
+  assert.match(list.response.text, /1\. Encrypted question/);
   assert.match(list.response.text, /2\. Question unavailable/);
   assert.equal(list.response.text.includes('0x78787878'), false);
   assert.equal(list.response.text.includes('0x90909090'), false);
@@ -849,6 +849,96 @@ test('private session join makes later question commands use the selected sessio
   assert.equal(questions.response.text.includes('q-alpha'), false);
   assert.match(posed.response.text, /Question for demo:/);
   assert.match(posed.response.text, /What should Demo decide next/);
+});
+
+test('session join prefetches questions immediately in the background', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        },
+        {
+          sessionSlug: 'demo',
+          sessionName: 'Demo Session',
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        sessionSlug: 'demo',
+        questionId: 'q-demo',
+        questionType: 'freeform',
+        prompt: 'What should Demo decide next?',
+      },
+    ]),
+  });
+  const waited = [];
+  const waitUntil = (promise) => waited.push(promise);
+
+  const joined = await buildTelegramCommandResponse({
+    update: privateMessage('/join demo'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+    waitUntil,
+  });
+
+  assert.equal(joined.ok, true);
+  assert.deepEqual(joined.questionPrefetch, {
+    scheduled: true,
+    sessionSlug: 'demo',
+  });
+  assert.equal(waited.length, 1);
+  await Promise.all(waited);
+});
+
+test('group session join prefetches questions immediately in the background', async () => {
+  const env = baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'demo',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'demo',
+        sessionName: 'Demo Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+      }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      {
+        sessionSlug: 'demo',
+        questionId: 'q-demo',
+        questionType: 'freeform',
+        prompt: 'What should Demo decide next?',
+      },
+    ]),
+  });
+  const waited = [];
+  const waitUntil = (promise) => waited.push(promise);
+
+  const joined = await buildTelegramCommandResponse({
+    update: groupMessage('/join demo'),
+    env,
+    now: '2026-05-08T12:00:00.000Z',
+    waitUntil,
+  });
+
+  assert.equal(joined.ok, true);
+  assert.deepEqual(joined.questionPrefetch, {
+    scheduled: true,
+    sessionSlug: 'demo',
+  });
+  assert.equal(waited.length, 1);
+  await Promise.all(waited);
 });
 
 test('private session join requests faucet funding when session policy allows it', async () => {
@@ -1068,7 +1158,7 @@ test('/q renders structured answer buttons and auto-submits from callbacks', asy
   assert.match(binary.response.text, /Tap an answer to submit from Telegram/);
   assert.deepEqual(
     flattenButtons(binary.response.replyMarkup).map((button) => button.text).slice(0, 3),
-    ['Agree', 'Disagree', 'Unsure']
+    ['Agree', 'Unsure', 'Disagree']
   );
   assert.deepEqual(
     flattenButtons(rating.response.replyMarkup).map((button) => button.text).slice(0, 11),

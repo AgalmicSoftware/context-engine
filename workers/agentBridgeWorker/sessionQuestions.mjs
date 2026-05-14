@@ -10,7 +10,7 @@ const DEFAULT_PAYLOAD_CONCURRENCY = 4;
 const DEFAULT_FOREGROUND_CHUNKS = 1;
 const DEFAULT_RPC_TIMEOUT_MS = 5_000;
 const DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 2_500;
-const QUESTION_CACHE_PREFIX = 'telegram:questions:v4:';
+const QUESTION_CACHE_PREFIX = 'telegram:questions:v5:';
 const questionMemoryCache = new Map();
 const QUESTION_PAYLOAD_SKIP = '__telegramQuestionPayloadSkip';
 
@@ -569,8 +569,102 @@ function normalizeQuestionVisibility(payload = {}) {
   if (['private', 'sbt_gated', 'lit_encrypted'].includes(raw)) return raw;
   if (payload.private === true || payload.isPrivate === true) return 'private';
   if (payload.sbtGated === true || payload.gated === true) return 'sbt_gated';
-  if (payload.litEncrypted === true || payload.encrypted === true || payload.promptEncrypted) return 'lit_encrypted';
+  const encryption = payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
+    ? payload.encryption
+    : null;
+  if (
+    payload.litEncrypted === true ||
+    payload.encrypted === true ||
+    payload.promptEncrypted ||
+    payload.optionsEncrypted ||
+    payload.tagsEncrypted ||
+    encryption?.enabled === true ||
+    Array.isArray(encryption?.gates)
+  ) {
+    return 'lit_encrypted';
+  }
   return 'public';
+}
+
+function normalizeGateMode(value = '') {
+  const mode = lower(value);
+  return mode === 'all' ? 'all' : 'any';
+}
+
+function normalizeSbtAddresses(values = []) {
+  const raw = Array.isArray(values) ? values : [values];
+  const seen = new Set();
+  const out = [];
+  raw.forEach((value) => {
+    const address = normalizeHexAddress(value);
+    if (!address) return;
+    const key = lower(address);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(address);
+  });
+  return out;
+}
+
+function normalizeQuestionGate(gate = {}, index = 0) {
+  if (!gate || typeof gate !== 'object' || Array.isArray(gate)) return null;
+  const sbtAddresses = normalizeSbtAddresses([
+    ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
+    ...(Array.isArray(gate.addresses) ? gate.addresses : []),
+    gate.sbtAddress,
+    gate.address,
+  ]);
+  if (!sbtAddresses.length) return null;
+  const mode = normalizeGateMode(gate.mode || gate.gateMode || gate.operator);
+  return {
+    id: safeString(gate.gateId || gate.id || gate.resourceKey || `question-gate-${index}`),
+    label: safeString(gate.label || gate.name || gate.title),
+    resourceKey: safeString(gate.resourceKey || gate.resource || ''),
+    mode,
+    sbtAddress: sbtAddresses[0],
+    sbtAddresses,
+  };
+}
+
+function normalizeQuestionEncryption(payload = {}, visibility = 'public') {
+  const root = normalizeQuestionPayloadRoot(payload) || {};
+  const encryption = root.encryption && typeof root.encryption === 'object' && !Array.isArray(root.encryption)
+    ? root.encryption
+    : (
+        payload.encryption && typeof payload.encryption === 'object' && !Array.isArray(payload.encryption)
+          ? payload.encryption
+          : {}
+      );
+  const gateCandidates = [
+    ...(Array.isArray(encryption.gates) ? encryption.gates : []),
+    encryption.gate,
+    ...(Array.isArray(root.gates) ? root.gates : []),
+    root.gate,
+    payload.gate,
+  ].filter(Boolean);
+  const gates = gateCandidates
+    .map((gate, index) => normalizeQuestionGate(gate, index))
+    .filter(Boolean);
+  const sbtAddresses = normalizeSbtAddresses([
+    ...gates.flatMap((gate) => gate.sbtAddresses || []),
+    ...(Array.isArray(encryption.sbtAddresses) ? encryption.sbtAddresses : []),
+    ...(Array.isArray(root.sbtAddresses) ? root.sbtAddresses : []),
+    encryption.sbtAddress,
+    root.sbtAddress,
+  ]);
+  const encrypted = visibility === 'lit_encrypted' ||
+    visibility === 'sbt_gated' ||
+    root.encrypted === true ||
+    payload.encrypted === true ||
+    Boolean(root.promptEncrypted || root.optionsEncrypted || root.tagsEncrypted);
+  if (!encrypted && !sbtAddresses.length && !gates.length) return null;
+  return {
+    enabled: encrypted || gates.length > 0 || sbtAddresses.length > 0,
+    encrypted,
+    mode: normalizeGateMode(encryption.mode || encryption.gateMode || gates[0]?.mode),
+    gates,
+    sbtAddresses,
+  };
 }
 
 function normalizePayloadSessionSlug(payload = {}) {
@@ -581,12 +675,9 @@ function normalizePayloadSessionSlug(payload = {}) {
   for (const candidate of [
     payload.sessionSlug,
     payload.session_slug,
-    payload.sessionName,
     payload.groupSlug,
-    payload.groupName,
     sessionObject.sessionSlug,
     sessionObject.slug,
-    sessionObject.sessionName,
     payload.session,
   ]) {
     if (typeof candidate !== 'string' && typeof candidate !== 'number') continue;
@@ -661,6 +752,7 @@ function normalizeQuestionPayload(payload = {}, {
   const id = normalizeBytes32(root.questionId || root.id || payload.questionId || payload.id) || normalizeBytes32(questionId);
   if (!id) return null;
   const visibility = normalizeQuestionVisibility(root);
+  const encryption = normalizeQuestionEncryption(payload, visibility);
   const publicPrompt = visibility === 'public'
     ? safeString(root.questionText || root.prompt || root.title || payload.questionText || payload.prompt || payload.title)
     : '';
@@ -676,6 +768,20 @@ function normalizeQuestionPayload(payload = {}, {
     options: visibility === 'public' ? normalizeOptions(root) : [],
     singleSelect: root.singleSelect === true || root.singleChoice === true || root.oneSelectionOnly === true,
     visibility,
+    ...(encryption?.encrypted === true ? { encrypted: true } : {}),
+    ...(encryption?.sbtAddresses?.length ? { requiredSbtAddresses: encryption.sbtAddresses } : {}),
+    ...(encryption?.mode ? { gateMode: encryption.mode } : {}),
+    ...(encryption?.enabled === true
+      ? {
+          encryption: {
+            enabled: true,
+            encrypted: encryption.encrypted === true,
+            mode: encryption.mode,
+            gates: encryption.gates,
+            sbtAddresses: encryption.sbtAddresses,
+          },
+        }
+      : {}),
     source: 'live_session_question',
     sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower(sessionSlug),
     arweaveTxId: pointerId,

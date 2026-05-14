@@ -89,7 +89,8 @@ the linked group may pose a question; the worker still enforces session
 linkage, opaque action ids, idempotent action refs, and public-safe output. The
 old `/drop_question` command is only a deprecated compatibility alias.
 Private or gated question text is never posed to the group; group output shows a
-locked state and routes eligible accounts to private chat or Mini App.
+locked/encrypted state, carries any public SBT gate requirements, and routes
+eligible accounts to private chat or Mini App.
 
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 
@@ -320,10 +321,13 @@ slug, the Worker skips it instead of materializing it under the selected
 session. If a question ID and payload pointer are visible on-chain but the
 payload gateway is unavailable, the bot shows an unavailable/retryable row
 instead of a private/encrypted lock. That state is an availability signal, not
-proof that the question was encrypted. Payload-unavailable cache records are
-retried from the on-chain pointer on refresh, and stale unavailable caches are
-refreshed before the bot returns them. RPC/log/hash failures are reported as
-source errors instead of cached as empty lists. Session scans prefer metadata
+proof that the question was encrypted. When the payload is reachable but masked
+by Lit/SBT encryption, the bot and Mini App label it as encrypted and surface
+the public SBT addresses required to decrypt without exposing plaintext.
+Payload-unavailable cache records are retried from the on-chain pointer on
+refresh, and stale unavailable caches are refreshed before the bot returns them.
+RPC/log/hash failures are reported as source errors instead of cached as empty
+lists. Session scans prefer metadata
 `blockLimits.start`; when metadata is unavailable, the Worker derives a scoped
 start block from that slug's `SessionCreated` event. Explicit scan bounds are
 still available for debug/repair runs, and unscoped recent-block fallback
@@ -420,7 +424,9 @@ Current v0 scope:
 - Native freeform, binary, rating, and multichoice answer forms rendered inline
   on each displayed question card, with a five-question pager styled after the
   CE pile response flow. The Mini App does not render question IDs or a
-  `Create Agent` launcher; settings are opened from the bottom action bar.
+  `Create Agent` launcher; settings are opened from the top-right gear button.
+- The Mini App keeps polling state while questions are still empty, the question
+  source reports an error, or payload-unavailable question rows are present.
 - Draft saves through `POST /telegram/mini-app/api/draft`.
 - Settings saves through `POST /telegram/mini-app/api/settings`, which creates a
   Worker-local `telegram:agent-request:*` record and a planned canonical
@@ -667,8 +673,8 @@ Telegram question cards follow CE control conventions:
   `singleSelect`, and `sessionName`/`sessionSlug`; the worker cache prefix was
   bumped so stale freeform-only and payload-unavailable records are not reused
   after deploy.
-- Binary/agree-style questions use `Agree`, `Disagree`, and `Unsure` answer
-  buttons, so the direct yes/no choices appear together first.
+- Binary/agree-style questions use `Agree`, `Unsure`, and `Disagree` answer
+  buttons, matching the main client order and colors.
 - Rating questions render discrete `0` through `10` answer buttons.
 - Single-select multichoice questions render single-select option buttons.
 - Multi-select multichoice questions preserve per-option selected state.
@@ -678,6 +684,8 @@ Telegram question cards follow CE control conventions:
   managed Telegram demo accounts when session policy and worker configuration
   allow it. Otherwise the worker creates the canonical
   `/api/agent/responses/submit-request` handoff with an opaque request ID.
+- Joining a session schedules an immediate background question fetch so the
+  question list and Mini App can hydrate as soon as the session is selected.
 - Additional comments are always present, microphone is present when supported,
   and docs/context appears only when docs exist or are relevant.
 

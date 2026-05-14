@@ -2906,6 +2906,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             surveyArweaveTxId = String(
               await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
                 arweaveJwk: arweaveKey?.arweaveJwk || '',
+                forceDirectArweaveUpload: arweaveKey?.source === 'local' && !!arweaveKey?.arweaveJwk,
                 sessionSlug,
                 sessionConfig,
                 context: {
