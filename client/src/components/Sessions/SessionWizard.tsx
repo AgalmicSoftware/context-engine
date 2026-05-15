@@ -227,6 +227,7 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
+  buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
 } from './sessionWizardDraftState';
 import {
@@ -1164,9 +1165,76 @@ const SessionWizard = ({
   }, []);
 
   useEffect(() => {
-    // Redact secret values; live deployment evidence never enters localStorage.
-    if (workerCanonicalSettlement.isSettled) return;
-    const cachePayload = buildSessionWizardCacheWritePayload({
+    const desiredChain = Number(initialRegistryChainId || 0) || null;
+    if (!desiredChain) return;
+    // For now we assume session chain === registry chain; if this diverges, split these values.
+    setRegistryChainId((prev) => (Number(prev || 0) === desiredChain ? prev : desiredChain));
+  }, [initialRegistryChainId]);
+
+  useEffect(() => {
+    const raw = toStr(initialSessionId).trim();
+    if (!raw) return;
+    const parsedSessionId = sessionRegistryUtils.formatSessionId(raw);
+    if (parsedSessionId) {
+      setSessionId(parsedSessionId);
+      return;
+    }
+    const desiredSlug = normalizeSlug(raw);
+    setDraft((prev) => {
+      if (toStr(prev.slug).trim()) return prev;
+      const next = deepClone(prev);
+      next.slug = desiredSlug;
+      return next;
+    });
+  }, [initialSessionId]);
+
+  useEffect(() => {
+    if (slugPinnedByPendingSbtDrafts) return;
+    if (!privateSlugMode) return;
+    const desiredSlug = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
+    if (!desiredSlug) return;
+    setDraft((prev) => {
+      if (toStr(prev.slug).trim() === desiredSlug) return prev;
+      const next = deepClone(prev);
+      next.slug = desiredSlug;
+      return next;
+    });
+  }, [privateSlugMode, sessionId, slugPinnedByPendingSbtDrafts]);
+
+  // Auto-generate slug from sessionName when not in private URL mode.
+  useEffect(() => {
+    if (slugPinnedByPendingSbtDrafts) return;
+    if (privateSlugMode) return;
+    const name = toStr(draft?.sessionName).trim();
+    if (!name) return;
+    const autoSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 48);
+    if (!autoSlug) return;
+    const currentSlug = toStr(draft?.slug).trim();
+    if (currentSlug && currentSlug === lastManualSlugRef.current && currentSlug !== autoSlug) return;
+    if (autoSlug === toStr(draft?.slug).trim()) return;
+    setDraft((prev) => {
+      const next = deepClone(prev);
+      next.slug = autoSlug;
+      return next;
+    });
+  }, [draft?.sessionName, draft?.slug, privateSlugMode, slugPinnedByPendingSbtDrafts]);
+
+  useEffect(() => {
+    const prev = lastHasPrivateSbtNameRef.current;
+    lastHasPrivateSbtNameRef.current = hasPrivateSbtName;
+    if (!hasPrivateSbtName || prev) return;
+    if (privateSlugMode) return;
+    togglePrivateSlugMode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPrivateSbtName]);
+
+  useEffect(() => {
+    // Persist wizard state between refreshes until deploy/upload clears them.
+    // Default: redact secret values so refresh requires re-entry (security: no keys in localStorage).
+    // Pending SBT drafts use sessionStorage so same-tab refresh can recover
+    // queued CREATE2 drafts without turning them into long-lived local secrets.
+    // Dev toggle: optionally persist secrets locally for faster iteration.
+    writeSessionWizardCache(buildSessionWizardCacheWritePayload({
       sessionId,
       draft,
       privateSlugMode,
@@ -1184,14 +1252,11 @@ const SessionWizard = ({
       workerSecretsEnabled,
       effectivePersistWorkerSecrets,
       workerSecrets,
-      deployForm,
       deployComplete,
       deployWorkerUrl,
       workerRequirementProof,
       provisionedSponsoredContext,
-    });
-    const result = writeSessionWizardCache(cachePayload, { expectedCachedPayload: wizardCacheSnapshotRef.current });
-    if (result.ok && result.status !== 'preserved-foreign-draft') wizardCacheSnapshotRef.current = cachePayload;
+    }));
   }, [
     sessionId,
     draft,
