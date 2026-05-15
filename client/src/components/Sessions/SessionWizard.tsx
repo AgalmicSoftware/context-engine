@@ -3460,7 +3460,6 @@ const SessionWizard = ({
     result.onChainFields = buildSessionWizardRegistrySessionFields({
       onChainFields: result.onChainFields,
       sponsoredFields,
-      clientRpcUrl: getCurrentEnabledWorkerSecrets().customRpcUrl,
     });
     return { ...result };
   };
@@ -4082,7 +4081,7 @@ const SessionWizard = ({
     }
     if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
     const rpcUrl = resolveWorkerRpcUrl();
-    if (!rpcUrl) missing.push('RPC URL (include key in URL)');
+    if (!rpcUrl) missing.push('Worker RPC URL');
     const hasAnyChipotleField = (
       CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
       !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
