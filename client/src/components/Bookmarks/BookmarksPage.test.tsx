@@ -1,4 +1,8 @@
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
 import {
+  default as BookmarksPage,
+  buildQuestionBookmarkHref,
   buildSurveyBookmarkHref,
   buildBookmarkPageDataSignature,
   buildBookmarkPageSourceSignature,
@@ -22,6 +26,7 @@ const readEntries = readManagedBookmarkPageEntries as () => {
 describe('BookmarksPage cache scan helpers', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    window.localStorage.clear();
   });
 
   it('reads bookmark and filter namespaces with cloneValues disabled', () => {
@@ -90,8 +95,8 @@ describe('BookmarksPage cache scan helpers', () => {
   it('returns identical data signatures for equivalent bookmark page payloads', () => {
     const base = {
       users: [{ address: '0xabc', nickname: '', username: '', networkId: '' }],
-      surveys: ['s1'],
-      questions: ['q1'],
+      surveys: [{ id: 's1', sessionSlug: '' }],
+      questions: [{ id: 'q1', sessionSlug: '' }],
       sbts: ['0x1'],
       filters: [{ key: 'k1', raw: 'x', parsed: {} }],
       atlasNodes: ['node-1'],
@@ -101,13 +106,63 @@ describe('BookmarksPage cache scan helpers', () => {
     expect(buildDataSignature(clone)).toBe(buildDataSignature(base));
   });
 
-  it('builds survey bookmark links without inheriting route session hints', () => {
+  it('builds bookmark links only from persisted session pins', () => {
     const priorUrl = window.location.href;
     try {
       window.history.replaceState({}, '', '/bookmarks?session=edge');
       expect(buildSurveyBookmarkHref('0xabc')).toBe('/survey/0xabc');
+      expect(buildSurveyBookmarkHref({ id: '0xabc', sessionSlug: 'edge' })).toBe('/survey/0xabc?session=edge');
+      expect(buildSurveyBookmarkHref({ id: '0xabc', sessionSlug: 'general' })).toBe('/survey/0xabc');
+      expect(buildQuestionBookmarkHref({ id: '0xdef', sessionSlug: 'edge' })).toBe('/question/0xdef?session=edge');
+      expect(buildQuestionBookmarkHref({ id: '0xdef', sessionSlug: 'general' })).toBe('/question/0xdef');
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
+  });
+
+  it('preserves duplicate survey and question IDs across bookmarked session namespaces', async () => {
+    mockListNamespaceEntriesSync.mockImplementation((namespace: string) => {
+      if (namespace === 'bookmarksCache') {
+        return [
+          {
+            key: 'dg:bookmarksCache:edge',
+            slug: 'edge',
+            value: {
+              surveys: ['0xsame'],
+              questions: ['0qsame'],
+            },
+          },
+          {
+            key: 'dg:bookmarksCache:beta',
+            slug: 'beta',
+            value: {
+              surveys: ['0xsame'],
+              questions: ['0qsame'],
+            },
+          },
+        ];
+      }
+      return [];
+    });
+
+    render(<BookmarksPage />);
+
+    await waitFor(() => {
+      const surveyLinks = screen.getAllByRole('link').filter((link) => (
+        link.getAttribute('href')?.startsWith('/survey/0xsame')
+      ));
+      expect(surveyLinks.map((link) => link.getAttribute('href')).sort()).toEqual([
+        '/survey/0xsame?session=beta',
+        '/survey/0xsame?session=edge',
+      ]);
+    });
+
+    const questionLinks = screen.getAllByRole('link').filter((link) => (
+      link.getAttribute('href')?.startsWith('/question/0qsame')
+    ));
+    expect(questionLinks.map((link) => link.getAttribute('href')).sort()).toEqual([
+      '/question/0qsame?session=beta',
+      '/question/0qsame?session=edge',
+    ]);
   });
 });
