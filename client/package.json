@@ -108,14 +108,32 @@
     "worker-loader": "3.0.8"
   },
   "overrides": {
+    "@coinbase/wallet-sdk": {
+      "bn.js": "5.2.3"
+    },
     "@ethersproject/providers": {
       "ws": "7.5.10"
+    },
+    "@ethersproject/bignumber": {
+      "bn.js": "5.2.3"
+    },
+    "@ethersproject/signing-key": {
+      "bn.js": "5.2.3"
     },
     "@json-rpc-tools/provider": {
       "ws": "7.5.10"
     },
     "@walletconnect/socket-transport": {
       "ws": "7.5.10"
+    },
+    "@walletconnect/utils": {
+      "bn.js": "4.12.3"
+    },
+    "asn1.js": {
+      "bn.js": "4.12.3"
+    },
+    "elliptic": {
+      "bn.js": "4.12.3"
     },
     "@remix-run/router": "1.23.2",
     "follow-redirects": "1.16.0",
