@@ -237,7 +237,6 @@ describe('SurveyTool draft persistence', () => {
       network: { id: 84532 },
       activeSessionSlug: 'edge',
       sessionSlug: 'edge',
-      sessionSlug: 'edge',
       questionPool: [{ id: 'q1' }],
     });
 
@@ -517,7 +516,6 @@ describe('SurveyTool draft persistence', () => {
       loginComplete: true,
       network: { id: 84532 },
       activeSessionSlug: 'edge',
-      sessionSlug: 'edge',
       sessionSlug: 'edge',
       questionPool: [{ id: 'q1' }],
     });
@@ -1114,7 +1112,6 @@ describe('SurveyTool draft persistence', () => {
       loginComplete: true,
       network: { id: 84532 },
       activeSessionSlug: 'edge',
-      sessionSlug: 'edge',
       sessionSlug: 'edge',
       questionPool: [{ id: 'q1' }],
     });
