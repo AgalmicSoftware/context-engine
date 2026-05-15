@@ -346,6 +346,7 @@ export const executeViewedSingleQuestionResponseBootstrap = async ({
     clearRetry();
     if (!latestFromCache) {
       await writeResponseToCache(String(responderAddress || ''), latest);
+      if (isStaleRun()) return { applied: false, reason: 'stale' };
     }
     updateSingleQuestionDebug({
       phase: 'responder-response-loaded',

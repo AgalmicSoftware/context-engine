@@ -615,7 +615,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   _canDecryptOtherResponsesInFlight = null;
   _canDecryptOtherResponsesSig = '';
   _canDecryptOtherResponsesRunId = 0;
+  _fetchSurveyResponseRunId = 0;
   _fetchSingleQuestionRunId = 0;
+  _localCacheRehydrateRunId = 0;
   _singleQuestionBootstrapRetryTimer = null;
   _singleQuestionBootstrapRetrySig = '';
   _isMounted = false;
@@ -640,6 +642,12 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     if (Object.prototype.hasOwnProperty.call(tracking, 'lastDraftSemanticSignature')) {
       this._lastDraftSemanticSignature = tracking.lastDraftSemanticSignature ?? null;
     }
+  };
+
+  invalidateResponseHydrationRuns = () => {
+    this._fetchSurveyResponseRunId = (Number(this._fetchSurveyResponseRunId) || 0) + 1;
+    this._fetchSingleQuestionRunId = (Number(this._fetchSingleQuestionRunId) || 0) + 1;
+    this._localCacheRehydrateRunId = (Number(this._localCacheRehydrateRunId) || 0) + 1;
   };
 
   _applyDraftHydrationEntryToSlice = ({
@@ -1748,6 +1756,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   async componentDidUpdate(prevProps, prevState) {
     const diffInputsChanged = this.didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
+      this.invalidateResponseHydrationRuns();
       this.invalidateDiffCaches();
     }
     if (prevState.userAnswers !== this.state.userAnswers) {
@@ -2225,7 +2234,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this._priorResponseBackfillInFlight = null;
     this.clearSingleQuestionBootstrapRetry();
     this._isMounted = false;
-    this._fetchSingleQuestionRunId += 1;
+    this.invalidateResponseHydrationRuns();
   }
 
 
@@ -4477,6 +4486,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
 
   rehydrateLocalCacheAnswersForRenderedIds = async (callback) => {
+    const runId = (Number(this._localCacheRehydrateRunId) || 0) + 1;
+    this._localCacheRehydrateRunId = runId;
+    const isStaleRun = () => !this._isMounted || this._localCacheRehydrateRunId !== runId;
     await executeSurveyLocalCacheRehydrate({
       props: this.props,
       state: this.state,
@@ -4507,6 +4519,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       onError: (error) => {
         DEBUG_PREFILL && surveyLog.error('[Survey][rehydrateLocal] Error:', error);
       },
+      isStaleRun,
     });
   };
 
@@ -5174,6 +5187,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   };
 
   handleStartFresh = () => {
+    this.invalidateResponseHydrationRuns();
     executeSurveyStartFresh({
       props: this.props,
       state: this.state,
