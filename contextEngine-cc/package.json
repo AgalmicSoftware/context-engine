@@ -13,5 +13,10 @@
   },
   "dependencies": {
     "ethers": "5.7.2"
+  },
+  "overrides": {
+    "@ethersproject/providers": {
+      "ws": "7.5.10"
+    }
   }
 }
