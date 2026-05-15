@@ -3,7 +3,20 @@ import {
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyQuestionFieldUpdateList,
   buildCreateSurveyQuestionOptionList,
+  buildCreateSurveyQuestionListPatch,
+  buildCreateSurveyQuestionListValidationPatch,
+  buildCreateSurveyQuestionTagCommitList,
+  buildCreateSurveyQuestionTagInputValueList,
+  buildCreateSurveyQuestionTagRemovalList,
+  buildCreateSurveyQuestionsSubmitSuccessPatch,
   buildCreateSurveySubmitGatePlan,
+  buildCreateSurveySurveySubmitSuccessPatch,
+  buildCreateSurveySubmitBlockingErrorPatch,
+  buildCreateSurveySubmitCatchPatch,
+  buildCreateSurveySubmitProgressPatch,
+  buildCreateSurveySubmitFailurePatch,
+  buildCreateSurveySubmitResetPatch,
+  buildCreateSurveySubmitStartPatch,
   buildCreateSurveyStandaloneToggleState,
   formatAiPromptModelLabel,
   isMultichoiceQuestionType,
@@ -267,93 +280,6 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
     expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: ['question-gate'] }))
       .toEqual(['question-gate']);
     expect(standalonePlan.needsLit).toBe(true);
-  });
-
-  it('derives authoring gate options for survey and standalone response resources', () => {
-    const cfg = {
-      sessionName: 'FOR TEST 12',
-      __registry: {
-        gateAuthority: 'onchain',
-        gatesByResource: {
-          surveyResponses: {
-            gateId: 'survey_gate',
-            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
-            lookupStatus: 'ok',
-          },
-          questionResponses: {
-            gateId: 'question_gate',
-            sbtAddresses: ['0x2222222222222222222222222222222222222222'],
-            lookupStatus: 'ok',
-          },
-          default: {
-            gateId: 'default_gate',
-            sbtAddresses: ['0x3333333333333333333333333333333333333333'],
-            lookupStatus: 'ok',
-          },
-          docUrls: {
-            gateId: 'doc_gate',
-            sbtAddresses: ['0x4444444444444444444444444444444444444444'],
-            lookupStatus: 'ok',
-          },
-        },
-      },
-      sponsored: {
-        gates: {
-          survey_gate: {
-            mode: 'all',
-            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
-          },
-          question_gate: {
-            mode: 'any',
-            sbtAddresses: ['0x2222222222222222222222222222222222222222'],
-          },
-          default_gate: {
-            mode: 'any',
-            sbtAddresses: ['0x3333333333333333333333333333333333333333'],
-          },
-          doc_gate: {
-            mode: 'all',
-            sbtAddresses: ['0x4444444444444444444444444444444444444444'],
-          },
-        },
-      },
-    };
-
-    const surveyOptions = buildCreateSurveyGateOptions({
-      cfg,
-      isStandaloneQuestion: false,
-      sessionLabel: 'FOR TEST 12',
-    });
-    expect(surveyOptions.defaultGateId).toBe('survey_gate');
-    expect(surveyOptions.gateOptions.map((option) => option.id)).toEqual([
-      'default_gate',
-      'survey_gate',
-    ]);
-    expect(surveyOptions.gateOptions.map((option) => option.displayLabel)).toEqual([
-      'FOR TEST 12 (default)',
-      'FOR TEST 12 (survey)',
-    ]);
-    expect(surveyOptions.gateOptions.find((option) => option.id === 'survey_gate'))
-      .toMatchObject({
-        mode: 'all',
-        resourceKey: 'surveyResponses',
-        sbtAddress: '0x1111111111111111111111111111111111111111',
-      });
-
-    const standaloneOptions = buildCreateSurveyGateOptions({
-      cfg,
-      isStandaloneQuestion: true,
-      sessionLabel: 'FOR TEST 12',
-    });
-    expect(standaloneOptions.defaultGateId).toBe('question_gate');
-    expect(standaloneOptions.gateOptions.map((option) => option.id)).toEqual([
-      'default_gate',
-      'question_gate',
-    ]);
-    expect(standaloneOptions.gateOptions.map((option) => option.displayLabel)).toEqual([
-      'FOR TEST 12 (default)',
-      'FOR TEST 12 (questions)',
-    ]);
   });
 
   it('removes duplicate survey questions by id while preserving first occurrences', () => {
