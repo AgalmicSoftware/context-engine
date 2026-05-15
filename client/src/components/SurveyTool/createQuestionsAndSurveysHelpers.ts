@@ -49,6 +49,17 @@ type CreateSurveyValidationInput = {
   isStandaloneQuestion?: unknown;
   questions?: unknown;
 };
+type CreateSurveySubmitGatePlanQuestion = {
+  lockGateIds?: unknown;
+  [key: string]: unknown;
+};
+type CreateSurveySubmitGatePlanArgs = {
+  defaultGateId?: unknown;
+  gateMap?: Record<string, unknown> | null;
+  isStandaloneQuestion?: unknown;
+  questions?: unknown;
+  surveyLockGateIds?: unknown;
+};
 type CreateSurveyQuestionPatchEntry = {
   id?: string;
   uiKey?: string;
@@ -773,6 +784,62 @@ export const normalizeGateIds = (value: unknown) => {
   }
   const raw = typeof value === 'string' ? value.trim() : '';
   return raw ? [raw] : [];
+};
+
+export const buildCreateSurveySubmitGatePlan = ({
+  defaultGateId = '',
+  gateMap = {},
+  isStandaloneQuestion = false,
+  questions = [],
+  surveyLockGateIds = [],
+}: CreateSurveySubmitGatePlanArgs = {}) => {
+  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
+  const knownGateIds = new Set(Object.keys(safeGateMap));
+  const normalizeKnownGateIds = (value: unknown): string[] => (
+    normalizeGateIds(value).filter((gateId): gateId is string => (
+      typeof gateId === 'string' && knownGateIds.has(gateId)
+    ))
+  );
+
+  const defaultSubmitGateIds = defaultGateId ? normalizeKnownGateIds([defaultGateId]) : [];
+  const applyDefaultSubmitGateIds = (value: unknown): string[] => {
+    const normalized = normalizeKnownGateIds(value);
+    return normalized.length ? normalized : defaultSubmitGateIds;
+  };
+
+  const resolvedSurveyLockGateIds = !isStandaloneQuestion
+    ? applyDefaultSubmitGateIds(surveyLockGateIds)
+    : [];
+
+  const resolveQuestionSubmitGateIds = (
+    question?: CreateSurveySubmitGatePlanQuestion | null
+  ): string[] => {
+    if (!question) return [];
+    if (isStandaloneQuestion) return applyDefaultSubmitGateIds(question.lockGateIds);
+    const hasOwnLock = Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds');
+    if (!hasOwnLock || question.lockGateIds === null) return resolvedSurveyLockGateIds;
+    return applyDefaultSubmitGateIds(question.lockGateIds);
+  };
+
+  const questionNeedsEncryption = (
+    question?: CreateSurveySubmitGatePlanQuestion | null
+  ): boolean => resolveQuestionSubmitGateIds(question).length > 0;
+
+  const needsLit = (
+    resolvedSurveyLockGateIds.length > 0 ||
+    (Array.isArray(questions) ? questions : []).some(questionNeedsEncryption)
+  );
+
+  return {
+    knownGateIds,
+    defaultSubmitGateIds,
+    resolvedSurveyLockGateIds,
+    normalizeKnownGateIds,
+    applyDefaultSubmitGateIds,
+    resolveQuestionSubmitGateIds,
+    questionNeedsEncryption,
+    needsLit,
+  };
 };
 
 export const normalizeGateText = (value: unknown) => {
