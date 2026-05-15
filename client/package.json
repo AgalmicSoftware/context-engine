@@ -108,6 +108,15 @@
     "worker-loader": "3.0.8"
   },
   "overrides": {
+    "@ethersproject/providers": {
+      "ws": "7.5.10"
+    },
+    "@json-rpc-tools/provider": {
+      "ws": "7.5.10"
+    },
+    "@walletconnect/socket-transport": {
+      "ws": "7.5.10"
+    },
     "@remix-run/router": "1.23.2",
     "follow-redirects": "1.16.0",
     "webpack": "4.44.2",
