@@ -16,6 +16,7 @@ import {
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
+  buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionUniversePanelClassName,
   collectSbtDocumentUrls,
@@ -253,6 +254,46 @@ describe('sbtListHelpers', () => {
       slugLabel: 'general',
       statusLabel: 'Loading',
     }));
+    expect(buildSbtListSessionChipStateBySlug({
+      allSessionsMode: true,
+      displayedSessionUniverseSlugs: ['alpha', 'beta', SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
+      getSessionProgressSnapshot: (slug) => (
+        slug === 'alpha' ? { scanInProgress: true } : null
+      ),
+      hasNoSessionCards: false,
+      readSbtCacheMeta: (slug) => (slug === 'beta' ? { lastBlock: 200 } : null),
+      refreshing: false,
+      sbtListBySlug: {
+        beta: [{ sbtAddress: '0x2222222222222222222222222222222222222222' }],
+      },
+      sessionHasLoadedOnceBySlug: {
+        alpha: true,
+        beta: true,
+      },
+      sessionLoadStateBySlug: {
+        alpha: 'loaded',
+        beta: 'idle',
+      },
+    })).toEqual({
+      alpha: {
+        hasCards: false,
+        hasLoadedOnce: true,
+        isLoaded: false,
+        isLoading: true,
+      },
+      beta: {
+        hasCards: true,
+        hasLoadedOnce: true,
+        isLoaded: true,
+        isLoading: false,
+      },
+      [SBT_LIST_NO_SESSION_UNIVERSE_SLUG]: {
+        hasCards: false,
+        hasLoadedOnce: true,
+        isLoaded: true,
+        isLoading: false,
+      },
+    });
     expect(buildSbtListExpandedCardShellClassName({
       baseClassName: 'card',
       expandedClassName: 'card-expanded',

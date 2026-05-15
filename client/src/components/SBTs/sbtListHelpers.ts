@@ -240,6 +240,13 @@ export type SbtListSessionLoadingStatus = {
   slugLabel: string;
   statusLabel: string;
 };
+export type SbtListSessionChipState = {
+  hasCards: boolean;
+  hasLoadedOnce: boolean;
+  isLoaded: boolean;
+  isLoading: boolean;
+};
+export type SbtListSessionChipStateBySlug = Record<string, SbtListSessionChipState | undefined>;
 type BuildSbtListSessionLoadingStatusArgs = {
   allSessionsMode?: boolean;
   alwaysShow?: boolean;
@@ -247,6 +254,20 @@ type BuildSbtListSessionLoadingStatusArgs = {
   formatBlockCount?: (value: unknown) => string;
   loading?: boolean;
   snapshot?: SbtListSessionLoadingStatusSnapshot | null;
+};
+type BuildSbtListSessionChipStateBySlugArgs = {
+  allSessionsMode?: unknown;
+  displayedSessionUniverseSlugs?: unknown;
+  getSessionProgressSnapshot?: (slug: string) => {
+    deferred?: unknown;
+    scanInProgress?: unknown;
+  } | null;
+  hasNoSessionCards?: unknown;
+  readSbtCacheMeta?: (slug: string) => unknown;
+  refreshing?: unknown;
+  sbtListBySlug?: Record<string, unknown>;
+  sessionHasLoadedOnceBySlug?: Record<string, unknown>;
+  sessionLoadStateBySlug?: Record<string, unknown>;
 };
 
 export type SbtSessionGroupLists = {
@@ -454,6 +475,52 @@ export const buildSbtListSessionLoadingStatus = ({
     scanInProgress,
     deferred,
   };
+};
+
+export const buildSbtListSessionChipStateBySlug = ({
+  allSessionsMode = false,
+  displayedSessionUniverseSlugs = [],
+  getSessionProgressSnapshot = () => null,
+  hasNoSessionCards = false,
+  readSbtCacheMeta = () => null,
+  refreshing = false,
+  sbtListBySlug = {},
+  sessionHasLoadedOnceBySlug = {},
+  sessionLoadStateBySlug = {},
+}: BuildSbtListSessionChipStateBySlugArgs = {}): SbtListSessionChipStateBySlug => {
+  if (!allSessionsMode) return {};
+  const out: SbtListSessionChipStateBySlug = {};
+  (Array.isArray(displayedSessionUniverseSlugs) ? displayedSessionUniverseSlugs : []).forEach((slugRaw) => {
+    const slug = normalizeSessionSlug(slugRaw || '');
+    if (isSbtListSyntheticNoSessionSlug(slug)) {
+      const hasLoadedOnce = Object.values(sessionHasLoadedOnceBySlug).some(Boolean);
+      const anySessionLoading = Object.values(sessionLoadStateBySlug).some((state) => state === 'loading');
+      const hasCards = !!hasNoSessionCards;
+      const isLoading = !!refreshing || (!hasCards && (!hasLoadedOnce || anySessionLoading));
+      const isLoaded = hasCards || (hasLoadedOnce && !isLoading);
+      out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
+      return;
+    }
+    const cacheMeta = readSbtCacheMeta(slug);
+    const snapshot = getSessionProgressSnapshot(slug);
+    const hasCacheSnapshot = cacheMeta != null;
+    const hasLoadedOnce = !!sessionHasLoadedOnceBySlug[slug];
+    const listForSlug = sbtListBySlug[slug];
+    const hasCards = Array.isArray(listForSlug) && listForSlug.length > 0;
+    const loadState = sessionLoadStateBySlug[slug] || 'idle';
+    const scanInProgress = !!snapshot?.scanInProgress;
+    const deferred = !!snapshot?.deferred;
+    const isLoading = (
+      loadState === 'loading' ||
+      scanInProgress ||
+      deferred ||
+      !!refreshing ||
+      (!hasCacheSnapshot && !hasLoadedOnce)
+    );
+    const isLoaded = (hasLoadedOnce || hasCacheSnapshot) && !scanInProgress && !deferred && loadState !== 'loading';
+    out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
+  });
+  return out;
 };
 
 export const isSbtListHelperRecord = (value: unknown): value is SbtListHelperRecord => (
