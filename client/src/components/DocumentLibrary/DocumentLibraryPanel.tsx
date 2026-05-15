@@ -703,6 +703,10 @@ export default function DocumentLibraryPanel({
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
+    listRequestSeqRef.current += 1;
+    activeListQueryKeyRef.current = '__unmounted__';
+    activeUploadContextKeyRef.current = '__unmounted__';
+    loadingRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -793,7 +797,7 @@ export default function DocumentLibraryPanel({
       });
     }
     return [];
-  }, [documentNetwork?.id, isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, sbtChainId]);
+  }, [isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId]);
 
   const listQueryKey = useMemo(
     () =>
@@ -812,59 +816,35 @@ export default function DocumentLibraryPanel({
     if (mode === 'session') return !!normalizedSessionIdHex;
     if (mode === 'sbt') return !!normalizedSbtAddress && !!Number(sbtChainId || documentNetwork?.id || 0);
     return false;
-  }, [
-    docProvider,
-    isArweaveBackedDocProvider,
-    mode,
-    normalizedSessionIdHex,
-    normalizedSbtAddress,
-    documentNetwork?.id,
-    sbtChainId,
-    sessionSlug,
-  ]);
-  const listRunKey = useMemo(
-    () => `${viewerContextKey}|${canList ? '1' : '0'}|${listQueryKey}`,
-    [canList, listQueryKey, viewerContextKey],
-  );
+  }, [docProvider, isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId, sessionSlug]);
+  const listRunKey = useMemo(() => `${canList ? '1' : '0'}|${listQueryKey}`, [canList, listQueryKey]);
   activeListQueryKeyRef.current = listRunKey;
 
-  const loadDocs = useCallback(
-    async ({ reset }: { reset?: boolean } = {}) => {
-      if (!canList) return;
-      if (loadingRef.current && !reset) return;
-      if (!reset && !cursorRef.current) return;
-      setError('');
-      const requestSeq = (listRequestSeqRef.current += 1);
-      const expectedQueryKey = listRunKey;
-      loadingRef.current = true;
-      setLoading(true);
-      try {
-        const after = reset ? null : cursorRef.current;
-        let nextCursor: string | null = null;
-        let edges: DocRecord[] = [];
-        if (docProvider === STORAGE_BACKENDS.CLOUDFLARE) {
-          const page = await listSessionStorageRefsPageForDocs({
-            sessionSlug,
-            sessionConfig,
-            context: { account, providerLike: provider, chainId: documentNetwork?.id || null },
-            resource: 'docsContext',
-            cursor: after,
-            limit: pageSize,
-          });
-          edges = (Array.isArray(page?.items) ? page.items : [])
-            .map((item: Record<string, unknown>) => buildDocRecordFromStorageItem(item))
-            .filter(Boolean) as DocRecord[];
-          nextCursor = toStr(page?.cursor).trim() || null;
-        } else {
-          edges = (await listArweaveTransactionsByTags({
-            graphqlUrl,
-            graphqlUrls,
-            tags: listFilters,
-            first: pageSize,
-            after,
-          })) as DocRecord[];
-          nextCursor = edges.length ? edges[edges.length - 1].cursor : null;
-        }
+  const loadDocs = useCallback(async ({ reset }: { reset?: boolean } = {}) => {
+    if (!canList) return;
+    if (loadingRef.current && !reset) return;
+    if (!reset && !cursorRef.current) return;
+    setError('');
+    const requestSeq = (listRequestSeqRef.current += 1);
+    const expectedQueryKey = listRunKey;
+    loadingRef.current = true;
+    setLoading(true);
+    try {
+      const after = reset ? null : cursorRef.current;
+      const edges = docProvider === STORAGE_BACKENDS.CLOUDFLARE
+        ? ((await listSessionStorageRefsForDocs({
+          sessionSlug,
+          sessionConfig,
+          context: { account, providerLike: provider, chainId: network?.id || null },
+          resource: 'docsContext',
+        })).map((item: Record<string, unknown>) => buildDocRecordFromStorageItem(item)).filter(Boolean) as DocRecord[])
+        : (await listArweaveTransactionsByTags({
+          graphqlUrl,
+          graphqlUrls,
+          tags: listFilters,
+          first: pageSize,
+          after,
+        })) as DocRecord[];
 
         if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
 
@@ -900,33 +880,39 @@ export default function DocumentLibraryPanel({
           });
           return next;
         });
-        cursorRef.current = nextCursor;
-        setCursor(nextCursor);
-      } catch (err) {
-        if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
-        setError(getErrorMessage(err, 'Failed to load docs.'));
-      } finally {
-        if (listRequestSeqRef.current === requestSeq && activeListQueryKeyRef.current === expectedQueryKey) {
-          loadingRef.current = false;
-          setLoading(false);
-        }
-      }
-    },
-    [
-      account,
-      canList,
-      docProvider,
-      graphqlUrl,
-      graphqlUrls,
-      listFilters,
-      documentNetwork?.id,
-      pageSize,
-      provider,
-      sessionConfig,
-      sessionSlug,
-      listRunKey,
-    ],
-  );
+        edges.forEach((edge) => {
+          const id = toStr(edge?.txId).trim();
+          if (!id) return;
+          const existingIdx = idxById.get(id);
+          if (existingIdx == null) {
+            idxById.set(id, next.length);
+            next.push(edge);
+            return;
+          }
+          const prevDoc = next[existingIdx] || {};
+          next[existingIdx] = {
+            ...prevDoc,
+            ...edge,
+            tags: Array.isArray(edge.tags) ? edge.tags : (Array.isArray(prevDoc.tags) ? prevDoc.tags : []),
+            tagMap: edge.tagMap && typeof edge.tagMap === 'object'
+              ? normalizeDocTagMap(edge.tagMap)
+              : (prevDoc.tagMap && typeof prevDoc.tagMap === 'object' ? prevDoc.tagMap : {}),
+          };
+        });
+        return next;
+      });
+      const nextCursor = docProvider === STORAGE_BACKENDS.CLOUDFLARE ? null : (edges.length ? edges[edges.length - 1].cursor : null);
+      cursorRef.current = nextCursor;
+      setCursor(nextCursor);
+    } catch (err) {
+      if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
+      setError(getErrorMessage(err, 'Failed to load docs.'));
+    } finally {
+      if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, [account, canList, docProvider, graphqlUrl, graphqlUrls, listFilters, network?.id, pageSize, provider, sessionConfig, sessionSlug, listRunKey]);
 
   useEffect(() => {
     // Cancel in-flight requests for the previous query to avoid stale updates.
