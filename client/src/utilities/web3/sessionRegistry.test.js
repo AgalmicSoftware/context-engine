@@ -728,9 +728,43 @@ describe('registerSessionOnChain duplicate guards', () => {
     });
     const contractSpy = jest.spyOn(ethers, 'Contract');
 
-    await expect(
-      registerSessionOnChain({
-        providerLike: walletProvider,
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'unknown-wallet-network',
+      sessionId: '0x11111111111111111111111111111113',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow(
+      `Unable to verify the connected wallet chain. Session registry writes require ${CONFIGURED_REGISTRY_CHAIN_NAME} (${CONFIGURED_REGISTRY_CHAIN_ID}). Switch the wallet network and retry.`
+    );
+
+    expect(contractSpy).not.toHaveBeenCalled();
+    expect(walletProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({
+      method: 'eth_sendTransaction',
+    }));
+  });
+
+  it.each([
+    ['setSessionFieldsOnChain', () => setSessionFieldsOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'wrong-wallet-network',
+      fields: { corsWorkerUrl: 'https://worker.example' },
+    })],
+    ['updateSessionMetadataOnChain', () => updateSessionMetadataOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'wrong-wallet-network',
+      metadataURI: 'ar://new-metadata',
+      encryptedMetadataURI: '',
+    })],
+    ['setResourceGatesOnChain', () => setResourceGatesOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'wrong-wallet-network',
+      gates: [{
+        resourceKey: 'default',
+        sbtAddresses: ['0x0000000000000000000000000000000000000002'],
         chainId: CONFIGURED_REGISTRY_CHAIN_ID,
         slug: 'unknown-wallet-network',
         sessionId: '0x11111111111111111111111111111113',

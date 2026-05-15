@@ -858,10 +858,7 @@ const describeChainTarget = (chainId: unknown) => {
   return chain?.name ? `${chain.name} (${id})` : `chain ${id}`;
 };
 
-const readSignerChainId = async (
-  signer: AnyRecord | null,
-  ethersProvider: ethers.providers.Web3Provider | null = null,
-) => {
+const readSignerChainId = async (signer, ethersProvider = null) => {
   try {
     if (typeof signer?.getChainId === 'function') {
       const signerChainId = Number(await signer.getChainId());
@@ -886,15 +883,7 @@ const readSignerChainId = async (
   return 0;
 };
 
-const assertSignerOnRegistryWriteChain = async ({
-  signer,
-  ethersProvider = null,
-  chainId,
-}: {
-  signer: AnyRecord;
-  ethersProvider?: ethers.providers.Web3Provider | null;
-  chainId?: unknown;
-}) => {
+const assertSignerOnRegistryWriteChain = async ({ signer, ethersProvider = null, chainId }) => {
   const writeChainId = Number(chainId || 0) || 0;
   const signerChainId = await readSignerChainId(signer, ethersProvider);
   if (writeChainId && !signerChainId) {

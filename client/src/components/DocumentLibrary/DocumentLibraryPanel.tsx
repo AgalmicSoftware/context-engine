@@ -161,7 +161,8 @@ type EncryptAudience =
     };
 
 type FetchArweaveBlobResult =
-  { ok: true; blob: Blob; contentType: string } | { ok: false; error: string; stale?: boolean };
+  | { ok: true; blob: Blob; contentType: string }
+  | { ok: false; error: string; stale?: boolean };
 
 type UploadResult = {
   txId?: string;
@@ -345,7 +346,9 @@ const fetchArweaveBlobWithFallback = async (
   txId: string,
   opts: { gateways?: string[]; isCurrent?: () => boolean } = {},
 ): Promise<FetchArweaveBlobResult> => {
-  const gateways = Array.isArray(opts.gateways) && opts.gateways.length ? opts.gateways : DOC_LIBRARY_ARWEAVE_GATEWAYS;
+  const gateways = Array.isArray(opts.gateways) && opts.gateways.length
+      ? opts.gateways
+      : DOC_LIBRARY_ARWEAVE_GATEWAYS;
   const isCurrent = typeof opts.isCurrent === 'function' ? opts.isCurrent : null;
 
   let lastErr: unknown = null;
@@ -358,7 +361,7 @@ const fetchArweaveBlobWithFallback = async (
         continue;
       }
       if (isCurrent && !isCurrent()) return { ok: false, error: '', stale: true };
-
+      // eslint-disable-next-line no-await-in-loop
       const blob = await resp.blob();
       if (isCurrent && !isCurrent()) return { ok: false, error: '', stale: true };
       const ct = resp.headers.get('content-type') || blob.type || '';
@@ -688,6 +691,10 @@ export default function DocumentLibraryPanel({
 
   const autoOpenedRef = useRef('');
   const viewerRequestSeqRef = useRef(0);
+
+  useEffect(() => () => {
+    viewerRequestSeqRef.current += 1;
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1142,8 +1149,9 @@ export default function DocumentLibraryPanel({
         return;
       }
 
-      const res = await fetchArweaveBlobWithFallback(txId);
+      const res = await fetchArweaveBlobWithFallback(txId, { isCurrent: isCurrentViewerRequest });
       if (!isCurrentViewerRequest()) return;
+      if (!res.ok && res.stale) return;
       if (!res.ok) throw new Error(res.error || 'Failed to fetch document.');
       const blob = res.blob;
       const mime = toStr(res.contentType || blob.type || '').trim();
