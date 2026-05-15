@@ -783,8 +783,10 @@ class SBTPage extends Component<any, any> {
     propsIn: SbtAddressPropsLike = this.props
   ): SbtPageUrlAutoMintIntent | null => {
     return resolveSbtPageUrlAutoMintIntent({
+      chainId: this.props.network?.id || this.props.networkChainId,
       propsIn,
       searchRaw,
+      sessionSlug: this.getEffectiveSessionSlug(),
       sessionStorageRef: (typeof window !== 'undefined' && window.sessionStorage)
         ? window.sessionStorage
         : null,
@@ -808,6 +810,11 @@ class SBTPage extends Component<any, any> {
       shouldAttemptAuto,
       autoKey,
     } = intent;
+    const markAutoMintSuccess = () => {
+      if (autoKey && typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem(autoKey, 'done');
+      }
+    };
 
     if (targetCode && !shouldAttemptAuto) {
       if (this._isMounted) this.setState(buildSbtPagePasswordInputValuePatch({
@@ -820,12 +827,9 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
-    if (autoKey && typeof window !== 'undefined' && window.sessionStorage) {
-      window.sessionStorage.setItem(autoKey, 'done');
-    }
-
     if (!targetCode) {
-      await this.autoMintPublicIfAllowed(currentSbtAddress);
+      const minted = await this.autoMintPublicIfAllowed(currentSbtAddress);
+      if (minted) markAutoMintSuccess();
       return true;
     }
 
@@ -841,6 +845,7 @@ class SBTPage extends Component<any, any> {
 
     if (targetInvite) {
       await this.claimWithInviteCode(targetInvite, currentSbtAddress);
+      markAutoMintSuccess();
       return true;
     }
 
@@ -859,12 +864,14 @@ class SBTPage extends Component<any, any> {
 
     if (sbtInfo?.hasPasswordMint) {
       await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
+      markAutoMintSuccess();
       return true;
     }
 
     const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
       await this.mintUnlimitedWithGroupPassword();
+      markAutoMintSuccess();
       return true;
     }
 

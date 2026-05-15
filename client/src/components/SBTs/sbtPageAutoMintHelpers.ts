@@ -1,6 +1,9 @@
 type SbtPageAutoMintAddressPropsLike = Record<string, unknown> & {
   SBTAddress?: unknown;
   loginComplete?: unknown;
+  network?: { id?: unknown } | null;
+  networkChainId?: unknown;
+  sessionSlug?: unknown;
 };
 type SbtPageAutoMintAddressInfo = {
   lower: string;
@@ -27,8 +30,10 @@ type ResolveSbtPagePropListAutoMintArgs = {
   sbtMintPassword?: unknown;
 };
 type ResolveSbtPageUrlAutoMintIntentArgs = {
+  chainId?: unknown;
   propsIn?: SbtPageAutoMintAddressPropsLike | null;
   searchRaw?: unknown;
+  sessionSlug?: unknown;
   sessionStorageRef?: SbtPageSessionStorageLike | null;
   state?: SbtPageUrlAutoMintState | null;
   windowSearch?: unknown;
@@ -82,6 +87,31 @@ const getSbtPageAutoMintAddressInfo = (
     original,
     lower: String(original || '').toLowerCase(),
   };
+};
+
+const normalizeAutoMintScopePart = (value: unknown, fallback: string): string => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return normalized || fallback;
+};
+
+export const buildSbtPageAutoMintStorageKey = ({
+  chainId = '',
+  sbtAddress = '',
+  sessionSlug = '',
+}: {
+  chainId?: unknown;
+  sbtAddress?: unknown;
+  sessionSlug?: unknown;
+} = {}): string | null => {
+  const address = String(sbtAddress || '').trim().toLowerCase();
+  if (!address) return null;
+  return [
+    'autoMint',
+    normalizeAutoMintScopePart(chainId, 'unknown-chain'),
+    normalizeAutoMintScopePart(sessionSlug, 'general'),
+    address,
+    'success',
+  ].join(':');
 };
 
 export const sanitizeSbtPageMintedTokensOverride = (value: unknown): string | null => {
@@ -180,8 +210,10 @@ export const collectAutoMintPairsFromSearchParams = (
 };
 
 export const resolveSbtPageUrlAutoMintIntent = ({
+  chainId = null,
   propsIn = {},
   searchRaw = null,
+  sessionSlug = null,
   sessionStorageRef = null,
   state = {},
   windowSearch = '',
@@ -221,7 +253,13 @@ export const resolveSbtPageUrlAutoMintIntent = ({
   }
 
   const targetCode = targetInvite || targetPassword;
-  const autoKey = currentSbtAddrLower ? `autoMint:${currentSbtAddrLower}` : null;
+  const resolvedChainId = chainId ?? propsIn?.network?.id ?? propsIn?.networkChainId ?? '';
+  const resolvedSessionSlug = sessionSlug ?? propsIn?.sessionSlug ?? '';
+  const autoKey = buildSbtPageAutoMintStorageKey({
+    chainId: resolvedChainId,
+    sessionSlug: resolvedSessionSlug,
+    sbtAddress: currentSbtAddrLower,
+  });
   const alreadyTried = !!(
     autoKey &&
     sessionStorageRef?.getItem &&
