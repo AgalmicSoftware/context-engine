@@ -669,9 +669,15 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     try {
       return this.setState(next, (...args) => {
         try {
-          if (typeof callback === 'function') callback(...args);
-        } finally {
+          const result = typeof callback === 'function' ? callback(...args) : undefined;
+          if (result && typeof result.then === 'function') {
+            return result.finally(release);
+          }
           release();
+          return result;
+        } catch (error) {
+          release();
+          throw error;
         }
       });
     } catch (error) {
@@ -5355,7 +5361,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     this._fetchSingleQuestionRunId = runId;
     const isStaleRun = () => !this._isMounted || this._fetchSingleQuestionRunId !== runId;
     const safeSetState = (...args) => {
-      if (!isStaleRun()) this.setState(...args);
+      if (!isStaleRun()) this.setResponseHydrationState(...args);
     };
     const bootstrapRetryAttempt = Number(opts?.bootstrapRetryAttempt || 0);
     const configuredFetchTimeoutMs = Number(opts?.questionFetchTimeoutMs);
@@ -5691,7 +5697,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     // Build pool and merge state before fetching responses
     if (isStaleRun()) return;
-    this.setState(
+    this.setResponseHydrationState(
       (prev) => ({
         questionPool: [{ ...qData, id: qData.id }],
         surveysResponseState: this.mergeSurveyResponseState(
@@ -8687,7 +8693,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       const nextSurveysResponseState = [...this.state.surveysResponseState];
       nextSurveysResponseState[surveyIndex] = finalSlice;
 
-      const optimisticUserAnswers = this.prepareJsonAndHash(surveyIndex);
+      // Regression guard: the encrypted merge above is a class setState, so
+      // build optimistic JSON from the known final slice instead of this.state.
+      const optimisticUserAnswers = this.prepareJsonAndHash(surveyIndex, undefined, finalSlice);
 
       // Check encryption status from the new baseline
       const hasEncrypted = Object.values(nextBaseline.answers || {}).some(a => !!a.encrypted) ||
