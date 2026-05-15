@@ -744,6 +744,13 @@ export default function DocumentLibraryPanel({
 
   useEffect(() => {
     viewerRequestSeqRef.current += 1;
+    setViewerOpen(false);
+    setViewerLoading(false);
+    setViewerError('');
+    setViewerTitle('');
+    setViewerText('');
+    setViewerBlobUrl('');
+    setViewerMime('');
   }, [viewerContextKey]);
 
   useEffect(() => {

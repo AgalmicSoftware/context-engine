@@ -5521,7 +5521,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         cacheState: seededCacheState,
       } = cacheBootstrapResult;
       if (isStaleRun()) return;
-      this.setState(
+      this.setResponseHydrationState(
         (prev) => ({
           questionPool: [{ ...seededQData, id: seededQData.id }],
           surveysResponseState: this.mergeSurveyResponseState(
@@ -5537,7 +5537,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         }),
         () => {
           this.updateJsonPreview();
-          this.rehydrateDraftForRenderedIds();
+          this.rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
         }
       );
       if (shouldBootstrapViewedResponse) {
