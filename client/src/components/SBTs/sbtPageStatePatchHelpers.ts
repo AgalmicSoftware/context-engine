@@ -20,6 +20,7 @@ type BuildSbtPageBooleanTogglePatchArgs = {
   stateKey?: unknown;
 };
 type BuildSbtPageAddressChangeResetMintUiPatchArgs = {
+  forceReset?: unknown;
   sbtAddressChanged?: unknown;
 };
 type BuildSbtPageNetworkUpdatePatchArgs = {
@@ -266,9 +267,10 @@ export const buildSbtPageBooleanTogglePatch = ({
 };
 
 export const buildSbtPageAddressChangeResetMintUiPatch = ({
+  forceReset = false,
   sbtAddressChanged = false,
 }: BuildSbtPageAddressChangeResetMintUiPatchArgs = {}): Record<string, unknown> | null => (
-  sbtAddressChanged
+  sbtAddressChanged || forceReset
     ? {
       showMiniPasswordInput: false,
       mintStep: 0,
