@@ -1086,7 +1086,7 @@ export default function DocumentLibraryPanel({
     // Clear params so refresh/back doesn't re-open repeatedly.
     try {
       const url = new URL(window.location.href);
-      ['__ceDocTx', '__ceDocStorage', '__ceDocKind', '__ceDocName'].forEach((param) => {
+      ['__ceDocTx', '__ceDocRef', '__ceDocStorage', '__ceDocKind', '__ceDocName'].forEach((param) => {
         url.searchParams.delete(param);
       });
       window.history.replaceState({}, '', url.toString());
