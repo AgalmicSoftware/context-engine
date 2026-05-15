@@ -733,6 +733,9 @@ export class SurveyQuestions extends Component {
     this._fetchSurveyResponseRunId = (Number(this._fetchSurveyResponseRunId) || 0) + 1;
     this._fetchSingleQuestionRunId = (Number(this._fetchSingleQuestionRunId) || 0) + 1;
     this._localCacheRehydrateRunId = (Number(this._localCacheRehydrateRunId) || 0) + 1;
+    if (this._isMounted && this.state.isLoadingResponse) {
+      this.setState({ isLoadingResponse: false });
+    }
   };
 
   setResponseHydrationState = (next, callback) => {
@@ -1970,7 +1973,23 @@ export class SurveyQuestions extends Component {
   async componentDidUpdate(prevProps, prevState) {
     const diffInputsChanged = this.didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
-      if (!this._responseHydrationStateUpdateDepth) {
+      const propsHydrationContextChanged =
+        prevProps.isStandalone !== this.props.isStandalone ||
+        prevProps.minifiedMode !== this.props.minifiedMode ||
+        prevProps.surveyIndex !== this.props.surveyIndex ||
+        prevProps.surveyId !== this.props.surveyId ||
+        prevProps.viewAddress !== this.props.viewAddress ||
+        prevProps.account !== this.props.account ||
+        prevProps.loginComplete !== this.props.loginComplete ||
+        prevProps.singleQuestionMode !== this.props.singleQuestionMode ||
+        prevProps.questionID !== this.props.questionID ||
+        prevProps.responderAddress !== this.props.responderAddress ||
+        prevProps.network?.id !== this.props.network?.id ||
+        prevProps.networkChainId !== this.props.networkChainId ||
+        getSessionSlugHintFromProps(prevProps) !== getSessionSlugHintFromProps(this.props) ||
+        getSessionSlugPinnedFromProps(prevProps) !== getSessionSlugPinnedFromProps(this.props) ||
+        buildQuestionIdScopeSignature(prevProps.questionPool) !== buildQuestionIdScopeSignature(this.props.questionPool);
+      if (propsHydrationContextChanged || !this._responseHydrationStateUpdateDepth) {
         this.invalidateResponseHydrationRuns();
       }
       this.invalidateDiffCaches();

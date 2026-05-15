@@ -1166,6 +1166,88 @@ describe('SurveyTool question pool lifecycle', () => {
     expect(subject.state.isLoadingResponse).toBe(false);
   });
 
+  it('clears the response loading flag when canceling active hydration runs', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      isLoadingResponse: true,
+    };
+    syncClassSetState(subject);
+
+    subject.invalidateResponseHydrationRuns();
+
+    expect(subject.state.isLoadingResponse).toBe(false);
+  });
+
+  it('invalidates response hydration for prop context changes during owned hydration updates', async () => {
+    const subject = new SurveyQuestions({
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      surveyId: 'survey-b',
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+    });
+    subject._isMounted = true;
+    subject._responseHydrationStateUpdateDepth = 1;
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+      editBaseline: { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      userAnswers: null,
+      submissionComplete: false,
+      isLoadingResponse: true,
+      modifiedCount: 0,
+      encryptedModifiedCount: 0,
+      isDirty: false,
+      autoDecryptEnabled: false,
+      showComments: {},
+      prefillQueuedAfterCache: false,
+      submittedSinceLastEdit: false,
+    };
+    syncClassSetState(subject);
+    subject.invalidateResponseHydrationRuns = jest.fn(
+      subject.invalidateResponseHydrationRuns.bind(subject),
+    );
+    subject.invalidateDiffCaches = jest.fn(subject.invalidateDiffCaches.bind(subject));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 0, encrypted: 0 }));
+    subject.emitPendingStats = jest.fn();
+    subject.recalculateEditStats = jest.fn();
+    subject.maybeRefreshCanDecryptOtherResponses = jest.fn();
+    subject.fetchQuestionPool = jest.fn().mockResolvedValue(undefined);
+    subject.initializeSurveyResponseState = jest.fn(() => [
+      { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+    ]);
+    subject.fetchSurveyResponse = jest.fn().mockResolvedValue(undefined);
+    subject.checkAndHandleStartFresh = jest.fn();
+    subject.hydrateGateSbtLabels = jest.fn();
+    subject.isAutoDecryptBlocked = () => false;
+
+    const prevProps = {
+      ...subject.props,
+      surveyId: 'survey-a',
+    };
+    const prevState = { ...subject.state };
+
+    await subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.invalidateResponseHydrationRuns).toHaveBeenCalledTimes(1);
+    expect(subject.state.isLoadingResponse).toBe(false);
+  });
+
   it('resets form state for account changes from initialized survey state', () => {
     jest.useFakeTimers();
 

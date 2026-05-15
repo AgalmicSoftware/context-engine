@@ -1123,6 +1123,52 @@ class SBTPage extends Component<any, any> {
     return true;
   };
 
+  buildMintTargetKey = ({
+    accountLower = '',
+    sbtAddress = '',
+    sessionSlug = null,
+  }: {
+    accountLower?: unknown;
+    sbtAddress?: unknown;
+    sessionSlug?: unknown;
+  } = {}): string => [
+    String(accountLower || '').trim().toLowerCase(),
+    String(resolveSbtAddressString(sbtAddress) || '').trim().toLowerCase(),
+    sessionSlug == null ? '' : String(sessionSlug || ''),
+  ].join('|');
+
+  setMintPendingForTarget = ({
+    accountLower = '',
+    clearError = false,
+    sbtAddress = '',
+    sessionSlug = null,
+  }: {
+    accountLower?: unknown;
+    clearError?: unknown;
+    sbtAddress?: unknown;
+    sessionSlug?: unknown;
+  } = {}): void => {
+    this._activeMintPendingTargetKey = this.buildMintTargetKey({ accountLower, sbtAddress, sessionSlug });
+    if (this._isMounted) this.setState(buildSbtPageMintPendingPatch({ clearError }));
+  };
+
+  clearMintPendingForTarget = ({
+    accountLower = '',
+    sbtAddress = '',
+    sessionSlug = null,
+  }: {
+    accountLower?: unknown;
+    sbtAddress?: unknown;
+    sessionSlug?: unknown;
+  } = {}): void => {
+    const targetKey = this.buildMintTargetKey({ accountLower, sbtAddress, sessionSlug });
+    if (!targetKey || this._activeMintPendingTargetKey !== targetKey) return;
+    this._activeMintPendingTargetKey = '';
+    if (this._isMounted && this.state.mintingStatus === 'pending') {
+      this.setState({ mintingStatus: 'idle' });
+    }
+  };
+
   // Regression guard: URL auto-mint transactions can finish after the route,
   // session, or wallet changes; only the captured target may receive local UI state.
   completeMintSuccessForTarget = async ({
@@ -1163,6 +1209,9 @@ class SBTPage extends Component<any, any> {
       }
       this.applyLocalMintSuccess(accountLower);
       this.clearAutoMintUrlIntent();
+      this._activeMintPendingTargetKey = '';
+    } else {
+      this.clearMintPendingForTarget({ accountLower, sbtAddress, sessionSlug });
     }
 
     this.refreshSbtDataWithSlug(sbtAddress, undefined, sessionSlug);
@@ -1180,6 +1229,16 @@ class SBTPage extends Component<any, any> {
     const slug = options?.sessionSlugOverride != null
       ? String(options.sessionSlugOverride || '')
       : this.getEffectiveSessionSlug();
+    const mintAccountLower = options?.accountLowerOverride != null
+      ? String(options.accountLowerOverride || '').trim().toLowerCase()
+      : String(this.props.account || '').trim().toLowerCase();
+    const isCurrentTarget = () => this.isMintTargetContextCurrent({
+      accountLower: mintAccountLower,
+      sbtAddress,
+      sessionSlug: slug,
+    });
+    if (!isCurrentTarget()) return false;
+
     const currentPropAddress = resolveSbtAddressString(this.props.SBTAddress);
     let sbtInfo: unknown = (
       currentPropAddress &&
@@ -1273,7 +1332,12 @@ class SBTPage extends Component<any, any> {
       if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
         return { ok: false, error: new Error('Mint context changed before send.') };
       }
-      if (this._isMounted) this.setState(buildSbtPageMintPendingPatch({ clearError: true }));
+      this.setMintPendingForTarget({
+        accountLower: mintAccountLower,
+        clearError: true,
+        sbtAddress: sbt,
+        sessionSlug: slug,
+      });
       const tx = await contractScripts.claimWithInvite(
         this.props.provider,
         sbt,
@@ -3097,7 +3161,11 @@ class SBTPage extends Component<any, any> {
       if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
       }
-      this.setState(buildSbtPageMintPendingPatch());
+      this.setMintPendingForTarget({
+        accountLower: mintAccountLower,
+        sbtAddress: sbt,
+        sessionSlug: slug,
+      });
 
       sbtLog.log('[MANUAL-MINT] Signing authorization...');
       const sig = await contractScripts.signGroupMintAuthorization({
@@ -3201,7 +3269,11 @@ class SBTPage extends Component<any, any> {
           if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
             return false;
           }
-          if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
+          this.setMintPendingForTarget({
+            accountLower: mintAccountLower,
+            sbtAddress: sbtAddressOriginalCase,
+            sessionSlug: slug,
+          });
 
           const userCommit = ethers.utils.solidityKeccak256(
             ["string", "address"],
@@ -3217,6 +3289,13 @@ class SBTPage extends Component<any, any> {
               txHash: tx.transactionHash,
             }));
             this.startClaimCountdown();
+            this._activeMintPendingTargetKey = '';
+          } else {
+            this.clearMintPendingForTarget({
+              accountLower: mintAccountLower,
+              sbtAddress: sbtAddressOriginalCase,
+              sessionSlug: slug,
+            });
           }
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
           return true;
@@ -3224,7 +3303,11 @@ class SBTPage extends Component<any, any> {
           if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
             return false;
           }
-          if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
+          this.setMintPendingForTarget({
+            accountLower: mintAccountLower,
+            sbtAddress: sbtAddressOriginalCase,
+            sessionSlug: slug,
+          });
           const tx = await contractScripts.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
           await this.completeMintSuccessForTarget({
@@ -3242,7 +3325,11 @@ class SBTPage extends Component<any, any> {
         if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
           return false;
         }
-        if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
+        this.setMintPendingForTarget({
+          accountLower: mintAccountLower,
+          sbtAddress: sbtAddressOriginalCase,
+          sessionSlug: slug,
+        });
         const tx = await contractScripts.claim(this.props.provider, sbtAddressOriginalCase);
         this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
         await this.completeMintSuccessForTarget({
