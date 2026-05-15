@@ -1539,7 +1539,15 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
       expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
       expect(global.fetch).not.toHaveBeenCalled();
       expect(Arweave.init).toHaveBeenCalledTimes(1);
+      expect(Arweave.init).toHaveBeenCalledWith(expect.objectContaining({
+        host: 'arweave.net',
+        port: 443,
+        protocol: 'https',
+        logging: false,
+      }));
       expect(createTransaction).toHaveBeenCalledTimes(1);
+      const createTxPayload = createTransaction.mock.calls[0]?.[0] || {};
+      expect(new TextDecoder().decode(createTxPayload.data)).toBe('{"ok":true}');
       expect(sign).toHaveBeenCalledWith(tx, { kty: 'RSA' });
       expect(post).toHaveBeenCalledWith(tx);
       expect(tx.addTag).toHaveBeenCalledWith('Content-Type', 'application/json');
