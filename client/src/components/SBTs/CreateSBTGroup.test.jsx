@@ -573,6 +573,73 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(instance.state.tokenURI).toBe('test-token-uri');
   });
 
+  it('preserves txId-only locked uploaded images in encrypted SBT metadata', async () => {
+    const instance = makeInstance({
+      account: '0xCreator',
+      network: { id: 84532, name: 'Base Sepolia' },
+      provider: 'mock-provider',
+      sessionSlug: 'test',
+    });
+    const imageTxId = 'd'.repeat(43);
+    const gateMap = {
+      'gate-a': {
+        gateId: 'gate-a',
+        id: 'gate-a',
+        label: 'Gate A',
+        sbtAddress: '0x00000000000000000000000000000000000000aa',
+        chainId: 84532,
+      },
+    };
+    instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'test', networkChainId: 84532 }));
+    instance.resolveLockGateOptions = jest.fn(() => ({ gateMap, defaultGateId: 'gate-a' }));
+    instance.buildGateObjectsAndRecipients = jest.fn(() => ({
+      recipients: [{ accessControlConditions: [{ contractAddress: '0xgate' }], chain: 'baseSepolia' }],
+    }));
+    instance.requireRecipientsForGateSelection = jest.fn();
+    const encryptSpy = jest.spyOn(instance, 'encryptValueWithRecipients').mockResolvedValue({
+      value: '[encrypted]',
+      encrypted: { ciphertext: 'wrong-image-fallback' },
+    });
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Locked Image Group',
+      sbtDescription: 'Uses uploaded encrypted image asset',
+      useImageUrl: false,
+      sbtImageFile: new File([new Uint8Array([1, 2, 3])], 'locked.png', { type: 'image/png' }),
+      lockedImageAsset: {
+        storage: 'lit-arweave',
+        txId: imageTxId,
+      },
+      metadataLockGateIds: {
+        ...instance.state.metadataLockGateIds,
+        image: ['gate-a'],
+      },
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        network: { name: 'Base Sepolia' },
+      },
+    };
+
+    jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({ arweaveJwk: 'test-jwk' });
+    const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave').mockImplementation(async (data) => {
+      const parsed = JSON.parse(data);
+      expect(parsed.image).toBe('');
+      expect(parsed.encryptedFields.image).toEqual({
+        storage: 'lit-arweave',
+        txId: imageTxId,
+      });
+      expect(parsed.encryption.targets.image).toBe(true);
+      return 'test-token-uri';
+    });
+
+    await instance.uploadTokenUriToArweave();
+
+    expect(encryptSpy).not.toHaveBeenCalled();
+    expect(uploadSpy).toHaveBeenCalled();
+    expect(instance.state.tokenURI).toBe('test-token-uri');
+  });
+
   it('passes the session wizard Arweave JWK override through deferred uploads for fallback handling', async () => {
     const signAdminAction = jest.fn(async () => ({
       address: '0xCreator',
