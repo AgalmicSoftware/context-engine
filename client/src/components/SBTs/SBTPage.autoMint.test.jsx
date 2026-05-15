@@ -674,6 +674,36 @@ describe('SBTPage auto-mint routing', () => {
     expect(startClaimSpy).not.toHaveBeenCalled();
   });
 
+  it('does not run URL auto-mints before the wallet chain is known', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000130';
+    const previousHref = window.location.href;
+    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress)}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        account: '0x0000000000000000000000000000000000000abc',
+        loginComplete: true,
+        network: undefined,
+        networkChainId: undefined,
+      });
+      subject.state = {
+        ...subject.state,
+        network: { id: 84532, name: 'Base Sepolia' },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      const publicMintSpy = jest.spyOn(subject, 'autoMintPublicIfAllowed').mockResolvedValue(true);
+
+      const result = await subject.handleUrlAutoMintIntent();
+
+      expect(result).toBe(false);
+      expect(publicMintSpy).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
   it('passes captured target overrides to invite list auto-mints', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000128';
     const account = '0x0000000000000000000000000000000000000abc';

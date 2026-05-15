@@ -1138,10 +1138,8 @@ class SBTPage extends Component<any, any> {
 
     if (chainId != null) {
       const targetChainId = String(chainId || '').trim();
-      if (targetChainId) {
-        const currentChainId = this.getMintTargetChainId();
-        if (targetChainId !== currentChainId) return false;
-      }
+      const currentChainId = this.getMintTargetChainId();
+      if (!targetChainId || !currentChainId || targetChainId !== currentChainId) return false;
     }
 
     return true;
