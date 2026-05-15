@@ -445,6 +445,236 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject.state.decryptingByKey['q1:answer']).toBe(false);
   });
 
+  it('does not let stale decrypt cleanup clear a newer decrypt busy token', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: 'wagmi',
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+      surveysResponseState: [{
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: '{}' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      userAnswers: {},
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.resolveQuestionDecryptHandlingMode = jest.fn(() => ({
+      effectiveResponseOverride: null,
+      hasResponseOverride: false,
+      isViewedResponseMode: false,
+    }));
+    subject.prepareSelfQuestionDecryptState = jest.fn().mockResolvedValue({
+      baselineSlice: subject.state.surveysResponseState[0],
+      baselineForDecrypt: subject.state.surveysResponseState[0],
+      ratingEnvelopes: {},
+    });
+    subject.prepareQuestionDecryptAttempt = jest.fn(() => ({
+      shouldDecrypt: true,
+      decryptSelection: {
+        keysToMark: ['q1:answer'],
+        clearMode: 'answer',
+      },
+      chainId: 84532,
+      lit: null,
+      opts: {},
+    }));
+    subject.finalizeQuestionDecryptAttempt = jest.fn(async () => {
+      subject.props = { ...subject.props, account: '0xdef' };
+      subject.registerQuestionDecryptBusyTokens(['q1:answer']);
+      subject.state = {
+        ...subject.state,
+        decryptingByKey: { 'q1:answer': true },
+      };
+      return {
+        decryptedStateSlice: {
+          answers: { q1: { value: 'old decrypted', encrypted: false } },
+          additionalComments: {},
+        },
+        didUpdate: true,
+        decryptedImportance: null,
+        decryptedConviction: null,
+      };
+    });
+
+    const result = await subject.handleDecryptQuestionAnswerInternal(
+      'q1',
+      'answer',
+      null,
+      subject.buildDecryptContextSnapshot(),
+    );
+
+    expect(result).toBe(false);
+    expect(subject.state.decryptingByKey['q1:answer']).toBe(true);
+  });
+
+  it('does not apply an older same-context decrypt result after a newer decrypt owns the field', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: 'wagmi',
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+      surveysResponseState: [{
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: '{}' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      userAnswers: {},
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.resolveQuestionDecryptHandlingMode = jest.fn(() => ({
+      effectiveResponseOverride: null,
+      hasResponseOverride: false,
+      isViewedResponseMode: false,
+    }));
+    subject.prepareSelfQuestionDecryptState = jest.fn().mockResolvedValue({
+      baselineSlice: subject.state.surveysResponseState[0],
+      baselineForDecrypt: subject.state.surveysResponseState[0],
+      ratingEnvelopes: {},
+    });
+    subject.prepareQuestionDecryptAttempt = jest.fn(() => ({
+      shouldDecrypt: true,
+      decryptSelection: {
+        keysToMark: ['q1:answer'],
+        clearMode: 'answer',
+      },
+      chainId: 84532,
+      lit: null,
+      opts: {},
+    }));
+    subject.finalizeQuestionDecryptAttempt = jest.fn(async () => {
+      subject.registerQuestionDecryptBusyTokens(['q1:answer']);
+      subject.state = {
+        ...subject.state,
+        decryptingByKey: { 'q1:answer': true },
+      };
+      return {
+        decryptedStateSlice: {
+          answers: { q1: { value: 'old decrypted', encrypted: false } },
+          additionalComments: {},
+        },
+        didUpdate: true,
+        decryptedImportance: null,
+        decryptedConviction: null,
+      };
+    });
+    subject.buildSelfQuestionDecryptSuccessState = jest.fn(() => ({
+      staleDecryptApplied: true,
+    }));
+
+    const result = await subject.handleDecryptQuestionAnswerInternal(
+      'q1',
+      'answer',
+      null,
+      subject.buildDecryptContextSnapshot(),
+    );
+
+    expect(result).toBe(false);
+    expect(subject.buildSelfQuestionDecryptSuccessState).not.toHaveBeenCalled();
+    expect(subject.state.staleDecryptApplied).toBeUndefined();
+    expect(subject.state.decryptingByKey['q1:answer']).toBe(true);
+  });
+
+  it('does not apply stale full-survey decrypt results after the viewer account changes', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: 'survey-a',
+      account: '0xabc',
+      loginComplete: true,
+      provider: 'wagmi',
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: '{}' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      userAnswers: {},
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.prepareSurveyDecryptAttempt = jest.fn().mockResolvedValue({
+      sourceSlice: subject.state.surveysResponseState[0],
+      ratingEnvelopesByQid: {},
+      chainId: 84532,
+      lit: null,
+      opts: {},
+      poolForDecrypt: [{ id: 'q1' }],
+    });
+    subject.finalizeSurveyDecryptAttempt = jest.fn(async () => {
+      subject.props = { ...subject.props, account: '0xdef' };
+      return {
+        normalizedDecryptedSlice: {
+          answers: { q1: { value: 'old decrypted', encrypted: false } },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+        decryptedImportanceFromEnv: {},
+        decryptedConvictionFromEnv: {},
+      };
+    });
+    subject.buildSurveyDecryptSuccessState = jest.fn((prev) => ({
+      ...prev,
+      staleSurveyDecryptApplied: true,
+    }));
+    subject.prepareJsonAndHash = jest.fn(() => []);
+    subject.persistDraftSafely = jest.fn();
+
+    await subject.handleDecryptEdit();
+
+    expect(subject.buildSurveyDecryptSuccessState).not.toHaveBeenCalled();
+    expect(subject.state.staleSurveyDecryptApplied).toBeUndefined();
+    expect(subject.state.isDecrypting).toBe(false);
+  });
+
   it('does not apply stale submit success after the viewer account changes', async () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
@@ -514,6 +744,84 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(subject.writeSubmittedResponsesToLocalCaches).not.toHaveBeenCalled();
     expect(subject.state.isSubmitting).toBe(false);
     expect(subject.state.currentStep).toBe(0);
+    expect(subject.state.submissionComplete).toBe(false);
+  });
+
+  it('does not let stale submit cleanup clear a newer submit attempt', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: `0x${'2'.repeat(64)}`,
+      account: '0xabc',
+      loginComplete: true,
+      provider: { request: jest.fn() },
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      toggleLoginModal: jest.fn(),
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.resolveSessionChainId = jest.fn(() => 84532);
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: 'draft answer' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      editBaseline: {
+        answers: {},
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      },
+      modifiedCount: 1,
+      hasEncryptedChanges: false,
+      submittedSinceLastEdit: false,
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.getAnsweredQuestionsCount = jest.fn(() => 1);
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.submitSurveyResponse = jest.fn(async () => {
+      subject.props = { ...subject.props, account: '0xdef' };
+      subject.startSubmitAttempt();
+      subject.state = {
+        ...subject.state,
+        isSubmitting: true,
+        currentStep: 1,
+      };
+      return {
+        blockNumber: 123,
+        __ceSubmissionGroupKey: 'edge',
+        __ceQuestionResponses: [],
+        __ceSurveyResponse: null,
+        __ceSurveyId: `0x${'2'.repeat(64)}`,
+      };
+    });
+    subject.clearDraftFor = jest.fn();
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn();
+    subject.prepareJsonAndHash = jest.fn(() => []);
+
+    await subject.encryptAndUpload();
+
+    expect(subject.submitSurveyResponse).toHaveBeenCalledTimes(1);
+    expect(subject.clearDraftFor).not.toHaveBeenCalled();
+    expect(subject.writeSubmittedResponsesToLocalCaches).not.toHaveBeenCalled();
+    expect(subject.state.isSubmitting).toBe(true);
+    expect(subject.state.currentStep).toBe(1);
     expect(subject.state.submissionComplete).toBe(false);
   });
 

@@ -697,6 +697,12 @@ export class SurveyQuestions extends Component {
   _fetchSingleQuestionRunId = 0;
   _localCacheRehydrateRunId = 0;
   _responseHydrationStateUpdateDepth = 0;
+  _surveyDecryptAttemptSeq = 0;
+  _activeSurveyDecryptAttemptSeq = 0;
+  _submitAttemptSeq = 0;
+  _activeSubmitAttemptSeq = 0;
+  _questionDecryptBusyTokenSeq = 0;
+  _questionDecryptBusyTokens = {};
   _singleQuestionBootstrapRetryTimer = null;
   _singleQuestionBootstrapRetrySig = '';
   _isMounted = false;
@@ -1134,6 +1140,8 @@ export class SurveyQuestions extends Component {
       singleQuestionMode,
       isStandalone,
       surveyIndex: singleQuestionMode || isStandalone ? 0 : (this.props?.surveyIndex || 0),
+      surveyId: this.props?.surveyId || this.props?.surveyID || '',
+      questionID: this.props?.questionID || '',
       mounted: !!this._isMounted,
     };
   };
@@ -1146,6 +1154,10 @@ export class SurveyQuestions extends Component {
       context.sessionSlug || '',
       context.networkID || '',
       context.responder || '',
+      context.singleQuestionMode ? 'single' : (context.isStandalone ? 'standalone' : 'survey'),
+      String(context.surveyIndex ?? '').trim(),
+      String(context.surveyId || '').trim().toLowerCase(),
+      String(context.questionID || '').trim().toLowerCase(),
     ].join('|');
   };
 
@@ -1160,14 +1172,110 @@ export class SurveyQuestions extends Component {
     (!snapshot.mounted || this._isMounted)
   );
 
-  buildQuestionDecryptStaleState = (prev, questionId, fieldToDecrypt = 'both') => ({
+  startSurveyDecryptAttempt = () => {
+    const attemptId = (Number(this._surveyDecryptAttemptSeq) || 0) + 1;
+    this._surveyDecryptAttemptSeq = attemptId;
+    this._activeSurveyDecryptAttemptSeq = attemptId;
+    return attemptId;
+  };
+
+  canUpdateSurveyDecryptAttempt = (snapshot = null, attemptId = null) => (
+    this.canUpdateStateForAsyncSnapshot(snapshot) &&
+    Number(attemptId || 0) > 0 &&
+    this._activeSurveyDecryptAttemptSeq === attemptId
+  );
+
+  finishSurveyDecryptAttempt = (attemptId = null) => {
+    if (Number(attemptId || 0) > 0 && this._activeSurveyDecryptAttemptSeq === attemptId) {
+      this._activeSurveyDecryptAttemptSeq = 0;
+    }
+  };
+
+  buildSurveyDecryptStaleState = () => ({
     isDecrypting: false,
-    decryptingByKey: clearQuestionFieldBusyMapHelper(
-      prev?.decryptingByKey || {},
-      questionId,
-      fieldToDecrypt,
-    ),
   });
+
+  getQuestionDecryptBusyKeys = (questionId, fieldToDecrypt = 'both') => (
+    getQuestionFieldTaskKeysHelper(questionId, {
+      includeAnswer: fieldToDecrypt === 'answer' || fieldToDecrypt === 'both',
+      includeAdditional: fieldToDecrypt === 'additional' || fieldToDecrypt === 'both',
+    })
+  );
+
+  registerQuestionDecryptBusyTokens = (keysToMark = []) => {
+    const token = (Number(this._questionDecryptBusyTokenSeq) || 0) + 1;
+    this._questionDecryptBusyTokenSeq = token;
+    const nextTokens = { ...(this._questionDecryptBusyTokens || {}) };
+    keysToMark.forEach((key) => {
+      if (key) nextTokens[key] = token;
+    });
+    this._questionDecryptBusyTokens = nextTokens;
+    return token;
+  };
+
+  clearQuestionDecryptBusyTokens = (keysToClear = [], token = null) => {
+    const nextTokens = { ...(this._questionDecryptBusyTokens || {}) };
+    keysToClear.forEach((key) => {
+      if (!key) return;
+      if (token == null || nextTokens[key] === token) delete nextTokens[key];
+    });
+    this._questionDecryptBusyTokens = nextTokens;
+  };
+
+  ownsQuestionDecryptBusyTokens = (keysToCheck = [], token = null) => {
+    if (token == null) return true;
+    const keys = keysToCheck.filter(Boolean);
+    return keys.length > 0 && keys.every((key) => this._questionDecryptBusyTokens?.[key] === token);
+  };
+
+  hasQuestionDecryptBusy = (busyMap = {}) => (
+    Object.values(busyMap || {}).some(Boolean)
+  );
+
+  buildQuestionDecryptOwnedClearState = (
+    prev,
+    questionId,
+    fieldToDecrypt = 'both',
+    token = null,
+    extraPatch = {},
+  ) => {
+    const keysToClear = this.getQuestionDecryptBusyKeys(questionId, fieldToDecrypt)
+      .filter((key) => key && token != null && this._questionDecryptBusyTokens?.[key] === token);
+    if (keysToClear.length === 0) {
+      return token == null
+        ? {
+            ...extraPatch,
+            isDecrypting: this._activeSurveyDecryptAttemptSeq > 0 || this.hasQuestionDecryptBusy(prev?.decryptingByKey || {}),
+            decryptingByKey: prev?.decryptingByKey || {},
+          }
+        : null;
+    }
+
+    const decryptingByKey = { ...(prev?.decryptingByKey || {}) };
+    keysToClear.forEach((key) => {
+      decryptingByKey[key] = false;
+    });
+    this.clearQuestionDecryptBusyTokens(keysToClear, token);
+    return {
+      ...extraPatch,
+      isDecrypting: this._activeSurveyDecryptAttemptSeq > 0 || this.hasQuestionDecryptBusy(decryptingByKey),
+      decryptingByKey,
+    };
+  };
+
+  buildQuestionDecryptStaleState = (prev, questionId, fieldToDecrypt = 'both', token = null) => {
+    // Regression guard: stale decrypt cleanup may only clear busy flags it owns.
+    // A newer decrypt for the same field can start after this attempt's await.
+    return this.buildQuestionDecryptOwnedClearState(prev, questionId, fieldToDecrypt, token);
+  };
+
+  buildQuestionDecryptFailureStateForAttempt = (prev, questionId, fieldToDecrypt = 'both', errorMessage = '', token = null) => {
+    const patch = this.buildQuestionDecryptOwnedClearState(prev, questionId, fieldToDecrypt, token, {
+      submissionError: errorMessage || 'Decryption failed.',
+    });
+    if (patch) return patch;
+    return null;
+  };
 
   buildDecryptTaskKey = (mode, questionId, fieldToDecrypt = 'both', responseOverride = null, decryptContext = null) => {
     const baseKey = buildDecryptTaskKeyHelper(
@@ -6694,12 +6802,18 @@ export class SurveyQuestions extends Component {
 
 
   async handleDecryptEdit() {
-    this.setState({ isDecrypting: true, submissionError: '', suppressPrefill: true });
-    const surveyIndex =
-      this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
+    const decryptContext = this.buildDecryptContextSnapshot();
+    const decryptAttemptId = this.startSurveyDecryptAttempt();
+    this.setState(buildDecryptEditStartState());
+    const surveyIndex = decryptContext.surveyIndex;
 
     // Align decrypt slug with draft slug (single-Q aware)
-    const slug = this._getEffectiveDraftSlug();
+    const slug = decryptContext.sessionSlug || this._getEffectiveDraftSlug();
+    const fallbackUserAnswers = this.state.userAnswers;
+    const fallbackSourceSlice =
+      this.state.surveysResponseState[surveyIndex] ||
+      { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+    const previousStateSlice = this.state.surveysResponseState?.[surveyIndex] || {};
 
     try {
       const {
@@ -6710,18 +6824,23 @@ export class SurveyQuestions extends Component {
         opts,
         poolForDecrypt,
       } = await this.prepareSurveyDecryptAttempt({
-        singleQuestionMode: this.props.singleQuestionMode,
-        questionId: this.props.questionID,
-        account: this.props.account,
-        providerLike: this.props.provider,
+        singleQuestionMode: decryptContext.singleQuestionMode,
+        questionId: decryptContext.questionID,
+        account: decryptContext.account,
+        providerLike: decryptContext.provider,
         slug,
-        surveyId: this.props.surveyId,
-        fallbackUserAnswers: this.state.userAnswers,
-        fallbackSourceSlice:
-          this.state.surveysResponseState[surveyIndex] ||
-          { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
-        previousStateSlice: this.state.surveysResponseState?.[surveyIndex] || {},
+        surveyId: decryptContext.surveyId,
+        fallbackUserAnswers,
+        fallbackSourceSlice,
+        previousStateSlice,
       });
+      if (!this.isDecryptContextCurrent(decryptContext)) {
+        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
+          this.finishSurveyDecryptAttempt(decryptAttemptId);
+          this.setState(this.buildSurveyDecryptStaleState());
+        }
+        return;
+      }
       const {
         normalizedDecryptedSlice,
         decryptedImportanceFromEnv,
@@ -6729,15 +6848,23 @@ export class SurveyQuestions extends Component {
       } = await this.finalizeSurveyDecryptAttempt({
         sourceSlice,
         ratingEnvelopesByQid,
-        account: this.props.account,
-        providerLike: this.props.provider,
+        account: decryptContext.account,
+        providerLike: decryptContext.provider,
         chainId,
         lit,
         poolForDecrypt,
         opts,
-        previousStateSlice: this.state.surveysResponseState?.[surveyIndex] || {},
+        previousStateSlice,
       });
+      if (!this.isDecryptContextCurrent(decryptContext)) {
+        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
+          this.finishSurveyDecryptAttempt(decryptAttemptId);
+          this.setState(this.buildSurveyDecryptStaleState());
+        }
+        return;
+      }
 
+      this.finishSurveyDecryptAttempt(decryptAttemptId);
       this.setState((prevState) => this.buildSurveyDecryptSuccessState(prevState, {
         surveyIndex,
         decryptedSlice: normalizedDecryptedSlice,
@@ -6750,7 +6877,15 @@ export class SurveyQuestions extends Component {
       });
     } catch (error) {
       surveyLog.error('Error decrypting answers:', error);
-      this.setState({ isDecrypting: false, submissionError: error.message || 'Decryption failed.' });
+      if (!this.isDecryptContextCurrent(decryptContext)) {
+        if (this.canUpdateSurveyDecryptAttempt(decryptContext, decryptAttemptId)) {
+          this.finishSurveyDecryptAttempt(decryptAttemptId);
+          this.setState(this.buildSurveyDecryptStaleState());
+        }
+        return;
+      }
+      this.finishSurveyDecryptAttempt(decryptAttemptId);
+      this.setState(buildDecryptEditFailureState(error.message));
     }
   }
 
@@ -6774,6 +6909,7 @@ export class SurveyQuestions extends Component {
 
   handleDecryptViewedResponseFieldInternal = async (questionId, fieldToDecrypt = 'both', responseOverride = null, decryptContext = null) => {
     const context = decryptContext || this.buildDecryptContextSnapshot();
+    let decryptAttemptToken = null;
     // Require wallet login (viewer). Decryption is enforced by Lit access control conditions.
     if (!context.loginComplete || !context.account) {
       return false;
@@ -6828,6 +6964,7 @@ export class SurveyQuestions extends Component {
         clearMode,
       } = decryptSelection;
 
+      decryptAttemptToken = this.registerQuestionDecryptBusyTokens(keysToMark);
       this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
 
       const {
@@ -6848,11 +6985,16 @@ export class SurveyQuestions extends Component {
       });
       if (!this.isDecryptContextCurrent(context)) {
         if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt));
+          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
         }
         return false;
       }
+      if (!this.ownsQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken)) {
+        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
+        return false;
+      }
 
+      this.clearQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken);
       this.setState((prev) => this.buildViewedResponseDecryptSuccessState(prev, {
         questionId: qid,
         clearMode,
@@ -6866,13 +7008,13 @@ export class SurveyQuestions extends Component {
     } catch (error) {
       surveyLog.error(`Error decrypting viewed response ${fieldToDecrypt} for ${questionId}`, error);
       if (!this.isDecryptContextCurrent(context)) {
-        if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt));
+        if (decryptAttemptToken != null && this.canUpdateStateForAsyncSnapshot(context)) {
+          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt, decryptAttemptToken));
         }
         return false;
       }
       this.setState((prev) => {
-        return this.buildQuestionDecryptFailureState(prev, qid, fieldToDecrypt, error.message);
+        return this.buildQuestionDecryptFailureStateForAttempt(prev, qid, fieldToDecrypt, error.message, decryptAttemptToken);
       });
       return false;
     }
@@ -6889,6 +7031,7 @@ export class SurveyQuestions extends Component {
 
   handleDecryptQuestionAnswerInternal = async (questionId, fieldToDecrypt = 'both', responseOverride = null, decryptContext = null) => {
     const context = decryptContext || this.buildDecryptContextSnapshot();
+    let decryptAttemptToken = null;
     // Require wallet login
     if (!context.loginComplete || !context.account) {
       return false;
@@ -6957,6 +7100,7 @@ export class SurveyQuestions extends Component {
         return false;
       }
 
+      decryptAttemptToken = this.registerQuestionDecryptBusyTokens(keysToMark);
       this.setState((prev) => this.buildQuestionDecryptStartState(prev, keysToMark));
 
       const {
@@ -6977,11 +7121,16 @@ export class SurveyQuestions extends Component {
       });
       if (!this.isDecryptContextCurrent(context)) {
         if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt));
+          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
         }
         return false;
       }
+      if (!this.ownsQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken)) {
+        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
+        return false;
+      }
 
+      this.clearQuestionDecryptBusyTokens(keysToMark, decryptAttemptToken);
       this.setState((prevState) => this.buildSelfQuestionDecryptSuccessState(prevState, {
         surveyIndex,
         questionId,
@@ -7000,13 +7149,13 @@ export class SurveyQuestions extends Component {
     } catch (error) {
       surveyLog.error(`Error decrypting ${fieldToDecrypt} for ${questionId}`, error);
       if (!this.isDecryptContextCurrent(context)) {
-        if (this.canUpdateStateForAsyncSnapshot(context)) {
-          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt));
+        if (decryptAttemptToken != null && this.canUpdateStateForAsyncSnapshot(context)) {
+          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt, decryptAttemptToken));
         }
         return false;
       }
       this.setState((prev) => (
-        this.buildQuestionDecryptFailureState(prev, questionId, fieldToDecrypt, error.message)
+        this.buildQuestionDecryptFailureStateForAttempt(prev, questionId, fieldToDecrypt, error.message, decryptAttemptToken)
       ));
       return false;
     }
@@ -9935,9 +10084,27 @@ export class SurveyQuestions extends Component {
     currentStep: 0,
   });
 
+  startSubmitAttempt = () => {
+    const attemptId = (Number(this._submitAttemptSeq) || 0) + 1;
+    this._submitAttemptSeq = attemptId;
+    this._activeSubmitAttemptSeq = attemptId;
+    return attemptId;
+  };
+
+  finishSubmitAttempt = (attemptId = null) => {
+    if (Number(attemptId || 0) > 0 && this._activeSubmitAttemptSeq === attemptId) {
+      this._activeSubmitAttemptSeq = 0;
+    }
+  };
+
   handleStaleSubmitContext = (snapshot = null) => {
     this._submitGuard = false;
-    if (this.canUpdateStateForAsyncSnapshot(snapshot)) {
+    if (
+      this.canUpdateStateForAsyncSnapshot(snapshot) &&
+      Number(snapshot?.submitAttemptId || 0) > 0 &&
+      this._activeSubmitAttemptSeq === snapshot.submitAttemptId
+    ) {
+      this.finishSubmitAttempt(snapshot.submitAttemptId);
       this.setState(this.buildSubmitStaleState());
     }
   };
@@ -9971,6 +10138,7 @@ export class SurveyQuestions extends Component {
       }
 
       submitContext = this.buildSubmitContextSnapshot();
+      submitContext.submitAttemptId = this.startSubmitAttempt();
       this.setState(buildSubmitStartState());
 
       const providerKind = cryptoUtils.getProviderKind(submitContext.provider);
@@ -10126,10 +10294,11 @@ export class SurveyQuestions extends Component {
       this._userAnswersSliceCache = { source: null, value: null };
 
       this._submitGuard = false;
-      this.setState({
-        isSubmitting: false,
-        submitProgress: 100,
-        submissionComplete: true, // Locks fetchers from overwriting
+      this.finishSubmitAttempt(submitContext.submitAttemptId);
+      this.setState(buildSubmitSuccessState({
+        editBaseline: nextBaseline,
+        hasEncrypted,
+        responseUrl,
         submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_success'),
         currentStep: 3,
         suppressPrefill: false,
@@ -10188,6 +10357,7 @@ export class SurveyQuestions extends Component {
         this.handleStaleSubmitContext(submitContext);
         return;
       }
+      if (submitContext?.submitAttemptId) this.finishSubmitAttempt(submitContext.submitAttemptId);
       this.setState(buildSubmitFailureState({
         submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_error'),
         submissionError: error.message || 'Submission failed.'
@@ -10497,6 +10667,11 @@ export class SurveyQuestions extends Component {
     } catch (e) {
       surveyLog.error('Failed to encrypt response rating:', e);
       throw e;
+    }
+    // Regression guard: rating envelope encryption can await Lit/provider work; do
+    // not broadcast if the viewer/session changed while that was in flight.
+    if (!this.isSubmitContextCurrent(context)) {
+      throw new Error('Submission context changed before broadcast.');
     }
 
     // Centralized identifier hashing right before contract call
