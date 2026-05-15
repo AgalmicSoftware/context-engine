@@ -19,14 +19,6 @@ type BuildLockedQuestionGateDetailsArgs = {
   translate?: (key: string) => string;
 };
 
-type CollectGateSbtAddressesForHydrationArgs = {
-  policy?: unknown;
-  questionPools?: unknown;
-  getQuestionEncryptionGates?: (question: unknown) => GateDetailRecord[];
-  isAddress?: (value: string) => boolean;
-  getAddress?: (value: string) => string;
-};
-
 type LockedQuestionGateDetailDraft = {
   id: string;
   label: string;
@@ -68,40 +60,6 @@ const collectUniqueGateSbtAddresses = (gate: GateDetailRecord = {}): string[] =>
       .filter(Boolean)
   ))
 );
-
-export const collectGateSbtAddressesForHydrationFromSources = ({
-  policy = {},
-  questionPools = [],
-  getQuestionEncryptionGates = () => [],
-  isAddress = () => false,
-  getAddress = identityChecksum,
-}: CollectGateSbtAddressesForHydrationArgs = {}): string[] => {
-  const addresses = new Set<string>();
-  const addAddress = (value: unknown): void => {
-    const raw = String(value || '').trim();
-    if (!raw || !isAddress(raw)) return;
-    addresses.add(getAddress(raw));
-  };
-  const addGateAddresses = (gate: unknown): void => {
-    const gateRecord = (gate && typeof gate === 'object') ? gate as GateDetailRecord : {};
-    [
-      ...(Array.isArray(gateRecord.sbtAddresses) ? gateRecord.sbtAddresses : []),
-      gateRecord.sbtAddress,
-    ].forEach(addAddress);
-  };
-
-  const policyRecord = (policy && typeof policy === 'object') ? policy as GateDetailRecord : {};
-  const gates = Array.isArray(policyRecord?.gates) ? policyRecord.gates : [];
-  gates.forEach(addGateAddresses);
-
-  (Array.isArray(questionPools) ? questionPools : []).forEach((pool) => {
-    (Array.isArray(pool) ? pool : []).forEach((question) => {
-      getQuestionEncryptionGates(question).forEach(addGateAddresses);
-    });
-  });
-
-  return Array.from(addresses);
-};
 
 export const buildLockedQuestionGateDetailsFromPool = ({
   hiddenMaskedQuestionIds = [],
