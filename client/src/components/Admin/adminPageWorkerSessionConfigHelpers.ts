@@ -168,6 +168,17 @@ export const buildWorkerSessionConfigPayload = ({
       resolvedRpcUrlsByChainId[key] = [resolvedRpcUrl];
     }
   }
+  if (registryChainId) {
+    const key = String(registryChainId);
+    const registryChainRpcUrl = getRpcUrlsForChain(resolvedRpcUrlsByChainId, registryChainId)[0] || '';
+    const fallbackRegistryRpcUrl =
+      registryChainRpcUrl ||
+      (registryChainId === inferredSessionChainId ? resolvedRpcUrl : '') ||
+      getDefaultRpcForChain(registryChainId);
+    if (fallbackRegistryRpcUrl && !normalizeRpcUrlList(resolvedRpcUrlsByChainId[key]).length) {
+      resolvedRpcUrlsByChainId[key] = [fallbackRegistryRpcUrl];
+    }
+  }
   const allowOriginsRaw = cfg.allowOrigins;
   const allowOrigins = Array.isArray(allowOriginsRaw)
     ? allowOriginsRaw.map((entry) => toStr(entry).trim()).filter(Boolean)

@@ -140,7 +140,7 @@ describe('SBTPage auto-mint routing', () => {
     }
   });
 
-  it('sends public URL auto-mints to the captured SBT even if route props change before mint', async () => {
+  it('does not send public URL auto-mints after the route target changes before mint', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000108';
     const nextSbtAddress = '0x0000000000000000000000000000000000000109';
     const previousHref = window.location.href;
@@ -177,19 +177,19 @@ describe('SBTPage auto-mint routing', () => {
 
       const result = await subject.handleUrlAutoMintIntent();
 
-      expect(result).toBe(true);
-      expect(contractScripts.claim).toHaveBeenCalledWith('mock', sbtAddress);
+      expect(result).toBe(false);
+      expect(contractScripts.claim).not.toHaveBeenCalled();
       expect(contractScripts.claim).not.toHaveBeenCalledWith('mock', nextSbtAddress);
       expect(loadSpy).not.toHaveBeenCalled();
       expect(localSuccessSpy).not.toHaveBeenCalled();
-      expect(refreshSpy).toHaveBeenCalledWith(sbtAddress, undefined, 'edge');
-      expect(window.sessionStorage.getItem(successKey)).toBe('done');
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(window.sessionStorage.getItem(successKey)).toBeNull();
     } finally {
       window.history.replaceState({}, '', previousHref);
     }
   });
 
-  it('sends group-password URL auto-mints to the captured SBT even if route props change before mint', async () => {
+  it('does not send group-password URL auto-mints after the route target changes before mint', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000110';
     const nextSbtAddress = '0x0000000000000000000000000000000000000111';
     const previousHref = window.location.href;
@@ -231,17 +231,13 @@ describe('SBTPage auto-mint routing', () => {
 
       const result = await subject.handleUrlAutoMintIntent();
 
-      expect(result).toBe(true);
-      expect(contractScripts.signGroupMintAuthorization).toHaveBeenCalledWith(expect.objectContaining({
-        password: 'claim-code',
-        sbtAddress,
-      }));
-      expect(contractScripts.mintWithGroupSignature).toHaveBeenCalledWith('mock', sbtAddress, '0xsig');
-      expect(contractScripts.mintWithGroupSignature).not.toHaveBeenCalledWith('mock', nextSbtAddress, '0xsig');
+      expect(result).toBe(false);
+      expect(contractScripts.signGroupMintAuthorization).not.toHaveBeenCalled();
+      expect(contractScripts.mintWithGroupSignature).not.toHaveBeenCalled();
       expect(loadSpy).not.toHaveBeenCalled();
       expect(localSuccessSpy).not.toHaveBeenCalled();
-      expect(refreshSpy).toHaveBeenCalledWith(sbtAddress, undefined, 'edge');
-      expect(window.sessionStorage.getItem(successKey)).toBe('done');
+      expect(refreshSpy).not.toHaveBeenCalled();
+      expect(window.sessionStorage.getItem(successKey)).toBeNull();
     } finally {
       window.history.replaceState({}, '', previousHref);
     }
