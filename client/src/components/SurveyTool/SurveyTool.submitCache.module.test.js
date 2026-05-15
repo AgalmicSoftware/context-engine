@@ -649,6 +649,9 @@ describe('SurveyTool submit cache writes', () => {
     expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith(expect.objectContaining({
       receipt: expect.objectContaining({ status: 1, blockNumber: 42 }),
       surveyId: '0xsurvey',
+    }), expect.objectContaining({
+      account: '0xabc',
+      surveyId: '0xsurvey',
     }));
     expect(subject._submitGuard).toBe(false);
     expect(refreshQuestionResponses).not.toHaveBeenCalled();
@@ -680,24 +683,19 @@ describe('SurveyTool submit cache writes', () => {
       changedMap: { q1: { answer: 1 } },
     }));
     subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
-    subject.submitSurveyResponse = jest.fn().mockResolvedValue({
-      status: 1,
-      blockNumber: 42,
-      transactionHash: `0x${'4'.repeat(64)}`,
-      __ceQuestionResponses: [
-        {
-          questionID: 'q1',
-          responder: '0xabc',
-          type: 'freeform',
-          prompt: 'Prompt 1',
-          answer: { value: 'yes', encrypted: false },
-          additional: { value: '', encrypted: false },
-        },
-      ],
-      __ceSurveyResponse: {
-        surveyID: '0xsurvey',
-        responder: '0xabc',
-        responses: [
+    subject.submitSurveyResponse = jest.fn().mockImplementation(async () => {
+      subject.props = {
+        ...subject.props,
+        account: '0xdef',
+        surveyId: '0xchanged-survey',
+        sessionSlug: 'changed-session',
+        activeSessionSlug: 'changed-session',
+      };
+      return {
+        status: 1,
+        blockNumber: 42,
+        transactionHash: `0x${'4'.repeat(64)}`,
+        __ceQuestionResponses: [
           {
             questionID: 'q1',
             responder: '0xabc',
@@ -707,8 +705,22 @@ describe('SurveyTool submit cache writes', () => {
             additional: { value: '', encrypted: false },
           },
         ],
-      },
-      __ceSurveyId: '0xsurvey',
+        __ceSurveyResponse: {
+          surveyID: '0xsurvey',
+          responder: '0xabc',
+          responses: [
+            {
+              questionID: 'q1',
+              responder: '0xabc',
+              type: 'freeform',
+              prompt: 'Prompt 1',
+              answer: { value: 'yes', encrypted: false },
+              additional: { value: '', encrypted: false },
+            },
+          ],
+        },
+        __ceSurveyId: '0xsurvey',
+      };
     });
     subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockResolvedValue({
       questionCacheWritten: false,
@@ -955,10 +967,19 @@ describe('SurveyTool submit cache writes', () => {
         }),
       }),
       expect.any(Set),
+      expect.objectContaining({
+        account: '0xabc',
+        provider: expect.any(Object),
+        surveyId: '0xsurvey',
+        effectiveDraftSlug: 'edge',
+      }),
     );
     expect(subject.submitSurveyResponse.mock.calls[0][1]).toEqual(new Set(['q1']));
     expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith(expect.objectContaining({
       receipt: expect.objectContaining({ status: 1, blockNumber: 77 }),
+    }), expect.objectContaining({
+      account: '0xabc',
+      surveyId: '0xsurvey',
     }));
   });
 
@@ -1067,6 +1088,9 @@ describe('SurveyTool submit cache writes', () => {
 
     expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith(expect.objectContaining({
       submissionSlug: 'alpha',
+    }), expect.objectContaining({
+      account: '0xabc',
+      surveyId: '0xsurvey',
     }));
     expect(refreshQuestionResponses).toHaveBeenCalledWith(['q1'], {
       slug: 'alpha',
