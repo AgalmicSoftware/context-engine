@@ -1,4 +1,5 @@
 import {
+  buildSessionWizardInitialDraftFromCache,
   buildSessionWizardDefaultTemplate,
   normalizeSessionWizardDraftShape,
 } from './sessionWizardDraftState';
@@ -46,6 +47,50 @@ describe('sessionWizardDraftState', () => {
         fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
         thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5' }),
       }),
+    }));
+  });
+
+  it('merges cached wizard drafts with source defaults and normal-mode worker fallback', () => {
+    const defaultTemplate = {
+      slug: '',
+      sessionName: '',
+      corsWorkerUrl: 'https://hosted.example/default-worker.js',
+      embeddedDeployHelperEnabled: false,
+      rpc: {},
+      faucet: {},
+    };
+
+    expect(buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached Session',
+          corsWorkerUrl: 'https://cached.example/worker',
+        },
+        deployComplete: false,
+      },
+      defaultTemplate,
+      normalModeSharedHostedWorkerEnabled: false,
+      sourceEmbeddedDeployHelperDefault: true,
+    })).toEqual(expect.objectContaining({
+      sessionName: 'Cached Session',
+      corsWorkerUrl: '',
+      embeddedDeployHelperEnabled: true,
+    }));
+
+    expect(buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          embeddedDeployHelperEnabled: false,
+          corsWorkerUrl: 'https://cached.example/worker',
+        },
+        deployComplete: true,
+      },
+      defaultTemplate,
+      normalModeSharedHostedWorkerEnabled: false,
+      sourceEmbeddedDeployHelperDefault: true,
+    })).toEqual(expect.objectContaining({
+      corsWorkerUrl: 'https://cached.example/worker',
+      embeddedDeployHelperEnabled: false,
     }));
   });
 });

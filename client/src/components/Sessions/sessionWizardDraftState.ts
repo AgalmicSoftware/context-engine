@@ -26,6 +26,17 @@ const { getPathRpcUrl } = rpcDefaults;
 export const DEFAULT_NEW_SESSION_SBT_TAGS = 'group, event, idea, demographic, location';
 
 const deepClone = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj ?? {}));
+const mergeSessionWizardDraftDeep = (target: AnyRecord, source: AnyRecord): AnyRecord => {
+  const out: AnyRecord = { ...(target || {}) };
+  Object.entries(source || {}).forEach(([key, value]) => {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      out[key] = mergeSessionWizardDraftDeep(out[key] as AnyRecord || {}, value as AnyRecord);
+    } else {
+      out[key] = value;
+    }
+  });
+  return out;
+};
 
 export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRecord => {
   const draft = normalizeSessionNaming(draftIn && typeof draftIn === 'object' ? draftIn : {}) as AnyRecord;
@@ -162,4 +173,37 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
     draft.lit.defaultGateId = 'gate-1';
   }
   return normalizeSessionWizardDraftShape(draft);
+};
+
+export const buildSessionWizardInitialDraftFromCache = ({
+  cachedWizard = null,
+  defaultTemplate = buildSessionWizardDefaultTemplate(),
+  normalModeSharedHostedWorkerEnabled = true,
+  sourceEmbeddedDeployHelperDefault = null,
+}: {
+  cachedWizard?: AnyRecord | null;
+  defaultTemplate?: AnyRecord;
+  normalModeSharedHostedWorkerEnabled?: unknown;
+  sourceEmbeddedDeployHelperDefault?: unknown;
+} = {}): AnyRecord => {
+  const cachedDraft = (
+    cachedWizard?.draft &&
+    typeof cachedWizard.draft === 'object'
+  ) ? cachedWizard.draft as AnyRecord : null;
+  const cachedDraftHasEmbeddedDeployHelperEnabled = (
+    typeof cachedDraft?.embeddedDeployHelperEnabled === 'boolean'
+  );
+  const base = deepClone(defaultTemplate || {});
+  if (
+    !cachedDraftHasEmbeddedDeployHelperEnabled &&
+    typeof sourceEmbeddedDeployHelperDefault === 'boolean'
+  ) {
+    base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
+  }
+  const merged = cachedDraft ? mergeSessionWizardDraftDeep(base, cachedDraft) : base;
+  const normalized = normalizeSessionWizardDraftShape(merged);
+  if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
+    normalized.corsWorkerUrl = '';
+  }
+  return normalized;
 };
