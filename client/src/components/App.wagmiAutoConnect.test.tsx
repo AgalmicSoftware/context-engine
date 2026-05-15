@@ -4,7 +4,7 @@ import { act, cleanup, render } from '@testing-library/react';
 const buildMockConfigureChainsResult = (_chains: unknown[], _providers: unknown[]) => ({
   chains: [{ id: 84532, chainId: 84532, name: 'Base Sepolia' }],
   provider: {},
-  webSocketProvider: {},
+  webSocketProvider: { kind: 'configured-websocket-provider' },
 });
 const buildMockJsonRpcProvider = ({ rpc }: { rpc: (chain: any) => { http: string } | null }) => (
   (chain: any) => {
@@ -256,6 +256,17 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockCreateClient).toHaveBeenCalledWith(
       expect.objectContaining({ autoConnect: true })
     );
+  });
+
+  it('passes the configured websocket provider through without enabling WalletConnect by default', () => {
+    loadAppModule();
+
+    expect(mockCreateClient).toHaveBeenCalledWith(
+      expect.objectContaining({
+        webSocketProvider: { kind: 'configured-websocket-provider' },
+      })
+    );
+    expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
   });
 
   it('uses an injected-only MetaMask connector by default to avoid WalletConnect bridge startup', () => {
