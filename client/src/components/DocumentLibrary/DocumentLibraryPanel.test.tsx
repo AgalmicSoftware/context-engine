@@ -525,6 +525,64 @@ describe('DocumentLibraryPanel photo docs', () => {
     }
   });
 
+  it('does not apply stale Cloudflare list completions after an immediate context rerender', async () => {
+    mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
+    const slowList = createDeferred<any[]>();
+    mockListSessionStorageRefs
+      .mockReturnValueOnce(slowList.promise)
+      .mockResolvedValueOnce([]);
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge-a',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      mode: 'session',
+      sessionIdHex: `0x${'a'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+    await waitFor(() => {
+      expect(mockListSessionStorageRefs).toHaveBeenCalledWith(expect.objectContaining({
+        sessionSlug: 'edge-a',
+      }));
+    });
+
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        sessionSlug="edge-b"
+        sessionIdHex={`0x${'b'.repeat(32)}`}
+      />
+    );
+    await act(async () => {
+      slowList.resolve([
+        {
+          storageRef: {
+            backend: 'cloudflare',
+            id: 'cf_stale_list',
+            uri: '/storage/read?id=cf_stale_list',
+            contentType: 'text/plain',
+            resource: 'docsContext',
+          },
+          metadata: {
+            size: 15,
+            tags: [
+              { name: 'CE-DocKind', value: 'file' },
+              { name: 'CE-DocName', value: 'Stale list note' },
+            ],
+          },
+        },
+      ]);
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.queryByText('Stale list note')).not.toBeInTheDocument();
+  });
+
   it('does not apply upload completions after unmount', async () => {
     const slowUpload = createDeferred<any>();
     mockUploadDocLibraryFile.mockReturnValueOnce(slowUpload.promise);
@@ -833,6 +891,72 @@ describe('DocumentLibraryPanel photo docs', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(screen.queryByText('old context text')).not.toBeInTheDocument();
+  });
+
+  it('ignores in-flight document open requests resolved immediately after a context rerender', async () => {
+    mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
+    const slowRead = createDeferred<any>();
+    mockListSessionStorageRefs
+      .mockResolvedValueOnce([
+        {
+          storageRef: {
+            backend: 'cloudflare',
+            id: 'cf_render_context',
+            uri: '/storage/read?id=cf_render_context',
+            contentType: 'text/plain',
+            resource: 'docsContext',
+          },
+          metadata: {
+            size: 17,
+            tags: [
+              { name: 'CE-DocKind', value: 'file' },
+              { name: 'CE-DocName', value: 'Render context note' },
+            ],
+          },
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    mockReadSessionStorageBlob.mockReturnValueOnce(slowRead.promise);
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge-a',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      mode: 'session',
+      sessionIdHex: `0x${'7'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+
+    expect(await screen.findByText('Render context note')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
+    await waitFor(() => {
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_render_context' }),
+      }));
+    });
+
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        account="0x456"
+        sessionSlug="edge-b"
+        sessionIdHex={`0x${'8'.repeat(32)}`}
+      />
+    );
+    await act(async () => {
+      slowRead.resolve({
+        headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
+        blob: async () => ({ type: 'text/plain', text: async () => 'render stale text' }),
+      });
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.queryByText('render stale text')).not.toBeInTheDocument();
   });
 
   it('ignores in-flight document open requests after the storage config changes', async () => {

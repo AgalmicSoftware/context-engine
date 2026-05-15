@@ -718,6 +718,8 @@ export default function DocumentLibraryPanel({
     loginComplete ? '1' : '0',
     docAsyncConfigKey,
   ].join('|')), [account, docAsyncConfigKey, loginComplete, network?.id, panelContextKey]);
+  const activeViewerContextKeyRef = useRef(viewerContextKey);
+  activeViewerContextKeyRef.current = viewerContextKey;
   const activeUploadContextKeyRef = useRef(viewerContextKey);
   activeUploadContextKeyRef.current = viewerContextKey;
 
@@ -725,6 +727,7 @@ export default function DocumentLibraryPanel({
     viewerRequestSeqRef.current += 1;
     listRequestSeqRef.current += 1;
     activeListQueryKeyRef.current = '__unmounted__';
+    activeViewerContextKeyRef.current = '__unmounted__';
     activeUploadContextKeyRef.current = '__unmounted__';
     loadingRef.current = false;
   }, []);
@@ -815,7 +818,7 @@ export default function DocumentLibraryPanel({
     if (mode === 'sbt') return !!normalizedSbtAddress && !!Number(sbtChainId || network?.id || 0);
     return false;
   }, [docProvider, isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId, sessionSlug]);
-  const listRunKey = useMemo(() => `${canList ? '1' : '0'}|${listQueryKey}`, [canList, listQueryKey]);
+  const listRunKey = useMemo(() => `${viewerContextKey}|${canList ? '1' : '0'}|${listQueryKey}`, [canList, listQueryKey, viewerContextKey]);
   activeListQueryKeyRef.current = listRunKey;
 
   const loadDocs = useCallback(async ({ reset }: { reset?: boolean } = {}) => {
@@ -917,7 +920,11 @@ export default function DocumentLibraryPanel({
     if (!txId) return false;
     const requestSeq = viewerRequestSeqRef.current + 1;
     viewerRequestSeqRef.current = requestSeq;
-    const isCurrentViewerRequest = () => viewerRequestSeqRef.current === requestSeq;
+    const viewerContextAtStart = activeViewerContextKeyRef.current;
+    const isCurrentViewerRequest = () => (
+      viewerRequestSeqRef.current === requestSeq &&
+      activeViewerContextKeyRef.current === viewerContextAtStart
+    );
     const revokeStaleBlobUrl = (blobUrl: string) => {
       if (!blobUrl || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
       try { URL.revokeObjectURL(blobUrl); } catch (e) { log.warn('DocumentLibraryPanel: stale blob cleanup', e); }
