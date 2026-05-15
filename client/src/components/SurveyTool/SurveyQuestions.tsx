@@ -1434,35 +1434,35 @@ export class SurveyQuestions extends Component {
     }, Math.max(0, Number(delayMs) || 0));
   };
 
-  resolveEffectiveResponseGateConfig = (slugIn = '') => {
+  resolveEffectiveResponseGateConfig = (slugIn = '', propsSnapshot = this.props) => {
     const slug = String(slugIn || '').trim().toLowerCase();
     const resolved = resolveSurveyToolResponseGateSessionContext({
       sessionSlug: slug,
-      sessionConfig: (this.props.sessionConfig && typeof this.props.sessionConfig === 'object')
-        ? this.props.sessionConfig
+      sessionConfig: (propsSnapshot?.sessionConfig && typeof propsSnapshot.sessionConfig === 'object')
+        ? propsSnapshot.sessionConfig
         : null,
       resolveBySlug: getStrictSessionConfigBySlug,
     });
     return resolved.effectiveSessionConfig || {};
   };
 
-  resolveSessionChainId = (slugIn = '', cfgIn = null) => {
+  resolveSessionChainId = (slugIn = '', cfgIn = null, propsSnapshot = this.props) => {
     const slug = String(
-      slugIn || (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : resolveEffectiveSlug(this.props)) || ''
+      slugIn || (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : resolveEffectiveSlug(propsSnapshot)) || ''
     ).trim().toLowerCase();
     const cfg =
       cfgIn && typeof cfgIn === 'object'
         ? cfgIn
-        : this.resolveEffectiveResponseGateConfig(slug);
+        : this.resolveEffectiveResponseGateConfig(slug, propsSnapshot);
     return Number(
       cfg?.networkChainId ||
       cfg?.contracts?.surveys?.chainId ||
       cfg?.contracts?.sbtFactory?.chainId ||
       cfg?.__registry?.chainId ||
       cfg?.__registry?.registryChainId ||
-      this.props.networkChainId ||
-      this.props.network?.id ||
-      this.props.network?.chainId ||
+      propsSnapshot?.networkChainId ||
+      propsSnapshot?.network?.id ||
+      propsSnapshot?.network?.chainId ||
       0
     ) || null;
   };
@@ -4566,11 +4566,11 @@ export class SurveyQuestions extends Component {
     });
   };
 
-  resolveSubmissionGroupContext = ({ questionIds = [], surveyId = null } = {}) => {
+  resolveSubmissionGroupContext = ({ questionIds = [], surveyId = null, fallbackSlug = null } = {}) => {
     return buildSubmissionGroupContext({
       questionIds,
       slugByQuestionId: this.resolveQuestionSlugMapForIds(questionIds, { surveyId }),
-      fallbackSlug: resolveEffectiveSlug(this.props),
+      fallbackSlug: fallbackSlug != null ? fallbackSlug : resolveEffectiveSlug(this.props),
       normalizeSlug: normalizeSessionSlugValue,
     });
   };
@@ -9808,10 +9808,35 @@ export class SurveyQuestions extends Component {
     return encState;
   };
 
+  buildSubmitContextSnapshot = () => {
+    const singleQuestionMode = !!this.props.singleQuestionMode;
+    const isStandalone = !!this.props.isStandalone;
+    const surveyIndex = singleQuestionMode || isStandalone ? 0 : (this.props.surveyIndex || 0);
+    const effectiveDraftSlug = normalizeSessionSlugValue(
+      this._getEffectiveDraftSlug
+        ? this._getEffectiveDraftSlug()
+        : resolveEffectiveSlug(this.props)
+    );
+
+    return {
+      props: this.props,
+      account: this.props.account || '',
+      provider: this.props.provider,
+      loginComplete: !!this.props.loginComplete,
+      singleQuestionMode,
+      isStandalone,
+      surveyIndex,
+      surveyId: this.props.surveyId || '',
+      questionID: this.props.questionID || '',
+      effectiveDraftSlug,
+      chainId: this.resolveSessionChainId(effectiveDraftSlug, null, this.props),
+    };
+  };
 
   encryptAndUpload = async () => {
     try {
-      if (!this.props.loginComplete) {
+      const submitContext = this.buildSubmitContextSnapshot();
+      if (!submitContext.loginComplete) {
         this._submitGuard = false;
         this.props.toggleLoginModal(true);
         return;
@@ -9838,10 +9863,10 @@ export class SurveyQuestions extends Component {
 
       this.setState({ isSubmitting: true, submitProgress: 0, currentStep: 1, submissionError: '' });
 
-      const providerKind = cryptoUtils.getProviderKind(this.props.provider);
+      const providerKind = cryptoUtils.getProviderKind(submitContext.provider);
 
       // Compute changed set once (used for encrypt + submit)
-      const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
+      const surveyIndex = submitContext.surveyIndex;
       const { changedQids } = this.getChangedQidsAndFields(surveyIndex);
 
       // Local state tracker to ensure baseline syncs with encrypted data even if React is slow
@@ -9867,8 +9892,7 @@ export class SurveyQuestions extends Component {
         if (missingRecipients.length > 0) {
           throw new Error(`Missing Lit recipients for gated field(s): ${missingRecipients.join(', ')}`);
         }
-          const chainId = this.resolveSessionChainId();
-          const surveyId = this.props.singleQuestionMode ? ethers.constants.HashZero : this.props.surveyId;
+          const surveyId = submitContext.singleQuestionMode ? ethers.constants.HashZero : submitContext.surveyId;
           const poolForCommit =
             (Array.isArray(this.state.questionPool) && this.state.questionPool.length > 0)
               ? this.state.questionPool
@@ -9877,9 +9901,9 @@ export class SurveyQuestions extends Component {
             workGroups,
             baseOpts: {
               providerKind,
-              provider: this.props.provider,
-              account: this.props.account,
-              chainId,
+              provider: submitContext.provider,
+              account: submitContext.account,
+              chainId: submitContext.chainId,
               surveyId,
               questionPool: poolForCommit,
               hasher: this.state.hasher,
@@ -9914,7 +9938,7 @@ export class SurveyQuestions extends Component {
       this.setState({ currentStep: 2 });
 
       // Await the receipt to ensure transaction is confirmed before optimistic update
-      const receipt = await this.submitSurveyResponse(activeSlice, changedQids);
+      const receipt = await this.submitSurveyResponse(activeSlice, changedQids, submitContext);
       surveyLog.log("Submission receipt received", receipt?.blockNumber || 'unknown block');
 
       // Success path
@@ -9942,21 +9966,21 @@ export class SurveyQuestions extends Component {
       const submittedCacheSlug = normalizeSessionSlugValue(
         receipt?.__ceSubmissionGroupKey != null
           ? receipt.__ceSubmissionGroupKey
-          : this._getEffectiveDraftSlug()
+          : submitContext.effectiveDraftSlug
       );
       try {
-        const accountLower = (this.props.account || '').toLowerCase();
+        const accountLower = (submitContext.account || '').toLowerCase();
         if (accountLower) {
-          if (this.props.singleQuestionMode) {
-            const qLower = (this.props.questionID || '').toLowerCase();
+          if (submitContext.singleQuestionMode) {
+            const qLower = (submitContext.questionID || '').toLowerCase();
             if (qLower) {
               responseUrl = buildQuestionRoutePath(qLower, {
                 responderAddress: accountLower,
                 sessionSlug: submittedCacheSlug,
               });
             }
-          } else if (!this.props.isStandalone) {
-            const sLower = (this.props.surveyId || '').toLowerCase();
+          } else if (!submitContext.isStandalone) {
+            const sLower = (submitContext.surveyId || '').toLowerCase();
             if (sLower) responseUrl = `/survey/${sLower}/${accountLower}${submittedCacheSlug ? `?session=${encodeURIComponent(submittedCacheSlug)}` : ''}`;
           }
         }
@@ -10012,7 +10036,7 @@ export class SurveyQuestions extends Component {
             surveyResponse: receipt?.__ceSurveyResponse,
             surveyId: receipt?.__ceSurveyId,
             submissionSlug: submittedCacheSlug,
-          }).catch((error) => {
+          }, submitContext).catch((error) => {
             surveyLog.warn('[SurveyQuestions] Local submit cache write-through failed:', error);
             return { questionCacheWritten: false, surveyCacheWritten: false };
           });
@@ -10025,17 +10049,17 @@ export class SurveyQuestions extends Component {
             if (ids.length > 0) {
               await this.props.refreshQuestionResponses(ids, {
                 slug: submittedCacheSlug,
-                responder: this.props.account || '',
+                responder: submitContext.account || '',
               });
             }
           }
           if (
             !cacheWriteResult?.surveyCacheWritten &&
-            !this.props.singleQuestionMode &&
+            !submitContext.singleQuestionMode &&
             typeof this.props.refreshSurveyResponsesByID === 'function' &&
-            this.props.surveyId
+            submitContext.surveyId
           ) {
-            await this.props.refreshSurveyResponsesByID(this.props.surveyId);
+            await this.props.refreshSurveyResponsesByID(submitContext.surveyId);
           }
         } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
       });
@@ -10209,14 +10233,17 @@ export class SurveyQuestions extends Component {
     return true;
   };
 
-  submitSurveyResponse = async (overrideState = null, overrideChangedQids = null) => {
-    if (!this.props.loginComplete) {
+  submitSurveyResponse = async (overrideState = null, overrideChangedQids = null, submitContext = null) => {
+    const context = submitContext && typeof submitContext === 'object'
+      ? submitContext
+      : this.buildSubmitContextSnapshot();
+    if (!context.loginComplete) {
       this.props.toggleLoginModal(true);
       return;
     }
 
     // Use correct survey index for payload + diff gating
-    const idx = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
+    const idx = context.surveyIndex;
 
     const data = this.prepareJsonAndHash(idx, undefined, overrideState);
 
@@ -10243,7 +10270,23 @@ export class SurveyQuestions extends Component {
       throw new Error('No new or changed responses to submit.');
     }
 
-    let questionIds, questionResponses, surveyId, surveyResponse;
+    let filtered;
+    try {
+      filtered = filterChangedResponsesForSubmit({
+        data,
+        changedSet,
+        singleQuestionMode: !!context.singleQuestionMode,
+        isStandalone: !!context.isStandalone,
+        surveyId: context.surveyId,
+        HashZero: ethers.constants.HashZero,
+      });
+    } catch (e) {
+      this._submitGuard = false;
+      this.setState(buildSubmitPreparationErrorState(
+        e.message || 'No new or changed responses to submit.'
+      ));
+      throw e;
+    }
 
     if (this.props.singleQuestionMode) {
       const qid = data && data.questionID;
@@ -10284,7 +10327,8 @@ export class SurveyQuestions extends Component {
 
     const submissionContext = this.resolveSubmissionGroupContext({
       questionIds,
-      surveyId: this.props.singleQuestionMode ? null : (this.props.surveyId || null),
+      surveyId: context.singleQuestionMode ? null : (context.surveyId || null),
+      fallbackSlug: context.effectiveDraftSlug,
     });
     if (!submissionContext.ok) {
       throw new Error(submissionContext.error);
@@ -10296,210 +10340,41 @@ export class SurveyQuestions extends Component {
     // - When the response is encrypted (or rating already encrypted), ensure ratings are stored in envelopes
     //   and remove plaintext copies from the uploaded payload.
     try {
-      const sliceForSubmit =
-        (overrideState && typeof overrideState === 'object')
-          ? overrideState
-          : (this.state.surveysResponseState && this.state.surveysResponseState[idx]) ||
-            { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
-
-      const encChainId = this.resolveSessionChainId(submissionGroupKey);
-      const encSurveyId =
-        (this.props.singleQuestionMode || this.props.isStandalone)
-          ? ethers.constants.HashZero
-          : this.props.surveyId;
-
-      const pickAudienceForQid = (qid) => {
-        const qLower = String(qid || '').trim().toLowerCase();
-        if (!qLower) return { audience: 'self', recipients: [] };
-        if (this.isQuestionLockedForResponse(qLower)) {
-          return {
-            audience: 'gate',
-            recipients: this.getEffectiveRecipientsForQid(qLower),
-          };
-        }
-
-        const ans = sliceForSubmit.answers?.[qLower] || {};
-        const add = sliceForSubmit.additionalComments?.[qLower] || {};
-
-        if (ans?.encrypted) {
-          const aAud = this.resolveFieldEncryptionAudience(ans, qLower, 'answer');
-          if (aAud === 'gate') {
-            return {
-              audience: 'gate',
-              recipients: this.getEffectiveRecipientsForField({
-                questionId: qLower,
-                fieldKey: 'answer',
-                field: ans,
-              }),
-            };
-          }
-          if (aAud === 'self') return { audience: 'self', recipients: [] };
-        }
-
-        if (add?.encrypted) {
-          const dAud = this.resolveFieldEncryptionAudience(add, qLower, 'additional');
-          if (dAud === 'gate') {
-            return {
-              audience: 'gate',
-              recipients: this.getEffectiveRecipientsForField({
-                questionId: qLower,
-                fieldKey: 'additional',
-                field: add,
-              }),
-            };
-          }
-          if (dAud === 'self') return { audience: 'self', recipients: [] };
-        }
-
-        const defaultAudience = this.getDefaultResponseEncryptionAudienceForQid(qLower);
-        return {
-          audience: defaultAudience,
-          recipients: defaultAudience === 'gate' ? this.getEffectiveRecipientsForQid(qLower) : [],
-        };
-      };
-
-      const shouldEncryptRatingForQid = (qid, respObj) => {
-        const locked = this.isQuestionLockedForResponse(qid);
-        const ansState = sliceForSubmit.answers?.[qid];
-        const addState = sliceForSubmit.additionalComments?.[qid];
-        const encryptedState = !!locked || !!ansState?.encrypted || !!addState?.encrypted;
-        const encryptedPayload = !!respObj?.answer?.encrypted || !!respObj?.additional?.encrypted;
-        return encryptedState || encryptedPayload;
-      };
-
-      const baseOpts = {
-        provider: this.props.provider,
-        account: this.props.account,
-        chainId: encChainId,
-        surveyId: encSurveyId,
-        kind: 'rating',
-        hasher: this.state.hasher,
-      };
-      const ratingFieldSpecs = [
-        { fieldKey: 'importance', envelopeKey: 'importanceEncrypted' },
-        { fieldKey: 'conviction', envelopeKey: 'convictionEncrypted' },
-      ];
-
-      // Snapshot latest on-chain rating values/envelopes so non-rating edits don't wipe them.
-      const ratingBaselineByQid = new Map();
-      try {
-        const source = this.state.userAnswers;
-        const list =
-          source && typeof source === 'object'
-            ? (Array.isArray(source.responses) ? source.responses : [source])
-            : [];
-        list.forEach((r) => {
-          const id = String(r?.questionID || r?.questionId || '').trim().toLowerCase();
-          if (!id) return;
-          const impEnv = (typeof r?.importanceEncrypted === 'string') ? r.importanceEncrypted : '';
-          const convEnv = (typeof r?.convictionEncrypted === 'string') ? r.convictionEncrypted : '';
-          const impPlain = getImportanceFromResponse(r);
-          const convPlain = getConvictionFromResponse(r);
-          if (!impEnv && !convEnv && impPlain === null && convPlain === null) return;
-          ratingBaselineByQid.set(id, {
-            importanceEncrypted: impEnv,
-            convictionEncrypted: convEnv,
-            importance: impPlain,
-            conviction: convPlain,
-          });
-        });
-      } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-
-      // Serialize envelope creation to avoid concurrent wallet signature prompts (eth_signTypedData_v4).
-      for (const respObj of (questionResponses || [])) {
-        const qidRaw = String(respObj?.questionID || respObj?.questionId || '').trim();
-        const qid = qidRaw.toLowerCase();
-        if (!qid) continue;
-
-        const fields =
-          (changedMapForSubmit && (changedMapForSubmit[qidRaw] || changedMapForSubmit[qid])) ||
-          {};
-        const baseline = ratingBaselineByQid.get(qid) || null;
-        const changedByField = {};
-
-        ratingFieldSpecs.forEach(({ fieldKey, envelopeKey }) => {
-          const fieldChanged = !!fields[fieldKey];
-          changedByField[fieldKey] = fieldChanged;
-
-          const baselineEnvelope = baseline?.[envelopeKey] || '';
-          const baselinePlain = baseline?.[fieldKey];
-
-          // Always carry forward existing envelopes so a non-rating edit can't wipe them.
-          if (!respObj[envelopeKey] && baselineEnvelope) respObj[envelopeKey] = baselineEnvelope;
-
-          // Preserve plaintext rating values for non-rating edits when the baseline is plaintext.
-          // (When encryption is active, we migrate plaintext into envelopes below.)
-          if (!fieldChanged && (respObj[fieldKey] === null || respObj[fieldKey] === undefined) && baselinePlain !== null && baselinePlain !== undefined) {
-            respObj[fieldKey] = baselinePlain;
-          }
-        });
-
-        const hasAnyExistingEnvelope = ratingFieldSpecs.some(({ envelopeKey }) => {
-          const env = typeof respObj[envelopeKey] === 'string' ? respObj[envelopeKey] : '';
-          return !!env;
-        });
-
-        // Rating encryption is active when the response is encrypted, or when rating is already encrypted.
-        const shouldEncryptRating = hasAnyExistingEnvelope || shouldEncryptRatingForQid(qid, respObj);
-        if (!shouldEncryptRating) {
-          // Rating stays plaintext; clear any stale envelopes for changed fields.
-          ratingFieldSpecs.forEach(({ fieldKey, envelopeKey }) => {
-            if (changedByField[fieldKey]) respObj[envelopeKey] = '';
-          });
-          continue;
-        }
-
-        const fieldsNeedingEncryption = ratingFieldSpecs.filter(({ fieldKey, envelopeKey }) => {
-          const value = respObj?.[fieldKey];
-          const existingEnvelope = (typeof respObj[envelopeKey] === 'string') ? respObj[envelopeKey] : '';
-          return (
-            value !== undefined &&
-            value !== null &&
-            (changedByField[fieldKey] || !existingEnvelope)
-          );
-        });
-
-        // Only resolve Lit recipients when we actually need to encrypt a value.
-        let lit = undefined;
-        if (fieldsNeedingEncryption.length > 0) {
-          const audienceSelection = pickAudienceForQid(qid);
-          if (audienceSelection.audience === 'gate') {
-            const recipients = audienceSelection.recipients;
-            if (!Array.isArray(recipients) || recipients.length === 0) {
-              throw new Error(`Missing Lit recipients for gated rating encryption (${qid}).`);
-            }
-            lit = this.buildLitEncryptionOptionsForRecipients(recipients);
-            if (!lit) {
-              throw new Error('Lit hooks unavailable; cannot encrypt gated rating.');
-            }
-          }
-        }
-
-        for (const { fieldKey, envelopeKey } of ratingFieldSpecs) {
-          const value = respObj?.[fieldKey];
-          const existingEnvelope = (typeof respObj[envelopeKey] === 'string') ? respObj[envelopeKey] : '';
-          const shouldEncryptField =
-            (value !== undefined && value !== null) &&
-            (changedByField[fieldKey] || !existingEnvelope);
-
-          if (shouldEncryptField) {
-            // eslint-disable-next-line no-await-in-loop
-            respObj[envelopeKey] = await cryptoUtils.encryptEnvelopeValue(value, {
-              ...baseOpts,
-              ...(lit ? { lit } : {}),
-              qId: `${fieldKey}:${qid}`,
-            });
-          } else if (changedByField[fieldKey]) {
-            // Explicit clear on changed plaintext.
-            respObj[envelopeKey] = '';
-          }
-        }
-
-        // Rating is stored in envelopes only when encryption is active.
-        ratingFieldSpecs.forEach(({ fieldKey }) => {
-          respObj[fieldKey] = null;
-        });
-      }
+      await processRatingEnvelopesForSubmit(
+        {
+          sliceForSubmit:
+            (overrideState && typeof overrideState === 'object')
+              ? overrideState
+              : (this.state.surveysResponseState && this.state.surveysResponseState[idx]) ||
+                { answers: {}, importance: {}, conviction: {}, additionalComments: {} },
+          userAnswersSource: this.state.userAnswers,
+          questionResponses,
+          changedMapForSubmit,
+          encryptionBaseOpts: {
+            provider: context.provider,
+            account: context.account,
+            chainId: this.resolveSessionChainId(submissionGroupKey, null, context.props || this.props) || context.chainId,
+            surveyId:
+              (context.singleQuestionMode || context.isStandalone)
+                ? ethers.constants.HashZero
+                : context.surveyId,
+            kind: 'rating',
+            hasher: this.state.hasher,
+          },
+        },
+        {
+          isQuestionLockedForResponse: (qid) => this.isQuestionLockedForResponse(qid),
+          resolveFieldEncryptionAudience: (field, qid, fk) => this.resolveFieldEncryptionAudience(field, qid, fk),
+          getEffectiveRecipientsForQid: (qid) => this.getEffectiveRecipientsForQid(qid),
+          getEffectiveRecipientsForField: (opts) => this.getEffectiveRecipientsForField(opts),
+          getDefaultResponseEncryptionAudienceForQid: (qid) => this.getDefaultResponseEncryptionAudienceForQid(qid),
+          buildLitEncryptionOptionsForRecipients: (r) => this.buildLitEncryptionOptionsForRecipients(r),
+          encryptEnvelopeValue: (value, opts) => cryptoUtils.encryptEnvelopeValue(value, opts),
+          getImportanceFromResponse,
+          getConvictionFromResponse,
+          warn: (msg, err) => surveyLog.warn(msg, err),
+        },
+      );
     } catch (e) {
       surveyLog.error('Failed to encrypt response rating:', e);
       throw e;
@@ -10522,7 +10397,7 @@ export class SurveyQuestions extends Component {
 
     // Submit tx (must actually send or we throw)
     const tx = await contractScripts.submitResponses(
-      this.props.provider,
+      context.provider,
       hashedQuestionIds,
       questionResponses,
       hashedSurveyId,
@@ -10559,147 +10434,17 @@ export class SurveyQuestions extends Component {
     throw new Error('No transaction was sent.');
   };
 
-  writeSubmittedResponsesToLocalCaches = async ({
-    receipt = null,
-    questionResponses = [],
-    surveyResponse = null,
-    surveyId = null,
-    submissionSlug = null,
-  } = {}) => {
-    const responderLower = String(this.props.account || '').trim().toLowerCase();
-    if (!responderLower) {
-      return { questionCacheWritten: false, surveyCacheWritten: false };
-    }
-
-    const slug = normalizeSessionSlugValue(
-      submissionSlug != null
-        ? submissionSlug
-        : this._getEffectiveDraftSlug()
-    );
-    const cacheWriteContext = resolveSubmittedCacheWriteContext(this.props, slug);
-    const netIdStr = cacheWriteContext.networkIdStr || '';
-    if (!netIdStr) {
-      return { questionCacheWritten: false, surveyCacheWritten: false };
-    }
-
-    const recencyMeta = toResponseRecencyMeta(receipt);
-    let questionCacheWritten = false;
-    let surveyCacheWritten = false;
-
-    const submittedQuestionResponses = Array.isArray(questionResponses) ? questionResponses : [];
-    if (submittedQuestionResponses.length > 0) {
-      await updateCacheAtomic('questionsCache', slug, (current) => {
-        const nextCache = ensureQuestionsNet(current, netIdStr);
-        const net = nextCache[netIdStr];
-        if (!net.questions || typeof net.questions !== 'object') net.questions = {};
-        if (!net.questionResponses || typeof net.questionResponses !== 'object') net.questionResponses = {};
-        if (!net.questionResponsesMeta || typeof net.questionResponsesMeta !== 'object') net.questionResponsesMeta = {};
-        let didWrite = false;
-
-        submittedQuestionResponses.forEach((rawResponse) => {
-          const questionId = normalizeQuestionIdKey(rawResponse?.questionID || rawResponse?.questionId);
-          if (!questionId) return;
-          if (!net.questionResponses[questionId] || typeof net.questionResponses[questionId] !== 'object') {
-            net.questionResponses[questionId] = {};
-          }
-          if (!net.questionResponsesMeta[questionId] || typeof net.questionResponsesMeta[questionId] !== 'object') {
-            net.questionResponsesMeta[questionId] = {};
-          }
-          if (!isIncomingResponseMetaNewer(recencyMeta, net.questionResponsesMeta[questionId][responderLower])) {
-            return;
-          }
-
-          const nextResponse = stampResponsePayloadWithMeta(
-            this.deepClone(rawResponse || {}),
-            recencyMeta
-          );
-          net.questionResponses[questionId][responderLower] = nextResponse;
-          net.questionResponsesMeta[questionId][responderLower] = {
-            bn: recencyMeta.bn,
-            txi: recencyMeta.txi,
-            li: recencyMeta.li,
-            ts: recencyMeta.ts,
-          };
-
-          const prevQuestion = (net.questions[questionId] && typeof net.questions[questionId] === 'object')
-            ? net.questions[questionId]
-            : {};
-          net.questions[questionId] = {
-            ...prevQuestion,
-            id: questionId,
-            ...(rawResponse?.type ? { type: rawResponse.type } : {}),
-            ...(typeof rawResponse?.prompt === 'string' ? { prompt: rawResponse.prompt } : {}),
-            ...(typeof rawResponse?.sessionName === 'string' && rawResponse.sessionName.trim()
-              ? { sessionName: rawResponse.sessionName }
-              : {}),
-          };
-          didWrite = true;
-        });
-
-        if (didWrite) questionCacheWritten = true;
-        return nextCache;
-      });
-    }
-
-    const surveyIdLower = normalizeQuestionIdKey(surveyId || surveyResponse?.surveyID || surveyResponse?.surveyId);
-    const shouldWriteSurveyCache = (
-      !this.props.singleQuestionMode &&
-      !this.props.isStandalone &&
-      surveyResponse &&
-      surveyIdLower &&
-      surveyIdLower !== normalizeQuestionIdKey(ethers.constants.HashZero)
-    );
-
-    if (shouldWriteSurveyCache) {
-      await updateCacheAtomic('surveysCache', slug, (current) => {
-        const nextCache = ensureSurveysNet(current, netIdStr);
-        const net = nextCache[netIdStr];
-        if (!net.surveys || typeof net.surveys !== 'object') net.surveys = {};
-        if (!net.surveyResponses || typeof net.surveyResponses !== 'object') net.surveyResponses = {};
-        if (!net.surveyResponses[surveyIdLower] || typeof net.surveyResponses[surveyIdLower] !== 'object') {
-          net.surveyResponses[surveyIdLower] = {};
-        }
-        const existingResponse = net.surveyResponses[surveyIdLower][responderLower] || null;
-        if (!isIncomingResponseMetaNewer(recencyMeta, existingResponse)) {
-          return nextCache;
-        }
-
-        const mergedResponse = mergeSurveyResponsePayloads(
-          existingResponse,
-          this.deepClone(surveyResponse)
-        );
-        net.surveyResponses[surveyIdLower][responderLower] = stampResponsePayloadWithMeta(
-          mergedResponse,
-          recencyMeta
-        );
-
-        const prevSurvey = (net.surveys[surveyIdLower] && typeof net.surveys[surveyIdLower] === 'object')
-          ? net.surveys[surveyIdLower]
-          : {};
-        const mergedResponses = Array.isArray(net.surveyResponses[surveyIdLower][responderLower]?.responses)
-          ? net.surveyResponses[surveyIdLower][responderLower].responses
-          : [];
-        const mergedQuestionIds = mergedResponses
-          .map((row) => normalizeQuestionIdKey(row?.questionID || row?.questionId))
-          .filter(Boolean);
-        net.surveys[surveyIdLower] = {
-          ...prevSurvey,
-          id: surveyIdLower,
-          surveyID: surveyIdLower,
-          ...(typeof surveyResponse?.surveyTitle === 'string' && surveyResponse.surveyTitle.trim()
-            ? { title: surveyResponse.surveyTitle }
-            : {}),
-          ...(typeof surveyResponse?.sessionName === 'string' && surveyResponse.sessionName.trim()
-            ? { sessionName: surveyResponse.sessionName }
-            : {}),
-          ...(mergedQuestionIds.length > 0 ? { questionIDs: mergedQuestionIds } : {}),
-        };
-        surveyCacheWritten = true;
-        return nextCache;
-      });
-    }
-
-    return { questionCacheWritten, surveyCacheWritten };
+  writeSubmittedResponsesToLocalCaches = async (params = {}, submitContext = null) => {
+    const context = submitContext && typeof submitContext === 'object' ? submitContext : null;
+    const contextProps = context?.props || this.props;
+    return writeSubmittedResponsesToLocalCachesHelper(params, {
+      account: context?.account || this.props.account || '',
+      effectiveDraftSlug: context?.effectiveDraftSlug || this._getEffectiveDraftSlug() || '',
+      singleQuestionMode: context ? !!context.singleQuestionMode : !!this.props.singleQuestionMode,
+      isStandalone: context ? !!context.isStandalone : !!this.props.isStandalone,
+      deepClone: (obj) => this.deepClone(obj),
+      resolveSubmittedCacheWriteContext: (slug) => resolveSubmittedCacheWriteContext(contextProps, slug),
+    });
   };
 
 
