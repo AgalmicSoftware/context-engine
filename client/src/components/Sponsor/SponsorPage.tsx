@@ -78,7 +78,7 @@ const normalizeExpiryToIso = (raw: any) => {
 };
 const SPONSOR_PAGE_CACHE_KEY = 'ce:sponsorPageDraft:v1';
 const SPONSOR_PAGE_CACHE_VERSION = 1;
-const DEV_PERSIST_SPONSOR_BUNDLE_FIELDS = process.env.NODE_ENV !== 'production';
+const DEFAULT_REMEMBER_SPONSOR_DRAFT = process.env.NODE_ENV !== 'production';
 const buildEmptyBundleForm = () => ({
   label: '',
   openaiKey: '',
@@ -102,9 +102,13 @@ const normalizeSponsorBundleForm = (raw: any = {}) => {
   });
   return next;
 };
+const normalizeSponsorBundleDraftForm = (raw: any = {}) => ({
+  ...buildEmptyBundleForm(),
+  label: toStr(raw?.label || '').trim(),
+});
 const readSponsorPageCache = () => {
   const fallback = {
-    persistBundleSecrets: DEV_PERSIST_SPONSOR_BUNDLE_FIELDS,
+    persistBundleDraft: DEFAULT_REMEMBER_SPONSOR_DRAFT,
     bundleForm: buildEmptyBundleForm(),
     expiresAt: null,
   };
@@ -112,14 +116,16 @@ const readSponsorPageCache = () => {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(SPONSOR_PAGE_CACHE_KEY) || 'null');
     if (!parsed || Number(parsed.v || 0) !== SPONSOR_PAGE_CACHE_VERSION) return fallback;
-    const persistBundleSecrets = typeof parsed.persistBundleSecrets === 'boolean'
-      ? parsed.persistBundleSecrets
-      : fallback.persistBundleSecrets;
+    const persistBundleDraft = typeof parsed.persistBundleDraft === 'boolean'
+      ? parsed.persistBundleDraft
+      : typeof parsed.persistBundleSecrets === 'boolean'
+        ? parsed.persistBundleSecrets
+        : fallback.persistBundleDraft;
     const expiresAtRaw = toStr(parsed.expiresAt || '').trim();
     const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null;
     return {
-      persistBundleSecrets,
-      bundleForm: persistBundleSecrets ? normalizeSponsorBundleForm(parsed.bundleForm) : buildEmptyBundleForm(),
+      persistBundleDraft,
+      bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(parsed.bundleForm) : buildEmptyBundleForm(),
       expiresAt: expiresAt instanceof Date && Number.isFinite(expiresAt.getTime()) ? expiresAt : null,
     };
   } catch (_) {
@@ -127,7 +133,7 @@ const readSponsorPageCache = () => {
   }
 };
 const writeSponsorPageCache = ({
-  persistBundleSecrets = DEV_PERSIST_SPONSOR_BUNDLE_FIELDS,
+  persistBundleDraft = DEFAULT_REMEMBER_SPONSOR_DRAFT,
   bundleForm = {},
   expiresAt = null,
 }: any = {}) => {
@@ -135,9 +141,10 @@ const writeSponsorPageCache = ({
   try {
     window.localStorage.setItem(SPONSOR_PAGE_CACHE_KEY, JSON.stringify({
       v: SPONSOR_PAGE_CACHE_VERSION,
-      persistBundleSecrets: !!persistBundleSecrets,
-      bundleForm: persistBundleSecrets ? normalizeSponsorBundleForm(bundleForm) : {},
-      expiresAt: persistBundleSecrets && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
+      persistBundleDraft: !!persistBundleDraft,
+      persistBundleSecrets: false,
+      bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(bundleForm) : {},
+      expiresAt: persistBundleDraft && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
         ? expiresAt.toISOString()
         : '',
     }));
@@ -256,7 +263,7 @@ const SponsorPage = ({
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
   const [workerUrl, setWorkerUrl] = useState<any>('');
   const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
-  const [persistBundleSecrets, setPersistBundleSecrets] = useState<any>(initialCache.persistBundleSecrets);
+  const [persistBundleDraft, setPersistBundleDraft] = useState<any>(initialCache.persistBundleDraft);
   const [bundleForm, setBundleForm] = useState<any>(initialCache.bundleForm);
   const [expiresAt, setExpiresAt] = useState<any>(initialCache.expiresAt);
   const [createBusy, setCreateBusy] = useState<any>(false);
@@ -285,11 +292,11 @@ const SponsorPage = ({
 
   useEffect(() => {
     writeSponsorPageCache({
-      persistBundleSecrets,
+      persistBundleDraft,
       bundleForm,
       expiresAt,
     });
-  }, [persistBundleSecrets, bundleForm, expiresAt]);
+  }, [persistBundleDraft, bundleForm, expiresAt]);
 
   const syncSessionsFromRegistryCache = useCallback(({ isCancelled }: any = {}) => {
     const cached = sessionRegistryStore.getAllSessionEntries();
@@ -908,13 +915,13 @@ const SponsorPage = ({
               <Label className={styles.workerToggle}>
                 <Input
                   type="checkbox"
-                  checked={persistBundleSecrets}
-                  onChange={(e: any) => setPersistBundleSecrets(!!e.target.checked)}
+                  checked={persistBundleDraft}
+                  onChange={(e: any) => setPersistBundleDraft(!!e.target.checked)}
                 />
-                <span>Dev: keep secrets on refresh</span>
+                <span>Remember non-secret draft fields</span>
               </Label>
               <div className={styles.panelHint}>
-                Stores sponsor bundle fields in localStorage so repeated sponsor links do not require re-entry. Do not enable on shared machines.
+                Stores only non-secret metadata such as label and expiry in localStorage. API keys, private keys, tokens, JWKs, and RPC URLs are never restored.
               </div>
             </div>
           </div>
