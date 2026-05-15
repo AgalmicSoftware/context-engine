@@ -134,14 +134,65 @@ describe('SurveyQuestions runtime helpers', () => {
     window.sessionStorage?.removeItem('dg:recentQuestionPayloads');
   });
 
-  it('delegates runtime override points through the strategy bridge', async () => {
-    const strategy = {
-      buildInitialState: jest.fn(() => ({ showComments: { q1: true } })),
-      componentDidMount: jest.fn(),
-      componentDidUpdate: jest.fn(),
-      componentWillUnmount: jest.fn(),
-      render: jest.fn(() => <div data-testid="strategy-render">strategy</div>),
-    };
+  it('runs mount-time survey draft hydration under the response hydration guard', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: `0x${'1'.repeat(64)}`,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      isQuestionCacheReady: true,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject.loadBookmarks = jest.fn();
+    subject.hydrateGateSbtLabels = jest.fn();
+    subject.maybeRefreshCanDecryptOtherResponses = jest.fn();
+    subject.fetchQuestionPool = jest.fn().mockResolvedValue(undefined);
+    subject.initializeSurveyResponseState = jest.fn(() => [{
+      answers: {},
+      additionalComments: {},
+      importance: {},
+      conviction: {},
+    }]);
+    subject.rehydrateDraftForRenderedIds = jest.fn();
+    subject.rehydrateLocalCacheAnswersForRenderedIds = jest.fn().mockResolvedValue(undefined);
+    subject.fetchSurveyResponse = jest.fn().mockResolvedValue(undefined);
+    subject.checkAndHandleStartFresh = jest.fn();
+    let callbackRun = Promise.resolve();
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') {
+        const maybePromise = callback();
+        if (maybePromise && typeof maybePromise.then === 'function') {
+          callbackRun = callbackRun.then(() => maybePromise);
+        }
+      }
+      return patch;
+    });
+
+    subject.componentDidMount();
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await callbackRun;
+
+    expect(subject.rehydrateDraftForRenderedIds).toHaveBeenCalledWith(expect.objectContaining({
+      responseHydrationOwned: true,
+    }));
+    expect(subject.rehydrateLocalCacheAnswersForRenderedIds).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ responseHydrationOwned: true }),
+    );
+    expect(subject.fetchSurveyResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists SurveyQuestions bookmarks with optimistic cache writes', async () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({ questions: [] });
+    const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
 
     const harness = renderSurveyQuestions({
       runtimeStrategy: strategy,
