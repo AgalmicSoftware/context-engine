@@ -1074,8 +1074,63 @@ export class SurveyQuestions extends Component {
   buildAutoDecryptMaskedFieldSignature = (field = null) =>
     buildAutoDecryptMaskedFieldSignatureHelper(field);
 
-  buildDecryptTaskKey = (mode, questionId, fieldToDecrypt = 'both', responseOverride = null) => {
-    return buildDecryptTaskKeyHelper(
+  buildDecryptContextSnapshot = () => {
+    const draftSlug = this._getEffectiveDraftSlug
+      ? this._getEffectiveDraftSlug()
+      : resolveEffectiveSlug(this.props);
+    const hydrationContext = resolveDecryptHydrationContext(this.props, draftSlug);
+    const singleQuestionMode = !!this.props.singleQuestionMode;
+    const isStandalone = !!this.props.isStandalone;
+    return {
+      account: String(this.props?.account || '').trim().toLowerCase(),
+      providerKind: String(cryptoUtils.getProviderKind(this.props?.provider) || '').trim().toLowerCase(),
+      sessionSlug: normalizeSessionSlugValue(hydrationContext.sessionSlug || draftSlug || ''),
+      networkID: String(
+        hydrationContext.networkIdStr ||
+        this.props?.networkID ||
+        this.props?.network?.id ||
+        this.props?.network?.chainId ||
+        ''
+      ).trim(),
+      responder: String(
+        this.props?.responderAddress ||
+        this.props?.viewAddress ||
+        ''
+      ).trim().toLowerCase(),
+      provider: this.props?.provider,
+      loginComplete: !!this.props?.loginComplete,
+      singleQuestionMode,
+      isStandalone,
+      surveyIndex: singleQuestionMode || isStandalone ? 0 : (this.props?.surveyIndex || 0),
+    };
+  };
+
+  buildDecryptContextKey = (snapshot = null) => {
+    const context = snapshot || this.buildDecryptContextSnapshot();
+    return [
+      context.account || '',
+      context.providerKind || '',
+      context.sessionSlug || '',
+      context.networkID || '',
+      context.responder || '',
+    ].join('|');
+  };
+
+  isDecryptContextCurrent = (snapshot = null) => (
+    !!snapshot && this.buildDecryptContextKey(snapshot) === this.buildDecryptContextKey()
+  );
+
+  buildQuestionDecryptStaleState = (prev, questionId, fieldToDecrypt = 'both') => ({
+    isDecrypting: false,
+    decryptingByKey: clearQuestionFieldBusyMapHelper(
+      prev?.decryptingByKey || {},
+      questionId,
+      fieldToDecrypt,
+    ),
+  });
+
+  buildDecryptTaskKey = (mode, questionId, fieldToDecrypt = 'both', responseOverride = null, decryptContext = null) => {
+    const baseKey = buildDecryptTaskKeyHelper(
       mode,
       questionId,
       fieldToDecrypt,
@@ -1086,6 +1141,7 @@ export class SurveyQuestions extends Component {
       ''
       ),
     );
+    return `${baseKey}|${this.buildDecryptContextKey(decryptContext || this.buildDecryptContextSnapshot())}`;
   };
 
   getQuestionFieldTaskKey = (questionId, fieldKey = 'answer') => {
@@ -6713,10 +6769,11 @@ export class SurveyQuestions extends Component {
 
 
   handleDecryptViewedResponseField = async (questionId, fieldToDecrypt = 'both', responseOverride = null) => {
-    const taskKey = this.buildDecryptTaskKey('viewed', questionId, fieldToDecrypt, responseOverride);
+    const decryptContext = this.buildDecryptContextSnapshot();
+    const taskKey = this.buildDecryptTaskKey('viewed', questionId, fieldToDecrypt, responseOverride, decryptContext);
     return this.runDedupedDecryptTask(
       taskKey,
-      () => this.handleDecryptViewedResponseFieldInternal(questionId, fieldToDecrypt, responseOverride)
+      () => this.handleDecryptViewedResponseFieldInternal(questionId, fieldToDecrypt, responseOverride, decryptContext)
     );
   };
 
@@ -6728,9 +6785,10 @@ export class SurveyQuestions extends Component {
     );
   };
 
-  handleDecryptViewedResponseFieldInternal = async (questionId, fieldToDecrypt = 'both', responseOverride = null) => {
+  handleDecryptViewedResponseFieldInternal = async (questionId, fieldToDecrypt = 'both', responseOverride = null, decryptContext = null) => {
+    const context = decryptContext || this.buildDecryptContextSnapshot();
     // Require wallet login (viewer). Decryption is enforced by Lit access control conditions.
-    if (!this.props || !this.props.loginComplete || !this.props.account) {
+    if (!context.loginComplete || !context.account) {
       return false;
     }
 
@@ -6740,12 +6798,10 @@ export class SurveyQuestions extends Component {
     }
 
     try {
-      const viewedHydrationContext = resolveDecryptHydrationContext(this.props, this._getEffectiveDraftSlug());
       const responderForLatest = String(
         responseOverride?.responder ||
         responseOverride?.responderAddress ||
-        this.props.responderAddress ||
-        this.props.viewAddress ||
+        context.responder ||
         ''
       ).trim();
       const {
@@ -6755,11 +6811,14 @@ export class SurveyQuestions extends Component {
         questionId: qid,
         fieldToDecrypt,
         responseOverride,
-        account: this.props.account,
+        account: context.account,
         responderForLatest,
-        sessionSlug: viewedHydrationContext.sessionSlug || '',
-        networkID: viewedHydrationContext.networkIdStr,
+        sessionSlug: context.sessionSlug || '',
+        networkID: context.networkID,
       });
+      if (!this.isDecryptContextCurrent(context)) {
+        return false;
+      }
 
       const preparedAttempt = this.prepareQuestionDecryptAttempt({
         questionId: qid,
@@ -6794,12 +6853,16 @@ export class SurveyQuestions extends Component {
         fieldToDecrypt,
         baselineForDecrypt,
         ratingEnvelopes,
-        account: this.props.account,
-        providerLike: this.props.provider,
+        account: context.account,
+        providerLike: context.provider,
         chainId,
         lit,
         opts,
       });
+      if (!this.isDecryptContextCurrent(context)) {
+        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt));
+        return false;
+      }
 
       this.setState((prev) => this.buildViewedResponseDecryptSuccessState(prev, {
         questionId: qid,
@@ -6821,20 +6884,22 @@ export class SurveyQuestions extends Component {
   };
 
   handleDecryptQuestionAnswer = async (questionId, fieldToDecrypt = 'both', responseOverride = null) => {
-    const taskKey = this.buildDecryptTaskKey('self', questionId, fieldToDecrypt, responseOverride);
+    const decryptContext = this.buildDecryptContextSnapshot();
+    const taskKey = this.buildDecryptTaskKey('self', questionId, fieldToDecrypt, responseOverride, decryptContext);
     return this.runDedupedDecryptTask(
       taskKey,
-      () => this.handleDecryptQuestionAnswerInternal(questionId, fieldToDecrypt, responseOverride)
+      () => this.handleDecryptQuestionAnswerInternal(questionId, fieldToDecrypt, responseOverride, decryptContext)
     );
   };
 
-  handleDecryptQuestionAnswerInternal = async (questionId, fieldToDecrypt = 'both', responseOverride = null) => {
+  handleDecryptQuestionAnswerInternal = async (questionId, fieldToDecrypt = 'both', responseOverride = null, decryptContext = null) => {
+    const context = decryptContext || this.buildDecryptContextSnapshot();
     // Require wallet login
-    if (!this.props || !this.props.loginComplete || !this.props.account) {
+    if (!context.loginComplete || !context.account) {
       return false;
     }
 
-    const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
+    const surveyIndex = context.surveyIndex;
 
     try {
       // If we're viewing someone else's response (via /question/:id/:responder or /survey/:id?address=),
@@ -6846,8 +6911,8 @@ export class SurveyQuestions extends Component {
       } = this.resolveQuestionDecryptHandlingMode({
         questionId,
         responseOverride,
-        viewerAccount: this.props.account,
-        viewedResponder: this.props.responderAddress || this.props.viewAddress || '',
+        viewerAccount: context.account,
+        viewedResponder: context.responder || '',
       });
       if (isViewedResponseMode) {
         if (!hasResponseOverride) return false;
@@ -6858,7 +6923,6 @@ export class SurveyQuestions extends Component {
         );
       }
 
-      const hydrationContext = resolveDecryptHydrationContext(this.props, this._getEffectiveDraftSlug());
       const {
         baselineSlice,
         baselineForDecrypt,
@@ -6869,10 +6933,13 @@ export class SurveyQuestions extends Component {
         fieldToDecrypt,
         responseOverride: effectiveResponseOverride,
         userAnswers: this.state.userAnswers,
-        account: this.props.account,
-        sessionSlug: hydrationContext.sessionSlug || '',
-        networkID: hydrationContext.networkIdStr,
+        account: context.account,
+        sessionSlug: context.sessionSlug || '',
+        networkID: context.networkID,
       });
+      if (!this.isDecryptContextCurrent(context)) {
+        return false;
+      }
 
       const preparedAttempt = this.prepareQuestionDecryptAttempt({
         questionId,
@@ -6907,12 +6974,16 @@ export class SurveyQuestions extends Component {
         fieldToDecrypt,
         baselineForDecrypt,
         ratingEnvelopes: latestRatingEnvs,
-        account: this.props.account,
-        providerLike: this.props.provider,
+        account: context.account,
+        providerLike: context.provider,
         chainId,
         lit,
         opts,
       });
+      if (!this.isDecryptContextCurrent(context)) {
+        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt));
+        return false;
+      }
 
       this.setState((prevState) => this.buildSelfQuestionDecryptSuccessState(prevState, {
         surveyIndex,
