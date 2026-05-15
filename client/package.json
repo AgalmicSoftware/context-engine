@@ -140,6 +140,9 @@
     "elliptic": {
       "bn.js": "4.12.3"
     },
+    "react-simple-maps": {
+      "d3-zoom": "3.0.0"
+    },
     "@remix-run/router": "1.23.2",
     "follow-redirects": "1.16.0",
     "webpack": "4.44.2",
