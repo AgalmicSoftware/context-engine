@@ -390,6 +390,96 @@ import {
   writeSurveysCache,
   bumpSurveyPerfCounter,
 } from './surveyToolUtils.js';
+import {
+  buildSurveyLocalCacheSlice,
+  executeSurveyResponsePrefill,
+  executeSurveySingleQuestionPrefill,
+  executeSurveyDraftHydration,
+  executeSurveyLocalCacheRehydrate,
+  executeSurveyPriorResponseBackfill,
+  resolveSurveyMissingRenderedResponseLookup,
+} from './surveyToolHydrationController';
+import {
+  executeSurveyExitEditing,
+  executeSurveyFormStateReset,
+  executeSurveyPendingRevert,
+  executeSurveyStartFresh,
+  shouldSurveyAutoStartFresh,
+} from './surveyToolResponseResetController';
+import {
+  executeOwnSingleQuestionResponseBootstrap,
+  executeViewedSingleQuestionResponseBootstrap,
+  readFreshSingleQuestionCachedResponderResponse,
+  readSingleQuestionCachedResponderResponse,
+  writeSingleQuestionResponseToCache,
+} from './surveyToolSingleQuestionController';
+import {
+  resolveSingleQuestionCacheBootstrap,
+} from './surveyToolSingleQuestionCacheBootstrapController';
+import {
+  buildSingleQuestionEncryptedMetadataPlaceholder,
+  fetchSingleQuestionMetadataCandidates,
+  normalizeSingleQuestionMetadataForCache,
+  resolveSingleQuestionCacheState,
+} from './surveyToolSingleQuestionMetadataController';
+import {
+  resolveSingleQuestionMetadataBootstrap,
+} from './surveyToolSingleQuestionMetadataBootstrapController';
+import {
+  areSurveyResponsesConsistent,
+  resolveSurveyBaselineSourceSlice,
+  resolveSurveyUserAnswersSlice,
+} from './surveyToolResponseSourceController';
+import {
+  buildAnswerUpdatePlan,
+  buildAdditionalUpdatePlan,
+} from './surveyToolResponseMutationController';
+import { buildResponsePayload } from './surveyToolResponsePayloadController';
+import {
+  buildIndexedQuestionEntryKeys,
+  computePendingEditStats,
+  orchestrateGetChangedQidsAndFields,
+} from './surveyToolChangedFieldsController';
+import {
+  getQuestionEncryptionGates as getQuestionEncryptionGatesCore,
+  normalizeFieldAudienceMode as normalizeFieldAudienceModeCore,
+  normalizeResponseEncryptionAudience as normalizeResponseEncryptionAudienceCore,
+  resolveFieldEncryptionAudience as resolveFieldEncryptionAudienceCore,
+  buildEmptyResponseFieldState as buildEmptyResponseFieldStateCore,
+  buildInheritedAdditionalFieldState as buildInheritedAdditionalFieldStateCore,
+  normalizeGateLabelText as normalizeGateLabelTextCore,
+} from './surveyToolAudienceDerivationController';
+import {
+  buildRecipientsFromGates as buildRecipientsFromGatesController,
+  buildGateAudienceSbtItems as buildGateAudienceSbtItemsController,
+  getQuestionGateOptions as getQuestionGateOptionsController,
+  getResponseGateOptions as getResponseGateOptionsController,
+  getResponseGateOptionById as getResponseGateOptionByIdController,
+  resolveFieldEncryptionGateId as resolveFieldEncryptionGateIdController,
+  getEffectiveRecipientsForField as getEffectiveRecipientsForFieldController,
+  resolveGatedPromptGateNames as resolveGatedPromptGateNamesController,
+  resolveGateDisplayLabel as resolveGateDisplayLabelController,
+  resolveConfiguredGateLabel as resolveConfiguredGateLabelController,
+  resolveLockAudienceSessionName as resolveLockAudienceSessionNameController,
+} from './surveyToolResponseGateController';
+import {
+  buildLockedGateRequirementSentence as buildLockedGateRequirementSentenceCore,
+  buildLockedQuestionGateDetailsFromPool,
+} from './surveyQuestionGateDetails';
+import {
+  buildEncryptionTogglePlan,
+  buildAnswerAudienceSelectionPlan,
+  buildAdditionalAudienceSelectionPlan,
+} from './surveyToolFieldEncryptionController';
+import {
+  buildFieldEncryptionWorkGroups as buildFieldEncryptionWorkGroupsCore,
+  verifyEncryptionIntegrity,
+} from './surveyToolSubmitPrepController';
+import {
+  buildCanDecryptContext,
+  evaluateCanDecryptPreCheck,
+  resolveCanDecryptGateAccess,
+} from './surveyToolCanDecryptController';
 
 import { SurveySelector, QuestionsDashboard } from './SurveySelector';
 import {
@@ -8987,86 +9077,22 @@ export class SurveyQuestions extends Component {
       resolveEffectiveSlug(this.props) ||
       ''
     ).trim().toLowerCase();
-    const detailsByKey = new Map();
-    const isGenericResourceGateLabel = (value) => {
-      const normalized = String(value || '').trim().toLowerCase();
-      if (!normalized) return true;
-      return [
-        'questionresponses',
-        'surveyresponses',
-        'responses',
-        'questionresponse',
-        'surveyresponse',
-        'default',
-        'default gate',
-      ].includes(normalized);
-    };
-
-    pool.forEach((question) => {
-      const questionId = String(question?.id || '').trim().toLowerCase();
-      if (!hiddenIds.has(questionId)) return;
-      const gates = this.getQuestionEncryptionGates(question);
-      const questionSessionSlug = normalizeSessionSlugValue(question?.sessionSlug || slug);
-      gates.forEach((gate, gateIndex) => {
-        const sbtAddresses = Array.from(new Set(
-          [
-            ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
-            gate?.sbtAddress,
-          ]
-            .map((addr) => String(addr || '').trim())
-            .filter(Boolean)
-        ));
-        const configuredLabel = this.normalizeGateLabelText(
-          this.resolveConfiguredGateLabel({
-            gate,
-            resourceKey: gate?.resourceKey || '',
-            sbtAddresses,
-          })
-        );
-        const explicitLabel = this.normalizeGateLabelText(
-          gate?.label || gate?.name || gate?.title || ''
-        );
-        const maybeGateId = this.normalizeGateLabelText(gate?.gateId || gate?.id || '');
-        const sbtLabelFallback = sbtAddresses.length > 0
-          ? `${this.resolveSbtGateLabel(sbtAddresses[0], slug) || getShortenedAddress(sbtAddresses[0], false)} gate`
-          : 'Question gate';
-        const label = !isGenericResourceGateLabel(configuredLabel)
-          ? configuredLabel
-          : !isGenericResourceGateLabel(explicitLabel)
-            ? explicitLabel
-          : (!isGenericResourceGateLabel(maybeGateId) ? maybeGateId : sbtLabelFallback);
-        const key = `${String(label || `gate-${gateIndex}`).toLowerCase()}|${sbtAddresses
-          .map((addr) => String(addr).toLowerCase())
-          .sort()
-          .join('|')}`;
-        if (!detailsByKey.has(key)) {
-          detailsByKey.set(key, {
-            id: key || `${questionId}:${gateIndex}`,
-            label: label || t('gate'),
-            sbtAddresses: [],
-            questionIds: new Set(),
-            sessionSlug: questionSessionSlug,
-          });
-        }
-        const detail = detailsByKey.get(key);
-        detail.questionIds.add(questionId);
-        if (!detail.sessionSlug && questionSessionSlug) detail.sessionSlug = questionSessionSlug;
-        sbtAddresses.forEach((address) => {
-          const checksum = ethers.utils.isAddress(address) ? ethers.utils.getAddress(address) : address;
-          if (!detail.sbtAddresses.includes(checksum)) detail.sbtAddresses.push(checksum);
-        });
-      });
+    const questionGateDetails = buildLockedQuestionGateDetailsFromPool({
+      hiddenMaskedQuestionIds,
+      pool,
+      slug,
+      getQuestionEncryptionGates: (question) => this.getQuestionEncryptionGates(question),
+      normalizeGateLabelText: (value) => this.normalizeGateLabelText(value),
+      resolveConfiguredGateLabel: (args) => this.resolveConfiguredGateLabel(args),
+      resolveSbtGateLabel: (address, preferredSlug = '') => this.resolveSbtGateLabel(address, preferredSlug),
+      getShortenedAddress,
+      buildSbtDetailPath,
+      normalizeSessionSlug: normalizeSessionSlugValue,
+      getChecksumAddress: (address) => (
+        ethers.utils.isAddress(address) ? ethers.utils.getAddress(address) : address
+      ),
+      translate: t,
     });
-
-    const questionGateDetails = Array.from(detailsByKey.values()).map((detail) => ({
-      ...detail,
-      questionCount: detail.questionIds.size,
-      sbts: detail.sbtAddresses.map((address) => ({
-        address,
-        label: this.resolveSbtGateLabel(address, detail.sessionSlug || slug) || getShortenedAddress(address, false),
-        href: buildSbtDetailPath(address, detail.sessionSlug || slug),
-      })),
-    }));
     if (questionGateDetails.length > 0) return questionGateDetails;
     return this.buildSessionQuestionGateDetails(hiddenIds.size || 1);
   };
@@ -9177,18 +9203,9 @@ export class SurveyQuestions extends Component {
       .filter(Boolean);
   };
 
-  getLockedGateRequirementSentence = (lockedGateDetails = []) => {
-    const labels = Array.from(new Set(
-      (Array.isArray(lockedGateDetails) ? lockedGateDetails : [])
-        .flatMap((gate) => Array.isArray(gate?.sbts) ? gate.sbts : [])
-        .map((sbt) => String(sbt?.label || sbt?.address || '').trim())
-        .filter(Boolean)
-    ));
-    if (!labels.length) return '';
-    const shown = labels.slice(0, 3);
-    const extra = labels.length > shown.length ? ` +${labels.length - shown.length} more` : '';
-    return `${t('sbt')}${labels.length === 1 ? '' : 's'} required: ${shown.join(', ')}${extra}.`;
-  };
+  getLockedGateRequirementSentence = (lockedGateDetails = []) => (
+    buildLockedGateRequirementSentenceCore(lockedGateDetails, { translate: t })
+  );
 
   renderLockedQuestionsDecryptButton = (questionIds = []) => (
     <button
