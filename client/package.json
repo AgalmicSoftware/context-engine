@@ -109,6 +109,7 @@
   },
   "overrides": {
     "@remix-run/router": "1.23.2",
+    "follow-redirects": "1.16.0",
     "webpack": "4.44.2",
     "@metamask/utils": "9.2.0"
   },
