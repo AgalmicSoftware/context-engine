@@ -5367,7 +5367,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       userAnswer,
       buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
       applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
-      setState: this.setState.bind(this),
+      setState: this.setResponseHydrationState.bind(this),
       updateJsonPreview: this.updateJsonPreview,
       recalculateEditStats: this.recalculateEditStats,
     });
