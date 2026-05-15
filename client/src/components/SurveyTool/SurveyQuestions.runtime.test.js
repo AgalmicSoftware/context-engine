@@ -120,6 +120,116 @@ describe('SurveyQuestions runtime helpers', () => {
     expect(runner).toHaveBeenCalledTimes(2);
   });
 
+  it('scopes decrypt task keys to account, provider, session, network, and viewed responder', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xABC',
+      loginComplete: true,
+      provider: 'wagmi',
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      responderAddress: '0xResponder',
+    });
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+
+    const firstKey = subject.buildDecryptTaskKey('self', 'q1', 'answer');
+    subject.props = { ...subject.props, account: '0xDEF' };
+    const accountKey = subject.buildDecryptTaskKey('self', 'q1', 'answer');
+    subject.props = { ...subject.props, account: '0xABC', sessionSlug: 'alpha', activeSessionSlug: 'alpha' };
+    subject._getEffectiveDraftSlug = jest.fn(() => 'alpha');
+    const sessionKey = subject.buildDecryptTaskKey('self', 'q1', 'answer');
+
+    expect(firstKey).toContain('0xabc');
+    expect(firstKey).toContain('edge');
+    expect(firstKey).toContain('84532');
+    expect(firstKey).toContain('0xresponder');
+    expect(accountKey).not.toBe(firstKey);
+    expect(sessionKey).not.toBe(firstKey);
+  });
+
+  it('does not apply stale self decrypt results after the viewer account changes', async () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      provider: 'wagmi',
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+      surveysResponseState: [{
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: '{}' } },
+        additionalComments: {},
+        importance: {},
+        conviction: {},
+      }],
+      userAnswers: {},
+    };
+    subject.setState = jest.fn((updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') callback();
+      return patch;
+    });
+    subject.resolveQuestionDecryptHandlingMode = jest.fn(() => ({
+      effectiveResponseOverride: null,
+      hasResponseOverride: false,
+      isViewedResponseMode: false,
+    }));
+    subject.prepareSelfQuestionDecryptState = jest.fn().mockResolvedValue({
+      baselineSlice: subject.state.surveysResponseState[0],
+      baselineForDecrypt: subject.state.surveysResponseState[0],
+      ratingEnvelopes: {},
+    });
+    subject.prepareQuestionDecryptAttempt = jest.fn(() => ({
+      shouldDecrypt: true,
+      decryptSelection: {
+        keysToMark: ['q1:answer'],
+        clearMode: 'answer',
+      },
+      chainId: 84532,
+      lit: null,
+      opts: {},
+    }));
+    subject.finalizeQuestionDecryptAttempt = jest.fn(async () => {
+      subject.props = { ...subject.props, account: '0xdef' };
+      return {
+        decryptedStateSlice: {
+          answers: { q1: { value: 'decrypted', encrypted: false } },
+          additionalComments: {},
+        },
+        didUpdate: true,
+        decryptedImportance: null,
+        decryptedConviction: null,
+      };
+    });
+    subject.buildSelfQuestionDecryptSuccessState = jest.fn((prev) => ({
+      ...prev,
+      staleDecryptApplied: true,
+    }));
+
+    const result = await subject.handleDecryptQuestionAnswerInternal(
+      'q1',
+      'answer',
+      null,
+      subject.buildDecryptContextSnapshot(),
+    );
+
+    expect(result).toBe(false);
+    expect(subject.buildSelfQuestionDecryptSuccessState).not.toHaveBeenCalled();
+    expect(subject.state.staleDecryptApplied).toBeUndefined();
+    expect(subject.state.decryptingByKey['q1:answer']).toBe(false);
+  });
+
   it('skips auto-decrypt requeue for unchanged masked payloads after a failed attempt', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,
