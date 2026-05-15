@@ -24,6 +24,7 @@ import {
   buildCreateSurveyMountSubmitResetPatch,
   buildCreateSurveyNetworkSwitchPatch,
   buildCreateSurveyGateOptions,
+  buildCreateSurveyGateObjectsAndRecipients,
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyOpenLockKeyPatch,
   buildCreateSurveyQuestionFieldUpdateList,
@@ -517,6 +518,63 @@ describe('createQuestionsAndSurveysHelpers encryption payloads', () => {
       { operator: 'or' },
       ...second,
     ]);
+  });
+
+  it('plans Lit gate objects and deduped recipients without executing crypto', () => {
+    const buildSbtAccessControlConditions = jest.fn(({ sbtAddresses, chainId, litChain, mode }) => ([{
+      contractAddress: sbtAddresses[0],
+      chain: litChain,
+      chainId,
+      mode,
+    }]));
+    const resolveLitChain = jest.fn(({ chainId, litChain }) => litChain || `chain-${chainId}`);
+
+    const plan = buildCreateSurveyGateObjectsAndRecipients({
+      buildSbtAccessControlConditions,
+      chainIdFallback: 11155420,
+      gateIds: ['gate-a', 'missing', 'gate-b'],
+      gateMap: {
+        'gate-a': {
+          label: 'Gate A',
+          mode: 'all',
+          sbtAddresses: ['0xAAA', '0xAAA'],
+        },
+        'gate-b': {
+          name: 'Gate B',
+          mode: 'all',
+          sbtAddress: '0xAAA',
+        },
+      },
+      resolveLitChain,
+    });
+
+    expect(plan.gates).toHaveLength(2);
+    expect(plan.gates[0]).toEqual(expect.objectContaining({
+      gateId: 'gate-a',
+      label: 'Gate A',
+      mode: 'all',
+      sbtAddress: '0xAAA',
+      sbtAddresses: ['0xAAA'],
+      chainId: 11155420,
+      litChain: 'chain-11155420',
+      type: 'sbt',
+    }));
+    expect(plan.gates[1]).toEqual(expect.objectContaining({
+      gateId: 'gate-b',
+      label: 'Gate B',
+      color: stableGateColor('gate-b'),
+    }));
+    expect(plan.recipients).toEqual([{
+      accessControlConditions: [{
+        contractAddress: '0xAAA',
+        chain: 'chain-11155420',
+        chainId: 11155420,
+        mode: 'all',
+      }],
+      chain: 'chain-11155420',
+    }]);
+    expect(resolveLitChain).toHaveBeenCalledTimes(2);
+    expect(buildSbtAccessControlConditions).toHaveBeenCalledTimes(2);
   });
 });
 
