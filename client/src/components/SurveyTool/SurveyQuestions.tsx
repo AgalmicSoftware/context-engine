@@ -747,15 +747,9 @@ export class SurveyQuestions extends Component {
     try {
       return this.setState(next, (...args) => {
         try {
-          const result = typeof callback === 'function' ? callback(...args) : undefined;
-          if (result && typeof result.then === 'function') {
-            return result.finally(release);
-          }
+          return typeof callback === 'function' ? callback(...args) : undefined;
+        } finally {
           release();
-          return result;
-        } catch (error) {
-          release();
-          throw error;
         }
       });
     } catch (error) {
