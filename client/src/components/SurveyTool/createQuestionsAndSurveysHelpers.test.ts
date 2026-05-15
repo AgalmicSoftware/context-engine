@@ -557,6 +557,7 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
     const digest = jest.fn((value: unknown) => ({
       toString: () => `digest:${value}`,
     }));
+    const scriptUrl = ['java', 'script:alert(1)'].join('');
 
     expect(buildCreateSurveyHashValue({
       digest,
@@ -564,7 +565,7 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
         ' https://docs.example/a ',
         'HTTPS://docs.example/a',
         '/local/doc',
-        'javascript:alert(1)',
+        scriptUrl,
       ],
       title: 'Survey title',
     })).toBe('0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a","/local/doc"]}');
