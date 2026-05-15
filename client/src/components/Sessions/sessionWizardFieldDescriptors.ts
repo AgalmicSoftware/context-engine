@@ -152,7 +152,7 @@ export const getSessionWizardFieldTooltip = (path: string[], value: unknown): st
     return 'API key for this provider. Lock to store as Lit-encrypted.';
   }
   if (lastKey === 'rpcUrl' || lastKey === 'rpcUrlsByChainId') {
-    return 'RPC endpoint(s) used by this provider. Required for worker deploy (include key in URL).';
+    return 'Private RPC endpoint(s) used by worker deploy and runtime. Credential-bearing URLs stay in worker config and are not published to the session registry.';
   }
   if (lastKey === 'address') return 'Contract address for this resource.';
   if (lastKey === 'chainId') return 'Chain id for this contract or provider.';
