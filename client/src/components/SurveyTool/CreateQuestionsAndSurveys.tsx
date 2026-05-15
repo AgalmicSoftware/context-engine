@@ -103,6 +103,7 @@ import {
   buildCreateSurveyMountSubmitResetPatch,
   buildCreateSurveyNetworkSwitchPatch,
   buildCreateSurveyGateOptions,
+  buildCreateSurveyGateObjectsAndRecipients,
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyOpenLockKeyPatch,
   buildCreateSurveyQuestionFieldUpdateList,
@@ -143,7 +144,6 @@ import {
   removeCreateSurveyEncryptionGateSbt,
   resolvePayloadSingleSelect,
   resolveQuestionSingleSelect,
-  stableGateColor,
 } from './createQuestionsAndSurveysHelpers.js';
 import {
   sanitizeDocumentUrls,
@@ -2251,58 +2251,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
 
     const buildGateObjectsAndRecipients = (gateIdsIn: unknown) => {
-      const gateIds = normalizeKnownGateIds(gateIdsIn);
-      const gates: UnknownRecord[] = [];
-      const recipients: CreateSurveyLitRecipient[] = [];
-      const dedupe = new Set<string>();
-
-      gateIds.forEach((gateId) => {
-        const rawGate = gateMap?.[gateId];
-        if (!rawGate || typeof rawGate !== 'object') return;
-
-        const chainId = Number(rawGate.chainId || chainIdFallback || 0) || chainIdFallback || null;
-        const litChain = resolveLitChain({ chainId, litChain: rawGate.litChain });
-        const sbtAddresses = Array.from(new Set(
-          [
-            ...(Array.isArray(rawGate.sbtAddresses) ? rawGate.sbtAddresses : []),
-            rawGate.sbtAddress,
-          ].filter(Boolean)
-        )) as string[];
-        if (!sbtAddresses.length) return;
-
-        const mode = rawGate.mode || 'any';
-        const label = String(rawGate.label || rawGate.name || gateId);
-        const color = String(rawGate.color || stableGateColor(gateId));
-
-        gates.push({
-          ...rawGate,
-          type: rawGate.type || 'sbt',
-          gateId,
-          sbtAddresses,
-          sbtAddress: sbtAddresses[0] || '',
-          chainId,
-          litChain,
-          mode,
-          label,
-          color,
-        });
-
-        const accessControlConditions = buildSbtAccessControlConditions({
-          sbtAddresses,
-          chainId,
-          litChain,
-          mode,
-        });
-        if (!accessControlConditions) return;
-
-        const recipient = { accessControlConditions, chain: litChain };
-        const sig = JSON.stringify({ accessControlConditions, chain: litChain });
-        if (dedupe.has(sig)) return;
-        dedupe.add(sig);
-        recipients.push(recipient);
-      });
-
-      return { gates, recipients };
+      return buildCreateSurveyGateObjectsAndRecipients({
+        buildSbtAccessControlConditions,
+        chainIdFallback,
+        gateIds: gateIdsIn,
+        gateMap,
+        normalizeKnownGateIds,
+        resolveLitChain,
+      }) as { gates: UnknownRecord[]; recipients: CreateSurveyLitRecipient[] };
     };
 
     const requireRecipientsForGateSelection = ({
