@@ -217,7 +217,7 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
-  normalizeSessionWizardDraftShape as normalizeDraftShape,
+  buildSessionWizardInitialDraftFromCache,
 } from './sessionWizardDraftState';
 import {
   __test__getSessionWizardDefaultAiSettings,
@@ -249,7 +249,6 @@ import {
   formatContractLabel,
   generateSessionId,
   getChainName,
-  mergeDeep,
 } from './sessionWizardCoreUtils';
 import {
   clearSessionWizardCache,
@@ -600,17 +599,14 @@ const SessionWizard = ({
     resolvedActiveSessionSlug,
   ]);
   const initialDraft = useMemo(() => {
-    const base = deepClone(DEFAULT_TEMPLATE);
-    if (!cachedDraftHasEmbeddedDeployHelperEnabled && typeof sourceEmbeddedDeployHelperDefault === 'boolean') {
-      base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
-    }
-    const cachedDraft = cachedWizard?.draft;
-    const merged = cachedDraft && typeof cachedDraft === 'object' ? mergeDeep(base, cachedDraft) : base;
-    const normalized = normalizeDraftShape(merged);
-    if (!NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED && !cachedWizard?.deployComplete) {
-      normalized.corsWorkerUrl = '';
-    }
-    return normalized;
+    return buildSessionWizardInitialDraftFromCache({
+      cachedWizard,
+      defaultTemplate: DEFAULT_TEMPLATE,
+      normalModeSharedHostedWorkerEnabled: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
+      sourceEmbeddedDeployHelperDefault: cachedDraftHasEmbeddedDeployHelperEnabled
+        ? null
+        : sourceEmbeddedDeployHelperDefault,
+    });
   }, [cachedDraftHasEmbeddedDeployHelperEnabled, cachedWizard, sourceEmbeddedDeployHelperDefault]);
   const initialGates = useMemo(() => {
     const cachedGates = cachedWizard?.encryptionGates;
