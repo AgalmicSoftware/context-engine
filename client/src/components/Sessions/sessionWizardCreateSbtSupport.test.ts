@@ -1,5 +1,6 @@
 import {
   buildSessionWizardCreateSbtModalLaunchState,
+  buildSessionWizardDeferredCreateSbtComponentProps,
   getSessionWizardGateById,
   resolveSessionWizardCreateSbtTargetGateId,
 } from './sessionWizardCreateSbtSupport';
@@ -61,5 +62,68 @@ describe('sessionWizardCreateSbtSupport', () => {
       sessionSlug: 'custom-slug',
       arweaveJwkOverride: 'manual-jwk',
     });
+  });
+
+  it('builds deferred CreateSBT props from draft session context', () => {
+    const signAdminAction = jest.fn();
+    const props = buildSessionWizardDeferredCreateSbtComponentProps({
+      account: '0xaccount',
+      defaultGateId: '',
+      draft: {
+        slug: 'alpha',
+        corsWorkerUrl: ' https://worker.example/ ',
+        networkChainId: 84532,
+        contracts: { SessionRegistry: '0xregistry' },
+        defaultSbtTags: 'alpha,beta',
+      },
+      encryptionGates: [{
+        id: 'gate-1',
+        label: 'Gate 1',
+        color: '#fff',
+        mode: 'all',
+        sbts: [{ address: '0xsbt1' }, { address: '0xsbt2' }],
+      }],
+      getChainById: (chainId) => ({ id: chainId, name: `Known ${chainId}` }),
+      getChainName: (chainId) => `Chain ${chainId}`,
+      getEnabledWorkerArweaveJwk: () => 'jwk',
+      normalizeSbtSelection: (value) => Array.isArray(value) ? value : [],
+      normalizeWorkerAuthUrl: (value) => String(value || '').trim().replace(/\/$/, ''),
+      provider: 'provider',
+      signAdminAction,
+      toggleLoginModal: 'toggle',
+      workerSecrets: { arweaveJwk: 'jwk' },
+    });
+
+    expect(props).toEqual(expect.objectContaining({
+      account: '0xaccount',
+      network: { id: 84532, name: 'Known 84532' },
+      loginComplete: true,
+      sessionSlug: 'alpha',
+      arweaveJwkOverride: 'jwk',
+      defaultGateId: 'gate-1',
+      defaultSbtTags: 'alpha,beta',
+      deferredDeploy: true,
+      attemptImmediateDeferredUpload: true,
+      hideNetworkSelector: true,
+      preferDirectArweaveUpload: false,
+      signAdminAction,
+    }));
+    expect(props.sessionConfigOverride).toEqual(expect.objectContaining({
+      slug: 'alpha',
+      corsWorkerUrl: 'https://worker.example',
+      networkChainId: 84532,
+      contracts: { SessionRegistry: '0xregistry' },
+    }));
+    expect(props.encryptionGates).toEqual([{
+      id: 'gate-1',
+      gateId: 'gate-1',
+      label: 'Gate 1',
+      name: 'Gate 1',
+      color: '#fff',
+      mode: 'all',
+      requireAll: true,
+      sbtAddresses: ['0xsbt1', '0xsbt2'],
+      chainId: 84532,
+    }]);
   });
 });
