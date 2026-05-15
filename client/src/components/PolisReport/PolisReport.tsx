@@ -72,6 +72,32 @@ const getErrorMessage = (error: any, fallback = 'Unknown error') => (
   typeof error?.message === 'string' && error.message.trim() ? error.message : fallback
 );
 
+export const sanitizePolisReportPdfNamePart = (value: unknown): string => (
+  String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[_.,-]+|[_.,-]+$/g, '')
+    .slice(0, 80)
+);
+
+export const buildPolisReportPdfFilename = (
+  sessionName: unknown,
+  now: Date = new Date()
+): string => {
+  const sessionPart = sanitizePolisReportPdfNamePart(sessionName);
+  const timestamp = now.toISOString().replace(/[:.-]/g, '_');
+  return `contextEngine_report${sessionPart ? `_${sessionPart}` : ''}_${timestamp}.pdf`;
+};
+
+export const resolveJsPdfConstructor = (module: any): any => {
+  if (typeof module?.default === 'function') return module.default;
+  if (typeof module?.jsPDF === 'function') return module.jsPDF;
+  if (typeof module?.default?.jsPDF === 'function') return module.default.jsPDF;
+  throw new Error('jsPDF constructor is unavailable');
+};
+
 
 
 
@@ -1827,10 +1853,11 @@ export default function PolisReport({
           }
         }
       };
-      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+      const [{ default: html2canvas }, jsPdfModule] = await Promise.all([
         loadWithRetry(() => import('html2canvas')),
         loadWithRetry(() => import('jspdf')),
       ]);
+      const jsPDF = resolveJsPdfConstructor(jsPdfModule);
 
       // Capture full element
       const canvas = await html2canvas(input, {
@@ -1866,9 +1893,7 @@ export default function PolisReport({
         heightLeft -= pageHeight;
       }
 
-      const ts = new Date().toISOString().replace(/[:.-]/g, '_');
-      const filename = `contextEngine_report${resolvedSessionName ? '_' + resolvedSessionName : ''}_${ts}.pdf`;
-      pdf.save(filename);
+      pdf.save(buildPolisReportPdfFilename(resolvedSessionName));
     } catch (e) {
       setErrorMessage('PDF export failed — please try refreshing the page and downloading again.');
     } finally {
