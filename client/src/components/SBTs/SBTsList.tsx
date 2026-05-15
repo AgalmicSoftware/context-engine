@@ -77,9 +77,7 @@ import {
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
-  buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
-  buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
   coerceSbtMintEndSeconds,
   dedupeNormalizedSbtListSlugs,
@@ -1770,70 +1768,14 @@ const SBTsList = ({
 
     const snapshot = getSessionProgressSnapshot(slug);
     if (!snapshot) return null;
-    const {
-      cfg,
-      lastBlock,
-      hasCache,
-      startBlock,
-      latestForGroup,
-      hasLatest,
-      displayCurrentBlock,
-      remainingBlocks,
-      scanInProgress,
-      deferred,
-    } = snapshot;
-    const sessionLabel = cfg?.sessionName || (slug || 'General');
-    const slugLabel = slug || 'general';
-    const displayName =
-      sessionLabel && sessionLabel.toLowerCase() !== slugLabel.toLowerCase()
-        ? `${sessionLabel} (${slugLabel})`
-        : sessionLabel;
-    const numericLatestForGroup = Number(latestForGroup || 0);
-    const numericStartBlock = Number(startBlock || 0);
-    const numericRemainingBlocks = Number(remainingBlocks || 0);
-    const totalBlocks = hasLatest ? Math.max(1, numericLatestForGroup - numericStartBlock + 1) : null;
-    const scannedBlocks = hasLatest
-      ? Math.max(0, Math.min(totalBlocks || 0, displayCurrentBlock - numericStartBlock + 1))
-      : 0;
-    const progressPct = hasLatest
-      ? Math.max(0, Math.min(100, Math.round((scannedBlocks / (totalBlocks || 1)) * 100)))
-      : 0;
-    const progressText = hasLatest
-      ? (numericRemainingBlocks === 0
-        ? `In Sync (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`
-        : `Remaining Blocks: ${formatBlockCount(numericRemainingBlocks)} (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`)
-      : `Loading latest block... (Current: ${formatBlockCount(displayCurrentBlock)})`;
-    const chipRemainingText = hasLatest
-      ? (numericRemainingBlocks > 0
-        ? `${formatBlockCount(numericRemainingBlocks)} remaining`
-        : 'Synced')
-      : 'Syncing';
-    const chipBlockProgressText = hasLatest
-      ? `${formatBlockCount(displayCurrentBlock)} / ${formatBlockCount(latestForGroup)}`
-      : `Current ${formatBlockCount(displayCurrentBlock)}`;
-    const statusLabel = scanInProgress ? 'Scanning' : deferred ? 'Queued' : 'Loading';
-    const shouldShow = alwaysShow || forceShow || (allSessionsMode
-      ? (scanInProgress || deferred || (!hasCache && loading))
-      : true);
-
-    if (!shouldShow) return null;
-    return {
-      slug,
-      slugLabel,
-      displayName,
-      statusLabel,
-      progressText,
-      chipRemainingText,
-      chipBlockProgressText,
-      progressPct,
-      hasLatest,
-      latestForGroup,
-      lastBlock,
-      displayCurrentBlock,
-      remainingBlocks,
-      scanInProgress,
-      deferred
-    };
+    return buildSbtListSessionLoadingStatus({
+      allSessionsMode,
+      alwaysShow,
+      forceShow,
+      formatBlockCount,
+      loading,
+      snapshot,
+    });
   }, [
     allSessionsMode,
     getSessionProgressSnapshot,

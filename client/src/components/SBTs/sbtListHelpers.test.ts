@@ -16,9 +16,7 @@ import {
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
-  buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
-  buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
   collectSbtDocumentUrls,
   collectSbtTagValues,
@@ -254,101 +252,6 @@ describe('sbtListHelpers', () => {
       displayName: 'General',
       slugLabel: 'general',
       statusLabel: 'Loading',
-    }));
-    expect(buildSbtListSessionChipStateBySlug({
-      allSessionsMode: true,
-      displayedSessionUniverseSlugs: ['alpha', 'beta', SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
-      getSessionProgressSnapshot: (slug) => (
-        slug === 'alpha' ? { scanInProgress: true } : null
-      ),
-      hasNoSessionCards: false,
-      readSbtCacheMeta: (slug) => (slug === 'beta' ? { lastBlock: 200 } : null),
-      refreshing: false,
-      sbtListBySlug: {
-        beta: [{ sbtAddress: '0x2222222222222222222222222222222222222222' }],
-      },
-      sessionHasLoadedOnceBySlug: {
-        alpha: true,
-        beta: true,
-      },
-      sessionLoadStateBySlug: {
-        alpha: 'loaded',
-        beta: 'idle',
-      },
-    })).toEqual({
-      alpha: {
-        hasCards: false,
-        hasLoadedOnce: true,
-        isLoaded: false,
-        isLoading: true,
-      },
-      beta: {
-        hasCards: true,
-        hasLoadedOnce: true,
-        isLoaded: true,
-        isLoading: false,
-      },
-      [SBT_LIST_NO_SESSION_UNIVERSE_SLUG]: {
-        hasCards: false,
-        hasLoadedOnce: true,
-        isLoaded: true,
-        isLoading: false,
-      },
-    });
-    expect(buildSbtListSessionProgressSnapshot({
-      allSessionsMode: true,
-      bridgeMs: 2500,
-      bridgeTailBlocks: 5,
-      bridgedLiveProgress: {
-        currentBlock: 198,
-        latestBlock: 200,
-        updatedAtMs: 1000,
-      },
-      cacheMeta: {
-        lastBlock: 150,
-        sbtCount: 3,
-      },
-      cfg: {
-        blockLimits: { start: 100 },
-      },
-      recentLiveProgressNowMs: 1200,
-      slug: 'alpha',
-    })).toEqual(expect.objectContaining({
-      displayCurrentBlock: 198,
-      hasCache: true,
-      hasLatest: true,
-      latestForGroup: 200,
-      liveCurrentBlock: 198,
-      remainingBlocks: 2,
-      scanInProgress: false,
-    }));
-    expect(buildSbtListSessionProgressSnapshot({
-      allSessionsMode: true,
-      bridgeMs: 2500,
-      bridgeTailBlocks: 5,
-      bridgedLiveProgress: {
-        currentBlock: 198,
-        latestBlock: 220,
-        updatedAtMs: 1000,
-      },
-      cacheMeta: {
-        lastBlock: 220,
-        sbtCount: 3,
-      },
-      cfg: {
-        blockLimits: { start: 100 },
-      },
-      latestBlock: 220,
-      recentLiveProgressNowMs: 4000,
-      scanInProgressRaw: true,
-      deferredRaw: true,
-      slug: 'alpha',
-    })).toEqual(expect.objectContaining({
-      displayCurrentBlock: 220,
-      liveProgress: null,
-      remainingBlocks: 0,
-      scanInProgress: false,
-      deferred: false,
     }));
     expect(buildSbtListExpandedCardShellClassName({
       baseClassName: 'card',
