@@ -59,6 +59,7 @@ export const buildSurveyStartFreshStatePatch = ({
   modifiedCount: 0,
   hasEncryptedChanges: false,
   isDirty: false,
+  isLoadingResponse: false,
   submittedSinceLastEdit: nextSubmittedSinceLastEdit,
 });
 
