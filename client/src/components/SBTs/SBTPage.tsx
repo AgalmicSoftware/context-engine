@@ -1074,7 +1074,6 @@ class SBTPage extends Component<any, any> {
   getMintTargetChainId = (): string => String(
     this.props.network?.id ||
     this.props.networkChainId ||
-    this.state?.network?.id ||
     ''
   ).trim();
 
