@@ -485,6 +485,62 @@ describe('DocumentLibraryPanel photo docs', () => {
     expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).not.toHaveTextContent('slow document');
   });
 
+  it('cancels in-flight document open requests when the panel unmounts', async () => {
+    const slowTxId = 'U'.repeat(43);
+    const slowFetch = createDeferred<any>();
+    const blobReader = jest.fn(async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }));
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (String(url).includes(slowTxId)) return slowFetch.promise;
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    mockListArweaveTransactionsByTags.mockResolvedValueOnce([
+      {
+        cursor: 'cursor-unmount',
+        txId: slowTxId,
+        owner: 'owner',
+        tags: [],
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'unmount.png',
+          'CE-DocMime': 'image/png',
+        },
+        data: { size: 4, type: 'image/png' },
+        block: { height: 1, timestamp: 1710000004 },
+      },
+    ]);
+
+    const { unmount } = render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'2'.repeat(32)}`}
+      />
+    );
+
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
+    unmount();
+    slowFetch.resolve({
+      ok: true,
+      blob: blobReader,
+      headers: { get: (name: string) => (name === 'content-type' ? 'image/png' : null) },
+    });
+
+    await waitFor(() => {
+      expect(global.fetch as jest.Mock).toHaveBeenCalled();
+    });
+    await Promise.resolve();
+
+    expect(blobReader).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
   it('renders image thumbnails directly in the document list', async () => {
     mockListArweaveTransactionsByTags.mockResolvedValueOnce([
       {

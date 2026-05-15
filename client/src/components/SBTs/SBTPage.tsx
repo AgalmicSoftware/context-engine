@@ -942,7 +942,7 @@ class SBTPage extends Component<any, any> {
     if (!targetCode) {
       const minted = await this.autoMintPublicIfAllowed(currentSbtAddress);
       if (minted) markAutoMintSuccess();
-      return true;
+      return minted;
     }
 
     if (!isUrlAutoMintTargetCurrent()) return false;
@@ -957,9 +957,9 @@ class SBTPage extends Component<any, any> {
     });
 
     if (targetInvite) {
-      await this.claimWithInviteCode(targetInvite, currentSbtAddress);
-      markAutoMintSuccess();
-      return true;
+      const minted = await this.claimWithInviteCode(targetInvite, currentSbtAddress);
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
     const slug = targetSlug;
@@ -978,17 +978,17 @@ class SBTPage extends Component<any, any> {
 
     if (!isUrlAutoMintTargetCurrent()) return false;
     if (sbtInfo?.hasPasswordMint) {
-      await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
-      markAutoMintSuccess();
-      return true;
+      const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
     const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
     if (!isUrlAutoMintTargetCurrent()) return false;
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
-      await this.mintUnlimitedWithGroupPassword();
-      markAutoMintSuccess();
-      return true;
+      const minted = await this.mintUnlimitedWithGroupPassword();
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
     if (!isUrlAutoMintTargetCurrent()) return false;
@@ -1319,13 +1319,7 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
-    return await this.handleMint(true, {
-      accountLowerOverride: options?.accountLowerOverride,
-      chainIdOverride: mintChainId,
-      sbtAddressOverride: sbtAddress,
-      sessionSlugOverride: slug,
-      sbtInfoOverride: sbtInfo,
-    });
+    return await this.handleMint(true);
   };
 
   handleGroupPasswordInputChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -1414,15 +1408,7 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  claimWithGroupPassword = async (
-    rawPassword: unknown,
-    sbtOverride?: unknown,
-    options: SbtPageGroupPasswordClaimOptions = {}
-  ): Promise<boolean> => {
-    let sbt = '';
-    let slug = '';
-    let mintAccountLower = '';
-    let mintChainId = '';
+  claimWithGroupPassword = async (rawPassword: unknown, sbtOverride?: unknown): Promise<boolean> => {
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -1550,12 +1536,7 @@ class SBTPage extends Component<any, any> {
         }
 
         const suppressErrors = attempt < maxAttempts - 1;
-        const result = await this.claimWithInvitePayload(payload, sbt, {
-          accountLowerOverride: mintAccountLower,
-          chainIdOverride: mintChainId,
-          suppressErrors,
-          sessionSlugOverride: slug,
-        });
+        const result = await this.claimWithInvitePayload(payload, sbt, { suppressErrors });
         if (result && result.ok) return true;
 
         lastError = result?.error || new Error('Invite claim failed.');
@@ -1589,33 +1570,19 @@ class SBTPage extends Component<any, any> {
       }
     } catch (error) {
       inviteLog.error('[INVITE] claimWithGroupPassword failed:', error);
-      if (
-        this._isMounted &&
-        this.isMintTargetContextCurrent({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          sbtAddress: sbt,
-          sessionSlug: slug,
-        })
-      ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
-      }
+      if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
       return false;
     }
     return false;
   };
 
-  claimWithInviteCode = async (
-    rawCode: unknown,
-    sbtOverride?: unknown,
-    options: SbtPageGroupPasswordClaimOptions = {}
-  ): Promise<boolean> => {
+  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown): Promise<boolean> => {
     const payload = this.decodeInviteInput(rawCode);
     if (payload) {
-      const result = await this.claimWithInvitePayload(payload, sbtOverride, options);
+      const result = await this.claimWithInvitePayload(payload, sbtOverride);
       return !!result?.ok;
     }
-    return await this.claimWithGroupPassword(rawCode, sbtOverride, options);
+    return await this.claimWithGroupPassword(rawCode, sbtOverride);
   };
 
   // Helpers
@@ -3151,7 +3118,7 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  async mintUnlimitedWithGroupPassword(options: SbtPageManualMintOptions = {}): Promise<boolean> {
+  async mintUnlimitedWithGroupPassword(): Promise<boolean> {
     sbtLog.log('[MANUAL-MINT] Starting manual mint...');
     let sbt: string | null = null;
     let slug = '';
@@ -3246,20 +3213,24 @@ class SBTPage extends Component<any, any> {
       const tx = await contractScripts.mintWithGroupSignature(this.props.provider, sbt, sig);
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
 
-      await this.completeMintSuccessForTarget({
-        accountLower: mintAccountLower,
-        chainId: mintChainId,
-        forceEventRefreshOnSuccess: true,
-        sbtAddress: sbt,
-        sessionSlug: slug,
-        txHash: tx.transactionHash,
-      });
+      await this.loadSBTInfo(true);
+      this.setState(buildSbtPageMintSuccessPatch({ txHash: tx.transactionHash }));
+
+      // Optimistic + parent refresh to ensure counters update everywhere
+      const meLower = this.props.account.toLowerCase();
+      this.applyLocalMintSuccess(meLower);
+      this.refreshSbtDataWithSlug(sbt);
+
+      // Cleanup auto-mint intent to prevent loop on refresh
+      this.clearAutoMintUrlIntent();
+
+      try {
+        window.dispatchEvent(new CustomEvent('sbt-mint-success', { detail: { sbtAddress: sbt, txHash: tx.transactionHash } }));
+      } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
       return true;
     } catch (error) {
       sbtLog.error('Manual mint flow failed:', error);
-      if (this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('mint')} failed.`) }));
-      }
+      this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('mint')} failed.`) }));
       return false;
     }
   }
@@ -3270,10 +3241,7 @@ class SBTPage extends Component<any, any> {
     }));
   };
 
-  handleMint = async (
-    forceEventRefreshOnSuccess: boolean = true,
-    options: SbtPageHandleMintOptions = {}
-  ): Promise<boolean> => {
+  handleMint = async (forceEventRefreshOnSuccess: boolean = true): Promise<boolean> => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return false;
@@ -3352,47 +3320,36 @@ class SBTPage extends Component<any, any> {
           );
 
           const tx = await contractScripts.startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
-          if (
-            this._isMounted &&
-            this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
-          ) {
-            this.setState(buildSbtPagePasswordClaimStartSuccessPatch({
-              txHash: tx.transactionHash,
-            }));
-            this.startClaimCountdown();
-            this._activeMintPendingTargetKey = '';
-          } else {
-            this.clearMintPendingForTarget({
-              accountLower: mintAccountLower,
-              chainId: mintChainId,
-              sbtAddress: sbtAddressOriginalCase,
-              sessionSlug: slug,
-            });
-          }
-          this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
+          if (this._isMounted) this.setState(buildSbtPagePasswordClaimStartSuccessPatch({
+            txHash: tx.transactionHash,
+          }));
+          this.startClaimCountdown();
+          this.cacheTransactionHash(tx.transactionHash);
           return true;
         } else if (mintStep === 2) {
-          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
-            return false;
-          }
-          this.setMintPendingForTarget({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
-            sbtAddress: sbtAddressOriginalCase,
-            sessionSlug: slug,
-          });
+          if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
           const tx = await contractScripts.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
-          this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
-          await this.completeMintSuccessForTarget({
-            accountLower: mintAccountLower,
-            chainId: mintChainId,
+          if (this._isMounted) this.setState(buildSbtPageMintSuccessPatch({
             clearManualPassword: true,
-            forceEventRefreshOnSuccess,
             mintStep: 3,
-            sbtAddress: sbtAddressOriginalCase,
-            sessionSlug: slug,
             txHash: tx.transactionHash,
-          });
+          }));
+          await this.loadSBTInfo(forceEventRefreshOnSuccess);
+          this.cacheTransactionHash(tx.transactionHash);
+
+          // Optimistic + parent refresh
+          const meLower = this.props.account.toLowerCase();
+          this.applyLocalMintSuccess(meLower);
+          this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
+
+          // Cleanup auto-mint intent to prevent loop on refresh
+          this.clearAutoMintUrlIntent();
+
+          try {
+            window.dispatchEvent(new CustomEvent('sbt-mint-success', {
+              detail: { sbtAddress: sbtAddressOriginalCase, txHash: tx.transactionHash }
+            }));
+          } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
           return true;
         }
       } else {
@@ -3406,25 +3363,28 @@ class SBTPage extends Component<any, any> {
           sessionSlug: slug,
         });
         const tx = await contractScripts.claim(this.props.provider, sbtAddressOriginalCase);
-        this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
-        await this.completeMintSuccessForTarget({
-          accountLower: mintAccountLower,
-          chainId: mintChainId,
-          forceEventRefreshOnSuccess,
-          sbtAddress: sbtAddressOriginalCase,
-          sessionSlug: slug,
-          txHash: tx.transactionHash,
-        });
+        if (this._isMounted) this.setState(buildSbtPageMintSuccessPatch({ txHash: tx.transactionHash }));
+        await this.loadSBTInfo(forceEventRefreshOnSuccess);
+        this.cacheTransactionHash(tx.transactionHash);
+
+        // Optimistic + parent refresh
+        const meLower = this.props.account.toLowerCase();
+        this.applyLocalMintSuccess(meLower);
+        this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
+
+        // Cleanup auto-mint intent to prevent loop on refresh
+        this.clearAutoMintUrlIntent();
+
+        try {
+          window.dispatchEvent(new CustomEvent('sbt-mint-success', {
+            detail: { sbtAddress: sbtAddressOriginalCase, txHash: tx.transactionHash }
+          }));
+        } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
         return true;
       }
     } catch (error) {
       sbtLog.error("Minting failed in handleMint:", error);
-      if (
-        this._isMounted &&
-        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
-      ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('minting')} failed.`) }));
-      }
+      if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('minting')} failed.`) }));
       return false;
     }
     return false;

@@ -684,13 +684,6 @@ describe('SurveyTool submit cache writes', () => {
     }));
     subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
     subject.submitSurveyResponse = jest.fn().mockImplementation(async () => {
-      subject.props = {
-        ...subject.props,
-        account: '0xdef',
-        surveyId: '0xchanged-survey',
-        sessionSlug: 'changed-session',
-        activeSessionSlug: 'changed-session',
-      };
       return {
         status: 1,
         blockNumber: 42,

@@ -1110,6 +1110,7 @@ export class SurveyQuestions extends Component {
       singleQuestionMode,
       isStandalone,
       surveyIndex: singleQuestionMode || isStandalone ? 0 : (this.props?.surveyIndex || 0),
+      mounted: !!this._isMounted,
     };
   };
 
@@ -1125,7 +1126,14 @@ export class SurveyQuestions extends Component {
   };
 
   isDecryptContextCurrent = (snapshot = null) => (
-    !!snapshot && this.buildDecryptContextKey(snapshot) === this.buildDecryptContextKey()
+    !!snapshot &&
+    (!snapshot.mounted || this._isMounted) &&
+    this.buildDecryptContextKey(snapshot) === this.buildDecryptContextKey()
+  );
+
+  canUpdateStateForAsyncSnapshot = (snapshot = null) => (
+    !!snapshot &&
+    (!snapshot.mounted || this._isMounted)
   );
 
   buildQuestionDecryptStaleState = (prev, questionId, fieldToDecrypt = 'both') => ({
@@ -1700,7 +1708,6 @@ export class SurveyQuestions extends Component {
     if (prevState.surveysResponseState !== this.state.surveysResponseState) return true;
     if (prevState.editBaseline !== this.state.editBaseline) return true;
     if (prevState.userAnswers !== this.state.userAnswers) return true;
-    if (prevState.isLoadingResponse !== this.state.isLoadingResponse) return true;
     if (prevStateQuestionPoolSig !== nextStateQuestionPoolSig) return true;
     if (prevStatePileQuestionsSig !== nextStatePileQuestionsSig) return true;
     if (prevPropsQuestionPoolSig !== nextPropsQuestionPoolSig) return true;
@@ -6815,7 +6822,9 @@ export class SurveyQuestions extends Component {
         opts,
       });
       if (!this.isDecryptContextCurrent(context)) {
-        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt));
+        if (this.canUpdateStateForAsyncSnapshot(context)) {
+          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt));
+        }
         return false;
       }
 
@@ -6831,6 +6840,12 @@ export class SurveyQuestions extends Component {
       return didUpdate;
     } catch (error) {
       surveyLog.error(`Error decrypting viewed response ${fieldToDecrypt} for ${questionId}`, error);
+      if (!this.isDecryptContextCurrent(context)) {
+        if (this.canUpdateStateForAsyncSnapshot(context)) {
+          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, qid, fieldToDecrypt));
+        }
+        return false;
+      }
       this.setState((prev) => {
         return this.buildQuestionDecryptFailureState(prev, qid, fieldToDecrypt, error.message);
       });
@@ -6936,7 +6951,9 @@ export class SurveyQuestions extends Component {
         opts,
       });
       if (!this.isDecryptContextCurrent(context)) {
-        this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt));
+        if (this.canUpdateStateForAsyncSnapshot(context)) {
+          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt));
+        }
         return false;
       }
 
@@ -6957,6 +6974,12 @@ export class SurveyQuestions extends Component {
       return didUpdate;
     } catch (error) {
       surveyLog.error(`Error decrypting ${fieldToDecrypt} for ${questionId}`, error);
+      if (!this.isDecryptContextCurrent(context)) {
+        if (this.canUpdateStateForAsyncSnapshot(context)) {
+          this.setState((prev) => this.buildQuestionDecryptStaleState(prev, questionId, fieldToDecrypt));
+        }
+        return false;
+      }
       this.setState((prev) => (
         this.buildQuestionDecryptFailureState(prev, questionId, fieldToDecrypt, error.message)
       ));
@@ -9848,6 +9871,7 @@ export class SurveyQuestions extends Component {
       props: this.props,
       account: this.props.account || '',
       provider: this.props.provider,
+      providerKind: String(cryptoUtils.getProviderKind(this.props.provider) || '').trim().toLowerCase(),
       loginComplete: !!this.props.loginComplete,
       singleQuestionMode,
       isStandalone,
@@ -9856,13 +9880,47 @@ export class SurveyQuestions extends Component {
       questionID: this.props.questionID || '',
       effectiveDraftSlug,
       chainId: this.resolveSessionChainId(effectiveDraftSlug, null, this.props),
+      mounted: !!this._isMounted,
     };
   };
 
+  buildSubmitContextKey = (snapshot = null) => {
+    const context = snapshot || this.buildSubmitContextSnapshot();
+    return [
+      String(context.account || '').trim().toLowerCase(),
+      String(context.providerKind || '').trim().toLowerCase(),
+      normalizeSessionSlugValue(context.effectiveDraftSlug || ''),
+      String(context.chainId || '').trim(),
+      context.singleQuestionMode ? 'single' : (context.isStandalone ? 'standalone' : 'survey'),
+      String(context.surveyIndex ?? '').trim(),
+      String(context.surveyId || '').trim().toLowerCase(),
+      String(context.questionID || '').trim().toLowerCase(),
+    ].join('|');
+  };
+
+  isSubmitContextCurrent = (snapshot = null) => (
+    !!snapshot &&
+    (!snapshot.mounted || this._isMounted) &&
+    this.buildSubmitContextKey(snapshot) === this.buildSubmitContextKey()
+  );
+
+  buildSubmitStaleState = () => ({
+    isSubmitting: false,
+    submitProgress: 0,
+    currentStep: 0,
+  });
+
+  handleStaleSubmitContext = (snapshot = null) => {
+    this._submitGuard = false;
+    if (this.canUpdateStateForAsyncSnapshot(snapshot)) {
+      this.setState(this.buildSubmitStaleState());
+    }
+  };
+
   encryptAndUpload = async () => {
+    let submitContext = null;
     try {
-      const submitContext = this.buildSubmitContextSnapshot();
-      if (!submitContext.loginComplete) {
+      if (!this.props.loginComplete) {
         this._submitGuard = false;
         this.props.toggleLoginModal(true);
         return;
@@ -9887,7 +9945,8 @@ export class SurveyQuestions extends Component {
         return;
       }
 
-      this.setState({ isSubmitting: true, submitProgress: 0, currentStep: 1, submissionError: '' });
+      submitContext = this.buildSubmitContextSnapshot();
+      this.setState(buildSubmitStartState());
 
       const providerKind = cryptoUtils.getProviderKind(submitContext.provider);
 
@@ -9935,6 +9994,10 @@ export class SurveyQuestions extends Component {
               hasher: this.state.hasher,
             },
           });
+          if (!this.isSubmitContextCurrent(submitContext)) {
+            this.handleStaleSubmitContext(submitContext);
+            return;
+          }
 
           // Merge back (overrides hash with salted Keccak; carries envelope v1 + recipients)
           const newArr = [...this.state.surveysResponseState];
@@ -9965,6 +10028,10 @@ export class SurveyQuestions extends Component {
 
       // Await the receipt to ensure transaction is confirmed before optimistic update
       const receipt = await this.submitSurveyResponse(activeSlice, changedQids, submitContext);
+      if (!this.isSubmitContextCurrent(submitContext)) {
+        this.handleStaleSubmitContext(submitContext);
+        return;
+      }
       surveyLog.log("Submission receipt received", receipt?.blockNumber || 'unknown block');
 
       // Success path
@@ -10092,10 +10159,11 @@ export class SurveyQuestions extends Component {
     } catch (error) {
       surveyLog.error('Failed to submit survey:', error);
       this._submitGuard = false;
-      this.setState({
-        isSubmitting: false,
-        submitProgress: 0,
-        submissionComplete: false,
+      if (submitContext && !this.isSubmitContextCurrent(submitContext)) {
+        this.handleStaleSubmitContext(submitContext);
+        return;
+      }
+      this.setState(buildSubmitFailureState({
         submittedSinceLastEdit: updateSubmittedSinceLastEdit(this.state.submittedSinceLastEdit, 'submit_error'),
         submissionError: error.message || 'Submission failed.'
       });

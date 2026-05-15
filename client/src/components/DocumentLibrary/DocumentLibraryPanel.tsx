@@ -692,6 +692,10 @@ export default function DocumentLibraryPanel({
   const autoOpenedRef = useRef('');
   const viewerRequestSeqRef = useRef(0);
 
+  useEffect(() => () => {
+    viewerRequestSeqRef.current += 1;
+  }, []);
+
   useEffect(() => {
     return () => {
       if (!viewerBlobUrl) return;
@@ -1007,8 +1011,9 @@ export default function DocumentLibraryPanel({
         return;
       }
 
-      const res = await fetchArweaveBlobWithFallback(txId);
+      const res = await fetchArweaveBlobWithFallback(txId, { isCurrent: isCurrentViewerRequest });
       if (!isCurrentViewerRequest()) return;
+      if (!res.ok && res.stale) return;
       if (!res.ok) throw new Error(res.error || 'Failed to fetch document.');
       const blob = res.blob;
       const mime = toStr(res.contentType || blob.type || '').trim();

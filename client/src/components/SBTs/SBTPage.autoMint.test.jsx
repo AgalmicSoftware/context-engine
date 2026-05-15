@@ -98,6 +98,45 @@ describe('SBTPage auto-mint routing', () => {
     }
   });
 
+  it('does not mark public URL auto-mint complete when the real mint path catches a wallet failure', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000107';
+    const previousHref = window.location.href;
+    const successKey = buildSbtPageAutoMintStorageKey({
+      chainId: 84532,
+      sessionSlug: 'edge',
+      sbtAddress,
+    });
+    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        account: '0x0000000000000000000000000000000000000abc',
+        loginComplete: true,
+        sessionSlug: 'edge',
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: { hasPasswordMint: false },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      jest
+        .spyOn(contractScripts, 'getGroupPasswordHash')
+        .mockResolvedValue('0x0000000000000000000000000000000000000000000000000000000000000000');
+      jest.spyOn(contractScripts, 'claim').mockRejectedValue(new Error('wallet rejected'));
+      jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+
+      const result = await subject.handleUrlAutoMintIntent();
+
+      expect(result).toBe(false);
+      expect(contractScripts.claim).toHaveBeenCalledWith('mock', sbtAddress);
+      expect(window.sessionStorage.getItem(successKey)).toBeNull();
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
   it('defers prop-driven auto-mint on mount until sbtInfo is loaded', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000105';
     const subject = createSubject({
