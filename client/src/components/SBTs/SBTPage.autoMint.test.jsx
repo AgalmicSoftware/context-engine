@@ -167,17 +167,22 @@ describe('SBTPage auto-mint routing', () => {
       jest
         .spyOn(contractScripts, 'getGroupPasswordHash')
         .mockImplementation(async () => {
-          subject.props = { ...subject.props, SBTAddress: nextSbtAddress };
+          subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
           return '0x0000000000000000000000000000000000000000000000000000000000000000';
         });
       jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xpublicmint' });
-      jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+      const loadSpy = jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+      const localSuccessSpy = jest.spyOn(subject, 'applyLocalMintSuccess');
+      const refreshSpy = jest.spyOn(subject, 'refreshSbtDataWithSlug').mockReturnValue(undefined);
 
       const result = await subject.handleUrlAutoMintIntent();
 
       expect(result).toBe(true);
       expect(contractScripts.claim).toHaveBeenCalledWith('mock', sbtAddress);
       expect(contractScripts.claim).not.toHaveBeenCalledWith('mock', nextSbtAddress);
+      expect(loadSpy).not.toHaveBeenCalled();
+      expect(localSuccessSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).toHaveBeenCalledWith(sbtAddress, undefined, 'edge');
       expect(window.sessionStorage.getItem(successKey)).toBe('done');
     } finally {
       window.history.replaceState({}, '', previousHref);
@@ -212,7 +217,7 @@ describe('SBTPage auto-mint routing', () => {
       jest
         .spyOn(contractScripts, 'getGroupPasswordHash')
         .mockImplementationOnce(async () => {
-          subject.props = { ...subject.props, SBTAddress: nextSbtAddress };
+          subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
           return onchainHash;
         })
         .mockResolvedValue(onchainHash);
@@ -220,7 +225,9 @@ describe('SBTPage auto-mint routing', () => {
       jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(onchainHash);
       jest.spyOn(contractScripts, 'signGroupMintAuthorization').mockResolvedValue('0xsig');
       jest.spyOn(contractScripts, 'mintWithGroupSignature').mockResolvedValue({ transactionHash: '0xgroupmint' });
-      jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+      const loadSpy = jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+      const localSuccessSpy = jest.spyOn(subject, 'applyLocalMintSuccess');
+      const refreshSpy = jest.spyOn(subject, 'refreshSbtDataWithSlug').mockReturnValue(undefined);
 
       const result = await subject.handleUrlAutoMintIntent();
 
@@ -231,6 +238,9 @@ describe('SBTPage auto-mint routing', () => {
       }));
       expect(contractScripts.mintWithGroupSignature).toHaveBeenCalledWith('mock', sbtAddress, '0xsig');
       expect(contractScripts.mintWithGroupSignature).not.toHaveBeenCalledWith('mock', nextSbtAddress, '0xsig');
+      expect(loadSpy).not.toHaveBeenCalled();
+      expect(localSuccessSpy).not.toHaveBeenCalled();
+      expect(refreshSpy).toHaveBeenCalledWith(sbtAddress, undefined, 'edge');
       expect(window.sessionStorage.getItem(successKey)).toBe('done');
     } finally {
       window.history.replaceState({}, '', previousHref);
@@ -259,7 +269,8 @@ describe('SBTPage auto-mint routing', () => {
       };
       return { transactionHash: '0xinvite' };
     });
-    jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+    const loadSpy = jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+    const localSuccessSpy = jest.spyOn(subject, 'applyLocalMintSuccess');
     const refreshSpy = jest.spyOn(subject, 'refreshSbtDataWithSlug').mockReturnValue(undefined);
 
     const result = await subject.claimWithInvitePayload(
@@ -270,6 +281,8 @@ describe('SBTPage auto-mint routing', () => {
 
     expect(result.ok).toBe(true);
     expect(contractScripts.claimWithInvite).toHaveBeenCalledWith('mock', sbtAddress, '1', '0xsig');
+    expect(loadSpy).not.toHaveBeenCalled();
+    expect(localSuccessSpy).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalledWith(sbtAddress, undefined, 'edge');
     expect(refreshSpy).not.toHaveBeenCalledWith(nextSbtAddress, undefined, 'next');
   });

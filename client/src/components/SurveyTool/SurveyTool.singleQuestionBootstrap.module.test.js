@@ -524,9 +524,16 @@ describe('SurveyTool single-question bootstrap cache', () => {
     };
     let callbackRun = Promise.resolve();
     subject.setState = jest.fn((update, cb) => {
+      const prevState = subject.state;
       const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
       if (patch && typeof patch === 'object') {
         subject.state = { ...subject.state, ...patch };
+      }
+      if (
+        subject.didEditDiffInputsChange(subject.props, prevState) &&
+        !subject._responseHydrationStateUpdateDepth
+      ) {
+        subject.invalidateResponseHydrationRuns();
       }
       if (typeof cb === 'function') {
         const maybePromise = cb();
@@ -914,9 +921,16 @@ describe('SurveyTool single-question bootstrap cache', () => {
     };
     let callbackRun = Promise.resolve();
     subject.setState = jest.fn((update, cb) => {
+      const prevState = subject.state;
       const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
       if (patch && typeof patch === 'object') {
         subject.state = { ...subject.state, ...patch };
+      }
+      if (
+        subject.didEditDiffInputsChange(subject.props, prevState) &&
+        !subject._responseHydrationStateUpdateDepth
+      ) {
+        subject.invalidateResponseHydrationRuns();
       }
       if (typeof cb === 'function') {
         const maybePromise = cb();
@@ -1069,9 +1083,16 @@ describe('SurveyTool single-question bootstrap cache', () => {
     };
     let callbackRun = Promise.resolve();
     subject.setState = jest.fn((update, cb) => {
+      const prevState = subject.state;
       const patch = typeof update === 'function' ? update(subject.state, subject.props) : update;
       if (patch && typeof patch === 'object') {
         subject.state = { ...subject.state, ...patch };
+      }
+      if (
+        subject.didEditDiffInputsChange(subject.props, prevState) &&
+        !subject._responseHydrationStateUpdateDepth
+      ) {
+        subject.invalidateResponseHydrationRuns();
       }
       if (typeof cb === 'function') {
         const maybePromise = cb();
