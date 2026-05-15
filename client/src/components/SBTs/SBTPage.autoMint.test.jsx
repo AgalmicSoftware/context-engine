@@ -189,6 +189,42 @@ describe('SBTPage auto-mint routing', () => {
     }
   });
 
+  it('does not write public auto-mint metadata after the route target changes during hydration', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000116';
+    const nextSbtAddress = '0x0000000000000000000000000000000000000117';
+    const account = '0x0000000000000000000000000000000000000abc';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: null,
+      userHasSBT: false,
+      mintingStatus: 'idle',
+    };
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockImplementation(async () => {
+      subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
+      return { hasPasswordMint: false };
+    });
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(
+      '0x0000000000000000000000000000000000000000000000000000000000000000',
+    );
+    const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xpublicmint' });
+
+    const result = await subject.autoMintPublicIfAllowed(sbtAddress, {
+      accountLowerOverride: account,
+      sessionSlugOverride: 'edge',
+    });
+
+    expect(result).toBe(false);
+    expect(subject.state.sbtInfo).toBeNull();
+    expect(subject.state.mintingStatus).toBe('idle');
+    expect(claimSpy).not.toHaveBeenCalled();
+  });
+
   it('does not send group-password URL auto-mints after the route target changes before mint', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000110';
     const nextSbtAddress = '0x0000000000000000000000000000000000000111';
@@ -317,6 +353,7 @@ describe('SBTPage auto-mint routing', () => {
     expect(localSuccessSpy).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalledWith(sbtAddress, undefined, 'edge');
     expect(refreshSpy).not.toHaveBeenCalledWith(nextSbtAddress, undefined, 'next');
+    expect(subject.state.mintingStatus).toBe('idle');
   });
 
   it('defers prop-driven auto-mint on mount until sbtInfo is loaded', async () => {
@@ -375,6 +412,38 @@ describe('SBTPage auto-mint routing', () => {
     subject.componentDidUpdate(subject.props, prevState);
 
     expect(handleMintSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('resets pending mint UI when the connected account changes', () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000115';
+    const previousAccount = '0x0000000000000000000000000000000000000abc';
+    const nextAccount = '0x0000000000000000000000000000000000000def';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: nextAccount,
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      groupPasswordInput: 'claim-code',
+      manualPasswordInput: 'manual-code',
+      mintingStatus: 'pending',
+      showMiniPasswordInput: true,
+    };
+    jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
+    jest.spyOn(subject, 'handleUrlAutoMintIntent').mockResolvedValue(false);
+
+    subject.componentDidUpdate({
+      ...subject.props,
+      account: previousAccount,
+    });
+
+    expect(subject.state.mintingStatus).toBe('idle');
+    expect(subject.state.groupPasswordInput).toBe('');
+    expect(subject.state.manualPasswordInput).toBe('');
+    expect(subject.state.showMiniPasswordInput).toBe(false);
+    expect(subject.loadSBTInfo).toHaveBeenCalled();
   });
 
   it('routes invite auto-mint URLs to invite claiming on the dedicated page', async () => {
