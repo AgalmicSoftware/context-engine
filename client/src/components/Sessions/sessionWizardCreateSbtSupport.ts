@@ -2,6 +2,11 @@ import { toStr } from '../../utilities/shared/primitives.js';
 
 type SessionWizardCreateSbtGate = Record<string, unknown> & {
   id?: unknown;
+  gateId?: unknown;
+  label?: unknown;
+  mode?: unknown;
+  color?: unknown;
+  sbts?: unknown;
 };
 
 type SessionWizardCreateSbtLaunchOptions = Record<string, unknown> & {
@@ -16,6 +21,36 @@ type SessionWizardCreateSbtLaunchState = {
   gateId: string;
   sessionSlug: string;
   arweaveJwkOverride: string;
+};
+type SessionWizardNetworkLike = Record<string, unknown> & {
+  id?: unknown;
+  chainId?: unknown;
+  name?: unknown;
+};
+type SessionWizardSbtSelection = Record<string, unknown> & {
+  address?: unknown;
+};
+type BuildSessionWizardDeferredCreateSbtComponentPropsArgs = {
+  account?: unknown;
+  accountOverride?: unknown;
+  defaultGateId?: unknown;
+  draft?: Record<string, unknown> | null;
+  encryptionGates?: SessionWizardCreateSbtGate[];
+  getChainById?: (chainId: number | null) => SessionWizardNetworkLike | null | undefined;
+  getChainName?: (chainId: number | null) => string;
+  getEnabledWorkerArweaveJwk?: (secrets: unknown) => unknown;
+  network?: SessionWizardNetworkLike | null;
+  normalizeSbtSelection?: (value: unknown) => SessionWizardSbtSelection[];
+  normalizeWorkerAuthUrl?: (value: unknown) => string;
+  provider?: unknown;
+  registryChainId?: unknown;
+  resolvedActiveSessionSlug?: unknown;
+  resolvedWalletAccount?: unknown;
+  sessionSlugOverride?: unknown;
+  signAdminAction?: unknown;
+  toggleLoginModal?: unknown;
+  workerSecrets?: unknown;
+  workerUrlOverride?: unknown;
 };
 
 export const getSessionWizardGateById = (
@@ -71,36 +106,6 @@ export const buildSessionWizardCreateSbtModalLaunchState = ({
   ).trim(),
 });
 
-export const resolveSessionWizardCreateSbtModalPlan = ({
-  createSbtModalState = null,
-  draft = {},
-  getChainById = () => null,
-  getChainName = () => '',
-  getEnabledWorkerArweaveJwk = () => '',
-  network = null,
-  registryChainId = null,
-  resolvedActiveSessionSlug = '',
-  workerSecretsEnabled = false,
-}: ResolveSessionWizardCreateSbtModalPlanArgs = {}): SessionWizardCreateSbtModalPlan => {
-  const draftRecord = draft && typeof draft === 'object' ? draft : {};
-  const modalState = createSbtModalState && typeof createSbtModalState === 'object' ? createSbtModalState : {};
-  const chainId = Number(draftRecord.networkChainId || registryChainId || network?.id || network?.chainId || 0) || null;
-  const resolvedNetwork =
-    getChainById(chainId) ||
-    (chainId ? { id: chainId, name: getChainName(chainId) || `Chain ${chainId}` } : network || { id: null, name: '' });
-  const sessionSlug = toStr(modalState.sessionSlug || draftRecord.slug || resolvedActiveSessionSlug || '').trim();
-  const arweaveJwkOverride = workerSecretsEnabled
-    ? toStr(modalState.arweaveJwkOverride || getEnabledWorkerArweaveJwk()).trim()
-    : '';
-
-  return {
-    arweaveJwkOverride,
-    chainId,
-    network: resolvedNetwork,
-    sessionSlug,
-  };
-};
-
 export const buildSessionWizardDeferredCreateSbtComponentProps = ({
   account = '',
   accountOverride = '',
@@ -111,7 +116,7 @@ export const buildSessionWizardDeferredCreateSbtComponentProps = ({
   getChainName = () => '',
   getEnabledWorkerArweaveJwk = () => '',
   network = null,
-  normalizeSbtSelection = (value) => (Array.isArray(value) ? (value as SessionWizardSbtSelection[]) : []),
+  normalizeSbtSelection = (value) => (Array.isArray(value) ? value as SessionWizardSbtSelection[] : []),
   normalizeWorkerAuthUrl = (value) => toStr(value).trim(),
   provider = null,
   registryChainId = null,
@@ -123,13 +128,25 @@ export const buildSessionWizardDeferredCreateSbtComponentProps = ({
   workerSecrets = null,
   workerUrlOverride = '',
 }: BuildSessionWizardDeferredCreateSbtComponentPropsArgs = {}) => {
-  const draftRecord = draft && typeof draft === 'object' ? draft : {};
-  const chainId =
-    Number(draftRecord?.networkChainId || registryChainId || network?.id || network?.chainId || 0) || null;
-  const sessionSlug = toStr(sessionSlugOverride || draftRecord?.slug || resolvedActiveSessionSlug || '').trim();
-  const resolvedNetwork =
-    getChainById(chainId) ||
-    (chainId ? { id: chainId, name: getChainName(chainId) || `Chain ${chainId}` } : network || { id: null, name: '' });
+  const draftRecord = (draft && typeof draft === 'object') ? draft : {};
+  const chainId = Number(
+    draftRecord?.networkChainId ||
+    registryChainId ||
+    network?.id ||
+    network?.chainId ||
+    0
+  ) || null;
+  const sessionSlug = toStr(
+    sessionSlugOverride ||
+    draftRecord?.slug ||
+    resolvedActiveSessionSlug ||
+    ''
+  ).trim();
+  const resolvedNetwork = getChainById(chainId) || (
+    chainId
+      ? { id: chainId, name: getChainName(chainId) || `Chain ${chainId}` }
+      : (network || { id: null, name: '' })
+  );
 
   return {
     account: toStr(accountOverride || resolvedWalletAccount || account).trim(),
@@ -141,9 +158,14 @@ export const buildSessionWizardDeferredCreateSbtComponentProps = ({
     sessionConfigOverride: {
       ...draftRecord,
       slug: sessionSlug,
-      corsWorkerUrl: normalizeWorkerAuthUrl(toStr(workerUrlOverride || draftRecord?.corsWorkerUrl).trim()),
+      corsWorkerUrl: normalizeWorkerAuthUrl(
+        toStr(workerUrlOverride || draftRecord?.corsWorkerUrl).trim()
+      ),
       networkChainId: chainId,
-      contracts: draftRecord && typeof draftRecord?.contracts === 'object' ? draftRecord.contracts : {},
+      contracts: (
+        draftRecord &&
+        typeof draftRecord?.contracts === 'object'
+      ) ? draftRecord.contracts : {},
     },
     arweaveJwkOverride: getEnabledWorkerArweaveJwk(workerSecrets),
     encryptionGates: (Array.isArray(encryptionGates) ? encryptionGates : []).map((gate) => ({
