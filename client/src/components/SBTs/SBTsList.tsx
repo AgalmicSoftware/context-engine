@@ -64,6 +64,7 @@ import {
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
+  buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionUniversePanelClassName,
   coerceSbtMintEndSeconds,
@@ -1695,38 +1696,17 @@ const SBTsList = ({
   ]);
 
   const sessionChipStateBySlug = useMemo(() => {
-    if (!allSessionsMode) return {};
-    const out: SbtSessionChipStateBySlug = {};
-    displayedSessionUniverseSlugs.forEach((slugRaw) => {
-      const slug = normalizeSessionSlug(slugRaw || '');
-      if (isSbtListSyntheticNoSessionSlug(slug)) {
-        const hasLoadedOnce = Object.values(sessionHasLoadedOnceBySlug).some(Boolean);
-        const anySessionLoading = Object.values(sessionLoadStateBySlug).some((state) => state === 'loading');
-        const hasCards = hasNoSessionCards;
-        const isLoading = refreshing || (!hasCards && (!hasLoadedOnce || anySessionLoading));
-        const isLoaded = hasCards || (hasLoadedOnce && !isLoading);
-        out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
-        return;
-      }
-      const cacheMeta = readSbtCacheMeta(slug);
-      const snapshot = getSessionProgressSnapshot(slug);
-      const hasCacheSnapshot = cacheMeta != null;
-      const hasLoadedOnce = !!sessionHasLoadedOnceBySlug[slug];
-      const hasCards = Array.isArray(sbtListBySlug[slug]) && sbtListBySlug[slug].length > 0;
-      const loadState = sessionLoadStateBySlug[slug] || 'idle';
-      const scanInProgress = !!snapshot?.scanInProgress;
-      const deferred = !!snapshot?.deferred;
-      const isLoading = (
-        loadState === 'loading' ||
-        scanInProgress ||
-        deferred ||
-        refreshing ||
-        (!hasCacheSnapshot && !hasLoadedOnce)
-      );
-      const isLoaded = (hasLoadedOnce || hasCacheSnapshot) && !scanInProgress && !deferred && loadState !== 'loading';
-      out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
-    });
-    return out;
+    return buildSbtListSessionChipStateBySlug({
+      allSessionsMode,
+      displayedSessionUniverseSlugs,
+      getSessionProgressSnapshot,
+      hasNoSessionCards,
+      readSbtCacheMeta,
+      refreshing,
+      sbtListBySlug,
+      sessionHasLoadedOnceBySlug,
+      sessionLoadStateBySlug,
+    }) as SbtSessionChipStateBySlug;
   }, [
     allSessionsMode,
     displayedSessionUniverseSlugs,
