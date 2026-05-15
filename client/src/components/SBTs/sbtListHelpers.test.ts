@@ -16,6 +16,7 @@ import {
   buildSbtListRenderItemKey,
   buildSbtListRenderBuckets,
   buildSbtListRootClassName,
+  buildSbtListSessionLoadingStatus,
   buildSbtListSessionUniversePanelClassName,
   collectSbtDocumentUrls,
   collectSbtTagValues,
@@ -152,6 +153,57 @@ describe('sbtListHelpers', () => {
       fontSize: '0.85rem',
       opacity: 0.85,
     });
+    expect(buildSbtListSessionLoadingStatus({
+      allSessionsMode: true,
+      formatBlockCount: (value) => `#${value}`,
+      snapshot: {
+        cfg: { sessionName: 'Alpha' },
+        displayCurrentBlock: 1050,
+        hasCache: true,
+        hasLatest: true,
+        lastBlock: 1040,
+        latestForGroup: 1100,
+        remainingBlocks: 50,
+        scanInProgress: true,
+        slug: 'alpha',
+        startBlock: 1000,
+      },
+    })).toEqual(expect.objectContaining({
+      chipBlockProgressText: '#1050 / #1100',
+      chipRemainingText: '#50 remaining',
+      displayName: 'Alpha',
+      progressPct: 50,
+      progressText: 'Remaining Blocks: #50 (Current: #1050 / Latest: #1100)',
+      statusLabel: 'Scanning',
+    }));
+    expect(buildSbtListSessionLoadingStatus({
+      allSessionsMode: true,
+      loading: false,
+      snapshot: {
+        cfg: { sessionName: 'Alpha' },
+        displayCurrentBlock: 1100,
+        hasCache: true,
+        hasLatest: true,
+        latestForGroup: 1100,
+        remainingBlocks: 0,
+        slug: 'alpha',
+        startBlock: 1000,
+      },
+    })).toBeNull();
+    expect(buildSbtListSessionLoadingStatus({
+      alwaysShow: true,
+      snapshot: {
+        cfg: { sessionName: 'General' },
+        displayCurrentBlock: 0,
+        hasLatest: false,
+        slug: '',
+      },
+    })).toEqual(expect.objectContaining({
+      chipRemainingText: 'Syncing',
+      displayName: 'General',
+      slugLabel: 'general',
+      statusLabel: 'Loading',
+    }));
     expect(buildSbtListExpandedCardShellClassName({
       baseClassName: 'card',
       expandedClassName: 'card-expanded',

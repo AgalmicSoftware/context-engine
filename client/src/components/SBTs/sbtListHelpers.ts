@@ -132,6 +132,44 @@ export type SbtCacheMetaSnapshot = {
   lastBlock: number;
   sbtCount: number;
 };
+export type SbtListSessionLoadingStatusSnapshot = {
+  cfg?: SbtListHelperRecord | null;
+  deferred?: boolean;
+  displayCurrentBlock?: number;
+  hasCache?: boolean;
+  hasLatest?: boolean;
+  lastBlock?: number;
+  latestForGroup?: number | null;
+  remainingBlocks?: number | null;
+  scanInProgress?: boolean;
+  slug?: string;
+  startBlock?: number | null;
+};
+export type SbtListSessionLoadingStatus = {
+  chipBlockProgressText: string;
+  chipRemainingText: string;
+  deferred: boolean;
+  displayCurrentBlock: number;
+  displayName: string;
+  hasLatest: boolean;
+  lastBlock: number;
+  latestForGroup: number | null;
+  progressPct: number;
+  progressText: string;
+  remainingBlocks: number | null;
+  scanInProgress: boolean;
+  slug: string;
+  slugLabel: string;
+  statusLabel: string;
+};
+type BuildSbtListSessionLoadingStatusArgs = {
+  allSessionsMode?: boolean;
+  alwaysShow?: boolean;
+  forceShow?: boolean;
+  formatBlockCount?: (value: unknown) => string;
+  loading?: boolean;
+  snapshot?: SbtListSessionLoadingStatusSnapshot | null;
+};
 
 export type SbtSessionGroupLists = {
   featured_SBTs_LIST?: unknown;
@@ -263,6 +301,82 @@ const SBT_LIST_MANAGED_DG_CACHE_NAMES = new Set<string>([
   'sbtCache',
   'userCache',
 ]);
+
+export const buildSbtListSessionLoadingStatus = ({
+  allSessionsMode = false,
+  alwaysShow = false,
+  forceShow = false,
+  formatBlockCount = (value) => String(value ?? ''),
+  loading = false,
+  snapshot = null,
+}: BuildSbtListSessionLoadingStatusArgs = {}): SbtListSessionLoadingStatus | null => {
+  if (!snapshot) return null;
+  const {
+    cfg = null,
+    lastBlock = 0,
+    hasCache = false,
+    startBlock = null,
+    latestForGroup = null,
+    hasLatest = false,
+    displayCurrentBlock = 0,
+    remainingBlocks = null,
+    scanInProgress = false,
+    deferred = false,
+  } = snapshot;
+  const slug = normalizeSessionSlug(snapshot.slug || '');
+  const sessionLabel = String(cfg?.sessionName || (slug || 'General'));
+  const slugLabel = slug || 'general';
+  const displayName =
+    sessionLabel && sessionLabel.toLowerCase() !== slugLabel.toLowerCase()
+      ? `${sessionLabel} (${slugLabel})`
+      : sessionLabel;
+  const numericLatestForGroup = Number(latestForGroup || 0);
+  const numericStartBlock = Number(startBlock || 0);
+  const numericRemainingBlocks = Number(remainingBlocks || 0);
+  const totalBlocks = hasLatest ? Math.max(1, numericLatestForGroup - numericStartBlock + 1) : null;
+  const scannedBlocks = hasLatest
+    ? Math.max(0, Math.min(totalBlocks || 0, displayCurrentBlock - numericStartBlock + 1))
+    : 0;
+  const progressPct = hasLatest
+    ? Math.max(0, Math.min(100, Math.round((scannedBlocks / (totalBlocks || 1)) * 100)))
+    : 0;
+  const progressText = hasLatest
+    ? (numericRemainingBlocks === 0
+      ? `In Sync (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`
+      : `Remaining Blocks: ${formatBlockCount(numericRemainingBlocks)} (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`)
+    : `Loading latest block... (Current: ${formatBlockCount(displayCurrentBlock)})`;
+  const chipRemainingText = hasLatest
+    ? (numericRemainingBlocks > 0
+      ? `${formatBlockCount(numericRemainingBlocks)} remaining`
+      : 'Synced')
+    : 'Syncing';
+  const chipBlockProgressText = hasLatest
+    ? `${formatBlockCount(displayCurrentBlock)} / ${formatBlockCount(latestForGroup)}`
+    : `Current ${formatBlockCount(displayCurrentBlock)}`;
+  const statusLabel = scanInProgress ? 'Scanning' : deferred ? 'Queued' : 'Loading';
+  const shouldShow = alwaysShow || forceShow || (allSessionsMode
+    ? (scanInProgress || deferred || (!hasCache && loading))
+    : true);
+
+  if (!shouldShow) return null;
+  return {
+    slug,
+    slugLabel,
+    displayName,
+    statusLabel,
+    progressText,
+    chipRemainingText,
+    chipBlockProgressText,
+    progressPct,
+    hasLatest,
+    latestForGroup,
+    lastBlock,
+    displayCurrentBlock,
+    remainingBlocks,
+    scanInProgress,
+    deferred,
+  };
+};
 
 export const isSbtListHelperRecord = (value: unknown): value is SbtListHelperRecord => (
   !!value && typeof value === 'object'
