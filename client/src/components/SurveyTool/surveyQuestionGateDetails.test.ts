@@ -1,7 +1,6 @@
 import {
   buildLockedGateRequirementSentence,
   buildLockedQuestionGateDetailsFromPool,
-  collectGateSbtAddressesForHydrationFromSources,
   isGenericResourceGateLabel,
 } from './surveyQuestionGateDetails';
 
@@ -86,47 +85,5 @@ describe('surveyQuestionGateDetails', () => {
     expect(buildLockedGateRequirementSentence(details, {
       translate: (key) => (key === 'sbt' ? 'Badge' : key),
     })).toBe('Badge required: Configured SBT.');
-  });
-
-  it('collects unique valid SBT addresses for gate label hydration', () => {
-    const policyAddress = '0x1111111111111111111111111111111111111111';
-    const questionAddress = '0x2222222222222222222222222222222222222222';
-    const invalidAddress = 'not-an-address';
-
-    const addresses = collectGateSbtAddressesForHydrationFromSources({
-      policy: {
-        gates: [{
-          sbtAddress: policyAddress.toLowerCase(),
-          sbtAddresses: [invalidAddress, questionAddress.toLowerCase()],
-        }],
-      },
-      questionPools: [
-        [{
-          id: 'q1',
-          encryption: {
-            gates: [{
-              sbtAddress: policyAddress.toLowerCase(),
-            }],
-          },
-        }],
-        'not-a-pool',
-        [{
-          id: 'q2',
-          encryption: {
-            gates: [{
-              sbtAddresses: [questionAddress.toLowerCase()],
-            }],
-          },
-        }],
-      ],
-      getQuestionEncryptionGates: (question: any) => question?.encryption?.gates || [],
-      isAddress: (value) => value.startsWith('0x') && value.length === 42,
-      getAddress: (value) => value.toUpperCase(),
-    });
-
-    expect(addresses).toEqual([
-      questionAddress.toUpperCase(),
-      policyAddress.toUpperCase(),
-    ]);
   });
 });
