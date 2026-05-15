@@ -742,6 +742,10 @@ export default function DocumentLibraryPanel({
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
+    listRequestSeqRef.current += 1;
+    activeListQueryKeyRef.current = '__unmounted__';
+    activeUploadContextKeyRef.current = '__unmounted__';
+    loadingRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -812,7 +816,7 @@ export default function DocumentLibraryPanel({
       return buildSbtListFilters({ chainId: sbtChainId || network?.id || null, sbtAddress: normalizedSbtAddress });
     }
     return [];
-  }, [isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId, sessionSlug]);
+  }, [isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId]);
 
   const listQueryKey = useMemo(() => (
     JSON.stringify({
@@ -830,6 +834,8 @@ export default function DocumentLibraryPanel({
     if (mode === 'sbt') return !!normalizedSbtAddress && !!Number(sbtChainId || network?.id || 0);
     return false;
   }, [docProvider, isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId, sessionSlug]);
+  const listRunKey = useMemo(() => `${canList ? '1' : '0'}|${listQueryKey}`, [canList, listQueryKey]);
+  activeListQueryKeyRef.current = listRunKey;
 
   const loadDocs = useCallback(async ({ reset }: { reset?: boolean } = {}) => {
     if (!canList) return;
@@ -837,7 +843,7 @@ export default function DocumentLibraryPanel({
     if (!reset && !cursorRef.current) return;
     setError('');
     const requestSeq = (listRequestSeqRef.current += 1);
-    const expectedQueryKey = listQueryKey;
+    const expectedQueryKey = listRunKey;
     loadingRef.current = true;
     setLoading(true);
     try {
@@ -899,10 +905,9 @@ export default function DocumentLibraryPanel({
       loadingRef.current = false;
       setLoading(false);
     }
-  }, [account, canList, docProvider, graphqlUrl, graphqlUrls, listFilters, network?.id, pageSize, provider, sessionConfig, sessionSlug, listQueryKey]);
+  }, [account, canList, docProvider, graphqlUrl, graphqlUrls, listFilters, network?.id, pageSize, provider, sessionConfig, sessionSlug, listRunKey]);
 
   useEffect(() => {
-    activeListQueryKeyRef.current = listQueryKey;
     // Cancel in-flight requests for the previous query to avoid stale updates.
     listRequestSeqRef.current += 1;
     loadingRef.current = false;
@@ -913,7 +918,7 @@ export default function DocumentLibraryPanel({
     setCursor(null);
     if (!canList) return;
     loadDocs({ reset: true });
-  }, [canList, listQueryKey, loadDocs]);
+  }, [canList, listRunKey, loadDocs]);
 
   const closeViewer = useCallback(() => {
     viewerRequestSeqRef.current += 1;
