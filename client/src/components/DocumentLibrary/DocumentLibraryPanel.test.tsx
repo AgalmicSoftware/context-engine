@@ -641,7 +641,7 @@ describe('DocumentLibraryPanel photo docs', () => {
     window.history.replaceState(
       {},
       '',
-      '/session/edge/docs?__ceDocTx=cf_docopaque1&__ceDocStorage=cloudflare&__ceDocKind=file&__ceDocName=Cloud%20auto'
+      '/session/edge/docs?keep=1&__ceDocRef=cf_docopaque1&__ceDocStorage=cloudflare&__ceDocKind=file&__ceDocName=Cloud%20auto'
     );
 
     render(
@@ -664,6 +664,7 @@ describe('DocumentLibraryPanel photo docs', () => {
       }));
     });
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('cloud auto text');
+    expect(window.location.search).toBe('?keep=1');
   });
 
   it('auto-opens self-recipient Lit-Arweave viewer links without scoped getKey hooks', async () => {

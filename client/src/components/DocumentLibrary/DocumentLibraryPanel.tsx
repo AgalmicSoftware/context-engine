@@ -1050,18 +1050,11 @@ export default function DocumentLibraryPanel({
     autoOpenedRef.current = key;
     openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef });
 
-        // Clear params so refresh/back doesn't re-open repeatedly.
-        try {
-          const url = new URL(window.location.href);
-          ['__ceDocTx', '__ceDocRef', '__ceDocStorage', '__ceDocKind', '__ceDocName'].forEach((param) => {
-            url.searchParams.delete(param);
-          });
-          window.history.replaceState({}, '', url.toString());
-        } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
-      })
-      .catch((error) => {
-        if (autoOpeningRef.current === key) autoOpeningRef.current = '';
-        log.warn('DocumentLibraryPanel: auto-open failed', error);
+    // Clear params so refresh/back doesn't re-open repeatedly.
+    try {
+      const url = new URL(window.location.href);
+      ['__ceDocTx', '__ceDocRef', '__ceDocStorage', '__ceDocKind', '__ceDocName'].forEach((param) => {
+        url.searchParams.delete(param);
       });
       window.history.replaceState({}, '', url.toString());
     } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
