@@ -830,7 +830,7 @@ class SBTPage extends Component<any, any> {
     if (!targetCode) {
       const minted = await this.autoMintPublicIfAllowed(currentSbtAddress);
       if (minted) markAutoMintSuccess();
-      return true;
+      return minted;
     }
 
     await new Promise<void>((resolve) => {
@@ -844,9 +844,9 @@ class SBTPage extends Component<any, any> {
     });
 
     if (targetInvite) {
-      await this.claimWithInviteCode(targetInvite, currentSbtAddress);
-      markAutoMintSuccess();
-      return true;
+      const minted = await this.claimWithInviteCode(targetInvite, currentSbtAddress);
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
     const slug = this.getEffectiveSessionSlug();
@@ -863,16 +863,16 @@ class SBTPage extends Component<any, any> {
     }
 
     if (sbtInfo?.hasPasswordMint) {
-      await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
-      markAutoMintSuccess();
-      return true;
+      const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
     const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
-      await this.mintUnlimitedWithGroupPassword();
-      markAutoMintSuccess();
-      return true;
+      const minted = await this.mintUnlimitedWithGroupPassword();
+      if (minted) markAutoMintSuccess();
+      return minted;
     }
 
     if (this._isMounted) {
@@ -1009,8 +1009,7 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
-    await this.handleMint(true);
-    return true;
+    return await this.handleMint(true);
   };
 
   handleGroupPasswordInputChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -1078,21 +1077,21 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  claimWithGroupPassword = async (rawPassword: unknown, sbtOverride?: unknown): Promise<void> => {
+  claimWithGroupPassword = async (rawPassword: unknown, sbtOverride?: unknown): Promise<boolean> => {
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
-        return;
+        return false;
       }
       const password = cryptoUtils.normalizeGroupPasswordInput(rawPassword);
       if (!password) {
         if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Group password is required.' }));
-        return;
+        return false;
       }
 
       const sbt = String(sbtOverride || resolveSbtAddressString(this.props.SBTAddress) || '');
 
-      if (!sbt) return;
+      if (!sbt) return false;
 
       const slug = this.getEffectiveSessionSlug();
       let sbtInfo = this.state.sbtInfo;
@@ -1121,7 +1120,7 @@ class SBTPage extends Component<any, any> {
           if (this._isMounted) {
             this.setState(buildSbtPageMintFailurePatch({ error: 'Group password mismatch.' }));
           }
-          return;
+          return false;
         }
       }
 
@@ -1148,7 +1147,7 @@ class SBTPage extends Component<any, any> {
 
         if (mintedTokens === null) {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Unable to load minted count.' }));
-          return;
+          return false;
         }
 
         let mintedBig: ethers.BigNumber | null = null;
@@ -1160,12 +1159,12 @@ class SBTPage extends Component<any, any> {
 
         if (mintedBig === null) {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Unable to parse minted count.' }));
-          return;
+          return false;
         }
 
         if (maxTokens && mintedBig.gte(maxTokens)) {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Group limit reached.' }));
-          return;
+          return false;
         }
 
         const nonce = mintedBig.add(1).toString();
@@ -1178,12 +1177,12 @@ class SBTPage extends Component<any, any> {
         const payload = invites && invites[0];
         if (!payload) {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Failed to generate invite.' }));
-          return;
+          return false;
         }
 
         const suppressErrors = attempt < maxAttempts - 1;
         const result = await this.claimWithInvitePayload(payload, sbt, { suppressErrors });
-        if (result && result.ok) return;
+        if (result && result.ok) return true;
 
         lastError = result?.error || new Error('Invite claim failed.');
 
@@ -1205,22 +1204,24 @@ class SBTPage extends Component<any, any> {
           if (this._isMounted && suppressErrors) {
             this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(lastError, 'Invite claim failed.') }));
           }
-          return;
+          return false;
         }
       }
     } catch (error) {
       inviteLog.error('[INVITE] claimWithGroupPassword failed:', error);
       if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
+      return false;
     }
+    return false;
   };
 
-  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown): Promise<void> => {
+  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown): Promise<boolean> => {
     const payload = this.decodeInviteInput(rawCode);
     if (payload) {
-      await this.claimWithInvitePayload(payload, sbtOverride);
-      return;
+      const result = await this.claimWithInvitePayload(payload, sbtOverride);
+      return !!result?.ok;
     }
-    await this.claimWithGroupPassword(rawCode, sbtOverride);
+    return await this.claimWithGroupPassword(rawCode, sbtOverride);
   };
 
   // Helpers
@@ -2738,17 +2739,17 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  async mintUnlimitedWithGroupPassword() {
+  async mintUnlimitedWithGroupPassword(): Promise<boolean> {
     sbtLog.log('[MANUAL-MINT] Starting manual mint...');
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
-        return;
+        return false;
       }
       const password = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPasswordInput);
       if (!password) {
         this.setState(buildSbtPageErrorPatch({ error: 'Enter group password first.' }));
-        return;
+        return false;
       }
 
       const sbt = resolveSbtAddressString(this.props.SBTAddress);
@@ -2761,7 +2762,7 @@ class SBTPage extends Component<any, any> {
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
       if (!onchain || onchain === ethers.constants.HashZero) {
         this.setState(buildSbtPageErrorPatch({ error: `This ${t('sbt')} does not support group-password signature ${t('mintLower')}.` }));
-        return;
+        return false;
       }
 
       const walletScopeSbtAddress = cryptoUtils.resolveGroupPasswordWalletScopeAddress({
@@ -2778,7 +2779,7 @@ class SBTPage extends Component<any, any> {
       if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
         sbtLog.error('[MANUAL-MINT] Sanity check FAILED', { expected: onchain, computed: local });
         this.setState(buildSbtPageErrorPatch({ error: 'Incorrect group password.' }));
-        return;
+        return false;
       }
 
       this.setState(buildSbtPageMintPendingPatch());
@@ -2810,9 +2811,11 @@ class SBTPage extends Component<any, any> {
       try {
         window.dispatchEvent(new CustomEvent('sbt-mint-success', { detail: { sbtAddress: sbt, txHash: tx.transactionHash } }));
       } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
+      return true;
     } catch (error) {
       sbtLog.error('Manual mint flow failed:', error);
       this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('mint')} failed.`) }));
+      return false;
     }
   }
 
@@ -2822,15 +2825,15 @@ class SBTPage extends Component<any, any> {
     }));
   };
 
-  handleMint = async (forceEventRefreshOnSuccess: boolean = true): Promise<void> => {
+  handleMint = async (forceEventRefreshOnSuccess: boolean = true): Promise<boolean> => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
-      return;
+      return false;
     }
 
     const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
 
-    if (!sbtAddressOriginalCase) return;
+    if (!sbtAddressOriginalCase) return false;
 
     const { sbtInfo, mintPassword, mintStep, manualPasswordInput } = this.state;
 
@@ -2839,7 +2842,7 @@ class SBTPage extends Component<any, any> {
         const effectivePassword = (mintPassword && mintPassword.trim() !== '' ? mintPassword : (manualPasswordInput || '').trim());
         if (effectivePassword === '') {
           if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: `Password is required for this ${t('sbt')}.` }));
-          return;
+          return false;
         }
 
         if (mintStep === 0) {
@@ -2855,7 +2858,7 @@ class SBTPage extends Component<any, any> {
             );
             if (!isValid) {
               if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid password.' }));
-              return;
+              return false;
             }
           } catch (preCheckErr) {
             // If the view call fails (e.g. network issue), proceed with the mint anyway —
@@ -2876,6 +2879,7 @@ class SBTPage extends Component<any, any> {
           }));
           this.startClaimCountdown();
           this.cacheTransactionHash(tx.transactionHash);
+          return true;
         } else if (mintStep === 2) {
           if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
           const tx = await contractScripts.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
@@ -2900,6 +2904,7 @@ class SBTPage extends Component<any, any> {
               detail: { sbtAddress: sbtAddressOriginalCase, txHash: tx.transactionHash }
             }));
           } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
+          return true;
         }
       } else {
         if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
@@ -2921,11 +2926,14 @@ class SBTPage extends Component<any, any> {
             detail: { sbtAddress: sbtAddressOriginalCase, txHash: tx.transactionHash }
           }));
         } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
+        return true;
       }
     } catch (error) {
       sbtLog.error("Minting failed in handleMint:", error);
       if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('minting')} failed.`) }));
+      return false;
     }
+    return false;
   };
 
   miniMintHandler = async (): Promise<void> => {
