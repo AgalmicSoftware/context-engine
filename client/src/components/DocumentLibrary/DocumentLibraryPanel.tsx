@@ -625,66 +625,7 @@ export default function DocumentLibraryPanel({
   const [viewerMime, setViewerMime] = useState('');
 
   const autoOpenedRef = useRef('');
-  const autoOpeningRef = useRef('');
   const viewerRequestSeqRef = useRef(0);
-  const viewerContextKey = useMemo(
-    () =>
-      [
-        panelContextKey,
-        toStr(account).trim().toLowerCase(),
-        String(documentNetwork?.id || ''),
-        loginComplete ? '1' : '0',
-        docAsyncConfigKey,
-      ].join('|'),
-    [account, docAsyncConfigKey, documentNetwork?.id, loginComplete, panelContextKey],
-  );
-  const activeViewerContextKeyRef = useRef(viewerContextKey);
-  activeViewerContextKeyRef.current = viewerContextKey;
-  const activeUploadContextKeyRef = useRef(viewerContextKey);
-  activeUploadContextKeyRef.current = viewerContextKey;
-  const activeFileRef = useRef<File | null>(file);
-  activeFileRef.current = file;
-  const activeUrlInputRef = useRef(urlInput);
-  activeUrlInputRef.current = urlInput;
-  const activeUrlTitleRef = useRef(urlTitle);
-  activeUrlTitleRef.current = urlTitle;
-  const fileUploadInFlightRef = useRef(false);
-  const urlUploadInFlightRef = useRef(false);
-  const fileUploadAttemptSeqRef = useRef(0);
-  const urlUploadAttemptSeqRef = useRef(0);
-
-  useEffect(
-    () => () => {
-      viewerRequestSeqRef.current += 1;
-      listRequestSeqRef.current += 1;
-      fileUploadAttemptSeqRef.current += 1;
-      urlUploadAttemptSeqRef.current += 1;
-      activeListQueryKeyRef.current = '__unmounted__';
-      activeViewerContextKeyRef.current = '__unmounted__';
-      activeUploadContextKeyRef.current = '__unmounted__';
-      loadingRef.current = false;
-      fileUploadInFlightRef.current = false;
-      urlUploadInFlightRef.current = false;
-    },
-    [],
-  );
-
-  useEffect(() => {
-    viewerRequestSeqRef.current += 1;
-    fileUploadAttemptSeqRef.current += 1;
-    urlUploadAttemptSeqRef.current += 1;
-    setViewerOpen(false);
-    setViewerLoading(false);
-    setViewerError('');
-    setViewerTitle('');
-    setViewerText('');
-    setViewerBlobUrl('');
-    setViewerMime('');
-    fileUploadInFlightRef.current = false;
-    urlUploadInFlightRef.current = false;
-    setFileUploadPending(false);
-    setUrlUploadPending(false);
-  }, [viewerContextKey]);
 
   useEffect(() => {
     return () => {
@@ -922,42 +863,83 @@ export default function DocumentLibraryPanel({
     setViewerMime('');
   }, []);
 
-  const openDoc = useCallback(
-    async (doc: OpenableDoc): Promise<boolean> => {
-      const txId = toStr(doc?.txId).trim();
-      if (!txId) return false;
-      const requestSeq = viewerRequestSeqRef.current + 1;
-      viewerRequestSeqRef.current = requestSeq;
-      const viewerContextAtStart = activeViewerContextKeyRef.current;
-      const isCurrentViewerRequest = () =>
-        viewerRequestSeqRef.current === requestSeq && activeViewerContextKeyRef.current === viewerContextAtStart;
-      const revokeStaleBlobUrl = (blobUrl: string) => {
-        if (!blobUrl || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
-        try {
-          URL.revokeObjectURL(blobUrl);
-        } catch (e) {
-          log.warn('DocumentLibraryPanel: stale blob cleanup', e);
+  const openDoc = useCallback(async (doc: OpenableDoc) => {
+    const txId = toStr(doc?.txId).trim();
+    if (!txId) return;
+    const requestSeq = viewerRequestSeqRef.current + 1;
+    viewerRequestSeqRef.current = requestSeq;
+    const isCurrentViewerRequest = () => viewerRequestSeqRef.current === requestSeq;
+    const revokeStaleBlobUrl = (blobUrl: string) => {
+      if (!blobUrl || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
+      try { URL.revokeObjectURL(blobUrl); } catch (e) { log.warn('DocumentLibraryPanel: stale blob cleanup', e); }
+    };
+    const applyTextViewerState = ({ title, mime, text }: { title: string; mime: string; text: string }) => {
+      if (!isCurrentViewerRequest()) return false;
+      setViewerTitle(title);
+      setViewerMime(mime);
+      setViewerText(text);
+      setViewerLoading(false);
+      return true;
+    };
+    const applyBlobViewerState = ({ title, mime, blobUrl }: { title: string; mime: string; blobUrl: string }) => {
+      if (!isCurrentViewerRequest()) {
+        revokeStaleBlobUrl(blobUrl);
+        return false;
+      }
+      setViewerTitle(title);
+      setViewerMime(mime);
+      setViewerBlobUrl(blobUrl);
+      setViewerLoading(false);
+      return true;
+    };
+
+    const tagMap = doc?.tagMap || {};
+    const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
+    const kind = toStr(tagMap['CE-DocKind']).trim().toLowerCase();
+    const isEncrypted = storage === 'lit-arweave' || storage === 'lit';
+    const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
+    const isCloudflareStorage = storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE;
+
+    setViewerOpen(true);
+    setViewerLoading(true);
+    setViewerError('');
+    setViewerText('');
+    setViewerMime('');
+    setViewerBlobUrl('');
+    setViewerTitle(isEncrypted ? 'Decrypting…' : 'Loading…');
+
+    try {
+      if (isCloudflareStorage) {
+        if (isEncrypted) {
+          throw new Error('Lit-encrypted Cloudflare document reads are not implemented yet.');
         }
-      };
-      const applyTextViewerState = ({ title, mime, text }: { title: string; mime: string; text: string }) => {
-        if (!isCurrentViewerRequest()) return false;
-        setViewerTitle(title);
-        setViewerMime(mime);
-        setViewerText(text);
-        setViewerLoading(false);
-        return true;
-      };
-      const applyBlobViewerState = ({ title, mime, blobUrl }: { title: string; mime: string; blobUrl: string }) => {
-        if (!isCurrentViewerRequest()) {
-          revokeStaleBlobUrl(blobUrl);
-          return false;
+        const response = await readSessionStorageBlobForDocs({
+          storageRef,
+          sessionSlug,
+          sessionConfig,
+          context: { account, providerLike: provider, chainId: network?.id || null },
+        });
+        if (!isCurrentViewerRequest()) return;
+        const blob = await response.blob();
+        if (!isCurrentViewerRequest()) return;
+        const mime = toStr(response.headers.get('content-type') || blob.type || storageRef?.contentType || '').trim();
+        if (kind === 'link' || isTextLikeMime(mime)) {
+          const text = await blob.text();
+          applyTextViewerState({
+            title: toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : 'Document'),
+            mime: mime || (kind === 'link' ? 'application/json' : 'text/plain'),
+            text: text || '',
+          });
+          return;
         }
-        setViewerTitle(title);
-        setViewerMime(mime);
-        setViewerBlobUrl(blobUrl);
-        setViewerLoading(false);
-        return true;
-      };
+        const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
+        applyBlobViewerState({
+          title: toStr(tagMap['CE-DocName']).trim() || 'Document',
+          mime,
+          blobUrl,
+        });
+        return;
+      }
 
       const tagMap = doc?.tagMap || {};
       const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
@@ -1026,29 +1008,20 @@ export default function DocumentLibraryPanel({
                 chainId: Number(documentNetwork?.id || 0) || null,
               },
             },
-          });
-          if (!isCurrentViewerRequest()) return false;
+          },
+        });
+        if (!isCurrentViewerRequest()) return;
 
-          const name = toStr(payload?.name || '').trim() || (kind === 'link' ? 'Encrypted link' : 'Encrypted document');
-          const mime = toStr(payload?.mime || '').trim();
-          const text = litStorage.decodeLitPayloadToText(payload);
-          if (text) {
-            return applyTextViewerState({
-              title: name,
-              mime: mime || 'text/plain',
-              text,
-            });
-          }
-          const blob = litStorage.decodeLitPayloadToBlob(payload);
-          if (!blob) {
-            throw new Error('Unable to decode encrypted document.');
-          }
-          const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-          return applyBlobViewerState({
+        const name = toStr(payload?.name || '').trim() || (kind === 'link' ? 'Encrypted link' : 'Encrypted document');
+        const mime = toStr(payload?.mime || '').trim();
+        const text = litStorage.decodeLitPayloadToText(payload);
+        if (text) {
+          applyTextViewerState({
             title: name,
-            mime: blob.type || mime || '',
-            blobUrl,
+            mime: mime || 'text/plain',
+            text,
           });
+          return;
         }
 
         if (kind === 'link') {
@@ -1082,21 +1055,58 @@ export default function DocumentLibraryPanel({
           });
         }
         const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-        return applyBlobViewerState({
-          title: toStr(tagMap['CE-DocName']).trim() || 'Document',
-          mime,
+        applyBlobViewerState({
+          title: name,
+          mime: blob.type || mime || '',
           blobUrl,
         });
-      } catch (err) {
-        if (!isCurrentViewerRequest()) return false;
-        setViewerLoading(false);
-        setViewerError(getErrorMessage(err, 'Failed to open document.'));
-        setViewerTitle('Error');
-        return false;
+        return;
       }
-    },
-    [provider, account, documentNetwork?.id, panelContextKey, getActiveLitHooks, sessionConfig, sessionSlug],
-  );
+
+      if (kind === 'link') {
+        const text = await arweaveScripts.downloadDataFromArweave(txId, {
+          debugContext: {
+            category: 'doc_link_payload',
+            caller: 'DocumentLibraryPanel.openDoc.link',
+            slug: panelContextKey || '',
+            chainId: Number(network?.id || 0) || null,
+          },
+        });
+        applyTextViewerState({
+          title: toStr(tagMap['CE-DocName']).trim() || 'Link record',
+          mime: 'application/json',
+          text: text || '',
+        });
+        return;
+      }
+
+      const res = await fetchArweaveBlobWithFallback(txId);
+      if (!isCurrentViewerRequest()) return;
+      if (!res.ok) throw new Error(res.error || 'Failed to fetch document.');
+      const blob = res.blob;
+      const mime = toStr(res.contentType || blob.type || '').trim();
+      if (isTextLikeMime(mime)) {
+        const text = await blob.text();
+        applyTextViewerState({
+          title: toStr(tagMap['CE-DocName']).trim() || 'Document',
+          mime: mime || 'text/plain',
+          text: text || '',
+        });
+        return;
+      }
+      const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
+      applyBlobViewerState({
+        title: toStr(tagMap['CE-DocName']).trim() || 'Document',
+        mime,
+        blobUrl,
+      });
+    } catch (err) {
+      if (!isCurrentViewerRequest()) return;
+      setViewerLoading(false);
+      setViewerError(getErrorMessage(err, 'Failed to open document.'));
+      setViewerTitle('Error');
+    }
+  }, [provider, account, network?.id, panelContextKey, getActiveLitHooks, sessionConfig, sessionSlug]);
 
   useEffect(() => {
     if (!autoOpenDoc || !autoOpenDoc.txId) return;
