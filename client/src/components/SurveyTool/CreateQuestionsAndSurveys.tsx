@@ -112,6 +112,7 @@ import {
   buildCreateSurveyQuestionTagInputValueList,
   buildCreateSurveyQuestionTagRemovalList,
   buildCreateSurveyQuestionsSubmitSuccessPatch,
+  buildCreateSurveySubmitGatePlan,
   buildCreateSurveySurveySubmitSuccessPatch,
   buildCreateSurveySubmitBlockingErrorPatch,
   buildCreateSurveySubmitCatchPatch,
@@ -2395,42 +2396,18 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     } = this.state;
 
     const { gateMap, defaultGateId } = this.resolveGateOptions(sessionConfig, { isStandaloneQuestion });
-    const knownGateIds = new Set<string>(Object.keys(gateMap || {}));
-
-    const normalizeKnownGateIds = (value: unknown): string[] => (
-      normalizeGateIds(value).filter((gateId): gateId is string => (
-        typeof gateId === 'string' && knownGateIds.has(gateId)
-      ))
-    );
-
-    const defaultSubmitGateIds = defaultGateId ? normalizeKnownGateIds([defaultGateId]) : [];
-    // Regression guard: a restricted session/resource default gate must fail closed.
-    // Empty authoring lock state is an untouched draft, not permission to upload plaintext.
-    const applyDefaultSubmitGateIds = (value: unknown): string[] => {
-      const normalized = normalizeKnownGateIds(value);
-      return normalized.length ? normalized : defaultSubmitGateIds;
-    };
-
-    const resolvedSurveyLockGateIds = !isStandaloneQuestion
-      ? applyDefaultSubmitGateIds(surveyLockGateIds)
-      : [];
-
-    const resolveQuestionSubmitGateIds = (q?: CreateQuestionsAndSurveysQuestion | null): string[] => {
-      if (!q) return [];
-      if (isStandaloneQuestion) return applyDefaultSubmitGateIds(q.lockGateIds);
-      const hasOwnLock = Object.prototype.hasOwnProperty.call(q || {}, 'lockGateIds');
-      if (!hasOwnLock || q.lockGateIds === null) return resolvedSurveyLockGateIds;
-      return applyDefaultSubmitGateIds(q.lockGateIds);
-    };
-
-    const questionNeedsEncryption = (q?: CreateQuestionsAndSurveysQuestion | null) => {
-      const gateIds = resolveQuestionSubmitGateIds(q);
-      return Array.isArray(gateIds) && gateIds.length > 0;
-    };
-
-    const needsLit =
-      resolvedSurveyLockGateIds.length > 0 ||
-      (Array.isArray(questions) ? questions : []).some(questionNeedsEncryption);
+    const {
+      normalizeKnownGateIds,
+      resolvedSurveyLockGateIds,
+      resolveQuestionSubmitGateIds,
+      needsLit,
+    } = buildCreateSurveySubmitGatePlan({
+      defaultGateId,
+      gateMap,
+      isStandaloneQuestion,
+      questions,
+      surveyLockGateIds,
+    });
 
     const chainIdFallback = this.resolveSessionChainId(sessionConfig);
 

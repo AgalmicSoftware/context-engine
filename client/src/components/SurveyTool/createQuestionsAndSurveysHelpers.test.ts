@@ -33,6 +33,7 @@ import {
   buildCreateSurveyQuestionTagInputValueList,
   buildCreateSurveyQuestionTagRemovalList,
   buildCreateSurveyQuestionsSubmitSuccessPatch,
+  buildCreateSurveySubmitGatePlan,
   buildCreateSurveySurveySubmitSuccessPatch,
   buildCreateSurveySubmitBlockingErrorPatch,
   buildCreateSurveySubmitCatchPatch,
@@ -276,6 +277,49 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
         { id: 'q3', lockGateIds: null },
       ],
     });
+  });
+
+  it('derives submit-time lock gates for survey and standalone modes', () => {
+    const surveyPlan = buildCreateSurveySubmitGatePlan({
+      defaultGateId: 'default-gate',
+      gateMap: {
+        'default-gate': {},
+        'survey-gate': {},
+        'question-gate': {},
+      },
+      isStandaloneQuestion: false,
+      surveyLockGateIds: [],
+      questions: [
+        { id: 'q1', lockGateIds: null },
+        { id: 'q2', lockGateIds: [' question-gate ', 'missing-gate'] },
+      ],
+    });
+
+    expect(surveyPlan.defaultSubmitGateIds).toEqual(['default-gate']);
+    expect(surveyPlan.resolvedSurveyLockGateIds).toEqual(['default-gate']);
+    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: null }))
+      .toEqual(['default-gate']);
+    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: [' question-gate ', 'missing-gate'] }))
+      .toEqual(['question-gate']);
+    expect(surveyPlan.needsLit).toBe(true);
+
+    const standalonePlan = buildCreateSurveySubmitGatePlan({
+      defaultGateId: 'default-gate',
+      gateMap: {
+        'default-gate': {},
+        'question-gate': {},
+      },
+      isStandaloneQuestion: true,
+      surveyLockGateIds: ['default-gate'],
+      questions: [{ id: 'q1', lockGateIds: [] }],
+    });
+
+    expect(standalonePlan.resolvedSurveyLockGateIds).toEqual([]);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: [] }))
+      .toEqual(['default-gate']);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: ['question-gate'] }))
+      .toEqual(['question-gate']);
+    expect(standalonePlan.needsLit).toBe(true);
   });
 
   it('removes duplicate survey questions by id while preserving first occurrences', () => {
