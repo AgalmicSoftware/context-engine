@@ -18,6 +18,7 @@ import {
   buildSbtListRootClassName,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
+  buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
   collectSbtDocumentUrls,
   collectSbtTagValues,
@@ -294,6 +295,61 @@ describe('sbtListHelpers', () => {
         isLoading: false,
       },
     });
+    expect(buildSbtListSessionProgressSnapshot({
+      allSessionsMode: true,
+      bridgeMs: 2500,
+      bridgeTailBlocks: 5,
+      bridgedLiveProgress: {
+        currentBlock: 198,
+        latestBlock: 200,
+        updatedAtMs: 1000,
+      },
+      cacheMeta: {
+        lastBlock: 150,
+        sbtCount: 3,
+      },
+      cfg: {
+        blockLimits: { start: 100 },
+      },
+      recentLiveProgressNowMs: 1200,
+      slug: 'alpha',
+    })).toEqual(expect.objectContaining({
+      displayCurrentBlock: 198,
+      hasCache: true,
+      hasLatest: true,
+      latestForGroup: 200,
+      liveCurrentBlock: 198,
+      remainingBlocks: 2,
+      scanInProgress: false,
+    }));
+    expect(buildSbtListSessionProgressSnapshot({
+      allSessionsMode: true,
+      bridgeMs: 2500,
+      bridgeTailBlocks: 5,
+      bridgedLiveProgress: {
+        currentBlock: 198,
+        latestBlock: 220,
+        updatedAtMs: 1000,
+      },
+      cacheMeta: {
+        lastBlock: 220,
+        sbtCount: 3,
+      },
+      cfg: {
+        blockLimits: { start: 100 },
+      },
+      latestBlock: 220,
+      recentLiveProgressNowMs: 4000,
+      scanInProgressRaw: true,
+      deferredRaw: true,
+      slug: 'alpha',
+    })).toEqual(expect.objectContaining({
+      displayCurrentBlock: 220,
+      liveProgress: null,
+      remainingBlocks: 0,
+      scanInProgress: false,
+      deferred: false,
+    }));
     expect(buildSbtListExpandedCardShellClassName({
       baseClassName: 'card',
       expandedClassName: 'card-expanded',
