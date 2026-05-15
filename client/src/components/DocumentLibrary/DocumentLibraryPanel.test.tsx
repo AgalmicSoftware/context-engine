@@ -23,6 +23,12 @@ const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
+const getDocumentLibraryStateUpdateWarnings = (spy: any) => spy.mock.calls.filter(([message]: any[]) => {
+  const text = String(message || '');
+  return text.includes('Warning: An update to DocumentLibraryPanel')
+    || text.includes('unmounted component');
+});
+
 jest.mock('../../utilities/logging.js', () => ({
   createLogger: () => ({
     log: jest.fn(),
@@ -408,6 +414,108 @@ describe('DocumentLibraryPanel photo docs', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(screen.queryByText('old-context.txt')).not.toBeInTheDocument();
+  });
+
+  it('does not apply document list completions after unmount', async () => {
+    const slowList = createDeferred<any[]>();
+    mockListArweaveTransactionsByTags.mockReturnValueOnce(slowList.promise);
+    const { unmount } = render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'c'.repeat(32)}`}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockListArweaveTransactionsByTags).toHaveBeenCalled();
+    });
+
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      unmount();
+      slowList.resolve([
+        {
+          cursor: 'cursor-unmounted',
+          txId: 'U'.repeat(43),
+          owner: 'owner',
+          tags: [],
+          tagMap: {
+            'CE-DocStorage': 'arweave',
+            'CE-DocKind': 'file',
+            'CE-DocName': 'unmounted-list.txt',
+          },
+          data: { size: 11, type: 'text/plain' },
+        },
+      ]);
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(getDocumentLibraryStateUpdateWarnings(consoleErrorSpy)).toEqual([]);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it('does not apply upload completions after unmount', async () => {
+    const slowUpload = createDeferred<any>();
+    mockUploadDocLibraryFile.mockReturnValueOnce(slowUpload.promise);
+    const { unmount } = render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'d'.repeat(32)}`}
+      />
+    );
+
+    const file = new File(['unmounted'], 'unmounted-upload.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
+        file,
+        sessionSlug: 'edge',
+      }));
+    });
+
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      unmount();
+      slowUpload.resolve({
+        txId: 'V'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'unmounted-upload.txt',
+        },
+        data: { size: 9, type: 'text/plain' },
+      });
+
+      await Promise.resolve();
+      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(getDocumentLibraryStateUpdateWarnings(consoleErrorSpy)).toEqual([]);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('keeps image documents previewable and downloadable in the viewer', async () => {

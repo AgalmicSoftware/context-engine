@@ -703,6 +703,10 @@ export default function DocumentLibraryPanel({
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
+    listRequestSeqRef.current += 1;
+    activeListQueryKeyRef.current = '__unmounted__';
+    activeUploadContextKeyRef.current = '__unmounted__';
+    loadingRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -791,7 +795,7 @@ export default function DocumentLibraryPanel({
     if (mode === 'sbt') return !!normalizedSbtAddress && !!Number(sbtChainId || network?.id || 0);
     return false;
   }, [docProvider, isArweaveBackedDocProvider, mode, normalizedSessionIdHex, normalizedSbtAddress, network?.id, sbtChainId, sessionSlug]);
-  const listRunKey = useMemo(() => `${viewerContextKey}|${canList ? '1' : '0'}|${listQueryKey}`, [canList, listQueryKey, viewerContextKey]);
+  const listRunKey = useMemo(() => `${canList ? '1' : '0'}|${listQueryKey}`, [canList, listQueryKey]);
   activeListQueryKeyRef.current = listRunKey;
 
   const loadDocs = useCallback(async ({ reset }: { reset?: boolean } = {}) => {
