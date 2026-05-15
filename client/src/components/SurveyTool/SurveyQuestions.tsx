@@ -6119,42 +6119,53 @@ export class SurveyQuestions extends Component {
       return { netIdStr, questionsCache };
     };
 
-    let qData = null;
-    const recentPayload = readRecentQuestionPayload(questionId);
-    const recentPayloadForAccount = canUseRecentQuestionPayloadForAccount(
-      recentPayload,
-      this.props.account
-    )
-      ? { ...recentPayload, id: questionId }
-      : null;
-    let cacheState = await getCacheStateForSlug(effectiveSingleSlug);
-    if (!cacheState) {
-      if (recentPayloadForAccount) {
-        const shouldBootstrapViewedResponse = !!responderAddress;
-        qData = { ...recentPayloadForAccount, id: questionId };
-        if (!qData.creator) qData.creator = '';
-        if (!Array.isArray(qData.tags)) qData.tags = [];
-        const fallbackNetId = resolveQuestionBootstrapContext(
-          this.props,
-          effectiveSingleSlug
-        ).networkIdStr;
-        if (fallbackNetId) {
-          const bootstrapCache = await updateCacheAtomic('questionsCache', effectiveSingleSlug, (current) => {
-            const nextCache = ensureQuestionsNet(
-              (current && typeof current === 'object') ? current : {},
-              fallbackNetId
-            );
-            nextCache[fallbackNetId].questions[questionId] = {
-              ...(nextCache[fallbackNetId].questions[questionId] || {}),
-              ...qData,
-              id: questionId,
-            };
-            return nextCache;
-          });
-          cacheState = {
-            netIdStr: fallbackNetId,
-            questionsCache: ensureQuestionsNet(bootstrapCache || {}, fallbackNetId),
-          };
+    const cacheBootstrapResult = await resolveSingleQuestionCacheBootstrap({
+      questionId,
+      effectiveSingleSlug,
+      responderAddress: String(responderAddress || ''),
+      account: String(this.props.account || ''),
+      resolveCacheState: (slug) => resolveSingleQuestionCacheState({
+        slug,
+        questionId,
+        resolveQuestionBootstrapContext: (nextSlug) => resolveQuestionBootstrapContext(this.props, nextSlug),
+        readQuestionsCacheAsync,
+        ensureQuestionsNet,
+      }),
+      readRecentPayload: readRecentQuestionPayload,
+      canUseRecentPayload: canUseRecentQuestionPayloadForAccount,
+      resolveBootstrapNetworkId: (slug) => resolveQuestionBootstrapContext(this.props, slug).networkIdStr || '',
+      updateCacheAtomic,
+      ensureQuestionsNet,
+      pickBetterQuestionPayload,
+      areQuestionPayloadsEquivalent,
+      writeQuestionsCache,
+    });
+
+    if (cacheBootstrapResult.status === 'seeded-from-recent') {
+      const {
+        questionData: seededQData,
+        shouldBootstrapViewedResponse,
+        fallbackNetId,
+        cacheState: seededCacheState,
+      } = cacheBootstrapResult;
+      if (isStaleRun()) return;
+      this.setResponseHydrationState(
+        (prev) => ({
+          questionPool: [{ ...seededQData, id: seededQData.id }],
+          surveysResponseState: this.mergeSurveyResponseState(
+            prev.surveysResponseState ||
+              [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+            [{ ...seededQData, id: seededQData.id }],
+            0
+          ),
+          viewAddressAnswers: '',
+          parsedViewAddressAnswers: null,
+          noResponse: false,
+          isLoadingResponse: shouldBootstrapViewedResponse,
+        }),
+        () => {
+          this.updateJsonPreview();
+          this.rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
         }
         if (isStaleRun()) return;
         this.setState(

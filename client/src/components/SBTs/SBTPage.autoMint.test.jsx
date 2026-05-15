@@ -243,6 +243,42 @@ describe('SBTPage auto-mint routing', () => {
     }
   });
 
+  it('does not send generated group-password invites after the wallet changes before claim', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000114';
+    const startAccount = '0x0000000000000000000000000000000000000abc';
+    const nextAccount = '0x0000000000000000000000000000000000000def';
+    const onchainHash = `0x${'22'.repeat(32)}`;
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: startAccount,
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      sbtInfo: { hasPasswordMint: true },
+      userHasSBT: false,
+      mintingStatus: 'idle',
+    };
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(onchainHash);
+    jest.spyOn(cryptoUtils, 'resolveGroupPasswordWalletScopeAddress').mockReturnValue(sbtAddress);
+    jest.spyOn(contractScripts, 'computeGroupPasswordHash').mockReturnValue(onchainHash);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('0');
+    jest.spyOn(contractScripts, 'generateInvitePayloads').mockImplementation(async () => {
+      subject.props = { ...subject.props, account: nextAccount };
+      return [{ nonce: '1', signature: '0xsig' }];
+    });
+    const claimSpy = jest.spyOn(contractScripts, 'claimWithInvite').mockResolvedValue({ transactionHash: '0xinvite' });
+
+    const result = await subject.claimWithGroupPassword('claim-code', sbtAddress, {
+      sessionSlugOverride: 'edge',
+    });
+
+    expect(result).toBe(false);
+    expect(contractScripts.generateInvitePayloads).toHaveBeenCalled();
+    expect(claimSpy).not.toHaveBeenCalled();
+  });
+
   it('refreshes invite payload mints with the captured session even if route props change', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000112';
     const nextSbtAddress = '0x0000000000000000000000000000000000000113';

@@ -584,6 +584,7 @@ describe('DocumentLibraryPanel photo docs', () => {
         storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_old_context' }),
       }));
     });
+    expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER)).toBeInTheDocument();
 
     rerender(
       <DocumentLibraryPanel
@@ -593,6 +594,9 @@ describe('DocumentLibraryPanel photo docs', () => {
         sessionIdHex={`0x${'8'.repeat(32)}`}
       />
     );
+    await waitFor(() => {
+      expect(screen.queryByTestId(E2E_TESTIDS.DOC_VIEWER)).not.toBeInTheDocument();
+    });
 
     slowRead.resolve({
       headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
