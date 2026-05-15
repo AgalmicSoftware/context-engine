@@ -103,6 +103,8 @@ import {
   isUserPageEncryptedResponseField,
   isUserPageGateAccessContext,
   isUserPageResponsePayloadEncrypted,
+  mergeUserPageQuestionCacheSource,
+  mergeUserPageSurveyCacheSource,
   buildUserPageRootClassName,
   normalizeUserPageDeepScanProgressRows,
   normalizeUserPageDeepScanTooltipLines,
@@ -118,7 +120,6 @@ import {
   readUserPageNamespaceSourceEntries,
   readBoolishUserPageTelemetryFlag,
   readUserPageAnalysisCacheEntry,
-  readUserPageNetworkCache,
   resolveUserPageAnalysisAiContext,
   resolveUserPageAnalysisCacheStatusState,
   resolveUserPageAnalysisModalDisplayState,
@@ -2312,6 +2313,7 @@ class UserPage extends Component<any, any> {
     const questionSourceSlugById: SourceSlugMap = {};
     const questionResponseSourceSlugById: SourceSlugMap = {};
     const questionResponseSourceSlugByKey: SourceSlugMap = {};
+
     const upsertSurveyResponseByRecency = ({
       sid,
       responder,
@@ -2331,6 +2333,7 @@ class UserPage extends Component<any, any> {
         slug,
       });
     };
+
     const upsertQuestionResponseByRecency = ({
       qid,
       responder,
@@ -2350,91 +2353,32 @@ class UserPage extends Component<any, any> {
         slug,
       });
     };
-    surveysCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
-      const netObj = readUserPageNetworkCache(cacheObj, networkID) as CacheNetworkBucket;
-      const surveysMap = toAnalysisRecord(netObj.surveys);
-      Object.keys(surveysMap).forEach((sidRaw: string) => {
-        const sid = String(sidRaw || '').toLowerCase();
-        if (!sid) return;
-        if (!combinedSurveys[sid]) {
-          combinedSurveys[sid] = toAnalysisRecord(surveysMap[sidRaw] || surveysMap[sid]);
-        }
-        writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
-      });
 
-      const responseMap = toAnalysisRecord(netObj.surveyResponses);
-      Object.keys(responseMap).forEach((sidRaw: string) => {
-        const sid = String(sidRaw || '').toLowerCase();
-        if (!sid) return;
-        const perSurvey = toAnalysisRecord(responseMap[sidRaw] || responseMap[sid]);
-        Object.keys(perSurvey).forEach((resAddrRaw: string) => {
-          const responder = String(resAddrRaw || '').toLowerCase();
-          if (!responder) return;
-          const responseValue = (
-            Object.prototype.hasOwnProperty.call(perSurvey, resAddrRaw)
-              ? perSurvey[resAddrRaw]
-              : perSurvey[responder]
-          );
-          const responseMeta = (responseValue && typeof responseValue === 'object')
-            ? responseValue
-            : null;
-          upsertSurveyResponseByRecency({
-            sid,
-            responder,
-            responseValue,
-            metaValue: responseMeta,
-            slug,
-          });
-        });
+    surveysCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
+      mergeUserPageSurveyCacheSource({
+        cacheObj,
+        combinedSurveyResponses,
+        combinedSurveyResponsesMeta,
+        combinedSurveys,
+        networkID,
+        slug,
+        surveyResponseSourceSlugById,
+        surveyResponseSourceSlugByKey,
+        surveySourceSlugById,
       });
     });
 
     questionsCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
-      const netObj = readUserPageNetworkCache(cacheObj, networkID) as CacheNetworkBucket;
-      const questionsMap = toAnalysisRecord(netObj.questions);
-      Object.keys(questionsMap).forEach((qidRaw: string) => {
-        const qid = String(qidRaw || '').toLowerCase();
-        if (!qid) return;
-        if (!combinedQuestions[qid]) {
-          combinedQuestions[qid] = toAnalysisRecord(questionsMap[qidRaw] || questionsMap[qid]);
-        }
-        writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
-      });
-
-      const responseMap = toAnalysisRecord(netObj.questionResponses);
-      const responseMetaMap = toAnalysisRecord(netObj.questionResponsesMeta);
-      Object.keys(responseMap).forEach((qidRaw: string) => {
-        const qid = String(qidRaw || '').toLowerCase();
-        if (!qid) return;
-        const perQuestion = toAnalysisRecord(responseMap[qidRaw] || responseMap[qid]);
-        const perQuestionMeta = (
-          isPlainAnalysisObject(responseMetaMap[qidRaw])
-            ? responseMetaMap[qidRaw]
-            : isPlainAnalysisObject(responseMetaMap[qid])
-              ? responseMetaMap[qid]
-              : {}
-        );
-        Object.keys(perQuestion).forEach((resAddrRaw: string) => {
-          const responder = String(resAddrRaw || '').toLowerCase();
-          if (!responder) return;
-          const responseValue = (
-            Object.prototype.hasOwnProperty.call(perQuestion, resAddrRaw)
-              ? perQuestion[resAddrRaw]
-              : perQuestion[responder]
-          );
-          const responseMeta = (
-            perQuestionMeta[resAddrRaw] ??
-            perQuestionMeta[responder] ??
-            null
-          );
-          upsertQuestionResponseByRecency({
-            qid,
-            responder,
-            responseValue,
-            metaValue: responseMeta,
-            slug,
-          });
-        });
+      mergeUserPageQuestionCacheSource({
+        cacheObj,
+        combinedQuestionResponses,
+        combinedQuestionResponsesMeta,
+        combinedQuestions,
+        networkID,
+        questionResponseSourceSlugById,
+        questionResponseSourceSlugByKey,
+        questionSourceSlugById,
+        slug,
       });
     });
 

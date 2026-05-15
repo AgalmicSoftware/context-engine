@@ -129,6 +129,8 @@ import {
   normalizeUserPageResponseField,
   normalizeUserPageSingleQuestionResponsePayload,
   normalizeUserPageSourceSlugForSignature,
+  mergeUserPageQuestionCacheSource,
+  mergeUserPageSurveyCacheSource,
   mergeUserPageQueuedCacheRefreshFlags,
   parseUserPageCachedResponsePayload,
   readBoolishUserPageTelemetryFlag,
@@ -351,6 +353,99 @@ describe('userPageCacheHelpers', () => {
       sourceSlugById,
     });
     expect(Object.keys(responses)).toEqual(['surveya']);
+  });
+
+  it('merges survey and question namespace cache sources into aggregate buckets', () => {
+    const combinedSurveys: Record<string, unknown> = {};
+    const combinedSurveyResponses: Record<string, Record<string, unknown>> = {};
+    const combinedSurveyResponsesMeta: Record<string, Record<string, any>> = {};
+    const surveySourceSlugById: Record<string, string> = {};
+    const surveyResponseSourceSlugById: Record<string, string> = {};
+    const surveyResponseSourceSlugByKey: Record<string, string> = {};
+    const combinedQuestions: Record<string, unknown> = {};
+    const combinedQuestionResponses: Record<string, Record<string, unknown>> = {};
+    const combinedQuestionResponsesMeta: Record<string, Record<string, any>> = {};
+    const questionSourceSlugById: Record<string, string> = {};
+    const questionResponseSourceSlugById: Record<string, string> = {};
+    const questionResponseSourceSlugByKey: Record<string, string> = {};
+
+    mergeUserPageSurveyCacheSource({
+      cacheObj: {
+        84532: {
+          surveys: { SurveyA: { title: 'Survey A' } },
+          surveyResponses: {
+            SurveyA: {
+              '0xABC': { answer: 'old', blockNumber: 10 },
+            },
+          },
+        },
+      },
+      combinedSurveyResponses,
+      combinedSurveyResponsesMeta,
+      combinedSurveys,
+      networkID: 84532,
+      slug: 'alpha',
+      surveyResponseSourceSlugById,
+      surveyResponseSourceSlugByKey,
+      surveySourceSlugById,
+    });
+    mergeUserPageSurveyCacheSource({
+      cacheObj: {
+        84532: {
+          surveyResponses: {
+            surveya: {
+              '0xabc': { answer: 'newer', blockNumber: 11 },
+            },
+          },
+        },
+      },
+      combinedSurveyResponses,
+      combinedSurveyResponsesMeta,
+      combinedSurveys,
+      networkID: 84532,
+      slug: 'beta',
+      surveyResponseSourceSlugById,
+      surveyResponseSourceSlugByKey,
+      surveySourceSlugById,
+    });
+    mergeUserPageQuestionCacheSource({
+      cacheObj: {
+        84532: {
+          questions: { QuestionA: { prompt: 'Question A' } },
+          questionResponses: {
+            QuestionA: {
+              '0xABC': { answer: 'answer-a' },
+            },
+          },
+          questionResponsesMeta: {
+            QuestionA: {
+              '0xABC': { blockNumber: 7 },
+            },
+          },
+        },
+      },
+      combinedQuestionResponses,
+      combinedQuestionResponsesMeta,
+      combinedQuestions,
+      networkID: 84532,
+      questionResponseSourceSlugById,
+      questionResponseSourceSlugByKey,
+      questionSourceSlugById,
+      slug: 'gamma',
+    });
+
+    expect(combinedSurveys.surveya).toEqual({ title: 'Survey A' });
+    expect(combinedSurveyResponses.surveya['0xabc']).toEqual({ answer: 'newer', blockNumber: 11 });
+    expect(combinedSurveyResponsesMeta.surveya['0xabc']).toMatchObject({ bn: 11 });
+    expect(surveySourceSlugById.surveya).toBe('alpha');
+    expect(surveyResponseSourceSlugById.surveya).toBe('beta');
+    expect(surveyResponseSourceSlugByKey['surveya|0xabc']).toBe('beta');
+    expect(combinedQuestions.questiona).toEqual({ prompt: 'Question A' });
+    expect(combinedQuestionResponses.questiona['0xabc']).toEqual({ answer: 'answer-a' });
+    expect(combinedQuestionResponsesMeta.questiona['0xabc']).toMatchObject({ bn: 7 });
+    expect(questionSourceSlugById.questiona).toBe('gamma');
+    expect(questionResponseSourceSlugById.questiona).toBe('gamma');
+    expect(questionResponseSourceSlugByKey['questiona|0xabc']).toBe('gamma');
   });
 
   it('merges user-page network cache buckets with active network taking precedence', () => {
