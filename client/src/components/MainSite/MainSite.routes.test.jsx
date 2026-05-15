@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { MainSite } from './MainSite';
+import { MainSite, mainSiteDispatchActions } from './MainSite';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import { initCacheManager } from '../../utilities/cache/cacheScripts.js';
@@ -526,30 +526,6 @@ const createSubject = ({
     write: jest.fn(),
     remove: jest.fn(),
   };
-  return subject;
-};
-
-const stubMainSiteMountSideEffects = (subject) => {
-  subject.applySessionFallbackRedirect = jest.fn(() => null);
-  subject.syncSessionFallbackRedirectConsumption = jest.fn();
-  subject.manageAutoHashPersistence = jest.fn();
-  subject.getDisplaySessionChainId = jest.fn(() => DEFAULT_NETWORK.id);
-  subject.getDisplaySessionNetwork = jest.fn(() => DEFAULT_NETWORK);
-  subject.resolveSessionPathSlug = jest.fn();
-  subject.syncLitHooks = jest.fn();
-  subject.refreshSessionInfo = jest.fn();
-  subject.refreshSessionMetaFields = jest.fn();
-  subject.refreshGroupCredentials = jest.fn();
-  subject.hasPersistedManagedCacheData = jest.fn(async () => false);
-  subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
-  subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
-  subject.getSessionNetwork = jest.fn(() => null);
-  subject.getInitializableSessionNetwork = jest.fn(() => null);
-  subject.setReadinessStateIfChanged = jest.fn((patch) => {
-    subject.state = { ...subject.state, ...(patch || {}) };
-  });
-  subject.checkAllCachesReady = jest.fn();
-  subject.handleDeepLinkScan = jest.fn();
   return subject;
 };
 
