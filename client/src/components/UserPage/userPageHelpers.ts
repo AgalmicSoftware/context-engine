@@ -91,6 +91,8 @@ export {
   getPrioritizedUserPageNetworkCacheNodes,
   getUserPageOwnershipCountMaps,
   hasMeaningfulUserPageOwnershipCounts,
+  mergeUserPageQuestionCacheSource,
+  mergeUserPageSurveyCacheSource,
   readUserPageNetworkCache,
   readUserPageOwnershipCount,
   upsertUserPageResponseByRecency,
@@ -99,6 +101,8 @@ export {
 } from './userPageCacheHelpers';
 export type {
   UpsertUserPageResponseByRecencyArgs,
+  MergeUserPageQuestionCacheSourceArgs,
+  MergeUserPageSurveyCacheSourceArgs,
   UserPageCacheNetworkBucket,
   UserPageOwnershipCountMaps,
   UserPageOwnershipSignalAggregate,
