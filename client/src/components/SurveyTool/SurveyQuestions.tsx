@@ -1935,9 +1935,9 @@ export class SurveyQuestions extends Component {
             editBaseline: this.deepClone(initialStates[this.props.surveyIndex || 0] || { answers: {}, importance: {}, conviction: {}, additionalComments: {} }),
           },
           async () => {
-            this.rehydrateDraftForRenderedIds();
+            this.rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
             // Quick local-cache rehydrate for non-encrypted prior answers (survey)
-            this.rehydrateLocalCacheAnswersForRenderedIds();
+            await this.rehydrateLocalCacheAnswersForRenderedIds(null, { responseHydrationOwned: true });
 
             // Defer prefill if caches/IDs not ready yet; avoid double-prefill
             if (this.props.isQuestionCacheReady ||
@@ -2160,7 +2160,7 @@ export class SurveyQuestions extends Component {
             });
 
             // 1. Apply Draft (Anon answers) onto Empty
-            this.rehydrateDraftForRenderedIds();
+            this.rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
 
             // 2. Fetch Chain (Merges Chain into Draft)
             const pendingBootstrapRetryAttempt = this.props.singleQuestionMode
@@ -2301,7 +2301,7 @@ export class SurveyQuestions extends Component {
 
             // 1. Rehydrate draft immediately so it exists before fetch returns
             if (this.props.account && this.props.account !== prevProps.account) {
-               this.rehydrateDraftForRenderedIds();
+               this.rehydrateDraftForRenderedIds({ responseHydrationOwned: true });
             }
 
             // 2. Fetch Chain (Merges Chain into Draft)
@@ -4864,34 +4864,32 @@ export class SurveyQuestions extends Component {
     return this._priorResponseBackfillInFlight;
   };
 
-  rehydrateDraftForRenderedIds = (forceOverwrite = false) => {
-    try {
-      const draft = this.loadDraft();
-      if (shouldSkipDraftHydrationRun({
-        suppressPrefill: this.state?.suppressPrefill,
-        submissionError: this.state?.submissionError,
-        draft,
-      })) return;
-
-      const {
-        surveyIndex,
-        prevSlice,
-      } = buildDraftHydrationSeedContext({
-        isStandalone: this.props.isStandalone,
-        singleQuestionMode: this.props.singleQuestionMode,
-        surveyIndex: this.props.surveyIndex,
-        surveysResponseState: this.state.surveysResponseState,
-      });
-
-      const pendingStats =
-        (typeof this.getPendingEditStats === 'function' && this.getPendingEditStats()) ||
-        { total: this.state.modifiedCount || 0 };
-      const {
-        renderedQuestionIds,
-        updates,
-      } = buildDraftHydrationRunPlan({
-        hydrationQuestionIds: this.getHydrationQuestionIds(),
-        pileQuestions: this.state?.pileQuestions,
+  rehydrateDraftForRenderedIds = (forceOverwriteOrOptions = false) => {
+    const hasOptions = (
+      forceOverwriteOrOptions &&
+      typeof forceOverwriteOrOptions === 'object' &&
+      !Array.isArray(forceOverwriteOrOptions)
+    );
+    const options = hasOptions ? forceOverwriteOrOptions : {};
+    const forceOverwrite = hasOptions
+      ? !!options.forceOverwrite
+      : !!forceOverwriteOrOptions;
+    const setState = options.responseHydrationOwned
+      ? this.setResponseHydrationState.bind(this)
+      : this.setState.bind(this);
+    executeSurveyDraftHydration({
+      props: this.props,
+      state: this.state,
+      loadDraft: () => this.loadDraft(),
+      getPendingEditStats: () => this.getPendingEditStats?.() || null,
+      getHydrationQuestionIds: () => this.getHydrationQuestionIds(),
+      applyDraftHydrationEntryToSlice: this._applyDraftHydrationEntryToSlice,
+      cloneBaseline: this.deepClone,
+      setState,
+      updateJsonPreview: this.updateJsonPreview,
+      onError: (error) => { surveyLog.warn('SurveyTool: fallback', error); },
+      buildDraftRunPlan: (args) => buildDraftHydrationRunPlan({
+        ...args,
         forceOverwrite,
         isDirty: this.state.isDirty,
         modifiedCount: this.state.modifiedCount,
@@ -5190,7 +5188,20 @@ export class SurveyQuestions extends Component {
   };
 
 
-  rehydrateLocalCacheAnswersForRenderedIds = async (callback) => {
+  rehydrateLocalCacheAnswersForRenderedIds = async (callback = null, options = {}) => {
+    let finalCallback = callback;
+    let finalOptions = options;
+    if (
+      callback &&
+      typeof callback === 'object' &&
+      !Array.isArray(callback)
+    ) {
+      finalOptions = callback;
+      finalCallback = null;
+    }
+    const setState = finalOptions?.responseHydrationOwned
+      ? this.setResponseHydrationState.bind(this)
+      : this.setState.bind(this);
     const runId = (Number(this._localCacheRehydrateRunId) || 0) + 1;
     this._localCacheRehydrateRunId = runId;
     const isStaleRun = () => !this._isMounted || this._localCacheRehydrateRunId !== runId;
@@ -5212,11 +5223,11 @@ export class SurveyQuestions extends Component {
         areEnvelopesEquivalent,
       }),
       applyLocalCacheHydrationEntryToSlice: this._applyLocalCacheHydrationEntryToSlice,
-      setState: this.setState.bind(this),
+      setState,
       updateJsonPreview: this.updateJsonPreview,
       recalculateEditStats: this.recalculateEditStats,
       ensurePriorResponses: () => { void this.ensurePriorResponsesForRenderedIds(); },
-      callback,
+      callback: finalCallback,
       bumpNoop: () => bumpSurveyPerfCounter('noopSkipCount'),
       onNoChange: () => {
         DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] No changes to apply.');
