@@ -465,6 +465,7 @@ import {
 import {
   buildLockedGateRequirementSentence as buildLockedGateRequirementSentenceCore,
   buildLockedQuestionGateDetailsFromPool,
+  collectGateSbtAddressesForHydrationFromSources,
 } from './surveyQuestionGateDetails';
 import {
   buildEncryptionTogglePlan,
@@ -8964,36 +8965,20 @@ export class SurveyQuestions extends Component {
   };
 
   collectGateSbtAddressesForHydration = () => {
-    const addresses = new Set();
-    const addAddress = (value) => {
-      const raw = String(value || '').trim();
-      if (!raw || !ethers.utils.isAddress(raw)) return;
-      addresses.add(ethers.utils.getAddress(raw));
-    };
-    const addGateAddresses = (gate) => {
-      if (!gate || typeof gate !== 'object') return;
-      [
-        ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
-        gate.sbtAddress,
-      ].forEach(addAddress);
-    };
-
     const policy = this.getResponseGatePolicy();
-    const gates = Array.isArray(policy?.gates) ? policy.gates : [];
-    gates.forEach(addGateAddresses);
-
     const questionPools = [
       Array.isArray(this.state.questionPool) ? this.state.questionPool : [],
       Array.isArray(this.state.pileQuestions) ? this.state.pileQuestions : [],
       Array.isArray(this.props.questionPool) ? this.props.questionPool : [],
     ];
-    questionPools.forEach((pool) => {
-      pool.forEach((question) => {
-        this.getQuestionEncryptionGates(question).forEach(addGateAddresses);
-      });
-    });
 
-    return Array.from(addresses);
+    return collectGateSbtAddressesForHydrationFromSources({
+      policy,
+      questionPools,
+      getQuestionEncryptionGates: (question) => this.getQuestionEncryptionGates(question),
+      isAddress: (value) => ethers.utils.isAddress(value),
+      getAddress: (value) => ethers.utils.getAddress(value),
+    });
   };
 
   hydrateGateSbtLabels = async ({ force = false } = {}) => {
