@@ -939,28 +939,10 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
-    // Regression guard: URL auto-mint must keep using the address/session captured
-    // from the original intent even if routing props change during metadata awaits.
-    const targetSlug = this.getEffectiveSessionSlug();
-    const targetAccountLower = String(this.props.account || '').trim().toLowerCase();
-    const targetChainId = this.getMintTargetChainId();
-    const isUrlAutoMintTargetCurrent = () => this.isMintTargetContextCurrent({
-      accountLower: targetAccountLower,
-      chainId: targetChainId,
-      sbtAddress: currentSbtAddress,
-      sessionSlug: targetSlug,
-    });
-
-    if (!isUrlAutoMintTargetCurrent()) return false;
-
     if (!targetCode) {
-      const minted = await this.autoMintPublicIfAllowed(currentSbtAddress, {
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        sessionSlugOverride: targetSlug,
-      });
+      const minted = await this.autoMintPublicIfAllowed(currentSbtAddress);
       if (minted) markAutoMintSuccess();
-      return minted;
+      return true;
     }
 
     if (!isUrlAutoMintTargetCurrent()) return false;
@@ -975,13 +957,9 @@ class SBTPage extends Component<any, any> {
     });
 
     if (targetInvite) {
-      const minted = await this.claimWithInviteCode(targetInvite, currentSbtAddress, {
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        sessionSlugOverride: targetSlug,
-      });
-      if (minted) markAutoMintSuccess();
-      return minted;
+      await this.claimWithInviteCode(targetInvite, currentSbtAddress);
+      markAutoMintSuccess();
+      return true;
     }
 
     const slug = targetSlug;
@@ -1000,27 +978,17 @@ class SBTPage extends Component<any, any> {
 
     if (!isUrlAutoMintTargetCurrent()) return false;
     if (sbtInfo?.hasPasswordMint) {
-      const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress, {
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        sessionSlugOverride: slug,
-      });
-      if (minted) markAutoMintSuccess();
-      return minted;
+      await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
+      markAutoMintSuccess();
+      return true;
     }
 
     const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
     if (!isUrlAutoMintTargetCurrent()) return false;
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
-      const minted = await this.mintUnlimitedWithGroupPassword({
-        accountLowerOverride: targetAccountLower,
-        chainIdOverride: targetChainId,
-        passwordOverride: targetPassword,
-        sbtAddressOverride: currentSbtAddress,
-        sessionSlugOverride: slug,
-      });
-      if (minted) markAutoMintSuccess();
-      return minted;
+      await this.mintUnlimitedWithGroupPassword();
+      markAutoMintSuccess();
+      return true;
     }
 
     if (!isUrlAutoMintTargetCurrent()) return false;

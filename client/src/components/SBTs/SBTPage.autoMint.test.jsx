@@ -1,6 +1,7 @@
 import SBTPage from './SBTPage';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { buildSbtPageAutoMintStorageKey } from './sbtPageAutoMintHelpers';
 
 const createSubject = (props = {}) => {
   const subject = new SBTPage({
@@ -49,6 +50,49 @@ describe('SBTPage auto-mint routing', () => {
       await flushPromises();
 
       expect(publicMintSpy).toHaveBeenCalledWith(sbtAddress);
+      expect(window.sessionStorage.getItem(buildSbtPageAutoMintStorageKey({
+        chainId: 84532,
+        sessionSlug: 'general',
+        sbtAddress,
+      }))).toBe('done');
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('does not consume URL auto-mint attempts until the mint succeeds', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000106';
+    const previousHref = window.location.href;
+    const successKey = buildSbtPageAutoMintStorageKey({
+      chainId: 84532,
+      sessionSlug: 'edge',
+      sbtAddress,
+    });
+    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&auto=1`);
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        loginComplete: true,
+        sessionSlug: 'edge',
+      });
+      subject.state = {
+        ...subject.state,
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      const publicMintSpy = jest
+        .spyOn(subject, 'autoMintPublicIfAllowed')
+        .mockRejectedValueOnce(new Error('wallet rejected'))
+        .mockResolvedValueOnce(true);
+
+      await expect(subject.handleUrlAutoMintIntent()).rejects.toThrow('wallet rejected');
+      expect(window.sessionStorage.getItem(successKey)).toBeNull();
+
+      await subject.handleUrlAutoMintIntent();
+
+      expect(publicMintSpy).toHaveBeenCalledTimes(2);
+      expect(window.sessionStorage.getItem(successKey)).toBe('done');
     } finally {
       window.history.replaceState({}, '', previousHref);
     }
