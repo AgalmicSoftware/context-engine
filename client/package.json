@@ -36,7 +36,7 @@
     "ethers": "5.7.2",
     "hark": "1.2.3",
     "html2canvas": "1.4.1",
-    "jspdf": "2.5.2",
+    "jspdf": "4.2.1",
     "ml-kmeans": "6.0.0",
     "networkanalysis-ts": "1.0.0",
     "poseidon-lite": "0.3.0",
