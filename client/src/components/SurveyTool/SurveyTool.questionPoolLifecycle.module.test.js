@@ -160,6 +160,43 @@ describe('SurveyTool question pool lifecycle', () => {
     expect(subject.didEditDiffInputsChange(prevProps, prevState)).toBe(false);
   });
 
+  it('does not invalidate hydration runs for response loading state changes only', () => {
+    const sharedResponsesState = [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }];
+    const sharedBaseline = { answers: {}, importance: {}, conviction: {}, additionalComments: {} };
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: 'survey-a',
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      questionPool: [{ id: 'q1' }],
+    });
+    const prevProps = { ...subject.props };
+    const prevState = {
+      ...subject.state,
+      surveysResponseState: sharedResponsesState,
+      editBaseline: sharedBaseline,
+      userAnswers: null,
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      isLoadingResponse: false,
+    };
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: sharedResponsesState,
+      editBaseline: sharedBaseline,
+      userAnswers: null,
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      isLoadingResponse: true,
+    };
+
+    expect(subject.didEditDiffInputsChange(prevProps, prevState)).toBe(false);
+  });
+
   it('skips no-op SurveyQuestions questionPool state writes when fetched payloads are semantically unchanged', async () => {
     jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
       if (namespace === 'surveysCache') {

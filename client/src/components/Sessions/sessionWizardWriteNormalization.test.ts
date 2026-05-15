@@ -150,6 +150,7 @@ describe('sessionWizardWriteNormalization', () => {
     const signer = {
       provider: null,
       getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
+      getChainId: jest.fn().mockResolvedValue(DEFAULT_CONFIG_CHAIN_ID),
     };
     const contractMock = {
       address: getSessionRegistryAddress(DEFAULT_CONFIG_CHAIN_ID),
