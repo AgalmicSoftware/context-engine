@@ -28,8 +28,15 @@ import {
 } from '../../utilities/docLibrary/tags.js';
 import { resolveArweaveGraphqlUrl, resolveArweaveGraphqlUrls } from '../../utilities/docLibrary/config.js';
 import { listArweaveTransactionsByTags } from '../../utilities/docLibrary/arweaveGraphql.js';
-import { listSessionStorageRefsPage, readSessionStorageBlob } from '../../utilities/storage/storageClient.js';
-import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
+import {
+  listSessionStorageRefs,
+  readSessionStorageBlob,
+} from '../../utilities/storage/storageClient.js';
+import {
+  STORAGE_BACKENDS,
+  normalizeStorageBackend,
+  normalizeStorageRef,
+} from '../../utilities/storage/storageRefs.js';
 import {
   resolveDocUploadsGate,
   uploadDocLibraryFile,
@@ -111,6 +118,17 @@ type CustomSbtEntry = {
   name?: string;
   chainId?: number | string | null;
   [key: string]: unknown;
+};
+
+type ListFilter = {
+  name: string;
+  values: string[];
+};
+
+type AutoOpenDoc = {
+  txId: string;
+  tagMap: DocTagMap;
+  storageRef?: StorageRef | null;
 };
 
 type OpenableDoc = Pick<DocRecord, 'txId' | 'tagMap' | 'storageRef'>;
@@ -304,6 +322,24 @@ const buildAsyncContextKeyPart = (value: unknown): string => {
     return String(value ?? '');
   }
 };
+
+const isArweaveTxId = (value: unknown): boolean => /^[a-z0-9_-]{43}$/i.test(toStr(value).trim());
+
+const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is StorageRef => {
+  if (!storageRef?.id) return false;
+  return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
+};
+
+const buildSessionListFilters = (sessionIdHex: string): ListFilter[] => ([
+  { name: 'CE-DocLibrary', values: ['1'] },
+  { name: 'CE-SessionId', values: [normalizeSessionIdHex(sessionIdHex)] },
+].filter((f) => f.values && f.values[0]));
+
+const buildSbtListFilters = ({ chainId, sbtAddress }: { chainId?: number | string | null; sbtAddress?: string }): ListFilter[] => ([
+  { name: 'CE-DocLibrary', values: ['1'] },
+  { name: 'CE-SbtChainId', values: [String(Number(chainId || 0) || '')] },
+  { name: 'CE-SbtAddress', values: [normalizeSbtAddress(sbtAddress)] },
+].filter((f) => f.values && f.values[0]));
 
 const fetchArweaveBlobWithFallback = async (
   txId: string,
@@ -559,10 +595,36 @@ export default function DocumentLibraryPanel({
 
   const locationSearch = typeof window !== 'undefined' ? window.location.search || '' : '';
 
-  const autoOpenDoc = useMemo(
-    () => resolveDocumentLibraryAutoOpenDoc({ locationSearch, usesWorkerCanonicalDocumentStorage }),
-    [locationSearch, usesWorkerCanonicalDocumentStorage],
-  );
+  const autoOpenDoc = useMemo<AutoOpenDoc | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const qp = new URLSearchParams(locationSearch);
+      const storage = normalizeStorageBackend(
+        qp.get('__ceDocStorage') || '',
+        STORAGE_BACKENDS.LIT_ARWEAVE
+      );
+      const refId = toStr(qp.get('__ceDocRef') || qp.get('__ceDocTx') || '').trim();
+      const storageRef = normalizeDocStorageRef(
+        { backend: storage, id: refId },
+        { fallbackBackend: storage }
+      );
+      if (!isValidStorageDocRef(storageRef)) return null;
+
+      const kind = toStr(qp.get('__ceDocKind') || '').trim() || 'file';
+      const name = toStr(qp.get('__ceDocName') || '').trim();
+
+      const tagMap = {
+        'CE-DocStorage': storageRef.backend,
+        'CE-DocKind': kind,
+        ...(name ? { 'CE-DocName': name } : {}),
+      };
+
+      return { txId: storageRef.id, tagMap, storageRef };
+    } catch (_) {
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationSearch]);
 
   const [docs, setDocs] = useState<DocRecord[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -1119,13 +1181,8 @@ export default function DocumentLibraryPanel({
     const wantsEncrypted = storage === 'lit-arweave' || storage === 'lit';
     if (wantsEncrypted && (!loginComplete || !toStr(account).trim() || !provider)) return;
 
-    let cancelled = false;
-    autoOpeningRef.current = key;
-    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef })
-      .then((opened) => {
-        if (autoOpeningRef.current === key) autoOpeningRef.current = '';
-        if (cancelled || !opened) return;
-        autoOpenedRef.current = key;
+    autoOpenedRef.current = key;
+    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef });
 
         // Clear params so refresh/back doesn't re-open repeatedly.
         try {
@@ -1142,11 +1199,8 @@ export default function DocumentLibraryPanel({
         if (autoOpeningRef.current === key) autoOpeningRef.current = '';
         log.warn('DocumentLibraryPanel: auto-open failed', error);
       });
-
-    return () => {
-      cancelled = true;
-      if (autoOpeningRef.current === key) autoOpeningRef.current = '';
-    };
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
   }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
 
   const addCustomSbt = useCallback((sbt: CustomSbtEntry) => {
