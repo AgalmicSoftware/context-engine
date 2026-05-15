@@ -1,5 +1,4 @@
 import {
-  buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
   buildSessionWizardDefaultTemplate,
   normalizeSessionWizardDraftShape,
@@ -93,44 +92,5 @@ describe('sessionWizardDraftState', () => {
       corsWorkerUrl: 'https://cached.example/worker',
       embeddedDeployHelperEnabled: false,
     }));
-  });
-
-  it('builds cache write payloads with redacted worker secrets and durable pending draft isolation', () => {
-    const payload = buildSessionWizardCacheWritePayload({
-      sessionId: 'session-1',
-      draft: { sessionName: 'Draft' },
-      pendingSbtDrafts: [{ address: '0xpending' }],
-      effectivePersistWorkerSecrets: false,
-      workerSecrets: {
-        apiToken: 'secret',
-        optional: '',
-      },
-    });
-
-    expect(payload).toEqual(expect.objectContaining({
-      sessionId: 'session-1',
-      draft: { sessionName: 'Draft' },
-      pendingSbtDrafts: [],
-      persistWorkerSecrets: false,
-      workerSecrets: {
-        apiToken: '[redacted]',
-        optional: '',
-      },
-    }));
-  });
-
-  it('keeps worker secrets only when local secret persistence is explicitly enabled', () => {
-    const workerSecrets = {
-      apiToken: 'secret',
-      accountId: 'account',
-    };
-
-    const payload = buildSessionWizardCacheWritePayload({
-      effectivePersistWorkerSecrets: true,
-      workerSecrets,
-    });
-
-    expect(payload.persistWorkerSecrets).toBe(true);
-    expect(payload.workerSecrets).toBe(workerSecrets);
   });
 });

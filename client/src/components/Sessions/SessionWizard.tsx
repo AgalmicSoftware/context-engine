@@ -217,7 +217,6 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
-  buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
 } from './sessionWizardDraftState';
 import {
