@@ -416,6 +416,66 @@ describe('DocumentLibraryPanel photo docs', () => {
     expect(screen.queryByText('old-context.txt')).not.toBeInTheDocument();
   });
 
+  it('does not prepend completed uploads after the storage config changes', async () => {
+    mockResolveDocLibraryProvider.mockImplementation((config: any) => (
+      config?.storageProfile?.backend || config?.docLibrary?.provider || 'arweave'
+    ));
+    const slowUpload = createDeferred<any>();
+    mockUploadDocLibraryFile.mockReturnValueOnce(slowUpload.promise);
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge',
+      sessionConfig: TEST_SESSION_CONFIG,
+      mode: 'session',
+      sessionIdHex: `0x${'e'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+
+    const file = new File(['old storage'], 'old-storage.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
+        file,
+        sessionSlug: 'edge',
+      }));
+    });
+
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        sessionConfig={{ storageProfile: { backend: 'cloudflare', namespace: 'next-docs' } }}
+      />
+    );
+
+    await act(async () => {
+      slowUpload.resolve({
+        txId: 'W'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'old-storage.txt',
+        },
+        data: { size: 11, type: 'text/plain' },
+      });
+      await slowUpload.promise;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByText('old-storage.txt')).not.toBeInTheDocument();
+  });
+
   it('does not apply document list completions after unmount', async () => {
     const slowList = createDeferred<any[]>();
     mockListArweaveTransactionsByTags.mockReturnValueOnce(slowList.promise);
@@ -773,6 +833,74 @@ describe('DocumentLibraryPanel photo docs', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(screen.queryByText('old context text')).not.toBeInTheDocument();
+  });
+
+  it('ignores in-flight document open requests after the storage config changes', async () => {
+    mockResolveDocLibraryProvider.mockImplementation((config: any) => (
+      config?.storageProfile?.backend || 'arweave'
+    ));
+    const slowRead = createDeferred<any>();
+    mockListSessionStorageRefs.mockResolvedValueOnce([
+      {
+        storageRef: {
+          backend: 'cloudflare',
+          id: 'cf_storage_context',
+          uri: '/storage/read?id=cf_storage_context',
+          contentType: 'text/plain',
+          resource: 'docsContext',
+        },
+        metadata: {
+          size: 18,
+          tags: [
+            { name: 'CE-DocKind', value: 'file' },
+            { name: 'CE-DocName', value: 'Old storage note' },
+          ],
+        },
+      },
+    ]);
+    mockReadSessionStorageBlob.mockReturnValueOnce(slowRead.promise);
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge',
+      sessionConfig: { storageProfile: { backend: 'cloudflare', namespace: 'old-docs' } },
+      mode: 'session',
+      sessionIdHex: `0x${'7'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+
+    expect(await screen.findByText('Old storage note')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
+    await waitFor(() => {
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_storage_context' }),
+      }));
+    });
+    expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER)).toBeInTheDocument();
+
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        sessionConfig={{ storageProfile: { backend: 'cloudflare', namespace: 'next-docs' } }}
+      />
+    );
+    await waitFor(() => {
+      expect(screen.queryByTestId(E2E_TESTIDS.DOC_VIEWER)).not.toBeInTheDocument();
+    });
+
+    slowRead.resolve({
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
+      blob: async () => ({ type: 'text/plain', text: async () => 'old storage text' }),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByText('old storage text')).not.toBeInTheDocument();
   });
 
   it('renders image thumbnails directly in the document list', async () => {

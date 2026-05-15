@@ -588,6 +588,48 @@ describe('SBTPage auto-mint routing', () => {
     expect(startClaimSpy).not.toHaveBeenCalled();
   });
 
+  it('does not continue password mints after the network changes during prevalidation', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000126';
+    const account = '0x0000000000000000000000000000000000000abc';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      provider: 'base-provider',
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      error: null,
+      manualPasswordInput: 'claim-code',
+      mintStep: 0,
+      mintingStatus: 'idle',
+      sbtInfo: { hasPasswordMint: true },
+    };
+    jest.spyOn(contractScripts, 'isPasswordValid').mockImplementation(async () => {
+      subject.props = {
+        ...subject.props,
+        provider: 'op-provider',
+        network: { id: 11155420, name: 'OP Sepolia' },
+      };
+      return true;
+    });
+    const startClaimSpy = jest.spyOn(contractScripts, 'startClaim').mockResolvedValue({ transactionHash: '0xstart' });
+
+    const result = await subject.handleMint(true, {
+      accountLowerOverride: account,
+      sbtAddressOverride: sbtAddress,
+      sessionSlugOverride: 'edge',
+      sbtInfoOverride: { hasPasswordMint: true },
+    });
+
+    expect(result).toBe(false);
+    expect(subject.state.error).toBeNull();
+    expect(subject.state.mintingStatus).toBe('idle');
+    expect(startClaimSpy).not.toHaveBeenCalled();
+  });
+
   it('routes invite auto-mint URLs to invite claiming on the dedicated page', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000102';
     const previousHref = window.location.href;

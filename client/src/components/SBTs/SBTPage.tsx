@@ -287,6 +287,7 @@ type QueueLocalStorageJsonWriteOptions = {
 type SbtPageInviteClaimPayload = SbtPageDecodedInviteInput;
 type SbtPageInviteClaimOptions = {
   accountLowerOverride?: unknown;
+  chainIdOverride?: unknown;
   suppressErrors?: boolean;
   sessionSlugOverride?: unknown;
 };
@@ -928,8 +929,10 @@ class SBTPage extends Component<any, any> {
     // from the original intent even if routing props change during metadata awaits.
     const targetSlug = this.getEffectiveSessionSlug();
     const targetAccountLower = String(this.props.account || '').trim().toLowerCase();
+    const targetChainId = this.getMintTargetChainId();
     const isUrlAutoMintTargetCurrent = () => this.isMintTargetContextCurrent({
       accountLower: targetAccountLower,
+      chainId: targetChainId,
       sbtAddress: currentSbtAddress,
       sessionSlug: targetSlug,
     });
@@ -939,6 +942,7 @@ class SBTPage extends Component<any, any> {
     if (!targetCode) {
       const minted = await this.autoMintPublicIfAllowed(currentSbtAddress, {
         accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
         sessionSlugOverride: targetSlug,
       });
       if (minted) markAutoMintSuccess();
@@ -959,6 +963,7 @@ class SBTPage extends Component<any, any> {
     if (targetInvite) {
       const minted = await this.claimWithInviteCode(targetInvite, currentSbtAddress, {
         accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
         sessionSlugOverride: targetSlug,
       });
       if (minted) markAutoMintSuccess();
@@ -983,6 +988,7 @@ class SBTPage extends Component<any, any> {
     if (sbtInfo?.hasPasswordMint) {
       const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress, {
         accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
         sessionSlugOverride: slug,
       });
       if (minted) markAutoMintSuccess();
@@ -994,6 +1000,7 @@ class SBTPage extends Component<any, any> {
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
       const minted = await this.mintUnlimitedWithGroupPassword({
         accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
         passwordOverride: targetPassword,
         sbtAddressOverride: currentSbtAddress,
         sessionSlugOverride: slug,
@@ -1103,10 +1110,12 @@ class SBTPage extends Component<any, any> {
 
   isMintTargetContextCurrent = ({
     accountLower = '',
+    chainId = null,
     sbtAddress = '',
     sessionSlug = null,
   }: {
     accountLower?: unknown;
+    chainId?: unknown;
     sbtAddress?: unknown;
     sessionSlug?: unknown;
   } = {}): boolean => {
@@ -1127,48 +1136,70 @@ class SBTPage extends Component<any, any> {
       if (targetAccount !== currentAccount) return false;
     }
 
+    if (chainId != null) {
+      const targetChainId = String(chainId || '').trim();
+      if (targetChainId) {
+        const currentChainId = this.getMintTargetChainId();
+        if (targetChainId !== currentChainId) return false;
+      }
+    }
+
     return true;
   };
 
+  getMintTargetChainId = (): string => String(
+    this.props.network?.id ||
+    this.props.networkChainId ||
+    this.state?.network?.id ||
+    ''
+  ).trim();
+
   buildMintTargetKey = ({
     accountLower = '',
+    chainId = null,
     sbtAddress = '',
     sessionSlug = null,
   }: {
     accountLower?: unknown;
+    chainId?: unknown;
     sbtAddress?: unknown;
     sessionSlug?: unknown;
   } = {}): string => [
     String(accountLower || '').trim().toLowerCase(),
+    chainId == null ? '' : String(chainId || '').trim(),
     String(resolveSbtAddressString(sbtAddress) || '').trim().toLowerCase(),
     sessionSlug == null ? '' : String(sessionSlug || ''),
   ].join('|');
 
   setMintPendingForTarget = ({
     accountLower = '',
+    chainId = null,
     clearError = false,
     sbtAddress = '',
     sessionSlug = null,
   }: {
     accountLower?: unknown;
+    chainId?: unknown;
     clearError?: unknown;
     sbtAddress?: unknown;
     sessionSlug?: unknown;
   } = {}): void => {
-    this._activeMintPendingTargetKey = this.buildMintTargetKey({ accountLower, sbtAddress, sessionSlug });
+    this._activeMintPendingTargetKey = this.buildMintTargetKey({ accountLower, chainId, sbtAddress, sessionSlug });
     if (this._isMounted) this.setState(buildSbtPageMintPendingPatch({ clearError }));
   };
 
   clearMintPendingForTarget = ({
     accountLower = '',
+    chainId = null,
     sbtAddress = '',
     sessionSlug = null,
   }: {
     accountLower?: unknown;
+    chainId?: unknown;
     sbtAddress?: unknown;
     sessionSlug?: unknown;
   } = {}): void => {
-    const targetKey = this.buildMintTargetKey({ accountLower, sbtAddress, sessionSlug });
+    const targetKey = this.buildMintTargetKey({ accountLower, chainId, sbtAddress, sessionSlug });
     if (!targetKey || this._activeMintPendingTargetKey !== targetKey) return;
     this._activeMintPendingTargetKey = '';
     if (this._isMounted && this.state.mintingStatus === 'pending') {
@@ -1180,6 +1211,7 @@ class SBTPage extends Component<any, any> {
   // session, or wallet changes; only the captured target may receive local UI state.
   completeMintSuccessForTarget = async ({
     accountLower = '',
+    chainId = null,
     clearManualPassword = false,
     forceEventRefreshOnSuccess = true,
     mintStep,
@@ -1188,6 +1220,7 @@ class SBTPage extends Component<any, any> {
     txHash = '',
   }: {
     accountLower?: unknown;
+    chainId?: unknown;
     clearManualPassword?: boolean;
     forceEventRefreshOnSuccess?: unknown;
     mintStep?: number;
@@ -1198,6 +1231,7 @@ class SBTPage extends Component<any, any> {
     const txHashString = String(txHash || '');
     const isCurrentTarget = () => this.isMintTargetContextCurrent({
       accountLower,
+      chainId,
       sbtAddress,
       sessionSlug,
     });
@@ -1218,7 +1252,7 @@ class SBTPage extends Component<any, any> {
       this.clearAutoMintUrlIntent();
       this._activeMintPendingTargetKey = '';
     } else {
-      this.clearMintPendingForTarget({ accountLower, sbtAddress, sessionSlug });
+      this.clearMintPendingForTarget({ accountLower, chainId, sbtAddress, sessionSlug });
     }
 
     this.refreshSbtDataWithSlug(sbtAddress, undefined, sessionSlug);
@@ -1239,8 +1273,12 @@ class SBTPage extends Component<any, any> {
     const mintAccountLower = options?.accountLowerOverride != null
       ? String(options.accountLowerOverride || '').trim().toLowerCase()
       : String(this.props.account || '').trim().toLowerCase();
+    const mintChainId = options?.chainIdOverride != null
+      ? String(options.chainIdOverride || '').trim()
+      : this.getMintTargetChainId();
     const isCurrentTarget = () => this.isMintTargetContextCurrent({
       accountLower: mintAccountLower,
+      chainId: mintChainId,
       sbtAddress,
       sessionSlug: slug,
     });
@@ -1287,6 +1325,7 @@ class SBTPage extends Component<any, any> {
 
     return await this.handleMint(true, {
       accountLowerOverride: options?.accountLowerOverride,
+      chainIdOverride: mintChainId,
       sbtAddressOverride: sbtAddress,
       sessionSlugOverride: slug,
       sbtInfoOverride: sbtInfo,
@@ -1313,6 +1352,7 @@ class SBTPage extends Component<any, any> {
     let sbt = '';
     let slug = '';
     let mintAccountLower = '';
+    let mintChainId = '';
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -1335,12 +1375,16 @@ class SBTPage extends Component<any, any> {
       mintAccountLower = options?.accountLowerOverride != null
         ? String(options.accountLowerOverride || '').trim().toLowerCase()
         : String(this.props.account || '').trim().toLowerCase();
+      mintChainId = options?.chainIdOverride != null
+        ? String(options.chainIdOverride || '').trim()
+        : this.getMintTargetChainId();
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return { ok: false, error: new Error('Mint context changed before send.') };
       }
       this.setMintPendingForTarget({
         accountLower: mintAccountLower,
+        chainId: mintChainId,
         clearError: true,
         sbtAddress: sbt,
         sessionSlug: slug,
@@ -1354,6 +1398,7 @@ class SBTPage extends Component<any, any> {
 
       await this.completeMintSuccessForTarget({
         accountLower: mintAccountLower,
+        chainId: mintChainId,
         forceEventRefreshOnSuccess: true,
         sbtAddress: sbt,
         sessionSlug: slug,
@@ -1365,7 +1410,7 @@ class SBTPage extends Component<any, any> {
       if (
         this._isMounted &&
         !options.suppressErrors &&
-        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })
+        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })
       ) {
         this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
       }
@@ -1381,6 +1426,7 @@ class SBTPage extends Component<any, any> {
     let sbt = '';
     let slug = '';
     let mintAccountLower = '';
+    let mintChainId = '';
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -1402,10 +1448,13 @@ class SBTPage extends Component<any, any> {
       mintAccountLower = options?.accountLowerOverride != null
         ? String(options.accountLowerOverride || '').trim().toLowerCase()
         : String(this.props.account || '').trim().toLowerCase();
+      mintChainId = options?.chainIdOverride != null
+        ? String(options.chainIdOverride || '').trim()
+        : this.getMintTargetChainId();
       let sbtInfo = this.state.sbtInfo;
       if (!sbtInfo || typeof sbtInfo !== 'object') sbtInfo = {};
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
       }
 
@@ -1413,7 +1462,7 @@ class SBTPage extends Component<any, any> {
       if (!onchainHash) {
         try { onchainHash = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
       }
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
       }
       let walletScopeSbtAddress: string | null = sbt;
@@ -1453,7 +1502,7 @@ class SBTPage extends Component<any, any> {
       let lastError: unknown = null;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
           return false;
         }
         let mintedTokens: unknown = null;
@@ -1462,7 +1511,7 @@ class SBTPage extends Component<any, any> {
         } catch (_) {
           mintedTokens = null;
         }
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
           return false;
         }
 
@@ -1495,7 +1544,7 @@ class SBTPage extends Component<any, any> {
           nonces: [nonce],
           walletScopeSbtAddress
         });
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
           return false;
         }
         const payload = invites && invites[0];
@@ -1507,13 +1556,14 @@ class SBTPage extends Component<any, any> {
         const suppressErrors = attempt < maxAttempts - 1;
         const result = await this.claimWithInvitePayload(payload, sbt, {
           accountLowerOverride: mintAccountLower,
+          chainIdOverride: mintChainId,
           suppressErrors,
           sessionSlugOverride: slug,
         });
         if (result && result.ok) return true;
 
         lastError = result?.error || new Error('Invite claim failed.');
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
           return false;
         }
 
@@ -1530,7 +1580,7 @@ class SBTPage extends Component<any, any> {
         } catch (_) {
           mintedAfterBig = null;
         }
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
           return false;
         }
 
@@ -1547,6 +1597,7 @@ class SBTPage extends Component<any, any> {
         this._isMounted &&
         this.isMintTargetContextCurrent({
           accountLower: mintAccountLower,
+          chainId: mintChainId,
           sbtAddress: sbt,
           sessionSlug: slug,
         })
@@ -3105,6 +3156,7 @@ class SBTPage extends Component<any, any> {
     let sbt: string | null = null;
     let slug = '';
     let mintAccountLower = '';
+    let mintChainId = '';
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -3128,16 +3180,19 @@ class SBTPage extends Component<any, any> {
       mintAccountLower = options?.accountLowerOverride != null
         ? String(options.accountLowerOverride || '').trim().toLowerCase()
         : String(this.props.account || '').trim().toLowerCase();
+      mintChainId = options?.chainIdOverride != null
+        ? String(options.chainIdOverride || '').trim()
+        : this.getMintTargetChainId();
       const mintAccount = this.props.account;
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
       }
 
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
       const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
       }
       if (!onchain || onchain === ethers.constants.HashZero) {
@@ -3158,18 +3213,19 @@ class SBTPage extends Component<any, any> {
       });
       if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
         sbtLog.error('[MANUAL-MINT] Sanity check FAILED', { expected: onchain, computed: local });
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
           return false;
         }
         this.setState(buildSbtPageErrorPatch({ error: 'Incorrect group password.' }));
         return false;
       }
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
       }
       this.setMintPendingForTarget({
         accountLower: mintAccountLower,
+        chainId: mintChainId,
         sbtAddress: sbt,
         sessionSlug: slug,
       });
@@ -3183,7 +3239,7 @@ class SBTPage extends Component<any, any> {
       });
       sbtLog.log('[MANUAL-MINT] Signature:', sig);
 
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
       }
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
@@ -3192,6 +3248,7 @@ class SBTPage extends Component<any, any> {
 
       await this.completeMintSuccessForTarget({
         accountLower: mintAccountLower,
+        chainId: mintChainId,
         forceEventRefreshOnSuccess: true,
         sbtAddress: sbt,
         sessionSlug: slug,
@@ -3200,7 +3257,7 @@ class SBTPage extends Component<any, any> {
       return true;
     } catch (error) {
       sbtLog.error('Manual mint flow failed:', error);
-      if (this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+      if (this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
         this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('mint')} failed.`) }));
       }
       return false;
@@ -3235,9 +3292,12 @@ class SBTPage extends Component<any, any> {
     const mintAccountLower = options?.accountLowerOverride != null
       ? String(options.accountLowerOverride || '').trim().toLowerCase()
       : String(this.props.account || '').trim().toLowerCase();
+    const mintChainId = options?.chainIdOverride != null
+      ? String(options.chainIdOverride || '').trim()
+      : this.getMintTargetChainId();
     const mintAccount = this.props.account;
 
-    if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+    if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
       return false;
     }
 
@@ -3261,7 +3321,7 @@ class SBTPage extends Component<any, any> {
               slug
             );
             if (!isValid) {
-              if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+              if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
                 return false;
               }
               if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid password.' }));
@@ -3273,11 +3333,12 @@ class SBTPage extends Component<any, any> {
             sbtLog.warn('[SBTPage] Password pre-validation call failed, proceeding with mint:', preCheckErr);
           }
 
-          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
             return false;
           }
           this.setMintPendingForTarget({
             accountLower: mintAccountLower,
+            chainId: mintChainId,
             sbtAddress: sbtAddressOriginalCase,
             sessionSlug: slug,
           });
@@ -3290,7 +3351,7 @@ class SBTPage extends Component<any, any> {
           const tx = await contractScripts.startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
           if (
             this._isMounted &&
-            this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
+            this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
           ) {
             this.setState(buildSbtPagePasswordClaimStartSuccessPatch({
               txHash: tx.transactionHash,
@@ -3300,6 +3361,7 @@ class SBTPage extends Component<any, any> {
           } else {
             this.clearMintPendingForTarget({
               accountLower: mintAccountLower,
+              chainId: mintChainId,
               sbtAddress: sbtAddressOriginalCase,
               sessionSlug: slug,
             });
@@ -3307,11 +3369,12 @@ class SBTPage extends Component<any, any> {
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
           return true;
         } else if (mintStep === 2) {
-          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
             return false;
           }
           this.setMintPendingForTarget({
             accountLower: mintAccountLower,
+            chainId: mintChainId,
             sbtAddress: sbtAddressOriginalCase,
             sessionSlug: slug,
           });
@@ -3319,6 +3382,7 @@ class SBTPage extends Component<any, any> {
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
           await this.completeMintSuccessForTarget({
             accountLower: mintAccountLower,
+            chainId: mintChainId,
             clearManualPassword: true,
             forceEventRefreshOnSuccess,
             mintStep: 3,
@@ -3329,11 +3393,12 @@ class SBTPage extends Component<any, any> {
           return true;
         }
       } else {
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
           return false;
         }
         this.setMintPendingForTarget({
           accountLower: mintAccountLower,
+          chainId: mintChainId,
           sbtAddress: sbtAddressOriginalCase,
           sessionSlug: slug,
         });
@@ -3341,6 +3406,7 @@ class SBTPage extends Component<any, any> {
         this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
         await this.completeMintSuccessForTarget({
           accountLower: mintAccountLower,
+          chainId: mintChainId,
           forceEventRefreshOnSuccess,
           sbtAddress: sbtAddressOriginalCase,
           sessionSlug: slug,
@@ -3352,7 +3418,7 @@ class SBTPage extends Component<any, any> {
       sbtLog.error("Minting failed in handleMint:", error);
       if (
         this._isMounted &&
-        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
+        this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })
       ) {
         this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('minting')} failed.`) }));
       }

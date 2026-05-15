@@ -358,6 +358,14 @@ const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is Stor
   return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
 };
 
+const buildAsyncContextKeyPart = (value: unknown): string => {
+  try {
+    return JSON.stringify(value ?? null);
+  } catch (_) {
+    return String(value ?? '');
+  }
+};
+
 const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is StorageRef => {
   if (!storageRef?.id) return false;
   return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
@@ -615,6 +623,17 @@ export default function DocumentLibraryPanel({
       })
       : ''
   ), [docUploadsGate.chainId, docUploadsGate.hasRecipients, network?.id, sessionHasLitChipotle]);
+  const docAsyncConfigKey = useMemo(() => buildAsyncContextKeyPart({
+    corsWorkerUrl: toStr(sessionConfig?.corsWorkerUrl).trim(),
+    docLibrary: sessionConfig?.docLibrary || null,
+    docProvider,
+    docUploadsGate,
+    graphqlUrl,
+    graphqlUrls,
+    lit: sessionConfig?.lit || null,
+    litNetwork: toStr(sessionConfig?.litNetwork).trim(),
+    storageProfile: sessionConfig?.storageProfile || null,
+  }), [docProvider, docUploadsGate, graphqlUrl, graphqlUrls, sessionConfig]);
 
   const locationSearch = typeof window !== 'undefined' ? (window.location.search || '') : '';
 
@@ -697,7 +716,8 @@ export default function DocumentLibraryPanel({
     toStr(account).trim().toLowerCase(),
     String(network?.id || ''),
     loginComplete ? '1' : '0',
-  ].join('|')), [account, loginComplete, network?.id, panelContextKey]);
+    docAsyncConfigKey,
+  ].join('|')), [account, docAsyncConfigKey, loginComplete, network?.id, panelContextKey]);
   const activeUploadContextKeyRef = useRef(viewerContextKey);
   activeUploadContextKeyRef.current = viewerContextKey;
 
