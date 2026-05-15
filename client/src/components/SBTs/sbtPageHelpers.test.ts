@@ -2390,7 +2390,7 @@ describe('sbtPageHelpers', () => {
       targetPassword: 'secret',
       targetCode: 'secret',
       shouldAttemptAuto: true,
-      autoKey: 'autoMint:0x00000000000000000000000000000000000000aa',
+      autoKey: 'autoMint:unknown-chain:general:0x00000000000000000000000000000000000000aa:success',
     });
     expect(resolveSbtPageUrlAutoMintIntent({
       propsIn,
