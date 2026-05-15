@@ -104,6 +104,7 @@ import {
   buildCreateSurveyMountSubmitResetPatch,
   buildCreateSurveyNetworkSwitchPatch,
   buildCreateSurveyGateOptions,
+  buildCreateSurveyGateObjectsAndRecipients,
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyOpenLockKeyPatch,
   buildCreateSurveyQuestionFieldUpdateList,

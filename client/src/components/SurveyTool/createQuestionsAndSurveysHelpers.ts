@@ -179,6 +179,25 @@ type BuildCreateSurveyGateObjectsAndRecipientsArgs = {
   resolveLitChain?: (args: { chainId: number | null; litChain?: unknown }) => unknown;
 };
 
+type CreateSurveyEncryptionGateSbt = {
+  address?: string;
+  name?: string;
+  [key: string]: unknown;
+};
+type BuildCreateSurveyGateObjectsAndRecipientsArgs = {
+  buildSbtAccessControlConditions?: (args: {
+    sbtAddresses: string[];
+    chainId: number | null;
+    litChain: unknown;
+    mode: unknown;
+  }) => unknown;
+  chainIdFallback?: unknown;
+  gateIds?: unknown;
+  gateMap?: Record<string, unknown> | null;
+  normalizeKnownGateIds?: (value: unknown) => string[];
+  resolveLitChain?: (args: { chainId: number | null; litChain?: unknown }) => unknown;
+};
+
 export {
   buildCreateSurveyDocUrlClearPatch,
   buildCreateSurveyDocUrlErrorPatch,
@@ -448,7 +467,7 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
   normalizeKnownGateIds = normalizeGateIds,
   resolveLitChain = ({ litChain }) => litChain || null,
 }: BuildCreateSurveyGateObjectsAndRecipientsArgs = {}) => {
-  const safeGateMap = gateMap && typeof gateMap === 'object' ? gateMap : {};
+  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
   const gateIds = normalizeKnownGateIds(gateIdsIn);
   const gates: UnknownRecord[] = [];
   const recipients: CreateSurveyGateRecipient[] = [];
@@ -462,9 +481,12 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
     const fallbackChainId = Number(chainIdFallback || 0) || null;
     const chainId = Number(gate.chainId || fallbackChainId || 0) || fallbackChainId;
     const litChain = resolveLitChain({ chainId, litChain: gate.litChain });
-    const sbtAddresses = Array.from(
-      new Set([...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []), gate.sbtAddress].filter(Boolean)),
-    ) as string[];
+    const sbtAddresses = Array.from(new Set(
+      [
+        ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
+        gate.sbtAddress,
+      ].filter(Boolean)
+    )) as string[];
     if (!sbtAddresses.length) return;
 
     const mode = gate.mode || 'any';
@@ -502,7 +524,7 @@ export const buildCreateSurveyGateObjectsAndRecipients = ({
   return { gates, recipients };
 };
 
-export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number =>
+export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number => (
   (Array.isArray(questions) ? questions : []).findIndex((question) => {
     const questionRecord = question && typeof question === 'object' ? (question as QuestionPromptInput) : null;
     return String(questionRecord?.prompt || '').trim() === '';
