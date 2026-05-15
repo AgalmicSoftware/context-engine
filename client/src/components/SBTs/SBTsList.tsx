@@ -1392,98 +1392,17 @@ const SBTsList = ({
     }
   }, [hasResolvableSessionWorker]);
 
-  const resolveConcreteSessionBindingSlug = useCallback((sbt: any) => {
-    const sbtInfo = sbt?.sbtInfo || {};
-
-    if (hasAuthoritativeSessionSlug(sbtInfo)) {
-      return normalizeSessionSlug(sbtInfo?.sessionSlug || '');
-    }
-    if (hasAuthoritativeSessionSlug(sbt)) {
-      return normalizeSessionSlug(sbt?.sessionSlug || '');
-    }
-
-    const legacySlugRaw = sbtInfo?.slug;
-    if (legacySlugRaw != null && String(legacySlugRaw).trim() !== '') {
-      return normalizeSessionSlug(legacySlugRaw);
-    }
-
-    const hasInferredSessionSlug = (
-      (hasOwn(sbtInfo, 'sessionSlug') && sbtInfo?.sessionSlugExplicit === false) ||
-      (hasOwn(sbt, 'sessionSlug') && sbt?.sessionSlugExplicit === false)
-    );
-    if (hasInferredSessionSlug) return null;
-
-    const legacySessionName = String(
-      sbtInfo?.sessionName ??
-      sbt?.sessionName ??
-      ''
-    ).trim();
-    if (!legacySessionName) return null;
-
-    const mappedSlug = getSessionSlugByName(legacySessionName);
-    if (mappedSlug == null) return null;
-    return normalizeSessionSlug(mappedSlug);
+  const resolveConcreteSessionBindingSlug = useCallback((sbt: SbtListItem | null | undefined): string | null => {
+    return resolveSbtListConcreteSessionBindingSlug(sbt, { getSessionSlugByName });
   }, []);
 
-  const resolveSbtSessionSlug = useCallback((sbt: any) => {
-    const sbtInfo = sbt?.sbtInfo || {};
-    const sourceSlug = normalizeSessionSlug(
-      sbt?.__sourceSessionSlug ?? sbt?.slug ?? sbt?.sessionSlug ?? ''
-    );
-    if (allSessionsMode && hasExplicitNoSessionAssociation(sbt)) {
-      return NO_SESSION_UNIVERSE_SLUG;
-    }
-    const hasMetadataSessionSlug = (
-      hasOwn(sbtInfo, 'sessionSlug') ||
-      hasOwn(sbt, 'sessionSlug')
-    );
-    const metadataSessionSlug = hasMetadataSessionSlug
-      ? normalizeSessionSlug(sbtInfo?.sessionSlug ?? sbt?.sessionSlug ?? '')
-      : null;
-    const hasAuthoritativeMetadataSessionSlug = (
-      hasAuthoritativeSessionSlug(sbtInfo) || hasAuthoritativeSessionSlug(sbt)
-    );
-
-    if (allSessionsMode && isListModeScopeEnabled) {
-      const concreteBindingSlug = resolveConcreteSessionBindingSlug(sbt);
-      if (concreteBindingSlug != null) {
-        return concreteBindingSlug === ''
-          ? NO_SESSION_UNIVERSE_SLUG
-          : concreteBindingSlug;
-      }
-      if (hasMissingOrEmptySessionSlug(sbt)) {
-        return NO_SESSION_UNIVERSE_SLUG;
-      }
-      return NO_SESSION_UNIVERSE_SLUG;
-    }
-    if (hasAuthoritativeSessionSlug(sbtInfo)) {
-      return normalizeSessionSlug(sbtInfo?.sessionSlug || '');
-    }
-    if (hasAuthoritativeSessionSlug(sbt)) {
-      return normalizeSessionSlug(sbt?.sessionSlug || '');
-    }
-    if (
-      metadataSessionSlug != null &&
-      metadataSessionSlug !== sourceSlug &&
-      !hasAuthoritativeMetadataSessionSlug &&
-      sourceSlug
-    ) {
-      // Inferred metadata slugs should not override the source bucket slug.
-      return sourceSlug;
-    }
-
-    // Legacy cache migration fallback for pre-sessionSlug entries.
-    const legacyRaw = (
-      sbtInfo?.sessionSlug ??
-      sbtInfo?.slug ??
-      sbt?.sessionSlug ??
-      sbt?.slug
-    );
-    if (legacyRaw != null && String(legacyRaw).trim() !== '') {
-      return normalizeSessionSlug(legacyRaw);
-    }
-    if (allSessionsMode) return NO_SESSION_UNIVERSE_SLUG;
-    return normalizeSessionSlug(listSlug || '');
+  const resolveSbtSessionSlug = useCallback((sbt: SbtListItem | null | undefined): string => {
+    return resolveSbtListItemSessionSlug(sbt, {
+      allSessionsMode,
+      isListModeScopeEnabled,
+      listSlug,
+      resolveConcreteSessionBindingSlug,
+    });
   }, [allSessionsMode, isListModeScopeEnabled, listSlug, resolveConcreteSessionBindingSlug]);
 
   const collectLinkedScopedSbtEntries = useCallback((targetSlugs: any = [], options: any = {}) => {
