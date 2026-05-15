@@ -1,4 +1,5 @@
 import {
+  buildSbtPageAutoMintStorageKey,
   buildSbtPageAutoMintCleanPath,
   collectAutoMintPairsFromSearchParams,
   decodeSbtPageInviteInput,
@@ -75,6 +76,8 @@ describe('sbtPageAutoMintHelpers', () => {
 
     expect(resolveSbtPageUrlAutoMintIntent({
       propsIn,
+      chainId: 84532,
+      sessionSlug: 'edge',
       searchRaw: '?sbt=0x00000000000000000000000000000000000000aa&gp=secret&auto=1',
       state,
     })).toEqual({
@@ -83,7 +86,7 @@ describe('sbtPageAutoMintHelpers', () => {
       targetPassword: 'secret',
       targetCode: 'secret',
       shouldAttemptAuto: true,
-      autoKey: 'autoMint:0x00000000000000000000000000000000000000aa',
+      autoKey: 'autoMint:84532:edge:0x00000000000000000000000000000000000000aa:success',
     });
     expect(resolveSbtPageUrlAutoMintIntent({
       propsIn,
@@ -97,8 +100,10 @@ describe('sbtPageAutoMintHelpers', () => {
     })?.shouldAttemptAuto).toBe(false);
     expect(resolveSbtPageUrlAutoMintIntent({
       propsIn,
+      chainId: 84532,
+      sessionSlug: 'edge',
       searchRaw: '?sbt=0x00000000000000000000000000000000000000aa&gp=secret&auto=1',
-      sessionStorageRef: { getItem: () => 'done' },
+      sessionStorageRef: { getItem: (key) => (key === 'autoMint:84532:edge:0x00000000000000000000000000000000000000aa:success' ? 'done' : null) },
       state,
     })?.shouldAttemptAuto).toBe(false);
     expect(resolveSbtPageUrlAutoMintIntent({
@@ -111,6 +116,46 @@ describe('sbtPageAutoMintHelpers', () => {
       searchRaw: '?auto=1',
       state,
     })).toBeNull();
+  });
+
+  it('scopes URL auto-mint completion by chain, session, and SBT address', () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000aa';
+    const doneKey = buildSbtPageAutoMintStorageKey({
+      chainId: 84532,
+      sessionSlug: 'edge',
+      sbtAddress,
+    });
+    const state = { userHasSBT: false, mintingStatus: 'idle' };
+    const searchRaw = `?sbt=${sbtAddress}&auto=1`;
+    const sessionStorageRef = {
+      getItem: (key: string) => (key === doneKey ? 'done' : null),
+    };
+
+    expect(doneKey).toBe('autoMint:84532:edge:0x00000000000000000000000000000000000000aa:success');
+    expect(resolveSbtPageUrlAutoMintIntent({
+      propsIn: { SBTAddress: sbtAddress, loginComplete: true },
+      chainId: 84532,
+      sessionSlug: 'edge',
+      searchRaw,
+      sessionStorageRef,
+      state,
+    })?.shouldAttemptAuto).toBe(false);
+    expect(resolveSbtPageUrlAutoMintIntent({
+      propsIn: { SBTAddress: sbtAddress, loginComplete: true },
+      chainId: 84532,
+      sessionSlug: 'beta',
+      searchRaw,
+      sessionStorageRef,
+      state,
+    })?.shouldAttemptAuto).toBe(true);
+    expect(resolveSbtPageUrlAutoMintIntent({
+      propsIn: { SBTAddress: sbtAddress, loginComplete: true },
+      chainId: 8453,
+      sessionSlug: 'edge',
+      searchRaw,
+      sessionStorageRef,
+      state,
+    })?.shouldAttemptAuto).toBe(true);
   });
 
   it('preserves array SBTAddress resolution for URL auto-mint intent', () => {
