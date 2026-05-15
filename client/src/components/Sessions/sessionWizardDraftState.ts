@@ -22,74 +22,17 @@ const { getPathRpcUrl } = rpcDefaults;
 
 export const DEFAULT_NEW_SESSION_SBT_TAGS = 'group, event, idea, demographic, location';
 
-const deepClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj ?? {}));
+const deepClone = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj ?? {}));
 const mergeSessionWizardDraftDeep = (target: AnyRecord, source: AnyRecord): AnyRecord => {
   const out: AnyRecord = { ...(target || {}) };
   Object.entries(source || {}).forEach(([key, value]) => {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
-      out[key] = mergeSessionWizardDraftDeep((out[key] as AnyRecord) || {}, value as AnyRecord);
+      out[key] = mergeSessionWizardDraftDeep(out[key] as AnyRecord || {}, value as AnyRecord);
     } else {
       out[key] = value;
     }
   });
   return out;
-};
-const hasCachedStorageProfile = (draft: AnyRecord | null): boolean =>
-  !!(
-    draft &&
-    ((draft.storageProfile && typeof draft.storageProfile === 'object') ||
-      (draft.sessionStorageProfile && typeof draft.sessionStorageProfile === 'object') ||
-      (draft.storage && typeof draft.storage === 'object'))
-  );
-const getCachedStorageProfileOverride = (draft: AnyRecord | null): AnyRecord | null => {
-  if (!draft || draft.storageProfile) return null;
-  if (draft.sessionStorageProfile && typeof draft.sessionStorageProfile === 'object') {
-    return draft.sessionStorageProfile as AnyRecord;
-  }
-  if (draft.storage && typeof draft.storage === 'object') {
-    return draft.storage as AnyRecord;
-  }
-  return null;
-};
-const getCachedStorageProfilePayloadAccessMode = (draft: AnyRecord): string => {
-  const storageProfile =
-    draft.storageProfile && typeof draft.storageProfile === 'object' ? (draft.storageProfile as AnyRecord) : {};
-  const payloadAccessControl =
-    storageProfile.payloadAccessControl && typeof storageProfile.payloadAccessControl === 'object'
-      ? (storageProfile.payloadAccessControl as AnyRecord)
-      : {};
-  const cloudflare =
-    storageProfile.cloudflare && typeof storageProfile.cloudflare === 'object'
-      ? (storageProfile.cloudflare as AnyRecord)
-      : {};
-  return toStr(
-    payloadAccessControl.mode ||
-      cloudflare.payloadAccessMode ||
-      storageProfile.payloadAccessMode ||
-      storageProfile.accessControlMode,
-  )
-    .trim()
-    .toLowerCase();
-};
-const buildCachedDraftSessionModeProfile = (draft: AnyRecord): SessionModeProfile => {
-  const profile = profileFromLegacyConfig(draft);
-  const storageProfile =
-    draft.storageProfile && typeof draft.storageProfile === 'object' ? (draft.storageProfile as AnyRecord) : {};
-  const backend = toStr(storageProfile.backend).trim().toLowerCase();
-  if (backend === 'cloudflare' && getCachedStorageProfilePayloadAccessMode(draft) === 'lit_encrypted') {
-    const nextProfile: SessionModeProfile = {
-      ...profile,
-      storage: {
-        ...profile.storage,
-        backend: 'cloudflare',
-      },
-      // Keep mode-specific metadata aligned: a Lit migration must not retain
-      // the Cloudflare preset worker-secret key provider.
-      encryption: { mode: 'lit' },
-    };
-    return nextProfile;
-  }
-  return profile;
 };
 
 export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRecord => {
@@ -265,201 +208,24 @@ export const buildSessionWizardInitialDraftFromCache = ({
   normalModeSharedHostedWorkerEnabled?: unknown;
   sourceEmbeddedDeployHelperDefault?: unknown;
 } = {}): AnyRecord => {
-  const cachedDraft =
-    cachedWizard?.draft && typeof cachedWizard.draft === 'object' ? (cachedWizard.draft as AnyRecord) : null;
-  const cachedDraftHasEmbeddedDeployHelperEnabled = typeof cachedDraft?.embeddedDeployHelperEnabled === 'boolean';
+  const cachedDraft = (
+    cachedWizard?.draft &&
+    typeof cachedWizard.draft === 'object'
+  ) ? cachedWizard.draft as AnyRecord : null;
+  const cachedDraftHasEmbeddedDeployHelperEnabled = (
+    typeof cachedDraft?.embeddedDeployHelperEnabled === 'boolean'
+  );
   const base = deepClone(defaultTemplate || {});
-  if (!cachedDraftHasEmbeddedDeployHelperEnabled && typeof sourceEmbeddedDeployHelperDefault === 'boolean') {
+  if (
+    !cachedDraftHasEmbeddedDeployHelperEnabled &&
+    typeof sourceEmbeddedDeployHelperDefault === 'boolean'
+  ) {
     base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
   }
   const merged = cachedDraft ? mergeSessionWizardDraftDeep(base, cachedDraft) : base;
-  const cachedStorageProfileOverride = getCachedStorageProfileOverride(cachedDraft);
-  if (cachedStorageProfileOverride) {
-    merged.storageProfile = cachedStorageProfileOverride;
-  }
-  const shouldBuildCachedStorageModeProfile =
-    cachedDraft && !merged.sessionModeProfile && hasCachedStorageProfile(cachedDraft);
   const normalized = normalizeSessionWizardDraftShape(merged);
-  if (shouldBuildCachedStorageModeProfile && !normalized.sessionModeProfile) {
-    normalized.sessionModeProfile = buildCachedDraftSessionModeProfile(normalized);
-    const support = classifySessionModeProfileSupport(normalized.sessionModeProfile);
-    if (support.status === 'reachable') {
-      const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
-      normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
-    }
-  }
   if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';
   }
   return normalized;
-};
-
-export const applySessionWizardRegistryChainDraftDefaults = ({
-  draft = {},
-  chainId = 0,
-  contractDefaults = {},
-  pathRpc = '',
-  includeContracts = true,
-  includeFaucet = true,
-}: {
-  draft?: AnyRecord | null;
-  chainId?: unknown;
-  contractDefaults?: AnyRecord | null;
-  pathRpc?: unknown;
-  includeContracts?: boolean;
-  includeFaucet?: boolean;
-} = {}): AnyRecord => {
-  const resolvedChainId = Number(chainId || 0) || 0;
-  const next = deepClone(draft && typeof draft === 'object' ? draft : {}) as AnyRecord;
-  if (!resolvedChainId) return next;
-
-  if (Number(next.networkChainId || 0) !== resolvedChainId) {
-    next.networkChainId = resolvedChainId;
-  }
-
-  if (
-    next.sessionModeProfile &&
-    typeof next.sessionModeProfile === 'object' &&
-    !Array.isArray(next.sessionModeProfile)
-  ) {
-    const support = classifySessionModeProfileSupport(next.sessionModeProfile);
-    if (support.status === 'reachable') {
-      const profile = next.sessionModeProfile as SessionModeProfile;
-      const accessDocuments = [
-        profile.encryption.accessConditions,
-        profile.storage.payloadAccessControl?.accessConditions,
-      ];
-      const hasSbtCondition = accessDocuments.some(
-        (document) =>
-          Array.isArray(document?.conditions) &&
-          document.conditions.some((condition) => condition.kind === 'sbt_onchain'),
-      );
-      const chainRelevant =
-        profile.authority.mode === 'evm_registry_canonical' || profile.encryption.mode === 'lit' || hasSbtCondition;
-      if (chainRelevant) {
-        if (profile.evm.registryChainId !== resolvedChainId) {
-          profile.evm.registryChainId = resolvedChainId;
-          profile.preset = 'custom';
-        }
-        accessDocuments.forEach((document) => {
-          document?.conditions.forEach((condition) => {
-            if (condition.kind === 'sbt_onchain') condition.chainId = resolvedChainId;
-          });
-        });
-      }
-    }
-  }
-
-  if (includeContracts) {
-    const defaults = contractDefaults && typeof contractDefaults === 'object' ? contractDefaults : {};
-    const contracts = next.contracts && typeof next.contracts === 'object' ? (next.contracts as AnyRecord) : {};
-    next.contracts = contracts;
-    const keys = new Set([...Object.keys(contracts || {}), ...Object.keys(defaults || {})]);
-    keys.forEach((key) => {
-      const entry = contracts[key] && typeof contracts[key] === 'object' ? (contracts[key] as AnyRecord) : {};
-      const fallback = toStr(defaults[key] || '').trim();
-      if (fallback) {
-        entry.address = fallback;
-      }
-      entry.chainId = resolvedChainId;
-      contracts[key] = entry;
-    });
-  }
-
-  const resolvedPathRpc = toStr(pathRpc).trim();
-  if (resolvedPathRpc) {
-    const rpc = next.rpc && typeof next.rpc === 'object' ? (next.rpc as AnyRecord) : {};
-    next.rpc = rpc;
-    if (!toStr(rpc.provider).trim()) {
-      rpc.provider = 'path';
-    }
-    const rpcProviders = rpc.providers && typeof rpc.providers === 'object' ? (rpc.providers as AnyRecord) : {};
-    rpc.providers = rpcProviders;
-    const pathProvider =
-      rpcProviders.path && typeof rpcProviders.path === 'object' ? (rpcProviders.path as AnyRecord) : {};
-    rpcProviders.path = pathProvider;
-    if (!toStr(pathProvider.rpcUrl).trim()) {
-      pathProvider.rpcUrl = resolvedPathRpc;
-    }
-
-    if (includeFaucet) {
-      const faucet = next.faucet && typeof next.faucet === 'object' ? (next.faucet as AnyRecord) : {};
-      next.faucet = faucet;
-      if (!toStr(faucet.rpcUrl).trim()) {
-        faucet.rpcUrl = resolvedPathRpc;
-      }
-    }
-  }
-
-  return next;
-};
-
-export const buildSessionWizardCacheWritePayload = ({
-  sessionId = '',
-  draft = {},
-  privateSlugMode = false,
-  lastManualSlug = '',
-  encryptionGates = [],
-  encryptedFieldGates = {},
-  gateSelections = {},
-  defaultGateId = '',
-  featuredDraftGateAutoLink = null,
-  resourceGateMap = {},
-  manualGasLimit = '',
-  manualGasPriceGwei = '',
-  manualMaxFeePerGasGwei = '',
-  manualMaxPriorityFeePerGasGwei = '',
-  workerSecretsEnabled = true,
-  workerSecrets = {},
-  deployForm = {},
-  deployComplete = false,
-  deployWorkerUrl = '',
-  workerRequirementProof = null,
-  provisionedSponsoredContext = null,
-}: AnyRecord = {}): AnyRecord => {
-  const workerSecretsRecord =
-    workerSecrets && typeof workerSecrets === 'object' && !Array.isArray(workerSecrets)
-      ? (workerSecrets as AnyRecord)
-      : {};
-  const publicWorkerConfig: AnyRecord = {};
-  WORKER_SECRET_CACHE_SAFE_FIELDS.forEach((key) => {
-    const value = toStr(workerSecretsRecord[key]).trim();
-    if (value) publicWorkerConfig[key] = value;
-  });
-  const deployFormRecord =
-    deployForm && typeof deployForm === 'object' && !Array.isArray(deployForm) ? (deployForm as AnyRecord) : {};
-  const durableDeployForm = {
-    workerName: toStr(deployFormRecord.workerName || '').trim(),
-    adminAddress: toStr(deployFormRecord.adminAddress || '').trim() || undefined,
-    bundleUrl: toStr(deployFormRecord.bundleUrl || '').trim(),
-  };
-
-  return {
-    sessionId,
-    draft: sanitizeSessionWizardDraftForBrowserCache(draft),
-    privateSlugMode,
-    lastManualSlug,
-    encryptionGates,
-    // Regression guard: pending CREATE2 SBT drafts remain tab-memory-only;
-    // this durable wizard cache must never contain their deploy or claim secrets.
-    pendingSbtDrafts: [],
-    encryptedFieldGates,
-    gateSelections,
-    defaultGateId,
-    featuredDraftGateAutoLink,
-    resourceGateMap,
-    manualGasLimit,
-    manualGasPriceGwei,
-    manualMaxFeePerGasGwei,
-    manualMaxPriorityFeePerGasGwei,
-    workerSecretsEnabled,
-    persistWorkerSecrets: false,
-    workerSecrets: publicWorkerConfig,
-    deployForm: durableDeployForm,
-    // Remote requirement evidence is intentionally live-memory only. A reload
-    // must replay the stable deployment request and reverify the same worker.
-    deployComplete: workerRequirementProof ? false : deployComplete,
-    deployWorkerUrl,
-    provisionedSponsoredContext,
-  };
 };

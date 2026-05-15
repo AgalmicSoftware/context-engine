@@ -227,8 +227,6 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
-  applySessionWizardRegistryChainDraftDefaults,
-  buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
 } from './sessionWizardDraftState';
 import {
@@ -255,7 +253,6 @@ import {
   deepClone,
   generateSessionId,
   getChainName,
-  getSessionWizardErrorMessage,
 } from './sessionWizardCoreUtils';
 import {
   clearSessionWizardCache,
@@ -598,7 +595,7 @@ const SessionWizard = ({
       : null;
   }, [cachedWizard?.draft?.networkChainId, network?.chainId, network?.id, resolvedActiveSessionSlug]);
   const initialDraft = useMemo(() => {
-    const draftFromCache = buildSessionWizardInitialDraftFromCache({
+    return buildSessionWizardInitialDraftFromCache({
       cachedWizard,
       defaultTemplate: DEFAULT_TEMPLATE,
       normalModeSharedHostedWorkerEnabled: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
@@ -606,22 +603,33 @@ const SessionWizard = ({
         ? null
         : sourceEmbeddedDeployHelperDefault,
     });
-    if (!isNewSessionWizardRoute || cachedWizard?.draft?.sessionModeProfile) return draftFromCache;
-    const freshNewSessionDraft = { ...draftFromCache };
-    delete freshNewSessionDraft.sessionModeProfile;
-    return freshNewSessionDraft;
-  }, [
-    cachedDraftHasEmbeddedDeployHelperEnabled,
-    cachedWizard,
-    isNewSessionWizardRoute,
-    sourceEmbeddedDeployHelperDefault,
-  ]);
-  const cachedInitialState = useSessionWizardCachedInitialState({
-    cachedWizard,
-    initialDraftNetworkChainId: initialDraft.networkChainId,
-    networkId: network?.id,
-    initialSessionId,
-  });
+  }, [cachedDraftHasEmbeddedDeployHelperEnabled, cachedWizard, sourceEmbeddedDeployHelperDefault]);
+  const initialGates = useMemo(() => {
+    const cachedGates = cachedWizard?.encryptionGates;
+    if (Array.isArray(cachedGates) && cachedGates.length) return cachedGates;
+    return [buildEncryptionGate(0)];
+  }, [cachedWizard]);
+  const initialDefaultGateId = useMemo(() => {
+    const cachedId = toStr(cachedWizard?.defaultGateId).trim();
+    if (cachedId) return cachedId;
+    return initialGates[0]?.id || '';
+  }, [cachedWizard, initialGates]);
+  const initialGateSelections = useMemo(() => {
+    const cachedSelections = cachedWizard?.gateSelections;
+    if (cachedSelections && typeof cachedSelections === 'object') return cachedSelections;
+    return buildDefaultGateState(initialDraft.networkChainId || network?.id);
+  }, [cachedWizard, initialDraft.networkChainId, network?.id]);
+  const initialFeaturedDraftGateAutoLink = useMemo(
+    () => normalizeFeaturedDraftGateAutoLink(cachedWizard?.featuredDraftGateAutoLink),
+    [cachedWizard]
+  );
+  const initialSessionIdValue = useMemo(() => {
+    const fromQuery = sessionRegistryUtils.formatSessionId(initialSessionId);
+    if (fromQuery) return fromQuery;
+    const fromCache = sessionRegistryUtils.formatSessionId(cachedWizard?.sessionId);
+    if (fromCache) return fromCache;
+    return generateSessionId();
+  }, [cachedWizard?.sessionId, initialSessionId]);
 
   const [draft, setDraft] = useState<DraftState>(() => initialDraft as DraftState);
   const draftRef = useRef<DraftState>(initialDraft as DraftState);

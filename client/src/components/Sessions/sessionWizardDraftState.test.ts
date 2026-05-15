@@ -1,6 +1,4 @@
 import {
-  applySessionWizardRegistryChainDraftDefaults,
-  buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
   buildSessionWizardDefaultTemplate,
   normalizeSessionWizardDraftShape,
@@ -536,5 +534,49 @@ describe('sessionWizardDraftState', () => {
     expect(payload.workerSecrets).toEqual({});
     expect(JSON.stringify(payload)).not.toContain('secret');
     expect(JSON.stringify(payload)).not.toContain('account');
+  });
+
+  it('merges cached wizard drafts with source defaults and normal-mode worker fallback', () => {
+    const defaultTemplate = {
+      slug: '',
+      sessionName: '',
+      corsWorkerUrl: 'https://hosted.example/default-worker.js',
+      embeddedDeployHelperEnabled: false,
+      rpc: {},
+      faucet: {},
+    };
+
+    expect(buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          sessionName: 'Cached Session',
+          corsWorkerUrl: 'https://cached.example/worker',
+        },
+        deployComplete: false,
+      },
+      defaultTemplate,
+      normalModeSharedHostedWorkerEnabled: false,
+      sourceEmbeddedDeployHelperDefault: true,
+    })).toEqual(expect.objectContaining({
+      sessionName: 'Cached Session',
+      corsWorkerUrl: '',
+      embeddedDeployHelperEnabled: true,
+    }));
+
+    expect(buildSessionWizardInitialDraftFromCache({
+      cachedWizard: {
+        draft: {
+          embeddedDeployHelperEnabled: false,
+          corsWorkerUrl: 'https://cached.example/worker',
+        },
+        deployComplete: true,
+      },
+      defaultTemplate,
+      normalModeSharedHostedWorkerEnabled: false,
+      sourceEmbeddedDeployHelperDefault: true,
+    })).toEqual(expect.objectContaining({
+      corsWorkerUrl: 'https://cached.example/worker',
+      embeddedDeployHelperEnabled: false,
+    }));
   });
 });
