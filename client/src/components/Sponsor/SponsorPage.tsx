@@ -225,7 +225,7 @@ const normalizeRestoredExpiryDate = (raw: unknown) => {
 const SPONSOR_PAGE_CACHE_KEY = 'ce:sponsorPageDraft:v1';
 const SPONSOR_PAGE_CACHE_VERSION = 1;
 const DEFAULT_REMEMBER_SPONSOR_DRAFT = process.env.NODE_ENV !== 'production';
-const buildEmptyBundleForm = (): SponsorBundleForm => ({
+const buildEmptyBundleForm = () => ({
   label: '',
   openaiKey: '',
   anthropicKey: '',
@@ -249,58 +249,55 @@ const normalizeSponsorBundleForm = (raw: unknown = {}): SponsorBundleForm => {
   });
   return next;
 };
-const normalizeSponsorBundleDraftForm = (raw: unknown = {}): SponsorBundleForm => {
-  const source = isRecord(raw) ? raw : {};
-  return {
-    ...buildEmptyBundleForm(),
-    label: toStr(source.label || '').trim(),
-  };
-};
-const readSponsorPageCache = (): SponsorPageCache => {
-  const fallback: SponsorPageCache = {
+const normalizeSponsorBundleDraftForm = (raw: any = {}) => ({
+  ...buildEmptyBundleForm(),
+  label: toStr(raw?.label || '').trim(),
+});
+const readSponsorPageCache = () => {
+  const fallback = {
     persistBundleDraft: DEFAULT_REMEMBER_SPONSOR_DRAFT,
     bundleForm: buildEmptyBundleForm(),
     expiresAt: null,
   };
   if (typeof window === 'undefined' || !window.localStorage) return fallback;
   try {
-    const parsed: unknown = JSON.parse(window.localStorage.getItem(SPONSOR_PAGE_CACHE_KEY) || 'null');
-    if (!isRecord(parsed) || Number(parsed.v || 0) !== SPONSOR_PAGE_CACHE_VERSION) return fallback;
-    const persistBundleDraft =
-      typeof parsed.persistBundleDraft === 'boolean'
-        ? parsed.persistBundleDraft
-        : typeof parsed.persistBundleSecrets === 'boolean'
-          ? parsed.persistBundleSecrets
-          : fallback.persistBundleDraft;
-    const expiresAt = normalizeRestoredExpiryDate(parsed.expiresAt);
+    const parsed = JSON.parse(window.localStorage.getItem(SPONSOR_PAGE_CACHE_KEY) || 'null');
+    if (!parsed || Number(parsed.v || 0) !== SPONSOR_PAGE_CACHE_VERSION) return fallback;
+    const persistBundleDraft = typeof parsed.persistBundleDraft === 'boolean'
+      ? parsed.persistBundleDraft
+      : typeof parsed.persistBundleSecrets === 'boolean'
+        ? parsed.persistBundleSecrets
+        : fallback.persistBundleDraft;
+    const expiresAtRaw = toStr(parsed.expiresAt || '').trim();
+    const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null;
     return {
       persistBundleDraft,
       bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(parsed.bundleForm) : buildEmptyBundleForm(),
-      expiresAt,
+      expiresAt: expiresAt instanceof Date && Number.isFinite(expiresAt.getTime()) ? expiresAt : null,
     };
   } catch (_) {
     return fallback;
   }
 };
-const writeSponsorPageCache = (cache: Partial<SponsorPageCache> = {}) => {
+const writeSponsorPageCache = ({
+  persistBundleDraft = DEFAULT_REMEMBER_SPONSOR_DRAFT,
+  bundleForm = {},
+  expiresAt = null,
+}: any = {}) => {
   if (typeof window === 'undefined' || !window.localStorage) return;
   const persistBundleDraft = cache.persistBundleDraft ?? DEFAULT_REMEMBER_SPONSOR_DRAFT;
   const bundleForm = cache.bundleForm ?? buildEmptyBundleForm();
   const expiresAt = cache.expiresAt ?? null;
   try {
-    window.localStorage.setItem(
-      SPONSOR_PAGE_CACHE_KEY,
-      JSON.stringify({
-        v: SPONSOR_PAGE_CACHE_VERSION,
-        persistBundleDraft: !!persistBundleDraft,
-        persistBundleSecrets: false,
-        bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(bundleForm) : {},
-        expiresAt:
-          persistBundleDraft && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
-            ? expiresAt.toISOString()
-            : '',
-      }),
-    );
+    window.localStorage.setItem(SPONSOR_PAGE_CACHE_KEY, JSON.stringify({
+      v: SPONSOR_PAGE_CACHE_VERSION,
+      persistBundleDraft: !!persistBundleDraft,
+      persistBundleSecrets: false,
+      bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(bundleForm) : {},
+      expiresAt: persistBundleDraft && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
+        ? expiresAt.toISOString()
+        : '',
+    }));
   } catch (_) {}
 };
 const getCurrentOrigin = () =>
@@ -410,28 +407,32 @@ const SponsorPage = ({
     initialCacheRef.current = readSponsorPageCache();
   }
   const initialCache = initialCacheRef.current;
-  const [sessions, setSessions] = useState<SponsorSessionEntry[]>([]);
-  const [selectedSlug, setSelectedSlug] = useState('');
-  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
-  const [sessionLookupStatus, setSessionLookupStatus] = useState('');
-  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
-  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
-  const [workerUrl, setWorkerUrl] = useState('');
-  const [workerUrlEditable, setWorkerUrlEditable] = useState(false);
-  const [persistBundleDraft, setPersistBundleDraft] = useState(initialCache.persistBundleDraft);
-  const [bundleForm, setBundleForm] = useState<SponsorBundleForm>(initialCache.bundleForm);
-  const [expiresAt, setExpiresAt] = useState<Date | null>(initialCache.expiresAt);
-  const [createBusy, setCreateBusy] = useState(false);
-  const [createStatus, setCreateStatus] = useState('');
-  const [shareUrl, setShareUrl] = useState('');
-  const [shareKey, setShareKey] = useState('');
-  const [shareTxId, setShareTxId] = useState('');
-  const [workerUrlOverrideDirty, setWorkerUrlOverrideDirty] = useState(false);
-  const requestedFetchKeyRef = useRef('');
-  const requestedAutoRefreshKeyRef = useRef('');
-  const prevSelectedSlugRef = useRef('');
-  const workerUrlOverrideDirtyRef = useRef(false);
-  const createRequestSeqRef = useRef(0);
+  const [sessions, setSessions] = useState<any>([]);
+  const [selectedSlug, setSelectedSlug] = useState<any>('');
+  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState<any>(false);
+  const [sessionLookupStatus, setSessionLookupStatus] = useState<any>('');
+  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState<any>('');
+  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
+  const [workerUrl, setWorkerUrl] = useState<any>('');
+  const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
+  const [persistBundleDraft, setPersistBundleDraft] = useState<any>(initialCache.persistBundleDraft);
+  const [bundleForm, setBundleForm] = useState<any>(initialCache.bundleForm);
+  const [expiresAt, setExpiresAt] = useState<any>(initialCache.expiresAt);
+  const [createBusy, setCreateBusy] = useState<any>(false);
+  const [createStatus, setCreateStatus] = useState<any>('');
+  const [shareUrl, setShareUrl] = useState<any>('');
+  const [shareTxId, setShareTxId] = useState<any>('');
+  const shareTxUrl = shareTxId
+    ? (() => {
+        const normalized = normalizeArweaveUrl(shareTxId);
+        return normalized === shareTxId ? `https://ar-io.dev/${shareTxId}` : normalized;
+      })()
+    : '';
+  const [workerUrlOverrideDirty, setWorkerUrlOverrideDirty] = useState<any>(false);
+  const requestedFetchKeyRef = useRef<any>('');
+  const requestedAutoRefreshKeyRef = useRef<any>('');
+  const prevSelectedSlugRef = useRef<any>('');
+  const workerUrlOverrideDirtyRef = useRef<any>(false);
   const requestedSessionRaw = toStr(initialSessionId).trim();
   const requestedSessionIdHex = sessionRegistryReadsPort.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
@@ -1158,13 +1159,12 @@ const SponsorPage = ({
                 <Input
                   type="checkbox"
                   checked={persistBundleDraft}
-                  onChange={(e) => setPersistBundleDraft(!!e.target.checked)}
+                  onChange={(e: any) => setPersistBundleDraft(!!e.target.checked)}
                 />
                 <span>Remember non-secret draft fields</span>
               </Label>
               <div className={styles.panelHint}>
-                Stores only non-secret metadata such as label and expiry in localStorage. API keys, private keys,
-                tokens, JWKs, and RPC URLs are never restored.
+                Stores only non-secret metadata such as label and expiry in localStorage. API keys, private keys, tokens, JWKs, and RPC URLs are never restored.
               </div>
             </div>
           </div>

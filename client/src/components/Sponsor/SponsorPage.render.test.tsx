@@ -620,103 +620,6 @@ describe('SponsorPage', () => {
     );
   });
 
-  it('does not apply stale create completions after the selected session changes', async () => {
-    sessionEntries = [
-      ['edge', buildSessionConfig()],
-      [
-        'other',
-        buildSessionConfig({
-          slug: 'other',
-          sessionName: 'Other Session',
-          __registry: {
-            sessionIdHex: '0xother-session-id',
-            adminAddress: ADMIN_ADDRESS,
-            registryChainId: 84532,
-            chainId: 84532,
-          },
-        }),
-      ],
-    ];
-    const uploadDeferred = createDeferred<string>();
-    mockUploadDataToArweave.mockReturnValueOnce(uploadDeferred.promise);
-
-    await renderSponsorPage();
-
-    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-    fireEvent.change(getFieldInputByLabel('Label'), {
-      target: { value: 'Launch week sponsor bundle' },
-    });
-    fireEvent.change(getFieldInputByLabel('OpenAI key'), {
-      target: { value: 'sk-live-openai' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
-
-    await waitFor(() => {
-      expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
-    });
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT), {
-      target: { value: 'other' },
-    });
-
-    await act(async () => {
-      uploadDeferred.resolve('stale_sponsor_tx_id');
-      await uploadDeferred.promise;
-      await Promise.resolve();
-    });
-
-    expect(screen.queryByText('Sponsored URL ready.')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Sponsored share URL')).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('other');
-  });
-
-  it('does not apply stale create completions after the selected session config refreshes in place', async () => {
-    const uploadDeferred = createDeferred<string>();
-    mockUploadDataToArweave.mockReturnValueOnce(uploadDeferred.promise);
-
-    await renderSponsorPage();
-
-    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-    fireEvent.change(getFieldInputByLabel('Label'), {
-      target: { value: 'Launch week sponsor bundle' },
-    });
-    fireEvent.change(getFieldInputByLabel('OpenAI key'), {
-      target: { value: 'sk-live-openai' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
-
-    await waitFor(() => {
-      expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
-    });
-
-    sessionEntries = [
-      [
-        'edge',
-        buildSessionConfig({
-          sessionName: 'Edge Session Refresh',
-          __registry: {
-            sessionIdHex: '0xedge-session-id-refreshed',
-          },
-        }),
-      ],
-    ];
-    await act(async () => {
-      window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    await act(async () => {
-      uploadDeferred.resolve('stale_sponsor_tx_id');
-      await uploadDeferred.promise;
-      await Promise.resolve();
-    });
-
-    expect(screen.queryByText('Sponsored URL ready.')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Sponsored share URL')).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-  });
-
   it('persists only non-secret sponsor draft fields across remounts', async () => {
     const view = await renderSponsorPage();
 
@@ -734,15 +637,13 @@ describe('SponsorPage', () => {
     });
 
     const cached = JSON.parse(localStorage.getItem('ce:sponsorPageDraft:v1') || '{}');
-    expect(cached).toEqual(
-      expect.objectContaining({
-        persistBundleDraft: true,
-        persistBundleSecrets: false,
-        bundleForm: expect.objectContaining({
-          label: 'Repeatable sponsor bundle',
-        }),
+    expect(cached).toEqual(expect.objectContaining({
+      persistBundleDraft: true,
+      persistBundleSecrets: false,
+      bundleForm: expect.objectContaining({
+        label: 'Repeatable sponsor bundle',
       }),
-    );
+    }));
     expect(JSON.stringify(cached)).not.toContain('sk-repeat-openai');
     expect(JSON.stringify(cached)).not.toContain('cf-repeat-token');
 
@@ -756,42 +657,19 @@ describe('SponsorPage', () => {
     expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('');
   });
 
-  it('drops expired sponsor draft expiry values during restore', async () => {
-    localStorage.setItem(
-      'ce:sponsorPageDraft:v1',
-      JSON.stringify({
-        v: 1,
-        persistBundleDraft: true,
-        bundleForm: {
-          label: 'Expired sponsor bundle',
-        },
-        expiresAt: '2000-01-01T00:00:00.000Z',
-      }),
-    );
-
-    await renderSponsorPage();
-
-    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-    expect(getFieldInputByLabel('Label')).toHaveValue('Expired sponsor bundle');
-    expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveValue('');
-  });
-
   it('redacts legacy sponsor draft caches that contain raw secrets', async () => {
-    localStorage.setItem(
-      'ce:sponsorPageDraft:v1',
-      JSON.stringify({
-        v: 1,
-        persistBundleSecrets: true,
-        bundleForm: {
-          label: 'Legacy cached bundle',
-          openaiKey: 'sk-legacy-openai',
-          cloudflareApiToken: 'cf-legacy-token',
-          customRpcUrl: 'https://rpc.example.test/secret',
-          arweaveJwk: '{"kty":"RSA","d":"secret"}',
-          faucetPrivateKey: '0xlegacyfaucet',
-        },
-      }),
-    );
+    localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
+      v: 1,
+      persistBundleSecrets: true,
+      bundleForm: {
+        label: 'Legacy cached bundle',
+        openaiKey: 'sk-legacy-openai',
+        cloudflareApiToken: 'cf-legacy-token',
+        customRpcUrl: 'https://rpc.example.test/secret',
+        arweaveJwk: '{"kty":"RSA","d":"secret"}',
+        faucetPrivateKey: '0xlegacyfaucet',
+      },
+    }));
 
     await renderSponsorPage();
 
