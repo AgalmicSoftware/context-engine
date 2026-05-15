@@ -942,6 +942,7 @@ describe('SurveyTool question pool lifecycle', () => {
     expect(subject.state.modifiedCount).toBe(0);
     expect(subject.state.hasEncryptedChanges).toBe(false);
     expect(subject.state.isDirty).toBe(false);
+    expect(subject.state.isLoadingResponse).toBe(false);
     expect(subject.state.submittedSinceLastEdit).toBe(false);
     expect(subject.state.surveysResponseState).toEqual([
       { answers: { keep: { value: 'persisted' } } },
@@ -981,6 +982,73 @@ describe('SurveyTool question pool lifecycle', () => {
     expect(subject.clearDraftFor).toHaveBeenNthCalledWith(2, 'q2');
     expect(subject.recalculateEditStats).toHaveBeenCalledTimes(1);
     expect(subject.persistDraftSafely).toHaveBeenCalledWith(0);
+  });
+
+  it('does not let late survey response hydration undo start fresh', async () => {
+    const deferred = createDeferred();
+    const subject = new SurveyQuestions({
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      surveyId: 'survey-a',
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          answers: { q1: { value: 'old draft' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+      ],
+      userAnswers: null,
+      submissionComplete: false,
+      isLoadingResponse: false,
+    };
+    syncClassSetState(subject);
+    subject.getLatestSurveyResponse = jest.fn(() => deferred.promise);
+    subject.prefillSurveyResponses = jest.fn();
+    subject.getCurrentRenderedQuestionIds = jest.fn(() => ['q1']);
+    subject.buildEmptyResponseFieldState = jest.fn((questionId, fieldKey = 'answer') => ({
+      value: '',
+      questionId,
+      fieldKey,
+    }));
+    subject.deepClone = jest.fn((value) => JSON.parse(JSON.stringify(value)));
+    subject.clearDraftFor = jest.fn();
+    subject.recalculateEditStats = jest.fn();
+    subject.persistDraftSafely = jest.fn();
+
+    const pendingHydration = subject.fetchSurveyResponse();
+    await Promise.resolve();
+    expect(subject.state.isLoadingResponse).toBe(true);
+
+    subject.handleStartFresh();
+    expect(subject.state.startFresh).toBe(true);
+    expect(subject.state.suppressPrefill).toBe(true);
+    expect(subject.state.isLoadingResponse).toBe(false);
+
+    deferred.resolve({
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: 'late chain answer' },
+          additional: { value: 'late chain note' },
+        },
+      ],
+    });
+    await pendingHydration;
+    await flushAsyncCallbacks();
+
+    expect(subject.prefillSurveyResponses).not.toHaveBeenCalled();
+    expect(subject.state.startFresh).toBe(true);
+    expect(subject.state.suppressPrefill).toBe(true);
+    expect(subject.state.userAnswers).toBeNull();
+    expect(subject.state.surveysResponseState[0].answers.q1.value).toBe('');
   });
 
   it('resets form state for account changes from initialized survey state', () => {
