@@ -298,6 +298,7 @@ import {
 } from './sessionWizardResourceGateSupport';
 import {
   buildSessionWizardCreateSbtModalLaunchState,
+  buildSessionWizardDeferredCreateSbtComponentProps,
   getSessionWizardGateById,
   resolveSessionWizardCreateSbtTargetGateId,
 } from './sessionWizardCreateSbtSupport';
@@ -3534,66 +3535,28 @@ const SessionWizard = ({
     sessionSlugOverride = '',
     workerUrlOverride = '',
     accountOverride = '',
-  } = {}) => {
-    const chainId = Number(
-      draftRef.current?.networkChainId ||
-      registryChainId ||
-      network?.id ||
-      network?.chainId ||
-      0
-    ) || null;
-    const sessionSlug = toStr(
-      sessionSlugOverride ||
-      draftRef.current?.slug ||
-      resolvedActiveSessionSlug ||
-      ''
-    ).trim();
-    return {
-      account: toStr(accountOverride || resolvedWalletAccountRef.current || account).trim(),
-      provider,
-      network: getChainById(chainId) || (
-        chainId
-          ? { id: chainId, name: getChainName(chainId) || `Chain ${chainId}` }
-          : (network || { id: null, name: '' })
-      ),
-      loginComplete: true,
-      toggleLoginModal,
-      sessionSlug,
-      sessionConfigOverride: {
-        ...(draftRef.current && typeof draftRef.current === 'object' ? draftRef.current : {}),
-        slug: sessionSlug,
-        corsWorkerUrl: normalizeWorkerAuthUrl(
-          toStr(workerUrlOverride || draftRef.current?.corsWorkerUrl).trim()
-        ),
-        networkChainId: chainId,
-        contracts: (
-          draftRef.current &&
-          typeof draftRef.current?.contracts === 'object'
-        ) ? draftRef.current.contracts : {},
-      },
-      arweaveJwkOverride: getEnabledWorkerArweaveJwk(workerSecretsRef.current),
-      encryptionGates: encryptionGates.map((gate) => ({
-        id: gate.id,
-        gateId: gate.id,
-        label: gate.label,
-        name: gate.label,
-        color: gate.color,
-        mode: gate.mode,
-        requireAll: gate.mode === 'all',
-        sbtAddresses: normalizeSbtSelection(gate.sbts || []).map((entry) => entry.address),
-        chainId,
-      })),
-      defaultGateId: defaultGateId || encryptionGates[0]?.id || '',
-      defaultSbtTags: draftRef.current?.defaultSbtTags || '',
-      deferredDeploy: true,
-      attemptImmediateDeferredUpload: true,
-      hideNetworkSelector: true,
-      // Publish finalization should use the resolved session worker first.
-      // A provided JWK stays available as fallback inside the upload helper.
-      preferDirectArweaveUpload: false,
-      signAdminAction: signBootstrapAdminAction,
-    };
-  };
+  } = {}) => buildSessionWizardDeferredCreateSbtComponentProps({
+    account,
+    accountOverride,
+    defaultGateId,
+    draft: draftRef.current,
+    encryptionGates,
+    getChainById,
+    getChainName,
+    getEnabledWorkerArweaveJwk,
+    network,
+    normalizeSbtSelection,
+    normalizeWorkerAuthUrl,
+    provider,
+    registryChainId,
+    resolvedActiveSessionSlug,
+    resolvedWalletAccount: resolvedWalletAccountRef.current,
+    sessionSlugOverride,
+    signAdminAction: signBootstrapAdminAction,
+    toggleLoginModal,
+    workerSecrets: workerSecretsRef.current,
+    workerUrlOverride,
+  });
 
   const deployPendingSbtDrafts = async ({ workerUrlOverride = '', signerAccountOverride = '' } = {}) => {
     const draftsToDeploy = normalizePendingSbtDrafts(pendingSbtDrafts).filter((entry) => entry.deployed !== true);
