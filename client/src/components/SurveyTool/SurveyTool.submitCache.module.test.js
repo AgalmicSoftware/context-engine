@@ -427,6 +427,74 @@ describe('SurveyTool submit cache writes', () => {
     expect(submitSpy).not.toHaveBeenCalled();
   });
 
+  it('does not broadcast when submit context changes during rating encryption', async () => {
+    const submitSpy = jest.spyOn(contractScripts, 'submitResponses').mockResolvedValue({
+      wait: jest.fn().mockResolvedValue({
+        status: 1,
+        transactionHash: `0x${'9'.repeat(64)}`,
+      }),
+    });
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      networkChainId: 84532,
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+    });
+    subject._isMounted = true;
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.resolveSessionChainId = jest.fn(() => 84532);
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: '*', encrypted: true, encryptedPortion: '{}' } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: { q1: 4 },
+        conviction: {},
+      }],
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      userAnswers: null,
+      hasher: { hash: jest.fn() },
+    };
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: '*', encrypted: true, encryptedPortion: '{}' },
+          additional: { value: '', encrypted: false },
+          importance: 4,
+        },
+      ],
+    }));
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { importance: 1 } },
+    }));
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    jest.spyOn(cryptoUtils, 'encryptEnvelopeValue').mockImplementation(async () => {
+      subject.props = { ...subject.props, account: '0xdef' };
+      return 'encrypted-rating';
+    });
+
+    await expect(
+      subject.submitSurveyResponse(null, null, subject.buildSubmitContextSnapshot())
+    ).rejects.toThrow('Submission context changed before broadcast.');
+
+    expect(submitSpy).not.toHaveBeenCalled();
+  });
+
   it('does not write submitted responses into a borrowed general network cache when the draft slug is unresolved', async () => {
     const slug = 'missing-session-slug';
     const surveyId = '0xsurvey';
