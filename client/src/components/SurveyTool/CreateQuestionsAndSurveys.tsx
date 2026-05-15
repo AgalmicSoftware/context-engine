@@ -102,6 +102,7 @@ import {
   buildCreateSurveyHashPatch,
   buildCreateSurveyMountSubmitResetPatch,
   buildCreateSurveyNetworkSwitchPatch,
+  buildCreateSurveyGateOptions,
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyOpenLockKeyPatch,
   buildCreateSurveyQuestionFieldUpdateList,
@@ -133,7 +134,6 @@ import {
   getCreateSurveyValidationError,
   isMultichoiceQuestionType,
   isEncryptableFieldValueEmpty,
-  normalizeAddressList,
   normalizeAuthoringQuestionOptions,
   normalizeGateIds,
   normalizeGateText,
@@ -498,19 +498,6 @@ type CreateSurveyGateOptionsResult = {
 type CreateSurveyGateOptionsArgs = {
   isStandaloneQuestion?: unknown;
 };
-type CreateSurveyGateSessionConfig = CreateSurveySessionConfigLike & {
-  encryption?: {
-    gates?: unknown;
-    [key: string]: unknown;
-  };
-  sponsored?: {
-    defaultGateId?: unknown;
-    gates?: unknown;
-    resources?: unknown;
-    [key: string]: unknown;
-  };
-};
-
 interface CreateQuestionsAndSurveysGateSbt {
   address?: string;
   name?: string;
@@ -645,12 +632,6 @@ const writeCreateSurveyCache = writeCache as unknown as CreateSurveyCacheWriter;
 const contractScriptsForSubmit = contractScripts as unknown as CreateSurveyContractScriptsWithSession;
 
 const DOCUMENT_URL_ERROR_TEXT = 'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.';
-
-const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
-  default: 'default',
-  questionResponses: 'questions',
-  surveyResponses: 'survey',
-});
 
 const ensureManagedSurveysNet = (current: unknown = {}, netId: unknown = ''): ManagedCacheSnapshot => {
   const next: ManagedCacheSnapshot = isObjectLikeRecord(current) ? { ...current } : {};
@@ -973,173 +954,11 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     cfgIn: unknown = this.getResolvedSessionConfig(),
     { isStandaloneQuestion = this.state?.isStandaloneQuestion }: CreateSurveyGateOptionsArgs = {}
   ): CreateSurveyGateOptionsResult => {
-    const cfg = (cfgIn && typeof cfgIn === 'object') ? cfgIn as CreateSurveyGateSessionConfig : {};
-    const fullEncryptionGateMap = isPlainObject(cfg?.encryption?.gates) ? cfg.encryption.gates : null;
-    const fullSponsoredGateMap = isPlainObject(cfg?.sponsored?.gates) ? cfg.sponsored.gates : null;
-    const fullGateMap: CreateSurveyGateMap = ((fullEncryptionGateMap && Object.keys(fullEncryptionGateMap).length)
-      ? fullEncryptionGateMap
-      : (fullSponsoredGateMap && Object.keys(fullSponsoredGateMap).length ? fullSponsoredGateMap : {})) as CreateSurveyGateMap;
-    const primaryResource = isStandaloneQuestion ? 'questionResponses' : 'surveyResponses';
-    const sessionLabel = this.resolveLockAudienceSessionName(cfg);
-    const relevantGates: CreateSurveyGateDefinition[] = [];
-    const seenGateIds = new Set<string>();
-    const seenGateKeys = new Set<string>();
-
-    const pushRelevantGate = (
-      seedGate: CreateSurveyGateDefinition | null = null,
-      resourceKey: unknown = ''
-    ) => {
-      if (!seedGate || typeof seedGate !== 'object') return;
-
-      const candidateIds = [
-        seedGate.gateId,
-        seedGate.id,
-      ]
-        .map((value: unknown) => normalizeGateText(value))
-        .filter((gateId): gateId is string => Boolean(gateId));
-      const seedAddresses = normalizeAddressList([
-        ...(Array.isArray(seedGate.sbtAddresses) ? seedGate.sbtAddresses : []),
-        seedGate.sbtAddress,
-      ]);
-      const seedAddressKey = seedAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
-
-      let resolvedGateId = candidateIds[0] || '';
-      let resolvedGate: CreateSurveyGateDefinition | null = resolvedGateId
-        ? fullGateMap?.[resolvedGateId] || null
-        : null;
-
-      if (!resolvedGate && seedAddressKey) {
-        Object.entries(fullGateMap || {}).some(([gateId, gate]) => {
-          const gateAddresses = normalizeAddressList([
-            ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
-            gate?.sbtAddress,
-          ]);
-          const gateAddressKey = gateAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
-          if (!gateAddressKey || gateAddressKey !== seedAddressKey) return false;
-          resolvedGateId = normalizeGateText(gateId);
-          resolvedGate = gate;
-          return true;
-        });
-      }
-
-      const finalGateId = normalizeGateText(resolvedGateId || resourceKey || `gate-${relevantGates.length + 1}`);
-      const mergedGate = {
-        ...seedGate,
-        ...(resolvedGate && typeof resolvedGate === 'object' ? resolvedGate : {}),
-        id: finalGateId,
-        gateId: finalGateId,
-        resourceKey: normalizeGateText(resourceKey || seedGate.resourceKey || primaryResource) || primaryResource,
-      };
-      const mergedAddresses = normalizeAddressList([
-        ...(Array.isArray(mergedGate.sbtAddresses) ? mergedGate.sbtAddresses : []),
-        mergedGate.sbtAddress,
-      ]);
-      mergedGate.sbtAddresses = mergedAddresses;
-      mergedGate.sbtAddress = mergedAddresses[0] || '';
-
-      const dedupeKey = JSON.stringify({
-        gateId: finalGateId.toLowerCase(),
-        resourceKey: String(mergedGate.resourceKey || '').toLowerCase(),
-        sbtAddresses: mergedAddresses.map((address: string) => address.toLowerCase()).sort(),
-      });
-      if (seenGateIds.has(finalGateId.toLowerCase()) || seenGateKeys.has(dedupeKey)) return;
-      seenGateIds.add(finalGateId.toLowerCase());
-      seenGateKeys.add(dedupeKey);
-      relevantGates.push(mergedGate);
-    };
-
-    const primaryState = resolveSponsoredGateStateForResource(cfg, primaryResource);
-    const primaryExplicitOpen = primaryState?.status === SPONSORED_GATE_STATES.OPEN;
-    if (primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED && primaryState.gate) {
-      pushRelevantGate(primaryState.gate, primaryResource);
-    }
-
-    if (!primaryExplicitOpen) {
-      const defaultState = resolveSponsoredGateStateForResource(cfg, 'default');
-      if (defaultState?.status === SPONSORED_GATE_STATES.RESTRICTED && defaultState.gate) {
-        pushRelevantGate(defaultState.gate, 'default');
-      }
-    }
-
-    if (!relevantGates.length) {
-      const resources = isPlainObject(cfg?.sponsored?.resources)
-        ? cfg.sponsored.resources as Record<string, UnknownRecord | undefined>
-        : {};
-      const primaryResourceCfg = (resources?.[primaryResource] && typeof resources[primaryResource] === 'object')
-        ? resources[primaryResource]
-        : {};
-      const defaultResourceCfg = (resources?.default && typeof resources.default === 'object')
-        ? resources.default
-        : {};
-      const fallbackIds = [
-        ...(Array.isArray(primaryResourceCfg.gateIds) ? primaryResourceCfg.gateIds : []),
-        primaryResourceCfg.gateId,
-        ...(Array.isArray(defaultResourceCfg.gateIds) ? defaultResourceCfg.gateIds : []),
-        defaultResourceCfg.gateId,
-        cfg?.sponsored?.defaultGateId,
-      ]
-        .map((value: unknown) => normalizeGateText(value))
-        .filter((gateId): gateId is string => Boolean(gateId));
-      fallbackIds.forEach((gateId: string) => {
-        const resourceKey = gateId === normalizeGateText(cfg?.sponsored?.defaultGateId) ? 'default' : primaryResource;
-        pushRelevantGate({ gateId, resourceKey }, resourceKey);
-      });
-    }
-
-    const gateMap: CreateSurveyGateMap = {};
-    relevantGates.forEach((gate) => {
-      const gateId = String(gate?.id || '');
-      if (!gateId) return;
-      gateMap[gateId] = gate;
-    });
-    const gateIds = Object.keys(gateMap || {}).filter(Boolean).sort();
-    const multipleGateOptions = gateIds.length > 1;
-    const gateOptions = gateIds.map((gateId: string): CreateSurveyGateOption => {
-      const gate: CreateSurveyGateDefinition = gateMap[gateId] || {};
-      const color = String(gate.color || stableGateColor(gateId));
-      const sbtAddresses = normalizeAddressList([
-        ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
-        gate.sbtAddress,
-      ]);
-      const mode = String(
-        gate.mode ||
-        gate.operator ||
-        gate.gateMode ||
-        (gate.requireAll === true ? 'all' : '')
-      ).trim();
-      const resourceKey = normalizeGateText(gate.resourceKey) || primaryResource;
-      const resourceLabel = AUTHORING_GATE_RESOURCE_LABELS[resourceKey] || resourceKey;
-      const displayLabel = multipleGateOptions
-        ? `${sessionLabel} (${resourceLabel})`
-        : sessionLabel;
-      return {
-        id: gateId,
-        label: displayLabel,
-        displayLabel,
-        badgeLabel: sessionLabel,
-        color,
-        mode,
-        requireAll: gate.requireAll === true,
-        sbtAddresses,
-        sbtAddress: sbtAddresses[0] || '',
-        resourceKey,
-      };
-    });
-
-    const candidateDefaults = [
-      primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED
-        ? normalizeGateText(primaryState?.gate?.gateId || primaryState?.gate?.id)
-        : '',
-      !primaryExplicitOpen
-        ? normalizeGateText(resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.gateId || resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.id)
-        : '',
-      gateOptions[0]?.id,
-    ]
-      .map((val: unknown) => normalizeGateText(val))
-      .filter((gateId): gateId is string => Boolean(gateId));
-    const defaultGateId = candidateDefaults.find((gateId: string) => gateIds.includes(gateId)) || (gateOptions[0]?.id || '');
-
-    return { gateMap, gateOptions, defaultGateId };
+    return buildCreateSurveyGateOptions({
+      cfg: cfgIn,
+      isStandaloneQuestion,
+      sessionLabel: this.resolveLockAudienceSessionName(cfgIn),
+    }) as CreateSurveyGateOptionsResult;
   };
 
   ensureResolvedSessionConfigForSubmit = async (
