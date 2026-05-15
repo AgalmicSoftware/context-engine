@@ -1356,35 +1356,35 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     }, Math.max(0, Number(delayMs) || 0));
   };
 
-  resolveEffectiveResponseGateConfig = (slugIn = '') => {
+  resolveEffectiveResponseGateConfig = (slugIn = '', propsSnapshot = this.props) => {
     const slug = String(slugIn || '').trim().toLowerCase();
     const resolved = resolveSurveyToolResponseGateSessionContext({
       sessionSlug: slug,
-      sessionConfig: (this.props.sessionConfig && typeof this.props.sessionConfig === 'object')
-        ? this.props.sessionConfig
+      sessionConfig: (propsSnapshot?.sessionConfig && typeof propsSnapshot.sessionConfig === 'object')
+        ? propsSnapshot.sessionConfig
         : null,
       resolveBySlug: getStrictSessionConfigBySlug,
     });
     return resolved.effectiveSessionConfig || {};
   };
 
-  resolveSessionChainId = (slugIn = '', cfgIn = null) => {
+  resolveSessionChainId = (slugIn = '', cfgIn = null, propsSnapshot = this.props) => {
     const slug = String(
-      slugIn || (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : resolveEffectiveSlug(this.props)) || ''
+      slugIn || (this._getEffectiveDraftSlug ? this._getEffectiveDraftSlug() : resolveEffectiveSlug(propsSnapshot)) || ''
     ).trim().toLowerCase();
     const cfg =
       cfgIn && typeof cfgIn === 'object'
         ? cfgIn
-        : this.resolveEffectiveResponseGateConfig(slug);
+        : this.resolveEffectiveResponseGateConfig(slug, propsSnapshot);
     return Number(
       cfg?.networkChainId ||
       cfg?.contracts?.surveys?.chainId ||
       cfg?.contracts?.sbtFactory?.chainId ||
       cfg?.__registry?.chainId ||
       cfg?.__registry?.registryChainId ||
-      this.props.networkChainId ||
-      this.props.network?.id ||
-      this.props.network?.chainId ||
+      propsSnapshot?.networkChainId ||
+      propsSnapshot?.network?.id ||
+      propsSnapshot?.network?.chainId ||
       0
     ) || null;
   };
@@ -4084,11 +4084,11 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
   };
 
-  resolveSubmissionGroupContext = ({ questionIds = [], surveyId = null } = {}) => {
+  resolveSubmissionGroupContext = ({ questionIds = [], surveyId = null, fallbackSlug = null } = {}) => {
     return buildSubmissionGroupContext({
       questionIds,
       slugByQuestionId: this.resolveQuestionSlugMapForIds(questionIds, { surveyId }),
-      fallbackSlug: resolveEffectiveSlug(this.props),
+      fallbackSlug: fallbackSlug != null ? fallbackSlug : resolveEffectiveSlug(this.props),
       normalizeSlug: normalizeSessionSlugValue,
     });
   };
@@ -8144,10 +8144,35 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return encState;
   };
 
+  buildSubmitContextSnapshot = () => {
+    const singleQuestionMode = !!this.props.singleQuestionMode;
+    const isStandalone = !!this.props.isStandalone;
+    const surveyIndex = singleQuestionMode || isStandalone ? 0 : (this.props.surveyIndex || 0);
+    const effectiveDraftSlug = normalizeSessionSlugValue(
+      this._getEffectiveDraftSlug
+        ? this._getEffectiveDraftSlug()
+        : resolveEffectiveSlug(this.props)
+    );
+
+    return {
+      props: this.props,
+      account: this.props.account || '',
+      provider: this.props.provider,
+      loginComplete: !!this.props.loginComplete,
+      singleQuestionMode,
+      isStandalone,
+      surveyIndex,
+      surveyId: this.props.surveyId || '',
+      questionID: this.props.questionID || '',
+      effectiveDraftSlug,
+      chainId: this.resolveSessionChainId(effectiveDraftSlug, null, this.props),
+    };
+  };
 
   encryptAndUpload = async () => {
     try {
-      if (!this.props.loginComplete) {
+      const submitContext = this.buildSubmitContextSnapshot();
+      if (!submitContext.loginComplete) {
         this._submitGuard = false;
         this.props.toggleLoginModal(true);
         return;
@@ -8174,10 +8199,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
       this.setState(buildSubmitStartState());
 
-      const providerKind = cryptoUtils.getProviderKind(this.props.provider);
+      const providerKind = cryptoUtils.getProviderKind(submitContext.provider);
 
       // Compute changed set once (used for encrypt + submit)
-      const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : this.props.surveyIndex;
+      const surveyIndex = submitContext.surveyIndex;
       const { changedQids } = this.getChangedQidsAndFields(surveyIndex);
 
       // Local state tracker to ensure baseline syncs with encrypted data even if React is slow
@@ -8203,8 +8228,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         if (missingRecipients.length > 0) {
           throw new Error(`Missing Lit recipients for gated field(s): ${missingRecipients.join(', ')}`);
         }
-          const chainId = this.resolveSessionChainId();
-          const surveyId = this.props.singleQuestionMode ? ethers.constants.HashZero : this.props.surveyId;
+          const surveyId = submitContext.singleQuestionMode ? ethers.constants.HashZero : submitContext.surveyId;
           const poolForCommit =
             (Array.isArray(this.state.questionPool) && this.state.questionPool.length > 0)
               ? this.state.questionPool
@@ -8213,9 +8237,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             workGroups,
             baseOpts: {
               providerKind,
-              provider: this.props.provider,
-              account: this.props.account,
-              chainId,
+              provider: submitContext.provider,
+              account: submitContext.account,
+              chainId: submitContext.chainId,
               surveyId,
               questionPool: poolForCommit,
               hasher: this.state.hasher,
@@ -8250,7 +8274,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       this.setState(buildCurrentStepState(2));
 
       // Await the receipt to ensure transaction is confirmed before optimistic update
-      const receipt = await this.submitSurveyResponse(activeSlice, changedQids);
+      const receipt = await this.submitSurveyResponse(activeSlice, changedQids, submitContext);
       surveyLog.log("Submission receipt received", receipt?.blockNumber || 'unknown block');
 
       // Success path
@@ -8278,21 +8302,21 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       const submittedCacheSlug = normalizeSessionSlugValue(
         receipt?.__ceSubmissionGroupKey != null
           ? receipt.__ceSubmissionGroupKey
-          : this._getEffectiveDraftSlug()
+          : submitContext.effectiveDraftSlug
       );
       try {
-        const accountLower = (this.props.account || '').toLowerCase();
+        const accountLower = (submitContext.account || '').toLowerCase();
         if (accountLower) {
-          if (this.props.singleQuestionMode) {
-            const qLower = (this.props.questionID || '').toLowerCase();
+          if (submitContext.singleQuestionMode) {
+            const qLower = (submitContext.questionID || '').toLowerCase();
             if (qLower) {
               responseUrl = buildQuestionRoutePath(qLower, {
                 responderAddress: accountLower,
                 sessionSlug: submittedCacheSlug,
               });
             }
-          } else if (!this.props.isStandalone) {
-            const sLower = (this.props.surveyId || '').toLowerCase();
+          } else if (!submitContext.isStandalone) {
+            const sLower = (submitContext.surveyId || '').toLowerCase();
             if (sLower) responseUrl = `/survey/${sLower}/${accountLower}${submittedCacheSlug ? `?session=${encodeURIComponent(submittedCacheSlug)}` : ''}`;
           }
         }
@@ -8335,7 +8359,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             surveyResponse: receipt?.__ceSurveyResponse,
             surveyId: receipt?.__ceSurveyId,
             submissionSlug: submittedCacheSlug,
-          }).catch((error) => {
+          }, submitContext).catch((error) => {
             surveyLog.warn('[SurveyQuestions] Local submit cache write-through failed:', error);
             return { questionCacheWritten: false, surveyCacheWritten: false };
           });
@@ -8348,17 +8372,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
             if (ids.length > 0) {
               await this.props.refreshQuestionResponses(ids, {
                 slug: submittedCacheSlug,
-                responder: this.props.account || '',
+                responder: submitContext.account || '',
               });
             }
           }
           if (
             !cacheWriteResult?.surveyCacheWritten &&
-            !this.props.singleQuestionMode &&
+            !submitContext.singleQuestionMode &&
             typeof this.props.refreshSurveyResponsesByID === 'function' &&
-            this.props.surveyId
+            submitContext.surveyId
           ) {
-            await this.props.refreshSurveyResponsesByID(this.props.surveyId);
+            await this.props.refreshSurveyResponsesByID(submitContext.surveyId);
           }
         } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
       });
@@ -8461,14 +8485,17 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     return true;
   };
 
-  submitSurveyResponse = async (overrideState = null, overrideChangedQids = null) => {
-    if (!this.props.loginComplete) {
+  submitSurveyResponse = async (overrideState = null, overrideChangedQids = null, submitContext = null) => {
+    const context = submitContext && typeof submitContext === 'object'
+      ? submitContext
+      : this.buildSubmitContextSnapshot();
+    if (!context.loginComplete) {
       this.props.toggleLoginModal(true);
       return;
     }
 
     // Use correct survey index for payload + diff gating
-    const idx = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
+    const idx = context.surveyIndex;
 
     const data = this.prepareJsonAndHash(idx, undefined, overrideState);
 
@@ -8496,9 +8523,9 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       filtered = filterChangedResponsesForSubmit({
         data,
         changedSet,
-        singleQuestionMode: !!this.props.singleQuestionMode,
-        isStandalone: !!this.props.isStandalone,
-        surveyId: this.props.surveyId,
+        singleQuestionMode: !!context.singleQuestionMode,
+        isStandalone: !!context.isStandalone,
+        surveyId: context.surveyId,
         HashZero: ethers.constants.HashZero,
       });
     } catch (e) {
@@ -8513,7 +8540,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     const submissionContext = this.resolveSubmissionGroupContext({
       questionIds,
-      surveyId: this.props.singleQuestionMode ? null : (this.props.surveyId || null),
+      surveyId: context.singleQuestionMode ? null : (context.surveyId || null),
+      fallbackSlug: context.effectiveDraftSlug,
     });
     if (!submissionContext.ok) {
       throw new Error(submissionContext.error);
@@ -8536,13 +8564,13 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
           questionResponses,
           changedMapForSubmit,
           encryptionBaseOpts: {
-            provider: this.props.provider,
-            account: this.props.account,
-            chainId: this.resolveSessionChainId(submissionGroupKey),
+            provider: context.provider,
+            account: context.account,
+            chainId: this.resolveSessionChainId(submissionGroupKey, null, context.props || this.props) || context.chainId,
             surveyId:
-              (this.props.singleQuestionMode || this.props.isStandalone)
+              (context.singleQuestionMode || context.isStandalone)
                 ? ethers.constants.HashZero
-                : this.props.surveyId,
+                : context.surveyId,
             kind: 'rating',
             hasher: this.state.hasher,
           },
@@ -8579,7 +8607,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     // Submit tx (must actually send or we throw)
     const tx = await contractScripts.submitResponses(
-      this.props.provider,
+      context.provider,
       hashedQuestionIds,
       questionResponses,
       hashedSurveyId,
@@ -8596,14 +8624,16 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
     });
   };
 
-  writeSubmittedResponsesToLocalCaches = async (params = {}) => {
+  writeSubmittedResponsesToLocalCaches = async (params = {}, submitContext = null) => {
+    const context = submitContext && typeof submitContext === 'object' ? submitContext : null;
+    const contextProps = context?.props || this.props;
     return writeSubmittedResponsesToLocalCachesHelper(params, {
-      account: this.props.account || '',
-      effectiveDraftSlug: this._getEffectiveDraftSlug() || '',
-      singleQuestionMode: !!this.props.singleQuestionMode,
-      isStandalone: !!this.props.isStandalone,
+      account: context?.account || this.props.account || '',
+      effectiveDraftSlug: context?.effectiveDraftSlug || this._getEffectiveDraftSlug() || '',
+      singleQuestionMode: context ? !!context.singleQuestionMode : !!this.props.singleQuestionMode,
+      isStandalone: context ? !!context.isStandalone : !!this.props.isStandalone,
       deepClone: (obj) => this.deepClone(obj),
-      resolveSubmittedCacheWriteContext: (slug) => resolveSubmittedCacheWriteContext(this.props, slug),
+      resolveSubmittedCacheWriteContext: (slug) => resolveSubmittedCacheWriteContext(contextProps, slug),
     });
   };
 
