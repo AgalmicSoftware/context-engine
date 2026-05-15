@@ -79,6 +79,7 @@ import {
   buildSbtListRootClassName,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
+  buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
   coerceSbtMintEndSeconds,
   dedupeNormalizedSbtListSlugs,

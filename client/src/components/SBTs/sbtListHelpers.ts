@@ -210,6 +210,29 @@ export type SbtCacheMetaSnapshot = {
   lastBlock: number;
   sbtCount: number;
 };
+export type SbtListLiveProgressSnapshot = SbtListHelperRecord & {
+  currentBlock?: unknown;
+  latestBlock?: unknown;
+  updatedAtMs?: unknown;
+};
+export type SbtListSessionProgressSnapshot = {
+  cacheMeta: SbtCacheMetaSnapshot | null;
+  cfg: SbtListHelperRecord | null;
+  deferred: boolean;
+  displayCurrentBlock: number;
+  hasCache: boolean;
+  hasLatest: boolean;
+  lastBlock: number;
+  latestForGroup: number | null;
+  liveCurrentBlock: number | null;
+  liveLatestBlock: number | null;
+  liveProgress: SbtListLiveProgressSnapshot | null;
+  remainingBlocks: number | null;
+  sbtCount: number;
+  scanInProgress: boolean;
+  slug: string;
+  startBlock: number | null;
+};
 export type SbtListSessionLoadingStatusSnapshot = {
   cfg?: SbtListHelperRecord | null;
   deferred?: boolean;
@@ -268,6 +291,20 @@ type BuildSbtListSessionChipStateBySlugArgs = {
   sbtListBySlug?: Record<string, unknown>;
   sessionHasLoadedOnceBySlug?: Record<string, unknown>;
   sessionLoadStateBySlug?: Record<string, unknown>;
+};
+type BuildSbtListSessionProgressSnapshotArgs = {
+  allSessionsMode?: unknown;
+  bridgeMs?: unknown;
+  bridgeTailBlocks?: unknown;
+  bridgedLiveProgress?: SbtListLiveProgressSnapshot | null;
+  cacheMeta?: SbtCacheMetaSnapshot | null;
+  cfg?: SbtListHelperRecord | null;
+  deferredRaw?: unknown;
+  latestBlock?: unknown;
+  liveProgressFromProps?: SbtListLiveProgressSnapshot | null;
+  recentLiveProgressNowMs?: unknown;
+  scanInProgressRaw?: unknown;
+  slug?: unknown;
 };
 type ResolveSbtListConcreteSessionBindingSlugOptions = {
   getSessionSlugByName?: (sessionName: string) => unknown;
@@ -530,6 +567,95 @@ export const buildSbtListSessionChipStateBySlug = ({
     out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
   });
   return out;
+};
+
+export const buildSbtListSessionProgressSnapshot = ({
+  allSessionsMode = false,
+  bridgeMs = 0,
+  bridgeTailBlocks = 0,
+  bridgedLiveProgress = null,
+  cacheMeta = null,
+  cfg = null,
+  deferredRaw = false,
+  latestBlock = 0,
+  liveProgressFromProps = null,
+  recentLiveProgressNowMs = 0,
+  scanInProgressRaw = false,
+  slug: slugIn = '',
+}: BuildSbtListSessionProgressSnapshotArgs = {}): SbtListSessionProgressSnapshot => {
+  const slug = normalizeSessionSlug(slugIn || '');
+  const lastBlock = Number(cacheMeta?.lastBlock || 0);
+  const sbtCount = Number(cacheMeta?.sbtCount || 0);
+  const hasCache = lastBlock > 0 || sbtCount > 0;
+  const bridgedAgeMs = bridgedLiveProgress
+    ? Math.max(0, Number(recentLiveProgressNowMs || 0) - Number(bridgedLiveProgress.updatedAtMs || 0))
+    : Number.POSITIVE_INFINITY;
+  const bridgedRemainingBlocks = Math.max(
+    0,
+    Number(bridgedLiveProgress?.latestBlock || 0) - Number(bridgedLiveProgress?.currentBlock || 0)
+  );
+  // Regression guard: after a scan completes, live progress can clear before the
+  // cache watermark catches up. Keep only a fresh tail bridge to avoid a false restart.
+  const liveProgress = liveProgressFromProps || (
+    !scanInProgressRaw &&
+    !deferredRaw &&
+    bridgedLiveProgress &&
+    bridgedAgeMs <= Number(bridgeMs || 0) &&
+    bridgedRemainingBlocks <= Number(bridgeTailBlocks || 0) &&
+    Number(bridgedLiveProgress.currentBlock || 0) > lastBlock
+      ? bridgedLiveProgress
+      : null
+  );
+  const liveCurrentCandidate = Number(liveProgress?.currentBlock || 0);
+  const liveCurrentBlock = Number.isFinite(liveCurrentCandidate) && liveCurrentCandidate > 0
+    ? liveCurrentCandidate
+    : null;
+  const liveLatestCandidate = Number(liveProgress?.latestBlock || 0);
+  const liveLatestBlock = Number.isFinite(liveLatestCandidate) && liveLatestCandidate > 0
+    ? liveLatestCandidate
+    : null;
+  const cfgRecord = (cfg && typeof cfg === 'object') ? cfg : null;
+  const blockLimits = (cfgRecord?.blockLimits && typeof cfgRecord.blockLimits === 'object')
+    ? cfgRecord.blockLimits as SbtListHelperRecord
+    : {};
+  const startRaw = Number(blockLimits.start);
+  const startBlock = Number.isFinite(startRaw) && startRaw > 0 ? startRaw : null;
+  const latestCandidate = Math.max(
+    Number(latestBlock || 0),
+    Number(liveLatestBlock || 0)
+  );
+  const latestForGroup = Number.isFinite(latestCandidate) && latestCandidate > 0
+    ? latestCandidate
+    : null;
+  const hasLatest = latestForGroup != null && latestForGroup > 0 && startBlock != null;
+  const currentBlockBaseline = liveCurrentBlock != null
+    ? Math.max(lastBlock, liveCurrentBlock)
+    : lastBlock;
+  const displayCurrentBlock = hasLatest
+    ? Math.max(Number(startBlock || 0), currentBlockBaseline)
+    : currentBlockBaseline;
+  const remainingBlocks = hasLatest ? Math.max(0, latestForGroup - displayCurrentBlock) : null;
+  const scanFlagNeedsAttention = !hasCache || !hasLatest || Number(remainingBlocks || 0) > 0;
+  const useRawScanFlags = !allSessionsMode || scanFlagNeedsAttention;
+
+  return {
+    slug,
+    cfg: cfgRecord,
+    cacheMeta,
+    lastBlock,
+    sbtCount,
+    hasCache,
+    liveProgress: liveProgress || null,
+    liveCurrentBlock,
+    liveLatestBlock,
+    startBlock,
+    latestForGroup,
+    hasLatest,
+    displayCurrentBlock,
+    remainingBlocks,
+    scanInProgress: !!scanInProgressRaw && useRawScanFlags,
+    deferred: !!deferredRaw && useRawScanFlags,
+  };
 };
 
 export const isSbtListHelperRecord = (value: unknown): value is SbtListHelperRecord => (
