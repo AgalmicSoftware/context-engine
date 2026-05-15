@@ -508,6 +508,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
   buildRehydrationUpdatePlan = buildLocalCacheRehydrationUpdatePlan,
   applyRehydrateMissEffects = applyLocalCacheRehydrateMissEffects,
   applyRehydrateUpdatePlan = applyLocalCacheRehydrateUpdatePlan,
+  isStaleRun = () => false,
 }: {
   props?: SurveyToolLikeProps | null;
   state?: SurveyToolLikeState | null;
@@ -534,6 +535,7 @@ export const executeSurveyLocalCacheRehydrate = async ({
   buildRehydrationUpdatePlan?: (args?: Record<string, unknown>) => { changed?: boolean; baselineChanged?: boolean; updates?: Record<string, unknown> };
   applyRehydrateMissEffects?: (args?: Record<string, unknown>) => void;
   applyRehydrateUpdatePlan?: (args?: Record<string, unknown>) => boolean;
+  isStaleRun?: () => boolean;
 } = {}) => {
   try {
     const nextProps = props || {};
@@ -567,6 +569,14 @@ export const executeSurveyLocalCacheRehydrate = async ({
     }
 
     const cacheSlice = await buildSliceFromLocalCache();
+    if (isStaleRun()) {
+      return {
+        reason: 'stale',
+        applied: false,
+        renderedQuestionIds,
+        hydrationSig: rehydrateRun.hydrationSig,
+      };
+    }
     if (!cacheSlice) {
       applyRehydrateMissEffects({
         clearHydrationSignature: () => {
