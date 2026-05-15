@@ -875,23 +875,10 @@ const readSignerChainId = async (signer: AnyRecord | null, ethersProvider: ether
   return 0;
 };
 
-const assertSignerOnRegistryWriteChain = async ({
-  signer,
-  ethersProvider = null,
-  chainId,
-}: {
-  signer: AnyRecord;
-  ethersProvider?: ethers.providers.Web3Provider | null;
-  chainId?: unknown;
-}) => {
+const assertSignerOnRegistryWriteChain = async ({ signer, chainId }) => {
   const writeChainId = Number(chainId || 0) || 0;
-  const signerChainId = await readSignerChainId(signer, ethersProvider);
-  if (writeChainId && !signerChainId) {
-    throw new Error(
-      `Unable to verify the connected wallet chain. Session registry writes require ${describeChainTarget(writeChainId)}. Switch the wallet network and retry.`,
-    );
-  }
-  if (writeChainId && signerChainId !== writeChainId) {
+  const signerChainId = await readSignerChainId(signer);
+  if (writeChainId && signerChainId && signerChainId !== writeChainId) {
     throw new Error(
       `Connected wallet is on ${describeChainTarget(signerChainId)}, but session registry writes require ${describeChainTarget(writeChainId)}. Switch the wallet network and retry.`,
     );
@@ -899,8 +886,8 @@ const assertSignerOnRegistryWriteChain = async ({
   return writeChainId;
 };
 
-const isArweaveTxId = (value: string) => /^[a-z0-9_-]{43}$/i.test(value);
-const isArweaveGatewayHost = (host: string) =>
+const isArweaveTxId = (value) => /^[a-z0-9_-]{43}$/i.test(value);
+const isArweaveGatewayHost = (host) =>
   host.endsWith('arweave.net') || host.endsWith('arweave.dev') || host.endsWith('arweave.app');
 
 const decodeBase64Utf8 = (raw = '') => {
@@ -1845,7 +1832,7 @@ export const registerSessionOnChain = async ({
   }
 
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
-  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, ethersProvider, chainId });
+  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, chainId });
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   const readContract: AnyRecord = getRegistryContract(writeChainId, null, { bootstrapRpc: true }) || contract;
 
@@ -2154,7 +2141,7 @@ export const setSessionFieldsOnChain = async ({
   }
   const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
-  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, ethersProvider, chainId });
+  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, chainId });
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   const txFeeOverrides = await resolveTxFeeOverrides({
     signer,
@@ -2255,7 +2242,7 @@ export const updateSessionMetadataOnChain = async ({
   }
   const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
-  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, ethersProvider, chainId });
+  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, chainId });
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   if (typeof contract.updateSessionMetadata !== 'function') {
     throw new Error('SessionRegistry does not support updateSessionMetadata.');
@@ -2313,7 +2300,7 @@ export const setResourceGatesOnChain = async ({
   }
   const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
-  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, ethersProvider, chainId });
+  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, chainId });
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   const txFeeOverrides = await resolveTxFeeOverrides({
     signer,
