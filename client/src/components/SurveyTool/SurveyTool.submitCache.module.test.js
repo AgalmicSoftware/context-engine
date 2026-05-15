@@ -940,16 +940,19 @@ describe('SurveyTool submit cache writes', () => {
     });
     subject.clearDraftFor = jest.fn();
     subject.invalidateDiffCaches = jest.fn();
-    subject.prepareJsonAndHash = jest.fn(() => ({
-      responder: '0xabc',
-      responses: [
-        {
-          questionID: 'q1',
-          answer: { value: '*', encrypted: true, encryptedPortion: 'answer-env' },
-          additional: { value: '*', encrypted: true, encryptedPortion: 'additional-env' },
-        },
-      ],
-    }));
+    subject.prepareJsonAndHash = jest.fn((surveyIndex, responderAddress, overrideState = null) => {
+      const sourceSlice = overrideState || subject.state.surveysResponseState[surveyIndex];
+      return ({
+        responder: '0xabc',
+        responses: [
+          {
+            questionID: 'q1',
+            answer: sourceSlice.answers.q1,
+            additional: sourceSlice.additionalComments.q1,
+          },
+        ],
+      });
+    });
     subject.state = {
       ...subject.state,
       surveysResponseState: [{
@@ -1036,6 +1039,30 @@ describe('SurveyTool submit cache writes', () => {
       }),
     );
     expect(subject.submitSurveyResponse.mock.calls[0][1]).toEqual(new Set(['q1']));
+    expect(subject.prepareJsonAndHash).toHaveBeenCalledWith(
+      0,
+      undefined,
+      expect.objectContaining({
+        answers: expect.objectContaining({
+          q1: expect.objectContaining({ encryptedPortion: 'answer-env' }),
+        }),
+        additionalComments: expect.objectContaining({
+          q1: expect.objectContaining({ encryptedPortion: 'additional-env' }),
+        }),
+      }),
+    );
+    expect(deferredStatePatches).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        userAnswers: expect.objectContaining({
+          responses: [
+            expect.objectContaining({
+              answer: expect.objectContaining({ encryptedPortion: 'answer-env' }),
+              additional: expect.objectContaining({ encryptedPortion: 'additional-env' }),
+            }),
+          ],
+        }),
+      }),
+    ]));
     expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalledWith(expect.objectContaining({
       receipt: expect.objectContaining({ status: 1, blockNumber: 77 }),
     }), expect.objectContaining({
