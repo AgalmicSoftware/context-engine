@@ -2754,7 +2754,7 @@ class CreateSBTGroup extends Component<any, any> {
         scopeLabel: 'image',
       });
       if (imageEncryption && imageEncryption.recipients.length) {
-        if (!useImageUrl && sbtImageFile && lockedImageAsset?.txId && lockedImageAsset?.url) {
+        if (!useImageUrl && sbtImageFile && lockedImageAsset?.txId) {
           finalImageUrl = '';
           encryptedFields.image = lockedImageAsset;
           markEncryptedField('image', selectedImageGateIds);
