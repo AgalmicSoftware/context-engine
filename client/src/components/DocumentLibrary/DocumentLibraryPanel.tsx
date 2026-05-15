@@ -685,59 +685,7 @@ export default function DocumentLibraryPanel({
   const [viewerMime, setViewerMime] = useState('');
 
   const autoOpenedRef = useRef('');
-  const autoOpeningRef = useRef('');
   const viewerRequestSeqRef = useRef(0);
-  const viewerContextKey = useMemo(() => ([
-    panelContextKey,
-    toStr(account).trim().toLowerCase(),
-    String(network?.id || ''),
-    loginComplete ? '1' : '0',
-    docAsyncConfigKey,
-  ].join('|')), [account, docAsyncConfigKey, loginComplete, network?.id, panelContextKey]);
-  const activeViewerContextKeyRef = useRef(viewerContextKey);
-  activeViewerContextKeyRef.current = viewerContextKey;
-  const activeUploadContextKeyRef = useRef(viewerContextKey);
-  activeUploadContextKeyRef.current = viewerContextKey;
-  const activeFileRef = useRef<File | null>(file);
-  activeFileRef.current = file;
-  const activeUrlInputRef = useRef(urlInput);
-  activeUrlInputRef.current = urlInput;
-  const activeUrlTitleRef = useRef(urlTitle);
-  activeUrlTitleRef.current = urlTitle;
-  const fileUploadInFlightRef = useRef(false);
-  const urlUploadInFlightRef = useRef(false);
-  const fileUploadAttemptSeqRef = useRef(0);
-  const urlUploadAttemptSeqRef = useRef(0);
-
-  useEffect(() => () => {
-    viewerRequestSeqRef.current += 1;
-    listRequestSeqRef.current += 1;
-    fileUploadAttemptSeqRef.current += 1;
-    urlUploadAttemptSeqRef.current += 1;
-    activeListQueryKeyRef.current = '__unmounted__';
-    activeViewerContextKeyRef.current = '__unmounted__';
-    activeUploadContextKeyRef.current = '__unmounted__';
-    loadingRef.current = false;
-    fileUploadInFlightRef.current = false;
-    urlUploadInFlightRef.current = false;
-  }, []);
-
-  useEffect(() => {
-    viewerRequestSeqRef.current += 1;
-    fileUploadAttemptSeqRef.current += 1;
-    urlUploadAttemptSeqRef.current += 1;
-    setViewerOpen(false);
-    setViewerLoading(false);
-    setViewerError('');
-    setViewerTitle('');
-    setViewerText('');
-    setViewerBlobUrl('');
-    setViewerMime('');
-    fileUploadInFlightRef.current = false;
-    urlUploadInFlightRef.current = false;
-    setFileUploadPending(false);
-    setUrlUploadPending(false);
-  }, [viewerContextKey]);
 
   useEffect(() => {
     return () => {
@@ -913,14 +861,10 @@ export default function DocumentLibraryPanel({
 
   const openDoc = useCallback(async (doc: OpenableDoc): Promise<boolean> => {
     const txId = toStr(doc?.txId).trim();
-    if (!txId) return false;
+    if (!txId) return;
     const requestSeq = viewerRequestSeqRef.current + 1;
     viewerRequestSeqRef.current = requestSeq;
-    const viewerContextAtStart = activeViewerContextKeyRef.current;
-    const isCurrentViewerRequest = () => (
-      viewerRequestSeqRef.current === requestSeq &&
-      activeViewerContextKeyRef.current === viewerContextAtStart
-    );
+    const isCurrentViewerRequest = () => viewerRequestSeqRef.current === requestSeq;
     const revokeStaleBlobUrl = (blobUrl: string) => {
       if (!blobUrl || typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
       try { URL.revokeObjectURL(blobUrl); } catch (e) { log.warn('DocumentLibraryPanel: stale blob cleanup', e); }
@@ -971,24 +915,26 @@ export default function DocumentLibraryPanel({
           sessionConfig,
           context: { account, providerLike: provider, chainId: network?.id || null },
         });
-        if (!isCurrentViewerRequest()) return false;
+        if (!isCurrentViewerRequest()) return;
         const blob = await response.blob();
-        if (!isCurrentViewerRequest()) return false;
+        if (!isCurrentViewerRequest()) return;
         const mime = toStr(response.headers.get('content-type') || blob.type || storageRef?.contentType || '').trim();
         if (kind === 'link' || isTextLikeMime(mime)) {
           const text = await blob.text();
-          return applyTextViewerState({
+          applyTextViewerState({
             title: toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : 'Document'),
             mime: mime || (kind === 'link' ? 'application/json' : 'text/plain'),
             text: text || '',
           });
+          return;
         }
         const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-        return applyBlobViewerState({
+        applyBlobViewerState({
           title: toStr(tagMap['CE-DocName']).trim() || 'Document',
           mime,
           blobUrl,
         });
+        return;
       }
 
       if (isEncrypted) {
@@ -1013,28 +959,30 @@ export default function DocumentLibraryPanel({
             },
           },
         });
-        if (!isCurrentViewerRequest()) return false;
+        if (!isCurrentViewerRequest()) return;
 
         const name = toStr(payload?.name || '').trim() || (kind === 'link' ? 'Encrypted link' : 'Encrypted document');
         const mime = toStr(payload?.mime || '').trim();
         const text = litStorage.decodeLitPayloadToText(payload);
         if (text) {
-          return applyTextViewerState({
+          applyTextViewerState({
             title: name,
             mime: mime || 'text/plain',
             text,
           });
+          return;
         }
         const blob = litStorage.decodeLitPayloadToBlob(payload);
         if (!blob) {
           throw new Error('Unable to decode encrypted document.');
         }
         const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-        return applyBlobViewerState({
+        applyBlobViewerState({
           title: name,
           mime: blob.type || mime || '',
           blobUrl,
         });
+        return;
       }
 
       if (kind === 'link') {
@@ -1046,35 +994,36 @@ export default function DocumentLibraryPanel({
             chainId: Number(network?.id || 0) || null,
           },
         });
-        return applyTextViewerState({
+        applyTextViewerState({
           title: toStr(tagMap['CE-DocName']).trim() || 'Link record',
           mime: 'application/json',
           text: text || '',
         });
+        return;
       }
 
-      const res = await fetchArweaveBlobWithFallback(txId, { isCurrent: isCurrentViewerRequest });
-      if (!isCurrentViewerRequest()) return false;
-      if (!res.ok && res.stale) return false;
+      const res = await fetchArweaveBlobWithFallback(txId);
+      if (!isCurrentViewerRequest()) return;
       if (!res.ok) throw new Error(res.error || 'Failed to fetch document.');
       const blob = res.blob;
       const mime = toStr(res.contentType || blob.type || '').trim();
       if (isTextLikeMime(mime)) {
         const text = await blob.text();
-        return applyTextViewerState({
+        applyTextViewerState({
           title: toStr(tagMap['CE-DocName']).trim() || 'Document',
           mime: mime || 'text/plain',
           text: text || '',
         });
+        return;
       }
       const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-      return applyBlobViewerState({
+      applyBlobViewerState({
         title: toStr(tagMap['CE-DocName']).trim() || 'Document',
         mime,
         blobUrl,
       });
     } catch (err) {
-      if (!isCurrentViewerRequest()) return false;
+      if (!isCurrentViewerRequest()) return;
       setViewerLoading(false);
       setViewerError(getErrorMessage(err, 'Failed to open document.'));
       setViewerTitle('Error');

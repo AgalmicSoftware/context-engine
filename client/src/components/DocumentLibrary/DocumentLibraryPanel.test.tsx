@@ -1,21 +1,5 @@
-import {
-  React,
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  E2E_TESTIDS,
-  mockBuildSbtAccessControlConditions,
-  mockGetGlobalLitHooks,
-  mockGetUnsupportedLitContractAccessControlError,
-  mockListArweaveTransactionsByTags,
-  mockResolveDocUploadsGate,
-  mockUploadDocLibraryFile,
-  DocumentLibraryPanel,
-  TEST_SESSION_CONFIG,
-  setupDocumentLibraryPanelTestLifecycle,
-} from './DocumentLibraryPanel.testUtils';
+import React from 'react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -28,6 +12,16 @@ const mockResolveDocUploadsGate = jest.fn();
 const mockUploadDocLibraryFile = jest.fn();
 const mockUploadDocLibraryUrlRecord = jest.fn();
 const mockSBTSelector = jest.fn();
+
+const createDeferred = <T,>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: any) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
 
 jest.mock('../../utilities/logging.js', () => ({
   createLogger: () => ({
@@ -406,6 +400,88 @@ describe('DocumentLibraryPanel photo docs', () => {
     });
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_IMAGE)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER_DOWNLOAD)).toBeInTheDocument();
+  });
+
+  it('keeps late document open requests from replacing the current viewer', async () => {
+    const slowTxId = 'S'.repeat(43);
+    const fastTxId = 'F'.repeat(43);
+    const slowFetch = createDeferred<any>();
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (String(url).includes(slowTxId)) return slowFetch.promise;
+      if (String(url).includes(fastTxId)) {
+        return Promise.resolve({
+          ok: true,
+          blob: async () => ({ type: 'text/plain', text: async () => 'fast document' }),
+          headers: { get: (name: string) => (name === 'content-type' ? 'text/plain' : null) },
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+    });
+    mockListArweaveTransactionsByTags.mockResolvedValueOnce([
+      {
+        cursor: 'cursor-slow',
+        txId: slowTxId,
+        owner: 'owner',
+        tags: [],
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'slow.txt',
+          'CE-DocMime': 'text/plain',
+        },
+        data: { size: 4, type: 'text/plain' },
+        block: { height: 1, timestamp: 1710000002 },
+      },
+      {
+        cursor: 'cursor-fast',
+        txId: fastTxId,
+        owner: 'owner',
+        tags: [],
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'fast.txt',
+          'CE-DocMime': 'text/plain',
+        },
+        data: { size: 4, type: 'text/plain' },
+        block: { height: 2, timestamp: 1710000003 },
+      },
+    ]);
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'2'.repeat(32)}`}
+      />
+    );
+
+    const rows = await screen.findAllByTestId(E2E_TESTIDS.DOC_ROW);
+    const slowRow = rows.find((row) => row.getAttribute('data-ce-doc-txid') === slowTxId);
+    const fastRow = rows.find((row) => row.getAttribute('data-ce-doc-txid') === fastTxId);
+    if (!slowRow || !fastRow) throw new Error('Expected slow and fast document rows.');
+
+    fireEvent.click(within(slowRow).getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
+    fireEvent.click(within(fastRow).getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
+
+    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('fast document');
+
+    slowFetch.resolve({
+      ok: true,
+      blob: async () => ({ type: 'text/plain', text: async () => 'slow document' }),
+      headers: { get: (name: string) => (name === 'content-type' ? 'text/plain' : null) },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('fast document');
+    });
+    expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).not.toHaveTextContent('slow document');
   });
 
   it('renders image thumbnails directly in the document list', async () => {
