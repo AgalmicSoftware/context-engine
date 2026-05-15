@@ -17,6 +17,10 @@
   "overrides": {
     "@ethersproject/providers": {
       "ws": "7.5.10"
+    },
+    "elliptic": {
+      ".": "6.6.1",
+      "bn.js": "4.12.3"
     }
   }
 }
