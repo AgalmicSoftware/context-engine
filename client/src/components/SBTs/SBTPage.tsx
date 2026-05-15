@@ -1152,6 +1152,9 @@ class SBTPage extends Component<any, any> {
         : this.getEffectiveSessionSlug();
       mintAccountLower = String(this.props.account || '').trim().toLowerCase();
 
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        return { ok: false, error: new Error('Mint context changed before send.') };
+      }
       if (this._isMounted) this.setState(buildSbtPageMintPendingPatch({ clearError: true }));
       const tx = await contractScripts.claimWithInvite(
         this.props.provider,
@@ -2878,6 +2881,11 @@ class SBTPage extends Component<any, any> {
         ? String(options.sessionSlugOverride || '')
         : this.getEffectiveSessionSlug();
       mintAccountLower = String(this.props.account || '').trim().toLowerCase();
+      const mintAccount = this.props.account;
+
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
 
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
       const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
@@ -2904,17 +2912,23 @@ class SBTPage extends Component<any, any> {
         return false;
       }
 
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
       this.setState(buildSbtPageMintPendingPatch());
 
       sbtLog.log('[MANUAL-MINT] Signing authorization...');
       const sig = await contractScripts.signGroupMintAuthorization({
         password,
         sbtAddress: sbt,
-        userAddress: this.props.account,
+        userAddress: mintAccount,
         walletScopeSbtAddress,
       });
       sbtLog.log('[MANUAL-MINT] Signature:', sig);
 
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
       const tx = await contractScripts.mintWithGroupSignature(this.props.provider, sbt, sig);
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
@@ -2962,6 +2976,11 @@ class SBTPage extends Component<any, any> {
       ? String(options.sessionSlugOverride || '')
       : this.getEffectiveSessionSlug();
     const mintAccountLower = String(this.props.account || '').trim().toLowerCase();
+    const mintAccount = this.props.account;
+
+    if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+      return false;
+    }
 
     try {
       if (sbtInfo.hasPasswordMint) {
@@ -2992,11 +3011,14 @@ class SBTPage extends Component<any, any> {
             sbtLog.warn('[SBTPage] Password pre-validation call failed, proceeding with mint:', preCheckErr);
           }
 
+          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+            return false;
+          }
           if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
 
           const userCommit = ethers.utils.solidityKeccak256(
             ["string", "address"],
-            [effectivePassword, this.props.account]
+            [effectivePassword, mintAccount]
           );
 
           const tx = await contractScripts.startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
@@ -3012,6 +3034,9 @@ class SBTPage extends Component<any, any> {
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
           return true;
         } else if (mintStep === 2) {
+          if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+            return false;
+          }
           if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
           const tx = await contractScripts.claimWithPassword(this.props.provider, sbtAddressOriginalCase, effectivePassword);
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
@@ -3027,6 +3052,9 @@ class SBTPage extends Component<any, any> {
           return true;
         }
       } else {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+          return false;
+        }
         if (this._isMounted) this.setState(buildSbtPageMintPendingPatch());
         const tx = await contractScripts.claim(this.props.provider, sbtAddressOriginalCase);
         this.cacheTransactionHash(tx.transactionHash, mintAccountLower);

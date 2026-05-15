@@ -162,6 +162,31 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
     });
   });
 
+  it('backfills registry-chain RPC maps for split worker payloads', () => {
+    const payload = buildWorkerSessionConfigPayload({
+      sessionConfig: {
+        slug: 'split-rpc-missing-registry-map',
+        networkChainId: 8453,
+        __registry: {
+          registryChainId: 84532,
+          address: '0x1111111111111111111111111111111111111111',
+          adminAddress: ACCOUNT,
+        },
+        rpcUrlsByChainId: {
+          8453: ['https://session-chain.example'],
+        },
+      },
+      account: ACCOUNT,
+      fallbackChainId: 84532,
+    });
+
+    expect(payload.rpcUrl).toBe('https://session-chain.example');
+    expect(payload.rpcUrlsByChainId).toEqual({
+      8453: ['https://session-chain.example'],
+      84532: [getDefaultHttpRpc(84532)],
+    });
+  });
+
   it('preserves worker session config payload field normalization', () => {
     const payload = buildWorkerSessionConfigPayload({
       sessionConfig: {
