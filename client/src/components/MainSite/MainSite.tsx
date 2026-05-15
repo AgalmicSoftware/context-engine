@@ -2,7 +2,7 @@
 
 import React, { Component, Suspense } from "react";
 import { connect } from 'react-redux';
-import { fetchAccount } from '../../actions/accountActions.js';
+import { changeAccount, fetchAccount } from '../../actions/accountActions.js';
 import {
   fetchSessionState,
   changeFocusedTab,
@@ -6532,12 +6532,15 @@ const mapStateToProps = (state: RootState) => ({
 
 const MainSiteWithWagmiHooks = WagmiHooksHOC(MainSite);
 
-export default connect(mapStateToProps, {
+export const mainSiteDispatchActions = {
   fetchAccount,
+  changeAccount,
   fetchSessionState,
   changeFocusedTab,
   toggleLoginModal,
   updateLoginInfo,
   toggleDemoMode,
   changeActiveSessionSlug
-})(MainSiteWithWagmiHooks) as unknown as React.ComponentType<Record<string, unknown>>;
+};
+
+export default connect(mapStateToProps, mainSiteDispatchActions)(MainSiteWithWagmiHooks) as unknown as React.ComponentType<Record<string, unknown>>;

@@ -13,6 +13,7 @@ export type MainSiteLitHooksLike = MainSiteRecord & {
 export type MainSiteProps = {
   fetchSessionState: MainSiteCallback;
   fetchAccount: MainSiteCallback;
+  changeAccount: MainSiteCallback;
   changeFocusedTab: MainSiteCallback;
   toggleLoginModal: MainSiteCallback;
   updateLoginInfo: MainSiteCallback;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { MainSite } from './MainSite';
+import { MainSite, mainSiteDispatchActions } from './MainSite';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
@@ -40,7 +40,7 @@ const restoreSessionScanGlobals = () => {
 };
 
 jest.mock('react-redux', () => ({
-  connect: () => (Comp) => Comp,
+  connect: jest.fn((_mapStateToProps, _mapDispatchToProps) => (Comp) => Comp),
 }));
 
 jest.mock('../HooksHOC/withWagmiBridge', () => ({
@@ -339,6 +339,7 @@ const SESSION_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const buildProps = (overrides = {}) => ({
   fetchSessionState: jest.fn(),
   fetchAccount: jest.fn(),
+  changeAccount: jest.fn(),
   changeFocusedTab: jest.fn(),
   toggleLoginModal: jest.fn(),
   updateLoginInfo: jest.fn(),
@@ -489,6 +490,15 @@ const createSubject = ({
   };
   return subject;
 };
+
+describe('MainSite connected export wiring', () => {
+  it('wires changeAccount into the connected MainSite export for wagmi hydration', () => {
+    expect(mainSiteDispatchActions).toEqual(expect.objectContaining({
+      changeAccount: expect.any(Function),
+      updateLoginInfo: expect.any(Function),
+    }));
+  });
+});
 
 describe('MainSite route render smoke', () => {
   const originalPublicUrl = process.env.PUBLIC_URL;
