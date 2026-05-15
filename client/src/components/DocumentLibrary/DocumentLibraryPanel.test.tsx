@@ -145,6 +145,7 @@ describe('DocumentLibraryPanel photo docs', () => {
     delete (global as any).fetch;
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
+    window.history.replaceState({}, '', '/');
   });
 
   it('labels saved photo docs and paired photo analysis sidecars in the browse list', async () => {
@@ -630,6 +631,77 @@ describe('DocumentLibraryPanel photo docs', () => {
     });
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('cloud text');
     expect(JSON.stringify(mockReadSessionStorageBlob.mock.calls[0][0].storageRef)).not.toMatch(/bucket|account|token|secret|r2:\/\//i);
+  });
+
+  it('auto-opens Cloudflare viewer links through session storage refs', async () => {
+    mockReadSessionStorageBlob.mockResolvedValueOnce({
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
+      blob: async () => ({ type: 'text/plain', text: async () => 'cloud auto text' }),
+    });
+    window.history.replaceState(
+      {},
+      '',
+      '/session/edge/docs?__ceDocTx=cf_docopaque1&__ceDocStorage=cloudflare&__ceDocKind=file&__ceDocName=Cloud%20auto'
+    );
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
+        mode="session"
+        sessionIdHex={`0x${'7'.repeat(32)}`}
+      />
+    );
+
+    await waitFor(() => {
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_docopaque1' }),
+      }));
+    });
+    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('cloud auto text');
+  });
+
+  it('auto-opens self-recipient Lit-Arweave viewer links without scoped getKey hooks', async () => {
+    const litStorage = require('../../utilities/crypto/litProtocol.js').litStorage;
+    const txId = 'F'.repeat(43);
+    litStorage.downloadEncryptedArweaveData.mockResolvedValueOnce({
+      payload: { name: 'Encrypted auto', mime: 'text/plain', text: 'lit auto text' },
+    });
+    litStorage.decodeLitPayloadToText.mockReturnValueOnce('lit auto text');
+    window.history.replaceState(
+      {},
+      '',
+      `/session/edge/docs?__ceDocTx=${txId}&__ceDocStorage=lit-arweave&__ceDocKind=file&__ceDocName=Encrypted%20auto`
+    );
+
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'8'.repeat(32)}`}
+      />
+    );
+
+    await waitFor(() => {
+      expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(expect.objectContaining({
+        url: `https://lit.example.test/${txId}`,
+        providerLike: {},
+        account: '0x123',
+      }));
+    });
+    expect(litStorage.downloadEncryptedArweaveData.mock.calls[0][0]).not.toHaveProperty('lit');
+    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('lit auto text');
   });
 
   it('requires encrypted uploads for lit-arweave session document storage', async () => {

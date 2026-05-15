@@ -358,6 +358,11 @@ const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is Stor
   return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
 };
 
+const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is StorageRef => {
+  if (!storageRef?.id) return false;
+  return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
+};
+
 const buildSessionListFilters = (sessionIdHex: string): ListFilter[] => ([
   { name: 'CE-DocLibrary', values: ['1'] },
   { name: 'CE-SessionId', values: [normalizeSessionIdHex(sessionIdHex)] },
@@ -1042,13 +1047,8 @@ export default function DocumentLibraryPanel({
     const wantsEncrypted = storage === 'lit-arweave' || storage === 'lit';
     if (wantsEncrypted && (!loginComplete || !toStr(account).trim() || !provider)) return;
 
-    let cancelled = false;
-    autoOpeningRef.current = key;
-    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef })
-      .then((opened) => {
-        if (autoOpeningRef.current === key) autoOpeningRef.current = '';
-        if (cancelled || !opened) return;
-        autoOpenedRef.current = key;
+    autoOpenedRef.current = key;
+    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef });
 
         // Clear params so refresh/back doesn't re-open repeatedly.
         try {
@@ -1063,11 +1063,8 @@ export default function DocumentLibraryPanel({
         if (autoOpeningRef.current === key) autoOpeningRef.current = '';
         log.warn('DocumentLibraryPanel: auto-open failed', error);
       });
-
-    return () => {
-      cancelled = true;
-      if (autoOpeningRef.current === key) autoOpeningRef.current = '';
-    };
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
   }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
 
   const addCustomSbt = useCallback((sbt: CustomSbtEntry) => {
