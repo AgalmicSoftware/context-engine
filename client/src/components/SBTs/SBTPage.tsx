@@ -928,6 +928,13 @@ class SBTPage extends Component<any, any> {
     // from the original intent even if routing props change during metadata awaits.
     const targetSlug = this.getEffectiveSessionSlug();
     const targetAccountLower = String(this.props.account || '').trim().toLowerCase();
+    const isUrlAutoMintTargetCurrent = () => this.isMintTargetContextCurrent({
+      accountLower: targetAccountLower,
+      sbtAddress: currentSbtAddress,
+      sessionSlug: targetSlug,
+    });
+
+    if (!isUrlAutoMintTargetCurrent()) return false;
 
     if (!targetCode) {
       const minted = await this.autoMintPublicIfAllowed(currentSbtAddress, {
@@ -3130,7 +3137,7 @@ class SBTPage extends Component<any, any> {
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
       const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
-      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
         return false;
       }
       if (!onchain || onchain === ethers.constants.HashZero) {
@@ -3151,7 +3158,7 @@ class SBTPage extends Component<any, any> {
       });
       if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
         sbtLog.error('[MANUAL-MINT] Sanity check FAILED', { expected: onchain, computed: local });
-        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbt, sessionSlug: slug })) {
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
           return false;
         }
         this.setState(buildSbtPageErrorPatch({ error: 'Incorrect group password.' }));
@@ -3254,7 +3261,7 @@ class SBTPage extends Component<any, any> {
               slug
             );
             if (!isValid) {
-              if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, chainId: mintChainId, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+              if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
                 return false;
               }
               if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid password.' }));

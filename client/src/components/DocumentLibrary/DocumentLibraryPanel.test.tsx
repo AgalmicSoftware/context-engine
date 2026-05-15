@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -350,6 +350,64 @@ describe('DocumentLibraryPanel photo docs', () => {
         }),
       }));
     });
+  });
+
+  it('does not prepend completed uploads after the panel context changes', async () => {
+    const slowUpload = createDeferred<any>();
+    mockUploadDocLibraryFile.mockReturnValueOnce(slowUpload.promise);
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge-a',
+      sessionConfig: TEST_SESSION_CONFIG,
+      mode: 'session',
+      sessionIdHex: `0x${'a'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+
+    const file = new File(['old context'], 'old-context.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
+        file,
+        sessionSlug: 'edge-a',
+      }));
+    });
+
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        sessionSlug="edge-b"
+        sessionIdHex={`0x${'b'.repeat(32)}`}
+      />
+    );
+
+    await act(async () => {
+      slowUpload.resolve({
+        txId: 'O'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'old-context.txt',
+        },
+        data: { size: 11, type: 'text/plain' },
+      });
+      await slowUpload.promise;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByText('old-context.txt')).not.toBeInTheDocument();
   });
 
   it('keeps image documents previewable and downloadable in the viewer', async () => {

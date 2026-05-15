@@ -6159,6 +6159,7 @@ export class SurveyQuestions extends Component {
       areQuestionPayloadsEquivalent,
       writeQuestionsCache,
     });
+    if (isStaleRun()) return;
 
     if (cacheBootstrapResult.status === 'seeded-from-recent') {
       const {
@@ -6302,9 +6303,16 @@ export class SurveyQuestions extends Component {
           this.props.provider,
           questionId,
           candidateSlug,
-          { decryptContext: this.buildQuestionDecryptContext(candidateSlug) }
-        )
-      ).catch(() => null);
+          this.buildAutomaticQuestionMetadataFetchOptions(candidateSlug)
+        ),
+      }),
+      pickBetterQuestionPayload,
+      areQuestionPayloadsEquivalent,
+      normalizeSingleQuestionMetadataForCache,
+      resolveCacheState: getCacheStateForSlug,
+      writeQuestionsCache,
+    });
+    if (isStaleRun()) return;
 
       return new Promise((resolve) => {
         let settled = false;
@@ -6456,6 +6464,7 @@ export class SurveyQuestions extends Component {
       qData = normalizedForCache;
     }
 
+    if (isStaleRun()) return;
     if (!hasPendingRetryForQuestion || bootstrapRetryAttempt > 0) {
       this.clearSingleQuestionBootstrapRetry();
     }

@@ -225,6 +225,77 @@ describe('SBTPage auto-mint routing', () => {
     expect(claimSpy).not.toHaveBeenCalled();
   });
 
+  it('does not write password auto-mint metadata after the route target changes during hydration', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000118';
+    const nextSbtAddress = '0x0000000000000000000000000000000000000119';
+    const previousHref = window.location.href;
+    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&gp=claim-code&auto=1`);
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        account: '0x0000000000000000000000000000000000000abc',
+        loginComplete: true,
+        sessionSlug: 'edge',
+      });
+      subject.state = {
+        ...subject.state,
+        sbtInfo: null,
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      jest.spyOn(contractScripts, 'getSbtMetadata').mockImplementation(async () => {
+        subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
+        return { hasPasswordMint: true };
+      });
+      const claimSpy = jest.spyOn(subject, 'claimWithGroupPassword').mockResolvedValue(true);
+
+      const result = await subject.handleUrlAutoMintIntent();
+
+      expect(result).toBe(false);
+      expect(subject.state.sbtInfo).toBeNull();
+      expect(claimSpy).not.toHaveBeenCalled();
+      expect(subject.state.mintingStatus).toBe('idle');
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
+  it('does not write invite-code errors after URL group hash lookup becomes stale', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000120';
+    const nextSbtAddress = '0x0000000000000000000000000000000000000121';
+    const previousHref = window.location.href;
+    window.history.replaceState({}, '', `${buildSbtDetailPath(sbtAddress, { sessionSlug: 'edge' })}?sbt=${encodeURIComponent(sbtAddress)}&gp=claim-code&auto=1`);
+
+    try {
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        account: '0x0000000000000000000000000000000000000abc',
+        loginComplete: true,
+        sessionSlug: 'edge',
+      });
+      subject.state = {
+        ...subject.state,
+        error: null,
+        sbtInfo: { hasPasswordMint: false },
+        userHasSBT: false,
+        mintingStatus: 'idle',
+      };
+      jest.spyOn(contractScripts, 'getGroupPasswordHash').mockImplementation(async () => {
+        subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
+        return '0x0000000000000000000000000000000000000000000000000000000000000000';
+      });
+
+      const result = await subject.handleUrlAutoMintIntent();
+
+      expect(result).toBe(false);
+      expect(subject.state.error).toBeNull();
+      expect(subject.state.mintingStatus).toBe('idle');
+    } finally {
+      window.history.replaceState({}, '', previousHref);
+    }
+  });
+
   it('does not send group-password URL auto-mints after the route target changes before mint', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000110';
     const nextSbtAddress = '0x0000000000000000000000000000000000000111';
@@ -444,6 +515,77 @@ describe('SBTPage auto-mint routing', () => {
     expect(subject.state.manualPasswordInput).toBe('');
     expect(subject.state.showMiniPasswordInput).toBe(false);
     expect(subject.loadSBTInfo).toHaveBeenCalled();
+  });
+
+  it('does not write unlimited group-password errors after hash lookup becomes stale', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000122';
+    const nextSbtAddress = '0x0000000000000000000000000000000000000123';
+    const account = '0x0000000000000000000000000000000000000abc';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      error: null,
+      groupPasswordInput: 'claim-code',
+      mintingStatus: 'idle',
+    };
+    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockImplementation(async () => {
+      subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
+      return '0x0000000000000000000000000000000000000000000000000000000000000000';
+    });
+    const signSpy = jest.spyOn(contractScripts, 'signGroupMintAuthorization').mockResolvedValue('0xsig');
+
+    const result = await subject.mintUnlimitedWithGroupPassword({
+      accountLowerOverride: account,
+      passwordOverride: 'claim-code',
+      sbtAddressOverride: sbtAddress,
+      sessionSlugOverride: 'edge',
+    });
+
+    expect(result).toBe(false);
+    expect(subject.state.error).toBeNull();
+    expect(signSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not write password prevalidation errors after the mint target changes', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000124';
+    const nextSbtAddress = '0x0000000000000000000000000000000000000125';
+    const account = '0x0000000000000000000000000000000000000abc';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      error: null,
+      manualPasswordInput: 'claim-code',
+      mintStep: 0,
+      mintingStatus: 'idle',
+      sbtInfo: { hasPasswordMint: true },
+    };
+    jest.spyOn(contractScripts, 'isPasswordValid').mockImplementation(async () => {
+      subject.props = { ...subject.props, SBTAddress: nextSbtAddress, sessionSlug: 'next' };
+      return false;
+    });
+    const startClaimSpy = jest.spyOn(contractScripts, 'startClaim').mockResolvedValue({ transactionHash: '0xstart' });
+
+    const result = await subject.handleMint(true, {
+      accountLowerOverride: account,
+      sbtAddressOverride: sbtAddress,
+      sessionSlugOverride: 'edge',
+      sbtInfoOverride: { hasPasswordMint: true },
+    });
+
+    expect(result).toBe(false);
+    expect(subject.state.error).toBeNull();
+    expect(subject.state.mintingStatus).toBe('idle');
+    expect(startClaimSpy).not.toHaveBeenCalled();
   });
 
   it('routes invite auto-mint URLs to invite claiming on the dedicated page', async () => {

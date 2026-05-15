@@ -698,6 +698,8 @@ export default function DocumentLibraryPanel({
     String(network?.id || ''),
     loginComplete ? '1' : '0',
   ].join('|')), [account, loginComplete, network?.id, panelContextKey]);
+  const activeUploadContextKeyRef = useRef(viewerContextKey);
+  activeUploadContextKeyRef.current = viewerContextKey;
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
@@ -1257,13 +1259,7 @@ export default function DocumentLibraryPanel({
     }
 
     const uploadContextKey = activeUploadContextKeyRef.current;
-    const uploadAttemptSeq = (fileUploadAttemptSeqRef.current += 1);
-    const submittedFile = file;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
-    const isCurrentUploadAttemptSeq = () => fileUploadAttemptSeqRef.current === uploadAttemptSeq;
-    const isCurrentUploadAttempt = () => isCurrentUploadContext() && activeFileRef.current === submittedFile;
-    fileUploadInFlightRef.current = true;
-    setFileUploadPending(true);
 
     try {
       if (!locked) {
@@ -1335,13 +1331,8 @@ export default function DocumentLibraryPanel({
       }
       if (isCurrentUploadAttempt()) setFile(null);
     } catch (err) {
-      if (isCurrentUploadAttempt()) {
+      if (isCurrentUploadContext()) {
         setError(getErrorMessage(err, 'Upload failed.'));
-      }
-    } finally {
-      if (isCurrentUploadAttemptSeq() && isCurrentUploadContext()) {
-        fileUploadInFlightRef.current = false;
-        setFileUploadPending(false);
       }
     }
   }, [
@@ -1420,18 +1411,7 @@ export default function DocumentLibraryPanel({
     }
 
     const uploadContextKey = activeUploadContextKeyRef.current;
-    const uploadAttemptSeq = (urlUploadAttemptSeqRef.current += 1);
-    const submittedUrlInput = urlInput;
-    const submittedUrlTitle = urlTitle;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
-    const isCurrentUploadAttemptSeq = () => urlUploadAttemptSeqRef.current === uploadAttemptSeq;
-    const isCurrentUrlUploadAttempt = () => (
-      isCurrentUploadContext() &&
-      activeUrlInputRef.current === submittedUrlInput &&
-      activeUrlTitleRef.current === submittedUrlTitle
-    );
-    urlUploadInFlightRef.current = true;
-    setUrlUploadPending(true);
 
     try {
       if (!locked) {
@@ -1511,13 +1491,8 @@ export default function DocumentLibraryPanel({
         setUrlTitle('');
       }
     } catch (err) {
-      if (isCurrentUrlUploadAttempt()) {
+      if (isCurrentUploadContext()) {
         setError(getErrorMessage(err, 'Upload failed.'));
-      }
-    } finally {
-      if (isCurrentUploadAttemptSeq() && isCurrentUploadContext()) {
-        urlUploadInFlightRef.current = false;
-        setUrlUploadPending(false);
       }
     }
   }, [

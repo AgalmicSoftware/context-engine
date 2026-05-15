@@ -614,6 +614,54 @@ describe('SurveyTool single-question bootstrap cache', () => {
     expect(subject.state.questionPool[0].prompt).toBe('Recovered prompt');
   });
 
+  it('does not clear a newer pending retry when an older metadata fetch resolves stale', async () => {
+    const deferred = createDeferred();
+    jest.spyOn(contractScripts, 'getQuestionData').mockImplementation(() => deferred.promise);
+    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({});
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      sessionSlugPinned: true,
+      account: '',
+      loginComplete: false,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      provider: {},
+    });
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      questionPool: [],
+      surveysResponseState: [{ answers: {}, importance: {}, conviction: {}, additionalComments: {} }],
+    };
+    syncClassSetState(subject);
+    const clearSpy = jest.spyOn(subject, 'clearSingleQuestionBootstrapRetry');
+
+    const runPromise = subject.fetchSingleQuestionData();
+    await Promise.resolve();
+
+    subject._singleQuestionBootstrapRetrySig = 'q2:1';
+    subject._fetchSingleQuestionRunId += 1;
+    deferred.resolve({
+      id: 'q1',
+      type: 'binary',
+      prompt: 'Recovered prompt',
+      tags: [],
+    });
+
+    await runPromise;
+
+    expect(clearSpy).not.toHaveBeenCalled();
+    expect(subject._singleQuestionBootstrapRetrySig).toBe('q2:1');
+    expect(subject.state.questionPool).toEqual([]);
+  });
+
   it('renders a masked encrypted question placeholder while new Arweave metadata propagates', async () => {
     jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
       '84532': {
