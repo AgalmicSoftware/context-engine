@@ -674,6 +674,73 @@ describe('SBTPage auto-mint routing', () => {
     expect(startClaimSpy).not.toHaveBeenCalled();
   });
 
+  it('passes captured target overrides to invite list auto-mints', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000128';
+    const account = '0x0000000000000000000000000000000000000abc';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      provider: 'base-provider',
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      groupPasswordInput: '',
+      mintingStatus: 'idle',
+    };
+    jest.spyOn(subject, 'decodeInviteInput').mockImplementation((token) => (
+      token === 'invite-payload' ? { nonce: '1', signature: '0xsig' } : null
+    ));
+    const inviteSpy = jest.spyOn(subject, 'claimWithInviteCode').mockResolvedValue(true);
+
+    await subject.attemptMintWithPasswordList(['invite-payload']);
+
+    expect(subject.state.groupPasswordInput).toBe('invite-payload');
+    expect(inviteSpy).toHaveBeenCalledWith('invite-payload', sbtAddress, expect.objectContaining({
+      accountLowerOverride: account,
+      chainIdOverride: '84532',
+      sessionSlugOverride: 'edge',
+    }));
+  });
+
+  it('does not continue password-list mints after network props disappear during validation', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000129';
+    const account = '0x0000000000000000000000000000000000000abc';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      provider: 'base-provider',
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      hasInviteMint: false,
+      manualPasswordInput: '',
+      mintingStatus: 'idle',
+      network: { id: 84532, name: 'Base Sepolia' },
+      sbtInfo: { hasPasswordMint: true },
+    };
+    jest.spyOn(contractScripts, 'isPasswordValid').mockImplementation(async () => {
+      subject.props = {
+        ...subject.props,
+        provider: 'transition-provider',
+        network: undefined,
+        networkChainId: undefined,
+      };
+      return true;
+    });
+    const handleMintSpy = jest.spyOn(subject, 'handleMint').mockResolvedValue(true);
+
+    await subject.attemptMintWithPasswordList(['claim-code']);
+
+    expect(subject.state.manualPasswordInput).toBe('');
+    expect(handleMintSpy).not.toHaveBeenCalled();
+  });
+
   it('routes invite auto-mint URLs to invite claiming on the dedicated page', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000102';
     const previousHref = window.location.href;
