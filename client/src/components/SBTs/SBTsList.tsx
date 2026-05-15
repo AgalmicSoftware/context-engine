@@ -66,6 +66,7 @@ import {
   buildSbtListRootClassName,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
+  buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
   coerceSbtMintEndSeconds,
   dedupeNormalizedSbtListSlugs,
@@ -1450,9 +1451,6 @@ const SBTsList = ({
 
     const cfg = getDisplaySessionConfig(slug) as SbtSessionDisplayConfig | null;
     const cacheMeta = readSbtCacheMeta(slug);
-    const lastBlock = Number(cacheMeta?.lastBlock || 0);
-    const sbtCount = Number(cacheMeta?.sbtCount || 0);
-    const hasCache = lastBlock > 0 || sbtCount > 0;
     const scanProgressBySlug = (
       sbtScanProgressBySlug &&
       typeof sbtScanProgressBySlug === 'object'
@@ -1465,76 +1463,20 @@ const SBTsList = ({
     const bridgedLiveProgress = !liveProgressFromProps
       ? recentLiveProgressBySlugRef.current[slug] || null
       : null;
-    const bridgedAgeMs = bridgedLiveProgress
-      ? Math.max(0, recentLiveProgressNowMs - Number(bridgedLiveProgress.updatedAtMs || 0))
-      : Number.POSITIVE_INFINITY;
-    const bridgedRemainingBlocks = Math.max(
-      0,
-      Number(bridgedLiveProgress?.latestBlock || 0) - Number(bridgedLiveProgress?.currentBlock || 0)
-    );
-    // Regression guard: when MainSite clears live progress right after a finished scan,
-    // the list can briefly fall back to the stale cache watermark and appear to restart.
-    // Keep the last live block only during this short post-scan cache handoff window.
-    const liveProgress = liveProgressFromProps || (
-      !scanInProgressRaw &&
-      !deferredRaw &&
-      bridgedLiveProgress &&
-      bridgedAgeMs <= SBT_LIVE_PROGRESS_BRIDGE_MS &&
-      bridgedRemainingBlocks <= SBT_LIVE_PROGRESS_BRIDGE_TAIL_BLOCKS &&
-      Number(bridgedLiveProgress.currentBlock || 0) > lastBlock
-        ? bridgedLiveProgress
-        : null
-    );
-    const liveCurrentCandidate = Number(liveProgress?.currentBlock || 0);
-    const liveCurrentBlock = Number.isFinite(liveCurrentCandidate) && liveCurrentCandidate > 0
-      ? liveCurrentCandidate
-      : null;
-    const liveLatestCandidate = Number(liveProgress?.latestBlock || 0);
-    const liveLatestBlock = Number.isFinite(liveLatestCandidate) && liveLatestCandidate > 0
-      ? liveLatestCandidate
-      : null;
-    const startRaw = Number(cfg?.blockLimits?.start);
-    const startBlock = Number.isFinite(startRaw) && startRaw > 0 ? startRaw : null;
-    const latestCandidate = Math.max(
-      Number(latestBlockBySlug[slug] || 0),
-      Number(liveLatestBlock || 0)
-    );
-    const latestForGroup = Number.isFinite(latestCandidate) && latestCandidate > 0
-      ? latestCandidate
-      : null;
-    const hasLatest = latestForGroup != null && latestForGroup > 0 && startBlock != null;
-    const currentBlockBaseline = liveCurrentBlock != null
-      ? Math.max(lastBlock, liveCurrentBlock)
-      : lastBlock;
-    const displayCurrentBlock = hasLatest
-      ? Math.max(Number(startBlock || 0), currentBlockBaseline)
-      : currentBlockBaseline;
-    const remainingBlocks = hasLatest ? Math.max(0, latestForGroup - displayCurrentBlock) : null;
-    const scanFlagNeedsAttention = !hasCache || !hasLatest || Number(remainingBlocks || 0) > 0;
-
-    // Regression guard: all-sessions chips only do light discovery here.
-    // Route-owned deferred/full-scan flags can linger, so only treat them as active
-    // while the session cache is still missing or behind its known latest block.
-    const useRawScanFlags = !allSessionsMode || scanFlagNeedsAttention;
-
-    return {
-      slug,
-      cfg,
+    return buildSbtListSessionProgressSnapshot({
+      allSessionsMode,
+      bridgeMs: SBT_LIVE_PROGRESS_BRIDGE_MS,
+      bridgeTailBlocks: SBT_LIVE_PROGRESS_BRIDGE_TAIL_BLOCKS,
+      bridgedLiveProgress,
       cacheMeta,
-      lastBlock,
-      sbtCount,
-      hasCache,
-      liveProgress,
-      liveCurrentBlock,
-      liveLatestBlock,
-      startBlock,
-      latestForGroup,
-      hasLatest,
-      displayCurrentBlock,
-      remainingBlocks,
-      scanInProgress: scanInProgressRaw && useRawScanFlags,
-      deferred: deferredRaw && useRawScanFlags,
-    };
+      cfg: cfg as UnknownRecord | null,
+      deferredRaw,
+      latestBlock: latestBlockBySlug[slug],
+      liveProgressFromProps,
+      recentLiveProgressNowMs,
+      scanInProgressRaw,
+      slug,
+    }) as SbtSessionProgressSnapshot;
   }, [
     allSessionsMode,
     getDisplaySessionConfig,
