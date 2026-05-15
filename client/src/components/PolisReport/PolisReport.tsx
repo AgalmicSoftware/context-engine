@@ -110,6 +110,32 @@ export {
 
 const surveyLog = createLogger('surveys');
 
+export const sanitizePolisReportPdfNamePart = (value: unknown): string => (
+  String(value ?? '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[_.,-]+|[_.,-]+$/g, '')
+    .slice(0, 80)
+);
+
+export const buildPolisReportPdfFilename = (
+  sessionName: unknown,
+  now: Date = new Date()
+): string => {
+  const sessionPart = sanitizePolisReportPdfNamePart(sessionName);
+  const timestamp = now.toISOString().replace(/[:.-]/g, '_');
+  return `contextEngine_report${sessionPart ? `_${sessionPart}` : ''}_${timestamp}.pdf`;
+};
+
+export const resolveJsPdfConstructor = (module: any): any => {
+  if (typeof module?.default === 'function') return module.default;
+  if (typeof module?.jsPDF === 'function') return module.jsPDF;
+  if (typeof module?.default?.jsPDF === 'function') return module.default.jsPDF;
+  throw new Error('jsPDF constructor is unavailable');
+};
+
 
 
 

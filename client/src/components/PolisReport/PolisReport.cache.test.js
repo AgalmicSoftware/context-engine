@@ -16,9 +16,7 @@ import PolisReport, {
   PARTICIPANTS_GRAPH_TOOLTIP_TEXT,
   REPORT_DEFAULT_EMBEDDING_LABEL,
   REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT,
-  resolveExploratoryClusterCount,
   resolveJsPdfConstructor,
-  resolvePrecomputedClusterDifference,
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
@@ -338,6 +336,28 @@ describe('PolisReport cache read options', () => {
       'contextEngine_report_Demo_script_alert_1_script_2026_01_02T03_04_05_006Z.pdf',
     );
     expect(buildPolisReportPdfFilename('', timestamp)).toBe('contextEngine_report_2026_01_02T03_04_05_006Z.pdf');
+  });
+
+  it('resolves jsPDF constructors across dynamic import module shapes', () => {
+    function LegacyJsPdf() {}
+    function NamedJsPdf() {}
+    function NamespacedJsPdf() {}
+
+    expect(resolveJsPdfConstructor({ default: LegacyJsPdf })).toBe(LegacyJsPdf);
+    expect(resolveJsPdfConstructor({ jsPDF: NamedJsPdf })).toBe(NamedJsPdf);
+    expect(resolveJsPdfConstructor({ default: { jsPDF: NamespacedJsPdf } })).toBe(NamespacedJsPdf);
+    expect(() => resolveJsPdfConstructor({ default: {} })).toThrow('jsPDF constructor is unavailable');
+  });
+
+  it('sanitizes session-derived PDF export filenames', () => {
+    const timestamp = new Date('2026-01-02T03:04:05.006Z');
+
+    expect(buildPolisReportPdfFilename('../Demo <script>alert(1)</script>', timestamp)).toBe(
+      'contextEngine_report_Demo_script_alert_1_script_2026_01_02T03_04_05_006Z.pdf'
+    );
+    expect(buildPolisReportPdfFilename('', timestamp)).toBe(
+      'contextEngine_report_2026_01_02T03_04_05_006Z.pdf'
+    );
   });
 
   it('resolves jsPDF constructors across dynamic import module shapes', () => {
