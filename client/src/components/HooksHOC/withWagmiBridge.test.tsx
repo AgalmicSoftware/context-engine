@@ -222,6 +222,31 @@ describe('WagmiHooksHOC explicit disconnect flag handling', () => {
     });
   });
 
+  it('reuses the read provider for the websocket prop instead of opening a second wagmi provider subscription', async () => {
+    const fixedSessionNetwork = { id: 11155420, chainId: 11155420, name: 'OP Sepolia' };
+    const provider = { send: jest.fn() };
+    const probe = jest.fn((_props: any) => null);
+    mockGetSessionNetwork.mockReturnValue(fixedSessionNetwork);
+    configureWagmiMocks({
+      address: '0x0000000000000000000000000000000000000006',
+      chain: fixedSessionNetwork,
+      chains: [fixedSessionNetwork],
+    });
+    mockUseProvider.mockReturnValue(provider);
+
+    const Wrapped = WagmiHooksHOC(probe);
+    render(<Wrapped {...buildProps()} />);
+
+    await waitFor(() => {
+      expect(probe).toHaveBeenCalled();
+    });
+    const injectedProps = probe.mock.calls[0]?.[0] as WagmiInjectedProps;
+    expect(mockUseProvider).toHaveBeenCalledTimes(1);
+    expect(mockUseProvider).toHaveBeenCalledWith({ chainId: 11155420 });
+    expect(injectedProps.wagmiProvider).toBe(provider);
+    expect(injectedProps.wagmiWsProvider).toBe(provider);
+  });
+
   it('reclaims bridge ownership after the original owner unmounts', async () => {
     const address = '0x0000000000000000000000000000000000000005';
     const baseSepolia = { id: 84532, chainId: 84532, name: 'Base Sepolia' };
