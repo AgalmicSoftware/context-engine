@@ -5941,21 +5941,13 @@ export class SurveyQuestions extends Component {
     const surveyIndex = 0; // single-question context uses index 0
     const questionId = normalizeQuestionIdKey(this.props.questionID);
 
-    if (!userAnswer || !questionId) return;
-
-    applyPrefillUpdatePlan({
-      updates: (prev) => buildPrefilledSingleQuestionUpdatePlan({
-        surveyIndex,
-        questionId,
-        prevSurveysResponseState: prev?.surveysResponseState,
-        prevEditBaseline: prev?.editBaseline,
-        isDirty: prev?.isDirty,
-        submissionComplete: prev?.submissionComplete,
-        userAnswer,
-        applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
-        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-      }).updates,
-      applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
+    executeSurveySingleQuestionPrefill({
+      state: this.state,
+      questionId,
+      userAnswer,
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+      applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
+      setState: this.setResponseHydrationState.bind(this),
       updateJsonPreview: this.updateJsonPreview,
       recalculateEditStats: this.recalculateEditStats,
     });
