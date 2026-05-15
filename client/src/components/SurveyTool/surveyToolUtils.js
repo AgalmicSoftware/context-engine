@@ -34,6 +34,7 @@ export {
   hasCacheHydratedFlag,
   isIncomingResponseMetaNewer,
   mergeQuestionResponses,
+  mergeSurveyToolCachePatchIntoSurveysCache,
   mergeSurveyResponsePayloads,
   readQuestionsCache,
   readQuestionsCacheAsync,
