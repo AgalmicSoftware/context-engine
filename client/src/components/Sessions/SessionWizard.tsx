@@ -217,6 +217,7 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
+  buildSessionWizardCacheWritePayload,
   buildSessionWizardInitialDraftFromCache,
 } from './sessionWizardDraftState';
 import {
@@ -1235,18 +1236,12 @@ const SessionWizard = ({
     // Pending SBT drafts use sessionStorage so same-tab refresh can recover
     // queued CREATE2 drafts without turning them into long-lived local secrets.
     // Dev toggle: optionally persist secrets locally for faster iteration.
-    const redactedSecrets = {};
-    for (const k of Object.keys(workerSecrets || {})) {
-      redactedSecrets[k] = workerSecrets[k] ? '[redacted]' : '';
-    }
-    const cacheSafePendingSbtDrafts = [];
-    writeSessionWizardCache({
+    writeSessionWizardCache(buildSessionWizardCacheWritePayload({
       sessionId,
       draft,
       privateSlugMode,
       lastManualSlug: lastManualSlugRef.current,
       encryptionGates,
-      pendingSbtDrafts: cacheSafePendingSbtDrafts,
       encryptedFieldGates,
       gateSelections,
       defaultGateId,
@@ -1257,12 +1252,12 @@ const SessionWizard = ({
       manualMaxFeePerGasGwei,
       manualMaxPriorityFeePerGasGwei,
       workerSecretsEnabled,
-      persistWorkerSecrets: !!effectivePersistWorkerSecrets,
-      workerSecrets: effectivePersistWorkerSecrets ? workerSecrets : redactedSecrets,
+      effectivePersistWorkerSecrets,
+      workerSecrets,
       deployComplete,
       deployWorkerUrl,
       provisionedSponsoredContext,
-    });
+    }));
   }, [
     sessionId,
     draft,
