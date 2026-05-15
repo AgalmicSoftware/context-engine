@@ -15,7 +15,15 @@ import {
   readSbtListUniverseCollapsedState,
   readSbtListSyncBarResearchBlockStep,
   readStoredSbtListModeSelectedSessionSlugs,
+  resolveSbtListConcreteSessionBindingSlug,
   resolveSbtListCreateGroupInitialVisibility,
+  resolveSbtListActionableSessionSlugs,
+  resolveSbtListChipSelectedSessionSlugs,
+  resolveSbtListClampedSelectedSessionSlugs,
+  resolveSbtListDefaultSelectedSessionSlugs,
+  resolveSbtListDisplayedSessionUniverseSlugs,
+  resolveSbtListHiddenRegistrySessionSlugs,
+  resolveSbtListItemSessionSlug,
   resolveSbtListHeaderBlocksLeftStyle,
   resolveSbtListHeaderSpinnerWrapStyle,
   resolveSbtListLoadingProgressFillStyle,
@@ -25,6 +33,74 @@ import {
 } from './sbtListHelpers';
 
 describe('sbtListHelpers', () => {
+  it('detects session id shaped slugs before list display', () => {
+    expect(isSbtListSessionIdLikeSlug('11111111-1111-4111-8111-111111111111')).toBe(true);
+    expect(isSbtListSessionIdLikeSlug('0x11111111111111111111111111111111')).toBe(true);
+    expect(isSbtListSessionIdLikeSlug('11111111111111111111111111111111')).toBe(true);
+    expect(isSbtListSessionIdLikeSlug('alpha')).toBe(false);
+  });
+
+  it('resolves SBT session metadata authority flags', () => {
+    expect(hasSbtListOwn({ sessionSlug: 'alpha' }, 'sessionSlug')).toBe(true);
+    expect(hasSbtListAuthoritativeSessionSlug({ sessionSlug: 'alpha' })).toBe(true);
+    expect(hasSbtListAuthoritativeSessionSlug({ sessionSlug: 'alpha', sessionSlugExplicit: false })).toBe(false);
+    expect(hasSbtListMetadataSessionSlugField({ sbtInfo: { sessionSlug: 'info' } })).toBe(true);
+    expect(hasSbtListMetadataSessionSlugField({ sessionSlug: 'top' })).toBe(true);
+    expect(hasSbtListExplicitNoSessionAssociation({
+      sessionSlug: 'top',
+      sbtInfo: { sessionSlug: '', sessionSlugExplicit: true },
+    })).toBe(true);
+    expect(hasSbtListMissingOrEmptySessionSlug({ sbtInfo: {} })).toBe(true);
+    expect(hasSbtListMissingOrEmptySessionSlug({ sbtInfo: { sessionSlug: 'alpha' } })).toBe(false);
+  });
+
+  it('resolves concrete and display SBT session slugs by metadata precedence', () => {
+    const getSessionSlugByName = jest.fn((sessionName: string) => (
+      sessionName === 'Legacy Alpha' ? 'alpha' : null
+    ));
+
+    expect(resolveSbtListConcreteSessionBindingSlug({
+      sbtInfo: { sessionSlug: 'beta', sessionSlugExplicit: true },
+      sessionName: 'Legacy Alpha',
+    }, { getSessionSlugByName })).toBe('beta');
+    expect(resolveSbtListConcreteSessionBindingSlug({
+      sbtInfo: { slug: 'legacyslug' },
+    }, { getSessionSlugByName })).toBe('legacyslug');
+    expect(resolveSbtListConcreteSessionBindingSlug({
+      sbtInfo: { sessionSlug: 'Inferred', sessionSlugExplicit: false },
+      sessionName: 'Legacy Alpha',
+    }, { getSessionSlugByName })).toBeNull();
+    expect(resolveSbtListConcreteSessionBindingSlug({
+      sessionName: 'Legacy Alpha',
+    }, { getSessionSlugByName })).toBe('alpha');
+
+    expect(resolveSbtListItemSessionSlug({
+      __sourceSessionSlug: 'source',
+      sbtInfo: { sessionSlug: 'inferred', sessionSlugExplicit: false },
+    }, {
+      allSessionsMode: false,
+      listSlug: 'fallback',
+    })).toBe('source');
+    expect(resolveSbtListItemSessionSlug({
+      sbtInfo: { sessionSlug: '', sessionSlugExplicit: true },
+    }, {
+      allSessionsMode: true,
+      isListModeScopeEnabled: true,
+      resolveConcreteSessionBindingSlug: () => '',
+    })).toBe(SBT_LIST_NO_SESSION_UNIVERSE_SLUG);
+    expect(resolveSbtListItemSessionSlug({
+      sbtInfo: { sessionSlug: 'beta', sessionSlugExplicit: true },
+    }, {
+      allSessionsMode: true,
+      isListModeScopeEnabled: true,
+      resolveConcreteSessionBindingSlug: () => 'beta',
+    })).toBe('beta');
+    expect(resolveSbtListItemSessionSlug({}, {
+      allSessionsMode: false,
+      listSlug: 'fallback',
+    })).toBe('fallback');
+  });
+
   it('reads SBT list storage and runtime settings defensively', () => {
     const storage = {
       getItem: jest.fn((key: string) =>
