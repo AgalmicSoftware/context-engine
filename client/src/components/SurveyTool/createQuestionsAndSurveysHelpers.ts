@@ -159,6 +159,23 @@ type LitRecipientInput = {
   accessControlConditions?: unknown;
   chain?: unknown;
 };
+type CreateSurveyGateRecipient = {
+  accessControlConditions: unknown;
+  chain: unknown;
+};
+type BuildCreateSurveyGateObjectsAndRecipientsArgs = {
+  buildSbtAccessControlConditions?: (args: {
+    sbtAddresses: string[];
+    chainId: number | null;
+    litChain: unknown;
+    mode: unknown;
+  }) => unknown;
+  chainIdFallback?: unknown;
+  gateIds?: unknown;
+  gateMap?: Record<string, unknown> | null;
+  normalizeKnownGateIds?: (value: unknown) => string[];
+  resolveLitChain?: (args: { chainId: number | null; litChain?: unknown }) => unknown;
+};
 
 type CreateSurveyEncryptionGateSbt = {
   address?: string;
@@ -442,6 +459,71 @@ export const combineLitRecipientAccessControlConditions = (
     combinedAccessControlConditions.push(...conditions);
   });
   return combinedAccessControlConditions;
+};
+
+export const buildCreateSurveyGateObjectsAndRecipients = ({
+  buildSbtAccessControlConditions = () => null,
+  chainIdFallback = null,
+  gateIds: gateIdsIn = [],
+  gateMap = {},
+  normalizeKnownGateIds = normalizeGateIds,
+  resolveLitChain = ({ litChain }) => litChain || null,
+}: BuildCreateSurveyGateObjectsAndRecipientsArgs = {}) => {
+  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
+  const gateIds = normalizeKnownGateIds(gateIdsIn);
+  const gates: UnknownRecord[] = [];
+  const recipients: CreateSurveyGateRecipient[] = [];
+  const dedupe = new Set<string>();
+
+  gateIds.forEach((gateId) => {
+    const rawGate = safeGateMap?.[gateId];
+    if (!rawGate || typeof rawGate !== 'object') return;
+    const gate = rawGate as UnknownRecord;
+
+    const fallbackChainId = Number(chainIdFallback || 0) || null;
+    const chainId = Number(gate.chainId || fallbackChainId || 0) || fallbackChainId;
+    const litChain = resolveLitChain({ chainId, litChain: gate.litChain });
+    const sbtAddresses = Array.from(new Set(
+      [
+        ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
+        gate.sbtAddress,
+      ].filter(Boolean)
+    )) as string[];
+    if (!sbtAddresses.length) return;
+
+    const mode = gate.mode || 'any';
+    const label = String(gate.label || gate.name || gateId);
+    const color = String(gate.color || stableGateColor(gateId));
+
+    gates.push({
+      ...gate,
+      type: gate.type || 'sbt',
+      gateId,
+      sbtAddresses,
+      sbtAddress: sbtAddresses[0] || '',
+      chainId,
+      litChain,
+      mode,
+      label,
+      color,
+    });
+
+    const accessControlConditions = buildSbtAccessControlConditions({
+      sbtAddresses,
+      chainId,
+      litChain,
+      mode,
+    });
+    if (!accessControlConditions) return;
+
+    const recipient = { accessControlConditions, chain: litChain };
+    const sig = JSON.stringify({ accessControlConditions, chain: litChain });
+    if (dedupe.has(sig)) return;
+    dedupe.add(sig);
+    recipients.push(recipient);
+  });
+
+  return { gates, recipients };
 };
 
 export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number => (
