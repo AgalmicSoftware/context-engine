@@ -263,7 +263,7 @@ const SponsorPage = ({
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
   const [workerUrl, setWorkerUrl] = useState<any>('');
   const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
-  const [persistBundleSecrets, setPersistBundleSecrets] = useState<any>(initialCache.persistBundleSecrets);
+  const [persistBundleDraft, setPersistBundleDraft] = useState<any>(initialCache.persistBundleDraft);
   const [bundleForm, setBundleForm] = useState<any>(initialCache.bundleForm);
   const [expiresAt, setExpiresAt] = useState<any>(initialCache.expiresAt);
   const [createBusy, setCreateBusy] = useState<any>(false);
@@ -957,8 +957,8 @@ const SponsorPage = ({
               <Label className={styles.workerToggle}>
                 <Input
                   type="checkbox"
-                  checked={persistBundleSecrets}
-                  onChange={(e: any) => setPersistBundleSecrets(!!e.target.checked)}
+                  checked={persistBundleDraft}
+                  onChange={(e: any) => setPersistBundleDraft(!!e.target.checked)}
                 />
                 <span>Remember non-secret draft fields</span>
               </Label>
