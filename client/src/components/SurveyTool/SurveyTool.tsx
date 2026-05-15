@@ -17,6 +17,7 @@ import {
   computeSubmitLabel,
   ensureQuestionsNet,
   ensureSurveysNet,
+  mergeSurveyToolCachePatchIntoSurveysCache,
   readSurveysCache,
   readSurveysCacheAsync,
   readQuestionsCacheAsync,
@@ -771,24 +772,11 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
         const newCache = updateCacheFn(prev.cache || {}) as SurveyToolCachePatch;
         if (netIdStr) {
           try {
-            const global = ensureSurveysNet(readSurveysCache(effectiveSlug), netIdStr);
-            const net = global[netIdStr];
-
-            if (newCache.surveys) {
-              net.surveys = { ...net.surveys, ...newCache.surveys } as typeof net.surveys;
-            }
-            if (newCache.surveyResponses) {
-              net.surveyResponses = {
-                ...net.surveyResponses,
-                ...newCache.surveyResponses,
-              } as typeof net.surveyResponses;
-            }
-            if (newCache.surveyResponsesLatestBlock) {
-              net.surveyResponsesLatestBlock = {
-                ...net.surveyResponsesLatestBlock,
-                ...newCache.surveyResponsesLatestBlock,
-              };
-            }
+            const global = mergeSurveyToolCachePatchIntoSurveysCache(
+              readSurveysCache(effectiveSlug),
+              netIdStr,
+              newCache
+            );
             writeSurveysCache(effectiveSlug, global);
           } catch (err) {
             surveyLog.warn('[SurveyTool] updateCache merge failed:', err);
@@ -1104,24 +1092,11 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       }
       if (netIdStr) {
         try {
-          const global = ensureSurveysNet(readSurveysCache(effectiveSlug), netIdStr);
-          const net = global[netIdStr];
-
-          if (newCache.surveys) {
-            net.surveys = { ...net.surveys, ...newCache.surveys } as typeof net.surveys;
-          }
-          if (newCache.surveyResponses) {
-            net.surveyResponses = {
-              ...net.surveyResponses,
-              ...newCache.surveyResponses,
-            } as typeof net.surveyResponses;
-          }
-          if (newCache.surveyResponsesLatestBlock) {
-            net.surveyResponsesLatestBlock = {
-              ...net.surveyResponsesLatestBlock,
-              ...newCache.surveyResponsesLatestBlock,
-            };
-          }
+          const global = mergeSurveyToolCachePatchIntoSurveysCache(
+            readSurveysCache(effectiveSlug),
+            netIdStr,
+            newCache
+          );
           writeSurveysCache(effectiveSlug, global);
         } catch (err) {
           surveyLog.warn('[SurveyTool] updateCache merge failed:', err);
