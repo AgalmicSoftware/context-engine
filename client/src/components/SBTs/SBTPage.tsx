@@ -852,6 +852,13 @@ class SBTPage extends Component<any, any> {
     // from the original intent even if routing props change during metadata awaits.
     const targetSlug = this.getEffectiveSessionSlug();
     const targetAccountLower = String(this.props.account || '').trim().toLowerCase();
+    const isUrlAutoMintTargetCurrent = () => this.isMintTargetContextCurrent({
+      accountLower: targetAccountLower,
+      sbtAddress: currentSbtAddress,
+      sessionSlug: targetSlug,
+    });
+
+    if (!isUrlAutoMintTargetCurrent()) return false;
 
     if (!targetCode) {
       const minted = await this.autoMintPublicIfAllowed(currentSbtAddress, {
@@ -862,6 +869,7 @@ class SBTPage extends Component<any, any> {
       return minted;
     }
 
+    if (!isUrlAutoMintTargetCurrent()) return false;
     await new Promise<void>((resolve) => {
       if (this._isMounted) {
         this.setState(buildSbtPagePasswordInputValuePatch({
@@ -889,11 +897,13 @@ class SBTPage extends Component<any, any> {
       } catch (_) {
         sbtInfo = null;
       }
+      if (!isUrlAutoMintTargetCurrent()) return false;
       if (sbtInfo && this._isMounted) {
         this.setState(buildSbtPageSbtInfoPatch({ sbtInfo }));
       }
     }
 
+    if (!isUrlAutoMintTargetCurrent()) return false;
     if (sbtInfo?.hasPasswordMint) {
       const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress, {
         accountLowerOverride: targetAccountLower,
@@ -904,6 +914,7 @@ class SBTPage extends Component<any, any> {
     }
 
     const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
+    if (!isUrlAutoMintTargetCurrent()) return false;
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
       const minted = await this.mintUnlimitedWithGroupPassword({
         accountLowerOverride: targetAccountLower,
@@ -915,6 +926,7 @@ class SBTPage extends Component<any, any> {
       return minted;
     }
 
+    if (!isUrlAutoMintTargetCurrent()) return false;
     if (this._isMounted) {
       this.setState(buildSbtPageMintFailurePatch({ error: `Invite code required for this ${t('sbt')}.` }));
     }
@@ -3031,6 +3043,9 @@ class SBTPage extends Component<any, any> {
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
       const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
       sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
+      if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+        return false;
+      }
       if (!onchain || onchain === ethers.constants.HashZero) {
         this.setState(buildSbtPageErrorPatch({ error: `This ${t('sbt')} does not support group-password signature ${t('mintLower')}.` }));
         return false;
@@ -3049,6 +3064,9 @@ class SBTPage extends Component<any, any> {
       });
       if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
         sbtLog.error('[MANUAL-MINT] Sanity check FAILED', { expected: onchain, computed: local });
+        if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbt, sessionSlug: slug })) {
+          return false;
+        }
         this.setState(buildSbtPageErrorPatch({ error: 'Incorrect group password.' }));
         return false;
       }
@@ -3149,6 +3167,9 @@ class SBTPage extends Component<any, any> {
               slug
             );
             if (!isValid) {
+              if (!this.isMintTargetContextCurrent({ accountLower: mintAccountLower, sbtAddress: sbtAddressOriginalCase, sessionSlug: slug })) {
+                return false;
+              }
               if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid password.' }));
               return false;
             }

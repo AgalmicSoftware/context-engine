@@ -5537,6 +5537,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       areQuestionPayloadsEquivalent,
       writeQuestionsCache,
     });
+    if (isStaleRun()) return;
 
     if (cacheBootstrapResult.status === 'seeded-from-recent') {
       const {
@@ -5668,6 +5669,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       resolveCacheState: getCacheStateForSlug,
       writeQuestionsCache,
     });
+    if (isStaleRun()) return;
 
     if (metadataBootstrapResult.status === 'missing-cache-state') {
       if (preserveCurrentSingleQuestionPool({ isLoadingResponse: false })) {
@@ -5735,6 +5737,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       ({ netIdStr, questionsCache } = cacheState);
     }
 
+    if (isStaleRun()) return;
     if (!hasPendingRetryForQuestion || bootstrapRetryAttempt > 0) {
       this.clearSingleQuestionBootstrapRetry();
     }

@@ -737,6 +737,8 @@ export default function DocumentLibraryPanel({
     String(network?.id || ''),
     loginComplete ? '1' : '0',
   ].join('|')), [account, loginComplete, network?.id, panelContextKey]);
+  const activeUploadContextKeyRef = useRef(viewerContextKey);
+  activeUploadContextKeyRef.current = viewerContextKey;
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
@@ -1293,6 +1295,9 @@ export default function DocumentLibraryPanel({
       return;
     }
 
+    const uploadContextKey = activeUploadContextKeyRef.current;
+    const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+
     try {
       if (!locked) {
         const result = await uploadDocLibraryFileUntyped({
@@ -1304,6 +1309,7 @@ export default function DocumentLibraryPanel({
           chainId: network?.id || null,
           tags,
         });
+        if (!isCurrentUploadContext()) return;
         const txId = toStr(result?.txId).trim();
         if (txId) {
           setDocs((prev) => [
@@ -1346,6 +1352,7 @@ export default function DocumentLibraryPanel({
           contextLabel: `doc:${sessionSlug || ''}`,
         },
       });
+      if (!isCurrentUploadContext()) return;
 
       const txId = toStr(result?.txId).trim();
       if (txId) {
@@ -1361,7 +1368,9 @@ export default function DocumentLibraryPanel({
       }
       setFile(null);
     } catch (err) {
-      setError(getErrorMessage(err, 'Upload failed.'));
+      if (isCurrentUploadContext()) {
+        setError(getErrorMessage(err, 'Upload failed.'));
+      }
     }
   }, [
     docProvider,
@@ -1437,6 +1446,9 @@ export default function DocumentLibraryPanel({
       return;
     }
 
+    const uploadContextKey = activeUploadContextKeyRef.current;
+    const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+
     try {
       if (!locked) {
         const result = await uploadDocLibraryUrlRecordUntyped({
@@ -1449,6 +1461,7 @@ export default function DocumentLibraryPanel({
           chainId: network?.id || null,
           tags,
         });
+        if (!isCurrentUploadContext()) return;
         const txId = toStr(result?.txId).trim();
         if (txId) {
           setDocs((prev) => [
@@ -1493,6 +1506,7 @@ export default function DocumentLibraryPanel({
           contextLabel: `doc-link:${sessionSlug || ''}`,
         },
       });
+      if (!isCurrentUploadContext()) return;
 
       const txId = toStr(result?.txId).trim();
       if (txId) {
@@ -1509,7 +1523,9 @@ export default function DocumentLibraryPanel({
       setUrlInput('');
       setUrlTitle('');
     } catch (err) {
-      setError(getErrorMessage(err, 'Upload failed.'));
+      if (isCurrentUploadContext()) {
+        setError(getErrorMessage(err, 'Upload failed.'));
+      }
     }
   }, [
     docProvider,
