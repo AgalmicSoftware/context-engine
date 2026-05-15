@@ -207,3 +207,62 @@ export const buildSessionWizardInitialDraftFromCache = ({
   }
   return normalized;
 };
+
+export const buildSessionWizardCacheWritePayload = ({
+  sessionId = '',
+  draft = {},
+  privateSlugMode = false,
+  lastManualSlug = '',
+  encryptionGates = [],
+  encryptedFieldGates = {},
+  gateSelections = {},
+  defaultGateId = '',
+  featuredDraftGateAutoLink = null,
+  resourceGateMap = {},
+  manualGasLimit = '',
+  manualGasPriceGwei = '',
+  manualMaxFeePerGasGwei = '',
+  manualMaxPriorityFeePerGasGwei = '',
+  workerSecretsEnabled = true,
+  effectivePersistWorkerSecrets = false,
+  workerSecrets = {},
+  deployComplete = false,
+  deployWorkerUrl = '',
+  provisionedSponsoredContext = null,
+}: AnyRecord = {}): AnyRecord => {
+  const workerSecretsRecord = (
+    workerSecrets &&
+    typeof workerSecrets === 'object' &&
+    !Array.isArray(workerSecrets)
+  ) ? workerSecrets as AnyRecord : {};
+  const redactedSecrets: AnyRecord = {};
+  Object.keys(workerSecretsRecord).forEach((key) => {
+    redactedSecrets[key] = workerSecretsRecord[key] ? '[redacted]' : '';
+  });
+
+  return {
+    sessionId,
+    draft,
+    privateSlugMode,
+    lastManualSlug,
+    encryptionGates,
+    // Regression guard: pending CREATE2 SBT drafts remain sessionStorage-only;
+    // this durable wizard cache must not turn them into long-lived local data.
+    pendingSbtDrafts: [],
+    encryptedFieldGates,
+    gateSelections,
+    defaultGateId,
+    featuredDraftGateAutoLink,
+    resourceGateMap,
+    manualGasLimit,
+    manualGasPriceGwei,
+    manualMaxFeePerGasGwei,
+    manualMaxPriorityFeePerGasGwei,
+    workerSecretsEnabled,
+    persistWorkerSecrets: !!effectivePersistWorkerSecrets,
+    workerSecrets: effectivePersistWorkerSecrets ? workerSecretsRecord : redactedSecrets,
+    deployComplete,
+    deployWorkerUrl,
+    provisionedSponsoredContext,
+  };
+};
