@@ -49,6 +49,7 @@ import {
 } from '../../utilities/storage/storageClient.js';
 import {
   STORAGE_BACKENDS,
+  normalizeStorageBackend,
   normalizeStorageRef,
 } from '../../utilities/storage/storageRefs.js';
 import {
@@ -134,6 +135,7 @@ type ListFilter = {
 type AutoOpenDoc = {
   txId: string;
   tagMap: DocTagMap;
+  storageRef?: StorageRef | null;
 };
 
 type OpenableDoc = Pick<DocRecord, 'txId' | 'tagMap' | 'storageRef'>;
@@ -377,6 +379,11 @@ const safeFilename = (name: unknown, fallback = 'document'): string => {
 };
 
 const isArweaveTxId = (value: unknown): boolean => /^[a-z0-9_-]{43}$/i.test(toStr(value).trim());
+
+const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is StorageRef => {
+  if (!storageRef?.id) return false;
+  return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
+};
 
 const buildSessionListFilters = (sessionIdHex: string): ListFilter[] => ([
   { name: 'CE-DocLibrary', values: ['1'] },
@@ -652,20 +659,27 @@ export default function DocumentLibraryPanel({
     if (typeof window === 'undefined') return null;
     try {
       const qp = new URLSearchParams(locationSearch);
-      const txId = toStr(qp.get('__ceDocTx') || '').trim();
-      if (!isArweaveTxId(txId)) return null;
+      const storage = normalizeStorageBackend(
+        qp.get('__ceDocStorage') || '',
+        STORAGE_BACKENDS.LIT_ARWEAVE
+      );
+      const refId = toStr(qp.get('__ceDocRef') || qp.get('__ceDocTx') || '').trim();
+      const storageRef = normalizeDocStorageRef(
+        { backend: storage, id: refId },
+        { fallbackBackend: storage }
+      );
+      if (!isValidStorageDocRef(storageRef)) return null;
 
-      const storage = toStr(qp.get('__ceDocStorage') || '').trim() || 'lit-arweave';
       const kind = toStr(qp.get('__ceDocKind') || '').trim() || 'file';
       const name = toStr(qp.get('__ceDocName') || '').trim();
 
       const tagMap = {
-        'CE-DocStorage': storage,
+        'CE-DocStorage': storageRef.backend,
         'CE-DocKind': kind,
         ...(name ? { 'CE-DocName': name } : {}),
       };
 
-      return { txId, tagMap };
+      return { txId: storageRef.id, tagMap, storageRef };
     } catch (_) {
       return null;
     }
@@ -1059,19 +1073,15 @@ export default function DocumentLibraryPanel({
   useEffect(() => {
     if (!autoOpenDoc || !autoOpenDoc.txId) return;
 
-    const key = `${panelContextKey}:${autoOpenDoc.txId}`;
+    const key = `${panelContextKey}:${autoOpenDoc.storageRef?.backend || ''}:${autoOpenDoc.txId}`;
     if (autoOpenedRef.current === key) return;
 
     const storage = toStr(autoOpenDoc.tagMap?.['CE-DocStorage']).trim().toLowerCase();
     const wantsEncrypted = storage === 'lit-arweave' || storage === 'lit';
     if (wantsEncrypted && (!loginComplete || !toStr(account).trim() || !provider)) return;
-    if (wantsEncrypted) {
-      const litHooks = getActiveLitHooks();
-      if (!litHooks || typeof litHooks.getKey !== 'function') return;
-    }
 
     autoOpenedRef.current = key;
-    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap });
+    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef });
 
     // Clear params so refresh/back doesn't re-open repeatedly.
     try {
@@ -1081,7 +1091,7 @@ export default function DocumentLibraryPanel({
       });
       window.history.replaceState({}, '', url.toString());
     } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
-  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc, getActiveLitHooks]);
+  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
 
   const addCustomSbt = useCallback((sbt: CustomSbtEntry) => {
     const addr = normalizeSbtAddress(sbt?.address);

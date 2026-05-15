@@ -46,12 +46,16 @@ const buildTagMap = (tags) => Object.fromEntries(
 export const buildSessionDocLibraryViewerUrl = ({
   sessionToken,
   txId,
+  storageRef,
+  storageId,
   storage = 'lit-arweave',
   kind = 'file',
   name = '',
 } = {}) => {
   const token = toStr(sessionToken).trim();
-  const id = toStr(txId).trim();
+  // __ceDocTx is the legacy query name. For non-Arweave backends it carries the
+  // backend-specific opaque storage ref, not necessarily an Arweave transaction id.
+  const id = toStr(storageRef || storageId || txId).trim();
   if (!token || !id) return '';
   const pathname = buildPublicUrlPath(`/session/${encodeURIComponent(token)}/docs`);
   const query = new URLSearchParams();
