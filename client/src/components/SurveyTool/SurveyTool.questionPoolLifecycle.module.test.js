@@ -1088,6 +1088,84 @@ describe('SurveyTool question pool lifecycle', () => {
     expect(subject.state.surveysResponseState[0].answers.q1.value).toBe('');
   });
 
+  it('prefills current survey responses after storing fetched user answers', async () => {
+    const userAnswers = {
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: 'chain answer' },
+          additional: { value: 'chain note' },
+        },
+      ],
+    };
+    const subject = new SurveyQuestions({
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      surveyId: 'survey-a',
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+    });
+
+    subject._isMounted = true;
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [
+        {
+          answers: {},
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        },
+      ],
+      editBaseline: {
+        answers: {},
+        importance: {},
+        conviction: {},
+        additionalComments: {},
+      },
+      questionPool: [{ id: 'q1' }],
+      pileQuestions: [],
+      userAnswers: null,
+      submissionComplete: false,
+      isLoadingResponse: false,
+    };
+    subject.getLatestSurveyResponse = jest.fn().mockResolvedValue(userAnswers);
+    subject.prefillSurveyResponses = jest.fn();
+    subject.invalidateResponseHydrationRuns = jest.fn(
+      subject.invalidateResponseHydrationRuns.bind(subject),
+    );
+    subject.invalidateDiffCaches = jest.fn(subject.invalidateDiffCaches.bind(subject));
+    subject.setState = jest.fn((next, cb) => {
+      const prevState = subject.state;
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      if (patch && typeof patch === 'object') {
+        subject.state = { ...subject.state, ...patch };
+      }
+      const diffInputsChanged = subject.didEditDiffInputsChange(subject.props, prevState);
+      if (diffInputsChanged) {
+        if (!subject._responseHydrationStateUpdateDepth) {
+          subject.invalidateResponseHydrationRuns();
+        }
+        subject.invalidateDiffCaches();
+      }
+      if (prevState.userAnswers !== subject.state.userAnswers) {
+        subject._userAnswersSliceCache = { source: null, value: null };
+        if (!diffInputsChanged) subject.invalidateDiffCaches();
+      }
+      if (typeof cb === 'function') cb();
+      return patch;
+    });
+
+    await subject.fetchSurveyResponse();
+
+    expect(subject.state.userAnswers).toBe(userAnswers);
+    expect(subject.prefillSurveyResponses).toHaveBeenCalledWith(userAnswers, {
+      responseHydrationOwned: true,
+    });
+    expect(subject.invalidateResponseHydrationRuns).not.toHaveBeenCalled();
+    expect(subject.state.isLoadingResponse).toBe(false);
+  });
+
   it('resets form state for account changes from initialized survey state', () => {
     jest.useFakeTimers();
 

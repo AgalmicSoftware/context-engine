@@ -541,6 +541,70 @@ describe('DocumentLibraryPanel photo docs', () => {
     expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
 
+  it('ignores in-flight document open requests after the panel context changes', async () => {
+    mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
+    const slowRead = createDeferred<any>();
+    mockListSessionStorageRefs.mockResolvedValueOnce([
+      {
+        storageRef: {
+          backend: 'cloudflare',
+          id: 'cf_old_context',
+          uri: '/storage/read?id=cf_old_context',
+          contentType: 'text/plain',
+          resource: 'docsContext',
+        },
+        metadata: {
+          size: 16,
+          tags: [
+            { name: 'CE-DocKind', value: 'file' },
+            { name: 'CE-DocName', value: 'Old context note' },
+          ],
+        },
+      },
+    ]);
+    mockReadSessionStorageBlob.mockReturnValueOnce(slowRead.promise);
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge-a',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      mode: 'session',
+      sessionIdHex: `0x${'7'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+
+    expect(await screen.findByText('Old context note')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
+    await waitFor(() => {
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_old_context' }),
+      }));
+    });
+
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        account="0x456"
+        sessionSlug="edge-b"
+        sessionIdHex={`0x${'8'.repeat(32)}`}
+      />
+    );
+
+    slowRead.resolve({
+      headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
+      blob: async () => ({ type: 'text/plain', text: async () => 'old context text' }),
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(screen.queryByText('old context text')).not.toBeInTheDocument();
+  });
+
   it('renders image thumbnails directly in the document list', async () => {
     mockListArweaveTransactionsByTags.mockResolvedValueOnce([
       {
@@ -723,9 +787,10 @@ describe('DocumentLibraryPanel photo docs', () => {
     expect(window.location.search).toBe('?keep=1');
   });
 
-  it('auto-opens self-recipient Lit-Arweave viewer links without scoped getKey hooks', async () => {
+  it('waits for Lit hooks before auto-opening encrypted viewer links', async () => {
     const litStorage = require('../../utilities/crypto/litProtocol.js').litStorage;
     const txId = 'F'.repeat(43);
+    const getKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     litStorage.downloadEncryptedArweaveData.mockResolvedValueOnce({
       payload: { name: 'Encrypted auto', mime: 'text/plain', text: 'lit auto text' },
     });
@@ -736,29 +801,36 @@ describe('DocumentLibraryPanel photo docs', () => {
       `/session/edge/docs?__ceDocTx=${txId}&__ceDocStorage=lit-arweave&__ceDocKind=file&__ceDocName=Encrypted%20auto`
     );
 
-    render(
-      <DocumentLibraryPanel
-        provider={{}}
-        network={{ id: 84532 }}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-        sessionSlug="edge"
-        sessionConfig={TEST_SESSION_CONFIG}
-        mode="session"
-        sessionIdHex={`0x${'8'.repeat(32)}`}
-      />
-    );
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge',
+      sessionConfig: TEST_SESSION_CONFIG,
+      mode: 'session',
+      sessionIdHex: `0x${'8'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+
+    await Promise.resolve();
+    expect(litStorage.downloadEncryptedArweaveData).not.toHaveBeenCalled();
+    expect(window.location.search).toContain('__ceDocTx=');
+
+    rerender(<DocumentLibraryPanel {...panelProps} litHooks={{ getKey }} />);
 
     await waitFor(() => {
       expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(expect.objectContaining({
         url: `https://lit.example.test/${txId}`,
         providerLike: {},
         account: '0x123',
+        lit: { getKey },
       }));
     });
-    expect(litStorage.downloadEncryptedArweaveData.mock.calls[0][0]).not.toHaveProperty('lit');
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('lit auto text');
+    expect(window.location.search).toBe('');
   });
 
   it('requires encrypted uploads for lit-arweave session document storage', async () => {

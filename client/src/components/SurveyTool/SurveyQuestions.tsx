@@ -696,6 +696,7 @@ export class SurveyQuestions extends Component {
   _fetchSurveyResponseRunId = 0;
   _fetchSingleQuestionRunId = 0;
   _localCacheRehydrateRunId = 0;
+  _responseHydrationStateUpdateDepth = 0;
   _singleQuestionBootstrapRetryTimer = null;
   _singleQuestionBootstrapRetrySig = '';
   _isMounted = false;
@@ -726,6 +727,29 @@ export class SurveyQuestions extends Component {
     this._fetchSurveyResponseRunId = (Number(this._fetchSurveyResponseRunId) || 0) + 1;
     this._fetchSingleQuestionRunId = (Number(this._fetchSingleQuestionRunId) || 0) + 1;
     this._localCacheRehydrateRunId = (Number(this._localCacheRehydrateRunId) || 0) + 1;
+  };
+
+  setResponseHydrationState = (next, callback) => {
+    this._responseHydrationStateUpdateDepth += 1;
+    const release = () => {
+      this._responseHydrationStateUpdateDepth = Math.max(
+        0,
+        (Number(this._responseHydrationStateUpdateDepth) || 0) - 1,
+      );
+    };
+
+    try {
+      return this.setState(next, (...args) => {
+        try {
+          if (typeof callback === 'function') callback(...args);
+        } finally {
+          release();
+        }
+      });
+    } catch (error) {
+      release();
+      throw error;
+    }
   };
 
   _applyDraftHydrationEntryToSlice = ({
@@ -1838,11 +1862,14 @@ export class SurveyQuestions extends Component {
   async componentDidUpdate(prevProps, prevState) {
     const diffInputsChanged = this.didEditDiffInputsChange(prevProps, prevState);
     if (diffInputsChanged) {
-      this.invalidateResponseHydrationRuns();
+      if (!this._responseHydrationStateUpdateDepth) {
+        this.invalidateResponseHydrationRuns();
+      }
       this.invalidateDiffCaches();
     }
     if (prevState.userAnswers !== this.state.userAnswers) {
       this._userAnswersSliceCache = { source: null, value: null };
+      if (!diffInputsChanged) this.invalidateDiffCaches();
     }
     if (
       diffInputsChanged ||
@@ -4977,23 +5004,19 @@ export class SurveyQuestions extends Component {
   // Prefill multi-question draft from prior survey response.
   // Hydrates encrypted: true for any previously encrypted field.
   // Synchronizes state and baseline cleanly to prevent ghost edits.
-  prefillSurveyResponses = (userAnswers) => {
-    if (!userAnswers || !Array.isArray(userAnswers.responses)) return;
-
+  prefillSurveyResponses = (userAnswers, options = {}) => {
     const surveyIndex = this.props.isStandalone || this.props.singleQuestionMode ? 0 : (this.props.surveyIndex || 0);
+    const setState = options?.responseHydrationOwned
+      ? this.setResponseHydrationState.bind(this)
+      : this.setState.bind(this);
 
-    applyPrefillUpdatePlan({
-      updates: (prev) => buildPrefilledSurveyUpdatePlan({
-        surveyIndex,
-        prevSurveysResponseState: prev?.surveysResponseState,
-        prevEditBaseline: prev?.editBaseline,
-        isDirty: prev?.isDirty,
-        submissionComplete: prev?.submissionComplete,
-        responses: userAnswers.responses,
-        applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
-        buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
-      }).updates,
-      applyStateUpdates: (nextUpdates, done) => this.setState(nextUpdates, done),
+    executeSurveyResponsePrefill({
+      state: this.state,
+      surveyIndex,
+      userAnswers,
+      buildSliceFromUserAnswers: this.buildSliceFromUserAnswers,
+      applyResponseHydrationListToSlice: this._applyResponseHydrationListToSlice,
+      setState,
       updateJsonPreview: this.updateJsonPreview,
       recalculateEditStats: this.recalculateEditStats,
     });
@@ -5631,7 +5654,7 @@ export class SurveyQuestions extends Component {
     const runId = (Number(this._fetchSurveyResponseRunId || 0) + 1);
     this._fetchSurveyResponseRunId = runId;
     const isStale = () => !this._isMounted || this._fetchSurveyResponseRunId !== runId;
-    const safe = (...args) => { if (!isStale()) this.setState(...args); };
+    const safe = (...args) => { if (!isStale()) this.setResponseHydrationState(...args); };
 
     safe({ isLoadingResponse: true, responseLookupWarning: '' });
 
@@ -5724,7 +5747,9 @@ export class SurveyQuestions extends Component {
             startFresh: false,
             userAnswers: userAnswers,
           });
-          if (!isStale()) this.prefillSurveyResponses(userAnswers);
+          if (!isStale()) {
+            this.prefillSurveyResponses(userAnswers, { responseHydrationOwned: true });
+          }
         } else {
           // Only reset to "no response" if we aren't holding an optimistic submission
           if (!this.state.submissionComplete) {

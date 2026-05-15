@@ -690,11 +690,22 @@ export default function DocumentLibraryPanel({
   const [viewerMime, setViewerMime] = useState('');
 
   const autoOpenedRef = useRef('');
+  const autoOpeningRef = useRef('');
   const viewerRequestSeqRef = useRef(0);
+  const viewerContextKey = useMemo(() => ([
+    panelContextKey,
+    toStr(account).trim().toLowerCase(),
+    String(network?.id || ''),
+    loginComplete ? '1' : '0',
+  ].join('|')), [account, loginComplete, network?.id, panelContextKey]);
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
   }, []);
+
+  useEffect(() => {
+    viewerRequestSeqRef.current += 1;
+  }, [viewerContextKey]);
 
   useEffect(() => {
     return () => {
@@ -870,7 +881,7 @@ export default function DocumentLibraryPanel({
 
   const openDoc = useCallback(async (doc: OpenableDoc): Promise<boolean> => {
     const txId = toStr(doc?.txId).trim();
-    if (!txId) return;
+    if (!txId) return false;
     const requestSeq = viewerRequestSeqRef.current + 1;
     viewerRequestSeqRef.current = requestSeq;
     const isCurrentViewerRequest = () => viewerRequestSeqRef.current === requestSeq;
@@ -924,26 +935,24 @@ export default function DocumentLibraryPanel({
           sessionConfig,
           context: { account, providerLike: provider, chainId: network?.id || null },
         });
-        if (!isCurrentViewerRequest()) return;
+        if (!isCurrentViewerRequest()) return false;
         const blob = await response.blob();
-        if (!isCurrentViewerRequest()) return;
+        if (!isCurrentViewerRequest()) return false;
         const mime = toStr(response.headers.get('content-type') || blob.type || storageRef?.contentType || '').trim();
         if (kind === 'link' || isTextLikeMime(mime)) {
           const text = await blob.text();
-          applyTextViewerState({
+          return applyTextViewerState({
             title: toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : 'Document'),
             mime: mime || (kind === 'link' ? 'application/json' : 'text/plain'),
             text: text || '',
           });
-          return;
         }
         const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-        applyBlobViewerState({
+        return applyBlobViewerState({
           title: toStr(tagMap['CE-DocName']).trim() || 'Document',
           mime,
           blobUrl,
         });
-        return;
       }
 
       if (isEncrypted) {
@@ -968,30 +977,28 @@ export default function DocumentLibraryPanel({
             },
           },
         });
-        if (!isCurrentViewerRequest()) return;
+        if (!isCurrentViewerRequest()) return false;
 
         const name = toStr(payload?.name || '').trim() || (kind === 'link' ? 'Encrypted link' : 'Encrypted document');
         const mime = toStr(payload?.mime || '').trim();
         const text = litStorage.decodeLitPayloadToText(payload);
         if (text) {
-          applyTextViewerState({
+          return applyTextViewerState({
             title: name,
             mime: mime || 'text/plain',
             text,
           });
-          return;
         }
         const blob = litStorage.decodeLitPayloadToBlob(payload);
         if (!blob) {
           throw new Error('Unable to decode encrypted document.');
         }
         const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-        applyBlobViewerState({
+        return applyBlobViewerState({
           title: name,
           mime: blob.type || mime || '',
           blobUrl,
         });
-        return;
       }
 
       if (kind === 'link') {
@@ -1003,37 +1010,35 @@ export default function DocumentLibraryPanel({
             chainId: Number(network?.id || 0) || null,
           },
         });
-        applyTextViewerState({
+        return applyTextViewerState({
           title: toStr(tagMap['CE-DocName']).trim() || 'Link record',
           mime: 'application/json',
           text: text || '',
         });
-        return;
       }
 
       const res = await fetchArweaveBlobWithFallback(txId, { isCurrent: isCurrentViewerRequest });
-      if (!isCurrentViewerRequest()) return;
-      if (!res.ok && res.stale) return;
+      if (!isCurrentViewerRequest()) return false;
+      if (!res.ok && res.stale) return false;
       if (!res.ok) throw new Error(res.error || 'Failed to fetch document.');
       const blob = res.blob;
       const mime = toStr(res.contentType || blob.type || '').trim();
       if (isTextLikeMime(mime)) {
         const text = await blob.text();
-        applyTextViewerState({
+        return applyTextViewerState({
           title: toStr(tagMap['CE-DocName']).trim() || 'Document',
           mime: mime || 'text/plain',
           text: text || '',
         });
-        return;
       }
       const blobUrl = typeof URL !== 'undefined' ? URL.createObjectURL(blob) : '';
-      applyBlobViewerState({
+      return applyBlobViewerState({
         title: toStr(tagMap['CE-DocName']).trim() || 'Document',
         mime,
         blobUrl,
       });
     } catch (err) {
-      if (!isCurrentViewerRequest()) return;
+      if (!isCurrentViewerRequest()) return false;
       setViewerLoading(false);
       setViewerError(getErrorMessage(err, 'Failed to open document.'));
       setViewerTitle('Error');
@@ -1051,19 +1056,38 @@ export default function DocumentLibraryPanel({
     const storage = toStr(autoOpenDoc.tagMap?.['CE-DocStorage']).trim().toLowerCase();
     const wantsEncrypted = storage === 'lit-arweave' || storage === 'lit';
     if (wantsEncrypted && (!loginComplete || !toStr(account).trim() || !provider)) return;
+    if (wantsEncrypted) {
+      const litHooks = getActiveLitHooks();
+      if (!litHooks || typeof litHooks.getKey !== 'function') return;
+    }
 
-    autoOpenedRef.current = key;
-    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef });
+    let cancelled = false;
+    autoOpeningRef.current = key;
+    openDoc({ txId: autoOpenDoc.txId, tagMap: autoOpenDoc.tagMap, storageRef: autoOpenDoc.storageRef })
+      .then((opened) => {
+        if (autoOpeningRef.current === key) autoOpeningRef.current = '';
+        if (cancelled || !opened) return;
+        autoOpenedRef.current = key;
 
-    // Clear params so refresh/back doesn't re-open repeatedly.
-    try {
-      const url = new URL(window.location.href);
-      ['__ceDocTx', '__ceDocRef', '__ceDocStorage', '__ceDocKind', '__ceDocName'].forEach((param) => {
-        url.searchParams.delete(param);
+        // Clear params so refresh/back doesn't re-open repeatedly.
+        try {
+          const url = new URL(window.location.href);
+          ['__ceDocTx', '__ceDocRef', '__ceDocStorage', '__ceDocKind', '__ceDocName'].forEach((param) => {
+            url.searchParams.delete(param);
+          });
+          window.history.replaceState({}, '', url.toString());
+        } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
+      })
+      .catch((error) => {
+        if (autoOpeningRef.current === key) autoOpeningRef.current = '';
+        log.warn('DocumentLibraryPanel: auto-open failed', error);
       });
-      window.history.replaceState({}, '', url.toString());
-    } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
-  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
+
+    return () => {
+      cancelled = true;
+      if (autoOpeningRef.current === key) autoOpeningRef.current = '';
+    };
+  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc, getActiveLitHooks]);
 
   const addCustomSbt = useCallback((sbt: CustomSbtEntry) => {
     const addr = normalizeSbtAddress(sbt?.address);
