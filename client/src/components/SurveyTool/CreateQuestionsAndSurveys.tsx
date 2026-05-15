@@ -103,7 +103,7 @@ import {
   buildCreateSurveyHashPatch,
   buildCreateSurveyMountSubmitResetPatch,
   buildCreateSurveyNetworkSwitchPatch,
-  buildCreateSurveyGateObjectsAndRecipients,
+  buildCreateSurveyGateOptions,
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyOpenLockKeyPatch,
   buildCreateSurveyQuestionFieldUpdateList,
@@ -479,6 +479,45 @@ type CreateSurveyGateOptionsResult = {
 type CreateSurveyGateOptionsArgs = {
   isStandaloneQuestion?: unknown;
 };
+interface CreateQuestionsAndSurveysGateSbt {
+  address?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+type CreateSurveyEncryptionTargets = {
+  survey: boolean;
+  questions: boolean;
+  questionTags: boolean;
+  docUrls: boolean;
+};
+type CreateSurveyEncryptionGatePolicyGate = UnknownRecord & {
+  chainId?: unknown;
+  color?: unknown;
+  gateId?: unknown;
+  label?: unknown;
+  litChain?: unknown;
+  mode?: unknown;
+  sbtAddress?: unknown;
+  sbtAddresses?: unknown;
+  type?: unknown;
+};
+type CreateSurveyEncryptionRecipient = {
+  accessControlConditions?: unknown;
+  chain?: unknown;
+  [key: string]: unknown;
+};
+type CreateSurveyEncryptionConfig =
+  | { enabled: false }
+  | { enabled: true; error: string }
+  | {
+    enabled: true;
+    status: 'lit-v1';
+    gate: CreateSurveyEncryptionGatePolicyGate | null;
+    gates: CreateSurveyEncryptionGatePolicyGate[];
+    recipients: CreateSurveyEncryptionRecipient[];
+    targets: CreateSurveyEncryptionTargets;
+  };
+
 interface CreateQuestionsAndSurveysProps {
   account?: string;
   provider?: unknown;
@@ -617,8 +656,7 @@ const writeCreateSurveyCache = writeCache as unknown as CreateSurveyCacheWriter;
 const writeCreateSurveyCacheOptimistic = writeCacheOptimistic as unknown as CreateSurveyCacheWriter;
 const contractScriptsForSubmit = contractScripts as unknown as CreateSurveyContractScriptsWithSession;
 
-const DOCUMENT_URL_ERROR_TEXT =
-  'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.';
+const DOCUMENT_URL_ERROR_TEXT = 'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.';
 
 const ensureManagedSurveysNet = (current: unknown = {}, netId: unknown = ''): ManagedCacheSnapshot => {
   const next: ManagedCacheSnapshot = isObjectLikeRecord(current) ? { ...current } : {};
@@ -913,13 +951,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   resolveGateOptions = (
     cfgIn: unknown = this.getResolvedSessionConfig(),
-    { isStandaloneQuestion = this.state?.isStandaloneQuestion }: CreateSurveyGateOptionsArgs = {},
-  ): CreateSurveyGateOptionsResult =>
-    resolveCreateSurveyGateOptions({
+    { isStandaloneQuestion = this.state?.isStandaloneQuestion }: CreateSurveyGateOptionsArgs = {}
+  ): CreateSurveyGateOptionsResult => {
+    return buildCreateSurveyGateOptions({
+      cfg: cfgIn,
       isStandaloneQuestion,
-      sessionConfig: cfgIn,
       sessionLabel: this.resolveLockAudienceSessionName(cfgIn),
     }) as CreateSurveyGateOptionsResult;
+  };
 
   ensureResolvedSessionConfigForSubmit = async (
     sessionConfigIn: unknown = this.getResolvedSessionConfig(),
