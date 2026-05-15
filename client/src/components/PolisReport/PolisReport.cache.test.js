@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
   buildClusterAnalysisDataKey,
+  buildPolisReportPdfFilename,
   buildPrecomputedDemoClusterState,
   buildRatingMatrixFromRealData,
   buildRatingMatrixFromDemo,
