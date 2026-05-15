@@ -2156,18 +2156,26 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     const { title, questions, isStandaloneQuestion, documentURLs, surveyLockGateIds } = this.state;
 
     const { gateMap, defaultGateId } = this.resolveGateOptions(sessionConfig, { isStandaloneQuestion });
-    const { normalizeKnownGateIds, resolvedSurveyLockGateIds, resolveQuestionSubmitGateIds, needsLit } =
-      buildCreateSurveySubmitGatePlan({
-        defaultGateId,
-        gateMap,
-        isStandaloneQuestion,
-        questions,
-        surveyLockGateIds,
-      });
+    const {
+      normalizeKnownGateIds,
+      resolvedSurveyLockGateIds,
+      resolveQuestionSubmitGateIds,
+      needsLit,
+    } = buildCreateSurveySubmitGatePlan({
+      defaultGateId,
+      gateMap,
+      isStandaloneQuestion,
+      questions,
+      surveyLockGateIds,
+    });
 
-    const chainIdFallback = isPureWorkerCanonicalAuthoring ? null : this.resolveSessionChainId(sessionConfig);
+    const chainIdFallback = this.resolveSessionChainId(sessionConfig);
 
-    const litHooks = needsLit ? this.resolveLitHooksForSubmit(sessionConfig, chainIdFallback) : null;
+    const scopedLitHooks = (
+      this.props.litHooks &&
+      typeof this.props.litHooks === 'object'
+    ) ? this.props.litHooks as CreateSurveyLitHooks : null;
+    const litHooks = needsLit ? (scopedLitHooks || getGlobalLitHooks() as CreateSurveyLitHooks | null) : null;
     if (needsLit) {
       if (!this.props.account) {
         this.setState(buildCreateSurveySubmitFailurePatch(`Connect a ${t('walletLower')} to encrypt this survey.`));
