@@ -1739,14 +1739,45 @@ class SBTPage extends Component<any, any> {
   };
 
   async attemptMintWithPasswordList(passwordList: unknown): Promise<void> {
+    let sbtAddressOriginalCase = '';
+    let targetSlug = '';
+    let targetAccountLower = '';
+    let targetChainId = '';
+    const isCurrentTarget = () => this.isMintTargetContextCurrent({
+      accountLower: targetAccountLower,
+      chainId: targetChainId,
+      sbtAddress: sbtAddressOriginalCase,
+      sessionSlug: targetSlug,
+    });
+    const applyMintInputForTarget = (inputField: string, inputValue: string) => new Promise<boolean>((resolve) => {
+      if (!this._isMounted || !isCurrentTarget()) {
+        resolve(false);
+        return;
+      }
+      this.setState(buildSbtPagePasswordMintInputPatch({
+        inputField,
+        inputValue,
+      }), () => resolve(isCurrentTarget()));
+    });
+
     try {
       if (!Array.isArray(passwordList) || passwordList.length === 0) return;
       const passwordTokens = passwordList as string[];
 
       const { provider } = this.props;
-      const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+      sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+      targetSlug = this.getEffectiveSessionSlug();
+      targetAccountLower = String(this.props.account || '').trim().toLowerCase();
+      targetChainId = this.getMintTargetChainId();
 
-      if (!sbtAddressOriginalCase || !provider) return;
+      if (!sbtAddressOriginalCase || !provider || !targetAccountLower || !targetChainId) return;
+      if (!isCurrentTarget()) return;
+
+      const targetOptions = {
+        accountLowerOverride: targetAccountLower,
+        chainIdOverride: targetChainId,
+        sessionSlugOverride: targetSlug,
+      };
 
       let chosen: string | null = null;
       let inviteToken: string | null = null;
@@ -1759,35 +1790,21 @@ class SBTPage extends Component<any, any> {
       }
 
       if (inviteToken) {
-        await new Promise<void>((resolve) => {
-          if (this._isMounted) {
-            this.setState(buildSbtPagePasswordMintInputPatch({
-              inputField: 'groupPasswordInput',
-              inputValue: inviteToken,
-            }), resolve);
-          } else {
-            resolve();
-          }
-        });
+        const didApply = await applyMintInputForTarget('groupPasswordInput', inviteToken);
+        if (!didApply) return;
 
-        await this.claimWithInviteCode(inviteToken, sbtAddressOriginalCase);
+        if (!isCurrentTarget()) return;
+        await this.claimWithInviteCode(inviteToken, sbtAddressOriginalCase, targetOptions);
         return;
       }
 
       if (this.state.hasInviteMint) {
         const fallbackPassword = passwordTokens[0];
         if (fallbackPassword) {
-          await new Promise<void>((resolve) => {
-            if (this._isMounted) {
-              this.setState(buildSbtPagePasswordMintInputPatch({
-                inputField: 'groupPasswordInput',
-                inputValue: fallbackPassword,
-              }), resolve);
-            } else {
-              resolve();
-            }
-          });
-          await this.claimWithGroupPassword(fallbackPassword, sbtAddressOriginalCase);
+          const didApply = await applyMintInputForTarget('groupPasswordInput', fallbackPassword);
+          if (!didApply) return;
+          if (!isCurrentTarget()) return;
+          await this.claimWithGroupPassword(fallbackPassword, sbtAddressOriginalCase, targetOptions);
           return;
         }
       }
@@ -1796,35 +1813,36 @@ class SBTPage extends Component<any, any> {
         const hashed = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(token));
         let ok = false;
         try {
-          ok = await contractScriptsUntyped.isPasswordValid(provider, sbtAddressOriginalCase, hashed, this.getEffectiveSessionSlug());
+          ok = await contractScriptsUntyped.isPasswordValid(provider, sbtAddressOriginalCase, hashed, targetSlug);
         } catch {
           ok = false;
         }
+        if (!isCurrentTarget()) return;
         if (ok) { chosen = token; break; }
       }
 
       if (!chosen) {
-        if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: "All claim codes have been used." }));
+        if (this._isMounted && isCurrentTarget()) {
+          this.setState(buildSbtPageErrorPatch({ error: "All claim codes have been used." }));
+        }
         return;
       }
 
-      await new Promise<void>((resolve) => {
-        if (this._isMounted) {
-          this.setState(buildSbtPagePasswordMintInputPatch({
-            inputField: 'manualPasswordInput',
-            inputValue: chosen,
-          }), resolve);
-        } else {
-          resolve();
-        }
-      });
+      const didApply = await applyMintInputForTarget('manualPasswordInput', chosen);
+      if (!didApply) return;
 
-      await this.handleMint(false);
+      if (!isCurrentTarget()) return;
+      await this.handleMint(false, {
+        ...targetOptions,
+        sbtAddressOverride: sbtAddressOriginalCase,
+      });
       if (this.state.mintingStatus !== 'success') {
         // Rare race: if it failed after check, fall through silently (the UI already shows error)
       }
     } catch (err) {
-      if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(err, 'Failed to mint with provided codes.') }));
+      if (this._isMounted && isCurrentTarget()) {
+        this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(err, 'Failed to mint with provided codes.') }));
+      }
     }
   }
 
