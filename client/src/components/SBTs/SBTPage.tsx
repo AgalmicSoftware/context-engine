@@ -282,6 +282,7 @@ type QueueLocalStorageJsonWriteOptions = {
 type SbtPageInviteClaimPayload = SbtPageDecodedInviteInput;
 type SbtPageInviteClaimOptions = {
   suppressErrors?: boolean;
+  sessionSlugOverride?: unknown;
 };
 type SbtPageTransactionResult = Record<string, unknown> & {
   transactionHash?: string;
@@ -827,8 +828,12 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
+    // Regression guard: URL auto-mint must keep using the address/session captured
+    // from the original intent even if routing props change during metadata awaits.
+    const targetSlug = this.getEffectiveSessionSlug();
+
     if (!targetCode) {
-      const minted = await this.autoMintPublicIfAllowed(currentSbtAddress);
+      const minted = await this.autoMintPublicIfAllowed(currentSbtAddress, { sessionSlugOverride: targetSlug });
       if (minted) markAutoMintSuccess();
       return minted;
     }
@@ -844,12 +849,12 @@ class SBTPage extends Component<any, any> {
     });
 
     if (targetInvite) {
-      const minted = await this.claimWithInviteCode(targetInvite, currentSbtAddress);
+      const minted = await this.claimWithInviteCode(targetInvite, currentSbtAddress, { sessionSlugOverride: targetSlug });
       if (minted) markAutoMintSuccess();
       return minted;
     }
 
-    const slug = this.getEffectiveSessionSlug();
+    const slug = targetSlug;
     let sbtInfo = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
@@ -863,14 +868,18 @@ class SBTPage extends Component<any, any> {
     }
 
     if (sbtInfo?.hasPasswordMint) {
-      const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress);
+      const minted = await this.claimWithGroupPassword(targetPassword, currentSbtAddress, { sessionSlugOverride: slug });
       if (minted) markAutoMintSuccess();
       return minted;
     }
 
     const onchainGph = await contractScriptsUntyped.getGroupPasswordHash('none', currentSbtAddress, slug);
     if (onchainGph && onchainGph !== ethers.constants.HashZero) {
-      const minted = await this.mintUnlimitedWithGroupPassword();
+      const minted = await this.mintUnlimitedWithGroupPassword({
+        passwordOverride: targetPassword,
+        sbtAddressOverride: currentSbtAddress,
+        sessionSlugOverride: slug,
+      });
       if (minted) markAutoMintSuccess();
       return minted;
     }
@@ -973,11 +982,17 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  autoMintPublicIfAllowed = async (sbtAddress: unknown): Promise<boolean> => {
+  autoMintPublicIfAllowed = async (sbtAddress: unknown, options: any = {}): Promise<boolean> => {
     if (!sbtAddress) return false;
 
-    const slug = this.getEffectiveSessionSlug();
-    let sbtInfo: unknown = this.state.sbtInfo;
+    const slug = options?.sessionSlugOverride != null
+      ? String(options.sessionSlugOverride || '')
+      : this.getEffectiveSessionSlug();
+    const currentPropAddress = resolveSbtAddressString(this.props.SBTAddress);
+    let sbtInfo: unknown = (
+      currentPropAddress &&
+      String(currentPropAddress).toLowerCase() === String(sbtAddress).toLowerCase()
+    ) ? this.state.sbtInfo : null;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
         sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', sbtAddress, slug);
@@ -1009,7 +1024,11 @@ class SBTPage extends Component<any, any> {
       return false;
     }
 
-    return await this.handleMint(true);
+    return await this.handleMint(true, {
+      sbtAddressOverride: sbtAddress,
+      sessionSlugOverride: slug,
+      sbtInfoOverride: sbtInfo,
+    });
   };
 
   handleGroupPasswordInputChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -1045,6 +1064,10 @@ class SBTPage extends Component<any, any> {
 
       if (!sbt) return { ok: false, error: new Error(`Missing ${t('sbt')} address`) };
 
+      const slug = options?.sessionSlugOverride != null
+        ? String(options.sessionSlugOverride || '')
+        : this.getEffectiveSessionSlug();
+
       if (this._isMounted) this.setState(buildSbtPageMintPendingPatch({ clearError: true }));
       const tx = await contractScripts.claimWithInvite(
         this.props.provider,
@@ -1060,7 +1083,7 @@ class SBTPage extends Component<any, any> {
 
       const meLower = this.props.account.toLowerCase();
       this.applyLocalMintSuccess(meLower);
-      this.refreshSbtDataWithSlug(sbt);
+      this.refreshSbtDataWithSlug(sbt, undefined, slug);
 
       this.clearAutoMintUrlIntent();
 
@@ -1077,7 +1100,11 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  claimWithGroupPassword = async (rawPassword: unknown, sbtOverride?: unknown): Promise<boolean> => {
+  claimWithGroupPassword = async (
+    rawPassword: unknown,
+    sbtOverride?: unknown,
+    options: any = {}
+  ): Promise<boolean> => {
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
@@ -1093,11 +1120,13 @@ class SBTPage extends Component<any, any> {
 
       if (!sbt) return false;
 
-      const slug = this.getEffectiveSessionSlug();
+      const slug = options?.sessionSlugOverride != null
+        ? String(options.sessionSlugOverride || '')
+        : this.getEffectiveSessionSlug();
       let sbtInfo = this.state.sbtInfo;
       if (!sbtInfo || typeof sbtInfo !== 'object') sbtInfo = {};
 
-      let onchainHash = this.state.groupPasswordHash || null;
+      let onchainHash = options?.groupPasswordHashOverride || (sbtOverride ? null : this.state.groupPasswordHash) || null;
       if (!onchainHash) {
         try { onchainHash = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug); } catch (e) { sbtLog.warn('SBTPage: fallback', e); }
       }
@@ -1181,7 +1210,10 @@ class SBTPage extends Component<any, any> {
         }
 
         const suppressErrors = attempt < maxAttempts - 1;
-        const result = await this.claimWithInvitePayload(payload, sbt, { suppressErrors });
+        const result = await this.claimWithInvitePayload(payload, sbt, {
+          suppressErrors,
+          sessionSlugOverride: slug,
+        });
         if (result && result.ok) return true;
 
         lastError = result?.error || new Error('Invite claim failed.');
@@ -1215,13 +1247,13 @@ class SBTPage extends Component<any, any> {
     return false;
   };
 
-  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown): Promise<boolean> => {
+  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown, options: any = {}): Promise<boolean> => {
     const payload = this.decodeInviteInput(rawCode);
     if (payload) {
-      const result = await this.claimWithInvitePayload(payload, sbtOverride);
+      const result = await this.claimWithInvitePayload(payload, sbtOverride, options);
       return !!result?.ok;
     }
-    return await this.claimWithGroupPassword(rawCode, sbtOverride);
+    return await this.claimWithGroupPassword(rawCode, sbtOverride, options);
   };
 
   // Helpers
@@ -2739,23 +2771,27 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  async mintUnlimitedWithGroupPassword(): Promise<boolean> {
+  async mintUnlimitedWithGroupPassword(options: any = {}): Promise<boolean> {
     sbtLog.log('[MANUAL-MINT] Starting manual mint...');
     try {
       if (!this.props.account) {
         this.props.toggleLoginModal(true);
         return false;
       }
-      const password = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPasswordInput);
+      const password = cryptoUtils.normalizeGroupPasswordInput(
+        options?.passwordOverride != null ? options.passwordOverride : this.state.groupPasswordInput
+      );
       if (!password) {
         this.setState(buildSbtPageErrorPatch({ error: 'Enter group password first.' }));
         return false;
       }
 
-      const sbt = resolveSbtAddressString(this.props.SBTAddress);
+      const sbt = resolveSbtAddressString(options?.sbtAddressOverride || this.props.SBTAddress);
 
       sbtLog.log('[MANUAL-MINT] Preparing mint for', sbt, '...');
-      const slug = this.getEffectiveSessionSlug();
+      const slug = options?.sessionSlugOverride != null
+        ? String(options.sessionSlugOverride || '')
+        : this.getEffectiveSessionSlug();
 
       sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
       const onchain = await contractScriptsUntyped.getGroupPasswordHash('none', sbt, slug);
@@ -2825,17 +2861,25 @@ class SBTPage extends Component<any, any> {
     }));
   };
 
-  handleMint = async (forceEventRefreshOnSuccess: boolean = true): Promise<boolean> => {
+  handleMint = async (forceEventRefreshOnSuccess: boolean = true, options: any = {}): Promise<boolean> => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return false;
     }
 
-    const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
+    const sbtAddressOriginalCase = resolveSbtAddressString(options?.sbtAddressOverride || this.props.SBTAddress);
 
     if (!sbtAddressOriginalCase) return false;
 
-    const { sbtInfo, mintPassword, mintStep, manualPasswordInput } = this.state;
+    const {
+      mintPassword,
+      mintStep,
+      manualPasswordInput,
+    } = this.state;
+    const sbtInfo = options?.sbtInfoOverride || this.state.sbtInfo || {};
+    const slug = options?.sessionSlugOverride != null
+      ? String(options.sessionSlugOverride || '')
+      : this.getEffectiveSessionSlug();
 
     try {
       if (sbtInfo.hasPasswordMint) {
@@ -2854,7 +2898,7 @@ class SBTPage extends Component<any, any> {
               this.props.provider,
               sbtAddressOriginalCase,
               hashedPassword,
-              this.getEffectiveSessionSlug()
+              slug
             );
             if (!isValid) {
               if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid password.' }));
@@ -2894,7 +2938,7 @@ class SBTPage extends Component<any, any> {
           // Optimistic + parent refresh
           const meLower = this.props.account.toLowerCase();
           this.applyLocalMintSuccess(meLower);
-          this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
+          this.refreshSbtDataWithSlug(sbtAddressOriginalCase, undefined, slug);
 
           // Cleanup auto-mint intent to prevent loop on refresh
           this.clearAutoMintUrlIntent();
@@ -2916,7 +2960,7 @@ class SBTPage extends Component<any, any> {
         // Optimistic + parent refresh
         const meLower = this.props.account.toLowerCase();
         this.applyLocalMintSuccess(meLower);
-        this.refreshSbtDataWithSlug(sbtAddressOriginalCase);
+        this.refreshSbtDataWithSlug(sbtAddressOriginalCase, undefined, slug);
 
         // Cleanup auto-mint intent to prevent loop on refresh
         this.clearAutoMintUrlIntent();
