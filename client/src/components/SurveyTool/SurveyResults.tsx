@@ -138,6 +138,10 @@ import {
   SurveyResultsLockedResponsesBanner,
   SurveyResultsLockedResponsesToggle,
 } from './SurveyResultsLockedResponsesPanel';
+import {
+  SurveyResultsFreeformAggregatorSummary,
+  SurveyResultsMultichoiceAggregatorSummary,
+} from './SurveyResultsAggregatorSummaries';
 
 export {
   countQuestionModeResponses,
