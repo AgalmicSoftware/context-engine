@@ -587,8 +587,8 @@ export default function DocumentLibraryPanel({
   const panelContextKey = useMemo(() => {
     const slug = toStr(sessionSlug).trim().toLowerCase();
     if (mode === 'session') {
-      const id = slug || normalizedSessionIdHex;
-      return id ? `session:${id}` : '';
+      const id = normalizedSessionIdHex || '';
+      return (slug || id) ? `session:${slug}:${id}` : '';
     }
     if (mode === 'sbt') {
       const chain = resolvedSbtChainId ? String(resolvedSbtChainId) : '';
