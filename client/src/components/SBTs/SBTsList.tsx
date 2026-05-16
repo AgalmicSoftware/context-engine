@@ -12,7 +12,7 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync, faTrash, faPlus, faCog, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
@@ -23,6 +23,10 @@ import {
   SbtListDetailsPanel,
   SbtListMetaRow,
 } from './SbtListCardChrome';
+import {
+  SbtListCompactLinkCard,
+  SbtListStandardCard,
+} from './SbtListDisplayCards';
 import {
   SbtListSectionLoadingHint,
   SbtListSectionTitle,
@@ -3210,33 +3214,21 @@ const SBTsList = ({
     );
   };
 
-  const renderSbtDetailsToggle = (sbt: any, details: any, detailsId: any, buttonLabel: any) => {
-    if (miniaturized || !details?.hasDetails) return null;
-    const sbtAddressLower = String(sbt?.sbtAddress || '').toLowerCase();
-    const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
-    return (
-      <div className={styles.sbtDetailsFooter}>
-        <button
-          type="button"
-          className={styles.sbtDetailsToggle}
-          aria-controls={detailsId}
-          aria-expanded={isExpanded}
-          aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${buttonLabel}`}
-          onClick={() => toggleExpandedSbt(sbt?.sbtAddress)}
-        >
-          <FontAwesomeIcon icon={isExpanded ? faChevronUp : faChevronDown} />
-        </button>
-      </div>
-    );
-  };
-
-  const renderCompactSbtLinkCard = (sbt: any, keyPrefix: any = 'sbt') => {
-    if (!sbt || !sbt.sbtAddress || !sbt.sbtInfo) return null;
-    const { image } = sbt.sbtInfo;
-    const name = getSbtDisplayName(sbt.sbtInfo) || `Unnamed ${t('sbt')}`;
-    const description = getSbtDescriptionText(sbt.sbtInfo);
-    const locked = isPasswordLocked(sbt);
-    const sbtAddressLower = String(sbt.sbtAddress || '').toLowerCase();
+  const renderCompactSbtLinkCard = (
+    sbt: SbtListItem | null | undefined,
+    keyPrefix = 'sbt'
+  ): React.ReactNode => {
+    const model = buildSbtListDisplayCardModel({
+      addressMode: 'raw',
+      getDescriptionText: getSbtDescriptionText,
+      getDisplayName: getSbtDisplayName,
+      isPasswordLocked,
+      keyPrefix,
+      resolveSbtSessionSlug,
+      sbt,
+      unnamedLabel: t('sbt'),
+    });
+    if (!model) return null;
     const compactCardClassName = [
       styles.sbtItem,
       miniaturized && viewMode === 'modal' ? styles.modalMiniSbtItem : '',
@@ -3244,23 +3236,14 @@ const SBTsList = ({
 
     return (
       <SbtListCompactLinkCard
-        key={model.key}
         className={compactCardClassName}
-        href={buildSbtHref(sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
-        onClick={(event: any) => handleSbtLinkClick(event, sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
-      >
-        <div className={styles.sbtImage} style={{ position: 'relative' }}>
-          {/* {locked && <FontAwesomeIcon icon={faLock} className={styles.inlineLock} />} */}
-          {image && <img src={normalizeTokenUri(image) || undefined} alt={`${t('sbt')} Thumbnail`} />}
-        </div>
-        <div className={styles.sbtInfo}>
-          <p className={styles.sbtName}>
-            {name}
-            {locked && <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />}
-          </p>
-          <p className={styles.sbtDescription}>{description || 'No description.'}</p>
-        </div>
-      </a>
+        href={buildSbtHref(model.sbtAddress, model.sessionSlug)}
+        imageStyle={resolveSbtListRelativeImageStyle()}
+        model={model}
+        onClick={(event) => handleSbtLinkClick(event, model.sbtAddress, model.sessionSlug)}
+        sbtLabel={t('sbt')}
+        styles={styles}
+      />
     );
   };
 
@@ -3378,13 +3361,23 @@ const SBTsList = ({
     />
   );
 
-  const renderSBTButton = (sbt: any) => {
-    if (!sbt || !sbt.sbtAddress || !sbt.sbtInfo) return null;
-    const { image } = sbt.sbtInfo;
-    const name = getSbtDisplayName(sbt.sbtInfo) || `Unnamed ${t('sbt')}`;
-    const description = getSbtDescriptionText(sbt.sbtInfo);
-    const locked = isPasswordLocked(sbt);
-    const sbtAddressLower = String(sbt.sbtAddress || '').toLowerCase();
+  const renderSBTButton = (sbt: SbtListItem | null | undefined): React.ReactNode => {
+    const model = buildSbtListDisplayCardModel({
+      getDescriptionText: getSbtDescriptionText,
+      getDisplayName: getSbtDisplayName,
+      isPasswordLocked,
+      resolveSbtSessionSlug,
+      sbt,
+      unnamedLabel: t('sbt'),
+    });
+    if (!model) return null;
+    const {
+      name,
+      sbtAddress,
+      sbtAddressLower,
+      sessionSlug,
+    } = model;
+    const resolvedSbt = sbt as SbtListItem;
     const details = getSbtCardDetails(sbt);
     const detailsId = `sbt-details-${sbtAddressLower}`;
     const isExpanded = expandedSbtAddresses.has(sbtAddressLower);
@@ -3397,30 +3390,22 @@ const SBTsList = ({
     }
 
     return (
-      <article
-        key={`${resolveSbtSessionSlug(sbt)}|${sbt.sbtAddress}`}
-        className={`${styles.standardCardShell} ${isExpanded ? styles.standardCardShellExpanded : ''}`}
-      >
-        <a
-          className={styles.standardCardBodyLink}
-          href={buildSbtHref(sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
-          onClick={(event: any) => handleSbtLinkClick(event, sbt.sbtAddress, resolveSbtSessionSlug(sbt))}
-        >
-          <div className={styles.standardCardImage} style={{ position: 'relative' }}>
-            {/* {locked && <FontAwesomeIcon icon={faLock} className={styles.inlineLock} />} */}
-            {image && <img src={normalizeTokenUri(image) || undefined} alt={`${t('sbt')} Thumbnail`} />}
-          </div>
-          <div className={styles.standardCardInfo}>
-            <p className={styles.standardCardName}>
-              {name}
-              {locked && <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />}
-            </p>
-            <p className={styles.standardCardDescription}>{description || 'No description.'}</p>
-          </div>
-        </a>
-        {renderSbtDetailsToggle(sbt, details, detailsId, name || sbt.sbtAddress || t('sbt'))}
-        {isExpanded && renderSbtDetailsPanel(details, detailsId)}
-      </article>
+      <SbtListStandardCard
+        href={buildSbtHref(sbtAddress, sessionSlug)}
+        imageStyle={resolveSbtListRelativeImageStyle()}
+        isExpanded={isExpanded}
+        metaRow={renderSbtMetaRow(resolvedSbt, details, detailsId, name || resolvedSbt.sbtAddress || t('sbt'))}
+        detailsPanel={renderSbtDetailsPanel(details, detailsId)}
+        model={model}
+        onClick={(event) => handleSbtLinkClick(event, sbtAddress, sessionSlug)}
+        sbtLabel={t('sbt')}
+        shellClassName={buildSbtListExpandedCardShellClassName({
+          baseClassName: styles.standardCardShell,
+          expandedClassName: styles.standardCardShellExpanded,
+          isExpanded,
+        })}
+        styles={styles}
+      />
     );
   };
 
