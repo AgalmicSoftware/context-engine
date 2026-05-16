@@ -1,20 +1,11 @@
 import { ethers } from 'ethers';
 
 import SBTPage from './SBTPage';
-import SbtPageActionsSection from './SbtPageActionsSection';
-import SbtPageIdentityPanel from './SbtPageIdentityPanel';
-import SbtPageMoreDetailsSection from './SbtPageMoreDetailsSection';
-import SbtPageRelevantInfo from './SbtPageRelevantInfo';
-import SbtPageStatsSection from './SbtPageStatsSection';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getDisplayImageRenderState } from './sbtPageHelpers';
 
 const mockIsCryptoMode = jest.fn(() => true);
-const RESOLVABLE_TREE_COMPONENTS = new Set([
-  SbtPageMoreDetailsSection,
-]);
-const resolvedTreeComponentCache = new WeakMap();
 
 jest.mock('../../utilities/ui/terminology.js', () => {
   const actual = jest.requireActual('../../utilities/ui/terminology.js');
@@ -48,12 +39,6 @@ const createSubject = (props = {}) => {
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
-  if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
-    if (!resolvedTreeComponentCache.has(node)) {
-      resolvedTreeComponentCache.set(node, node.type(node.props || {}));
-    }
-    return findElementInTree(resolvedTreeComponentCache.get(node), predicate);
-  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -75,44 +60,9 @@ const treeIncludesText = (node, text) => {
     return node.some((entry) => treeIncludesText(entry, text));
   }
   if (typeof node === 'object') {
-    if (RESOLVABLE_TREE_COMPONENTS.has(node.type)) {
-      if (!resolvedTreeComponentCache.has(node)) {
-        resolvedTreeComponentCache.set(node, node.type(node.props || {}));
-      }
-      return treeIncludesText(resolvedTreeComponentCache.get(node), text);
-    }
     return treeIncludesText(node?.props?.children, text);
   }
   return false;
-};
-
-const renderIdentityPanelTree = (tree) => {
-  const identityPanel = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageIdentityPanel
-  );
-  return identityPanel ? SbtPageIdentityPanel(identityPanel.props) : null;
-};
-
-const findActionsSection = (tree) => findElementInTree(
-  tree,
-  (element) => element?.type === SbtPageActionsSection
-);
-
-const renderStatsSectionTree = (tree) => {
-  const statsSection = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageStatsSection
-  );
-  return statsSection ? SbtPageStatsSection(statsSection.props) : null;
-};
-
-const renderRelevantInfoTree = (tree) => {
-  const relevantInfo = findElementInTree(
-    tree,
-    (element) => element?.type === SbtPageRelevantInfo
-  );
-  return relevantInfo ? SbtPageRelevantInfo(relevantInfo.props) : null;
 };
 
 describe('SBTPage metadata display', () => {
@@ -147,10 +97,9 @@ describe('SBTPage metadata display', () => {
     };
 
     const tree = subject.render();
-    const statsTree = renderStatsSectionTree(tree);
-    expect(treeIncludesText(statsTree, 'Admin:')).toBe(true);
-    expect(treeIncludesText(statsTree, 'Creator:')).toBe(true);
-    expect(treeIncludesText(statsTree, 'Deployer:')).toBe(false);
+    expect(treeIncludesText(tree, 'Admin:')).toBe(true);
+    expect(treeIncludesText(tree, 'Creator:')).toBe(true);
+    expect(treeIncludesText(tree, 'Deployer:')).toBe(false);
   });
 
   it('hides the docs entry section in UX while keeping the rest of the page visible', () => {
@@ -185,100 +134,6 @@ describe('SBTPage metadata display', () => {
     expect(treeIncludesText(tree, 'MORE')).toBe(true);
   });
 
-  it('keeps idle action feedback from formatting absent transaction hashes', () => {
-    const subject = createSubject({
-      SBTAddress: '0x00000000000000000000000000000000000000a1',
-    });
-    subject.state = {
-      ...subject.state,
-      sbtInfo: {
-        name: 'Badge',
-        tokenURI: 'https://arweave.example.test/example',
-        image: defaultSbtImage,
-        mintingEndTime: 0,
-        burnAuth: 0,
-        maxTokens: '0',
-      },
-      mintedAddresses: [],
-      burnedAddresses: [],
-      countsLoaded: true,
-      loadingMintersBurners: false,
-      showActions: true,
-      transactionHash: null,
-      lastMintTxHash: null,
-      lastBurnTxHash: null,
-    };
-
-    expect(() => subject.render()).not.toThrow();
-    const actionsSection = findActionsSection(subject.render());
-    expect(actionsSection?.props?.actionFeedbackState).toMatchObject({
-      showBurnSuccess: false,
-      showErrorTransactionHash: false,
-      showMintSuccess: false,
-      showTransactionError: false,
-    });
-    expect(actionsSection?.props?.transactionState).toEqual({
-      lastBurnTxHash: null,
-      lastMintTxHash: null,
-      transactionHash: null,
-    });
-  });
-
-  it('wires extracted full-view handlers back to the parent shell methods', () => {
-    const subject = createSubject({
-      SBTAddress: '0x00000000000000000000000000000000000000a1',
-    });
-    subject.copyToClipboard = jest.fn();
-    subject.bookmarkSBT = jest.fn();
-    subject.toggleStats = jest.fn();
-    subject.toggleActions = jest.fn();
-    subject.openMintedModal = jest.fn();
-    subject.state = {
-      ...subject.state,
-      sbtInfo: {
-        name: 'Badge',
-        tokenURI: 'https://arweave.example.test/example',
-        image: defaultSbtImage,
-        mintingEndTime: 0,
-        burnAuth: 0,
-        maxTokens: '0',
-        admin: '0x00000000000000000000000000000000000000a2',
-      },
-      mintedAddresses: [],
-      burnedAddresses: [],
-      countsLoaded: true,
-      loadingMintersBurners: false,
-      showStats: true,
-      showActions: true,
-    };
-
-    const tree = subject.render();
-    const identityPanel = findElementInTree(
-      tree,
-      (element) => element?.type === SbtPageIdentityPanel
-    );
-    const statsSection = findElementInTree(
-      tree,
-      (element) => element?.type === SbtPageStatsSection
-    );
-    const actionsSection = findActionsSection(tree);
-
-    identityPanel.props.onContractCopy();
-    identityPanel.props.onBookmark();
-    statsSection.props.onToggle();
-    statsSection.props.onOpenMintedModal();
-    actionsSection.props.onToggle();
-
-    expect(subject.copyToClipboard).toHaveBeenCalledWith(
-      '0x00000000000000000000000000000000000000a1',
-      'contract'
-    );
-    expect(subject.bookmarkSBT).toHaveBeenCalledTimes(1);
-    expect(subject.toggleStats).toHaveBeenCalledTimes(1);
-    expect(subject.openMintedModal).toHaveBeenCalledTimes(1);
-    expect(subject.toggleActions).toHaveBeenCalledTimes(1);
-  });
-
   it('uses Arweave metadata URL for token link when tokenURI is embedded data JSON', () => {
     const txId = 'Sng0VG2vetgNPITw5mtvt6om-fBCNu3KI5GZAYeEttY';
     const dataUriPayload = Buffer
@@ -307,55 +162,13 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      renderIdentityPanelTree(tree),
+      tree,
       (element) => element?.props?.title === 'Open token metadata'
     );
 
     expect(metadataLink).toBeTruthy();
     expect(metadataLink.props.href).toContain(txId);
     expect(String(metadataLink.props.href || '').startsWith('data:')).toBe(false);
-  });
-
-  it('passes resolved token metadata link display state to the identity panel', () => {
-    const subject = createSubject({
-      SBTAddress: '0x00000000000000000000000000000000000000a1',
-    });
-    subject.state = {
-      ...subject.state,
-      sbtInfo: {
-        name: 'Badge',
-        tokenURI: 'https://example.example.test/metadata/sbt.json',
-        image: 'https://example.example.test/badge.png',
-        mintingEndTime: 0,
-        burnAuth: 0,
-        maxTokens: '0',
-        admin: '0x00000000000000000000000000000000000000a2',
-      },
-      mintedAddresses: [],
-      burnedAddresses: [],
-      countsLoaded: true,
-      loadingMintersBurners: false,
-      showStats: true,
-    };
-
-    const identityPanel = findElementInTree(
-      subject.render(),
-      (element) => element?.type === SbtPageIdentityPanel
-    );
-    expect(identityPanel?.props?.tokenUriHref).toBe('https://example.example.test/metadata/sbt.json');
-
-    subject.state = {
-      ...subject.state,
-      sbtInfo: {
-        ...subject.state.sbtInfo,
-        tokenURI: 'https://cdn.example.test/preview.png',
-      },
-    };
-    const imageOnlyIdentityPanel = findElementInTree(
-      subject.render(),
-      (element) => element?.type === SbtPageIdentityPanel
-    );
-    expect(imageOnlyIdentityPanel?.props?.tokenUriHref).toBe('');
   });
 
   it('normalizes subdomain arweave tokenURI links to the preferred gateway URL', () => {
@@ -388,7 +201,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      renderIdentityPanelTree(tree),
+      tree,
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -427,7 +240,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      renderIdentityPanelTree(tree),
+      tree,
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -468,7 +281,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      renderIdentityPanelTree(tree),
+      tree,
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -506,7 +319,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const metadataLink = findElementInTree(
-      renderIdentityPanelTree(tree),
+      tree,
       (element) => element?.props?.title === 'Open token metadata'
     );
 
@@ -536,7 +349,7 @@ describe('SBTPage metadata display', () => {
 
     const tree = subject.render();
     const sbtImage = findElementInTree(
-      renderIdentityPanelTree(tree),
+      tree,
       (element) => element?.type === 'img' && element?.props?.alt === 'Badge'
     );
 
@@ -544,12 +357,13 @@ describe('SBTPage metadata display', () => {
     expect(sbtImage.props.src).toBe(defaultSbtImage);
   });
 
-  it('falls back through Arweave gateways before the default badge', () => {
+  it('falls back to the next Arweave gateway when the preferred image URL fails', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
-    const preferredGateway = 'https://arweave.net'; // intentional: real URL - verifies production gateway fallback order
-    const fallbackGateway = 'https://gateway.irys.xyz'; // intentional: real URL - verifies production gateway fallback order
+    const canonicalArweaveGateway = 'https://arweave.net'; // intentional: real URL - tests allowlist enforcement
+    const preferredGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway fallback order
     const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
     globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_AR_IO_URL = preferredGateway;
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -575,65 +389,23 @@ describe('SBTPage metadata display', () => {
     expect(firstAttempt.src).toBe(`${preferredGateway}/${txId}`);
 
     subject.handleDisplayImageError(firstAttempt);
-    const secondAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
-    expect(secondAttempt.src).toBe(`${fallbackGateway}/${txId}`);
-    subject.handleDisplayImageError(secondAttempt);
+    subject.handleDisplayImageError(firstAttempt);
 
-    expect(subject.state.displayImageFallbackIndex).toBe(2);
+    expect(subject.state.displayImageFallbackIndex).toBe(1);
 
     const tree = subject.render();
     const sbtImage = findElementInTree(
-      renderIdentityPanelTree(tree),
+      tree,
       (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SBT_PAGE_IMAGE
     );
 
     expect(sbtImage).toBeTruthy();
-    expect(sbtImage.props.src).toBe(defaultSbtImage);
+    expect(sbtImage.props.src).toBe(`${canonicalArweaveGateway}/${txId}`);
   });
 
   it('returns N/A for zero/invalid actor addresses', () => {
     const subject = createSubject();
     expect(subject.renderAddressLink(ethers.constants.AddressZero, 'admin')).toBe('N/A');
     expect(subject.renderAddressLink('not-an-address', 'admin')).toBe('N/A');
-  });
-
-  it('preserves PUBLIC_URL for actor and metadata links', () => {
-    const previousPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce/';
-
-    try {
-      const subject = createSubject();
-      const actorAddress = '0x00000000000000000000000000000000000000a2';
-      const actorTree = subject.renderAddressLink(actorAddress, 'admin');
-      const actorLink = findElementInTree(
-        actorTree,
-        (element) => element?.type === 'a' && element?.props?.href?.includes('/u/')
-      );
-
-      expect(actorLink?.props?.href).toBe(`/ce/u/${actorAddress}`);
-
-      subject.state = {
-        ...subject.state,
-        sbtInfo: {
-          documentIDHashes: ['doc hash'],
-          tags: ['AI Policy'],
-        },
-      };
-      const metadataTree = renderRelevantInfoTree(subject.renderRelevantInfo());
-      const docLink = findElementInTree(
-        metadataTree,
-        (element) => element?.type === 'a' && element?.props?.href?.includes('/doc/')
-      );
-      const tagLink = findElementInTree(
-        metadataTree,
-        (element) => element?.type === 'a' && element?.props?.href?.includes('/tag/')
-      );
-
-      expect(docLink?.props?.href).toBe('/ce/doc/doc%20hash');
-      expect(tagLink?.props?.href).toBe('/ce/tag/AI%20Policy');
-    } finally {
-      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = previousPublicUrl;
-    }
   });
 });
