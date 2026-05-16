@@ -512,6 +512,8 @@ const AdminPage = ({
   const rawMetadataCopyResetRef = useRef<any>(null);
   const prevSelectedSlugForDraftRef = useRef<any>(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef<any>(selectedSlug);
+  const metadataDraftTouchedRef = useRef<any>(metadataDraftTouched);
+  metadataDraftTouchedRef.current = metadataDraftTouched;
 
   const handleSecretChange = useCallback((key: any, value: any) => {
     setSecrets((prev: any) => ({ ...prev, [key]: value }));
@@ -873,7 +875,7 @@ const AdminPage = ({
     prevSelectedSlugForDraftRef.current = selectedSlug;
     // Regression guard: selectedSlug and groupMetadata can update in one commit.
     // Always rehydrate on session changes; only preserve dirty drafts within the same session.
-    if (!slugChanged && metadataDraftTouched) return;
+    if (!slugChanged && metadataDraftTouchedRef.current) return;
     setMetadataDraftTouched(false);
     setMetadataContractDraftTouched(false);
     setMetadataContractsVerified(false);
@@ -886,8 +888,6 @@ const AdminPage = ({
     setMetadataConfigDraft(buildAdminMetadataDraft(groupMetadata || {}));
     setMetadataAutoFeatureDraft(resolveAutoFeatureBySessionSlug(groupMetadata) !== false);
     setCopiedRawMetadataJson(false);
-    // `metadataDraftTouched` is intentionally omitted so same-session edits do not retrigger hydration.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupMetadata, selectedSlug]);
 
   useEffect(() => {
@@ -1886,7 +1886,6 @@ const AdminPage = ({
       },
     });
     return { data, configPayload };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     account,
     baseWorkerUrl,
