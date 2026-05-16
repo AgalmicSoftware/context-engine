@@ -31,10 +31,13 @@ jest.mock('./SBTPage', () => (props) => {
   mockSBTPage(props);
   return (
     <div data-testid="mock-sbt-page">
-      <button type="button" data-testid="mock-sbt-nested-button">
-        Nested Action
-      </button>
-      <div role="button" tabIndex={0} data-testid="mock-sbt-ignore-nav" data-featured-card-ignore-nav="true">
+      <button type="button" data-testid="mock-sbt-nested-button">Nested Action</button>
+      <div
+        role="button"
+        tabIndex={0}
+        data-testid="mock-sbt-ignore-nav"
+        data-featured-card-ignore-nav="true"
+      >
         Nested Custom Action
       </div>
     </div>
@@ -50,10 +53,14 @@ jest.mock('./CreateSBTGroup', () => {
 jest.mock('../TagPage/TagModal', () => (props) => {
   mockTagModal(props);
   if (!props.isOpen) return null;
-  return <div data-testid="mock-tag-modal">{props.activeTag}</div>;
+  return (
+    <div data-testid="mock-tag-modal">
+      {props.activeTag}
+    </div>
+  );
 });
 
-jest.mock('../../utilities/web3/chainGateway.js', () => ({
+jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   default: {
     getRelevantBlockWindowForFilter: (...args) => mockGetRelevantBlockWindowForFilter(...args),
@@ -77,7 +84,6 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 jest.mock('../../utilities/arweave/arweaveUrls.js', () => ({
-  buildArweaveGatewayUrlCandidates: jest.fn((value = '') => [String(value || '').trim()]),
   normalizeArweaveUrl: jest.fn((value = '') => String(value || '').trim()),
 }));
 
@@ -122,11 +128,7 @@ jest.mock('../../utilities/session/sessionDemoCompat.js', () => {
 });
 
 const setupGroupMocks = () => {
-  mockNormalizeSessionSlug.mockImplementation((value = '') =>
-    String(value || '')
-      .trim()
-      .toLowerCase(),
-  );
+  mockNormalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
   mockGetAllSessionEntries.mockReturnValue([
     ['alpha', { slug: 'alpha' }],
     ['beta', { slug: 'beta' }],
@@ -150,18 +152,14 @@ const setupGroupMocks = () => {
   mockReadSessionScanScope.mockReturnValue('all');
   mockReadSessionScanSlugs.mockReturnValue([]);
   mockGetSessionSlugByName.mockImplementation((sessionName) => {
-    const normalized = String(sessionName || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(sessionName || '').trim().toLowerCase();
     if (normalized === 'alpha') return 'alpha';
     if (normalized === 'beta') return 'beta';
     if (normalized === 'general' || normalized === 'context engine') return '';
     return '';
   });
   mockGetDemoSessionConfigBySlug.mockImplementation((slug) => {
-    const normalized = String(slug || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(slug || '').trim().toLowerCase();
     if (normalized === 'edge') {
       return {
         slug: 'edge',
@@ -171,9 +169,7 @@ const setupGroupMocks = () => {
     return null;
   });
   mockGetSessionConfigBySlug.mockImplementation((slug) => {
-    const normalized = String(slug || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(slug || '').trim().toLowerCase();
     if (normalized === 'alpha') {
       return {
         sessionName: 'Alpha',
@@ -202,34 +198,34 @@ const setupGroupMocks = () => {
     };
   });
   mockPeekCacheSync.mockImplementation((_namespace, slug) => {
-    const normalized = String(slug || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(slug || '').trim().toLowerCase();
     if (normalized === 'alpha') {
       return {
-        84532: { lastBlock: 1050, sbtList: {} },
+        '84532': { lastBlock: 1050, sbtList: {} },
       };
     }
     if (normalized === 'beta') {
       return {
-        84532: { lastBlock: 2060, sbtList: {} },
+        '84532': { lastBlock: 2060, sbtList: {} },
       };
     }
     return {
-      84532: { lastBlock: 0, sbtList: {} },
+      '84532': { lastBlock: 0, sbtList: {} },
     };
   });
   mockReadCache.mockResolvedValue({
-    84532: {
+    '84532': {
       sbtList: {},
       lastBlock: 0,
     },
   });
   mockListNamespaceEntriesSync.mockReturnValue([]);
   mockGetRelevantBlockWindowForFilter.mockImplementation(async (slugInput) => {
-    const normalized = String(slugInput && typeof slugInput === 'object' ? slugInput.slug || '' : slugInput || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(
+      slugInput && typeof slugInput === 'object'
+        ? (slugInput.slug || '')
+        : (slugInput || '')
+    ).trim().toLowerCase();
     if (normalized === 'alpha') return { fromBlock: 1000, toBlock: 1100 };
     if (normalized === 'beta') return { fromBlock: 2000, toBlock: 2200 };
     return { fromBlock: 1, toBlock: 1 };
@@ -273,16 +269,16 @@ describe('SBTsList registry refresh coordination', () => {
 
   afterAll(() => {
     if (typeof ORIGINAL_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP === 'undefined') {
-      try {
-        delete globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP;
-      } catch (_) {}
+      try { delete globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP; } catch (_) {}
     } else {
       globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP = ORIGINAL_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP;
     }
   });
 
   it('refresh in all-groups mode re-syncs universe slugs and calls universe discovery hook', async () => {
-    let dynamicRegistryEntries = [['alpha', { slug: 'alpha' }]];
+    let dynamicRegistryEntries = [
+      ['alpha', { slug: 'alpha' }],
+    ];
     mockSessionRegistryGetAllSessionEntries.mockImplementation(() => dynamicRegistryEntries);
     const ensureLightSbtUniverse = jest.fn().mockResolvedValue(undefined);
     const refreshSessionUniverseRegistryCache = jest.fn().mockImplementation(async () => {
@@ -310,7 +306,7 @@ describe('SBTsList registry refresh coordination', () => {
         ensureLightSbtDiscovery={jest.fn()}
         ensureLightSbtUniverse={ensureLightSbtUniverse}
         refreshSessionUniverseRegistryCache={refreshSessionUniverseRegistryCache}
-      />,
+      />
     );
 
     await openSessionSelector();
@@ -334,7 +330,7 @@ describe('SBTsList registry refresh coordination', () => {
     await waitFor(() => {
       expect(ensureLightSbtUniverse).toHaveBeenCalledWith(
         expect.arrayContaining(['alpha', 'gamma']),
-        expect.objectContaining({ force: true }),
+        expect.objectContaining({ force: true })
       );
     });
   });
@@ -366,7 +362,7 @@ describe('SBTsList registry refresh coordination', () => {
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
         refreshSessionUniverseRegistryCache={refreshSessionUniverseRegistryCache}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -430,7 +426,7 @@ describe('SBTsList registry refresh coordination', () => {
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
         refreshSessionUniverseRegistryCache={refreshSessionUniverseRegistryCache}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -482,7 +478,7 @@ describe('SBTsList registry refresh coordination', () => {
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
         refreshSessionUniverseRegistryCache={refreshSessionUniverseRegistryCache}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -523,7 +519,7 @@ describe('SBTsList registry refresh coordination', () => {
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
         refreshSessionUniverseRegistryCache={refreshSessionUniverseRegistryCache}
-      />,
+      />
     );
 
     await openSessionSelector();
@@ -546,7 +542,7 @@ describe('SBTsList registry refresh coordination', () => {
     mockSessionRegistryGetAllSessionEntries.mockReturnValue([]);
     mockSessionRegistryReadCache.mockImplementation(() => registryCache);
 
-    const refreshSessionUniverseRegistryCache = jest.fn().mockImplementation(() =>
+    const refreshSessionUniverseRegistryCache = jest.fn().mockImplementation(() => (
       refreshPromise.then(() => {
         registryCache = {
           sessions: {},
@@ -554,8 +550,8 @@ describe('SBTsList registry refresh coordination', () => {
           sessionsById: {},
           __hadLoadErrors: true,
         };
-      }),
-    );
+      })
+    ));
 
     render(
       <SBTsList
@@ -574,7 +570,7 @@ describe('SBTsList registry refresh coordination', () => {
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
         refreshSessionUniverseRegistryCache={refreshSessionUniverseRegistryCache}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -611,7 +607,7 @@ describe('SBTsList registry refresh coordination', () => {
         latestBlockNumber={0}
         allSessionsMode
         ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />,
+      />
     );
 
     await openSessionSelector();
@@ -655,7 +651,7 @@ describe('SBTsList registry refresh coordination', () => {
         allSessionsMode
         ensureLightSbtDiscovery={jest.fn()}
         ensureLightSbtUniverse={ensureLightSbtUniverse}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -692,7 +688,7 @@ describe('SBTsList registry refresh coordination', () => {
         latestBlockNumber={0}
         embeddedMode
         ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />,
+      />
     );
 
     await waitFor(() => {
@@ -708,7 +704,9 @@ describe('SBTsList registry refresh coordination', () => {
   });
 
   it('re-syncs session universe chips immediately on registry cache update events', async () => {
-    let dynamicGroupEntries = [['alpha', { slug: 'alpha' }]];
+    let dynamicGroupEntries = [
+      ['alpha', { slug: 'alpha' }],
+    ];
     mockGetAllSessionEntries.mockImplementation(() => dynamicGroupEntries);
     mockSessionRegistryGetAllSessionEntries.mockImplementation(() => dynamicGroupEntries);
 
@@ -729,7 +727,7 @@ describe('SBTsList registry refresh coordination', () => {
         allSessionsMode
         embeddedMode
         ensureLightSbtDiscovery={jest.fn()}
-      />,
+      />
     );
 
     await openSessionSelector();
