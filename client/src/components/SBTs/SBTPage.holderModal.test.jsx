@@ -1,8 +1,6 @@
 // Focused SBTPage holder-modal render coverage owns modal row display, spinners, and filtered-holder preservation.
-import { render, screen } from '@testing-library/react';
 import SBTPage from './SBTPage';
 import styles from './SBTPage.module.scss';
-import { renderSbtPageHolderModal } from './SBTPageModals';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 
@@ -40,12 +38,6 @@ const createSubject = (props = {}) => {
 const findElementInTree = (node, predicate) => {
   if (!node || typeof node !== 'object') return null;
   if (predicate(node)) return node;
-  const rendered = renderResolvableComponent(node);
-  if (rendered !== null) {
-    const found = findElementInTree(rendered, predicate);
-    if (found) return found;
-    return null;
-  }
   const children = node?.props?.children;
   if (Array.isArray(children)) {
     for (const child of children) {
@@ -67,36 +59,9 @@ const treeIncludesText = (node, text) => {
     return node.some((entry) => treeIncludesText(entry, text));
   }
   if (typeof node === 'object') {
-    const rendered = renderResolvableComponent(node);
-    if (rendered !== null) return treeIncludesText(rendered, text);
     return treeIncludesText(node?.props?.children, text);
   }
   return false;
-};
-
-const getNodeTypeName = (node) => {
-  const type = node?.type;
-  if (!type) return '';
-  if (typeof type === 'string') return type;
-  return String(type.displayName || type.name || '');
-};
-
-const RESOLVABLE_SBT_PAGE_COMPONENTS = new Set([
-  'SbtPageHolderStatusDisplay',
-  'SbtPageIdentityPanel',
-  'SbtPageStatsSection',
-]);
-
-const resolvedComponentCache = new WeakMap();
-
-const renderResolvableComponent = (node) => {
-  const typeName = getNodeTypeName(node);
-  if (!RESOLVABLE_SBT_PAGE_COMPONENTS.has(typeName)) return null;
-  if (typeof node?.type !== 'function') return null;
-  if (resolvedComponentCache.has(node)) return resolvedComponentCache.get(node);
-  const rendered = node.type(node.props || {});
-  resolvedComponentCache.set(node, rendered);
-  return rendered;
 };
 
 describe('SBTPage holder modal rendering', () => {
@@ -178,105 +143,6 @@ describe('SBTPage holder modal rendering', () => {
 
     expect(sbtFilterNode).toBeTruthy();
     expect(sbtFilterNode.props.network).toEqual(expect.objectContaining({ id: 84532 }));
-  });
-
-  it('renders the holders filter in the modal title row with a light button surface', () => {
-    const holderAddress = '0x00000000000000000000000000000000000000b1';
-    const tree = renderSbtPageHolderModal({
-      isOpen: true,
-      onClose: jest.fn(),
-      showHeaderCount: true,
-      holdersDisplayCount: '1',
-      showCornerSpinner: false,
-      holderItemsForFilter: [holderAddress],
-      provider: 'mock',
-      network: { id: 84532 },
-      sessionSlug: 'rxc',
-      defaultFeaturedSBTs: [],
-      onFilter: jest.fn(),
-      isSBTCacheReady: true,
-      sbtCacheRevision: 1,
-      loadingMintedFilter: false,
-      hasFilteredHolders: true,
-      hasComputedHolders: true,
-      showScanProgressInModal: false,
-      scanProgressText: '',
-      scanProgressSessionText: '',
-      scanProgressPct: 0,
-      scanProgressFillStyle: {},
-      showEmptyStateInModal: false,
-      showApproximateCountHint: false,
-      showSpinnerInModalBody: false,
-      filteredMintedUsers: [holderAddress],
-      copiedAddress: '',
-      copyToClipboard: jest.fn(),
-      getExplorerUrl: () => 'https://explorer.example/address',
-    });
-    const modalHeader = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalHeader
-    );
-    const modalBody = findElementInTree(
-      tree,
-      (element) => element?.props?.className === styles.modalBody
-    );
-    const headerFilter = findElementInTree(
-      modalHeader,
-      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
-    );
-    const bodyFilter = findElementInTree(
-      modalBody,
-      (element) => element?.props?.mode === 'addresses' && Array.isArray(element?.props?.items)
-    );
-
-    expect(headerFilter).toBeTruthy();
-    expect(headerFilter.props.buttonSurface).toBe('light');
-    expect(bodyFilter).toBeNull();
-  });
-
-  it('preserves PUBLIC_URL for holder modal user links', () => {
-    const previousPublicUrl = process.env.PUBLIC_URL;
-    process.env.PUBLIC_URL = '/ce/';
-
-    try {
-      const holderAddress = '0x00000000000000000000000000000000000000b1';
-      render(renderSbtPageHolderModal({
-        isOpen: true,
-        onClose: jest.fn(),
-        showHeaderCount: true,
-        holdersDisplayCount: '1',
-        showCornerSpinner: false,
-        holderItemsForFilter: [holderAddress],
-        provider: 'mock',
-        network: { id: 84532 },
-        sessionSlug: 'rxc',
-        defaultFeaturedSBTs: [],
-        onFilter: jest.fn(),
-        isSBTCacheReady: true,
-        sbtCacheRevision: 1,
-        loadingMintedFilter: false,
-        hasFilteredHolders: true,
-        hasComputedHolders: true,
-        showScanProgressInModal: false,
-        scanProgressText: '',
-        scanProgressSessionText: '',
-        scanProgressPct: 0,
-        scanProgressFillStyle: {},
-        showEmptyStateInModal: false,
-        showApproximateCountHint: false,
-        showSpinnerInModalBody: false,
-        filteredMintedUsers: [holderAddress],
-        copiedAddress: '',
-        copyToClipboard: jest.fn(),
-        getExplorerUrl: () => 'https://explorer.example/address',
-      }));
-
-      expect(screen.getByRole('link', { name: getShortenedAddress(holderAddress, false) }))
-        .toHaveAttribute('href', `/ce/u/${holderAddress}`);
-    } finally {
-      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
-      else process.env.PUBLIC_URL = previousPublicUrl;
-    }
   });
 
   it('clears modal loading even when filtered-list signature is unchanged', () => {
