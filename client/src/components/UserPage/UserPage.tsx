@@ -82,7 +82,6 @@ import {
   buildUserPageUsernameLoadedStatePatch,
   buildUserPageUsernameSaveStatePatch,
   buildUserPageViewAddressStatePatch,
-  applyUserPageOwnershipSignal,
   deriveUserPageDeepScanProgressRows,
   extractUserPageResponseRecency,
   formatUserPageDeepScanBlockCount,
@@ -93,7 +92,6 @@ import {
   getUserPageGateResourceKeysToCheck,
   getUserPageErrorMessage,
   hasDisplayableUserPageResponsePayload,
-  hasMeaningfulUserPageOwnershipCounts,
   hasUserPageResponseSubmissionHints,
   inferUserPageResponseEncryptionAudience,
   inferUserPageResponseFieldEncryptionAudience,
@@ -104,7 +102,9 @@ import {
   isUserPageGateAccessContext,
   isUserPageResponsePayloadEncrypted,
   mergeUserPageQuestionCacheSource,
+  mergeUserPageSbtCacheEntryIntoAggregate,
   mergeUserPageSurveyCacheSource,
+  mergeUserPageUserCacheSbtIntoAggregate,
   buildUserPageRootClassName,
   normalizeUserPageDeepScanProgressRows,
   normalizeUserPageDeepScanTooltipLines,
@@ -2387,52 +2387,13 @@ class UserPage extends Component<any, any> {
       netEntries.forEach(({ value: netObj }) => {
         const sbtList = toAnalysisRecord(netObj.sbtList);
         Object.keys(sbtList).forEach((addrLowerKey: string) => {
-          const entry = toAnalysisRecord(sbtList[addrLowerKey]);
-          const key = String(addrLowerKey || '').toLowerCase();
-          if (!key) return;
-
-          const aggEntry: SbtAggregateEntry = sbtAggregate[key] || {
-            sbtAddress: entry.sbtAddress || key,
-            sbtInfo: null,
-            mintedSet: new Set(),
-            burnedSet: new Set(),
-            viewerCountsAuthoritative: false,
-            blockNumber: 0,
-            slug: slug || '',
-          };
-
-          if (slug && !aggEntry.slug) aggEntry.slug = slug;
-          if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
-          if (aggEntry.sbtInfo && entry.sbtInfo) {
-            aggEntry.sbtInfo = {
-              ...(aggEntry.sbtInfo as UnknownRecord),
-              ...(entry.sbtInfo as UnknownRecord),
-            };
-          }
-          const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(entry, viewAddressKey);
-          if (hasExplicitCounts) {
-            aggEntry.mintedSet.delete(viewAddressKey);
-            aggEntry.burnedSet.delete(viewAddressKey);
-            aggEntry.viewerCountsAuthoritative = true;
-          }
-          (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
-            .forEach((address: unknown) => {
-              const addressLower = String(address || '').toLowerCase();
-              if (!addressLower) return;
-              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressKey) return;
-              aggEntry.mintedSet.add(addressLower);
-            });
-          (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [])
-            .forEach((address: unknown) => {
-              const addressLower = String(address || '').toLowerCase();
-              if (!addressLower) return;
-              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressKey) return;
-              aggEntry.burnedSet.add(addressLower);
-            });
-          applyUserPageOwnershipSignal(aggEntry, entry, viewAddressKey);
-          aggEntry.blockNumber = Math.max(aggEntry.blockNumber || 0, Number(entry.blockNumber || 0));
-          if (entry.sbtAddress) aggEntry.sbtAddress = entry.sbtAddress;
-          sbtAggregate[key] = aggEntry;
+          mergeUserPageSbtCacheEntryIntoAggregate({
+            sbtAggregate,
+            entry: sbtList[addrLowerKey],
+            key: addrLowerKey,
+            slug,
+            viewAddressKey,
+          });
         });
       });
     });
@@ -2510,37 +2471,12 @@ class UserPage extends Component<any, any> {
           : null;
         if (!chainPayload) return;
         (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
-          const itemRecord = toAnalysisRecord(item);
-          const key = String(itemRecord.sbtAddress || '').toLowerCase();
-          if (!key) return;
-          const aggEntry: SbtAggregateEntry = sbtAggregate[key] || {
-            sbtAddress: itemRecord.sbtAddress || key,
-            sbtInfo: null,
-            mintedSet: new Set(),
-            burnedSet: new Set(),
-            blockNumber: 0,
-            slug: slug || '',
-          };
-          if (slug && !aggEntry.slug) aggEntry.slug = slug;
-          if (!aggEntry.sbtInfo && itemRecord.sbtInfo) aggEntry.sbtInfo = itemRecord.sbtInfo;
-          if (aggEntry.sbtInfo && itemRecord.sbtInfo) {
-            aggEntry.sbtInfo = {
-              ...(aggEntry.sbtInfo as UnknownRecord),
-              ...(itemRecord.sbtInfo as UnknownRecord),
-            };
-          }
-          const hasAggregateOwnershipSignal = (
-            aggEntry.mintedSet.has(viewAddressKey) ||
-            aggEntry.burnedSet.has(viewAddressKey)
-          );
-          const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(itemRecord, viewAddressKey);
-          if (hasExplicitCounts) {
-            applyUserPageOwnershipSignal(aggEntry, itemRecord, viewAddressKey);
-          } else if (!hasAggregateOwnershipSignal) {
-            // userCache SBT rows are a fallback signal only; do not override fresher sbtCache burns.
-            aggEntry.mintedSet.add(viewAddressKey);
-          }
-          sbtAggregate[key] = aggEntry;
+          mergeUserPageUserCacheSbtIntoAggregate({
+            sbtAggregate,
+            item,
+            slug,
+            viewAddressKey,
+          });
         });
       });
     });
