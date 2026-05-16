@@ -1,7 +1,6 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
 
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
@@ -66,8 +65,26 @@ describe('AudioInput', () => {
     return element as T;
   };
 
+  const setNativeValue = (element: Element, value: string) => {
+    const ownDescriptor = Object.getOwnPropertyDescriptor(element, 'value');
+    const prototype = Object.getPrototypeOf(element);
+    const prototypeDescriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : undefined;
+    const setter = prototypeDescriptor?.set || ownDescriptor?.set;
+    if (setter) {
+      setter.call(element, value);
+      return;
+    }
+    (element as HTMLInputElement | HTMLTextAreaElement).value = value;
+  };
+
   const changeElementValue = (element: Element, value: string) => {
-    Simulate.change(element, { target: { value } } as any);
+    setNativeValue(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  const clickElement = (element: Element) => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   };
 
   const flushRafQueue = () => {
