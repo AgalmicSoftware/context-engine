@@ -12,12 +12,13 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
 import TagModal from '../TagPage/TagModal';
 import SessionChipSelector from '../Shared/SessionChipSelector';
+import SbtListSessionUniverseSummary from './SbtListSessionUniverseSummary';
 import {
   SbtListDetailsPanel,
   SbtListMetaRow,
@@ -3475,76 +3476,16 @@ const SBTsList = ({
     const collapsedSummarySlugs = isListModeScopeEnabled
       ? selectedSessionUniverseSlugs
       : [normalizeSessionSlug(listSlug || '')];
-    const collapsedSummaryPreview = collapsedSummarySlugs.slice(0, 4);
-    const collapsedSummaryOverflow = Math.max(0, collapsedSummarySlugs.length - collapsedSummaryPreview.length);
-    const renderCollapsedSummary = (testId: any) => (
-      <div
-        className={styles.sessionUniverseCollapsedSummary}
-        data-testid={testId}
-      >
-        <span className={styles.sessionUniverseCollapsedLabel}>
-          Selected ({collapsedSummarySlugs.length})
-        </span>
-        <div className={styles.sessionUniverseCollapsedChips}>
-          {collapsedSummaryPreview.map((slugRaw: any) => {
-            const normalized = normalizeSessionSlug(slugRaw || '');
-            const sessionLabel = labelForSessionSlug(normalized);
-            const isLoading = !!chipProgressVisibilityBySlug[normalized];
-            const chipLoadingStatus = chipLoadingStatusBySlug[normalized] || null;
-            const showCollapsedProgress = chipLoadingStatus != null && isLoading;
-            const sessionRouteHref = buildSessionRouteHref(normalized);
-            const collapsedChipClass = [
-              styles.sessionUniverseCollapsedChip,
-              isLoading ? styles.sessionUniverseCollapsedChipLoading : styles.sessionUniverseCollapsedChipLoaded,
-            ].filter(Boolean).join(' ');
-            return (
-              <span
-                key={`collapsed-${normalized || 'general'}`}
-                className={collapsedChipClass}
-                data-testid={`session-collapsed-chip-${normalized || 'general'}`}
-                data-session-loading={isLoading ? 'true' : 'false'}
-                title={showCollapsedProgress ? chipLoadingStatus.progressText : undefined}
-              >
-                <span className={styles.sessionUniverseCollapsedChipBody}>
-                  <span className={styles.sessionUniverseCollapsedChipName}>
-                    {sessionLabel}
-                  </span>
-                  {showCollapsedProgress && (
-                    <span
-                      className={styles.sessionUniverseCollapsedChipProgress}
-                      data-testid={`session-collapsed-chip-progress-${normalized || 'general'}`}
-                    >
-                      {chipLoadingStatus.chipBlockProgressText}
-                    </span>
-                  )}
-                </span>
-                {sessionRouteHref && (
-                  <button
-                    type="button"
-                    className={styles.sessionUniverseCollapsedChipOpen}
-                    data-testid={`session-collapsed-chip-open-${normalized || 'general'}`}
-                    aria-label={`Open session ${sessionLabel} in new tab`}
-                    title={`Open session ${sessionLabel} in new tab`}
-                    onClick={(event: any) => handleOpenSessionChip(normalized, event)}
-                  >
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                  </button>
-                )}
-              </span>
-            );
-          })}
-          {!collapsedSummaryPreview.length && (
-            <span className={styles.sessionUniverseCollapsedOverflow}>
-              No sessions selected
-            </span>
-          )}
-          {collapsedSummaryOverflow > 0 && (
-            <span className={styles.sessionUniverseCollapsedOverflow}>
-              +{collapsedSummaryOverflow} more
-            </span>
-          )}
-        </div>
-      </div>
+    const renderCollapsedSummary = (testId: string): React.ReactNode => (
+      <SbtListSessionUniverseSummary
+        testId={testId}
+        summarySlugs={collapsedSummarySlugs}
+        chipProgressVisibilityBySlug={chipProgressVisibilityBySlug}
+        chipLoadingStatusBySlug={chipLoadingStatusBySlug}
+        labelForSessionSlug={labelForSessionSlug}
+        buildSessionRouteHref={buildSessionRouteHref}
+        onOpenSessionChip={handleOpenSessionChip}
+      />
     );
 
     const renderHeaderActions = ({ isOpen }: any) => (
