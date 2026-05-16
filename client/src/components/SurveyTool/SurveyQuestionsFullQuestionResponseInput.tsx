@@ -1,15 +1,16 @@
 import React from 'react';
 
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import BinaryChoiceInput from './BinaryChoiceInput';
 import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionRatingInput from './FullQuestionRatingInput';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import {
-  buildSurveyQuestionsFullQuestionResponseInputActionDescriptor,
-  buildSurveyQuestionsFullQuestionResponseInputDescriptor,
-  shouldDispatchSurveyQuestionsFullQuestionResponseInputAction,
-} from './surveyQuestionsFullQuestionResponseInputState';
+  getNormalizedUiRatingValue,
+  isSingleSelectMultichoice,
+  normalizeMultichoiceValue,
+} from './surveyToolUtils.js';
 
 type SurveyQuestionRecord = {
   id: string;
@@ -51,134 +52,64 @@ const SurveyQuestionsFullQuestionResponseInput = ({
   onRatingChangeComplete,
   onToggleAnswerEncryption,
 }: SurveyQuestionsFullQuestionResponseInputProps): React.ReactNode => {
-  const inputDescriptor = buildSurveyQuestionsFullQuestionResponseInputDescriptor({
-    question,
-    qIndex,
-    answer,
-    glowAnswer,
-    isSubmitting,
-    singleQuestionMode,
-  });
-
-  const emitAnswerChange = (nextValue: unknown, event?: unknown) => {
-    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
-      inputDescriptor,
-      kind: 'answer-change',
-      nextValue,
-      event,
-    });
-    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'answer-change') return;
-    if (action.event === undefined) {
-      onAnswerChange?.(action.nextValue);
-    } else {
-      onAnswerChange?.(action.nextValue, action.event);
-    }
-  };
-
-  const emitRatingChange = (nextValue: number, event?: unknown) => {
-    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
-      inputDescriptor,
-      kind: 'rating-change',
-      nextValue,
-      event,
-    });
-    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'rating-change') return;
-    onRatingChange?.(action.nextValue, action.event);
-  };
-
-  const emitDeferredRatingCommit = (nextValue: number) => {
-    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
-      inputDescriptor,
-      kind: 'rating-commit',
-      nextValue,
-    });
-    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'rating-commit') return;
-    onDeferredRatingCommit?.(action.nextValue);
-  };
-
-  const emitRatingChangeComplete = (event?: unknown) => {
-    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
-      inputDescriptor,
-      kind: 'rating-change-complete',
-      event,
-    });
-    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'rating-change-complete') return;
-    if (action.event === undefined) {
-      onRatingChangeComplete?.();
-    } else {
-      onRatingChangeComplete?.(action.event);
-    }
-  };
-
-  const emitAnswerEncryptionToggle = (nextEncryptedState: boolean) => {
-    const action = buildSurveyQuestionsFullQuestionResponseInputActionDescriptor({
-      inputDescriptor,
-      kind: 'answer-encryption-toggle',
-      nextEncryptedState,
-    });
-    if (!shouldDispatchSurveyQuestionsFullQuestionResponseInputAction(action)) return;
-    if (action.kind !== 'answer-encryption-toggle') return;
-    onToggleAnswerEncryption?.(action.nextEncryptedState);
-  };
-
-  switch (inputDescriptor.kind) {
+  switch (question.type) {
     case 'multichoice': {
+      const options = Array.isArray(question.options) ? question.options : [];
+      const isSingleSelect = isSingleSelectMultichoice(question);
+      const selectedValues = normalizeMultichoiceValue(answer.value);
       return (
         <MultichoiceQuestionInput
-          questionId={inputDescriptor.questionId}
-          options={inputDescriptor.options}
-          selectedValues={inputDescriptor.selectedValues}
-          isSingleSelect={inputDescriptor.isSingleSelect}
-          disabled={inputDescriptor.disabled}
-          onChange={emitAnswerChange}
+          questionId={question.id}
+          options={options}
+          selectedValues={selectedValues}
+          isSingleSelect={isSingleSelect}
+          disabled={isSubmitting}
+          onChange={(newAnswer) => onAnswerChange?.(newAnswer)}
         />
       );
     }
     case 'rating': {
-      return inputDescriptor.useDeferredRating ? (
+      const ratingValue = getNormalizedUiRatingValue(answer.value);
+      return singleQuestionMode ? (
         <DeferredRatingSlider
-          value={inputDescriptor.ratingValue}
-          disabled={inputDescriptor.disabled}
-          onCommit={emitDeferredRatingCommit}
+          value={ratingValue}
+          disabled={isSubmitting}
+          onCommit={onDeferredRatingCommit}
         />
       ) : (
         <FullQuestionRatingInput
-          value={inputDescriptor.ratingValue}
-          disabled={inputDescriptor.disabled}
-          onChange={emitRatingChange}
-          onChangeComplete={emitRatingChangeComplete}
+          value={ratingValue}
+          disabled={isSubmitting}
+          onChange={onRatingChange}
+          onChangeComplete={onRatingChangeComplete}
         />
       );
     }
     case 'binary':
       return (
         <BinaryChoiceInput
-          questionId={inputDescriptor.questionId}
-          value={inputDescriptor.value}
-          onChange={emitAnswerChange}
-          disabled={inputDescriptor.disabled}
+          questionId={question.id}
+          value={String(answer.value || '')}
+          onChange={(option) => onAnswerChange?.(option)}
+          disabled={isSubmitting}
           showIcons
         />
       );
     default:
       return (
         <SurveyAudioFieldInput
-          qIndex={inputDescriptor.qIndex}
+          qIndex={qIndex}
           {...audioInputWorkerProps}
-          placeholder={inputDescriptor.placeholder}
-          updateFunction={emitAnswerChange}
-          toggleEncryption={emitAnswerEncryptionToggle}
-          value={inputDescriptor.value}
-          encrypted={inputDescriptor.encrypted}
-          dataTestId={inputDescriptor.dataTestId}
-          dataCeQuestionId={inputDescriptor.dataCeQuestionId}
-          disabled={inputDescriptor.disabled}
-          forceGlow={inputDescriptor.forceGlow}
-          disableEncryption={inputDescriptor.disableEncryption}
+          placeholder="response (optional)"
+          updateFunction={(answerValue: unknown) => onAnswerChange?.(answerValue)}
+          toggleEncryption={onToggleAnswerEncryption}
+          value={answer.value || ''}
+          encrypted={answer.encrypted || false}
+          dataTestId={E2E_TESTIDS.SURVEY_ANSWER_INPUT}
+          dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
+          disabled={isSubmitting}
+          forceGlow={glowAnswer}
+          disableEncryption
         />
       );
   }
