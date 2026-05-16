@@ -22,12 +22,10 @@ describe('SurveyResultsAggregatorSummaries', () => {
             },
           ],
         }}
-      />,
+      />
     );
 
-    expect(
-      screen.getByText('3 total responses. 1 encrypted responses not shown. 1 blank not shown.'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('3 total responses. 1 encrypted responses not shown. 1 blank not shown.')).toBeInTheDocument();
     expect(screen.getByText('Visible answer')).toBeInTheDocument();
     expect(screen.getByText('Visible comment')).toBeInTheDocument();
   });
@@ -42,7 +40,7 @@ describe('SurveyResultsAggregatorSummaries', () => {
             { key: 'no', label: 'No', count: 1 },
           ],
         }}
-      />,
+      />
     );
 
     expect(screen.getByText('4 total responders to this multichoice question.')).toBeInTheDocument();

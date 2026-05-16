@@ -72,6 +72,10 @@ import {
   SurveyResultsLockedResponsesBanner,
   SurveyResultsLockedResponsesToggle,
 } from './SurveyResultsLockedResponsesPanel';
+import {
+  SurveyResultsFreeformAggregatorSummary,
+  SurveyResultsMultichoiceAggregatorSummary,
+} from './SurveyResultsAggregatorSummaries';
 
 export {
   SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
@@ -1609,7 +1613,179 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         surveyLog.error('[SurveyResults] Error saving bookmarksCache:', writeResult.error);
       }
     });
-    setState(asSurveyResultsStatePatch(buildSurveyResultsBookmarkedSurveyIdsPatch(writePlan.statePatch.value)));
+    if (picks.size === 0) return;
+    totalResponders += 1;
+    picks.forEach((key) => {
+      countsByKey.set(key, (countsByKey.get(key) || 0) + 1);
+    });
+  });
+
+  return {
+    totalResponders,
+    options: Array.from(displayByKey.entries()).map(([key, label]) => ({
+      key,
+      label,
+      count: countsByKey.get(key) || 0,
+    })),
+  };
+};
+
+renderFreeformAggregatorSummary = (responses: unknown = []): React.ReactNode => {
+  const summary = this.buildFreeformSummaryModel(responses);
+  return SurveyResultsFreeformAggregatorSummary({ summary });
+};
+
+renderMultichoiceAggregatorSummary = (
+  responses: unknown = [],
+  question: SurveyResultsRecord | null = null
+): React.ReactNode => {
+  const summary = this.buildMultichoiceSummaryModel(responses, question);
+  return SurveyResultsMultichoiceAggregatorSummary({ summary });
+};
+
+getSurveyResultsResponseCardProps = (): SurveyResultsResponseCardClassNames => ({
+  containerClassName: styles.surveyResultsResponseCard,
+  bodyClassName: styles.surveyResultsResponseCardBody,
+  linksContainerClassName: styles.surveyResultsResponseCardLinks,
+  iconButtonClassName: styles.surveyResultsResponseCardLinkButton,
+  aggregatorContainerClassName: styles.surveyResultsAggregatorPanel,
+  aggregatorTextClassName: styles.surveyResultsAggregatorText,
+  aggregatorParagraphClassName: styles.surveyResultsAggregatorParagraph,
+  aggregatorFreeformAnswerClassName: styles.surveyResultsFreeformAnswer,
+});
+
+getDecryptLitHooks = (): SurveyResultsLitHooks | null => {
+  if (this.props.lit && typeof this.props.lit === 'object') {
+    return this.props.lit as SurveyResultsLitHooks;
+  }
+  if (this.props.litHooks && typeof this.props.litHooks === 'object') {
+    return this.props.litHooks as SurveyResultsLitHooks;
+  }
+  if (typeof window === 'undefined') return null;
+  const windowWithLitHooks = window as SurveyResultsWindowWithLitHooks;
+  return windowWithLitHooks.__litHooks || windowWithLitHooks.litHooks || null;
+};
+
+getQuestionEncryptionGates = (question: SurveyResultsQuestionWithEncryption | null = null): SurveyResultsGateRecord[] => {
+  const encryption = question?.encryption as SurveyResultsQuestionEncryptionRecord | null | undefined;
+  if (!encryption || typeof encryption !== 'object' || encryption.enabled === false) return [];
+  const list = Array.isArray(encryption.gates)
+    ? encryption.gates
+    : (encryption.gate && typeof encryption.gate === 'object' ? [encryption.gate] : []);
+  return list.filter((gate): gate is SurveyResultsGateRecord => !!gate && typeof gate === 'object');
+};
+
+getLockedResponseKey = ({
+  responder = '',
+  questionId = '',
+  surveyId = '',
+  response = null,
+}: SurveyResultsLockedResponseKeyArgs = {}): string => {
+  const responderLower = String(responder || '').trim().toLowerCase();
+  const qidLower = String(questionId || response?.questionID || response?.questionId || '').trim().toLowerCase();
+  const surveyKey = String(surveyId || '').trim().toLowerCase();
+  return [
+    surveyKey,
+    responderLower,
+    qidLower,
+    buildLockedResponseSignature(response || {}),
+  ].join('|');
+};
+
+getDecryptedResponseOverride = (
+  key: unknown = ''
+): SurveyResultsDecryptedResponseOverride | null => {
+  if (!key) return null;
+  const overrides = toSurveyResultsRecord(this.state.decryptedResponseOverrides);
+  const override = overrides[String(key)] || null;
+  return override && typeof override === 'object'
+    ? override as SurveyResultsDecryptedResponseOverride
+    : null;
+};
+
+applyDecryptedOverrideToResponse = ({
+  response = null,
+  key = '',
+}: SurveyResultsApplyDecryptedOverrideArgs = {}): SurveyResultsResponseRecord | null => {
+  if (!response || typeof response !== 'object' || !key) return response;
+  const override = this.getDecryptedResponseOverride(key);
+  if (!override || typeof override !== 'object') return response;
+
+  let changed = false;
+  const next: SurveyResultsRecord = { ...response };
+
+  if (hasOwn(override, 'answerValue') && next.answer && typeof next.answer === 'object') {
+    next.answer = { ...toSurveyResultsRecord(next.answer), value: override.answerValue };
+    changed = true;
+  }
+  if (hasOwn(override, 'additionalValue') && next.additional && typeof next.additional === 'object') {
+    next.additional = { ...toSurveyResultsRecord(next.additional), value: override.additionalValue };
+    changed = true;
+  }
+  if (hasOwn(override, 'importance')) {
+    next.importance = override.importance;
+    changed = true;
+  }
+  if (hasOwn(override, 'conviction')) {
+    next.conviction = override.conviction;
+    changed = true;
+  }
+
+  return changed ? next : response;
+};
+
+buildLockedGateDetails = (
+  lockedRows: unknown = [],
+  questionLookup: Record<string, SurveyResultsQuestionWithEncryption> = {}
+): SurveyResultsLockedGateDetailsResult => {
+  const rows = Array.isArray(lockedRows) ? lockedRows as SurveyResultsLockedRow[] : [];
+  if (rows.length === 0) {
+    return { gateDetails: [], hasGenericGateMessage: false };
+  }
+
+  const resolvedSession = this.getEffectiveSessionContext();
+  const baseSlug = resolvedSession.sessionSlug || '';
+  const baseSessionConfig = toSurveyResultsRecord(resolvedSession.sessionConfig) as SurveyResultsSessionConfigRecord;
+  const baseFallbackChainId = Number(
+    this.props.network?.id ||
+    this.props.networkChainId ||
+    baseSessionConfig?.networkChainId ||
+    baseSessionConfig?.__registry?.chainId ||
+    0
+  ) || null;
+  const sessionContextMemo = new Map<string, SurveyResultsLockedGateContext>();
+  const readSessionGateContext = (questionSlug: unknown = ''): SurveyResultsLockedGateContext => {
+    const requestedSlug = String(questionSlug || '').trim() || baseSlug;
+    if (sessionContextMemo.has(requestedSlug)) {
+      return sessionContextMemo.get(requestedSlug) as SurveyResultsLockedGateContext;
+    }
+    const nextResolvedSession = resolveSurveyResultsSessionContext({
+      sessionSlug: requestedSlug,
+      resolveBySlug: getSessionConfigBySlug,
+    });
+    const nextSlug = nextResolvedSession.sessionSlug || requestedSlug || baseSlug;
+    const nextSessionConfig = toSurveyResultsRecord(nextResolvedSession.sessionConfig) as SurveyResultsSessionConfigRecord;
+    const nextFallbackChainId = Number(
+      this.props.network?.id ||
+      this.props.networkChainId ||
+      nextSessionConfig?.networkChainId ||
+      nextSessionConfig?.__registry?.chainId ||
+      baseFallbackChainId ||
+      0
+    ) || null;
+    const sponsoredConfig = toSurveyResultsRecord(nextSessionConfig.sponsored);
+    const nextContext = {
+      slug: nextSlug,
+      fallbackChainId: nextFallbackChainId,
+      defaultPolicy: buildResponseGatePolicy({
+        cfg: nextSessionConfig,
+        isQuestionResponseFlow: this.state.viewMode === 'questions',
+        fallbackChainId: nextFallbackChainId,
+      }) as SurveyResultsRecord & { gates?: unknown },
+      configuredGateMap: toSurveyResultsRecord(sponsoredConfig.gates) as Record<string, SurveyResultsGateRecord>,
+    };
+    sessionContextMemo.set(requestedSlug, nextContext);
+    return nextContext;
   };
 
   const toggleQuestionBookmark = (questionId: unknown): void => {
