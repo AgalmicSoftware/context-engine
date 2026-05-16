@@ -4,7 +4,7 @@ import path from 'path';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { MemoryRouter } from 'react-router-dom';
 import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -22,7 +22,6 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
-const mockCorpusViewer = jest.fn();
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
   fs.readFileSync(
@@ -152,63 +151,6 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
-jest.mock('../DemoViews/CorpusViewer', () => {
-  const React = require('react');
-  const fullCorpusUrl = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json';
-
-  return {
-    __esModule: true,
-    default: (props) => {
-      mockCorpusViewer(props);
-      React.useEffect(() => {
-        let cancelled = false;
-        if (Number(props.externalLoadRequestNonce || 0) <= 0) return undefined;
-
-        const loadCorpus = async () => {
-          props.onExternalLoadStateChange?.({
-            activeCorpusKey: 'cross_corpus',
-            activeCorpusLabel: 'Cross-Corpus',
-            loadStatus: 'loading',
-            loadButtonLabel: 'Loading full corpus...',
-            disableLoadButton: true,
-            error: '',
-          });
-          const response = await global.fetch(fullCorpusUrl, { cache: 'no-store' });
-          if (response?.json) await response.json();
-          if (!cancelled) {
-            props.onExternalLoadStateChange?.({
-              activeCorpusKey: 'cross_corpus',
-              activeCorpusLabel: 'Cross-Corpus',
-              loadStatus: 'loaded',
-              loadButtonLabel: 'Full corpus loaded',
-              disableLoadButton: true,
-              error: '',
-            });
-          }
-        };
-
-        loadCorpus();
-        return () => {
-          cancelled = true;
-        };
-      }, [props.externalLoadRequestNonce, props.onExternalLoadStateChange]);
-
-      return React.createElement(
-        'div',
-        { 'data-testid': 'corpus-viewer' },
-        React.createElement('button', { type: 'button' }, 'Tweets'),
-        React.createElement(
-          'button',
-          {
-            type: 'button',
-            onClick: () => props.onAtlasIssueOpen?.('0x2110000000000000000000000000000000000000000000000000000000000000'),
-          },
-          'Exponential Progress Debate',
-        ),
-      );
-    },
-  };
-});
 jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
   mockDebateSelector(props);
   return <div data-testid="debate-selector">Debate Selector</div>;
