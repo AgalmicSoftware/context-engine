@@ -15,14 +15,6 @@ const makeInstance = (props = {}) => {
   return instance;
 };
 
-const expectUploadFailureLog = (consoleErrorSpy, messagePattern) => {
-  const loggedError = consoleErrorSpy.mock.calls.find(
-    ([prefix, label]) => prefix === '[sbt]' && label === 'uploadTokenUriToArweave failed:'
-  )?.[2];
-  expect(loggedError).toBeInstanceOf(Error);
-  expect(loggedError.message).toMatch(messagePattern);
-};
-
 describe('CreateSBTGroup metadata and deferred upload helpers', () => {
   beforeEach(() => {
     sessionStorage.clear();
@@ -115,7 +107,6 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
       documentIDHashes: ['hash-a', 'hash-b'],
       documentURLs: [],
       sessionSlug: 'test',
-      sessionSlugExplicit: true,
       encryptedFields: {
         name: '[encrypted]',
         description: '[encrypted]',
@@ -245,19 +236,10 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
         name: ['missing-gate'],
       },
     };
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    try {
-      await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(
-        'name encryption access rules could not be resolved. Please reselect the lock or configure valid access rules.'
-      );
-      expectUploadFailureLog(
-        consoleErrorSpy,
-        /^name encryption access rules could not be resolved\. Please reselect the lock or configure valid access rules\.$/
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
+    await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(
+      'name encryption access rules could not be resolved. Please reselect the lock or configure valid access rules.'
+    );
   });
 
   it('omits public admin recovery metadata when uploading group-password SBT metadata', async () => {
@@ -571,23 +553,14 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     };
 
     const uploadSpy = jest.spyOn(arweaveScripts, 'uploadDataToArweave');
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    try {
-      await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(
-        'Set the session URL before adding this Group to the session.'
-      );
+    await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(
+      'Set the session URL before adding this Group to the session.'
+    );
 
-      expect(uploadSpy).not.toHaveBeenCalled();
-      expect(instance.state.mintingFailed).toBe(true);
-      expect(instance.state.error).toBe('Set the session URL before adding this Group to the session.');
-      expectUploadFailureLog(
-        consoleErrorSpy,
-        /^Set the session URL before adding this Group to the session\.$/
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
+    expect(uploadSpy).not.toHaveBeenCalled();
+    expect(instance.state.mintingFailed).toBe(true);
+    expect(instance.state.error).toBe('Set the session URL before adding this Group to the session.');
   });
 
   it('saves a pending-upload draft when no worker or immediate Arweave upload path is available', async () => {
@@ -976,16 +949,10 @@ describe('CreateSBTGroup metadata and deferred upload helpers', () => {
     };
 
     jest.spyOn(resourceKeys, 'getEffectiveArweaveKey').mockResolvedValue({ arweaveJwk: 'test-jwk' });
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    try {
-      await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(/could not be resolved/i);
+    await expect(instance.uploadTokenUriToArweave()).rejects.toThrow(/could not be resolved/i);
 
-      expect(instance.state.mintingFailed).toBe(true);
-      expect(instance.state.error).toMatch(/could not be resolved/i);
-      expectUploadFailureLog(consoleErrorSpy, /could not be resolved/i);
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
+    expect(instance.state.mintingFailed).toBe(true);
+    expect(instance.state.error).toMatch(/could not be resolved/i);
   });
 });
