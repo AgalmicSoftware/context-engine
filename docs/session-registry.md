@@ -68,9 +68,9 @@ the current wallet, client Survey contract reads use the session-sponsored
 `rpcUrl` / `rpcUrlsByChainId` before anonymous defaults. Restricted sponsored
 RPC still fails closed to the normal fallback stack until the wallet grant is
 verified.
-Session publish/deploy mirrors an uploaded Custom RPC URL into `rpcUrl` when
-sponsored worker secrets are enabled, making that URL browser-visible so
-question and SBT reads can use the same session RPC.
+Session publish/deploy keeps uploaded Custom RPC worker secrets out of public
+registry fields. If browser reads need a sponsored RPC, configure an explicit
+browser-visible session `rpcUrl` / `rpcUrlsByChainId` value.
 
 Multi-tx flow:
 - `createSession(slug, sessionId, chainId, ...)` creates the session.
