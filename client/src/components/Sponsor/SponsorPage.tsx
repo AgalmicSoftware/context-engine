@@ -573,12 +573,23 @@ const SponsorPage = ({
   const hasManualWorkerUrlOverride = workerUrlOverrideDirty && !!normalizedEnteredWorkerUrl;
   const deploySponsoringWorkerUrl = normalizedEnteredWorkerUrl || selectedConfigWorkerUrl || '';
   const accountLower = toStr(account || '').toLowerCase();
+  const selectedConfigCreateSignature = useMemo(
+    () => buildCreateConfigSignature(selectedConfig),
+    [selectedConfig]
+  );
   const createContextKey = useMemo(() => [
     normalizeSlug(selectedSlug),
     accountLower,
     String(relevantSessionChainId || ''),
     deploySponsoringWorkerUrl,
-  ].join('|'), [accountLower, deploySponsoringWorkerUrl, relevantSessionChainId, selectedSlug]);
+    selectedConfigCreateSignature,
+  ].join('|'), [
+    accountLower,
+    deploySponsoringWorkerUrl,
+    relevantSessionChainId,
+    selectedConfigCreateSignature,
+    selectedSlug,
+  ]);
   const activeCreateContextKeyRef = useRef(createContextKey);
   activeCreateContextKeyRef.current = createContextKey;
   const selectedSessionSupportsEmbeddedDeploy = useMemo(() => (
@@ -591,6 +602,9 @@ const SponsorPage = ({
   useEffect(() => {
     createRequestSeqRef.current += 1;
     setCreateBusy(false);
+    setCreateStatus('');
+    setShareUrl('');
+    setShareTxId('');
   }, [createContextKey]);
 
   useEffect(() => {

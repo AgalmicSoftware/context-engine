@@ -533,6 +533,51 @@ describe('SponsorPage', () => {
     expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('other');
   });
 
+  it('does not apply stale create completions after the selected session config refreshes in place', async () => {
+    const uploadDeferred = createDeferred<string>();
+    mockUploadDataToArweave.mockReturnValueOnce(uploadDeferred.promise);
+
+    await renderSponsorPage();
+
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    fireEvent.change(getFieldInputByLabel('Label'), {
+      target: { value: 'Launch week sponsor bundle' },
+    });
+    fireEvent.change(getFieldInputByLabel('OpenAI key'), {
+      target: { value: 'sk-live-openai' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
+
+    await waitFor(() => {
+      expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
+    });
+
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        sessionName: 'Edge Session Refresh',
+        __registry: {
+          sessionIdHex: '0xedge-session-id-refreshed',
+        },
+      }),
+    ]];
+    await act(async () => {
+      window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      uploadDeferred.resolve('stale_sponsor_tx_id');
+      await uploadDeferred.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Sponsored URL ready.')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sponsored share URL')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+  });
+
   it('persists only non-secret sponsor draft fields across remounts', async () => {
     const view = await renderSponsorPage();
 
