@@ -512,6 +512,8 @@ const AdminPage = ({
   const rawMetadataCopyResetRef = useRef<any>(null);
   const prevSelectedSlugForDraftRef = useRef<any>(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef<any>(selectedSlug);
+  const metadataDraftTouchedRef = useRef<any>(metadataDraftTouched);
+  metadataDraftTouchedRef.current = metadataDraftTouched;
 
   const handleSecretChange = useCallback((key: any, value: any) => {
     setSecrets((prev: any) => ({ ...prev, [key]: value }));
