@@ -218,7 +218,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject._isMounted = true;
     subject.state = {
@@ -273,7 +274,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject._isMounted = true;
     subject.state = {
@@ -326,7 +328,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject._isMounted = true;
     syncClassSetState(subject);
@@ -400,7 +403,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject._isMounted = true;
     subject.state = {
@@ -455,7 +459,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -508,7 +513,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -582,7 +588,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -615,7 +622,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -666,7 +674,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -719,7 +728,8 @@ describe('SurveyTool pile response sync and JSON controls', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject.state = {
       ...subject.state,
