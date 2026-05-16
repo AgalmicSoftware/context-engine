@@ -1080,9 +1080,6 @@ describe('SBTSelector scoped options', () => {
     const slugsSpy = jest
       .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
       .mockReturnValue(['demo']);
-    const hydrateSpy = jest
-      .spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted')
-      .mockResolvedValue(null);
 
     try {
       await instance.loadSBTOptions({ force: true });
@@ -1095,7 +1092,6 @@ describe('SBTSelector scoped options', () => {
         }),
       ]);
     } finally {
-      hydrateSpy.mockRestore();
       slugsSpy.mockRestore();
       scopeSpy.mockRestore();
       groupListsSpy.mockRestore();
