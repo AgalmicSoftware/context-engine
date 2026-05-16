@@ -1072,6 +1072,8 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       }
     }
   }, []);
+  const initialMountPropsRef = useRef(props);
+  const initialFetchSurveysRef = useRef(fetchSurveys);
 
   const updateCache = useCallback((updater: unknown, cb?: () => void) => {
     if (typeof updater !== 'function') {
@@ -1132,15 +1134,15 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
   }, [cache, cacheCallbackTick]);
 
   useEffect(() => {
+    const initialProps = initialMountPropsRef.current;
     if (shouldRouteSurveyToolMountToQuestions({
       pathname: window.location.pathname,
-      props,
+      props: initialProps,
     })) {
       window.history.pushState({}, '', '/questions');
     }
 
-    fetchSurveys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    initialFetchSurveysRef.current();
   }, []);
 
   useEffect(() => {
