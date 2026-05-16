@@ -122,9 +122,221 @@ import {
 import type { SbtCacheMetaSnapshot, SbtCardDetails } from './sbtListHelpers';
 
 const sbtLog = createLogger('sbt');
-const contractScriptsUntyped = contractScripts as any;
-const hasCachedCreateSbtFormUntyped = hasCachedCreateSbtForm as any;
-const runtimeGlobal = globalThis as any;
+type UnknownRecord = Record<string, unknown>;
+type SbtListMetadata = UnknownRecord & {
+  chainID?: unknown;
+  chainId?: unknown;
+  description?: unknown;
+  image?: unknown;
+  name?: unknown;
+  sessionName?: unknown;
+  sessionSlug?: unknown;
+  sessionSlugExplicit?: unknown;
+  title?: unknown;
+  tokenURI?: unknown;
+  tokenUri?: unknown;
+};
+type SbtListItem = UnknownRecord & {
+  blockNumber?: unknown;
+  burnedAddresses?: unknown;
+  defaultSbtTags?: unknown;
+  docURLs?: unknown;
+  documentURLs?: unknown;
+  documentUrls?: unknown;
+  documents?: unknown;
+  featuredSbtTags?: unknown;
+  historySummary?: UnknownRecord & {
+    currentHolderCount?: unknown;
+    historicalHolderCount?: unknown;
+  };
+  mintedAddresses?: unknown;
+  sbtAddress?: unknown;
+  sbtInfo?: SbtListMetadata;
+  sessionName?: unknown;
+  sessionSlug?: unknown;
+  sessionSlugExplicit?: unknown;
+  slug?: unknown;
+  __sourceSessionSlug?: unknown;
+};
+type SbtListScopedCacheEntry = UnknownRecord & {
+  slug?: unknown;
+  value?: unknown;
+};
+type SbtListScopedEntryOptions = {
+  requireConcreteBinding?: boolean;
+};
+type SbtListPointerEventLike = {
+  altKey?: boolean;
+  button?: number;
+  ctrlKey?: boolean;
+  currentTarget?: EventTarget | null;
+  defaultPrevented?: boolean;
+  metaKey?: boolean;
+  preventDefault?: () => void;
+  shiftKey?: boolean;
+  stopPropagation?: () => void;
+  target?: EventTarget | null;
+};
+type SbtListHeaderActionsArgs = {
+  isOpen: boolean;
+};
+type SbtSessionUniverseSnapshot = {
+  fallbackEntryCount: number;
+  registryEntryCount: number;
+  registryHydrated: boolean;
+  slugs: string[];
+};
+type SbtListLiveProgress = UnknownRecord & {
+  currentBlock?: unknown;
+  latestBlock?: unknown;
+  updatedAtMs?: number;
+};
+type SbtListBySlug = Record<string, SbtListItem[] | undefined>;
+type SbtListLiveProgressBySlug = Record<string, SbtListLiveProgress | undefined>;
+type SbtListBooleanBySlug = Record<string, boolean | undefined>;
+type SbtListLoadState = 'idle' | 'loading' | 'loaded' | 'error';
+type SbtListLoadStateBySlug = Record<string, SbtListLoadState | undefined>;
+type SbtListFetchRunBySlug = Record<string, number | undefined>;
+type SbtSessionDisplayConfig = UnknownRecord & {
+  blockLimits?: UnknownRecord & {
+    start?: unknown;
+  };
+  sessionName?: string;
+};
+type SbtSessionProgressSnapshot = {
+  cacheMeta: SbtCacheMetaSnapshot | null;
+  cfg: SbtSessionDisplayConfig | null;
+  deferred: boolean;
+  displayCurrentBlock: number;
+  hasCache: boolean;
+  hasLatest: boolean;
+  lastBlock: number;
+  latestForGroup: number | null;
+  liveCurrentBlock: number | null;
+  liveLatestBlock: number | null;
+  liveProgress: SbtListLiveProgress | null;
+  remainingBlocks: number | null;
+  sbtCount: number;
+  scanInProgress: boolean;
+  slug: string;
+  startBlock: number | null;
+};
+type SbtSessionLoadingOptions = {
+  alwaysShow?: boolean;
+  forceShow?: boolean;
+};
+type SbtSessionLoadingStatus = {
+  chipBlockProgressText: string;
+  chipRemainingText: string;
+  deferred: boolean;
+  displayCurrentBlock: number;
+  displayName: string;
+  hasLatest: boolean;
+  lastBlock: number;
+  latestForGroup: number | null;
+  progressPct: number;
+  progressText: string;
+  remainingBlocks: number | null;
+  scanInProgress: boolean;
+  slug: string;
+  slugLabel: string;
+  statusLabel: string;
+};
+type SbtSessionLoadingStatusBySlug = Record<string, SbtSessionLoadingStatus | undefined>;
+type SbtSessionChipState = {
+  hasCards: boolean;
+  hasLoadedOnce: boolean;
+  isLoaded: boolean;
+  isLoading: boolean;
+};
+type SbtSessionChipStateBySlug = Record<string, SbtSessionChipState | undefined>;
+type SbtPassiveLatestLookupState = {
+  lastRequestedAtBlock?: unknown;
+};
+type SbtPassiveLatestLookupStateBySlug = Record<string, SbtPassiveLatestLookupState | undefined>;
+type SbtPassiveLatestLookupInFlightBySlug = Record<string, boolean | undefined>;
+type SbtListInitDeps = {
+  listSlug: string;
+  allSessionsMode: boolean;
+  selectedSessionSignature: string;
+  universeSignature: string;
+  sessionUniverseRegistryPending: boolean;
+  sbtCacheRevision: number;
+};
+type SbtListFetchSBTs = (
+  forceRefresh?: boolean,
+  showLoadingIndicator?: boolean,
+  slugOverride?: unknown
+) => Promise<void>;
+type SbtListChipProgressMeta = UnknownRecord & {
+  lastModeChangeAtMs?: number;
+  pendingVisible?: boolean;
+  timerId?: ReturnType<typeof setTimeout> | null;
+  visible?: boolean;
+};
+type SbtListChipProgressMetaBySlug = Record<string, SbtListChipProgressMeta | undefined>;
+type SbtListBlockWindow = UnknownRecord & {
+  toBlock?: unknown;
+};
+type SbtListGroupPasswordMap = Record<string, boolean | undefined>;
+type SbtListPasswordFlagResult = [string, boolean];
+type SbtGroupPasswordHashReader = {
+  getGroupPasswordHash: (
+    providerName: string,
+    sbtAddress: string,
+    groupKeyOrCfg?: unknown,
+    options?: unknown
+  ) => Promise<unknown>;
+};
+type SbtRelevantBlockWindowReader = {
+  getRelevantBlockWindowForFilter: (scopeRef: unknown) => Promise<SbtListBlockWindow | unknown>;
+};
+type HasCachedCreateSbtFormReader = (options?: UnknownRecord) => boolean;
+type SbtListNetwork = UnknownRecord & {
+  id?: unknown;
+};
+type SbtLightDiscoveryOptions = {
+  force?: boolean;
+  forceScopeSlug?: string;
+};
+type SbtUniverseDiscoveryOptions = {
+  force?: boolean;
+};
+type SBTsListProps = {
+  account?: unknown;
+  litHooks?: unknown;
+  allSessionsMode?: boolean;
+  communityTabCompactSettings?: boolean;
+  embeddedMode?: boolean;
+  ensureLightSbtDiscovery?: (slug: string, options?: SbtLightDiscoveryOptions) => Promise<unknown> | unknown;
+  ensureLightSbtUniverse?: (slugs: string[], options?: SbtUniverseDiscoveryOptions) => Promise<unknown> | unknown;
+  interactiveMiniCards?: boolean;
+  isSBTCacheReady?: boolean;
+  latestBlockNumber?: unknown;
+  loginComplete?: unknown;
+  miniaturized?: boolean;
+  network?: SbtListNetwork | null;
+  onNavigateToSbt?: (sbtAddress: string, href: string) => void;
+  onRequestSbtCacheRefresh?: () => void;
+  provider?: unknown;
+  refreshSbtData?: unknown;
+  refreshSessionUniverseRegistryCache?: () => Promise<unknown> | unknown;
+  sbtCacheRevision?: unknown;
+  sbtRealtimeCoverageBySlug?: SbtListBooleanBySlug | UnknownRecord;
+  sbtScanProgressBySlug?: SbtListLiveProgressBySlug | UnknownRecord;
+  sessionSlug?: unknown;
+  toggleLoginModal?: unknown;
+  viewMode?: 'standard' | 'modal' | string;
+};
+const isRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object'
+);
+const isSbtListPointerEventLike = (value: unknown): value is SbtListPointerEventLike => (
+  !!value && typeof value === 'object'
+);
+const sbtGroupPasswordHashReader = contractScripts as unknown as SbtGroupPasswordHashReader;
+const sbtRelevantBlockWindowReader = contractScripts as unknown as SbtRelevantBlockWindowReader;
+const hasCachedCreateSbtFormReader = hasCachedCreateSbtForm as unknown as HasCachedCreateSbtFormReader;
 const DEMO_SESSION_MAP = getDemoSessionMap();
 
 const SBT_LIVE_PROGRESS_BRIDGE_MS = 2500;
@@ -2083,8 +2295,9 @@ const SBTsList = ({
 
         try {
           // Let MainSite own tokenURI hydration during light discovery
-          if (shouldShowLoaderForThisRun && typeof ensureLightSbtDiscovery === 'function') {
-            await Promise.all(targets.map(async (slug: any) => {
+          const runLightDiscovery = ensureLightSbtDiscoveryRef.current;
+          if (shouldShowLoaderForThisRun && typeof runLightDiscovery === 'function') {
+            await Promise.all(targets.map(async (slug: string) => {
               try {
                 await runLightDiscovery(
                   slug,
@@ -2093,7 +2306,10 @@ const SBTsList = ({
               } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
             }));
           }
-          await Promise.all(targets.map((slug: any) => fetchSBTs(false, false, slug)));
+          const runFetchSBTs = fetchSBTsRef.current;
+          if (typeof runFetchSBTs === 'function') {
+            await Promise.all(targets.map((slug: string) => runFetchSBTs(false, false, slug)));
+          }
         } finally {
           if (shouldShowLoaderForThisRun && isMounted.current) setLoading(false);
         }
