@@ -94,6 +94,32 @@ import {
   suppressQuestionFilterSbtState,
 } from './questionFilterSbtCapability';
 import {
+  QUESTION_FILTER_ACTIONS_STYLE,
+  QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
+  QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
+  QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE,
+  QUESTION_FILTER_MODAL_HEADER_ROW_STYLE,
+  QUESTION_FILTER_MODAL_TITLE_ROW_STYLE,
+  QUESTION_FILTER_SBT_SPINNER_STYLE,
+  buildQuestionFilterAiCombineRowClassName,
+  buildQuestionFilterDisabledSectionClassName,
+  buildQuestionFilterSectionIconClassName,
+  buildQuestionFilterTagBubbleClassName,
+  buildQuestionFilterTypeButtonClassName,
+  buildQuestionFilterTypePillClassName,
+  resolveQuestionFilterBookmarkIconStyle,
+  resolveQuestionFilterClearIconStyle,
+  resolveQuestionFilterCopyIconStyle,
+  resolveQuestionFilterEncryptedCountBadgeStyle,
+  resolveQuestionFilterInlineVisibilityStyle,
+  resolveQuestionFilterSectionBodyStyle,
+  resolveQuestionFilterSectionHeaderStyle,
+} from './questionFilterDisplayHelpers';
+import {
+  areQuestionListsEquivalentById,
+  buildAiCandidateSignature,
+  buildFilterPayloadSignature,
+  buildFilteredResponsesByQuestionSignature,
   buildQuestionFilterAiApplyBasePatch,
   buildQuestionFilterAiApplyFailurePatch,
   buildQuestionFilterAiApplyErrorPatch,
@@ -138,7 +164,7 @@ import {
   normalizeNonceKey,
   stableSerializeSmallObject,
   toLowerId,
-} from './questionFilterSignatureHelpers.js';
+} from './questionFilterHelpers.js';
 export {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -163,6 +189,232 @@ export {
 } from './questionFilterDisplayHelpers';
 
 const questionFilterLog = createLogger('questionFilter');
+const FILTER_STORAGE_KEY_PREFIX = 'dg:filters:';
+type UnknownRecord = Record<string, unknown>;
+type QuestionFilterMutableStatePatch = Record<string, unknown>;
+type QuestionFilterBookmarkCache = Record<string, unknown> & {
+  bookmarkedFilters?: unknown[];
+  filters?: unknown[];
+};
+type QuestionFilterResponsesByQuestion = Record<string, unknown>;
+type QuestionFilterWriteCache = (
+  namespace: string,
+  slug: string | undefined,
+  value: unknown
+) => boolean | Promise<boolean>;
+type QuestionFilterSessionProps = UnknownRecord & {
+  account?: string;
+  activeSessionSlug?: unknown;
+  network?: {
+    id?: unknown;
+    [key: string]: unknown;
+  } | null;
+  provider?: unknown;
+  sessionSlug?: unknown;
+  storageKeyPrefix?: unknown;
+};
+type QuestionFilterAiRequestOptions = {
+  sessionSlug: string;
+  sessionConfig: UnknownRecord;
+  context: {
+    account: string;
+    providerLike?: unknown;
+    chainId: unknown;
+  };
+};
+type QuestionFilterAiProviderSettings = {
+  apiKey?: unknown;
+  encryptedApiKey?: unknown;
+};
+type QuestionFilterQuestionRecord = UnknownRecord & {
+  id?: unknown;
+  tags?: unknown;
+  type?: unknown;
+};
+type QuestionFilterResponseStats = {
+  responseCount: number;
+  totalImportance: number;
+};
+type QuestionFilterResponseStatsMemo = {
+  relevantResponsesRef: unknown;
+  mergedQuestionsRef: unknown;
+  questionResponsesNonceKey: unknown;
+  questionsCacheNonceKey: unknown;
+  result: Map<string, QuestionFilterResponseStats>;
+};
+type QuestionFilterPipelineResult = {
+  finalQuestions: QuestionFilterQuestionRecord[];
+  count: number;
+};
+type QuestionFilterPipelineMemo = {
+  usePendingState: boolean;
+  mergedQuestionsRef: unknown;
+  relevantResponsesRef: unknown;
+  selectedTypesRef: unknown;
+  sortByImportance: unknown;
+  sbtFilteredQuestionsRef: unknown;
+  showTopQuestions: unknown;
+  topQuestionsCount: unknown;
+  showTopQuestionsByResponses: unknown;
+  selectedTagsRef: unknown;
+  filterByResponded: unknown;
+  filterByNotResponded: unknown;
+  aiSearchQuery: string;
+  aiFilterApplied: boolean;
+  aiAppliedTopN: number;
+  aiCombineWithOtherFilters: boolean;
+  aiRankedIdsSignature: string;
+  questionResponsesNonceKey: unknown;
+  questionsCacheNonceKey: unknown;
+  result: QuestionFilterPipelineResult;
+};
+type QuestionFilterRankedQuestion = [QuestionFilterQuestionRecord, number, number];
+type QuestionFilterSerializableState = Record<string, unknown> & {
+  sbtFilter?: unknown;
+};
+type QuestionFilterQuestionsCacheNet = UnknownRecord & {
+  questions?: Record<string, QuestionFilterQuestionRecord | null | undefined>;
+};
+type QuestionFilterAiApplySignatureArgs = {
+  stateIn?: unknown;
+  propsIn?: QuestionFilterSessionProps;
+  queryOverride?: unknown;
+  candidateQuestions?: unknown;
+};
+type QuestionFilterAiApplyOptions = {
+  auto?: boolean;
+  queryOverride?: unknown;
+  source?: unknown;
+  topNOverride?: unknown;
+};
+type QuestionFilterPersistenceProps = QuestionFilterSessionProps & {
+  defaultFilterState?: unknown;
+  enableLocalStorage?: unknown;
+  filterState?: unknown;
+  filterType?: unknown;
+};
+type QuestionFilterStateArg = {
+  stateIn?: unknown;
+};
+type QuestionFilterResponseDrivenStateArgs = QuestionFilterStateArg & {
+  usePendingState?: boolean;
+};
+type QuestionFilterInputChangeEvent = {
+  target?: {
+    checked?: unknown;
+    value?: unknown;
+  } | null;
+} | null | undefined;
+type QuestionFilterLoadStateOptions = {
+  resetIfMissing?: boolean;
+};
+type QuestionFilterRequiredValueEvent = {
+  target: {
+    value: unknown;
+  };
+};
+type QuestionFilterSbtSummaryEntry = {
+  address?: unknown;
+  name?: unknown;
+};
+type QuestionFilterSbtSummaryState = Record<string, unknown> & {
+  excludedSBTGroups?: unknown[];
+  excludedSBTGroupsCreator?: unknown[];
+  excludedSBTGroupsResponder?: unknown[];
+  selectedSBTGroups?: unknown[];
+  selectedSBTGroupsCreator?: unknown[];
+  selectedSBTGroupsResponder?: unknown[];
+};
+type QuestionFilterSummaryItem = {
+  label: string;
+  onRemove: () => void;
+  type: string;
+};
+type QuestionFilterAiAccessState = {
+  enabled: boolean;
+  sponsoredAvailable: boolean;
+  localKeyAvailable: boolean;
+  sponsoredStatus: string;
+};
+type QuestionFilterGateTooltipProps = {
+  gateId: string | null;
+  gateConfig: React.ComponentProps<typeof GateTooltip>['gateConfig'];
+  mode: string;
+  sbtAddresses: string[];
+} | null;
+type QuestionFilterStateRecord = UnknownRecord & {
+  aiAppliedTopN?: number | null;
+  aiRankingCount?: number;
+  expandedSections: Record<string, boolean>;
+  topQuestionsCount?: number;
+};
+const toUnknownRecord = (value: unknown): UnknownRecord => (
+  value && typeof value === 'object' ? value as UnknownRecord : {}
+);
+const getErrorMessage = (error: unknown, fallback = 'Unknown error') => {
+  const message = error && typeof error === 'object' && 'message' in error
+    ? (error as { message?: unknown }).message
+    : '';
+  return typeof message === 'string' && message.trim() ? message : fallback;
+};
+const getEncryptedQuestionCount = (questions: unknown): number => (
+  (Array.isArray(questions) ? questions : [])
+    .filter((question: { prompt?: unknown }) => String(question?.prompt || '').trim() === '[encrypted]')
+    .length
+);
+
+
+/**
+ * This component provides the UI and logic for filtering questions based on type, tags,
+ * SBT ownership (creator or responder), popularity, and (when enabled) AI search/ranking.
+ *
+ * The AI-based filter is currently placed at the top but disabled so it cannot be used.
+ * A summary of selected filters is displayed at the top, allowing removal of each filter item by clicking.
+ */
+const DEFAULT_TOP_QUESTIONS_COUNT = 10;
+const DEFAULT_AI_TOP_N = 10;
+const QUESTION_FILTER_RESPONSE_PARSE_MEMO_MAX = 500;
+const EMPTY_FILTER_RESPONSES = Object.freeze({});
+
+const modalStyles = {
+  backgroundColor: 'white',
+  fontSize: '16px'
+};
+
+/* ---------------------------------------------------------------------------
+ * Group-aware helpers (file-local, minimal surface)
+ * -------------------------------------------------------------------------*/
+
+/** Resolve effective session slug:
+ * Priority: URL /session/:slug → Redux activeSessionSlug → props.sessionSlug → '' (general)
+ */
+function resolveEffectiveSlug(props: QuestionFilterSessionProps = {}) {
+  return resolveQuestionFilterEffectiveSlug({
+    pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
+    activeSessionSlug: props.activeSessionSlug,
+    sessionSlug: props.sessionSlug,
+  });
+}
+
+function resolveEffectiveSessionContext(props: QuestionFilterSessionProps = {}) {
+  return resolveQuestionFilterSessionContext({
+    pathname: (typeof window !== 'undefined' && window.location?.pathname) || '',
+    activeSessionSlug: props.activeSessionSlug,
+    sessionSlug: props.sessionSlug,
+    resolveBySlug: getSessionConfigBySlug,
+  });
+}
+
+function resolveFilterStorageSlug(props: QuestionFilterSessionProps = {}) {
+  const prefix = String(props?.storageKeyPrefix || '').trim();
+  if (prefix.startsWith(FILTER_STORAGE_KEY_PREFIX)) {
+    return prefix.slice(FILTER_STORAGE_KEY_PREFIX.length);
+  }
+  return resolveEffectiveSlug(props);
+}
+
+const readQuestionsCacheSync = (slug: string | undefined) => peekCacheSync('questionsCache', slug, { clone: false }) || {};
+
 let QUESTION_FILTER_INSTANCE_SEQ = 0;
 
 export { shouldEnableQuestionFilterSbt };

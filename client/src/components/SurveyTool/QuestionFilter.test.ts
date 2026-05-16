@@ -1,6 +1,9 @@
 import { QuestionFilter as QuestionFilterComponent, shouldEnableQuestionFilterSbt } from './QuestionFilter';
 import { QuestionFilterSbtSection } from './QuestionFilterSections';
 import {
+  QuestionFilter as QuestionFilterComponent,
+} from './QuestionFilter';
+import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
   QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,

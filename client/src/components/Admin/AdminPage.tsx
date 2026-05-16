@@ -102,34 +102,14 @@ import {
   getSessionReadRpcConfig,
 } from './adminPageWorkerSessionConfigHelpers';
 import {
-  buildAdminArweaveBalanceResource,
-  buildAdminArweaveEmptyResource,
-  buildAdminArweaveErrorResource,
-  buildAdminArweaveInvalidResource,
-  buildAdminArweaveLoadingResource,
-  buildAdminFaucetBalanceResource,
-  buildAdminFaucetEmptyResource,
-  buildAdminFaucetErrorResource,
-  buildAdminFaucetInvalidResource,
-  buildAdminFaucetLoadingResource,
-  buildAdminFaucetRpcUnavailableResource,
-  buildAdminLitErrorResource,
-  buildAdminLitLoadingResource,
-  buildAdminLitNotConfiguredResource,
-  buildAdminLitStatusNotLoadedResource,
-  buildAdminLitStatusResource,
-  buildAdminLitUnavailableResource,
-  getAdminLitResourceLabel,
-} from './adminPageResourceDisplayHelpers';
-import {
   ADMIN_AI_PROVIDER_OPTIONS,
   ADMIN_EDITABLE_CONTRACT_KEY_SET,
   applyAdminMetadataDraft,
   buildAdminMetadataDraft,
   buildEditableSessionMetadataPayload,
-  buildWorkerCanonicalMetadataConfigPatch,
   parseChainIdInput,
   resolveAutoFeatureBySessionSlug,
+  shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
 
 const log = createLogger('general');
