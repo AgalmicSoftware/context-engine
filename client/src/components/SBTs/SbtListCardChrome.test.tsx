@@ -1,7 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { SbtListDetailsPanel, SbtListMetaRow } from './SbtListCardChrome';
+import {
+  SbtListDetailsPanel,
+  SbtListMetaRow,
+} from './SbtListCardChrome';
 
 const styles = {
   sbtDetailsHeading: 'sbtDetailsHeading',
@@ -29,7 +32,7 @@ describe('SbtListCardChrome', () => {
         }}
         detailsId="sbt-details-alpha"
         styles={styles}
-      />,
+      />
     );
 
     const link = screen.getByRole('link', { name: 'Alpha doc' });
@@ -42,7 +45,7 @@ describe('SbtListCardChrome', () => {
         details={{ documentUrls: [], hasDetails: false, tags: [] }}
         detailsId="sbt-details-alpha"
         styles={styles}
-      />,
+      />
     );
     expect(screen.queryByRole('link', { name: 'Alpha doc' })).not.toBeInTheDocument();
   });
@@ -67,7 +70,7 @@ describe('SbtListCardChrome', () => {
         onTagClick={onTagClick}
         onToggleDetails={onToggleDetails}
         styles={styles}
-      />,
+      />
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open tag explorer for alpha' }));
