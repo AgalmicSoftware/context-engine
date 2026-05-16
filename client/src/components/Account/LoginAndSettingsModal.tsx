@@ -56,6 +56,7 @@ import {
   LoginSettingsControlRow,
   LoginSettingsSessionSummary,
 } from './LoginSettingsControlRow';
+import LoginSettingsSectionCard from './LoginSettingsSectionCard';
 
 // Smart contract interactions and config
 import {
@@ -2038,17 +2039,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     summary = '',
     children = null,
   }: any = {}) => (
-    <div className={styles.settingsSectionCard}>
-      <div className={styles.settingsSectionToggle}>
-        <span className={styles.settingsSectionTitleGroup}>
-          <span className={styles.settingsSectionTitle}>{title}</span>
-          {summary ? <span className={styles.settingsSectionSummary}>{summary}</span> : null}
-        </span>
-      </div>
-      <div className={styles.settingsSectionBody}>
-        {children}
-      </div>
-    </div>
+    <LoginSettingsSectionCard title={title} summary={summary}>
+      {children}
+    </LoginSettingsSectionCard>
   );
 
   renderSettingsOverviewPanel: any = ({
