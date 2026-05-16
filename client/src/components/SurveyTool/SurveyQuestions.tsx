@@ -35,20 +35,17 @@ import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
-import BinaryChoiceInput from './BinaryChoiceInput';
 import BullhornToggleButton from './BullhornToggleButton';
 import ConvictionImportanceLabel from './ConvictionImportanceLabel';
 import ConvictionImportanceSliderControl from './ConvictionImportanceSliderControl';
 import DeferredConvictionImportanceSlider from './DeferredConvictionImportanceSlider';
-import DeferredRatingSlider from './DeferredRatingSlider';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import FullQuestionHeader from './FullQuestionHeader';
-import FullQuestionRatingInput from './FullQuestionRatingInput';
 import GatedPromptNotice from './GatedPromptNotice';
-import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
+import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import {
@@ -321,7 +318,6 @@ import {
   getHighlightedQuestionIdsSet,
   getImportanceFromResponse,
   getImportanceFromSlice,
-  getNormalizedUiRatingValue,
   getPendingStatsSnapshotFromState,
   getQuestionConvictionSliderValue,
   getQuestionImportanceSliderValue,
@@ -332,12 +328,10 @@ import {
   hasConvictionOrImportanceValueForQuestion,
   hasMeaningfulFieldValue,
   isIncomingResponseMetaNewer,
-  isSingleSelectMultichoice,
   isSurveyToolFilterStateActive,
   mergeDecryptedViewedResponse,
   mergeQuestionResponses,
   mergeSurveyResponsePayloads,
-  normalizeMultichoiceValue,
   normalizeQuestionIdKey,
   normalizeQuestionProgressSlug,
   normalizeSessionSlugValue,
@@ -3053,22 +3047,6 @@ export class SurveyQuestions extends Component {
     }
   };
 
-  renderSingleQuestionDeferredRatingSlider = ({ surveyIndex, questionId, ratingValue }) => (
-    <DeferredRatingSlider
-      value={ratingValue}
-      disabled={this.state.isSubmitting}
-      onCommit={(committedRating) => this.handleAnswer(
-        surveyIndex,
-        questionId,
-        committedRating,
-        {
-          persistDraft: false,
-          afterUpdate: this.flushDraftPersistAfterSliderChange,
-        }
-      )}
-    />
-  );
-
   renderSingleQuestionDeferredConvictionSlider = ({
     surveyIndex,
     questionId,
@@ -3162,76 +3140,39 @@ export class SurveyQuestions extends Component {
     surveyIndex,
     answer,
     glowAnswer,
-  }) => {
-    switch (question.type) {
-      case 'multichoice': {
-        const options = Array.isArray(question.options) ? question.options : [];
-        const isSingleSelect = isSingleSelectMultichoice(question);
-        const selectedValues = normalizeMultichoiceValue(answer.value);
-        return (
-          <MultichoiceQuestionInput
-            questionId={question.id}
-            options={options}
-            selectedValues={selectedValues}
-            isSingleSelect={isSingleSelect}
-            disabled={this.state.isSubmitting}
-            onChange={(newAnswer) => this.handleAnswer(surveyIndex, question.id, newAnswer)}
-          />
-        );
-      }
-      case 'rating': {
-        const ratingValue = getNormalizedUiRatingValue(answer.value);
-        return (
-          this.props.singleQuestionMode
-            ? this.renderSingleQuestionDeferredRatingSlider({
-                surveyIndex,
-                questionId: question.id,
-                ratingValue,
-              })
-            : (
-              <FullQuestionRatingInput
-                value={ratingValue}
-                disabled={this.state.isSubmitting}
-                onChange={(ratingAnswer, event) => this.handleAnswer(
-                  surveyIndex,
-                  question.id,
-                  ratingAnswer,
-                  this.getSliderPersistOptions(event)
-                )}
-                onChangeComplete={this.flushDraftPersistAfterSliderChange}
-              />
-            )
-        );
-      }
-      case 'binary':
-        return (
-          <BinaryChoiceInput
-            questionId={question.id}
-            value={answer.value}
-            onChange={(option) => this.handleAnswer(surveyIndex, question.id, option)}
-            disabled={this.state.isSubmitting}
-            showIcons
-          />
-        );
-      default:
-        return (
-          <SurveyAudioFieldInput
-            qIndex={qIndex}
-            {...this.getAudioInputWorkerProps()}
-            placeholder={'response (optional)'}
-            updateFunction={(answerValue) => this.handleAnswer(surveyIndex, question.id, answerValue)}
-            toggleEncryption={(newEncryptedState) => this.toggleAnswerEncryption(surveyIndex, question.id, newEncryptedState)}
-            value={answer.value || ''}
-            encrypted={answer.encrypted || false}
-            dataTestId={E2E_TESTIDS.SURVEY_ANSWER_INPUT}
-            dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
-            disabled={this.state.isSubmitting}
-            forceGlow={glowAnswer}
-            disableEncryption
-          />
-        );
-    }
-  };
+  }) => (
+    <SurveyQuestionsFullQuestionResponseInput
+      question={question}
+      qIndex={qIndex}
+      answer={answer}
+      glowAnswer={glowAnswer}
+      isSubmitting={this.state.isSubmitting}
+      singleQuestionMode={this.props.singleQuestionMode}
+      audioInputWorkerProps={this.getAudioInputWorkerProps()}
+      onAnswerChange={(answerValue) => this.handleAnswer(surveyIndex, question.id, answerValue)}
+      onDeferredRatingCommit={(committedRating) => this.handleAnswer(
+        surveyIndex,
+        question.id,
+        committedRating,
+        {
+          persistDraft: false,
+          afterUpdate: this.flushDraftPersistAfterSliderChange,
+        }
+      )}
+      onRatingChange={(ratingAnswer, event) => this.handleAnswer(
+        surveyIndex,
+        question.id,
+        ratingAnswer,
+        this.getSliderPersistOptions(event)
+      )}
+      onRatingChangeComplete={this.flushDraftPersistAfterSliderChange}
+      onToggleAnswerEncryption={(newEncryptedState) => this.toggleAnswerEncryption(
+        surveyIndex,
+        question.id,
+        newEncryptedState
+      )}
+    />
+  );
 
   renderFullQuestionAdditionalInput = ({
     qIndex,
