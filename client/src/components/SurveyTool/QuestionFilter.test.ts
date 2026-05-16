@@ -1,4 +1,7 @@
 import {
+  QuestionFilter as QuestionFilterComponent,
+} from './QuestionFilter';
+import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
   QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
@@ -6,7 +9,6 @@ import {
   QUESTION_FILTER_MODAL_HEADER_ROW_STYLE,
   QUESTION_FILTER_MODAL_TITLE_ROW_STYLE,
   QUESTION_FILTER_SBT_SPINNER_STYLE,
-  QuestionFilter as QuestionFilterComponent,
   buildQuestionFilterAiCombineRowClassName,
   buildQuestionFilterDisabledSectionClassName,
   buildQuestionFilterSectionIconClassName,
@@ -20,7 +22,7 @@ import {
   resolveQuestionFilterInlineVisibilityStyle,
   resolveQuestionFilterSectionBodyStyle,
   resolveQuestionFilterSectionHeaderStyle,
-} from './QuestionFilter';
+} from './questionFilterDisplayHelpers';
 import GateTooltip from '../Gates/GateTooltip';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import { serializeFilterState as serializeFilterStateStrict } from '../../utilities/survey/filterStateUtils.js';
