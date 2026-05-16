@@ -433,6 +433,7 @@ const SponsorPage = ({
   const requestedAutoRefreshKeyRef = useRef<any>('');
   const prevSelectedSlugRef = useRef<any>('');
   const workerUrlOverrideDirtyRef = useRef<any>(false);
+  const createRequestSeqRef = useRef(0);
   const requestedSessionRaw = toStr(initialSessionId).trim();
   const requestedSessionIdHex = sessionRegistryReadsPort.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
@@ -704,17 +705,19 @@ const SponsorPage = ({
   const hasManualWorkerUrlOverride = workerUrlOverrideDirty && !!normalizedEnteredWorkerUrl;
   const deploySponsoringWorkerUrl = normalizedEnteredWorkerUrl || selectedConfigWorkerUrl || '';
   const accountLower = toStr(account || '').toLowerCase();
-  const selectedConfigCreateSignature = useMemo(() => buildCreateConfigSignature(selectedConfig), [selectedConfig]);
-  const createContextKey = useMemo(
-    () =>
-      [
-        normalizeSlug(selectedSlug),
-        accountLower,
-        String(relevantSessionChainId || ''),
-        deploySponsoringWorkerUrl,
-        selectedConfigCreateSignature,
-      ].join('|'),
-    [accountLower, deploySponsoringWorkerUrl, relevantSessionChainId, selectedConfigCreateSignature, selectedSlug],
+  const createContextKey = useMemo(() => [
+    normalizeSlug(selectedSlug),
+    accountLower,
+    String(relevantSessionChainId || ''),
+    deploySponsoringWorkerUrl,
+  ].join('|'), [accountLower, deploySponsoringWorkerUrl, relevantSessionChainId, selectedSlug]);
+  const activeCreateContextKeyRef = useRef(createContextKey);
+  activeCreateContextKeyRef.current = createContextKey;
+  const selectedSessionSupportsEmbeddedDeploy = useMemo(() => (
+    selectedConfig?.embeddedDeployHelperEnabled !== false
+  ), [selectedConfig]);
+  const canCreateSponsoredUrl = !!selectedConfig && (
+    selectedSessionHasUsableWorker || hasManualWorkerUrlOverride
   );
   const activeCreateContextKeyRef = useRef(createContextKey);
   activeCreateContextKeyRef.current = createContextKey;
@@ -731,6 +734,11 @@ const SponsorPage = ({
     setShareUrl('');
     setShareKey('');
     setShareTxId('');
+  }, [createContextKey]);
+
+  useEffect(() => {
+    createRequestSeqRef.current += 1;
+    setCreateBusy(false);
   }, [createContextKey]);
 
   useEffect(() => {
@@ -869,8 +877,10 @@ const SponsorPage = ({
     const requestSeq = createRequestSeqRef.current + 1;
     createRequestSeqRef.current = requestSeq;
     const requestContextKey = activeCreateContextKeyRef.current;
-    const isCurrentCreateRequest = () =>
-      createRequestSeqRef.current === requestSeq && activeCreateContextKeyRef.current === requestContextKey;
+    const isCurrentCreateRequest = () => (
+      createRequestSeqRef.current === requestSeq &&
+      activeCreateContextKeyRef.current === requestContextKey
+    );
     const setCreateStatusIfCurrent = (nextStatus: string) => {
       if (isCurrentCreateRequest()) setCreateStatus(nextStatus);
     };
@@ -916,7 +926,7 @@ const SponsorPage = ({
       let resolvedGrantWorkerUrl = resolvedWorkerUrl;
       if (grantRequest.deploy || grantRequest.faucet) {
         setCreateStatusIfCurrent('Issuing sponsored bootstrap grants…');
-        const grantRequestBody: UnknownRecord = {
+        const grantRequestBody = {
           sessionSlug: selectedSlug,
           grantRequest,
         };
@@ -944,7 +954,7 @@ const SponsorPage = ({
           );
         }
         if (!isCurrentCreateRequest()) return;
-        const grantData: UnknownRecord = await grantResponse.json().catch(() => ({}));
+        const grantData = await grantResponse.json().catch(() => ({}));
         if (!isCurrentCreateRequest()) return;
         if (!grantResponse.ok) {
           throw new Error(
@@ -994,12 +1004,12 @@ const SponsorPage = ({
         throw new Error('Add at least one sponsored credential before creating a URL.');
       }
 
-      const secret = sponsoredBundlePort.generateSponsoredBundleSecret();
+      const secret = generateSponsoredBundleSecret();
       setCreateStatusIfCurrent('Uploading sponsored bundle…');
 
       const adminAuth = await buildBootstrapUploadAuth({ workerUrl: resolvedWorkerUrl });
       if (!isCurrentCreateRequest()) return;
-      const result = await sponsoredBundlePort.uploadSponsoredBundle({
+      const result = await uploadSponsoredBundleUntyped({
         secret,
         label,
         expiresAt: normalizedExpiry,

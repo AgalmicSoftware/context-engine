@@ -485,6 +485,37 @@ describe('SBTPage auto-mint routing', () => {
     expect(handleMintSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('retries password-list auto-mint when the target changes', () => {
+    const oldSbtAddress = '0x0000000000000000000000000000000000000113';
+    const nextSbtAddress = '0x0000000000000000000000000000000000000114';
+    const subject = createSubject({
+      SBTAddress: oldSbtAddress,
+      account: '0x0000000000000000000000000000000000000abc',
+      autoMintingMode: true,
+      loginComplete: true,
+      sbtMintPassword: ['claim-code'],
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      mintingStatus: 'idle',
+    };
+    subject.markAttemptedListMintForCurrentTarget();
+    subject.props = {
+      ...subject.props,
+      SBTAddress: nextSbtAddress,
+    };
+    const listMintSpy = jest.spyOn(subject, 'attemptMintWithPasswordList').mockResolvedValue(undefined);
+
+    subject.componentDidUpdate(subject.props, {
+      ...subject.state,
+      mintingStatus: 'pending',
+    });
+
+    expect(listMintSpy).toHaveBeenCalledWith(['claim-code']);
+    expect(subject._attemptedListMintTargetKey).toContain(nextSbtAddress.toLowerCase());
+  });
+
   it('resets pending mint UI when the connected account changes', () => {
     const sbtAddress = '0x0000000000000000000000000000000000000115';
     const previousAccount = '0x0000000000000000000000000000000000000abc';
