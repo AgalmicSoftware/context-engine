@@ -642,6 +642,8 @@ const SessionWizard = ({
   const [sessionIdStatus, setSessionIdStatus] = useState('');
   const [isSessionIdRegenerating, setIsSessionIdRegenerating] = useState(false);
   const [privateSlugMode, setPrivateSlugMode] = useState(() => !!cachedWizard?.privateSlugMode);
+  const privateSlugModeRef = useRef(privateSlugMode);
+  privateSlugModeRef.current = privateSlugMode;
   const lastManualSlugRef = useRef(toStr(cachedWizard?.lastManualSlug).trim());
   const [encryptedFieldGates, setEncryptedFieldGates] = useState<UnknownRecord>(() => (
     cachedWizard?.encryptedFieldGates && typeof cachedWizard.encryptedFieldGates === 'object'
@@ -714,6 +716,8 @@ const SessionWizard = ({
     normalizedPendingSbtDrafts,
     hasUndeployedPendingSbtDrafts,
   } = usePendingSbtDrafts();
+  const pendingSbtDraftsRef = useRef(pendingSbtDrafts);
+  pendingSbtDraftsRef.current = pendingSbtDrafts;
   const [createSbtModalState, setCreateSbtModalState] = useState<CreateSbtModalState>(() => ({
     open: false,
     targetType: 'gate',
@@ -896,6 +900,17 @@ const SessionWizard = ({
     sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets)
   );
   const workerDeployRuntimeRef = useRef(null);
+  const toggleLoginModalRef = useRef<SessionWizardProps['toggleLoginModal']>(toggleLoginModal);
+  toggleLoginModalRef.current = toggleLoginModal;
+  const togglePrivateSlugModeRef = useRef<null | (() => void)>(null);
+  const updateDraftValueRef = useRef<null | ((path: unknown[], value: unknown) => void)>(null);
+  const resolveCreateSbtTargetGateIdRef = useRef<null | ((requestedGateId?: unknown) => string)>(null);
+  const openCreateSbtModalRef = useRef<null | ((options?: UnknownRecord) => void)>(null);
+  const clearPendingSbtDraftsRef = useRef<null | ((draftsToClear?: unknown[], statusMessage?: string) => void)>(null);
+  const pruneAllPendingSbtSelectionsRef = useRef<null | (() => void)>(null);
+  const prunePendingSbtSelectionsRef = useRef<null | ((addressLowerSet: Set<string>) => void)>(null);
+  const clearFeaturedDraftGateAutoLinkRef = useRef<null | ((address?: unknown) => void)>(null);
+  const dismissFeaturedDraftGateAutoLinkRef = useRef<null | ((args?: UnknownRecord) => void)>(null);
   const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const defaultSponsoredSbtLookupInFlightRef = useRef('');
   const pendingSbtDeployContextSignature = useMemo(() => (
@@ -1061,6 +1076,8 @@ const SessionWizard = ({
   const [compactSessionHeaderMode, setCompactSessionHeaderMode] = useState('idle');
   const [sessionHeaderFile, setSessionHeaderFile] = useState<File | null>(null);
   const [sessionHeaderPreviewUrl, setSessionHeaderPreviewUrl] = useState('');
+  const sessionHeaderPreviewUrlRef = useRef(sessionHeaderPreviewUrl);
+  sessionHeaderPreviewUrlRef.current = sessionHeaderPreviewUrl;
   const [sessionHeaderPreviewModalOpen, setSessionHeaderPreviewModalOpen] = useState(false);
   const [sessionHeaderUploadStatus, setSessionHeaderUploadStatus] = useState('');
   const [sessionHeaderUploadStatusTone, setSessionHeaderUploadStatusTone] = useState<SessionHeaderUploadStatusTone>('default');
@@ -1225,9 +1242,8 @@ const SessionWizard = ({
     const prev = lastHasPrivateSbtNameRef.current;
     lastHasPrivateSbtNameRef.current = hasPrivateSbtName;
     if (!hasPrivateSbtName || prev) return;
-    if (privateSlugMode) return;
-    togglePrivateSlugMode();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (privateSlugModeRef.current) return;
+    togglePrivateSlugModeRef.current?.();
   }, [hasPrivateSbtName]);
 
   useEffect(() => {
@@ -1324,9 +1340,8 @@ const SessionWizard = ({
     }
     if (!deployComplete && configuredUrl && fallbackUrl && configuredUrl === fallbackUrl) {
       setWorkerUrlAutoFilled(false);
-      updateDraftValue(['corsWorkerUrl'], '');
+      updateDraftValueRef.current?.(['corsWorkerUrl'], '');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizardMode, workerMode, draft.corsWorkerUrl, deployComplete]);
 
   useEffect(() => {
@@ -1390,19 +1405,18 @@ const SessionWizard = ({
       });
       return changed ? next : prev;
     });
-    const normalizedPendingDrafts = normalizePendingSbtDrafts(pendingSbtDrafts);
+    const normalizedPendingDrafts = normalizePendingSbtDrafts(pendingSbtDraftsRef.current);
     if (!registryChainHydratedRef.current) {
       registryChainHydratedRef.current = true;
       return;
     }
     if (normalizedPendingDrafts.length > 0) {
-      clearPendingSbtDrafts(
+      clearPendingSbtDraftsRef.current?.(
         normalizedPendingDrafts,
         'Pending SBT drafts were cleared because the session chain or SBT factory changed. Recreate them before publishing.'
       );
-      pruneAllPendingSbtSelections();
+      pruneAllPendingSbtSelectionsRef.current?.();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registryChainId]);
 
   useEffect(() => {
@@ -1449,7 +1463,6 @@ const SessionWizard = ({
       });
       return changed ? next : prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [encryptionGates, registryChainId, resourceGateMap, workerResourceKeys]);
 
   useEffect(() => {
@@ -1499,7 +1512,6 @@ const SessionWizard = ({
       }
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultGateId, encryptionGates, registryChainId, resourceGateMap, workerResourceKeys]);
 
   useEffect(() => {
@@ -1566,7 +1578,7 @@ const SessionWizard = ({
       : ((Number.isFinite(fallbackStart) && fallbackStart > 0) ? fallbackStart : 0);
     if (!startBlock || !Number.isFinite(duration) || duration <= 0) {
       if (blockEndAutoRef.current) {
-        updateDraftValue(['blockLimits', 'end'], null);
+        updateDraftValueRef.current?.(['blockLimits', 'end'], null);
         blockEndAutoRef.current = false;
       }
       return;
@@ -1574,9 +1586,8 @@ const SessionWizard = ({
     const blockTimeMs = getChainBlockTimeMs(registryChainId);
     const blocks = Math.max(1, Math.ceil((duration * unitMs) / blockTimeMs));
     const endBlock = startBlock + blocks;
-    updateDraftValue(['blockLimits', 'end'], endBlock);
+    updateDraftValueRef.current?.(['blockLimits', 'end'], endBlock);
     blockEndAutoRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blockLimitDuration, blockLimitUnit, latestChainBlock, registryChainId, draft?.blockLimits?.start]);
 
   useEffect(() => {
@@ -1611,12 +1622,13 @@ const SessionWizard = ({
   useEffect(() => {
     const canCreateObjectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
     if (!sessionHeaderFile) {
+      const currentPreviewUrl = sessionHeaderPreviewUrlRef.current;
       if (
-        sessionHeaderPreviewUrl &&
+        currentPreviewUrl &&
         typeof URL !== 'undefined' &&
         typeof URL.revokeObjectURL === 'function'
       ) {
-        URL.revokeObjectURL(sessionHeaderPreviewUrl);
+        URL.revokeObjectURL(currentPreviewUrl);
       }
       setSessionHeaderPreviewUrl('');
       return;
@@ -1629,7 +1641,6 @@ const SessionWizard = ({
         URL.revokeObjectURL(previewUrl);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionHeaderFile]);
 
   const sessionHeaderPreviewSrc = useMemo(() => {
@@ -1756,7 +1767,6 @@ const SessionWizard = ({
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     defaultSponsoredSbtAddress,
     defaultSponsoredSbtLookupContext,
@@ -1836,6 +1846,7 @@ const SessionWizard = ({
     defaultGateId,
     requestedGateId,
   });
+  resolveCreateSbtTargetGateIdRef.current = resolveCreateSbtTargetGateId;
   const activeCreateSbtTargetGateId = resolveCreateSbtTargetGateId(createSbtTargetGateId);
   const activeCreateSbtTargetGate = getSessionWizardGateById(allEncryptionGates, activeCreateSbtTargetGateId);
   const focusCreateSbtTargetGate = (gateId = '') => {
@@ -1859,6 +1870,7 @@ const SessionWizard = ({
       ...nextModalState,
     });
   };
+  openCreateSbtModalRef.current = openCreateSbtModal;
 
   const launchCreateSbtModal = (options = {}) => {
     const nextModalState = buildCreateSbtModalLaunchState(options);
@@ -1906,10 +1918,9 @@ const SessionWizard = ({
 
   useEffect(() => {
     if (!toStr(account).trim() || !pendingCreateSbtLaunch) return;
-    if (typeof toggleLoginModal === 'function') toggleLoginModal(false);
-    openCreateSbtModal(pendingCreateSbtLaunch);
+    if (typeof toggleLoginModalRef.current === 'function') toggleLoginModalRef.current(false);
+    openCreateSbtModalRef.current?.(pendingCreateSbtLaunch);
     setPendingCreateSbtLaunch(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [account, pendingCreateSbtLaunch]);
 
   useEffect(() => {
@@ -1950,11 +1961,10 @@ const SessionWizard = ({
   }, [workerSecrets]);
 
   useEffect(() => {
-    const resolvedGateId = resolveCreateSbtTargetGateId(createSbtTargetGateId);
+    const resolvedGateId = resolveCreateSbtTargetGateIdRef.current?.(createSbtTargetGateId) || '';
     if (resolvedGateId !== toStr(createSbtTargetGateId).trim()) {
       setCreateSbtTargetGateId(resolvedGateId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createSbtTargetGateId, defaultGateId, encryptionGates]);
 
   const gateOptions = useMemo(() => (
@@ -1982,6 +1992,7 @@ const SessionWizard = ({
       return next;
     });
   };
+  togglePrivateSlugModeRef.current = togglePrivateSlugMode;
 
   const updateDraftValue = (path, value) => {
     if (pathKey(path) === 'slug' && !privateSlugMode) {
@@ -1994,6 +2005,7 @@ const SessionWizard = ({
       return next;
     });
   };
+  updateDraftValueRef.current = updateDraftValue;
 
   const updateArrayValue = (path, raw, asJson = false) => {
     try {
@@ -2029,6 +2041,7 @@ const SessionWizard = ({
       return null;
     });
   };
+  clearFeaturedDraftGateAutoLinkRef.current = clearFeaturedDraftGateAutoLink;
 
   const dismissFeaturedDraftGateAutoLink = ({ gateId = '', address = '' } = {}) => {
     const gateIdStr = toStr(gateId).trim();
@@ -2042,6 +2055,7 @@ const SessionWizard = ({
       return { ...current, dismissed: true };
     });
   };
+  dismissFeaturedDraftGateAutoLinkRef.current = dismissFeaturedDraftGateAutoLink;
 
   const handleGateAddSbt = (gateId, sbt) => {
     const gateIdStr = toStr(gateId).trim();
@@ -2200,6 +2214,7 @@ const SessionWizard = ({
       )
     );
   };
+  prunePendingSbtSelectionsRef.current = prunePendingSbtSelections;
 
   const pruneAllPendingSbtSelections = () => {
     setEncryptionGates((prev) => prev.map((gate) => ({
@@ -2214,6 +2229,7 @@ const SessionWizard = ({
       )
     );
   };
+  pruneAllPendingSbtSelectionsRef.current = pruneAllPendingSbtSelections;
 
   const removePendingSbtDraft = (predictedAddress) => {
     const addressLower = toStr(predictedAddress).trim().toLowerCase();
@@ -2237,6 +2253,7 @@ const SessionWizard = ({
       setStatus(statusMessage);
     }
   };
+  clearPendingSbtDraftsRef.current = clearPendingSbtDrafts;
 
   const handleSavePendingSbtDraft = async (draftPayload) => {
     const normalizedDrafts = normalizePendingSbtDrafts([draftPayload]);
@@ -2311,12 +2328,11 @@ const SessionWizard = ({
     // Regression guard: pending SBT drafts are CREATE2-addressed against the
     // current chain/factory pair. Keeping them after that context changes can
     // mine a real deploy tx and only fail after the address mismatch check.
-    clearPendingSbtDrafts(
+    clearPendingSbtDraftsRef.current?.(
       normalizedDrafts,
       'Pending SBT drafts were cleared because the session chain or SBT factory changed. Recreate them before publishing.'
     );
-    pruneAllPendingSbtSelections();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    pruneAllPendingSbtSelectionsRef.current?.();
   }, [pendingSbtDeployContextSignature, pendingSbtDrafts]);
 
   useEffect(() => {
@@ -2337,7 +2353,7 @@ const SessionWizard = ({
     if (!hasDanglingPendingSelection) return;
     // Keep gate selections aligned with the in-memory pending-draft list.
     // A `pending: true` entry without a live draft is always stale UI state.
-    prunePendingSbtSelections(new Set(
+    prunePendingSbtSelectionsRef.current?.(new Set(
       [
         ...encryptionGates.flatMap((gate) => normalizeSbtSelection(gate?.sbts || [])),
         ...normalizeSbtSelection(draft?.defaultFeaturedSBTs || []),
@@ -2346,7 +2362,6 @@ const SessionWizard = ({
         .map((entry) => toStr(entry?.address).trim().toLowerCase())
         .filter((addressLower) => addressLower && !livePendingAddressSet.has(addressLower))
     ));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.defaultFeaturedSBTs, encryptionGates, pendingSbtDrafts]);
 
   useEffect(() => {
@@ -2358,12 +2373,12 @@ const SessionWizard = ({
       (entry) => toStr(entry?.predictedAddress).trim().toLowerCase() === linkedAddressLower
     );
     if (!liveDraft) {
-      clearFeaturedDraftGateAutoLink(autoLink.address);
+      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
       return;
     }
     const targetGate = encryptionGates.find((gate) => toStr(gate?.id).trim() === gateId);
     if (!targetGate) {
-      clearFeaturedDraftGateAutoLink(autoLink.address);
+      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
       return;
     }
     const gateSelections = dedupeSbtSelection(targetGate?.sbts || []);
@@ -2374,13 +2389,13 @@ const SessionWizard = ({
       (entry) => toStr(entry?.address).trim().toLowerCase() !== linkedAddressLower
     );
     if (hasOtherSelections && autoLink.dismissed !== true) {
-      dismissFeaturedDraftGateAutoLink({ gateId, address: autoLink.address });
+      dismissFeaturedDraftGateAutoLinkRef.current?.({ gateId, address: autoLink.address });
       return;
     }
     if (autoLink.dismissed || hasAutoLinkedSelection) return;
     const pendingSelection = buildPendingSbtSelection(liveDraft);
     if (!pendingSelection) {
-      clearFeaturedDraftGateAutoLink(autoLink.address);
+      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
       return;
     }
     // Keep the Step-1 featured-draft link resilient across refreshes, but stop
@@ -2392,7 +2407,6 @@ const SessionWizard = ({
         sbts: dedupeSbtSelection([...normalizeSbtSelection(gate?.sbts || []), pendingSelection]),
       };
     }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuredDraftGateAutoLink, encryptionGates, pendingSbtDrafts]);
 
   const renderField = (key, value, path, opts = {}) => {
