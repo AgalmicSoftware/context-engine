@@ -22,6 +22,10 @@ import {
   SbtListDetailsPanel,
   SbtListMetaRow,
 } from './SbtListCardChrome';
+import {
+  SbtListSectionLoadingHint,
+  SbtListSectionTitle,
+} from './SbtListSectionChrome';
 import { ethers } from 'ethers';
 import { createLogger } from '../../utilities/logging.js';
 import {
@@ -2918,26 +2922,18 @@ const SBTsList = ({
   };
 
   const renderSectionTitle = (label: React.ReactNode, spinnerId: string): React.ReactNode => (
-    <div className={styles.sectionTitleRow}>
-      <h2 className={styles.sectionTitle}>{label}</h2>
-      {sectionHeaderSpinnerVisible && (
-        <FontAwesomeIcon
-          icon={faSpinner}
-          spin
-          className={styles.sectionCornerSpinner}
-          data-testid={spinnerId}
-        />
-      )}
-    </div>
+    <SbtListSectionTitle
+      label={label}
+      showSpinner={sectionHeaderSpinnerVisible}
+      spinnerId={spinnerId}
+    />
   );
 
   const renderSectionLoadingHint = () => (
-    <div className={styles.sectionLoadingHint}>
-      <span>Loading…</span>
-      {!allSessionsMode && typeof blocksLeft === 'number' && (
-        <span className={styles.sectionLoadingBlocks}>Blocks left: {blocksLeft}</span>
-      )}
-    </div>
+    <SbtListSectionLoadingHint
+      allSessionsMode={allSessionsMode}
+      blocksLeft={typeof blocksLeft === 'number' ? blocksLeft : null}
+    />
   );
 
   const renderSBTButton = (sbt: SbtListItem | null | undefined): React.ReactNode => {
