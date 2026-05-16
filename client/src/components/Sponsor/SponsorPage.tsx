@@ -281,6 +281,7 @@ const SponsorPage = ({
   const requestedAutoRefreshKeyRef = useRef<any>('');
   const prevSelectedSlugRef = useRef<any>('');
   const workerUrlOverrideDirtyRef = useRef<any>(false);
+  const createRequestSeqRef = useRef(0);
   const requestedSessionRaw = toStr(initialSessionId).trim();
   const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
@@ -542,12 +543,26 @@ const SponsorPage = ({
   const normalizedEnteredWorkerUrl = useMemo(() => normalizeWorkerUrl(workerUrl), [workerUrl]);
   const hasManualWorkerUrlOverride = workerUrlOverrideDirty && !!normalizedEnteredWorkerUrl;
   const deploySponsoringWorkerUrl = normalizedEnteredWorkerUrl || selectedConfigWorkerUrl || '';
+  const accountLower = toStr(account || '').toLowerCase();
+  const createContextKey = useMemo(() => [
+    normalizeSlug(selectedSlug),
+    accountLower,
+    String(relevantSessionChainId || ''),
+    deploySponsoringWorkerUrl,
+  ].join('|'), [accountLower, deploySponsoringWorkerUrl, relevantSessionChainId, selectedSlug]);
+  const activeCreateContextKeyRef = useRef(createContextKey);
+  activeCreateContextKeyRef.current = createContextKey;
   const selectedSessionSupportsEmbeddedDeploy = useMemo(() => (
     selectedConfig?.embeddedDeployHelperEnabled !== false
   ), [selectedConfig]);
   const canCreateSponsoredUrl = !!selectedConfig && (
     selectedSessionHasUsableWorker || hasManualWorkerUrlOverride
   );
+
+  useEffect(() => {
+    createRequestSeqRef.current += 1;
+    setCreateBusy(false);
+  }, [createContextKey]);
 
   useEffect(() => {
     if (prevSelectedSlugRef.current === selectedSlug) return;
@@ -593,7 +608,6 @@ const SponsorPage = ({
     };
   }, [selectedConfig, selectedConfigWorkerUrl, selectedSlug]);
 
-  const accountLower = toStr(account || '').toLowerCase();
   const adminAddress = toStr(selectedConfig?.__registry?.adminAddress || selectedConfig?.adminAddress).toLowerCase();
   const hasRegistryEntry = !!selectedConfig?.__registry?.registryChainId || !!selectedConfig?.__registry?.adminAddress;
   // Sponsor uploads intentionally only support direct `adminAddress` sessions today.
@@ -651,6 +665,17 @@ const SponsorPage = ({
   }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
 
   const handleCreateSponsoredUrl = useCallback(async () => {
+    const requestSeq = createRequestSeqRef.current + 1;
+    createRequestSeqRef.current = requestSeq;
+    const requestContextKey = activeCreateContextKeyRef.current;
+    const isCurrentCreateRequest = () => (
+      createRequestSeqRef.current === requestSeq &&
+      activeCreateContextKeyRef.current === requestContextKey
+    );
+    const setCreateStatusIfCurrent = (nextStatus: string) => {
+      if (isCurrentCreateRequest()) setCreateStatus(nextStatus);
+    };
+
     setCreateBusy(true);
     setCreateStatus('');
     setShareUrl('');
@@ -690,7 +715,7 @@ const SponsorPage = ({
       let faucetGrantToken = '';
       let resolvedGrantWorkerUrl = resolvedWorkerUrl;
       if (grantRequest.deploy || grantRequest.faucet) {
-        setCreateStatus('Issuing sponsored bootstrap grants…');
+        setCreateStatusIfCurrent('Issuing sponsored bootstrap grants…');
         const grantRequestBody = {
           sessionSlug: selectedSlug,
           grantRequest,
@@ -699,6 +724,7 @@ const SponsorPage = ({
           workerUrl: resolvedWorkerUrl,
           body: grantRequestBody,
         });
+        if (!isCurrentCreateRequest()) return;
         let grantResponse;
         try {
           grantResponse = await fetch(`${resolvedWorkerUrl}/admin/issue-sponsored-grants`, {
@@ -715,7 +741,9 @@ const SponsorPage = ({
             workerBase: resolvedWorkerUrl,
           }));
         }
+        if (!isCurrentCreateRequest()) return;
         const grantData = await grantResponse.json().catch(() => ({}));
+        if (!isCurrentCreateRequest()) return;
         if (!grantResponse.ok) {
           throw new Error(normalizeSponsorGrantErrorMessage({
             error: grantData?.error || `Failed to issue sponsored bootstrap grants (${grantResponse.status}).`,
@@ -761,9 +789,10 @@ const SponsorPage = ({
       }
 
       const secret = generateSponsoredBundleSecret();
-      setCreateStatus('Uploading sponsored bundle…');
+      setCreateStatusIfCurrent('Uploading sponsored bundle…');
 
       const adminAuth = await buildBootstrapUploadAuth({ workerUrl: resolvedWorkerUrl });
+      if (!isCurrentCreateRequest()) return;
       const result = await uploadSponsoredBundleUntyped({
         secret,
         label,
@@ -782,13 +811,16 @@ const SponsorPage = ({
         skipAuth: true,
         bundle: sponsoredBundlePayload,
       });
+      if (!isCurrentCreateRequest()) return;
       setShareUrl(result.url);
       setShareTxId(result.txId);
       setCreateStatus('Sponsored URL ready.');
     } catch (error) {
-      setCreateStatus(getErrorMessage(error, 'Failed to create sponsored URL.'));
+      if (isCurrentCreateRequest()) {
+        setCreateStatus(getErrorMessage(error, 'Failed to create sponsored URL.'));
+      }
     } finally {
-      setCreateBusy(false);
+      if (isCurrentCreateRequest()) setCreateBusy(false);
     }
   }, [
     account,

@@ -466,6 +466,7 @@ type SbtPagePrimaryMetadataState = Record<string, unknown> & {
 class SBTPage extends Component<any, any> {
   _isMounted = false;
   hasAttemptedListMint = false; // Flag for sequential minting
+  _attemptedListMintTargetKey = '';
   // Per-instance guards (no background loops)
   _metaHydrationTried: Record<string, boolean> = {};     // key: `${netId}:${addrLower}` => true
   _eventScanTried: Record<string, boolean> = {};         // key: `${netId}:${addrLower}` => true
@@ -548,11 +549,11 @@ class SBTPage extends Component<any, any> {
       }
       if (shouldRunSbtPagePropListAutoMint({
         autoMintingMode: this.props.autoMintingMode,
-        hasAttemptedListMint: this.hasAttemptedListMint,
+        hasAttemptedListMint: this.hasAttemptedListMintForCurrentTarget(),
         loginComplete: this.props.loginComplete,
         sbtMintPassword: this.props.sbtMintPassword,
       })) {
-        this.hasAttemptedListMint = true;
+        this.markAttemptedListMintForCurrentTarget();
         this.attemptMintWithPasswordList(this.props.sbtMintPassword);
       }
 
@@ -676,11 +677,11 @@ class SBTPage extends Component<any, any> {
     }
     if (shouldRunSbtPagePropListAutoMint({
       autoMintingMode,
-      hasAttemptedListMint: this.hasAttemptedListMint,
+      hasAttemptedListMint: this.hasAttemptedListMintForCurrentTarget(),
       loginComplete,
       sbtMintPassword,
     })) {
-      this.hasAttemptedListMint = true;
+      this.markAttemptedListMintForCurrentTarget();
       this.attemptMintWithPasswordList(sbtMintPassword);
     }
   }
@@ -1091,6 +1092,23 @@ class SBTPage extends Component<any, any> {
     String(resolveSbtAddressString(sbtAddress) || '').trim().toLowerCase(),
     sessionSlug == null ? '' : String(sessionSlug || ''),
   ].join('|');
+
+  buildListAutoMintTargetKey = (): string => this.buildMintTargetKey({
+    accountLower: String(this.props.account || '').trim().toLowerCase(),
+    chainId: this.getMintTargetChainId(),
+    sbtAddress: this.props.SBTAddress,
+    sessionSlug: this.getEffectiveSessionSlug(),
+  });
+
+  hasAttemptedListMintForCurrentTarget = (): boolean => {
+    const targetKey = this.buildListAutoMintTargetKey();
+    return !!targetKey && this.hasAttemptedListMint && this._attemptedListMintTargetKey === targetKey;
+  };
+
+  markAttemptedListMintForCurrentTarget = (): void => {
+    this._attemptedListMintTargetKey = this.buildListAutoMintTargetKey();
+    this.hasAttemptedListMint = !!this._attemptedListMintTargetKey;
+  };
 
   setMintPendingForTarget = ({
     accountLower = '',
