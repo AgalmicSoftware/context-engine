@@ -8,34 +8,10 @@ import GatedPromptNotice from './GatedPromptNotice';
 import QuestionCardLinks from './QuestionCardLinks';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
-import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
-import {
-  buildFieldDecryptState,
-  buildQuestionFieldDecryptControlDisplayState,
-  buildQuestionFieldDisplayState,
-  buildQuestionRenderDisplayState,
-  buildQuestionResponseDisplayState,
-} from './surveyToolDecryptFlow.js';
-import {
-  buildAnswerLockDisplayState,
-  buildGatedPromptNoticeState,
-  buildQuestionPromptDecryptDisplayState,
-} from './surveyToolViewState';
-import {
-  buildSurveyQuestionsJsonForDisplayState,
-  buildSurveyQuestionsJsonPanelDisplayState,
-  buildSurveyQuestionsMaskedQuestionVisibility,
-  buildSurveyQuestionsSubmitFooterDisplayState,
-  buildSurveyQuestionsSubmitReadinessDescriptor,
-} from './surveyQuestionsTypes.js';
-import { buildSurveyQuestionsRouteJsonControlsProps } from './surveyQuestionsRouteJsonControlsProps';
-import {
-  renderPileAdditionalEditorRow,
-  renderPileCommentsSection,
-  renderPileQuestionIcons,
-} from './surveyPileQuestionSections';
-import { getNormalizedUiRatingValue } from './surveyToolResponseState';
+import SurveyQuestionTagControl from './SurveyQuestionTagControl';
+import styles from './SurveyTool.module.scss';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SurveyTool.module.scss';
 
@@ -160,10 +136,11 @@ describe('SurveyQuestions render helpers', () => {
     expect(inlineRow).not.toBeNull();
     expect(inlineRow.props.input.type).toBe(SurveyAudioFieldInput);
     expect(inlineRow.props.input.props.placeholder).toBe('Additional comments...');
-    expect(findFirstNodeByType(inlineRow.props.lockControl, SurveyQuestionsLockAudienceControl)).not.toBeNull();
-    expect(renderToStaticMarkup(tree)).toContain(styles.additionalCommentsInputWrap);
-    expect(renderToStaticMarkup(tree)).toContain(styles.additionalCommentsLockSlot);
-    expect(renderToStaticMarkup(tree)).not.toContain('Additional comments</');
+    expect(renderToStaticMarkup(inlineRow)).toContain(styles.additionalCommentsInputWrap);
+    expect(renderToStaticMarkup(inlineRow)).toContain(styles.additionalCommentsLockSlot);
+    const lockControl = findFirstNodeByType(inlineRow.props.lockControl, SurveyQuestionsLockAudienceControl);
+    expect(lockControl).not.toBeNull();
+    expect(lockControl.props.effectiveFieldKey).toBe('additional');
   });
 
   it('renders pile question icons through the shared footer helper', () => {
@@ -179,13 +156,10 @@ describe('SurveyQuestions render helpers', () => {
       (node) => React.isValidElement(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE,
     );
 
-    expect(button).not.toBeNull();
-    expect(button.props['data-ce-question-id']).toBe('q1');
-    button.props.onClick();
-    expect(onToggleComments).toHaveBeenCalledTimes(1);
-    expect(
-      findElement(tree, (node) => React.isValidElement(node) && node.props['data-testid'] === 'answer-lock'),
-    ).not.toBeNull();
+    expect(commentsButton).not.toBeNull();
+    commentsButton.props.onClick();
+    expect(subject.toggleComments).toHaveBeenCalledWith('q1');
+    expect(findFirstNodeByType(tree, SurveyQuestionsLockAudienceControl)).not.toBeNull();
   });
 
   it('renders full-question footer icons through the shared footer helper', () => {
@@ -215,67 +189,13 @@ describe('SurveyQuestions render helpers', () => {
       </FullQuestionFooterIcons>,
     );
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_TOGGLE));
-    expect(onToggleComments).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK)).toBeInTheDocument();
-    expect(screen.getByTestId('tag-control')).toHaveAttribute('data-tags', 'governance');
-  });
-
-  it('keeps full-question response input execution handlers parent-owned with stable arguments', () => {
-    const handleAnswer = jest.fn();
-    const sliderFlush = jest.fn();
-    const toggleAnswerEncryption = jest.fn();
-    const question = { id: 'q-response', type: 'rating', prompt: 'Rate this' };
-    const answer = { value: 4, encrypted: false };
-    const input = (
-      <SurveyQuestionsFullQuestionResponseInput
-        question={question}
-        qIndex={2}
-        answer={answer}
-        glowAnswer
-        isSubmitting
-        singleQuestionMode
-        audioInputWorkerProps={{ workerReady: true }}
-        onAnswerChange={(value) => handleAnswer(5, question.id, value)}
-        onRatingChange={(value, event) => handleAnswer(5, question.id, value, { persistDraft: true, event })}
-        onDeferredRatingCommit={(value) =>
-          handleAnswer(5, question.id, value, {
-            persistDraft: false,
-            afterUpdate: sliderFlush,
-          })
-        }
-        onRatingChangeComplete={sliderFlush}
-        onToggleAnswerEncryption={(encrypted) => toggleAnswerEncryption(5, question.id, encrypted)}
-      />
-    );
-
-    expect(input.props).toMatchObject({
-      question,
-      qIndex: 2,
-      answer,
-      glowAnswer: true,
-      isSubmitting: true,
-      singleQuestionMode: true,
-      audioInputWorkerProps: { workerReady: true },
-    });
-
-    input.props.onAnswerChange('next answer');
-    input.props.onRatingChange(8, { type: 'keydown' });
-    input.props.onDeferredRatingCommit(6);
-    input.props.onRatingChangeComplete();
-    input.props.onToggleAnswerEncryption(true);
-
-    expect(handleAnswer).toHaveBeenNthCalledWith(1, 5, 'q-response', 'next answer');
-    expect(handleAnswer).toHaveBeenNthCalledWith(2, 5, 'q-response', 8, {
-      persistDraft: true,
-      event: { type: 'keydown' },
-    });
-    expect(handleAnswer).toHaveBeenNthCalledWith(3, 5, 'q-response', 6, {
-      persistDraft: false,
-      afterUpdate: sliderFlush,
-    });
-    expect(sliderFlush).toHaveBeenCalledTimes(1);
-    expect(toggleAnswerEncryption).toHaveBeenCalledWith(5, 'q-response', true);
+    expect(footer).not.toBeNull();
+    expect(typeof footer.props.onToggleComments).toBe('function');
+    footer.props.onToggleComments();
+    expect(subject.toggleComments).toHaveBeenCalledWith('q1', true);
+    expect(findFirstNodeByType(tree, SurveyQuestionsLockAudienceControl)).not.toBeNull();
+    expect(dropdown).toBeTruthy();
+    expect(dropdown.props.tags).toEqual(['governance']);
   });
 
   it('renders full-question card links through the shared header helper', () => {

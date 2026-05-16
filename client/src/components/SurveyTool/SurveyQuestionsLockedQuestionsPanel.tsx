@@ -1,6 +1,12 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faExternalLinkAlt, faLock, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCaretDown,
+  faCaretUp,
+  faExternalLinkAlt,
+  faLock,
+  faSpinner,
+} from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -33,96 +39,6 @@ type SurveyQuestionsLockedQuestionsPanelProps = {
   onToggleDetails?: () => void;
 };
 
-type RequiredSbtLinkItem = {
-  key: string;
-  href: string;
-  label: React.ReactNode;
-  labelText: string;
-};
-
-const nodeToText = (value: React.ReactNode): string => {
-  if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
-  return '';
-};
-
-const collectRequiredSbtLinks = (lockedGateDetails: LockedQuestionGateDetail[] = []): RequiredSbtLinkItem[] => {
-  const out: RequiredSbtLinkItem[] = [];
-  const seen = new Set<string>();
-  (Array.isArray(lockedGateDetails) ? lockedGateDetails : []).forEach((gate) => {
-    (Array.isArray(gate?.sbts) ? gate.sbts : []).forEach((sbt) => {
-      const href = String(sbt?.href || '').trim();
-      const address = String(sbt?.address || '').trim();
-      const labelText = nodeToText(sbt?.label) || address;
-      if (!href || !labelText) return;
-      const key = `${address.toLowerCase()}|${href}|${labelText.toLowerCase()}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      out.push({
-        key,
-        href,
-        label: sbt?.label || labelText,
-        labelText,
-      });
-    });
-  });
-  return out;
-};
-
-const buildRequirementText = (items: RequiredSbtLinkItem[]): string => {
-  if (!items.length) return '';
-  const labels = items.map((item) => item.labelText);
-  const shown = labels.slice(0, 3);
-  const extra = labels.length > shown.length ? ` +${labels.length - shown.length} more` : '';
-  return `${t('sbt')}${labels.length === 1 ? '' : 's'} required: ${shown.join(', ')}${extra}.`;
-};
-
-const renderRequirementLinks = (items: RequiredSbtLinkItem[]): React.ReactNode => {
-  if (!items.length) return null;
-  const shown = items.slice(0, 3);
-  const extra = items.length > shown.length ? ` +${items.length - shown.length} more` : '';
-  return (
-    <>
-      {t('sbt')}
-      {items.length === 1 ? '' : 's'} required:{' '}
-      {shown.map((item, index) => (
-        <React.Fragment key={item.key}>
-          {index > 0 ? ', ' : null}
-          <a
-            href={item.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.lockedSbtInlineLink}
-            aria-label={`Open ${t('sbt')} ${item.labelText}`}
-          >
-            {item.label}
-          </a>
-        </React.Fragment>
-      ))}
-      {extra}.
-    </>
-  );
-};
-
-const renderLinkedSubtitle = ({
-  lockedGateDetails,
-  subtitle,
-}: {
-  lockedGateDetails: LockedQuestionGateDetail[];
-  subtitle: React.ReactNode;
-}): React.ReactNode => {
-  if (typeof subtitle !== 'string') return subtitle;
-  const items = collectRequiredSbtLinks(lockedGateDetails);
-  const requirementText = buildRequirementText(items);
-  if (!requirementText || !subtitle.startsWith(requirementText)) return subtitle;
-  const rest = subtitle.slice(requirementText.length);
-  return (
-    <>
-      {renderRequirementLinks(items)}
-      {rest}
-    </>
-  );
-};
-
 const SurveyQuestionsLockedQuestionsPanel = ({
   hiddenMaskedQuestionIds = [],
   lockedGateDetails = [],
@@ -142,11 +58,10 @@ const SurveyQuestionsLockedQuestionsPanel = ({
   const resolvedTitle = title || `${hiddenCount} Locked Question${hiddenCount === 1 ? '' : 's'}`;
   const canToggleLockedDetails = lockedGateDetails.length > 0 && showCaret;
   const showLockedGateDetails = forceExpanded || (!!lockedGateDetailsExpanded && canToggleLockedDetails);
-  const bannerClassName =
-    [styles.lockedQuestionsBanner, surface === 'dark' ? styles.lockedQuestionsBannerOnDark : '']
-      .filter(Boolean)
-      .join(' ') || undefined;
-  const renderedSubtitle = subtitle ? renderLinkedSubtitle({ lockedGateDetails, subtitle }) : null;
+  const bannerClassName = [
+    styles.lockedQuestionsBanner,
+    surface === 'dark' ? styles.lockedQuestionsBannerOnDark : '',
+  ].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className={bannerClassName} role="status" data-testid={E2E_TESTIDS.SURVEY_LOCKED_BANNER}>
@@ -155,8 +70,14 @@ const SurveyQuestionsLockedQuestionsPanel = ({
       </div>
       <div className={styles.lockedQuestionsHeader}>
         <div className={styles.lockedQuestionsCopy}>
-          <div className={styles.lockedQuestionsTitle}>{resolvedTitle}</div>
-          {renderedSubtitle ? <div className={styles.lockedQuestionsSubtext}>{renderedSubtitle}</div> : null}
+          <div className={styles.lockedQuestionsTitle}>
+            {resolvedTitle}
+          </div>
+          {subtitle ? (
+            <div className={styles.lockedQuestionsSubtext}>
+              {subtitle}
+            </div>
+          ) : null}
         </div>
         <div className={styles.lockedQuestionsAction}>
           <button
