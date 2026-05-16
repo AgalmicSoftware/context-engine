@@ -1,43 +1,5 @@
 import { SurveyQuestions } from './SurveyQuestions';
-import styles from './SurveyTool.module.scss';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-
-const treeHasDataTestId = (node, testId) => {
-  if (node == null) return false;
-  if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
-  if (typeof node !== 'object') return false;
-  if (node?.props?.['data-testid'] === testId) return true;
-  return treeHasDataTestId(node?.props?.children, testId);
-};
-
-const treeHasText = (node, text) => {
-  if (node == null) return false;
-  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
-  if (typeof node === 'string' || typeof node === 'number') {
-    return String(node).includes(text);
-  }
-  if (typeof node !== 'object') return false;
-  return treeHasText(node?.props?.children, text);
-};
-
-const findElement = (node, predicate) => {
-  const stack = [node];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    if (Array.isArray(current)) {
-      for (let i = current.length - 1; i >= 0; i -= 1) {
-        stack.push(current[i]);
-      }
-      continue;
-    }
-    if (typeof current !== 'object') continue;
-    if (predicate(current)) return current;
-    const children = current?.props?.children;
-    if (children !== undefined) stack.push(children);
-  }
-  return null;
-};
+import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 
 const findFirstNodeByType = (node, targetType) => {
   if (node == null) return null;
@@ -52,16 +14,6 @@ const findFirstNodeByType = (node, targetType) => {
   if (node?.type === targetType) return node;
   return findFirstNodeByType(node?.props?.children, targetType);
 };
-
-const nodeHasClassName = (node, className) => {
-  const value = node?.props?.className;
-  if (typeof value !== 'string') return false;
-  return value.split(/\s+/).includes(className);
-};
-
-const findNodeByClassName = (node, className) => (
-  findElement(node, (candidate) => nodeHasClassName(candidate, className))
-);
 
 describe('SurveyQuestions lock audience controls', () => {
   afterEach(() => {
@@ -98,10 +50,10 @@ describe('SurveyQuestions lock audience controls', () => {
       forceAudienceMenu: true,
       selfAudienceLabel: 'only me',
     });
-    const lockButton = findFirstNodeByType(lockControl, 'button');
+    const lockButton = findFirstNodeByType(lockControl, SurveyQuestionsLockAudienceControl);
     expect(lockButton).toBeTruthy();
 
-    lockButton.props.onClick();
+    lockButton.props.onLockClick();
 
     expect(subject.toggleLockAudienceMenu).toHaveBeenCalledWith('q1', true, 'answer');
     expect(subject.toggleAnswerEncryption).toHaveBeenCalledWith(0, 'q1', true);
@@ -137,10 +89,10 @@ describe('SurveyQuestions lock audience controls', () => {
       forceAudienceMenu: true,
       selfAudienceLabel: 'only me',
     });
-    const lockButton = findFirstNodeByType(lockControl, 'button');
+    const lockButton = findFirstNodeByType(lockControl, SurveyQuestionsLockAudienceControl);
     expect(lockButton).toBeTruthy();
 
-    lockButton.props.onClick();
+    lockButton.props.onLockClick();
 
     expect(subject.toggleLockAudienceMenu).toHaveBeenCalledWith('q1', true, 'answer');
     expect(subject.toggleAnswerEncryption).not.toHaveBeenCalled();
@@ -173,8 +125,10 @@ describe('SurveyQuestions lock audience controls', () => {
       selfAudienceLabel: 'only me',
     });
 
-    expect(treeHasText(lockControl, 'only me')).toBe(true);
-    expect(treeHasDataTestId(lockControl, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE)).toBe(false);
+    const audienceControl = findFirstNodeByType(lockControl, SurveyQuestionsLockAudienceControl);
+    expect(audienceControl).toBeTruthy();
+    expect(audienceControl.props.normalizedSelfAudienceLabel).toBe('only me');
+    expect(audienceControl.props.gateOptions).toEqual([]);
   });
 
   it('derives lock-audience display state for additional fields with inherit mode', () => {
@@ -243,14 +197,13 @@ describe('SurveyQuestions lock audience controls', () => {
       selfAudienceLabel: 'only me',
       visualContext: 'pile',
     });
-    const lockButton = findFirstNodeByType(lockControl, 'button');
+    const lockButton = findFirstNodeByType(lockControl, SurveyQuestionsLockAudienceControl);
 
     expect(lockButton).toBeTruthy();
-    expect(String(lockButton?.props?.className || '')).toContain(styles.pileLockButton);
-    expect(String(lockButton?.props?.className || '')).toContain(styles.pileLockButtonMenuOpen);
-    expect(String(lockButton?.props?.className || '')).not.toContain(styles.iconButtonActive);
-    expect(findNodeByClassName(lockControl, styles.iconGlow)).toBeNull();
-    expect(findNodeByClassName(lockControl, styles.pileLockAudiencePopover)).toBeTruthy();
+    expect(lockButton.props.isPileVisualContext).toBe(true);
+    expect(lockButton.props.pileMenuPressed).toBe(true);
+    expect(lockButton.props.showBrightLockState).toBe(false);
+    expect(lockButton.props.menuOpen).toBe(true);
   });
 
   it('labels response gate audience options with the session name', () => {
