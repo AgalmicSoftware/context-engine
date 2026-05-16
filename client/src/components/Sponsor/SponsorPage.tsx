@@ -164,7 +164,7 @@ const countSessionsForChain = (entries: unknown = [], chainId: number | null = n
     return cfgChainId === chainId;
   }).length;
 };
-const stableCreateContextValue = (value: unknown, seen = new WeakSet<object>()): unknown => {
+const stableCreateContextValue = (value: any, seen = new WeakSet<object>()): any => {
   if (value == null) return value;
   const valueType = typeof value;
   if (valueType === 'bigint') return value.toString();
@@ -176,27 +176,24 @@ const stableCreateContextValue = (value: unknown, seen = new WeakSet<object>()):
     seen.delete(value);
     return result;
   }
-  const record = value as UnknownRecord;
-  const result = Object.keys(record)
-    .sort()
-    .reduce<UnknownRecord>((acc, key) => {
-      const nextValue = record[key];
-      if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
-        acc[key] = stableCreateContextValue(nextValue, seen);
-      }
-      return acc;
-    }, {});
+  const result = Object.keys(value).sort().reduce((acc: Record<string, any>, key) => {
+    const nextValue = value[key];
+    if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
+      acc[key] = stableCreateContextValue(nextValue, seen);
+    }
+    return acc;
+  }, {});
   seen.delete(value);
   return result;
 };
-const buildCreateConfigSignature = (sessionConfig: unknown = null) => {
+const buildCreateConfigSignature = (sessionConfig: any = null) => {
   try {
     return JSON.stringify(stableCreateContextValue(sessionConfig || null));
   } catch (_) {
     return '';
   }
 };
-const shortAddress = (addr: unknown) => {
+const shortAddress = (addr: any) => {
   const value = toStr(addr).trim();
   if (!value) return '';
   return `${value.slice(0, 6)}…${value.slice(-4)}`;
@@ -705,12 +702,23 @@ const SponsorPage = ({
   const hasManualWorkerUrlOverride = workerUrlOverrideDirty && !!normalizedEnteredWorkerUrl;
   const deploySponsoringWorkerUrl = normalizedEnteredWorkerUrl || selectedConfigWorkerUrl || '';
   const accountLower = toStr(account || '').toLowerCase();
+  const selectedConfigCreateSignature = useMemo(
+    () => buildCreateConfigSignature(selectedConfig),
+    [selectedConfig]
+  );
   const createContextKey = useMemo(() => [
     normalizeSlug(selectedSlug),
     accountLower,
     String(relevantSessionChainId || ''),
     deploySponsoringWorkerUrl,
-  ].join('|'), [accountLower, deploySponsoringWorkerUrl, relevantSessionChainId, selectedSlug]);
+    selectedConfigCreateSignature,
+  ].join('|'), [
+    accountLower,
+    deploySponsoringWorkerUrl,
+    relevantSessionChainId,
+    selectedConfigCreateSignature,
+    selectedSlug,
+  ]);
   const activeCreateContextKeyRef = useRef(createContextKey);
   activeCreateContextKeyRef.current = createContextKey;
   const selectedSessionSupportsEmbeddedDeploy = useMemo(() => (
@@ -739,6 +747,9 @@ const SponsorPage = ({
   useEffect(() => {
     createRequestSeqRef.current += 1;
     setCreateBusy(false);
+    setCreateStatus('');
+    setShareUrl('');
+    setShareTxId('');
   }, [createContextKey]);
 
   useEffect(() => {
