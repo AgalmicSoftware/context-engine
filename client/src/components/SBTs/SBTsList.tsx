@@ -22,6 +22,10 @@ import {
   SbtListDetailsPanel,
   SbtListMetaRow,
 } from './SbtListCardChrome';
+import {
+  SbtListSectionLoadingHint,
+  SbtListSectionTitle,
+} from './SbtListSectionChrome';
 import { ethers } from 'ethers';
 import { createLogger } from '../../utilities/logging.js';
 import {
@@ -3358,18 +3362,12 @@ const SBTsList = ({
     );
   };
 
-  const renderSectionTitle = (label: any, spinnerId: any) => (
-    <div className={styles.sectionTitleRow}>
-      <h2 className={styles.sectionTitle}>{label}</h2>
-      {sectionHeaderSpinnerVisible && (
-        <FontAwesomeIcon
-          icon={faSpinner}
-          spin
-          className={styles.sectionCornerSpinner}
-          data-testid={spinnerId}
-        />
-      )}
-    </div>
+  const renderSectionTitle = (label: React.ReactNode, spinnerId: string): React.ReactNode => (
+    <SbtListSectionTitle
+      label={label}
+      showSpinner={sectionHeaderSpinnerVisible}
+      spinnerId={spinnerId}
+    />
   );
 
   const renderSectionLoadingHint = () => (
