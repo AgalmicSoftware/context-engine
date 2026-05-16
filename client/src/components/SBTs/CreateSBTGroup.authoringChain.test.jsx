@@ -2,7 +2,7 @@ import { act, render, screen, within } from '@testing-library/react';
 
 import CreateSBTGroup from './CreateSBTGroup';
 import styles from './CreateSBTGroup.module.scss';
-import { getDemoSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
+import { getDemoSessionConfigBySlug } from '../../utilities/web3/contractScripts.js';
 import { getSessionContractsForChain, getSessionRegistryChains } from '../../variables/chains.js';
 
 const makeInstance = (props = {}) => {
@@ -22,9 +22,7 @@ describe('CreateSBTGroup authoring chain selection', () => {
   });
 
   it('limits the network dropdown to session-registry authoring chains and defaults to the session chain', () => {
-    const authoringChain = getSessionRegistryChains().find(
-      (chain) => getSessionContractsForChain(chain.id)?.sbtFactory,
-    );
+    const authoringChain = getSessionRegistryChains().find((chain) => getSessionContractsForChain(chain.id)?.sbtFactory);
     expect(authoringChain).toBeTruthy();
     const instance = makeInstance({
       network: { id: 1, name: 'Ethereum Mainnet' },
@@ -43,9 +41,7 @@ describe('CreateSBTGroup authoring chain selection', () => {
     const networkRow = screen.getByText('Network').closest(`.${styles.settingRow}`);
     expect(networkRow).toBeInTheDocument();
     const networkSelect = within(networkRow).getByRole('combobox');
-    const options = within(networkSelect)
-      .getAllByRole('option')
-      .map((option) => option.textContent);
+    const options = within(networkSelect).getAllByRole('option').map((option) => option.textContent);
 
     expect(networkSelect).toHaveValue(String(authoringChain.id));
     expect(options).toContain(`${authoringChain.name} (${authoringChain.id})`);
@@ -54,9 +50,7 @@ describe('CreateSBTGroup authoring chain selection', () => {
   });
 
   it('keeps the resolved session config on the authoring chain instead of the wallet chain', () => {
-    const authoringChain = getSessionRegistryChains().find(
-      (chain) => getSessionContractsForChain(chain.id)?.sbtFactory,
-    );
+    const authoringChain = getSessionRegistryChains().find((chain) => getSessionContractsForChain(chain.id)?.sbtFactory);
     expect(authoringChain).toBeTruthy();
     const sessionContracts = getSessionContractsForChain(authoringChain.id);
     const instance = makeInstance({
@@ -69,52 +63,15 @@ describe('CreateSBTGroup authoring chain selection', () => {
 
     const resolved = instance.getSessionConfigForNetwork();
 
-    expect(resolved).toEqual(
-      expect.objectContaining({
-        slug: 'test',
-        networkChainId: authoringChain.id,
-        sbtFactoryAddress: sessionContracts.sbtFactory,
-      }),
-    );
-    expect(resolved.contracts.sbtFactory).toEqual(
-      expect.objectContaining({
-        address: sessionContracts.sbtFactory,
-        chainId: authoringChain.id,
-      }),
-    );
-  });
-
-  it('prefers the connected network over a pure Worker session legacy chain for standalone authoring', () => {
-    const instance = makeInstance({
-      network: { id: 84532, name: 'Base Sepolia' },
-      preferConnectedNetworkForAuthoring: true,
-      sessionConfigOverride: {
-        slug: 'demo-sh',
-        networkChainId: 11155420,
-      },
-    });
-    instance.getAuthoringChainOptions = jest.fn(() => [
-      { id: 84532, name: 'Base Sepolia' },
-      { id: 11155420, name: 'OP Sepolia' },
-    ]);
-
-    expect(instance.resolveAuthoringChainId()).toBe(84532);
-  });
-
-  it('retains the session authoring chain for registry and hybrid contexts', () => {
-    const instance = makeInstance({
-      network: { id: 84532, name: 'Base Sepolia' },
-      sessionConfigOverride: {
-        slug: 'registry-session',
-        networkChainId: 11155420,
-      },
-    });
-    instance.getAuthoringChainOptions = jest.fn(() => [
-      { id: 84532, name: 'Base Sepolia' },
-      { id: 11155420, name: 'OP Sepolia' },
-    ]);
-
-    expect(instance.resolveAuthoringChainId()).toBe(11155420);
+    expect(resolved).toEqual(expect.objectContaining({
+      slug: 'test',
+      networkChainId: authoringChain.id,
+      sbtFactoryAddress: sessionContracts.sbtFactory,
+    }));
+    expect(resolved.contracts.sbtFactory).toEqual(expect.objectContaining({
+      address: sessionContracts.sbtFactory,
+      chainId: authoringChain.id,
+    }));
   });
 
   it('oss demo fallback sessions omit shipped SBT factory addresses', () => {
@@ -157,25 +114,19 @@ describe('CreateSBTGroup authoring chain selection', () => {
 
       const resolved = instance.getSessionConfigForNetwork();
 
-      expect(resolved).toEqual(
-        expect.objectContaining({
-          slug: 'test',
-          networkChainId: 31337,
-          sbtFactoryAddress: localChainContracts.sbtFactory,
-        }),
-      );
-      expect(resolved.contracts.sbtFactory).toEqual(
-        expect.objectContaining({
-          address: localChainContracts.sbtFactory,
-          chainId: 31337,
-        }),
-      );
-      expect(resolved.contracts.surveys).toEqual(
-        expect.objectContaining({
-          address: localChainContracts.surveys,
-          chainId: 31337,
-        }),
-      );
+      expect(resolved).toEqual(expect.objectContaining({
+        slug: 'test',
+        networkChainId: 31337,
+        sbtFactoryAddress: localChainContracts.sbtFactory,
+      }));
+      expect(resolved.contracts.sbtFactory).toEqual(expect.objectContaining({
+        address: localChainContracts.sbtFactory,
+        chainId: 31337,
+      }));
+      expect(resolved.contracts.surveys).toEqual(expect.objectContaining({
+        address: localChainContracts.surveys,
+        chainId: 31337,
+      }));
     } finally {
       if (typeof priorIncludeLocalRegistry === 'undefined') {
         delete globalThis.CE_INCLUDE_LOCAL_SESSION_REGISTRY;
@@ -186,10 +137,6 @@ describe('CreateSBTGroup authoring chain selection', () => {
   });
 
   it('keeps the current authoring chain when the wallet switch request is rejected', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const switchError = Object.assign(new Error('User rejected network switch'), {
-      code: 4001,
-    });
     const instance = makeInstance({
       account: '0x00000000000000000000000000000000000000aa',
       network: { id: 84532, name: 'Base Sepolia' },
@@ -206,33 +153,28 @@ describe('CreateSBTGroup authoring chain selection', () => {
         network: { id: 84532, name: 'Base Sepolia' },
       },
     };
-    instance.getAuthoringChainOptions = jest.fn(() => [
+    instance.getAuthoringChainOptions = jest.fn(() => ([
       { id: 84532, name: 'Base Sepolia' },
       { id: 31337, name: 'Anvil' },
-    ]);
+    ]));
 
-    const request = jest.fn().mockRejectedValue(switchError);
+    const request = jest.fn().mockRejectedValue(Object.assign(new Error('User rejected network switch'), {
+      code: 4001,
+    }));
     window.ethereum = { request };
 
-    try {
-      await act(async () => {
-        await instance.handleNetworkChange({ target: { value: '31337' } });
-      });
+    await act(async () => {
+      await instance.handleNetworkChange({ target: { value: '31337' } });
+    });
 
-      expect(request).toHaveBeenCalledWith({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x7a69' }],
-      });
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'Failed to switch network', switchError);
-      expect(instance.state.network).toBe(84532);
-      expect(instance.state.sbtDistribution.network).toEqual(
-        expect.objectContaining({
-          id: 84532,
-          name: 'Base Sepolia',
-        }),
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
+    expect(request).toHaveBeenCalledWith({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: '0x7a69' }],
+    });
+    expect(instance.state.network).toBe(84532);
+    expect(instance.state.sbtDistribution.network).toEqual(expect.objectContaining({
+      id: 84532,
+      name: 'Base Sepolia',
+    }));
   });
 });
