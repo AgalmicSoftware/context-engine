@@ -45,6 +45,9 @@ import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from "reactstra
 import UserPage from "components/UserPage/UserPage";
 import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
+import {
+  LoginSettingsSupportedResourceCard,
+} from './LoginSettingsResourceSummary';
 
 // Smart contract interactions and config
 import {
@@ -2044,27 +2047,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  renderSessionPills: any = (sessions: any = [], emptyText: any = 'No sponsor sessions configured.') => {
-    if (!sessions.length) {
-      return <div className={styles.aiSettingsHintStrong}>{emptyText}</div>;
-    }
-    return (
-      <div className={styles.sessionPills}>
-        {sessions.map((sessionEntry: any) => (
-          <span
-            key={`${sessionEntry.slug}:${sessionEntry.label}`}
-            className={`${styles.sessionPill} ${sessionEntry.isActive ? styles.sessionPillActive : ''}`}
-          >
-            {sessionEntry.label}
-            <span className={styles.sessionPillMeta}>
-              {sessionEntry.isActive ? 'active' : sessionEntry.slugLabel}
-            </span>
-          </span>
-        ))}
-      </div>
-    );
-  };
-
   getPrimarySponsorSession: any = (sessions: any = []) => {
     const list = Array.isArray(sessions) ? sessions : [];
     return list.find((entry: any) => entry?.isActive) || list[0] || null;
@@ -2103,53 +2085,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const extraCount = extraSessions.length;
 
     return (
-      <div key={card.key} className={styles.supportedResourceCard}>
-        <div className={styles.supportedResourceHeader}>
-          <div className={styles.supportedResourceName}>{card.title}</div>
-          <span className={`${styles.aiSponsoredStatus} ${styles[`aiSponsoredStatus${card.status.tone}`]}`}>
-            {card.status.label}
-          </span>
-        </div>
-        <div className={styles.supportedResourceDetail}>{card.status.detail}</div>
-        <div className={styles.supportedResourceSessions}>
-          <div className={styles.supportedResourceSessionsLabel}>Active session</div>
-          <div className={styles.supportedResourcePrimarySession}>
-            {this.renderSessionPills([activeSession])}
-            <span
-              className={`${styles.supportedResourceActiveState} ${
-                activeSponsorSession
-                  ? styles.supportedResourceActiveStateOn
-                  : styles.supportedResourceActiveStateOff
-              }`}
-            >
-              {activeSponsorSession ? 'configured here' : 'not configured here'}
-            </span>
-          </div>
-          {extraCount > 0 ? (
-            <div className={styles.supportedResourceOtherSessions}>
-              <div className={styles.supportedResourceSessionsLabel}>Other sessions with {card.title}</div>
-              <button
-                type="button"
-                className={styles.supportedResourceMoreButton}
-                onClick={() => this.toggleSupportedResourceSessions(card.key)}
-                aria-expanded={extrasExpanded}
-                aria-label={`${extrasExpanded ? 'Hide' : 'Show'} other ${card.title} sponsor sessions`}
-              >
-                {extrasExpanded ? 'Hide other sessions' : `${extraCount} other ${extraCount === 1 ? 'session' : 'sessions'}`}
-                <FontAwesomeIcon
-                  icon={extrasExpanded ? faCaretUp : faCaretDown}
-                  className={styles.supportedResourceMoreChevron}
-                />
-              </button>
-            </div>
-          ) : null}
-          {extraCount > 0 && extrasExpanded ? (
-            <div className={styles.supportedResourceExtraSessions}>
-              {this.renderSessionPills(extraSessions)}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <LoginSettingsSupportedResourceCard
+        key={card.key}
+        activeSession={activeSession}
+        activeSponsorSession={activeSponsorSession}
+        card={card}
+        extraSessions={extraSessions}
+        extrasExpanded={extrasExpanded}
+        onToggleSessions={this.toggleSupportedResourceSessions}
+      />
     );
   };
 
