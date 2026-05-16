@@ -18,6 +18,8 @@ import {
   faSearch,
   faExpand,
   faExclamationCircle,
+  faSyncAlt,
+  faComments
 } from '@fortawesome/free-solid-svg-icons';
 
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
@@ -63,134 +65,13 @@ import {
 } from './surveyResultsHelpers.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import {
-  buildSurveyResultsQuestionTableEntries,
-  type SurveyResultsQuestionTableEntry,
-} from './surveyResultsSummaryModels';
+  readSessionScanScope,
+  readSessionScanSlugs,
+} from '../../utilities/session/sessionScanScope.js';
 import {
-  createInitialSurveyResultsState,
-  preserveSurveyResultsFilterStateValue,
-  surveyResultsReducer,
-} from './surveyResultsState';
-import type { SurveyResultsStateUpdate } from './surveyResultsState';
-import {
-  buildSurveyResultsHtmlReportAnalysisDemoReadyPatch,
-  buildSurveyResultsHtmlReportAnalysisEligibilityBlockedPatch,
-  buildSurveyResultsHtmlReportAnalysisErrorPatch,
-  buildSurveyResultsHtmlReportAnalysisProgressPatch,
-  buildSurveyResultsHtmlReportDemoModePatch,
-  buildSurveyResultsHtmlReportFormatPatch,
-  buildSurveyResultsHtmlReportModalClosePatch,
-  buildSurveyResultsHtmlReportModalOpenPatch,
-  buildSurveyResultsHtmlReportSectionTogglePatch,
-} from './surveyResultsHtmlReportStatePatches.js';
-import {
-  buildSurveyResultsHtmlReportDownloadFailurePatch,
-  buildSurveyResultsHtmlReportDownloadSuccessPatch,
-} from './surveyResultsHtmlReportDownloadAttempt.js';
-import type { SurveyResultsHtmlReportSectionKey } from './surveyResultsHtmlReportReadiness.js';
-import { buildSurveyResultsSurveyQuestionBookmarkWritePlan } from './surveyResultsCacheWriteEligibilityPlan';
-import { buildSurveyResultsBookmarksCacheReadRequest } from './surveyResultsBookmarkCacheReadPorts';
-import {
-  buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan,
-  runSurveyResultsAnalysisGeneratedArtifactCompletion,
-  type SurveyResultsAnalysisGeneratedArtifactCompletionPlan,
-} from './surveyResultsAnalysisGeneratedArtifactCompletionPlan';
-import { buildSurveyResultsAnalysisLifecyclePlan } from './surveyResultsAnalysisLifecyclePlan';
-import {
-  runSurveyResultsAnalysisLifecycleController,
-  type SurveyResultsAnalysisLifecycleStatePatchPort,
-} from './surveyResultsAnalysisLifecycleController';
-import { runSurveyResultsSurveyQuestionBookmarkWriteController } from './surveyResultsSurveyQuestionBookmarkWriteController';
-import { runSurveyResultsManualRefreshDispatchController } from './surveyResultsManualRefreshController';
-import { runSurveyResultsManualRefreshStatusApplicationController } from './surveyResultsManualRefreshStatusApplicationController';
-import { surveyResultsHtmlReportExporterPort } from './surveyResultsHtmlReportExporterPort';
-import { surveyResultsAnalysisGenerationPort } from './surveyResultsAnalysisGenerationPort';
-import { buildSurveyResultsHtmlReportDownloadExecutionPlan } from './surveyResultsHtmlReportDownloadRequest';
-import { normalizeGateSbtEntries, type SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
-import {
-  applyExistingGroupPrefix,
-  areValuesEquivalentBySignature,
-  getFilterStateSignature,
-  getResponseQuestionId,
-  getResponseQuestionPrompt,
-  getResponseQuestionType,
-  hasExplicitSessionQueryPinInPath,
-  normalizeNonceKey,
-  resolveNetBucketReadOnly,
-} from './surveyResultsRuntimeHelpers';
-import { buildSurveyResultsHtmlReportModalProps } from './surveyResultsHtmlReportModalProps';
-import { getSurveyResultsQuestionCardDomId } from './surveyResultsQuestionSummaryStatusController';
-import {
-  runSurveyResultsQuestionMetadataReadController,
-  type SurveyResultsQuestionMetadataReadIdentity,
-} from './surveyResultsQuestionMetadataReadController';
-import {
-  createSurveyResultsFallbackQuestionBuckets,
-  getSurveyResultsStableFallbackQuestion,
-  type SurveyResultsFallbackQuestion,
-  type SurveyResultsFallbackQuestionBuckets,
-} from './surveyResultsFallbackQuestionHelpers';
-import {
-  EMPTY_SCOPED_QUESTION_NETWORK_DATA,
-  runSurveyResultsQuestionNetworkAsyncReadController,
-  runSurveyResultsQuestionNetworkReadController,
-  type SurveyResultsQuestionBucketRecord,
-  type SurveyResultsQuestionRecord,
-  type SurveyResultsQuestionResponsesByQuestion,
-  type SurveyResultsScopedQuestionNetworkData,
-  type SurveyResultsScopedQuestionNetworkMemo,
-} from './surveyResultsQuestionNetworkReadController';
-import {
-  applySurveyResultsBuiltInDemoQuestionMetadataFallbackToBucket,
-  isSurveyResultsDemoQuestionResultsContext,
-} from './surveyResultsDemoQuestionFallback';
-import { createSurveyResultsInstanceFields } from './surveyResultsInstanceFields';
-import { surveyResultsCachePort } from '../../domains/surveys/surveyResultsCachePort';
-import { surveyResultsAnalysisArtifactMergePort } from '../../domains/surveys/surveyResultsAnalysisArtifactMergePort';
-import { cryptoGatePort } from '../../domains/crypto/cryptoGatePort';
-import {
-  createSurveyResultsFetchResponsesRuntime,
-  type SurveyResultsFetchResponsesRuntime,
-} from '../../domains/surveys/surveyResultsFetchResponsesRuntime';
-import {
-  createSurveyResultsLocalStoragePollingRuntime,
-  type SurveyResultsLocalStoragePollingRuntime,
-} from '../../domains/surveys/surveyResultsLocalStoragePollingRuntime';
-import {
-  createSurveyResultsQueuedRefreshRuntime,
-  type SurveyResultsQueuedRefreshRuntime,
-} from '../../domains/surveys/surveyResultsQueuedRefreshRuntime';
-import { runSurveyResultsComponentDidMount, runSurveyResultsComponentDidUpdate } from './surveyResultsLifecycleRuntime';
-import { chainScanReadsPort } from '../../domains/chain/chainScanReadsPort';
-import { createSurveyResultsDataExportRuntime } from './surveyResultsDataExportRuntime';
-import { createSurveyResultsHtmlReportRuntime } from './surveyResultsHtmlReportRuntime';
-import {
-  fetchSurveyResultsQuestionModeResponses,
-  fetchSurveyResultsSurveyModeResponses,
-} from './surveyResultsHydrationRuntime';
-import {
-  maybeRefreshSurveyResultsNetworkLatestBlockFromPolling,
-  pollSurveyResultsLocalStorageForUpdates,
-} from './surveyResultsLocalStoragePollRuntime';
-import {
-  createSurveyResultsLockedResponsesRuntime,
-  type SurveyResultsLockedResponsesRuntimeInstance,
-} from './surveyResultsLockedResponsesRuntime';
-import { renderSurveyResultsRenderSurface } from './surveyResultsRenderSurface';
-import {
-  buildSessionResultsAnalysisPrompt,
-  SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
-  SESSION_RESULTS_EXPORT_FORMAT_PDF,
-  SESSION_RESULTS_EXPORT_FORMAT_VIEWER,
-  type SessionResultsAnalysisSectionKey,
-  type SessionResultsExportFormat,
-  type SessionResultsGeneratedAnalysisArtifact,
-  type SessionResultsSectionSelection,
-} from '../../utilities/sessionResultsExport';
-import type { QuestionFilterHandle } from './QuestionFilter';
-import { type SurveyResultsHtmlReportExportModalProps } from './SurveyResultsHtmlReportExportModal';
-import SurveyResultsQuestionSummary from './SurveyResultsQuestionSummary';
-import SurveyResultsQuestionTable from './SurveyResultsQuestionTable';
+  SurveyResultsLockedResponsesBanner,
+  SurveyResultsLockedResponsesToggle,
+} from './SurveyResultsLockedResponsesPanel';
 
 export {
   SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
@@ -1863,20 +1744,183 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     });
     const networkQuestions = questionMetadataRead.selectedNetworkQuestions;
 
-    return SurveyResultsQuestionSummary({
-      activeQuestionToggles: stateRef.current.activeQuestionToggles,
-      activeSessionSlug,
-      applyDecryptedOverrideToResponse: applyDecryptedOverrideToResponse,
-      bookmarkedQuestionIDs: stateRef.current.bookmarkedQuestionIDs,
-      bookmarkIconStyle: SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
-      getFallbackQuestion: getStableFallbackQuestion,
-      getLockedResponseKey: getLockedResponseKey,
-      getResponseCardProps: getSurveyResultsResponseCardProps,
-      metadataMissingStyle: SURVEY_RESULTS_METADATA_MISSING_STYLE,
-      network: propsRef.current.network,
-      networkQuestions,
-      onToggleBookmark: toggleQuestionBookmark,
-      onToggleSummary: toggleQuestionSummary,
+  const { gateDetails, hasGenericGateMessage } = this.buildLockedGateDetails(lockedRows, questionLookup);
+  const result = {
+    lockedRows,
+    lockedCount: lockedRows.length,
+    gateDetails,
+    hasGenericGateMessage,
+  };
+  this._lockedResponsesModelMemo = {
+    viewMode,
+    surveyViewMode,
+    responsesRef: sbtFilteredResponses,
+    aggregatorRef: sbtFilteredAggregatorQuestionResponses,
+    questionLookupRef: questionLookup,
+    overridesRef: decryptedResponseOverrides,
+    slug,
+    result,
+  };
+  return result;
+};
+
+decryptFieldValue = async (
+  field: SurveyResultsEncryptedFieldRecord | null = null
+): Promise<SurveyResultsDecryptFieldResult> => {
+  if (!field || typeof field !== 'object') return { ok: false };
+  const envelope = extractEnvelopeCandidate(field);
+  if (!envelope) return { ok: false };
+
+  const litHooks = this.getDecryptLitHooks();
+  const litOpts = litHooks && typeof litHooks.getKey === 'function'
+    ? { getKey: litHooks.getKey }
+    : undefined;
+
+  try {
+    const value = await cryptoUtils.decryptEnvelopeValue(envelope, {
+      account: this.props.account,
+      chainId: this.props.network?.id || this.props.networkChainId || null,
+      providerLike: this.props.provider,
+      ...(litOpts ? { litOpts } : {}),
+    });
+    return { ok: true, value };
+  } catch (error) {
+    return { ok: false, error };
+  }
+};
+
+handleDecryptLockedResponses = async (): Promise<void> => {
+  if (this.state.lockedResponsesDecrypting) return;
+  if (!this.props.loginComplete || !this.props.account) {
+    this.setState(buildSurveyResultsAlertMessagePatch('Login required to decrypt locked responses.'));
+    return;
+  }
+
+  const questionLookup = this.getNetworkQuestionsForCurrentContext();
+  const model = this.getMemoizedLockedResponsesModel(questionLookup);
+  const lockedRows = Array.isArray(model?.lockedRows) ? model.lockedRows : [];
+  if (lockedRows.length === 0) return;
+
+  this.setState(buildSurveyResultsLockedResponsesDecryptingPatch(true));
+
+  let anyDecrypted = false;
+  const nextOverrides: Record<string, SurveyResultsDecryptedResponseOverride> = {
+    ...(toSurveyResultsRecord(this.state.decryptedResponseOverrides) as Record<string, SurveyResultsDecryptedResponseOverride>),
+  };
+
+  for (const row of lockedRows) {
+    const response: SurveyResultsResponseRecord = row?.response || {};
+    const override: SurveyResultsDecryptedResponseOverride = { ...(nextOverrides[row.key] || {}) };
+
+    if (isLockedEncryptedField(row?.mergedResponse?.answer)) {
+      const answerResult = await this.decryptFieldValue(response.answer);
+      if (answerResult.ok) {
+        override.answerValue = answerResult.value;
+        anyDecrypted = true;
+      }
+    }
+
+    if (isLockedEncryptedField(row?.mergedResponse?.additional)) {
+      const additionalResult = await this.decryptFieldValue(response.additional);
+      if (additionalResult.ok) {
+        override.additionalValue = additionalResult.value;
+        anyDecrypted = true;
+      }
+    }
+
+    if (
+      typeof response?.importanceEncrypted === 'string' &&
+      response.importanceEncrypted.trim() &&
+      !hasOwn(override, 'importance')
+    ) {
+      try {
+        const litHooks = this.getDecryptLitHooks();
+        const importance = await cryptoUtils.decryptEnvelopeValue(response.importanceEncrypted, {
+          account: this.props.account,
+          chainId: this.props.network?.id || this.props.networkChainId || null,
+          providerLike: this.props.provider,
+          ...(litHooks?.getKey ? { litOpts: { getKey: litHooks.getKey } } : {}),
+        });
+        override.importance = Number.isNaN(Number(importance)) ? importance : Number(importance);
+        anyDecrypted = true;
+      } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
+    }
+
+    if (
+      typeof response?.convictionEncrypted === 'string' &&
+      response.convictionEncrypted.trim() &&
+      !hasOwn(override, 'conviction')
+    ) {
+      try {
+        const litHooks = this.getDecryptLitHooks();
+        const conviction = await cryptoUtils.decryptEnvelopeValue(response.convictionEncrypted, {
+          account: this.props.account,
+          chainId: this.props.network?.id || this.props.networkChainId || null,
+          providerLike: this.props.provider,
+          ...(litHooks?.getKey ? { litOpts: { getKey: litHooks.getKey } } : {}),
+        });
+        override.conviction = Number.isNaN(Number(conviction)) ? conviction : Number(conviction);
+        anyDecrypted = true;
+      } catch (e) { surveyLog.warn('SurveyResults: fallback', e); }
+    }
+
+    if (Object.keys(override).length > 0) {
+      nextOverrides[row.key] = override;
+    }
+  }
+
+  this.setState(buildSurveyResultsLockedResponsesDecryptCompletePatch({
+    anyDecrypted,
+    decryptedResponseOverrides: nextOverrides,
+    walletLowerLabel: t('walletLower'),
+  }));
+};
+
+toggleLockedResponseDetails = (): void => {
+  this.setState(toggleSurveyResultsLockedResponseDetailsPatch);
+};
+
+renderLockedResponsesToggle = (
+  lockedModel: SurveyResultsLockedResponsesModel | null = null
+): React.ReactNode => {
+  return SurveyResultsLockedResponsesToggle({
+    isOpen: !!this.state.lockedResponseDetailsOpen,
+    lockedModel,
+    onToggleDetails: this.toggleLockedResponseDetails,
+  });
+};
+
+renderLockedResponsesBanner = (
+  lockedModel: SurveyResultsLockedResponsesModel | null = null
+): React.ReactNode => {
+  return SurveyResultsLockedResponsesBanner({
+    decrypting: !!this.state.lockedResponsesDecrypting,
+    isOpen: !!this.state.lockedResponseDetailsOpen,
+    lockedModel,
+    onDecrypt: this.handleDecryptLockedResponses,
+  });
+};
+
+
+renderQuestionSummary = (
+  questionId: string,
+  responses: unknown,
+  preNetworkQuestions: Record<string, SurveyResultsRecord>
+): React.ReactNode => {
+  const domId = getQuestionCardDomId(questionId);
+  const lowerQId = questionId.toLowerCase();
+
+  // Prefer preloaded per-render cache to avoid repeated localStorage hits.
+  let networkQuestions = preNetworkQuestions;
+  if (!networkQuestions) {
+    networkQuestions = this.getNetworkQuestionsForCurrentContext();
+  }
+  const question = networkQuestions[lowerQId];
+  const questionPrompt = (question?.prompt || `Unknown question: ${questionId}`) as React.ReactNode;
+  const displayResponses = (Array.isArray(responses) ? responses : []).map((row: SurveyResultsAggregateRow) => {
+    const rowResponse = row?.response as SurveyResultsResponseRecord | null;
+    const key = this.getLockedResponseKey({
+      responder: row?.responder,
       questionId,
       questionResponsesNonce: propsRef.current.questionResponsesNonce,
       questionsCacheNonce: propsRef.current.questionsCacheNonce,
