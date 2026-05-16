@@ -52,6 +52,14 @@ export type UserPageOwnershipSignalAggregate = {
   mintedSet: Set<string>;
   burnedSet: Set<string>;
 };
+export type UserPageSbtAggregateEntry = UserPageUnknownRecord & UserPageOwnershipSignalAggregate & {
+  blockNumber?: number;
+  sbtAddress?: unknown;
+  sbtInfo?: unknown;
+  slug?: unknown;
+  viewerCountsAuthoritative?: boolean;
+};
+export type UserPageSbtAggregateMap = Record<string, UserPageSbtAggregateEntry | undefined>;
 export type UserPageSourceSlugMap = Record<string, string>;
 export type UserPageSourceSlugWriteOptions = {
   replace?: unknown;
@@ -95,6 +103,19 @@ export type UserPageUserCachePayload = UserPageUnknownRecord & {
   createdQuestions?: unknown;
   surveyResponses?: unknown;
   questionResponses?: unknown;
+};
+type MergeUserPageSbtCacheEntryIntoAggregateArgs = {
+  entry?: unknown;
+  key?: unknown;
+  sbtAggregate: UserPageSbtAggregateMap;
+  slug?: unknown;
+  viewAddressKey?: unknown;
+};
+type MergeUserPageUserCacheSbtIntoAggregateArgs = {
+  item?: unknown;
+  sbtAggregate: UserPageSbtAggregateMap;
+  slug?: unknown;
+  viewAddressKey?: unknown;
 };
 
 const normalizeUserPageCacheSourceSlug = (slug: unknown): string => {
@@ -161,6 +182,105 @@ export const applyUserPageOwnershipSignal = (
   } else if (burnedCount > 0) {
     aggEntry.burnedSet.add(addressKey);
   }
+};
+
+const buildDefaultUserPageSbtAggregateEntry = (
+  entry: UserPageUnknownRecord,
+  key: string,
+  slug: unknown
+): UserPageSbtAggregateEntry => ({
+  sbtAddress: entry.sbtAddress || key,
+  sbtInfo: null,
+  mintedSet: new Set(),
+  burnedSet: new Set(),
+  viewerCountsAuthoritative: false,
+  blockNumber: 0,
+  slug: slug || '',
+});
+
+const applyUserPageSbtAggregateMetadata = (
+  aggEntry: UserPageSbtAggregateEntry,
+  entry: UserPageUnknownRecord,
+  slug: unknown
+): void => {
+  if (slug && !aggEntry.slug) aggEntry.slug = slug;
+  if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
+  if (aggEntry.sbtInfo && entry.sbtInfo) {
+    aggEntry.sbtInfo = {
+      ...(aggEntry.sbtInfo as UserPageUnknownRecord),
+      ...(entry.sbtInfo as UserPageUnknownRecord),
+    };
+  }
+};
+
+export const mergeUserPageSbtCacheEntryIntoAggregate = ({
+  entry: entryIn = {},
+  key: keyIn = '',
+  sbtAggregate,
+  slug = '',
+  viewAddressKey = '',
+}: MergeUserPageSbtCacheEntryIntoAggregateArgs): UserPageSbtAggregateEntry | null => {
+  const entry = toAnalysisRecord(entryIn);
+  const key = String(keyIn || entry.sbtAddress || '').toLowerCase();
+  if (!key) return null;
+  const addressKey = String(viewAddressKey || '').toLowerCase();
+  const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(entry, key, slug);
+
+  applyUserPageSbtAggregateMetadata(aggEntry, entry, slug);
+  const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(entry, addressKey);
+  if (hasExplicitCounts) {
+    aggEntry.mintedSet.delete(addressKey);
+    aggEntry.burnedSet.delete(addressKey);
+    aggEntry.viewerCountsAuthoritative = true;
+  }
+  (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
+    .forEach((address: unknown) => {
+      const addressLower = String(address || '').toLowerCase();
+      if (!addressLower) return;
+      if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === addressKey) return;
+      aggEntry.mintedSet.add(addressLower);
+    });
+  (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [])
+    .forEach((address: unknown) => {
+      const addressLower = String(address || '').toLowerCase();
+      if (!addressLower) return;
+      if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === addressKey) return;
+      aggEntry.burnedSet.add(addressLower);
+    });
+  applyUserPageOwnershipSignal(aggEntry, entry, addressKey);
+  aggEntry.blockNumber = Math.max(aggEntry.blockNumber || 0, Number(entry.blockNumber || 0));
+  if (entry.sbtAddress) aggEntry.sbtAddress = entry.sbtAddress;
+  sbtAggregate[key] = aggEntry;
+  return aggEntry;
+};
+
+export const mergeUserPageUserCacheSbtIntoAggregate = ({
+  item: itemIn = {},
+  sbtAggregate,
+  slug = '',
+  viewAddressKey = '',
+}: MergeUserPageUserCacheSbtIntoAggregateArgs): UserPageSbtAggregateEntry | null => {
+  const itemRecord = toAnalysisRecord(itemIn);
+  const key = String(itemRecord.sbtAddress || '').toLowerCase();
+  if (!key) return null;
+  const addressKey = String(viewAddressKey || '').toLowerCase();
+  const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(itemRecord, key, slug);
+
+  applyUserPageSbtAggregateMetadata(aggEntry, itemRecord, slug);
+  const hasAggregateOwnershipSignal = (
+    aggEntry.mintedSet.has(addressKey) ||
+    aggEntry.burnedSet.has(addressKey)
+  );
+  const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(itemRecord, addressKey);
+  if (hasExplicitCounts) {
+    applyUserPageOwnershipSignal(aggEntry, itemRecord, addressKey);
+  } else if (!hasAggregateOwnershipSignal) {
+    // Regression guard: userCache rows are fallback ownership hints; they must
+    // not re-mint a viewer already burned by the fresher sbtCache aggregate.
+    aggEntry.mintedSet.add(addressKey);
+  }
+  sbtAggregate[key] = aggEntry;
+  return aggEntry;
 };
 
 export const writeUserPageSourceSlug = (

@@ -131,6 +131,8 @@ import {
   normalizeUserPageSourceSlugForSignature,
   mergeUserPageQuestionCacheSource,
   mergeUserPageSurveyCacheSource,
+  mergeUserPageSbtCacheEntryIntoAggregate,
+  mergeUserPageUserCacheSbtIntoAggregate,
   mergeUserPageQueuedCacheRefreshFlags,
   parseUserPageCachedResponsePayload,
   readBoolishUserPageTelemetryFlag,
@@ -545,5 +547,71 @@ describe('userPageCacheHelpers', () => {
         questionResponses: [],
       },
     });
+  });
+
+  it('keeps sbtCache viewer ownership counts authoritative over userCache fallback rows', () => {
+    const viewAddressKey = '0xabc';
+    const sbtAggregate: Record<string, any> = {};
+
+    mergeUserPageSbtCacheEntryIntoAggregate({
+      sbtAggregate,
+      entry: {
+        sbtAddress: '0xBadge',
+        sbtInfo: { name: 'Registry badge', description: 'From sbt cache' },
+        mintedAddresses: ['0xABC', '0xdef'],
+        burnedAddresses: ['0xABC'],
+        mintedCountByAddress: { '0xabc': 1 },
+        burnedCountByAddress: { '0xabc': 2 },
+        blockNumber: 44,
+      },
+      key: '0xbadge',
+      slug: 'alpha',
+      viewAddressKey,
+    });
+
+    mergeUserPageUserCacheSbtIntoAggregate({
+      sbtAggregate,
+      item: {
+        sbtAddress: '0xBadge',
+        sbtInfo: { name: 'User cache badge' },
+      },
+      slug: 'beta',
+      viewAddressKey,
+    });
+
+    expect(sbtAggregate['0xbadge']).toEqual(expect.objectContaining({
+      blockNumber: 44,
+      sbtAddress: '0xBadge',
+      sbtInfo: {
+        name: 'User cache badge',
+        description: 'From sbt cache',
+      },
+      slug: 'alpha',
+      viewerCountsAuthoritative: true,
+    }));
+    expect(Array.from(sbtAggregate['0xbadge'].mintedSet).sort()).toEqual(['0xdef']);
+    expect(Array.from(sbtAggregate['0xbadge'].burnedSet)).toEqual([viewAddressKey]);
+  });
+
+  it('uses userCache SBT rows as a fallback ownership signal when no aggregate signal exists', () => {
+    const sbtAggregate: Record<string, any> = {};
+
+    mergeUserPageUserCacheSbtIntoAggregate({
+      sbtAggregate,
+      item: {
+        sbtAddress: '0xBadge',
+        sbtInfo: { name: 'Fallback badge' },
+      },
+      slug: 'alpha',
+      viewAddressKey: '0xabc',
+    });
+
+    expect(Array.from(sbtAggregate['0xbadge'].mintedSet)).toEqual(['0xabc']);
+    expect(Array.from(sbtAggregate['0xbadge'].burnedSet)).toEqual([]);
+    expect(sbtAggregate['0xbadge']).toEqual(expect.objectContaining({
+      sbtAddress: '0xBadge',
+      sbtInfo: { name: 'Fallback badge' },
+      slug: 'alpha',
+    }));
   });
 });

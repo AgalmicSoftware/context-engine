@@ -217,7 +217,8 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
 import {
-  normalizeSessionWizardDraftShape as normalizeDraftShape,
+  buildSessionWizardCacheWritePayload,
+  buildSessionWizardInitialDraftFromCache,
 } from './sessionWizardDraftState';
 import {
   __test__getSessionWizardDefaultAiSettings,
@@ -249,7 +250,6 @@ import {
   formatContractLabel,
   generateSessionId,
   getChainName,
-  mergeDeep,
 } from './sessionWizardCoreUtils';
 import {
   clearSessionWizardCache,
@@ -600,17 +600,14 @@ const SessionWizard = ({
     resolvedActiveSessionSlug,
   ]);
   const initialDraft = useMemo(() => {
-    const base = deepClone(DEFAULT_TEMPLATE);
-    if (!cachedDraftHasEmbeddedDeployHelperEnabled && typeof sourceEmbeddedDeployHelperDefault === 'boolean') {
-      base.embeddedDeployHelperEnabled = sourceEmbeddedDeployHelperDefault;
-    }
-    const cachedDraft = cachedWizard?.draft;
-    const merged = cachedDraft && typeof cachedDraft === 'object' ? mergeDeep(base, cachedDraft) : base;
-    const normalized = normalizeDraftShape(merged);
-    if (!NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED && !cachedWizard?.deployComplete) {
-      normalized.corsWorkerUrl = '';
-    }
-    return normalized;
+    return buildSessionWizardInitialDraftFromCache({
+      cachedWizard,
+      defaultTemplate: DEFAULT_TEMPLATE,
+      normalModeSharedHostedWorkerEnabled: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
+      sourceEmbeddedDeployHelperDefault: cachedDraftHasEmbeddedDeployHelperEnabled
+        ? null
+        : sourceEmbeddedDeployHelperDefault,
+    });
   }, [cachedDraftHasEmbeddedDeployHelperEnabled, cachedWizard, sourceEmbeddedDeployHelperDefault]);
   const initialGates = useMemo(() => {
     const cachedGates = cachedWizard?.encryptionGates;
@@ -1239,18 +1236,12 @@ const SessionWizard = ({
     // Pending SBT drafts use sessionStorage so same-tab refresh can recover
     // queued CREATE2 drafts without turning them into long-lived local secrets.
     // Dev toggle: optionally persist secrets locally for faster iteration.
-    const redactedSecrets = {};
-    for (const k of Object.keys(workerSecrets || {})) {
-      redactedSecrets[k] = workerSecrets[k] ? '[redacted]' : '';
-    }
-    const cacheSafePendingSbtDrafts = [];
-    writeSessionWizardCache({
+    writeSessionWizardCache(buildSessionWizardCacheWritePayload({
       sessionId,
       draft,
       privateSlugMode,
       lastManualSlug: lastManualSlugRef.current,
       encryptionGates,
-      pendingSbtDrafts: cacheSafePendingSbtDrafts,
       encryptedFieldGates,
       gateSelections,
       defaultGateId,
@@ -1261,12 +1252,12 @@ const SessionWizard = ({
       manualMaxFeePerGasGwei,
       manualMaxPriorityFeePerGasGwei,
       workerSecretsEnabled,
-      persistWorkerSecrets: !!effectivePersistWorkerSecrets,
-      workerSecrets: effectivePersistWorkerSecrets ? workerSecrets : redactedSecrets,
+      effectivePersistWorkerSecrets,
+      workerSecrets,
       deployComplete,
       deployWorkerUrl,
       provisionedSponsoredContext,
-    });
+    }));
   }, [
     sessionId,
     draft,
