@@ -679,30 +679,42 @@ const SessionWizard = ({
   const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
-  const [registryChainId, setRegistryChainId] = useState<number>(() =>
-    resolveSessionWizardInitialRegistryChainId({
-      draftChainId: draft.networkChainId,
-      networkChainId: network?.id,
-    }),
-  );
-  const checkSessionSlugExists = useCallback(
-    async ({ registryChainId: chainId, slug }: SessionSlugExistsArgs): Promise<boolean> => {
-      const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
-        chainId,
-        providerLike: null,
-      }) as SessionRegistryReadContract | null;
-      if (!registryRead || typeof registryRead.sessionExists !== 'function') {
-        throw new Error('Session registry read contract not available.');
-      }
-      return !!(await registryRead.sessionExists(sessionRegistryPublishAdapter.toRegistrySlug(slug)));
-    },
-    [],
-  );
-  const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => cachedInitialState.initialGates);
-  // Pending SBT drafts carry deploy secrets and claim codes, so keep them only
-  // in this mounted tab. Reloading or leaving the wizard intentionally clears them.
-  const { pendingSbtDrafts, setPendingSbtDrafts, normalizedPendingSbtDrafts, hasUndeployedPendingSbtDrafts } =
-    usePendingSbtDrafts();
+  const [wizardDisplaySettingsOpen, setWizardDisplaySettingsOpen] = useState(false);
+  const [registryChainId, setRegistryChainId] = useState(() => {
+    const fromDraft = Number(draft.networkChainId || 0);
+    if (fromDraft && getSessionRegistryAddress(fromDraft)) return fromDraft;
+    const fromNetwork = Number(network?.id || 0);
+    if (fromNetwork && getSessionRegistryAddress(fromNetwork)) return fromNetwork;
+    const defaultRegistryChainId = Number(DEFAULT_CHAIN_ID || 0);
+    if (defaultRegistryChainId && getSessionRegistryAddress(defaultRegistryChainId)) {
+      return defaultRegistryChainId;
+    }
+    const available = getSessionRegistryChains();
+    if (available.length) return available[0].id;
+    return DEFAULT_CHAIN_ID;
+  });
+  const checkSessionSlugExists = useCallback(({ registryChainId: chainId, slug }) => (
+    sessionRegistryUtils
+      .getRegistryContract(chainId)
+      .sessionExists(sessionRegistryUtils.toRegistrySlug(slug))
+  ), []);
+  const { slugAvailability } = useSessionSlugState({
+    slug: draft?.slug,
+    privateSlugMode,
+    registryChainId,
+    isReservedSlug: isReservedSessionSlug,
+    sessionExists: checkSessionSlugExists,
+  });
+  const initialGateRef = useRef(initialGates[0]);
+  const [encryptionGates, setEncryptionGates] = useState(() => initialGates);
+  // Pending SBT drafts carry deploy secrets and claim codes, so keep them out
+  // of localStorage while still surviving same-tab refreshes via sessionStorage.
+  const {
+    pendingSbtDrafts,
+    setPendingSbtDrafts,
+    normalizedPendingSbtDrafts,
+    hasUndeployedPendingSbtDrafts,
+  } = usePendingSbtDrafts();
   const pendingSbtDraftsRef = useRef(pendingSbtDrafts);
   pendingSbtDraftsRef.current = pendingSbtDrafts;
   const [createSbtModalState, setCreateSbtModalState] = useState<CreateSbtModalState>(() => ({
@@ -838,15 +850,19 @@ const SessionWizard = ({
   const workerSecretsRef = useRef<WorkerSecretsLike>(
     sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets)
   );
-  const workerDeployRuntimeRef = useRef<SessionWizardWorkerDeployRuntime | null>(null);
+  const workerDeployRuntimeRef = useRef(null);
   const toggleLoginModalRef = useRef<SessionWizardProps['toggleLoginModal']>(toggleLoginModal);
   toggleLoginModalRef.current = toggleLoginModal;
   const togglePrivateSlugModeRef = useRef<null | (() => void)>(null);
-  const updateDraftValueRef = useRef<null | ((path: string[], value: unknown) => void)>(null);
+  const updateDraftValueRef = useRef<null | ((path: unknown[], value: unknown) => void)>(null);
   const resolveCreateSbtTargetGateIdRef = useRef<null | ((requestedGateId?: unknown) => string)>(null);
-  const openCreateSbtModalRef = useRef<
-    null | ((options?: SessionWizardCreateSbtLaunchOptions | SessionWizardCreateSbtLaunchState) => void)
-  >(null);
+  const openCreateSbtModalRef = useRef<null | ((options?: UnknownRecord) => void)>(null);
+  const clearPendingSbtDraftsRef = useRef<null | ((draftsToClear?: unknown[], statusMessage?: string) => void)>(null);
+  const pruneAllPendingSbtSelectionsRef = useRef<null | (() => void)>(null);
+  const prunePendingSbtSelectionsRef = useRef<null | ((addressLowerSet: Set<string>) => void)>(null);
+  const clearFeaturedDraftGateAutoLinkRef = useRef<null | ((address?: unknown) => void)>(null);
+  const dismissFeaturedDraftGateAutoLinkRef = useRef<null | ((args?: UnknownRecord) => void)>(null);
+  const [workerUrlAutoFilled, setWorkerUrlAutoFilled] = useState(false);
   const defaultSponsoredSbtLookupInFlightRef = useRef('');
   const pendingSbtDeployContextSignature = useMemo(
     () =>
@@ -1025,6 +1041,8 @@ const SessionWizard = ({
   const [compactSessionHeaderMode, setCompactSessionHeaderMode] = useState('idle');
   const [sessionHeaderFile, setSessionHeaderFile] = useState<File | null>(null);
   const [sessionHeaderPreviewUrl, setSessionHeaderPreviewUrl] = useState('');
+  const sessionHeaderPreviewUrlRef = useRef(sessionHeaderPreviewUrl);
+  sessionHeaderPreviewUrlRef.current = sessionHeaderPreviewUrl;
   const [sessionHeaderPreviewModalOpen, setSessionHeaderPreviewModalOpen] = useState(false);
   const [sessionHeaderUploadStatus, setSessionHeaderUploadStatus] = useState('');
   const [sessionHeaderUploadStatusTone, setSessionHeaderUploadStatusTone] = useState<SessionHeaderUploadStatusTone>('default');
@@ -1223,9 +1241,8 @@ const SessionWizard = ({
     const prev = lastHasPrivateSbtNameRef.current;
     lastHasPrivateSbtNameRef.current = hasPrivateSbtName;
     if (!hasPrivateSbtName || prev) return;
-    if (privateSlugMode) return;
-    togglePrivateSlugMode();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (privateSlugModeRef.current) return;
+    togglePrivateSlugModeRef.current?.();
   }, [hasPrivateSbtName]);
 
   useEffect(() => {
@@ -1294,7 +1311,43 @@ const SessionWizard = ({
   }, [encryptedFieldGates]);
 
   useEffect(() => {
-    if (!sessionModeRequirements.requiresRpc) return;
+    const nextName = buildWorkerName(draft.sessionName || '');
+    if (nextName && nextName !== deployForm.workerName) {
+      setDeployForm((prev) => ({ ...prev, workerName: nextName }));
+    }
+  }, [draft.sessionName, deployForm.workerName]);
+
+  useEffect(() => {
+    const defaultUrl = getSessionWizardDefaultWorkerUrl();
+    const current = toStr(draft.corsWorkerUrl).trim();
+    if (current && defaultUrl && current !== defaultUrl) {
+      setWorkerMode('custom');
+    }
+  }, [draft.corsWorkerUrl]);
+
+  useEffect(() => {
+    if (!deployComplete) return;
+    const configured = normalizeBaseUrl(toStr(draft.corsWorkerUrl).trim());
+    const deployed = normalizeBaseUrl(toStr(deployWorkerUrl).trim());
+    if (!configured || !deployed || configured !== deployed) {
+      setDeployComplete(false);
+    }
+  }, [draft.corsWorkerUrl, deployComplete, deployWorkerUrl]);
+
+  useEffect(() => {
+    if (wizardMode !== 'normal' || NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED) return;
+    const fallbackUrl = normalizeWorkerAuthUrl(getSessionWizardDefaultWorkerUrl());
+    const configuredUrl = normalizeWorkerAuthUrl(toStr(draft.corsWorkerUrl).trim());
+    if (workerMode === 'default') {
+      setWorkerMode('custom');
+    }
+    if (!deployComplete && configuredUrl && fallbackUrl && configuredUrl === fallbackUrl) {
+      setWorkerUrlAutoFilled(false);
+      updateDraftValueRef.current?.(['corsWorkerUrl'], '');
+    }
+  }, [wizardMode, workerMode, draft.corsWorkerUrl, deployComplete]);
+
+  useEffect(() => {
     const chainId = Number(registryChainId || 0) || 0;
     if (!chainId) return;
     setDraft((prev) => {
@@ -1353,12 +1406,19 @@ const SessionWizard = ({
       });
       return changed ? next : prev;
     });
-  }, [
-    registryChainId,
-    sessionModeRequirements.publish.registerSession,
-    sessionModeRequirements.requiresFunding,
-    sessionModeRequirements.requiresRpc,
-  ]);
+    const normalizedPendingDrafts = normalizePendingSbtDrafts(pendingSbtDraftsRef.current);
+    if (!registryChainHydratedRef.current) {
+      registryChainHydratedRef.current = true;
+      return;
+    }
+    if (normalizedPendingDrafts.length > 0) {
+      clearPendingSbtDraftsRef.current?.(
+        normalizedPendingDrafts,
+        'Pending SBT drafts were cleared because the session chain or SBT factory changed. Recreate them before publishing.'
+      );
+      pruneAllPendingSbtSelectionsRef.current?.();
+    }
+  }, [registryChainId]);
 
   useEffect(() => {
     const gateIds = encryptionGates.map((gate) => gate.id).filter(Boolean);
@@ -1505,7 +1565,130 @@ const SessionWizard = ({
     });
   }, [aiModelProviderPatch]);
 
-  const defaultSponsoredGateId = toStr(draft?.sponsored?.defaultGateId).trim();
+  useEffect(() => {
+    const duration = Number(blockLimitDuration || 0);
+    const unitMs = blockLimitUnit === 'days' ? 86400000 : blockLimitUnit === 'minutes' ? 60000 : 3600000;
+    const startFromDraft = Number(draft?.blockLimits?.start);
+    const fallbackStart = Number(latestChainBlock);
+    const startBlock = (Number.isFinite(startFromDraft) && startFromDraft > 0)
+      ? startFromDraft
+      : ((Number.isFinite(fallbackStart) && fallbackStart > 0) ? fallbackStart : 0);
+    if (!startBlock || !Number.isFinite(duration) || duration <= 0) {
+      if (blockEndAutoRef.current) {
+        updateDraftValueRef.current?.(['blockLimits', 'end'], null);
+        blockEndAutoRef.current = false;
+      }
+      return;
+    }
+    const blockTimeMs = getChainBlockTimeMs(registryChainId);
+    const blocks = Math.max(1, Math.ceil((duration * unitMs) / blockTimeMs));
+    const endBlock = startBlock + blocks;
+    updateDraftValueRef.current?.(['blockLimits', 'end'], endBlock);
+    blockEndAutoRef.current = true;
+  }, [blockLimitDuration, blockLimitUnit, latestChainBlock, registryChainId, draft?.blockLimits?.start]);
+
+  useEffect(() => {
+    const fastProvider = normalizeAiProvider(draft?.ai?.models?.fast?.provider || 'openai');
+    const thinkingProvider = normalizeAiProvider(draft?.ai?.models?.thinking?.provider || 'openai');
+    const fastCurrent = toStr(draft?.ai?.models?.fast?.model).trim();
+    const thinkingCurrent = toStr(draft?.ai?.models?.thinking?.model).trim();
+    const fastNext = normalizeAiModelForProvider('fast', fastProvider, fastCurrent);
+    const thinkingNext = normalizeAiModelForProvider('thinking', thinkingProvider, thinkingCurrent);
+    if (fastNext === fastCurrent && thinkingNext === thinkingCurrent) return;
+    setDraft((prev) => {
+      const next = deepClone(prev);
+      if (!next.ai || typeof next.ai !== 'object') next.ai = {};
+      if (!next.ai.models || typeof next.ai.models !== 'object') next.ai.models = {};
+      if (fastNext !== fastCurrent) {
+        if (!next.ai.models.fast || typeof next.ai.models.fast !== 'object') next.ai.models.fast = {};
+        next.ai.models.fast.model = fastNext;
+      }
+      if (thinkingNext !== thinkingCurrent) {
+        if (!next.ai.models.thinking || typeof next.ai.models.thinking !== 'object') next.ai.models.thinking = {};
+        next.ai.models.thinking.model = thinkingNext;
+      }
+      return next;
+    });
+  }, [
+    draft?.ai?.models?.fast?.provider,
+    draft?.ai?.models?.fast?.model,
+    draft?.ai?.models?.thinking?.provider,
+    draft?.ai?.models?.thinking?.model,
+  ]);
+
+  useEffect(() => {
+    const canCreateObjectUrl = typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
+    if (!sessionHeaderFile) {
+      const currentPreviewUrl = sessionHeaderPreviewUrlRef.current;
+      if (
+        currentPreviewUrl &&
+        typeof URL !== 'undefined' &&
+        typeof URL.revokeObjectURL === 'function'
+      ) {
+        URL.revokeObjectURL(currentPreviewUrl);
+      }
+      setSessionHeaderPreviewUrl('');
+      return;
+    }
+    if (!canCreateObjectUrl) return undefined;
+    const previewUrl = URL.createObjectURL(sessionHeaderFile);
+    setSessionHeaderPreviewUrl(previewUrl);
+    return () => {
+      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [sessionHeaderFile]);
+
+  const sessionHeaderPreviewSrc = useMemo(() => {
+    if (sessionHeaderMode === 'upload') {
+      return toStr(sessionHeaderPreviewUrl).trim();
+    }
+    return normalizeArweaveUrl(draft?.sessionHeader || '', {
+      contextLabel: 'session_wizard_header_preview',
+    });
+  }, [draft?.sessionHeader, sessionHeaderMode, sessionHeaderPreviewUrl]);
+
+  useEffect(() => {
+    if (sessionHeaderPreviewSrc) return;
+    setSessionHeaderPreviewModalOpen(false);
+  }, [sessionHeaderPreviewSrc]);
+
+  const handlePasteSessionHeaderFromClipboard = async () => {
+    const clipboardResult = await readCompactImageClipboard({
+      fileNamePrefix: 'clipboard-session-header',
+    });
+
+    if (clipboardResult?.kind === 'file' && clipboardResult.file) {
+      setSessionHeaderMode('upload');
+      setCompactSessionHeaderMode('idle');
+      setSessionHeaderFile(clipboardResult.file);
+      setSessionHeaderStatus('');
+      return;
+    }
+
+    if (clipboardResult?.kind === 'text') {
+      setSessionHeaderMode('url');
+      setCompactSessionHeaderMode('url');
+      setSessionHeaderFile(null);
+      updateDraftValue(['sessionHeader'], clipboardResult.text);
+      setSessionHeaderStatus('');
+      return;
+    }
+
+    setSessionHeaderStatus(clipboardResult?.error || 'Clipboard does not contain a supported image or URL.', 'error');
+  };
+
+  const handleClearSessionHeaderPreview = () => {
+    setSessionHeaderPreviewModalOpen(false);
+    setSessionHeaderMode('url');
+    setCompactSessionHeaderMode('idle');
+    setSessionHeaderFile(null);
+    updateDraftValue(['sessionHeader'], '');
+    setSessionHeaderStatus('');
+  };
+
+  const defaultSponsoredGateId = draft?.sponsored?.defaultGateId;
   const defaultSponsoredGate = defaultSponsoredGateId ? draft?.sponsored?.gates?.[defaultSponsoredGateId] : null;
   const defaultSponsoredSbtAddress = toStr(defaultSponsoredGate?.sbtAddress || '').trim();
   const defaultSponsoredLookupSlug = resolvedActiveSessionSlug || draft?.slug || '';
@@ -1656,14 +1839,21 @@ const SessionWizard = ({
     return [...encryptionGates];
   }, [encryptionGates]);
 
-  const getGateById = (gateId: unknown): EncryptionGateState | null =>
-    getSessionWizardGateById(allEncryptionGates, gateId) as EncryptionGateState | null;
-  const resolveCreateSbtTargetGateId = (requestedGateId: unknown = '') =>
-    resolveSessionWizardCreateSbtTargetGateId({
-      allEncryptionGates,
-      defaultGateId,
-      requestedGateId,
-    });
+  const pendingSbtSelectorOptions = useMemo(() => (
+    normalizePendingSbtDrafts(pendingSbtDrafts).map((draftEntry) => ({
+      address: draftEntry.predictedAddress,
+      name: `${draftEntry.displayName} (Pending)`,
+      pending: true,
+      metadataPreview: draftEntry.metadataPreview || null,
+    }))
+  ), [pendingSbtDrafts]);
+
+  const getGateById = (gateId) => getSessionWizardGateById(allEncryptionGates, gateId);
+  const resolveCreateSbtTargetGateId = (requestedGateId = '') => resolveSessionWizardCreateSbtTargetGateId({
+    allEncryptionGates,
+    defaultGateId,
+    requestedGateId,
+  });
   resolveCreateSbtTargetGateIdRef.current = resolveCreateSbtTargetGateId;
   const activeCreateSbtTargetGateId = resolveCreateSbtTargetGateId(createSbtTargetGateId);
   const activeCreateSbtTargetGate = getGateById(activeCreateSbtTargetGateId);
@@ -1755,6 +1945,43 @@ const SessionWizard = ({
   }, [account, pendingCreateSbtLaunch]);
 
   useEffect(() => {
+    if (!publishBusy || publishStep <= 0) {
+      setPublishStepElapsedMs(0);
+      return undefined;
+    }
+    setPublishStepElapsedMs(0);
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setPublishStepElapsedMs(Date.now() - startedAt);
+    }, 120);
+    return () => clearInterval(timer);
+  }, [publishBusy, publishStep]);
+
+  useEffect(() => {
+    deployCompleteRef.current = deployComplete;
+  }, [deployComplete]);
+
+  useEffect(() => {
+    deployWorkerUrlRef.current = deployWorkerUrl;
+  }, [deployWorkerUrl]);
+
+  useEffect(() => {
+    provisionedSponsoredContextRef.current = provisionedSponsoredContext;
+  }, [provisionedSponsoredContext]);
+
+  useEffect(() => {
+    workerSecretsEnabledRef.current = workerSecretsEnabled;
+  }, [workerSecretsEnabled]);
+
+  useEffect(() => {
+    persistWorkerSecretsRef.current = persistWorkerSecrets;
+  }, [persistWorkerSecrets]);
+
+  useEffect(() => {
+    workerSecretsRef.current = workerSecrets;
+  }, [workerSecrets]);
+
+  useEffect(() => {
     const resolvedGateId = resolveCreateSbtTargetGateIdRef.current?.(createSbtTargetGateId) || '';
     if (resolvedGateId !== toStr(createSbtTargetGateId).trim()) {
       setCreateSbtTargetGateId(resolvedGateId);
@@ -1819,7 +2046,136 @@ const SessionWizard = ({
     if (Object.prototype.hasOwnProperty.call(normalizedUpdates, 'sbts')) {
       normalizedUpdates.sbts = dedupeSbtSelection(normalizedUpdates.sbts || []);
     }
-    setEncryptionGates((prev) => prev.map((gate) => (gate.id === gateId ? { ...gate, ...normalizedUpdates } : gate)));
+    setEncryptionGates((prev) =>
+      prev.map((gate) => (gate.id === gateId ? { ...gate, ...normalizedUpdates } : gate))
+    );
+  };
+
+  const clearFeaturedDraftGateAutoLink = (address = '') => {
+    const addressLower = toStr(address).trim().toLowerCase();
+    setFeaturedDraftGateAutoLink((prev) => {
+      const current = normalizeFeaturedDraftGateAutoLink(prev);
+      if (!current) return prev;
+      if (addressLower && current.address.toLowerCase() !== addressLower) return prev;
+      return null;
+    });
+  };
+  clearFeaturedDraftGateAutoLinkRef.current = clearFeaturedDraftGateAutoLink;
+
+  const dismissFeaturedDraftGateAutoLink = ({ gateId = '', address = '' } = {}) => {
+    const gateIdStr = toStr(gateId).trim();
+    const addressLower = toStr(address).trim().toLowerCase();
+    setFeaturedDraftGateAutoLink((prev) => {
+      const current = normalizeFeaturedDraftGateAutoLink(prev);
+      if (!current) return prev;
+      if (gateIdStr && toStr(current.gateId).trim() !== gateIdStr) return prev;
+      if (addressLower && current.address.toLowerCase() !== addressLower) return prev;
+      if (current.dismissed) return prev;
+      return { ...current, dismissed: true };
+    });
+  };
+  dismissFeaturedDraftGateAutoLinkRef.current = dismissFeaturedDraftGateAutoLink;
+
+  const handleGateAddSbt = (gateId, sbt) => {
+    const gateIdStr = toStr(gateId).trim();
+    const nextSbt = normalizeSbtSelection([sbt])[0];
+    if (!gateIdStr || !nextSbt) return;
+    const autoLink = normalizeFeaturedDraftGateAutoLink(featuredDraftGateAutoLink);
+    const nextAddressLower = toStr(nextSbt?.address).trim().toLowerCase();
+    if (
+      autoLink &&
+      autoLink.dismissed !== true &&
+      toStr(autoLink.gateId).trim() === gateIdStr &&
+      nextAddressLower &&
+      nextAddressLower !== autoLink.address.toLowerCase()
+    ) {
+      dismissFeaturedDraftGateAutoLink({ gateId: gateIdStr });
+    }
+    const targetGate = getGateById(gateIdStr);
+    updateEncryptionGate(gateIdStr, { sbts: [...normalizeSbtSelection(targetGate?.sbts || []), nextSbt] });
+  };
+
+  const handleGateRemoveSbt = (gateId, address) => {
+    const gateIdStr = toStr(gateId).trim();
+    const addressLower = toStr(address).trim().toLowerCase();
+    if (!gateIdStr || !addressLower) return;
+    const autoLink = normalizeFeaturedDraftGateAutoLink(featuredDraftGateAutoLink);
+    if (
+      autoLink &&
+      toStr(autoLink.gateId).trim() === gateIdStr &&
+      autoLink.address.toLowerCase() === addressLower
+    ) {
+      dismissFeaturedDraftGateAutoLink({ gateId: gateIdStr, address });
+    }
+    const targetGate = getGateById(gateIdStr);
+    updateEncryptionGate(gateIdStr, {
+      sbts: normalizeSbtSelection(targetGate?.sbts || [])
+        .filter((sbt) => toStr(sbt.address).toLowerCase() !== addressLower),
+    });
+  };
+
+  const handleRemoveDefaultFeaturedSbt = (address) => {
+    const addressLower = toStr(address).trim().toLowerCase();
+    if (!addressLower) return;
+    const nextSelections = normalizeSbtSelection(draftRef.current?.defaultFeaturedSBTs || [])
+      .filter((sbt) => toStr(sbt.address).toLowerCase() !== addressLower);
+    updateDraftValue(['defaultFeaturedSBTs'], serializeDefaultFeaturedSbtSelections(nextSelections));
+
+    const autoLink = normalizeFeaturedDraftGateAutoLink(featuredDraftGateAutoLink);
+    if (
+      !autoLink ||
+      autoLink.dismissed === true ||
+      toStr(autoLink.source).trim() !== FEATURED_DRAFT_GATE_AUTO_LINK_SOURCE ||
+      autoLink.address.toLowerCase() !== addressLower
+    ) {
+      return;
+    }
+
+    // Regression guard: removing a Step-1 featured pending SBT should also
+    // remove the auto-linked Gate A entry. Otherwise the gate keeps a draft the
+    // admin already removed from the featured list.
+    clearFeaturedDraftGateAutoLink(address);
+    const gateId = toStr(autoLink.gateId).trim() || FEATURED_DRAFT_GATE_AUTO_LINK_GATE_ID;
+    const targetGate = getGateById(gateId);
+    updateEncryptionGate(gateId, {
+      sbts: normalizeSbtSelection(targetGate?.sbts || [])
+        .filter((sbt) => toStr(sbt.address).toLowerCase() !== addressLower),
+    });
+  };
+
+  const promoteDeployedPendingSbtSelections = (deployedDrafts = []) => {
+    const normalizedDeployedDrafts = normalizePendingSbtDrafts(deployedDrafts);
+    if (!normalizedDeployedDrafts.length) return;
+    const deployedAddressSet = new Set(
+      normalizedDeployedDrafts
+        .map((entry) => toStr(entry?.deployedAddress || entry?.predictedAddress).trim().toLowerCase())
+        .filter(Boolean)
+    );
+    if (!deployedAddressSet.size) return;
+
+    // Regression guard: publish clears pending drafts immediately after
+    // on-chain registration. Promote matching pending selections to normal
+    // deployed selections first so the just-published gate/featured state
+    // survives in the local wizard and cache.
+    setEncryptionGates((prev) => prev.map((gate) => ({
+      ...gate,
+      sbts: promotePendingSbtSelectionsAfterDeploy({
+        selections: gate?.sbts || [],
+        deployedDrafts: normalizedDeployedDrafts,
+      }),
+    })));
+    updateDraftValue(
+      ['defaultFeaturedSBTs'],
+      serializeDefaultFeaturedSbtSelections(promotePendingSbtSelectionsAfterDeploy({
+        selections: draftRef.current?.defaultFeaturedSBTs || [],
+        deployedDrafts: normalizedDeployedDrafts,
+      }))
+    );
+    setFeaturedDraftGateAutoLink((prev) => {
+      const current = normalizeFeaturedDraftGateAutoLink(prev);
+      if (!current) return prev;
+      return deployedAddressSet.has(current.address.toLowerCase()) ? null : prev;
+    });
   };
 
   const addEncryptionGate = () => {
@@ -1859,34 +2215,23 @@ const SessionWizard = ({
     });
   };
 
-  const {
-    clearPendingSbtDrafts,
-    handleGateAddSbt,
-    handleGateRemoveSbt,
-    handleRemoveDefaultFeaturedSbt,
-    handleSavePendingSbtDraft,
-    pendingSbtSelectorOptions,
-    promoteDeployedPendingSbtSelections,
-    removePendingSbtDraft,
-  } = useSessionWizardPendingSbtController<EncryptionGateState>({
-    allEncryptionGates,
-    createSbtModalState,
-    draftDefaultFeaturedSBTs: draft?.defaultFeaturedSBTs,
-    draftRef,
-    encryptionGates,
-    featuredDraftGateAutoLink,
-    network,
-    pendingSbtDeployContextSignature,
-    pendingSbtDrafts,
-    registryChainId,
-    closeCreateSbtModal,
-    resolveCreateSbtTargetGateId,
-    setEncryptionGates,
-    setFeaturedDraftGateAutoLink,
-    setPendingSbtDrafts,
-    setStatus,
-    updateDraftValue,
-  });
+  const prunePendingSbtSelections = (addressLowerSet) => {
+    if (!(addressLowerSet instanceof Set) || addressLowerSet.size === 0) return;
+    setEncryptionGates((prev) => prev.map((gate) => ({
+      ...gate,
+      sbts: normalizeSbtSelection(gate?.sbts || []).filter(
+        (sbt) => !addressLowerSet.has(toStr(sbt?.address).trim().toLowerCase())
+      ),
+    })));
+    updateDraftValue(
+      ['defaultFeaturedSBTs'],
+      serializeDefaultFeaturedSbtSelections(
+        normalizeSbtSelection(draftRef.current?.defaultFeaturedSBTs || [])
+          .filter((entry) => !addressLowerSet.has(toStr(entry?.address).trim().toLowerCase()))
+      )
+    );
+  };
+  prunePendingSbtSelectionsRef.current = prunePendingSbtSelections;
 
   const pruneAllPendingSbtSelections = () => {
     setEncryptionGates((prev) => prev.map((gate) => ({
@@ -1901,6 +2246,7 @@ const SessionWizard = ({
       )
     );
   };
+  pruneAllPendingSbtSelectionsRef.current = pruneAllPendingSbtSelections;
 
   const removePendingSbtDraft = (predictedAddress) => {
     const addressLower = toStr(predictedAddress).trim().toLowerCase();
@@ -1924,6 +2270,7 @@ const SessionWizard = ({
       setStatus(statusMessage);
     }
   };
+  clearPendingSbtDraftsRef.current = clearPendingSbtDrafts;
 
   const handleSavePendingSbtDraft = async (draftPayload) => {
     const normalizedDrafts = normalizePendingSbtDrafts([draftPayload]);
@@ -1998,12 +2345,11 @@ const SessionWizard = ({
     // Regression guard: pending SBT drafts are CREATE2-addressed against the
     // current chain/factory pair. Keeping them after that context changes can
     // mine a real deploy tx and only fail after the address mismatch check.
-    clearPendingSbtDrafts(
+    clearPendingSbtDraftsRef.current?.(
       normalizedDrafts,
       'Pending SBT drafts were cleared because the session chain or SBT factory changed. Recreate them before publishing.'
     );
-    pruneAllPendingSbtSelections();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    pruneAllPendingSbtSelectionsRef.current?.();
   }, [pendingSbtDeployContextSignature, pendingSbtDrafts]);
 
   useEffect(() => {
@@ -2024,7 +2370,7 @@ const SessionWizard = ({
     if (!hasDanglingPendingSelection) return;
     // Keep gate selections aligned with the in-memory pending-draft list.
     // A `pending: true` entry without a live draft is always stale UI state.
-    prunePendingSbtSelections(new Set(
+    prunePendingSbtSelectionsRef.current?.(new Set(
       [
         ...encryptionGates.flatMap((gate) => normalizeSbtSelection(gate?.sbts || [])),
         ...normalizeSbtSelection(draft?.defaultFeaturedSBTs || []),
@@ -2033,7 +2379,6 @@ const SessionWizard = ({
         .map((entry) => toStr(entry?.address).trim().toLowerCase())
         .filter((addressLower) => addressLower && !livePendingAddressSet.has(addressLower))
     ));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft?.defaultFeaturedSBTs, encryptionGates, pendingSbtDrafts]);
 
   useEffect(() => {
@@ -2045,12 +2390,12 @@ const SessionWizard = ({
       (entry) => toStr(entry?.predictedAddress).trim().toLowerCase() === linkedAddressLower
     );
     if (!liveDraft) {
-      clearFeaturedDraftGateAutoLink(autoLink.address);
+      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
       return;
     }
     const targetGate = encryptionGates.find((gate) => toStr(gate?.id).trim() === gateId);
     if (!targetGate) {
-      clearFeaturedDraftGateAutoLink(autoLink.address);
+      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
       return;
     }
     const gateSelections = dedupeSbtSelection(targetGate?.sbts || []);
@@ -2061,13 +2406,13 @@ const SessionWizard = ({
       (entry) => toStr(entry?.address).trim().toLowerCase() !== linkedAddressLower
     );
     if (hasOtherSelections && autoLink.dismissed !== true) {
-      dismissFeaturedDraftGateAutoLink({ gateId, address: autoLink.address });
+      dismissFeaturedDraftGateAutoLinkRef.current?.({ gateId, address: autoLink.address });
       return;
     }
     if (autoLink.dismissed || hasAutoLinkedSelection) return;
     const pendingSelection = buildPendingSbtSelection(liveDraft);
     if (!pendingSelection) {
-      clearFeaturedDraftGateAutoLink(autoLink.address);
+      clearFeaturedDraftGateAutoLinkRef.current?.(autoLink.address);
       return;
     }
     // Keep the Step-1 featured-draft link resilient across refreshes, but stop
@@ -2079,7 +2424,6 @@ const SessionWizard = ({
         sbts: dedupeSbtSelection([...normalizeSbtSelection(gate?.sbts || []), pendingSelection]),
       };
     }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuredDraftGateAutoLink, encryptionGates, pendingSbtDrafts]);
 
   const renderField = (key, value, path, opts = {}) => {
