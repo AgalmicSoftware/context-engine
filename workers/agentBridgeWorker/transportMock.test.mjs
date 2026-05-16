@@ -131,7 +131,7 @@ test('view questions lists existing session questions and pose question posts gr
   assert.equal(listed.listState.source, 'canonical_agent_questions');
   assert.deepEqual(listed.listState.questions.map((question) => question.title), [
     'What should Alpha decide next?',
-    'Locked question',
+    'Encrypted question',
   ]);
   assert.equal(posed.poseState.action.action, TELEGRAM_BRIDGE_ACTIONS.POSE_QUESTION);
   assert.equal(posed.poseState.action.command, '/pose_question');
