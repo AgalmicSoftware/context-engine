@@ -251,6 +251,11 @@ type SbtListInitDeps = {
   sessionUniverseRegistryPending: boolean;
   sbtCacheRevision: number;
 };
+type SbtListFetchSBTs = (
+  forceRefresh?: boolean,
+  showLoadingIndicator?: boolean,
+  slugOverride?: unknown
+) => Promise<void>;
 type SbtListChipProgressMeta = UnknownRecord & {
   lastModeChangeAtMs?: number;
   pendingVisible?: boolean;
@@ -856,6 +861,9 @@ const SBTsList = ({
     sessionUniverseRegistryPending: false,
     sbtCacheRevision: Number(sbtCacheRevision || 0),
   });
+  const ensureLightSbtDiscoveryRef = useRef<SBTsListProps['ensureLightSbtDiscovery']>(ensureLightSbtDiscovery);
+  ensureLightSbtDiscoveryRef.current = ensureLightSbtDiscovery;
+  const fetchSBTsRef = useRef<SbtListFetchSBTs | null>(null);
 
   const clearRefreshSafetyTimeout = useCallback(() => {
     if (refreshSafetyTimeoutRef.current) {
@@ -1895,17 +1903,21 @@ const SBTsList = ({
 
         try {
           // Let MainSite own tokenURI hydration during light discovery
-          if (shouldShowLoaderForThisRun && typeof ensureLightSbtDiscovery === 'function') {
+          const runLightDiscovery = ensureLightSbtDiscoveryRef.current;
+          if (shouldShowLoaderForThisRun && typeof runLightDiscovery === 'function') {
             await Promise.all(targets.map(async (slug: string) => {
               try {
-                await ensureLightSbtDiscovery(
+                await runLightDiscovery(
                   slug,
                   allSessionsMode ? { force: true, forceScopeSlug: slug } : undefined
                 );
               } catch (e) { sbtLog.warn('SBTsList: fallback', e); }
             }));
           }
-          await Promise.all(targets.map((slug: string) => fetchSBTs(false, false, slug)));
+          const runFetchSBTs = fetchSBTsRef.current;
+          if (typeof runFetchSBTs === 'function') {
+            await Promise.all(targets.map((slug: string) => runFetchSBTs(false, false, slug)));
+          }
         } finally {
           if (shouldShowLoaderForThisRun && isMounted.current) setLoading(false);
         }
@@ -1929,7 +1941,6 @@ const SBTsList = ({
     return () => {
       isMounted.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     listSlug,
     allSessionsMode,
@@ -2132,6 +2143,7 @@ const SBTsList = ({
     onRequestSbtCacheRefresh,
     updateSessionCacheMeta,
   ]);
+  fetchSBTsRef.current = fetchSBTs;
 
   // Derived helpers / rendering utils
 
