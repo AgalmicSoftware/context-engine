@@ -645,7 +645,6 @@ export default function DocumentLibraryPanel({
     } catch (_) {
       return null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationSearch]);
 
   const [docs, setDocs] = useState<DocRecord[]>([]);
