@@ -24,7 +24,7 @@ const SurveyQuestionsFullQuestionCardShell = ({
   sliderSection = null,
 }: SurveyQuestionsFullQuestionCardShellProps): React.ReactElement => (
   <Card key={cardKey} className={styles.fullQuestionCard}>
-    <CardBody className={`${styles.questionTitleBody} ${styles.fullQuestionBody}`}>
+    <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
       <FullQuestionHeader>
         {promptContent}
         {cardIcons}
