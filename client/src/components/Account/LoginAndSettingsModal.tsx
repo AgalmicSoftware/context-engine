@@ -51,6 +51,11 @@ import {
   LoginSettingsInlineNetworkSummary,
   LoginSettingsPanelNetworkSummary,
 } from './LoginSettingsNetworkSummary';
+import {
+  LoginSettingsConfigToggleControl,
+  LoginSettingsControlRow,
+  LoginSettingsSessionSummary,
+} from './LoginSettingsControlRow';
 
 // Smart contract interactions and config
 import {
@@ -1496,21 +1501,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     expanded = false,
     onToggle = null,
     testId = '',
-  }: any = {}) => (
-    <Button
-      type="button"
-      onClick={onToggle}
-      className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton}`}
-      aria-expanded={expanded}
-      data-testid={testId || undefined}
-    >
-      Config
-      <FontAwesomeIcon
-        icon={expanded ? faCaretUp : faCaretDown}
-        className={styles.aiSettingsToggleIcon}
-      />
-    </Button>
-  );
+  }: any = {}) => LoginSettingsConfigToggleControl({
+    expanded,
+    onToggle,
+    testId,
+  });
 
   renderSessionSummary: any = (activeSessionIn: any = null) => {
     const activeSession = activeSessionIn || this.getSessionDescriptor(this.getActiveSessionSlug());
@@ -1532,26 +1527,23 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     tooltipPlacement = 'top',
     containerClassName = '',
     rowClassName = '',
-  }: any = {}) => (
-    <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
-      <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
-        {beforeConfig}
-        {this.renderConfigToggleControl({
-          expanded: configOpen,
-          onToggle: onToggleConfig,
-          testId: configTestId,
-        })}
-        {this.renderSessionSummary(activeSession)}
-        {betweenSessionAndTooltips}
-        {this.renderTooltipsToggleControl({
-          infoId: tooltipsInfoId,
-          tooltipPlacement,
-        })}
-        {this.renderDemoSurfaceToggleControl()}
-        {afterDemo}
-      </div>
-    </div>
-  );
+  }: any = {}) => LoginSettingsControlRow({
+    activeSession,
+    configOpen,
+    onToggleConfig,
+    configTestId,
+    beforeConfig,
+    betweenSessionAndTooltips,
+    afterDemo,
+    tooltipsControl: this.renderTooltipsToggleControl({
+      infoId: tooltipsInfoId,
+      tooltipPlacement,
+    }),
+    demoControl: this.renderDemoSurfaceToggleControl(),
+    containerClassName,
+    rowClassName,
+    sessionHref: buildSettingsSessionHref(activeSession.slug),
+  });
 
   handleActiveSessionChange: any = (event: any) => {
     const nextSlug = normalizeSettingsSessionSlug(event?.target?.value || '');
