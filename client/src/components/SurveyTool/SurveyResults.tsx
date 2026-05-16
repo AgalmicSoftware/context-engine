@@ -139,6 +139,10 @@ import {
   SurveyResultsLockedResponsesBanner,
   SurveyResultsLockedResponsesToggle,
 } from './SurveyResultsLockedResponsesPanel';
+import {
+  SurveyResultsFreeformAggregatorSummary,
+  SurveyResultsMultichoiceAggregatorSummary,
+} from './SurveyResultsAggregatorSummaries';
 
 export {
   countQuestionModeResponses,
@@ -3831,41 +3835,7 @@ buildMultichoiceSummaryModel = (
 
 renderFreeformAggregatorSummary = (responses: unknown = []): React.ReactNode => {
   const summary = this.buildFreeformSummaryModel(responses);
-  const panelClassName = buildSurveyResultsAggregatorPanelClassName(styles);
-  if (summary.totalResponses === 0 && summary.encryptedCount === 0 && summary.blankCount === 0) {
-    return (
-      <div className={panelClassName}>
-        <p className={styles.surveyResultsAggregatorParagraph}>No freeform responses available.</p>
-      </div>
-    );
-  }
-
-  const parts = [`${summary.totalResponses} total responses.`];
-  if (summary.encryptedCount > 0) {
-    parts.push(`${summary.encryptedCount} encrypted responses not shown.`);
-  }
-  if (summary.blankCount > 0) {
-    parts.push(`${summary.blankCount} blank not shown.`);
-  }
-
-  return (
-    <div className={panelClassName}>
-      <p className={styles.surveyResultsAggregatorParagraph}>{parts.join(' ')}</p>
-      {summary.displayedResponses.map((item, index) => (
-        <div
-          key={`freeform-${item.responder || ''}-${index}`}
-          className={styles.surveyResultsFreeformAnswer}
-        >
-          {typeof item.value === 'string' ? item.value : JSON.stringify(item.value)}
-          {item.additional && (
-            <div className={styles.surveyResultsFreeformAdditionalComment}>
-              <em>Comment:</em> {item.additional}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  return SurveyResultsFreeformAggregatorSummary({ summary });
 };
 
 renderMultichoiceAggregatorSummary = (
@@ -3873,46 +3843,7 @@ renderMultichoiceAggregatorSummary = (
   question: SurveyResultsRecord | null = null
 ): React.ReactNode => {
   const summary = this.buildMultichoiceSummaryModel(responses, question);
-  const panelClassName = buildSurveyResultsAggregatorPanelClassName(styles);
-  if (summary.options.length === 0) {
-    return (
-      <div className={panelClassName}>
-        <p className={styles.surveyResultsAggregatorParagraph}>
-          No multichoice options are defined for this question.
-        </p>
-      </div>
-    );
-  }
-
-  if (summary.totalResponders === 0) {
-    return (
-      <div className={panelClassName}>
-        <p className={styles.surveyResultsAggregatorParagraph}>No multichoice responses available.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={panelClassName}>
-      <p className={styles.surveyResultsAggregatorParagraph}>
-        {summary.totalResponders} total responders to this multichoice question.
-      </p>
-      {summary.options.map((option) => {
-        const percent = ((option.count / summary.totalResponders) * 100).toFixed(2);
-        return (
-          <div
-            key={option.key}
-            className={buildSurveyResultsMultichoiceOptionClassName(styles)}
-          >
-            <span className={styles.surveyResultsMultichoiceOptionLabel}>{option.label}</span>
-            <span className={styles.surveyResultsMultichoiceOptionStats}>
-              {option.count} ({percent}%)
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return SurveyResultsMultichoiceAggregatorSummary({ summary });
 };
 
 getSurveyResultsResponseCardProps = (): SurveyResultsResponseCardClassNames => ({
