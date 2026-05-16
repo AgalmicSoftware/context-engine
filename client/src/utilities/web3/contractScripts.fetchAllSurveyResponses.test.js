@@ -223,6 +223,20 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       1,
       30,
     );
+
+    expect(mockGetReadProviderForGroup).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: GROUP_CFG.slug }),
+      expect.objectContaining({ contractKey: 'surveys' })
+    );
+    expect(mockGetReadProviderForChain).not.toHaveBeenCalled();
+    expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledWith(
+      mockSessionReadProvider,
+      expect.objectContaining({
+        address: GROUP_CFG.contracts.surveys.address,
+      }),
+      1,
+      30
+    );
     expect(result.hadPartialFailure).toBe(false);
     expect(result.lowestFailedBlock).toBeNull();
     expect(result.responses).toHaveLength(2);

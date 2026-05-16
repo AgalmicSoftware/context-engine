@@ -1141,34 +1141,27 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     const currentProps = {
       network: { id: props.network?.id },
       isSurveyCacheReady: props.isSurveyCacheReady,
-      minifiedMode: props.minifiedMode,
-      singleQuestionMode: props.singleQuestionMode,
-      sessionConfig: props.sessionConfig,
     };
     if (!didRunFetchUpdateEffectRef.current) {
       didRunFetchUpdateEffectRef.current = true;
-      prevSurveyFetchPropsRef.current = currentProps;
+      prevFetchNetworkIdRef.current = currentProps.network.id;
+      prevSurveyCacheReadyRef.current = currentProps.isSurveyCacheReady;
       return;
     }
 
-    if (
-      shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: prevSurveyFetchPropsRef.current,
-        props: currentProps,
-      })
-    ) {
+    if (shouldFetchSurveyToolSurveysOnPropsChange({
+      prevProps: {
+        network: { id: prevFetchNetworkIdRef.current },
+        isSurveyCacheReady: prevSurveyCacheReadyRef.current,
+      },
+      props: currentProps,
+    })) {
       fetchSurveys();
     }
 
-    prevSurveyFetchPropsRef.current = currentProps;
-  }, [
-    props.network?.id,
-    props.isSurveyCacheReady,
-    props.minifiedMode,
-    props.singleQuestionMode,
-    props.sessionConfig,
-    fetchSurveys,
-  ]);
+    prevFetchNetworkIdRef.current = currentProps.network.id;
+    prevSurveyCacheReadyRef.current = currentProps.isSurveyCacheReady;
+  }, [props.network?.id, props.isSurveyCacheReady, fetchSurveys]);
 
   useEffect(() => {
     const currentProps = { autoOpenResults: props.autoOpenResults };
@@ -1178,13 +1171,11 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       return;
     }
 
-    if (
-      shouldOpenSurveyToolResultsOnPropsChange({
-        prevProps: { autoOpenResults: prevAutoOpenResultsRef.current },
-        props: currentProps,
-        showResultsModal: showResultsModalRef.current,
-      })
-    ) {
+    if (shouldOpenSurveyToolResultsOnPropsChange({
+      prevProps: { autoOpenResults: prevAutoOpenResultsRef.current },
+      props: currentProps,
+      showResultsModal: showResultsModalRef.current,
+    })) {
       setShowResultsModal(true);
     }
 
@@ -1207,17 +1198,15 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       return;
     }
 
-    if (
-      shouldBumpSurveyToolQuestionsCacheNonce({
-        prevProps: {
-          isQuestionCacheReady: prevQuestionCacheReadyRef.current,
-          isResponsesCacheReady: prevResponsesCacheReadyRef.current,
-          questionResponsesNonce: prevQuestionResponsesNonceRef.current,
-          network: { id: prevNonceNetworkIdRef.current },
-        },
-        props: currentProps,
-      })
-    ) {
+    if (shouldBumpSurveyToolQuestionsCacheNonce({
+      prevProps: {
+        isQuestionCacheReady: prevQuestionCacheReadyRef.current,
+        isResponsesCacheReady: prevResponsesCacheReadyRef.current,
+        questionResponsesNonce: prevQuestionResponsesNonceRef.current,
+        network: { id: prevNonceNetworkIdRef.current },
+      },
+      props: currentProps,
+    })) {
       setQuestionsCacheNonce((prev) => prev + 1);
     }
 

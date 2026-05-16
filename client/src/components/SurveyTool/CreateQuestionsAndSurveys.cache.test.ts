@@ -380,18 +380,23 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const unsafeJavascriptUrl = ['java', 'script:alert(1)'].join('');
     const unsafeDataUrl = 'data:text/html,<script>alert(1)</script>';
 
-    expect(
-      sanitizeDocumentUrls([
-        'https://example.com/doc',
-        'http://example.com/alt',
-        relativeViewerUrl,
-        arUrl,
-        litUrl,
-        legacyLitUrl,
-        unsafeJavascriptUrl,
-        unsafeDataUrl,
-      ]),
-    ).toEqual(['https://example.com/doc', 'http://example.com/alt', relativeViewerUrl, arUrl, litUrl, legacyLitUrl]);
+    expect(sanitizeDocumentUrls([
+      'https://example.com/doc',
+      'http://example.com/alt',
+      relativeViewerUrl,
+      arUrl,
+      litUrl,
+      legacyLitUrl,
+      unsafeJavascriptUrl,
+      unsafeDataUrl,
+    ])).toEqual([
+      'https://example.com/doc',
+      'http://example.com/alt',
+      relativeViewerUrl,
+      arUrl,
+      litUrl,
+      legacyLitUrl,
+    ]);
 
     const allowedInstance = makeInstance();
     allowedInstance.state = {
@@ -420,7 +425,14 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       isStandaloneQuestion: false,
       title: 'Survey Title',
       questions: [],
-      documentURLs: ['https://safe.example/doc', arUrl, litUrl, legacyLitUrl, unsafeJavascriptUrl, unsafeDataUrl],
+      documentURLs: [
+        'https://safe.example/doc',
+        arUrl,
+        litUrl,
+        legacyLitUrl,
+        unsafeJavascriptUrl,
+        unsafeDataUrl,
+      ],
       docURLInput: unsafeJavascriptUrl,
     };
 
