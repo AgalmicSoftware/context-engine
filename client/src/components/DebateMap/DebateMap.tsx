@@ -1487,7 +1487,6 @@ const OrbitalAtlasView = ({
       : { min: 0, max: 0 };
 
     return { nodes, links, disagreementRange };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, atlasRoot, dimensions.w]);
 
   // Mouse/Touch Handlers
@@ -2894,7 +2893,6 @@ const DebateMap = ({
     const path = window.location.pathname;
     const match = path.match(/\/atlas\/(0x[a-fA-F0-9]+)/);
     return match ? match[1] : null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramNodeId]);
 
   // Reset handled flag when the URL ID changes
