@@ -12,7 +12,7 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync, faTrash, faPlus, faCog, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
@@ -23,6 +23,10 @@ import {
   SbtListDetailsPanel,
   SbtListMetaRow,
 } from './SbtListCardChrome';
+import {
+  SbtListCompactLinkCard,
+  SbtListStandardCard,
+} from './SbtListDisplayCards';
 import {
   SbtListSectionLoadingHint,
   SbtListSectionTitle,
@@ -2771,39 +2775,21 @@ const SBTsList = ({
       unnamedLabel: t('sbt'),
     });
     if (!model) return null;
-    const {
-      description,
-      imageSrc,
-      key,
-      locked,
-      name,
-      sbtAddress,
-      sessionSlug,
-    } = model;
     const compactCardClassName = [
       styles.sbtItem,
       miniaturized && viewMode === 'modal' ? styles.modalMiniSbtItem : '',
     ].filter(Boolean).join(' ');
 
     return (
-      <a
-        key={key}
+      <SbtListCompactLinkCard
         className={compactCardClassName}
-        href={buildSbtHref(sbtAddress, sessionSlug)}
-        onClick={(event) => handleSbtLinkClick(event, sbtAddress, sessionSlug)}
-      >
-        <div className={styles.sbtImage} style={resolveSbtListRelativeImageStyle()}>
-          {/* {locked && <FontAwesomeIcon icon={faLock} className={styles.inlineLock} />} */}
-          {imageSrc && <img src={imageSrc} alt={`${t('sbt')} Thumbnail`} />}
-        </div>
-        <div className={styles.sbtInfo}>
-          <p className={styles.sbtName}>
-            {name}
-            {locked && <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />}
-          </p>
-          <p className={styles.sbtDescription}>{description || 'No description.'}</p>
-        </div>
-      </a>
+        href={buildSbtHref(model.sbtAddress, model.sessionSlug)}
+        imageStyle={resolveSbtListRelativeImageStyle()}
+        model={model}
+        onClick={(event) => handleSbtLinkClick(event, model.sbtAddress, model.sessionSlug)}
+        sbtLabel={t('sbt')}
+        styles={styles}
+      />
     );
   };
 
@@ -2948,9 +2934,6 @@ const SBTsList = ({
     });
     if (!model) return null;
     const {
-      description,
-      imageSrc,
-      locked,
       name,
       sbtAddress,
       sbtAddressLower,
@@ -2969,34 +2952,22 @@ const SBTsList = ({
     }
 
     return (
-      <article
-        key={`${sessionSlug}|${sbtAddress}`}
-        className={buildSbtListExpandedCardShellClassName({
+      <SbtListStandardCard
+        href={buildSbtHref(sbtAddress, sessionSlug)}
+        imageStyle={resolveSbtListRelativeImageStyle()}
+        isExpanded={isExpanded}
+        metaRow={renderSbtMetaRow(resolvedSbt, details, detailsId, name || resolvedSbt.sbtAddress || t('sbt'))}
+        detailsPanel={renderSbtDetailsPanel(details, detailsId)}
+        model={model}
+        onClick={(event) => handleSbtLinkClick(event, sbtAddress, sessionSlug)}
+        sbtLabel={t('sbt')}
+        shellClassName={buildSbtListExpandedCardShellClassName({
           baseClassName: styles.standardCardShell,
           expandedClassName: styles.standardCardShellExpanded,
           isExpanded,
         })}
-      >
-        <a
-          className={styles.standardCardBodyLink}
-          href={buildSbtHref(sbtAddress, sessionSlug)}
-          onClick={(event) => handleSbtLinkClick(event, sbtAddress, sessionSlug)}
-        >
-          <div className={styles.standardCardImage} style={resolveSbtListRelativeImageStyle()}>
-            {/* {locked && <FontAwesomeIcon icon={faLock} className={styles.inlineLock} />} */}
-            {imageSrc && <img src={imageSrc} alt={`${t('sbt')} Thumbnail`} />}
-          </div>
-          <div className={styles.standardCardInfo}>
-            <p className={styles.standardCardName}>
-              {name}
-              {locked && <FontAwesomeIcon icon={faLock} className={styles.lockIcon} />}
-            </p>
-            <p className={styles.standardCardDescription}>{description || 'No description.'}</p>
-          </div>
-        </a>
-        {renderSbtMetaRow(resolvedSbt, details, detailsId, name || resolvedSbt.sbtAddress || t('sbt'))}
-        {isExpanded && renderSbtDetailsPanel(details, detailsId)}
-      </article>
+        styles={styles}
+      />
     );
   };
 
