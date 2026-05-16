@@ -41,7 +41,6 @@ import {
   buildUserPageDeepScanReportTelemetryPayloads,
   buildUserPageDeepScanRefreshCarryPatch,
   buildUserPageDeepScanTooltipDisplayState,
-  buildUserPageDeepScanProgressRowDisplayState,
   buildUserPageDeepScanProgressStatePatch,
   buildUserPageDeepScanPrioritySlugs,
   buildUserPageDeepScanRequestStatePatch,
@@ -194,6 +193,9 @@ import CompareAddressSection from './CompareAddresses';
 import SBTPage from '../SBTs/SBTPage';
 import { Collapse, Modal, ModalHeader, ModalBody } from 'reactstrap';
 import CETooltip from '../Shared/CETooltip';
+import UserPageDeepScanProgressPanel, {
+  type UserPageDeepScanProgressPanelOptions,
+} from './UserPageDeepScanProgressPanel';
 
 // NEW IMPORT: for mini question display
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
@@ -575,11 +577,6 @@ type DeepScanProgressRow = {
   label: string;
   startBlock: number | null;
   displayLastBlock: number;
-};
-
-type DeepScanProgressPanelOptions = {
-  headerText?: string;
-  showScannedText?: boolean;
 };
 
 type DeepScanProgressSnapshot = {
@@ -1077,58 +1074,15 @@ class UserPage extends Component<any, any> {
 
   renderDeepScanProgressPanel = (
     progressRows: DeepScanProgressRow[] | null | undefined,
-    options: DeepScanProgressPanelOptions = {},
-  ): React.ReactNode => {
-    if (!Array.isArray(progressRows) || progressRows.length === 0) return null;
-    const {
-      headerText = 'Deep scan in progress',
-      showScannedText = true,
-    } = options;
-
-    return (
-      <div className={styles.deepScanProgressPanel}>
-        {headerText ? (
-          <div className={styles.deepScanProgressHeader}>{headerText}</div>
-        ) : null}
-        {progressRows.map((row, index) => {
-          const {
-            indeterminateText,
-            progressFillStyle,
-            remainingText,
-            rowKey,
-            scannedText,
-            shouldRenderScannedText,
-          } = buildUserPageDeepScanProgressRowDisplayState({
-            index,
-            row,
-            showScannedText,
-          });
-
-          return (
-            <div key={rowKey} className={styles.deepScanProgressRow}>
-              <div className={styles.deepScanProgressLabel}>{row.label}</div>
-              {row.isDeterminate ? (
-                <>
-                  <div className={styles.deepScanProgressBar}>
-                    <div
-                      className={styles.deepScanProgressFill}
-                      style={progressFillStyle}
-                    />
-                  </div>
-                  <div className={styles.deepScanProgressStats}>{remainingText}</div>
-                  {shouldRenderScannedText ? (
-                    <div className={styles.deepScanProgressStats}>{scannedText}</div>
-                  ) : null}
-                </>
-              ) : (
-                <div className={styles.deepScanIndeterminate}>{indeterminateText}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+    options: UserPageDeepScanProgressPanelOptions = {},
+  ): React.ReactNode => (
+    UserPageDeepScanProgressPanel({
+      headerText: options.headerText,
+      progressRows,
+      showScannedText: options.showScannedText,
+      styles,
+    })
+  );
 
   renderDeepScanTooltipContent = (
     tooltipLines: string[] | null | undefined,
