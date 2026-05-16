@@ -1,7 +1,6 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
 
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
@@ -66,8 +65,26 @@ describe('AudioInput', () => {
     return element as T;
   };
 
+  const setNativeValue = (element: Element, value: string) => {
+    const ownDescriptor = Object.getOwnPropertyDescriptor(element, 'value');
+    const prototype = Object.getPrototypeOf(element);
+    const prototypeDescriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : undefined;
+    const setter = prototypeDescriptor?.set || ownDescriptor?.set;
+    if (setter) {
+      setter.call(element, value);
+      return;
+    }
+    (element as HTMLInputElement | HTMLTextAreaElement).value = value;
+  };
+
   const changeElementValue = (element: Element, value: string) => {
-    Simulate.change(element, { target: { value } } as any);
+    setNativeValue(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  const clickElement = (element: Element) => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   };
 
   const flushRafQueue = () => {
@@ -199,7 +216,7 @@ describe('AudioInput', () => {
     const micButton = requireElement(container.querySelector('button[aria-label="Recording temporarily disabled"]'));
 
     act(() => {
-      Simulate.click(micButton);
+      clickElement(micButton);
     });
 
     expect(startRecording).not.toHaveBeenCalled();
@@ -223,7 +240,7 @@ describe('AudioInput', () => {
     const micButton = requireElement(container.querySelector('button[aria-label="Start recording"]'));
 
     act(() => {
-      Simulate.click(micButton);
+      clickElement(micButton);
     });
 
     expect(startRecording).toHaveBeenCalledTimes(1);
@@ -314,7 +331,7 @@ describe('AudioInput', () => {
 
     const downloadToggle = requireElement(container.querySelector('button[title="Downloads"]'));
     act(() => {
-      Simulate.click(downloadToggle);
+      clickElement(downloadToggle);
     });
 
     expect(container.querySelector('button[aria-label="Download final transcript"]')).not.toBeNull();
@@ -342,7 +359,7 @@ describe('AudioInput', () => {
 
     const downloadToggle = requireElement(container.querySelector('button[title="Downloads"]'));
     act(() => {
-      Simulate.click(downloadToggle);
+      clickElement(downloadToggle);
     });
 
     expect(container.querySelector('button[aria-label="Download final transcript"]')).not.toBeNull();
@@ -549,7 +566,7 @@ describe('AudioInput', () => {
     const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
 
     act(() => {
-      Simulate.click(rewriteButton);
+      clickElement(rewriteButton);
     });
     expect(updateFns[0]).toHaveBeenCalledTimes(0);
     const tick = waitingTick as (() => void) | null;
@@ -645,7 +662,7 @@ describe('AudioInput', () => {
     const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
 
     await act(async () => {
-      Simulate.click(rewriteButton);
+      clickElement(rewriteButton);
       await Promise.resolve();
     });
     act(() => {
@@ -656,7 +673,7 @@ describe('AudioInput', () => {
     const revertButton = requireElement(container.querySelector('button[title="Revert to original"]'));
 
     act(() => {
-      Simulate.click(revertButton);
+      clickElement(revertButton);
     });
     act(() => {
       flushRafQueue();

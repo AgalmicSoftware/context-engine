@@ -488,8 +488,7 @@ const AudioInput = ({
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('pagehide', onVis);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [audioContextRef, mediaStreamRef, drawWaveform]);
 
   // Keep canvas sized to wrapper
   const sizeCanvasToWrap = useCallback(() => {
@@ -625,7 +624,6 @@ const AudioInput = ({
       dataArrayRef.current = null;
       bufferLenRef.current = 0;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, isPaused, ensureWaveformSetup, clearWaveformSetupRetry, sizeCanvasToWrap]);
 
   // Animation controller - run RAF only while actively recording (not paused)
@@ -647,7 +645,6 @@ const AudioInput = ({
         animationRef.current = null;
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, isPaused, drawWaveform]);
 
   // Handlers
@@ -819,8 +816,7 @@ const AudioInput = ({
       : (lastRecordingBlobRef?.current || { blob: null, mimeType: '' });
     const t = rec?.mimeType || (rec?.blob && rec.blob.type) || 'audio/mpeg';
     return extFromMime(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getLastRecordingBlob]);
+  }, [getLastRecordingBlob, lastRecordingBlobRef]);
 
   // Strict gating for download dock
   const hasText = (visibleText || '').trim().length > 0;
