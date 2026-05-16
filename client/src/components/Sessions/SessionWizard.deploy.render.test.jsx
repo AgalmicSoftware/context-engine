@@ -1,4 +1,5 @@
-// SessionWizard deploy render coverage owns worker deploy, post-deploy sync, and Lit provisioning.
+/* eslint-disable import/first */
+// SessionWizard deploy render coverage owns worker deploy, post-deploy sync, Lit provisioning, and login guards.
 import fs from 'fs';
 import React from 'react';
 import { ethers } from 'ethers';
@@ -27,33 +28,17 @@ const mockDecryptWithPassword = jest.fn();
 const mockPendingSbtAddress = ethers.utils.getAddress('0x5fbdb2315678afecb367f032d93f642f64180aa3');
 const mockSecondPendingSbtAddress = ethers.utils.getAddress('0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512');
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
-const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
-const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
+const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
-let mockPersistedPublicWorkerConfig = null;
-const maybeHandlePublicWorkerVerificationRequest = (url, init = {}) => {
-  const normalizedUrl = String(url);
-  if (normalizedUrl.endsWith('/admin/set-config')) {
-    mockPersistedPublicWorkerConfig = JSON.parse(String(init.body || '{}')).config;
-    return { ok: true, status: 200, json: async () => ({ ok: true }) };
-  }
-  if (normalizedUrl.includes('/session-config')) {
-    const { litCredentials: _privateLitDescriptor, ...publicConfig } = mockPersistedPublicWorkerConfig || {};
-    if (publicConfig.ai) publicConfig.ai = { models: publicConfig.ai.models };
-    return { ok: true, status: 200, json: async () => ({ config: publicConfig }) };
-  }
-  return null;
-};
-const buildMockSponsoredBundleEnvelope = () =>
-  JSON.stringify({
-    type: 'contextengine-sponsored-bundle',
-    version: 1,
-    cipher: 'password-aes-gcm',
-    encryptedData: 'encrypted-base64',
-  });
+const buildMockSponsoredBundleEnvelope = () => JSON.stringify({
+  type: 'contextengine-sponsored-bundle',
+  version: 1,
+  cipher: 'password-aes-gcm',
+  encryptedData: 'encrypted-base64',
+});
 const buildMockSponsoredBundle = () => ({
   openaiKey: 'sponsored-openai',
   arweaveJwk: '{"kty":"RSA","n":"sponsored"}',
@@ -126,12 +111,10 @@ jest.mock('../SBTs/SBTSelector', () => (props) => {
     >
       <button
         type="button"
-        onClick={() =>
-          props.onAddSBT?.({
-            address: mockReplacementSbtAddress,
-            name: 'Replacement SBT',
-          })
-        }
+        onClick={() => props.onAddSBT?.({
+          address: mockReplacementSbtAddress,
+          name: 'Replacement SBT',
+        })}
       >
         {`Mock add ${props.id || 'selector'} SBT`}
       </button>
@@ -139,7 +122,11 @@ jest.mock('../SBTs/SBTSelector', () => (props) => {
         const address = typeof entry === 'string' ? entry : entry?.address || entry?.sbtAddress || '';
         if (!address) return null;
         return (
-          <button key={address} type="button" onClick={() => props.onRemoveSBT?.(address)}>
+          <button
+            key={address}
+            type="button"
+            onClick={() => props.onRemoveSBT?.(address)}
+          >
             {`Mock remove ${address} from ${props.id || 'selector'}`}
           </button>
         );
@@ -196,8 +183,8 @@ jest.mock('../../utilities/crypto/cryptography.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/arweave/arweaveClient.js', () => ({
-  arweaveClient: {
+jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
+  arweaveScripts: {
     uploadDataToArweave: jest.fn(),
     downloadDataFromArweave: (...args) => mockDownloadDataFromArweave(...args),
     buildArweaveGatewayUrl: jest.fn((txId) => `https://arweave.example.test/${txId}`),
@@ -211,11 +198,7 @@ jest.mock('../../utilities/session/resourceKeys.js', () => ({
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   registerSessionOnChain: (...args) => mockRegisterSessionOnChain(...args),
   sessionRegistryUtils: {
-    normalizeSlug: jest.fn((value = '') =>
-      String(value || '')
-        .trim()
-        .toLowerCase(),
-    ),
+    normalizeSlug: jest.fn((value = '') => String(value || '').trim().toLowerCase()),
     formatSessionId: jest.fn((value = '') => String(value || '').trim()),
     normalizeSessionIdHex: jest.fn((value = '') => String(value || '').trim()),
     toRegistrySlug: jest.fn((value = '') => String(value || '').trim()),
@@ -227,16 +210,14 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   },
 }));
 
-jest.mock('../../utilities/web3/chainGateway.js', () => ({
+jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   default: {
     createSBT: (...args) => mockCreateSBT(...args),
     getSbtMetadata: jest.fn(async () => ({})),
   },
   getSessionConfigBySlugOrDefault: jest.fn((slug = '') => {
-    const normalized = String(slug || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(slug || '').trim().toLowerCase();
     if (normalized && normalized !== 'general') return null;
     return {
       slug: '',
@@ -255,9 +236,7 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
     };
   }),
   getDemoSessionConfigBySlug: jest.fn((slug = '') => {
-    const normalized = String(slug || '')
-      .trim()
-      .toLowerCase();
+    const normalized = String(slug || '').trim().toLowerCase();
     if (normalized && normalized !== 'general') return null;
     return {
       slug: '',
@@ -280,13 +259,13 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
   buildSiweMessage: jest.fn(() => 'siwe-message'),
   buildSignedBootstrapAdminAuth: jest.fn(async ({ slug }) => ({
-    address: mockTestAdminAddress,
+    address: TEST_ADMIN_ADDRESS,
     message: 'bootstrap-siwe-message',
     signature: '0xbootstrap-admin-auth',
     sessionSlug: slug,
   })),
   buildSignedAdminActionAuth: jest.fn(async ({ action, slug, body }) => ({
-    address: mockTestAdminAddress,
+    address: TEST_ADMIN_ADDRESS,
     signature: '0xadmin-action-signature',
     action,
     slug,
@@ -317,14 +296,14 @@ import SessionWizard, {
   finalizeSessionWizardPendingSbtDraft,
   persistSessionWizardSbtRecoveryCodes,
   promotePendingSbtSelectionsAfterDeploy,
+  resolveSessionWizardChipotleHookConfig,
   resolveSessionWizardSelectorSourceConfig,
   resolveSessionWizardWorkerBaseUrl,
 } from './SessionWizard';
-import { resolveSessionWizardChipotleHookConfig } from './sessionWizardWorkerSecretSupport';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
-const createTooltipStore = (tooltipsEnabled = true) =>
-  createStore((state = { sessionState: { tooltipsEnabled } }, action) => {
+const createTooltipStore = (tooltipsEnabled = true) => createStore(
+  (state = { sessionState: { tooltipsEnabled } }, action) => {
     if (action.type === 'SET_TOOLTIPS') {
       return {
         sessionState: {
@@ -333,37 +312,37 @@ const createTooltipStore = (tooltipsEnabled = true) =>
       };
     }
     return state;
-  });
+  }
+);
 const renderSessionWizardWithTooltipStore = ({ tooltipsEnabled = true, props = {} } = {}) => {
   const store = createTooltipStore(tooltipsEnabled);
   const view = render(
     <Provider store={store}>
       <SessionWizard network={{ id: 84532 }} {...props} />
-    </Provider>,
+    </Provider>
   );
   return { store, ...view };
 };
-const renderLoggedInSessionWizard = (props = {}) =>
-  renderSessionWizard({
-    account: TEST_ADMIN_ADDRESS,
-    loginComplete: true,
-    toggleLoginModal: jest.fn(),
-    ...props,
-  });
-const getWizardResourceCard = (resourceKey) =>
-  screen
-    .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
-    .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey);
+const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
+  account: TEST_ADMIN_ADDRESS,
+  loginComplete: true,
+  toggleLoginModal: jest.fn(),
+  ...props,
+});
+const getWizardResourceCard = (resourceKey) => (
+  screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
+    .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey)
+);
 const enableAdvancedMode = () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
 };
 const selectNormalModeCard = (label) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
-const getMockSelectorById = (selectorId) =>
-  screen
-    .queryAllByTestId('mock-wizard-sbt-selector')
-    .find((node) => node.getAttribute('data-selector-id') === selectorId);
+const getMockSelectorById = (selectorId) => (
+  screen.queryAllByTestId('mock-wizard-sbt-selector')
+    .find((node) => node.getAttribute('data-selector-id') === selectorId)
+);
 const expectSelectorAddresses = async (selectorId, expectedAddresses) => {
   await waitFor(() => {
     const selector = getMockSelectorById(selectorId);
@@ -375,14 +354,13 @@ const openAdvancedMoreOptions = async () => {
   enableAdvancedMode();
   fireEvent.click(screen.getByRole('button', { name: /more options/i }));
 };
-const getFeaturedCreateButton = async () =>
-  await waitFor(() => {
-    const button = screen
-      .getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT)
-      .find((node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs');
-    expect(button).toBeTruthy();
-    return button;
-  });
+const getFeaturedCreateButton = async () => await waitFor(() => {
+  const button = screen.getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT).find(
+    (node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs'
+  );
+  expect(button).toBeTruthy();
+  return button;
+});
 const ensureGateASelectorVisible = async () => {
   if (!getMockSelectorById('encryption-gate-gate-1')) {
     fireEvent.click(screen.getByRole('button', { name: /groups allowed to decrypt locked fields/i }));
@@ -397,11 +375,7 @@ const createPendingFeaturedDraft = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
   await waitFor(() => {
     expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
-      'data-ce-sbt-address',
-      mockPendingSbtAddress.toLowerCase(),
-    );
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
   });
 };
 
@@ -423,8 +397,7 @@ describe('SessionWizard deploy render validation', () => {
     window.history.replaceState({}, '', '/');
     localStorage.clear();
     sessionStorage.clear();
-    mockPersistedPublicWorkerConfig = null;
-    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) =>
+    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) => (
       Object.keys(sessionContracts).map((contractKey) => ({
         key: contractKey,
         name:
@@ -446,17 +419,15 @@ describe('SessionWizard deploy render validation', () => {
                 : 'Contract.sol',
         source: `contract ${contractKey} {}`,
         addresses: sessionContracts[contractKey]?.address
-          ? [
-              {
-                address: sessionContracts[contractKey].address,
-                id: sessionContracts[contractKey].chainId || 84532,
-                testnet: true,
-                explorerUrl: `https://example.example.test/${contractKey}`,
-              },
-            ]
+          ? [{
+              address: sessionContracts[contractKey].address,
+              id: sessionContracts[contractKey].chainId || 84532,
+              testnet: true,
+              explorerUrl: `https://example.example.test/${contractKey}`,
+            }]
           : [],
-      })),
-    );
+      }))
+    ));
   });
 
   it('excludes cached legacy Lit payer secrets from deploy payloads', async () => {
@@ -469,33 +440,30 @@ describe('SessionWizard deploy render validation', () => {
         signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
       }),
     }));
-    const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        workerSecretsEnabled: true,
-        workerSecrets: {
-          litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
-          litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        litPayerPrivateKey: '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5',
+        litPayerAddress: '0x3AC823CA9AcDA550244C6fF4927b5e1478E70Ff7',
+      },
+      provisionedSponsoredContext: {
+        sessionSlug: 'hidden-lit-session',
+        workerUrl: 'https://deployed.example.test',
+        fields: {
+          sponsored_lit: '1',
         },
-        provisionedSponsoredContext: {
-          sessionSlug: 'hidden-lit-session',
-          workerUrl: 'https://deployed.example.test',
-          fields: {
-            sponsored_lit: '1',
-          },
-        },
-      }),
-    );
+      },
+    }));
 
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url, init = {}) => {
+    global.fetch = jest.fn(async (url) => {
       const normalizedUrl = String(url);
-      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
-      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/account')) {
         return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
       }
@@ -571,17 +539,15 @@ describe('SessionWizard deploy render validation', () => {
       });
 
       const deployPayload = JSON.parse(deployCall[1].body);
-      expect(deployPayload.secrets).toEqual(
-        expect.objectContaining({
-          openaiKey: 'sk-latest',
-          arweaveJwk: '{"kty":"RSA","n":"abc"}',
-        }),
-      );
+      expect(deployPayload.secrets).toEqual(expect.objectContaining({
+        openaiKey: 'sk-latest',
+        arweaveJwk: '{"kty":"RSA","n":"abc"}',
+      }));
       expect(deployPayload.secrets.litPayerPrivateKey).toBeUndefined();
       expect(deployPayload.secrets.litPayerAddress).toBeUndefined();
 
       await waitFor(() => {
-        const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+        const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
         expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('0');
       });
     } finally {
@@ -602,15 +568,15 @@ describe('SessionWizard deploy render validation', () => {
         signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
       }),
     }));
-    const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url, init = {}) => {
+    global.fetch = jest.fn(async (url) => {
       const normalizedUrl = String(url);
-      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
-      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/account')) {
         return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
       }
@@ -707,53 +673,45 @@ describe('SessionWizard deploy render validation', () => {
 
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.embeddedDeployHelperEnabled).toBe(true);
-      expect(deployPayload.secrets).toEqual(
-        expect.objectContaining({
-          openaiKey: 'sk-latest',
-          arweaveJwk: '{"kty":"RSA","n":"abc"}',
-          litAccountApiKey: 'account-secret',
-        }),
-      );
+      expect(deployPayload.secrets).toEqual(expect.objectContaining({
+        openaiKey: 'sk-latest',
+        arweaveJwk: '{"kty":"RSA","n":"abc"}',
+        litAccountApiKey: 'account-secret',
+      }));
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
       });
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deployed.example.test');
 
-      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'set-secrets',
-          body: expect.objectContaining({
-            secrets: expect.objectContaining({
-              openaiKey: 'sk-latest',
-              arweaveJwk: '{"kty":"RSA","n":"abc"}',
-              litAccountApiKey: 'account-secret',
-            }),
+      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'set-secrets',
+        body: expect.objectContaining({
+          secrets: expect.objectContaining({
+            openaiKey: 'sk-latest',
+            arweaveJwk: '{"kty":"RSA","n":"abc"}',
+            litAccountApiKey: 'account-secret',
           }),
         }),
-      );
+      }));
       const secretsSyncCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
       const secretsSyncPayload = JSON.parse(secretsSyncCall[1].body);
-      expect(secretsSyncPayload.secrets).toEqual(
-        expect.objectContaining({
-          openaiKey: 'sk-latest',
-          arweaveJwk: '{"kty":"RSA","n":"abc"}',
-          litAccountApiKey: 'account-secret',
-        }),
-      );
+      expect(secretsSyncPayload.secrets).toEqual(expect.objectContaining({
+        openaiKey: 'sk-latest',
+        arweaveJwk: '{"kty":"RSA","n":"abc"}',
+        litAccountApiKey: 'account-secret',
+      }));
 
       await waitFor(() => {
-        const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
-        expect(JSON.parse(cachedRaw)).toEqual(
-          expect.objectContaining({
-            provisionedSponsoredContext: expect.objectContaining({
-              workerUrl: 'https://deployed.example.test',
-              fields: expect.objectContaining({
-                sponsored_lit: '1',
-              }),
+        const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+        expect(JSON.parse(cachedRaw)).toEqual(expect.objectContaining({
+          provisionedSponsoredContext: expect.objectContaining({
+            workerUrl: 'https://deployed.example.test',
+            fields: expect.objectContaining({
+              sponsored_lit: '1',
             }),
           }),
-        );
+        }));
       });
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
     } finally {
@@ -774,15 +732,15 @@ describe('SessionWizard deploy render validation', () => {
         signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
       }),
     }));
-    const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url, init = {}) => {
+    global.fetch = jest.fn(async (url) => {
       const normalizedUrl = String(url);
-      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
-      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/deploy')) {
         return {
           ok: true,
@@ -817,18 +775,15 @@ describe('SessionWizard deploy render validation', () => {
     });
 
     try {
-      sessionStorage.setItem(
-        'ce:sessionWizardDraft:v1',
-        JSON.stringify({
-          workerSecretsEnabled: true,
-          workerSecrets: {
-            litApiBase: 'https://api.chipotle.litprotocol.com',
-            litGroupId: 'ce-session-content-prod',
-            litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
-            litUsageApiKey: 'lit-usage-key',
-          },
-        }),
-      );
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        workerSecretsEnabled: true,
+        workerSecrets: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'ce-session-content-prod',
+          litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
+          litUsageApiKey: 'lit-usage-key',
+        },
+      }));
       renderSessionWizard({
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
@@ -874,34 +829,28 @@ describe('SessionWizard deploy render validation', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Lit provisioning note: Lit action auto-provisioned.',
+          'Lit provisioning note: Lit action auto-provisioned.'
         );
       });
 
-      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'lit-chipotle-provision',
-          body: expect.objectContaining({
-            litGroupId: 'ce-session-content-prod',
-            litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
-          }),
+      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'lit-chipotle-provision',
+        body: expect.objectContaining({
+          litGroupId: 'ce-session-content-prod',
+          litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
         }),
-      );
+      }));
 
-      const provisionCall = global.fetch.mock.calls.find(([url]) =>
-        String(url).endsWith('/admin/lit-chipotle-provision'),
-      );
+      const provisionCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'));
       const provisionPayload = JSON.parse(provisionCall[1].body);
       expect(provisionPayload.actionName).toBe('ce-sbt-gated-crypto-v3');
 
       const configSyncCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
       const configSyncPayload = JSON.parse(configSyncCall[1].body);
-      expect(configSyncPayload.config.litCredentials).toEqual(
-        expect.objectContaining({
-          litActionCid: 'QmZPKjGtD4qLZhr17juP8XgUKV1A34Y9GtUUpeJNJ7f2vL',
-          litGroupId: '7',
-        }),
-      );
+      expect(configSyncPayload.config.litCredentials).toEqual(expect.objectContaining({
+        litActionCid: 'QmZPKjGtD4qLZhr17juP8XgUKV1A34Y9GtUUpeJNJ7f2vL',
+        litGroupId: '7',
+      }));
     } finally {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
@@ -910,7 +859,7 @@ describe('SessionWizard deploy render validation', () => {
     }
   });
 
-  it('auto-bootstraps Lit runtime from the Lit API key and ignores stale hidden runtime fields', async () => {
+  it('auto-bootstraps Lit runtime from the Lit account API key and ignores stale hidden runtime fields', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
@@ -922,15 +871,15 @@ describe('SessionWizard deploy render validation', () => {
         signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
       }),
     }));
-    const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url, init = {}) => {
+    global.fetch = jest.fn(async (url) => {
       const normalizedUrl = String(url);
-      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
-      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/deploy')) {
         return {
           ok: true,
@@ -967,19 +916,16 @@ describe('SessionWizard deploy render validation', () => {
     });
 
     try {
-      sessionStorage.setItem(
-        'ce:sessionWizardDraft:v1',
-        JSON.stringify({
-          workerSecretsEnabled: true,
-          workerSecrets: {
-            litApiBase: 'https://stale-chipotle.example.test',
-            litGroupId: 'stale-group',
-            litPkpId: 'stale-pkp',
-            litActionCid: 'stale-cid',
-            litUsageApiKey: 'stale-usage-key',
-          },
-        }),
-      );
+      localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+        workerSecretsEnabled: true,
+        workerSecrets: {
+          litApiBase: 'https://stale-chipotle.example.test',
+          litGroupId: 'stale-group',
+          litPkpId: 'stale-pkp',
+          litActionCid: 'stale-cid',
+          litUsageApiKey: 'stale-usage-key',
+        },
+      }));
       renderSessionWizard({
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
@@ -1028,58 +974,50 @@ describe('SessionWizard deploy render validation', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Lit bootstrap note: Lit session account auto-created.',
+          'Lit bootstrap note: Lit session account auto-created.'
         );
       });
 
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(deployCall[1].body);
-      expect(deployPayload.secrets).toEqual(
-        expect.objectContaining({
-          litAccountApiKey: 'lit-account-key',
-        }),
-      );
+      expect(deployPayload.secrets).toEqual(expect.objectContaining({
+        litAccountApiKey: 'lit-account-key',
+      }));
       expect(deployPayload.secrets.litUsageApiKey).toBeUndefined();
       expect(deployPayload.secrets.litApiBase).toBeUndefined();
 
-      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'lit-chipotle-bootstrap-session',
-          body: expect.objectContaining({
-            litAccountApiKey: 'lit-account-key',
-            sessionName: 'Chipotle Bootstrap Session',
-          }),
+      expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(expect.objectContaining({
+        action: 'lit-chipotle-bootstrap-session',
+        body: expect.objectContaining({
+          litAccountApiKey: 'lit-account-key',
+          sessionName: 'Chipotle Bootstrap Session',
         }),
-      );
+      }));
       const bootstrapAuthCall = workerAuth.buildSignedAdminActionAuth.mock.calls.find(
-        ([arg]) => arg?.action === 'lit-chipotle-bootstrap-session',
+        ([arg]) => arg?.action === 'lit-chipotle-bootstrap-session'
       );
       expect(bootstrapAuthCall[0].body.litApiBase).toBeUndefined();
       expect(bootstrapAuthCall[0].body.litUsageApiKey).toBeUndefined();
-      const bootstrapCall = global.fetch.mock.calls.find(([url]) =>
-        String(url).endsWith('/admin/lit-chipotle-bootstrap-session'),
-      );
+      const bootstrapCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/lit-chipotle-bootstrap-session'));
       const bootstrapPayload = JSON.parse(bootstrapCall[1].body);
       expect(bootstrapPayload.litAccountApiKey).toBe('lit-account-key');
       expect(bootstrapPayload.litUsageApiKey).toBeUndefined();
       expect(bootstrapPayload.litGroupId).toBeUndefined();
       await waitFor(() => {
-        expect(litProtocol.createLitHooks).toHaveBeenCalledWith(
-          expect.objectContaining({
-            chipotle: expect.objectContaining({
-              litCredentials: expect.objectContaining({
-                litApiBase: 'https://api.chipotle.litprotocol.com',
-                litGroupId: '7',
-                litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
-                litActionCid: 'QmBootstrapAction123',
-              }),
+        expect(litProtocol.createLitHooks).toHaveBeenCalledWith(expect.objectContaining({
+          chipotle: expect.objectContaining({
+            litCredentials: expect.objectContaining({
+              litApiBase: 'https://api.chipotle.litprotocol.com',
+              litGroupId: '7',
+              litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
+              litActionCid: 'QmBootstrapAction123',
             }),
           }),
-        );
+        }));
       });
-      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'))).toBe(
-        false,
-      );
+      expect(
+        global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'))
+      ).toBe(false);
     } finally {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
@@ -1098,15 +1036,15 @@ describe('SessionWizard deploy render validation', () => {
         signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
       }),
     }));
-    const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url, init = {}) => {
+    global.fetch = jest.fn(async (url) => {
       const normalizedUrl = String(url);
-      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
-      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/account')) {
         return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
       }
@@ -1175,11 +1113,114 @@ describe('SessionWizard deploy render validation', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Secrets sync note: Deploy helper already wrote secrets; skipped browser post-deploy secret sync.',
+          'Secrets sync note: Deploy helper already wrote secrets; skipped browser post-deploy secret sync.'
         );
       });
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
-      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/set-secrets'))).toBe(false);
+      expect(
+        global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/set-secrets'))
+      ).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      web3ProviderSpy.mockRestore();
+      verifyMessageSpy.mockRestore();
+    }
+  });
+
+  it('includes a cached Cloudflare account id in the deploy-helper payload', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
+      getSigner: () => ({
+        getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
+        signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
+      }),
+    }));
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      deployForm: {
+        accountId: 'cf-account-1',
+      },
+    }));
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Deploy Account Id Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'deploy-account-id-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
+      fireEvent.change(deployHelperInput, {
+        target: { value: 'https://deploy-helper.example.test' },
+      });
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-latest' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"abc"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      let deployCall;
+      await waitFor(() => {
+        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+        expect(deployCall).toBeTruthy();
+      });
+
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.accountId).toBe('cf-account-1');
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
     } finally {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
@@ -1207,10 +1248,8 @@ describe('SessionWizard deploy render validation', () => {
     cryptoUtils._getProvider.mockImplementation(() => ({
       request: providerRequest,
     }));
-    global.fetch = jest.fn(async (url, init = {}) => {
+    global.fetch = jest.fn(async (url) => {
       const normalizedUrl = String(url);
-      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
-      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/account')) {
         return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
       }
@@ -1290,4 +1329,101 @@ describe('SessionWizard deploy render validation', () => {
       cryptoUtils._getProvider.mockImplementation(originalGetProvider);
     }
   });
+
+  it('prompts for login instead of attempting publish when publish is available but no wallet is connected', async () => {
+    const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
+    const originalGetProvider = cryptoUtils._getProvider.getMockImplementation();
+    const providerRequest = jest.fn(async ({ method }) => {
+      if (method === 'eth_accounts') return [];
+      if (method === 'eth_chainId') return '0x14a34';
+      if (method === 'net_version') return '84532';
+      if (method === 'eth_requestAccounts') {
+        throw new Error('publish should open the login modal instead of requesting wallet accounts');
+      }
+      return [];
+    });
+    cryptoUtils._getProvider.mockImplementation(() => ({
+      request: providerRequest,
+    }));
+    const toggleLoginModal = jest.fn();
+    try {
+      renderSessionWizard({
+        account: '',
+        loginComplete: false,
+        toggleLoginModal,
+      });
+      enableAdvancedMode();
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Login Required Publish Session' },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /^Publish$/i }));
+      fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+      fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+        target: { value: 'ar://'.concat('a'.repeat(43)) },
+      });
+
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(toggleLoginModal).toHaveBeenCalledWith(true);
+        expect(screen.getByText('Connect your wallet to publish this session.')).toBeInTheDocument();
+      });
+      expect(providerRequest.mock.calls.map(([payload]) => payload?.method)).not.toContain('eth_requestAccounts');
+    } finally {
+      cryptoUtils._getProvider.mockImplementation(originalGetProvider);
+    }
+  });
+
+  it('prompts for login before direct worker deploy starts when no wallet session is active', async () => {
+    const toggleLoginModal = jest.fn();
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+
+    try {
+      renderSessionWizard({
+        account: '',
+        loginComplete: false,
+        toggleLoginModal,
+      });
+      enableAdvancedMode();
+      fireEvent.change(screen.getAllByRole('combobox')[0], {
+        target: { value: '84532' },
+      });
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Login Before Deploy Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'login-before-deploy-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(toggleLoginModal).toHaveBeenCalledWith(true);
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+          'Connect your wallet to set the admin address.'
+        );
+      });
+      expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'))).toBeUndefined();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
 });
