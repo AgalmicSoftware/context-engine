@@ -53,6 +53,10 @@ type UnknownRecord = Record<string, unknown>;
 type CompareGlobalThis = typeof globalThis & {
   CE_E2E_AI_MOCK?: boolean;
 };
+type CompareRunComparison = (
+  addresses: string[],
+  options?: { skipNavigate?: boolean }
+) => Promise<void>;
 
 interface CompareBookmark {
   address?: string;
@@ -730,6 +734,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   // per-item drill-down state map: { 'agree-0': {open, loading, error, text, tree?}, ... }
   const [drillState, setDrillState] = useState<CompareDrillStateMap>({});
+  const runComparisonRef = useRef<CompareRunComparison | null>(null);
 
   useEffect(() => {
     // Extract addresses from the URL or use firstAddress
@@ -746,14 +751,13 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
         const key = pathAddresses.map(a => a.toLowerCase()).join('&');
         if (key && key !== lastAutoKeyRef.current) {
           lastAutoKeyRef.current = key;
-          runComparison(pathAddresses, { skipNavigate: true });
+          runComparisonRef.current?.(pathAddresses, { skipNavigate: true });
         }
       }
     } else {
       setCompareAddresses([firstAddress || '', '']);
       setShowComparison(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstAddress, location.pathname]);
 
   const isE2eAutofillDisabled = React.useCallback(() => {
@@ -786,8 +790,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       }
       return prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, firstAddress]);
+  }, [account, firstAddress, isE2eAutofillDisabled]);
 
   // Bookmarks (read + listen for changes)
   const readBookmarks = React.useCallback(() => {
@@ -1066,6 +1069,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
     if (!isStale()) setLoading(false);
   };
+  runComparisonRef.current = runComparison;
 
   // If user toggles “More visuals” after initial run and we don't have a matrix yet,
   // ask just for the matrix using the same users (avoid recomputing others).
@@ -1080,8 +1084,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     } catch (e) {
       setMatrixData(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMoreViz, currentUsers && currentUsers.length, !!matrixData]);
+  }, [showMoreViz, currentUsers, matrixData]);
 
   const performComparison = async () => runComparison(compareAddresses, { skipNavigate: false });
 
@@ -1706,8 +1709,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     if (vizMode === 'venn' && !canShowVenn) setVizMode('summary');
     if (vizMode === 'matrix' && !canShowMatrix) setVizMode('summary');
     if (vizMode === 'compass' && !(participantsCount >= 2 && participantsCount <= 10)) setVizMode('summary');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [participantsCount]);
+  }, [canShowMatrix, canShowVenn, participantsCount, vizMode]);
 
   return (
     <div className={styles.compareSection}>
