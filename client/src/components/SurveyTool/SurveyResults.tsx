@@ -47,6 +47,7 @@ import {
   faExternalLinkAlt,
   faFilter,
   faExclamationCircle,
+  faSyncAlt,
   faComments
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -137,24 +138,6 @@ import {
   SurveyResultsLockedResponsesBanner,
   SurveyResultsLockedResponsesToggle,
 } from './SurveyResultsLockedResponsesPanel';
-import {
-  SurveyResultsFreeformAggregatorSummary,
-  SurveyResultsMultichoiceAggregatorSummary,
-} from './SurveyResultsAggregatorSummaries';
-import {
-  renderSurveyResultsFilterSummary,
-  renderSurveyResultsSyncStatusPanel,
-} from './SurveyResultsPanels';
-import {
-  isSurveyResultsStateSynced,
-  type SurveyResultsSyncStateLike,
-} from './surveyResultsSyncHelpers.js';
-import {
-  SURVEY_RESULTS_EXPORT_OPTIONS as EXPORT_OPTIONS,
-  SURVEY_RESULTS_EXPORT_TYPES as EXPORT_TYPES,
-  getSurveyResultsExportTypeLabel as getExportTypeLabel,
-  type SurveyResultsExportOption,
-} from './surveyResultsExportDisplayHelpers.js';
 
 export {
   countQuestionModeResponses,
