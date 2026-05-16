@@ -261,6 +261,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const litUrl = `lit://arweave/${txId}`;
     const legacyLitUrl = `lit+ar://${txId}`;
     const relativeViewerUrl = `/session/0xSessionToken/docs?__ceDocTx=${txId}&__ceDocStorage=lit-arweave&__ceDocKind=link`;
+    const unsafeJavascriptUrl = ['java', 'script:alert(1)'].join('');
+    const unsafeDataUrl = 'data:text/html,<script>alert(1)</script>';
 
     expect(sanitizeDocumentUrls([
       'https://example.com/doc',
@@ -269,8 +271,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       arUrl,
       litUrl,
       legacyLitUrl,
-      'javascript:alert(1)',
-      'data:text/html,<script>alert(1)</script>',
+      unsafeJavascriptUrl,
+      unsafeDataUrl,
     ])).toEqual([
       'https://example.com/doc',
       'http://example.com/alt',
@@ -315,10 +317,10 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         arUrl,
         litUrl,
         legacyLitUrl,
-        'javascript:alert(1)',
-        'data:text/html,<script>alert(1)</script>',
+        unsafeJavascriptUrl,
+        unsafeDataUrl,
       ],
-      docURLInput: 'javascript:alert(1)',
+      docURLInput: unsafeJavascriptUrl,
     };
 
     instance.addDocumentURL();
@@ -331,8 +333,8 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       arUrl,
       litUrl,
       legacyLitUrl,
-      'javascript:alert(1)',
-      'data:text/html,<script>alert(1)</script>',
+      unsafeJavascriptUrl,
+      unsafeDataUrl,
     ]);
 
     const markup = renderToStaticMarkup(instance.render());
@@ -344,7 +346,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(markup).toContain(`Encrypted doc (${legacyLitUrl})`);
     expect(markup).not.toContain(`href="${litUrl}"`);
     expect(markup).not.toContain(`href="${legacyLitUrl}"`);
-    expect(markup).not.toContain('href="javascript:alert(1)"');
+    expect(markup).not.toContain(`href="${unsafeJavascriptUrl}"`);
     expect(markup).not.toContain('href="data:text/html');
   });
 

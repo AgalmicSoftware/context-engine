@@ -634,6 +634,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
   _singleQuestionBootstrapRetryTimer = null;
   _singleQuestionBootstrapRetrySig = '';
   _isMounted = false;
+  _hasMounted = false;
   _autoDecProcessTimer = null;
   _autoDecryptSweepMicrotaskScheduled = false;
   _autoDecryptSweepFrameRequestId = null;
@@ -1816,6 +1817,7 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
 
     // Lazy load ZK-compatible Poseidon hasher (poseidon-lite)
     this._isMounted = true;
+    this._hasMounted = true;
     const loadHasher = async () => {
       try {
         const { poseidon } = await import('poseidon-lite');
@@ -4683,7 +4685,10 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
       : this.setState.bind(this);
     const runId = (Number(this._localCacheRehydrateRunId) || 0) + 1;
     this._localCacheRehydrateRunId = runId;
-    const isStaleRun = () => !this._isMounted || this._localCacheRehydrateRunId !== runId;
+    const isStaleRun = () => (
+      (this._hasMounted && !this._isMounted) ||
+      this._localCacheRehydrateRunId !== runId
+    );
     await executeSurveyLocalCacheRehydrate({
       props: this.props,
       state: this.state,
