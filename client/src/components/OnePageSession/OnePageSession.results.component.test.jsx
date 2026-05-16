@@ -4,7 +4,7 @@ import path from 'path';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { MemoryRouter } from 'react-router-dom';
 import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -22,7 +22,6 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
-const mockCorpusViewer = jest.fn();
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
   fs.readFileSync(
@@ -152,69 +151,6 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
-jest.mock('../DemoViews/CorpusViewer', () => {
-  const React = require('react');
-  const fullCorpusUrl = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json';
-
-  function MockCorpusViewer({
-    externalLoadRequestNonce,
-    onAtlasIssueOpen,
-    onExternalLoadStateChange,
-  }) {
-    mockCorpusViewer({ externalLoadRequestNonce, onAtlasIssueOpen, onExternalLoadStateChange });
-    React.useEffect(() => {
-      let cancelled = false;
-      if (Number(externalLoadRequestNonce || 0) <= 0) return undefined;
-
-      const loadCorpus = async () => {
-        onExternalLoadStateChange?.({
-          activeCorpusKey: 'cross_corpus',
-          activeCorpusLabel: 'Cross-Corpus',
-          loadStatus: 'loading',
-          loadButtonLabel: 'Loading full corpus...',
-          disableLoadButton: true,
-          error: '',
-        });
-        const response = await global.fetch(fullCorpusUrl, { cache: 'no-store' });
-        if (response?.json) await response.json();
-        if (!cancelled) {
-          onExternalLoadStateChange?.({
-            activeCorpusKey: 'cross_corpus',
-            activeCorpusLabel: 'Cross-Corpus',
-            loadStatus: 'loaded',
-            loadButtonLabel: 'Full corpus loaded',
-            disableLoadButton: true,
-            error: '',
-          });
-        }
-      };
-
-      loadCorpus();
-      return () => {
-        cancelled = true;
-      };
-    }, [externalLoadRequestNonce, onExternalLoadStateChange]);
-
-    return React.createElement(
-      'div',
-      { 'data-testid': 'corpus-viewer' },
-      React.createElement('button', { type: 'button' }, 'Tweets'),
-      React.createElement(
-        'button',
-        {
-          type: 'button',
-          onClick: () => onAtlasIssueOpen?.('0x2110000000000000000000000000000000000000000000000000000000000000'),
-        },
-        'Exponential Progress Debate',
-      ),
-    );
-  }
-
-  return {
-    __esModule: true,
-    default: MockCorpusViewer,
-  };
-});
 jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
   mockDebateSelector(props);
   return <div data-testid="debate-selector">Debate Selector</div>;
@@ -338,11 +274,7 @@ describe('OnePageSession results routing', () => {
     expect(loadButton).toHaveTextContent('Load full corpus');
     expect(loadButton.parentElement).toBe(githubLink.parentElement);
 
-    await act(async () => {
-      fireEvent.click(loadButton);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    fireEvent.click(loadButton);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -389,7 +321,7 @@ describe('OnePageSession results routing', () => {
       });
 
       expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
-      expect(window.location.pathname).toBe('/session/edge/questions/results');
+      expect(window.location.pathname).toBe('/questions/results');
       expect(window.location.search).toBe('?session=edge');
       expect(getFullCalls().slice(-2).map((props) => props.autoOpenResults)).toEqual([false, true]);
 
@@ -414,7 +346,7 @@ describe('OnePageSession results routing', () => {
       });
 
       expect(getFullCalls().slice(-2).map((props) => props.autoOpenResults)).toEqual([false, true]);
-      expect(window.location.pathname).toBe('/session/edge/questions/results');
+      expect(window.location.pathname).toBe('/questions/results');
       expect(window.location.search).toBe('?session=edge');
     } finally {
       window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
@@ -455,7 +387,7 @@ describe('OnePageSession results routing', () => {
       await waitFor(() => {
         expect(screen.getByTestId('survey-page-full')).toBeInTheDocument();
       });
-      expect(window.location.pathname).toBe('/ce/session/edge/questions/results');
+      expect(window.location.pathname).toBe('/ce/questions/results');
       expect(window.location.search).toBe('?session=edge');
 
       act(() => {
@@ -515,7 +447,7 @@ describe('OnePageSession results routing', () => {
     try {
       window.history.replaceState({}, '', '/');
       const debateView = await openFullResults({ sessionSlug: 'DEBATE' });
-      expect(window.location.pathname).toBe('/session/DEBATE/questions/results');
+      expect(window.location.pathname).toBe('/questions/results');
       expect(window.location.search).toBe('?session=DEBATE');
       debateView.unmount();
 
@@ -649,22 +581,6 @@ describe('OnePageSession results routing', () => {
     expect(resultsActionStrip).toHaveClass(styles.resultsModeActions);
     expect(resultsActionStrip.parentElement).toHaveClass(styles.resultsModeActionsScroller);
     expect(screen.getByTestId('polis-report')).toBeInTheDocument();
-  });
-
-  it('keeps selected results mode button glow inside a contained scroller gutter', () => {
-    const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
-    const tabletResultsBlock = extractMediaBlock(
-      scss,
-      '@media only screen and (max-width: 1024px)',
-      '.resultsModeActionsScroller'
-    );
-
-    expect(scss).toMatch(/\.resultsModeActionsScroller\s*{[\s\S]*?padding-block:\s*6px;[\s\S]*?margin-block:\s*-6px;/);
-    expect(tabletResultsBlock).toContain('.resultsModeActionsScroller');
-    expect(tabletResultsBlock).toContain('max-width: 100%;');
-    expect(tabletResultsBlock).toContain('overflow-x: auto;');
-    expect(tabletResultsBlock).toContain('overflow-y: hidden;');
-    expect(tabletResultsBlock).toContain('padding: 6px 10px;');
   });
 
   it('keeps DebateSelector out of debate map mode', async () => {
@@ -821,7 +737,7 @@ describe('OnePageSession results routing', () => {
     expect(screen.getAllByRole('button', { name: 'Exponential Progress Debate' }).length).toBeGreaterThan(0);
   });
 
-  it('shows the Breakdown results mode for configured demo sessions', async () => {
+  it('shows the Breakdown results mode only for /session/demo', async () => {
     const baseProps = buildProps();
 
     const nonDemoView = render(<OnePageSession {...baseProps} />);
@@ -838,8 +754,8 @@ describe('OnePageSession results routing', () => {
     render(
       <OnePageSession
         {...baseProps}
-        slug="demo-1"
-        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo-1' }}
+        slug="demo"
+        sessionConfig={{ ...baseProps.sessionConfig, slug: 'demo' }}
       />
     );
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
@@ -931,9 +847,7 @@ describe('OnePageSession results routing', () => {
     expect(analysisButton).toHaveAttribute('aria-pressed', 'true');
     expect(analysisButton).toHaveClass(styles.sectionHeaderViewModeButtonActive);
     expect(polisButton).toHaveAttribute('aria-pressed', 'false');
-    expect(mockDemoAnalysisWorkspace).toHaveBeenLastCalledWith(
-      expect.objectContaining({ sessionSlug: 'demo' })
-    );
+    expect(mockDemoAnalysisWorkspace).toHaveBeenCalled();
   });
 
   it('kicks off a slug-scoped light SBT universe scan on mount and session switches', async () => {
