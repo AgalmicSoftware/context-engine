@@ -2,10 +2,6 @@ import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import {
-  CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP,
-  SHOW_DEMO_SESSIONS,
-} from '../../variables/appConfig.js';
 import { resolveSessionUniverseEntrySlug } from './sbtSessionUniverse.js';
 export {
   buildSbtListExpandedCardShellClassName,
@@ -21,6 +17,16 @@ export {
   resolveSbtListLoadingProgressFillStyle,
   resolveSbtListRelativeImageStyle,
 } from './sbtListDisplayHelpers';
+export {
+  isSbtListManagedDgCacheName,
+  readSbtListShowDemoSessions,
+  readSbtListSyncBarResearchBlockStep,
+  readSbtListUniverseCollapsedState,
+  readStoredSbtListModeSelectedSessionSlugs,
+  resolveSbtListCreateGroupInitialVisibility,
+  SBT_LIST_MODE_SELECTION_STORAGE_KEY,
+} from './sbtListStorageHelpers';
+export type { SbtListStorageReader } from './sbtListStorageHelpers';
 
 export type SbtListHelperRecord = Record<string, unknown>;
 export type SbtListHelperItem = SbtListHelperRecord & {
@@ -270,19 +276,6 @@ export type SbtListSessionUniverseOptions = {
   demoSessionMap?: Record<string, SbtListHelperRecord>;
 };
 
-export type SbtListStorageReader = {
-  getItem?: (key: string) => string | null;
-};
-
-type SbtListCreateFormCacheChecker = (args: {
-  clearInvalid: true;
-  migrateLegacyToSessionKey: true;
-  sessionSlug: string;
-}) => boolean;
-type ResolveSbtListCreateGroupInitialVisibilityArgs = {
-  hasCachedCreateSbtForm?: SbtListCreateFormCacheChecker | null;
-  listSlug?: unknown;
-};
 type ResolveSbtListSectionSessionSlugsArgs = {
   allSessionsMode?: unknown;
   isListModeScopeEnabled?: unknown;
@@ -359,15 +352,6 @@ const SESSION_ID_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 const SESSION_ID_HEX_RE = /^0x[0-9a-f]{32}$/i;
 const SESSION_ID_COMPACT_RE = /^[0-9a-f]{32}$/i;
 export const SBT_LIST_NO_SESSION_UNIVERSE_SLUG = '__no_session__';
-export const SBT_LIST_MODE_SELECTION_STORAGE_KEY = 'dg:sbtListModeSelectedSessions';
-const SBT_LIST_MANAGED_DG_CACHE_NAMES = new Set<string>([
-  'questionsCache',
-  'surveysCache',
-  'bookmarksCache',
-  'filters',
-  'sbtCache',
-  'userCache',
-]);
 
 export const buildSbtListSessionLoadingStatus = ({
   allSessionsMode = false,
@@ -584,24 +568,6 @@ export const isSbtListHelperRecord = (value: unknown): value is SbtListHelperRec
   !!value && typeof value === 'object'
 );
 
-const getDefaultSbtListStorage = (): SbtListStorageReader | null => {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) return null;
-    return window.localStorage;
-  } catch (_) {
-    return null;
-  }
-};
-
-const getDefaultSbtListRuntimeGlobal = (): SbtListHelperRecord => {
-  try {
-    if (typeof globalThis === 'undefined') return {};
-    return globalThis as unknown as SbtListHelperRecord;
-  } catch (_) {
-    return {};
-  }
-};
-
 export const hasSbtListOwn = (obj: unknown, key: PropertyKey): boolean => (
   isSbtListHelperRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key)
 );
@@ -740,87 +706,6 @@ export const resolveSbtListItemSessionSlug = <T extends SbtListHelperItem = SbtL
   }
   if (allSessionsMode) return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
   return normalizeSessionSlug(listSlug || '');
-};
-
-export const isSbtListManagedDgCacheName = (name: unknown): boolean => (
-  SBT_LIST_MANAGED_DG_CACHE_NAMES.has(String(name || ''))
-);
-
-export const readStoredSbtListModeSelectedSessionSlugs = (
-  storage?: SbtListStorageReader | null
-): string[] => {
-  try {
-    const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
-    if (!resolvedStorage?.getItem) return [];
-    const raw = resolvedStorage.getItem(SBT_LIST_MODE_SELECTION_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return dedupeNormalizedSbtListSlugs(Array.isArray(parsed) ? parsed : []);
-  } catch (_) {
-    return [];
-  }
-};
-
-export const resolveSbtListCreateGroupInitialVisibility = ({
-  hasCachedCreateSbtForm = null,
-  listSlug = '',
-}: ResolveSbtListCreateGroupInitialVisibilityArgs = {}): boolean => (
-  typeof hasCachedCreateSbtForm === 'function'
-    ? hasCachedCreateSbtForm({
-      sessionSlug: normalizeSessionSlug(listSlug || ''),
-      migrateLegacyToSessionKey: true,
-      clearInvalid: true,
-    })
-    : false
-);
-
-export const readSbtListUniverseCollapsedState = (
-  storage?: SbtListStorageReader | null
-): boolean => {
-  try {
-    const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
-    return resolvedStorage?.getItem?.('dg:sbtUniverseCollapsed') === 'true';
-  } catch (_) {
-    return false;
-  }
-};
-
-export const readSbtListShowDemoSessions = (
-  runtimeGlobal = getDefaultSbtListRuntimeGlobal(),
-  fallback: unknown = SHOW_DEMO_SESSIONS
-): boolean => {
-  try {
-    if (
-      isSbtListHelperRecord(runtimeGlobal) &&
-      typeof runtimeGlobal.SHOW_DEMO_SESSIONS !== 'undefined'
-    ) {
-      return !!runtimeGlobal.SHOW_DEMO_SESSIONS;
-    }
-  } catch (e) { void e; /* fallback: demo visibility lookup. */ }
-  return !!fallback;
-};
-
-export const readSbtListSyncBarResearchBlockStep = (
-  runtimeGlobal = getDefaultSbtListRuntimeGlobal(),
-  fallback: unknown = CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP
-): number => {
-  try {
-    if (
-      isSbtListHelperRecord(runtimeGlobal) &&
-      typeof runtimeGlobal.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP !== 'undefined'
-    ) {
-      const runtimeValue = Number(runtimeGlobal.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP);
-      if (Number.isFinite(runtimeValue) && runtimeValue > 0) {
-        return Math.max(1, Math.floor(runtimeValue));
-      }
-    }
-  } catch (e) { void e; /* fallback: sync-bar research step lookup. */ }
-
-  const defaultValue = Number(fallback || 0);
-  if (Number.isFinite(defaultValue) && defaultValue > 0) {
-    return Math.max(1, Math.floor(defaultValue));
-  }
-  return 50;
 };
 
 export const isSbtListSessionIdLikeSlug = (raw: unknown): boolean => {
