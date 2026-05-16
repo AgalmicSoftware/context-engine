@@ -28,7 +28,6 @@ import {
   faWindowClose,
   faSpinner,
   faQuestionCircle,
-  faExternalLinkAlt,
   faWallet,
   faBookmark,
   faSignOutAlt,
@@ -52,6 +51,11 @@ import {
   LoginSettingsInlineNetworkSummary,
   LoginSettingsPanelNetworkSummary,
 } from './LoginSettingsNetworkSummary';
+import {
+  LoginSettingsConfigToggleControl,
+  LoginSettingsControlRow,
+  LoginSettingsSessionSummary,
+} from './LoginSettingsControlRow';
 
 // Smart contract interactions and config
 import {
@@ -1477,45 +1481,18 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     expanded = false,
     onToggle = null,
     testId = '',
-  }: any = {}) => (
-    <Button
-      type="button"
-      onClick={onToggle}
-      className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton}`}
-      aria-expanded={expanded}
-      data-testid={testId || undefined}
-    >
-      Config
-      <FontAwesomeIcon
-        icon={expanded ? faCaretUp : faCaretDown}
-        className={styles.aiSettingsToggleIcon}
-      />
-    </Button>
-  );
+  }: any = {}) => LoginSettingsConfigToggleControl({
+    expanded,
+    onToggle,
+    testId,
+  });
 
   renderSessionSummary: any = (activeSessionIn: any = null) => {
     const activeSession = activeSessionIn || this.getSessionDescriptor(this.getActiveSessionSlug());
-    const sessionSummaryHref = buildSettingsSessionHref(activeSession.slug);
-
-    return (
-      <div className={styles.settingsSessionSummary}>
-        <div
-          className={styles.settingsSessionRoute}
-          aria-label={`Active session: ${activeSession.label}`}
-        >
-          <span className={styles.settingsSessionLabel}>SESSION</span>
-          <span className={styles.settingsSessionName}>{activeSession.label}</span>
-          <a
-            href={sessionSummaryHref}
-            className={styles.settingsSessionLink}
-            aria-label={`Open session ${activeSession.label}`}
-            title={`Open session ${activeSession.label}`}
-          >
-            <FontAwesomeIcon icon={faExternalLinkAlt} />
-          </a>
-        </div>
-      </div>
-    );
+    return LoginSettingsSessionSummary({
+      activeSession,
+      sessionHref: buildSettingsSessionHref(activeSession.slug),
+    });
   };
 
   renderSettingsControlRow: any = ({
@@ -1530,26 +1507,23 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     tooltipPlacement = 'top',
     containerClassName = '',
     rowClassName = '',
-  }: any = {}) => (
-    <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
-      <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
-        {beforeConfig}
-        {this.renderConfigToggleControl({
-          expanded: configOpen,
-          onToggle: onToggleConfig,
-          testId: configTestId,
-        })}
-        {this.renderSessionSummary(activeSession)}
-        {betweenSessionAndTooltips}
-        {this.renderTooltipsToggleControl({
-          infoId: tooltipsInfoId,
-          tooltipPlacement,
-        })}
-        {this.renderDemoSurfaceToggleControl()}
-        {afterDemo}
-      </div>
-    </div>
-  );
+  }: any = {}) => LoginSettingsControlRow({
+    activeSession,
+    configOpen,
+    onToggleConfig,
+    configTestId,
+    beforeConfig,
+    betweenSessionAndTooltips,
+    afterDemo,
+    tooltipsControl: this.renderTooltipsToggleControl({
+      infoId: tooltipsInfoId,
+      tooltipPlacement,
+    }),
+    demoControl: this.renderDemoSurfaceToggleControl(),
+    containerClassName,
+    rowClassName,
+    sessionHref: buildSettingsSessionHref(activeSession.slug),
+  });
 
   handleActiveSessionChange: any = (event: any) => {
     const nextSlug = normalizeSettingsSessionSlug(event?.target?.value || '');
