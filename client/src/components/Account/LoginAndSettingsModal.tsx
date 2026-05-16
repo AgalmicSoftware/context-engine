@@ -48,6 +48,10 @@ import SessionChipSelector from '../Shared/SessionChipSelector';
 import {
   LoginSettingsSupportedResourceCard,
 } from './LoginSettingsResourceSummary';
+import {
+  LoginSettingsInlineNetworkSummary,
+  LoginSettingsPanelNetworkSummary,
+} from './LoginSettingsNetworkSummary';
 
 // Smart contract interactions and config
 import {
@@ -1958,33 +1962,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     showWalletNetwork = false,
     tooltipId = 'networkInfoTooltipInline',
   }: any = {}) => {
-    const detail = `The active session targets ${targetNetworkName}. If your wallet shows a different chain, switch before submitting.`;
-
-    return (
-      <div className={styles.networkInfo}>
-        <span className={styles.networkLabel}>network:</span>
-        <span className={styles.networkValue}>{targetNetworkName}</span>
-        {showWalletNetwork && (
-          <>
-            <span className={styles.networkLabel}>wallet:</span>
-            <span className={styles.networkValue}>{walletNetworkName}</span>
-          </>
-        )}
-        <FontAwesomeIcon icon={faQuestionCircle} className={styles.infoIcon} id={tooltipId} />
-        <CETooltip
-          placement="right"
-          target={tooltipId}
-          delay={0}
-          trigger="hover click focus"
-          autohide={false}
-          className={styles.networkTooltip}
-        >
-          <div style={{ padding: '10px' }}>
-            {detail}
-          </div>
-        </CETooltip>
-      </div>
-    );
+    return LoginSettingsInlineNetworkSummary({
+      targetNetworkName,
+      walletNetworkName,
+      showWalletNetwork,
+      tooltipId,
+    });
   };
 
   renderPanelNetworkSummary: any = ({
@@ -1995,56 +1978,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     needsNetworkSwitch = false,
     tooltipId = 'networkInfoTooltipPanel',
   }: any = {}) => {
-    const detail = `The active session targets ${targetNetworkName}. If your wallet shows a different chain, switch before submitting.`;
-
-    return (
-      <>
-        <div className={styles.aiSettingsSummaryStrip}>
-          <div className={styles.aiSettingsSummaryCard}>
-            <div className={styles.aiSettingsSummaryLabelRow}>
-              <span className={styles.aiSettingsSummaryLabel}>Network</span>
-              <FontAwesomeIcon
-                icon={faQuestionCircle}
-                className={`${styles.infoIcon} ${styles.aiSettingsSummaryInfoIcon}`}
-                id={tooltipId}
-              />
-            </div>
-            <div className={styles.aiSettingsSummaryValue}>{targetNetworkName}</div>
-            <div className={styles.aiSettingsSummaryDetail}>
-              {detail}
-            </div>
-            <CETooltip
-              placement="right"
-              target={tooltipId}
-              delay={0}
-              trigger="hover click focus"
-              autohide={false}
-              className={styles.networkTooltip}
-            >
-              <div style={{ padding: '10px' }}>
-                {detail}
-              </div>
-            </CETooltip>
-          </div>
-          {showWalletNetwork && (
-            <div className={styles.aiSettingsSummaryCard}>
-              <div className={styles.aiSettingsSummaryLabel}>Wallet</div>
-              <div className={styles.aiSettingsSummaryValue}>{walletNetworkName}</div>
-              <div className={styles.aiSettingsSummaryDetail}>
-                Switch before submitting to match the session network.
-              </div>
-            </div>
-          )}
-        </div>
-        {needsNetworkSwitch && targetNetwork?.name ? (
-          <div className={styles.aiSettingsActions}>
-            <Button onClick={this.switchToCorrectNetwork} className={`${styles.networkSwitchButton} ${styles.glow}`}>
-              Switch to {targetNetwork.name}
-            </Button>
-          </div>
-        ) : null}
-      </>
-    );
+    return LoginSettingsPanelNetworkSummary({
+      targetNetwork,
+      targetNetworkName,
+      walletNetworkName,
+      showWalletNetwork,
+      needsNetworkSwitch,
+      tooltipId,
+      onSwitchNetwork: this.switchToCorrectNetwork,
+    });
   };
 
   getPrimarySponsorSession: any = (sessions: any = []) => {
