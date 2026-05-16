@@ -3,7 +3,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock } from '@fortawesome/free-solid-svg-icons';
 
 import type { SbtListDisplayCardModel } from './sbtListHelpers';
-import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
 type SbtListDisplayCardStyles = Record<string, string>;
 
@@ -32,14 +31,6 @@ type SbtListStandardCardProps = {
   styles: SbtListDisplayCardStyles;
 };
 
-const resolveSbtListCardImageSrc = (imageSrc: string | null | undefined): string => imageSrc || defaultSbtImage;
-
-const handleSbtListCardImageError: React.ReactEventHandler<HTMLImageElement> = (event) => {
-  const image = event.currentTarget;
-  if (image.src.endsWith(defaultSbtImage)) return;
-  image.src = defaultSbtImage;
-};
-
 export const SbtListCompactLinkCard = ({
   className,
   href,
@@ -49,16 +40,23 @@ export const SbtListCompactLinkCard = ({
   sbtLabel,
   styles,
 }: SbtListCompactLinkCardProps): React.ReactElement => {
-  const { description, imageSrc, key, locked, name } = model;
+  const {
+    description,
+    imageSrc,
+    key,
+    locked,
+    name,
+  } = model;
 
   return (
-    <a key={key} className={className} href={href} onClick={onClick}>
+    <a
+      key={key}
+      className={className}
+      href={href}
+      onClick={onClick}
+    >
       <div className={styles.sbtImage} style={imageStyle}>
-        <img
-          src={resolveSbtListCardImageSrc(imageSrc)}
-          alt={`${sbtLabel} Thumbnail`}
-          onError={handleSbtListCardImageError}
-        />
+        {imageSrc && <img src={imageSrc} alt={`${sbtLabel} Thumbnail`} />}
       </div>
       <div className={styles.sbtInfo}>
         <p className={styles.sbtName}>
@@ -83,17 +81,27 @@ export const SbtListStandardCard = ({
   shellClassName,
   styles,
 }: SbtListStandardCardProps): React.ReactElement => {
-  const { description, imageSrc, locked, name, sbtAddress, sessionSlug } = model;
+  const {
+    description,
+    imageSrc,
+    locked,
+    name,
+    sbtAddress,
+    sessionSlug,
+  } = model;
 
   return (
-    <article key={`${sessionSlug}|${sbtAddress}`} className={shellClassName}>
-      <a className={styles.standardCardBodyLink} href={href} onClick={onClick}>
+    <article
+      key={`${sessionSlug}|${sbtAddress}`}
+      className={shellClassName}
+    >
+      <a
+        className={styles.standardCardBodyLink}
+        href={href}
+        onClick={onClick}
+      >
         <div className={styles.standardCardImage} style={imageStyle}>
-          <img
-            src={resolveSbtListCardImageSrc(imageSrc)}
-            alt={`${sbtLabel} Thumbnail`}
-            onError={handleSbtListCardImageError}
-          />
+          {imageSrc && <img src={imageSrc} alt={`${sbtLabel} Thumbnail`} />}
         </div>
         <div className={styles.standardCardInfo}>
           <p className={styles.standardCardName}>
