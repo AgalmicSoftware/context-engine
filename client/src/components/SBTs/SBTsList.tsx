@@ -28,6 +28,7 @@ import {
   SbtListStandardCard,
 } from './SbtListDisplayCards';
 import {
+  SbtListInitialLoader,
   SbtListSectionLoadingHint,
   SbtListSectionTitle,
 } from './SbtListSectionChrome';
@@ -3065,50 +3066,10 @@ const SBTsList = ({
 
   if (showInitialLoader) {
     return (
-      <div className={styles.initialLoader}>
-        <div className={styles.loadingHeader}>
-          <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingSpinner} />
-          <div className={styles.loadingTitle}>{`Loading ${t('sbts')}`}</div>
-        </div>
-        {loadingSessionStatuses.length > 0 && (
-          <div className={styles.loadingGroupList}>
-            {loadingSessionStatuses.map((group: any) => (
-              <div key={group.slug} className={styles.loadingGroupRow}>
-                <div className={styles.loadingGroupHeader}>
-                  <span className={styles.loadingGroupName}>{group.displayName}</span>
-                  <span
-                    className={`${styles.loadingGroupStatus} ${
-                      group.scanInProgress ? styles.loadingStatusActive : styles.loadingStatusPending
-                    }`}
-                  >
-                    {group.statusLabel}
-                  </span>
-                </div>
-                <div className={styles.loadingGroupMeta}>
-                  {group.progressText}
-                  {!group.hasLatest && (
-                    <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingGroupSpinner} />
-                  )}
-                </div>
-                <div
-                  className={styles.loadingProgressBar}
-                  role="progressbar"
-                  aria-valuenow={group.hasLatest ? group.progressPct : 0}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
-                  <div
-                    className={`${styles.loadingProgressFill} ${
-                      group.hasLatest ? '' : styles.loadingProgressIndeterminate
-                    }`}
-                    style={{ width: group.hasLatest ? `${group.progressPct}%` : undefined }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <SbtListInitialLoader
+        loadingLabel={`Loading ${t('sbts')}`}
+        loadingSessionStatuses={loadingSessionStatuses}
+      />
     );
   }
 
