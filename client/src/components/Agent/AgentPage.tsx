@@ -72,7 +72,6 @@ export default function AgentPage() {
     } catch (_) {
       return null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent]);
   const agentContract = useMemo(() => {
     try {
@@ -80,7 +79,6 @@ export default function AgentPage() {
     } catch (_) {
       return null;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agent]);
   const actionLabels = Array.isArray(agentContract?.actions)
     ? agentContract.actions
