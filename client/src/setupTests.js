@@ -36,6 +36,7 @@ if (typeof HTMLCanvasElement !== 'undefined') {
     rect: () => {},
     clip: () => {},
   });
+  HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,canvas-mock';
 }
 
 jest.mock('./utilities/useWhisper.js', () => ({
