@@ -12,26 +12,16 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSync, faTrash, faPlus, faCog, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
 import TagModal from '../TagPage/TagModal';
 import SessionChipSelector from '../Shared/SessionChipSelector';
-import SbtListSessionUniverseSummary from './SbtListSessionUniverseSummary';
 import {
   SbtListDetailsPanel,
   SbtListMetaRow,
 } from './SbtListCardChrome';
-import {
-  SbtListCompactLinkCard,
-  SbtListStandardCard,
-} from './SbtListDisplayCards';
-import {
-  SbtListInitialLoader,
-  SbtListSectionLoadingHint,
-  SbtListSectionTitle,
-} from './SbtListSectionChrome';
 import { ethers } from 'ethers';
 import { createLogger } from '../../utilities/logging.js';
 import {
@@ -3168,42 +3158,50 @@ const SBTsList = ({
     });
   };
 
-  const renderSbtDetailsPanel = (details: any, detailsId: any) => {
-    if (!details?.hasDetails) return null;
+  const renderSbtDetailsPanel = (
+    details: SbtCardDetails | null | undefined,
+    detailsId: string
+  ): React.ReactNode => (
+    <SbtListDetailsPanel
+      details={details}
+      detailsId={detailsId}
+      styles={styles}
+    />
+  );
+
+  const handleTagChipClick = (
+    event: SbtListPointerEventLike,
+    tag: unknown
+  ): void => {
+    if (event?.preventDefault) event.preventDefault();
+    if (event?.stopPropagation) event.stopPropagation();
+    const normalizedTag = String(tag || '').trim();
+    if (!normalizedTag) return;
+    setActiveTag(normalizedTag);
+  };
+
+  const renderSbtMetaRow = (
+    sbt: SbtListItem,
+    details: SbtCardDetails | null | undefined,
+    detailsId: string,
+    buttonLabel: unknown
+  ): React.ReactNode => {
+    const model = buildSbtListMetaRowModel({
+      details,
+      expandedSbtAddresses,
+      miniaturized,
+      sbt,
+    });
+    if (!model) return null;
     return (
-      <div id={detailsId} className={styles.sbtDetailsPanel}>
-        {details.documentUrls.length > 0 && (
-          <div className={styles.sbtDetailsSection}>
-            <span className={styles.sbtDetailsHeading}>Documents</span>
-            <div className={styles.sbtDocumentList}>
-              {details.documentUrls.map((documentUrl: any) => (
-                <a
-                  key={documentUrl.href}
-                  className={styles.sbtDocumentLink}
-                  href={documentUrl.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={documentUrl.label}
-                >
-                  {documentUrl.label}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-        {details.tags.length > 0 && (
-          <div className={styles.sbtDetailsSection}>
-            <span className={styles.sbtDetailsHeading}>Tags</span>
-            <div className={styles.sbtTagList}>
-              {details.tags.map((tag: any) => (
-                <span key={tag} className={styles.sbtTagChip}>
-                  {tag}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <SbtListMetaRow
+        buttonLabel={buttonLabel}
+        detailsId={detailsId}
+        model={model}
+        onTagClick={handleTagChipClick}
+        onToggleDetails={() => toggleExpandedSbt(sbt?.sbtAddress)}
+        styles={styles}
+      />
     );
   };
 
