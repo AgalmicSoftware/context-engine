@@ -12,12 +12,16 @@ import contractScripts, {
 } from '../../utilities/web3/contractScripts.js';
 import styles from './SBTsList.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown, faExternalLinkAlt, faCaretUp, faCaretDown } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faSync, faTrash, faPlus, faLock, faCog, faChevronUp, faChevronDown, faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
 import TagModal from '../TagPage/TagModal';
 import SessionChipSelector from '../Shared/SessionChipSelector';
+import {
+  SbtListDetailsPanel,
+  SbtListMetaRow,
+} from './SbtListCardChrome';
 import { ethers } from 'ethers';
 import { createLogger } from '../../utilities/logging.js';
 import {
@@ -2703,32 +2707,13 @@ const SBTsList = ({
   const renderSbtDetailsPanel = (
     details: SbtCardDetails | null | undefined,
     detailsId: string
-  ): React.ReactNode => {
-    if (!details?.hasDetails) return null;
-    return (
-      <div id={detailsId} className={styles.sbtDetailsPanel}>
-        {details.documentUrls.length > 0 && (
-          <div className={styles.sbtDetailsSection}>
-            <span className={styles.sbtDetailsHeading}>Documents</span>
-            <div className={styles.sbtDocumentList}>
-              {details.documentUrls.map((documentUrl) => (
-                <a
-                  key={documentUrl.href}
-                  className={styles.sbtDocumentLink}
-                  href={documentUrl.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={documentUrl.label}
-                >
-                  {documentUrl.label}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
+  ): React.ReactNode => (
+    <SbtListDetailsPanel
+      details={details}
+      detailsId={detailsId}
+      styles={styles}
+    />
+  );
 
   const handleTagChipClick = (
     event: SbtListPointerEventLike,
@@ -2754,51 +2739,15 @@ const SBTsList = ({
       sbt,
     });
     if (!model) return null;
-    const {
-      hasDetailsToggle,
-      hasTags,
-      isExpanded,
-      sbtAddressLower,
-      tags,
-    } = model;
-    const metaRowClassName = [
-      styles.sbtMetaRow,
-      hasTags ? styles.sbtMetaRowWithTags : styles.sbtMetaRowToggleOnly,
-    ].filter(Boolean).join(' ');
-
     return (
-      <div className={metaRowClassName}>
-        {hasTags && (
-          <div className={styles.sbtTagList}>
-            {tags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                className={styles.sbtTagChip}
-                aria-label={`Open tag explorer for ${tag}`}
-                onClick={(event) => handleTagChipClick(event, tag)}
-              >
-                #{tag}
-              </button>
-            ))}
-          </div>
-        )}
-        {hasDetailsToggle && (
-          <button
-            type="button"
-            className={styles.sbtDetailsToggle}
-            aria-controls={detailsId}
-            aria-expanded={isExpanded}
-            aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${buttonLabel}`}
-            onClick={() => toggleExpandedSbt(sbt?.sbtAddress)}
-          >
-            <FontAwesomeIcon
-              icon={isExpanded ? faCaretUp : faCaretDown}
-              className={styles.sbtDetailsToggleIcon}
-            />
-          </button>
-        )}
-      </div>
+      <SbtListMetaRow
+        buttonLabel={buttonLabel}
+        detailsId={detailsId}
+        model={model}
+        onTagClick={handleTagChipClick}
+        onToggleDetails={() => toggleExpandedSbt(sbt?.sbtAddress)}
+        styles={styles}
+      />
     );
   };
 
