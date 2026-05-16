@@ -549,7 +549,7 @@ export default function DocumentLibraryPanel({
     const slug = toStr(sessionSlug).trim().toLowerCase();
     if (mode === 'session') {
       const id = normalizedSessionIdHex || '';
-      return slug || id ? `session:${slug}:${id}` : '';
+      return (slug || id) ? `session:${slug}:${id}` : '';
     }
     if (mode === 'sbt') {
       const chain = resolvedSbtChainId ? String(resolvedSbtChainId) : '';
