@@ -12,8 +12,6 @@ import {
   faSpinner,
   faExclamationCircle,
   faExternalLinkAlt,
-  faCopy,
-  faDownload,
   faImage,
   faClipboard,
   faBookmark,
@@ -46,6 +44,7 @@ import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import CompactImageChooser from '../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
+import CreateSbtShareableBlock from './CreateSbtShareableBlock';
 
 import { cryptoUtils }  from '../../utilities/crypto/cryptography.js';
 import {
@@ -224,7 +223,6 @@ import {
   resolveCreateSbtRestoredMetadataLockGateIds,
   resolveCreateSbtRestoredPredictableAddressEnabled,
   resolveCreateSbtEffectiveSessionSlug,
-  resolveCreateSbtShareableTooltipIconStyle,
   resolveCreateSbtSuccessDisplayState,
   resolveCreateSbtTooltipIconStyle,
   requireCreateSbtRecipientsForGateSelection,
@@ -3638,99 +3636,21 @@ class CreateSBTGroup extends Component<any, any> {
     testId: string | null = null
   ): JSX.Element => {
     const { copiedLinkIndex, sbtAddress } = this.state;
-    const copyKeyUrl = `url_${qrId}`;
-    const copyKeyImg = `img_${qrId}`;
-    const copyUrlActionState = resolveCreateSbtCopyActionDisplayState({
-      copied: copiedLinkIndex === copyKeyUrl,
-    });
-    const copyQrImageActionState = resolveCreateSbtCopyActionDisplayState({
-      copied: copiedLinkIndex === copyKeyImg,
-    });
-
-    // Derive ID for the hidden high-res QR code
-    const highResQrId = `${qrId}_high_res`;
-
-    const { hiddenStyle } = resolveCreateSbtHiddenQrDisplayState();
-
     return (
-      <div className={styles.shareableBlock} {...(testId ? { 'data-testid': testId } : {})}>
-        {/* Left Column: Title & URL */}
-        <div className={styles.leftCol}>
-          <h3 className={styles.blockTitle}>
-            {title}
-            {tooltipText && (
-              <>
-                <FontAwesomeIcon
-                  icon={faQuestionCircle}
-                  className={styles.tooltip}
-                  id={`tt_${qrId}`}
-                  style={resolveCreateSbtShareableTooltipIconStyle()}
-                />
-                <CETooltip placement="right" target={`tt_${qrId}`} className={styles.tooltipBubble}>
-                  {tooltipText}
-                </CETooltip>
-              </>
-            )}
-          </h3>
-
-          <div className={styles.urlContainer}>
-            <span className={styles.urlText} title={url}>{url}</span>
-            <button
-              onClick={() => this.copyToClipboard(url, copyKeyUrl)}
-              className={styles.copyButton}
-              title="Copy URL"
-            >
-              {copyUrlActionState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-              {copyUrlActionState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-            </button>
-          </div>
-        </div>
-
-        {/* Right Column: Compact QR & Actions */}
-        <div className={styles.rightCol}>
-          <div className={styles.qrCodeContainer}>
-            {/* Visible Small QR (64px) */}
-            <QRCodeSVG
-              id={qrId}
-              value={url}
-              size={64}
-              bgColor={"#ffffff"}
-              fgColor={"#000000"}
-              level="L"
-              includeMargin={false}
-            />
-            {/* Hidden High-Res QR (1024px) for Copy/Download */}
-            <div style={hiddenStyle}>
-              <QRCodeSVG
-                id={highResQrId}
-                value={url}
-                size={1024}
-                bgColor={"#ffffff"}
-                fgColor={"#000000"}
-                level="L"
-                includeMargin={true}
-              />
-            </div>
-          </div>
-          <div className={styles.qrActionsColumn}>
-            <button
-              className={styles.qrActionButton}
-              onClick={() => this.copyQRImage(highResQrId, copyKeyImg)}
-              title="Copy QR Image to Clipboard"
-            >
-              {copyQrImageActionState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-              {copyQrImageActionState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faClipboard} />}
-            </button>
-            <button
-              className={styles.qrActionButton}
-              onClick={() => this.downloadQR(highResQrId, `ContextEngine_Sbt_${sbtAddress}_${fileSuffix}.png`)}
-              title="Download QR Code"
-            >
-              <FontAwesomeIcon icon={faDownload} />
-            </button>
-          </div>
-        </div>
-      </div>
+      <CreateSbtShareableBlock
+        copiedLinkIndex={copiedLinkIndex}
+        fileSuffix={fileSuffix}
+        onCopyQrImage={this.copyQRImage}
+        onCopyUrl={this.copyToClipboard}
+        onDownloadQr={this.downloadQR}
+        qrId={qrId}
+        sbtAddress={sbtAddress}
+        styles={styles}
+        testId={testId}
+        title={title}
+        tooltipText={tooltipText}
+        url={url}
+      />
     );
   }
 
