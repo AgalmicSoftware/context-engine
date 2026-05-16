@@ -233,8 +233,16 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
             prevAddressRef.current = address;
           }
         // Track the wallet chain separately because currentNetwork can stay pinned to the session.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        }, [address, chain?.id, currentNetwork?.id, props.provider, props.account, props.loginComplete]);
+        }, [
+          address,
+          chain,
+          currentNetwork,
+          props.changeAccount,
+          props.updateLoginInfo,
+          props.provider,
+          props.account,
+          props.loginComplete,
+        ]);
 
         const injectedProps = {
           wagmiProvider: provider,
