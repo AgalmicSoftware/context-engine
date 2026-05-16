@@ -3,7 +3,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock } from '@fortawesome/free-solid-svg-icons';
 
 import type { SbtListDisplayCardModel } from './sbtListHelpers';
-import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
 type SbtListDisplayCardStyles = Record<string, string>;
 
@@ -32,16 +31,6 @@ type SbtListStandardCardProps = {
   styles: SbtListDisplayCardStyles;
 };
 
-const resolveSbtListCardImageSrc = (imageSrc: string | null | undefined): string => (
-  imageSrc || defaultSbtImage
-);
-
-const handleSbtListCardImageError: React.ReactEventHandler<HTMLImageElement> = (event) => {
-  const image = event.currentTarget;
-  if (image.src.endsWith(defaultSbtImage)) return;
-  image.src = defaultSbtImage;
-};
-
 export const SbtListCompactLinkCard = ({
   className,
   href,
@@ -67,11 +56,7 @@ export const SbtListCompactLinkCard = ({
       onClick={onClick}
     >
       <div className={styles.sbtImage} style={imageStyle}>
-        <img
-          src={resolveSbtListCardImageSrc(imageSrc)}
-          alt={`${sbtLabel} Thumbnail`}
-          onError={handleSbtListCardImageError}
-        />
+        {imageSrc && <img src={imageSrc} alt={`${sbtLabel} Thumbnail`} />}
       </div>
       <div className={styles.sbtInfo}>
         <p className={styles.sbtName}>
@@ -116,11 +101,7 @@ export const SbtListStandardCard = ({
         onClick={onClick}
       >
         <div className={styles.standardCardImage} style={imageStyle}>
-          <img
-            src={resolveSbtListCardImageSrc(imageSrc)}
-            alt={`${sbtLabel} Thumbnail`}
-            onError={handleSbtListCardImageError}
-          />
+          {imageSrc && <img src={imageSrc} alt={`${sbtLabel} Thumbnail`} />}
         </div>
         <div className={styles.standardCardInfo}>
           <p className={styles.standardCardName}>

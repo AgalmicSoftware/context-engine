@@ -1,11 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import {
   SbtListCompactLinkCard,
   SbtListStandardCard,
 } from './SbtListDisplayCards';
-import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 
 const styles = {
   lockIcon: 'lockIcon',
@@ -84,38 +83,5 @@ describe('SbtListDisplayCards', () => {
 
     expect(screen.getByText('Meta row')).toBeInTheDocument();
     expect(screen.queryByText('Details panel')).not.toBeInTheDocument();
-  });
-
-  it('falls back to the default badge image when list metadata has no image', () => {
-    render(
-      <SbtListStandardCard
-        href="/groups/0xabc"
-        model={{ ...model, imageSrc: null }}
-        onClick={jest.fn()}
-        sbtLabel="Group"
-        shellClassName="standard"
-        styles={styles}
-      />
-    );
-
-    expect(screen.getByRole('img', { name: 'Group Thumbnail' })).toHaveAttribute('src', defaultSbtImage);
-  });
-
-  it('falls back to the default badge image when a metadata image fails to load', () => {
-    render(
-      <SbtListCompactLinkCard
-        className="compact"
-        href="/groups/0xabc"
-        model={model}
-        onClick={jest.fn()}
-        sbtLabel="Group"
-        styles={styles}
-      />
-    );
-
-    const image = screen.getByRole('img', { name: 'Group Thumbnail' });
-    fireEvent.error(image);
-
-    expect(image).toHaveAttribute('src', defaultSbtImage);
   });
 });
