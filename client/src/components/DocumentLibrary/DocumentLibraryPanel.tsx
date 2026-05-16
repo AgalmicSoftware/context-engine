@@ -722,6 +722,12 @@ export default function DocumentLibraryPanel({
   activeViewerContextKeyRef.current = viewerContextKey;
   const activeUploadContextKeyRef = useRef(viewerContextKey);
   activeUploadContextKeyRef.current = viewerContextKey;
+  const activeFileRef = useRef<File | null>(file);
+  activeFileRef.current = file;
+  const activeUrlInputRef = useRef(urlInput);
+  activeUrlInputRef.current = urlInput;
+  const activeUrlTitleRef = useRef(urlTitle);
+  activeUrlTitleRef.current = urlTitle;
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
@@ -1290,7 +1296,9 @@ export default function DocumentLibraryPanel({
     }
 
     const uploadContextKey = activeUploadContextKeyRef.current;
+    const submittedFile = file;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+    const isCurrentUploadAttempt = () => isCurrentUploadContext() && activeFileRef.current === submittedFile;
 
     try {
       if (!locked) {
@@ -1362,7 +1370,7 @@ export default function DocumentLibraryPanel({
       }
       if (isCurrentUploadAttempt()) setFile(null);
     } catch (err) {
-      if (isCurrentUploadContext()) {
+      if (isCurrentUploadAttempt()) {
         setError(getErrorMessage(err, 'Upload failed.'));
       }
     }
@@ -1442,7 +1450,14 @@ export default function DocumentLibraryPanel({
     }
 
     const uploadContextKey = activeUploadContextKeyRef.current;
+    const submittedUrlInput = urlInput;
+    const submittedUrlTitle = urlTitle;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+    const isCurrentUrlUploadAttempt = () => (
+      isCurrentUploadContext() &&
+      activeUrlInputRef.current === submittedUrlInput &&
+      activeUrlTitleRef.current === submittedUrlTitle
+    );
 
     try {
       if (!locked) {
@@ -1522,7 +1537,7 @@ export default function DocumentLibraryPanel({
         setUrlTitle('');
       }
     } catch (err) {
-      if (isCurrentUploadContext()) {
+      if (isCurrentUrlUploadAttempt()) {
         setError(getErrorMessage(err, 'Upload failed.'));
       }
     }

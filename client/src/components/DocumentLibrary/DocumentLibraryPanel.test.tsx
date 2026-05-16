@@ -636,6 +636,115 @@ describe('DocumentLibraryPanel photo docs', () => {
     }
   });
 
+  it('does not clear a newer selected file when an earlier upload completes', async () => {
+    const slowUpload = createDeferred<any>();
+    mockUploadDocLibraryFile.mockReturnValueOnce(slowUpload.promise);
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'d'.repeat(32)}`}
+      />
+    );
+
+    const firstFile = new File(['first'], 'first-upload.txt', { type: 'text/plain' });
+    const nextFile = new File(['next'], 'next-upload.txt', { type: 'text/plain' });
+    const fileInput = screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT);
+    fireEvent.change(fileInput, {
+      target: { files: [firstFile] },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
+        file: firstFile,
+      }));
+    });
+
+    fireEvent.change(fileInput, {
+      target: { files: [nextFile] },
+    });
+
+    await act(async () => {
+      slowUpload.resolve({
+        txId: 'N'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'first-upload.txt',
+        },
+        data: { size: 5, type: 'text/plain' },
+      });
+      await slowUpload.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON)).not.toBeDisabled();
+  });
+
+  it('does not clear newer URL fields when an earlier URL upload completes', async () => {
+    const slowUpload = createDeferred<any>();
+    mockUploadDocLibraryUrlRecord.mockReturnValueOnce(slowUpload.promise);
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'e'.repeat(32)}`}
+      />
+    );
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {
+      target: { value: 'https://docs.example.test/first' },
+    });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_TITLE_INPUT), {
+      target: { value: 'First link' },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_URL_ADD_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
+        url: 'https://docs.example.test/first',
+        title: 'First link',
+      }));
+    });
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {
+      target: { value: 'https://docs.example.test/next' },
+    });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_TITLE_INPUT), {
+      target: { value: 'Next link' },
+    });
+
+    await act(async () => {
+      slowUpload.resolve({
+        txId: 'L'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'link',
+          'CE-DocName': 'First link',
+        },
+        data: { size: null, type: 'application/json' },
+      });
+      await slowUpload.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT)).toHaveValue('https://docs.example.test/next');
+    expect(screen.getByTestId(E2E_TESTIDS.DOC_URL_TITLE_INPUT)).toHaveValue('Next link');
+  });
+
   it('keeps image documents previewable and downloadable in the viewer', async () => {
     const imageBlob = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
     (global.fetch as jest.Mock).mockResolvedValue({

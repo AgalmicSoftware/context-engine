@@ -1168,6 +1168,23 @@ class SBTPage extends Component<any, any> {
     sessionSlug == null ? '' : String(sessionSlug || ''),
   ].join('|');
 
+  buildListAutoMintTargetKey = (): string => this.buildMintTargetKey({
+    accountLower: String(this.props.account || '').trim().toLowerCase(),
+    chainId: this.getMintTargetChainId(),
+    sbtAddress: this.props.SBTAddress,
+    sessionSlug: this.getEffectiveSessionSlug(),
+  });
+
+  hasAttemptedListMintForCurrentTarget = (): boolean => {
+    const targetKey = this.buildListAutoMintTargetKey();
+    return !!targetKey && this.hasAttemptedListMint && this._attemptedListMintTargetKey === targetKey;
+  };
+
+  markAttemptedListMintForCurrentTarget = (): void => {
+    this._attemptedListMintTargetKey = this.buildListAutoMintTargetKey();
+    this.hasAttemptedListMint = !!this._attemptedListMintTargetKey;
+  };
+
   setMintPendingForTarget = ({
     accountLower = '',
     chainId = null,

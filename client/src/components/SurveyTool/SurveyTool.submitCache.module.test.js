@@ -837,6 +837,121 @@ describe('SurveyTool submit cache writes', () => {
     expect(refreshSurveyResponsesByID).toHaveBeenCalledWith('0xsurvey');
   });
 
+  it('does not run submit fallback refreshes after the submit context changes', async () => {
+    jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
+
+    const refreshQuestionResponses = jest.fn().mockResolvedValue(undefined);
+    const refreshSurveyResponsesByID = jest.fn().mockResolvedValue(undefined);
+    const subject = new SurveyQuestions({
+      surveyIndex: 0,
+      surveyId: '0xsurvey',
+      account: '0xabc',
+      loginComplete: true,
+      provider: {},
+      network: { id: 84532 },
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      refreshQuestionResponses,
+      refreshSurveyResponsesByID,
+    });
+
+    subject._getEffectiveDraftSlug = jest.fn(() => 'edge');
+    subject.maybeBlockSubmitUntilQuestionPoolComplete = jest.fn(() => false);
+    subject.getChangedQidsAndFields = jest.fn(() => ({
+      changedQids: new Set(['q1']),
+      changedMap: { q1: { answer: 1 } },
+    }));
+    subject.getPendingEditStats = jest.fn(() => ({ total: 1, encrypted: 0 }));
+    subject.submitSurveyResponse = jest.fn().mockResolvedValue({
+      status: 1,
+      blockNumber: 42,
+      transactionHash: `0x${'5'.repeat(64)}`,
+      __ceQuestionResponses: [
+        {
+          questionID: 'q1',
+          responder: '0xabc',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+      __ceSurveyResponse: {
+        surveyID: '0xsurvey',
+        responder: '0xabc',
+        responses: [
+          {
+            questionID: 'q1',
+            responder: '0xabc',
+            type: 'freeform',
+            prompt: 'Prompt 1',
+            answer: { value: 'yes', encrypted: false },
+            additional: { value: '', encrypted: false },
+          },
+        ],
+      },
+      __ceSurveyId: '0xsurvey',
+    });
+    subject.writeSubmittedResponsesToLocalCaches = jest.fn().mockImplementation(async () => {
+      subject.props = {
+        ...subject.props,
+        sessionSlug: 'next',
+        activeSessionSlug: 'next',
+      };
+      subject._getEffectiveDraftSlug = jest.fn(() => 'next');
+      return {
+        questionCacheWritten: false,
+        surveyCacheWritten: false,
+      };
+    });
+    subject.clearDraftFor = jest.fn();
+    subject.invalidateDiffCaches = jest.fn();
+    subject.prepareJsonAndHash = jest.fn(() => ({
+      responder: '0xabc',
+      responses: [
+        {
+          questionID: 'q1',
+          answer: { value: 'yes', encrypted: false },
+          additional: { value: '', encrypted: false },
+        },
+      ],
+    }));
+    subject.state = {
+      ...subject.state,
+      surveysResponseState: [{
+        answers: { q1: { value: 'yes', encrypted: false } },
+        additionalComments: { q1: { value: '', encrypted: false } },
+        importance: {},
+        conviction: {},
+      }],
+      questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Prompt 1' }],
+      pileQuestions: [],
+      isSubmitting: false,
+      submissionComplete: false,
+      submittedSinceLastEdit: false,
+      modifiedCount: 1,
+      hasEncryptedChanges: false,
+    };
+    subject.setState = (updater, callback) => {
+      const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      if (typeof callback === 'function') {
+        const pending = callback();
+        if (pending && typeof pending.then === 'function') {
+          subject._lastSetStatePromise = pending;
+        }
+      }
+    };
+
+    await subject.encryptAndUpload();
+    await flushAsyncCallbacks();
+    if (subject._lastSetStatePromise) await subject._lastSetStatePromise;
+
+    expect(subject.writeSubmittedResponsesToLocalCaches).toHaveBeenCalled();
+    expect(refreshQuestionResponses).not.toHaveBeenCalled();
+    expect(refreshSurveyResponsesByID).not.toHaveBeenCalled();
+  });
+
   it('passes the merged encrypted slice into submit work before async state flush', async () => {
     jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
 

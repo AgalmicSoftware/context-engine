@@ -10361,6 +10361,7 @@ export class SurveyQuestions extends Component {
         hasEncryptedChanges: false,
       }, async () => {
         try {
+          if (!this.isSubmitContextCurrent(submitContext)) return;
           const cacheWriteResult = await this.writeSubmittedResponsesToLocalCaches({
             receipt,
             questionResponses: receipt?.__ceQuestionResponses,
@@ -10371,13 +10372,14 @@ export class SurveyQuestions extends Component {
             surveyLog.warn('[SurveyQuestions] Local submit cache write-through failed:', error);
             return { questionCacheWritten: false, surveyCacheWritten: false };
           });
+          if (!this.isSubmitContextCurrent(submitContext)) return;
 
           if (
             !cacheWriteResult?.questionCacheWritten &&
             typeof this.props.refreshQuestionResponses === 'function'
           ) {
             const ids = Array.from(changedQids).map((id) => normalizeQuestionIdKey(id)).filter(Boolean);
-            if (ids.length > 0) {
+            if (ids.length > 0 && this.isSubmitContextCurrent(submitContext)) {
               await this.props.refreshQuestionResponses(ids, {
                 slug: submittedCacheSlug,
                 responder: submitContext.account || '',
@@ -10390,7 +10392,9 @@ export class SurveyQuestions extends Component {
             typeof this.props.refreshSurveyResponsesByID === 'function' &&
             submitContext.surveyId
           ) {
-            await this.props.refreshSurveyResponsesByID(submitContext.surveyId);
+            if (this.isSubmitContextCurrent(submitContext)) {
+              await this.props.refreshSurveyResponsesByID(submitContext.surveyId);
+            }
           }
         } catch (e) { surveyLog.warn('SurveyTool: callback', e); }
       });
