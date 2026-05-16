@@ -56,6 +56,7 @@ import {
   LoginSettingsControlRow,
   LoginSettingsSessionSummary,
 } from './LoginSettingsControlRow';
+import LoginSettingsSectionCard from './LoginSettingsSectionCard';
 
 // Smart contract interactions and config
 import {
@@ -2018,17 +2019,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     summary = '',
     children = null,
   }: any = {}) => (
-    <div className={styles.settingsSectionCard}>
-      <div className={styles.settingsSectionToggle}>
-        <span className={styles.settingsSectionTitleGroup}>
-          <span className={styles.settingsSectionTitle}>{title}</span>
-          {summary ? <span className={styles.settingsSectionSummary}>{summary}</span> : null}
-        </span>
-      </div>
-      <div className={styles.settingsSectionBody}>
-        {children}
-      </div>
-    </div>
+    <LoginSettingsSectionCard title={title} summary={summary}>
+      {children}
+    </LoginSettingsSectionCard>
   );
 
   renderSettingsOverviewPanel: any = ({
@@ -2135,28 +2128,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const renderSection = ({ key, title, summary, children }: any) => {
       const isOpen = this.isAiSettingsSectionOpen(key);
       return (
-        <div className={styles.settingsSectionCard}>
-          <button
-            type="button"
-            className={styles.settingsSectionToggle}
-            onClick={() => this.toggleAiSettingsSection(key)}
-            aria-expanded={isOpen}
-          >
-            <span className={styles.settingsSectionTitleGroup}>
-              <span className={styles.settingsSectionTitle}>{title}</span>
-              {summary ? <span className={styles.settingsSectionSummary}>{summary}</span> : null}
-            </span>
-            <FontAwesomeIcon
-              icon={isOpen ? faCaretUp : faCaretDown}
-              className={styles.settingsSectionChevron}
-            />
-          </button>
-          {isOpen && (
-            <div className={styles.settingsSectionBody}>
-              {children}
-            </div>
-          )}
-        </div>
+        <LoginSettingsSectionCard
+          title={title}
+          summary={summary}
+          isOpen={isOpen}
+          onToggle={() => this.toggleAiSettingsSection(key)}
+        >
+          {children}
+        </LoginSettingsSectionCard>
       );
     };
 
