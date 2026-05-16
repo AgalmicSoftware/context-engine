@@ -52,6 +52,13 @@ const SurveyQuestionsFullQuestionResponseInput = ({
   onRatingChangeComplete,
   onToggleAnswerEncryption,
 }: SurveyQuestionsFullQuestionResponseInputProps): React.ReactNode => {
+  const answerValue = answer.value;
+  const audioInputValue = (
+    typeof answerValue === 'string' ||
+    typeof answerValue === 'number' ||
+    answerValue == null
+  ) ? answerValue || '' : '';
+
   switch (question.type) {
     case 'multichoice': {
       const options = Array.isArray(question.options) ? question.options : [];
@@ -101,9 +108,9 @@ const SurveyQuestionsFullQuestionResponseInput = ({
           qIndex={qIndex}
           {...audioInputWorkerProps}
           placeholder="response (optional)"
-          updateFunction={(answerValue: unknown) => onAnswerChange?.(answerValue)}
-          toggleEncryption={onToggleAnswerEncryption}
-          value={answer.value || ''}
+          updateFunction={(nextAnswerValue: unknown) => onAnswerChange?.(nextAnswerValue)}
+          toggleEncryption={(nextEncryptedState: boolean) => onToggleAnswerEncryption?.(nextEncryptedState)}
+          value={audioInputValue}
           encrypted={answer.encrypted || false}
           dataTestId={E2E_TESTIDS.SURVEY_ANSWER_INPUT}
           dataCeQuestionId={String(question.id || '').trim().toLowerCase()}
