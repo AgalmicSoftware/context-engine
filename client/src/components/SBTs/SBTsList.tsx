@@ -28,6 +28,7 @@ import {
   SbtListStandardCard,
 } from './SbtListDisplayCards';
 import {
+  SbtListInitialLoader,
   SbtListSectionLoadingHint,
   SbtListSectionTitle,
 } from './SbtListSectionChrome';
@@ -70,8 +71,6 @@ import {
   buildSbtListFilterContainerClassName,
   buildSbtListFilterLabelClassName,
   buildSbtListInteractiveMiniCardModel,
-  buildSbtListLoadingGroupStatusClassName,
-  buildSbtListLoadingProgressFillClassName,
   buildSbtListMetaRowModel,
   buildSbtListMiniSettingsButtonClassName,
   buildSbtListRenderItemKey,
@@ -114,7 +113,6 @@ import {
   resolveSbtListSectionSessionSlugs,
   resolveSbtListSessionUniverseSnapshotUpdate,
   resolveSbtListCreateGroupInitialVisibility,
-  resolveSbtListLoadingProgressFillStyle,
   resolveSbtListRelativeImageStyle,
   SBT_LIST_MODE_SELECTION_STORAGE_KEY,
   SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
@@ -2610,58 +2608,10 @@ const SBTsList = ({
 
   if (showInitialLoader) {
     return (
-      <div className={styles.initialLoader}>
-        <div className={styles.loadingHeader}>
-          <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingSpinner} />
-          <div className={styles.loadingTitle}>{`Loading ${t('sbts')}`}</div>
-        </div>
-        {loadingSessionStatuses.length > 0 && (
-          <div className={styles.loadingGroupList}>
-            {loadingSessionStatuses.map((group: SbtSessionLoadingStatus) => (
-              <div key={group.slug} className={styles.loadingGroupRow}>
-                <div className={styles.loadingGroupHeader}>
-                  <span className={styles.loadingGroupName}>{group.displayName}</span>
-                  <span
-                    className={buildSbtListLoadingGroupStatusClassName({
-                      activeClassName: styles.loadingStatusActive,
-                      baseClassName: styles.loadingGroupStatus,
-                      pendingClassName: styles.loadingStatusPending,
-                      scanInProgress: group.scanInProgress,
-                    })}
-                  >
-                    {group.statusLabel}
-                  </span>
-                </div>
-                <div className={styles.loadingGroupMeta}>
-                  {group.progressText}
-                  {!group.hasLatest && (
-                    <FontAwesomeIcon icon={faSpinner} spin className={styles.loadingGroupSpinner} />
-                  )}
-                </div>
-                <div
-                  className={styles.loadingProgressBar}
-                  role="progressbar"
-                  aria-valuenow={group.hasLatest ? group.progressPct : 0}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
-                  <div
-                    className={buildSbtListLoadingProgressFillClassName({
-                      baseClassName: styles.loadingProgressFill,
-                      hasLatest: group.hasLatest,
-                      indeterminateClassName: styles.loadingProgressIndeterminate,
-                    })}
-                    style={resolveSbtListLoadingProgressFillStyle({
-                      hasLatest: group.hasLatest,
-                      progressPct: group.progressPct,
-                    })}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <SbtListInitialLoader
+        loadingLabel={`Loading ${t('sbts')}`}
+        loadingSessionStatuses={loadingSessionStatuses}
+      />
     );
   }
 
