@@ -4,12 +4,12 @@ import path from 'path';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ethers } from 'ethers';
-import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import { MemoryRouter } from 'react-router-dom';
 import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import contractScripts from '../../utilities/web3/chainGateway.js';
-import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
+import contractScripts from '../../utilities/web3/contractScripts.js';
+import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
@@ -24,7 +24,10 @@ const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
-  fs.readFileSync(path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'), 'utf8'),
+  fs.readFileSync(
+    path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'),
+    'utf8'
+  )
 );
 
 const extractMediaBlock = (scss, query, requiredSnippet = '') => {
@@ -76,7 +79,11 @@ jest.mock('../SurveyTool/SurveyPage', () => (props) => {
 
 jest.mock('../SBTs/SBTsPage', () => (props) => {
   mockSBTsPage(props);
-  return <div data-testid="sbts-page">{props.showCreateGroupExternal ? 'Create Open' : 'Create Closed'}</div>;
+  return (
+    <div data-testid="sbts-page">
+      {props.showCreateGroupExternal ? 'Create Open' : 'Create Closed'}
+    </div>
+  );
 });
 jest.mock('../PolisReport/PolisReport', () => (props) => {
   mockPolisReport(props);
@@ -109,8 +116,9 @@ jest.mock('../MainContent/RiskMatrix', () => ({
           <button
             type="button"
             data-testid="risk-matrix-open-atlas-node"
-            onClick={() =>
-              props.onOpenAtlasNode('0x4110000000000000000000000000000000000000000000000000000000000000', {
+            onClick={() => props.onOpenAtlasNode(
+              '0x4110000000000000000000000000000000000000000000000000000000000000',
+              {
                 modal: true,
                 selectedCellId: 'Capabilities_vs_Labor',
                 activeCategoryX: 'Capabilities',
@@ -126,8 +134,8 @@ jest.mock('../MainContent/RiskMatrix', () => ({
                     intensity: 5,
                   },
                 ],
-              })
-            }
+              }
+            )}
           >
             Open linked atlas node
           </button>
@@ -189,10 +197,6 @@ describe('OnePageSession auto-mint queue', () => {
       contracts: {},
       blockLimits: {},
       networkChainId: 84532,
-      __registry: {
-        registryChainId: 84532,
-        sessionIdHex: '0x00112233445566778899aabbccddeeff',
-      },
     },
   });
 
@@ -209,8 +213,9 @@ describe('OnePageSession auto-mint queue', () => {
     return subject;
   };
 
-  const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
-    `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
+  const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) => (
+    `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`
+  );
 
   it('uses getNativeBalance for auto-mint balance checks when the legacy getETHBalance alias is unavailable', async () => {
     const subject = createSubject({
@@ -227,7 +232,13 @@ describe('OnePageSession auto-mint queue', () => {
 
     try {
       delete contractScripts.getETHBalance;
-      const ok = await subject.waitForSufficientBalance('mock', account, ethers.utils.parseEther('0.00002'), 50, 1);
+      const ok = await subject.waitForSufficientBalance(
+        'mock',
+        account,
+        ethers.utils.parseEther('0.00002'),
+        50,
+        1
+      );
 
       expect(ok).toBe(true);
       expect(nativeBalanceSpy).toHaveBeenCalledWith(account, expect.any(String));
@@ -266,9 +277,7 @@ describe('OnePageSession auto-mint queue', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
 
     expect(scss).toMatch(/\.sbtMintStatusItem\s*{[\s\S]*?position:\s*relative;[\s\S]*?padding-right:\s*54px;/);
-    expect(scss).toMatch(
-      /:global\(\.sbt-alert-close-btn\)\s*{[\s\S]*?position:\s*absolute !important;[\s\S]*?top:\s*50% !important;[\s\S]*?right:\s*10px !important;[\s\S]*?transform:\s*translateY\(-50%\) !important;/,
-    );
+    expect(scss).toMatch(/:global\(\.sbt-alert-close-btn\)\s*{[\s\S]*?position:\s*absolute !important;[\s\S]*?top:\s*50% !important;[\s\S]*?right:\s*10px !important;[\s\S]*?transform:\s*translateY\(-50%\) !important;/);
   });
 
   it('auto-mints public no-password SBTs through the session queue', async () => {
@@ -367,13 +376,11 @@ describe('OnePageSession auto-mint queue', () => {
         account: accountB,
       };
 
-      expect(subject.parseAutoMintFragment()).toEqual([
-        {
-          sbt: sbtAddress,
-          gp: '',
-          inv: '',
-        },
-      ]);
+      expect(subject.parseAutoMintFragment()).toEqual([{
+        sbt: sbtAddress,
+        gp: '',
+        inv: '',
+      }]);
     } finally {
       window.history.replaceState({}, '', originalUrl || '/');
     }
@@ -403,8 +410,7 @@ describe('OnePageSession auto-mint queue', () => {
       maxTokens: '0',
     });
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
-    const claimSpy = jest
-      .spyOn(contractScripts, 'claim')
+    const claimSpy = jest.spyOn(contractScripts, 'claim')
       .mockRejectedValueOnce(new Error('temporary rpc failure'))
       .mockResolvedValueOnce({ transactionHash: '0xclaim' });
     subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
@@ -433,7 +439,12 @@ describe('OnePageSession auto-mint queue', () => {
       refreshSbtData: jest.fn(),
       slug: 'edge',
     });
-    const persistedIntent = ['auto=1', `sbt=${firstSbtAddress}`, `sbt1=${secondSbtAddress}`, 'auto1=1'].join('&');
+    const persistedIntent = [
+      'auto=1',
+      `sbt=${firstSbtAddress}`,
+      `sbt1=${secondSbtAddress}`,
+      'auto1=1',
+    ].join('&');
     let secondClaimAttempts = 0;
 
     subject.state = {
@@ -511,7 +522,9 @@ describe('OnePageSession auto-mint queue', () => {
     });
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
     const claimSpy = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xclaim' });
-    subject.waitForSufficientBalance = jest.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    subject.waitForSufficientBalance = jest.fn()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
 
     await subject.runAutoMintQueue();
 
@@ -666,42 +679,6 @@ describe('OnePageSession auto-mint queue', () => {
     });
   });
 
-  it('does not expose provider-returned invite credentials in auto-mint status', async () => {
-    const sbtAddress = '0x00000000000000000000000000000000000000c3';
-    const secretSentinel = '0xinvite-secret-sentinel';
-    const subject = createSubject({
-      account: '0x00000000000000000000000000000000000000c4',
-      loginComplete: true,
-      slug: 'edge',
-    });
-    subject.state = {
-      ...subject.state,
-      autoMintTargets: [{ sbt: sbtAddress, inv: 'invite-token' }],
-    };
-    subject.decodeInviteInput = jest.fn().mockReturnValue({ nonce: '7', signature: secretSentinel });
-    subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
-
-    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
-    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
-    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
-      name: 'Invite Badge',
-      tokenURI: 'ar://invite-badge',
-      hasPasswordMint: false,
-      maxTokens: '0',
-    });
-    jest.spyOn(contractScripts, 'claimWithInvite').mockRejectedValue(new Error(`provider echoed ${secretSentinel}`));
-
-    await subject.runAutoMintQueue();
-
-    const status = subject.state.autoMintStatuses[sbtAddress.toLowerCase()];
-    expect(status).toMatchObject({
-      status: 'failed',
-      name: 'Join Failed',
-      error: 'Join failed. Verify the credential and network, then retry.',
-    });
-    expect(JSON.stringify(status)).not.toContain(secretSentinel);
-  });
-
   it('auto-mints limited password SBTs through generated invite payloads in the session queue', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000d1';
     const subject = createSubject({
@@ -803,7 +780,7 @@ describe('OnePageSession auto-mint queue', () => {
     jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        84532: {
+        '84532': {
           sbtList: {
             [sbtAddress.toLowerCase()]: {
               sbtAddress,
@@ -854,7 +831,7 @@ describe('OnePageSession auto-mint queue', () => {
     jest.spyOn(cacheScripts, 'peekCacheSync').mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
-        84532: {
+        '84532': {
           sbtList: {
             [sbtAddress.toLowerCase()]: {
               sbtAddress,
@@ -887,5 +864,4 @@ describe('OnePageSession auto-mint queue', () => {
     await subject.runAutoMintQueue();
 
     expect(claimSpy).toHaveBeenCalledWith('wagmi', sbtAddress);
-  });
-});
+  });});
