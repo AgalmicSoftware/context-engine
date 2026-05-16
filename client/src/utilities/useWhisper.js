@@ -78,6 +78,71 @@ export const RECORDING_STATUS = {
   ERROR: 'error'
 };
 
+// Overlap-safe merge helper used by streaming and final transcripts.
+const mergeTranscript = (prev, next) => {
+  const a = String(prev || '');
+  const b = String(next || '');
+  if (!a.trim()) {
+    // squash trivial repeats in b only
+    return b.replace(/\b([A-Za-z]{1,16})\b(?:[.!?]?\s+\1\b){2,}/g, (m, w) => `${w.charAt(0).toUpperCase()}${w.slice(1)}.`).trim();
+  }
+  if (!b.trim()) return a;
+
+  const tokenize = (s) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+  const A = tokenize(a);
+  const B = tokenize(b);
+
+  let bestK = 0;
+  const maxK = Math.min(A.length, B.length);
+  for (let k = maxK; k >= 1; k--) {
+    let ok = true;
+    for (let i = 0; i < k; i++) {
+      if (A[A.length - k + i] !== B[i]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) {
+      bestK = k;
+      break;
+    }
+  }
+
+  // Avoid tiny overlaps (e.g., "the", "a")
+  if (bestK > 0) {
+    const overlappedChars = B.slice(0, bestK).join(' ').length;
+    if (overlappedChars < 8) bestK = 0;
+  }
+
+  let bTrimmed = b;
+  if (bestK > 0) {
+    // Drop the first `bestK` tokens from the original `b`, keeping punctuation around them.
+    const re = new RegExp(`^(([\\s\\W]*\\w+[\\s\\W]*){${bestK}})`);
+    bTrimmed = b.replace(re, '');
+  }
+
+  const merged = `${a}${a && bTrimmed && !/\s$/.test(a) ? ' ' : ''}${bTrimmed}`.trim();
+
+  // Squash trivial EXACT repeats like "yes yes yes", "okay okay okay" (avoid numbers/enumerations)
+  return merged.replace(/\b([A-Za-z]{1,16})\b(?:[.!?]?\s+\1\b){2,}/g, (m, w) => `${w.charAt(0).toUpperCase()}${w.slice(1)}.`).trim();
+};
+
+const resolveAudioExtension = (blob) => {
+  const type = String(blob?.type || '').toLowerCase();
+  if (type.includes('wav')) return 'wav';
+  if (type.includes('webm')) return 'webm';
+  if (type.includes('ogg')) return 'ogg';
+  if (type.includes('mpeg') || type.includes('mp3')) return 'mp3';
+  return 'wav';
+};
+
 export const useWhisper = ({
   // apiKey intentionally unused (worker holds the secret)
   apiKey = '',
@@ -170,62 +235,6 @@ export const useWhisper = ({
     whisperLog.log(`[useWhisper] ${msg}`, ...args);
   }, []);
 
-  // NEW: overlap-safe merge helper
-  const mergeTranscript = (prev, next) => {
-    const a = String(prev || '');
-    const b = String(next || '');
-    if (!a.trim()) {
-      // squash trivial repeats in b only
-      return b.replace(/\b([A-Za-z]{1,16})\b(?:[.!?]?\s+\1\b){2,}/g, (m, w) => `${w.charAt(0).toUpperCase()}${w.slice(1)}.`).trim();
-    }
-    if (!b.trim()) return a;
-
-    const tokenize = (s) =>
-      s
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, ' ')
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean);
-
-    const A = tokenize(a);
-    const B = tokenize(b);
-
-    let bestK = 0;
-    const maxK = Math.min(A.length, B.length);
-    for (let k = maxK; k >= 1; k--) {
-      let ok = true;
-      for (let i = 0; i < k; i++) {
-        if (A[A.length - k + i] !== B[i]) {
-          ok = false;
-          break;
-        }
-      }
-      if (ok) {
-        bestK = k;
-        break;
-      }
-    }
-
-    // Avoid tiny overlaps (e.g., "the", "a")
-    if (bestK > 0) {
-      const overlappedChars = B.slice(0, bestK).join(' ').length;
-      if (overlappedChars < 8) bestK = 0;
-    }
-
-    let bTrimmed = b;
-    if (bestK > 0) {
-      // Drop the first `bestK` tokens from the original `b`, keeping punctuation around them.
-      const re = new RegExp(`^(([\\s\\W]*\\w+[\\s\\W]*){${bestK}})`);
-      bTrimmed = b.replace(re, '');
-    }
-
-    const merged = `${a}${a && bTrimmed && !/\s$/.test(a) ? ' ' : ''}${bTrimmed}`.trim();
-
-    // Squash trivial EXACT repeats like "yes yes yes", "okay okay okay" (avoid numbers/enumerations)
-    return merged.replace(/\b([A-Za-z]{1,16})\b(?:[.!?]?\s+\1\b){2,}/g, (m, w) => `${w.charAt(0).toUpperCase()}${w.slice(1)}.`).trim();
-  };
-
   const cleanupResources = useCallback((fromUnmount = false) => {
     clearTimeout(silenceTimerRef.current);
     silenceTimerRef.current = null;
@@ -315,7 +324,7 @@ export const useWhisper = ({
     }
   };
 
-  const setupSilenceDetection = async (stream) => {
+  const setupSilenceDetection = useCallback(async (stream) => {
     if (speechMonitorRef.current) {
       try { speechMonitorRef.current.stop(); } catch (e) { whisperLog.warn('useWhisper: cleanup', e); }
     }
@@ -341,18 +350,9 @@ export const useWhisper = ({
         }, effectiveSilenceDurationMsRef.current);
       }
     });
-  };
+  }, []);
 
-  const resolveAudioExtension = (blob) => {
-    const type = String(blob?.type || '').toLowerCase();
-    if (type.includes('wav')) return 'wav';
-    if (type.includes('webm')) return 'webm';
-    if (type.includes('ogg')) return 'ogg';
-    if (type.includes('mpeg') || type.includes('mp3')) return 'mp3';
-    return 'wav';
-  };
-
-  const callWhisperViaWorker = async (audioBlob, isStreamingCall = false) => {
+  const callWhisperViaWorker = useCallback(async (audioBlob, isStreamingCall = false) => {
     if (!audioBlob || audioBlob.size < 100) {
       if (isStreamingCall) return null;
       throw new Error('Audio blob too small');
@@ -491,7 +491,15 @@ export const useWhisper = ({
         }
       }
     }
-  };
+  }, [
+    apiKey,
+    context,
+    effectiveSessionConfig,
+    effectiveSessionSlug,
+    model,
+    onError,
+    workerUrl,
+  ]);
 
   const handleStreamingTranscription = useCallback(async () => {
     // Use live refs for guards to avoid stale-closure churn
@@ -533,8 +541,7 @@ export const useWhisper = ({
       speechSinceLastSliceRef.current = false;
       if (!abortedRef.current) setIsStreaming(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // stable; uses live refs internally
+  }, [callWhisperViaWorker, onTranscriptionUpdate]);
 
   const startRecording = async () => {
     if (isRecording || isProcessing || isStreaming) return;
@@ -741,8 +748,14 @@ export const useWhisper = ({
       cleanupResources();
       setIsProcessing(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastRecordingTimestamp, cleanupResources, onRecordingStop, onTranscriptionComplete]);
+  }, [
+    callWhisperViaWorker,
+    cleanupResources,
+    lastRecordingTimestamp,
+    onError,
+    onRecordingStop,
+    onTranscriptionComplete,
+  ]);
 
   // Keep latest stopRecording in a ref for any deferred callbacks (e.g., silence timeout)
   useEffect(() => { stopRecordingRef.current = stopRecording; }, [stopRecording]);
@@ -792,7 +805,7 @@ export const useWhisper = ({
       setStatus(RECORDING_STATUS.ERROR);
       onError(error);
     }
-  }, [isPaused, isRecording, isProcessing, isStreaming, silenceDetection, onError]);
+  }, [isPaused, isRecording, isProcessing, isStreaming, setupSilenceDetection, silenceDetection, onError]);
 
   useEffect(() => () => cleanupResources(true), [cleanupResources]);
 
