@@ -102,8 +102,8 @@ test('runLitChipotleRuntimeSmokeTest bootstraps from only an account key and use
       return jsonResponse({ usage_api_key: 'usage-key' });
     }
     if (normalizedUrl.endsWith('/core/v1/lit_action')) {
-      assert.equal(body?.js_params?.rpcUrl, 'https://op-sepolia-testnet.api.pocket.network/');
       if (body?.js_params?.op === 'check') {
+        assert.equal(body?.js_params?.rpcUrl, 'https://op-sepolia-testnet.api.pocket.network/');
         return jsonResponse({
           has_error: false,
           response: {
@@ -115,6 +115,7 @@ test('runLitChipotleRuntimeSmokeTest bootstraps from only an account key and use
         });
       }
       if (body?.js_params?.op === 'encrypt') {
+        assert.equal(body?.js_params?.rpcUrl, undefined);
         return jsonResponse({
           has_error: false,
           response: {
@@ -126,6 +127,7 @@ test('runLitChipotleRuntimeSmokeTest bootstraps from only an account key and use
         });
       }
       if (body?.js_params?.op === 'decrypt') {
+        assert.equal(body?.js_params?.rpcUrl, 'https://op-sepolia-testnet.api.pocket.network/');
         return jsonResponse({
           has_error: false,
           response: {
