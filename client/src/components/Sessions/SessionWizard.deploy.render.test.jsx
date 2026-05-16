@@ -1,5 +1,5 @@
 /* eslint-disable import/first */
-// SessionWizard deploy render coverage owns worker deploy, post-deploy sync, and Lit provisioning.
+// SessionWizard deploy render coverage owns worker deploy, post-deploy sync, Lit provisioning, and login guards.
 import fs from 'fs';
 import React from 'react';
 import { ethers } from 'ethers';
@@ -28,8 +28,7 @@ const mockDecryptWithPassword = jest.fn();
 const mockPendingSbtAddress = ethers.utils.getAddress('0x5fbdb2315678afecb367f032d93f642f64180aa3');
 const mockSecondPendingSbtAddress = ethers.utils.getAddress('0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512');
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
-const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
-const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
+const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
@@ -260,13 +259,13 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
   buildSiweMessage: jest.fn(() => 'siwe-message'),
   buildSignedBootstrapAdminAuth: jest.fn(async ({ slug }) => ({
-    address: mockTestAdminAddress,
+    address: TEST_ADMIN_ADDRESS,
     message: 'bootstrap-siwe-message',
     signature: '0xbootstrap-admin-auth',
     sessionSlug: slug,
   })),
   buildSignedAdminActionAuth: jest.fn(async ({ action, slug, body }) => ({
-    address: mockTestAdminAddress,
+    address: TEST_ADMIN_ADDRESS,
     signature: '0xadmin-action-signature',
     action,
     slug,
@@ -860,7 +859,7 @@ describe('SessionWizard deploy render validation', () => {
     }
   });
 
-  it('auto-bootstraps Lit runtime from the Lit API key and ignores stale hidden runtime fields', async () => {
+  it('auto-bootstraps Lit runtime from the Lit account API key and ignores stale hidden runtime fields', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
@@ -1129,6 +1128,107 @@ describe('SessionWizard deploy render validation', () => {
     }
   });
 
+  it('includes a cached Cloudflare account id in the deploy-helper payload', async () => {
+    const originalFetch = global.fetch;
+    const workerAuth = require('../../utilities/worker/workerAuth.js');
+    const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
+    const web3ProviderSpy = jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(() => ({
+      getSigner: () => ({
+        getAddress: jest.fn().mockResolvedValue(TEST_ADMIN_ADDRESS),
+        signMessage: jest.fn().mockResolvedValue('0xsigned-admin-request'),
+      }),
+    }));
+    const verifyMessageSpy = jest
+      .spyOn(ethers.utils, 'verifyMessage')
+      .mockReturnValue(TEST_ADMIN_ADDRESS);
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      deployForm: {
+        accountId: 'cf-account-1',
+      },
+    }));
+    workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => {
+      const trimmed = String(value || '').trim();
+      return trimmed || 'https://deploy-helper.example.test';
+    });
+    global.fetch = jest.fn(async (url) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/auth/nonce')) {
+        return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      renderSessionWizard({
+        account: TEST_ADMIN_ADDRESS,
+        toggleLoginModal: jest.fn(),
+      });
+      enableAdvancedMode();
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Deploy Account Id Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'deploy-account-id-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
+      fireEvent.change(deployHelperInput, {
+        target: { value: 'https://deploy-helper.example.test' },
+      });
+      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
+      act(() => {
+        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+        target: { value: 'sk-latest' },
+      });
+      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+        target: { value: '{"kty":"RSA","n":"abc"}' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      let deployCall;
+      await waitFor(() => {
+        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+        expect(deployCall).toBeTruthy();
+      });
+
+      const deployPayload = JSON.parse(deployCall[1].body);
+      expect(deployPayload.accountId).toBe('cf-account-1');
+      expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
+    } finally {
+      global.fetch = originalFetch;
+      workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
+      web3ProviderSpy.mockRestore();
+      verifyMessageSpy.mockRestore();
+    }
+  });
+
   it('backfills the deploy admin address from the connected wallet provider when account props lag behind', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
@@ -1227,6 +1327,102 @@ describe('SessionWizard deploy render validation', () => {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
       cryptoUtils._getProvider.mockImplementation(originalGetProvider);
+    }
+  });
+
+  it('prompts for login instead of attempting publish when publish is available but no wallet is connected', async () => {
+    const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
+    const originalGetProvider = cryptoUtils._getProvider.getMockImplementation();
+    const providerRequest = jest.fn(async ({ method }) => {
+      if (method === 'eth_accounts') return [];
+      if (method === 'eth_chainId') return '0x14a34';
+      if (method === 'net_version') return '84532';
+      if (method === 'eth_requestAccounts') {
+        throw new Error('publish should open the login modal instead of requesting wallet accounts');
+      }
+      return [];
+    });
+    cryptoUtils._getProvider.mockImplementation(() => ({
+      request: providerRequest,
+    }));
+    const toggleLoginModal = jest.fn();
+    try {
+      renderSessionWizard({
+        account: '',
+        loginComplete: false,
+        toggleLoginModal,
+      });
+      enableAdvancedMode();
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Login Required Publish Session' },
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: /^Publish$/i }));
+      fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+      fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+        target: { value: 'ar://'.concat('a'.repeat(43)) },
+      });
+
+      const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(toggleLoginModal).toHaveBeenCalledWith(true);
+        expect(screen.getByText('Connect your wallet to publish this session.')).toBeInTheDocument();
+      });
+      expect(providerRequest.mock.calls.map(([payload]) => payload?.method)).not.toContain('eth_requestAccounts');
+    } finally {
+      cryptoUtils._getProvider.mockImplementation(originalGetProvider);
+    }
+  });
+
+  it('prompts for login before direct worker deploy starts when no wallet session is active', async () => {
+    const toggleLoginModal = jest.fn();
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn(async () => ({ ok: true, json: async () => ({ ok: true }) }));
+
+    try {
+      renderSessionWizard({
+        account: '',
+        loginComplete: false,
+        toggleLoginModal,
+      });
+      enableAdvancedMode();
+      fireEvent.change(screen.getAllByRole('combobox')[0], {
+        target: { value: '84532' },
+      });
+
+      const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
+        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
+      }
+
+      fireEvent.change(sessionNameInput, {
+        target: { value: 'Login Before Deploy Session' },
+      });
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'login-before-deploy-session' },
+      });
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+
+      await waitFor(() => {
+        expect(toggleLoginModal).toHaveBeenCalledWith(true);
+        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+          'Connect your wallet to set the admin address.'
+        );
+      });
+      expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'))).toBeUndefined();
+    } finally {
+      global.fetch = originalFetch;
     }
   });
 
