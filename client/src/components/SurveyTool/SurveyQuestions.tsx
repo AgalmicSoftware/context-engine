@@ -46,6 +46,7 @@ import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
 import SurveyQuestionsFullQuestionResponseInput from './SurveyQuestionsFullQuestionResponseInput';
+import SurveyQuestionsFullQuestionCardShell from './SurveyQuestionsFullQuestionCardShell';
 import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import {
@@ -3619,25 +3620,15 @@ export class SurveyQuestions extends Component {
     sliderSection,
     commentsSection,
   }) => (
-    <Card key={cardKey} className={styles.fullQuestionCard}>
-      <CardBody id={styles.questionTitleBody} className={styles.fullQuestionBody}>
-        <FullQuestionHeader>
-          {this.renderPromptWithManualDecrypt(question)}
-          {cardIcons}
-        </FullQuestionHeader>
-
-        <div className={styles.fullQuestionMain}>
-          {mainContent}
-        </div>
-
-        <div className={styles.fullQuestionFooter}>
-          {sliderSection}
-          {footerIcons}
-        </div>
-
-        {commentsSection}
-      </CardBody>
-    </Card>
+    <SurveyQuestionsFullQuestionCardShell
+      cardKey={cardKey}
+      promptContent={this.renderPromptWithManualDecrypt(question)}
+      cardIcons={cardIcons}
+      mainContent={mainContent}
+      footerIcons={footerIcons}
+      sliderSection={sliderSection}
+      commentsSection={commentsSection}
+    />
   );
 
 /**
