@@ -54,6 +54,10 @@ type UnknownRecord = Record<string, unknown>;
 type CompareGlobalThis = typeof globalThis & {
   CE_E2E_AI_MOCK?: boolean;
 };
+type CompareRunComparison = (
+  addresses: string[],
+  options?: { skipNavigate?: boolean }
+) => Promise<void>;
 
 interface CompareBookmark {
   address?: string;
@@ -748,6 +752,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   // per-item drill-down state map: { 'agree-0': {open, loading, error, text, tree?}, ... }
   const [drillState, setDrillState] = useState<CompareDrillStateMap>({});
+  const runComparisonRef = useRef<CompareRunComparison | null>(null);
 
   useEffect(() => {
     // Extract addresses from the URL or use firstAddress
