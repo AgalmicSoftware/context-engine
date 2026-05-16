@@ -49,6 +49,8 @@ import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import QuestionCardLinks from './QuestionCardLinks';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
+import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
+import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import {
   applyDecryptedQuestionResponseValues as applyDecryptedQuestionResponseValuesHelper,
   applyDecryptedQuestionResponseValuesToContainer as applyDecryptedQuestionResponseValuesToContainerHelper,
@@ -535,15 +537,11 @@ import {
   buildSurveyAccountViewResetState,
   buildSurveyChangedResetState,
   buildSurveyQuestionsJsonTreeItemStyle,
-  buildSurveyQuestionsLockAudienceGateClassName,
-  buildSurveyQuestionsLockAudiencePopoverClassName,
-  buildSurveyQuestionsLockAudienceToggleClassName,
   buildSurveyQuestionsFullLoadingProgressFillStyle,
   buildSurveyQuestionsSubmitAuxIconClassName,
   buildSurveyQuestionPoolLoadState,
   buildSurveyUserEditResponseStatePatch,
   buildViewingResponseModeState,
-  resolveSurveyQuestionsIconGlowClassName,
   SURVEY_QUESTIONS_SUBMISSION_ERROR_STYLE,
   SURVEY_QUESTIONS_SUBMIT_ICON_STYLE,
   toggleShowJsonState,
@@ -8147,167 +8145,6 @@ export class SurveyQuestions extends Component {
     };
   };
 
-  renderLockAudienceGateOption = ({
-    qid,
-    effectiveFieldKey,
-    option,
-    gateActive,
-    currentGateId,
-    expandedGateId,
-    onSelectAudience,
-  }) => {
-    const showGateDetails = expandedGateId === option.gateId;
-    const sbtItems = Array.isArray(option.sbtItems) ? option.sbtItems : [];
-
-    return (
-      <React.Fragment key={`${qid}:${effectiveFieldKey}:${option.gateId}`}>
-        <div className={styles.lockAudienceGateRow}>
-          <button
-            type="button"
-            className={`${styles.convictionToggleLine} ${styles.lockAudienceGateButton} ${gateActive && currentGateId === option.gateId ? styles.convictionToggleButtonActive : ''}`}
-            onClick={() => onSelectAudience('gate', option.gateId)}
-            data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE}
-            data-ce-gate-id={option.gateId}
-          >
-            <span className={styles.convictionToggleLabel}>{option.label}</span>
-          </button>
-          {sbtItems.length > 0 && (
-            <button
-              type="button"
-              className={styles.lockAudienceCaretButton}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                this.toggleLockAudienceGateDetails(
-                  qid,
-                  showGateDetails ? '' : option.gateId,
-                  effectiveFieldKey,
-                );
-              }}
-              aria-expanded={showGateDetails}
-              aria-label={showGateDetails ? `Hide ${option.label} ${t('sbts')}` : `Show ${option.label} ${t('sbts')}`}
-            >
-              <FontAwesomeIcon icon={showGateDetails ? faCaretUp : faCaretDown} />
-            </button>
-          )}
-        </div>
-        {showGateDetails && (
-          <div className={styles.lockAudienceGateDetails}>
-            {sbtItems.map((item) => (
-              <a
-                key={`${option.gateId}:${item.address}`}
-                href={item.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.lockAudienceGateDetailItem}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <span className={styles.lockAudienceGateDetailName}>{item.label}</span>
-                <span className={styles.lockAudienceGateDetailSbts}>{item.meta}</span>
-              </a>
-            ))}
-          </div>
-        )}
-      </React.Fragment>
-    );
-  };
-
-  renderLockAudiencePopover = ({
-    qid,
-    effectiveFieldKey,
-    isPileVisualContext,
-    gateOptions,
-    gateActive,
-    currentGateId,
-    selfActive,
-    plaintextActive,
-    followActive,
-    allowPlaintextOption,
-    normalizedSelfAudienceLabel,
-    expandedGateId,
-    showFollowOption = false,
-    onSelectAudience,
-  }) => (
-    <div className={`${styles.lockAudiencePopover} ${isPileVisualContext ? styles.pileLockAudiencePopover : ''}`}>
-      {allowPlaintextOption && (
-        <button
-          type="button"
-          className={`${styles.convictionToggleLine} ${plaintextActive ? styles.convictionToggleButtonActive : ''}`}
-          onClick={() => onSelectAudience('none')}
-          data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE}
-        >
-          <span className={styles.convictionToggleLabel}>Not encrypted</span>
-        </button>
-      )}
-      <button
-        type="button"
-        className={`${styles.convictionToggleLine} ${selfActive ? styles.convictionToggleButtonActive : ''}`}
-        onClick={() => onSelectAudience('self')}
-        data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF}
-      >
-        <span className={styles.convictionToggleLabel}>{normalizedSelfAudienceLabel}</span>
-      </button>
-      {gateOptions.map((option) => this.renderLockAudienceGateOption({
-        qid,
-        effectiveFieldKey,
-        option,
-        gateActive,
-        currentGateId,
-        expandedGateId,
-        onSelectAudience,
-      }))}
-      {showFollowOption && (
-        <button
-          type="button"
-          className={`${styles.convictionToggleLine} ${followActive ? styles.convictionToggleButtonActive : ''}`}
-          onClick={() => onSelectAudience('follow')}
-          data-testid={E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW}
-        >
-          <span className={styles.convictionToggleLabel}>Match Answer</span>
-        </button>
-      )}
-    </div>
-  );
-
-  renderLockAudienceButton = ({
-    effectiveFieldKey,
-    isPileVisualContext,
-    pileMenuPressed,
-    showBrightLockState,
-    isLockDisabled,
-    buttonTitle,
-    hasAudienceMenu,
-    menuOpen,
-    lockButtonStyle,
-    fieldState,
-    forcedGate,
-    onClick,
-  }) => (
-    <button
-      type="button"
-      className={[
-        styles.iconButton,
-        styles.lockButton,
-        showBrightLockState ? styles.iconButtonActive : '',
-        isPileVisualContext ? styles.pileLockButton : '',
-        pileMenuPressed ? styles.pileLockButtonMenuOpen : '',
-      ].filter(Boolean).join(' ')}
-      onClick={onClick}
-      disabled={isLockDisabled}
-      title={buttonTitle}
-      aria-label={buttonTitle}
-      aria-expanded={hasAudienceMenu ? menuOpen : undefined}
-      aria-haspopup={hasAudienceMenu ? 'dialog' : undefined}
-      style={lockButtonStyle}
-      data-testid={effectiveFieldKey === 'additional' ? E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK : E2E_TESTIDS.SURVEY_ANSWER_LOCK}
-    >
-      <FontAwesomeIcon
-        icon={(fieldState?.encrypted || forcedGate) ? faLock : faUnlock}
-        className={showBrightLockState ? styles.iconGlow : undefined}
-      />
-    </button>
-  );
-
   applyLockAudienceSelection = ({
     surveyIndex,
     qid,
@@ -8468,39 +8305,35 @@ export class SurveyQuestions extends Component {
     };
 
     return (
-      <div className={styles.lockAudienceContainer}>
-        {this.renderLockAudienceButton({
-          effectiveFieldKey,
-          isPileVisualContext,
-          pileMenuPressed,
-          showBrightLockState,
-          isLockDisabled,
-          buttonTitle,
-          hasAudienceMenu,
-          menuOpen,
-          lockButtonStyle,
-          fieldState,
-          forcedGate,
-          onClick: handleLockClick,
-        })}
-
-        {hasAudienceMenu && menuOpen && !lockDisabled && this.renderLockAudiencePopover({
-          qid,
-          effectiveFieldKey,
-          isPileVisualContext,
-          gateOptions,
-          gateActive,
-          currentGateId,
-          selfActive,
-          plaintextActive,
-          followActive,
-          allowPlaintextOption,
-          normalizedSelfAudienceLabel,
-          expandedGateId,
-          showFollowOption,
-          onSelectAudience: handleAudienceSelect,
-        })}
-      </div>
+      <SurveyQuestionsLockAudienceControl
+        qid={qid}
+        effectiveFieldKey={effectiveFieldKey}
+        isPileVisualContext={isPileVisualContext}
+        pileMenuPressed={pileMenuPressed}
+        showBrightLockState={showBrightLockState}
+        isLockDisabled={isLockDisabled}
+        buttonTitle={buttonTitle}
+        hasAudienceMenu={hasAudienceMenu}
+        menuOpen={menuOpen}
+        lockButtonStyle={lockButtonStyle}
+        fieldState={fieldState}
+        forcedGate={forcedGate}
+        gateOptions={gateOptions}
+        gateActive={gateActive}
+        currentGateId={currentGateId}
+        selfActive={selfActive}
+        plaintextActive={plaintextActive}
+        followActive={followActive}
+        allowPlaintextOption={allowPlaintextOption}
+        normalizedSelfAudienceLabel={normalizedSelfAudienceLabel}
+        expandedGateId={expandedGateId}
+        showFollowOption={showFollowOption}
+        onLockClick={handleLockClick}
+        onSelectAudience={handleAudienceSelect}
+        onToggleGateDetails={(nextQid, gateId, nextFieldKey) => (
+          this.toggleLockAudienceGateDetails(nextQid, gateId, nextFieldKey)
+        )}
+      />
     );
   };
 
@@ -9462,60 +9295,6 @@ export class SurveyQuestions extends Component {
     buildLockedGateRequirementSentenceCore(lockedGateDetails, { translate: t })
   );
 
-  renderLockedQuestionsDecryptButton = (questionIds = []) => (
-    <button
-      type="button"
-      className={styles.lockedQuestionsDecryptButton}
-      onClick={() => this.reloadMaskedQuestionBatch(questionIds)}
-      disabled={!!this.state.bulkPromptReloading}
-      data-testid={E2E_TESTIDS.SURVEY_LOCKED_DECRYPT}
-    >
-      {this.state.bulkPromptReloading ? (
-        <span className={styles.lockedQuestionsDecryptLoading}>
-          <FontAwesomeIcon icon={faSpinner} spin />
-          <span>Decrypting...</span>
-        </span>
-      ) : (
-        'Decrypt'
-      )}
-    </button>
-  );
-
-  renderLockedQuestionGateCards = (lockedGateDetails = []) => {
-    if (lockedGateDetails.length > 0) {
-      return (
-        <div className={styles.lockedQuestionsDetails}>
-          {lockedGateDetails.map((gate) => (
-            <div key={gate.id} className={styles.lockedGateDetailCard}>
-              <div className={styles.lockedGateDetailHeader}>
-                <span className={styles.lockedGateDetailName}>{gate.label || t('gate')}</span>
-                <span className={styles.lockedGateDetailCount}>
-                  {gate.questionCount} question{gate.questionCount === 1 ? '' : 's'}
-                </span>
-              </div>
-              <div className={styles.lockedGateSbtList}>
-                {gate.sbts.map((sbt) => (
-                  <a
-                    key={`${gate.id}:${sbt.address}`}
-                    href={sbt.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.lockedSbtCard}
-                  >
-                    <span className={styles.lockedSbtName}>{sbt.label}</span>
-                    <span className={styles.lockedSbtMeta}>required to view</span>
-                    <FontAwesomeIcon icon={faExternalLinkAlt} className={styles.lockedSbtLinkIcon} />
-                  </a>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
-
   renderLockedQuestionsPanel = ({
     hiddenMaskedQuestionIds = [],
     lockedGateDetails = [],
@@ -9524,56 +9303,21 @@ export class SurveyQuestions extends Component {
     forceExpanded = false,
     surface = 'light',
     showCaret = true,
-  } = {}) => {
-    const hiddenCount = Array.isArray(hiddenMaskedQuestionIds) ? hiddenMaskedQuestionIds.length : 0;
-    if (hiddenCount <= 0) return null;
-
-    const resolvedTitle = title || `${hiddenCount} Locked Question${hiddenCount === 1 ? '' : 's'}`;
-    const canToggleLockedDetails = lockedGateDetails.length > 0 && showCaret;
-    const showLockedGateDetails = forceExpanded || (!!this.state.lockedGateDetailsExpanded && canToggleLockedDetails);
-    const bannerClassName = [
-      styles.lockedQuestionsBanner,
-      surface === 'dark' ? styles.lockedQuestionsBannerOnDark : '',
-    ].filter(Boolean).join(' ') || undefined;
-
-    return (
-      <div className={bannerClassName} role="status" data-testid={E2E_TESTIDS.SURVEY_LOCKED_BANNER}>
-        <div className={styles.lockedQuestionsBackdrop}>
-          <FontAwesomeIcon icon={faLock} />
-        </div>
-        <div className={styles.lockedQuestionsHeader}>
-          <div className={styles.lockedQuestionsCopy}>
-            <div className={styles.lockedQuestionsTitle}>
-              {resolvedTitle}
-            </div>
-            {subtitle ? (
-              <div className={styles.lockedQuestionsSubtext}>
-                {subtitle}
-              </div>
-            ) : null}
-          </div>
-          <div className={styles.lockedQuestionsAction}>
-            {this.renderLockedQuestionsDecryptButton(hiddenMaskedQuestionIds)}
-          </div>
-        </div>
-        {showLockedGateDetails
-          ? this.renderLockedQuestionGateCards(lockedGateDetails)
-          : null}
-        {canToggleLockedDetails ? (
-          <button
-            type="button"
-            className={styles.lockedQuestionsCaretButton}
-            onClick={() => this.setState((prev) => ({ lockedGateDetailsExpanded: !prev.lockedGateDetailsExpanded }))}
-            aria-expanded={showLockedGateDetails}
-            aria-label={showLockedGateDetails ? `Hide ${t('gateLower')} details` : `Show ${t('gateLower')} details`}
-            data-testid={E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET}
-          >
-            <FontAwesomeIcon icon={showLockedGateDetails ? faCaretUp : faCaretDown} />
-          </button>
-        ) : null}
-      </div>
-    );
-  };
+  } = {}) => (
+    <SurveyQuestionsLockedQuestionsPanel
+      hiddenMaskedQuestionIds={hiddenMaskedQuestionIds}
+      lockedGateDetails={lockedGateDetails}
+      title={title}
+      subtitle={subtitle}
+      forceExpanded={forceExpanded}
+      surface={surface}
+      showCaret={showCaret}
+      bulkPromptReloading={!!this.state.bulkPromptReloading}
+      lockedGateDetailsExpanded={!!this.state.lockedGateDetailsExpanded}
+      onDecrypt={(questionIds) => this.reloadMaskedQuestionBatch(questionIds)}
+      onToggleDetails={() => this.setState((prev) => ({ lockedGateDetailsExpanded: !prev.lockedGateDetailsExpanded }))}
+    />
+  );
 
   resolveGateDisplayLabel = (gate = {}, fallbackSbt = '') => {
     const readText = (value) => this.normalizeGateLabelText(value);
