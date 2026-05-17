@@ -385,6 +385,106 @@ describe('sessionWizardPublishFlow', () => {
     );
   });
 
+  it('requires grant-backed sponsored bundles to include deploy and bootstrap resources', () => {
+    const sponsoredBundle = {
+      deployGrantToken: 'deploy-grant-token',
+      bootstrapWorkerUrl: 'https://source-worker.example.test',
+      openaiKey: 'sponsored-openai',
+      arweaveJwk: '{"kty":"RSA"}',
+    };
+    const readyDeployForm = {
+      apiToken: '',
+      workerName: 'launch-week-worker-201225',
+      bundleUrl: 'https://github.com/example/repo/releases/latest/download/sessionCorsWorker.bundle.js',
+    };
+
+    expect(resolveSponsoredBundleDeployReadiness({
+      sponsoredBundle,
+      deployForm: readyDeployForm,
+      workerSecretsEnabled: true,
+      missingWorkerSecrets: [],
+    })).toEqual(expect.objectContaining({
+      active: true,
+      ready: true,
+      missing: [],
+    }));
+
+    expect(resolveSponsoredBundleDeployReadiness({
+      sponsoredBundle: {
+        ...sponsoredBundle,
+        bootstrapWorkerUrl: '',
+      },
+      deployForm: readyDeployForm,
+      workerSecretsEnabled: true,
+      missingWorkerSecrets: [],
+    })).toEqual(expect.objectContaining({
+      active: true,
+      ready: false,
+      missing: ['Bootstrap worker URL'],
+    }));
+
+    expect(resolveSponsoredBundleDeployReadiness({
+      sponsoredBundle: {
+        ...sponsoredBundle,
+        deployGrantToken: '',
+      },
+      deployForm: readyDeployForm,
+      workerSecretsEnabled: true,
+      missingWorkerSecrets: [],
+    })).toEqual(expect.objectContaining({
+      active: true,
+      ready: false,
+      missing: ['Deploy grant token'],
+    }));
+  });
+
+  it('keeps sponsored auto-deploy readiness override-aware when the hosted bundle URL is blank', () => {
+    const baseArgs = {
+      wizardMode: 'normal',
+      sponsoredBundle: {
+        deployGrantToken: 'deploy-grant-token',
+        bootstrapWorkerUrl: 'https://source-worker.example.test',
+        openaiKey: 'sponsored-openai',
+        arweaveJwk: '{"kty":"RSA"}',
+      },
+      deployForm: {
+        workerName: 'launch-week-worker',
+        bundleUrl: '',
+      },
+      workerSecretsEnabled: true,
+      currentWorkerSecrets: {
+        openaiKey: 'sponsored-openai',
+        arweaveJwk: '{"kty":"RSA"}',
+      },
+      getMissingWorkerSecretsForDeploy: () => [],
+      normalModeDefaultBundleUrl: '',
+    };
+
+    expect(resolveSessionWizardSponsoredAutoDeployReadiness({
+      ...baseArgs,
+      normalModeBundleUrlOverride: 'https://assets.example.test/sessionCorsWorker.bundle.js',
+    })).toEqual(expect.objectContaining({
+      active: true,
+      ready: true,
+      missing: [],
+    }));
+
+    expect(resolveSessionWizardSponsoredAutoDeployReadiness(baseArgs)).toEqual(expect.objectContaining({
+      active: true,
+      ready: false,
+      missing: ['Worker bundle URL'],
+    }));
+
+    expect(resolveSessionWizardSponsoredAutoDeployReadiness({
+      ...baseArgs,
+      hasBundleFile: true,
+    })).toEqual(expect.objectContaining({
+      active: true,
+      ready: true,
+      missing: [],
+    }));
+  });
+
   it('resolves deploy bundle mode from normal-mode overrides and manual fallback choices', () => {
     expect(
       resolveSessionWizardDeployBundleMode({
@@ -407,118 +507,26 @@ describe('sessionWizardPublishFlow', () => {
       }),
     ).toBe('upload');
 
-    expect(
-      resolveSessionWizardDeployBundleMode({
-        wizardMode: 'advanced',
-        bundleMode: 'upload',
-        sponsoredAutoDeployReady: true,
-      }),
-    ).toBe('upload');
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'advanced',
+      bundleMode: 'upload',
+      sponsoredAutoDeployReady: true,
+    })).toBe('upload');
 
-    expect(
-      resolveSessionWizardDeployBundleMode({
-        wizardMode: 'normal',
-        bundleMode: 'upload',
-        sponsoredAutoDeployReady: true,
-      }),
-    ).toBe('url');
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'upload',
+      sponsoredAutoDeployReady: true,
+    })).toBe('url');
 
-    expect(
-      resolveSessionWizardDeployBundleMode({
-        wizardMode: 'normal',
-        bundleMode: 'url',
-        sponsoredAutoDeployReady: true,
-        forceSponsoredAutoDeploy: true,
-        forceManualBundleFile: true,
-        hasBundleFile: false,
-      }),
-    ).toBe('url');
-  });
-
-  it('plans sponsored auto-deploy publish surface without deploy or upload ports', () => {
-    expect(
-      resolveSessionWizardSponsoredPublishSurfaceState({
-        isNormalMode: true,
-        wizardMode: 'normal',
-        workerMode: 'custom',
-        sponsoredAutoDeployState: {
-          active: true,
-          ready: true,
-          missing: [],
-        },
-        forceManualBundleFile: false,
-        hasBundleFile: false,
-        normalModeDefaultBundleUrl: 'https://assets.example.test/sessionCorsWorker.bundle.js',
-        manualBundleRetryMessage: 'Retry with a local bundle.',
-        missingHostedBundleMessage: 'Bundle URL missing.',
-      }),
-    ).toEqual({
-      canUseSponsoredAutoDeployNow: true,
-      hasNormalModeBundleUrlOverride: false,
-      normalModeBundleHelpText: expect.stringContaining('GitHub-hosted worker bundle'),
-      normalModeHostedBundleConfigured: true,
-      normalModeManualBundleHelpText: 'Retry with a local bundle.',
-      shouldUseSponsoredAutoDeployFlow: true,
-      showNormalModeManualBundleControls: false,
-      showNormalModeWorkerStep: false,
-      showSponsoredBundleFallbackInput: false,
-      sponsoredAutoDeployBundleMode: 'url',
-      sponsoredAutoDeployMissingBundleUrl: false,
-      sponsoredLocalBundledAssetAvailable: true,
-    });
-  });
-
-  it('plans hosted-bundle fallback visibility for sponsored normal-mode deploys', () => {
-    expect(
-      resolveSessionWizardSponsoredPublishSurfaceState({
-        isNormalMode: true,
-        wizardMode: 'normal',
-        workerMode: 'custom',
-        deployForm: { bundleUrl: 'https://stale-advanced.example.test/sessionCorsWorker.bundle.js' },
-        sponsoredAutoDeployState: {
-          active: true,
-          ready: false,
-          missing: ['Worker bundle URL'],
-        },
-        forceManualBundleFile: false,
-        hasBundleFile: false,
-        normalModeDefaultBundleUrl: '',
-        manualBundleRetryMessage: 'Retry with a local bundle.',
-        missingHostedBundleMessage: 'Bundle URL missing.',
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        canUseSponsoredAutoDeployNow: false,
-        normalModeBundleHelpText: 'Bundle URL missing.',
-        normalModeHostedBundleConfigured: false,
-        normalModeManualBundleHelpText: 'Bundle URL missing.',
-        shouldUseSponsoredAutoDeployFlow: false,
-        showNormalModeManualBundleControls: true,
-        showNormalModeWorkerStep: false,
-        showSponsoredBundleFallbackInput: true,
-        sponsoredAutoDeployBundleMode: 'upload',
-        sponsoredAutoDeployMissingBundleUrl: true,
-        sponsoredLocalBundledAssetAvailable: false,
-      }),
-    );
-
-    expect(
-      resolveSessionWizardSponsoredPublishSurfaceState({
-        isNormalMode: false,
-        workerMode: 'custom',
-        sponsoredAutoDeployState: {
-          active: true,
-          ready: false,
-          missing: ['Worker bundle URL'],
-        },
-        normalModeDefaultBundleUrl: '',
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        showNormalModeManualBundleControls: false,
-        showSponsoredBundleFallbackInput: false,
-      }),
-    );
+    expect(resolveSessionWizardDeployBundleMode({
+      wizardMode: 'normal',
+      bundleMode: 'url',
+      sponsoredAutoDeployReady: true,
+      forceSponsoredAutoDeploy: true,
+      forceManualBundleFile: true,
+      hasBundleFile: false,
+    })).toBe('url');
   });
 
   it('resolves deploy bundle payloads for URL and validated upload modes', async () => {
@@ -572,16 +580,12 @@ describe('sessionWizardPublishFlow', () => {
       bundleSource: 'upload',
     });
 
-    await expect(
-      resolveSessionWizardDeployBundlePayload({
-        effectiveBundleMode: 'url',
-        bundleUrl: '',
-      }),
-    ).resolves.toEqual({
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'url',
+      bundleUrl: '',
+    })).resolves.toEqual({
       bundleText: '',
       bundleUrl: undefined,
-      bundleManifestUrl: undefined,
-      bundleSha256: undefined,
       bundleSource: 'url-missing',
     });
   });
@@ -590,47 +594,37 @@ describe('sessionWizardPublishFlow', () => {
     const staleAdvancedBundleUrl = 'https://assets.example.test/stale-advanced-sessionCorsWorker.bundle.js';
     const normalModeOverrideUrl = 'https://assets.example.test/manual-normal-sessionCorsWorker.bundle.js';
 
-    expect(
-      resolveSessionWizardBundleUrlForMode({
-        wizardMode: 'advanced',
-        bundleUrl: staleAdvancedBundleUrl,
-        normalModeDefaultBundleUrl: '',
-      }),
-    ).toBe(staleAdvancedBundleUrl);
+    expect(resolveSessionWizardBundleUrlForMode({
+      wizardMode: 'advanced',
+      bundleUrl: staleAdvancedBundleUrl,
+      normalModeDefaultBundleUrl: '',
+    })).toBe(staleAdvancedBundleUrl);
 
-    expect(
-      resolveSessionWizardBundleUrlForMode({
+    expect(resolveSessionWizardBundleUrlForMode({
+      wizardMode: 'normal',
+      bundleUrl: staleAdvancedBundleUrl,
+      normalModeDefaultBundleUrl: '',
+    })).toBe('');
+
+    await expect(resolveSessionWizardDeployBundlePayload({
+      effectiveBundleMode: 'url',
+      bundleUrl: resolveSessionWizardBundleUrlForMode({
         wizardMode: 'normal',
         bundleUrl: staleAdvancedBundleUrl,
         normalModeDefaultBundleUrl: '',
       }),
-    ).toBe('');
-
-    await expect(
-      resolveSessionWizardDeployBundlePayload({
-        effectiveBundleMode: 'url',
-        bundleUrl: resolveSessionWizardBundleUrlForMode({
-          wizardMode: 'normal',
-          bundleUrl: staleAdvancedBundleUrl,
-          normalModeDefaultBundleUrl: '',
-        }),
-      }),
-    ).resolves.toEqual({
+    })).resolves.toEqual({
       bundleText: '',
       bundleUrl: undefined,
-      bundleManifestUrl: undefined,
-      bundleSha256: undefined,
       bundleSource: 'url-missing',
     });
 
-    expect(
-      resolveSessionWizardBundleUrlForMode({
-        wizardMode: 'normal',
-        bundleUrl: staleAdvancedBundleUrl,
-        normalModeBundleUrlOverride: normalModeOverrideUrl,
-        normalModeDefaultBundleUrl: '',
-      }),
-    ).toBe(normalModeOverrideUrl);
+    expect(resolveSessionWizardBundleUrlForMode({
+      wizardMode: 'normal',
+      bundleUrl: staleAdvancedBundleUrl,
+      normalModeBundleUrlOverride: normalModeOverrideUrl,
+      normalModeDefaultBundleUrl: '',
+    })).toBe(normalModeOverrideUrl);
   });
 
   it('rejects empty, html, wrapped, and invalid bundle uploads with the fallback guidance', async () => {
@@ -698,56 +692,41 @@ describe('sessionWizardPublishFlow', () => {
       }),
     ).toBe(true);
 
-    expect(
-      shouldForceSessionWizardNormalModeManualBundleRetry({
-        err: {
-          message: 'Worker deploy failed.',
-          responseError: 'Failed to fetch bundle (404).',
-        },
-        wizardMode: 'advanced',
-        effectiveBundleMode: 'url',
-        hasBundleFile: false,
-      }),
-    ).toBe(false);
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: 'Failed to fetch bundle (404).',
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(true);
 
-    expect(
-      shouldForceSessionWizardNormalModeManualBundleRetry({
-        err: 'Failed to fetch bundle (404).',
-        wizardMode: 'normal',
-        effectiveBundleMode: 'url',
-        hasBundleFile: false,
-      }),
-    ).toBe(true);
-
-    expect(
-      shouldForceSessionWizardNormalModeManualBundleRetry({
-        err: {
-          message: 'Worker deploy failed.',
-          responseError: 'The uploaded script has no registered event handlers.',
-        },
-        wizardMode: 'normal',
-        effectiveBundleMode: 'url',
-        hasBundleFile: false,
-      }),
-    ).toBe(false);
+    expect(shouldForceSessionWizardNormalModeManualBundleRetry({
+      err: {
+        message: 'Worker deploy failed.',
+        responseError: 'The uploaded script has no registered event handlers.',
+      },
+      wizardMode: 'normal',
+      effectiveBundleMode: 'url',
+      hasBundleFile: false,
+    })).toBe(false);
   });
 
   it('skips upload steps when publish uses manual metadata', () => {
-    expect(
-      buildSessionWizardPublishPlan({
-        shouldAutoDeployWorker: true,
-        hasPendingDrafts: true,
-        hasManualMetadata: true,
-      }),
-    ).toEqual(['deploy-worker', 'deploy-sbts', 'register-session', 'done']);
+    expect(buildSessionWizardPublishPlan({
+      shouldAutoDeployWorker: true,
+      hasPendingDrafts: true,
+      hasManualMetadata: true,
+    })).toEqual([
+      'deploy-worker',
+      'deploy-sbts',
+      'register-session',
+      'done',
+    ]);
 
-    expect(
-      buildSessionWizardPublishStepNumbers({
-        shouldAutoDeployWorker: true,
-        hasPendingDrafts: true,
-        hasManualMetadata: true,
-      }),
-    ).toEqual({
+    expect(buildSessionWizardPublishStepNumbers({
+      shouldAutoDeployWorker: true,
+      hasPendingDrafts: true,
+      hasManualMetadata: true,
+    })).toEqual({
       'deploy-worker': 1,
       'deploy-sbts': 2,
       'register-session': 3,
