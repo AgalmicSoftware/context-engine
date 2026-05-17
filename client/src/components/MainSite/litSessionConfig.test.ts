@@ -1,4 +1,7 @@
-import { resolveMainSiteLitSessionConfig } from './litSessionConfig.js';
+import {
+  resolveMainSiteLitSessionConfig,
+  resolveMainSiteLitSessionConfigSource,
+} from './litSessionConfig.js';
 
 const VALID_SBT_ADDRESS = '0x0000000000000000000000000000000000000001';
 const resolveConfig = resolveMainSiteLitSessionConfig;
@@ -147,5 +150,101 @@ describe('litSessionConfig', () => {
     });
     expect(result.litNetwork).toBe('chipotle');
     expect(result.accessControlConditions).toEqual(expect.any(Array));
+  });
+
+  it('uses the primary encryption gate when the default resource is open', () => {
+    const sessionConfig = {
+      corsWorkerUrl: 'https://worker.example.test',
+      encryption: {
+        primaryGateId: 'questionResponses',
+      },
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: [],
+            chainId: 84532,
+            mode: 'any',
+          },
+          questionResponses: {
+            lookupStatus: 'ok',
+            sbtAddresses: [VALID_SBT_ADDRESS],
+            chainId: 84532,
+            mode: 'any',
+          },
+        },
+      },
+    };
+
+    const result = resolveConfig({ sessionConfig });
+
+    expect(result.chipotle).toEqual(expect.objectContaining({
+      enabled: true,
+      workerUrl: 'https://worker.example.test',
+    }));
+    expect(result.gateAddresses).toEqual([VALID_SBT_ADDRESS]);
+    expect(result.accessControlConditions).toEqual([
+      expect.objectContaining({
+        contractAddress: VALID_SBT_ADDRESS,
+      }),
+    ]);
+  });
+
+  it('prefers the primary encryption gate over a gated default resource', () => {
+    const defaultSbtAddress = '0x0000000000000000000000000000000000000002';
+    const sessionConfig = {
+      corsWorkerUrl: 'https://worker.example.test',
+      encryption: {
+        primaryGateId: 'questionResponses',
+      },
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: [defaultSbtAddress],
+            chainId: 84532,
+            mode: 'any',
+          },
+          questionResponses: {
+            lookupStatus: 'ok',
+            sbtAddresses: [VALID_SBT_ADDRESS],
+            chainId: 84532,
+            mode: 'any',
+          },
+        },
+      },
+    };
+
+    const result = resolveConfig({ sessionConfig });
+
+    expect(result.gateAddresses).toEqual([VALID_SBT_ADDRESS]);
+    expect(result.accessControlConditions).toEqual([
+      expect.objectContaining({
+        contractAddress: VALID_SBT_ADDRESS,
+      }),
+    ]);
+  });
+
+  it('prefers registry-backed session config when resolving Lit hook config sources', () => {
+    const staticConfig = {
+      corsWorkerUrl: 'https://static-worker.example.test',
+    };
+    const registryConfig = {
+      corsWorkerUrl: 'https://registry-worker.example.test',
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litGroupId: '7',
+        litPkpId: '0xpkp123',
+      },
+    };
+
+    expect(resolveMainSiteLitSessionConfigSource({
+      slug: 'dynamic-session',
+      resolveRegistryConfigBySlug: (slug) => (slug === 'dynamic-session' ? registryConfig : null),
+      resolveStaticConfigBySlug: () => staticConfig,
+    })).toBe(registryConfig);
   });
 });

@@ -774,6 +774,72 @@ describe('SurveyTool single-question bootstrap cache', () => {
     ]);
   });
 
+  it('lets an unmasked single-question payload override stale masked cache state', () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'binary', prompt: '[encrypted]' },
+        },
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      sessionSlugPinned: true,
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      provider: {},
+    });
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1', type: 'binary', prompt: 'Visible prompt', tags: [] }],
+    };
+
+    expect(subject.hasMaskedCurrentQuestionPayload()).toBe(false);
+  });
+
+  it('keeps submit disabled when only the question id is loaded over stale masked cache state', () => {
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      '84532': {
+        questions: {
+          q1: { id: 'q1', type: 'binary', prompt: '[encrypted]' },
+        },
+        questionResponses: {},
+        questionResponsesMeta: {},
+      },
+    });
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: true,
+      isStandalone: false,
+      surveyIndex: 0,
+      questionID: 'q1',
+      sessionSlug: 'edge',
+      activeSessionSlug: 'edge',
+      sessionSlugPinned: true,
+      account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      loginComplete: true,
+      network: { id: 84532 },
+      networkChainId: 84532,
+      provider: {},
+    });
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1', type: 'binary', tags: [] }],
+    };
+
+    expect(subject.hasMaskedCurrentQuestionPayload()).toBe(true);
+  });
+
   it('does not downgrade scheduled single-question bootstrap retry attempts on cache ticks', async () => {
     jest.useFakeTimers();
     const subject = new SurveyQuestions({
