@@ -16,7 +16,7 @@ stays centralized in `client/src/variables/publicDeploymentConfig.js`.
 
 1. Copy the example file: `cp client/.env.example client/.env`
 2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows an empty `.env` file is valid; the default `/new` flow now ships with a project deploy-helper URL, while healthcheck and self-host overrides still need explicit URLs when you use them.
-3. Restart the dev server: `cd client && npm run dev` (CRA reads `.env` only at build time)
+3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
 ## Netlify Static Deploy
@@ -28,7 +28,7 @@ server.
 ### 1. Set frontend variables
 
 Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.js`,
-and `client/src/variables/appConfig.js`. CRA bakes `REACT_APP_*` values into
+and `client/src/variables/appConfig.js`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
@@ -59,16 +59,12 @@ npm run build
 
 The output directory is `client/build/`.
 
-CRA remains the canonical production build. The client also has a Vite sidecar
-for toolchain compatibility checks:
+CRA remains available as an explicit fallback for migration comparison runs:
 
 ```bash
 cd client
-npm run build:vite
+npm run build:cra
 ```
-
-The sidecar output directory is `client/build-vite/`; do not use it to replace
-`client/build/` until the project intentionally flips the canonical build.
 
 ### 3. Upload to Netlify
 
