@@ -169,6 +169,7 @@ import {
 import {
   buildDecryptedSponsoredBundle,
   buildEnvelope,
+  buildMockContractViewerContracts,
   createDefaultFetchMock,
   createDeferred,
   seedWizardCache,
