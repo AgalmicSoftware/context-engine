@@ -56,7 +56,7 @@ while IFS= read -r file; do
   HAS_DYNAMIC_LOCALSTORAGE_CALL="$(search_file "localStorage\\??\\.(getItem|setItem|removeItem)\\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*" "${file}" || true)"
   [[ -z "${HAS_DYNAMIC_LOCALSTORAGE_CALL}" ]] && continue
 
-  HAS_MANAGED_GUARD="$(search_file 'is[A-Za-z0-9_]*ManagedDgCacheName\(' "${file}" || true)"
+  HAS_MANAGED_GUARD="$(rg -n 'is[A-Za-z0-9_]*ManagedDgCacheName\(' "${file}" || true)"
   if [[ -z "${HAS_MANAGED_GUARD}" ]]; then
     DYNAMIC_VIOLATIONS+="${file}: dynamic dg:* localStorage usage without managed namespace guard"$'\n'
   fi
