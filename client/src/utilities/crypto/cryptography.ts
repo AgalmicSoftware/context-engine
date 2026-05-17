@@ -699,21 +699,32 @@ const _getProvider = (providerLike) => {
         return window.__portoMockProvider;
       }
       try {
-        const globalBuildPasskeyProvider =
-          typeof window !== 'undefined' && typeof window.__ceCreatePasskeyEip1193Provider === 'function'
-            ? window.__ceCreatePasskeyEip1193Provider
+        const globalBuildPortoProvider =
+          typeof window !== 'undefined' && typeof window.__ceCreatePortoProviderMock === 'function'
+            ? window.__ceCreatePortoProviderMock
             : null;
-        if (globalBuildPasskeyProvider) {
-          const passkeyProvider = globalBuildPasskeyProvider();
-          if (
-            passkeyProvider &&
-            passkeyProvider.isPasskeyEoa === true &&
-            typeof passkeyProvider.request === 'function'
-          ) {
+        if (globalBuildPortoProvider) {
+          const portoProvider = globalBuildPortoProvider();
+          if (portoProvider && portoProvider.isPorto === true && typeof portoProvider.request === 'function') {
             if (typeof window !== 'undefined') {
-              window.__passkeyEoaProvider = passkeyProvider;
+              window.__portoMockProvider = portoProvider;
             }
-            return passkeyProvider;
+            return portoProvider;
+          }
+        }
+        // Avoid a hard module cycle at load time: portoFunctions imports contractScripts,
+        // which already depends on cryptography.
+        // eslint-disable-next-line global-require
+        const portoModule = require('../web3/portoFunctions.js');
+        const buildPortoProvider =
+          portoModule?.createPortoProviderMock ||
+          portoModule?.default?.createPortoProviderMock;
+        const portoProvider = typeof buildPortoProvider === 'function'
+          ? buildPortoProvider()
+          : null;
+        if (portoProvider && portoProvider.isPorto === true && typeof portoProvider.request === 'function') {
+          if (typeof window !== 'undefined') {
+            window.__portoMockProvider = portoProvider;
           }
         }
         // Avoid a hard module cycle at load time.
