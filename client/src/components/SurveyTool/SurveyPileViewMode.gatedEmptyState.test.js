@@ -1,10 +1,19 @@
 import SurveyTool from './SurveyTool';
+import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
 
+const expandInspectableNode = (node) => (
+  node?.type === SurveyQuestionsLockedQuestionsPanel
+    ? SurveyQuestionsLockedQuestionsPanel(node.props)
+    : node
+);
+
 const treeHasDataTestId = (node, testId) => {
   if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasDataTestId(expandedNode, testId);
   if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
   if (typeof node !== 'object') return false;
   if (node?.props?.['data-testid'] === testId) return true;
@@ -13,6 +22,8 @@ const treeHasDataTestId = (node, testId) => {
 
 const treeHasText = (node, text) => {
   if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasText(expandedNode, text);
   if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
   if (typeof node === 'string' || typeof node === 'number') {
     return String(node).includes(text);
