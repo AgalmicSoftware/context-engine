@@ -51,7 +51,6 @@ private-pack.manifest.json
 Demo Integration Package
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
-client/src/components/MainSite/MainSite.module.test.js
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
 EOF
