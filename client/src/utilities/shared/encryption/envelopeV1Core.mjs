@@ -1,5 +1,5 @@
 /**
- * Shared Envelope v1 pure-crypto core. Consumed by both client (CRA/React) and CE-CC (Node 20+).
+ * Shared Envelope v1 pure-crypto core. Consumed by both client (React/Vite) and CE-CC (Node 20+).
  * No browser globals, no Lit, no wallet provider resolution, no Node-specific keys.
  * Signing is provided via a `signTypedData(domain, types, message)` callback.
  */
