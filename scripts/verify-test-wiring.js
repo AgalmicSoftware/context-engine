@@ -38,6 +38,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`scripts.${scriptName} must include "${expected}"`);
     }
   };
+  const expectScriptOmits = (scriptName, unexpected) => {
+    const actual = String(scripts[scriptName] || '');
+    if (actual.includes(unexpected)) {
+      failures.push(`scripts.${scriptName} must not include "${unexpected}"`);
+    }
+  };
   const expectScriptMissing = (scriptName) => {
     if (Object.prototype.hasOwnProperty.call(scripts, scriptName)) {
       failures.push(`scripts.${scriptName} must be removed`);
@@ -84,6 +90,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:release', 'npm run worker:bundle');
   expectScriptContains('verify:release', 'npm run verify:worker-bundle');
   expectScriptContains('verify:release', 'npm --prefix client run build');
+  expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
 
   if (!workflow.includes('run: npm run test:ci')) {
     failures.push('CI workflow must execute "npm run test:ci"');
