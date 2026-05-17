@@ -191,6 +191,8 @@ describe('client package modernization contract', () => {
 
   it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
     [
+      'src/components/DebateMap/DebateMap.tsx',
+      'src/components/SurveyTool/CreateQuestionsAndSurveys.tsx',
       'src/components/ContractPage/contractSourceLoader.ts',
       'src/utilities/web3/contractScripts.ts',
     ].forEach((relativePath) => {
