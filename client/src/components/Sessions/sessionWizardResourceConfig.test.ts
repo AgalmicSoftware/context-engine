@@ -46,6 +46,6 @@ describe('sessionWizardResourceConfig', () => {
     expect(RESOURCE_LABELS.ai).toBe('AI');
     expect(RESOURCE_SECTION_TOOLTIPS.ai).toMatch(/OpenAI key/i);
     expect(RESOURCE_SECTION_TOOLTIPS.rpc).toMatch(/Authenticated RPC endpoint/i);
-    expect(RESOURCE_SECTION_TOOLTIPS.lit).toMatch(/Paste one Lit account API key/i);
+    expect(RESOURCE_SECTION_TOOLTIPS.lit).toMatch(/Paste one Lit API key/i);
   });
 });

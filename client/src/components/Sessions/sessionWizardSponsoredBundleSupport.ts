@@ -42,7 +42,7 @@ export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: Sponso
   ) {
     appliedLabels.push('Lit Chipotle config');
   }
-  if (toStr(normalizedBundle?.litAccountApiKey).trim()) appliedLabels.push('Lit account key');
+  if (toStr(normalizedBundle?.litAccountApiKey).trim()) appliedLabels.push('Lit API key');
   if (toStr(normalizedBundle?.litUsageApiKey).trim()) appliedLabels.push('Lit usage key');
   if (toStr(normalizedBundle?.deployGrantToken).trim()) appliedLabels.push('deploy access');
   return appliedLabels.length

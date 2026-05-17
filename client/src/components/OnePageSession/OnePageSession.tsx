@@ -45,6 +45,7 @@ import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
+import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
@@ -632,6 +633,7 @@ class OnePageSession extends Component<any, any> {
     const resolvedAutoFeature = propAutoFeature !== undefined
       ? propAutoFeature
       : resolveAutoFeatureBySessionSlug(baseSessionConfig);
+    const resolvedSlug = slug || baseSessionConfig.slug || '';
     const resolved = {
       ...baseSessionConfig,
       slug: resolvedSlug,
@@ -656,6 +658,43 @@ class OnePageSession extends Component<any, any> {
     };
     this._resolvedSessionConfigMemoValue = resolved;
     return resolved;
+  }
+
+  resolveScopedLitHooks(sessionConfig: any = {}) {
+    if (this.props.litHooks && typeof this.props.litHooks === 'object') {
+      return this.props.litHooks;
+    }
+    const {
+      chainId,
+      litNetwork,
+      litChain,
+      accessControlConditions,
+      userMaxPrice,
+      chipotle,
+    } = resolveMainSiteLitSessionConfig({
+      sessionConfig,
+      networkChainIdFallback: (
+        this.props.networkChainId ||
+        this.props.network?.id ||
+        this.props.network?.chainId ||
+        null
+      ),
+    });
+    if (!chipotle) return null;
+    const sessionSlug = normalizeOnePageSessionSlug(sessionConfig?.slug || this.props.slug || '');
+    return createLitHooks({
+      providerLike: this.props.provider,
+      account: this.props.account,
+      chainId,
+      litChain,
+      litNetwork,
+      userMaxPrice,
+      accessControlConditions: accessControlConditions || undefined,
+      chipotle: {
+        ...chipotle,
+        sessionSlug,
+      },
+    });
   }
 
   componentDidUpdate(prevProps: any, prevState: any) {
