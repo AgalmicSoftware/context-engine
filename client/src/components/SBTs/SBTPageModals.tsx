@@ -13,14 +13,13 @@ import styles from './SBTPage.module.scss';
 import SBTFilter from './SBTFilter';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { resolveSbtPageCopyIconState } from './sbtPageHelpers';
 
 type SbtPageHolderModalProps = {
   isOpen: boolean;
   onClose: () => void;
   showHeaderCount: boolean;
-  holdersDisplayCount: string;
+  holdersDisplayCount: number;
   showCornerSpinner: boolean;
   holderItemsForFilter: unknown[];
   provider?: unknown;
@@ -34,8 +33,8 @@ type SbtPageHolderModalProps = {
   hasFilteredHolders: boolean;
   hasComputedHolders: boolean;
   showScanProgressInModal: boolean;
-  scanProgressText: string | null;
-  scanProgressSessionText: string | null;
+  scanProgressText: string;
+  scanProgressSessionText: string;
   scanProgressPct: number;
   scanProgressFillStyle: React.CSSProperties;
   showEmptyStateInModal: boolean;
@@ -99,38 +98,34 @@ export const renderSbtPageHolderModal = ({
     >
       <ModalHeader toggle={onClose} close={closeButton} className={styles.modalHeader}>
         <div className={styles.modalTitleStack}>
-          <div className={styles.modalTitleRow}>
-            <span className={styles.modalTitle}>
-              Holders
-              {showHeaderCount && (
-                <span className={styles.modalTitleCount}>({holdersDisplayCount})</span>
-              )}
-            </span>
-            <div className={styles.holdersHeaderFilter}>
-              <SBTFilter
-                items={holderItemsForFilter}
-                mode="addresses"
-                provider={provider}
-                network={network}
-                sessionSlug={sessionSlug}
-                defaultFeaturedSBTs={defaultFeaturedSBTs}
-                onFilter={onFilter}
-                autoExpand={false}
-                isSBTCacheReady={isSBTCacheReady}
-                sbtCacheRevision={sbtCacheRevision}
-                buttonSurface="light"
-              />
-            </div>
-            {showCornerSpinner && (
-              <span className={styles.modalTitleSpinnerRow}>
-                <FontAwesomeIcon icon={faSpinner} spin className={styles.cornerSpinner} title="Refreshing holders..." />
-              </span>
+          <span className={styles.modalTitle}>
+            Holders
+            {showHeaderCount && (
+              <span className={styles.modalTitleCount}>({holdersDisplayCount})</span>
             )}
-          </div>
+          </span>
+          {showCornerSpinner && (
+            <span className={styles.modalTitleSpinnerRow}>
+              <FontAwesomeIcon icon={faSpinner} spin className={styles.cornerSpinner} title="Refreshing holders..." />
+            </span>
+          )}
         </div>
       </ModalHeader>
       <ModalBody className={styles.modalBody}>
         <div>
+          <SBTFilter
+            items={holderItemsForFilter}
+            mode="addresses"
+            provider={provider}
+            network={network}
+            sessionSlug={sessionSlug}
+            defaultFeaturedSBTs={defaultFeaturedSBTs}
+            onFilter={onFilter}
+            autoExpand={false}
+            isSBTCacheReady={isSBTCacheReady}
+            sbtCacheRevision={sbtCacheRevision}
+          />
+
           {loadingMintedFilter && !hasFilteredHolders && !hasComputedHolders && (
             <div className={styles.filteringStatus}>Filtering...</div>
           )}
@@ -183,7 +178,7 @@ export const renderSbtPageHolderModal = ({
                         className={styles.userBlockie}
                       />
                     ) : null}
-                    <a href={buildPublicRoute(`/u/${address}`)} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
+                    <a href={`/u/${address}`} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
                       {getShortenedAddress(address, false)}
                     </a>
                   </div>
