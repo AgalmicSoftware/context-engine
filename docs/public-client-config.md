@@ -116,13 +116,6 @@ The output directory is `client/build/`.
 Before building, the build script removes stale legacy `client/build-vite/` and
 `client/vite-build/` directories if they exist locally.
 
-CRA remains available as an explicit fallback for migration comparison runs:
-
-```bash
-cd client
-npm run build:cra
-```
-
 ### 3. Upload to Netlify
 
 The repository-root `netlify.toml` is the canonical connected-build contract.
@@ -251,8 +244,8 @@ SPA fallback concept, but their redirect config syntax differs.
 - Healthcheck still stays blank until the official project-owned endpoint is finalized for OSS.
 - Only `REACT_APP_*` keys are exposed to the browser in the Vite client
   compatibility env.
-- `publicDeploymentConfig.ts` is the single owner of deployment endpoint
-  fallbacks; `appConfig.ts` re-exports those values for the existing client API.
+- `publicDeploymentConfig.js` is the single owner of deployment endpoint
+  fallbacks; `appConfig.js` re-exports those values for the existing client API.
 - Browser/runtime overrides still exist for some flags (`globalThis`,
   `localStorage`, URL params). The env values only set the boot defaults.
 

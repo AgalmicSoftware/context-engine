@@ -10,7 +10,7 @@ const path = require('path');
 const vm = require('vm');
 const { execFileSync } = require('child_process');
 
-describe('chainGateway barrel', () => {
+describe('contractScripts compatibility barrel', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -35,13 +35,13 @@ describe('chainGateway barrel', () => {
 
   it('can load through a browser-targeted Vite bundle without CommonJS exports', () => {
     const clientRoot = path.resolve(__dirname, '../../..');
-    const tmpDir = fs.mkdtempSync(path.join(clientRoot, '.tmp-chain-gateway-barrel-'));
+    const tmpDir = fs.mkdtempSync(path.join(clientRoot, '.tmp-contract-scripts-barrel-'));
     const outputDir = path.join(tmpDir, 'dist');
     const entryPath = path.join(tmpDir, 'entry.js');
     const implStubPath = path.join(tmpDir, 'contractScripts.impl.stub.js');
     const viteConfigPath = path.join(tmpDir, 'vite.config.mjs');
     const viteBinPath = path.join(clientRoot, 'node_modules/vite/bin/vite.js');
-    const barrelPath = path.resolve(__dirname, 'chainGateway.ts');
+    const barrelPath = path.resolve(__dirname, 'contractScripts.ts');
 
     fs.mkdirSync(outputDir, { recursive: true });
     fs.writeFileSync(
@@ -98,11 +98,8 @@ describe('chainGateway barrel', () => {
         provider: getReadProviderForGroup().provider,
         slug: getSessionConfigBySlug('edge').slug,
       };
-    `,
-    );
-    fs.writeFileSync(
-      viteConfigPath,
-      `
+    `);
+    fs.writeFileSync(viteConfigPath, `
       export default {
         logLevel: 'silent',
         resolve: {
@@ -123,22 +120,25 @@ describe('chainGateway barrel', () => {
             output: {
               entryFileNames: 'bundle.js',
               format: 'iife',
-              name: 'ChainGatewayBarrelSmoke',
+              name: 'ContractScriptsBarrelSmoke',
               inlineDynamicImports: true,
             },
           },
         },
       };
-    `,
-    );
+    `);
 
     try {
       try {
-        execFileSync(process.execPath, [viteBinPath, 'build', '--config', viteConfigPath], {
-          cwd: clientRoot,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
+        execFileSync(
+          process.execPath,
+          [viteBinPath, 'build', '--config', viteConfigPath],
+          {
+            cwd: clientRoot,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }
+        );
       } catch (error) {
         const stdout = error.stdout ? `\nstdout:\n${error.stdout}` : '';
         const stderr = error.stderr ? `\nstderr:\n${error.stderr}` : '';
