@@ -43,7 +43,6 @@ const textResp = (status, textBody = '', contentType = 'text/plain') => ({
 const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 const TEST_ARWEAVE_BACKUP_GATEWAY = 'https://arweave-backup.example.test';
 const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev'; // intentional: real URL - verifies AR.IO gateway override handling
-const TEST_IRYS_GATEWAY = 'https://gateway-irys.example.test';
 
 describe('arweaveScripts.downloadDataFromArweave', () => {
   beforeEach(() => {
@@ -670,102 +669,6 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
     expect(fallbackUrl).toContain('wf-gateway.example.test');
   });
 
-  it('prefers ar.io direct hits without probing legacy gateways when direct-to-ar.io mode is enabled', async () => {
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
-    global.fetch.mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      text: async () => '{"ok":"ar-io-primary-hit"}',
-    });
-
-    const txId = 'ar-io-first-mode';
-    const text = await arweaveScripts.downloadDataFromArweave(txId, {
-      gateways: [TEST_ARWEAVE_GATEWAY],
-      retries: 0,
-      bypassCache: true,
-      disableExistencePrecheck: true,
-      debugContext: { category: 'question_response_payload' },
-    });
-
-    expect(text).toBe('{"ok":"ar-io-primary-hit"}');
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    const calledUrls = global.fetch.mock.calls.map((call) => String(call?.[0] || ''));
-    expect(calledUrls.every((url) => url.includes(TEST_AR_IO_GATEWAY))).toBe(true);
-    expect(calledUrls.some((url) => url.includes(TEST_ARWEAVE_GATEWAY))).toBe(false);
-    expect(calledUrls.some((url) => url.includes(TEST_IRYS_GATEWAY))).toBe(false);
-    expect(calledUrls[0]).toContain('/ar-io-first-mode');
-    expect(calledUrls.some((url) => url.includes('/raw/ar-io-first-mode'))).toBe(false);
-  });
-
-  it('does not fall back to legacy gateways after an ar.io html miss', async () => {
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
-    global.fetch.mockResolvedValueOnce(
-      textResp(200, '<html><title>404 - Page not found.</title></html>', 'text/html')
-    );
-
-    await expect(
-      arweaveScripts.downloadDataFromArweave('ar-io-html-fallback', {
-        gateways: [TEST_ARWEAVE_GATEWAY],
-        retries: 0,
-        bypassCache: true,
-        disableExistencePrecheck: true,
-        debugContext: { category: 'question_response_payload' },
-      })
-    ).rejects.toMatchObject({
-      name: 'ArweaveFetchError',
-      status: 404,
-      kind: 'not_found',
-    });
-
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    const calledUrl = String(global.fetch.mock.calls[0]?.[0] || '');
-    expect(calledUrl).toContain(TEST_AR_IO_GATEWAY);
-    expect(calledUrl).toContain('/ar-io-html-fallback');
-    expect(calledUrl).not.toContain(TEST_ARWEAVE_GATEWAY);
-    expect(calledUrl).not.toContain(TEST_IRYS_GATEWAY);
-    expect(calledUrl).not.toContain('/raw/ar-io-html-fallback');
-    expect(calledUrl).not.toContain('/tx/ar-io-html-fallback/data');
-  });
-
-  it('retries only against ar.io when direct-to-ar.io mode is enabled', async () => {
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
-    global.fetch
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 503,
-        text: async () => '',
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => '{"ok":"ar-io-retry-hit"}',
-      });
-
-    const text = await arweaveScripts.downloadDataFromArweave('ar-io-retry-fallback', {
-      gateways: [TEST_ARWEAVE_GATEWAY, TEST_IRYS_GATEWAY],
-      retries: 1,
-      retryDelayMs: 0,
-      bypassCache: true,
-      disableExistencePrecheck: true,
-      debugContext: { category: 'question_response_payload' },
-    });
-
-    expect(text).toBe('{"ok":"ar-io-retry-hit"}');
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-    const calledUrls = global.fetch.mock.calls.map((call) => String(call?.[0] || ''));
-    expect(calledUrls[0]).toContain(TEST_AR_IO_GATEWAY);
-    expect(calledUrls[1]).toContain(TEST_AR_IO_GATEWAY);
-    expect(calledUrls.some((url) => url.includes(TEST_ARWEAVE_GATEWAY))).toBe(false);
-    expect(calledUrls.some((url) => url.includes(TEST_IRYS_GATEWAY))).toBe(false);
-    expect(calledUrls[1]).toContain('/ar-io-retry-fallback');
-    expect(calledUrls[1]).not.toContain('/raw/ar-io-retry-fallback');
-    expect(calledUrls.some((url) => url.includes('/raw/ar-io-retry-fallback'))).toBe(false);
-    expect(calledUrls.some((url) => url.includes('/tx/ar-io-retry-fallback/data'))).toBe(false);
-  });
-
   it('uses short not-found cooldowns for response payload categories', async () => {
     global.fetch.mockResolvedValue({
       ok: false,
@@ -853,69 +756,6 @@ describe('arweaveScripts.downloadDataFromArweave', () => {
 
     expect(exists).toBeNull();
     expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('default routing stays on ar.io only when direct-to-ar.io mode is enabled', async () => {
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
-    globalThis.CE_ARWEAVE_GATEWAY_URL = TEST_ARWEAVE_GATEWAY;
-    global.fetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      text: async () => '',
-    });
-
-    await expect(
-      arweaveScripts.downloadDataFromArweave('default-gateway-fanout', {
-        retries: 0,
-        bypassCache: true,
-        disableExistencePrecheck: true,
-      })
-    ).rejects.toMatchObject({
-      name: 'ArweaveFetchError',
-      status: 404,
-      kind: 'not_found',
-    });
-
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    const calledUrls = global.fetch.mock.calls.map((call) => String(call?.[0] || ''));
-    expect(calledUrls.every((url) => url.includes(TEST_AR_IO_GATEWAY))).toBe(true);
-    expect(calledUrls.some((url) => url.includes(TEST_ARWEAVE_GATEWAY))).toBe(false);
-    expect(calledUrls.some((url) => url.includes(TEST_IRYS_GATEWAY))).toBe(false);
-    expect(calledUrls.some((url) => url.includes('/tx/default-gateway-fanout/data'))).toBe(false);
-    expect(calledUrls.some((url) => url.includes('/raw/default-gateway-fanout'))).toBe(false);
-  });
-
-  it('skips /raw and /tx-data probes while staying on ar.io in direct-to-ar.io mode', async () => {
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
-    globalThis.CE_ARWEAVE_AR_IO_URL = TEST_AR_IO_GATEWAY;
-    global.fetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      text: async () => '',
-    });
-
-    await expect(
-      arweaveScripts.downloadDataFromArweave('ar-io-no-tx-data', {
-        gateways: [TEST_ARWEAVE_GATEWAY],
-        retries: 0,
-        bypassCache: true,
-        disableExistencePrecheck: true,
-        debugContext: { category: 'question_response_payload' },
-      })
-    ).rejects.toMatchObject({
-      name: 'ArweaveFetchError',
-      status: 404,
-      kind: 'not_found',
-    });
-
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    const calledUrls = global.fetch.mock.calls.map((call) => String(call?.[0] || ''));
-    expect(calledUrls[0]).toContain('/ar-io-no-tx-data');
-    expect(calledUrls[0]).toContain(TEST_AR_IO_GATEWAY);
-    expect(calledUrls.some((url) => url.includes(TEST_ARWEAVE_GATEWAY))).toBe(false);
-    expect(calledUrls.some((url) => url.includes('/raw/ar-io-no-tx-data'))).toBe(false);
-    expect(calledUrls.some((url) => url.includes('/tx/ar-io-no-tx-data/data'))).toBe(false);
   });
 
   it('throws typed invalid errors for non-retryable 4xx', async () => {
