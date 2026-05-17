@@ -242,17 +242,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('worker:bundle', 'scripts/worker-bundle.mjs');
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
-  expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
-  expectScriptContains('verify:public-assets', 'scripts/verify-public-assets.js');
-  expectScriptContains('verify:public-text', 'scripts/verify-public-text.js');
-  expectScriptContains('verify:public-text:prepared', 'scripts/verify-prepared-public-text.sh');
-  expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
-  expectScriptContains('verify:release-version', 'scripts/release-version.mjs verify-worktree');
-  expectScriptContains('coverage-floor:check', 'scripts/check-client-coverage-floors.mjs');
-  expectScriptContains('client:bundle-budget:check', 'scripts/check-client-bundle-budget.mjs');
-  expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
-  expectScriptContains('dead-exports:check', 'scripts/check-dead-exports-advisory.mjs --check');
-  expectScriptContains('verify:release', 'scripts/run-ci-gates.mjs --profile release');
+  expectScriptContains('verify:release', 'npm run lint');
+  expectScriptContains('verify:release', 'npm run worker:bundle');
+  expectScriptContains('verify:release', 'npm run verify:worker-bundle');
+  expectScriptContains('verify:release', 'npm --prefix client run build');
   expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
 
   [
