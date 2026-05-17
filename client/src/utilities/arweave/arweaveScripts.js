@@ -989,8 +989,8 @@ const resolveWayfinderUrlForTx = async ({
   }
 
   if (opts?.useWayfinder === false) return '';
-  // CRA4/webpack4 cannot safely bundle the current @ar.io/wayfinder-core browser stack
-  // (OpenTelemetry subpath + node polyfill constraints). Use injected resolver hooks only.
+  // The current @ar.io/wayfinder-core browser stack still pulls OpenTelemetry
+  // and Node-polyfill-sensitive subpaths. Use injected resolver hooks only.
   return '';
 };
 
