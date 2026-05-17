@@ -24,8 +24,7 @@ import {
   ModalFooter,
   Collapse,
   Alert,
-  Table,
-  Progress
+  Table
 } from 'reactstrap';
 
 
@@ -48,7 +47,6 @@ import {
   faExternalLinkAlt,
   faFilter,
   faExclamationCircle,
-  faSyncAlt,
   faComments
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -143,6 +141,10 @@ import {
   SurveyResultsFreeformAggregatorSummary,
   SurveyResultsMultichoiceAggregatorSummary,
 } from './SurveyResultsAggregatorSummaries';
+import {
+  renderSurveyResultsFilterSummary,
+  renderSurveyResultsSyncStatusPanel,
+} from './SurveyResultsPanels';
 
 export {
   countQuestionModeResponses,
@@ -5017,7 +5019,6 @@ const normalizedFilteredResponsesCount = Math.min(
 
 // Compact sync status display
 let syncStatusText = '';
-let syncStatusIcon = faSpinner;
 let isSyncingOrLoading = true;
 
 if (showQuestionSpinner || showResponseSpinner) {
@@ -5095,97 +5096,31 @@ return (
       </div>
       <div className={styles.modalHeaderControls}>
         {this.renderLockedResponsesToggle(lockedResponsesModel)}
-        <div className={styles.syncStatusContainer}>
-          <button
-            type="button"
-            className={styles.syncStatus__simple}
-            onClick={() =>
-              this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
-                prevState,
-                stateKey: 'syncDetailsOpen',
-              }))
-            }
-            aria-expanded={!!this.state.syncDetailsOpen}
-            aria-label="Toggle sync details"
-          >
-            {isSynced ? (
-              <span className={styles.syncStatus__indicator_synced}></span>
-            ) : (
-              <FontAwesomeIcon icon={syncStatusIcon} spin={isSyncingOrLoading} />
-            )}
-            <span>
-              {syncStatusText}
-              {showLongSyncNotice}
-            </span>
-          </button>
-          {!isSynced && (
-            <button
-              type="button"
-              className={styles.syncStatus__quickRefresh}
-              onClick={() => this.handleManualRefresh()}
-              title="Refresh Now"
-              aria-label="Refresh sync data"
-            >
-              <FontAwesomeIcon icon={faSyncAlt} />
-            </button>
-          )}
-          <div
-            className={styles.syncStatus__details}
-            style={resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen)}
-          >
-            <div className={styles.miniBarContainer}>
-              {viewMode === 'questions' && (
-                <div className={styles.miniBarLine}>
-                  <div className={styles.miniBarLabel}>Questions:</div>
-                  {showQuestionSpinner ? (
-                    <>
-                      <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE} />
-                      <div className={styles.miniBarFraction}>Loading...</div>
-                    </>
-                  ) : (
-                    <>
-                      <Progress
-                        value={questionProgress}
-                        color={questionColor}
-                        style={SURVEY_RESULTS_MINI_PROGRESS_STYLE}
-                        className={styles.miniProgress}
-                      />
-                      <div className={styles.miniBarFraction}>{questionBarText}</div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              <div className={styles.miniBarLine}>
-                <div className={styles.miniBarLabel}>Responses:</div>
-                {showResponseSpinner ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE} />
-                    <div className={styles.miniBarFraction}>Loading...</div>
-                  </>
-                ) : (
-                  <>
-                    <Progress
-                      value={responseProgress}
-                      color={responseColor}
-                      style={SURVEY_RESULTS_MINI_PROGRESS_STYLE}
-                      className={styles.miniProgress}
-                    />
-                    <div className={styles.miniBarFraction}>{responseBarText}</div>
-                  </>
-                )}
-              </div>
-            </div>
-            <div
-              className={styles.syncStatus__refreshAction}
-              onClick={() => this.handleManualRefresh()}
-              title="Refresh Data from Cache/Chain"
-            >
-              <FontAwesomeIcon icon={faSyncAlt} />
-              <span>Refresh Now</span>
-            </div>
-          </div>
-        </div>
+        {renderSurveyResultsSyncStatusPanel({
+          isSynced,
+          isSyncingOrLoading,
+          syncStatusText,
+          showLongSyncNotice,
+          syncDetailsOpen: !!this.state.syncDetailsOpen,
+          syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
+          onToggleSyncDetails: () =>
+            this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+              prevState,
+              stateKey: 'syncDetailsOpen',
+            })),
+          onManualRefresh: () => this.handleManualRefresh(),
+          viewMode,
+          showQuestionSpinner,
+          questionProgress,
+          questionColor,
+          questionBarText,
+          showResponseSpinner,
+          responseProgress,
+          responseColor,
+          responseBarText,
+          miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
+          miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+        })}
         {isDemoQuestionResults && (
           <div
             className={styles.demoResultsViewNav}
@@ -5339,27 +5274,14 @@ return (
         </Card>
       )}
 
-      <div className={styles.filterSummaryBox}>
-        <p className={styles.filterSummaryText}>
-          Questions: <strong>{displayedTotalQuestionsCount}</strong> ‎  Filtered:{' '}
-          <strong>
-            {filterLoading || !areSummaryCountsHydrated ? (
-              <FontAwesomeIcon icon={faSpinner} spin />
-            ) : (
-              normalizedFilteredQuestionsCount
-            )}
-          </strong>
-          <br />
-          Responses: <strong>{displayedTotalResponsesCount}</strong> ‎  Filtered:{' '}
-          <strong>
-            {filterLoading || !areSummaryCountsHydrated ? (
-              <FontAwesomeIcon icon={faSpinner} spin />
-            ) : (
-              normalizedFilteredResponsesCount
-            )}
-          </strong>
-        </p>
-      </div>
+      {renderSurveyResultsFilterSummary({
+        displayedTotalQuestionsCount,
+        displayedTotalResponsesCount,
+        normalizedFilteredQuestionsCount,
+        normalizedFilteredResponsesCount,
+        filterLoading,
+        areSummaryCountsHydrated,
+      })}
 
 
       {/* The area with SBTFilter / QuestionFilter toggles previously (export + filter) */}
