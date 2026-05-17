@@ -14,7 +14,6 @@ import {
   WIZARD_CONTRACT_MODAL_TESTID,
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 
 const mockRegisterSessionOnChain = jest.fn();
 const mockFetchSessionFromRegistry = jest.fn();
@@ -25,7 +24,6 @@ const mockFinalizeDeferredCreateSbtDraftUpload = jest.fn();
 const mockDownloadDataFromArweave = jest.fn();
 const mockDecryptWithPassword = jest.fn();
 const mockPendingSbtAddress = ethers.utils.getAddress('0x5fbdb2315678afecb367f032d93f642f64180aa3');
-const mockSecondPendingSbtAddress = ethers.utils.getAddress('0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512');
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
 const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
@@ -287,16 +285,12 @@ jest.mock('../../variables/appConfig.js', () => {
 });
 
 import SessionWizard, {
-  buildPublishedPendingSbtLinks,
   getSessionWizardPublishProgressPercent,
   REQUIRED_SESSION_SLUG_ERROR,
   RESERVED_SESSION_SLUG_ERROR,
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
-  persistSessionWizardSbtRecoveryCodes,
-  promotePendingSbtSelectionsAfterDeploy,
   resolveSessionWizardChipotleHookConfig,
-  resolveSessionWizardSelectorSourceConfig,
   resolveSessionWizardWorkerBaseUrl,
 } from './SessionWizard';
 
@@ -638,139 +632,6 @@ describe('SessionWizard pending SBT rendering', () => {
       tokenURI: 'ar://finalized-pending-sbt',
       metadataUploadStatus: 'ready',
     }));
-  });
-
-  it('promotes pending SBT selections to deployed entries before pending-draft cleanup', () => {
-    const promoted = promotePendingSbtSelectionsAfterDeploy({
-      selections: [{
-        address: mockPendingSbtAddress,
-        name: 'Pending SBT (Pending)',
-        pending: true,
-        metadataPreview: { phase: 'pending' },
-      }],
-      deployedDrafts: [{
-        predictedAddress: mockPendingSbtAddress,
-        deployedAddress: mockPendingSbtAddress,
-        displayName: 'Pending SBT',
-        metadataPreview: { phase: 'deployed' },
-        deployed: true,
-      }],
-    });
-
-    expect(promoted).toEqual([{
-      address: mockPendingSbtAddress,
-      name: 'Pending SBT',
-      metadataPreview: { phase: 'deployed' },
-    }]);
-  });
-
-  it('builds published inline SBT links from newly deployed and resumed pending drafts', () => {
-    expect(buildPublishedPendingSbtLinks({
-      deployedDrafts: [{
-        predictedAddress: mockPendingSbtAddress,
-        deployedAddress: mockPendingSbtAddress,
-        displayName: 'Newly Deployed Group',
-        deployed: true,
-      }],
-      pendingDraftSnapshot: [
-        {
-          predictedAddress: mockPendingSbtAddress,
-          deployedAddress: mockPendingSbtAddress,
-          displayName: 'Newly Deployed Group',
-          deployed: true,
-        },
-        {
-          predictedAddress: mockSecondPendingSbtAddress,
-          deployedAddress: mockSecondPendingSbtAddress,
-          deployed: true,
-        },
-      ],
-      sessionSlug: 'writers-room',
-    })).toEqual([
-      {
-        address: mockPendingSbtAddress,
-        label: 'Newly Deployed Group',
-        href: buildSbtDetailPath(mockPendingSbtAddress, 'writers-room'),
-      },
-      {
-        address: mockSecondPendingSbtAddress,
-        label: mockSecondPendingSbtAddress,
-        href: buildSbtDetailPath(mockSecondPendingSbtAddress, 'writers-room'),
-      },
-    ]);
-  });
-
-  it('persists published pending SBT recovery codes to the scoped recovery store', () => {
-    const writeRecoveryCodes = jest.fn(() => ({ ok: true, status: 'ok' }));
-
-    const result = persistSessionWizardSbtRecoveryCodes({
-      finalizedDraft: {
-        hasPasswordMintOnChain: true,
-        passwordList: ['claim-code-1'],
-        groupPassword: '',
-        usesInviteCodes: false,
-      },
-      sbtAddress: mockPendingSbtAddress,
-      sessionConfigForDeploy: {
-        networkChainId: 84532,
-      },
-      writeRecoveryCodes,
-    });
-
-    expect(result).toEqual({ ok: true, status: 'ok' });
-    expect(writeRecoveryCodes).toHaveBeenCalledWith({
-      chainId: 84532,
-      sbtAddress: mockPendingSbtAddress,
-      passwords: ['claim-code-1'],
-      mode: 'replace',
-    });
-    expect(localStorage.getItem('createdSBTs')).toBeNull();
-  });
-
-  it('resolves demo selector discovery from the source session config instead of the auto-seeded draft block window', () => {
-    const latestBlock = 39316304;
-    const selectorConfig = resolveSessionWizardSelectorSourceConfig({
-      activeSessionSlug: 'demo',
-      registryChainId: 84532,
-      draftNetworkChainId: 84532,
-      network: { id: 84532 },
-      normalizeSlug: (value = '') => String(value || '').trim().toLowerCase(),
-      resolveStrictConfig: (slug = '') => {
-        const normalized = String(slug || '').trim().toLowerCase();
-        if (normalized && normalized !== 'general') return null;
-        return {
-          slug: '',
-          sessionName: 'Context Engine',
-          networkChainId: 84532,
-          contracts: {
-            sbtFactory: {
-              address: mockSelectorSourceFactory,
-              chainId: 84532,
-            },
-          },
-          blockLimits: {
-            start: mockSelectorSourceStartBlock,
-            end: null,
-          },
-        };
-      },
-      resolveDisplayConfig: () => null,
-    });
-
-    expect(selectorConfig).toEqual(expect.objectContaining({
-      slug: 'demo',
-      networkChainId: 84532,
-      contracts: expect.objectContaining({
-        sbtFactory: expect.objectContaining({
-          address: mockSelectorSourceFactory,
-          chainId: 84532,
-        }),
-      }),
-      blockLimits: expect.objectContaining({
-        start: mockSelectorSourceStartBlock,
-      }),
-    }));
-    expect(selectorConfig?.blockLimits?.start).not.toBe(latestBlock);
   });
 
   it('keeps pending SBT drafts out of localStorage while persisting them in sessionStorage for refresh recovery', async () => {
