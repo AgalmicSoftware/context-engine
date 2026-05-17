@@ -1,6 +1,7 @@
 /** @file CreateQuestionsAndSurveys.tsx */
 
 import React, { Component } from 'react';
+import sha256 from 'crypto-js/sha256';
 import {
   Button,
   Label,
@@ -236,7 +237,7 @@ type EffectiveAiConfigForCreateSurvey = {
   [key: string]: unknown;
 };
 
-const sha256 = require('crypto-js/sha256') as CreateSurveySha256;
+const createSurveySha256 = sha256 as CreateSurveySha256;
 const getEffectiveAiConfigForCreateSurvey = getEffectiveAiConfig as (
   args?: GetEffectiveAiConfigForCreateSurveyArgs,
 ) => Promise<EffectiveAiConfigForCreateSurvey>;
@@ -1618,7 +1619,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   updateSurveyHash: () => void = () => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
     const newHash = buildCreateSurveyHashValue({
-      digest: sha256,
+      digest: createSurveySha256,
       documentURLs,
       isStandaloneQuestion,
       title,
