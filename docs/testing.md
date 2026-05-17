@@ -19,7 +19,9 @@ nvm use 20
 npm test
 ```
 
-This runs the canonical root gate (`npm run test:ci`), which includes wiring checks, contract tests, client coverage, Node-side tests, and cache guards.
+This runs the canonical root gate (`npm run test:ci`), which includes wiring
+checks, the release-sanity gate, contract tests, client coverage, Node-side
+tests, and cache guards.
 
 ### Client-Only Tests
 
