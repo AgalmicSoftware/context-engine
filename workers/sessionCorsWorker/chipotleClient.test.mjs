@@ -46,6 +46,11 @@ const jsonResponse = (body, { ok = true, status = 200 } = {}) => ({
   text: async () => JSON.stringify(body),
 });
 
+const mockBalance = (value = 0) => ({
+  isZero: () => BigInt(value || 0) === 0n,
+  toString: () => String(value || 0),
+});
+
 const createDefaultActionHarness = ({
   chainId = 11155420,
   balances = {},
@@ -76,7 +81,7 @@ const createDefaultActionHarness = ({
       }
 
       async balanceOf() {
-        return ethers.BigNumber.from(balances[this.address] || 0);
+        return mockBalance(balances[this.address] || 0);
       }
     },
   };
@@ -496,6 +501,66 @@ test('executeSessionLitChipotleAction validates source code and executes the con
     cekHex: `0x${'12'.repeat(32)}`,
     policy: expectedPolicy,
   }));
+});
+
+test('executeSessionLitChipotleAction submits verified source code when configured action CID is not cached yet', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      return jsonResponse(TEST_ACTION_CID);
+    }
+    if (String(url).endsWith('/core/v1/lit_action')) {
+      const body = JSON.parse(options.body || '{}');
+      if (body.ipfs_id) {
+        return jsonResponse({
+          error: `No cached code found. Submit the action code at least once before referencing it by IPFS ID.: cache miss for IPFS ID ${TEST_ACTION_CID}`,
+        }, { ok: false, status: 502 });
+      }
+      return jsonResponse({
+        has_error: false,
+        logs: '',
+        response: {
+          ok: true,
+          ciphertext: 'wrapped-cek',
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  const actionCode = 'async function main() { return { ok: true }; }';
+  const result = await executeSessionLitChipotleAction({
+    config: {
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: TEST_ACTION_CID,
+        litPkpId: TEST_PKP_ID,
+      },
+    },
+    secrets: {
+      litUsageApiKey: 'usage-key',
+    },
+    request: {
+      actionCode,
+      op: 'encrypt',
+      sbtAddresses: [TEST_GATE_ADDRESS],
+      chainId: 11155420,
+      message: `0x${'12'.repeat(32)}`,
+    },
+    requesterAddress: TEST_REQUESTER,
+    fetchImpl,
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls.length, 3);
+  const cidBody = JSON.parse(calls[1][1].body);
+  assert.equal(cidBody.ipfs_id, TEST_ACTION_CID);
+  assert.equal(cidBody.code, undefined);
+  const inlineBody = JSON.parse(calls[2][1].body);
+  assert.equal(inlineBody.ipfs_id, undefined);
+  assert.equal(inlineBody.code, actionCode);
+  assert.equal(inlineBody.js_params.op, 'encrypt');
 });
 
 test('executeSessionLitChipotleAction falls back to worker env Lit API keys for execution', async () => {

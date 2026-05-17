@@ -1235,7 +1235,7 @@ describe('SessionWizard worker panel rendering', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key, deploy access.'
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.'
         );
       });
 
@@ -1408,7 +1408,7 @@ describe('SessionWizard worker panel rendering', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key, deploy access.'
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.'
         );
       });
 
@@ -1566,7 +1566,7 @@ describe('SessionWizard worker panel rendering', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key, deploy access.'
+          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.'
         );
       });
 
