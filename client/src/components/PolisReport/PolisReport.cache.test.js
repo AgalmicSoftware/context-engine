@@ -746,6 +746,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 0, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
