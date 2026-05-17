@@ -3,7 +3,7 @@
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle, faLock, faCopy, faCheck, faBookmark, faExpand, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
-import { Modal, ModalHeader, ModalBody, Alert } from 'reactstrap';
+import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import {
@@ -16,13 +16,11 @@ import {
 import { getChainBlockTimeMs } from '../../variables/chains.js';
 import { getShortenedAddress, getShortenedTransactionHash } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
-import SBTFilter from '../SBTs/SBTFilter';
 import contextEngineLoadingGif from '../../assets/img/context_engine_logo_animation.gif';
 import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import DocumentLibraryPanel from '../DocumentLibrary/DocumentLibraryPanel';
 
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
-import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
 import { createLogger } from 'utilities/logging.js';
 import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
@@ -44,6 +42,11 @@ import {
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import CETooltip from '../Shared/CETooltip';
+import {
+  renderSbtPageDocModal,
+  renderSbtPageFullImageModal,
+  renderSbtPageHolderModal,
+} from './SBTPageModals';
 import {
   appendSbtPageBookmark,
   appendSbtPageTransactionHash,
@@ -5018,16 +5021,6 @@ renderMintButton() {
       showScanProgress,
     });
     const filterNetwork = this.state.network || this.props.network || null;
-    const holdersModalClose = (
-      <button
-        type="button"
-        className={styles.modalCloseButton}
-        onClick={this.closeModal}
-        aria-label="Close holders"
-      >
-        <FontAwesomeIcon icon={faTimes} />
-      </button>
-    );
     const passwordAlertState = resolveSbtPagePasswordAlertState({
       mintPassword,
       sbtMintPassword: this.props.sbtMintPassword,
@@ -5314,172 +5307,55 @@ renderMintButton() {
           !error && loadingScreen
         )}
 
-        <Modal
-          isOpen={showModal}
-          toggle={this.closeModal}
-          className={styles.modal}
-          contentClassName={styles.modalContent} // Applies dark theme via SCSS
-          size="lg"
-          centered
-        >
-          <ModalHeader toggle={this.closeModal} close={holdersModalClose} className={styles.modalHeader}>
-            <div className={styles.modalTitleStack}>
-              <span className={styles.modalTitle}>
-                Holders
-                {showHeaderCount && (
-                  <span className={styles.modalTitleCount}>({holdersDisplayCount})</span>
-                )}
-              </span>
-              {showCornerSpinner && (
-                <span className={styles.modalTitleSpinnerRow}>
-                  <FontAwesomeIcon icon={faSpinner} spin className={styles.cornerSpinner} title="Refreshing holders..." />
-                </span>
-              )}
-            </div>
-          </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            <div>
-              <SBTFilter
-                items={holderItemsForFilter}
-                mode="addresses"
-                provider={this.props.provider}
-                network={filterNetwork}
-                sessionSlug={this.getEffectiveSessionSlug()}
-                defaultFeaturedSBTs={this.getSessionSBTAddresses()}
-                onFilter={this.handleModalFilteredMintedUsers}
-                autoExpand={false}
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                sbtCacheRevision={this.props.sbtCacheRevision}
-              />
+        {renderSbtPageHolderModal({
+          isOpen: showModal,
+          onClose: this.closeModal,
+          showHeaderCount,
+          holdersDisplayCount,
+          showCornerSpinner,
+          holderItemsForFilter,
+          provider: this.props.provider,
+          network: filterNetwork,
+          sessionSlug: this.getEffectiveSessionSlug(),
+          defaultFeaturedSBTs: this.getSessionSBTAddresses(),
+          onFilter: this.handleModalFilteredMintedUsers,
+          isSBTCacheReady: this.props.isSBTCacheReady,
+          sbtCacheRevision: this.props.sbtCacheRevision,
+          loadingMintedFilter: this.state.loadingMintedFilter,
+          hasFilteredHolders,
+          hasComputedHolders,
+          showScanProgressInModal,
+          scanProgressText,
+          scanProgressSessionText,
+          scanProgressPct,
+          scanProgressFillStyle,
+          showEmptyStateInModal,
+          showApproximateCountHint,
+          showSpinnerInModalBody,
+          filteredMintedUsers,
+          copiedAddress: this.state.copiedAddress,
+          copyToClipboard: this.copyToClipboard,
+          getExplorerUrl: this.getExplorerUrl,
+        })}
 
-              {this.state.loadingMintedFilter && !hasFilteredHolders && !hasComputedHolders && (
-                <div className={styles.filteringStatus}>Filtering...</div>
-              )}
-              <div className={styles.userList}>
-                {showScanProgressInModal && (
-                  <div className={styles.scanProgress}>
-                    <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
-                    <div className={styles.scanProgressContent}>
-                      <span className={styles.scanProgressText}>{scanProgressText}</span>
-                      {scanProgressSessionText ? (
-                        <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
-                      ) : null}
-                      <div
-                        className={styles.scanProgressBar}
-                        role="progressbar"
-                        aria-valuenow={scanProgressPct}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                      >
-                        <div className={styles.scanProgressFill} style={scanProgressFillStyle} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {/* Body logic: Only show empty state if NOT initial loading */}
-                {showEmptyStateInModal && (
-                  <div className={styles.emptyState}>No holders found.</div>
-                )}
-                {showApproximateCountHint && (
-                  <div className={styles.emptyState}>Holder addresses not available yet. Showing approximate count only.</div>
-                )}
-                {/* Body logic: Show spinner if initial loading */}
-                {showSpinnerInModalBody && (
-                  <div className={styles.emptyState}><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>
-                )}
+        {renderSbtPageFullImageModal({
+          isOpen: this.state.showFullImage,
+          onToggle: this.toggleFullImage,
+          shouldRenderImage: !!sbtInfo,
+          imageUrl,
+          alt: sbtNameText,
+          onImageError: imageErrorHandler,
+        })}
 
-                {filteredMintedUsers.map((address: unknown, index: number) => {
-                  const copyAddressKey = `modal-addr-${index}`;
-                  const modalAddressCopyIconState = resolveSbtPageCopyIconState({
-                    copiedAddress: this.state.copiedAddress,
-                    targetKey: copyAddressKey,
-                  });
-                  const seed = String(address || 'contextengine-default-seed').toLowerCase();
-                  const blockieUrl = generateBlockieDataUrl(seed, 8, 4);
-                  return (
-                    <div key={index} className={styles.userItem}>
-                      <div className={styles.userItemLeft}>
-                        {blockieUrl ? (
-                          <img
-                            src={blockieUrl}
-                            alt=""
-                            className={styles.userBlockie}
-                          />
-                        ) : null}
-                        <a href={`/u/${address}`} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
-                          {getShortenedAddress(address, false)}
-                        </a>
-                      </div>
-                      <div className={styles.userItemActions}>
-                        <button onClick={() => this.copyToClipboard(address, copyAddressKey)} className={styles.copyButtonSmall}>
-                          {modalAddressCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-                          {modalAddressCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-                        </button>
-                        <a href={this.getExplorerUrl(address)} target="_blank" rel="noopener noreferrer" className={styles.explorerLinkSmall}>
-                          <FontAwesomeIcon icon={faExternalLinkAlt} />
-                        </a>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </ModalBody>
-        </Modal>
-
-        {/* Full Image Modal */}
-        <Modal
-          isOpen={this.state.showFullImage}
-          toggle={this.toggleFullImage}
-          centered
-          size="xl"
-          contentClassName={styles.imageModalContent}
-        >
-          <ModalBody className={styles.imageModalBody} onClick={this.toggleFullImage}>
-            {sbtInfo && (
-              <img
-                src={imageUrl}
-                alt={sbtNameText}
-                onError={imageErrorHandler}
-              />
-            )}
-          </ModalBody>
-        </Modal>
-
-        <Modal
-          isOpen={docModalOpen}
-          toggle={this.closeDocModal}
-          className={styles.modal}
-          contentClassName={styles.modalContent}
-          size="lg"
-        >
-          <ModalHeader toggle={this.closeDocModal} className={styles.modalHeader}>
-            <span className={styles.modalTitle}>{docModalName || 'Encrypted document'}</span>
-            {docModalLoading && (
-              <FontAwesomeIcon icon={faSpinner} spin className={styles.headerSpinner} />
-            )}
-          </ModalHeader>
-          <ModalBody className={styles.modalBody}>
-            {docModalError && (
-              <div className={styles.modalError}>{docModalError}</div>
-            )}
-            {!docModalError && docModalLoading && (
-              <div className={styles.modalLoading}>
-                <FontAwesomeIcon icon={faSpinner} spin /> Decrypting…
-              </div>
-            )}
-            {!docModalError && !docModalLoading && docModalContent && (
-              <pre className={styles.docModalContent}>{docModalContent}</pre>
-            )}
-            {!docModalError && !docModalLoading && !docModalContent && docModalBlobUrl && (
-              <div className={styles.docModalDownload}>
-                <a href={docModalBlobUrl} download={docModalName || 'document'}>
-                  Download decrypted file
-                </a>
-              </div>
-            )}
-          </ModalBody>
-        </Modal>
+        {renderSbtPageDocModal({
+          isOpen: docModalOpen,
+          onClose: this.closeDocModal,
+          loading: docModalLoading,
+          error: docModalError,
+          content: docModalContent,
+          name: docModalName,
+          blobUrl: docModalBlobUrl,
+        })}
       </div>
     );
   }
