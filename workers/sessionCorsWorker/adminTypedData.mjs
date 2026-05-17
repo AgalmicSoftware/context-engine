@@ -1,7 +1,7 @@
 // MIT-side duplicate of client/src/utilities/worker/adminTypedData.mjs.
 // Keep this file in sync with the client copy when the admin typed-data shape changes.
 
-import * as ethersModule from 'ethers';
+import ethersModule from 'ethers';
 
 const resolveEthersCompat = (loadedModule) => {
   const direct =
