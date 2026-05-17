@@ -12,33 +12,36 @@ const readClientFile = (relativePath) => {
 };
 
 describe('client package modernization contract', () => {
-  it('keeps canonical commands on the CRA compatibility path', () => {
+  it('keeps canonical commands on the Vite and standalone Jest paths', () => {
     const pkg = readClientPackageJson();
 
-    expect(pkg.scripts.dev).toBe('PUBLIC_URL=/ react-app-rewired start');
-    expect(pkg.scripts.build).toBe('PUBLIC_URL=/ react-app-rewired build');
+    expect(pkg.scripts.dev).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
+    expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts.start).toBe('serve -s build');
-    expect(pkg.scripts.test).toBe('react-app-rewired test');
+    expect(pkg.scripts.test).toBe('jest');
   });
 
-  it('keeps Vite available only as a sidecar command path', () => {
+  it('keeps CRA fallback scripts removed from the client package contract', () => {
     const pkg = readClientPackageJson();
+    const eslintConfig = readClientFile('.eslintrc.json');
 
-    expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0');
+    expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
     expect(pkg.scripts['build:vite']).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts['preview:vite']).toBe('vite preview --host 0.0.0.0');
-    expect(pkg.scripts.dev).not.toContain('vite');
-    expect(pkg.scripts.build).not.toContain('vite');
+    expect(pkg.scripts['dev:cra']).toBeUndefined();
+    expect(pkg.scripts['build:cra']).toBeUndefined();
+    expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).not.toContain('vite');
+    expect(eslintConfig).not.toContain('react-app');
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
     const pkg = readClientPackageJson();
 
     expect(pkg.dependencies.ethers).toBe('5.7.2');
-    expect(pkg.devDependencies['react-scripts']).toBe('4.0.3');
-    expect(pkg.devDependencies.webpack).toBe('4.44.2');
-    expect(pkg.overrides.webpack).toBe('4.44.2');
+    expect(pkg.devDependencies['react-scripts']).toBeUndefined();
+    expect(pkg.devDependencies.webpack).toBeUndefined();
+    expect(pkg.overrides.webpack).toBeUndefined();
   });
 
   it('keeps stale dependency overrides out of the client package contract', () => {
@@ -60,17 +63,46 @@ describe('client package modernization contract', () => {
     });
   });
 
-  it('keeps Vite output and entry wiring separate from CRA', () => {
+  it('keeps Vite output and entry wiring canonical', () => {
     const viteConfig = readClientFile('vite.config.mjs');
     const viteIndex = readClientFile('index.html');
-    const craIndex = readClientFile('public/index.html');
 
-    expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build-vite')");
-    expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build')");
+    expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
+    expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build-vite')");
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.js');
-    expect(craIndex).toContain('%PUBLIC_URL%');
-    expect(craIndex).not.toContain('/src/viteEntry.js');
+  });
+
+  it('keeps standalone Jest on explicit Babel and jsdom setup', () => {
+    const pkg = readClientPackageJson();
+    const jestConfig = readClientFile('jest.config.cjs');
+    const jsdomPolyfills = readClientFile('scripts/jest/jsdomPolyfills.js');
+
+    expect(pkg.babel.presets).toEqual([
+      [
+        '@babel/preset-env',
+        {
+          targets: {
+            node: 'current',
+          },
+        },
+      ],
+      [
+        '@babel/preset-react',
+        {
+          runtime: 'automatic',
+        },
+      ],
+      '@babel/preset-typescript',
+    ]);
+    expect(jestConfig).toContain("modules: 'commonjs'");
+    expect(jestConfig).toContain('@babel/preset-typescript');
+    expect(jestConfig).toContain('scripts/jest/jsdomPolyfills.js');
+    expect(jestConfig).not.toContain('react-app-polyfill');
+    expect(jsdomPolyfills).toContain("require('node-fetch')");
+    expect(jsdomPolyfills).toContain('class JestResponse');
+    expect(jsdomPolyfills).toContain('FileReader');
+    expect(jsdomPolyfills).toContain('process.env.PUBLIC_URL');
   });
 
   it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
@@ -88,17 +120,21 @@ describe('client package modernization contract', () => {
     const pkg = readClientPackageJson();
     const devOnlyPackages = [
       '@babel/core',
+      '@babel/preset-env',
+      '@babel/preset-react',
+      '@babel/preset-typescript',
+      '@typescript-eslint/eslint-plugin',
+      '@typescript-eslint/parser',
       'babel-jest',
+      'eslint',
+      'eslint-plugin-import',
       'eslint-plugin-prettier',
-      'node-polyfill-webpack-plugin',
-      'raw-loader',
-      'react-scripts',
+      'eslint-plugin-react',
+      'eslint-plugin-react-hooks',
       'sass',
-      'sass-loader',
       'serve',
       'source-map-explorer',
-      'source-map-loader',
-      'webpack',
+      'vite',
     ];
 
     devOnlyPackages.forEach((name) => {
@@ -107,9 +143,21 @@ describe('client package modernization contract', () => {
     });
   });
 
-  it('keeps stale webpack loaders out of the client package contract', () => {
+  it('keeps stale webpack and CRA packages out of the client package contract', () => {
     const pkg = readClientPackageJson();
     const staleLoaders = [
+      'babel-eslint',
+      'babel-preset-react-app',
+      'copy-webpack-plugin',
+      'file-loader',
+      'node-polyfill-webpack-plugin',
+      'raw-loader',
+      'react-app-polyfill',
+      'react-app-rewired',
+      'react-scripts',
+      'sass-loader',
+      'source-map-loader',
+      'webpack',
       'worker-loader',
     ];
 

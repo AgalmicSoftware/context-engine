@@ -27,7 +27,8 @@ const mockDecryptWithPassword = jest.fn();
 const mockPendingSbtAddress = ethers.utils.getAddress('0x5fbdb2315678afecb367f032d93f642f64180aa3');
 const mockSecondPendingSbtAddress = ethers.utils.getAddress('0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512');
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
-const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
+const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
+const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
 const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
@@ -258,13 +259,13 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
   buildSiweMessage: jest.fn(() => 'siwe-message'),
   buildSignedBootstrapAdminAuth: jest.fn(async ({ slug }) => ({
-    address: TEST_ADMIN_ADDRESS,
+    address: mockTestAdminAddress,
     message: 'bootstrap-siwe-message',
     signature: '0xbootstrap-admin-auth',
     sessionSlug: slug,
   })),
   buildSignedAdminActionAuth: jest.fn(async ({ action, slug, body }) => ({
-    address: TEST_ADMIN_ADDRESS,
+    address: mockTestAdminAddress,
     signature: '0xadmin-action-signature',
     action,
     slug,

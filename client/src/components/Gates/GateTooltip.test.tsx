@@ -48,7 +48,7 @@ describe('GateTooltip', () => {
     // Held SBT shows [held] prefix; address shown as display name or short address
     const tooltipText = screen.getByTestId('mock-gate-tooltip').textContent;
     expect(tooltipText).toMatch(/\[held\]/);
-    expect(tooltipText).toContain('0x1111');
+    expect(tooltipText).toContain('VIP SBT');
     expect(tooltipText).toContain('0x2222');
   });
 
