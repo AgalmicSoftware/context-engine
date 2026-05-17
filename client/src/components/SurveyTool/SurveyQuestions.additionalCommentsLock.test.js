@@ -1,17 +1,10 @@
 import { SurveyQuestions } from './SurveyQuestions';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
+import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-
-const treeHasDataTestId = (node, testId) => {
-  if (node == null) return false;
-  if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
-  if (typeof node !== 'object') return false;
-  if (node?.props?.['data-testid'] === testId) return true;
-  return treeHasDataTestId(node?.props?.children, testId);
-};
 
 const treeHasText = (node, text) => {
   if (node == null) return false;
@@ -66,6 +59,12 @@ const findNodeByClassName = (node, className) => (
   findElement(node, (candidate) => nodeHasClassName(candidate, className))
 );
 
+const getFullQuestionLockControl = (fullQuestionCard) => {
+  const footerIcons = fullQuestionCard?.props?.footerIcons;
+  const children = footerIcons?.props?.children;
+  return Array.isArray(children) ? children[0] : children;
+};
+
 describe('SurveyQuestions additional comment locks', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -105,10 +104,11 @@ describe('SurveyQuestions additional comment locks', () => {
       showPlaintextOption: true,
       showFollowOption: true,
     });
-    const lockButton = findFirstNodeByType(lockControl, 'button');
-    expect(lockButton).toBeTruthy();
+    expect(lockControl.type).toBe(SurveyQuestionsLockAudienceControl);
+    expect(lockControl.props.effectiveFieldKey).toBe('additional');
+    expect(typeof lockControl.props.onLockClick).toBe('function');
 
-    lockButton.props.onClick();
+    lockControl.props.onLockClick();
 
     expect(subject.toggleAdditionalCommentsEncryption).toHaveBeenCalledWith(0, 'q1', false);
     expect(subject.toggleLockAudienceMenu).toHaveBeenCalledWith('q1', false, 'additional');
@@ -144,8 +144,11 @@ describe('SurveyQuestions additional comment locks', () => {
 
     const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
 
-    expect(treeHasText(fullQuestionCard, 'only me')).toBe(true);
-    expect(treeHasDataTestId(fullQuestionCard, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE)).toBe(false);
+    const lockControl = getFullQuestionLockControl(fullQuestionCard);
+    expect(lockControl.type).toBe(SurveyQuestionsLockAudienceControl);
+    expect(lockControl.props.normalizedSelfAudienceLabel).toBe('only me');
+    expect(lockControl.props.gateOptions).toEqual([]);
+    expect(lockControl.props.allowPlaintextOption).toBe(false);
   });
 
   it('renders full-mode additional comments without the extra header and keeps the lock beside the field', () => {
@@ -178,15 +181,18 @@ describe('SurveyQuestions additional comment locks', () => {
     };
 
     const fullQuestionCard = subject.renderQuestion(question, 0, currentSurveyResponseState);
-    const inlineRow = findFirstNodeByType(fullQuestionCard, AdditionalCommentsInlineRow);
+    const commentsSection = fullQuestionCard.props.commentsSection;
+    const inlineRow = findFirstNodeByType(commentsSection, AdditionalCommentsInlineRow);
 
     expect(inlineRow).not.toBeNull();
-    expect(findNodeByClassName(fullQuestionCard, styles.additionalCommentsHeader)).toBeNull();
-    expect(treeHasText(fullQuestionCard, 'Additional comments')).toBe(false);
+    expect(findNodeByClassName(commentsSection, styles.additionalCommentsHeader)).toBeNull();
+    expect(treeHasText(commentsSection, 'Additional comments')).toBe(false);
     expect(inlineRow.props.input.type).toBe(SurveyAudioFieldInput);
     expect(inlineRow.props.input.props.placeholder).toBe('related thoughts or URLs (optional)');
     expect(renderToStaticMarkup(inlineRow)).toContain(styles.additionalCommentsInputWrap);
     expect(renderToStaticMarkup(inlineRow)).toContain(styles.additionalCommentsLockSlot);
-    expect(treeHasDataTestId(inlineRow.props.lockControl, E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK)).toBe(true);
+    expect(renderToStaticMarkup(inlineRow.props.lockControl)).toContain(
+      `data-testid="${E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK}"`
+    );
   });
 });
