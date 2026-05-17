@@ -71,6 +71,38 @@ describe('client package modernization contract', () => {
     expect(viteIndex).toContain('/src/viteEntry.js');
   });
 
+  it('keeps standalone Jest on explicit Babel and jsdom setup', () => {
+    const pkg = readClientPackageJson();
+    const jestConfig = readClientFile('jest.config.cjs');
+    const jsdomPolyfills = readClientFile('scripts/jest/jsdomPolyfills.js');
+
+    expect(pkg.babel.presets).toEqual([
+      [
+        '@babel/preset-env',
+        {
+          targets: {
+            node: 'current',
+          },
+        },
+      ],
+      [
+        '@babel/preset-react',
+        {
+          runtime: 'automatic',
+        },
+      ],
+      '@babel/preset-typescript',
+    ]);
+    expect(jestConfig).toContain("modules: 'commonjs'");
+    expect(jestConfig).toContain('@babel/preset-typescript');
+    expect(jestConfig).toContain('scripts/jest/jsdomPolyfills.js');
+    expect(jestConfig).not.toContain('react-app-polyfill');
+    expect(jsdomPolyfills).toContain("require('node-fetch')");
+    expect(jsdomPolyfills).toContain('class JestResponse');
+    expect(jsdomPolyfills).toContain('FileReader');
+    expect(jsdomPolyfills).toContain('process.env.PUBLIC_URL');
+  });
+
   it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
     [
       'src/components/DebateMap/DebateMap.tsx',
@@ -89,8 +121,6 @@ describe('client package modernization contract', () => {
       '@babel/preset-env',
       '@babel/preset-react',
       '@babel/preset-typescript',
-      '@typescript-eslint/eslint-plugin',
-      '@typescript-eslint/parser',
       'babel-jest',
       'eslint',
       'eslint-plugin-import',
@@ -110,10 +140,12 @@ describe('client package modernization contract', () => {
   it('keeps stale webpack and CRA packages out of the client package contract', () => {
     const pkg = readClientPackageJson();
     const staleLoaders = [
+      'babel-preset-react-app',
       'copy-webpack-plugin',
       'file-loader',
       'node-polyfill-webpack-plugin',
       'raw-loader',
+      'react-app-polyfill',
       'react-app-rewired',
       'react-scripts',
       'sass-loader',
