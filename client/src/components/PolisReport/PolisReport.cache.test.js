@@ -565,6 +565,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 0, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -610,6 +611,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 0, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -689,6 +691,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 0, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -743,6 +746,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 10, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -787,6 +791,7 @@ describe('PolisReport demo data defaults', () => {
       statementCoords: [
         { x: 10, y: 0, index: 0 },
       ],
+      commentStats: [],
       clusterAssignments: [0, 0, 1],
       clusterCount: 2,
       repQuestions: {},
@@ -816,6 +821,7 @@ describe('PolisReport demo data defaults', () => {
       },
       participantCoords: [{ x: 0, y: 0, index: 0 }],
       statementCoords: [{ x: 0, y: 0, index: 0 }],
+      commentStats: [],
       clusterAssignments: [0],
       clusterCount: 1,
       repQuestions: { 0: [] },

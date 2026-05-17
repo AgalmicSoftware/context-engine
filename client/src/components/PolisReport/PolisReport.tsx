@@ -2437,6 +2437,7 @@ export default function PolisReport({
                   : 'idle';
             const startedAt = analysisStartTimesRef.current?.[c];
             const elapsed = formatElapsed(startedAt); // analysisTicker used to re-render
+            const shouldRenderAnalysisState = isLoadingThis || !!analysis || !!errText;
 
             const nameSuffix = analysis?.name ? `: ${analysis.name}` : '';
 
@@ -2473,31 +2474,33 @@ export default function PolisReport({
                 </div>
 
                 {/* NEW: AI Analysis Summary / Spinner / Error */}
-                <div
-                  className={styles.clusterAnalysis}
-                  data-testid={E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS}
-                  data-ce-cluster-index={String(c)}
-                  data-ce-analysis-state={analysisState}
-                >
-                  {isLoadingThis && (
-                    <div className={styles.clusterAnalysisRow}>
-                      <FontAwesomeIcon icon={faSpinner} spin className={styles.analysisSpinner} />
-                      <span className={styles.elapsedTimer} aria-live="polite">{elapsed}</span>
-                      <span className={styles.analysisNote}>Analyzing group...</span>
-                    </div>
-                  )}
-                  {analysis && (
-                    <div className={styles.clusterAnalysisText}>
-                      <div className={styles.clusterAnalysisShort}>"{analysis.short}"</div>
-                      <div className={styles.clusterAnalysisLong}>{analysis.long}</div>
-                    </div>
-                  )}
-                  {errText && !analysis && (
-                    <div className={styles.clusterAnalysisError}>
-                      Couldn’t analyze this cluster: {errText}
-                    </div>
-                  )}
-                </div>
+                {shouldRenderAnalysisState && (
+                  <div
+                    className={styles.clusterAnalysis}
+                    data-testid={E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS}
+                    data-ce-cluster-index={String(c)}
+                    data-ce-analysis-state={analysisState}
+                  >
+                    {isLoadingThis && (
+                      <div className={styles.clusterAnalysisRow}>
+                        <FontAwesomeIcon icon={faSpinner} spin className={styles.analysisSpinner} />
+                        <span className={styles.elapsedTimer} aria-live="polite">{elapsed}</span>
+                        <span className={styles.analysisNote}>Analyzing group...</span>
+                      </div>
+                    )}
+                    {analysis && (
+                      <div className={styles.clusterAnalysisText}>
+                        <div className={styles.clusterAnalysisShort}>"{analysis.short}"</div>
+                        <div className={styles.clusterAnalysisLong}>{analysis.long}</div>
+                      </div>
+                    )}
+                    {errText && !analysis && (
+                      <div className={styles.clusterAnalysisError}>
+                        Couldn’t analyze this cluster: {errText}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {clusterIsOpen ? renderClusterRepresentativesFor(c) : (
                   <div style={{ marginLeft: '20px', marginTop: '6px' }}>
