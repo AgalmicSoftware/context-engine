@@ -146,6 +146,15 @@ describe('client package modernization contract', () => {
     });
   });
 
+  it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
+    [
+      'src/components/ContractPage/contractSourceLoader.ts',
+      'src/utilities/web3/contractScripts.ts',
+    ].forEach((relativePath) => {
+      expect(readClientFile(relativePath)).not.toMatch(/\brequire\(/);
+    });
+  });
+
   it('keeps build, test, lint, analyze, and static serving tools out of production dependencies', () => {
     const pkg = readClientPackageJson();
     const devOnlyPackages = [
