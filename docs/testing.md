@@ -49,36 +49,15 @@ helpers installed, but it is not a clean-checkout gate.
 
 ```bash
 cd client
-nvm use 20
+nvm use 16
 npm test -- --watchAll=false
 npm run lint
 npm run typecheck
 ```
 
 Use the client workflow when you are working only in `client/` and do not need the full root test gate.
-The client test runner is standalone Jest 30 configured by `client/jest.config.cjs`.
-Babel-Jest uses explicit Babel presets, and jsdom setup lives under
-`client/scripts/jest/`.
-Client linting runs ESLint 9 through `client/eslint.config.mjs`. One command
-covers every tracked client JS, JSX, TS, and TSX source; specialized blocks
-tighten React/Hooks rules for their established surfaces, while catch-all typed
-and TSX blocks prevent new files from escaping baseline coverage. Unused disable
-directives are errors. `npm run typecheck` runs the production client
-TypeScript project with `tsc --noEmit`; Jest/spec helper files remain covered
-by lint and Jest, and by the separate `npm run typecheck:client-tests` ratchet.
-That ratchet compiles all tracked typed tests and named helpers with Jest 30's
-real framework types, permits only the checked-in migration diagnostics, and
-fails on any new diagnostic signature or count. The raw test project is not
-yet zero-diagnostic, so the ratchet command—not a claim of clean standalone
-`tsc` output—is the current contract.
-
-`npm run test:client` performs one instrumented run with
-`client/jest.full-universe.config.cjs`. Every tracked executable JS, JSX, TS,
-and TSX production file under `client/src` enters the denominator, including
-never-imported files. `npm run coverage-floor:check` reuses that run's
-`coverage-final.json` to enforce both the fixed legacy imported-file metric and
-the separately banked whole-production metric. The two percentages are not
-directly comparable.
+The client test runner is standalone Jest configured by `client/jest.config.cjs`;
+it no longer shells through CRA or `react-app-rewired`.
 
 ### Targeted Root Commands
 
