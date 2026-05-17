@@ -38,6 +38,13 @@ cd client
 npm test -- --watchAll=false
 ```
 
+Client unit tests run through standalone Jest:
+
+```bash
+cd client
+npm test -- --watchAll=false
+```
+
 ## `local-chain`
 
 Local blockchain development with Anvil and Foundry.
