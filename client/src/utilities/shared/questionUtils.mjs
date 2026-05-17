@@ -8,7 +8,7 @@
 // Depends on: ethers (v5)
 
 import bufferModule from 'buffer';
-import ethersModule from 'ethers';
+import * as ethersModule from 'ethers';
 
 const Buffer =
   bufferModule?.Buffer ||
