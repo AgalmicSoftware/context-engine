@@ -164,6 +164,7 @@ import {
 import {
   buildDecryptedSponsoredBundle,
   buildEnvelope,
+  buildMockContractViewerContracts,
   createDefaultFetchMock,
   createDeferred,
   seedWizardCache,
@@ -194,37 +195,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     mockDownloadDataFromArweave.mockResolvedValue(buildEnvelope());
     mockUploadDataToArweave.mockResolvedValue('a'.repeat(43));
     mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
-    buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) => (
-      Object.keys(sessionContracts).map((contractKey) => ({
-        key: contractKey,
-        name:
-          contractKey === 'surveys'
-            ? 'Questions and Surveys'
-            : contractKey === 'sbtFactory'
-              ? 'SBT Factory'
-              : contractKey === 'sessionRegistry'
-                ? 'Session Registry'
-                : contractKey,
-        explainer: `Explainer for ${contractKey}`,
-        sourceFile:
-          contractKey === 'surveys'
-            ? 'Surveys.sol'
-            : contractKey === 'sbtFactory'
-              ? 'SBTFactory.sol'
-              : contractKey === 'sessionRegistry'
-                ? 'SessionRegistry.sol'
-                : 'Contract.sol',
-        source: `contract ${contractKey} {}`,
-        addresses: sessionContracts[contractKey]?.address
-          ? [{
-              address: sessionContracts[contractKey].address,
-              id: sessionContracts[contractKey].chainId || 84532,
-              testnet: true,
-              explorerUrl: `https://example.example.test/${contractKey}`,
-            }]
-          : [],
-      }))
-    ));
+    buildContractViewerContracts.mockImplementation(buildMockContractViewerContracts);
     mockDecryptWithPassword.mockResolvedValue(buildDecryptedSponsoredBundle());
   });
 

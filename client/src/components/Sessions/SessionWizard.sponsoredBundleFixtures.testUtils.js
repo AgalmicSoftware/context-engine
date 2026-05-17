@@ -91,9 +91,42 @@ const createDeferred = () => {
   return { promise, resolve, reject };
 };
 
+const buildMockContractViewerContracts = ({ sessionContracts = {} } = {}) => (
+  Object.keys(sessionContracts).map((contractKey) => ({
+    key: contractKey,
+    name:
+      contractKey === 'surveys'
+        ? 'Questions and Surveys'
+        : contractKey === 'sbtFactory'
+          ? 'SBT Factory'
+          : contractKey === 'sessionRegistry'
+            ? 'Session Registry'
+            : contractKey,
+    explainer: `Explainer for ${contractKey}`,
+    sourceFile:
+      contractKey === 'surveys'
+        ? 'Surveys.sol'
+        : contractKey === 'sbtFactory'
+          ? 'SBTFactory.sol'
+          : contractKey === 'sessionRegistry'
+            ? 'SessionRegistry.sol'
+            : 'Contract.sol',
+    source: `contract ${contractKey} {}`,
+    addresses: sessionContracts[contractKey]?.address
+      ? [{
+          address: sessionContracts[contractKey].address,
+          id: sessionContracts[contractKey].chainId || 84532,
+          testnet: true,
+          explorerUrl: `https://example.example.test/${contractKey}`,
+        }]
+      : [],
+  }))
+);
+
 export {
   buildDecryptedSponsoredBundle,
   buildEnvelope,
+  buildMockContractViewerContracts,
   createDefaultFetchMock,
   createDeferred,
   seedWizardCache,
