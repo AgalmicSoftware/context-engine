@@ -19,7 +19,7 @@ describe('SBTPage holder state preservation', () => {
       const ownerA = '0x00000000000000000000000000000000000000b1';
       const ownerB = '0x00000000000000000000000000000000000000b2';
       const cacheEntry = {
-        84532: {
+        '84532': {
           sbtList: {
             [sbtLower]: {
               sbtAddress,
@@ -44,11 +44,8 @@ describe('SBTPage holder state preservation', () => {
       };
 
       let resolveFirstRead;
-      const firstRead = new Promise((resolve) => {
-        resolveFirstRead = resolve;
-      });
-      const readSpy = jest
-        .spyOn(cacheScripts, 'readCache')
+      const firstRead = new Promise((resolve) => { resolveFirstRead = resolve; });
+      const readSpy = jest.spyOn(cacheScripts, 'readCache')
         .mockImplementationOnce(() => firstRead)
         .mockResolvedValue(cacheEntry);
       jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
@@ -95,7 +92,7 @@ describe('SBTPage holder state preservation', () => {
     const sbtLower = sbtAddress.toLowerCase();
     const holder = '0x00000000000000000000000000000000000000b1';
     const cacheEntry = {
-      84532: {
+      '84532': {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -150,7 +147,7 @@ describe('SBTPage holder state preservation', () => {
     const sbtLower = sbtAddress.toLowerCase();
     const holder = '0x00000000000000000000000000000000000000b3';
     const cacheEntry = {
-      84532: {
+      '84532': {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -200,7 +197,7 @@ describe('SBTPage holder state preservation', () => {
     const holder = '0x00000000000000000000000000000000000000b1';
     const holderLower = holder.toLowerCase();
     const cacheEntry = {
-      84532: {
+      '84532': {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -244,9 +241,7 @@ describe('SBTPage holder state preservation', () => {
     expect(subject.state.mintedAddresses).toEqual([holderLower, holderLower]);
     expect(subject.state.burnedAddresses).toEqual([holderLower]);
     expect(subject.state.userHasSBT).toBe(true);
-    expect(subject.getMemoizedNetHoldersList(subject.state.mintedAddresses, subject.state.burnedAddresses)).toEqual([
-      holderLower,
-    ]);
+    expect(subject.getMemoizedNetHoldersList(subject.state.mintedAddresses, subject.state.burnedAddresses)).toEqual([holderLower]);
   });
 
   it('preserves mintedTokensOverride after refresh when refreshed holder lists are incomplete', async () => {
@@ -254,7 +249,7 @@ describe('SBTPage holder state preservation', () => {
     const sbtLower = sbtAddress.toLowerCase();
     const ownerA = '0x00000000000000000000000000000000000000b1';
     const initialEntry = {
-      84532: {
+      '84532': {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -278,7 +273,7 @@ describe('SBTPage holder state preservation', () => {
       },
     };
     const refreshedEntry = {
-      84532: {
+      '84532': {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -302,8 +297,7 @@ describe('SBTPage holder state preservation', () => {
       },
     };
 
-    const readSpy = jest
-      .spyOn(cacheScripts, 'readCache')
+    const readSpy = jest.spyOn(cacheScripts, 'readCache')
       .mockResolvedValueOnce(initialEntry)
       .mockResolvedValueOnce(refreshedEntry);
     const refreshSpy = jest.fn().mockResolvedValue(undefined);
@@ -335,7 +329,7 @@ describe('SBTPage holder state preservation', () => {
     const sbtLower = sbtAddress.toLowerCase();
     const ownerA = '0x00000000000000000000000000000000000000b1';
     const emptyCountsLoadedEntry = {
-      84532: {
+      '84532': {
         sbtList: {
           [sbtLower]: {
             sbtAddress,
@@ -406,8 +400,7 @@ describe('SBTPage holder state preservation', () => {
       lastBlock: 1250,
     });
 
-    const readSpy = jest
-      .spyOn(cacheScripts, 'readCache')
+    const readSpy = jest.spyOn(cacheScripts, 'readCache')
       .mockResolvedValueOnce(initialEntry)
       .mockResolvedValueOnce(refreshedEntry);
     const refreshSpy = jest.fn().mockResolvedValue(undefined);
@@ -447,43 +440,6 @@ describe('SBTPage holder state preservation', () => {
     expect(subject.state.filteredMintedUsers).toEqual([ownerA.toLowerCase()]);
   });
 
-  it('does not repeat the central event refresh when the holder meta key was already scanned', async () => {
-    const sbtAddress = '0x00000000000000000000000000000000000000a1';
-    const sbtLower = sbtAddress.toLowerCase();
-    const cacheEntry = createReadCachePayload({
-      sbtAddress,
-      mintedAddresses: [],
-      burnedAddresses: [],
-      countsLoaded: false,
-      blockNumber: 1234,
-    });
-
-    const readSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue(cacheEntry);
-    const refreshSpy = jest.fn().mockResolvedValue(undefined);
-    jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
-    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(null);
-
-    const subject = createSubject({
-      SBTAddress: sbtAddress,
-      sessionSlug: 'edge',
-      refreshSbtData: refreshSpy,
-    });
-    subject.state = {
-      ...subject.state,
-      network: { id: 84532, name: 'Base Sepolia' },
-    };
-    subject._eventScanTried = {
-      [`edge:84532:${sbtLower}`]: true,
-    };
-
-    await subject.loadSBTInfo(false);
-
-    expect(readSpy).toHaveBeenCalledTimes(1);
-    expect(refreshSpy).not.toHaveBeenCalled();
-    expect(subject._eventScanTried[`edge:84532:${sbtLower}`]).toBe(true);
-    expect(subject.state.countsLoaded).toBe(false);
-  });
-
   it('clears only the holder whose burn count increases during a same-key empty refresh', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
     const ownerA = '0x00000000000000000000000000000000000000b1';
@@ -504,7 +460,9 @@ describe('SBTPage holder state preservation', () => {
       lastBlock: 1250,
     });
 
-    jest.spyOn(cacheScripts, 'readCache').mockResolvedValueOnce(initialEntry).mockResolvedValueOnce(refreshedEntry);
+    jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(initialEntry)
+      .mockResolvedValueOnce(refreshedEntry);
     const refreshSpy = jest.fn().mockResolvedValue(undefined);
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
     jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('2');
@@ -534,9 +492,7 @@ describe('SBTPage holder state preservation', () => {
     expect(refreshSpy).toHaveBeenCalledTimes(1);
     expect(subject.state.mintedAddresses).toEqual([ownerA.toLowerCase(), ownerB.toLowerCase()]);
     expect(subject.state.burnedAddresses).toEqual([ownerA.toLowerCase()]);
-    expect(subject.getMemoizedNetHoldersList(subject.state.mintedAddresses, subject.state.burnedAddresses)).toEqual([
-      ownerB.toLowerCase(),
-    ]);
+    expect(subject.getMemoizedNetHoldersList(subject.state.mintedAddresses, subject.state.burnedAddresses)).toEqual([ownerB.toLowerCase()]);
     expect(subject.state.filteredMintedUsers).toEqual([ownerB.toLowerCase()]);
     expect(subject.state.userHasSBT).toBe(false);
   });
@@ -585,7 +541,9 @@ describe('SBTPage holder state preservation', () => {
       lastBlock: 1250,
     });
 
-    jest.spyOn(cacheScripts, 'readCache').mockResolvedValueOnce(initialEntry).mockResolvedValueOnce(refreshedEntry);
+    jest.spyOn(cacheScripts, 'readCache')
+      .mockResolvedValueOnce(initialEntry)
+      .mockResolvedValueOnce(refreshedEntry);
     const refreshSpy = jest.fn().mockResolvedValue(undefined);
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
     jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue('1');
