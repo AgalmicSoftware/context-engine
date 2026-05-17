@@ -361,13 +361,11 @@ type DocumentLibraryUploadControlsProps = {
   file: File | null;
   onFileChange: (file: File | null) => void;
   onUploadFile: () => void;
-  fileUploadPending: boolean;
   urlInput: string;
   onUrlInputChange: (value: string) => void;
   urlTitle: string;
   onUrlTitleChange: (value: string) => void;
   onUploadUrlRecord: () => void;
-  urlUploadPending: boolean;
   isUploadableDocProvider: boolean;
   requiresLitDocumentStorage: boolean;
   locked: boolean;
@@ -400,13 +398,11 @@ export const DocumentLibraryUploadControls = ({
   file,
   onFileChange,
   onUploadFile,
-  fileUploadPending,
   urlInput,
   onUrlInputChange,
   urlTitle,
   onUrlTitleChange,
   onUploadUrlRecord,
-  urlUploadPending,
   isUploadableDocProvider,
   requiresLitDocumentStorage,
   locked,
@@ -449,11 +445,10 @@ export const DocumentLibraryUploadControls = ({
         size="sm"
         className={styles.primaryBtn}
         onClick={onUploadFile}
-        disabled={!file || !isUploadableDocProvider || fileUploadPending}
-        aria-busy={fileUploadPending || undefined}
+        disabled={!file || !isUploadableDocProvider}
         data-testid={E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON}
       >
-        <FontAwesomeIcon icon={fileUploadPending ? faSpinner : faUpload} spin={fileUploadPending} /> {fileUploadPending ? 'Uploading' : 'Upload'}
+        <FontAwesomeIcon icon={faUpload} /> Upload
       </Button>
     </div>
 
@@ -475,12 +470,11 @@ export const DocumentLibraryUploadControls = ({
         size="sm"
         className={styles.primaryBtn}
         onClick={onUploadUrlRecord}
-        disabled={!toStr(urlInput).trim() || !isUploadableDocProvider || urlUploadPending}
-        aria-busy={urlUploadPending || undefined}
+        disabled={!toStr(urlInput).trim() || !isUploadableDocProvider}
         title="Upload link record"
         data-testid={E2E_TESTIDS.DOC_URL_ADD_BUTTON}
       >
-        <FontAwesomeIcon icon={urlUploadPending ? faSpinner : faLink} spin={urlUploadPending} /> {urlUploadPending ? 'Adding' : 'Add'}
+        <FontAwesomeIcon icon={faLink} /> Add
       </Button>
     </div>
 

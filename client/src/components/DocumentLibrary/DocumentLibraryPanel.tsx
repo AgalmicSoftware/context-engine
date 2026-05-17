@@ -46,7 +46,6 @@ import {
   uploadDocLibraryFile,
   uploadDocLibraryUrlRecord,
 } from '../../utilities/docLibrary/uploads.js';
-import SBTSelector from '../SBTs/SBTSelector';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { createLogger } from '../../utilities/logging.js';
 import {
@@ -358,19 +357,6 @@ const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is Stor
   return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
 };
 
-const buildAsyncContextKeyPart = (value: unknown): string => {
-  try {
-    return JSON.stringify(value ?? null);
-  } catch (_) {
-    return String(value ?? '');
-  }
-};
-
-const isValidStorageDocRef = (storageRef: StorageRef | null): storageRef is StorageRef => {
-  if (!storageRef?.id) return false;
-  return storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE || isArweaveTxId(storageRef.id);
-};
-
 const buildSessionListFilters = (sessionIdHex: string): ListFilter[] => ([
   { name: 'CE-DocLibrary', values: ['1'] },
   { name: 'CE-SessionId', values: [normalizeSessionIdHex(sessionIdHex)] },
@@ -412,118 +398,6 @@ const fetchArweaveBlobWithFallback = async (
     }
   }
   return { ok: false, error: getErrorMessage(lastErr, 'Arweave fetch failed.') };
-};
-
-type DocRowImagePreviewProps = {
-  txId: string;
-  name: string;
-  isEncryptedStorage: boolean;
-  arweaveUrl: string;
-  provider?: unknown;
-  account?: string | null;
-  chainId?: number | string | null;
-  panelContextKey?: string;
-  litHooks?: LitHooks;
-};
-
-const DocRowImagePreview = ({
-  txId,
-  name,
-  isEncryptedStorage,
-  arweaveUrl,
-  provider,
-  account,
-  chainId,
-  panelContextKey,
-  litHooks: scopedLitHooks,
-}: DocRowImagePreviewProps) => {
-  const [encryptedPreviewUrl, setEncryptedPreviewUrl] = useState('');
-
-  useEffect(() => {
-    if (!isEncryptedStorage) {
-      setEncryptedPreviewUrl('');
-      return undefined;
-    }
-    if (!txId) {
-      setEncryptedPreviewUrl('');
-      return undefined;
-    }
-
-    const litHooks = (
-      (scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
-      getGlobalLitHooks()
-    ) as LitHooks;
-    if (!litHooks || typeof litHooks.getKey !== 'function' || !provider || !toStr(account).trim()) {
-      setEncryptedPreviewUrl('');
-      return undefined;
-    }
-
-    let cancelled = false;
-    let objectUrl = '';
-
-    const loadEncryptedPreview = async () => {
-      try {
-        const { payload } = await litStorage.downloadEncryptedArweaveData({
-          url: litStorage.buildLitArweaveUrl(txId),
-          providerLike: provider,
-          account,
-          chainId: chainId || null,
-          lit: { getKey: litHooks.getKey },
-          arweave: {
-            debugContext: {
-              category: 'doc_lit_preview',
-              caller: 'DocumentLibraryPanel.DocRowImagePreview',
-              slug: panelContextKey || '',
-              chainId: Number(chainId || 0) || null,
-            },
-          },
-        });
-
-        const blob = litStorage.decodeLitPayloadToBlob(payload);
-        if (!blob || !toStr(blob.type).trim().toLowerCase().startsWith('image/')) {
-          throw new Error('Encrypted image preview unavailable.');
-        }
-        if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return;
-
-        objectUrl = URL.createObjectURL(blob);
-        if (cancelled) {
-          if (objectUrl && typeof URL.revokeObjectURL === 'function') {
-            URL.revokeObjectURL(objectUrl);
-          }
-          return;
-        }
-        setEncryptedPreviewUrl(objectUrl);
-      } catch (_) {
-        if (!cancelled) setEncryptedPreviewUrl('');
-      }
-    };
-
-    loadEncryptedPreview();
-
-    return () => {
-      cancelled = true;
-      if (objectUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
-        try {
-          URL.revokeObjectURL(objectUrl);
-        } catch (e) {
-          log.warn('DocumentLibraryPanel: preview cleanup', e);
-        }
-      }
-    };
-  }, [account, chainId, isEncryptedStorage, panelContextKey, provider, scopedLitHooks, txId]);
-
-  const previewSrc = isEncryptedStorage ? encryptedPreviewUrl : arweaveUrl;
-  if (!previewSrc) return null;
-
-  return (
-    <div className={styles.docPreview} data-testid={E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW}>
-      <img
-        src={previewSrc}
-        alt={`${name || 'Document'} preview`}
-        className={styles.docPreviewImage}
-      />
-    </div>
-  );
 };
 
 export default function DocumentLibraryPanel({
@@ -1612,13 +1486,11 @@ export default function DocumentLibraryPanel({
           file={file}
           onFileChange={setFile}
           onUploadFile={uploadFile}
-          fileUploadPending={fileUploadPending}
           urlInput={urlInput}
           onUrlInputChange={setUrlInput}
           urlTitle={urlTitle}
           onUrlTitleChange={setUrlTitle}
           onUploadUrlRecord={uploadUrlRecord}
-          urlUploadPending={urlUploadPending}
           isUploadableDocProvider={isUploadableDocProvider}
           requiresLitDocumentStorage={requiresLitDocumentStorage}
           locked={locked}
