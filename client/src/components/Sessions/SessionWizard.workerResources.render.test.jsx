@@ -4,7 +4,6 @@ import {
   ethers,
   fireEvent,
   getWizardResourceCard,
-  mockRegisterSessionOnChain,
   renderLoggedInSessionWizard,
   renderSessionWizard,
   renderSessionWizardWithTooltipStore,
@@ -19,87 +18,21 @@ import {
 describe('SessionWizard worker resource rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  const openPublishSection = async () => {
-    fireEvent.click(screen.getByText('Publish').closest('button'));
-    return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-  };
-
-  const selectPreset = async (presetId) => {
-    const testId = `ce-new-preset-${presetId}`;
-    const originalConfirm = window.confirm;
-    window.confirm = jest.fn(() => true);
-    try {
-      fireEvent.click(screen.getByTestId(testId));
-    } finally {
-      window.confirm = originalConfirm;
-    }
-    await waitFor(() => {
-      expect(screen.getByTestId(testId)).toHaveAttribute('aria-checked', 'true');
-    });
-  };
-
-  const selectFastCheapPreset = async () => selectPreset('fast_cheap_cloudflare');
-  const selectTrustlessPublicPreset = async () => selectPreset('trustless_public_decentralized');
-  const selectLitProfile = async (selectBasePreset) => {
-    await selectBasePreset();
-    enableAdvancedMode();
-    const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
-    fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
-    await waitFor(() => {
-      expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true');
-    });
-  };
-  const selectCloudflareLitProfile = async () => selectLitProfile(selectFastCheapPreset);
-  const selectDecentralizedLitProfile = async () => selectLitProfile(selectTrustlessPublicPreset);
-
-  it('shows only the AI resource for the default Cloudflare two-key profile', async () => {
+  it('keeps session storage profile selection in advanced mode and defaults to Arweave', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectFastCheapPreset();
-    selectNormalModeCard('Worker');
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(1);
-    });
-    expect(getWizardResourceCard('ai')).toBeTruthy();
-    expect(getWizardResourceCard('arweave')).toBeUndefined();
-    expect(getWizardResourceCard('rpc')).toBeUndefined();
-    expect(getWizardResourceCard('txGas')).toBeUndefined();
-    expect(getWizardResourceCard('lit')).toBeUndefined();
-  });
-
-  it('preserves decentralized resource requirements while leaving Lit opt-in', async () => {
-    renderLoggedInSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
-    selectNormalModeCard('Worker');
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(4);
-    });
-    expect(getWizardResourceCard('ai')).toBeTruthy();
-    expect(getWizardResourceCard('arweave')).toBeTruthy();
-    expect(getWizardResourceCard('rpc')).toBeTruthy();
-    expect(getWizardResourceCard('txGas')).toBeTruthy();
-    expect(getWizardResourceCard('lit')).toBeUndefined();
-  });
-
-  it('uses the Privacy storage control instead of a second Session Storage editor', async () => {
-    renderLoggedInSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     enableAdvancedMode();
-    const storageOptions = within(await screen.findByRole('radiogroup', { name: 'Data storage' }));
-    const arweaveOption = storageOptions.getByRole('radio', { name: 'Arweave' });
-    const cloudflareOption = storageOptions.getByRole('radio', { name: 'Cloudflare' });
+
+    expect(await screen.findByText('Session Storage')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
+
+    const arweaveOption = screen.getByRole('radio', { name: 'Arweave' });
+    const cloudflareOption = screen.getByRole('radio', { name: 'Cloudflare' });
     expect(arweaveOption).toHaveAttribute('aria-checked', 'true');
     expect(cloudflareOption).toHaveAttribute('aria-checked', 'false');
-    expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     fireEvent.click(cloudflareOption);
 
@@ -107,95 +40,22 @@ describe('SessionWizard worker resource rendering', () => {
       expect(arweaveOption).toHaveAttribute('aria-checked', 'false');
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
-    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Worker SBT gate' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Lit encrypted' })).not.toBeInTheDocument();
-  });
-
-  it('shows only AI, RPC, and Lit resources when Cloudflare Lit encryption is explicitly selected', async () => {
-    renderLoggedInSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectCloudflareLitProfile();
-    enableAdvancedMode();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-
-    await waitFor(() => {
-      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(3);
-    });
-    expect(getWizardResourceCard('ai')).toBeTruthy();
-    expect(getWizardResourceCard('rpc')).toBeTruthy();
-    expect(getWizardResourceCard('lit')).toBeTruthy();
-    expect(getWizardResourceCard('arweave')).toBeUndefined();
-    expect(getWizardResourceCard('txGas')).toBeUndefined();
-  });
-
-  it('blocks publishing worker resources with unrepresentable All gate groups', async () => {
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: {
-          sessionName: 'Unrepresentable All Gates',
-          slug: 'unrepresentable-all-gates',
-          networkChainId: 11155420,
-        },
-        encryptionGates: [
-          {
-            id: 'gate-all-a',
-            label: 'All A',
-            mode: 'all',
-            chainId: 11155420,
-            sbts: [{ address: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', name: 'All A SBT' }],
-          },
-          {
-            id: 'gate-all-b',
-            label: 'All B',
-            mode: 'all',
-            chainId: 11155420,
-            sbts: [{ address: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', name: 'All B SBT' }],
-          },
-        ],
-        defaultGateId: 'gate-all-a',
-        resourceGateMap: {
-          ai: ['gate-all-a', 'gate-all-b'],
-        },
-      }),
-    );
-
-    renderLoggedInSessionWizard();
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
-    enableAdvancedMode();
-
-    const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: `ar://${'c'.repeat(43)}` },
-    });
-
-    await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
-    });
-
-    fireEvent.click(publishButton);
-
-    expect(await screen.findByText(/Resource "ai" uses multiple gate groups with All semantics/i)).toBeInTheDocument();
-    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    expect(screen.getByText(/R2 for blobs, D1 or KV for metadata\/indexes/)).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText(/worker-enforced access control, not end-to-end encryption/i)).toBeInTheDocument();
   });
 
   it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: {
-          storageProfile: {
-            backend: 'cloudflare',
-            payloadAccessControl: { mode: 'worker_sbt_gate' },
-          },
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'worker_sbt_gate' },
         },
-        workerSecretsEnabled: true,
-      }),
-    );
+      },
+      workerSecretsEnabled: true,
+    }));
 
     const firstRender = renderLoggedInSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -206,18 +66,15 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).not.toBeInTheDocument();
 
     firstRender.unmount();
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: {
-          storageProfile: {
-            backend: 'cloudflare',
-            payloadAccessControl: { mode: 'lit_encrypted' },
-          },
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      draft: {
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'lit_encrypted' },
         },
-        workerSecretsEnabled: true,
-      }),
-    );
+      },
+      workerSecretsEnabled: true,
+    }));
 
     renderLoggedInSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -236,27 +93,34 @@ describe('SessionWizard worker resource rendering', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(await screen.findByText('Worker Deployment')).toBeInTheDocument();
+    expect(screen.getByText('Sessions use a Cloudflare Worker for CORS proxy, AI, and faucet services.')).toBeInTheDocument();
     expect(
-      screen.getByText('Sessions use a Cloudflare Worker for CORS proxy, AI, and faucet services.'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('The default hosted worker is used automatically unless a custom worker URL is configured.'),
+      screen.getByText('The default hosted worker is used automatically unless a custom worker URL is configured.')
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /worker source/i })).toHaveAttribute(
       'href',
-      expect.stringContaining('/tree/main/workers/sessionCorsWorker'),
+      expect.stringContaining('/tree/main/workers/sessionCorsWorker')
     );
-    expect(screen.getByRole('link', { name: /worker source/i })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByRole('link', { name: /worker source/i })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer'
+    );
     expect(screen.getByRole('link', { name: /deploy helper/i })).toHaveAttribute(
       'href',
-      expect.stringContaining('/tree/main/workers/deploy-helper'),
+      expect.stringContaining('/tree/main/workers/deploy-helper')
     );
-    expect(screen.getByRole('link', { name: /deploy helper/i })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByRole('link', { name: /deploy helper/i })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer'
+    );
     expect(screen.getByRole('link', { name: /worker docs/i })).toHaveAttribute(
       'href',
-      expect.stringContaining('/blob/main/docs/session-cors-worker.md'),
+      expect.stringContaining('/blob/main/docs/session-cors-worker.md')
     );
-    expect(screen.getByRole('link', { name: /worker docs/i })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.getByRole('link', { name: /worker docs/i })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer'
+    );
     expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /copy worker code/i })).not.toBeInTheDocument();
   });
@@ -291,7 +155,6 @@ describe('SessionWizard worker resource rendering', () => {
   it('renders only the Chipotle Lit API key in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 
-    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
     const litCard = (await screen.findByText('LIT')).closest(`[data-testid="${E2E_TESTIDS.WIZARD_RESOURCE_CARD}"]`);
 
@@ -309,7 +172,6 @@ describe('SessionWizard worker resource rendering', () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
     renderSessionWizard();
-    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
@@ -324,23 +186,19 @@ describe('SessionWizard worker resource rendering', () => {
   it('waits for a worker URL before enabling Chipotle wizard hooks', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        workerSecretsEnabled: true,
-        workerSecrets: {
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-          litGroupId: 'group_123',
-          litPkpId: 'pkp_123',
-          litActionCid: 'bafy123',
-        },
-      }),
-    );
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+      },
+    }));
 
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
 
@@ -354,16 +212,13 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       renderSessionWizard();
-      await selectDecentralizedLitProfile();
       selectNormalModeCard('Worker');
 
       const trigger = await screen.findByTestId('ce-wizard-resource-tooltip-lit');
       fireEvent.mouseOver(trigger);
-      expect(
-        await screen.findByText(
-          'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.',
-        ),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(
+        'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.'
+      )).toBeInTheDocument();
       fireEvent.mouseOut(trigger);
     } finally {
       act(() => {
@@ -379,18 +234,14 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       renderSessionWizard();
-      await selectDecentralizedLitProfile();
       selectNormalModeCard('Worker');
 
       const tooltipCases = [
-        ['ai', 'Session-funded provider key used by the selected AI models.'],
+        ['ai', 'Session-funded OpenAI key used for text generation and transcription.'],
         ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
         ['arweave', 'Account used to pay for Arweave uploads and storage.'],
         ['txGas', 'Faucet signer used to send small testnet funding grants.'],
-        [
-          'lit',
-          'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.',
-        ],
+        ['lit', 'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.'],
       ];
 
       for (const [resourceKey, copy] of tooltipCases) {
@@ -419,11 +270,7 @@ describe('SessionWizard worker resource rendering', () => {
       const allowedOriginsTrigger = await screen.findByTestId('ce-wizard-worker-tooltip-gw-allowed-origins');
 
       fireEvent.mouseOver(rpcTooltipTrigger);
-      expect(
-        await screen.findByText(
-          'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
-        ),
-      ).toBeInTheDocument();
+      expect(await screen.findByText('Authenticated RPC endpoint used by the worker for chain reads and related operations.')).toBeInTheDocument();
       fireEvent.mouseOut(rpcTooltipTrigger);
 
       expect(allowedOriginsTrigger).toBeInTheDocument();
@@ -445,11 +292,7 @@ describe('SessionWizard worker resource rendering', () => {
       expect(await screen.findByTestId('ce-wizard-worker-tooltip-gw-allowed-origins')).toBeInTheDocument();
 
       fireEvent.click(restoredTrigger);
-      expect(
-        await screen.findByText(
-          'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
-        ),
-      ).toBeInTheDocument();
+      expect(await screen.findByText('Authenticated RPC endpoint used by the worker for chain reads and related operations.')).toBeInTheDocument();
     } finally {
       act(() => {
         jest.runOnlyPendingTimers();
@@ -479,26 +322,22 @@ describe('SessionWizard worker resource rendering', () => {
   it('keeps Chipotle Lit UI visible while stripping cached legacy payer secrets from saved drafts', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     const cachedLitKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        workerSecretsEnabled: true,
-        workerSecrets: {
-          litPayerPrivateKey: cachedLitKey,
-          litPayerAddress: ethers.utils.computeAddress(cachedLitKey),
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      workerSecretsEnabled: true,
+      workerSecrets: {
+        litPayerPrivateKey: cachedLitKey,
+        litPayerAddress: ethers.utils.computeAddress(cachedLitKey),
+      },
+      provisionedSponsoredContext: {
+        sessionSlug: 'edge',
+        workerUrl: 'https://deployed.example.test',
+        fields: {
+          sponsored_lit: '1',
         },
-        provisionedSponsoredContext: {
-          sessionSlug: 'edge',
-          workerUrl: 'https://deployed.example.test',
-          fields: {
-            sponsored_lit: '1',
-          },
-        },
-      }),
-    );
+      },
+    }));
 
     renderSessionWizard();
-    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
 
     expect(screen.getByText('LIT')).toBeInTheDocument();
@@ -512,7 +351,7 @@ describe('SessionWizard worker resource rendering', () => {
     });
 
     await waitFor(() => {
-      const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+      const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
       expect(cached.workerSecrets?.litPayerPrivateKey).toBeUndefined();
       expect(cached.workerSecrets?.litPayerAddress).toBeUndefined();
       expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('1');
