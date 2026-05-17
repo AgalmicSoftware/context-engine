@@ -360,7 +360,7 @@ describe('SurveyTool locked-question tags', () => {
       subject.state.surveysResponseState[0]
     );
     const dropdown = findElement(
-      tree,
+      tree?.props?.footerIcons || tree,
       (node) => node?.type === SurveyQuestionTagControl
     );
 
