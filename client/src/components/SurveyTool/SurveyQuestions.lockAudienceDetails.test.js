@@ -1,4 +1,5 @@
 import { SurveyQuestions } from './SurveyQuestions';
+import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
@@ -51,6 +52,11 @@ const nodeHasClassName = (node, className) => {
 const findNodeByClassName = (node, className) => (
   findElement(node, (candidate) => nodeHasClassName(candidate, className))
 );
+
+const renderLockAudienceControl = (lockControl) => {
+  expect(lockControl.type).toBe(SurveyQuestionsLockAudienceControl);
+  return SurveyQuestionsLockAudienceControl(lockControl.props);
+};
 
 describe('SurveyQuestions lock audience details', () => {
   afterEach(() => {
@@ -256,11 +262,12 @@ describe('SurveyQuestions lock audience details', () => {
       selfAudienceLabel: 'only me',
     });
 
-    expect(treeHasText(collapsedControl, 'only me')).toBe(true);
-    expect(treeHasText(collapsedControl, 'test-12')).toBe(true);
-    expect(treeHasText(collapsedControl, 'for test-12')).toBe(false);
-    expect(treeHasText(collapsedControl, 'AI Gate Test SBT')).toBe(false);
-    expect(findNodeByClassName(collapsedControl, styles.lockAudienceCaretButton)).toBeTruthy();
+    const collapsedTree = renderLockAudienceControl(collapsedControl);
+    expect(treeHasText(collapsedTree, 'only me')).toBe(true);
+    expect(treeHasText(collapsedTree, 'test-12')).toBe(true);
+    expect(treeHasText(collapsedTree, 'for test-12')).toBe(false);
+    expect(treeHasText(collapsedTree, 'AI Gate Test SBT')).toBe(false);
+    expect(findNodeByClassName(collapsedTree, styles.lockAudienceCaretButton)).toBeTruthy();
 
     subject.state = {
       ...subject.state,
@@ -279,8 +286,9 @@ describe('SurveyQuestions lock audience details', () => {
       selfAudienceLabel: 'only me',
     });
 
-    expect(treeHasText(expandedControl, 'AI Gate Test SBT')).toBe(true);
-    expect(treeHasText(expandedControl, '0x1111...1111')).toBe(true);
+    const expandedTree = renderLockAudienceControl(expandedControl);
+    expect(treeHasText(expandedTree, 'AI Gate Test SBT')).toBe(true);
+    expect(treeHasText(expandedTree, '0x1111...1111')).toBe(true);
   });
 
   it('wires shared lock-audience gate helper callbacks for select and details toggle', () => {
@@ -293,12 +301,15 @@ describe('SurveyQuestions lock audience details', () => {
       network: { id: 84532 },
     });
     subject.toggleLockAudienceGateDetails = jest.fn();
-    const onSelectAudience = jest.fn();
-
-    const gateOption = subject.renderLockAudienceGateOption({
-      qid: 'q1',
-      effectiveFieldKey: 'answer',
-      option: {
+    subject.applyLockAudienceSelection = jest.fn();
+    subject.state = {
+      ...subject.state,
+      lockAudienceMenuByQuestion: { q1: true },
+      lockAudienceGateDetailsByQuestion: {},
+    };
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => ({
+      gateDetails: [{
         gateId: 'vip_gate',
         label: 'VIP gate',
         sbtItems: [{
@@ -307,25 +318,45 @@ describe('SurveyQuestions lock audience details', () => {
           meta: '0x1111...1111',
           href: '/sbt/0x1111111111111111111111111111111111111111',
         }],
-      },
-      gateActive: false,
-      currentGateId: '',
-      expandedGateId: '',
-      onSelectAudience,
+      }],
+    }));
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.resolveFieldEncryptionGateId = jest.fn(() => null);
+
+    const lockControl = subject.renderAnswerLockControl({
+      surveyIndex: 0,
+      questionId: 'q1',
+      answer: { encrypted: false, encryptionAudience: 'self' },
+      lockDisabled: false,
+      lockTitle: 'Not encrypted',
+      glowAnswer: false,
+      forceAudienceMenu: true,
+      selfAudienceLabel: 'only me',
     });
+    const gateOption = lockControl.props.gateOptions[0];
+    expect(gateOption).toEqual(expect.objectContaining({
+      gateId: 'vip_gate',
+      label: 'VIP gate',
+    }));
 
     const gateButton = findElement(
-      gateOption,
+      renderLockAudienceControl(lockControl),
       (candidate) => candidate?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE
         && candidate?.props?.['data-ce-gate-id'] === 'vip_gate'
     );
-    const caretButton = findNodeByClassName(gateOption, styles.lockAudienceCaretButton);
+    const caretButton = findNodeByClassName(renderLockAudienceControl(lockControl), styles.lockAudienceCaretButton);
 
     expect(gateButton).toBeTruthy();
     expect(caretButton).toBeTruthy();
 
     gateButton.props.onClick();
-    expect(onSelectAudience).toHaveBeenCalledWith('gate', 'vip_gate');
+    expect(subject.applyLockAudienceSelection).toHaveBeenCalledWith({
+      surveyIndex: 0,
+      qid: 'q1',
+      effectiveFieldKey: 'answer',
+      audience: 'gate',
+      gateId: 'vip_gate',
+    });
 
     const preventDefault = jest.fn();
     const stopPropagation = jest.fn();
@@ -366,9 +397,10 @@ describe('SurveyQuestions lock audience details', () => {
       showFollowOption: true,
     });
 
-    expect(treeHasText(lockControl, 'Not encrypted')).toBe(false);
-    expect(treeHasDataTestId(lockControl, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).toBe(false);
-    expect(treeHasText(lockControl, 'only me')).toBe(true);
-    expect(treeHasText(lockControl, 'Match Answer')).toBe(true);
+    const lockTree = renderLockAudienceControl(lockControl);
+    expect(treeHasText(lockTree, 'Not encrypted')).toBe(false);
+    expect(treeHasDataTestId(lockTree, E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).toBe(false);
+    expect(treeHasText(lockTree, 'only me')).toBe(true);
+    expect(treeHasText(lockTree, 'Match Answer')).toBe(true);
   });
 });
