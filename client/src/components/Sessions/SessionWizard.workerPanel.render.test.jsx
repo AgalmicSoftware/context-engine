@@ -48,7 +48,7 @@ describe('SessionWizard worker panel rendering', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument();
     expect(screen.getByText('Worker URL appears here after a successful custom worker deploy.')).toBeInTheDocument();
-    expect(screen.getByText('Deploy-helper URL')).toBeInTheDocument();
+    expect(screen.queryByText('Deploy-helper URL')).not.toBeInTheDocument();
     expect(screen.getByText('Worker bundle URL (release asset)')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveAttribute('readonly');
