@@ -7,7 +7,10 @@ import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import CETooltip from '../Shared/CETooltip';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { buildCreateSbtActiveClassName, resolveCreateSbtTooltipIconStyle } from './createSbtGroupHelpers';
+import {
+  buildCreateSbtActiveClassName,
+  resolveCreateSbtTooltipIconStyle,
+} from './createSbtGroupHelpers';
 
 type CreateSbtDistributionState = Record<string, unknown> & {
   burnAdmin?: string;
@@ -102,12 +105,7 @@ export const renderCreateSbtMintOptionsSection = ({
               onChange={handleInputChange}
             />
             <span>Limited Tokens</span>
-            <FontAwesomeIcon
-              icon={faQuestionCircle}
-              className={styles.tooltip}
-              id="limitedNumberTooltip"
-              style={resolveCreateSbtTooltipIconStyle()}
-            />
+            <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="limitedNumberTooltip" style={resolveCreateSbtTooltipIconStyle()} />
             <CETooltip placement="right" target="limitedNumberTooltip" className={styles.tooltipBubble}>
               {`Specify the maximum number of ${t('sbts')} that can be ${t('mintedLower')}.`}
             </CETooltip>
@@ -142,12 +140,7 @@ export const renderCreateSbtMintOptionsSection = ({
               onChange={handleInputChange}
             />
             <span>Time-Limited</span>
-            <FontAwesomeIcon
-              icon={faQuestionCircle}
-              className={styles.tooltip}
-              id="timeLimitedTooltip"
-              style={resolveCreateSbtTooltipIconStyle()}
-            />
+            <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="timeLimitedTooltip" style={resolveCreateSbtTooltipIconStyle()} />
             <CETooltip placement="right" target="timeLimitedTooltip" className={styles.tooltipBubble}>
               Set an end time for the minting period.
             </CETooltip>
@@ -177,12 +170,7 @@ export const renderCreateSbtMintOptionsSection = ({
           <div className={styles.settingCopy}>
             <span className={styles.settingLabel}>
               {`${t('burn')} Auth`}
-              <FontAwesomeIcon
-                icon={faQuestionCircle}
-                className={styles.tooltip}
-                id="burnAuthTooltip"
-                style={resolveCreateSbtTooltipIconStyle()}
-              />
+              <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="burnAuthTooltip" style={resolveCreateSbtTooltipIconStyle()} />
             </span>
             <CETooltip placement="right" target="burnAuthTooltip" className={styles.tooltipBubble}>
               Specify who can burn the token.
@@ -205,12 +193,7 @@ export const renderCreateSbtMintOptionsSection = ({
           <div className={styles.settingCopy}>
             <span className={styles.settingLabel}>
               Admin Address
-              <FontAwesomeIcon
-                icon={faQuestionCircle}
-                className={styles.tooltip}
-                id="burnAdminTooltip"
-                style={resolveCreateSbtTooltipIconStyle()}
-              />
+              <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="burnAdminTooltip" style={resolveCreateSbtTooltipIconStyle()} />
             </span>
             <CETooltip placement="right" target="burnAdminTooltip" className={styles.tooltipBubble}>
               Enter the address that can burn the token.
@@ -231,22 +214,19 @@ export const renderCreateSbtMintOptionsSection = ({
             <div className={styles.settingCopy}>
               <span className={styles.settingLabel}>
                 Network
-                <FontAwesomeIcon
-                  icon={faQuestionCircle}
-                  className={styles.tooltip}
-                  id="networkTooltip"
-                  style={resolveCreateSbtTooltipIconStyle()}
-                />
+                <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="networkTooltip" style={resolveCreateSbtTooltipIconStyle()} />
               </span>
               <CETooltip placement="right" target="networkTooltip" className={styles.tooltipBubble}>
                 Select the network for minting.
               </CETooltip>
             </div>
-            <select className={styles.compactSelect} value={authoringChainId} onChange={handleNetworkChange}>
+            <select
+              className={styles.compactSelect}
+              value={authoringChainId}
+              onChange={handleNetworkChange}
+            >
               {chainOptions.map((c: CreateSbtChainOption) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.id})
-                </option>
+                <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
               ))}
             </select>
           </div>
@@ -277,12 +257,7 @@ export const renderCreateSbtMintOptionsSection = ({
             <span className={styles.settingCopy}>
               <span className={styles.settingLabel}>
                 Make address predictable before deploy
-                <FontAwesomeIcon
-                  icon={faQuestionCircle}
-                  className={styles.tooltip}
-                  id="create2SaltTooltip"
-                  style={resolveCreateSbtTooltipIconStyle()}
-                />
+                <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="create2SaltTooltip" style={resolveCreateSbtTooltipIconStyle()} />
               </span>
             </span>
             <CETooltip placement="right" target="create2SaltTooltip" className={styles.tooltipBubble}>
@@ -293,7 +268,10 @@ export const renderCreateSbtMintOptionsSection = ({
             <div className={styles.settingRowDetails}>
               <div className={styles.addressPreviewRow}>
                 <span className={styles.previewLabel}>Predicted address</span>
-                <code className={styles.addressPreviewValue} data-testid={E2E_TESTIDS.SBT_CREATE_PREDICTED_ADDRESS}>
+                <code
+                  className={styles.addressPreviewValue}
+                  data-testid={E2E_TESTIDS.SBT_CREATE_PREDICTED_ADDRESS}
+                >
                   {predictedAddressDisplayText}
                 </code>
               </div>
