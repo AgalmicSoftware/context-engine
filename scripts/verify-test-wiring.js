@@ -79,6 +79,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:surveys-sbt', 'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js');
   expectScriptContains('test:node', 'scripts/run-node-tests.js');
   expectScriptContains('test:ci', 'npm run test:wiring');
+  expectScriptContains('test:ci', 'npm run verify:release');
   expectScriptContains('test:ci', 'npm run test:node');
   expectScriptContains('tests', 'npm run test:ci');
   expectScriptContains('tests', 'npm run test:surveys-sbt');
