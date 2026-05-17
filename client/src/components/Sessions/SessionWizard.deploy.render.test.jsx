@@ -859,7 +859,7 @@ describe('SessionWizard deploy render validation', () => {
     }
   });
 
-  it('auto-bootstraps Lit runtime from the Lit account API key and ignores stale hidden runtime fields', async () => {
+  it('auto-bootstraps Lit runtime from the Lit API key and ignores stale hidden runtime fields', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const litProtocol = require('../../utilities/crypto/litProtocol.js');

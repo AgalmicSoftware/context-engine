@@ -4951,7 +4951,7 @@ const SessionWizard = ({
                       rel="noopener noreferrer"
                       className={styles.newSessionBannerLink}
                     >
-                      Lit account API key
+                      Lit API key
                     </a>
                     {' '}for encrypted access automation
                   </>

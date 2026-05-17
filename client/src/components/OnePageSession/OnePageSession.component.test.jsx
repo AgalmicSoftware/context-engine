@@ -236,7 +236,40 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('survey-page-full')).not.toBeInTheDocument();
   });
 
-  it('uses the title container slot to reserve pile submit rail space when the embedded pile signals visibility', async () => {
+  it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
+    render(<OnePageSession
+      {...buildProps()}
+      account="0x1E9a72A127dAB666fd47dFAFAe15CCd9e08505eE"
+      loginComplete={true}
+      sessionConfig={{
+        ...buildProps().sessionConfig,
+        slug: 'chipotle-session',
+        corsWorkerUrl: 'https://worker.example.test',
+        __registry: {
+          gateAuthority: 'onchain',
+          gatesByResource: {
+            default: {
+              lookupStatus: 'ok',
+              sbtAddresses: ['0x0000000000000000000000000000000000000001'],
+              chainId: 11155420,
+              mode: 'any',
+            },
+          },
+        },
+      }}
+    />);
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    const pileProps = mockSurveyPage.mock.calls.find(([props]) => props?.minifiedMode === 'pile')?.[0];
+
+    expect(pileProps?.litHooks).toEqual(expect.objectContaining({
+      saveKey: expect.any(Function),
+      getKey: expect.any(Function),
+      litNetwork: 'chipotle',
+    }));
+  });
+
+  it('uses the title container slot to keep the pile submit rail off the header title', async () => {
     render(<OnePageSession {...buildProps()} />);
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();

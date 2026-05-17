@@ -493,7 +493,7 @@ describe('SessionWizard rendered validation', () => {
       'https://platform.openai.com/api-keys'
     );
     expect(screen.getByText(/for text and transcription/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Lit account API key' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Lit API key' })).toHaveAttribute(
       'href',
       'https://developer.litprotocol.com/management/api_keys'
     );
@@ -548,7 +548,7 @@ describe('SessionWizard rendered validation', () => {
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key, deploy access.'
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.'
     );
     expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
@@ -566,7 +566,7 @@ describe('SessionWizard rendered validation', () => {
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit account key.'
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key.'
     );
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
@@ -904,7 +904,7 @@ describe('SessionWizard rendered validation', () => {
 
     const litCard = await waitFor(() => getWizardResourceCard('lit'));
     expect(litCard).toBeTruthy();
-    expect(within(litCard).getByText('Lit account API key')).toBeInTheDocument();
+    expect(within(litCard).getByText('Lit API key')).toBeInTheDocument();
   });
 
   it('defaults auto-feature session groups to enabled for sponsored /new drafts', async () => {
@@ -1358,14 +1358,14 @@ describe('SessionWizard rendered validation', () => {
     });
   });
 
-  it('renders only the Chipotle Lit account key in the normal-mode worker secret view', async () => {
+  it('renders only the Chipotle Lit API key in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 
     selectNormalModeCard('Worker');
     const litCard = (await screen.findByText('LIT')).closest(`[data-testid="${E2E_TESTIDS.WIZARD_RESOURCE_CARD}"]`);
 
     expect(litCard).not.toBeNull();
-    expect(within(litCard).getByText('Lit account API key')).toBeInTheDocument();
+    expect(within(litCard).getByText('Lit API key')).toBeInTheDocument();
     expect(within(litCard).queryByText('Lit API base')).not.toBeInTheDocument();
     expect(within(litCard).queryByText('Lit group ID')).not.toBeInTheDocument();
     expect(within(litCard).queryByText('Lit PKP ID')).not.toBeInTheDocument();
@@ -1423,7 +1423,7 @@ describe('SessionWizard rendered validation', () => {
       const trigger = await screen.findByTestId('ce-wizard-resource-tooltip-lit');
       fireEvent.mouseOver(trigger);
       expect(await screen.findByText(
-        'Worker-mediated Lit Chipotle setup. Paste one Lit account API key; the worker derives the scoped group, PKP, usage key, and CE action after deploy.'
+        'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.'
       )).toBeInTheDocument();
       fireEvent.mouseOut(trigger);
     } finally {
@@ -1447,7 +1447,7 @@ describe('SessionWizard rendered validation', () => {
         ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
         ['arweave', 'Account used to pay for Arweave uploads and storage.'],
         ['txGas', 'Faucet signer used to send small testnet funding grants.'],
-        ['lit', 'Worker-mediated Lit Chipotle setup. Paste one Lit account API key; the worker derives the scoped group, PKP, usage key, and CE action after deploy.'],
+        ['lit', 'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.'],
       ];
 
       for (const [resourceKey, copy] of tooltipCases) {

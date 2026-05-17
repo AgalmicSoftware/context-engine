@@ -1503,7 +1503,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   syncLitHooks = () => {
     if (typeof window === 'undefined') return;
     const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
+    const cfg = resolveMainSiteLitSessionConfigSource({
+      slug,
+      resolveRegistryConfigBySlug: (sessionSlug: string) => sessionRegistryStore.getSessionConfig(sessionSlug),
+      resolveStaticConfigBySlug: (sessionSlug: string) => getSessionConfigBySlugOrDefault(sessionSlug),
+    });
     const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } = resolveMainSiteLitSessionConfig({
       sessionConfig: cfg,
       networkChainIdFallback: this.props.network?.id || null,

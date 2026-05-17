@@ -2567,7 +2567,11 @@ export class SurveyQuestions extends Component {
   hasMaskedCurrentQuestionPayload = () => {
     if (!this.props.singleQuestionMode) return false;
     const q = Array.isArray(this.state.questionPool) ? this.state.questionPool[0] : null;
-    if (isMaskedQuestionPayload(q)) return true;
+    if (q && typeof q === 'object') {
+      if (isMaskedQuestionPayload(q)) return true;
+      const prompt = String(q.prompt || '').trim();
+      if (prompt || q.promptDecrypted) return false;
+    }
     const qid = String(this.props.questionID || '').toLowerCase();
     if (!qid) return false;
     const slug = this._getEffectiveDraftSlug();

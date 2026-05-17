@@ -43,6 +43,8 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
+import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
+import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
