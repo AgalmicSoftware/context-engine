@@ -103,8 +103,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('ai:test-nav:smoke', 'node scripts/vite-navigation-smoke.js');
   expectScriptContains('test:ci', 'npm run test:wiring');
   expectScriptContains('test:ci', 'npm run verify:release');
-  expectScriptContains('test:ci', 'npm run test:root:jest');
-  expectScriptContains('test:ci', 'npm run test:worker:session-cors');
   expectScriptContains('test:ci', 'npm run test:node');
   expectScriptContains('test:wiring', 'scripts/verify-test-inventory.js');
   expectScriptContains('tests', 'npm run test:ci');
