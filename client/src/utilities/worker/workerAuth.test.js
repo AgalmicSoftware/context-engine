@@ -505,8 +505,10 @@ describe('workerAuth bootstrap admin signing', () => {
   });
 
   it('marks admin action nonce requests for trusted-origin recovery', async () => {
+    const { ethers } = require('ethers');
     const { cryptoUtils } = require('../crypto/cryptography.js');
     cryptoUtils._getProvider.mockReturnValue({ request: mockProviderRequest });
+    ethers.utils.verifyTypedData.mockReturnValueOnce(NEXT_TEST_ADDRESS);
     global.fetch = jest.fn(async () => jsonResp(200, { nonce: 'nonce-admin-1' }));
 
     await expect(buildSignedAdminActionAuth({
