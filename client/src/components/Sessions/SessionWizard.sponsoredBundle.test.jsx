@@ -10,8 +10,6 @@ const mockUploadDataToArweave = jest.fn();
 const mockRegisterSessionOnChain = jest.fn();
 const mockSessionExists = jest.fn(async () => false);
 const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
-const SPONSORED_FAUCET_NOTICE = 'Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.';
-const SPONSORED_DEPLOY_NOTICE = 'Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to override it.';
 const defaultNormalizeWorkerUrl = (value = '') => String(value || '').trim();
 const testWebCrypto = require('crypto').webcrypto;
 const originalCrypto = global.crypto;
@@ -153,6 +151,8 @@ import SessionWizard, {
 } from './SessionWizard';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
 import {
+  SPONSORED_DEPLOY_NOTICE,
+  SPONSORED_FAUCET_NOTICE,
   configureAdvancedUseUrlDeploy,
   enableAdvancedMode,
   expectSponsoredStatus,
