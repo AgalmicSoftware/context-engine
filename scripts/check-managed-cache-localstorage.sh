@@ -32,7 +32,7 @@ done <<< "${CANDIDATE_FILES}"
 
 if [[ -n "${VIOLATIONS}" || -n "${DYNAMIC_VIOLATIONS}" ]]; then
   echo "cache-guard: direct localStorage usage detected for managed cache namespaces/legacy keys."
-  echo "Migrate these calls to client/src/utilities/cacheScripts.js APIs."
+  echo "Migrate these calls to client/src/utilities/cache/cacheScripts.js APIs."
   echo
   if [[ -n "${VIOLATIONS}" ]]; then
     printf "%s\n" "${VIOLATIONS}"
