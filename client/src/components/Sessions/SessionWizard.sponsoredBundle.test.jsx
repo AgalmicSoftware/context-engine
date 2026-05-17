@@ -156,6 +156,7 @@ import SessionWizard, {
   __test__resetSessionWizardSponsoredBundleCacheKey,
 } from './SessionWizard';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
+import { createIndexedDbMock } from './SessionWizard.sponsoredBundleIndexedDb.testUtils.js';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
 const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
@@ -246,6 +247,91 @@ const configureAdvancedUseUrlDeploy = async ({
   fireEvent.change(sessionNameInput, {
     target: { value: sessionName },
   });
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+    target: { value: slug },
+  });
+
+  openWorkerPanel();
+  fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+
+  const bundleModeUrlInput = screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL);
+  if (!bundleModeUrlInput.checked) {
+    fireEvent.click(bundleModeUrlInput);
+  }
+
+  const bundleUrlInput = screen.getByPlaceholderText(
+    'https://github.com/<org>/<repo>/releases/latest/download/sessionCorsWorker.bundle.js'
+  );
+  setControlledInputValue(bundleUrlInput, bundleUrl);
+  await waitFor(() => {
+    expect(bundleUrlInput).toHaveValue(bundleUrl);
+  });
+  setControlledInputValue(
+    screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL),
+    'https://deploy-helper.example.test'
+  );
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).toHaveValue(
+      'https://deploy-helper.example.test'
+    );
+  });
+  setCloudflareTokenValue(cloudflareToken);
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
+    target: { value: 'sk-test-openai' },
+  });
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
+    target: { value: '{"kty":"RSA","n":"abc"}' },
+  });
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent(slug);
+  });
+  return {
+    bundleModeUrlInput,
+    bundleUrlInput,
+  };
+};
+
+const seedWizardCache = ({
+  workerSecrets = {},
+  workerSecretsEnabled = true,
+  persistWorkerSecrets = true,
+  draft = {},
+  deployComplete = false,
+  deployWorkerUrl = '',
+} = {}) => {
+  localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+    draft: {
+      ai: {
+        models: {
+          fast: { provider: 'openrouter', model: 'test-fast' },
+          thinking: { provider: 'anthropic', model: 'test-thinking' },
+        },
+      },
+      ...draft,
+    },
+    workerSecrets,
+    workerSecretsEnabled,
+    persistWorkerSecrets,
+    deployComplete,
+    deployWorkerUrl,
+  }));
+};
+
+const buildEnvelope = () => JSON.stringify({
+  type: 'contextengine-sponsored-bundle',
+  version: 1,
+  cipher: 'password-aes-gcm',
+  encryptedData: 'encrypted-base64',
+});
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
 
 describe('SessionWizard sponsored bundle flow', () => {
   beforeEach(() => {
