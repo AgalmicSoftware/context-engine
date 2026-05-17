@@ -35,6 +35,17 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).not.toContain('react-app');
   });
 
+  it('keeps Vite available only as a sidecar command path', () => {
+    const pkg = readClientPackageJson();
+
+    expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0');
+    expect(pkg.scripts['build:vite']).toBe('PUBLIC_URL=/ vite build');
+    expect(pkg.scripts['preview:vite']).toBe('vite preview --host 0.0.0.0');
+    expect(pkg.scripts.dev).not.toContain('vite');
+    expect(pkg.scripts.build).not.toContain('vite');
+    expect(pkg.scripts.start).not.toContain('vite');
+  });
+
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
     const pkg = readClientPackageJson();
 
@@ -150,6 +161,32 @@ describe('client package modernization contract', () => {
     const pkg = readClientPackageJson();
 
     expect(pkg.overrides['@solana/web3.js']).toBeUndefined();
+  });
+
+  it('keeps Vite tooling scoped to development dependencies', () => {
+    const pkg = readClientPackageJson();
+    const vitePackages = [
+      '@vitejs/plugin-react',
+      'vite',
+    ];
+
+    vitePackages.forEach((name) => {
+      expect(pkg.dependencies[name]).toBeUndefined();
+      expect(pkg.devDependencies[name]).toBeDefined();
+    });
+  });
+
+  it('keeps Vite output and entry wiring separate from CRA', () => {
+    const viteConfig = readClientFile('vite.config.mjs');
+    const viteIndex = readClientFile('index.html');
+    const craIndex = readClientFile('public/index.html');
+
+    expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build-vite')");
+    expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build')");
+    expect(viteIndex).toContain('__PUBLIC_URL__');
+    expect(viteIndex).toContain('/src/viteEntry.js');
+    expect(craIndex).toContain('%PUBLIC_URL%');
+    expect(craIndex).not.toContain('/src/viteEntry.js');
   });
 
   it('keeps build, test, lint, analyze, and static serving tools out of production dependencies', () => {
