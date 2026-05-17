@@ -26,11 +26,13 @@ This runs the canonical root gate (`npm run test:ci`), which includes wiring che
 ```bash
 cd client
 nvm use 16
-CI=1 npm test -- --watchAll=false
+npm test -- --watchAll=false
 npm run lint
 ```
 
 Use the client workflow when you are working only in `client/` and do not need the full root test gate.
+The client test runner is standalone Jest configured by `client/jest.config.cjs`;
+it no longer shells through CRA or `react-app-rewired`.
 
 ### Targeted Root Commands
 
