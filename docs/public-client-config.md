@@ -59,13 +59,6 @@ npm run build
 
 The output directory is `client/build/`.
 
-CRA remains available as an explicit fallback for migration comparison runs:
-
-```bash
-cd client
-npm run build:cra
-```
-
 ### 3. Upload to Netlify
 
 For a manual upload, drag `client/build/` into Netlify's deploy UI. For a
@@ -124,7 +117,8 @@ SPA fallback concept, but their redirect config syntax differs.
 - Shared worker fallback now defaults to `https://demo-worker-030226.agalmic.workers.dev` unless `REACT_APP_CE_SHARED_WORKER_URL` overrides it.
 - The deploy-helper now defaults to `https://ce-deploy-helper.agalmic.workers.dev/`.
 - Healthcheck still stays blank until the official project-owned endpoint is finalized for OSS.
-- Only `REACT_APP_*` keys are exposed to the browser in the CRA client.
+- Only `REACT_APP_*` keys are exposed to the browser in the Vite client
+  compatibility env.
 - `publicDeploymentConfig.js` is the single owner of deployment endpoint
   fallbacks; `appConfig.js` re-exports those values for the existing client API.
 - Browser/runtime overrides still exist for some flags (`globalThis`,
