@@ -31,8 +31,6 @@ const getEthersUtils = () => (
   ethers?.utils ||
   ethersModule?.utils ||
   ethersModule?.ethers?.utils ||
-  ethersModule?.default?.utils ||
-  ethersModule?.default?.ethers?.utils ||
   null
 );
 const getAdminHashFns = () => {
@@ -41,18 +39,12 @@ const getAdminHashFns = () => {
     keccak256: getEthersFn(
       utils?.keccak256,
       ethers?.keccak256,
-      ethersModule?.keccak256,
-      ethersModule?.ethers?.keccak256,
-      ethersModule?.default?.keccak256,
-      ethersModule?.default?.ethers?.keccak256,
+      ethers?.ethers?.keccak256,
     ),
     toUtf8Bytes: getEthersFn(
       utils?.toUtf8Bytes,
       ethers?.toUtf8Bytes,
-      ethersModule?.toUtf8Bytes,
-      ethersModule?.ethers?.toUtf8Bytes,
-      ethersModule?.default?.toUtf8Bytes,
-      ethersModule?.default?.ethers?.toUtf8Bytes,
+      ethers?.ethers?.toUtf8Bytes,
     ),
   };
 };
