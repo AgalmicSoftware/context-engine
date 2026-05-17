@@ -27,11 +27,11 @@ export const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
-export const getDocumentLibraryStateUpdateWarnings = (spy: any) =>
-  spy.mock.calls.filter(([message]: any[]) => {
-    const text = String(message || '');
-    return text.includes('Warning: An update to DocumentLibraryPanel') || text.includes('unmounted component');
-  });
+export const getDocumentLibraryStateUpdateWarnings = (spy: any) => spy.mock.calls.filter(([message]: any[]) => {
+  const text = String(message || '');
+  return text.includes('Warning: An update to DocumentLibraryPanel')
+    || text.includes('unmounted component');
+});
 
 jest.mock('../../utilities/logging.js', () => ({
   createLogger: () => ({
@@ -53,8 +53,7 @@ jest.mock('../../utilities/docLibrary/config.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   buildSbtAccessControlConditions: (...args: any[]) => mockBuildSbtAccessControlConditions(...args),
-  getUnsupportedLitContractAccessControlError: (...args: any[]) =>
-    mockGetUnsupportedLitContractAccessControlError(...args),
+  getUnsupportedLitContractAccessControlError: (...args: any[]) => mockGetUnsupportedLitContractAccessControlError(...args),
   getGlobalLitHooks: (...args: any[]) => mockGetGlobalLitHooks(...args),
   litStorage: {
     buildLitArweaveUrl: (txId: string) => `https://lit.example.test/${txId}`,
@@ -65,13 +64,12 @@ jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   resolveLitChain: jest.fn(() => 'ethereum'),
 }));
 
-jest.mock('../../utilities/arweave/arweaveClient.js', () => {
-  const arweaveClient = {
+jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
+  arweaveScripts: {
     buildArweaveGatewayUrl: (txId: string, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
     downloadDataFromArweave: jest.fn(),
-  };
-  return { arweaveClient };
-});
+  },
+}));
 
 jest.mock('../../utilities/docLibrary/uploads.js', () => ({
   resolveDocUploadsGate: (...args: any[]) => mockResolveDocUploadsGate(...args),
@@ -80,10 +78,7 @@ jest.mock('../../utilities/docLibrary/uploads.js', () => ({
 }));
 
 jest.mock('../../utilities/storage/storageClient.js', () => ({
-  listSessionStorageRefsPage: async (...args: any[]) => {
-    const result = await mockListSessionStorageRefs(...args);
-    return Array.isArray(result) ? { items: result, cursor: null, listComplete: true } : result;
-  },
+  listSessionStorageRefs: (...args: any[]) => mockListSessionStorageRefs(...args),
   readSessionStorageBlob: (...args: any[]) => mockReadSessionStorageBlob(...args),
 }));
 
@@ -93,19 +88,18 @@ jest.mock('../SBTs/SBTSelector', () => ({
     mockSBTSelector(props);
     return (
       <div data-testid="mock-sbt-selector">
-        <button
-          type="button"
-          onClick={() =>
-            props.onAddSBT?.({
-              address: '0x00000000000000000000000000000000000000aa',
-              name: 'Mock Selected SBT',
-              chainId: 84532,
-            })
-          }
+        <button type="button" onClick={() => props.onAddSBT?.({
+          address: '0x00000000000000000000000000000000000000aa',
+          name: 'Mock Selected SBT',
+          chainId: 84532,
+        })}
         >
           Add mock selected SBT
         </button>
-        <button type="button" onClick={() => props.onRemoveSBT?.('0x00000000000000000000000000000000000000aa')}>
+        <button
+          type="button"
+          onClick={() => props.onRemoveSBT?.('0x00000000000000000000000000000000000000aa')}
+        >
           Remove mock selected SBT
         </button>
         <div>
@@ -120,11 +114,6 @@ jest.mock('../SBTs/SBTSelector', () => ({
 
 export const DocumentLibraryPanel = require('./DocumentLibraryPanel').default as React.ComponentType<any>;
 export const TEST_SESSION_CONFIG = {
-  networkChainId: 84532,
-  __registry: {
-    registryChainId: 84532,
-    sessionIdHex: `0x${'1'.repeat(32)}`,
-  },
   docLibrary: {
     provider: 'arweave',
     arweave: {

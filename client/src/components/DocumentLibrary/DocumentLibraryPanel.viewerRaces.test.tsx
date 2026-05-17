@@ -57,7 +57,7 @@ describe('DocumentLibraryPanel viewer race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'2'.repeat(32)}`}
-      />,
+      />
     );
 
     const viewButton = await screen.findByTestId(E2E_TESTIDS.DOC_ROW_VIEW);
@@ -128,7 +128,7 @@ describe('DocumentLibraryPanel viewer race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'2'.repeat(32)}`}
-      />,
+      />
     );
 
     const rows = await screen.findAllByTestId(E2E_TESTIDS.DOC_ROW);
@@ -189,7 +189,7 @@ describe('DocumentLibraryPanel viewer race guards', () => {
         sessionConfig={TEST_SESSION_CONFIG}
         mode="session"
         sessionIdHex={`0x${'2'.repeat(32)}`}
-      />,
+      />
     );
 
     fireEvent.click(await screen.findByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
@@ -248,11 +248,9 @@ describe('DocumentLibraryPanel viewer race guards', () => {
     expect(await screen.findByText('Old context note')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
     await waitFor(() => {
-      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_old_context' }),
-        }),
-      );
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_old_context' }),
+      }));
     });
     expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER)).toBeInTheDocument();
 
@@ -262,7 +260,7 @@ describe('DocumentLibraryPanel viewer race guards', () => {
         account="0x456"
         sessionSlug="edge-b"
         sessionIdHex={`0x${'8'.repeat(32)}`}
-      />,
+      />
     );
     await waitFor(() => {
       expect(screen.queryByTestId(E2E_TESTIDS.DOC_VIEWER)).not.toBeInTheDocument();
@@ -320,14 +318,17 @@ describe('DocumentLibraryPanel viewer race guards', () => {
     expect(await screen.findByText('Old session id note')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
     await waitFor(() => {
-      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_old_session_id' }),
-        }),
-      );
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_old_session_id' }),
+      }));
     });
 
-    rerender(<DocumentLibraryPanel {...panelProps} sessionIdHex={`0x${'8'.repeat(32)}`} />);
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        sessionIdHex={`0x${'8'.repeat(32)}`}
+      />
+    );
     await act(async () => {
       slowRead.resolve({
         headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
@@ -381,11 +382,9 @@ describe('DocumentLibraryPanel viewer race guards', () => {
     expect(await screen.findByText('Render context note')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
     await waitFor(() => {
-      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_render_context' }),
-        }),
-      );
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_render_context' }),
+      }));
     });
 
     rerender(
@@ -394,7 +393,7 @@ describe('DocumentLibraryPanel viewer race guards', () => {
         account="0x456"
         sessionSlug="edge-b"
         sessionIdHex={`0x${'8'.repeat(32)}`}
-      />,
+      />
     );
     await act(async () => {
       slowRead.resolve({
@@ -409,7 +408,9 @@ describe('DocumentLibraryPanel viewer race guards', () => {
   });
 
   it('ignores in-flight document open requests after the storage config changes', async () => {
-    mockResolveDocLibraryProvider.mockImplementation((config: any) => config?.storageProfile?.backend || 'arweave');
+    mockResolveDocLibraryProvider.mockImplementation((config: any) => (
+      config?.storageProfile?.backend || 'arweave'
+    ));
     const slowRead = createDeferred<any>();
     mockListSessionStorageRefs.mockResolvedValueOnce([
       {
@@ -447,11 +448,9 @@ describe('DocumentLibraryPanel viewer race guards', () => {
     expect(await screen.findByText('Old storage note')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
     await waitFor(() => {
-      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(
-        expect.objectContaining({
-          storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_storage_context' }),
-        }),
-      );
+      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
+        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_storage_context' }),
+      }));
     });
     expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER)).toBeInTheDocument();
 
@@ -459,7 +458,7 @@ describe('DocumentLibraryPanel viewer race guards', () => {
       <DocumentLibraryPanel
         {...panelProps}
         sessionConfig={{ storageProfile: { backend: 'cloudflare', namespace: 'next-docs' } }}
-      />,
+      />
     );
     await waitFor(() => {
       expect(screen.queryByTestId(E2E_TESTIDS.DOC_VIEWER)).not.toBeInTheDocument();
