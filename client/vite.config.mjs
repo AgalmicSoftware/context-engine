@@ -177,7 +177,7 @@ const copyStaticImageAssetsPlugin = () => ({
   apply: 'build',
   writeBundle(options) {
     const sourceDir = path.resolve(srcDir, 'assets', 'img');
-    const outputDir = path.resolve(options.dir || path.resolve(__dirname, 'build-vite'), 'images');
+    const outputDir = path.resolve(options.dir || path.resolve(__dirname, 'build'), 'images');
     if (!fs.existsSync(sourceDir)) return;
     fs.cpSync(sourceDir, outputDir, { recursive: true });
   },
@@ -198,7 +198,7 @@ const publicAssetsCompatibilityPlugin = () => ({
     });
   },
   writeBundle(options) {
-    copyDirectoryExcluding(publicDir, options.dir || path.resolve(__dirname, 'build-vite'), new Set(['index.html']));
+    copyDirectoryExcluding(publicDir, options.dir || path.resolve(__dirname, 'build'), new Set(['index.html']));
   },
 });
 
@@ -255,7 +255,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      outDir: path.resolve(__dirname, 'build-vite'),
+      outDir: path.resolve(__dirname, 'build'),
       emptyOutDir: true,
       rollupOptions: {
         input: path.resolve(__dirname, 'index.html'),

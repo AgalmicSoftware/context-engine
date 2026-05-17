@@ -59,16 +59,12 @@ npm run build
 
 The output directory is `client/build/`.
 
-CRA remains the canonical production build. The client also has a Vite sidecar
-for toolchain compatibility checks:
+CRA remains available as an explicit fallback for migration comparison runs:
 
 ```bash
 cd client
-npm run build:vite
+npm run build:cra
 ```
-
-The sidecar output directory is `client/build-vite/`; do not use it to replace
-`client/build/` until the project intentionally flips the canonical build.
 
 ### 3. Upload to Netlify
 
