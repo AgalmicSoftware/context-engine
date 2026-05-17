@@ -6,11 +6,13 @@
  * Key exports: default, getSessionConfigBySlug, getReadProviderForGroup, getSBTsForUser, getUserActivity
  */
 
+import * as contractScriptsImpl from './contractScripts.impl.js';
+
 type AnyRecord = Record<string, any>;
 type ContractScriptsImplModule = typeof import('./contractScripts.impl.js');
 type ContractScriptsDefaultExport = ContractScriptsImplModule['default'];
 
-const _impl = require('./contractScripts.impl.js') as ContractScriptsImplModule;
+const _impl = contractScriptsImpl as ContractScriptsImplModule;
 const defaultExport = _impl.default as ContractScriptsDefaultExport;
 const commonJsExports = typeof exports === 'undefined'
   ? null
