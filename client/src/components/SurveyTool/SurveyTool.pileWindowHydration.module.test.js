@@ -1,5 +1,4 @@
 import SurveyTool from './SurveyTool';
-import { PileViewMode } from './SurveyPileViewMode';
 
 const syncClassSetState = (subject) => {
   subject.setState = jest.fn((next, cb) => {
@@ -32,7 +31,8 @@ describe('SurveyTool pile visible window hydration', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -91,7 +91,8 @@ describe('SurveyTool pile visible window hydration', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     syncClassSetState(subject);
     subject.state = {
@@ -157,7 +158,8 @@ describe('SurveyTool pile visible window hydration', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     syncClassSetState(subject);
     subject.state = {
@@ -196,7 +198,8 @@ describe('SurveyTool pile visible window hydration', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject._loadAndSortQuestionsEpoch = 4;
     subject._lastLoadAndSortResultSignature = 'same-signature';
@@ -227,7 +230,8 @@ describe('SurveyTool pile visible window hydration', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject._loadAndSortQuestionsEpoch = 6;
     subject.initializeResponseState = jest.fn();
@@ -274,7 +278,8 @@ describe('SurveyTool pile visible window hydration', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject._isMounted = true;
     subject.state = {
@@ -342,7 +347,8 @@ describe('SurveyTool pile visible window hydration', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
+    const PileViewModeClass = pileElement.type;
+    const subject = new PileViewModeClass(pileElement.props);
 
     subject._isMounted = true;
     subject.state = {
