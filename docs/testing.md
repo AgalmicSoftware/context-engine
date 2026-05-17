@@ -34,8 +34,7 @@ npm run lint
 
 Use the client workflow when you are working only in `client/` and do not need the full root test gate.
 The client test runner is standalone Jest configured by `client/jest.config.cjs`;
-it no longer shells through CRA or `react-app-rewired`. Babel-Jest uses
-explicit Babel presets, and jsdom setup lives under `client/scripts/jest/`.
+it no longer shells through CRA or `react-app-rewired`.
 
 ### Targeted Root Commands
 
