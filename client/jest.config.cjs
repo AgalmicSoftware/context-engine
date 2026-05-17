@@ -8,11 +8,28 @@ const oxCjsBase = fs.existsSync(oxNestedCjs)
   ? '<rootDir>/node_modules/viem/node_modules/ox/_cjs'
   : '<rootDir>/node_modules/ox/_cjs';
 const oxScopedPrefixes = '(erc\\d{4}|tempo|trusted-setups|window)';
+const babelJestOptions = {
+  babelrc: false,
+  configFile: false,
+  presets: [
+    ['@babel/preset-env', {
+      modules: 'commonjs',
+      targets: {
+        node: 'current',
+      },
+    }],
+    ['@babel/preset-react', {
+      runtime: 'automatic',
+    }],
+    '@babel/preset-typescript',
+  ],
+  plugins: ['@babel/plugin-syntax-import-meta'],
+};
 
 module.exports = {
   roots: ['<rootDir>/src', '<rootDir>/../test'],
   testEnvironment: 'jsdom',
-  setupFiles: ['react-app-polyfill/jsdom'],
+  setupFiles: ['<rootDir>/scripts/jest/jsdomPolyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/src/setupTests.js'],
   modulePaths: ['<rootDir>/src', '<rootDir>/node_modules', '<rootDir>/../node_modules'],
   moduleFileExtensions: ['web.js', 'js', 'web.ts', 'ts', 'web.tsx', 'tsx', 'json', 'web.jsx', 'jsx', 'node'],
@@ -21,7 +38,7 @@ module.exports = {
     '<rootDir>/src/**/*.{spec,test}.{js,jsx,ts,tsx}',
   ],
   transform: {
-    '^.+\\.(js|jsx|mjs|cjs|ts|tsx)$': 'babel-jest',
+    '^.+\\.(js|jsx|mjs|cjs|ts|tsx)$': ['babel-jest', babelJestOptions],
   },
   transformIgnorePatterns: [nodeModulesPattern],
   moduleNameMapper: {
