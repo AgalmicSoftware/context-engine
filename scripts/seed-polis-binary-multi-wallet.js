@@ -15,23 +15,43 @@ const {
   writeJson,
 } = require('./lib/common');
 const { resolveChainDefaults } = require('./lib/network-defaults');
-const {
-  buildWalletFromPasskey,
-  DEFAULT_PASSKEY_A,
-  DEFAULT_PASSKEY_B,
-  DEFAULT_PASSKEY_C,
-  DEFAULT_PASSKEY_D,
-  DEFAULT_PASSKEY_E,
-  ensureWalletFunded,
-  toPortoSeedRecord,
-} = require('./lib/e2e/wallets');
-const { createNonceSender, sleep } = require('./lib/e2e/tx');
-const {
-  launchBrowserWithRetry,
-  requirePlaywright,
-  resolvePlaywrightBrowserType,
-} = require('./lib/e2e/playwright');
-const locators = require('./lib/e2e/locators');
+
+let buildWalletFromPasskey;
+let DEFAULT_PASSKEY_A;
+let DEFAULT_PASSKEY_B;
+let DEFAULT_PASSKEY_C;
+let DEFAULT_PASSKEY_D;
+let DEFAULT_PASSKEY_E;
+let ensureWalletFunded;
+let toPortoSeedRecord;
+let createNonceSender;
+let sleep;
+let launchBrowserWithRetry;
+let requirePlaywright;
+let resolvePlaywrightBrowserType;
+let locators;
+
+const loadE2eRuntime = () => {
+  if (locators) return;
+
+  ({
+    buildWalletFromPasskey,
+    DEFAULT_PASSKEY_A,
+    DEFAULT_PASSKEY_B,
+    DEFAULT_PASSKEY_C,
+    DEFAULT_PASSKEY_D,
+    DEFAULT_PASSKEY_E,
+    ensureWalletFunded,
+    toPortoSeedRecord,
+  } = require('./lib/e2e/wallets'));
+  ({ createNonceSender, sleep } = require('./lib/e2e/tx'));
+  ({
+    launchBrowserWithRetry,
+    requirePlaywright,
+    resolvePlaywrightBrowserType,
+  } = require('./lib/e2e/playwright'));
+  locators = require('./lib/e2e/locators');
+};
 
 const log = (...args) => console.log('[seed-polis-binary-multi-wallet]', ...args);
 
@@ -388,6 +408,8 @@ const resolveSessionSlug = ({ args = {}, env = process.env } = {}) => {
 };
 
 async function main() {
+  loadE2eRuntime();
+
   const args = parseArgs(process.argv);
   const runTag = resolveRunTag(args);
   const baseUrl = toStr(args['base-url'] || process.env.BASE_URL || 'http://127.0.0.1:3000').trim().replace(/\/+$/, '');
