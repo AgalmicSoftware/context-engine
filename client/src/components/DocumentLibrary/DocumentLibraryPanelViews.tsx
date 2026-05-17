@@ -14,10 +14,13 @@ import { Button, Input } from 'reactstrap';
 
 import styles from './DocumentLibraryPanel.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient.js';
+import { arweaveScripts } from '../../utilities/arweave/arweaveScripts.js';
 import { DOC_LIBRARY_DOC_ROLES } from '../../utilities/docLibrary/tags.js';
 import { getGlobalLitHooks, litStorage } from '../../utilities/crypto/litProtocol.js';
-import { STORAGE_BACKENDS, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
+import {
+  STORAGE_BACKENDS,
+  normalizeStorageRef,
+} from '../../utilities/storage/storageRefs.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
 import { createLogger } from '../../utilities/logging.js';
@@ -97,7 +100,7 @@ type LitHooks = {
 
 const normalizeDocStorageRef = normalizeStorageRef as (
   input: unknown,
-  opts?: NormalizeStorageRefOptions,
+  opts?: NormalizeStorageRefOptions
 ) => StorageRef | null;
 
 const copyToClipboard = async (text: unknown): Promise<boolean> => {
@@ -163,8 +166,10 @@ const DocRowImagePreview = ({
       return undefined;
     }
 
-    const litHooks = ((scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
-      getGlobalLitHooks()) as LitHooks;
+    const litHooks = (
+      (scopedLitHooks && typeof scopedLitHooks === 'object' ? scopedLitHooks : null) ||
+      getGlobalLitHooks()
+    ) as LitHooks;
     if (!provider || !toStr(account).trim()) {
       setEncryptedPreviewUrl('');
       return undefined;
@@ -180,7 +185,9 @@ const DocRowImagePreview = ({
           providerLike: provider,
           account,
           chainId: chainId || null,
-          ...(litHooks && typeof litHooks.getKey === 'function' ? { lit: { getKey: litHooks.getKey } } : {}),
+          ...(litHooks && typeof litHooks.getKey === 'function'
+            ? { lit: { getKey: litHooks.getKey } }
+            : {}),
           arweave: {
             debugContext: {
               category: 'doc_lit_preview',
@@ -229,7 +236,11 @@ const DocRowImagePreview = ({
 
   return (
     <div className={styles.docPreview} data-testid={E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW}>
-      <img src={previewSrc} alt={`${name || 'Document'} preview`} className={styles.docPreviewImage} />
+      <img
+        src={previewSrc}
+        alt={`${name || 'Document'} preview`}
+        className={styles.docPreviewImage}
+      />
     </div>
   );
 };
@@ -252,11 +263,7 @@ export const DocumentLibraryViewerBody = ({
   viewerTitle,
 }: DocumentLibraryViewerBodyProps) => {
   if (viewerError) {
-    return (
-      <div className={styles.viewerError} data-testid={E2E_TESTIDS.DOC_VIEWER_ERROR}>
-        {viewerError}
-      </div>
-    );
+    return <div className={styles.viewerError} data-testid={E2E_TESTIDS.DOC_VIEWER_ERROR}>{viewerError}</div>;
   }
   if (viewerLoading) {
     return (
@@ -285,21 +292,13 @@ export const DocumentLibraryViewerBody = ({
                   Unsafe or invalid URL (not rendered as a link): <code>{toStr(parsed.url).trim()}</code>
                 </div>
               )}
-              <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>
-                {viewerText}
-              </pre>
+              <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>{viewerText}</pre>
             </div>
           );
         }
-      } catch (e) {
-        log.warn('DocumentLibraryPanel: fallback', e);
-      }
+      } catch (e) { log.warn('DocumentLibraryPanel: fallback', e); }
     }
-    return (
-      <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>
-        {viewerText}
-      </pre>
-    );
+    return <pre className={styles.viewerPre} data-testid={E2E_TESTIDS.DOC_VIEWER_TEXT}>{viewerText}</pre>;
   }
 
   if (viewerBlobUrl) {
@@ -309,18 +308,8 @@ export const DocumentLibraryViewerBody = ({
     if (mime.startsWith('image/')) {
       return (
         <div className={styles.viewerMedia}>
-          <img
-            src={viewerBlobUrl}
-            alt={filename}
-            className={styles.viewerImage}
-            data-testid={E2E_TESTIDS.DOC_VIEWER_IMAGE}
-          />
-          <a
-            href={viewerBlobUrl}
-            download={filename}
-            className={styles.viewerDownload}
-            data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
-          >
+          <img src={viewerBlobUrl} alt={filename} className={styles.viewerImage} data-testid={E2E_TESTIDS.DOC_VIEWER_IMAGE} />
+          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
             Download file
           </a>
         </div>
@@ -329,18 +318,8 @@ export const DocumentLibraryViewerBody = ({
     if (mime === 'application/pdf') {
       return (
         <div className={styles.viewerMedia}>
-          <iframe
-            title="PDF"
-            src={viewerBlobUrl}
-            className={styles.viewerPdf}
-            data-testid={E2E_TESTIDS.DOC_VIEWER_PDF}
-          />
-          <a
-            href={viewerBlobUrl}
-            download={filename}
-            className={styles.viewerDownload}
-            data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
-          >
+          <iframe title="PDF" src={viewerBlobUrl} className={styles.viewerPdf} data-testid={E2E_TESTIDS.DOC_VIEWER_PDF} />
+          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
             Download file
           </a>
         </div>
@@ -350,12 +329,7 @@ export const DocumentLibraryViewerBody = ({
       return (
         <div className={styles.viewerMedia}>
           <audio controls src={viewerBlobUrl} className={styles.viewerAudio} />
-          <a
-            href={viewerBlobUrl}
-            download={filename}
-            className={styles.viewerDownload}
-            data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
-          >
+          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
             Download file
           </a>
         </div>
@@ -365,12 +339,7 @@ export const DocumentLibraryViewerBody = ({
       return (
         <div className={styles.viewerMedia}>
           <video controls src={viewerBlobUrl} className={styles.viewerVideo} />
-          <a
-            href={viewerBlobUrl}
-            download={filename}
-            className={styles.viewerDownload}
-            data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
-          >
+          <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
             Download file
           </a>
         </div>
@@ -378,12 +347,7 @@ export const DocumentLibraryViewerBody = ({
     }
     return (
       <div className={styles.viewerMedia}>
-        <a
-          href={viewerBlobUrl}
-          download={filename}
-          className={styles.viewerDownload}
-          data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}
-        >
+        <a href={viewerBlobUrl} download={filename} className={styles.viewerDownload} data-testid={E2E_TESTIDS.DOC_VIEWER_DOWNLOAD}>
           Download file
         </a>
       </div>
@@ -397,16 +361,12 @@ type DocumentLibraryUploadControlsProps = {
   file: File | null;
   onFileChange: (file: File | null) => void;
   onUploadFile: () => void;
-  fileUploadPending: boolean;
   urlInput: string;
   onUrlInputChange: (value: string) => void;
   urlTitle: string;
   onUrlTitleChange: (value: string) => void;
   onUploadUrlRecord: () => void;
-  urlUploadPending: boolean;
   isUploadableDocProvider: boolean;
-  showEncryptionControls: boolean;
-  showSbtAudienceControls: boolean;
   requiresLitDocumentStorage: boolean;
   locked: boolean;
   onToggleLocked: () => void;
@@ -438,16 +398,12 @@ export const DocumentLibraryUploadControls = ({
   file,
   onFileChange,
   onUploadFile,
-  fileUploadPending,
   urlInput,
   onUrlInputChange,
   urlTitle,
   onUrlTitleChange,
   onUploadUrlRecord,
-  urlUploadPending,
   isUploadableDocProvider,
-  showEncryptionControls,
-  showSbtAudienceControls,
   requiresLitDocumentStorage,
   locked,
   onToggleLocked,
@@ -489,17 +445,17 @@ export const DocumentLibraryUploadControls = ({
         size="sm"
         className={styles.primaryBtn}
         onClick={onUploadFile}
-        disabled={!file || !isUploadableDocProvider || fileUploadPending}
-        aria-busy={fileUploadPending || undefined}
+        disabled={!file || !isUploadableDocProvider}
         data-testid={E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON}
       >
-        <FontAwesomeIcon icon={fileUploadPending ? faSpinner : faUpload} spin={fileUploadPending} />{' '}
-        {fileUploadPending ? 'Uploading' : 'Upload'}
+        <FontAwesomeIcon icon={faUpload} /> Upload
       </Button>
     </div>
 
     <div className={styles.uploadRow}>
-      <div className={styles.uploadLabel}>URL</div>
+      <div className={styles.uploadLabel}>
+        URL
+      </div>
       <Input
         type="url"
         value={urlInput}
@@ -514,13 +470,11 @@ export const DocumentLibraryUploadControls = ({
         size="sm"
         className={styles.primaryBtn}
         onClick={onUploadUrlRecord}
-        disabled={!toStr(urlInput).trim() || !isUploadableDocProvider || urlUploadPending}
-        aria-busy={urlUploadPending || undefined}
+        disabled={!toStr(urlInput).trim() || !isUploadableDocProvider}
         title="Upload link record"
         data-testid={E2E_TESTIDS.DOC_URL_ADD_BUTTON}
       >
-        <FontAwesomeIcon icon={urlUploadPending ? faSpinner : faLink} spin={urlUploadPending} />{' '}
-        {urlUploadPending ? 'Adding' : 'Add'}
+        <FontAwesomeIcon icon={faLink} /> Add
       </Button>
     </div>
 
@@ -536,136 +490,120 @@ export const DocumentLibraryUploadControls = ({
       />
     </div>
 
-    {showEncryptionControls ? (
-      <div className={styles.encryptBox}>
-        <div className={styles.encryptHeader}>
-          <button
-            type="button"
-            className={styles.lockToggle}
-            onClick={onToggleLocked}
-            disabled={requiresLitDocumentStorage}
-            title={
-              requiresLitDocumentStorage
-                ? 'Lit-Arweave session storage requires encrypted uploads'
-                : locked
-                  ? 'Upload plaintext'
-                  : 'Encrypt with Lit'
-            }
-            data-testid={E2E_TESTIDS.DOC_LOCK_TOGGLE}
-            data-ce-locked={locked ? 'true' : 'false'}
-          >
-            <FontAwesomeIcon icon={locked ? faLock : faLockOpen} />
-            <span className={styles.lockLabel}>{locked ? 'Locked (Encrypted)' : 'Unlocked (Plaintext)'}</span>
-          </button>
-        </div>
-
-        {sessionGateUnsupportedMessage ? (
-          <div className={styles.noticeInline}>{sessionGateUnsupportedMessage}</div>
-        ) : null}
-
-        {locked && showSbtAudienceControls ? (
-          <div className={styles.encryptControls}>
-            <div className={styles.audienceRow}>
-              <label className={styles.radioLabel}>
-                <input
-                  type="radio"
-                  name="audienceMode"
-                  checked={audienceMode === 'sessionGate'}
-                  onChange={() => onAudienceModeChange('sessionGate')}
-                  disabled={!docUploadsGate.hasRecipients}
-                  data-testid={E2E_TESTIDS.DOC_AUDIENCE_SESSION_GATE}
-                />
-                Session <code>docUploads</code> gate
-              </label>
-              <label className={styles.radioLabel}>
-                <input
-                  type="radio"
-                  name="audienceMode"
-                  checked={audienceMode === 'custom'}
-                  onChange={() => onAudienceModeChange('custom')}
-                  data-testid={E2E_TESTIDS.DOC_AUDIENCE_CUSTOM}
-                />
-                Custom SBT(s)
-              </label>
-            </div>
-
-            {audienceMode === 'sessionGate' && (
-              <div className={styles.gateSummary}>
-                {docUploadsGate.hasRecipients ? (
-                  <div>
-                    <div>
-                      <strong>Mode:</strong> {docUploadsGate.mode}
-                    </div>
-                    <div>
-                      <strong>SBTs:</strong> {docUploadsGate.sbtAddresses.length}
-                    </div>
-                  </div>
-                ) : (
-                  <div className={styles.noticeInline}>
-                    Session <code>docUploads</code> gate is unavailable or empty. Uploads will default to plaintext
-                    unless you pick Custom SBT(s).
-                  </div>
-                )}
-              </div>
-            )}
-
-            {audienceMode === 'custom' && (
-              <div className={styles.customAudience}>
-                <div className={styles.customSelectorWrap} data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_SELECTOR}>
-                  <SBTSelector
-                    id={`doc-library-custom-${mode || 'session'}`}
-                    label="Select SBT access"
-                    selectedSBTs={customSbtList}
-                    onAddSBT={addCustomSbt}
-                    onRemoveSBT={removeCustomSbt}
-                    network={network}
-                    sessionSlug={sessionSlug || ''}
-                    discoverySessionSlugs={[sessionSlug || '']}
-                    variant="create"
-                  />
-                </div>
-
-                <div className={styles.customRow}>
-                  <label className={styles.radioLabel}>
-                    <input
-                      type="radio"
-                      name="customGateMode"
-                      checked={customGateMode === 'any'}
-                      onChange={() => onCustomGateModeChange('any')}
-                      data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ANY}
-                    />
-                    Any
-                  </label>
-                  <label className={styles.radioLabel}>
-                    <input
-                      type="radio"
-                      name="customGateMode"
-                      checked={customGateMode === 'all'}
-                      onChange={() => onCustomGateModeChange('all')}
-                      data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ALL}
-                    />
-                    All
-                  </label>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : locked ? (
-          <div className={styles.noticeInline}>
-            This session profile does not enable on-chain SBT document audiences.
-          </div>
-        ) : null}
+    <div className={styles.encryptBox}>
+      <div className={styles.encryptHeader}>
+        <button
+          type="button"
+          className={styles.lockToggle}
+          onClick={onToggleLocked}
+          disabled={requiresLitDocumentStorage}
+          title={requiresLitDocumentStorage ? 'Lit-Arweave session storage requires encrypted uploads' : (locked ? 'Upload plaintext' : 'Encrypt with Lit')}
+          data-testid={E2E_TESTIDS.DOC_LOCK_TOGGLE}
+          data-ce-locked={locked ? 'true' : 'false'}
+        >
+          <FontAwesomeIcon icon={locked ? faLock : faLockOpen} />
+          <span className={styles.lockLabel}>{locked ? 'Locked (Encrypted)' : 'Unlocked (Plaintext)'}</span>
+        </button>
       </div>
-    ) : null}
+
+      {sessionGateUnsupportedMessage ? (
+        <div className={styles.noticeInline}>
+          {sessionGateUnsupportedMessage}
+        </div>
+      ) : null}
+
+      {locked && (
+        <div className={styles.encryptControls}>
+          <div className={styles.audienceRow}>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                name="audienceMode"
+                checked={audienceMode === 'sessionGate'}
+                onChange={() => onAudienceModeChange('sessionGate')}
+                disabled={!docUploadsGate.hasRecipients}
+                data-testid={E2E_TESTIDS.DOC_AUDIENCE_SESSION_GATE}
+              />
+              Session <code>docUploads</code> gate
+            </label>
+            <label className={styles.radioLabel}>
+              <input
+                type="radio"
+                name="audienceMode"
+                checked={audienceMode === 'custom'}
+                onChange={() => onAudienceModeChange('custom')}
+                data-testid={E2E_TESTIDS.DOC_AUDIENCE_CUSTOM}
+              />
+              Custom SBT(s)
+            </label>
+          </div>
+
+          {audienceMode === 'sessionGate' && (
+            <div className={styles.gateSummary}>
+              {docUploadsGate.hasRecipients ? (
+                <div>
+                  <div><strong>Mode:</strong> {docUploadsGate.mode}</div>
+                  <div><strong>SBTs:</strong> {docUploadsGate.sbtAddresses.length}</div>
+                </div>
+              ) : (
+                <div className={styles.noticeInline}>
+                  Session <code>docUploads</code> gate is unavailable or empty. Uploads will default to plaintext unless you pick Custom SBT(s).
+                </div>
+              )}
+            </div>
+          )}
+
+          {audienceMode === 'custom' && (
+            <div className={styles.customAudience}>
+              <div
+                className={styles.customSelectorWrap}
+                data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_SELECTOR}
+              >
+                <SBTSelector
+                  id={`doc-library-custom-${mode || 'session'}`}
+                  label="Select SBT access"
+                  selectedSBTs={customSbtList}
+                  onAddSBT={addCustomSbt}
+                  onRemoveSBT={removeCustomSbt}
+                  network={network}
+                  sessionSlug={sessionSlug || ''}
+                  discoverySessionSlugs={[sessionSlug || '']}
+                  variant="create"
+                />
+              </div>
+
+              <div className={styles.customRow}>
+                <label className={styles.radioLabel}>
+                  <input
+                    type="radio"
+                    name="customGateMode"
+                    checked={customGateMode === 'any'}
+                    onChange={() => onCustomGateModeChange('any')}
+                    data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ANY}
+                  />
+                  Any
+                </label>
+                <label className={styles.radioLabel}>
+                  <input
+                    type="radio"
+                    name="customGateMode"
+                    checked={customGateMode === 'all'}
+                    onChange={() => onCustomGateModeChange('all')}
+                    data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ALL}
+                  />
+                  All
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
 
     {secondaryAssociationType === 'sbt' && mode !== 'session' && (
       <div className={styles.secondaryAssoc}>
         <label className={styles.checkboxLabel}>
-          <input
-            type="checkbox"
-            checked={alsoAssociateSbt}
-            onChange={(e) => onAlsoAssociateSbtChange(e.target.checked)}
-          />
+          <input type="checkbox" checked={alsoAssociateSbt} onChange={(e) => onAlsoAssociateSbtChange(e.target.checked)} />
           Also associate with SBT group
         </label>
         {alsoAssociateSbt && (
@@ -735,32 +673,26 @@ export const DocumentLibraryList = ({
 }: DocumentLibraryListProps) => (
   <div className={styles.list}>
     {!docs.length && !loading && canList && (
-      <div className={styles.empty}>{cursor ? 'No accessible documents on this page.' : 'No documents found yet.'}</div>
+      <div className={styles.empty}>No documents found yet.</div>
     )}
     {docs.map((doc) => {
       const tagMap = doc?.tagMap || {};
       const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
       const kind = toStr(tagMap['CE-DocKind']).trim().toLowerCase();
       const docRole = toStr(tagMap['CE-DocRole']).trim().toLowerCase();
-      const mimeType = toStr(tagMap['CE-DocMime'] || doc?.data?.type)
-        .trim()
-        .toLowerCase();
+      const mimeType = toStr(tagMap['CE-DocMime'] || doc?.data?.type).trim().toLowerCase();
       const isImageDoc = mimeType.startsWith('image/') || docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
-      const name =
-        toStr(tagMap['CE-DocName']).trim() ||
-        (kind === 'link' ? 'Link record' : storage === 'lit-arweave' ? 'Encrypted document' : 'Document');
+      const name = toStr(tagMap['CE-DocName']).trim() || (kind === 'link' ? 'Link record' : (storage === 'lit-arweave' ? 'Encrypted document' : 'Document'));
       const txId = toStr(doc?.txId).trim();
       const isEncryptedStorage = storage === 'lit-arweave' || storage === 'lit';
-      const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, {
-        fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE,
-      });
+      const storageRef = normalizeDocStorageRef(doc?.storageRef || { backend: storage, id: txId }, { fallbackBackend: storage || STORAGE_BACKENDS.ARWEAVE });
       const isCloudflareStorage = storageRef?.backend === STORAGE_BACKENDS.CLOUDFLARE;
-      const arweaveUrl = txId && !isCloudflareStorage ? arweaveClient.buildArweaveGatewayUrl(txId) : '';
+      const arweaveUrl = txId && !isCloudflareStorage ? arweaveScripts.buildArweaveGatewayUrl(txId) : '';
       const litUrl = txId && !isCloudflareStorage ? litStorage.buildLitArweaveUrl(txId) : '';
-      const storageUrl = isCloudflareStorage ? toStr(storageRef?.uri).trim() : isEncryptedStorage ? litUrl : arweaveUrl;
+      const storageUrl = isCloudflareStorage ? toStr(storageRef?.uri).trim() : (isEncryptedStorage ? litUrl : arweaveUrl);
       const ts = doc?.block?.timestamp ? Number(doc.block.timestamp) * 1000 : null;
-      const indexStatus = !doc?.block ? 'pending' : ts ? 'indexed' : 'unconfirmed';
-      const timeLabel = ts ? new Date(ts).toLocaleString() : doc?.block ? 'Unconfirmed' : 'Pending indexing';
+      const indexStatus = !doc?.block ? 'pending' : (ts ? 'indexed' : 'unconfirmed');
+      const timeLabel = ts ? new Date(ts).toLocaleString() : (doc?.block ? 'Unconfirmed' : 'Pending indexing');
       const showPhotoRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO;
       const showPhotoAnalysisRoleBadge = docRole === DOC_LIBRARY_DOC_ROLES.PHOTO_ANALYSIS;
 
@@ -810,12 +742,7 @@ export const DocumentLibraryList = ({
             >
               <FontAwesomeIcon icon={faEye} />
             </button>
-            <button
-              type="button"
-              className={styles.iconBtn}
-              onClick={() => copyToClipboard(storageUrl)}
-              title="Copy link"
-            >
+            <button type="button" className={styles.iconBtn} onClick={() => copyToClipboard(storageUrl)} title="Copy link">
               <FontAwesomeIcon icon={faCopy} />
             </button>
             {arweaveUrl ? (
@@ -841,9 +768,16 @@ export const DocumentLibraryList = ({
       </div>
     )}
 
-    {canList && (docs.length > 0 || !!cursor) && (
+    {canList && docs.length > 0 && (
       <div className={styles.pagination}>
-        <Button type="button" color="secondary" outline size="sm" onClick={onLoadMore} disabled={loading || !cursor}>
+        <Button
+          type="button"
+          color="secondary"
+          outline
+          size="sm"
+          onClick={onLoadMore}
+          disabled={loading || !cursor}
+        >
           Load more
         </Button>
       </div>
