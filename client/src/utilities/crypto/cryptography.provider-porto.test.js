@@ -12,9 +12,26 @@ describe('cryptoUtils Porto provider bootstrap', () => {
     mockCreatePortoProvider.mockReset();
     try {
       delete window.__portoMockProvider;
+      delete window.__ceCreatePortoProviderMock;
     } catch (_) {
       window.__portoMockProvider = undefined;
+      window.__ceCreatePortoProviderMock = undefined;
     }
+  });
+
+  it('uses the Vite-safe Porto provider factory when one is registered on window', () => {
+    const provider = {
+      isPorto: true,
+      request: jest.fn(),
+    };
+    window.__ceCreatePortoProviderMock = jest.fn(() => provider);
+
+    const resolved = cryptoUtils._getProvider('porto_passkey');
+
+    expect(resolved).toBe(provider);
+    expect(window.__ceCreatePortoProviderMock).toHaveBeenCalledTimes(1);
+    expect(mockCreatePortoProvider).not.toHaveBeenCalled();
+    expect(window.__portoMockProvider).toBe(provider);
   });
 
   it('synthesizes the Porto provider on demand for porto_passkey strings', () => {
