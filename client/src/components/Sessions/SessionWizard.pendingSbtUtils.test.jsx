@@ -1,6 +1,10 @@
 import {
   buildPublishedPendingSbtLinks,
   buildSbtDetailPath,
+  deploySessionWizardPendingSbtDraft,
+  ethers,
+  finalizeSessionWizardPendingSbtDraft,
+  mockCreateSBT,
   mockPendingSbtAddress,
   mockSecondPendingSbtAddress,
   mockSelectorSourceFactory,
@@ -9,6 +13,7 @@ import {
   promotePendingSbtSelectionsAfterDeploy,
   resetSessionWizardWorkerPanelTestState,
   resolveSessionWizardSelectorSourceConfig,
+  TEST_ADMIN_ADDRESS,
 } from './SessionWizard.workerPanel.testUtils';
 
 describe('SessionWizard pending SBT utilities', () => {
@@ -99,6 +104,107 @@ describe('SessionWizard pending SBT utilities', () => {
       mode: 'replace',
     });
     expect(localStorage.getItem('createdSBTs')).toBeNull();
+  });
+
+  it('finalizes pending-upload SBT drafts before deterministic deploy during publish', async () => {
+    const finalizeDeferredDraftUpload = jest.fn(async () => ({
+      tokenURI: 'ar://finalized-pending-sbt',
+      metadataPreview: { name: 'Pending SBT' },
+      authoringPayload: { sbtName: 'Pending SBT', _sessionSlug: 'publish-test' },
+    }));
+    mockCreateSBT.mockResolvedValue({
+      events: [
+        {
+          event: 'SBTCreatedDeterministic',
+          args: { sbtAddress: mockPendingSbtAddress },
+        },
+      ],
+      transactionHash: '0xdeploy-pending-sbt',
+    });
+
+    const pendingDraft = {
+      id: 'pending-sbt-1',
+      predictedAddress: mockPendingSbtAddress,
+      displayName: 'Pending SBT',
+      contractName: 'Pending SBT',
+      symbol: 'CE-SBT-PEND',
+      create2Salt: 'draft/test',
+      limitedNumber: 0,
+      adminAddress: '0xCreator',
+      mintingEndTimeUnix: 0,
+      hasPasswordMintOnChain: false,
+      burnAuthEnum: 0,
+      hashedPasswords: [],
+      tokenURI: '',
+      metadataUploadStatus: 'pending-upload',
+      finalGroupPasswordHash: ethers.constants.HashZero,
+      createOptions: { useConfiguredDeterministic: true, initializeGroupPasswordHash: false },
+      authoringPayload: { sbtName: 'Pending SBT', _sessionSlug: 'publish-test' },
+      passwordList: [],
+      groupPassword: '',
+      usesInviteCodes: false,
+    };
+
+    const finalizedDraft = await finalizeSessionWizardPendingSbtDraft({
+      draftEntry: pendingDraft,
+      workerUrlOverride: 'https://deployed.example.test',
+      createSbtComponentProps: {
+        account: TEST_ADMIN_ADDRESS,
+        sessionConfigOverride: {
+          slug: 'publish-test',
+        },
+      },
+      finalizeDeferredDraftUpload,
+    });
+    const finalizePendingDraftMock = jest.fn(async () => finalizedDraft);
+
+    const result = await deploySessionWizardPendingSbtDraft({
+      sbtDraft: pendingDraft,
+      providerLike: 'mock-provider',
+      sessionConfigForDeploy: {
+        slug: 'publish-test',
+        contracts: {},
+      },
+      finalizePendingDraft: finalizePendingDraftMock,
+      createSBT: mockCreateSBT,
+    });
+
+    expect(finalizeDeferredDraftUpload).toHaveBeenCalledWith(expect.objectContaining({
+      authoringPayload: pendingDraft.authoringPayload,
+      componentProps: expect.objectContaining({
+        account: TEST_ADMIN_ADDRESS,
+        sessionConfigOverride: expect.objectContaining({
+          slug: 'publish-test',
+        }),
+      }),
+    }));
+    expect(finalizePendingDraftMock.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCreateSBT.mock.invocationCallOrder[0]
+    );
+    expect(result.finalizedDraft.tokenURI).toBe('ar://finalized-pending-sbt');
+    expect(mockCreateSBT).toHaveBeenCalledWith(
+      'mock-provider',
+      'Pending SBT',
+      'CE-SBT-PEND',
+      0,
+      '0xCreator',
+      0,
+      false,
+      0,
+      [],
+      'ar://finalized-pending-sbt',
+      ethers.constants.HashZero,
+      {
+        slug: 'publish-test',
+        contracts: {},
+      },
+      'draft/test',
+      { useConfiguredDeterministic: true, initializeGroupPasswordHash: false }
+    );
+    expect(result.finalizedDraft).toEqual(expect.objectContaining({
+      tokenURI: 'ar://finalized-pending-sbt',
+      metadataUploadStatus: 'ready',
+    }));
   });
 
   it('resolves demo selector discovery from the source session config instead of the auto-seeded draft block window', () => {
