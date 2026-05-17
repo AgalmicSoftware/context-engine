@@ -12,12 +12,6 @@ import {
   resetSessionWizardWorkerPanelTestState,
 } from './SessionWizard.workerPanel.testUtils';
 
-const expectSponsoredStatusText = async (expectedText) => {
-  await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(expectedText);
-  });
-};
-
 describe('SessionWizard new-session requirements banner', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
@@ -109,7 +103,9 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await expectSponsoredStatusText('Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.');
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.'
+    );
     expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
 
@@ -125,7 +121,9 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await expectSponsoredStatusText('Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key.');
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key.'
+    );
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
@@ -149,7 +147,9 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await expectSponsoredStatusText('Sponsored resources applied: OpenAI key.');
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key.'
+    );
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
@@ -162,7 +162,9 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await expectSponsoredStatusText('Malformed sponsored link.');
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Malformed sponsored link.'
+    );
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
@@ -220,7 +222,9 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await expectSponsoredStatusText('Sponsored resources applied: OpenAI key.');
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+      'Sponsored resources applied: OpenAI key.'
+    );
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
