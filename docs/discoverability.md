@@ -6,7 +6,7 @@ and AI tools, plus the fastest post-deploy crawl steps.
 
 ## Static Crawl Assets
 
-- `client/public/index.html`
+- `client/index.html`
   - Includes root description/robots metadata, repo-linked JSON-LD seeded
     without route-specific canonical tags, and a `noscript` block with
     plain-text project summary plus direct links to the canonical GitHub repo,
@@ -32,7 +32,7 @@ Current discovery source tree URL:
 
 If the default public branch changes, update:
 
-1. `client/public/index.html`
+1. `client/index.html`
 2. `client/public/discoverability.html`
 3. `client/public/llms.txt`
 4. `client/src/variables/publicRepoMetadata.js`
