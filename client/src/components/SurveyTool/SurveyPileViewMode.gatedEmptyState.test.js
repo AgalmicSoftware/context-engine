@@ -1,5 +1,4 @@
 import SurveyTool from './SurveyTool';
-import { PileViewMode } from './SurveyPileViewMode';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
