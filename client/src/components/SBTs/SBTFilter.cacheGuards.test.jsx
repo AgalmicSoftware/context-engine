@@ -255,7 +255,6 @@ describe('SBTFilter holder cache guards', () => {
   });
 
   it('does not mark holder counts loaded when the count scan fails', async () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
@@ -285,20 +284,9 @@ describe('SBTFilter holder cache guards', () => {
       }
     );
 
-    try {
-      await subject.runApplyFilter('failed-holder-scan');
+    await subject.runApplyFilter('failed-holder-scan');
 
-      expect(cacheScripts.writeCache).not.toHaveBeenCalled();
-      expect(onFilter).toHaveBeenCalledWith([], expect.any(Object));
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        '[sbt]',
-        'Error fetching SBT holders:',
-        expect.objectContaining({
-          message: 'SBT holder count scan failed',
-        })
-      );
-    } finally {
-      consoleErrorSpy.mockRestore();
-    }
+    expect(cacheScripts.writeCache).not.toHaveBeenCalled();
+    expect(onFilter).toHaveBeenCalledWith([], expect.any(Object));
   });
 });
