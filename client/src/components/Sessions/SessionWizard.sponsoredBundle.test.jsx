@@ -151,6 +151,8 @@ import SessionWizard, {
 } from './SessionWizard';
 import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
 import {
+  SPONSORED_DEPLOY_NOTICE,
+  SPONSORED_FAUCET_NOTICE,
   configureAdvancedUseUrlDeploy,
   enableAdvancedMode,
   expectSponsoredStatus,
