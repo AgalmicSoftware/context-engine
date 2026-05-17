@@ -1,7 +1,7 @@
 // CPAL-side twin of workers/sessionCorsWorker/adminTypedData.mjs.
 // Keep this file in sync with the worker copy when the admin typed-data shape changes.
 
-import ethersModule from 'ethers';
+import * as ethersModule from 'ethers';
 
 const resolveEthersCompat = (loadedModule) => {
   const direct =
