@@ -28,7 +28,7 @@ server.
 ### 1. Set frontend variables
 
 Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.js`,
-and `client/src/variables/appConfig.js`. CRA bakes `REACT_APP_*` values into
+and `client/src/variables/appConfig.js`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
@@ -59,16 +59,12 @@ npm run build
 
 The output directory is `client/build/`.
 
-CRA remains the canonical production build. The client also has a Vite sidecar
-for toolchain compatibility checks:
+CRA remains available as an explicit fallback for migration comparison runs:
 
 ```bash
 cd client
-npm run build:vite
+npm run build:cra
 ```
-
-The sidecar output directory is `client/build-vite/`; do not use it to replace
-`client/build/` until the project intentionally flips the canonical build.
 
 ### 3. Upload to Netlify
 

@@ -19,18 +19,24 @@ npm install
 npm run dev
 ```
 
-CRA remains the canonical client dev/build path. A Vite sidecar is available for
-compatibility work without replacing CRA:
+Vite is the canonical client dev/build path. CRA remains available as an
+explicit fallback while the migration is being verified:
 
 ```bash
 cd client
-npm run dev:vite
-npm run build:vite
+npm run dev
+npm run build
 npm run preview:vite
 ```
 
-The sidecar build writes to `client/build-vite/`; the canonical production build
-still writes to `client/build/`.
+The Vite production build writes to `client/build/`, which is also what
+`npm start` serves. For CRA comparison runs, use:
+
+```bash
+cd client
+npm run dev:cra
+npm run build:cra
+```
 
 ## `local-chain`
 
