@@ -13,13 +13,9 @@ describe('cryptoUtils Porto provider bootstrap', () => {
     try {
       delete window.__portoMockProvider;
       delete window.__ceCreatePortoProviderMock;
-      delete window.ethereum;
-      delete window.web3authProvider;
     } catch (_) {
       window.__portoMockProvider = undefined;
       window.__ceCreatePortoProviderMock = undefined;
-      window.ethereum = undefined;
-      window.web3authProvider = undefined;
     }
   });
 
