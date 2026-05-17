@@ -2522,20 +2522,20 @@ export default function PolisReport({
                     {isLoadingThis && (
                       <div className={styles.clusterAnalysisRow}>
                         <FontAwesomeIcon icon={faSpinner} spin className={styles.analysisSpinner} />
-                        <span className={styles.elapsedTimer} aria-live="polite">
-                          {elapsed}
-                        </span>
+                        <span className={styles.elapsedTimer} aria-live="polite">{elapsed}</span>
                         <span className={styles.analysisNote}>Analyzing group...</span>
                       </div>
                     )}
                     {analysis && (
                       <div className={styles.clusterAnalysisText}>
-                        <div className={styles.clusterAnalysisShort}>&quot;{analysis.short}&quot;</div>
+                        <div className={styles.clusterAnalysisShort}>"{analysis.short}"</div>
                         <div className={styles.clusterAnalysisLong}>{analysis.long}</div>
                       </div>
                     )}
                     {errText && !analysis && (
-                      <div className={styles.clusterAnalysisError}>Couldn’t analyze this cluster: {errText}</div>
+                      <div className={styles.clusterAnalysisError}>
+                        Couldn’t analyze this cluster: {errText}
+                      </div>
                     )}
                   </div>
                 )}
