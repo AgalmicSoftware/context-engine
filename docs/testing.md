@@ -19,31 +19,9 @@ nvm use 20
 npm test
 ```
 
-This runs the canonical root gate (`npm run test:ci`): wiring and ratchets,
-release-surface checks and builds, contract/ABI parity, client coverage,
-public-safe root Jest, both public Worker suites, Context Engine CC, the tracked
-root Node universe, and the managed-cache guard. The coverage-enabled full
-client universe and tracked Node universe each run exactly once. The wiring
-lane also verifies that every tracked typed client test/support source is in
-the monotonic test-typecheck universe. Build-owning gates immediately run the
-manifest-backed bundle budget against the bytes they just produced, without a
-second build.
-
-`scripts/ci-gates.json` is the explicit command manifest. Local CI consumes
-its serial `ci` profile; GitHub Actions consumes the same named gates as split
-jobs so slow lanes remain visible. The final hosted `test` job compares all
-reported results with the manifest's `hosted` profile and fails for missing,
-extra, failed, canceled, or skipped lanes. Event-specific baseline-growth
-authorization remains a protected workflow step beside the manifest-backed
-gate.
-
-`npm run verify:release` is the standalone `release` profile. It retains the
-non-coverage full client and tracked-Node release rehearsal but is no longer
-nested inside `test:ci`.
-
-The manifest uses `test:node:tracked` for reproducible CI. The broader
-`test:node` alias remains available to operators with ignored private E2E
-helpers installed, but it is not a clean-checkout gate.
+This runs the canonical root gate (`npm run test:ci`), which includes wiring
+checks, the release-sanity gate, contract tests, client coverage, Node-side
+tests, and cache guards.
 
 ### Client-Only Tests
 

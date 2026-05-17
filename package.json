@@ -32,7 +32,7 @@
     "test:node": "node scripts/run-node-tests.js",
     "test:hygiene": "node scripts/check-text-hygiene.mjs",
     "test:wiring": "node scripts/verify-test-wiring.js && npm run -s test:hygiene",
-    "test:ci": "npm run test:wiring && npm run test:contracts && npm run test:client && npm run test:node && npm run test:cache-guard",
+    "test:ci": "npm run test:wiring && npm run verify:release && npm run test:contracts && npm run test:client && npm run test:node && npm run test:cache-guard",
     "tests": "npm run test:ci",
     "test": "npm run test:ci",
     "test:local": "bash -c 'set -euo pipefail; anvil --silent --port 8545 --chain-id 31337 --mnemonic \"test test test test test test test test test test test junk\" > /tmp/anvil.log 2>&1 & ANVIL_PID=$!; trap \"kill $ANVIL_PID\" EXIT; for i in {1..20}; do if cast block-number --rpc-url http://127.0.0.1:8545 >/dev/null 2>&1; then break; fi; sleep 0.25; done; npm run chain:deploy; (cd client && npm test)'",
