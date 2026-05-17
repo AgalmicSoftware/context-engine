@@ -2,7 +2,30 @@
 
 import React, { useLayoutEffect, useReducer, useRef } from 'react';
 import { connect } from 'react-redux';
-import { Form, Card, CardHeader, CardBody, FormText, InputGroup, InputGroupText, Collapse } from 'reactstrap';
+import {
+  Button,
+  DropdownToggle,
+  DropdownMenu,
+  DropdownItem,
+  UncontrolledDropdown,
+  FormGroup,
+  Label,
+  Input,
+  Form,
+  Card,
+  CardHeader,
+  CardBody,
+  FormText,
+  InputGroup,
+  InputGroupText,
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Collapse,
+  Alert,
+  Table
+} from 'reactstrap';
 
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyResults.module.scss';
@@ -18,7 +41,6 @@ import {
   faSearch,
   faExpand,
   faExclamationCircle,
-  faSyncAlt,
   faComments
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -76,6 +98,10 @@ import {
   SurveyResultsFreeformAggregatorSummary,
   SurveyResultsMultichoiceAggregatorSummary,
 } from './SurveyResultsAggregatorSummaries';
+import {
+  renderSurveyResultsFilterSummary,
+  renderSurveyResultsSyncStatusPanel,
+} from './SurveyResultsPanels';
 
 export {
   SURVEY_RESULTS_SORTABLE_HEADER_STYLE,
@@ -2152,49 +2178,685 @@ renderQuestionSummary = (
     const questionEntries = getMemoizedQuestionTableEntries(questionMap, networkQuestions);
     const { questionIdSortBy, questionIdSortAsc } = stateRef.current;
 
-    return (
-      <SurveyResultsQuestionTable
-        bookmarkedQuestionIDs={stateRef.current.bookmarkedQuestionIDs}
-        entries={questionEntries}
-        fallbackSessionSlug={getEffectiveSlug()}
-        onSort={changeQuestionIdSort}
-        onToggleQuestionBookmark={toggleQuestionBookmark}
-        onViewQuestion={(questionId) => {
-          // Use setState with a callback to guarantee the scroll happens after the render.
-          // This ensures the card is expanded before we attempt to scroll to it.
-          setState(
-            asSurveyResultsStateUpdater((prevState) =>
-              buildSurveyResultsKeyedTogglePatch({
-                forceValue: true,
-                itemKey: questionId,
-                mapKey: 'activeQuestionToggles',
-                prevState,
-              }),
-            ),
-            () => {
-              scrollToQuestion(questionId);
-            },
-          );
-        }}
-        sortAsc={questionIdSortAsc}
-        sortBy={questionIdSortBy}
-        styleMap={styles}
-      />
-    );
+const questionRecord = Object(questionMap || {}) as Record<string, unknown>;
+const networkQuestionRecord = Object(networkQuestions || {}) as Record<string, SurveyResultsRecord | undefined>;
+const entries = Object.keys(questionRecord).map((qId) => {
+  const responses = questionRecord[qId] || [];
+  const lowerQ = qId.toLowerCase();
+  const qData = networkQuestionRecord[lowerQ] || {};
+  return {
+    questionId: qId,
+    responsesCount: this.getLatestResponsesByResponder(responses).length,
+    type: (qData.type || '') as string,
+    prompt: (qData.prompt || '') as string,
+    sessionSlug: (qData.sessionSlug || '') as string,
   };
+});
 
-  const scrollToQuestion = (questionId: unknown): void => {
-    const domId = getSurveyResultsQuestionCardDomId(questionId as string | undefined);
-    const cleanupScrollWatcher = () => {
-      if (inst._scrollToQuestionRetryTimer) {
-        clearTimeout(inst._scrollToQuestionRetryTimer);
-        inst._scrollToQuestionRetryTimer = null;
+entries.sort((a, b) => {
+  let cmp = 0;
+  if (questionIdSortBy === 'responses') {
+    cmp = a.responsesCount - b.responsesCount;
+  } else if (questionIdSortBy === 'type') {
+    cmp = a.type.localeCompare(b.type);
+  } else if (questionIdSortBy === 'prompt') {
+    cmp = a.prompt.localeCompare(b.prompt);
+  }
+  return questionIdSortAsc ? cmp : -cmp;
+});
+
+this._questionTableEntriesMemo = {
+  questionMapRef: questionMap,
+  networkQuestionsRef: networkQuestions,
+  sortBy: questionIdSortBy,
+  sortAsc: questionIdSortAsc,
+  result: entries,
+};
+return entries;
+};
+
+renderQuestionIDsTable = (questionMap: unknown, preNetworkQuestions: unknown): React.ReactNode => {
+if (!this.props.network || !this.props.network.id) return null;
+const networkQuestions = preNetworkQuestions || this.getNetworkQuestionsForCurrentContext();
+const questionEntries = this.getMemoizedQuestionTableEntries(questionMap, networkQuestions);
+const { questionIdSortBy, questionIdSortAsc } = this.state;
+
+return (
+  <div className={styles.questionIdTableWrapper}>
+    <Table striped bordered hover size="sm" className={styles.questionIdTable}>
+      <thead>
+        <tr>
+          <th style={SURVEY_RESULTS_TABLE_CELL_STYLE}>Question ID</th>
+          <th
+            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
+            onClick={() => this.changeQuestionIdSort('prompt')}
+          >
+            Prompt {questionIdSortBy === 'prompt' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
+          </th>
+          <th
+            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
+            onClick={() => this.changeQuestionIdSort('type')}
+          >
+            Type {questionIdSortBy === 'type' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
+          </th>
+          <th
+            style={SURVEY_RESULTS_SORTABLE_HEADER_STYLE}
+            onClick={() => this.changeQuestionIdSort('responses')}
+          >
+            Responses{' '}
+            {questionIdSortBy === 'responses' ? (questionIdSortAsc ? '▲' : '▼') : '▲▼'}
+          </th>
+          <th style={SURVEY_RESULTS_TABLE_CELL_STYLE}>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {questionEntries.map((entry) => {
+          const shortened = getShortenedQuestionID(entry.questionId, false);
+          const bookmarked = this.state.bookmarkedQuestionIDs.includes(entry.questionId);
+          return (
+            <tr key={entry.questionId}>
+              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
+                <FontAwesomeIcon
+                  icon={faBookmark}
+                  style={SURVEY_RESULTS_TABLE_BOOKMARK_STYLE}
+                  color={bookmarked ? 'gold' : 'white'}
+                  onClick={() => this.toggleQuestionBookmark(entry.questionId)}
+                />
+                <a
+                  href={buildQuestionRoutePath(entry.questionId, {
+                    sessionSlug: entry.sessionSlug || this.getEffectiveSlug(),
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.clickableQuestionId}
+                >
+                  {shortened}
+                </a>
+              </td>
+              <td className={styles.promptColumn}>{entry.prompt || '(No prompt)'}</td>
+              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.type}</td>
+              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>{entry.responsesCount}</td>
+              <td style={SURVEY_RESULTS_TABLE_CELL_STYLE}>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    // Use setState with a callback to guarantee the scroll happens after the render.
+                    // This ensures the card is expanded before we attempt to scroll to it.
+                    this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsKeyedTogglePatch({
+                      forceValue: true,
+                      itemKey: entry.questionId,
+                      mapKey: 'activeQuestionToggles',
+                      prevState,
+                    }), () => {
+                      this.scrollToQuestion(entry.questionId);
+                    });
+                  }}
+                  className={styles.tableActionButton}
+                >
+                  View
+                </Button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </Table>
+  </div>
+);
+};
+
+// Add this helper inside the SurveyResults class
+stringifyAggregatorResponses = (aggregatorObj: unknown): SurveyResultsStringifiedAggregator => {
+const out: SurveyResultsStringifiedAggregator = {};
+if (!aggregatorObj || typeof aggregatorObj !== 'object') return out;
+const aggregatorRecord = aggregatorObj as Record<string, unknown>;
+Object.keys(aggregatorRecord).forEach((qId) => {
+  const arr = Array.isArray(aggregatorRecord[qId]) ? aggregatorRecord[qId] : [];
+  out[qId] = arr.map((item) => ({
+    ...(item as SurveyResultsRecord),
+    response:
+      typeof (item as SurveyResultsRecord).response === 'string'
+        ? (item as SurveyResultsRecord).response
+        : JSON.stringify((item as SurveyResultsRecord).response),
+  }));
+});
+return out;
+};
+
+
+scrollToQuestion = (questionId: unknown): void => {
+const domId = getQuestionCardDomId(questionId as string | undefined);
+const cleanupScrollWatcher = () => {
+  if (this._scrollToQuestionRetryTimer) {
+    clearTimeout(this._scrollToQuestionRetryTimer);
+    this._scrollToQuestionRetryTimer = null;
+  }
+  if (this._scrollMutationObserver) {
+    this._scrollMutationObserver.disconnect();
+    this._scrollMutationObserver = null;
+  }
+};
+
+cleanupScrollWatcher();
+
+const attemptScroll = (): boolean => {
+  const el = document.getElementById(domId);
+  if (!el || typeof el.scrollIntoView !== 'function') return false;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  cleanupScrollWatcher();
+  return true;
+};
+
+if (attemptScroll()) return;
+
+if (typeof MutationObserver === 'undefined') return;
+
+const containerToWatch =
+  (this.questionIdTableRef?.current &&
+    this.questionIdTableRef.current.closest(`.${styles.modalBody}`)) ||
+  document.querySelector(`.${styles.modalBody}`);
+
+if (!containerToWatch) return;
+
+this._scrollMutationObserver = new MutationObserver(() => {
+  attemptScroll();
+});
+
+this._scrollMutationObserver.observe(containerToWatch, {
+  childList: true,
+  subtree: true,
+});
+
+this._scrollToQuestionRetryTimer = setTimeout(() => {
+  cleanupScrollWatcher();
+}, 2000);
+};
+
+changeQuestionIdSort = (column: unknown): void => {
+this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsQuestionIdSortPatch({
+  column,
+  prevState,
+}));
+};
+
+  toggleQuestionFilter = (): void => {
+this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+  prevState,
+  stateKey: 'showQuestionFilter',
+}));
+};
+
+toggleSurveyViewMode = (mode: unknown): void => {
+this.setState(buildSurveyResultsSurveyViewModePatch(mode));
+};
+
+handleSurveyViewModeToggle = (): void => {
+this.toggleSurveyViewMode(this.state.surveyViewMode === 'individuals' ? 'aggregate' : 'individuals');
+};
+
+handleSurveyViewModeKeyDown = (event: React.KeyboardEvent<HTMLElement>): void => {
+if (event.key === 'Enter' || event.key === ' ') {
+  event.preventDefault();
+  this.handleSurveyViewModeToggle();
+}
+};
+
+toggleExportArea = (): void => {
+this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+  prevState,
+  stateKey: 'exportAreaOpen',
+}));
+};
+
+handleManualRefresh = async (): Promise<void> => {
+try {
+  const slug = this.getEffectiveSlug();
+  const latestOnChain = await contractScripts.getLatestBlockNumber(this.props.provider, slug);
+
+  this.setState(
+    {
+      refreshTargetQuestionBlock: latestOnChain,
+      refreshTargetResponseBlock: latestOnChain,
+      refreshTargetSurveyBlock: latestOnChain
+    },
+    async () => {
+      if (this.state.viewMode === 'questions') {
+        if (this.props.refreshQuestionMetadata) {
+          surveyLog.log("refreshQuestionMetadata present")
+          await this.props.refreshQuestionMetadata();
+        }
+        if (this.props.refreshQuestionResponses) {
+          await this.props.refreshQuestionResponses();
+        }
+      } else if (
+        this.state.viewMode === 'survey' &&
+        this.state.surveyId && // Use state.surveyId
+        this.props.refreshSurveyResponsesByID
+      ) {
+        await this.props.refreshSurveyResponsesByID(this.state.surveyId.toLowerCase());
       }
-      if (inst._scrollMutationObserver) {
-        inst._scrollMutationObserver.disconnect();
-        inst._scrollMutationObserver = null;
+      this.resetLocalStoragePollingBackoff('manual-refresh');
+      this.pollLocalStorageForUpdates();
+      this.queueResultsRefresh('manual-refresh');
+    }
+  );
+} catch (error) {
+  surveyLog.error('handleManualRefresh error:', error);
+}
+};
+
+handleBookmarkFilter = async (): Promise<void> => {
+if (!this._isMounted) return;
+
+const filterToBookmark = this.state.filterState;
+const slug = this.getEffectiveSlug();
+
+let filtersCache: unknown = peekCacheSync('filters', slug, { clone: false });
+if (!filtersCache || typeof filtersCache !== 'object') {
+  filtersCache = (await readCache('filters', slug)) || {};
+} else {
+  filtersCache = { ...(filtersCache as SurveyResultsFiltersCache) };
+}
+const filtersCacheRecord = toSurveyResultsRecord(filtersCache) as SurveyResultsFiltersCache;
+let bookmarks: unknown[] = [];
+try {
+  const parsed = filtersCacheRecord.bookmarkedFilters;
+  if (Array.isArray(parsed)) {
+    bookmarks = [...parsed];
+  } else if (parsed != null) {
+    surveyLog.warn('Bookmarked filters cache was not an array. Initializing to empty array.');
+  }
+} catch (e) {
+  surveyLog.error('Error parsing bookmarked filters cache:', e);
+}
+
+// Optional: Duplicate check (skipped for simplicity as per instructions)
+bookmarks.push(filterToBookmark);
+
+try {
+  await (writeCache as SurveyResultsWriteCache)('filters', slug, {
+    ...filtersCacheRecord,
+    bookmarkedFilters: bookmarks,
+  });
+  this.setState(buildSurveyResultsBookmarkFeedbackPatch(true));
+
+  if (this._bookmarkFeedbackTimer) {
+    clearTimeout(this._bookmarkFeedbackTimer);
+    this._bookmarkFeedbackTimer = null;
+  }
+  this._bookmarkFeedbackTimer = setTimeout(() => {
+    this._bookmarkFeedbackTimer = null;
+    if (this._isMounted) {
+      this.setState(buildSurveyResultsBookmarkFeedbackPatch(false));
+    }
+  }, 2000);
+} catch (e) {
+  surveyLog.error('Error saving bookmarked filters cache:', e);
+}
+};
+
+render() {
+const isActuallyOpen = this.props.isOpen;
+
+const {
+  responses,
+  sbtFilteredResponses,
+  exportType,
+  alertMessage,
+  filterLoading,
+  totalQuestionsCount,
+  totalResponsesCount,
+  filteredResponsesCount,
+  surveyViewMode,
+  exportAreaOpen,
+  aggregatorQuestionResponses,
+  sbtFilteredAggregatorQuestionResponses,
+  surveyTitle,
+  surveyDocumentURLs,
+  viewMode,
+  filteredQuestionsCount,
+  isFilterActive,
+} = this.state;
+
+// Use this.state.surveyId for consistency
+const currentSurveyId = this.state.surveyId;
+// Preload scoped question metadata once per render so question-mode summaries stay in
+// sync with the same list-scope aggregation used by fetchQuestionModeResponses().
+const slug = this.getEffectiveSlug();
+const preQuestionNetworkData = this.getScopedQuestionNetworkDataSync(viewMode);
+const preNetworkQuestions = preQuestionNetworkData.questions || {};
+const questionFilterQuestions = this.getMemoizedQuestionFilterQuestions(preNetworkQuestions);
+const aggregatorEntries = this.getMemoizedAggregatorEntries(sbtFilteredAggregatorQuestionResponses);
+const aggregatorEntriesCount = aggregatorEntries.length;
+const lockedResponsesModel = this.getMemoizedLockedResponsesModel(preNetworkQuestions);
+const surveyAggregateEntries =
+  (viewMode === 'survey' && surveyViewMode === 'aggregate') ? aggregatorEntries : [];
+const questionModeEntries = viewMode === 'questions' ? aggregatorEntries : [];
+
+const netBlock = this.state.networkLatestBlock || 0;
+const { questionLocalBlock, responseLocalBlock, surveyLocalBlock } = this.state;
+const {
+  refreshTargetQuestionBlock,
+  refreshTargetResponseBlock,
+  refreshTargetSurveyBlock
+} = this.state;
+
+const clampedQuestionLocalBlock = Math.min(questionLocalBlock, netBlock);
+const clampedResponseLocalBlock = Math.min(responseLocalBlock, netBlock);
+const clampedSurveyLocalBlock = Math.min(surveyLocalBlock, netBlock);
+
+const clampedRefreshTargetQuestionBlock =
+  refreshTargetQuestionBlock > 0 ? Math.min(refreshTargetQuestionBlock, netBlock) : 0;
+const clampedRefreshTargetResponseBlock =
+  refreshTargetResponseBlock > 0 ? Math.min(refreshTargetResponseBlock, netBlock) : 0;
+const clampedRefreshTargetSurveyBlock =
+  refreshTargetSurveyBlock > 0 ? Math.min(refreshTargetSurveyBlock, netBlock) : 0;
+
+let questionDifference = 0;
+let questionBarText: React.ReactNode = '';
+let questionProgress = 0;
+let showQuestionSpinner = false;
+
+if (viewMode === 'questions') {
+  if (clampedQuestionLocalBlock === 0 || netBlock === 0) {
+    showQuestionSpinner = true;
+  } else if (
+    clampedRefreshTargetQuestionBlock > 0 &&
+    clampedQuestionLocalBlock >= clampedRefreshTargetQuestionBlock
+  ) {
+    questionProgress = 100;
+    questionBarText = `In Sync (Current: ${clampedQuestionLocalBlock} / Latest: ${clampedRefreshTargetQuestionBlock})`;
+  } else {
+    const denom =
+      clampedRefreshTargetQuestionBlock > 0 ? clampedRefreshTargetQuestionBlock : netBlock;
+    if (clampedRefreshTargetQuestionBlock === 0) {
+      if (clampedQuestionLocalBlock >= netBlock) {
+        questionProgress = 100;
+        questionBarText = `In Sync (Current: ${clampedQuestionLocalBlock} / Latest: ${netBlock})`;
+      } else {
+        questionDifference = netBlock - clampedQuestionLocalBlock;
+        questionBarText = `Remaining Blocks: ${questionDifference} (Current: ${clampedQuestionLocalBlock} / Latest: ${netBlock})`;
+        questionProgress = Math.floor((clampedQuestionLocalBlock / netBlock) * 100);
       }
-    };
+    } else {
+      questionDifference = clampedRefreshTargetQuestionBlock - clampedQuestionLocalBlock;
+      questionBarText = (
+        <>
+          Remaining Blocks: {questionDifference}{' '}
+          <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE} />
+        </>
+      );
+      questionProgress = denom
+        ? Math.floor((clampedQuestionLocalBlock / denom) * 100)
+        : 0;
+    }
+  }
+}
+
+let showResponseSpinner = false;
+let responseBarText: React.ReactNode = '';
+let responseProgress = 0;
+let difference = 0;
+
+if (viewMode === 'survey') {
+  if (clampedSurveyLocalBlock === 0 || netBlock === 0) {
+    showResponseSpinner = true;
+  } else if (
+    clampedRefreshTargetSurveyBlock > 0 &&
+    clampedSurveyLocalBlock >= clampedRefreshTargetSurveyBlock
+  ) {
+    responseProgress = 100;
+    responseBarText = `In Sync (Current: ${clampedSurveyLocalBlock} / Latest: ${clampedRefreshTargetSurveyBlock})`;
+  } else {
+    const denom =
+      clampedRefreshTargetSurveyBlock > 0 ? clampedRefreshTargetSurveyBlock : netBlock;
+    if (clampedRefreshTargetSurveyBlock === 0) {
+      if (clampedSurveyLocalBlock >= netBlock) {
+        responseProgress = 100;
+        responseBarText = `In Sync (Current: ${clampedSurveyLocalBlock} / Latest: ${netBlock})`;
+      } else {
+        difference = netBlock - clampedSurveyLocalBlock;
+        responseBarText = `Remaining Blocks: ${difference} (Current: ${clampedSurveyLocalBlock} / Latest: ${netBlock})`;
+        responseProgress = Math.floor((clampedSurveyLocalBlock / netBlock) * 100);
+      }
+    } else {
+      difference = clampedRefreshTargetSurveyBlock - clampedSurveyLocalBlock;
+      responseBarText = (
+        <>
+          Remaining Blocks: {difference}{' '}
+          <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE} />
+        </>
+      );
+      responseProgress = denom
+        ? Math.floor((clampedSurveyLocalBlock / denom) * 100)
+        : 0;
+    }
+  }
+} else {
+  if (clampedResponseLocalBlock === 0 || netBlock === 0) {
+    showResponseSpinner = true;
+  } else if (
+    clampedRefreshTargetResponseBlock > 0 &&
+    clampedResponseLocalBlock >= clampedRefreshTargetResponseBlock
+  ) {
+    responseProgress = 100;
+    responseBarText = `In Sync (Current: ${clampedResponseLocalBlock} / Latest: ${clampedRefreshTargetResponseBlock})`;
+  } else {
+    const denom =
+      clampedRefreshTargetResponseBlock > 0 ? clampedRefreshTargetResponseBlock : netBlock;
+    if (clampedRefreshTargetResponseBlock === 0) {
+      if (clampedResponseLocalBlock >= netBlock) {
+        responseProgress = 100;
+        responseBarText = `In Sync (Current: ${clampedResponseLocalBlock} / Latest: ${netBlock})`;
+      } else {
+        difference = netBlock - clampedResponseLocalBlock;
+        responseBarText = `Remaining Blocks: ${difference} (Current: ${clampedResponseLocalBlock} / Latest: ${netBlock})`;
+        responseProgress = Math.floor((clampedResponseLocalBlock / netBlock) * 100);
+      }
+    } else {
+      difference = clampedRefreshTargetResponseBlock - clampedResponseLocalBlock;
+      responseBarText = (
+        <>
+          Remaining Blocks: {difference}{' '}
+          <FontAwesomeIcon icon={faSpinner} spin style={SURVEY_RESULTS_SYNC_REMAINING_SPINNER_STYLE} />
+        </>
+      );
+      responseProgress = denom
+        ? Math.floor((clampedResponseLocalBlock / denom) * 100)
+        : 0;
+    }
+  }
+}
+
+const questionColor = questionProgress < 100 ? 'info' : 'success';
+const responseColor = responseProgress < 100 ? 'info' : 'success';
+
+const currentViewModeForFilter = this.state.viewMode;
+const currentSurveyIdForFilter = this.state.viewMode === 'survey' ? this.state.surveyId : null;
+
+const isSynced = (viewMode === 'questions' ? questionColor === 'success' && responseColor === 'success' : responseColor === 'success');
+
+const surveyIdAbbreviation = currentSurveyId
+  ? getShortenedSurveyID(currentSurveyId, false, null, false)
+  : null;
+const areSummaryCountsHydrated =
+  viewMode === 'survey'
+    ? !!this.state.surveyResultsHydrated
+    : !!this.state.questionResultsHydrated;
+const isDemoQuestionResults = this.getIsDemoQuestionResultsContext();
+const demoResultsViewMode = isDemoQuestionResults
+  ? this.state.demoResultsViewMode || 'raw'
+  : 'raw';
+const isDemoAlternateResultsView = isDemoQuestionResults && demoResultsViewMode !== 'raw';
+const demoResultsViewOptions: SurveyResultsDemoViewOption[] = isDemoQuestionResults
+  ? [
+      { key: 'report', label: 'Report' },
+      { key: 'atlas', label: 'Atlas' },
+      { key: 'breakdown', label: 'Breakdown' },
+      { key: 'riskMatrix', label: 'Risk Matrix' },
+    ]
+  : [];
+
+// Compute a context-aware filtered questions count for display
+let displayedFilteredQuestionsCount;
+if (viewMode === 'survey') {
+  if (surveyViewMode === 'aggregate') {
+    displayedFilteredQuestionsCount = aggregatorEntriesCount || totalQuestionsCount;
+  } else {
+    // Individuals view does not change which questions belong to the survey
+    displayedFilteredQuestionsCount = totalQuestionsCount;
+  }
+} else {
+  // Questions view – use live count from QuestionFilter if available; otherwise fallback to visible aggregator keys
+  const fallbackLen = aggregatorEntriesCount;
+  displayedFilteredQuestionsCount =
+    (filteredQuestionsCount !== null && filteredQuestionsCount !== undefined)
+      ? filteredQuestionsCount
+      : fallbackLen;
+}
+const displayedTotalQuestionsCount = Math.max(0, Number(totalQuestionsCount) || 0);
+const displayedTotalResponsesCount = Math.max(0, Number(totalResponsesCount) || 0);
+const normalizedFilteredQuestionsCount = Math.min(
+  displayedTotalQuestionsCount,
+  Math.max(0, Number(displayedFilteredQuestionsCount) || 0)
+);
+const normalizedFilteredResponsesCount = Math.min(
+  displayedTotalResponsesCount,
+  Math.max(0, Number(filteredResponsesCount) || 0)
+);
+
+// Compact sync status display
+let syncStatusText = '';
+let isSyncingOrLoading = true;
+
+if (showQuestionSpinner || showResponseSpinner) {
+  syncStatusText = 'Loading...';
+} else if (isSynced) {
+  syncStatusText = 'In Sync';
+  isSyncingOrLoading = false;
+} else {
+  syncStatusText = 'Syncing...';
+}
+const showLongSyncNotice =
+  isSyncingOrLoading &&
+  this._syncLoadingStartedAt !== null &&
+  Date.now() - this._syncLoadingStartedAt >= 15000;
+
+return (
+  <Modal
+    isOpen={isActuallyOpen}
+    toggle={this.closeModal}
+    className={styles.resultsModal}
+  >
+    <ModalHeader toggle={this.closeModal} className={styles.modalHeader}>
+      <div className={styles.modalHeaderContent}>
+        <div className={styles.modalHeaderTitleBlock}>
+          <h2 className={styles.modalTitle}>
+            {viewMode === 'survey'
+             ? `${surveyTitle ? `${surveyTitle}` : 'Survey Results'}`
+              : 'Question Results'}
+          </h2>
+        </div>
+
+        {viewMode === 'survey' && currentSurveyId && (
+          <div className={styles.modalSubtitle}>
+            <span className={styles.surveyIdMeta}>
+              Survey ID:{' '}
+              <a
+                href={`/survey/${encodeURIComponent(currentSurveyId)}${this.getEffectiveSlug() ? `?session=${encodeURIComponent(this.getEffectiveSlug())}` : ''}`}
+                className={styles.surveyIdLink}
+              >
+                {surveyIdAbbreviation || currentSurveyId}
+              </a>
+            </span>
+            <FontAwesomeIcon
+              icon={faBookmark}
+              className={styles.biggerIcon}
+              onClick={(e: React.MouseEvent<SVGSVGElement>) => {
+                e.stopPropagation();
+                this.toggleSurveyBookmark(currentSurveyId);
+              }}
+              color={
+                this.state.bookmarkedSurveyIDs.includes(currentSurveyId) ? 'gold' : 'grey'
+              }
+              style={SURVEY_RESULTS_SURVEY_BOOKMARK_STYLE}
+              title="Bookmark Survey ID"
+            />
+          </div>
+        )}
+        {viewMode === 'survey' && Array.isArray(surveyDocumentURLs) && surveyDocumentURLs.length > 0 && (
+          <div className={styles.surveyDocUrls}>
+            {surveyDocumentURLs.map((url: string, idx: number) => (
+              <a
+                key={idx}
+                href={url}
+                target='_blank'
+                rel='noopener noreferrer'
+                className={styles.surveyDocUrlLink}
+                title={url}
+              >
+                <FontAwesomeIcon icon={faExternalLinkAlt} style={SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE} />
+                {url.length > 50 ? `${url.slice(0, 47)}...` : url}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className={styles.modalHeaderControls}>
+        {this.renderLockedResponsesToggle(lockedResponsesModel)}
+        {renderSurveyResultsSyncStatusPanel({
+          isSynced,
+          isSyncingOrLoading,
+          syncStatusText,
+          showLongSyncNotice,
+          syncDetailsOpen: !!this.state.syncDetailsOpen,
+          syncDetailsStyle: resolveSurveyResultsSyncDetailsStyle(this.state.syncDetailsOpen),
+          onToggleSyncDetails: () =>
+            this.setState((prevState: SurveyResultsRecord) => buildSurveyResultsBooleanTogglePatch({
+              prevState,
+              stateKey: 'syncDetailsOpen',
+            })),
+          onManualRefresh: () => this.handleManualRefresh(),
+          viewMode,
+          showQuestionSpinner,
+          questionProgress,
+          questionColor,
+          questionBarText,
+          showResponseSpinner,
+          responseProgress,
+          responseColor,
+          responseBarText,
+          miniBarSpinnerStyle: SURVEY_RESULTS_MINI_BAR_SPINNER_STYLE,
+          miniProgressStyle: SURVEY_RESULTS_MINI_PROGRESS_STYLE,
+        })}
+        {isDemoQuestionResults && (
+          <div
+            className={styles.demoResultsViewNav}
+            aria-label="Demo results views"
+            data-testid="ce-surveyresults-demo-view-nav"
+          >
+            {demoResultsViewOptions.map((option: SurveyResultsDemoViewOption) => {
+              const isActiveView = demoResultsViewMode === option.key;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={[
+                    styles.demoResultsViewButton,
+                    isActiveView ? styles.demoResultsViewButtonActive : '',
+                  ].filter(Boolean).join(' ')}
+                  aria-pressed={isActiveView}
+                  data-testid={`ce-surveyresults-demo-view-${option.key}`}
+                  onClick={() => this.handleDemoResultsViewSelect(option.key)}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </ModalHeader>
 
     cleanupScrollWatcher();
 
@@ -2216,9 +2878,14 @@ renderQuestionSummary = (
 
     if (!containerToWatch) return;
 
-    inst._scrollMutationObserver = new MutationObserver(() => {
-      attemptScroll();
-    });
+      {renderSurveyResultsFilterSummary({
+        displayedTotalQuestionsCount,
+        displayedTotalResponsesCount,
+        normalizedFilteredQuestionsCount,
+        normalizedFilteredResponsesCount,
+        filterLoading,
+        areSummaryCountsHydrated,
+      })}
 
     inst._scrollMutationObserver.observe(containerToWatch, {
       childList: true,
