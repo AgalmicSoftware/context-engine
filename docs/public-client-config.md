@@ -116,7 +116,18 @@ The output directory is `client/build/`.
 Before building, the build script removes stale legacy `client/build-vite/` and
 `client/vite-build/` directories if they exist locally.
 
-### 3. Publish to Netlify
+CRA remains the canonical production build. The client also has a Vite sidecar
+for toolchain compatibility checks:
+
+```bash
+cd client
+npm run build:vite
+```
+
+The sidecar output directory is `client/build-vite/`; do not use it to replace
+`client/build/` until the project intentionally flips the canonical build.
+
+### 3. Upload to Netlify
 
 The repository-root `netlify.toml` is the canonical connected-build contract.
 Connect only the public `AgalmicSoftware/context-engine` repository, select

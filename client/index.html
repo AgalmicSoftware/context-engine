@@ -23,7 +23,7 @@
       property="og:description"
       content="Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control."
     />
-    <meta property="og:image" content="https://contextengine.sh/assets/img/context-engine-social-preview-square.png" />
+    <meta property="og:image" content="https://contextengine.xyz/android-chrome-512x512.png" />
     <meta name="twitter:card" content="summary" />
     <meta
       name="twitter:title"
@@ -34,30 +34,30 @@
       content="Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control."
     />
     <meta name="twitter:image" content="https://contextengine.xyz/android-chrome-512x512.png" />
-    <link rel="alternate" href="%PUBLIC_URL%/discoverability.html" title="Context Engine static summary" />
-    <link rel="alternate" type="text/plain" href="%PUBLIC_URL%/llms.txt" title="Context Engine llms.txt" />
+    <link rel="alternate" href="__PUBLIC_URL__/discoverability.html" title="Context Engine static summary" />
+    <link rel="alternate" type="text/plain" href="__PUBLIC_URL__/llms.txt" title="Context Engine llms.txt" />
     <script type="application/ld+json" data-ce-structured-data="public-page">
       {
         "@context": "https://schema.org",
         "@graph": [
           {
             "@type": "Organization",
-            "@id": "https://contextengine.sh/#organization",
+            "@id": "https://contextengine.xyz/#organization",
             "name": "Context Engine",
-            "url": "https://contextengine.sh/",
+            "url": "https://contextengine.xyz/",
             "sameAs": ["https://github.com/AgalmicSoftware/context-engine"]
           },
           {
             "@type": "WebSite",
-            "@id": "https://contextengine.sh/#website",
-            "url": "https://contextengine.sh/",
+            "@id": "https://contextengine.xyz/#website",
+            "url": "https://contextengine.xyz/",
             "name": "Context Engine",
             "description": "Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control.",
-            "publisher": { "@id": "https://contextengine.sh/#organization" }
+            "publisher": { "@id": "https://contextengine.xyz/#organization" }
           },
           {
             "@type": "SoftwareSourceCode",
-            "@id": "https://contextengine.sh/#source",
+            "@id": "https://contextengine.xyz/#source",
             "name": "Context Engine",
             "description": "Context Engine is an open-source toolkit for AI-enhanced deliberation, surveys, SBT-gated access control, and permanent records.",
             "codeRepository": "https://github.com/AgalmicSoftware/context-engine",
@@ -70,6 +70,7 @@
 
     <!--     Fonts and icons     -->
     <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/>
+    <script defer src="https://kit.fontawesome.com/b17aad74d4.js" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,500;1,500;1,600&display=swap" rel="stylesheet">
@@ -78,7 +79,6 @@
     <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
     <!-- Do NOT require COEP for this app (popups/iframes during auth) -->
     <meta http-equiv="Cross-Origin-Embedder-Policy" content="unsafe-none">
-
 
     <title>Context Engine | Deliberation Toolkit</title>
   </head>
@@ -102,11 +102,11 @@
         </p>
         <p>
           Static summary page:
-          <a href="%PUBLIC_URL%/discoverability.html">Context Engine static summary</a>
+          <a href="__PUBLIC_URL__/discoverability.html">Context Engine static summary</a>
         </p>
         <p>
           LLM summary:
-          <a href="%PUBLIC_URL%/llms.txt">Context Engine llms.txt</a>
+          <a href="__PUBLIC_URL__/llms.txt">Context Engine llms.txt</a>
         </p>
         <p>
           JavaScript is required to run the interactive app, but these links are
@@ -115,6 +115,6 @@
       </main>
     </noscript>
     <div id="root"></div>
-    <script type="module" src="/src/viteEntry.ts"></script>
+    <script type="module" src="/src/viteEntry.js"></script>
   </body>
 </html>
