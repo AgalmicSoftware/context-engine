@@ -252,6 +252,28 @@ const openSessionSelector = async () => {
   return screen.findByTestId(SESSION_SELECTOR_PANEL_TEST_ID);
 };
 
+const buildSBTsListProps = (overrides = {}) => ({
+  provider: 'mock',
+  network: { id: 84532, name: 'Base Sepolia' },
+  account: '',
+  sessionSlug: '',
+  loginComplete: true,
+  miniaturized: false,
+  toggleLoginModal: jest.fn(),
+  sbtCacheRevision: 0,
+  onRequestSbtCacheRefresh: jest.fn(),
+  isSBTCacheReady: true,
+  refreshSbtData: jest.fn(),
+  latestBlockNumber: 0,
+  allSessionsMode: true,
+  ensureLightSbtDiscovery: jest.fn(),
+  ...overrides,
+});
+
+const renderSBTsList = (overrides = {}) => render(
+  <SBTsList {...buildSBTsListProps(overrides)} />
+);
+
 describe('SBTsList per-session loader countdown', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -1048,13 +1070,12 @@ describe('SBTsList per-session loader countdown', () => {
     });
 
     rerender(
-      <SBTsList
-        {...buildSBTsListProps({
-          sessionSlug: 'beta',
-          allSessionsMode: undefined,
-          ensureLightSbtDiscovery,
-        })}
-      />,
+      <SBTsList {...buildSBTsListProps({
+        sessionSlug: 'beta',
+        allSessionsMode: undefined,
+        ensureLightSbtDiscovery,
+      })}
+      />
     );
 
     await waitFor(() => {
@@ -1068,25 +1089,10 @@ describe('SBTsList per-session loader countdown', () => {
   });
 
   it('shows create-group control above universe selector in embedded all-groups mode', async () => {
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
@@ -1099,25 +1105,10 @@ describe('SBTsList per-session loader countdown', () => {
   });
 
   it('renders create-group panel above universe when expanded in embedded all-groups mode', async () => {
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     fireEvent.click(await screen.findByRole('button', { name: /Create Group/i }));
 
@@ -1133,25 +1124,10 @@ describe('SBTsList per-session loader countdown', () => {
       JSON.stringify({ sbtName: 'Alpha' })
     );
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     await screen.findByRole('button', { name: /Create Group/i });
 
@@ -1168,25 +1144,10 @@ describe('SBTsList per-session loader countdown', () => {
       })
     );
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     await screen.findByRole('button', { name: /Exit Group Creation/i });
     expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
@@ -1196,25 +1157,10 @@ describe('SBTsList per-session loader countdown', () => {
     mockReadSessionScanScope.mockReturnValue('list');
     mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     fireEvent.click(await screen.findByRole('button', { name: /Create Group/i }));
     await screen.findByTestId('create-group-panel');
@@ -1245,25 +1191,10 @@ describe('SBTsList per-session loader countdown', () => {
     ]);
     mockSessionRegistryGetAllSessionEntries.mockReturnValue([]);
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     expect(screen.queryByText(/Loading Groups/i)).not.toBeInTheDocument();
     expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
@@ -1284,25 +1215,10 @@ describe('SBTsList per-session loader countdown', () => {
     ]);
     mockSessionRegistryGetAllSessionEntries.mockReturnValue([]);
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     await openSessionSelector();
     await waitFor(() => {
