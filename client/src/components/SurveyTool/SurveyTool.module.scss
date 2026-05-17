@@ -3128,19 +3128,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .pileInteractionUnit {
   --pile-desktop-submit-rail-offset: 64px;
   --pile-desktop-rail-gap: 24px;
-  --pile-current-submit-rail-offset: 0px;
-  --pile-current-submit-rail-padding: 0px;
+  --pile-card-width: min(550px, 90vw);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  width: auto;
-  padding-top: var(--pile-current-submit-rail-padding);
-}
-
-.pileInteractionUnitWithSubmitRail {
-  --pile-current-submit-rail-offset: var(--pile-desktop-submit-rail-offset);
-  --pile-current-submit-rail-padding: var(--pile-desktop-submit-rail-offset);
+  width: var(--pile-card-width);
+  max-width: 90vw;
 }
 
 /* Card Stack Container */
@@ -3818,9 +3812,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileInteractionUnit {
     flex-direction: column;
     /* Stack card then controls */
-    width: 100%;
-    --pile-current-submit-rail-offset: 0px;
-    --pile-current-submit-rail-padding: 0px;
+    width: var(--pile-card-width);
+    max-width: 90vw;
   }
 
   .pileControls {
