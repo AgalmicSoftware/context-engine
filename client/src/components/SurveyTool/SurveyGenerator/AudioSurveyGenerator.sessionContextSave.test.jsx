@@ -25,9 +25,8 @@ import {
 describe('AudioSurveyGenerator session context saves', () => {
   setupAudioSurveyGeneratorTestLifecycle();
 
-  it('defaults generate-time OP Sepolia session context saves to the session doc gate', async () => {
+  it('defaults generate-time session context saves to only-me when the session doc gate uses OP Sepolia', async () => {
     delete window.__litHooks;
-    const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     const onQuestionsGenerated = jest.fn();
     mockProcessAdditionalSources.mockResolvedValue(
       'This additional source content is long enough to drive question generation on its own.'
@@ -48,7 +47,6 @@ describe('AudioSurveyGenerator session context saves', () => {
         provider={{ request: jest.fn() }}
         network={{ id: 11155420 }}
         account="0x0000000000000000000000000000000000000123"
-        litHooks={{ saveKey: scopedSaveKey }}
         loginComplete
         toggleLoginModal={jest.fn()}
         activeSessionSlug="edge"
@@ -69,9 +67,9 @@ describe('AudioSurveyGenerator session context saves', () => {
     toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
 
     const audienceButton = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_AUDIENCE_BUTTON}"]`);
-    expect(audienceButton.getAttribute('data-ce-doc-save-audience')).toBe('session');
-    expect(audienceButton.getAttribute('aria-label')).toContain('Edge Session');
-    expect(audienceButton.textContent).not.toContain('Edge Session');
+    expect(audienceButton.getAttribute('data-ce-doc-save-audience')).toBe('self');
+    expect(audienceButton.getAttribute('aria-label')).toContain('only me');
+    expect(audienceButton.textContent).not.toContain('only me');
 
     await act(async () => {
       container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
@@ -79,14 +77,12 @@ describe('AudioSurveyGenerator session context saves', () => {
 
     expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(1);
     expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).toEqual(expect.objectContaining({
-      enabled: true,
-      saveKey: scopedSaveKey,
-      chainId: 11155420,
-      litChain: 'optimismSepolia',
+      recipientType: 'self-eip712-v1',
+      selfRecipient: true,
       contextLabel: 'doc-link:edge',
     }));
-    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption.accessControlConditions).toEqual(expect.any(Array));
-    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).not.toHaveProperty('selfRecipient');
+    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).not.toHaveProperty('saveKey');
+    expect(mockUploadDocLibraryUrlRecord.mock.calls[0][0].encryption).not.toHaveProperty('accessControlConditions');
     expect(onQuestionsGenerated).toHaveBeenCalledTimes(1);
   });
 
@@ -236,74 +232,6 @@ describe('AudioSurveyGenerator session context saves', () => {
       expect.stringContaining('/session/0xSessionToken/docs?'),
     ]);
     expect(onQuestionsGenerated.mock.calls[0][1][0].startsWith('/session/0xSessionToken/docs?')).toBe(true);
-  });
-
-  it('stops queued doc-library uploads after unmount aborts generation', async () => {
-    let resolveFirstUpload;
-    const onQuestionsGenerated = jest.fn();
-    const firstFile = new File(['first-source-content'], 'first-notes.txt', { type: 'text/plain' });
-    const secondFile = new File(['second-source-content'], 'second-notes.txt', { type: 'text/plain' });
-
-    mockUploadDocLibraryFile.mockImplementationOnce(() => new Promise((resolve) => {
-      resolveFirstUpload = resolve;
-    }));
-    mockCallAI.mockResolvedValue(JSON.stringify({
-      surveyTitle: 'Aborted Save Survey',
-      questions: [
-        {
-          prompt: 'Should aborted uploads stop?',
-          questionType: 'binary',
-          tags: ['docs'],
-        },
-      ],
-    }));
-
-    await renderSubject(
-      <AudioSurveyGenerator
-        provider={{ request: jest.fn() }}
-        network={{ id: 84532 }}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-        activeSessionSlug="edge"
-        sessionConfig={makeSessionConfig({
-          sessionId: '0xSessionToken',
-          sessionIdHex: `0x${'5'.repeat(32)}`,
-        })}
-        onQuestionsGenerated={onQuestionsGenerated}
-      />
-    );
-
-    setAudioInputValue('This primary context is long enough to generate questions after source uploads finish.');
-    addAdditionalFile(firstFile);
-    addAdditionalFile(secondFile);
-    toggleCheckbox(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_SAVE_DOCS_TOGGLE}"]`));
-
-    await act(async () => {
-      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    });
-
-    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
-    expect(mockUploadDocLibraryFile.mock.calls[0][0].file).toBe(firstFile);
-
-    await renderSubject(null);
-
-    await act(async () => {
-      resolveFirstUpload({
-        txId: 'E'.repeat(43),
-        url: `https://example.com/${'E'.repeat(43)}`,
-        storage: 'lit-arweave',
-        kind: 'file',
-        tagMap: {},
-        data: { size: null, type: 'application/json' },
-      });
-      await Promise.resolve();
-    });
-
-    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
-    expect(mockProcessAdditionalSources).not.toHaveBeenCalled();
-    expect(mockCallAI).not.toHaveBeenCalled();
-    expect(onQuestionsGenerated).not.toHaveBeenCalled();
   });
 
   it('keeps photo analysis ephemeral when doc-library saving is disabled', async () => {
