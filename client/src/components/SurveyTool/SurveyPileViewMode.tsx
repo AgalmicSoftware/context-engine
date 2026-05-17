@@ -1317,15 +1317,6 @@ export class PileViewMode extends SurveyQuestions {
     super.componentWillUnmount();
   }
 
-  // Wrapper helpers so we don't shadow parent methods
-  handleAnswerPile = (questionId, answer, options = {}) => {
-    this.handleAnswer(0, questionId, answer, options);
-  };
-
-  handleAdditionalPile = (questionId, comments) => {
-    this.handleAdditional(0, questionId, comments);
-  };
-
   handleViewAllFromPile = () => {
     if (this._persistTimer) {
       clearTimeout(this._persistTimer);
@@ -1475,9 +1466,6 @@ export class PileViewMode extends SurveyQuestions {
       },
     }));
   };
-
-  // Keep this tiny wrapper only if other code calls it
-  getSubmitCount = () => (this.getPendingEditStats?.() || { total: 0 }).total | 0;
 
   // Keep semantics aligned with baseline-aware changed-set
   getAnsweredQuestionsCount = () => this.getSubmitCount();
