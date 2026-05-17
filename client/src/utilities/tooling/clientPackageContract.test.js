@@ -23,6 +23,7 @@ describe('client package modernization contract', () => {
 
   it('keeps CRA fallback scripts removed from the client package contract', () => {
     const pkg = readClientPackageJson();
+    const eslintConfig = readClientFile('.eslintrc.json');
 
     expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
     expect(pkg.scripts['build:vite']).toBe('PUBLIC_URL=/ vite build');
@@ -31,6 +32,7 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts['build:cra']).toBeUndefined();
     expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).not.toContain('vite');
+    expect(eslintConfig).not.toContain('react-app');
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
@@ -121,10 +123,14 @@ describe('client package modernization contract', () => {
       '@babel/preset-env',
       '@babel/preset-react',
       '@babel/preset-typescript',
+      '@typescript-eslint/eslint-plugin',
+      '@typescript-eslint/parser',
       'babel-jest',
       'eslint',
       'eslint-plugin-import',
       'eslint-plugin-prettier',
+      'eslint-plugin-react',
+      'eslint-plugin-react-hooks',
       'sass',
       'serve',
       'source-map-explorer',
@@ -140,6 +146,7 @@ describe('client package modernization contract', () => {
   it('keeps stale webpack and CRA packages out of the client package contract', () => {
     const pkg = readClientPackageJson();
     const staleLoaders = [
+      'babel-eslint',
       'babel-preset-react-app',
       'copy-webpack-plugin',
       'file-loader',
