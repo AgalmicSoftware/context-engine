@@ -25,6 +25,11 @@ import {
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FormGroup, Label, Input } from 'reactstrap';
 import { hierarchy as d3Hierarchy, pack as d3Pack } from 'd3';
+import treeData from '../../variables/demo/debate_map_demo_data.json';
+import historicalData from '../../variables/demo/historical_figures_tree_qs_and_votes.json';
+import loopholeHistoricalCases from '../../variables/demo/loophole_historical_cases.json';
+import loopholeHistoricalFigurePrinciples from '../../variables/demo/loophole_historical_figure_principles.json';
+import { getRiskMatrixAtlasScenariosForAtlasNode } from '../../variables/demo/riskMatrixAtlasScenarioData.js';
 import styles from './DebateMap.module.scss';
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -89,9 +94,7 @@ import type {
   VoteDirection,
 } from './debateMapTypes';
 
-export { buildExpandedHistoricalCaseBriefMap, buildHistoricalCaseBrief, buildHistoricalCompassPoints };
-
-const StandalonePoliticalCompass = React.lazy(() =>
+const StandalonePoliticalCompass = React.lazy(() => (
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
     default: module.StandalonePoliticalCompass,
   })),

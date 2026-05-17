@@ -2,7 +2,12 @@
 
 import React, { Component } from 'react';
 import sha256 from 'crypto-js/sha256';
-import { Button, Label, Input, FormGroup } from 'reactstrap';
+import {
+  Button,
+  Label,
+  Input,
+  FormGroup,
+} from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSpinner,
