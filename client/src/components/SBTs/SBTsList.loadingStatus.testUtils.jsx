@@ -86,7 +86,6 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 jest.mock('../../utilities/arweave/arweaveUrls.js', () => ({
-  buildArweaveGatewayUrlCandidates: jest.fn((value = '') => [String(value || '').trim()]),
   normalizeArweaveUrl: jest.fn((value = '') => String(value || '').trim()),
 }));
 
