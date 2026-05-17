@@ -43,7 +43,6 @@ const textResp = (status, textBody = '', contentType = 'text/plain') => ({
 const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 const TEST_ARWEAVE_BACKUP_GATEWAY = 'https://arweave-backup.example.test';
 const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev'; // intentional: real URL - verifies AR.IO gateway override handling
-const TEST_IRYS_GATEWAY = 'https://gateway-irys.example.test';
 
 describe('arweaveClient.downloadDataFromArweave', () => {
   beforeEach(() => {
@@ -689,5 +688,116 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     expect(global.fetch).toHaveBeenCalledTimes(4);
     const fallbackUrl = String(global.fetch.mock.calls[3]?.[0] || '');
     expect(fallbackUrl).toContain('wf-gateway.example.test');
+  });
+
+  it('uses short not-found cooldowns for response payload categories', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => '',
+    });
+
+    const txId = 'missing-response-cooldown';
+    await expect(
+      arweaveScripts.downloadDataFromArweave(txId, {
+        gateways: [TEST_ARWEAVE_GATEWAY],
+        retries: 0,
+        disableExistencePrecheck: true,
+        debugContext: { category: 'question_response_payload' },
+      })
+    ).rejects.toMatchObject({
+      name: 'ArweaveFetchError',
+      status: 404,
+      kind: 'not_found',
+    });
+
+    let cooldownErr = null;
+    try {
+      await arweaveScripts.downloadDataFromArweave(txId, {
+        gateways: [TEST_ARWEAVE_GATEWAY],
+        retries: 0,
+        disableExistencePrecheck: true,
+        debugContext: { category: 'question_response_payload' },
+      });
+    } catch (err) {
+      cooldownErr = err;
+    }
+
+    expect(cooldownErr).toBeTruthy();
+    const remainingMs = Number(cooldownErr?.nextRetryAtMs || 0) - Date.now();
+    expect(remainingMs).toBeGreaterThan(1000);
+    expect(remainingMs).toBeLessThan(60 * 1000);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses short not-found cooldowns for gateway-first session metadata categories', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => '',
+    });
+
+    const txId = 'missing-session-metadata-cooldown';
+    await expect(
+      arweaveScripts.downloadDataFromArweave(txId, {
+        gateways: [TEST_ARWEAVE_GATEWAY],
+        retries: 0,
+        debugContext: { category: 'session_registry_metadata' },
+      })
+    ).rejects.toMatchObject({
+      name: 'ArweaveFetchError',
+      status: 404,
+      kind: 'not_found',
+    });
+
+    let cooldownErr = null;
+    try {
+      await arweaveScripts.downloadDataFromArweave(txId, {
+        gateways: [TEST_ARWEAVE_GATEWAY],
+        retries: 0,
+        debugContext: { category: 'session_registry_metadata' },
+      });
+    } catch (err) {
+      cooldownErr = err;
+    }
+
+    expect(cooldownErr).toBeTruthy();
+    const remainingMs = Number(cooldownErr?.nextRetryAtMs || 0) - Date.now();
+    expect(remainingMs).toBeGreaterThan(1000);
+    expect(remainingMs).toBeLessThan(60 * 1000);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('skips GraphQL existence checks when SBT metadata preflight is disabled', async () => {
+    globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA = false;
+
+    const exists = await arweaveScripts.checkTxExists('sbt-image-no-preflight', {
+      debugContext: { category: 'sbt_metadata' },
+    });
+
+    expect(exists).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('throws typed invalid errors for non-retryable 4xx', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => '',
+    });
+
+    await expect(
+      arweaveScripts.downloadDataFromArweave('badtx', {
+        gateways: [TEST_ARWEAVE_GATEWAY],
+        retries: 1,
+        bypassCache: true,
+      })
+    ).rejects.toMatchObject({
+      name: 'ArweaveFetchError',
+      status: 400,
+      kind: 'invalid',
+      retryable: false,
+      txId: 'badtx',
+    });
   });
 });
