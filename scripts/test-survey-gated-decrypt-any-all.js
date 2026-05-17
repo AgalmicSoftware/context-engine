@@ -3,26 +3,47 @@
 
 const path = require('path');
 
-const {
-  addStep,
-  buildTimestampedSlug,
-  createBaseReport,
-  parseArgs,
-  readJson,
-  relRoot,
-  resolveArtifacts,
-  resolveRunTag,
-  ROOT,
-  toStr,
-  writeJson,
-} = require('./lib/e2e/common');
-const { assertAndRecord } = require('./lib/e2e/assertions');
-const {
-  ensureRealArweaveUploadsForManualFollowup,
-} = require('./lib/e2e/arweave-mode');
-const { resolveChainDefaults } = require('./lib/e2e/network-defaults');
-const { isLegacyDefaultSessionSlug } = require('./lib/e2e/session-target');
-const { runNodeScriptJsonLive } = require('./lib/e2e/node-runner');
+let addStep;
+let buildTimestampedSlug;
+let createBaseReport;
+let parseArgs;
+let readJson;
+let relRoot;
+let resolveArtifacts;
+let resolveRunTag;
+let ROOT;
+let toStr;
+let writeJson;
+let assertAndRecord;
+let ensureRealArweaveUploadsForManualFollowup;
+let resolveChainDefaults;
+let isLegacyDefaultSessionSlug;
+let runNodeScriptJsonLive;
+
+const loadE2eRuntime = () => {
+  if (runNodeScriptJsonLive) return;
+
+  ({
+    addStep,
+    buildTimestampedSlug,
+    createBaseReport,
+    parseArgs,
+    readJson,
+    relRoot,
+    resolveArtifacts,
+    resolveRunTag,
+    ROOT,
+    toStr,
+    writeJson,
+  } = require('./lib/e2e/common'));
+  ({ assertAndRecord } = require('./lib/e2e/assertions'));
+  ({
+    ensureRealArweaveUploadsForManualFollowup,
+  } = require('./lib/e2e/arweave-mode'));
+  ({ resolveChainDefaults } = require('./lib/e2e/network-defaults'));
+  ({ isLegacyDefaultSessionSlug } = require('./lib/e2e/session-target'));
+  ({ runNodeScriptJsonLive } = require('./lib/e2e/node-runner'));
+};
 
 const log = (...args) => console.log('[survey-gated-any-all]', ...args);
 const toMs = (value, fallbackMs) => {
@@ -48,6 +69,8 @@ const resolveGatedDecryptTimeoutMs = (env = process.env) => {
 };
 
 async function main() {
+  loadE2eRuntime();
+
   ensureRealArweaveUploadsForManualFollowup({
     env: process.env,
     contextLabel: 'survey-gated-decrypt:any-all',
