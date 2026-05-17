@@ -154,7 +154,10 @@ import {
   resolveMainSiteSessionRouteContext,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
-import { resolveMainSiteLitSessionConfig } from './litSessionConfig.js';
+import {
+  resolveMainSiteLitSessionConfig,
+  resolveMainSiteLitSessionConfigSource,
+} from './litSessionConfig.js';
 import {
   buildMetadataSessionCacheEnvelope as buildMetadataSessionCacheEnvelopeFn,
   resolveMetadataSessionBinding as resolveMetadataSessionBindingFn,
@@ -1505,7 +1508,11 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
   syncLitHooks = () => {
     if (typeof window === 'undefined') return;
     const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
+    const cfg = resolveMainSiteLitSessionConfigSource({
+      slug,
+      resolveRegistryConfigBySlug: (sessionSlug: string) => sessionRegistryStore.getSessionConfig(sessionSlug),
+      resolveStaticConfigBySlug: (sessionSlug: string) => getSessionConfigBySlugOrDefault(sessionSlug),
+    });
     const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } = resolveMainSiteLitSessionConfig({
       sessionConfig: cfg,
       networkChainIdFallback: this.props.network?.id || null,
@@ -5338,6 +5345,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               account={this.props.account}
               provider={this.props.provider}
               network={defaultSessionNetwork}
+              litHooks={this.state.litHooks}
               toggleLoginModal={this.props.toggleLoginModal}
               loginComplete={this.props.loginComplete}
               activeSessionSlug={defaultSlug}
@@ -6034,7 +6042,9 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       sessionTokenRaw,
       formatSessionId: sessionRegistryUtils.formatSessionId,
       resolveSessionConfigById: (sessionId: string | number) => sessionRegistryStore.getSessionConfigById(sessionId),
-      resolveSessionConfigBySlug: (slug: string) => getSessionConfigBySlug(slug),
+      resolveSessionConfigBySlug: (slug: string) => (
+        sessionRegistryStore.getSessionConfig(slug) || getSessionConfigBySlug(slug)
+      ),
       resolveDisplaySessionConfigBySlug: (slug: string) => (
         getDemoSessionConfigBySlug(slug, { allowDemoFallback: true })
       ),
@@ -6224,6 +6234,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
               }
               routeQuestionsOpen={isQuestionsRoute}
               routeAutoOpenResults={isQuestionResultsRoute}
+              litHooks={this.state.litHooks}
             />
           </div>
         </RouteErrorBoundary>

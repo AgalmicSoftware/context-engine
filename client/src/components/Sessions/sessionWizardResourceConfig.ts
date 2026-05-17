@@ -41,7 +41,7 @@ export const RESOURCE_SECTION_TOOLTIPS = Object.freeze({
   rpc: 'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
   arweave: `${t('wallet')} used to pay for Arweave uploads and storage.`,
   txGas: 'Faucet signer used to send small testnet funding grants.',
-  lit: 'Worker-mediated Lit Chipotle setup. Paste one Lit account API key; the worker derives the scoped group, PKP, usage key, and CE action after deploy.',
+  lit: 'Worker-mediated Lit Chipotle setup. Paste one Lit API key; the worker derives the scoped group, PKP, and CE action after deploy.',
 });
 
 const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Object.freeze({
@@ -61,7 +61,7 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   ],
   default: [],
   lit: [
-    { key: 'litAccountApiKey', label: 'Lit account API key', type: 'password' },
+    { key: 'litAccountApiKey', label: 'Lit API key', type: 'password' },
   ],
 });
 

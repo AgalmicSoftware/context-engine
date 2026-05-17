@@ -10,7 +10,7 @@ import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import * as resourceKeys from '../../utilities/session/resourceKeys.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
-import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
+import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { getChainById, getDefaultHttpRpc } from '../../variables/chains.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
@@ -1344,6 +1344,160 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
       expect(instance.state.submissionError).toBe('passed lit hook guard');
       expect(instance.state.submissionError).not.toContain('Lit hooks not initialized');
     } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it('derives Chipotle hooks from session config for locked question submits when globals are absent', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const stopAfterLitGuard = new Error('passed derived lit hook guard');
+    try {
+      try { delete (window as any).__litHooks; } catch (_) {}
+      try { delete (window as any).litHooks; } catch (_) {}
+      const sessionConfig = {
+        slug: 'chipotle-session',
+        networkChainId: 11155420,
+        corsWorkerUrl: 'https://worker.example.test',
+        __registry: {
+          gateAuthority: 'onchain',
+          gatesByResource: {
+            default: {
+              lookupStatus: 'ok',
+              sbtAddresses: ['0x0000000000000000000000000000000000000101'],
+              chainId: 11155420,
+              mode: 'any',
+            },
+          },
+        },
+      };
+      const instance = makeInstance({
+        provider: 'web3auth',
+        loginComplete: true,
+        account: '0xabc',
+        activeSessionSlug: 'chipotle-session',
+        sessionSlug: 'chipotle-session',
+        network: { id: 11155420, chainId: 11155420 },
+        networkChainId: 11155420,
+        sessionConfig,
+      });
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue(sessionConfig);
+      instance.resolveGateOptions = jest.fn(() => ({
+        gateMap: {
+          default: {
+            id: 'default',
+            gateId: 'default',
+            label: 'Default gate',
+            sbtAddress: '0x0000000000000000000000000000000000000101',
+            chainId: 11155420,
+            mode: 'any',
+          },
+        },
+      }));
+      instance.removeDuplicateQuestions = jest.fn(() => {
+        throw stopAfterLitGuard;
+      });
+      instance.state = {
+        ...instance.state,
+        isStandaloneQuestion: true,
+        questions: [{
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          tags: [],
+          lockGateIds: ['default'],
+        }],
+      };
+
+      await instance.createSurvey();
+
+      expect(instance.state.submissionError).toBe('passed derived lit hook guard');
+      expect(instance.state.submissionError).not.toContain('Lit hooks not initialized');
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it('derives Chipotle hooks from registry cache when submit config lacks worker runtime fields', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const registryConfigSpy = jest.spyOn(sessionRegistryStore, 'getSessionConfig');
+    const stopAfterLitGuard = new Error('passed registry-derived lit hook guard');
+    try {
+      try { delete (window as any).__litHooks; } catch (_) {}
+      try { delete (window as any).litHooks; } catch (_) {}
+      registryConfigSpy.mockReturnValue({
+        slug: 'registry-chipotle',
+        networkChainId: 11155420,
+        corsWorkerUrl: 'https://worker.example.test',
+        lit: { network: 'chipotle' },
+        __registry: {
+          gateAuthority: 'onchain',
+          gatesByResource: {
+            default: {
+              lookupStatus: 'ok',
+              sbtAddresses: ['0x0000000000000000000000000000000000000101'],
+              chainId: 11155420,
+              mode: 'any',
+            },
+          },
+        },
+      });
+      const instance = makeInstance({
+        provider: 'web3auth',
+        loginComplete: true,
+        account: '0xabc',
+        activeSessionSlug: 'registry-chipotle',
+        sessionSlug: 'registry-chipotle',
+        network: { id: 11155420, chainId: 11155420 },
+        networkChainId: 11155420,
+        sessionConfig: {
+          slug: 'registry-chipotle',
+          networkChainId: 11155420,
+          contracts: {
+            surveys: { chainId: 11155420 },
+          },
+        },
+      });
+      instance.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue({
+        slug: 'registry-chipotle',
+        networkChainId: 11155420,
+        contracts: {
+          surveys: { chainId: 11155420 },
+        },
+      });
+      instance.resolveGateOptions = jest.fn(() => ({
+        gateMap: {
+          default: {
+            id: 'default',
+            gateId: 'default',
+            label: 'Default gate',
+            sbtAddress: '0x0000000000000000000000000000000000000101',
+            chainId: 11155420,
+            mode: 'any',
+          },
+        },
+      }));
+      instance.removeDuplicateQuestions = jest.fn(() => {
+        throw stopAfterLitGuard;
+      });
+      instance.state = {
+        ...instance.state,
+        isStandaloneQuestion: true,
+        questions: [{
+          id: 'q1',
+          type: 'freeform',
+          prompt: 'Prompt 1',
+          tags: [],
+          lockGateIds: ['default'],
+        }],
+      };
+
+      await instance.createSurvey();
+
+      expect(registryConfigSpy).toHaveBeenCalledWith('registry-chipotle');
+      expect(instance.state.submissionError).toBe('passed registry-derived lit hook guard');
+      expect(instance.state.submissionError).not.toContain('Lit hooks not initialized');
+    } finally {
+      registryConfigSpy.mockRestore();
       consoleSpy.mockRestore();
     }
   });

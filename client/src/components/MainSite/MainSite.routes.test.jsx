@@ -867,6 +867,53 @@ describe('MainSite route render smoke', () => {
     expect(mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0]?.ensureLightSbtUniverse).toBe(subject.ensureLightSbtUniverse);
   });
 
+  it('prefers registry-backed slug session configs and forwards scoped Lit hooks', async () => {
+    const litHooks = { saveKey: jest.fn(), getKey: jest.fn() };
+    const sessionConfig = buildSessionConfig({
+      slug: 'live-session',
+      sessionName: 'Live Registry Session',
+      networkChainId: 11155420,
+      corsWorkerUrl: 'https://worker.example.test',
+      __registry: {
+        sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          default: {
+            lookupStatus: 'ok',
+            sbtAddresses: ['0x0000000000000000000000000000000000000101'],
+            chainId: 11155420,
+            mode: 'any',
+          },
+        },
+      },
+    });
+    seedSessionRegistryCache(sessionConfig);
+    sessionRegistryStore.getSessionConfig.mockImplementation((slug) => (
+      slug === 'live-session' ? sessionConfig : null
+    ));
+    const subject = createSubject({
+      path: '/session/live-session',
+      activeSessionSlug: 'live-session',
+      sessionConfig: null,
+    });
+    subject.state = {
+      ...subject.state,
+      litHooks,
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Live Registry Session');
+    const latestProps = mockOnePageSession.mock.calls[mockOnePageSession.mock.calls.length - 1][0] || {};
+    expect(sessionRegistryStore.getSessionConfig).toHaveBeenCalledWith('live-session');
+    expect(latestProps.sessionConfig).toEqual(expect.objectContaining({
+      slug: 'live-session',
+      corsWorkerUrl: 'https://worker.example.test',
+    }));
+    expect(latestProps.litHooks).toBe(litHooks);
+  });
+
   it('matches PUBLIC_URL-prefixed session routes when the app is served from a subpath', async () => {
     // '/ce/' is a representative subpath fixture, not a special production-only
     // route. It guards the optional PUBLIC_URL deployment mode.
