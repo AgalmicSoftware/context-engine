@@ -70,19 +70,8 @@ import { generateQuestionId as generateSharedQuestionId } from '../../utilities/
 import { notify } from '../../utilities/ui/notify.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
-import { chainHttpRpc, chainHttpRpcNoPath } from '../../variables/chains.js';
+import { chainHttpRpc, chainHttpRpcNoPath, getChainById } from '../../variables/chains.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
-import { workerCanonicalAuthoringPort } from '../../domains/surveys/workerCanonicalAuthoringPort';
-import {
-  workerCanonicalCacheIdentityMatches,
-  withWorkerCanonicalCacheIdentity,
-} from '../../utilities/survey/workerCanonicalCacheIdentity';
-import {
-  resolveCreateSurveyGateOptions,
-  resolveCreateSurveySessionChainId,
-  resolveCreateSurveySessionConfig,
-  resolveCreateSurveyTargetNetwork,
-} from './createSurveySessionCapabilityHelpers';
 import {
   buildAuthoringEncryptionPayload,
   buildCreateSurveyAiPromptModelLabelPatch,
@@ -628,6 +617,39 @@ const mergeCreateSurveySessionConfigWithRegistry = ({
   const inputSponsored = asPlainRecord(inputConfig.sponsored);
   const cachedSponsored = asPlainRecord(cachedConfig.sponsored);
 
+const isObjectLikeRecord = (value: unknown): value is UnknownRecord => (
+  !!value && typeof value === 'object'
+);
+const asPlainRecord = (value: unknown): UnknownRecord => (
+  isPlainObject(value) ? value : {}
+);
+const mergePlainRecords = (...values: unknown[]): UnknownRecord => (
+  values.reduce<UnknownRecord>((acc, value) => ({
+    ...acc,
+    ...asPlainRecord(value),
+  }), {})
+);
+const firstNonEmptyString = (...values: unknown[]): unknown => (
+  values.find((value) => String(value || '').trim()) || ''
+);
+const mergeCreateSurveySessionConfigWithRegistry = ({
+  sessionConfig,
+  registryConfig,
+  slug,
+}: {
+  sessionConfig: unknown;
+  registryConfig: unknown;
+  slug: string;
+}): UnknownRecord => {
+  const inputConfig = asPlainRecord(sessionConfig);
+  const cachedConfig = asPlainRecord(registryConfig);
+  const inputRegistry = asPlainRecord(inputConfig.__registry);
+  const cachedRegistry = asPlainRecord(cachedConfig.__registry);
+  const inputEncryption = asPlainRecord(inputConfig.encryption);
+  const cachedEncryption = asPlainRecord(cachedConfig.encryption);
+  const inputSponsored = asPlainRecord(inputConfig.sponsored);
+  const cachedSponsored = asPlainRecord(cachedConfig.sponsored);
+
   return {
     ...cachedConfig,
     ...inputConfig,
@@ -649,7 +671,10 @@ const mergeCreateSurveySessionConfigWithRegistry = ({
     __registry: {
       ...cachedRegistry,
       ...inputRegistry,
-      gatesByResource: mergePlainRecords(cachedRegistry.gatesByResource, inputRegistry.gatesByResource),
+      gatesByResource: mergePlainRecords(
+        cachedRegistry.gatesByResource,
+        inputRegistry.gatesByResource
+      ),
     },
   };
 };
@@ -1032,35 +1057,39 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     return '';
   };
 
-  resolveLitHooksForSubmit = (sessionConfig: unknown, chainIdFallback: unknown): CreateSurveyLitHooks | null => {
-    const inputSessionConfig = asPlainRecord(sessionConfig);
-    const projection = resolveSessionCapabilityProjection(inputSessionConfig);
-    const workerCanonicalBoundary = claimsWorkerCanonicalAuthority(inputSessionConfig);
-    if (workerCanonicalBoundary && (!projection.profileValid || !projection.isWorkerCanonical)) return null;
-
-    const scopedLitHooks =
-      this.props.litHooks && typeof this.props.litHooks === 'object'
-        ? (this.props.litHooks as CreateSurveyLitHooks)
-        : null;
+  resolveLitHooksForSubmit = (
+    sessionConfig: unknown,
+    chainIdFallback: unknown
+  ): CreateSurveyLitHooks | null => {
+    const scopedLitHooks = (
+      this.props.litHooks &&
+      typeof this.props.litHooks === 'object'
+    ) ? this.props.litHooks as CreateSurveyLitHooks : null;
     if (scopedLitHooks && typeof scopedLitHooks.saveKey === 'function') return scopedLitHooks;
 
-    if (!workerCanonicalBoundary) {
-      const globalLitHooks = getGlobalLitHooks() as CreateSurveyLitHooks | null;
-      if (globalLitHooks && typeof globalLitHooks.saveKey === 'function') return globalLitHooks;
-    }
+    const globalLitHooks = getGlobalLitHooks() as CreateSurveyLitHooks | null;
+    if (globalLitHooks && typeof globalLitHooks.saveKey === 'function') return globalLitHooks;
+
     const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
-    const resolvedLitSessionConfig = workerCanonicalBoundary
-      ? inputSessionConfig
-      : mergeCreateSurveySessionConfigWithRegistry({
-          sessionConfig: inputSessionConfig,
-          registryConfig: sessionSlug ? sessionRegistryStore.getSessionConfig(sessionSlug) : null,
-          slug: sessionSlug,
-        });
-    const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } =
-      resolveMainSiteLitSessionConfig({
-        sessionConfig: resolvedLitSessionConfig,
-        networkChainIdFallback: Number(chainIdFallback || 0) || null,
-      });
+    const registrySessionConfig = sessionSlug
+      ? sessionRegistryStore.getSessionConfig(sessionSlug)
+      : null;
+    const mergedSessionConfig = mergeCreateSurveySessionConfigWithRegistry({
+      sessionConfig,
+      registryConfig: registrySessionConfig,
+      slug: sessionSlug,
+    });
+    const {
+      chainId,
+      litNetwork,
+      litChain,
+      accessControlConditions,
+      userMaxPrice,
+      chipotle,
+    } = resolveMainSiteLitSessionConfig({
+      sessionConfig: mergedSessionConfig,
+      networkChainIdFallback: Number(chainIdFallback || 0) || null,
+    });
     if (!chipotle) return null;
     return createLitHooks({
       providerLike: this.props.provider,
@@ -1077,7 +1106,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }) as CreateSurveyLitHooks | null;
   };
 
-  buildAiRequestOptions = (props: CreateQuestionsAndSurveysProps = this.props): CreateSurveyAiRequestOptions => {
+  buildAiRequestOptions = (
+    props: CreateQuestionsAndSurveysProps = this.props
+  ): CreateSurveyAiRequestOptions => {
     const resolvedSessionConfig = this.getResolvedSessionConfig(props);
     const sessionSlug = this.getActiveSessionSlug(props);
     return {
@@ -2211,11 +2242,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
     const chainIdFallback = this.resolveSessionChainId(sessionConfig);
 
-    const scopedLitHooks = (
-      this.props.litHooks &&
-      typeof this.props.litHooks === 'object'
-    ) ? this.props.litHooks as CreateSurveyLitHooks : null;
-    const litHooks = needsLit ? (scopedLitHooks || getGlobalLitHooks() as CreateSurveyLitHooks | null) : null;
+    const litHooks = needsLit
+      ? this.resolveLitHooksForSubmit(sessionConfig, chainIdFallback)
+      : null;
     if (needsLit) {
       if (!this.props.account) {
         this.setState(buildCreateSurveySubmitFailurePatch(`Connect a ${t('walletLower')} to encrypt this survey.`));
@@ -3240,6 +3269,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     const applyDefaultSelectedGateIds = (value: unknown) => {
       const normalized = normalizeSelectedGateIds(value);
       if (normalized.length) return normalized;
+      if (Array.isArray(value)) return [];
       return defaultGateId ? [defaultGateId] : [];
     };
     const applyStandaloneSelectedGateIds = (value: unknown, touched: unknown) => {

@@ -30,8 +30,8 @@ import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utili
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
-import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
-import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
 import { clearAgentClientLoginEnvelope, readAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
@@ -474,10 +474,12 @@ class OnePageSession extends Component<any, any> {
       return this._resolvedSessionConfigMemoValue;
     }
 
-    const propAutoFeature =
-      autoFeatureSBTsBySessionSlug !== undefined ? autoFeatureSBTsBySessionSlug : autoFeatureSBTsWithFeaturedSbtTags;
-    const resolvedAutoFeature =
-      propAutoFeature !== undefined ? propAutoFeature : resolveAutoFeatureBySessionSlug(baseSessionConfig);
+    const propAutoFeature = autoFeatureSBTsBySessionSlug !== undefined
+      ? autoFeatureSBTsBySessionSlug
+      : autoFeatureSBTsWithFeaturedSbtTags;
+    const resolvedAutoFeature = propAutoFeature !== undefined
+      ? propAutoFeature
+      : resolveAutoFeatureBySessionSlug(baseSessionConfig);
     const resolvedSlug = slug || baseSessionConfig.slug || '';
     const resolved = {
       ...baseSessionConfig,
@@ -504,16 +506,25 @@ class OnePageSession extends Component<any, any> {
   }
 
   resolveScopedLitHooks(sessionConfig: any = {}) {
-    if (!sessionAllowsLitRuntime(sessionConfig)) return null;
     if (this.props.litHooks && typeof this.props.litHooks === 'object') {
       return this.props.litHooks;
     }
-    const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } =
-      resolveMainSiteLitSessionConfig({
-        sessionConfig,
-        networkChainIdFallback:
-          this.props.networkChainId || this.props.network?.id || this.props.network?.chainId || null,
-      });
+    const {
+      chainId,
+      litNetwork,
+      litChain,
+      accessControlConditions,
+      userMaxPrice,
+      chipotle,
+    } = resolveMainSiteLitSessionConfig({
+      sessionConfig,
+      networkChainIdFallback: (
+        this.props.networkChainId ||
+        this.props.network?.id ||
+        this.props.network?.chainId ||
+        null
+      ),
+    });
     if (!chipotle) return null;
     const sessionSlug = normalizeOnePageSessionSlug(sessionConfig?.slug || this.props.slug || '');
     return createLitHooks({
@@ -528,29 +539,6 @@ class OnePageSession extends Component<any, any> {
         ...chipotle,
         sessionSlug,
       },
-    });
-  }
-
-  resolveCurrentSessionSlug(propsIn: OnePageSessionPropsLike = this.props) {
-    return resolveCurrentSessionSlugForProps(propsIn, resolveEffectiveSlug);
-  }
-
-  resolveCurrentSessionConfig(propsIn: OnePageSessionPropsLike = this.props) {
-    return this.getResolvedSessionConfig(buildCurrentSessionConfigRequest(propsIn, resolveEffectiveSlug));
-  }
-
-  resolveTelegramAgentBridgeUrl(sessionConfig: unknown = this.resolveCurrentSessionConfig()) {
-    return resolveTelegramAgentBridgeUrlForSession(sessionConfig);
-  }
-
-  isTelegramBackendMode(
-    sessionConfig: unknown = this.resolveCurrentSessionConfig(),
-    sessionSlug: unknown = this.resolveCurrentSessionSlug(),
-  ) {
-    return isOnePageTelegramBackendMode({
-      sessionConfig,
-      telegramSessionMeta: this.state.telegramSessionMeta,
-      sessionSlug,
     });
   }
 
@@ -2277,10 +2265,6 @@ class OnePageSession extends Component<any, any> {
       incomingSessionConfig?.polisDemoDataBySlug ||
       resolvedSessionConfig?.polisDemoDataBySlug ||
       null;
-    const { network: routedNetwork, networkChainId: routedNetworkChainId } = resolveOnePageSessionNetworkRuntime(
-      resolvedSessionConfig,
-      this.props.network,
-    );
     const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
     const surveySessionSlug = resolveOnePageSessionSurveySlug({
@@ -2371,101 +2355,615 @@ class OnePageSession extends Component<any, any> {
     }
 
     return (
-      <OnePageSessionStandardShell
-        account={this.props.account}
-        aggregatorData={this.state.aggregatorData}
-        autoMintCountdown={this.state.autoMintCountdown}
-        autoMintingMode={this.state.autoMintingMode}
-        autoMintStatuses={this.state.autoMintStatuses || {}}
-        autoMintTargets={this.state.autoMintTargets || []}
-        autoOpenResults={this.state.autoOpenResults}
-        blockLimits={blockLimits}
-        cacheHasLoaded={this.props.cacheHasLoaded}
-        contracts={contracts}
-        corpusViewerLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
-        corpusViewerLoadState={corpusViewerLoadState}
-        defaultFeaturedSBTs={defaultFeaturedSBTs}
-        defaultFilterState={defaultFilterState}
-        defaultSbtTags={defaultSbtTags}
-        defaultTags={defaultTags}
-        disclaimersActive={this.state.disclaimersActive}
-        displaySessionSlug={displaySessionSlug}
-        dismissedLoginBanner={this.state.dismissedLoginBanner}
-        dismissedStatusItems={this.state.dismissedStatusItems || {}}
-        effectiveSlug={effectiveSlug}
-        embeddedAtlasNodeId={this.state.embeddedAtlasNodeId}
-        embeddedAtlasReturnState={this.state.embeddedAtlasReturnState}
-        embeddedGroupsSessionConfig={embeddedGroupsSessionConfig}
-        embeddedGroupsSessionSlug={embeddedGroupsSessionSlug}
-        embeddedQuestionSessionSlug={embeddedQuestionSessionSlug}
-        expandedImages={this.state.expandedImages || {}}
-        filterState={this.state.filterState}
-        isDemoSlug={isDemoSlug}
-        isQuestionCacheReady={this.props.isQuestionCacheReady}
-        isResponsesCacheReady={this.props.isResponsesCacheReady}
-        isSBTCacheReady={this.props.isSBTCacheReady}
-        isSurveyCacheReady={this.props.isSurveyCacheReady}
-        litHooks={scopedLitHooks}
-        loginComplete={this.props.loginComplete}
-        needsLoginForAutoMint={this.state.needsLoginForAutoMint}
-        network={routedNetwork}
-        networkChainId={routedNetworkChainId}
-        pileSubmitRailVisible={this.state.pileSubmitRailVisible}
-        provider={this.props.provider}
-        questionPool={sharedQuestionPool}
-        questionResponsesNonce={this.props.questionResponsesNonce}
-        questionScanProgress={this.props.questionScanProgress}
-        questionsSectionRef={this.questionsSectionRef}
-        refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-        refreshQuestionResponses={this.props.refreshQuestionResponses}
-        refreshSbtData={this.props.refreshSbtData}
-        refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-        resolvedPolisDemoDataBySlug={resolvedPolisDemoDataBySlug}
-        resolvedSessionConfig={resolvedSessionConfig}
-        resultsViewMode={this.state.resultsViewMode}
-        riskMatrixRestoreState={this.state.riskMatrixRestoreState}
-        sbtCacheRevision={this.props.sbtCacheRevision}
-        sbtImages={this.state.sbtImages || {}}
-        sbtNames={this.state.sbtNames || {}}
-        sbtRealtimeCoverageBySlug={this.props.sbtRealtimeCoverageBySlug}
-        sbtScanProgressBySlug={this.props.sbtScanProgressBySlug}
-        sessionHeader={sessionHeader}
-        sessionInfo={sessionInfo}
-        sessionName={sessionName}
-        sharedQuestionPool={sharedQuestionPool}
-        showDocuments={this.state.showDocuments}
-        showEmbeddedCreateGroup={this.state.showEmbeddedCreateGroup}
-        showGroups={this.state.showGroups}
-        showQuestions={this.state.showQuestions}
-        showResults={this.state.showResults}
-        slug={slug}
-        titleText={titleText}
-        toggleLoginModal={this.props.toggleLoginModal}
-        ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
-        ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
-        onCancelAutoMintCountdown={this.cancelAutoMintCountdown}
-        onCorpusAtlasIssueOpen={this.handleCorpusAtlasIssueOpen}
-        onCorpusViewerLoadStateChange={this.handleCorpusViewerLoadStateChange}
-        onDismissLoginBanner={this.dismissLoginBanner}
-        onDismissStatusItem={this.dismissStatusItem}
-        onEmbeddedAtlasModalClose={this.handleEmbeddedAtlasModalClose}
-        onFilterChange={this.handleFilterChange}
-        onGroupsViewAll={this.handleGroupsViewAll}
-        onKickoffAutoMintIfNeeded={this.kickoffAutoMintIfNeeded}
-        onLoadFullCorpusClick={this.handleLoadFullCorpusClick}
-        onOpenResults={this.handleOpenResults}
-        onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
-        onResultsModalClose={this.handleResultsModalClose}
-        onResultsModeChange={(resultsViewMode) => this.setState({ resultsViewMode })}
-        onRiskMatrixRestoreApplied={this.handleRiskMatrixRestoreApplied}
-        onToggleDocuments={this.toggleDocuments}
-        onToggleEmbeddedCreateGroup={this.toggleEmbeddedCreateGroup}
-        onToggleGroups={this.toggleGroups}
-        onToggleQuestions={this.toggleQuestions}
-        onToggleResults={this.toggleResults}
-        onToggleStatusImagePreview={this.toggleStatusImagePreview}
-        onViewAllQuestionsClick={this.handleViewAllQuestionsClick}
-      />
+      <div className={styles.onePageDemoContainer}>
+        {/* Sticky banners */}
+        {this.state.needsLoginForAutoMint && (
+          <Alert
+            color="warning"
+            className={styles.sbtMintStatusItem}
+            data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_LOGIN_BANNER}
+            style={{
+              position: 'sticky',
+              top: 0,
+              marginBottom: '12px',
+              fontWeight: '600',
+              fontSize: '1.5em'
+            }}
+            isOpen={!this.state.dismissedLoginBanner}
+            toggle={this.dismissLoginBanner}
+            closeClassName={alertCloseClass}
+          >
+            {`Login to Join ${t('sbt')}:`}&nbsp;
+            {firstTargetName
+              ? firstTargetName
+              : <FontAwesomeIcon icon={faSpinner} spin aria-label="loading group name" />}
+          </Alert>
+        )}
+
+        {this.state.autoMintCountdown !== null && (
+          <Alert
+            color='info'
+            className={styles.sbtMintStatusItem}
+            isOpen={true}
+            data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_COUNTDOWN}
+            style={{ fontSize: '1.15rem', fontWeight: 600 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>
+                <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: '8px' }} />
+                Joining group in {this.state.autoMintCountdown}...
+              </span>
+              <button
+                className='btn btn-outline-light'
+                style={{ padding: '4px 16px', cursor: 'pointer', marginLeft: '12px', fontSize: '1rem' }}
+                onClick={this.cancelAutoMintCountdown}
+              >
+                Cancel
+              </button>
+            </div>
+          </Alert>
+        )}
+
+        {/* Per-SBT status sub-banners */}
+        {this.state.autoMintStatuses && Object.keys(this.state.autoMintStatuses).length > 0 && (
+          <div className={styles.sbtMintBannerContainer}>
+            {Object.entries(this.state.autoMintStatuses).map(([addrKey, v]: any) => {
+              const color =
+                v.status === 'success'
+                  ? 'success'
+                  : v.status === 'failed'
+                  ? 'danger'
+                  : v.status === 'skipped'
+                  ? 'secondary'
+                  : 'info';
+              const isOpen = !this.state.dismissedStatusItems[(addrKey || '').toLowerCase()];
+              const isExpanded = !!this.state.expandedImages[(addrKey || '').toLowerCase()];
+              const sbtImage = this.state.sbtImages[(addrKey || '').toLowerCase()];
+              const isTerminalError = !!(
+                v.error &&
+                /max(imum)?\s*(tokens?\s*)?mint|supply\s*exhaust|mint.*expir|period.*end|group\s*limit/i.test(v.error)
+              );
+
+              // Map status to icon
+              let statusIcon: any = null;
+              if (v.status === 'pending') statusIcon = <FontAwesomeIcon icon={faSpinner} spin />;
+              else if (v.status === 'success') statusIcon = <FontAwesomeIcon icon={faCheck} />;
+              else if (v.status === 'failed') statusIcon = <FontAwesomeIcon icon={faTimes} />;
+              else statusIcon = <FontAwesomeIcon icon={faQuestionCircle} />; // skipped/info
+
+              return (
+                <Alert
+                  key={addrKey}
+                  color={color}
+                  className={styles.sbtMintStatusItem}
+                  isOpen={isOpen}
+                  data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_STATUS}
+                  data-ce-sbt-address={(addrKey || '').toLowerCase() || undefined}
+                  data-ce-status={String(v.status || '').trim().toLowerCase() || undefined}
+                  toggle={() => this.dismissStatusItem(addrKey)}
+                  closeClassName={alertCloseClass}
+                  style={{ fontSize: '1.15rem', fontWeight: 600 }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {statusIcon}
+                      <span>
+                        <a
+                          href={`${basePath}${buildSbtDetailPath(addrKey, effectiveSlug)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ textDecoration: 'underline', color: 'inherit' }}
+                        >
+                          {v.name || addrKey}
+                        </a>
+                      </span>
+                      {sbtImage && (
+                        <button
+                          onClick={() => this.toggleStatusImagePreview(addrKey)}
+                          style={{
+                             background: 'none',
+                             border: 'none',
+                             cursor: 'pointer',
+                             opacity: 0.7,
+                             marginLeft: '5px',
+                             padding: '0 5px'
+                          }}
+                          title={isExpanded ? "Hide Preview" : "Show Preview"}
+                        >
+                          {sbtImage ? (
+                            <img
+                              src={sbtImage}
+                              alt={t('sbt')}
+                              loading="lazy"
+                              referrerPolicy="no-referrer"
+                              style={{
+                                height: '24px',
+                                width: '24px',
+                                borderRadius: '4px',
+                                objectFit: 'cover',
+                                verticalAlign: 'middle'
+                              }}
+                            />
+                          ) : (
+                            <FontAwesomeIcon icon={faImage} />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {v.error && <div style={{ fontSize: '0.9em', marginTop: '4px', marginLeft: '26px', fontWeight: 400 }}>{v.error}</div>}
+
+                  {v.status === 'failed' && !isTerminalError && (
+                    <div style={{ marginTop: '6px', marginLeft: '26px' }}>
+                      <button
+                        className="btn btn-sm btn-outline-dark"
+                        style={{ padding: '2px 10px', border: '1px solid rgba(0,0,0,0.2)', cursor: 'pointer' }}
+                        onClick={() => this.kickoffAutoMintIfNeeded()}
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+
+                  {isExpanded && sbtImage && (
+                    <div style={{ marginTop: '10px', marginLeft: '26px' }}>
+                      <img
+                        src={sbtImage}
+                        alt={`${t('sbt')} Preview`}
+                        style={{ maxHeight: '100px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }}
+                      />
+                    </div>
+                  )}
+                </Alert>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Branding/header */}
+        <div className={brandingSectionClassName}>
+          <div className={titleContainerClassName}>
+            <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
+            <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
+              <FontAwesomeIcon icon={faQuestionCircle} />
+              <span className={styles.tooltiptext}>
+                {sessionInfo
+                  ? <p><em>{sessionInfo}</em></p>
+                  : <p>Share input; your responses help generate a collective intelligence map.</p>}
+              </span>
+            </div>
+          </div>
+
+          {this.state.showQuestions ? (
+            <div
+              className={styles.pileHeaderRow}
+              data-testid={E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER}
+            >
+              <div className={styles.pileBackContainer}>
+                <button
+                  type="button"
+                  onClick={this.toggleQuestions}
+                  className={styles.pileBackButton}
+                  data-testid={E2E_TESTIDS.SESSION_PILE_BACK}
+                  aria-label="Back to pile view"
+                >
+                  <FontAwesomeIcon icon={faArrowLeft} />
+                  <span>Back</span>
+                </button>
+              </div>
+              <div className={styles.pileHeaderTitleWrap}>
+                <h2 className={styles.pileHeaderTitle}>{questionsSectionTitle}</h2>
+                <div className={`${styles.tooltip} ${styles.pileHeaderTooltip}`} tabIndex={0} aria-label="Questions info">
+                  <FontAwesomeIcon icon={faQuestionCircle} />
+                  <span className={styles.tooltiptext}>
+                    {questionsSectionTooltip}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
+              <MemoSurveyPage
+                minifiedMode="pile"
+                account={this.props.account}
+                provider={this.props.provider}
+                network={this.props.network}
+                toggleLoginModal={this.props.toggleLoginModal}
+                loginComplete={this.props.loginComplete}
+                isSBTCacheReady={this.props.isSBTCacheReady}
+                isSurveyCacheReady={this.props.isSurveyCacheReady}
+                isQuestionCacheReady={this.props.isQuestionCacheReady}
+                isResponsesCacheReady={this.props.isResponsesCacheReady}
+                cacheHasLoaded={this.props.cacheHasLoaded}
+                sbtCacheRevision={this.props.sbtCacheRevision}
+                questionResponsesNonce={this.props.questionResponsesNonce}
+                questionScanProgress={this.props.questionScanProgress}
+                refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+                refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+                refreshQuestionResponses={this.props.refreshQuestionResponses}
+                sessionInfo={sessionInfo}
+                sessionName={sessionName}
+                sessionHeader={sessionHeader}
+                defaultTags={defaultTags}
+                defaultFilterState={defaultFilterState}
+                defaultFeaturedSBTs={defaultFeaturedSBTs}
+                onFilterChange={this.handleFilterChange}
+                onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
+                filterState={this.state.filterState}
+                onViewAllClick={this.handleViewAllQuestionsClick}
+                hideSessionSelector={true}
+                // Keep "Raw Results" session-local when launched from a
+                // specific OnePageSession; SurveyResults has its own scope selector.
+                sessionSlugPinned={true}
+                preventUrlChange={true}
+                /* per-demo passthroughs */
+                sessionSlug={slug}
+                sessionConfig={resolvedSessionConfig}
+                contracts={contracts}
+                blockLimits={blockLimits}
+                networkChainId={networkChainId}
+                litHooks={scopedLitHooks}
+              />
+            </Suspense>
+          )}
+
+        </div>
+
+        {/* Questions section */}
+        {this.state.showQuestions && (
+          <div className={styles.sectionContainer} ref={this.questionsSectionRef}>
+            <div className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader}`}>
+
+            <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
+              <MemoSurveyPage
+                miniMode={true}
+                hideEmbeddedDebugUi={true}
+                account={this.props.account}
+                provider={this.props.provider}
+                network={this.props.network}
+                toggleLoginModal={this.props.toggleLoginModal}
+                loginComplete={this.props.loginComplete}
+                sessionInfo={sessionInfo}
+                sessionName={sessionName}
+                sessionHeader={sessionHeader}
+                defaultTags={defaultTags}
+                defaultFilterState={defaultFilterState}
+                defaultFeaturedSBTs={defaultFeaturedSBTs}
+                autoOpenResults={this.state.autoOpenResults}
+                questionResponsesNonce={this.props.questionResponsesNonce}
+                questionScanProgress={this.props.questionScanProgress}
+                refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+                refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+                refreshQuestionResponses={this.props.refreshQuestionResponses}
+                isQuestionCacheReady={this.props.isQuestionCacheReady}
+                isSBTCacheReady={this.props.isSBTCacheReady}
+                isSurveyCacheReady={this.props.isSurveyCacheReady}
+                isResponsesCacheReady={this.props.isResponsesCacheReady}
+                cacheHasLoaded={this.props.cacheHasLoaded}
+                onFilterChange={this.handleFilterChange}
+                filterState={this.state.filterState}
+                hideSessionSelector={true}
+                // Same invariant in embedded full mode: start scoped to this session,
+                // then let SurveyResults widen scope explicitly if the user wants to.
+                sessionSlugPinned={true}
+                preventUrlChange={true}
+                onResultsModalClose={this.handleResultsModalClose}
+                /* per-demo passthroughs */
+                sessionSlug={slug}
+                sessionConfig={resolvedSessionConfig}
+                contracts={contracts}
+                blockLimits={blockLimits}
+                networkChainId={networkChainId}
+                litHooks={scopedLitHooks}
+              />
+            </Suspense>
+
+            </div>
+          </div>
+        )}
+
+        <div className={sectionsGridClassName}>
+          {/* Groups section */}
+          <div className={`${styles.sectionContainer} ${this.state.showGroups ? styles.sectionExpanded : ''}`}>
+            <div className={styles.sectionHeaderRow}>
+              <h2 onClick={this.toggleGroups} className={styles.sectionHeader}>
+                {this.state.showGroups ? (
+                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                ) : (
+                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                )}
+                {renderSectionHeading(t('sbts'), 'Join or Create')}
+                {this.state.showGroups && (
+                  <div
+                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                    onClick={(e: any) => e.stopPropagation()}
+                  >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                    <span className={styles.tooltiptext}>
+                      {`${SBT_TOOLTIP_LABEL} enable groups to organize membership, roles, and permissions on-chain.`}
+                      They unlock private coordination, community-governed tools, and shared AI training.
+                    </span>
+                  </div>
+                )}
+              </h2>
+
+              {this.state.showGroups && (
+                <div className={styles.sectionHeaderActionsScroller}>
+                  <div className={styles.sectionHeaderActions}>
+                    <button
+                      type="button"
+                      onClick={this.handleGroupsViewAll}
+                      className={styles.sectionHeaderActionButton}
+                    >
+                      <FontAwesomeIcon icon={faExpand} />
+                      View All
+                    </button>
+                    <button
+                      type="button"
+                      onClick={this.toggleEmbeddedCreateGroup}
+                      className={styles.sectionHeaderActionButton}
+                      data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
+                    >
+                      <FontAwesomeIcon icon={faPlus} />
+                      {this.state.showEmbeddedCreateGroup ? 'Exit' : 'Create'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {this.state.showGroups && (
+              <div className={styles.miniSectionContent}>
+                <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
+                  <SBTsPage
+                    key={`sbtspage:${slug || 'general'}`}
+                    provider={this.props.provider}
+                    network={this.props.network}
+                    account={this.props.account}
+                    loginComplete={this.props.loginComplete}
+                    toggleLoginModal={this.props.toggleLoginModal}
+                    miniaturized={true}
+                    hideMiniActionRow={true}
+                    sessionName={sessionName}
+                    sessionInfo={sessionInfo}
+                    defaultFeaturedSBTs={defaultFeaturedSBTs}
+                    defaultSbtTags={defaultSbtTags}
+                    isSBTCacheReady={this.props.isSBTCacheReady}
+                    autoMintingMode={this.state.autoMintingMode}
+                    showCreateGroupAboveFeatured={true}
+                    showCreateGroupExternal={this.state.showEmbeddedCreateGroup}
+                    onCreateGroupToggleExternal={this.toggleEmbeddedCreateGroup}
+                    preferCacheBackedFeaturedCards={true}
+                    refreshSbtData={this.props.refreshSbtData}
+                    /* per-demo passthroughs */
+                    sessionSlug={slug}
+                    contracts={contracts}
+                    blockLimits={blockLimits}
+                    networkChainId={networkChainId}
+                    /* Pass sessionConfig including the autoFeature flag so SBTsPage can read it */
+                    sessionConfig={resolvedSessionConfig}
+                    sbtScanProgressBySlug={this.props.sbtScanProgressBySlug}
+                    sbtRealtimeCoverageBySlug={this.props.sbtRealtimeCoverageBySlug}
+                    ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
+                    ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
+                  />
+                </Suspense>
+              </div>
+            )}
+          </div>
+
+          {/* Documents Section */}
+          {isDemoSlug && (
+            <div
+              className={`${styles.sectionContainer} ${this.state.showDocuments ? styles.sectionExpanded : ''}`}
+              data-testid='ce-demo-documents-section'
+            >
+            <div className={styles.sectionHeaderRow}>
+              <h2
+                onClick={this.toggleDocuments}
+                className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
+                data-testid='ce-demo-documents-toggle'
+              >
+                <span className={styles.documentsSectionHeaderMain}>
+                  {this.state.showDocuments ? (
+                    <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                  ) : (
+                    <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                  )}
+                  <span className={`${styles.sectionHeaderText} ${styles.documentsSectionHeaderText}`.trim()}>
+                    <span className={styles.documentsSectionHeaderTitleRow}>
+                      <span className={styles.sectionHeaderTitle}>Context</span>
+                      {this.state.showDocuments && (
+                        <span className={`${styles.sectionHeaderMeta} ${styles.documentsSectionHeaderMeta}`.trim()}>
+                          <div
+                            className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                            onClick={(e: any) => e.stopPropagation()}
+                          >
+                            <FontAwesomeIcon icon={faQuestionCircle} />
+                            <span className={styles.tooltiptext}>
+                              {documentsSectionTooltip}
+                            </span>
+                          </div>
+                          <a
+                            href={DEMO_CORPUS_GITHUB_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.sectionHeaderLink}
+                            onClick={(e: any) => e.stopPropagation()}
+                          >
+                            <FontAwesomeIcon icon={faExternalLinkAlt} />
+                            <span>GitHub</span>
+                          </a>
+                          <button
+                            type="button"
+                            className={`${styles.sectionHeaderLink} ${styles.sectionHeaderLinkButton}`.trim()}
+                            onClick={this.handleLoadFullCorpusClick}
+                            disabled={disableLoadFullCorpusButton}
+                            data-testid='ce-demo-documents-load-full-corpus'
+                          >
+                            <FontAwesomeIcon icon={faDownload} />
+                            <span>{loadFullCorpusButtonLabel}</span>
+                          </button>
+                        </span>
+                      )}
+                    </span>
+                    <span className={styles.sectionHeaderSubtitle}>View</span>
+                  </span>
+                </span>
+              </h2>
+            </div>
+              {this.state.showDocuments && (
+                <div className={styles.miniSectionContent}>
+                  <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
+                    <CorpusViewer
+                      onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen}
+                      showGithubLink={false}
+                      externalLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
+                      onExternalLoadStateChange={this.handleCorpusViewerLoadStateChange}
+                    />
+                  </Suspense>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Results section */}
+          <div className={`${styles.sectionContainer} ${this.state.showResults ? styles.sectionExpanded : ''}`}>
+            <div className={styles.sectionHeaderRow}>
+              <h2
+                onClick={this.toggleResults}
+                className={styles.sectionHeader}
+                data-testid={E2E_TESTIDS.SESSION_RESULTS_TOGGLE}
+              >
+                {this.state.showResults ? (
+                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
+                ) : (
+                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
+                )}
+                {renderSectionHeading('Results', 'View')}
+                {this.state.showResults && (
+                  <div
+                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
+                    onClick={(e: any) => e.stopPropagation()}
+                  >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                    <span className={styles.tooltiptext}>
+                      Click “Raw Results” to explore detailed breakdowns, filter by group membership,
+                      and export a pol.is report.
+                    </span>
+                  </div>
+                )}
+              </h2>
+
+              {this.state.showResults && (
+                <div className={`${styles.sectionHeaderActionsScroller} ${styles.resultsModeActionsScroller}`}>
+                  <div
+                    className={`${styles.sectionHeaderActions} ${styles.resultsModeActions}`}
+                    data-testid="ce-session-results-view-nav"
+                  >
+                    {resultsViewOptions.map(({ key, label, icon }: any) => {
+                      const isSelected = resultsViewMode === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => this.setState({ resultsViewMode: key })}
+                          className={`${styles.sectionHeaderViewModeButton} ${isSelected ? styles.sectionHeaderViewModeButtonActive : ''}`}
+                          title={label}
+                          aria-pressed={isSelected}
+                        >
+                          <span className={styles.sectionHeaderViewModeIcon} aria-hidden="true">{icon}</span>
+                          <span className={styles.sectionHeaderViewModeLabel}>{label}</span>
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={(e: any) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.handleOpenResults();
+                      }}
+                      className={styles.sectionHeaderViewModeButton}
+                    >
+                      <FontAwesomeIcon icon={faExpand} />
+                      Raw Results
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            {this.state.showResults && (
+              <div className={styles.miniSectionContent}>
+                <div>
+                  {resultsViewMode === 'polis' && (
+                    <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
+                      <PolisReport
+                        onePageDemo={true}
+                        miniMode={true}
+                        account={this.props.account}
+                        provider={this.props.provider}
+                        network={this.props.network}
+                        loginComplete={this.props.loginComplete}
+                        questionResponses={this.state.aggregatorData}
+                        disclaimersActive={this.state.disclaimersActive}
+                        filterState={this.state.filterState}
+                        sessionName={sessionName}
+                        sessionHeader={sessionHeader}
+                        sessionInfo={sessionInfo}
+                        defaultTags={defaultTags}
+                        isQuestionCacheReady={this.props.isQuestionCacheReady}
+                        isResponsesCacheReady={this.props.isResponsesCacheReady}
+                        questionScanProgress={this.props.questionScanProgress}
+                        questionResponsesNonce={this.props.questionResponsesNonce}
+                        /* per-demo passthroughs */
+                        sessionSlug={slug}
+                        demoDataBySlug={resolvedPolisDemoDataBySlug}
+                        contracts={contracts}
+                        blockLimits={blockLimits}
+                        networkChainId={networkChainId}
+                      />
+                    </Suspense>
+                  )}
+                  {isDemoSlug && resultsViewMode === 'analysis' && (
+                    <Suspense fallback={<LazyFallback label="Loading Analysis..." minHeight="30vh" />}>
+                      <DemoAnalysisWorkspace />
+                    </Suspense>
+                  )}
+                  {isDemoSlug && resultsViewMode === 'debateAtlas' && (
+                    <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
+                      <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+	                        <DebateMapAny
+	                          account={this.props.account}
+	                          provider={this.props.provider}
+	                          network={this.props.network}
+                          activeSessionSlug={slug}
+                          toggleLoginModal={this.props.toggleLoginModal}
+                          demoMode={true}
+                          embedded={true}
+                          requestedModalNodeId={this.state.embeddedAtlasNodeId}
+                          onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
+	                        />
+                      </div>
+                    </Suspense>
+                  )}
+                  {isDemoSlug && resultsViewMode === 'riskMatrix' && (
+                    <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
+                      <RiskMatrix
+                        embedded={true}
+                        onOpenAtlasNode={this.handleCorpusAtlasIssueOpen}
+                        restoreState={this.state.riskMatrixRestoreState}
+                        onRestoreApplied={this.handleRiskMatrixRestoreApplied}
+                      />
+                    </Suspense>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     );
   }
 }

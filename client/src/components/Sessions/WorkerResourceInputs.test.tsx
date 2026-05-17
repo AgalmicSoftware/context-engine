@@ -29,13 +29,13 @@ describe('WorkerResourceInputs', () => {
     expect(onUpdateSecret).toHaveBeenCalledWith('customRpcUrl', 'https://rpc.next');
   });
 
-  it('renders only the Chipotle Lit account key field with a stable test id', () => {
+  it('renders only the Chipotle Lit API key field with a stable test id', () => {
     const onUpdateSecret = jest.fn();
 
     render(
       <WorkerResourceInputs
         resourceKey="lit"
-        fields={[{ key: 'litAccountApiKey', label: 'Lit account API key', type: 'password' }]}
+        fields={[{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }]}
         workerSecrets={{
           litApiBase: 'https://api.chipotle.litprotocol.com',
           litGroupId: 'group_123',
@@ -69,7 +69,7 @@ describe('WorkerResourceInputs', () => {
     render(
       <WorkerResourceInputs
         resourceKey="lit"
-        fields={[{ key: 'litAccountApiKey', label: 'Lit account API key', type: 'password' }]}
+        fields={[{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }]}
         workerSecrets={{ litUsageApiKey: 'lit-secret', litAccountApiKey: 'account-secret' }}
         workerSecretsEnabled
         isNormalMode={false}
