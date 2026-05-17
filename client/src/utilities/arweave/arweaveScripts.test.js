@@ -43,6 +43,9 @@ const textResp = (status, textBody = '', contentType = 'text/plain') => ({
 const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 const TEST_ARWEAVE_BACKUP_GATEWAY = 'https://arweave-backup.example.test';
 const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev'; // intentional: real URL - verifies AR.IO gateway override handling
+const TEST_IRYS_GATEWAY = 'https://gateway-irys.example.test';
+const PERMAGATE_GRAPHQL_URL = 'https://permagate.io/graphql'; // intentional: real URL - verifies production GraphQL precheck routing
+const G8WAY_GRAPHQL_URL = 'https://g8way.io/graphql'; // intentional: real URL - verifies production GraphQL fallback routing
 
 describe('arweaveScripts.downloadDataFromArweave', () => {
   beforeEach(() => {
