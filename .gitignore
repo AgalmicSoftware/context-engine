@@ -125,6 +125,7 @@ broadcast/
 /client/.tmp-jest/
 /client/tmp_jest/
 /client/tmp_jest_cache/
+/client/build-vite/
 
 # AI agent local config and skills (maintainer-only; AGENTS.md is the public surface)
 .claude/

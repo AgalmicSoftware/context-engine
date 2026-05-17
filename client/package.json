@@ -61,16 +61,15 @@
   "scripts": {
     "postinstall": "patch-package",
     "dev": "PUBLIC_URL=/ react-app-rewired start",
+    "dev:vite": "PUBLIC_URL=/ vite --host 0.0.0.0",
     "analyze": "source-map-explorer 'build/static/js/*.js'",
     "start": "serve -s build",
-    "prebuild": "node scripts/clean-legacy-vite-output.mjs",
-    "build": "PUBLIC_URL=/ vite build",
-    "prebuild:vite": "node scripts/clean-legacy-vite-output.mjs",
+    "build": "PUBLIC_URL=/ react-app-rewired build",
     "build:vite": "PUBLIC_URL=/ vite build",
     "preview:vite": "vite preview --host 0.0.0.0",
-    "test": "jest",
-    "typecheck": "tsc --noEmit",
-    "lint": "eslint src/ \"src/utilities/ui/**/*.{ts,tsx}\" \"src/components/Shared/**/*.{ts,tsx}\" \"src/components/About/**/*.{ts,tsx}\" \"src/components/Footer/**/*.{ts,tsx}\" \"src/components/InformationModals/**/*.{ts,tsx}\" \"src/components/Onboarding/**/*.{ts,tsx}\" \"src/components/MainContent/**/*.{ts,tsx}\" \"src/components/Agent/**/*.{ts,tsx}\" \"src/components/Bookmarks/**/*.{ts,tsx}\" \"src/components/Sponsor/**/*.{ts,tsx}\" \"src/components/ErrorBoundary/**/*.{ts,tsx}\" \"src/components/RightSidebar/**/*.{ts,tsx}\" \"src/components/E2E/**/*.{ts,tsx}\" \"src/components/Gates/**/*.{ts,tsx}\" \"src/components/CommunityTab/**/*.{ts,tsx}\" \"src/components/PolisReport/**/*.{ts,tsx}\" \"src/components/DebateMap/**/*.{ts,tsx}\" \"src/components/Navbar/**/*.{ts,tsx}\" \"src/components/ContractPage/**/*.{ts,tsx}\""
+    "test": "react-app-rewired test",
+    "eject": "react-scripts eject",
+    "lint": "eslint src/"
   },
   "devDependencies": {
     "@babel/core": "7.28.6",
@@ -82,6 +81,7 @@
     "@types/node": "20.19.39",
     "@types/react": "18.3.28",
     "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "4.7.0",
     "assert": "2.1.0",
     "babel-eslint": "10.1.0",
     "babel-jest": "26.6.3",
@@ -107,8 +107,8 @@
     "stream-http": "3.2.0",
     "typescript": "5.8.3",
     "url": "0.11.4",
-    "webpack": "4.44.2",
-    "worker-loader": "3.0.8"
+    "vite": "4.5.14",
+    "webpack": "4.44.2"
   },
   "overrides": {
     "@coinbase/wallet-sdk": {

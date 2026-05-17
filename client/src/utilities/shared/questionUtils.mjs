@@ -7,7 +7,12 @@
 //
 // Depends on: ethers (v5)
 
+import bufferModule from 'buffer';
 import * as ethersModule from 'ethers';
+
+const Buffer =
+  bufferModule?.Buffer ||
+  bufferModule;
 
 const resolveEthersCompat = (loadedModule) => {
   const direct =
