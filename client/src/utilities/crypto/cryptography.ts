@@ -478,6 +478,19 @@ const _getProvider = (providerLike) => {
         return window.__portoMockProvider;
       }
       try {
+        const globalBuildPortoProvider =
+          typeof window !== 'undefined' && typeof window.__ceCreatePortoProviderMock === 'function'
+            ? window.__ceCreatePortoProviderMock
+            : null;
+        if (globalBuildPortoProvider) {
+          const portoProvider = globalBuildPortoProvider();
+          if (portoProvider && portoProvider.isPorto === true && typeof portoProvider.request === 'function') {
+            if (typeof window !== 'undefined') {
+              window.__portoMockProvider = portoProvider;
+            }
+            return portoProvider;
+          }
+        }
         // Avoid a hard module cycle at load time: portoFunctions imports contractScripts,
         // which already depends on cryptography.
         // eslint-disable-next-line global-require
