@@ -1,7 +1,5 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
-
-import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
-import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
+import SurveyTool from './SurveyTool';
+import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -9,22 +7,32 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 
-const SESSION_SBT = '0x1111111111111111111111111111111111111111';
-const WALLET = '0x2222222222222222222222222222222222222222';
+const expandInspectableNode = (node) => (
+  node?.type === SurveyQuestionsLockedQuestionsPanel
+    ? SurveyQuestionsLockedQuestionsPanel(node.props)
+    : node
+);
 
-const defaultQuestionScanProgress = {
-  slug: 'edge',
-  phase: 'hydrate',
-  discoveredQuestions: 1,
-  hydratedQuestions: 0,
-  pendingMetadataCount: 0,
-  remainingBlocks: 0,
+const treeHasDataTestId = (node, testId) => {
+  if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasDataTestId(expandedNode, testId);
+  if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
+  if (typeof node !== 'object') return false;
+  if (node?.props?.['data-testid'] === testId) return true;
+  return treeHasDataTestId(node?.props?.children, testId);
 };
 
-const defaultNetworkCache = {
-  questions: {},
-  questionResponses: {},
-  pendingQuestionMetadata: {},
+const treeHasText = (node, text) => {
+  if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasText(expandedNode, text);
+  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
+  if (typeof node === 'string' || typeof node === 'number') {
+    return String(node).includes(text);
+  }
+  if (typeof node !== 'object') return false;
+  return treeHasText(node?.props?.children, text);
 };
 
 const mockQuestionsCache = (networkCache = defaultNetworkCache) =>
