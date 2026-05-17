@@ -43,6 +43,7 @@ const textResp = (status, textBody = '', contentType = 'text/plain') => ({
 const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 const TEST_ARWEAVE_BACKUP_GATEWAY = 'https://arweave-backup.example.test';
 const TEST_AR_IO_GATEWAY = 'https://unit.ar-io.dev'; // intentional: real URL - verifies AR.IO gateway override handling
+const TEST_IRYS_GATEWAY = 'https://gateway-irys.example.test';
 
 describe('arweaveClient.downloadDataFromArweave', () => {
   beforeEach(() => {
