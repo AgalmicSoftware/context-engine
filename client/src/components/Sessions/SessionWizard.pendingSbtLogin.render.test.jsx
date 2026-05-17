@@ -324,7 +324,7 @@ const enableAdvancedMode = () => {
 const selectNormalModeCard = (label) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
-describe('SessionWizard pending SBT rendering', () => {
+describe('SessionWizard pending SBT login rendering', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateSbtDraftQueue = [];
