@@ -2,7 +2,7 @@
 
 import React, { Component } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle, faCopy, faCheck, faChevronUp, faChevronDown, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faCircle } from '@fortawesome/free-solid-svg-icons';
+import { faQuestionCircle, faLock, faCopy, faCheck, faBookmark, faExpand, faChevronUp, faChevronDown, faUser, faSpinner, faArrowLeft, faInfinity, faTimes, faExternalLinkAlt, faInfoCircle, faCircle, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import { Alert } from 'reactstrap';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -44,12 +44,6 @@ import {
   renderSbtPageFullImageModal,
   renderSbtPageHolderModal,
 } from './SBTPageModals';
-import SbtPageIdentityPanel from './SbtPageIdentityPanel';
-import SbtPageActionsSection from './SbtPageActionsSection';
-import SbtPageMiniCard from './SbtPageMiniCard';
-import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
-import SbtPageRelevantInfo from './SbtPageRelevantInfo';
-import SbtPageStatsSection from './SbtPageStatsSection';
 import {
   appendSbtPageBookmark,
   appendSbtPageTransactionHash,
