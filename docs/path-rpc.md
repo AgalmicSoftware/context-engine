@@ -25,7 +25,7 @@ Built-in anonymous RPC defaults live in `client/src/variables/rpcDefaults.js`.
 - No paid/keyed client RPC URL is committed in source; use one of these env/runtime-only overrides if you need that diagnostics path:
   - `REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP` / `REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_WSS`
   - `REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP` / `REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_WSS`
-- These values are browser-visible because they are part of the CRA client config, so keep them in local uncommitted `client/.env` only when you need browser-side diagnostics
+- These values are browser-visible because they are part of the client bundle config, so keep them in local uncommitted `client/.env` only when you need browser-side diagnostics
 
 OP Sepolia client read-provider order is:
 

@@ -9,24 +9,9 @@ import contractScriptsImpl, {
 } from './contractScripts.impl.js';
 
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const vm = require('vm');
-const webpack = require('webpack');
-
-const compileWebpack = (config) => new Promise((resolve, reject) => {
-  webpack(config, (error, stats) => {
-    if (error) {
-      reject(error);
-      return;
-    }
-    if (stats.hasErrors()) {
-      reject(new Error(stats.toString({ all: false, errors: true, warnings: true })));
-      return;
-    }
-    resolve(stats);
-  });
-});
+const { execFileSync } = require('child_process');
 
 describe('contractScripts compatibility barrel', () => {
   afterEach(() => {
@@ -53,11 +38,14 @@ describe('contractScripts compatibility barrel', () => {
     expect(typeof contractScripts.getUserActivity).toBe('function');
   });
 
-  it('can load through a browser-targeted Webpack bundle without CommonJS exports', async () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-contract-scripts-barrel-'));
+  it('can load through a browser-targeted Vite bundle without CommonJS exports', () => {
+    const clientRoot = path.resolve(__dirname, '../../..');
+    const tmpDir = fs.mkdtempSync(path.join(clientRoot, '.tmp-contract-scripts-barrel-'));
     const outputDir = path.join(tmpDir, 'dist');
     const entryPath = path.join(tmpDir, 'entry.js');
     const implStubPath = path.join(tmpDir, 'contractScripts.impl.stub.js');
+    const viteConfigPath = path.join(tmpDir, 'vite.config.mjs');
+    const viteBinPath = path.join(clientRoot, 'node_modules/vite/bin/vite.js');
     const barrelPath = path.resolve(__dirname, 'contractScripts.ts');
 
     fs.mkdirSync(outputDir, { recursive: true });
@@ -111,45 +99,51 @@ describe('contractScripts compatibility barrel', () => {
         slug: getSessionConfigBySlug('edge').slug,
       };
     `);
-
-    try {
-      await compileWebpack({
-        mode: 'development',
-        target: 'web',
-        devtool: false,
-        entry: entryPath,
-        output: {
-          filename: 'bundle.js',
-          hashFunction: 'sha256',
-          path: outputDir,
-        },
+    fs.writeFileSync(viteConfigPath, `
+      export default {
+        logLevel: 'silent',
         resolve: {
-          extensions: ['.ts', '.tsx', '.js', '.jsx'],
-        },
-        module: {
-          rules: [
+          alias: [
             {
-              test: /\.(js|jsx|ts|tsx)$/,
-              include: [tmpDir, path.resolve(__dirname)],
-              use: {
-                loader: require.resolve('babel-loader'),
-                options: {
-                  babelrc: false,
-                  configFile: false,
-                  envName: 'development',
-                  presets: [require.resolve('babel-preset-react-app')],
-                },
-              },
+              find: /^\\.\\/contractScripts\\.impl\\.js$/,
+              replacement: ${JSON.stringify(implStubPath)},
             },
           ],
         },
-        plugins: [
-          new webpack.NormalModuleReplacementPlugin(
-            /contractScripts\.impl\.js$/,
-            implStubPath
-          ),
-        ],
-      });
+        build: {
+          target: 'es2020',
+          outDir: ${JSON.stringify(outputDir)},
+          emptyOutDir: true,
+          write: true,
+          rollupOptions: {
+            input: ${JSON.stringify(entryPath)},
+            output: {
+              entryFileNames: 'bundle.js',
+              format: 'iife',
+              name: 'ContractScriptsBarrelSmoke',
+              inlineDynamicImports: true,
+            },
+          },
+        },
+      };
+    `);
+
+    try {
+      try {
+        execFileSync(
+          process.execPath,
+          [viteBinPath, 'build', '--config', viteConfigPath],
+          {
+            cwd: clientRoot,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'pipe'],
+          }
+        );
+      } catch (error) {
+        const stdout = error.stdout ? `\nstdout:\n${error.stdout}` : '';
+        const stderr = error.stderr ? `\nstderr:\n${error.stderr}` : '';
+        throw new Error(`Vite barrel smoke build failed.${stdout}${stderr}`);
+      }
 
       const context = { console, window: {} };
       vm.runInNewContext(fs.readFileSync(path.join(outputDir, 'bundle.js'), 'utf8'), context);
