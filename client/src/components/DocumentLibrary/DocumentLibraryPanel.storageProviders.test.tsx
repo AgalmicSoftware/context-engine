@@ -1,6 +1,5 @@
 import {
   React,
-  act,
   fireEvent,
   render,
   screen,
@@ -200,9 +199,10 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     expect(window.location.search).toBe('?keep=1');
   });
 
-  it('auto-opens encrypted viewer links without requiring Lit getKey hooks', async () => {
+  it('waits for Lit hooks before auto-opening encrypted viewer links', async () => {
     const litStorage = require('../../utilities/crypto/litProtocol.js').litStorage;
     const txId = 'F'.repeat(43);
+    const getKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     litStorage.downloadEncryptedArweaveData.mockResolvedValueOnce({
       payload: { name: 'Encrypted auto', mime: 'text/plain', text: 'lit auto text' },
     });
@@ -225,20 +225,22 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
       sessionIdHex: `0x${'8'.repeat(32)}`,
     };
 
-    await act(async () => {
-      render(<DocumentLibraryPanel {...panelProps} />);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+
+    await Promise.resolve();
+    expect(litStorage.downloadEncryptedArweaveData).not.toHaveBeenCalled();
+    expect(window.location.search).toContain('__ceDocTx=');
+
+    rerender(<DocumentLibraryPanel {...panelProps} litHooks={{ getKey }} />);
 
     await waitFor(() => {
       expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(expect.objectContaining({
         url: `https://lit.example.test/${txId}`,
         providerLike: {},
         account: '0x123',
+        lit: { getKey },
       }));
     });
-    expect(litStorage.downloadEncryptedArweaveData.mock.calls[0][0]).not.toHaveProperty('lit');
     expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('lit auto text');
     expect(window.location.search).toBe('');
   });
@@ -275,11 +277,7 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
       target: { files: [file] },
     });
-    await act(async () => {
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
 
     await waitFor(() => {
       expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
@@ -297,24 +295,20 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
   });
 
   it('can render the browse list without upload controls', async () => {
-    await act(async () => {
-      render(
-        <DocumentLibraryPanel
-          provider={{}}
-          network={{ id: 84532 }}
-          account="0x123"
-          loginComplete
-          toggleLoginModal={jest.fn()}
-          sessionSlug="edge"
-          sessionConfig={TEST_SESSION_CONFIG}
-          mode="session"
-          sessionIdHex={`0x${'5'.repeat(32)}`}
-          showUploadControls={false}
-        />
-      );
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'5'.repeat(32)}`}
+        showUploadControls={false}
+      />
+    );
 
     await waitFor(() => {
       expect(mockListArweaveTransactionsByTags).toHaveBeenCalled();
