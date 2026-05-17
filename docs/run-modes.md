@@ -19,8 +19,7 @@ npm install
 npm run dev
 ```
 
-Vite is the canonical client dev/build path. CRA remains available as an
-explicit fallback while the migration is being verified:
+Vite is the canonical client dev/build path:
 
 ```bash
 cd client
@@ -30,13 +29,7 @@ npm run preview:vite
 ```
 
 The Vite production build writes to `client/build/`, which is also what
-`npm start` serves. For CRA comparison runs, use:
-
-```bash
-cd client
-npm run dev:cra
-npm run build:cra
-```
+`npm start` serves.
 
 Client unit tests run through standalone Jest:
 

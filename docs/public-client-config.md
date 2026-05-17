@@ -59,13 +59,6 @@ npm run build
 
 The output directory is `client/build/`.
 
-CRA remains available as an explicit fallback for migration comparison runs:
-
-```bash
-cd client
-npm run build:cra
-```
-
 ### 3. Upload to Netlify
 
 For a manual upload, drag `client/build/` into Netlify's deploy UI. For a
