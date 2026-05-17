@@ -19,6 +19,19 @@ npm install
 npm run dev
 ```
 
+CRA remains the canonical client dev/build path. A Vite sidecar is available for
+compatibility work without replacing CRA:
+
+```bash
+cd client
+npm run dev:vite
+npm run build:vite
+npm run preview:vite
+```
+
+The sidecar build writes to `client/build-vite/`; the canonical production build
+still writes to `client/build/`.
+
 ## `local-chain`
 
 Local blockchain development with Anvil and Foundry.

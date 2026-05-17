@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="shortcut icon" href="__PUBLIC_URL__/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="__PUBLIC_URL__/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="__PUBLIC_URL__/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="__PUBLIC_URL__/favicon-16x16.png">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control."
+    />
+    <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="Context Engine | Deliberation Toolkit"
+    />
+    <meta
+      property="og:description"
+      content="Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control."
+    />
+    <meta property="og:image" content="https://contextengine.xyz/android-chrome-512x512.png" />
+    <meta name="twitter:card" content="summary" />
+    <meta
+      name="twitter:title"
+      content="Context Engine | Deliberation Toolkit"
+    />
+    <meta
+      name="twitter:description"
+      content="Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control."
+    />
+    <meta name="twitter:image" content="https://contextengine.xyz/android-chrome-512x512.png" />
+    <link rel="alternate" href="__PUBLIC_URL__/discoverability.html" title="Context Engine static summary" />
+    <link rel="alternate" type="text/plain" href="__PUBLIC_URL__/llms.txt" title="Context Engine llms.txt" />
+    <script type="application/ld+json" data-ce-structured-data="public-page">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://contextengine.xyz/#organization",
+            "name": "Context Engine",
+            "url": "https://contextengine.xyz/",
+            "sameAs": ["https://github.com/AgalmicSoftware/context-engine"]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://contextengine.xyz/#website",
+            "url": "https://contextengine.xyz/",
+            "name": "Context Engine",
+            "description": "Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control.",
+            "publisher": { "@id": "https://contextengine.xyz/#organization" }
+          },
+          {
+            "@type": "SoftwareSourceCode",
+            "@id": "https://contextengine.xyz/#source",
+            "name": "Context Engine",
+            "description": "Context Engine is an open-source toolkit for AI-enhanced deliberation, surveys, SBT-gated access control, and permanent records.",
+            "codeRepository": "https://github.com/AgalmicSoftware/context-engine",
+            "url": "https://github.com/AgalmicSoftware/context-engine/tree/main"
+          }
+        ]
+      }
+    </script>
+    <link rel="manifest" href="__PUBLIC_URL__/manifest.json" />
+
+    <!--     Fonts and icons     -->
+    <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet"/>
+    <script defer src="https://kit.fontawesome.com/b17aad74d4.js" crossorigin="anonymous"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,500;1,500;1,600&display=swap" rel="stylesheet">
+
+    <!-- Web3Auth / OAuth popups need an opener relationship -->
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin-allow-popups">
+    <!-- Do NOT require COEP for this app (popups/iframes during auth) -->
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="unsafe-none">
+
+    <title>Context Engine | Deliberation Toolkit</title>
+  </head>
+  <body>
+
+    <noscript>
+      <main>
+        <h1>Context Engine</h1>
+        <p>
+          Context Engine is an open-source toolkit for AI-enhanced deliberation,
+          surveys, SBT-gated access control, permanent records, and large-group
+          sensemaking.
+        </p>
+        <p>
+          Public GitHub repository:
+          <a href="https://github.com/AgalmicSoftware/context-engine">https://github.com/AgalmicSoftware/context-engine</a>
+        </p>
+        <p>
+          Latest public repository version:
+          <a href="https://github.com/AgalmicSoftware/context-engine/tree/main">https://github.com/AgalmicSoftware/context-engine/tree/main</a>
+        </p>
+        <p>
+          Static summary page:
+          <a href="__PUBLIC_URL__/discoverability.html">Context Engine static summary</a>
+        </p>
+        <p>
+          LLM summary:
+          <a href="__PUBLIC_URL__/llms.txt">Context Engine llms.txt</a>
+        </p>
+        <p>
+          JavaScript is required to run the interactive app, but these links are
+          provided directly in the HTML for crawlers, previews, and no-JS readers.
+        </p>
+      </main>
+    </noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/viteEntry.js"></script>
+  </body>
+</html>
