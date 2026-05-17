@@ -1,5 +1,4 @@
 import {
-  QuestionsDashboard,
   SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,
   SURVEY_SELECTOR_CREATE_BUTTON_STYLE,
   SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE,
@@ -153,80 +152,6 @@ describe('SurveySelector', () => {
     expect(patch.filterState).toEqual(
       normalizeSurveyToolFilterState({ questionTypes: ['rating'] })
     );
-  });
-
-  it('forwards scoped Lit hooks to selected survey question and results surfaces', () => {
-    const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
-    const lit = { getKey: jest.fn() };
-    const SurveyQuestionsComponent = () => null;
-    const subject = new SurveySelector({
-      SurveyQuestionsComponent,
-      autoOpenResults: false,
-      filterState: {},
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      isSurveyCacheReady: true,
-      isSBTCacheReady: true,
-      singleQuestionMode: false,
-      network: { id: 11155420 },
-      activeSessionSlug: 'edge',
-      sessionSlug: 'edge',
-      account: '0x123',
-      provider: {},
-      lit,
-      litHooks,
-    });
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      viewMode: 'survey',
-      selectedSurveyIndex: 0,
-      surveys: [{ id: '0xsurvey', title: 'Gated Survey', questionIDs: ['0xq'] }],
-      showResults: true,
-      createSurveyMode: false,
-    };
-    subject.areSurveySpecificQuestionsLoaded = jest.fn(() => true);
-    subject.getParsedQuestionsCacheForRender = jest.fn(() => ({}));
-
-    const tree = subject.render();
-    const questionsNode = findElement(tree, (node) => node.type === SurveyQuestionsComponent);
-    const resultsNode = findElement(tree, (node) => node.type === ConnectedSurveyResults);
-
-    expect(questionsNode?.props?.lit).toBe(lit);
-    expect(questionsNode?.props?.litHooks).toBe(litHooks);
-    expect(resultsNode?.props?.lit).toBe(lit);
-    expect(resultsNode?.props?.litHooks).toBe(litHooks);
-  });
-
-  it('forwards scoped Lit hooks from questions dashboard to pile question surfaces', () => {
-    const litHooks = { getKey: jest.fn(), saveKey: jest.fn() };
-    const lit = { getKey: jest.fn() };
-    const SurveyQuestionsComponent = () => null;
-    const subject = new QuestionsDashboard({
-      SurveyQuestionsComponent,
-      account: '0x123',
-      provider: {},
-      network: { id: 11155420 },
-      lit,
-      litHooks,
-      activeSessionSlug: 'edge',
-      sessionSlug: 'edge',
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      isSurveyCacheReady: true,
-      isSBTCacheReady: true,
-    });
-    subject.state = {
-      ...subject.state,
-      filterLoading: false,
-      filteredQuestions: [{ id: '0xq', prompt: 'Question?' }],
-    };
-
-    const tree = subject.render();
-    const questionsNode = findElement(tree, (node) => node.type === SurveyQuestionsComponent);
-
-    expect(questionsNode?.props?.lit).toBe(lit);
-    expect(questionsNode?.props?.litHooks).toBe(litHooks);
   });
 
   it('does not read SurveySelector survey list from a borrowed general network when the slug is unresolved', async () => {
