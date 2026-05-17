@@ -253,6 +253,28 @@ const openSessionSelector = async () => {
   return screen.findByTestId(SESSION_SELECTOR_PANEL_TEST_ID);
 };
 
+const buildSBTsListProps = (overrides = {}) => ({
+  provider: 'mock',
+  network: { id: 84532, name: 'Base Sepolia' },
+  account: '',
+  sessionSlug: '',
+  loginComplete: true,
+  miniaturized: false,
+  toggleLoginModal: jest.fn(),
+  sbtCacheRevision: 0,
+  onRequestSbtCacheRefresh: jest.fn(),
+  isSBTCacheReady: true,
+  refreshSbtData: jest.fn(),
+  latestBlockNumber: 0,
+  allSessionsMode: true,
+  ensureLightSbtDiscovery: jest.fn(),
+  ...overrides,
+});
+
+const renderSBTsList = (overrides = {}) => render(
+  <SBTsList {...buildSBTsListProps(overrides)} />
+);
+
 describe('SBTsList per-session loader countdown', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -282,24 +304,7 @@ describe('SBTsList per-session loader countdown', () => {
     localStorage.removeItem('dg:lastActiveSbtSession');
     localStorage.setItem('ce:primarySessionSlug', 'beta');
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList();
 
     await openSessionSelector();
     await waitFor(() => {
@@ -322,24 +327,7 @@ describe('SBTsList per-session loader countdown', () => {
     ]);
     localStorage.setItem('ce:primarySessionSlug', 'beta');
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList();
 
     await openSessionSelector();
     await waitFor(() => {
@@ -403,24 +391,7 @@ describe('SBTsList per-session loader countdown', () => {
       return { '84532': { lastBlock: 0, sbtList: {} } };
     });
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList();
 
     await waitFor(() => {
       expect(screen.getAllByText('[encrypted]').length).toBeGreaterThanOrEqual(1);
@@ -437,24 +408,10 @@ describe('SBTsList per-session loader countdown', () => {
 
     const ensureLightSbtDiscovery = jest.fn();
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      ensureLightSbtDiscovery,
+    });
 
     await waitFor(() => {
       expect(ensureLightSbtDiscovery).toHaveBeenCalledWith(
@@ -501,23 +458,10 @@ describe('SBTsList per-session loader countdown', () => {
     window.history.replaceState({}, '', sbtsListPath());
 
     try {
-      render(
-        <SBTsList
-          provider="mock"
-          network={{ id: 84532, name: 'Base Sepolia' }}
-          account=""
-          sessionSlug=""
-          loginComplete
-          miniaturized={false}
-          toggleLoginModal={jest.fn()}
-          sbtCacheRevision={0}
-          onRequestSbtCacheRefresh={jest.fn()}
-          isSBTCacheReady={false}
-          refreshSbtData={jest.fn()}
-          latestBlockNumber={0}
-          ensureLightSbtDiscovery={jest.fn()}
-        />
-      );
+      renderSBTsList({
+        allSessionsMode: undefined,
+        isSBTCacheReady: false,
+      });
 
       await waitFor(() => {
         expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
@@ -540,24 +484,10 @@ describe('SBTsList per-session loader countdown', () => {
 
     const ensureLightSbtDiscovery = jest.fn();
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      ensureLightSbtDiscovery,
+    });
 
     await waitFor(() => {
       expect(screen.queryByText(/Loading Groups/i)).not.toBeInTheDocument();
@@ -581,24 +511,10 @@ describe('SBTsList per-session loader countdown', () => {
 
     const ensureLightSbtDiscovery = jest.fn();
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      ensureLightSbtDiscovery,
+    });
 
     await waitFor(() => {
       expect(screen.queryByText(/Loading Groups/i)).not.toBeInTheDocument();
@@ -654,24 +570,10 @@ describe('SBTsList per-session loader countdown', () => {
     });
 
     const ensureLightSbtDiscovery = jest.fn();
-    const { unmount } = render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
+    const { unmount } = renderSBTsList({
+      isSBTCacheReady: false,
+      ensureLightSbtDiscovery,
+    });
 
     await waitFor(() => {
       expect(screen.queryByText(/Loading Groups/i)).not.toBeInTheDocument();
@@ -680,24 +582,10 @@ describe('SBTsList per-session loader countdown', () => {
     mockReadSessionScanSlugs.mockReturnValue(['alpha']);
     unmount();
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={1}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
+    renderSBTsList({
+      sbtCacheRevision: 1,
+      ensureLightSbtDiscovery,
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Alpha Stable Badge')).toBeInTheDocument();
@@ -729,24 +617,10 @@ describe('SBTsList per-session loader countdown', () => {
 
     const ensureLightSbtDiscovery = jest.fn();
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      ensureLightSbtDiscovery,
+    });
 
     await waitFor(() => {
       const calledSlugs = mockGetRelevantBlockWindowForFilter.mock.calls.map(([arg]) => (
@@ -812,43 +686,22 @@ describe('SBTsList per-session loader countdown', () => {
     });
 
     const ensureLightSbtDiscovery = jest.fn();
-    const { rerender } = render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug="alpha"
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={true}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-      />
-    );
+    const { rerender } = renderSBTsList({
+      sessionSlug: 'alpha',
+      allSessionsMode: undefined,
+      ensureLightSbtDiscovery,
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Alpha Badge')).toBeInTheDocument();
     });
 
     rerender(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug="beta"
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={true}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        ensureLightSbtDiscovery={ensureLightSbtDiscovery}
+      <SBTsList {...buildSBTsListProps({
+        sessionSlug: 'beta',
+        allSessionsMode: undefined,
+        ensureLightSbtDiscovery,
+      })}
       />
     );
 
@@ -863,25 +716,10 @@ describe('SBTsList per-session loader countdown', () => {
   });
 
   it('shows create-group control above universe selector in embedded all-groups mode', async () => {
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     await waitFor(() => {
       expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
@@ -894,25 +732,10 @@ describe('SBTsList per-session loader countdown', () => {
   });
 
   it('renders create-group panel above universe when expanded in embedded all-groups mode', async () => {
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     fireEvent.click(await screen.findByRole('button', { name: /Create Group/i }));
 
@@ -928,25 +751,10 @@ describe('SBTsList per-session loader countdown', () => {
       JSON.stringify({ sbtName: 'Alpha' })
     );
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     await screen.findByRole('button', { name: /Create Group/i });
 
@@ -963,25 +771,10 @@ describe('SBTsList per-session loader countdown', () => {
       })
     );
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     await screen.findByRole('button', { name: /Exit Group Creation/i });
     expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
@@ -991,25 +784,10 @@ describe('SBTsList per-session loader countdown', () => {
     mockReadSessionScanScope.mockReturnValue('list');
     mockReadSessionScanSlugs.mockReturnValue(['alpha', 'beta']);
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     fireEvent.click(await screen.findByRole('button', { name: /Create Group/i }));
     await screen.findByTestId('create-group-panel');
@@ -1040,25 +818,10 @@ describe('SBTsList per-session loader countdown', () => {
     ]);
     mockSessionRegistryGetAllSessionEntries.mockReturnValue([]);
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     expect(screen.queryByText(/Loading Groups/i)).not.toBeInTheDocument();
     expect(screen.getByText(/^Sessions$/i)).toBeInTheDocument();
@@ -1079,25 +842,10 @@ describe('SBTsList per-session loader countdown', () => {
     ]);
     mockSessionRegistryGetAllSessionEntries.mockReturnValue([]);
 
-    render(
-      <SBTsList
-        provider="mock"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        sessionSlug=""
-        loginComplete
-        miniaturized={false}
-        toggleLoginModal={jest.fn()}
-        sbtCacheRevision={0}
-        onRequestSbtCacheRefresh={jest.fn()}
-        isSBTCacheReady={false}
-        refreshSbtData={jest.fn()}
-        latestBlockNumber={0}
-        allSessionsMode
-        embeddedMode
-        ensureLightSbtDiscovery={jest.fn()}
-      />
-    );
+    renderSBTsList({
+      isSBTCacheReady: false,
+      embeddedMode: true,
+    });
 
     await openSessionSelector();
     await waitFor(() => {
