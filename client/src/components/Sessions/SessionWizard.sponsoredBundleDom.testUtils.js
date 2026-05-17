@@ -1,9 +1,6 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const SPONSORED_FAUCET_NOTICE = 'Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.';
-const SPONSORED_DEPLOY_NOTICE = 'Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to override it.';
-
 const getFieldInputByLabel = (labelText) => (
   screen.getByText(labelText).parentElement.querySelector('input,textarea,select')
 );
@@ -110,8 +107,6 @@ const configureAdvancedUseUrlDeploy = async ({
 };
 
 export {
-  SPONSORED_DEPLOY_NOTICE,
-  SPONSORED_FAUCET_NOTICE,
   configureAdvancedUseUrlDeploy,
   enableAdvancedMode,
   expectSponsoredStatus,
