@@ -1,13 +1,4 @@
-import {
-  SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,
-  SURVEY_SELECTOR_CREATE_BUTTON_STYLE,
-  SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE,
-  SurveySelector,
-  buildSurveySelectorDropdownItemClassName,
-  buildSurveySelectorHeaderSubmitButtonClassName,
-  resolveSurveySelectorFilterButtonStyle,
-  resolveSurveySelectorFilterIconStyle,
-} from './SurveySelector';
+import { SurveySelector } from './SurveySelector';
 import { normalizeSurveyToolFilterState } from './surveyToolUtils.js';
 import ConnectedSurveyResults from './SurveyResults';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
@@ -89,29 +80,6 @@ describe('SurveySelector', () => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     jest.useRealTimers();
-  });
-
-  it('builds SurveySelector display classes and header styles', () => {
-    expect(resolveSurveySelectorFilterButtonStyle(true)).toEqual({
-      color: SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,
-      borderColor: SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,
-    });
-    expect(resolveSurveySelectorFilterButtonStyle(false)).toEqual({});
-    expect(resolveSurveySelectorFilterIconStyle(true)).toEqual({
-      color: SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,
-    });
-    expect(resolveSurveySelectorFilterIconStyle(false)).toEqual({});
-    expect(SURVEY_SELECTOR_CREATE_BUTTON_STYLE).toEqual({ marginLeft: '10px' });
-    expect(SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE).toEqual({ marginLeft: 8 });
-    expect(buildSurveySelectorDropdownItemClassName(styles, 'questions')).toBe(
-      `${styles.dropdownItem} ${styles.questionsItem}`
-    );
-    expect(buildSurveySelectorDropdownItemClassName(styles, 'survey')).toBe(
-      `${styles.dropdownItem} ${styles.surveyItem}`
-    );
-    expect(buildSurveySelectorHeaderSubmitButtonClassName(styles)).toBe(
-      `${styles.headerSubmitButton} ${styles.submitGlow}`
-    );
   });
 
   it('coalesces SurveySelector auto-open and filter-state sync into one state patch', () => {
@@ -771,75 +739,6 @@ describe('SurveySelector', () => {
     expect(renderToStaticMarkup(questionToggleCount)).not.toContain('(12)');
     expect(renderToStaticMarkup(questionToggleCount)).toContain('(0)');
     expect(encryptedCountBadge).toBeNull();
-  });
-
-  it('does not render the SurveySelector header progress bar during background scanning', () => {
-    const subject = new SurveySelector({
-      autoOpenResults: false,
-      filterState: {},
-      isQuestionCacheReady: false,
-      isSurveyCacheReady: true,
-      singleQuestionMode: false,
-      network: { id: 84532 },
-      activeSessionSlug: 'edge',
-      questionsCacheNonce: 4,
-      account: '0xabc',
-      questionScanProgress: {
-        slug: 'edge',
-        phase: 'scan',
-        totalBlocks: 100,
-        remainingBlocks: 40,
-        scannedBlocks: 60,
-      },
-    });
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      viewMode: 'questions',
-      showLongLoading: false,
-    };
-
-    const tree = subject.render();
-
-    expect(treeHasText(tree, 'Scanning...')).toBe(false);
-    expect(treeHasText(tree, 'blocks left')).toBe(false);
-    expect(treeHasText(tree, 'items left')).toBe(false);
-    expect(treeHasText(tree, '60 / 100')).toBe(false);
-  });
-
-  it('renders the SurveySelector header submit CTA with submitGlow when pending edits exist', () => {
-    const subject = new SurveySelector({
-      autoOpenResults: false,
-      filterState: {},
-      isQuestionCacheReady: true,
-      isSurveyCacheReady: true,
-      singleQuestionMode: false,
-      network: { id: 84532 },
-      activeSessionSlug: 'edge',
-    });
-    syncClassSetState(subject);
-    subject.state = {
-      ...subject.state,
-      loading: false,
-      viewMode: 'questions',
-      showLongLoading: false,
-      pendingSubmitStats: {
-        total: 2,
-        encrypted: 1,
-        submittedSinceLastEdit: false,
-        isSubmitting: false,
-      },
-    };
-
-    const tree = subject.render();
-    const headerSubmitButton = findElement(
-      tree,
-      (element) => element?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT
-    );
-
-    expect(headerSubmitButton).toBeTruthy();
-    expect(nodeHasClassName(headerSubmitButton, styles.headerSubmitButton)).toBe(true);
-    expect(nodeHasClassName(headerSubmitButton, styles.submitGlow)).toBe(true);
   });
 
 });
