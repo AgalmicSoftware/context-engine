@@ -12,23 +12,24 @@ const readClientFile = (relativePath) => {
 };
 
 describe('client package modernization contract', () => {
-  it('keeps canonical commands on the CRA compatibility path', () => {
+  it('keeps canonical commands on the Vite and standalone Jest paths', () => {
     const pkg = readClientPackageJson();
 
-    expect(pkg.scripts.dev).toBe('PUBLIC_URL=/ react-app-rewired start');
-    expect(pkg.scripts.build).toBe('PUBLIC_URL=/ react-app-rewired build');
+    expect(pkg.scripts.dev).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
+    expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts.start).toBe('serve -s build');
-    expect(pkg.scripts.test).toBe('react-app-rewired test');
+    expect(pkg.scripts.test).toBe('jest');
   });
 
-  it('keeps Vite available only as a sidecar command path', () => {
+  it('keeps CRA fallback scripts removed from the client package contract', () => {
     const pkg = readClientPackageJson();
 
-    expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0');
+    expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
     expect(pkg.scripts['build:vite']).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts['preview:vite']).toBe('vite preview --host 0.0.0.0');
-    expect(pkg.scripts.dev).not.toContain('vite');
-    expect(pkg.scripts.build).not.toContain('vite');
+    expect(pkg.scripts['dev:cra']).toBeUndefined();
+    expect(pkg.scripts['build:cra']).toBeUndefined();
+    expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).not.toContain('vite');
   });
 
@@ -36,9 +37,9 @@ describe('client package modernization contract', () => {
     const pkg = readClientPackageJson();
 
     expect(pkg.dependencies.ethers).toBe('5.7.2');
-    expect(pkg.devDependencies['react-scripts']).toBe('4.0.3');
-    expect(pkg.devDependencies.webpack).toBe('4.44.2');
-    expect(pkg.overrides.webpack).toBe('4.44.2');
+    expect(pkg.devDependencies['react-scripts']).toBeUndefined();
+    expect(pkg.devDependencies.webpack).toBeUndefined();
+    expect(pkg.overrides.webpack).toBeUndefined();
   });
 
   it('keeps stale dependency overrides out of the client package contract', () => {
@@ -60,17 +61,14 @@ describe('client package modernization contract', () => {
     });
   });
 
-  it('keeps Vite output and entry wiring separate from CRA', () => {
+  it('keeps Vite output and entry wiring canonical', () => {
     const viteConfig = readClientFile('vite.config.mjs');
     const viteIndex = readClientFile('index.html');
-    const craIndex = readClientFile('public/index.html');
 
-    expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build-vite')");
-    expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build')");
+    expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
+    expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build-vite')");
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.js');
-    expect(craIndex).toContain('%PUBLIC_URL%');
-    expect(craIndex).not.toContain('/src/viteEntry.js');
   });
 
   it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
@@ -90,15 +88,10 @@ describe('client package modernization contract', () => {
       '@babel/core',
       'babel-jest',
       'eslint-plugin-prettier',
-      'node-polyfill-webpack-plugin',
-      'raw-loader',
-      'react-scripts',
       'sass',
-      'sass-loader',
       'serve',
       'source-map-explorer',
-      'source-map-loader',
-      'webpack',
+      'vite',
     ];
 
     devOnlyPackages.forEach((name) => {
@@ -107,9 +100,18 @@ describe('client package modernization contract', () => {
     });
   });
 
-  it('keeps stale webpack loaders out of the client package contract', () => {
+  it('keeps stale webpack and CRA packages out of the client package contract', () => {
     const pkg = readClientPackageJson();
     const staleLoaders = [
+      'copy-webpack-plugin',
+      'file-loader',
+      'node-polyfill-webpack-plugin',
+      'raw-loader',
+      'react-app-rewired',
+      'react-scripts',
+      'sass-loader',
+      'source-map-loader',
+      'webpack',
       'worker-loader',
     ];
 
