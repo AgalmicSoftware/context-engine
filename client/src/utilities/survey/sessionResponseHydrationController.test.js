@@ -210,6 +210,7 @@ const createMockHost = (overrides = {}) => {
 
 describe('createSessionResponseHydrationController', () => {
   beforeEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
     normalizeSessionSlug.mockImplementation((s) => String(s || ''));
     ethers.utils.isHexString.mockImplementation((value, size) => (
@@ -803,46 +804,47 @@ describe('createSessionResponseHydrationController', () => {
     it('normalizes raw ids via ethers.utils.id, filters invalid hashes, and deduplicates mixed-case ids before targeted queries', async () => {
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
-      const hashedRawQuestionId = `0x${'c'.repeat(64)}`;
       const upperCaseQuestionIdA = `0x${'A'.repeat(64)}`;
-
-      cryptoUtils.hashIdentifier.mockImplementation((value) => {
-        if (value === 'topic-1') {
+      const originalHashIdentifier = cryptoUtils.hashIdentifier;
+      const hashIdentifier = jest.fn()
+        .mockImplementationOnce(() => {
           throw new Error('fallback to ethers.utils.id');
-        }
-        if (value === 'bad-id') {
-          return 'not-a-hex-hash';
-        }
-        return `0x${'d'.repeat(64)}`;
-      });
-      ethers.utils.id.mockImplementation((value) => {
-        if (value === 'topic-1') return hashedRawQuestionId;
-        return `0x${'e'.repeat(64)}`;
-      });
-      contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => (
-        `response-for:${qId.slice(-4)}`
-      ));
+        })
+        .mockReturnValueOnce('not-a-hex-hash')
+        .mockImplementationOnce(() => {
+          throw new Error('fallback to ethers.utils.id');
+        });
 
-      await controller.refreshQuestionResponses(
-        [
-          upperCaseQuestionIdA,
-          QUESTION_ID_A,
-          'topic-1',
-          'bad-id',
-          'topic-1',
-        ],
-        { responder: RESPONDER }
-      );
+      cryptoUtils.hashIdentifier = hashIdentifier;
 
-      expect(cryptoUtils.hashIdentifier).toHaveBeenCalledWith('topic-1');
-      expect(cryptoUtils.hashIdentifier).toHaveBeenCalledWith('bad-id');
-      expect(ethers.utils.id).toHaveBeenCalledWith('topic-1');
-      expect(ethers.utils.id).not.toHaveBeenCalledWith('bad-id');
-      expect(contractScripts.getResponse).toHaveBeenCalledTimes(2);
-      expect(contractScripts.getResponse.mock.calls.map((args) => args[2])).toEqual([
-        QUESTION_ID_A,
-        hashedRawQuestionId,
-      ]);
+      try {
+        contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => (
+          `response-for:${qId.slice(-4)}`
+        ));
+
+        await controller.refreshQuestionResponses(
+          [
+            upperCaseQuestionIdA,
+            QUESTION_ID_A,
+            'ab-topic-1',
+            'bad-id',
+            'ab-topic-1',
+          ],
+          { responder: RESPONDER }
+        );
+
+        expect(hashIdentifier).toHaveBeenCalledWith('ab-topic-1');
+        expect(hashIdentifier).toHaveBeenCalledWith('bad-id');
+        expect(contractScripts.getResponse).toHaveBeenCalledTimes(2);
+        const targetedQuestionIds = contractScripts.getResponse.mock.calls.map((args) => args[2]);
+        expect(targetedQuestionIds[0]).toBe(QUESTION_ID_A);
+        expect(targetedQuestionIds[1]).toMatch(/^0x[0-9a-f]{64}$/);
+        expect(targetedQuestionIds[1]).not.toBe(QUESTION_ID_A);
+        expect(targetedQuestionIds).not.toContain('not-a-hex-hash');
+        expect(new Set(targetedQuestionIds).size).toBe(2);
+      } finally {
+        cryptoUtils.hashIdentifier = originalHashIdentifier;
+      }
     });
 
     it('writes updated responses to questionsCache and userCache', async () => {

@@ -32,7 +32,7 @@
     "cloudflare:token-link": "npm run -s ai:node -- scripts/cloudflare-token-link.js",
     "chain:deploy": "forge build && node scripts/sync-abis.mjs && forge script script/DeployLocal.s.sol --tc DeployLocal --rpc-url http://127.0.0.1:8545 --broadcast --sender 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266 --unlocked",
     "test:contracts": "bash -c 'set -euo pipefail; if [ ! -d node_modules/@openzeppelin/contracts ]; then echo \"Error: @openzeppelin/contracts not found. Run npm install first.\"; exit 1; fi; forge test --match-contract \"^(SurveysTest|CustomSBTTest|SessionRegistryTest)$\"'",
-    "test:client": "cd client && CI=1 npm test -- --watchAll=false --coverage --coverageReporters=lcov --coverageReporters=text-summary",
+    "test:client": "cd client && CI=1 npm test -- --watchAll=false --runInBand --coverage --coverageReporters=lcov --coverageReporters=text-summary",
     "test:cc": "node scripts/run-contextengine-cc-tests.js",
     "test:cc:coverage": "NODE_V8_COVERAGE=coverage node scripts/run-contextengine-cc-tests.js --experimental-test-coverage",
     "test:node": "node scripts/run-node-tests.js",
