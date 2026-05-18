@@ -6,7 +6,7 @@
 cd client && npm install  # install client dependencies with strict peer resolution
 npm run dev                       # dev server (port 3000, hot reload)
 
-# Worker bundle (from repo root; use Node 20 for root scripts)
+# Worker bundle (from repo root; use Node 20.19+ for root scripts)
 nvm use 20
 npm run worker:bundle            # generate local dist/sessionCorsWorker.bundle.js fallback bundles
 
@@ -19,12 +19,12 @@ npm run ai:seed-survey:question-types            # seed question type data
 
 ## Client
 - Run frontend package commands from `client/`.
-- Root worker/test scripts are standardized on Node `^20.0.0` (`nvm use 20`).
-- The frontend package supports Node `^16.14.2` with npm `^9.2.0`, and Node `^20.0.0` with npm `^10.0.0`; use the repo default Node 20/npm 10 unless you are intentionally doing client-only Node 16 compatibility work.
+- Root worker/test scripts are standardized on Node `^20.19.0` or `>=22.12.0` (`nvm use 20`).
+- The frontend package supports Node `^20.19.0` or `>=22.12.0` with npm `^10.0.0`; Node 16/npm 9 are no longer supported for client work.
 - Fresh `client/` installs use the standard `npm install` with strict peer resolution. Do not add `--legacy-peer-deps` or restore a package-level npm config shim for normal installs.
 - When upgrading peer-sensitive `client/` dependencies (Lit Protocol packages, `reactstrap`, `react-popper`, Testing Library, or anything else declaring a React / TypeScript peer), re-run `cd client && npm install --legacy-peer-deps=false` and `cd client && npm ci --legacy-peer-deps=false --dry-run` before committing to catch lockfile or peer-regression drift.
 - `npm run dev` is the hot-reload frontend dev server; `npm start` serves the existing production build from `build/`.
-- Useful frontend scripts: `npm test`, `npm test -- --watchAll=false`, `npm run lint`, `npm run build`, `npm run analyze`.
+- Useful frontend scripts: `npm test` (Jest 30), `npm test -- --watchAll=false`, `npm run lint`, `npm run build`, `npm run analyze`.
 - Codex targeted Jest runs should use the approval-friendly form from `client/`: `npm test -- --watchAll=false --runTestsByPath <paths...>`. Do not prefix targeted Jest commands with `CI=true`; shell env assignments make sandbox auto-approval less reliable and trigger repeated prompts for Jest's temp-dir haste-map cache.
 - Frontend logging is off by default. In the browser console, run `window.CE_LOGGING.enabled = true`, then `window.CE_LOGGING_HELP()` for categories and usage.
 
