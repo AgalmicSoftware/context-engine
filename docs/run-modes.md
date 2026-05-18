@@ -7,14 +7,15 @@ Context Engine can be used in three main modes depending on how much infrastruct
 Frontend development and local client work only.
 
 - Use the React client without chain, worker, or Arweave dependencies
-- Client workflows use Node.js 16.14.2 and npm 9.2.0
-- Install client dependencies with `npm install`; the `--legacy-peer-deps`
-  contract is carried automatically via `client/.npmrc`
+- Client workflows support Node.js 16.14.2/npm 9.2.0 and Node.js 20/npm 10;
+  use Node 20/npm 10 for repo-wide work
+- Install client dependencies with plain `npm install`; strict peer resolution
+  is the normal install contract
 - Typical start command:
 
 ```bash
 cd client
-nvm use 16
+nvm use 20
 npm install
 npm run dev
 ```
