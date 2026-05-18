@@ -124,6 +124,9 @@ function setupSourceRepo() {
 
     writeFile(sourceDir, 'public.txt', 'public one\npublic two\n');
     writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');
+    writeFile(sourceDir, '.env.e2e', 'E2E_SECRET=value\n');
+    writeFile(sourceDir, '.env.e2e.local', 'E2E_LOCAL_SECRET=value\n');
+    writeFile(sourceDir, '.env.e2e.example', 'E2E_AI_MOCK=1\n');
     writeFile(sourceDir, 'private-pack.manifest.json', '{"generated":"local-only"}\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review-snapshot.js'), 'temp review snapshot\n');
     writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '456_private-mixed-roadmap.md'), 'private mixed roadmap\n');
@@ -267,6 +270,9 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.doesNotMatch(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
+    assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
+    assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.local$/m);
+    assert.match(trackedPaths, /^\.env\.e2e\.example$/m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
 
     const publicFile = git(sourceDir, ['show', 'release-staging:public.txt']);
@@ -387,6 +393,9 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assert.doesNotMatch(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.doesNotMatch(trackedPaths, /^\.tmp-review\//m);
     assert.doesNotMatch(trackedPaths, /^\.secrets\.baseline$/m);
+    assert.doesNotMatch(trackedPaths, /^\.env\.e2e$/m);
+    assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.local$/m);
+    assert.match(trackedPaths, /^\.env\.e2e\.example$/m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
   });
 });
