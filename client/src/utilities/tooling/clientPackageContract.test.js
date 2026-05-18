@@ -66,11 +66,16 @@ describe('client package modernization contract', () => {
   it('keeps Vite output and entry wiring canonical', () => {
     const viteConfig = readClientFile('vite.config.mjs');
     const viteIndex = readClientFile('index.html');
+    const contractSourceLoader = readClientFile('src/components/ContractPage/contractSourceLoader.ts');
 
     expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
     expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build-vite')");
+    expect(viteConfig).not.toContain('ce-raw-loader-compatibility');
+    expect(viteConfig).not.toContain('!!raw-loader!');
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.js');
+    expect(contractSourceLoader).toContain('.sol?raw');
+    expect(contractSourceLoader).not.toContain('!!raw-loader!');
   });
 
   it('keeps Vite vendor chunk policy explicit', () => {
