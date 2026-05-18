@@ -1,5 +1,5 @@
 /** @file LoginAndSettingsModal.tsx */
-import React, { Component } from "react";
+import React, { Component, Suspense } from "react";
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { ethers } from 'ethers';
@@ -41,7 +41,6 @@ import MetaMaskLogo from "assets/img/metamask_icon_white.png";
 // Reactstrap components
 import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from "reactstrap";
 
-import UserPage from "components/UserPage/UserPage";
 import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import {
@@ -106,6 +105,7 @@ import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainBy
 import { createLogger } from 'utilities/logging.js';
 
 const accountLog = createLogger('account');
+const AccountUserPage = React.lazy(() => import("components/UserPage/UserPage"));
 
 type LoginAndSettingsRecord = Record<string, any>;
 
@@ -2820,13 +2820,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             <div className={styles.accountModalBody}>
               {this.props.account && (
                 <div className={styles.accountModalProfileShell}>
-                  <UserPage
-                    viewAddress={this.props.account}
-                    account={this.props.account}
-                    provider={this.props.provider}
-                    minimized={true}
-                    network={this.props.network}
-                  />
+                  <Suspense fallback={null}>
+                    <AccountUserPage
+                      viewAddress={this.props.account}
+                      account={this.props.account}
+                      provider={this.props.provider}
+                      minimized={true}
+                      network={this.props.network}
+                    />
+                  </Suspense>
                 </div>
               )}
               <div className={styles.accountModalControls}>
