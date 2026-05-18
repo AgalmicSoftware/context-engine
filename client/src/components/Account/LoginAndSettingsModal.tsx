@@ -938,24 +938,34 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             blockExplorerUrls: [tn.blockExplorers?.default?.url].filter(Boolean)
           }]
         });
+        return true;
       } catch (error) {
         accountLog.error("Error adding network:", error);
+        return false;
       }
     }
+    return false;
   };
 
   switchToCorrectNetwork: any = async () => {
     if (window.ethereum && this.props.provider === "wagmi") {
+      const tn = this.getTargetNetwork();
+      const chainIdHex = chainHexId(tn);
+      const switchToTargetNetwork = () => window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: chainIdHex }],
+      });
       try {
-        const tn = this.getTargetNetwork();
-        const chainIdHex = chainHexId(tn);
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: chainIdHex }],
-        });
+        await switchToTargetNetwork();
       } catch (error: any) {
         if (getErrorCode(error) === 4902) {
-          await this.addCorrectNetwork();
+          const added = await this.addCorrectNetwork();
+          if (!added) return;
+          try {
+            await switchToTargetNetwork();
+          } catch (switchAfterAddError) {
+            accountLog.error("Error switching network after adding network:", switchAfterAddError);
+          }
         } else {
           accountLog.error("Error switching network:", error);
         }
