@@ -59,8 +59,6 @@ const LazyPileViewMode = React.lazy(() => (
 ));
 const SurveyResults = React.lazy(() => import('./SurveyResults'));
 
-const SurveyResults = React.lazy(() => import('./SurveyResults'));
-
 type SurveyToolRecord = Record<string, unknown>;
 type SurveyToolQuestionDataRecord = SurveyToolRecord & {
   creator?: unknown;

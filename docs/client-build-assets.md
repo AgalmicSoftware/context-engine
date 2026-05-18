@@ -11,8 +11,7 @@ near-term action is lazy-loading or intentional replacement, not deletion.
 
 | Build output | Size | Source / owner | Current use | Safe next action |
 | --- | ---: | --- | --- | --- |
-| `build/assets/index-52bf1ede.js` | 1,067.87 KB | app shell bundle | Main React entry and shared app shell code | Continue route-boundary splitting; no single obvious mechanical split remains. |
-| `build/assets/SurveyTool-c5f17d7d.js` | 621.08 KB | SurveyTool route bundle | Survey/question answering runtime | Results modal split out; remaining splits need narrower review of survey/question runtime boundaries. |
+| `build/assets/index-d2c14822.js` | 1,067.40 KB | app shell bundle | Main React entry and shared app shell code | Only remaining JS warning; further splits need bootstrap, wallet, contract, Arweave, or cache boundary review. |
 | `build/assets/ce_circuit_logo-41136bba.png` | 1,883.03 KB | `client/src/assets/img/ce_circuit_logo.png` | SBT pages and tests | Keep; replacement/compression needs visual review. |
 | `build/assets/magnifying_glass-faf43812.png` | 1,396.30 KB | `client/src/assets/img/magnifying_glass.png` | ToolExplorer visuals | Keep; candidate for future lazy media loading. |
 | `build/assets/explainer_first-5c5b7870.png` | 1,363.02 KB | `client/src/assets/img/explainer_first.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
