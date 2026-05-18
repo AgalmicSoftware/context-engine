@@ -422,6 +422,59 @@ describe('CommunityTab helpers', () => {
     openSpy.mockRestore();
   });
 
+  it('renders community internal routes under the configured PUBLIC_URL base path', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce';
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    try {
+      const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+      instance.state = {
+        ...instance.state,
+        modalType: 'surveys',
+        surveysList: [
+          { id: '0xabc', title: 'Survey A', responsesCount: 2, questionsCount: 3, slug: 'test-10' },
+        ],
+      };
+
+      const surveysTree = instance.renderModalContent();
+      const [surveyAnchor] = collectTreeNodes(
+        surveysTree,
+        (node) => node?.type === 'a' && typeof node?.props?.href === 'string'
+      );
+      expect(surveyAnchor.props.href).toBe('/ce/survey/0xabc?session=test-10');
+
+      const [responseSpan] = collectTreeNodes(
+        surveysTree,
+        (node) => node?.type === 'span' && typeof node?.props?.onClick === 'function'
+      );
+      responseSpan.props.onClick();
+      expect(openSpy).toHaveBeenNthCalledWith(1, '/ce/survey/0xabc/results?session=test-10', '_blank');
+
+      instance.state = {
+        ...instance.state,
+        modalType: 'questions',
+      };
+      const questionsTree = instance.renderModalContent();
+      const [questionsAnchor] = collectTreeNodes(
+        questionsTree,
+        (node) => node?.type === 'a' && typeof node?.props?.href === 'string'
+      );
+      expect(questionsAnchor.props.href).toBe('/ce/questions');
+
+      instance.handleUserClick({ username: '0xabc' });
+      instance.handleUserClick({ username: 'ada' });
+      expect(openSpy).toHaveBeenNthCalledWith(2, '/ce/u/0xabc', '_blank');
+      expect(openSpy).toHaveBeenNthCalledWith(3, '/ce/su/ada', '_blank');
+    } finally {
+      openSpy.mockRestore();
+      if (previousPublicUrl === undefined) {
+        delete process.env.PUBLIC_URL;
+      } else {
+        process.env.PUBLIC_URL = previousPublicUrl;
+      }
+    }
+  });
+
   it('renders a beeswarm preview alongside the full questions link in modal content', () => {
     const instance = new CommunityTab({ activeSessionSlug: 'edge' });
     instance.state = {

@@ -27,6 +27,7 @@ import { createLogger } from 'utilities/logging.js';
 import { peekCacheSync, readCache, subscribeCacheUpdates, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { computeQuestionDivisiveness } from '../../utilities/survey/polisMath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import {
@@ -1313,9 +1314,9 @@ class CommunityTab extends Component<any, any> {
 
   handleUserClick: any = (user: any) => {
     if (user.username.startsWith('0x')) {
-      window.open(`/u/${user.username}`, '_blank');
+      window.open(buildPublicRoute(`/u/${user.username}`), '_blank');
     } else {
-      window.open(`/su/${user.username}`, '_blank');
+      window.open(buildPublicRoute(`/su/${user.username}`), '_blank');
     }
   }
 
@@ -1823,7 +1824,7 @@ class CommunityTab extends Component<any, any> {
       <div className={styles.questionsModalContent}>
         <div className={styles.questionsModalTopBar}>
           <a
-            href="/questions"
+            href={buildPublicRoute('/questions')}
             className={styles.questionsModalLink}
           >
             View Full Questions
@@ -1947,7 +1948,7 @@ class CommunityTab extends Component<any, any> {
                     <div
                       key={index}
                       className={styles.userItem}
-                      onClick={() => window.open(`/u/${address}`, '_blank')}
+                      onClick={() => window.open(buildPublicRoute(`/u/${address}`), '_blank')}
                     >
                       {blockieUrl ? (
                         <img
@@ -1977,7 +1978,7 @@ class CommunityTab extends Component<any, any> {
               return (
                 <div key={index} className={styles.surveyItem}>
                 <a
-                  href={`/survey/${survey.id}${sessionQuery}`}
+                  href={buildPublicRoute(`/survey/${survey.id}${sessionQuery}`)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={styles.surveyLink}
@@ -1989,7 +1990,7 @@ class CommunityTab extends Component<any, any> {
                 </span>
                 <span
                   className={styles.responsesCount}
-                  onClick={() => window.open(`/survey/${survey.id}/results${sessionQuery}`, '_blank')} // Link to results page
+                  onClick={() => window.open(buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`), '_blank')} // Link to results page
                   style={{ cursor: 'pointer' }} // Add pointer cursor
                 >
                   Responses: {survey.responsesCount}
