@@ -241,15 +241,8 @@ const manualChunkGroups = [
   {
     name: 'vendor-polyfills',
     patterns: [
-      '/node_modules/assert/',
       '/node_modules/buffer/',
-      '/node_modules/crypto-browserify/',
-      '/node_modules/https-browserify/',
-      '/node_modules/os-browserify/',
       '/node_modules/process/',
-      '/node_modules/stream-browserify/',
-      '/node_modules/stream-http/',
-      '/node_modules/url/',
     ],
   },
 ];
