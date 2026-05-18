@@ -30,7 +30,7 @@ Worker, Arweave, and on-chain E2E flows may also require a funded test wallet, a
 ## Running Tests
 
 - Root CI-equivalent test flow: `npm test`
-- Client-only tests (no Foundry required): `cd client && CI=1 npm test -- --watchAll=false`
+- Client-only tests (no Foundry required): `cd client && npm test -- --watchAll=false`
 - Contract tests: `forge test`
 - Gate E2E smoke: `npm run ai:test-gates:any-all`
 - Gated decrypt E2E: `npm run ai:test-gated-decrypt:all-types`
@@ -50,12 +50,11 @@ Before opening a PR, run the smallest relevant test set for your change. `npm te
 
 ## Commits
 
-- Automated changes should use the `autocoder:` prefix.
-- Manual commits should use clear conventional messages.
+- Use concise conventional commit messages such as `fix: guard empty response payload` or `docs: clarify client tooling`.
 
 ## Code Style
 
-- Use JavaScript and React; do not introduce TypeScript as part of routine contribution work.
+- This is a mixed JavaScript and TypeScript React repo. Prefer the existing local style, use TypeScript for typed boundaries when it reduces risk, and avoid churn-only conversions.
 - Follow the existing SCSS module pattern for component styling.
 - Use `data-testid="ce-<area>-<control>"` for new stable UI hooks.
 

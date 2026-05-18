@@ -454,9 +454,9 @@ export default defineConfig(({ mode }) => {
       headers,
     },
     css: {
-      // The legacy PostCSS config runs PurgeCSS. CRA does not use it for local
-      // dev, but Vite does, which strips CSS Module selectors before the app
-      // can reference their generated class names.
+      // The legacy PostCSS config runs PurgeCSS. Vite loads it during dev/build,
+      // which strips CSS Module selectors before the app can reference their
+      // generated class names.
       postcss: { plugins: [] },
       preprocessorOptions: {
         scss: {

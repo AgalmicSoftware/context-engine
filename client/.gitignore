@@ -17,7 +17,6 @@
 
 # misc
 .DS_Store
-# trying to use the below to fix build issue with react-scripts/webpack: https://stackoverflow.com/questions/56528222/npm-start-returns-error-there-might-be-a-problem-with-the-project-dependency
 # env
 .env
 .env.local
