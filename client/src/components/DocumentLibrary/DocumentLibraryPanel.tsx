@@ -572,6 +572,8 @@ export default function DocumentLibraryPanel({
   const [file, setFile] = useState<File | null>(null);
   const [urlInput, setUrlInput] = useState('');
   const [urlTitle, setUrlTitle] = useState('');
+  const [fileUploadPending, setFileUploadPending] = useState(false);
+  const [urlUploadPending, setUrlUploadPending] = useState(false);
 
   // Track whether the user has manually changed encryption defaults; if they have,
   // don't auto-reset when gates/config load asynchronously.
@@ -616,18 +618,28 @@ export default function DocumentLibraryPanel({
   activeUrlInputRef.current = urlInput;
   const activeUrlTitleRef = useRef(urlTitle);
   activeUrlTitleRef.current = urlTitle;
+  const fileUploadInFlightRef = useRef(false);
+  const urlUploadInFlightRef = useRef(false);
+  const fileUploadAttemptSeqRef = useRef(0);
+  const urlUploadAttemptSeqRef = useRef(0);
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
     listRequestSeqRef.current += 1;
+    fileUploadAttemptSeqRef.current += 1;
+    urlUploadAttemptSeqRef.current += 1;
     activeListQueryKeyRef.current = '__unmounted__';
     activeViewerContextKeyRef.current = '__unmounted__';
     activeUploadContextKeyRef.current = '__unmounted__';
     loadingRef.current = false;
+    fileUploadInFlightRef.current = false;
+    urlUploadInFlightRef.current = false;
   }, []);
 
   useEffect(() => {
     viewerRequestSeqRef.current += 1;
+    fileUploadAttemptSeqRef.current += 1;
+    urlUploadAttemptSeqRef.current += 1;
     setViewerOpen(false);
     setViewerLoading(false);
     setViewerError('');
@@ -635,6 +647,10 @@ export default function DocumentLibraryPanel({
     setViewerText('');
     setViewerBlobUrl('');
     setViewerMime('');
+    fileUploadInFlightRef.current = false;
+    urlUploadInFlightRef.current = false;
+    setFileUploadPending(false);
+    setUrlUploadPending(false);
   }, [viewerContextKey]);
 
   useEffect(() => {
@@ -1150,6 +1166,7 @@ export default function DocumentLibraryPanel({
   ]);
 
   const uploadFile = useCallback(async () => {
+    if (fileUploadInFlightRef.current) return;
     if (!isUploadableDocProvider) return;
     if (!file) return;
     if (!loginComplete && typeof toggleLoginModal === 'function') {
@@ -1183,9 +1200,13 @@ export default function DocumentLibraryPanel({
     }
 
     const uploadContextKey = activeUploadContextKeyRef.current;
+    const uploadAttemptSeq = (fileUploadAttemptSeqRef.current += 1);
     const submittedFile = file;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+    const isCurrentUploadAttemptSeq = () => fileUploadAttemptSeqRef.current === uploadAttemptSeq;
     const isCurrentUploadAttempt = () => isCurrentUploadContext() && activeFileRef.current === submittedFile;
+    fileUploadInFlightRef.current = true;
+    setFileUploadPending(true);
 
     try {
       if (!locked) {
@@ -1260,6 +1281,11 @@ export default function DocumentLibraryPanel({
       if (isCurrentUploadAttempt()) {
         setError(getErrorMessage(err, 'Upload failed.'));
       }
+    } finally {
+      if (isCurrentUploadAttemptSeq() && isCurrentUploadContext()) {
+        fileUploadInFlightRef.current = false;
+        setFileUploadPending(false);
+      }
     }
   }, [
     docProvider,
@@ -1283,6 +1309,7 @@ export default function DocumentLibraryPanel({
   ]);
 
   const uploadUrlRecord = useCallback(async () => {
+    if (urlUploadInFlightRef.current) return;
     if (!isUploadableDocProvider) return;
     const url = toStr(urlInput).trim();
     if (!url) return;
@@ -1336,14 +1363,18 @@ export default function DocumentLibraryPanel({
     }
 
     const uploadContextKey = activeUploadContextKeyRef.current;
+    const uploadAttemptSeq = (urlUploadAttemptSeqRef.current += 1);
     const submittedUrlInput = urlInput;
     const submittedUrlTitle = urlTitle;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+    const isCurrentUploadAttemptSeq = () => urlUploadAttemptSeqRef.current === uploadAttemptSeq;
     const isCurrentUrlUploadAttempt = () => (
       isCurrentUploadContext() &&
       activeUrlInputRef.current === submittedUrlInput &&
       activeUrlTitleRef.current === submittedUrlTitle
     );
+    urlUploadInFlightRef.current = true;
+    setUrlUploadPending(true);
 
     try {
       if (!locked) {
@@ -1426,6 +1457,11 @@ export default function DocumentLibraryPanel({
       if (isCurrentUrlUploadAttempt()) {
         setError(getErrorMessage(err, 'Upload failed.'));
       }
+    } finally {
+      if (isCurrentUploadAttemptSeq() && isCurrentUploadContext()) {
+        urlUploadInFlightRef.current = false;
+        setUrlUploadPending(false);
+      }
     }
   }, [
     docProvider,
@@ -1498,11 +1534,13 @@ export default function DocumentLibraryPanel({
           file={file}
           onFileChange={setFile}
           onUploadFile={uploadFile}
+          fileUploadPending={fileUploadPending}
           urlInput={urlInput}
           onUrlInputChange={setUrlInput}
           urlTitle={urlTitle}
           onUrlTitleChange={setUrlTitle}
           onUploadUrlRecord={uploadUrlRecord}
+          urlUploadPending={urlUploadPending}
           isUploadableDocProvider={isUploadableDocProvider}
           requiresLitDocumentStorage={requiresLitDocumentStorage}
           locked={locked}
