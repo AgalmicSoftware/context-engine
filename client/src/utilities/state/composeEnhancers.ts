@@ -1,7 +1,7 @@
 import { compose } from 'redux';
+import type { StoreEnhancer } from 'redux';
 
-type GenericComposable = (...args: any[]) => any;
-type ComposeLike = (...enhancers: GenericComposable[]) => GenericComposable;
+type ComposeLike = (...enhancers: StoreEnhancer[]) => StoreEnhancer;
 
 declare global {
   interface Window {
@@ -15,11 +15,11 @@ const isDevToolsEnabled = (): boolean => (
   typeof window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ === 'function'
 );
 
-export const composeWithOptionalDevTools = (...enhancers: GenericComposable[]): GenericComposable => {
+export const composeWithOptionalDevTools = (...enhancers: StoreEnhancer[]): StoreEnhancer => {
   const composeEnhancer = isDevToolsEnabled()
     ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
-    : compose;
-  return (composeEnhancer as ComposeLike)(...enhancers);
+    : (compose as unknown as ComposeLike);
+  return composeEnhancer(...enhancers);
 };
 
 export default composeWithOptionalDevTools;
