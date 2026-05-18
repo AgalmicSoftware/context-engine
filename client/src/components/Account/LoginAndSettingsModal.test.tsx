@@ -395,8 +395,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('persists wagmi disconnect intent even when wagmi disconnect throws', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const disconnectError = new Error('disconnect failed');
     const wagmiDisconnect = jest.fn(() => {
-      throw new Error('disconnect failed');
+      throw disconnectError;
     });
     const props = buildProps({
       provider: 'wagmi',
@@ -404,16 +406,25 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     });
     const subject = new LoginAndSettingsModalSubject(props);
 
-    await expect(subject.handleLogout()).resolves.toBeUndefined();
-    expect(wagmiDisconnect).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
-    expect(props.updateLoginInfo).toHaveBeenCalledWith({
-      loginInProgress: false,
-      loginComplete: false,
-      provider: null,
-    });
-    expect(props.changeAccount).toHaveBeenCalledWith({});
-    expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+    try {
+      await expect(subject.handleLogout()).resolves.toBeUndefined();
+      expect(wagmiDisconnect).toHaveBeenCalledTimes(1);
+      expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
+      expect(props.updateLoginInfo).toHaveBeenCalledWith({
+        loginInProgress: false,
+        loginComplete: false,
+        provider: null,
+      });
+      expect(props.changeAccount).toHaveBeenCalledWith({});
+      expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[account]',
+        'wagmiDisconnect failed:',
+        disconnectError
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('does not set wagmi disconnect flag when logging out Porto passkey', async () => {
@@ -595,6 +606,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('stores visible faucet error state for manual settings requests', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const error = new Error('Failed to request test ETH: Token missing faucet scope.');
     (error as any).status = 403;
     mockedContractScripts.sendTestnetFunds.mockRejectedValueOnce(error);
@@ -607,12 +619,21 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       wagmiBalance: { data: { value: 0n } },
     })));
 
-    await subject.handleManualTestFundsRequest();
+    try {
+      await subject.handleManualTestFundsRequest();
 
-    expect(subject.state.sentTxHash).toBe('');
-    expect(subject.state.testFundsStatusTone).toBe('error');
-    expect(subject.state.testFundsStatusMessage).toContain('Get test gas failed');
-    expect(subject.state.testFundsStatusMessage).toContain('Token missing faucet scope.');
+      expect(subject.state.sentTxHash).toBe('');
+      expect(subject.state.testFundsStatusTone).toBe('error');
+      expect(subject.state.testFundsStatusMessage).toContain('Get test gas failed');
+      expect(subject.state.testFundsStatusMessage).toContain('Token missing faucet scope.');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[account]',
+        'Manual testnet funds request failed:',
+        error
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('ignores stale manual faucet responses after the active session changes', async () => {
