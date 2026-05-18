@@ -1,5 +1,8 @@
 import { SurveySelector } from './SurveySelector';
-import { normalizeSurveyToolFilterState } from './surveyToolUtils.js';
+import {
+  normalizeSurveyToolFilterState,
+  serializeSurveyToolFilterState,
+} from './surveyToolUtils.js';
 import ConnectedSurveyResults from './SurveyResults';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -249,6 +252,100 @@ describe('SurveySelector', () => {
 
       expect(subject.setState).toHaveBeenCalledTimes(1);
       expect((subject.setState as jest.Mock).mock.calls[0][0]).toEqual({ showLongLoading: false });
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('preserves session query params and hash when applying a SurveySelector filter', () => {
+    const priorUrl = window.location.href;
+    window.history.replaceState(
+      {},
+      '',
+      '/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&view=list#question-list'
+    );
+    try {
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: {},
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        questionsCacheNonce: 4,
+      });
+      subject.fetchSurveys = jest.fn();
+      subject.computeFilteredQuestionCount = jest.fn();
+      subject.state = {
+        ...subject.state,
+        filterState: {},
+        showLongLoading: false,
+        loading: false,
+      };
+      subject._filterStateSig = '';
+      syncClassSetState(subject);
+
+      const nextFilterState = normalizeSurveyToolFilterState({ questionTypes: ['rating'] });
+      subject.handleFilteredQuestionsWithState([], nextFilterState);
+
+      const params = new URLSearchParams(window.location.search);
+      expect(window.location.pathname).toBe('/questions');
+      expect(params.get('session')).toBe('edge');
+      expect(params.get('sessionSlug')).toBe('alias');
+      expect(params.get('sessionId')).toBe('0xabc');
+      expect(params.get('sid')).toBe('short');
+      expect(params.get('chainId')).toBe('84532');
+      expect(params.get('view')).toBe('list');
+      expect(params.get('filter')).toBe(serializeSurveyToolFilterState(nextFilterState));
+      expect(window.location.hash).toBe('#question-list');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('removes only the filter query param when clearing a SurveySelector filter', () => {
+    const priorUrl = window.location.href;
+    const activeFilterState = normalizeSurveyToolFilterState({ questionTypes: ['rating'] });
+    const activeFilter = serializeSurveyToolFilterState(activeFilterState);
+    window.history.replaceState(
+      {},
+      '',
+      `/questions?session=edge&sessionSlug=alias&sessionId=0xabc&sid=short&chainId=84532&filter=${activeFilter}#question-list`
+    );
+    try {
+      const subject = new SurveySelector({
+        autoOpenResults: false,
+        filterState: activeFilterState,
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+        singleQuestionMode: false,
+        network: { id: 84532 },
+        activeSessionSlug: 'edge',
+        questionsCacheNonce: 4,
+      });
+      subject.fetchSurveys = jest.fn();
+      subject.computeFilteredQuestionCount = jest.fn();
+      subject.state = {
+        ...subject.state,
+        filterState: activeFilterState,
+        showLongLoading: false,
+        loading: false,
+      };
+      subject._filterStateSig = activeFilter;
+      syncClassSetState(subject);
+
+      subject.handleFilteredQuestionsWithState([], {});
+
+      const params = new URLSearchParams(window.location.search);
+      expect(window.location.pathname).toBe('/questions');
+      expect(params.get('session')).toBe('edge');
+      expect(params.get('sessionSlug')).toBe('alias');
+      expect(params.get('sessionId')).toBe('0xabc');
+      expect(params.get('sid')).toBe('short');
+      expect(params.get('chainId')).toBe('84532');
+      expect(params.has('filter')).toBe(false);
+      expect(window.location.hash).toBe('#question-list');
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
