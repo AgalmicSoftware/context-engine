@@ -4,9 +4,8 @@ Context Engine testing spans the root repo, the React client, and the E2E workfl
 
 ## Runtime Requirements
 
-- Root scripts and CI-style test runs use Node.js 20+
-- Client workflows support Node.js 16.14.2/npm 9.2.0 and Node.js 20/npm 10;
-  use Node 20/npm 10 for repo-wide test work
+- Root scripts, CI-style test runs, and client workflows use Node.js
+  `^20.19.0` or `>=22.12.0` with npm `^10.0.0`
 - Install client dependencies with plain `npm install`; strict peer resolution
   is the normal install contract
 - Contract and local-chain test flows require Foundry (`forge` / `anvil`)
@@ -34,7 +33,7 @@ npm run lint
 ```
 
 Use the client workflow when you are working only in `client/` and do not need the full root test gate.
-The client test runner is standalone Jest configured by `client/jest.config.cjs`.
+The client test runner is standalone Jest 30 configured by `client/jest.config.cjs`.
 Babel-Jest uses explicit Babel presets, and jsdom setup lives under
 `client/scripts/jest/`.
 

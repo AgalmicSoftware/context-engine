@@ -20,7 +20,7 @@ The local React dev server runs with:
 
 `cd client && npm run dev`
 
-Repo-level scripts and CI target Node 20 because the root test flow uses Node's built-in test runner. The client package supports Node 16.14.2/npm 9 and Node 20/npm 10; contributors should use the project default unless they are intentionally doing client-only compatibility work. Client installs are expected to pass with npm's normal strict peer resolution.
+Repo-level scripts, CI, and the client package target Node `^20.19.0` or `>=22.12.0` with npm `^10.0.0`; Node 16/npm 9 are no longer supported for client work. Client installs are expected to pass with npm's normal strict peer resolution.
 Install Foundry as well if you plan to run the root test gate (`npm test`), since it includes Solidity suites via `forge test`. Setup instructions live in [docs/local-chain.md](docs/local-chain.md).
 
 If you need public client environment overrides, use [`client/.env.example`](client/.env.example). Root-level script and E2E variables are documented in [`.env.example`](.env.example).
@@ -30,7 +30,7 @@ Worker, Arweave, and on-chain E2E flows may also require a funded test wallet, a
 ## Running Tests
 
 - Root CI-equivalent test flow: `npm test`
-- Client-only tests (no Foundry required): `cd client && npm test -- --watchAll=false`
+- Client-only tests (no Foundry required): `cd client && npm test -- --watchAll=false` (Jest 30)
 - Contract tests: `forge test`
 - Gate E2E smoke: `npm run ai:test-gates:any-all`
 - Gated decrypt E2E: `npm run ai:test-gated-decrypt:all-types`

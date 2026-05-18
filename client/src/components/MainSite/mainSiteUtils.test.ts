@@ -1,17 +1,3 @@
-import { emitForcedLog } from 'utilities/logging.js';
-import {
-  readBoolishDebugFlag,
-  isForcedSbtSelectorDebugEnabled,
-  emitMainSiteSbtDebug,
-  buildMainSiteCacheManagerReadyStatePatch,
-  buildMainSiteLitHooksStatePatch,
-  isRouteResponderAddress,
-  hasCoreSbtMetadata,
-  isMainSitePerfCountersEnabled,
-  bumpMainSitePerfCounter,
-  getMainSitePerfNow,
-} from './mainSiteUtils';
-
 jest.mock('utilities/logging.js', () => {
   const mockLogger = {
     log: jest.fn(),
@@ -26,7 +12,7 @@ jest.mock('utilities/logging.js', () => {
     createLogger: jest.fn(() => mockLogger),
     emitForcedLog: jest.fn(),
   };
-}, { virtual: true });
+});
 
 jest.mock('ethers', () => ({
   __esModule: true,
@@ -35,7 +21,7 @@ jest.mock('ethers', () => ({
       AddressZero: '0x0000000000000000000000000000000000000000',
     },
   },
-}), { virtual: true });
+}));
 
 type MainSiteTestGlobals = typeof globalThis & {
   CE_SBT_SELECTOR_DEBUG?: unknown;
@@ -54,7 +40,21 @@ const loggingModule = jest.requireMock('utilities/logging.js') as {
     warn: jest.Mock;
     error: jest.Mock;
   };
+  emitForcedLog: jest.Mock;
 };
+const { emitForcedLog } = loggingModule;
+const {
+  readBoolishDebugFlag,
+  isForcedSbtSelectorDebugEnabled,
+  emitMainSiteSbtDebug,
+  buildMainSiteCacheManagerReadyStatePatch,
+  buildMainSiteLitHooksStatePatch,
+  isRouteResponderAddress,
+  hasCoreSbtMetadata,
+  isMainSitePerfCountersEnabled,
+  bumpMainSitePerfCounter,
+  getMainSitePerfNow,
+} = require('./mainSiteUtils') as typeof import('./mainSiteUtils');
 
 const clearMainSiteTestState = (): void => {
   delete globals.CE_SBT_SELECTOR_DEBUG;
