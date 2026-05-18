@@ -163,7 +163,6 @@ describe('client package modernization contract', () => {
       'babel-jest',
       'eslint',
       'eslint-plugin-import',
-      'eslint-plugin-prettier',
       'eslint-plugin-react',
       'eslint-plugin-react-hooks',
       'sass',
@@ -176,6 +175,17 @@ describe('client package modernization contract', () => {
       expect(pkg.dependencies[name]).toBeUndefined();
       expect(pkg.devDependencies[name]).toBeDefined();
     });
+  });
+
+  it('keeps disabled Prettier lint plugin wiring out of the ESLint contract', () => {
+    const pkg = readClientPackageJson();
+    const eslintConfig = JSON.parse(readClientFile('.eslintrc.json'));
+
+    expect(pkg.devDependencies['eslint-plugin-prettier']).toBeUndefined();
+    expect(eslintConfig.plugins).toContain('import');
+    expect(eslintConfig.plugins).toContain('react-hooks');
+    expect(eslintConfig.plugins).not.toContain('prettier');
+    expect(eslintConfig.rules['prettier/prettier']).toBeUndefined();
   });
 
   it('keeps stale webpack and CRA packages out of the client package contract', () => {
