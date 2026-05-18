@@ -46,6 +46,7 @@ module.exports = {
     '^.+\\.(css|sass|scss)$': 'identity-obj-proxy',
     '^.+\\.(bmp|gif|jpg|jpeg|png|svg|webp|avif|ico|mp4|webm|wav|mp3|m4a|aac|oga|txt|html)$':
       '<rootDir>/scripts/jest/fileMock.js',
+    '^.+\\.sol\\?raw$': '<rootDir>/scripts/jest/fileMock.js',
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^(utilities/.+)\\.js$': '$1',
     '^node:os$': '<rootDir>/src/shims/node-os.js',
