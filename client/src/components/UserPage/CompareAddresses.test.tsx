@@ -3,6 +3,7 @@ import {
   buildCompareSbtImageMap,
   buildCompareSbtKeySets,
   buildCompareClassName,
+  buildCompareProfileHref,
   buildNicknameByAddressMap,
   readDgObjectValues,
   resolveCompareAddressBlockieStyle,
@@ -61,6 +62,21 @@ describe('CompareAddresses cache scan helpers', () => {
       { cloneValues: false }
     );
     expect(result).toEqual([{ a: 1 }, { b: 2 }]);
+  });
+
+  it('builds compare profile links under the configured PUBLIC_URL base path', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce';
+    try {
+      expect(buildCompareProfileHref('0xabc')).toBe('/ce/u/0xabc');
+      expect(buildCompareProfileHref('')).toBe('');
+    } finally {
+      if (previousPublicUrl === undefined) {
+        delete process.env.PUBLIC_URL;
+      } else {
+        process.env.PUBLIC_URL = previousPublicUrl;
+      }
+    }
   });
 
   it('builds nickname maps from already-hydrated bookmarks state', () => {
