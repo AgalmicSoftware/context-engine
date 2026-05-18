@@ -34,6 +34,7 @@ import {
   hasSbtListMissingOrEmptySessionSlug,
   hasSbtListOwn,
   isSbtListManagedDgCacheName,
+  isSbtListHelperRecord,
   isModifiedSbtListPointerNavigation,
   isSbtListSessionIdLikeSlug,
   isSbtListSyntheticNoSessionSlug,
@@ -69,6 +70,16 @@ import {
   SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
   sortSbtListSlugsByUniverseOrder,
 } from './sbtListHelpers';
+import type {
+  BuildSbtListDisplayCardModelOptions,
+  BuildSbtListFeaturedCardModelOptions,
+  SbtListHelperItem,
+} from './sbtListHelpers';
+
+type SbtListHelperTestItem = SbtListHelperItem & {
+  locked?: boolean;
+  slug?: string;
+};
 
 describe('sbtListHelpers', () => {
   it('detects session id shaped slugs before list display', () => {
@@ -719,11 +730,15 @@ describe('sbtListHelpers', () => {
   });
 
   it('builds display card models with explicit address handling', () => {
-    const baseOptions = {
-      getDescriptionText: (sbtInfo: any) => sbtInfo.description || '',
-      getDisplayName: (sbtInfo: any) => sbtInfo.name,
-      isPasswordLocked: (sbt: any) => sbt.locked,
-      resolveSbtSessionSlug: (sbt: any) => sbt.slug,
+    const baseOptions: BuildSbtListDisplayCardModelOptions<SbtListHelperTestItem> = {
+      getDescriptionText: (sbtInfo) => (
+        isSbtListHelperRecord(sbtInfo) ? String(sbtInfo.description || '') : ''
+      ),
+      getDisplayName: (sbtInfo) => (
+        isSbtListHelperRecord(sbtInfo) ? sbtInfo.name : ''
+      ),
+      isPasswordLocked: (sbt) => sbt.locked,
+      resolveSbtSessionSlug: (sbt) => sbt.slug,
       sbt: {
         locked: true,
         sbtAddress: ' 0xABC ',
@@ -803,17 +818,21 @@ describe('sbtListHelpers', () => {
   });
 
   it('builds featured card models from display state', () => {
-    expect(buildSbtListFeaturedCardModel({
+    const featuredOptions: BuildSbtListFeaturedCardModelOptions<SbtListHelperTestItem> = {
       expandedSbtAddresses: new Set(['0xabc']),
       fallbackLabel: 'Credential',
-      getDisplayName: (sbtInfo: any) => sbtInfo?.name,
-      resolveSbtSessionSlug: (sbt: any) => sbt.slug,
+      getDisplayName: (sbtInfo) => (
+        isSbtListHelperRecord(sbtInfo) ? sbtInfo.name : ''
+      ),
+      resolveSbtSessionSlug: (sbt) => sbt.slug,
       sbt: {
         sbtAddress: ' 0xABC ',
         sbtInfo: { name: '' },
         slug: 'alpha',
       },
-    })).toEqual({
+    };
+
+    expect(buildSbtListFeaturedCardModel(featuredOptions)).toEqual({
       detailsId: 'featured-sbt-details-0xabc',
       isExpanded: true,
       linkLabel: '0xABC',
