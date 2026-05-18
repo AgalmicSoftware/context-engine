@@ -1,10 +1,11 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+'use strict';
 
-const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const assert = require('node:assert/strict');
+const test = require('node:test');
+const { readFileSync } = require('node:fs');
+const { resolve } = require('node:path');
+
+const rootDir = resolve(__dirname, '..');
 
 const readJson = (relativePath) => JSON.parse(readFileSync(resolve(rootDir, relativePath), 'utf8'));
 
