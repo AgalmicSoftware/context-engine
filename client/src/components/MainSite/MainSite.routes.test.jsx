@@ -1,8 +1,9 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MainSite, mainSiteDispatchActions } from './MainSite';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
+import { initCacheManager } from '../../utilities/cache/cacheScripts.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -294,6 +295,12 @@ jest.mock('../../utilities/arweave/arweaveUrls.js', () => ({
   normalizeArweaveUrl: jest.fn((value = '') => String(value || '').trim()),
 }));
 
+jest.mock('../../utilities/cache/cacheScripts.js', () => ({
+  __esModule: true,
+  initCacheManager: jest.fn(() => Promise.resolve()),
+  subscribeCacheUpdates: jest.fn(() => jest.fn()),
+}));
+
 jest.mock('../../utilities/web3/sessionRegistry.js', () => {
   const readCache = () => {
     try {
@@ -406,6 +413,16 @@ const syncSessionRegistryStoreMocks = () => {
   });
 };
 
+const createDeferred = () => {
+  let resolve;
+  let reject;
+  const promise = new Promise((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+  return { promise, resolve, reject };
+};
+
 const createSubject = ({
   path = '/',
   search = '',
@@ -505,6 +522,7 @@ describe('MainSite route render smoke', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    initCacheManager.mockResolvedValue(undefined);
     getSessionConfigBySlug.mockImplementation(() => null);
     normalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
     localStorage.clear();
@@ -521,6 +539,7 @@ describe('MainSite route render smoke', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    initCacheManager.mockResolvedValue(undefined);
     getSessionConfigBySlug.mockImplementation(() => null);
     normalizeSessionSlug.mockImplementation((value = '') => String(value || '').trim().toLowerCase());
     localStorage.clear();
@@ -593,6 +612,55 @@ describe('MainSite route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
+  });
+
+  it('does not restore the mount session after navigating during cache initialization', async () => {
+    const deferredCacheInit = createDeferred();
+    initCacheManager.mockReturnValueOnce(deferredCacheInit.promise);
+    const props = buildProps({
+      path: '/session/edge',
+      sessionState: {
+        primarySessionSlug: 'edge',
+        primarySessionExplicit: true,
+      },
+    });
+    setRoute('/session/edge');
+    const subject = new MainSite(props);
+    subject.setState = jest.fn((next) => {
+      const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+      subject.state = { ...subject.state, ...(patch || {}) };
+      return patch;
+    });
+    subject.applySessionFallbackRedirect = jest.fn(() => null);
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+    subject.manageAutoHashPersistence = jest.fn();
+    subject.getDisplaySessionChainId = jest.fn(() => DEFAULT_NETWORK.id);
+    subject.getDisplaySessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.resolveSessionPathSlug = jest.fn();
+    subject.syncLitHooks = jest.fn();
+    subject.refreshSessionInfo = jest.fn();
+    subject.refreshSessionMetaFields = jest.fn();
+    subject.refreshGroupCredentials = jest.fn();
+    subject.hasPersistedManagedCacheData = jest.fn(async () => false);
+    subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
+    subject.getSessionNetwork = jest.fn(() => null);
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.checkAllCachesReady = jest.fn();
+    subject.handleDeepLinkScan = jest.fn();
+
+    const mountPromise = subject.componentDidMount();
+    await Promise.resolve();
+
+    setRoute('/session/alpha');
+    await act(async () => {
+      deferredCacheInit.resolve();
+      await mountPromise;
+    });
+
+    expect(props.changeActiveSessionSlug).not.toHaveBeenCalledWith('edge');
+    expect(props.changeActiveSessionSlug).not.toHaveBeenCalled();
   });
 
   it('redirects a general route to the first list-scoped session once and consumes the redirect', async () => {
@@ -757,6 +825,16 @@ describe('MainSite route render smoke', () => {
     expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
     expect(screen.getByText(/not part of the supported public surface/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
+  });
+
+  it.each(['/sessionevil', '/sessions'])('renders a clean 404 for invalid session prefix %s', async (path) => {
+    const subject = createSubject({ path });
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).not.toBeInTheDocument();
+    expect(mockOnePageSession).not.toHaveBeenCalled();
   });
 
   it.each(['/compare', '/compare/'])('renders the compare route root for %s', async (path) => {

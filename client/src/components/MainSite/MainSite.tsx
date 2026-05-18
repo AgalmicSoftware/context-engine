@@ -3727,6 +3727,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     const mountFallbackTarget = this.applySessionFallbackRedirect({ pathIn: mountPathRaw });
     this.syncSessionFallbackRedirectConsumption({ pathIn: mountPathRaw });
     const currentPath = this.getEffectiveRoutePath(mountPathRaw);
+    const mountSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';
 
     // Handle auto-hash persistence (restore)
     this.manageAutoHashPersistence();
@@ -3755,9 +3756,15 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     }
 
     // Determine active group from URL and persist locally in state
+    const postInitPathRaw = this.getCurrentPathname();
+    const postInitPath = this.getEffectiveRoutePath(postInitPathRaw);
     const currentSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';
-    const slug = this.getBootstrapActiveSessionSlug(currentPath, currentSearch);
-    this.props.changeActiveSessionSlug(slug);
+    const routeChangedDuringCacheInit = postInitPath !== currentPath || currentSearch !== mountSearch;
+    const bootstrapPath = routeChangedDuringCacheInit ? postInitPath : currentPath;
+    const slug = this.getBootstrapActiveSessionSlug(bootstrapPath, currentSearch);
+    if (!routeChangedDuringCacheInit) {
+      this.props.changeActiveSessionSlug(slug);
+    }
     if (slug && !this.getDisplaySessionChainId(slug)) {
       this.resolveSessionPathSlug(slug);
     }
@@ -3855,7 +3862,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     mainSiteLog.log("this.props.urlExtension:", this.props.urlExtension);
 
     // Prioritize user load (deep search) if on a user profile
-    const targetUser = this.getUserAddressFromPath(currentPath);
+    const targetUser = this.getUserAddressFromPath(bootstrapPath);
     if (targetUser) {
       mainSiteLog.log(`[MainSite] User Profile detected (${targetUser}). Prioritizing Deep Search.`);
       // Best effort: warm active-chain registry cache without adding another blocking wait.
@@ -6459,7 +6466,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     if (fullPath === "/telegram-demo-setup" || fullPath === "/telegram-demo-setup/") {
       return this._renderTelegramDemoSetupRoute(ctx);
     }
-    if (fullPath.startsWith("/session")) {
+    if (firstPathSegment === "session") {
       return this._renderSessionRoute(ctx);
     }
     return <NotFoundRoute path={fullPath} />;
