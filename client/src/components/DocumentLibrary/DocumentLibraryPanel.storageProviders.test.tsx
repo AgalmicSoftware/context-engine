@@ -1,5 +1,6 @@
 import {
   React,
+  act,
   fireEvent,
   render,
   screen,
@@ -277,7 +278,11 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
       target: { files: [file] },
     });
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({

@@ -602,18 +602,28 @@ export default function DocumentLibraryPanel({
   activeUrlInputRef.current = urlInput;
   const activeUrlTitleRef = useRef(urlTitle);
   activeUrlTitleRef.current = urlTitle;
+  const fileUploadInFlightRef = useRef(false);
+  const urlUploadInFlightRef = useRef(false);
+  const fileUploadAttemptSeqRef = useRef(0);
+  const urlUploadAttemptSeqRef = useRef(0);
 
   useEffect(() => () => {
     viewerRequestSeqRef.current += 1;
     listRequestSeqRef.current += 1;
+    fileUploadAttemptSeqRef.current += 1;
+    urlUploadAttemptSeqRef.current += 1;
     activeListQueryKeyRef.current = '__unmounted__';
     activeViewerContextKeyRef.current = '__unmounted__';
     activeUploadContextKeyRef.current = '__unmounted__';
     loadingRef.current = false;
+    fileUploadInFlightRef.current = false;
+    urlUploadInFlightRef.current = false;
   }, []);
 
   useEffect(() => {
     viewerRequestSeqRef.current += 1;
+    fileUploadAttemptSeqRef.current += 1;
+    urlUploadAttemptSeqRef.current += 1;
     setViewerOpen(false);
     setViewerLoading(false);
     setViewerError('');
@@ -621,6 +631,10 @@ export default function DocumentLibraryPanel({
     setViewerText('');
     setViewerBlobUrl('');
     setViewerMime('');
+    fileUploadInFlightRef.current = false;
+    urlUploadInFlightRef.current = false;
+    setFileUploadPending(false);
+    setUrlUploadPending(false);
   }, [viewerContextKey]);
 
   useEffect(() => {
@@ -1170,9 +1184,13 @@ export default function DocumentLibraryPanel({
     }
 
     const uploadContextKey = activeUploadContextKeyRef.current;
+    const uploadAttemptSeq = (fileUploadAttemptSeqRef.current += 1);
     const submittedFile = file;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+    const isCurrentUploadAttemptSeq = () => fileUploadAttemptSeqRef.current === uploadAttemptSeq;
     const isCurrentUploadAttempt = () => isCurrentUploadContext() && activeFileRef.current === submittedFile;
+    fileUploadInFlightRef.current = true;
+    setFileUploadPending(true);
 
     try {
       if (!locked) {
@@ -1246,6 +1264,11 @@ export default function DocumentLibraryPanel({
     } catch (err) {
       if (isCurrentUploadAttempt()) {
         setError(getErrorMessage(err, 'Upload failed.'));
+      }
+    } finally {
+      if (isCurrentUploadAttemptSeq() && isCurrentUploadContext()) {
+        fileUploadInFlightRef.current = false;
+        setFileUploadPending(false);
       }
     }
   }, [
@@ -1324,14 +1347,18 @@ export default function DocumentLibraryPanel({
     }
 
     const uploadContextKey = activeUploadContextKeyRef.current;
+    const uploadAttemptSeq = (urlUploadAttemptSeqRef.current += 1);
     const submittedUrlInput = urlInput;
     const submittedUrlTitle = urlTitle;
     const isCurrentUploadContext = () => activeUploadContextKeyRef.current === uploadContextKey;
+    const isCurrentUploadAttemptSeq = () => urlUploadAttemptSeqRef.current === uploadAttemptSeq;
     const isCurrentUrlUploadAttempt = () => (
       isCurrentUploadContext() &&
       activeUrlInputRef.current === submittedUrlInput &&
       activeUrlTitleRef.current === submittedUrlTitle
     );
+    urlUploadInFlightRef.current = true;
+    setUrlUploadPending(true);
 
     try {
       if (!locked) {
@@ -1414,6 +1441,11 @@ export default function DocumentLibraryPanel({
       if (isCurrentUrlUploadAttempt()) {
         setError(getErrorMessage(err, 'Upload failed.'));
       }
+    } finally {
+      if (isCurrentUploadAttemptSeq() && isCurrentUploadContext()) {
+        urlUploadInFlightRef.current = false;
+        setUrlUploadPending(false);
+      }
     }
   }, [
     docProvider,
@@ -1486,11 +1518,13 @@ export default function DocumentLibraryPanel({
           file={file}
           onFileChange={setFile}
           onUploadFile={uploadFile}
+          fileUploadPending={fileUploadPending}
           urlInput={urlInput}
           onUrlInputChange={setUrlInput}
           urlTitle={urlTitle}
           onUrlTitleChange={setUrlTitle}
           onUploadUrlRecord={uploadUrlRecord}
+          urlUploadPending={urlUploadPending}
           isUploadableDocProvider={isUploadableDocProvider}
           requiresLitDocumentStorage={requiresLitDocumentStorage}
           locked={locked}
