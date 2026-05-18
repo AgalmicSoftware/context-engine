@@ -124,9 +124,11 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.getSessionNetworkId = () => 84532;
     instance.getMetadataLookupConfig = () => ({ slug: 'edge', networkChainId: 84532 });
     instance.resolveSbtLabel = jest.fn(() => 'Resolved Name');
+    const cacheReadError = new Error('cache read failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     instance.readSbtCacheBySlug = jest.fn()
       .mockResolvedValueOnce(cachedValue)
-      .mockRejectedValueOnce(new Error('cache read failed'))
+      .mockRejectedValueOnce(cacheReadError)
       .mockResolvedValueOnce(cachedValue);
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
@@ -141,7 +143,13 @@ describe('SBTSelector discovery lifecycle', () => {
 
       await instance.loadSBTOptions();
       expect(instance.readSbtCacheBySlug).toHaveBeenCalledTimes(3);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[sbt]',
+        'SBTSelector option load failed:',
+        cacheReadError
+      );
     } finally {
+      consoleErrorSpy.mockRestore();
       groupListsSpy.mockRestore();
     }
   });
