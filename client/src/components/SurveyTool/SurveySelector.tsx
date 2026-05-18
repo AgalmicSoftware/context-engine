@@ -32,8 +32,7 @@ import styles from './SurveyTool.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faCog, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faBullhorn, faRobot } from '@fortawesome/free-solid-svg-icons';
 
-import AudioInput from '../Shared/AudioInput/AudioInput.jsx';
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
+import AudioInput from '../Shared/AudioInput/AudioInput';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
@@ -266,7 +265,6 @@ export const SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE: React.CSSProperties = 
 };
 
 export const LazyCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
-export const LazySurveyResults = React.lazy(() => import('./SurveyResults'));
 
 export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
   isFilterActive
@@ -1585,17 +1583,19 @@ export class SurveySelector extends Component<any, any> {
 
         {/* Create survey */}
         {createSurveyMode && (
-          <CreateQuestionsAndSurveys
-            {...this.props}
-            toggleLoginModal={this.props.toggleLoginModal}
-            expanded={createSurveyMode}
-            surveys={surveys}
-            surveyIndex={selectedSurveyIndex}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            sessionConfig={sessionConfig}
-            sessionName={this.props.sessionName}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Question Authoring..." minHeight="160px" />}>
+            <LazyCreateQuestionsAndSurveys
+              {...this.props}
+              toggleLoginModal={this.props.toggleLoginModal}
+              expanded={createSurveyMode}
+              surveys={surveys}
+              surveyIndex={selectedSurveyIndex}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              sessionConfig={sessionConfig}
+              sessionName={this.props.sessionName}
+            />
+          </React.Suspense>
         )}
 
         {/* Survey / questions views */}

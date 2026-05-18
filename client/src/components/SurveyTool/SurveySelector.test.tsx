@@ -1,4 +1,4 @@
-import { SurveySelector } from './SurveySelector';
+import { LazyCreateQuestionsAndSurveys, SurveySelector } from './SurveySelector';
 import {
   normalizeSurveyToolFilterState,
   serializeSurveyToolFilterState,
