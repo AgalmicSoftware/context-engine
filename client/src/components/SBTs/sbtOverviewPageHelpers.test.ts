@@ -105,7 +105,7 @@ describe('sbtOverviewPageHelpers', () => {
           },
         },
       },
-      getDisplayName: (info) => (info as any).name,
+      getDisplayName: (info) => (isSBTsPageRecord(info) ? info.name : ''),
       getShortAddress: (address) => `short:${address}`,
       index: 3,
       nowSeconds: 100,
