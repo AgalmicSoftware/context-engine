@@ -162,6 +162,32 @@ const manualChunkGroups = [
     ],
   },
   {
+    name: 'vendor-crypto-zk-poseidon-low',
+    patterns: [
+      '/node_modules/poseidon-lite/constants/1.js',
+      '/node_modules/poseidon-lite/constants/2.js',
+      '/node_modules/poseidon-lite/constants/3.js',
+      '/node_modules/poseidon-lite/constants/4.js',
+      '/node_modules/poseidon-lite/constants/5.js',
+      '/node_modules/poseidon-lite/constants/6.js',
+      '/node_modules/poseidon-lite/constants/7.js',
+      '/node_modules/poseidon-lite/constants/8.js',
+    ],
+  },
+  {
+    name: 'vendor-crypto-zk-poseidon-high',
+    patterns: [
+      '/node_modules/poseidon-lite/constants/9.js',
+      '/node_modules/poseidon-lite/constants/10.js',
+      '/node_modules/poseidon-lite/constants/11.js',
+      '/node_modules/poseidon-lite/constants/12.js',
+      '/node_modules/poseidon-lite/constants/13.js',
+      '/node_modules/poseidon-lite/constants/14.js',
+      '/node_modules/poseidon-lite/constants/15.js',
+      '/node_modules/poseidon-lite/constants/16.js',
+    ],
+  },
+  {
     name: 'vendor-crypto-zk',
     patterns: [
       '/node_modules/poseidon-lite/',
