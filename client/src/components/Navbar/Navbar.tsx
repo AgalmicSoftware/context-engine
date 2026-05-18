@@ -130,14 +130,22 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
         ? AnimatedLogoPingPong
         : AnimatedLogo;
     const logoSrc = this.state.showAnimatedLogo ? animatedLogoSrc : StaticLogo;
+    const logoHref = getConfiguredBaseUrl();
     const legacyFluidImgProp = { fluid: "true" } as Record<string, string>;
 
   const beforeLogin = (
     <>
         <div id={styles.navbarContainer}>
           <div id={styles.navbarLogoCol}>
-            <img id={styles.mainLogo} src={logoSrc} {...legacyFluidImgProp} alt="logo" onClick={this.logoClicked}>
-            </img>
+            <a
+              href={logoHref}
+              className={styles.logoHomeLink}
+              aria-label="Context Engine home"
+              onClick={this.handleLogoLinkClick}
+            >
+              <img id={styles.mainLogo} src={logoSrc} {...legacyFluidImgProp} alt="" aria-hidden="true">
+              </img>
+            </a>
           </div>
           <div id={styles.accountSection}>
               <AccountSection
@@ -156,7 +164,14 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
     <>
         <div id={styles.navbarContainerLoggedIn}>
             <div id={styles.navbarLogoColLoggedIn}>
-              <img id={styles.mainLogoLoggedIn} src={logoSrc} {...legacyFluidImgProp} alt="ce_logo" onClick={this.logoClicked}></img>
+              <a
+                href={logoHref}
+                className={styles.logoHomeLink}
+                aria-label="Context Engine home"
+                onClick={this.handleLogoLinkClick}
+              >
+                <img id={styles.mainLogoLoggedIn} src={logoSrc} {...legacyFluidImgProp} alt="" aria-hidden="true"></img>
+              </a>
             </div>
             <div id={styles.accountSectionLoggedIn}>
               <AccountSection
