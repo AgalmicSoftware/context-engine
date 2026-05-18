@@ -364,8 +364,10 @@ describe('SurveyResults bookmark cache writes', () => {
 
   it('does not mutate live bookmarkedFilters cache when filter write fails', async () => {
     const liveCache = { bookmarkedFilters: ['existing-filter'] };
+    const writeError = new Error('write failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue(liveCache);
-    jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(new Error('write failed'));
+    jest.spyOn(cacheScripts, 'writeCache').mockRejectedValue(writeError);
 
     const subject = createSubject({
       activeSessionSlug: 'edge',
@@ -377,9 +379,18 @@ describe('SurveyResults bookmark cache writes', () => {
       filterState: { types: ['radio'] },
     };
 
-    await subject.handleBookmarkFilter();
+    try {
+      await subject.handleBookmarkFilter();
 
-    expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
+      expect(liveCache.bookmarkedFilters).toEqual(['existing-filter']);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[surveys]',
+        'Error saving bookmarked filters cache:',
+        writeError
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
 

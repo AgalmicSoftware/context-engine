@@ -638,13 +638,16 @@ describe('contractScripts user profile metadata wrappers', () => {
   it('keeps strict and soft getResponse calls isolated in in-flight coalescing', async () => {
     const address = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const groupCfg = makeProfileGroupCfg('edge', 1000);
+    const strictError = new Error('strict call failed');
+    const softError = new Error('soft call failed');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     let rejectSoft = null;
     const softRpcCall = new Promise((_, reject) => {
       rejectSoft = reject;
     });
     const contractGetResponse = jest.fn()
       .mockImplementationOnce(() => softRpcCall)
-      .mockRejectedValueOnce(new Error('strict call failed'));
+      .mockRejectedValueOnce(strictError);
 
     jest.spyOn(ethers, 'Contract').mockImplementation(() => ({
       getResponse: contractGetResponse,
@@ -666,11 +669,25 @@ describe('contractScripts user profile metadata wrappers', () => {
       { throwOnError: true }
     );
 
-    rejectSoft(new Error('soft call failed'));
+    rejectSoft(softError);
 
-    await expect(softPromise).resolves.toBeNull();
-    await expect(strictPromise).rejects.toThrow('strict call failed');
-    expect(contractGetResponse).toHaveBeenCalledTimes(2);
+    try {
+      await expect(softPromise).resolves.toBeNull();
+      await expect(strictPromise).rejects.toThrow('strict call failed');
+      expect(contractGetResponse).toHaveBeenCalledTimes(2);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[contracts]',
+        'Error fetching or parsing response:',
+        strictError
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[contracts]',
+        'Error fetching or parsing response:',
+        softError
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('uses _resolvedCfg when getResponse is called with an unresolved group reference', async () => {
