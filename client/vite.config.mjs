@@ -81,17 +81,27 @@ const manualChunkGroups = [
     ],
   },
   {
-    name: 'vendor-wallet',
+    name: 'vendor-ethers',
     patterns: [
       '/node_modules/@ethersproject/',
-      '/node_modules/@metamask/',
-      '/node_modules/@noble/',
-      '/node_modules/@rainbow-me/',
-      '/node_modules/@wagmi/',
-      '/node_modules/@walletconnect/',
       '/node_modules/ethers/',
+    ],
+  },
+  {
+    name: 'vendor-wallet-core',
+    patterns: [
+      '/node_modules/@noble/',
+      '/node_modules/@wagmi/',
       '/node_modules/viem/',
       '/node_modules/wagmi/',
+    ],
+  },
+  {
+    name: 'vendor-wallet-connectors',
+    patterns: [
+      '/node_modules/@metamask/',
+      '/node_modules/@rainbow-me/',
+      '/node_modules/@walletconnect/',
     ],
   },
   {
@@ -140,7 +150,7 @@ const manualChunkGroups = [
     ],
   },
   {
-    name: 'vendor-crypto',
+    name: 'vendor-crypto-core',
     patterns: [
       '/node_modules/aes-js/',
       '/node_modules/bech32/',
@@ -148,16 +158,31 @@ const manualChunkGroups = [
       '/node_modules/crypto-js/',
       '/node_modules/hash.js/',
       '/node_modules/js-sha3/',
-      '/node_modules/poseidon-lite/',
       '/node_modules/scrypt-js/',
     ],
   },
   {
-    name: 'vendor-media',
+    name: 'vendor-crypto-zk',
+    patterns: [
+      '/node_modules/poseidon-lite/',
+    ],
+  },
+  {
+    name: 'vendor-media-canvas-export',
+    patterns: [
+      '/node_modules/html2canvas/',
+    ],
+  },
+  {
+    name: 'vendor-media-pdf',
+    patterns: [
+      '/node_modules/jspdf/',
+    ],
+  },
+  {
+    name: 'vendor-media-audio',
     patterns: [
       '/node_modules/hark/',
-      '/node_modules/html2canvas/',
-      '/node_modules/jspdf/',
       '/node_modules/recordrtc/',
     ],
   },
