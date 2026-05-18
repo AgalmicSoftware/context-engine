@@ -75,8 +75,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -104,8 +103,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     subject.isMaskedPromptText = jest.fn(() => false);
@@ -198,8 +196,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     syncClassSetState(subject);
@@ -367,8 +364,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     syncClassSetState(subject);
@@ -423,8 +419,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     subject.isMaskedPromptText = jest.fn(() => false);
@@ -464,8 +459,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     subject.isMaskedPromptText = jest.fn(() => false);
@@ -519,8 +513,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     subject.isMaskedPromptText = jest.fn(() => false);
@@ -574,8 +567,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     subject.isMaskedPromptText = jest.fn(() => false);
@@ -623,8 +615,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onViewAllClick: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     subject.renderActiveQuestion = jest.fn(() => null);
@@ -699,8 +690,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.getPendingEditStats = jest.fn(() => ({ total: 7, encrypted: 2 }));
     subject.state = {
@@ -731,8 +721,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onViewAllClick: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     subject.renderActiveQuestion = jest.fn(() => null);
@@ -788,8 +777,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onViewAllClick: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const visibleList = [{ id: 'q1', type: 'freeform', prompt: 'Q1' }];
 
     subject.renderActiveQuestion = jest.fn(() => null);
@@ -849,8 +837,7 @@ describe('SurveyPileViewMode runtime surface', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,

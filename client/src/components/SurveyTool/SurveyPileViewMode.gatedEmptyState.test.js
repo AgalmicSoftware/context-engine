@@ -1,4 +1,5 @@
 import SurveyTool from './SurveyTool';
+import { PileViewMode } from './SurveyPileViewMode';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -70,8 +71,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -163,8 +163,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -224,8 +223,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -289,8 +287,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -382,8 +379,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
