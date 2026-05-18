@@ -231,6 +231,7 @@ import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildExplorerAddressUrl } from '../../variables/chains.js';
 import { ethers } from 'ethers';
@@ -3169,7 +3170,7 @@ class UserPage extends Component<any, any> {
   }
 
   openFullPage = (): void => {
-    window.open(`/u/${this.props.viewAddress}`);
+    window.open(buildPublicRoute(`/u/${this.props.viewAddress}`));
   }
 
   handleUsernameChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -3810,10 +3811,13 @@ class UserPage extends Component<any, any> {
       stateViewAddress: this.state.viewAddress,
       username,
     });
+    const renderedAddressHref = String(addressHref || '').startsWith('/')
+      ? buildPublicRoute(String(addressHref || ''))
+      : addressHref;
     const addressDisplay = shouldLinkAddressLabel
       ? (
         <a
-          href={addressHref}
+          href={renderedAddressHref}
           {...(!minimized ? {
             target: '_blank',
             rel: 'noopener noreferrer',
@@ -4116,7 +4120,7 @@ class UserPage extends Component<any, any> {
               {/* My Bookmarks Link (Owner Only) - Moved here from headerActionsRight */}
               {headerActionVisibility.showBookmarksLink && (
                 <a
-                  href="/bookmarks"
+                  href={buildPublicRoute('/bookmarks')}
                   className={bookmarksLinkDisplayState.className}
                   style={bookmarksLinkDisplayState.style}
                 >
@@ -4338,7 +4342,7 @@ class UserPage extends Component<any, any> {
                                     }
                                     surveyUrlParams.set('responder', String(propViewAddress));
                                     window.open(
-                                      `/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`,
+                                      buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`),
                                       '_blank',
                                       'noopener,noreferrer'
                                     );
@@ -4480,7 +4484,7 @@ class UserPage extends Component<any, any> {
                               style={surveyCreatedPreviewDisplayState.style}
                             >
                               <a
-                                href={`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(surveyLinkSlug)}` : ''}`}
+                                href={buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(surveyLinkSlug)}` : ''}`)}
                                 target='_blank'
                                 rel='noopener noreferrer'
                                 className={styles.surveyTitleLink}
@@ -4882,7 +4886,7 @@ class UserPage extends Component<any, any> {
             {fullProfileModalDisplayState.shouldRenderModalActions && (
               <div className={styles.modalActions}>
                 {fullProfileModalDisplayState.shouldRenderBookmarksLink && (
-                  <a href="/bookmarks" className={styles.bookmarksLink}>
+                  <a href={buildPublicRoute('/bookmarks')} className={styles.bookmarksLink}>
                     My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
                   </a>
                 )}
