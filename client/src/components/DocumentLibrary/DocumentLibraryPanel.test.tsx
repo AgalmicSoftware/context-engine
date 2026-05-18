@@ -1,5 +1,6 @@
 import {
   React,
+  act,
   fireEvent,
   render,
   screen,
