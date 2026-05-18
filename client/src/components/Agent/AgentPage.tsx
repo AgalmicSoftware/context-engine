@@ -98,7 +98,18 @@ export default function AgentPage() {
         .filter(Boolean)
     : [];
 
-  const appendLog = (entry: Record<string, unknown> & { kind: string }) => {
+  const startAsyncAction = () => {
+    asyncActionSeqRef.current += 1;
+    return asyncActionSeqRef.current;
+  };
+
+  const canUpdateForSeq = (seq: number) => (
+    mountedRef.current && asyncActionSeqRef.current === seq
+  );
+
+  const appendLog = (entry: Record<string, unknown> & { kind: string }, seq?: number) => {
+    if (!mountedRef.current) return;
+    if (seq !== undefined && !canUpdateForSeq(seq)) return;
     setLogLines((prev) => [...prev, { at: new Date().toISOString(), ...entry }]);
   };
 
@@ -124,7 +135,7 @@ export default function AgentPage() {
       const result = await agentNow.run(actions);
       appendLog({ kind: 'run:result', result }, seq);
     } catch (e) {
-      appendLog({ kind: 'run:error', error: e instanceof Error ? e.message : String(e) });
+      appendLog({ kind: 'run:error', error: e instanceof Error ? e.message : String(e) }, seq);
     }
   };
 
@@ -148,7 +159,7 @@ export default function AgentPage() {
         setStepIdx((i) => i + 1);
       }
     } catch (e) {
-      appendLog({ kind: 'step:error', stepIdx, error: e instanceof Error ? e.message : String(e) });
+      appendLog({ kind: 'step:error', stepIdx, error: e instanceof Error ? e.message : String(e) }, seq);
     }
   };
 
