@@ -140,6 +140,13 @@ describe('client package modernization contract', () => {
     expect(jsdomPolyfills).toContain('process.env.PUBLIC_URL');
   });
 
+  it('keeps deprecated direct Babel proposal plugin wiring out of the client contract', () => {
+    const pkg = readClientPackageJson();
+
+    expect(pkg.devDependencies['@babel/plugin-proposal-private-property-in-object']).toBeUndefined();
+    expect(pkg.babel.plugins).toEqual(['@babel/plugin-syntax-import-meta']);
+  });
+
   it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
     [
       'src/components/DebateMap/DebateMap.tsx',
