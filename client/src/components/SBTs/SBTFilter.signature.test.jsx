@@ -446,6 +446,7 @@ describe('SBTFilter signature guards', () => {
   });
 
   it('reruns active filtering when network becomes available after a no-network pass', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     cacheScripts.peekCacheSync.mockImplementation((namespace) => {
       if (namespace !== 'sbtCache') return {};
       return {
@@ -475,19 +476,27 @@ describe('SBTFilter signature guards', () => {
       }
     );
 
-    await subject.runApplyFilter('no-network');
-    expect(onFilter).toHaveBeenCalledWith(['0xa', '0xb'], expect.any(Object));
+    try {
+      await subject.runApplyFilter('no-network');
+      expect(onFilter).toHaveBeenCalledWith(['0xa', '0xb'], expect.any(Object));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[sbt]',
+        'Network ID is undefined in SBTFilter. Cannot proceed.'
+      );
 
-    onFilter.mockClear();
-    subject.props = {
-      ...subject.props,
-      network: { id: 84532 },
-    };
+      onFilter.mockClear();
+      subject.props = {
+        ...subject.props,
+        network: { id: 84532 },
+      };
 
-    await subject.runApplyFilter('network-ready');
+      await subject.runApplyFilter('network-ready');
 
-    expect(onFilter).toHaveBeenCalledTimes(1);
-    expect(onFilter).toHaveBeenCalledWith(['0xa'], expect.any(Object));
+      expect(onFilter).toHaveBeenCalledTimes(1);
+      expect(onFilter).toHaveBeenCalledWith(['0xa'], expect.any(Object));
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('syncs external SBT filter state when payload mutates in place under a stable prop reference', () => {
