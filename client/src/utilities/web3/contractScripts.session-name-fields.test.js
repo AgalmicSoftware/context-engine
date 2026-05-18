@@ -40,4 +40,16 @@ describe('contractScripts session name normalization', () => {
     });
     expect(payload).not.toHaveProperty('groupName');
   });
+
+  it('injects canonical sessionSlug when provided by upload context', () => {
+    const payload = { sessionName: 'Demo Session' };
+
+    normalizeSessionNameFields(payload, '', { sessionSlug: ' Demo-Session_2 ' });
+
+    expect(payload).toEqual({
+      sessionName: 'Demo Session',
+      sessionSlug: 'Demo-Session_2',
+    });
+    expect(payload).not.toHaveProperty('groupName');
+  });
 });

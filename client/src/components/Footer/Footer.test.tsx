@@ -36,6 +36,28 @@ describe('Footer', () => {
     expect(newLink).toHaveTextContent('NEW');
   });
 
+  it('renders internal links under the configured PUBLIC_URL base path', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce';
+    try {
+      renderFooter();
+
+      expect(screen.getByRole('link', { name: 'NEW' })).toHaveAttribute('href', '/ce/new');
+      expect(screen.getByRole('link', { name: 'ABOUT' })).toHaveAttribute('href', '/ce/about');
+      expect(screen.getByRole('link', { name: 'CONTRACTS' })).toHaveAttribute('href', '/ce/contracts');
+      expect(screen.getByTestId('ce-footer-link-github')).toHaveAttribute(
+        'href',
+        'https://github.com/AgalmicSoftware/context-engine'
+      );
+    } finally {
+      if (previousPublicUrl === undefined) {
+        delete process.env.PUBLIC_URL;
+      } else {
+        process.env.PUBLIC_URL = previousPublicUrl;
+      }
+    }
+  });
+
   it('renders the CPAL attribution text with a separate GitHub icon link', () => {
     renderFooter();
 

@@ -250,6 +250,44 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(questionLock.querySelector(`.${gateLockStyles.dots}`)).toBeNull();
   });
 
+  it('keeps an explicit empty standalone question gate selection unlocked', () => {
+    const instance = makeInstance();
+    instance.resolveGateOptions = jest.fn(() => ({
+      gateMap: {
+        gate_1: { id: 'gate_1' },
+      },
+      gateOptions: [
+        { id: 'gate_1', label: 'Edge Alpha', badgeLabel: 'Edge Alpha', color: '#5affc2' },
+      ],
+      defaultGateId: 'gate_1',
+    }));
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      isStandaloneQuestion: true,
+      questions: [{
+        uiKey: 'q1',
+        id: 'q1',
+        type: 'freeform',
+        prompt: 'Question 1',
+        lockGateIds: [],
+        tags: [],
+        currentTagInputValue: '',
+        aiGeneratedTagsFromSource: [],
+        isGeneratingTags: false,
+      }],
+    };
+
+    const { container } = render(instance.render());
+    const questionLock = container.querySelector(`.${surveyStyles.questionHeaderActions}`) as HTMLElement | null;
+
+    expect(questionLock).not.toBeNull();
+    if (!questionLock) throw new Error('Expected question header lock to render');
+    const button = within(questionLock).getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON);
+    expect(button).toHaveAttribute('aria-label', expect.stringMatching(/^Choose /i));
+    expect(button.querySelector('svg')?.getAttribute('data-icon')).toBe('lock-open');
+  });
+
   it('opens an app-native clear confirmation instead of calling window.confirm', () => {
     const confirmSpy = jest.spyOn(window, 'confirm').mockImplementation(() => true);
     const instance = makeInstance();
@@ -413,6 +451,47 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     alertSpy.mockRestore();
   });
 
+  it('opens the login modal and clears stale submit errors before submit work', async () => {
+    const toggleLoginModal = jest.fn();
+    const instance = makeInstance({
+      loginComplete: false,
+      toggleLoginModal,
+    });
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+      title: 'Survey title',
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+      isSubmitting: true,
+      submissionError: 'stale submit error',
+      formValidationError: 'stale validation error',
+    };
+
+    await instance.createSurvey();
+
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(instance.state.isSubmitting).toBe(false);
+    expect(instance.state.submissionError).toBe('');
+    expect(instance.state.formValidationError).toBe('');
+  });
+
+  it('shows an inline login error when no login modal callback is available', async () => {
+    const instance = makeInstance({
+      loginComplete: false,
+    });
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: false,
+      title: 'Survey title',
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+      submissionError: '',
+    };
+
+    await instance.createSurvey();
+
+    expect(instance.state.submissionError).toBe('Log in to create this survey.');
+  });
+
   it('shows blank question prompt validation inline instead of calling window.alert', async () => {
     const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
     const instance = makeInstance({
@@ -433,6 +512,31 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     expect(instance.state.formValidationError).toBe('Question 1 prompt cannot be blank.');
 
     alertSpy.mockRestore();
+  });
+
+  it('opens the login modal instead of surfacing a submit error for valid unauthenticated drafts', async () => {
+    const toggleLoginModal = jest.fn();
+    const instance = makeInstance({
+      loginComplete: false,
+      toggleLoginModal,
+    });
+    instance.ensureResolvedSessionConfigForSubmit = jest.fn();
+    instance.state = {
+      ...instance.state,
+      isStandaloneQuestion: true,
+      questions: [{ uiKey: 'q1', id: 'q1', type: 'freeform', prompt: 'Question 1', tags: [] }],
+      submissionError: 'stale error',
+      formValidationError: 'stale validation',
+      isSubmitting: true,
+    };
+
+    await instance.createSurvey();
+
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
+    expect(instance.state.submissionError).toBe('');
+    expect(instance.state.formValidationError).toBe('');
+    expect(instance.state.isSubmitting).toBe(false);
   });
 
   it('renders form validation feedback with a stable test id', () => {

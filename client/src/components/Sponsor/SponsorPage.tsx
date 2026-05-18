@@ -56,6 +56,35 @@ const countSessionsForChain = (entries: any = [], chainId: any = null) => {
     return cfgChainId === chainId;
   }).length;
 };
+const stableCreateContextValue = (value: any, seen = new WeakSet<object>()): any => {
+  if (value == null) return value;
+  const valueType = typeof value;
+  if (valueType === 'bigint') return value.toString();
+  if (valueType !== 'object') return value;
+  if (seen.has(value)) return '[Circular]';
+  seen.add(value);
+  if (Array.isArray(value)) {
+    const result = value.map((entry) => stableCreateContextValue(entry, seen));
+    seen.delete(value);
+    return result;
+  }
+  const result = Object.keys(value).sort().reduce((acc: Record<string, any>, key) => {
+    const nextValue = value[key];
+    if (typeof nextValue !== 'function' && typeof nextValue !== 'undefined') {
+      acc[key] = stableCreateContextValue(nextValue, seen);
+    }
+    return acc;
+  }, {});
+  seen.delete(value);
+  return result;
+};
+const buildCreateConfigSignature = (sessionConfig: any = null) => {
+  try {
+    return JSON.stringify(stableCreateContextValue(sessionConfig || null));
+  } catch (_) {
+    return '';
+  }
+};
 const shortAddress = (addr: any) => {
   const value = toStr(addr).trim();
   if (!value) return '';
@@ -78,7 +107,7 @@ const normalizeExpiryToIso = (raw: any) => {
 };
 const SPONSOR_PAGE_CACHE_KEY = 'ce:sponsorPageDraft:v1';
 const SPONSOR_PAGE_CACHE_VERSION = 1;
-const DEV_PERSIST_SPONSOR_BUNDLE_FIELDS = process.env.NODE_ENV !== 'production';
+const DEFAULT_REMEMBER_SPONSOR_DRAFT = process.env.NODE_ENV !== 'production';
 const buildEmptyBundleForm = () => ({
   label: '',
   openaiKey: '',
@@ -102,9 +131,13 @@ const normalizeSponsorBundleForm = (raw: any = {}) => {
   });
   return next;
 };
+const normalizeSponsorBundleDraftForm = (raw: any = {}) => ({
+  ...buildEmptyBundleForm(),
+  label: toStr(raw?.label || '').trim(),
+});
 const readSponsorPageCache = () => {
   const fallback = {
-    persistBundleSecrets: DEV_PERSIST_SPONSOR_BUNDLE_FIELDS,
+    persistBundleDraft: DEFAULT_REMEMBER_SPONSOR_DRAFT,
     bundleForm: buildEmptyBundleForm(),
     expiresAt: null,
   };
@@ -112,14 +145,16 @@ const readSponsorPageCache = () => {
   try {
     const parsed = JSON.parse(window.localStorage.getItem(SPONSOR_PAGE_CACHE_KEY) || 'null');
     if (!parsed || Number(parsed.v || 0) !== SPONSOR_PAGE_CACHE_VERSION) return fallback;
-    const persistBundleSecrets = typeof parsed.persistBundleSecrets === 'boolean'
-      ? parsed.persistBundleSecrets
-      : fallback.persistBundleSecrets;
+    const persistBundleDraft = typeof parsed.persistBundleDraft === 'boolean'
+      ? parsed.persistBundleDraft
+      : typeof parsed.persistBundleSecrets === 'boolean'
+        ? parsed.persistBundleSecrets
+        : fallback.persistBundleDraft;
     const expiresAtRaw = toStr(parsed.expiresAt || '').trim();
     const expiresAt = expiresAtRaw ? new Date(expiresAtRaw) : null;
     return {
-      persistBundleSecrets,
-      bundleForm: persistBundleSecrets ? normalizeSponsorBundleForm(parsed.bundleForm) : buildEmptyBundleForm(),
+      persistBundleDraft,
+      bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(parsed.bundleForm) : buildEmptyBundleForm(),
       expiresAt: expiresAt instanceof Date && Number.isFinite(expiresAt.getTime()) ? expiresAt : null,
     };
   } catch (_) {
@@ -127,7 +162,7 @@ const readSponsorPageCache = () => {
   }
 };
 const writeSponsorPageCache = ({
-  persistBundleSecrets = DEV_PERSIST_SPONSOR_BUNDLE_FIELDS,
+  persistBundleDraft = DEFAULT_REMEMBER_SPONSOR_DRAFT,
   bundleForm = {},
   expiresAt = null,
 }: any = {}) => {
@@ -135,9 +170,10 @@ const writeSponsorPageCache = ({
   try {
     window.localStorage.setItem(SPONSOR_PAGE_CACHE_KEY, JSON.stringify({
       v: SPONSOR_PAGE_CACHE_VERSION,
-      persistBundleSecrets: !!persistBundleSecrets,
-      bundleForm: persistBundleSecrets ? normalizeSponsorBundleForm(bundleForm) : {},
-      expiresAt: persistBundleSecrets && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
+      persistBundleDraft: !!persistBundleDraft,
+      persistBundleSecrets: false,
+      bundleForm: persistBundleDraft ? normalizeSponsorBundleDraftForm(bundleForm) : {},
+      expiresAt: persistBundleDraft && expiresAt instanceof Date && Number.isFinite(expiresAt.getTime())
         ? expiresAt.toISOString()
         : '',
     }));
@@ -256,7 +292,7 @@ const SponsorPage = ({
   const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
   const [workerUrl, setWorkerUrl] = useState<any>('');
   const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
-  const [persistBundleSecrets, setPersistBundleSecrets] = useState<any>(initialCache.persistBundleSecrets);
+  const [persistBundleDraft, setPersistBundleDraft] = useState<any>(initialCache.persistBundleDraft);
   const [bundleForm, setBundleForm] = useState<any>(initialCache.bundleForm);
   const [expiresAt, setExpiresAt] = useState<any>(initialCache.expiresAt);
   const [createBusy, setCreateBusy] = useState<any>(false);
@@ -274,6 +310,7 @@ const SponsorPage = ({
   const requestedAutoRefreshKeyRef = useRef<any>('');
   const prevSelectedSlugRef = useRef<any>('');
   const workerUrlOverrideDirtyRef = useRef<any>(false);
+  const createRequestSeqRef = useRef(0);
   const requestedSessionRaw = toStr(initialSessionId).trim();
   const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
@@ -285,11 +322,11 @@ const SponsorPage = ({
 
   useEffect(() => {
     writeSponsorPageCache({
-      persistBundleSecrets,
+      persistBundleDraft,
       bundleForm,
       expiresAt,
     });
-  }, [persistBundleSecrets, bundleForm, expiresAt]);
+  }, [persistBundleDraft, bundleForm, expiresAt]);
 
   const syncSessionsFromRegistryCache = useCallback(({ isCancelled }: any = {}) => {
     const cached = sessionRegistryStore.getAllSessionEntries();
@@ -535,12 +572,40 @@ const SponsorPage = ({
   const normalizedEnteredWorkerUrl = useMemo(() => normalizeWorkerUrl(workerUrl), [workerUrl]);
   const hasManualWorkerUrlOverride = workerUrlOverrideDirty && !!normalizedEnteredWorkerUrl;
   const deploySponsoringWorkerUrl = normalizedEnteredWorkerUrl || selectedConfigWorkerUrl || '';
+  const accountLower = toStr(account || '').toLowerCase();
+  const selectedConfigCreateSignature = useMemo(
+    () => buildCreateConfigSignature(selectedConfig),
+    [selectedConfig]
+  );
+  const createContextKey = useMemo(() => [
+    normalizeSlug(selectedSlug),
+    accountLower,
+    String(relevantSessionChainId || ''),
+    deploySponsoringWorkerUrl,
+    selectedConfigCreateSignature,
+  ].join('|'), [
+    accountLower,
+    deploySponsoringWorkerUrl,
+    relevantSessionChainId,
+    selectedConfigCreateSignature,
+    selectedSlug,
+  ]);
+  const activeCreateContextKeyRef = useRef(createContextKey);
+  activeCreateContextKeyRef.current = createContextKey;
   const selectedSessionSupportsEmbeddedDeploy = useMemo(() => (
     selectedConfig?.embeddedDeployHelperEnabled !== false
   ), [selectedConfig]);
   const canCreateSponsoredUrl = !!selectedConfig && (
     selectedSessionHasUsableWorker || hasManualWorkerUrlOverride
   );
+
+  useEffect(() => {
+    createRequestSeqRef.current += 1;
+    setCreateBusy(false);
+    setCreateStatus('');
+    setShareUrl('');
+    setShareTxId('');
+  }, [createContextKey]);
 
   useEffect(() => {
     if (prevSelectedSlugRef.current === selectedSlug) return;
@@ -586,7 +651,6 @@ const SponsorPage = ({
     };
   }, [selectedConfig, selectedConfigWorkerUrl, selectedSlug]);
 
-  const accountLower = toStr(account || '').toLowerCase();
   const adminAddress = toStr(selectedConfig?.__registry?.adminAddress || selectedConfig?.adminAddress).toLowerCase();
   const hasRegistryEntry = !!selectedConfig?.__registry?.registryChainId || !!selectedConfig?.__registry?.adminAddress;
   // Sponsor uploads intentionally only support direct `adminAddress` sessions today.
@@ -644,6 +708,17 @@ const SponsorPage = ({
   }, [account, network?.id, provider, selectedConfig, selectedConfigWorkerUrl, selectedSlug, toggleLoginModal, workerUrl]);
 
   const handleCreateSponsoredUrl = useCallback(async () => {
+    const requestSeq = createRequestSeqRef.current + 1;
+    createRequestSeqRef.current = requestSeq;
+    const requestContextKey = activeCreateContextKeyRef.current;
+    const isCurrentCreateRequest = () => (
+      createRequestSeqRef.current === requestSeq &&
+      activeCreateContextKeyRef.current === requestContextKey
+    );
+    const setCreateStatusIfCurrent = (nextStatus: string) => {
+      if (isCurrentCreateRequest()) setCreateStatus(nextStatus);
+    };
+
     setCreateBusy(true);
     setCreateStatus('');
     setShareUrl('');
@@ -683,7 +758,7 @@ const SponsorPage = ({
       let faucetGrantToken = '';
       let resolvedGrantWorkerUrl = resolvedWorkerUrl;
       if (grantRequest.deploy || grantRequest.faucet) {
-        setCreateStatus('Issuing sponsored bootstrap grants…');
+        setCreateStatusIfCurrent('Issuing sponsored bootstrap grants…');
         const grantRequestBody = {
           sessionSlug: selectedSlug,
           grantRequest,
@@ -692,6 +767,7 @@ const SponsorPage = ({
           workerUrl: resolvedWorkerUrl,
           body: grantRequestBody,
         });
+        if (!isCurrentCreateRequest()) return;
         let grantResponse;
         try {
           grantResponse = await fetch(`${resolvedWorkerUrl}/admin/issue-sponsored-grants`, {
@@ -708,7 +784,9 @@ const SponsorPage = ({
             workerBase: resolvedWorkerUrl,
           }));
         }
+        if (!isCurrentCreateRequest()) return;
         const grantData = await grantResponse.json().catch(() => ({}));
+        if (!isCurrentCreateRequest()) return;
         if (!grantResponse.ok) {
           throw new Error(normalizeSponsorGrantErrorMessage({
             error: grantData?.error || `Failed to issue sponsored bootstrap grants (${grantResponse.status}).`,
@@ -754,9 +832,10 @@ const SponsorPage = ({
       }
 
       const secret = generateSponsoredBundleSecret();
-      setCreateStatus('Uploading sponsored bundle…');
+      setCreateStatusIfCurrent('Uploading sponsored bundle…');
 
       const adminAuth = await buildBootstrapUploadAuth({ workerUrl: resolvedWorkerUrl });
+      if (!isCurrentCreateRequest()) return;
       const result = await uploadSponsoredBundleUntyped({
         secret,
         label,
@@ -775,13 +854,16 @@ const SponsorPage = ({
         skipAuth: true,
         bundle: sponsoredBundlePayload,
       });
+      if (!isCurrentCreateRequest()) return;
       setShareUrl(result.url);
       setShareTxId(result.txId);
       setCreateStatus('Sponsored URL ready.');
     } catch (error) {
-      setCreateStatus(getErrorMessage(error, 'Failed to create sponsored URL.'));
+      if (isCurrentCreateRequest()) {
+        setCreateStatus(getErrorMessage(error, 'Failed to create sponsored URL.'));
+      }
     } finally {
-      setCreateBusy(false);
+      if (isCurrentCreateRequest()) setCreateBusy(false);
     }
   }, [
     account,
@@ -908,13 +990,13 @@ const SponsorPage = ({
               <Label className={styles.workerToggle}>
                 <Input
                   type="checkbox"
-                  checked={persistBundleSecrets}
-                  onChange={(e: any) => setPersistBundleSecrets(!!e.target.checked)}
+                  checked={persistBundleDraft}
+                  onChange={(e: any) => setPersistBundleDraft(!!e.target.checked)}
                 />
-                <span>Dev: keep secrets on refresh</span>
+                <span>Remember non-secret draft fields</span>
               </Label>
               <div className={styles.panelHint}>
-                Stores sponsor bundle fields in localStorage so repeated sponsor links do not require re-entry. Do not enable on shared machines.
+                Stores only non-secret metadata such as label and expiry in localStorage. API keys, private keys, tokens, JWKs, and RPC URLs are never restored.
               </div>
             </div>
           </div>

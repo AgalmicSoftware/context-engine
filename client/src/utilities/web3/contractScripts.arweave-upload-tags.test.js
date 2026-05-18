@@ -142,4 +142,36 @@ describe('contractScripts Arweave upload tags', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('forces direct Arweave upload when the effective key is explicitly local', async () => {
+    const cfg = {
+      slug: 'demo-session',
+      networkChainId: 84532,
+      contracts: {
+        surveys: {
+          address: surveyAddress,
+        },
+      },
+    };
+    const signer = ethers.Wallet.createRandom();
+
+    getEffectiveArweaveKey.mockResolvedValue({
+      arweaveJwk: '{"kty":"RSA"}',
+      source: 'local',
+    });
+
+    const result = await resolveArweaveUploadOpts(cfg, {
+      providerLike: 'wagmi',
+      signer,
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      arweaveJwk: '{"kty":"RSA"}',
+      sessionSlug: 'demo-session',
+      skipAuth: true,
+      forceDirectArweaveUpload: true,
+    }));
+    expect(result.adminAuth).toBeUndefined();
+    expect(getCorsProxyUrlOrThrow).not.toHaveBeenCalled();
+  });
 });

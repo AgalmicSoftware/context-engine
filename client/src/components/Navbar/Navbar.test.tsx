@@ -79,9 +79,36 @@ describe('Navbar logo navigation', () => {
     const navigate = jest.fn();
 
     renderNavbar({ navigate });
-    fireEvent.click(screen.getByAltText('logo'));
+    const homeLink = screen.getByRole('link', { name: 'Context Engine home' });
+
+    expect(homeLink).toHaveAttribute('href', '/ce-base');
+    fireEvent.click(homeLink);
 
     expect(navigate).toHaveBeenCalledWith('/ce-base');
+  });
+
+  it('exposes the logged-out logo as a keyboard-focusable home link', () => {
+    renderNavbar();
+    const homeLink = screen.getByRole('link', { name: 'Context Engine home' });
+
+    expect(homeLink).toHaveAttribute('href', '/ce-base');
+    homeLink.focus();
+    expect(homeLink).toHaveFocus();
+  });
+
+  it('exposes the logged-in logo as a keyboard-focusable home link', () => {
+    renderNavbar({
+      account: '0x1111111111111111111111111111111111111111',
+      provider: 'wagmi',
+      loginComplete: true,
+    }, {
+      sessionState: { loginComplete: true },
+    });
+    const homeLink = screen.getByRole('link', { name: 'Context Engine home' });
+
+    expect(homeLink).toHaveAttribute('href', '/ce-base');
+    homeLink.focus();
+    expect(homeLink).toHaveFocus();
   });
 
   it('falls back to location.assign with the configured base url', () => {

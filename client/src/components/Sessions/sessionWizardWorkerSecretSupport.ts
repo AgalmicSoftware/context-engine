@@ -102,6 +102,18 @@ export const sanitizeSessionWizardWorkerSecretsForLitMode = (
   return next;
 };
 
+export const resolveSessionWizardEnabledWorkerSecrets = ({
+  workerSecrets = {},
+  workerSecretsEnabled = true,
+}: {
+  workerSecrets?: WorkerSecretsLike | AnyRecord;
+  workerSecretsEnabled?: boolean;
+} = {}): WorkerSecretsLike => (
+  workerSecretsEnabled
+    ? sanitizeSessionWizardWorkerSecretsForLitMode(workerSecrets)
+    : { ...DEFAULT_WORKER_SECRETS }
+);
+
 export const sanitizeSessionWizardSponsoredFieldSnapshotForLitMode = (
   value: AnyRecord = {},
 ) => {

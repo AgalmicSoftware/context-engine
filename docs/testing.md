@@ -19,18 +19,23 @@ nvm use 20
 npm test
 ```
 
-This runs the canonical root gate (`npm run test:ci`), which includes wiring checks, contract tests, client coverage, Node-side tests, and cache guards.
+This runs the canonical root gate (`npm run test:ci`), which includes wiring
+checks, the release-sanity gate, contract tests, client coverage, Node-side
+tests, and cache guards.
 
 ### Client-Only Tests
 
 ```bash
 cd client
 nvm use 16
-CI=1 npm test -- --watchAll=false
+npm test -- --watchAll=false
 npm run lint
 ```
 
 Use the client workflow when you are working only in `client/` and do not need the full root test gate.
+The client test runner is standalone Jest configured by `client/jest.config.cjs`;
+it no longer shells through CRA or `react-app-rewired`. Babel-Jest uses
+explicit Babel presets, and jsdom setup lives under `client/scripts/jest/`.
 
 ### Targeted Root Commands
 

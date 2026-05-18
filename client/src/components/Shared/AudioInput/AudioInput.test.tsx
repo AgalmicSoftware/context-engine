@@ -1,7 +1,6 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
-import { Simulate } from 'react-dom/test-utils';
 
 import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
@@ -66,8 +65,26 @@ describe('AudioInput', () => {
     return element as T;
   };
 
+  const setNativeValue = (element: Element, value: string) => {
+    const ownDescriptor = Object.getOwnPropertyDescriptor(element, 'value');
+    const prototype = Object.getPrototypeOf(element);
+    const prototypeDescriptor = prototype ? Object.getOwnPropertyDescriptor(prototype, 'value') : undefined;
+    const setter = prototypeDescriptor?.set || ownDescriptor?.set;
+    if (setter) {
+      setter.call(element, value);
+      return;
+    }
+    (element as HTMLInputElement | HTMLTextAreaElement).value = value;
+  };
+
   const changeElementValue = (element: Element, value: string) => {
-    Simulate.change(element, { target: { value } } as any);
+    setNativeValue(element, value);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  const clickElement = (element: Element) => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   };
 
   const flushRafQueue = () => {
@@ -199,7 +216,7 @@ describe('AudioInput', () => {
     const micButton = requireElement(container.querySelector('button[aria-label="Recording temporarily disabled"]'));
 
     act(() => {
-      Simulate.click(micButton);
+      clickElement(micButton);
     });
 
     expect(startRecording).not.toHaveBeenCalled();
@@ -223,7 +240,7 @@ describe('AudioInput', () => {
     const micButton = requireElement(container.querySelector('button[aria-label="Start recording"]'));
 
     act(() => {
-      Simulate.click(micButton);
+      clickElement(micButton);
     });
 
     expect(startRecording).toHaveBeenCalledTimes(1);
@@ -314,7 +331,7 @@ describe('AudioInput', () => {
 
     const downloadToggle = requireElement(container.querySelector('button[title="Downloads"]'));
     act(() => {
-      Simulate.click(downloadToggle);
+      clickElement(downloadToggle);
     });
 
     expect(container.querySelector('button[aria-label="Download final transcript"]')).not.toBeNull();
@@ -342,7 +359,7 @@ describe('AudioInput', () => {
 
     const downloadToggle = requireElement(container.querySelector('button[title="Downloads"]'));
     act(() => {
-      Simulate.click(downloadToggle);
+      clickElement(downloadToggle);
     });
 
     expect(container.querySelector('button[aria-label="Download final transcript"]')).not.toBeNull();
@@ -549,7 +566,7 @@ describe('AudioInput', () => {
     const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
 
     act(() => {
-      Simulate.click(rewriteButton);
+      clickElement(rewriteButton);
     });
     expect(updateFns[0]).toHaveBeenCalledTimes(0);
     const tick = waitingTick as (() => void) | null;
@@ -645,7 +662,7 @@ describe('AudioInput', () => {
     const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
 
     await act(async () => {
-      Simulate.click(rewriteButton);
+      clickElement(rewriteButton);
       await Promise.resolve();
     });
     act(() => {
@@ -656,11 +673,111 @@ describe('AudioInput', () => {
     const revertButton = requireElement(container.querySelector('button[title="Revert to original"]'));
 
     act(() => {
-      Simulate.click(revertButton);
+      clickElement(revertButton);
     });
     act(() => {
       flushRafQueue();
     });
     expect(updateSpy).toHaveBeenLastCalledWith('Original version');
+  });
+
+  it('restores current text when the first AI rewrite fails', async () => {
+    mockRequestAiRewrite.mockRejectedValueOnce(new Error('rewrite failed'));
+    const updateSpy = jest.fn();
+
+    act(() => {
+      root.render(
+        <AudioInput
+          updateFunction={updateSpy}
+          value=""
+          placeholder="Speak"
+        />
+      );
+    });
+
+    const textarea = requireElement(container.querySelector('textarea'));
+    act(() => {
+      changeElementValue(textarea, 'Current draft');
+    });
+
+    const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await act(async () => {
+      clickElement(rewriteButton);
+      await Promise.resolve();
+    });
+    act(() => {
+      flushRafQueue();
+    });
+
+    expect(mockRequestAiRewrite).toHaveBeenCalledWith('Current draft', expect.any(Object));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[surveys]',
+      '[AudioInput] AI rewrite error:',
+      expect.any(Error)
+    );
+    expect((textarea as HTMLTextAreaElement).value).toBe('Current draft');
+    expect(updateSpy).toHaveBeenLastCalledWith('Current draft');
+  });
+
+  it('does not restore an older original after a later AI rewrite fails', async () => {
+    mockRequestAiRewrite
+      .mockResolvedValueOnce('First rewrite')
+      .mockRejectedValueOnce(new Error('later rewrite failed'));
+    const updateSpy = jest.fn();
+
+    act(() => {
+      root.render(
+        <AudioInput
+          updateFunction={updateSpy}
+          value="First original"
+          placeholder="Speak"
+        />
+      );
+    });
+
+    const textarea = requireElement(container.querySelector('textarea'));
+    const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
+
+    await act(async () => {
+      clickElement(rewriteButton);
+      await Promise.resolve();
+    });
+    act(() => {
+      flushRafQueue();
+    });
+    expect(updateSpy).toHaveBeenLastCalledWith('First rewrite');
+
+    const revertButton = requireElement(container.querySelector('button[title="Revert to original"]'));
+    act(() => {
+      clickElement(revertButton);
+    });
+    act(() => {
+      flushRafQueue();
+    });
+
+    act(() => {
+      changeElementValue(textarea, 'Second current draft');
+    });
+
+    const nextRewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await act(async () => {
+      clickElement(nextRewriteButton);
+      await Promise.resolve();
+    });
+    act(() => {
+      flushRafQueue();
+    });
+
+    expect(mockRequestAiRewrite).toHaveBeenLastCalledWith('Second current draft', expect.any(Object));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[surveys]',
+      '[AudioInput] AI rewrite error:',
+      expect.any(Error)
+    );
+    expect((textarea as HTMLTextAreaElement).value).toBe('Second current draft');
+    expect(updateSpy).toHaveBeenLastCalledWith('Second current draft');
+    expect(updateSpy).not.toHaveBeenLastCalledWith('First original');
   });
 });

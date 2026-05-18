@@ -4,7 +4,7 @@ import React from 'react';
 
 export const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 export const SurveyTool = React.lazy(() => import('../SurveyTool/SurveyTool'));
-export const SBTPage = React.lazy(() => import('../SBTs/SBTPage'));
+export const SBTPage = React.lazy(() => import('../SBTs/SBTPageRoute'));
 export const SBTsPage = React.lazy(() => import('../SBTs/SBTsList')); // SBTsList, often referred to as SBTsPage in comments
 export const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 export const AdminPage = React.lazy(() => import('../Admin/AdminPage'));
@@ -21,4 +21,5 @@ export const BookmarksPage = React.lazy(() => import('../Bookmarks/BookmarksPage
 export const RiskMatrixDemo = React.lazy(() => import('../DemoViews/RiskMatrixDemo'));
 export const AboutPage = React.lazy(() => import('../About/AboutPage'));
 export const AgentPage = React.lazy(() => import('../Agent/AgentPage'));
+export const TelegramDemoSetupPage = React.lazy(() => import('../TelegramDemoSetup/TelegramDemoSetupPage'));
 export const TagPage = React.lazy(() => import('../TagPage/TagPage'));

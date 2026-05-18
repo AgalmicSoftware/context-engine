@@ -1,159 +1,24 @@
-import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  React,
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  E2E_TESTIDS,
+  mockBuildSbtAccessControlConditions,
+  mockGetGlobalLitHooks,
+  mockGetUnsupportedLitContractAccessControlError,
+  mockListArweaveTransactionsByTags,
+  mockResolveDocUploadsGate,
+  mockUploadDocLibraryFile,
+  DocumentLibraryPanel,
+  TEST_SESSION_CONFIG,
+  setupDocumentLibraryPanelTestLifecycle,
+} from './DocumentLibraryPanel.testUtils';
 
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-
-const mockBuildSbtAccessControlConditions = jest.fn();
-const mockGetGlobalLitHooks = jest.fn();
-const mockGetUnsupportedLitContractAccessControlError = jest.fn();
-const mockListArweaveTransactionsByTags = jest.fn();
-const mockResolveDocLibraryProvider = jest.fn();
-const mockResolveArweaveGraphqlUrl = jest.fn();
-const mockResolveArweaveGraphqlUrls = jest.fn();
-const mockResolveDocUploadsGate = jest.fn();
-const mockUploadDocLibraryFile = jest.fn();
-const mockUploadDocLibraryUrlRecord = jest.fn();
-const mockListSessionStorageRefs = jest.fn();
-const mockReadSessionStorageBlob = jest.fn();
-const mockSBTSelector = jest.fn();
-
-jest.mock('../../utilities/logging.js', () => ({
-  createLogger: () => ({
-    log: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  }),
-}));
-
-jest.mock('../../utilities/docLibrary/arweaveGraphql.js', () => ({
-  listArweaveTransactionsByTags: (...args: any[]) => mockListArweaveTransactionsByTags(...args),
-}));
-
-jest.mock('../../utilities/docLibrary/config.js', () => ({
-  resolveDocLibraryProvider: (...args: any[]) => mockResolveDocLibraryProvider(...args),
-  resolveArweaveGraphqlUrl: (...args: any[]) => mockResolveArweaveGraphqlUrl(...args),
-  resolveArweaveGraphqlUrls: (...args: any[]) => mockResolveArweaveGraphqlUrls(...args),
-}));
-
-jest.mock('../../utilities/crypto/litProtocol.js', () => ({
-  buildSbtAccessControlConditions: (...args: any[]) => mockBuildSbtAccessControlConditions(...args),
-  getUnsupportedLitContractAccessControlError: (...args: any[]) => mockGetUnsupportedLitContractAccessControlError(...args),
-  getGlobalLitHooks: (...args: any[]) => mockGetGlobalLitHooks(...args),
-  litStorage: {
-    buildLitArweaveUrl: (txId: string) => `https://lit.example.test/${txId}`,
-    downloadEncryptedArweaveData: jest.fn(),
-    decodeLitPayloadToText: jest.fn(),
-    decodeLitPayloadToBlob: jest.fn(),
-  },
-  resolveLitChain: jest.fn(() => 'ethereum'),
-}));
-
-jest.mock('../../utilities/arweave/arweaveScripts.js', () => ({
-  arweaveScripts: {
-    buildArweaveGatewayUrl: (txId: string, gateway = 'https://arweave.example.test') => `${gateway}/${txId}`,
-    downloadDataFromArweave: jest.fn(),
-  },
-}));
-
-jest.mock('../../utilities/docLibrary/uploads.js', () => ({
-  resolveDocUploadsGate: (...args: any[]) => mockResolveDocUploadsGate(...args),
-  uploadDocLibraryFile: (...args: any[]) => mockUploadDocLibraryFile(...args),
-  uploadDocLibraryUrlRecord: (...args: any[]) => mockUploadDocLibraryUrlRecord(...args),
-}));
-
-jest.mock('../../utilities/storage/storageClient.js', () => ({
-  listSessionStorageRefs: (...args: any[]) => mockListSessionStorageRefs(...args),
-  readSessionStorageBlob: (...args: any[]) => mockReadSessionStorageBlob(...args),
-}));
-
-jest.mock('../SBTs/SBTSelector', () => ({
-  __esModule: true,
-  default: (props: any) => {
-    mockSBTSelector(props);
-    return (
-      <div data-testid="mock-sbt-selector">
-        <button type="button" onClick={() => props.onAddSBT?.({
-          address: '0x00000000000000000000000000000000000000aa',
-          name: 'Mock Selected SBT',
-          chainId: 84532,
-        })}
-        >
-          Add mock selected SBT
-        </button>
-        <button
-          type="button"
-          onClick={() => props.onRemoveSBT?.('0x00000000000000000000000000000000000000aa')}
-        >
-          Remove mock selected SBT
-        </button>
-        <div>
-          {(props.selectedSBTs || []).map((sbt: any) => (
-            <span key={sbt.address}>{sbt.name || sbt.address}</span>
-          ))}
-        </div>
-      </div>
-    );
-  },
-}));
-
-const DocumentLibraryPanel = require('./DocumentLibraryPanel').default as React.ComponentType<any>;
-const TEST_SESSION_CONFIG = {
-  docLibrary: {
-    provider: 'arweave',
-    arweave: {
-      graphqlUrl: 'https://arweave.example.test/graphql',
-    },
-  },
-};
-
-describe('DocumentLibraryPanel photo docs', () => {
-  let originalCreateObjectURL: typeof URL.createObjectURL;
-  let originalRevokeObjectURL: typeof URL.revokeObjectURL;
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockResolveDocLibraryProvider.mockReturnValue('arweave');
-    mockResolveArweaveGraphqlUrl.mockReturnValue('https://arweave.example.test/graphql');
-    mockResolveArweaveGraphqlUrls.mockReturnValue(['https://arweave.example.test/graphql']);
-    mockResolveDocUploadsGate.mockReturnValue({
-      gate: null,
-      lookupStatus: '',
-      sbtAddresses: [],
-      chainId: null,
-      mode: 'any',
-      hasRecipients: false,
-    });
-    mockBuildSbtAccessControlConditions.mockReturnValue([{ contractAddress: '0xgate' }]);
-    mockGetGlobalLitHooks.mockReturnValue(null);
-    mockGetUnsupportedLitContractAccessControlError.mockReturnValue('');
-    mockUploadDocLibraryFile.mockResolvedValue({
-      txId: 'Z'.repeat(43),
-      tagMap: {},
-      data: { size: 6, type: 'text/plain' },
-    });
-    mockUploadDocLibraryUrlRecord.mockResolvedValue({
-      txId: 'Y'.repeat(43),
-      tagMap: {},
-      data: { size: null, type: 'application/json' },
-    });
-    mockListSessionStorageRefs.mockResolvedValue([]);
-    mockReadSessionStorageBlob.mockResolvedValue({
-      headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
-      blob: async () => ({ type: 'text/plain', text: async () => 'mock document' }),
-    });
-    mockListArweaveTransactionsByTags.mockResolvedValue([]);
-    global.fetch = jest.fn() as any;
-    originalCreateObjectURL = URL.createObjectURL;
-    originalRevokeObjectURL = URL.revokeObjectURL;
-    URL.createObjectURL = jest.fn(() => 'blob:doc-library-image-preview');
-    URL.revokeObjectURL = jest.fn();
-  });
-
-  afterEach(() => {
-    delete (global as any).fetch;
-    URL.createObjectURL = originalCreateObjectURL;
-    URL.revokeObjectURL = originalRevokeObjectURL;
-  });
+describe('DocumentLibraryPanel photo docs and upload audience', () => {
+  setupDocumentLibraryPanelTestLifecycle();
 
   it('labels saved photo docs and paired photo analysis sidecars in the browse list', async () => {
     mockListArweaveTransactionsByTags.mockResolvedValueOnce([
@@ -278,7 +143,11 @@ describe('DocumentLibraryPanel photo docs', () => {
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
       target: { files: [file] },
     });
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       expect(mockBuildSbtAccessControlConditions).toHaveBeenCalledWith(expect.objectContaining({
@@ -337,7 +206,11 @@ describe('DocumentLibraryPanel photo docs', () => {
     fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
       target: { files: [file] },
     });
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
@@ -349,276 +222,5 @@ describe('DocumentLibraryPanel photo docs', () => {
         }),
       }));
     });
-  });
-
-  it('keeps image documents previewable and downloadable in the viewer', async () => {
-    const imageBlob = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
-    (global.fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      blob: async () => imageBlob,
-      headers: {
-        get: (name: string) => (name === 'content-type' ? 'image/png' : null),
-      },
-    });
-    mockListArweaveTransactionsByTags.mockResolvedValueOnce([
-      {
-        cursor: 'cursor-c',
-        txId: 'C'.repeat(43),
-        owner: 'owner',
-        tags: [],
-        tagMap: {
-          'CE-DocStorage': 'arweave',
-          'CE-DocKind': 'file',
-          'CE-DocName': 'policy-note.png',
-          'CE-DocMime': 'image/png',
-        },
-        data: { size: 4, type: 'image/png' },
-        block: { height: 1, timestamp: 1710000002 },
-      },
-    ]);
-
-    render(
-      <DocumentLibraryPanel
-        provider={{}}
-        network={{ id: 84532 }}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-        sessionSlug="edge"
-        sessionConfig={TEST_SESSION_CONFIG}
-        mode="session"
-        sessionIdHex={`0x${'2'.repeat(32)}`}
-      />
-    );
-
-    const viewButton = await screen.findByTestId(E2E_TESTIDS.DOC_ROW_VIEW);
-    fireEvent.click(viewButton);
-
-    await waitFor(() => {
-      expect(global.fetch as jest.Mock).toHaveBeenCalled();
-      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
-    });
-    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_IMAGE)).toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.DOC_VIEWER_DOWNLOAD)).toBeInTheDocument();
-  });
-
-  it('renders image thumbnails directly in the document list', async () => {
-    mockListArweaveTransactionsByTags.mockResolvedValueOnce([
-      {
-        cursor: 'cursor-d',
-        txId: 'D'.repeat(43),
-        owner: 'owner',
-        tags: [],
-        tagMap: {
-          'CE-DocStorage': 'arweave',
-          'CE-DocKind': 'file',
-          'CE-DocName': 'briefing-board.png',
-          'CE-DocMime': 'image/png',
-        },
-        data: { size: 4, type: 'image/png' },
-        block: { height: 1, timestamp: 1710000003 },
-      },
-    ]);
-
-    render(
-      <DocumentLibraryPanel
-        provider={{}}
-        network={{ id: 84532 }}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-        sessionSlug="edge"
-        sessionConfig={TEST_SESSION_CONFIG}
-        mode="session"
-        sessionIdHex={`0x${'4'.repeat(32)}`}
-      />
-    );
-
-    const preview = await screen.findByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW);
-    const image = preview.querySelector('img');
-    expect(image).toBeTruthy();
-    expect(image?.getAttribute('src')).toBe(`https://arweave.example.test/${'D'.repeat(43)}`);
-  });
-
-  it('loads encrypted image thumbnails when scoped Lit hooks become available after render', async () => {
-    const litStorage = require('../../utilities/crypto/litProtocol.js').litStorage;
-    const getKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
-    litStorage.downloadEncryptedArweaveData.mockResolvedValue({
-      payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' },
-    });
-    litStorage.decodeLitPayloadToBlob.mockReturnValue(
-      new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }),
-    );
-    mockListArweaveTransactionsByTags.mockResolvedValue([
-      {
-        cursor: 'cursor-e',
-        txId: 'E'.repeat(43),
-        owner: 'owner',
-        tags: [],
-        tagMap: {
-          'CE-DocStorage': 'lit-arweave',
-          'CE-DocKind': 'file',
-          'CE-DocName': 'encrypted-board.png',
-          'CE-DocMime': 'image/png',
-        },
-        data: { size: 4, type: 'image/png' },
-        block: { height: 1, timestamp: 1710000004 },
-      },
-    ]);
-
-    const panelProps = {
-      provider: {},
-      network: { id: 84532 },
-      account: '0x123',
-      loginComplete: true,
-      toggleLoginModal: jest.fn(),
-      sessionSlug: 'edge',
-      sessionConfig: TEST_SESSION_CONFIG,
-      mode: 'session',
-      sessionIdHex: `0x${'9'.repeat(32)}`,
-    };
-    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
-
-    await screen.findByText('encrypted-board.png');
-    expect(screen.queryByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW)).not.toBeInTheDocument();
-
-    rerender(<DocumentLibraryPanel {...panelProps} litHooks={{ getKey }} />);
-
-    const preview = await screen.findByTestId(E2E_TESTIDS.DOC_ROW_IMAGE_PREVIEW);
-    const image = preview.querySelector('img');
-    expect(litStorage.downloadEncryptedArweaveData).toHaveBeenCalledWith(expect.objectContaining({
-      lit: { getKey },
-    }));
-    expect(image?.getAttribute('src')).toBe('blob:doc-library-image-preview');
-  });
-
-
-
-  it('lists and opens Cloudflare session docs through storage refs', async () => {
-    mockResolveDocLibraryProvider.mockReturnValue('cloudflare');
-    mockListSessionStorageRefs.mockResolvedValueOnce([
-      {
-        storageRef: {
-          backend: 'cloudflare',
-          id: 'cf_docopaque1',
-          uri: '/storage/read?id=cf_docopaque1',
-          contentType: 'text/plain',
-          resource: 'docsContext',
-        },
-        metadata: {
-          size: 12,
-          tags: [
-            { name: 'CE-DocKind', value: 'file' },
-            { name: 'CE-DocName', value: 'Cloud policy note' },
-          ],
-        },
-      },
-    ]);
-    mockReadSessionStorageBlob.mockResolvedValueOnce({
-      headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? 'text/plain' : null) },
-      blob: async () => ({ type: 'text/plain', text: async () => 'cloud text' }),
-    });
-
-    render(
-      <DocumentLibraryPanel
-        provider={{}}
-        network={{ id: 84532 }}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-        sessionSlug="edge"
-        sessionConfig={{ storageProfile: { backend: 'cloudflare' } }}
-        mode="session"
-        sessionIdHex={`0x${'7'.repeat(32)}`}
-      />
-    );
-
-    expect(await screen.findByText('Cloud policy note')).toBeInTheDocument();
-    expect(mockListSessionStorageRefs).toHaveBeenCalledWith(expect.objectContaining({
-      sessionSlug: 'edge',
-      resource: 'docsContext',
-    }));
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_ROW_VIEW));
-
-    await waitFor(() => {
-      expect(mockReadSessionStorageBlob).toHaveBeenCalledWith(expect.objectContaining({
-        storageRef: expect.objectContaining({ backend: 'cloudflare', id: 'cf_docopaque1' }),
-      }));
-    });
-    expect(await screen.findByTestId(E2E_TESTIDS.DOC_VIEWER_TEXT)).toHaveTextContent('cloud text');
-    expect(JSON.stringify(mockReadSessionStorageBlob.mock.calls[0][0].storageRef)).not.toMatch(/bucket|account|token|secret|r2:\/\//i);
-  });
-
-  it('requires encrypted uploads for lit-arweave session document storage', async () => {
-    mockResolveDocLibraryProvider.mockReturnValue('lit-arweave');
-    const saveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
-    mockGetGlobalLitHooks.mockReturnValue({ saveKey });
-
-    render(
-      <DocumentLibraryPanel
-        provider={{}}
-        network={{ id: 84532 }}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-        sessionSlug="edge"
-        sessionConfig={{
-          ...TEST_SESSION_CONFIG,
-          storageProfile: { backend: 'lit-arweave' },
-        }}
-        mode="session"
-        sessionIdHex={`0x${'8'.repeat(32)}`}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId(E2E_TESTIDS.DOC_LOCK_TOGGLE)).toHaveAttribute('data-ce-locked', 'true');
-      expect(screen.getByTestId(E2E_TESTIDS.DOC_LOCK_TOGGLE)).toBeDisabled();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Add mock selected SBT' }));
-    const file = new File(['secret'], 'secret.txt', { type: 'text/plain' });
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
-      target: { files: [file] },
-    });
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
-
-    await waitFor(() => {
-      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
-        file,
-        encryption: expect.objectContaining({
-          enabled: true,
-          saveKey,
-          accessControlConditions: [{ contractAddress: '0xgate' }],
-        }),
-        tags: expect.arrayContaining([
-          expect.objectContaining({ name: 'CE-DocStorage', value: 'lit-arweave' }),
-        ]),
-      }));
-    });
-  });
-
-  it('can render the browse list without upload controls', async () => {
-    render(
-      <DocumentLibraryPanel
-        provider={{}}
-        network={{ id: 84532 }}
-        account="0x123"
-        loginComplete
-        toggleLoginModal={jest.fn()}
-        sessionSlug="edge"
-        sessionConfig={TEST_SESSION_CONFIG}
-        mode="session"
-        sessionIdHex={`0x${'5'.repeat(32)}`}
-        showUploadControls={false}
-      />
-    );
-
-    await waitFor(() => {
-      expect(mockListArweaveTransactionsByTags).toHaveBeenCalled();
-    });
-    expect(screen.queryByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.DOC_URL_INPUT)).not.toBeInTheDocument();
   });
 });

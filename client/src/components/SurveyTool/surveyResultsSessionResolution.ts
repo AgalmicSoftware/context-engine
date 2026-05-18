@@ -23,6 +23,7 @@ type SurveyResultsSessionInput = {
 type SurveyResultsQuestionReadScopeInput = SurveyResultsSessionInput & {
   pathname?: unknown;
   questionReadSlugsOverride?: unknown;
+  sessionSlugPinned?: unknown;
   viewMode?: unknown;
   readSessionScanScope?: () => unknown;
   readSessionScanSlugs?: () => unknown;
@@ -148,6 +149,7 @@ export const resolveSurveyResultsQuestionReadScope = ({
   pathname = '',
   search = '',
   sessionSlug,
+  sessionSlugPinned = false,
   activeSessionSlug,
   questionReadSlugsOverride = null,
   viewMode = 'questions',
@@ -166,6 +168,7 @@ export const resolveSurveyResultsQuestionReadScope = ({
     ''
   );
   const shouldFanOut = (
+    sessionSlugPinned !== true &&
     !hasExplicitSessionQueryPin(search) &&
     String(viewMode || '').trim().toLowerCase() === 'questions'
   );

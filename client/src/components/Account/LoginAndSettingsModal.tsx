@@ -1,5 +1,5 @@
 /** @file LoginAndSettingsModal.tsx */
-import React, { Component } from "react";
+import React, { Component, Suspense } from "react";
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { ethers } from 'ethers';
@@ -28,7 +28,6 @@ import {
   faWindowClose,
   faSpinner,
   faQuestionCircle,
-  faExternalLinkAlt,
   faWallet,
   faBookmark,
   faSignOutAlt,
@@ -42,9 +41,21 @@ import MetaMaskLogo from "assets/img/metamask_icon_white.png";
 // Reactstrap components
 import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from "reactstrap";
 
-import UserPage from "components/UserPage/UserPage";
 import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
+import {
+  LoginSettingsSupportedResourceCard,
+} from './LoginSettingsResourceSummary';
+import {
+  LoginSettingsInlineNetworkSummary,
+  LoginSettingsPanelNetworkSummary,
+} from './LoginSettingsNetworkSummary';
+import {
+  LoginSettingsConfigToggleControl,
+  LoginSettingsControlRow,
+  LoginSettingsSessionSummary,
+} from './LoginSettingsControlRow';
+import LoginSettingsSectionCard from './LoginSettingsSectionCard';
 
 // Smart contract interactions and config
 import {
@@ -94,6 +105,7 @@ import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainBy
 import { createLogger } from 'utilities/logging.js';
 
 const accountLog = createLogger('account');
+const AccountUserPage = React.lazy(() => import("components/UserPage/UserPage"));
 
 type LoginAndSettingsRecord = Record<string, any>;
 
@@ -926,24 +938,34 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             blockExplorerUrls: [tn.blockExplorers?.default?.url].filter(Boolean)
           }]
         });
+        return true;
       } catch (error) {
         accountLog.error("Error adding network:", error);
+        return false;
       }
     }
+    return false;
   };
 
   switchToCorrectNetwork: any = async () => {
     if (window.ethereum && this.props.provider === "wagmi") {
+      const tn = this.getTargetNetwork();
+      const chainIdHex = chainHexId(tn);
+      const switchToTargetNetwork = () => window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: chainIdHex }],
+      });
       try {
-        const tn = this.getTargetNetwork();
-        const chainIdHex = chainHexId(tn);
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: chainIdHex }],
-        });
+        await switchToTargetNetwork();
       } catch (error: any) {
         if (getErrorCode(error) === 4902) {
-          await this.addCorrectNetwork();
+          const added = await this.addCorrectNetwork();
+          if (!added) return;
+          try {
+            await switchToTargetNetwork();
+          } catch (switchAfterAddError) {
+            accountLog.error("Error switching network after adding network:", switchAfterAddError);
+          }
         } else {
           accountLog.error("Error switching network:", error);
         }
@@ -1470,45 +1492,18 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     expanded = false,
     onToggle = null,
     testId = '',
-  }: any = {}) => (
-    <Button
-      type="button"
-      onClick={onToggle}
-      className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton}`}
-      aria-expanded={expanded}
-      data-testid={testId || undefined}
-    >
-      Config
-      <FontAwesomeIcon
-        icon={expanded ? faCaretUp : faCaretDown}
-        className={styles.aiSettingsToggleIcon}
-      />
-    </Button>
-  );
+  }: any = {}) => LoginSettingsConfigToggleControl({
+    expanded,
+    onToggle,
+    testId,
+  });
 
   renderSessionSummary: any = (activeSessionIn: any = null) => {
     const activeSession = activeSessionIn || this.getSessionDescriptor(this.getActiveSessionSlug());
-    const sessionSummaryHref = buildSettingsSessionHref(activeSession.slug);
-
-    return (
-      <div className={styles.settingsSessionSummary}>
-        <div
-          className={styles.settingsSessionRoute}
-          aria-label={`Active session: ${activeSession.label}`}
-        >
-          <span className={styles.settingsSessionLabel}>SESSION</span>
-          <span className={styles.settingsSessionName}>{activeSession.label}</span>
-          <a
-            href={sessionSummaryHref}
-            className={styles.settingsSessionLink}
-            aria-label={`Open session ${activeSession.label}`}
-            title={`Open session ${activeSession.label}`}
-          >
-            <FontAwesomeIcon icon={faExternalLinkAlt} />
-          </a>
-        </div>
-      </div>
-    );
+    return LoginSettingsSessionSummary({
+      activeSession,
+      sessionHref: buildSettingsSessionHref(activeSession.slug),
+    });
   };
 
   renderSettingsControlRow: any = ({
@@ -1523,26 +1518,23 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     tooltipPlacement = 'top',
     containerClassName = '',
     rowClassName = '',
-  }: any = {}) => (
-    <div className={[styles.settingsContainer, containerClassName].filter(Boolean).join(' ')}>
-      <div className={[styles.settingsRow, rowClassName].filter(Boolean).join(' ')}>
-        {beforeConfig}
-        {this.renderConfigToggleControl({
-          expanded: configOpen,
-          onToggle: onToggleConfig,
-          testId: configTestId,
-        })}
-        {this.renderSessionSummary(activeSession)}
-        {betweenSessionAndTooltips}
-        {this.renderTooltipsToggleControl({
-          infoId: tooltipsInfoId,
-          tooltipPlacement,
-        })}
-        {this.renderDemoSurfaceToggleControl()}
-        {afterDemo}
-      </div>
-    </div>
-  );
+  }: any = {}) => LoginSettingsControlRow({
+    activeSession,
+    configOpen,
+    onToggleConfig,
+    configTestId,
+    beforeConfig,
+    betweenSessionAndTooltips,
+    afterDemo,
+    tooltipsControl: this.renderTooltipsToggleControl({
+      infoId: tooltipsInfoId,
+      tooltipPlacement,
+    }),
+    demoControl: this.renderDemoSurfaceToggleControl(),
+    containerClassName,
+    rowClassName,
+    sessionHref: buildSettingsSessionHref(activeSession.slug),
+  });
 
   handleActiveSessionChange: any = (event: any) => {
     const nextSlug = normalizeSettingsSessionSlug(event?.target?.value || '');
@@ -1955,33 +1947,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     showWalletNetwork = false,
     tooltipId = 'networkInfoTooltipInline',
   }: any = {}) => {
-    const detail = `The active session targets ${targetNetworkName}. If your wallet shows a different chain, switch before submitting.`;
-
-    return (
-      <div className={styles.networkInfo}>
-        <span className={styles.networkLabel}>network:</span>
-        <span className={styles.networkValue}>{targetNetworkName}</span>
-        {showWalletNetwork && (
-          <>
-            <span className={styles.networkLabel}>wallet:</span>
-            <span className={styles.networkValue}>{walletNetworkName}</span>
-          </>
-        )}
-        <FontAwesomeIcon icon={faQuestionCircle} className={styles.infoIcon} id={tooltipId} />
-        <CETooltip
-          placement="right"
-          target={tooltipId}
-          delay={0}
-          trigger="hover click focus"
-          autohide={false}
-          className={styles.networkTooltip}
-        >
-          <div style={{ padding: '10px' }}>
-            {detail}
-          </div>
-        </CETooltip>
-      </div>
-    );
+    return LoginSettingsInlineNetworkSummary({
+      targetNetworkName,
+      walletNetworkName,
+      showWalletNetwork,
+      tooltipId,
+    });
   };
 
   renderPanelNetworkSummary: any = ({
@@ -1992,77 +1963,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     needsNetworkSwitch = false,
     tooltipId = 'networkInfoTooltipPanel',
   }: any = {}) => {
-    const detail = `The active session targets ${targetNetworkName}. If your wallet shows a different chain, switch before submitting.`;
-
-    return (
-      <>
-        <div className={styles.aiSettingsSummaryStrip}>
-          <div className={styles.aiSettingsSummaryCard}>
-            <div className={styles.aiSettingsSummaryLabelRow}>
-              <span className={styles.aiSettingsSummaryLabel}>Network</span>
-              <FontAwesomeIcon
-                icon={faQuestionCircle}
-                className={`${styles.infoIcon} ${styles.aiSettingsSummaryInfoIcon}`}
-                id={tooltipId}
-              />
-            </div>
-            <div className={styles.aiSettingsSummaryValue}>{targetNetworkName}</div>
-            <div className={styles.aiSettingsSummaryDetail}>
-              {detail}
-            </div>
-            <CETooltip
-              placement="right"
-              target={tooltipId}
-              delay={0}
-              trigger="hover click focus"
-              autohide={false}
-              className={styles.networkTooltip}
-            >
-              <div style={{ padding: '10px' }}>
-                {detail}
-              </div>
-            </CETooltip>
-          </div>
-          {showWalletNetwork && (
-            <div className={styles.aiSettingsSummaryCard}>
-              <div className={styles.aiSettingsSummaryLabel}>Wallet</div>
-              <div className={styles.aiSettingsSummaryValue}>{walletNetworkName}</div>
-              <div className={styles.aiSettingsSummaryDetail}>
-                Switch before submitting to match the session network.
-              </div>
-            </div>
-          )}
-        </div>
-        {needsNetworkSwitch && targetNetwork?.name ? (
-          <div className={styles.aiSettingsActions}>
-            <Button onClick={this.switchToCorrectNetwork} className={`${styles.networkSwitchButton} ${styles.glow}`}>
-              Switch to {targetNetwork.name}
-            </Button>
-          </div>
-        ) : null}
-      </>
-    );
-  };
-
-  renderSessionPills: any = (sessions: any = [], emptyText: any = 'No sponsor sessions configured.') => {
-    if (!sessions.length) {
-      return <div className={styles.aiSettingsHintStrong}>{emptyText}</div>;
-    }
-    return (
-      <div className={styles.sessionPills}>
-        {sessions.map((sessionEntry: any) => (
-          <span
-            key={`${sessionEntry.slug}:${sessionEntry.label}`}
-            className={`${styles.sessionPill} ${sessionEntry.isActive ? styles.sessionPillActive : ''}`}
-          >
-            {sessionEntry.label}
-            <span className={styles.sessionPillMeta}>
-              {sessionEntry.isActive ? 'active' : sessionEntry.slugLabel}
-            </span>
-          </span>
-        ))}
-      </div>
-    );
+    return LoginSettingsPanelNetworkSummary({
+      targetNetwork,
+      targetNetworkName,
+      walletNetworkName,
+      showWalletNetwork,
+      needsNetworkSwitch,
+      tooltipId,
+      onSwitchNetwork: this.switchToCorrectNetwork,
+    });
   };
 
   getPrimarySponsorSession: any = (sessions: any = []) => {
@@ -2103,53 +2012,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const extraCount = extraSessions.length;
 
     return (
-      <div key={card.key} className={styles.supportedResourceCard}>
-        <div className={styles.supportedResourceHeader}>
-          <div className={styles.supportedResourceName}>{card.title}</div>
-          <span className={`${styles.aiSponsoredStatus} ${styles[`aiSponsoredStatus${card.status.tone}`]}`}>
-            {card.status.label}
-          </span>
-        </div>
-        <div className={styles.supportedResourceDetail}>{card.status.detail}</div>
-        <div className={styles.supportedResourceSessions}>
-          <div className={styles.supportedResourceSessionsLabel}>Active session</div>
-          <div className={styles.supportedResourcePrimarySession}>
-            {this.renderSessionPills([activeSession])}
-            <span
-              className={`${styles.supportedResourceActiveState} ${
-                activeSponsorSession
-                  ? styles.supportedResourceActiveStateOn
-                  : styles.supportedResourceActiveStateOff
-              }`}
-            >
-              {activeSponsorSession ? 'configured here' : 'not configured here'}
-            </span>
-          </div>
-          {extraCount > 0 ? (
-            <div className={styles.supportedResourceOtherSessions}>
-              <div className={styles.supportedResourceSessionsLabel}>Other sessions with {card.title}</div>
-              <button
-                type="button"
-                className={styles.supportedResourceMoreButton}
-                onClick={() => this.toggleSupportedResourceSessions(card.key)}
-                aria-expanded={extrasExpanded}
-                aria-label={`${extrasExpanded ? 'Hide' : 'Show'} other ${card.title} sponsor sessions`}
-              >
-                {extrasExpanded ? 'Hide other sessions' : `${extraCount} other ${extraCount === 1 ? 'session' : 'sessions'}`}
-                <FontAwesomeIcon
-                  icon={extrasExpanded ? faCaretUp : faCaretDown}
-                  className={styles.supportedResourceMoreChevron}
-                />
-              </button>
-            </div>
-          ) : null}
-          {extraCount > 0 && extrasExpanded ? (
-            <div className={styles.supportedResourceExtraSessions}>
-              {this.renderSessionPills(extraSessions)}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <LoginSettingsSupportedResourceCard
+        key={card.key}
+        activeSession={activeSession}
+        activeSponsorSession={activeSponsorSession}
+        card={card}
+        extraSessions={extraSessions}
+        extrasExpanded={extrasExpanded}
+        onToggleSessions={this.toggleSupportedResourceSessions}
+      />
     );
   };
 
@@ -2158,17 +2029,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     summary = '',
     children = null,
   }: any = {}) => (
-    <div className={styles.settingsSectionCard}>
-      <div className={styles.settingsSectionToggle}>
-        <span className={styles.settingsSectionTitleGroup}>
-          <span className={styles.settingsSectionTitle}>{title}</span>
-          {summary ? <span className={styles.settingsSectionSummary}>{summary}</span> : null}
-        </span>
-      </div>
-      <div className={styles.settingsSectionBody}>
-        {children}
-      </div>
-    </div>
+    <LoginSettingsSectionCard title={title} summary={summary}>
+      {children}
+    </LoginSettingsSectionCard>
   );
 
   renderSettingsOverviewPanel: any = ({
@@ -2275,28 +2138,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const renderSection = ({ key, title, summary, children }: any) => {
       const isOpen = this.isAiSettingsSectionOpen(key);
       return (
-        <div className={styles.settingsSectionCard}>
-          <button
-            type="button"
-            className={styles.settingsSectionToggle}
-            onClick={() => this.toggleAiSettingsSection(key)}
-            aria-expanded={isOpen}
-          >
-            <span className={styles.settingsSectionTitleGroup}>
-              <span className={styles.settingsSectionTitle}>{title}</span>
-              {summary ? <span className={styles.settingsSectionSummary}>{summary}</span> : null}
-            </span>
-            <FontAwesomeIcon
-              icon={isOpen ? faCaretUp : faCaretDown}
-              className={styles.settingsSectionChevron}
-            />
-          </button>
-          {isOpen && (
-            <div className={styles.settingsSectionBody}>
-              {children}
-            </div>
-          )}
-        </div>
+        <LoginSettingsSectionCard
+          title={title}
+          summary={summary}
+          isOpen={isOpen}
+          onToggle={() => this.toggleAiSettingsSection(key)}
+        >
+          {children}
+        </LoginSettingsSectionCard>
       );
     };
 
@@ -2981,13 +2830,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
             <div className={styles.accountModalBody}>
               {this.props.account && (
                 <div className={styles.accountModalProfileShell}>
-                  <UserPage
-                    viewAddress={this.props.account}
-                    account={this.props.account}
-                    provider={this.props.provider}
-                    minimized={true}
-                    network={this.props.network}
-                  />
+                  <Suspense fallback={null}>
+                    <AccountUserPage
+                      viewAddress={this.props.account}
+                      account={this.props.account}
+                      provider={this.props.provider}
+                      minimized={true}
+                      network={this.props.network}
+                    />
+                  </Suspense>
                 </div>
               )}
               <div className={styles.accountModalControls}>

@@ -12,6 +12,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - `scripts/` holds automation, seeding, audits, migration helpers, and E2E entrypoints.
 - `docs/` holds canonical implementation and operations documentation.
 - `TODO/` is an ignored local area for private planning notes and unshipped work items.
+- `contextEngine-cc/` holds the local Claude Code companion integration.
 - `test/` holds source-of-truth root Foundry and Node test files when source-adjacent tests are not practical.
 - `tests/` is an index/symlink view over selected test surfaces. Do not assume it is the source of truth.
 - `artifacts/`, `broadcast/`, `cache/`, `dist/`, `out/`, and `tmp/` are generated or runtime output locations and are not canonical homes for new source files.

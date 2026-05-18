@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const repoRoot = path.resolve(__dirname, '..');
-const indexHtml = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'index.html'), 'utf8');
+const indexHtml = fs.readFileSync(path.join(repoRoot, 'client', 'index.html'), 'utf8');
 const discoverabilityHtml = fs.readFileSync(
   path.join(repoRoot, 'client', 'public', 'discoverability.html'),
   'utf8'
@@ -42,17 +42,17 @@ test('index.html exposes crawlable repo discovery links in raw HTML', () => {
 test('index.html uses deployment-relative discovery asset links for the active PUBLIC_URL', () => {
   assert.match(
     indexHtml,
-    /<link rel="alternate" href="%PUBLIC_URL%\/discoverability\.html" title="Context Engine static summary" \/>/
+    /<link rel="alternate" href="__PUBLIC_URL__\/discoverability\.html" title="Context Engine static summary" \/>/
   );
   assert.match(
     indexHtml,
-    /<link rel="alternate" type="text\/plain" href="%PUBLIC_URL%\/llms\.txt" title="Context Engine llms\.txt" \/>/
+    /<link rel="alternate" type="text\/plain" href="__PUBLIC_URL__\/llms\.txt" title="Context Engine llms\.txt" \/>/
   );
   assert.match(
     indexHtml,
-    /<a href="%PUBLIC_URL%\/discoverability\.html">Context Engine static summary<\/a>/
+    /<a href="__PUBLIC_URL__\/discoverability\.html">Context Engine static summary<\/a>/
   );
-  assert.match(indexHtml, /<a href="%PUBLIC_URL%\/llms\.txt">Context Engine llms\.txt<\/a>/);
+  assert.match(indexHtml, /<a href="__PUBLIC_URL__\/llms\.txt">Context Engine llms\.txt<\/a>/);
   assert.doesNotMatch(
     indexHtml,
     /<link rel="alternate" href="https:\/\/contextengine\.xyz\/discoverability\.html"/

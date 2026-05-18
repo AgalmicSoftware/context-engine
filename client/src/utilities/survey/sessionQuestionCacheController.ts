@@ -1994,39 +1994,39 @@ export const createSessionQuestionCacheController = (
         _maskedQuestionRefreshCursor[slug] = (cursor + scanned) % total;
       }
 
+      const refreshQuestionPayload = async (id: string): Promise<RefreshQuestionPayloadResult> => {
+        const prev = questionMap[id] || {};
+        if (!isMaskedQuestionPayload(prev)) return { qid: id, next: null, improved: false };
+
+        const key = backoffKey(id);
+        const next: QuestionMetadata = { ...(prev || {}), id };
+        try {
+          await questionCacheContractScripts.decryptQuestionPayloadInPlace(next, slug, { decryptContext });
+        } catch (err: unknown) {
+          mainSiteLog.warn(`Failed to decrypt cached question payload for ${id}:`, err);
+          const attemptTs = Date.now();
+          maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
+          pruneMaskedQuestionDecryptBackoff(attemptTs);
+          return { qid: id, next: null, improved: false };
+        }
+
+        const improved = hasMaskedQuestionPayloadImproved(prev, next);
+        if (!improved) {
+          const attemptTs = Date.now();
+          maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
+          pruneMaskedQuestionDecryptBackoff(attemptTs);
+          return { qid: id, next: null, improved: false };
+        }
+
+        // Success: clear backoff so future partial decrypts can run immediately.
+        maskedQuestionDecryptBackoff.delete(key);
+        return { qid: id, next, improved: true };
+      };
+
       let changed = 0;
       for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
         const batch = toProcess.slice(i, i + BATCH_SIZE);
-        const refreshedBatch: RefreshQuestionPayloadResult[] = await Promise.all(
-          batch.map(async (id: string) => {
-            const prev = questionMap[id] || {};
-            if (!isMaskedQuestionPayload(prev)) return { qid: id, next: null, improved: false };
-
-            const key = backoffKey(id);
-            const next: QuestionMetadata = { ...(prev || {}), id };
-            try {
-              await questionCacheContractScripts.decryptQuestionPayloadInPlace(next, slug, { decryptContext });
-            } catch (err: unknown) {
-              mainSiteLog.warn(`Failed to decrypt cached question payload for ${id}:`, err);
-              const attemptTs = Date.now();
-              maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
-              pruneMaskedQuestionDecryptBackoff(attemptTs);
-              return { qid: id, next: null, improved: false };
-            }
-
-            const improved = hasMaskedQuestionPayloadImproved(prev, next);
-            if (!improved) {
-              const attemptTs = Date.now();
-              maskedQuestionDecryptBackoff.set(key, { ts: attemptTs });
-              pruneMaskedQuestionDecryptBackoff(attemptTs);
-              return { qid: id, next: null, improved: false };
-            }
-
-            // Success: clear backoff so future partial decrypts can run immediately.
-            maskedQuestionDecryptBackoff.delete(key);
-            return { qid: id, next, improved: true };
-          })
-        );
+        const refreshedBatch: RefreshQuestionPayloadResult[] = await Promise.all(batch.map(refreshQuestionPayload));
 
         for (const { qid, next, improved } of refreshedBatch) {
           if (!improved || !next) continue;

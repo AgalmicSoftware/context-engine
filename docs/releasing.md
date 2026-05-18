@@ -67,11 +67,12 @@ Both workflows remove these paths from the public result:
 | `contextEngine-cc/` | Claude Code extension (local dev tool) |
 | `docs/agent-native*.md` | Private agent-native contract docs |
 | `client/public/skill.md` | Private agent skill artifact |
-| `workers/agentBridgeWorker/` | Private agent bridge worker |
+| `workers/agentBridgeWorker/` | Private Telegram agent bridge worker |
 | `CLAUDE.md` | Maintainer AI instructions |
 | `.claude/`, `.codex/`, `.codex-artifacts/`, `.codex-solc/`, `.codex-tmp/` | AI agent skills, settings, caches, and scratch artifacts |
 | `video-clickthrough-local/` | Durable local video workflow scripts and handoff notes |
 | `.tmp-review/` | Temporary review snapshots / scratch files |
+| `.secrets.baseline` | Local secret-scan baseline with private path names |
 | `.env`, `.env.local`, `.env.*.local`, `.keys/`, `.e2e-secrets/`, `.e2e-cache/` | Local environment files, keys, and E2E secret/cache material |
 | `artifacts/`, `output/` | Local test and generated media artifacts |
 | `dist/`, `out/`, `cache/`, `broadcast/`, `coverage/`, `.npm-cache*`, `release-public/` | Generated build, dependency, and previous release outputs |

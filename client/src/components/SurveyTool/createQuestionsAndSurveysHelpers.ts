@@ -1,3 +1,9 @@
+import {
+  resolveSponsoredGateStateForResource,
+  SPONSORED_GATE_STATES,
+} from '../../utilities/web3/sponsoredAccess.js';
+
+type UnknownRecord = Record<string, unknown>;
 type QuestionSelectionInput = {
   singleSelect?: unknown;
   oneSelectionOnly?: unknown;
@@ -48,6 +54,52 @@ type CreateSurveyValidationInput = {
   title?: unknown;
   isStandaloneQuestion?: unknown;
   questions?: unknown;
+};
+type CreateSurveySubmitGatePlanQuestion = {
+  lockGateIds?: unknown;
+  [key: string]: unknown;
+};
+type CreateSurveySubmitGatePlanArgs = {
+  defaultGateId?: unknown;
+  gateMap?: Record<string, unknown> | null;
+  isStandaloneQuestion?: unknown;
+  questions?: unknown;
+  surveyLockGateIds?: unknown;
+};
+type CreateSurveyGateDefinition = UnknownRecord & {
+  id?: string;
+  gateId?: unknown;
+  resourceKey?: string;
+  sbtAddresses?: unknown;
+  sbtAddress?: unknown;
+  color?: unknown;
+  mode?: unknown;
+  operator?: unknown;
+  gateMode?: unknown;
+  requireAll?: unknown;
+};
+type CreateSurveyGateMap = Record<string, CreateSurveyGateDefinition>;
+type CreateSurveyGateOption = {
+  id: string;
+  label: string;
+  displayLabel: string;
+  badgeLabel: string;
+  color: string;
+  mode: string;
+  requireAll: boolean;
+  sbtAddresses: string[];
+  sbtAddress: string;
+  resourceKey: string;
+};
+type CreateSurveyGateOptionsArgs = {
+  cfg?: unknown;
+  isStandaloneQuestion?: unknown;
+  sessionLabel?: unknown;
+};
+type CreateSurveyGateOptionsResult = {
+  gateMap: CreateSurveyGateMap;
+  gateOptions: CreateSurveyGateOption[];
+  defaultGateId: string;
 };
 type CreateSurveyQuestionPatchEntry = {
   id?: string;
@@ -107,6 +159,23 @@ type LitRecipientInput = {
   accessControlConditions?: unknown;
   chain?: unknown;
 };
+type CreateSurveyGateRecipient = {
+  accessControlConditions: unknown;
+  chain: unknown;
+};
+type BuildCreateSurveyGateObjectsAndRecipientsArgs = {
+  buildSbtAccessControlConditions?: (args: {
+    sbtAddresses: string[];
+    chainId: number | null;
+    litChain: unknown;
+    mode: unknown;
+  }) => unknown;
+  chainIdFallback?: unknown;
+  gateIds?: unknown;
+  gateMap?: Record<string, unknown> | null;
+  normalizeKnownGateIds?: (value: unknown) => string[];
+  resolveLitChain?: (args: { chainId: number | null; litChain?: unknown }) => unknown;
+};
 
 type CreateSurveyEncryptionGateSbt = {
   address?: string;
@@ -138,6 +207,17 @@ const AI_PROVIDER_LABELS: Record<string, string> = Object.freeze({
   local: 'Local',
 });
 const ENCRYPTION_GATE_COLORS = ['#5affc2', '#5b8cff', '#ffb347', '#ff6bcb', '#ffd166'];
+const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
+  default: 'default',
+  questionResponses: 'questions',
+  surveyResponses: 'survey',
+});
+
+const isPlainRecord = (value: unknown): value is UnknownRecord => (
+  !!value &&
+  typeof value === 'object' &&
+  !Array.isArray(value)
+);
 
 const normalizeCreateSurveyUploadedQuestions = (
   uploadedQuestions: unknown
@@ -379,6 +459,71 @@ export const combineLitRecipientAccessControlConditions = (
     combinedAccessControlConditions.push(...conditions);
   });
   return combinedAccessControlConditions;
+};
+
+export const buildCreateSurveyGateObjectsAndRecipients = ({
+  buildSbtAccessControlConditions = () => null,
+  chainIdFallback = null,
+  gateIds: gateIdsIn = [],
+  gateMap = {},
+  normalizeKnownGateIds = normalizeGateIds,
+  resolveLitChain = ({ litChain }) => litChain || null,
+}: BuildCreateSurveyGateObjectsAndRecipientsArgs = {}) => {
+  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
+  const gateIds = normalizeKnownGateIds(gateIdsIn);
+  const gates: UnknownRecord[] = [];
+  const recipients: CreateSurveyGateRecipient[] = [];
+  const dedupe = new Set<string>();
+
+  gateIds.forEach((gateId) => {
+    const rawGate = safeGateMap?.[gateId];
+    if (!rawGate || typeof rawGate !== 'object') return;
+    const gate = rawGate as UnknownRecord;
+
+    const fallbackChainId = Number(chainIdFallback || 0) || null;
+    const chainId = Number(gate.chainId || fallbackChainId || 0) || fallbackChainId;
+    const litChain = resolveLitChain({ chainId, litChain: gate.litChain });
+    const sbtAddresses = Array.from(new Set(
+      [
+        ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
+        gate.sbtAddress,
+      ].filter(Boolean)
+    )) as string[];
+    if (!sbtAddresses.length) return;
+
+    const mode = gate.mode || 'any';
+    const label = String(gate.label || gate.name || gateId);
+    const color = String(gate.color || stableGateColor(gateId));
+
+    gates.push({
+      ...gate,
+      type: gate.type || 'sbt',
+      gateId,
+      sbtAddresses,
+      sbtAddress: sbtAddresses[0] || '',
+      chainId,
+      litChain,
+      mode,
+      label,
+      color,
+    });
+
+    const accessControlConditions = buildSbtAccessControlConditions({
+      sbtAddresses,
+      chainId,
+      litChain,
+      mode,
+    });
+    if (!accessControlConditions) return;
+
+    const recipient = { accessControlConditions, chain: litChain };
+    const sig = JSON.stringify({ accessControlConditions, chain: litChain });
+    if (dedupe.has(sig)) return;
+    dedupe.add(sig);
+    recipients.push(recipient);
+  });
+
+  return { gates, recipients };
 };
 
 export const findFirstBlankQuestionPromptIndex = (questions: unknown = []): number => (
@@ -773,6 +918,249 @@ export const normalizeGateIds = (value: unknown) => {
   }
   const raw = typeof value === 'string' ? value.trim() : '';
   return raw ? [raw] : [];
+};
+
+export const buildCreateSurveySubmitGatePlan = ({
+  defaultGateId = '',
+  gateMap = {},
+  isStandaloneQuestion = false,
+  questions = [],
+  surveyLockGateIds = [],
+}: CreateSurveySubmitGatePlanArgs = {}) => {
+  const safeGateMap = (gateMap && typeof gateMap === 'object') ? gateMap : {};
+  const knownGateIds = new Set(Object.keys(safeGateMap));
+  const normalizeKnownGateIds = (value: unknown): string[] => (
+    normalizeGateIds(value).filter((gateId): gateId is string => (
+      typeof gateId === 'string' && knownGateIds.has(gateId)
+    ))
+  );
+
+  const defaultSubmitGateIds = defaultGateId ? normalizeKnownGateIds([defaultGateId]) : [];
+  const applyDefaultSubmitGateIds = (value: unknown): string[] => {
+    const normalized = normalizeKnownGateIds(value);
+    return normalized.length ? normalized : defaultSubmitGateIds;
+  };
+
+  const resolvedSurveyLockGateIds = !isStandaloneQuestion
+    ? applyDefaultSubmitGateIds(surveyLockGateIds)
+    : [];
+
+  const resolveQuestionSubmitGateIds = (
+    question?: CreateSurveySubmitGatePlanQuestion | null
+  ): string[] => {
+    if (!question) return [];
+    if (isStandaloneQuestion) return applyDefaultSubmitGateIds(question.lockGateIds);
+    const hasOwnLock = Object.prototype.hasOwnProperty.call(question || {}, 'lockGateIds');
+    if (!hasOwnLock || question.lockGateIds === null) return resolvedSurveyLockGateIds;
+    return applyDefaultSubmitGateIds(question.lockGateIds);
+  };
+
+  const questionNeedsEncryption = (
+    question?: CreateSurveySubmitGatePlanQuestion | null
+  ): boolean => resolveQuestionSubmitGateIds(question).length > 0;
+
+  const needsLit = (
+    resolvedSurveyLockGateIds.length > 0 ||
+    (Array.isArray(questions) ? questions : []).some(questionNeedsEncryption)
+  );
+
+  return {
+    knownGateIds,
+    defaultSubmitGateIds,
+    resolvedSurveyLockGateIds,
+    normalizeKnownGateIds,
+    applyDefaultSubmitGateIds,
+    resolveQuestionSubmitGateIds,
+    questionNeedsEncryption,
+    needsLit,
+  };
+};
+
+export const buildCreateSurveyGateOptions = ({
+  cfg: cfgIn = {},
+  isStandaloneQuestion = false,
+  sessionLabel: sessionLabelIn = 'session',
+}: CreateSurveyGateOptionsArgs = {}): CreateSurveyGateOptionsResult => {
+  const cfg = isPlainRecord(cfgIn) ? cfgIn : {};
+  const encryption = isPlainRecord(cfg.encryption) ? cfg.encryption : {};
+  const sponsored = isPlainRecord(cfg.sponsored) ? cfg.sponsored : {};
+  const fullEncryptionGateMap = isPlainRecord(encryption.gates) ? encryption.gates : null;
+  const fullSponsoredGateMap = isPlainRecord(sponsored.gates) ? sponsored.gates : null;
+  const fullGateMap: CreateSurveyGateMap = ((fullEncryptionGateMap && Object.keys(fullEncryptionGateMap).length)
+    ? fullEncryptionGateMap
+    : (fullSponsoredGateMap && Object.keys(fullSponsoredGateMap).length ? fullSponsoredGateMap : {})) as CreateSurveyGateMap;
+  const primaryResource = isStandaloneQuestion ? 'questionResponses' : 'surveyResponses';
+  const sessionLabel = normalizeGateText(sessionLabelIn) || 'session';
+  const relevantGates: CreateSurveyGateDefinition[] = [];
+  const seenGateIds = new Set<string>();
+  const seenGateKeys = new Set<string>();
+
+  const pushRelevantGate = (
+    seedGate: CreateSurveyGateDefinition | null = null,
+    resourceKey: unknown = ''
+  ) => {
+    if (!seedGate || typeof seedGate !== 'object') return;
+
+    const candidateIds = [
+      seedGate.gateId,
+      seedGate.id,
+    ]
+      .map((value: unknown) => normalizeGateText(value))
+      .filter((gateId): gateId is string => Boolean(gateId));
+    const seedAddresses = normalizeAddressList([
+      ...(Array.isArray(seedGate.sbtAddresses) ? seedGate.sbtAddresses : []),
+      seedGate.sbtAddress,
+    ]);
+    const seedAddressKey = seedAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
+
+    let resolvedGateId = candidateIds[0] || '';
+    let resolvedGate: CreateSurveyGateDefinition | null = resolvedGateId
+      ? fullGateMap?.[resolvedGateId] || null
+      : null;
+
+    if (!resolvedGate && seedAddressKey) {
+      Object.entries(fullGateMap || {}).some(([gateId, gate]) => {
+        const gateAddresses = normalizeAddressList([
+          ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
+          gate?.sbtAddress,
+        ]);
+        const gateAddressKey = gateAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
+        if (!gateAddressKey || gateAddressKey !== seedAddressKey) return false;
+        resolvedGateId = normalizeGateText(gateId);
+        resolvedGate = gate;
+        return true;
+      });
+    }
+
+    const finalGateId = normalizeGateText(resolvedGateId || resourceKey || `gate-${relevantGates.length + 1}`);
+    const mergedGate = {
+      ...seedGate,
+      ...(resolvedGate && typeof resolvedGate === 'object' ? resolvedGate : {}),
+      id: finalGateId,
+      gateId: finalGateId,
+      resourceKey: normalizeGateText(resourceKey || seedGate.resourceKey || primaryResource) || primaryResource,
+    };
+    const mergedAddresses = normalizeAddressList([
+      ...(Array.isArray(mergedGate.sbtAddresses) ? mergedGate.sbtAddresses : []),
+      mergedGate.sbtAddress,
+    ]);
+    mergedGate.sbtAddresses = mergedAddresses;
+    mergedGate.sbtAddress = mergedAddresses[0] || '';
+
+    const dedupeKey = JSON.stringify({
+      gateId: finalGateId.toLowerCase(),
+      resourceKey: String(mergedGate.resourceKey || '').toLowerCase(),
+      sbtAddresses: mergedAddresses.map((address: string) => address.toLowerCase()).sort(),
+    });
+    if (seenGateIds.has(finalGateId.toLowerCase()) || seenGateKeys.has(dedupeKey)) return;
+    seenGateIds.add(finalGateId.toLowerCase());
+    seenGateKeys.add(dedupeKey);
+    relevantGates.push(mergedGate);
+  };
+
+  const primaryState = resolveSponsoredGateStateForResource(cfg, primaryResource);
+  const primaryExplicitOpen = primaryState?.status === SPONSORED_GATE_STATES.OPEN;
+  if (primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED && primaryState.gate) {
+    pushRelevantGate(primaryState.gate as CreateSurveyGateDefinition, primaryResource);
+  }
+
+  if (!primaryExplicitOpen) {
+    const defaultState = resolveSponsoredGateStateForResource(cfg, 'default');
+    if (defaultState?.status === SPONSORED_GATE_STATES.RESTRICTED && defaultState.gate) {
+      pushRelevantGate(defaultState.gate as CreateSurveyGateDefinition, 'default');
+    }
+  }
+
+  if (!relevantGates.length) {
+    const resources = isPlainRecord(sponsored.resources)
+      ? sponsored.resources as Record<string, UnknownRecord | undefined>
+      : {};
+    const primaryResourceCfg = (
+      resources?.[primaryResource] &&
+      typeof resources[primaryResource] === 'object' &&
+      !Array.isArray(resources[primaryResource])
+    )
+      ? resources[primaryResource]
+      : {};
+    const defaultResourceCfg = (
+      resources?.default &&
+      typeof resources.default === 'object' &&
+      !Array.isArray(resources.default)
+    )
+      ? resources.default
+      : {};
+    const fallbackIds = [
+      ...(Array.isArray(primaryResourceCfg?.gateIds) ? primaryResourceCfg.gateIds : []),
+      primaryResourceCfg?.gateId,
+      ...(Array.isArray(defaultResourceCfg?.gateIds) ? defaultResourceCfg.gateIds : []),
+      defaultResourceCfg?.gateId,
+      sponsored.defaultGateId,
+    ]
+      .map((value: unknown) => normalizeGateText(value))
+      .filter((gateId): gateId is string => Boolean(gateId));
+    fallbackIds.forEach((gateId: string) => {
+      const resourceKey = gateId === normalizeGateText(sponsored.defaultGateId) ? 'default' : primaryResource;
+      pushRelevantGate({ gateId, resourceKey }, resourceKey);
+    });
+  }
+
+  const gateMap: CreateSurveyGateMap = {};
+  relevantGates.forEach((gate) => {
+    const gateId = String(gate?.id || '');
+    if (!gateId) return;
+    gateMap[gateId] = gate;
+  });
+  const gateIds = Object.keys(gateMap || {}).filter(Boolean).sort();
+  const multipleGateOptions = gateIds.length > 1;
+  const gateOptions = gateIds.map((gateId: string): CreateSurveyGateOption => {
+    const gate: CreateSurveyGateDefinition = gateMap[gateId] || {};
+    const color = String(gate.color || stableGateColor(gateId));
+    const sbtAddresses = normalizeAddressList([
+      ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
+      gate.sbtAddress,
+    ]);
+    const mode = String(
+      gate.mode ||
+      gate.operator ||
+      gate.gateMode ||
+      (gate.requireAll === true ? 'all' : '')
+    ).trim();
+    const resourceKey = normalizeGateText(gate.resourceKey) || primaryResource;
+    const resourceLabel = AUTHORING_GATE_RESOURCE_LABELS[resourceKey] || resourceKey;
+    const displayLabel = multipleGateOptions
+      ? `${sessionLabel} (${resourceLabel})`
+      : sessionLabel;
+    return {
+      id: gateId,
+      label: displayLabel,
+      displayLabel,
+      badgeLabel: sessionLabel,
+      color,
+      mode,
+      requireAll: gate.requireAll === true,
+      sbtAddresses,
+      sbtAddress: sbtAddresses[0] || '',
+      resourceKey,
+    };
+  });
+
+  const candidateDefaults = [
+    primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED
+      ? normalizeGateText(primaryState?.gate?.gateId || primaryState?.gate?.id)
+      : '',
+    !primaryExplicitOpen
+      ? normalizeGateText(
+        resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.gateId ||
+        resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.id
+      )
+      : '',
+    gateOptions[0]?.id,
+  ]
+    .map((val: unknown) => normalizeGateText(val))
+    .filter((gateId): gateId is string => Boolean(gateId));
+  const defaultGateId = candidateDefaults.find((gateId: string) => gateIds.includes(gateId)) || (gateOptions[0]?.id || '');
+
+  return { gateMap, gateOptions, defaultGateId };
 };
 
 export const normalizeGateText = (value: unknown) => {

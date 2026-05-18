@@ -23,6 +23,7 @@ When you add or change a feature, update documentation in the same PR:
 ## Core Docs
 
 Code navigation maps:
+- `docs/ai-agent-bootstrap.md`: current AI-agent entry points and supported contracts.
 - `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
 - `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
 - `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
@@ -51,6 +52,7 @@ Payload schemas:
 - `docs/arweave-payloads.md`: Example Arweave payload shapes for surveys, questions, and SBT tokenURI JSON.
 
 Local development:
+- `docs/client-build-assets.md`: Vite build outputs over 500 KB, source ownership, and safe follow-up actions.
 - `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
 - `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.

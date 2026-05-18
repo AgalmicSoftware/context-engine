@@ -406,7 +406,6 @@ describe('aiScripts worker auth options', () => {
     expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionSlug: 'general3',
-        sessionSlug: 'general3',
       }),
     );
   });
@@ -431,7 +430,6 @@ describe('aiScripts worker auth options', () => {
     const out = await runCompareToolkit('compare', {
       users: [{ address: '0x0000000000000000000000000000000000000001' }],
       sessionSlug: 'general3',
-      sessionSlug: 'general3',
     });
 
     expect(out).toEqual(
@@ -442,7 +440,6 @@ describe('aiScripts worker auth options', () => {
     );
     expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith(
       expect.objectContaining({
-        sessionSlug: 'general3',
         sessionSlug: 'general3',
       }),
     );

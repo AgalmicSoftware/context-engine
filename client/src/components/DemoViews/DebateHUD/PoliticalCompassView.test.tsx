@@ -2,6 +2,8 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { StandalonePoliticalCompass } from './PoliticalCompassView';
+import { debateData } from '../../../variables/demo/debateData.js';
+import historicalFigureUsers from '../../../variables/demo/historical_figure_users.json';
 
 const createCompass = () => ({
   xAxis: {
@@ -38,6 +40,15 @@ const createCompass = () => ({
       type: 'historical',
       comment: 'Avatar-backed historical figure.',
     },
+    {
+      name: 'Machiavelli',
+      profileUsername: 'Machiavelli',
+      x: 0.72,
+      y: 0.64,
+      color: '#8b5cf6',
+      type: 'historical',
+      comment: 'Resolvable simulated profile.',
+    },
   ],
 });
 
@@ -58,7 +69,10 @@ const mockWrapperRect = () => {
 };
 
 describe('PoliticalCompass tooltip hover behavior', () => {
+  const originalPublicUrl = process.env.PUBLIC_URL;
+
   afterEach(() => {
+    (process.env as Record<string, string | undefined>).PUBLIC_URL = originalPublicUrl;
     jest.restoreAllMocks();
   });
 
@@ -118,8 +132,45 @@ describe('PoliticalCompass tooltip hover behavior', () => {
 
     fireEvent.click(screen.getByTestId('ce-political-compass-point-comment-point'));
 
-    expect(screen.getByRole('link', { name: 'Comment Point' })).toBeInTheDocument();
+    expect(screen.getAllByText('Comment Point').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: 'Comment Point' })).toBeNull();
     expect(screen.getByText(/Quoted comment text for hover tooltip coverage\./)).toBeInTheDocument();
+  });
+
+  it('links selected points only when an explicit simulated profile username is available', () => {
+    (process.env as Record<string, string | undefined>).PUBLIC_URL = '/ce-base';
+    const { container } = render(<StandalonePoliticalCompass compass={createCompass()} compact={false} />);
+
+    fireEvent.click(screen.getByTestId('ce-political-compass-point-machiavelli'));
+
+    const profileLink = screen.getByRole('link', { name: 'Machiavelli' });
+    expect(profileLink).toHaveAttribute('href', '/ce-base/su/Machiavelli');
+
+    fireEvent.click(screen.getByTestId('ce-political-compass-point-comment-point'));
+
+    expect(screen.queryByRole('link', { name: 'Comment Point' })).toBeNull();
+    expect(container.querySelector('a[href="/ce-base/su/Comment%20Point"]')).toBeNull();
+    expect(container.querySelector('a[href="/su/Comment Point"]')).toBeNull();
+  });
+
+  it('keeps demo compass profile usernames aligned with simulated-user fixtures', () => {
+    const knownUsernames = new Set(
+      (historicalFigureUsers as Array<{ username?: string }>)
+        .map((figure) => String(figure?.username || '').trim())
+        .filter(Boolean)
+    );
+    const compassProfileUsernames = debateData.flatMap((debate: any) => (
+      (debate?.compass?.points || [])
+        .map((point: any) => String(point?.profileUsername || '').trim())
+        .filter(Boolean)
+    ));
+
+    expect(compassProfileUsernames).toEqual(expect.arrayContaining([
+      'Fuller',
+      'Machiavelli',
+      'Voltaire',
+    ]));
+    expect(compassProfileUsernames.filter((username) => !knownUsernames.has(username))).toEqual([]);
   });
 
   it('renders demo figure markers as clipped avatar images and keeps fallback markers for unknown points', () => {

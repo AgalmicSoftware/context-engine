@@ -1,5 +1,5 @@
 /** @file UserPage.tsx */
-import React, { Component } from 'react';
+import React, { Component, Suspense } from 'react';
 import styles from './UserPage.module.scss';
 import {
   buildUserPageAnalysisAiOptions,
@@ -41,7 +41,6 @@ import {
   buildUserPageDeepScanReportTelemetryPayloads,
   buildUserPageDeepScanRefreshCarryPatch,
   buildUserPageDeepScanTooltipDisplayState,
-  buildUserPageDeepScanProgressRowDisplayState,
   buildUserPageDeepScanProgressStatePatch,
   buildUserPageDeepScanPrioritySlugs,
   buildUserPageDeepScanRequestStatePatch,
@@ -82,7 +81,6 @@ import {
   buildUserPageUsernameLoadedStatePatch,
   buildUserPageUsernameSaveStatePatch,
   buildUserPageViewAddressStatePatch,
-  applyUserPageOwnershipSignal,
   deriveUserPageDeepScanProgressRows,
   extractUserPageResponseRecency,
   formatUserPageDeepScanBlockCount,
@@ -93,7 +91,6 @@ import {
   getUserPageGateResourceKeysToCheck,
   getUserPageErrorMessage,
   hasDisplayableUserPageResponsePayload,
-  hasMeaningfulUserPageOwnershipCounts,
   hasUserPageResponseSubmissionHints,
   inferUserPageResponseEncryptionAudience,
   inferUserPageResponseFieldEncryptionAudience,
@@ -103,6 +100,10 @@ import {
   isUserPageEncryptedResponseField,
   isUserPageGateAccessContext,
   isUserPageResponsePayloadEncrypted,
+  mergeUserPageQuestionCacheSource,
+  mergeUserPageSbtCacheEntryIntoAggregate,
+  mergeUserPageSurveyCacheSource,
+  mergeUserPageUserCacheSbtIntoAggregate,
   buildUserPageRootClassName,
   normalizeUserPageDeepScanProgressRows,
   normalizeUserPageDeepScanTooltipLines,
@@ -118,7 +119,6 @@ import {
   readUserPageNamespaceSourceEntries,
   readBoolishUserPageTelemetryFlag,
   readUserPageAnalysisCacheEntry,
-  readUserPageNetworkCache,
   resolveUserPageAnalysisAiContext,
   resolveUserPageAnalysisCacheStatusState,
   resolveUserPageAnalysisModalDisplayState,
@@ -189,10 +189,12 @@ import {
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import StatsSection from './UserStats';
-import CompareAddressSection from './CompareAddresses';
 import SBTPage from '../SBTs/SBTPage';
 import { Collapse, Modal, ModalHeader, ModalBody } from 'reactstrap';
 import CETooltip from '../Shared/CETooltip';
+import UserPageDeepScanProgressPanel, {
+  type UserPageDeepScanProgressPanelOptions,
+} from './UserPageDeepScanProgressPanel';
 
 // NEW IMPORT: for mini question display
 import SingleQuestionResponse from '../SurveyTool/SingleQuestionResponse';
@@ -229,11 +231,13 @@ import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildExplorerAddressUrl } from '../../variables/chains.js';
 import { ethers } from 'ethers';
 
 const accountLog = createLogger('account');
+const CompareAddressSection = React.lazy(() => import('./CompareAddresses'));
 const USERPAGE_GATE_UNKNOWN_RETRY_MS = 30 * 1000;
 const USERPAGE_GATE_TERMINAL_RECHECK_MS = 60 * 1000;
 const USERPAGE_RESPONSE_PARSE_MEMO_LIMIT = 300;
@@ -574,11 +578,6 @@ type DeepScanProgressRow = {
   label: string;
   startBlock: number | null;
   displayLastBlock: number;
-};
-
-type DeepScanProgressPanelOptions = {
-  headerText?: string;
-  showScannedText?: boolean;
 };
 
 type DeepScanProgressSnapshot = {
@@ -1076,58 +1075,15 @@ class UserPage extends Component<any, any> {
 
   renderDeepScanProgressPanel = (
     progressRows: DeepScanProgressRow[] | null | undefined,
-    options: DeepScanProgressPanelOptions = {},
-  ): React.ReactNode => {
-    if (!Array.isArray(progressRows) || progressRows.length === 0) return null;
-    const {
-      headerText = 'Deep scan in progress',
-      showScannedText = true,
-    } = options;
-
-    return (
-      <div className={styles.deepScanProgressPanel}>
-        {headerText ? (
-          <div className={styles.deepScanProgressHeader}>{headerText}</div>
-        ) : null}
-        {progressRows.map((row, index) => {
-          const {
-            indeterminateText,
-            progressFillStyle,
-            remainingText,
-            rowKey,
-            scannedText,
-            shouldRenderScannedText,
-          } = buildUserPageDeepScanProgressRowDisplayState({
-            index,
-            row,
-            showScannedText,
-          });
-
-          return (
-            <div key={rowKey} className={styles.deepScanProgressRow}>
-              <div className={styles.deepScanProgressLabel}>{row.label}</div>
-              {row.isDeterminate ? (
-                <>
-                  <div className={styles.deepScanProgressBar}>
-                    <div
-                      className={styles.deepScanProgressFill}
-                      style={progressFillStyle}
-                    />
-                  </div>
-                  <div className={styles.deepScanProgressStats}>{remainingText}</div>
-                  {shouldRenderScannedText ? (
-                    <div className={styles.deepScanProgressStats}>{scannedText}</div>
-                  ) : null}
-                </>
-              ) : (
-                <div className={styles.deepScanIndeterminate}>{indeterminateText}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
+    options: UserPageDeepScanProgressPanelOptions = {},
+  ): React.ReactNode => (
+    UserPageDeepScanProgressPanel({
+      headerText: options.headerText,
+      progressRows,
+      showScannedText: options.showScannedText,
+      styles,
+    })
+  );
 
   renderDeepScanTooltipContent = (
     tooltipLines: string[] | null | undefined,
@@ -2312,6 +2268,7 @@ class UserPage extends Component<any, any> {
     const questionSourceSlugById: SourceSlugMap = {};
     const questionResponseSourceSlugById: SourceSlugMap = {};
     const questionResponseSourceSlugByKey: SourceSlugMap = {};
+
     const upsertSurveyResponseByRecency = ({
       sid,
       responder,
@@ -2331,6 +2288,7 @@ class UserPage extends Component<any, any> {
         slug,
       });
     };
+
     const upsertQuestionResponseByRecency = ({
       qid,
       responder,
@@ -2350,91 +2308,32 @@ class UserPage extends Component<any, any> {
         slug,
       });
     };
-    surveysCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
-      const netObj = readUserPageNetworkCache(cacheObj, networkID) as CacheNetworkBucket;
-      const surveysMap = toAnalysisRecord(netObj.surveys);
-      Object.keys(surveysMap).forEach((sidRaw: string) => {
-        const sid = String(sidRaw || '').toLowerCase();
-        if (!sid) return;
-        if (!combinedSurveys[sid]) {
-          combinedSurveys[sid] = toAnalysisRecord(surveysMap[sidRaw] || surveysMap[sid]);
-        }
-        writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
-      });
 
-      const responseMap = toAnalysisRecord(netObj.surveyResponses);
-      Object.keys(responseMap).forEach((sidRaw: string) => {
-        const sid = String(sidRaw || '').toLowerCase();
-        if (!sid) return;
-        const perSurvey = toAnalysisRecord(responseMap[sidRaw] || responseMap[sid]);
-        Object.keys(perSurvey).forEach((resAddrRaw: string) => {
-          const responder = String(resAddrRaw || '').toLowerCase();
-          if (!responder) return;
-          const responseValue = (
-            Object.prototype.hasOwnProperty.call(perSurvey, resAddrRaw)
-              ? perSurvey[resAddrRaw]
-              : perSurvey[responder]
-          );
-          const responseMeta = (responseValue && typeof responseValue === 'object')
-            ? responseValue
-            : null;
-          upsertSurveyResponseByRecency({
-            sid,
-            responder,
-            responseValue,
-            metaValue: responseMeta,
-            slug,
-          });
-        });
+    surveysCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
+      mergeUserPageSurveyCacheSource({
+        cacheObj,
+        combinedSurveyResponses,
+        combinedSurveyResponsesMeta,
+        combinedSurveys,
+        networkID,
+        slug,
+        surveyResponseSourceSlugById,
+        surveyResponseSourceSlugByKey,
+        surveySourceSlugById,
       });
     });
 
     questionsCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
-      const netObj = readUserPageNetworkCache(cacheObj, networkID) as CacheNetworkBucket;
-      const questionsMap = toAnalysisRecord(netObj.questions);
-      Object.keys(questionsMap).forEach((qidRaw: string) => {
-        const qid = String(qidRaw || '').toLowerCase();
-        if (!qid) return;
-        if (!combinedQuestions[qid]) {
-          combinedQuestions[qid] = toAnalysisRecord(questionsMap[qidRaw] || questionsMap[qid]);
-        }
-        writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
-      });
-
-      const responseMap = toAnalysisRecord(netObj.questionResponses);
-      const responseMetaMap = toAnalysisRecord(netObj.questionResponsesMeta);
-      Object.keys(responseMap).forEach((qidRaw: string) => {
-        const qid = String(qidRaw || '').toLowerCase();
-        if (!qid) return;
-        const perQuestion = toAnalysisRecord(responseMap[qidRaw] || responseMap[qid]);
-        const perQuestionMeta = (
-          isPlainAnalysisObject(responseMetaMap[qidRaw])
-            ? responseMetaMap[qidRaw]
-            : isPlainAnalysisObject(responseMetaMap[qid])
-              ? responseMetaMap[qid]
-              : {}
-        );
-        Object.keys(perQuestion).forEach((resAddrRaw: string) => {
-          const responder = String(resAddrRaw || '').toLowerCase();
-          if (!responder) return;
-          const responseValue = (
-            Object.prototype.hasOwnProperty.call(perQuestion, resAddrRaw)
-              ? perQuestion[resAddrRaw]
-              : perQuestion[responder]
-          );
-          const responseMeta = (
-            perQuestionMeta[resAddrRaw] ??
-            perQuestionMeta[responder] ??
-            null
-          );
-          upsertQuestionResponseByRecency({
-            qid,
-            responder,
-            responseValue,
-            metaValue: responseMeta,
-            slug,
-          });
-        });
+      mergeUserPageQuestionCacheSource({
+        cacheObj,
+        combinedQuestionResponses,
+        combinedQuestionResponsesMeta,
+        combinedQuestions,
+        networkID,
+        questionResponseSourceSlugById,
+        questionResponseSourceSlugByKey,
+        questionSourceSlugById,
+        slug,
       });
     });
 
@@ -2443,52 +2342,13 @@ class UserPage extends Component<any, any> {
       netEntries.forEach(({ value: netObj }) => {
         const sbtList = toAnalysisRecord(netObj.sbtList);
         Object.keys(sbtList).forEach((addrLowerKey: string) => {
-          const entry = toAnalysisRecord(sbtList[addrLowerKey]);
-          const key = String(addrLowerKey || '').toLowerCase();
-          if (!key) return;
-
-          const aggEntry: SbtAggregateEntry = sbtAggregate[key] || {
-            sbtAddress: entry.sbtAddress || key,
-            sbtInfo: null,
-            mintedSet: new Set(),
-            burnedSet: new Set(),
-            viewerCountsAuthoritative: false,
-            blockNumber: 0,
-            slug: slug || '',
-          };
-
-          if (slug && !aggEntry.slug) aggEntry.slug = slug;
-          if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
-          if (aggEntry.sbtInfo && entry.sbtInfo) {
-            aggEntry.sbtInfo = {
-              ...(aggEntry.sbtInfo as UnknownRecord),
-              ...(entry.sbtInfo as UnknownRecord),
-            };
-          }
-          const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(entry, viewAddressKey);
-          if (hasExplicitCounts) {
-            aggEntry.mintedSet.delete(viewAddressKey);
-            aggEntry.burnedSet.delete(viewAddressKey);
-            aggEntry.viewerCountsAuthoritative = true;
-          }
-          (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
-            .forEach((address: unknown) => {
-              const addressLower = String(address || '').toLowerCase();
-              if (!addressLower) return;
-              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressKey) return;
-              aggEntry.mintedSet.add(addressLower);
-            });
-          (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [])
-            .forEach((address: unknown) => {
-              const addressLower = String(address || '').toLowerCase();
-              if (!addressLower) return;
-              if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === viewAddressKey) return;
-              aggEntry.burnedSet.add(addressLower);
-            });
-          applyUserPageOwnershipSignal(aggEntry, entry, viewAddressKey);
-          aggEntry.blockNumber = Math.max(aggEntry.blockNumber || 0, Number(entry.blockNumber || 0));
-          if (entry.sbtAddress) aggEntry.sbtAddress = entry.sbtAddress;
-          sbtAggregate[key] = aggEntry;
+          mergeUserPageSbtCacheEntryIntoAggregate({
+            sbtAggregate,
+            entry: sbtList[addrLowerKey],
+            key: addrLowerKey,
+            slug,
+            viewAddressKey,
+          });
         });
       });
     });
@@ -2566,37 +2426,12 @@ class UserPage extends Component<any, any> {
           : null;
         if (!chainPayload) return;
         (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
-          const itemRecord = toAnalysisRecord(item);
-          const key = String(itemRecord.sbtAddress || '').toLowerCase();
-          if (!key) return;
-          const aggEntry: SbtAggregateEntry = sbtAggregate[key] || {
-            sbtAddress: itemRecord.sbtAddress || key,
-            sbtInfo: null,
-            mintedSet: new Set(),
-            burnedSet: new Set(),
-            blockNumber: 0,
-            slug: slug || '',
-          };
-          if (slug && !aggEntry.slug) aggEntry.slug = slug;
-          if (!aggEntry.sbtInfo && itemRecord.sbtInfo) aggEntry.sbtInfo = itemRecord.sbtInfo;
-          if (aggEntry.sbtInfo && itemRecord.sbtInfo) {
-            aggEntry.sbtInfo = {
-              ...(aggEntry.sbtInfo as UnknownRecord),
-              ...(itemRecord.sbtInfo as UnknownRecord),
-            };
-          }
-          const hasAggregateOwnershipSignal = (
-            aggEntry.mintedSet.has(viewAddressKey) ||
-            aggEntry.burnedSet.has(viewAddressKey)
-          );
-          const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(itemRecord, viewAddressKey);
-          if (hasExplicitCounts) {
-            applyUserPageOwnershipSignal(aggEntry, itemRecord, viewAddressKey);
-          } else if (!hasAggregateOwnershipSignal) {
-            // userCache SBT rows are a fallback signal only; do not override fresher sbtCache burns.
-            aggEntry.mintedSet.add(viewAddressKey);
-          }
-          sbtAggregate[key] = aggEntry;
+          mergeUserPageUserCacheSbtIntoAggregate({
+            sbtAggregate,
+            item,
+            slug,
+            viewAddressKey,
+          });
         });
       });
     });
@@ -3335,7 +3170,7 @@ class UserPage extends Component<any, any> {
   }
 
   openFullPage = (): void => {
-    window.open(`/u/${this.props.viewAddress}`);
+    window.open(buildPublicRoute(`/u/${this.props.viewAddress}`));
   }
 
   handleUsernameChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
@@ -3976,10 +3811,13 @@ class UserPage extends Component<any, any> {
       stateViewAddress: this.state.viewAddress,
       username,
     });
+    const renderedAddressHref = String(addressHref || '').startsWith('/')
+      ? buildPublicRoute(String(addressHref || ''))
+      : addressHref;
     const addressDisplay = shouldLinkAddressLabel
       ? (
         <a
-          href={addressHref}
+          href={renderedAddressHref}
           {...(!minimized ? {
             target: '_blank',
             rel: 'noopener noreferrer',
@@ -4282,7 +4120,7 @@ class UserPage extends Component<any, any> {
               {/* My Bookmarks Link (Owner Only) - Moved here from headerActionsRight */}
               {headerActionVisibility.showBookmarksLink && (
                 <a
-                  href="/bookmarks"
+                  href={buildPublicRoute('/bookmarks')}
                   className={bookmarksLinkDisplayState.className}
                   style={bookmarksLinkDisplayState.style}
                 >
@@ -4413,11 +4251,13 @@ class UserPage extends Component<any, any> {
         {/* Compare section collapses right under header */}
         {!minimized && (
           <Collapse isOpen={collapseOpen}>
-            <CompareAddressSection
-              firstAddress={propViewAddress}
-              account={account}
-              scanSpecificUserProfile={this.props.scanSpecificUserProfile}
-            />
+            <Suspense fallback={null}>
+              <CompareAddressSection
+                firstAddress={propViewAddress}
+                account={account}
+                scanSpecificUserProfile={this.props.scanSpecificUserProfile}
+              />
+            </Suspense>
           </Collapse>
         )}
 
@@ -4502,7 +4342,7 @@ class UserPage extends Component<any, any> {
                                     }
                                     surveyUrlParams.set('responder', String(propViewAddress));
                                     window.open(
-                                      `/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`,
+                                      buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyUrlParams.toString() ? `?${surveyUrlParams.toString()}` : ''}`),
                                       '_blank',
                                       'noopener,noreferrer'
                                     );
@@ -4644,7 +4484,7 @@ class UserPage extends Component<any, any> {
                               style={surveyCreatedPreviewDisplayState.style}
                             >
                               <a
-                                href={`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(surveyLinkSlug)}` : ''}`}
+                                href={buildPublicRoute(`/survey/${encodeURIComponent(String(survey.id))}${surveyLinkSlug ? `?session=${encodeURIComponent(surveyLinkSlug)}` : ''}`)}
                                 target='_blank'
                                 rel='noopener noreferrer'
                                 className={styles.surveyTitleLink}
@@ -5046,7 +4886,7 @@ class UserPage extends Component<any, any> {
             {fullProfileModalDisplayState.shouldRenderModalActions && (
               <div className={styles.modalActions}>
                 {fullProfileModalDisplayState.shouldRenderBookmarksLink && (
-                  <a href="/bookmarks" className={styles.bookmarksLink}>
+                  <a href={buildPublicRoute('/bookmarks')} className={styles.bookmarksLink}>
                     My Bookmarks <FontAwesomeIcon icon={faExternalLinkAlt} />
                   </a>
                 )}

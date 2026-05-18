@@ -12,8 +12,6 @@ import {
   faSpinner,
   faExclamationCircle,
   faExternalLinkAlt,
-  faCopy,
-  faDownload,
   faImage,
   faClipboard,
   faBookmark,
@@ -41,11 +39,11 @@ import {
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import JsonDisplay from '../Shared/Json/JsonDisplay';
 import CETooltip from '../Shared/CETooltip';
-import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import CompactImageChooser from '../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
+import CreateSbtShareableBlock from './CreateSbtShareableBlock';
 
 import { cryptoUtils }  from '../../utilities/crypto/cryptography.js';
 import {
@@ -76,6 +74,10 @@ import {
 import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerAuth.js';
+import {
+  renderCreateSbtDistributionOptionsSection,
+  renderCreateSbtMintOptionsSection,
+} from './CreateSBTGroupSections';
 import {
   areMetadataLockGateMapsEqual,
   buildCreateSbtAutoCreate2SaltSource,
@@ -121,7 +123,6 @@ import {
   buildCreateSbtInviteLinks,
   buildCreateSbtInviteLinksBackupPatch,
   buildCreateSbtJsonPreviewData,
-  buildCreateSbtActiveClassName,
   buildCreateSbtActionLinkClassName,
   buildCreateSbtCollapseHeaderClassName,
   buildCreateSbtInlineFieldLockClassName,
@@ -224,7 +225,6 @@ import {
   resolveCreateSbtRestoredMetadataLockGateIds,
   resolveCreateSbtRestoredPredictableAddressEnabled,
   resolveCreateSbtEffectiveSessionSlug,
-  resolveCreateSbtShareableTooltipIconStyle,
   resolveCreateSbtSuccessDisplayState,
   resolveCreateSbtTooltipIconStyle,
   requireCreateSbtRecipientsForGateSelection,
@@ -2754,7 +2754,7 @@ class CreateSBTGroup extends Component<any, any> {
         scopeLabel: 'image',
       });
       if (imageEncryption && imageEncryption.recipients.length) {
-        if (!useImageUrl && sbtImageFile && lockedImageAsset?.txId && lockedImageAsset?.url) {
+        if (!useImageUrl && sbtImageFile && lockedImageAsset?.txId) {
           finalImageUrl = '';
           encryptedFields.image = lockedImageAsset;
           markEncryptedField('image', selectedImageGateIds);
@@ -3638,99 +3638,21 @@ class CreateSBTGroup extends Component<any, any> {
     testId: string | null = null
   ): JSX.Element => {
     const { copiedLinkIndex, sbtAddress } = this.state;
-    const copyKeyUrl = `url_${qrId}`;
-    const copyKeyImg = `img_${qrId}`;
-    const copyUrlActionState = resolveCreateSbtCopyActionDisplayState({
-      copied: copiedLinkIndex === copyKeyUrl,
-    });
-    const copyQrImageActionState = resolveCreateSbtCopyActionDisplayState({
-      copied: copiedLinkIndex === copyKeyImg,
-    });
-
-    // Derive ID for the hidden high-res QR code
-    const highResQrId = `${qrId}_high_res`;
-
-    const { hiddenStyle } = resolveCreateSbtHiddenQrDisplayState();
-
     return (
-      <div className={styles.shareableBlock} {...(testId ? { 'data-testid': testId } : {})}>
-        {/* Left Column: Title & URL */}
-        <div className={styles.leftCol}>
-          <h3 className={styles.blockTitle}>
-            {title}
-            {tooltipText && (
-              <>
-                <FontAwesomeIcon
-                  icon={faQuestionCircle}
-                  className={styles.tooltip}
-                  id={`tt_${qrId}`}
-                  style={resolveCreateSbtShareableTooltipIconStyle()}
-                />
-                <CETooltip placement="right" target={`tt_${qrId}`} className={styles.tooltipBubble}>
-                  {tooltipText}
-                </CETooltip>
-              </>
-            )}
-          </h3>
-
-          <div className={styles.urlContainer}>
-            <span className={styles.urlText} title={url}>{url}</span>
-            <button
-              onClick={() => this.copyToClipboard(url, copyKeyUrl)}
-              className={styles.copyButton}
-              title="Copy URL"
-            >
-              {copyUrlActionState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-              {copyUrlActionState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
-            </button>
-          </div>
-        </div>
-
-        {/* Right Column: Compact QR & Actions */}
-        <div className={styles.rightCol}>
-          <div className={styles.qrCodeContainer}>
-            {/* Visible Small QR (64px) */}
-            <QRCodeSVG
-              id={qrId}
-              value={url}
-              size={64}
-              bgColor={"#ffffff"}
-              fgColor={"#000000"}
-              level="L"
-              includeMargin={false}
-            />
-            {/* Hidden High-Res QR (1024px) for Copy/Download */}
-            <div style={hiddenStyle}>
-              <QRCodeSVG
-                id={highResQrId}
-                value={url}
-                size={1024}
-                bgColor={"#ffffff"}
-                fgColor={"#000000"}
-                level="L"
-                includeMargin={true}
-              />
-            </div>
-          </div>
-          <div className={styles.qrActionsColumn}>
-            <button
-              className={styles.qrActionButton}
-              onClick={() => this.copyQRImage(highResQrId, copyKeyImg)}
-              title="Copy QR Image to Clipboard"
-            >
-              {copyQrImageActionState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
-              {copyQrImageActionState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faClipboard} />}
-            </button>
-            <button
-              className={styles.qrActionButton}
-              onClick={() => this.downloadQR(highResQrId, `ContextEngine_Sbt_${sbtAddress}_${fileSuffix}.png`)}
-              title="Download QR Code"
-            >
-              <FontAwesomeIcon icon={faDownload} />
-            </button>
-          </div>
-        </div>
-      </div>
+      <CreateSbtShareableBlock
+        copiedLinkIndex={copiedLinkIndex}
+        fileSuffix={fileSuffix}
+        onCopyQrImage={this.copyQRImage}
+        onCopyUrl={this.copyToClipboard}
+        onDownloadQr={this.downloadQR}
+        qrId={qrId}
+        sbtAddress={sbtAddress}
+        styles={styles}
+        testId={testId}
+        title={title}
+        tooltipText={tooltipText}
+        url={url}
+      />
     );
   }
 
@@ -3784,7 +3706,6 @@ class CreateSBTGroup extends Component<any, any> {
       predictedAddressBusy
     } = this.state;
 
-    const calendarStyles = { color: 'black' };
     const authoringChain = this.getSelectedAuthoringChain();
     const authoringChainId = authoringChain?.id || this.getSelectedAuthoringChainId() || '';
 
@@ -3971,6 +3892,15 @@ class CreateSBTGroup extends Component<any, any> {
         showDots={false}
       />
     );
+    const onPredictableAddressToggle = (checked: boolean): void => {
+      this.setState(
+        { predictableAddressEnabled: checked },
+        () => {
+          this.persistFormCache();
+          this.schedulePredictedAddressRefresh();
+        }
+      );
+    };
 
     return (
       <div id={styles.createGroupExpanded} style={rootSurfaceStyle}>
@@ -4174,293 +4104,34 @@ class CreateSBTGroup extends Component<any, any> {
         <div className={styles.collapsibleSection}>
           {this.renderCollapsibleHeader('Create Options', 'mintOptionsCollapsed')}
           {!mintOptionsCollapsed && (
-            <div className={styles.sbtTokenOptions}>
-
-              {/* Top Row: Limited & Time-Limited Cards */}
-              <div className={styles.optionsGrid}>
-                {/* 1. Limited Tokens Card */}
-                <div
-                  className={buildCreateSbtActiveClassName({
-                    activeClassName: styles.activeOption,
-                    baseClassNames: styles.optionCard,
-                    shouldUseActiveClass: mintOptionsDisplayState.shouldUseLimitedOptionActiveClass,
-                  })}
-                >
-                  <label className={styles.optionHeader}>
-                    <input
-                      type="checkbox"
-                      name="sbtDistribution.isLimited"
-                      checked={sbtDistribution.isLimited}
-                      onChange={this.handleInputChange}
-                    />
-                    <span>Limited Tokens</span>
-                    <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="limitedNumberTooltip" style={resolveCreateSbtTooltipIconStyle()} />
-                    <CETooltip placement="right" target="limitedNumberTooltip" className={styles.tooltipBubble}>
-                      {`Specify the maximum number of ${t('sbts')} that can be ${t('mintedLower')}.`}
-                    </CETooltip>
-                  </label>
-
-                  {mintOptionsDisplayState.shouldRenderLimitedNumberInput && (
-                    <div className={styles.optionBody}>
-                      <input
-                        type="number"
-                        name="sbtDistribution.limitedNumber"
-                        value={sbtDistribution.limitedNumber}
-                        onChange={this.handleInputChange}
-                        placeholder="Qty (e.g. 100)"
-                        className={styles.inlineNumberInput}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. Time-Limited Card */}
-                <div
-                  className={buildCreateSbtActiveClassName({
-                    activeClassName: styles.activeOption,
-                    baseClassNames: styles.optionCard,
-                    shouldUseActiveClass: mintOptionsDisplayState.shouldUseTimeLimitedOptionActiveClass,
-                  })}
-                >
-                  <label className={styles.optionHeader}>
-                    <input
-                      type="checkbox"
-                      name="sbtDistribution.isTimeLimited"
-                      checked={sbtDistribution.isTimeLimited}
-                      onChange={this.handleInputChange}
-                    />
-                    <span>Time-Limited</span>
-                    <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="timeLimitedTooltip" style={resolveCreateSbtTooltipIconStyle()} />
-                    <CETooltip placement="right" target="timeLimitedTooltip" className={styles.tooltipBubble}>
-                      Set an end time for the minting period.
-                    </CETooltip>
-                  </label>
-
-                  {mintOptionsDisplayState.shouldRenderTimeLimitedInput && (
-                    <div className={styles.timeLimitedOptions}>
-                      <CEDateTimeInput
-                        selected={sbtDistribution.mintingEndTime}
-                        onChange={this.handleMintingEndTimeChange}
-                        showTimeSelect
-                        timeFormat="HH:mm"
-                        timeIntervals={15}
-                        timeCaption="time"
-                        dateFormat="MMMM d, yyyy h:mm aa"
-                        calendarClassName={styles.blackText}
-                        style={calendarStyles}
-                        placeholderText="Select End Date"
-                        // className={styles.datePickerInput}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className={styles.settingsStack}>
-                <div className={styles.settingRow}>
-                  <div className={styles.settingCopy}>
-                    <span className={styles.settingLabel}>
-                      {`${t('burn')} Auth`}
-                      <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="burnAuthTooltip" style={resolveCreateSbtTooltipIconStyle()} />
-                    </span>
-                    <CETooltip placement="right" target="burnAuthTooltip" className={styles.tooltipBubble}>
-                      Specify who can burn the token.
-                    </CETooltip>
-                  </div>
-                  <select
-                    name="sbtDistribution.burnAuth"
-                    value={sbtDistribution.burnAuth}
-                    onChange={this.handleBurnAuthChange}
-                    className={styles.compactSelect}
-                  >
-                    <option value="AdminOnly">Admin Only</option>
-                    <option value="OwnerOnly">Owner Only</option>
-                    <option value="Both">Both</option>
-                    <option value="Neither">Neither</option>
-                  </select>
-                </div>
-
-                <div className={styles.settingRow}>
-                  <div className={styles.settingCopy}>
-                    <span className={styles.settingLabel}>
-                      Admin Address
-                      <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="burnAdminTooltip" style={resolveCreateSbtTooltipIconStyle()} />
-                    </span>
-                    <CETooltip placement="right" target="burnAdminTooltip" className={styles.tooltipBubble}>
-                      Enter the address that can burn the token.
-                    </CETooltip>
-                  </div>
-                  <input
-                    type="text"
-                    name="sbtDistribution.burnAdmin"
-                    value={sbtDistribution.burnAdmin}
-                    onChange={this.handleInputChange}
-                    placeholder="0x... (default: deployer)"
-                    className={styles.compactTextInput}
-                  />
-                </div>
-
-                {mintOptionsDisplayState.shouldRenderNetworkSelector ? (
-                  <div className={styles.settingRow}>
-                    <div className={styles.settingCopy}>
-                      <span className={styles.settingLabel}>
-                        Network
-                        <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="networkTooltip" style={resolveCreateSbtTooltipIconStyle()} />
-                      </span>
-                      <CETooltip placement="right" target="networkTooltip" className={styles.tooltipBubble}>
-                        Select the network for minting.
-                      </CETooltip>
-                    </div>
-                    <select
-                      className={styles.compactSelect}
-                      value={authoringChainId}
-                      onChange={this.handleNetworkChange}
-                    >
-                      {chainOptions.map((c: CreateSbtChainOption) => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : mintOptionsDisplayState.shouldRenderNetworkReadonly ? (
-                  <div className={styles.settingRow}>
-                    <div className={styles.settingCopy}>
-                      <span className={styles.settingLabel}>Network</span>
-                    </div>
-                    <span className={styles.readonlyPill}>{authoringChain?.name || 'Session chain'}</span>
-                  </div>
-                ) : null}
-
-                <div
-                  className={buildCreateSbtActiveClassName({
-                    activeClassName: styles.settingRowActive,
-                    baseClassNames: [styles.settingRow, styles.settingToggleRow],
-                    shouldUseActiveClass: mintOptionsDisplayState.shouldUsePredictableAddressActiveClass,
-                  })}
-                >
-                  <label className={styles.settingToggleLabel}>
-                    <input
-                      type="checkbox"
-                      checked={predictableAddressActive}
-                      disabled={predictableAddressLocked}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => this.setState(
-                        { predictableAddressEnabled: e.target.checked },
-                        () => {
-                          this.persistFormCache();
-                          this.schedulePredictedAddressRefresh();
-                        }
-                      )}
-                      data-testid={E2E_TESTIDS.SBT_CREATE_PREDICTABLE_TOGGLE}
-                    />
-                    <span className={styles.settingCopy}>
-                      <span className={styles.settingLabel}>
-                        Make address predictable before deploy
-                        <FontAwesomeIcon icon={faQuestionCircle} className={styles.tooltip} id="create2SaltTooltip" style={resolveCreateSbtTooltipIconStyle()} />
-                      </span>
-                    </span>
-                    <CETooltip placement="right" target="create2SaltTooltip" className={styles.tooltipBubble}>
-                      {`Use deterministic deployment so the ${t('sbt')} address is known before on-chain creation.`}
-                    </CETooltip>
-                  </label>
-                  {mintOptionsDisplayState.shouldRenderPredictableAddressDetails && (
-                    <div className={styles.settingRowDetails}>
-                      <div className={styles.addressPreviewRow}>
-                        <span className={styles.previewLabel}>Predicted address</span>
-                        <code
-                          className={styles.addressPreviewValue}
-                          data-testid={E2E_TESTIDS.SBT_CREATE_PREDICTED_ADDRESS}
-                        >
-                          {this.getPredictedAddressDisplayText()}
-                        </code>
-                      </div>
-                      {mintOptionsDisplayState.shouldRenderPredictableAddressBusy && (
-                        <div className={styles.fieldHelpText}>Calculating address…</div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-            </div>
+            renderCreateSbtMintOptionsSection({
+              sbtDistribution,
+              mintOptionsDisplayState,
+              authoringChainId,
+              authoringChain,
+              chainOptions,
+              predictableAddressActive,
+              predictableAddressLocked,
+              predictedAddressDisplayText: this.getPredictedAddressDisplayText(),
+              handleInputChange: this.handleInputChange,
+              handleBurnAuthChange: this.handleBurnAuthChange,
+              handleNetworkChange: this.handleNetworkChange,
+              handleMintingEndTimeChange: this.handleMintingEndTimeChange,
+              onPredictableAddressToggle,
+            })
           )}
         </div>
 
         <div className={styles.collapsibleSection}>
           {this.renderCollapsibleHeader('Distribution Options', 'distributionOptionsCollapsed')}
           {!distributionOptionsCollapsed && (
-            <div className={styles.distributionSection}>
-              <div className={styles.distributionGrid}>
-                {distributionOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className={buildCreateSbtActiveClassName({
-                      activeClassName: styles.distributionCardActive,
-                      baseClassNames: styles.distributionCard,
-                      shouldUseActiveClass: option.shouldUseActiveClass,
-                    })}
-                  >
-                    <span className={styles.distributionCardTop}>
-                      <span className={styles.distributionChoice}>
-                        <input
-                          type="radio"
-                          name="sbtDistribution.distributionOption"
-                          value={option.value}
-                          checked={option.selected}
-                          onChange={this.handleInputChange}
-                        />
-                        <span>{option.label}</span>
-                      </span>
-                      <span className={styles.distributionTooltipWrap}>
-                        <FontAwesomeIcon
-                          icon={faQuestionCircle}
-                          className={styles.tooltip}
-                          id={option.tooltipId}
-                          style={resolveCreateSbtTooltipIconStyle()}
-                        />
-                        <CETooltip placement="right" target={option.tooltipId} className={styles.tooltipBubble}>
-                          {option.tooltipText}
-                        </CETooltip>
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-
-              {actionDisplayState.shouldRenderGroupPasswordInput && (
-                <div className={styles.groupPasswordInputContainer}>
-                  <input
-                    type="text"
-                    name="groupPassword"
-                    value={groupPassword}
-                    onChange={this.handleInputChange}
-                    placeholder="Enter the group password"
-                    className={styles.groupPasswordInput}
-                  />
-                </div>
-              )}
-
-              <label className={styles.distributionCheckboxRow}>
-                <span className={styles.distributionChoice}>
-                  <input
-                    type="checkbox"
-                    name="sbtDistribution.unlisted"
-                    checked={sbtDistribution.unlisted}
-                    onChange={this.handleInputChange}
-                  />
-                  <span>Unlisted</span>
-                </span>
-                <span className={styles.distributionTooltipWrap}>
-                  <FontAwesomeIcon
-                    icon={faQuestionCircle}
-                    className={styles.tooltip}
-                    id="unlistedTooltip"
-                    style={resolveCreateSbtTooltipIconStyle()}
-                  />
-                  <CETooltip placement="right" target="unlistedTooltip" className={styles.tooltipBubble}>
-                    {`If checked, the ${t('sbtLower')} will not appear in the public list but will still be discoverable via the Arweave transaction if not encrypted.`}
-                  </CETooltip>
-                </span>
-              </label>
-            </div>
+            renderCreateSbtDistributionOptionsSection({
+              distributionOptions,
+              actionDisplayState,
+              groupPassword,
+              sbtDistribution,
+              handleInputChange: this.handleInputChange,
+            })
           )}
         </div>
 

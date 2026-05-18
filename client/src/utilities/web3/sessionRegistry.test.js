@@ -511,6 +511,88 @@ describe('registerSessionOnChain duplicate guards', () => {
     expect(contractMock.createSession).not.toHaveBeenCalled();
   });
 
+  it('fails closed when the connected wallet chain cannot be verified before a registry write', async () => {
+    const walletProvider = makeWalletProvider();
+    const signer = {
+      provider: {
+        getNetwork: jest.fn().mockRejectedValue(new Error('wallet chain unavailable')),
+      },
+      getChainId: jest.fn().mockRejectedValue(new Error('signer chain unavailable')),
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    jest.spyOn(ethers.providers, 'Web3Provider').mockImplementation(function MockWeb3Provider() {
+      return {
+        getSigner: () => signer,
+        getNetwork: jest.fn().mockRejectedValue(new Error('provider chain unavailable')),
+      };
+    });
+    const contractSpy = jest.spyOn(ethers, 'Contract');
+
+    await expect(registerSessionOnChain({
+      providerLike: walletProvider,
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'unknown-wallet-network',
+      sessionId: '0x11111111111111111111111111111113',
+      metadataURI: 'ar://example',
+    })).rejects.toThrow(
+      `Unable to verify the connected wallet chain. Session registry writes require ${CONFIGURED_REGISTRY_CHAIN_NAME} (${CONFIGURED_REGISTRY_CHAIN_ID}). Switch the wallet network and retry.`
+    );
+
+    expect(contractSpy).not.toHaveBeenCalled();
+    expect(walletProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({
+      method: 'eth_sendTransaction',
+    }));
+  });
+
+  it.each([
+    ['setSessionFieldsOnChain', () => setSessionFieldsOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'wrong-wallet-network',
+      fields: { corsWorkerUrl: 'https://worker.example' },
+    })],
+    ['updateSessionMetadataOnChain', () => updateSessionMetadataOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'wrong-wallet-network',
+      metadataURI: 'ar://new-metadata',
+      encryptedMetadataURI: '',
+    })],
+    ['setResourceGatesOnChain', () => setResourceGatesOnChain({
+      providerLike: makeWalletProvider(),
+      chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+      slug: 'wrong-wallet-network',
+      gates: [{
+        resourceKey: 'default',
+        sbtAddresses: ['0x0000000000000000000000000000000000000002'],
+        chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        mode: 0,
+        perMemberLimit: 0,
+      }],
+    })],
+  ])('throws before sending when %s is called from the wrong wallet chain', async (_name, runWrite) => {
+    const walletProvider = makeWalletProvider();
+    const signer = {
+      provider: {
+        getNetwork: jest.fn().mockResolvedValue({ chainId: 8453 }),
+      },
+    };
+    cryptoUtils._getProvider.mockReturnValue(walletProvider);
+
+    installWeb3ProviderMock({ signer });
+    const contractSpy = jest.spyOn(ethers, 'Contract');
+
+    await expect(runWrite()).rejects.toThrow(
+      `Connected wallet is on Base (8453), but session registry writes require ${CONFIGURED_REGISTRY_CHAIN_NAME} (${CONFIGURED_REGISTRY_CHAIN_ID}). Switch the wallet network and retry.`
+    );
+
+    expect(contractSpy).not.toHaveBeenCalled();
+    expect(walletProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({
+      method: 'eth_sendTransaction',
+    }));
+  });
+
   it('throws a clear error before sending when the session id already exists', async () => {
     const walletProvider = makeWalletProvider();
     const signer = { provider: null, getAddress: jest.fn().mockResolvedValue(TEST_SIGNER_ADDRESS) };
@@ -894,7 +976,7 @@ describe('registerSessionOnChain creation fee overrides', () => {
 
   it('rethrows transient RPC errors from SESSION_CREATION_FEE getter', async () => {
     const walletProvider = { request: jest.fn() };
-    const signer = { provider: null };
+    const signer = { provider: null, getChainId: jest.fn().mockResolvedValue(CONFIGURED_REGISTRY_CHAIN_ID) };
     const rpcError = new Error('network timeout');
     rpcError.code = 'SERVER_ERROR';
     const signerContractMock = {

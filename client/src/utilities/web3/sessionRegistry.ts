@@ -790,7 +790,7 @@ const describeChainTarget = (chainId) => {
     : `chain ${id}`;
 };
 
-const readSignerChainId = async (signer) => {
+const readSignerChainId = async (signer, ethersProvider = null) => {
   try {
     if (typeof signer?.getChainId === 'function') {
       const signerChainId = Number(await signer.getChainId());
@@ -806,7 +806,29 @@ const readSignerChainId = async (signer) => {
     if (signerChainId > 0) return signerChainId;
   } catch (_) {}
 
+  try {
+    const net = await ethersProvider?.getNetwork?.();
+    const signerChainId = Number(net?.chainId || 0) || 0;
+    if (signerChainId > 0) return signerChainId;
+  } catch (_) {}
+
   return 0;
+};
+
+const assertSignerOnRegistryWriteChain = async ({ signer, ethersProvider = null, chainId }) => {
+  const writeChainId = Number(chainId || 0) || 0;
+  const signerChainId = await readSignerChainId(signer, ethersProvider);
+  if (writeChainId && !signerChainId) {
+    throw new Error(
+      `Unable to verify the connected wallet chain. Session registry writes require ${describeChainTarget(writeChainId)}. Switch the wallet network and retry.`,
+    );
+  }
+  if (writeChainId && signerChainId !== writeChainId) {
+    throw new Error(
+      `Connected wallet is on ${describeChainTarget(signerChainId)}, but session registry writes require ${describeChainTarget(writeChainId)}. Switch the wallet network and retry.`,
+    );
+  }
+  return writeChainId;
 };
 
 const isArweaveTxId = (value) => /^[a-z0-9_-]{43}$/i.test(value);
@@ -1600,13 +1622,7 @@ export const registerSessionOnChain = async ({
   }
 
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
-  const writeChainId = Number(chainId || 0) || 0;
-  const signerChainId = await readSignerChainId(signer);
-  if (writeChainId && signerChainId && signerChainId !== writeChainId) {
-    throw new Error(
-      `Connected wallet is on ${describeChainTarget(signerChainId)}, but session registry writes require ${describeChainTarget(writeChainId)}. Switch the wallet network and retry.`,
-    );
-  }
+  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, ethersProvider, chainId });
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   const readContract = getRegistryContract(writeChainId, null, { bootstrapRpc: true }) || contract;
 
@@ -1905,10 +1921,11 @@ export const setSessionFieldsOnChain = async ({
   }
   const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
+  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, ethersProvider, chainId });
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   const txFeeOverrides = await resolveTxFeeOverrides({
     signer,
-    chainId: Number(chainId || 0) || 0,
+    chainId: writeChainId,
     gasPriceGwei,
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
@@ -1918,7 +1935,6 @@ export const setSessionFieldsOnChain = async ({
   const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
     ? Math.floor(gasOverride)
     : null;
-  const writeChainId = Number(chainId || 0) || 0;
 
   const entries = fields && typeof fields === 'object'
     ? Object.entries(fields).filter(([, value]) => value != null)
@@ -2006,13 +2022,14 @@ export const updateSessionMetadataOnChain = async ({
   }
   const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
+  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, ethersProvider, chainId });
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
   if (typeof contract.updateSessionMetadata !== 'function') {
     throw new Error('SessionRegistry does not support updateSessionMetadata.');
   }
   const txFeeOverrides = await resolveTxFeeOverrides({
     signer,
-    chainId: Number(chainId || 0) || 0,
+    chainId: writeChainId,
     gasPriceGwei,
     maxFeePerGasGwei,
     maxPriorityFeePerGasGwei,
@@ -2021,7 +2038,6 @@ export const updateSessionMetadataOnChain = async ({
   const normalizedGasOverride = Number.isFinite(gasOverride) && gasOverride > 0
     ? Math.floor(gasOverride)
     : null;
-  const writeChainId = Number(chainId || 0) || 0;
   const tx = await sendWithNonceRetry({
     estimate: null,
     send: (overrides) => sendRegistryContractWriteViaProvider({
@@ -2064,8 +2080,8 @@ export const setResourceGatesOnChain = async ({
   }
   const registrySlug = validateRegistrySlugForWriteOrThrow(slug);
   const { signingProvider, ethersProvider, signer } = getWriteContextFromProviderLike(providerLike);
+  const writeChainId = await assertSignerOnRegistryWriteChain({ signer, ethersProvider, chainId });
   const contract = new ethers.Contract(registryAddress, SESSION_REGISTRY_ABI, signer);
-  const writeChainId = Number(chainId || 0) || 0;
   const txFeeOverrides = await resolveTxFeeOverrides({
     signer,
     chainId: writeChainId,

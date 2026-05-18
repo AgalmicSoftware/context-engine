@@ -4,6 +4,7 @@ import { debateData, voterProfiles } from '../../../variables/demo/debateData.js
 import { ThemeContext, darkTheme, soften, useTheme } from './debateHudTheme';
 import { getDemoAvatarByName } from '../../../utilities/ui/demoAvatars.js';
 import { generateBlockieDataUrl } from '../../../utilities/ui/blockieAvatars.js';
+import { buildPublicRoute } from '../../../utilities/ui/publicUrl.js';
 
 type CompassPoint = {
   name: string;
@@ -12,6 +13,8 @@ type CompassPoint = {
   color?: string;
   type?: string;
   comment?: string;
+  profileUsername?: string;
+  profileUrl?: string;
 };
 
 type Compass = {
@@ -72,6 +75,17 @@ type StandalonePoliticalCompassProps = PoliticalCompassProps & {
 
 const compassQuotes: Record<string, CompassQuote[]> = {};
 const voterProfileMap = voterProfiles as Record<string, VoterProfile | undefined>;
+
+const getCompassPointProfileHref = (point?: CompassPoint | null): string => {
+  const profileUrl = String(point?.profileUrl || "").trim();
+  if (profileUrl) {
+    return profileUrl.startsWith("/") ? buildPublicRoute(profileUrl) : profileUrl;
+  }
+
+  const profileUsername = String(point?.profileUsername || "").trim();
+  if (!profileUsername) return "";
+  return buildPublicRoute(`/su/${encodeURIComponent(profileUsername)}`);
+};
 
 const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) => {
   const T = useTheme();
@@ -322,6 +336,17 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
         const quotes = compassQuotes[selectedPoint] || [];
         const sp = compass.points.find((p) => p.name === selectedPoint);
         const pointComment = getPointComment(sp);
+        const profileHref = getCompassPointProfileHref(sp);
+        const selectedPointTitleStyle: React.CSSProperties = {
+          color: (sp && sp.color) || T.accent,
+          textDecoration: 'none',
+          fontWeight: 700,
+          fontSize: 15,
+        };
+        const selectedPointCitationStyle: React.CSSProperties = {
+          color: (sp && sp.color) || T.accent,
+          textDecoration: 'none',
+        };
         const qLabel = sp ? (
           (sp.y > 0.5 ? compass.yAxis.top : compass.yAxis.bottom) + " / " +
           (sp.x > 0.5 ? compass.xAxis.right : compass.xAxis.left)
@@ -340,14 +365,18 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
             boxShadow: T.shadow}}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
               <div>
-                <a
-                  href={`/su/${selectedPoint}`}
-                  style={{ color: (sp && sp.color) || T.accent, textDecoration: 'none', fontWeight: 700, fontSize: 15 }}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                >
-                  {selectedPoint}
-                </a>
+                {profileHref ? (
+                  <a
+                    href={profileHref}
+                    style={selectedPointTitleStyle}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                  >
+                    {selectedPoint}
+                  </a>
+                ) : (
+                  <span style={selectedPointTitleStyle}>{selectedPoint}</span>
+                )}
                 {profile && (
                   <span style={{ fontSize: 11, color: T.textMuted, marginLeft: 8 }}>
                     {profile.affiliation}{profile.role ? ` · ${profile.role}` : ""}
@@ -382,7 +411,11 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                   fontStyle: "normal",
                   fontWeight: 700,
                   color: (sp && sp.color) || T.accent}}>
-                  <a href={`/su/${selectedPoint}`} style={{ color: (sp && sp.color) || T.accent, textDecoration: 'none' }} target='_blank' rel='noopener noreferrer'>— {selectedPoint}</a>
+                  {profileHref ? (
+                    <a href={profileHref} style={selectedPointCitationStyle} target='_blank' rel='noopener noreferrer'>— {selectedPoint}</a>
+                  ) : (
+                    <span style={selectedPointCitationStyle}>— {selectedPoint}</span>
+                  )}
                 </div>
               </div>
             ) : (

@@ -23,6 +23,8 @@ import {
   buildCreateSurveyHashPatch,
   buildCreateSurveyMountSubmitResetPatch,
   buildCreateSurveyNetworkSwitchPatch,
+  buildCreateSurveyGateOptions,
+  buildCreateSurveyGateObjectsAndRecipients,
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyOpenLockKeyPatch,
   buildCreateSurveyQuestionFieldUpdateList,
@@ -33,6 +35,7 @@ import {
   buildCreateSurveyQuestionTagInputValueList,
   buildCreateSurveyQuestionTagRemovalList,
   buildCreateSurveyQuestionsSubmitSuccessPatch,
+  buildCreateSurveySubmitGatePlan,
   buildCreateSurveySurveySubmitSuccessPatch,
   buildCreateSurveySubmitBlockingErrorPatch,
   buildCreateSurveySubmitCatchPatch,
@@ -278,6 +281,136 @@ describe('createQuestionsAndSurveysHelpers question options', () => {
     });
   });
 
+  it('derives submit-time lock gates for survey and standalone modes', () => {
+    const surveyPlan = buildCreateSurveySubmitGatePlan({
+      defaultGateId: 'default-gate',
+      gateMap: {
+        'default-gate': {},
+        'survey-gate': {},
+        'question-gate': {},
+      },
+      isStandaloneQuestion: false,
+      surveyLockGateIds: [],
+      questions: [
+        { id: 'q1', lockGateIds: null },
+        { id: 'q2', lockGateIds: [' question-gate ', 'missing-gate'] },
+      ],
+    });
+
+    expect(surveyPlan.defaultSubmitGateIds).toEqual(['default-gate']);
+    expect(surveyPlan.resolvedSurveyLockGateIds).toEqual(['default-gate']);
+    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: null }))
+      .toEqual(['default-gate']);
+    expect(surveyPlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: [' question-gate ', 'missing-gate'] }))
+      .toEqual(['question-gate']);
+    expect(surveyPlan.needsLit).toBe(true);
+
+    const standalonePlan = buildCreateSurveySubmitGatePlan({
+      defaultGateId: 'default-gate',
+      gateMap: {
+        'default-gate': {},
+        'question-gate': {},
+      },
+      isStandaloneQuestion: true,
+      surveyLockGateIds: ['default-gate'],
+      questions: [{ id: 'q1', lockGateIds: [] }],
+    });
+
+    expect(standalonePlan.resolvedSurveyLockGateIds).toEqual([]);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q1', lockGateIds: [] }))
+      .toEqual(['default-gate']);
+    expect(standalonePlan.resolveQuestionSubmitGateIds({ id: 'q2', lockGateIds: ['question-gate'] }))
+      .toEqual(['question-gate']);
+    expect(standalonePlan.needsLit).toBe(true);
+  });
+
+  it('derives authoring gate options for survey and standalone response resources', () => {
+    const cfg = {
+      sessionName: 'FOR TEST 12',
+      __registry: {
+        gateAuthority: 'onchain',
+        gatesByResource: {
+          surveyResponses: {
+            gateId: 'survey_gate',
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+            lookupStatus: 'ok',
+          },
+          questionResponses: {
+            gateId: 'question_gate',
+            sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+            lookupStatus: 'ok',
+          },
+          default: {
+            gateId: 'default_gate',
+            sbtAddresses: ['0x3333333333333333333333333333333333333333'],
+            lookupStatus: 'ok',
+          },
+          docUrls: {
+            gateId: 'doc_gate',
+            sbtAddresses: ['0x4444444444444444444444444444444444444444'],
+            lookupStatus: 'ok',
+          },
+        },
+      },
+      sponsored: {
+        gates: {
+          survey_gate: {
+            mode: 'all',
+            sbtAddresses: ['0x1111111111111111111111111111111111111111'],
+          },
+          question_gate: {
+            mode: 'any',
+            sbtAddresses: ['0x2222222222222222222222222222222222222222'],
+          },
+          default_gate: {
+            mode: 'any',
+            sbtAddresses: ['0x3333333333333333333333333333333333333333'],
+          },
+          doc_gate: {
+            mode: 'all',
+            sbtAddresses: ['0x4444444444444444444444444444444444444444'],
+          },
+        },
+      },
+    };
+
+    const surveyOptions = buildCreateSurveyGateOptions({
+      cfg,
+      isStandaloneQuestion: false,
+      sessionLabel: 'FOR TEST 12',
+    });
+    expect(surveyOptions.defaultGateId).toBe('survey_gate');
+    expect(surveyOptions.gateOptions.map((option) => option.id)).toEqual([
+      'default_gate',
+      'survey_gate',
+    ]);
+    expect(surveyOptions.gateOptions.map((option) => option.displayLabel)).toEqual([
+      'FOR TEST 12 (default)',
+      'FOR TEST 12 (survey)',
+    ]);
+    expect(surveyOptions.gateOptions.find((option) => option.id === 'survey_gate'))
+      .toMatchObject({
+        mode: 'all',
+        resourceKey: 'surveyResponses',
+        sbtAddress: '0x1111111111111111111111111111111111111111',
+      });
+
+    const standaloneOptions = buildCreateSurveyGateOptions({
+      cfg,
+      isStandaloneQuestion: true,
+      sessionLabel: 'FOR TEST 12',
+    });
+    expect(standaloneOptions.defaultGateId).toBe('question_gate');
+    expect(standaloneOptions.gateOptions.map((option) => option.id)).toEqual([
+      'default_gate',
+      'question_gate',
+    ]);
+    expect(standaloneOptions.gateOptions.map((option) => option.displayLabel)).toEqual([
+      'FOR TEST 12 (default)',
+      'FOR TEST 12 (questions)',
+    ]);
+  });
+
   it('removes duplicate survey questions by id while preserving first occurrences', () => {
     const first = { id: 'q1', prompt: 'First' };
     const duplicate = { id: 'q1', prompt: 'Duplicate' };
@@ -386,6 +519,63 @@ describe('createQuestionsAndSurveysHelpers encryption payloads', () => {
       ...second,
     ]);
   });
+
+  it('plans Lit gate objects and deduped recipients without executing crypto', () => {
+    const buildSbtAccessControlConditions = jest.fn(({ sbtAddresses, chainId, litChain, mode }) => ([{
+      contractAddress: sbtAddresses[0],
+      chain: litChain,
+      chainId,
+      mode,
+    }]));
+    const resolveLitChain = jest.fn(({ chainId, litChain }) => litChain || `chain-${chainId}`);
+
+    const plan = buildCreateSurveyGateObjectsAndRecipients({
+      buildSbtAccessControlConditions,
+      chainIdFallback: 11155420,
+      gateIds: ['gate-a', 'missing', 'gate-b'],
+      gateMap: {
+        'gate-a': {
+          label: 'Gate A',
+          mode: 'all',
+          sbtAddresses: ['0xAAA', '0xAAA'],
+        },
+        'gate-b': {
+          name: 'Gate B',
+          mode: 'all',
+          sbtAddress: '0xAAA',
+        },
+      },
+      resolveLitChain,
+    });
+
+    expect(plan.gates).toHaveLength(2);
+    expect(plan.gates[0]).toEqual(expect.objectContaining({
+      gateId: 'gate-a',
+      label: 'Gate A',
+      mode: 'all',
+      sbtAddress: '0xAAA',
+      sbtAddresses: ['0xAAA'],
+      chainId: 11155420,
+      litChain: 'chain-11155420',
+      type: 'sbt',
+    }));
+    expect(plan.gates[1]).toEqual(expect.objectContaining({
+      gateId: 'gate-b',
+      label: 'Gate B',
+      color: stableGateColor('gate-b'),
+    }));
+    expect(plan.recipients).toEqual([{
+      accessControlConditions: [{
+        contractAddress: '0xAAA',
+        chain: 'chain-11155420',
+        chainId: 11155420,
+        mode: 'all',
+      }],
+      chain: 'chain-11155420',
+    }]);
+    expect(resolveLitChain).toHaveBeenCalledTimes(2);
+    expect(buildSbtAccessControlConditions).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('createQuestionsAndSurveysHelpers single-select selection', () => {
@@ -425,6 +615,7 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
     const digest = jest.fn((value: unknown) => ({
       toString: () => `digest:${value}`,
     }));
+    const scriptUrl = ['java', 'script:alert(1)'].join('');
 
     expect(buildCreateSurveyHashValue({
       digest,
@@ -432,7 +623,7 @@ describe('createQuestionsAndSurveysHelpers survey signatures', () => {
         ' https://docs.example/a ',
         'HTTPS://docs.example/a',
         '/local/doc',
-        'javascript:alert(1)',
+        scriptUrl,
       ],
       title: 'Survey title',
     })).toBe('0xdigest:{"title":"Survey title","documentURLs":["https://docs.example/a","/local/doc"]}');

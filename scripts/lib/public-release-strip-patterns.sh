@@ -9,11 +9,6 @@ contextEngine-cc
 docs/agent-native*.md
 client/public/skill.md
 workers/agentBridgeWorker
-client/src/components/TelegramDemoSetup
-docs/ai-agent-bootstrap.md
-.secrets.baseline
-test/contextEngineCc.sw-cache-policy.test.mjs
-workers/sessionCorsWorker/chipotleClient.test.mjs
 TODO
 local-private-version
 CLAUDE.md
@@ -25,6 +20,7 @@ CLAUDE.md
 video-clickthrough-local
 .tmp-review
 .DS_Store
+.secrets.baseline
 .env
 .env.local
 .env.*.local
@@ -56,7 +52,6 @@ private-pack.manifest.json
 Demo Integration Package
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
-client/src/components/MainSite/MainSite.module.test.js
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
 EOF
@@ -88,6 +83,7 @@ CLAUDE.md
 .codex-solc
 .codex-tmp
 .DS_Store
+.secrets.baseline
 .env
 .env.local
 .env.*.local

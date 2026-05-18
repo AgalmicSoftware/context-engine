@@ -24,12 +24,11 @@ import styles from './SurveyTool.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock, faUnlock, faCaretUp, faArrowLeft, faArrowRight, faExternalLinkAlt, faExclamationCircle, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
-import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
+import LazyFallback from '../Shared/LazyFallback';
 import BinaryChoiceInput from './BinaryChoiceInput';
 import BullhornToggleButton from './BullhornToggleButton';
 import ConvictionImportanceLabel from './ConvictionImportanceLabel';
@@ -70,7 +69,6 @@ import {
   renderPileFooterSection,
 } from './surveyPileQuestionSections';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
-import SessionListeningPanel from './SessionListeningPanel';
 import {
   buildPileBaselineCheckPlan,
   buildPileBaselineConsistencyPlan,
@@ -473,6 +471,9 @@ import {
 } from './surveyQuestionsTypes.js';
 
 import { SurveyQuestions } from './SurveyQuestions';
+
+export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
+export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 
 export class PileViewMode extends SurveyQuestions {
   constructor(props) {
@@ -1317,15 +1318,6 @@ export class PileViewMode extends SurveyQuestions {
     super.componentWillUnmount();
   }
 
-  // Wrapper helpers so we don't shadow parent methods
-  handleAnswerPile = (questionId, answer, options = {}) => {
-    this.handleAnswer(0, questionId, answer, options);
-  };
-
-  handleAdditionalPile = (questionId, comments) => {
-    this.handleAdditional(0, questionId, comments);
-  };
-
   handleViewAllFromPile = () => {
     if (this._persistTimer) {
       clearTimeout(this._persistTimer);
@@ -1475,9 +1467,6 @@ export class PileViewMode extends SurveyQuestions {
       },
     }));
   };
-
-  // Keep this tiny wrapper only if other code calls it
-  getSubmitCount = () => (this.getPendingEditStats?.() || { total: 0 }).total | 0;
 
   // Keep semantics aligned with baseline-aware changed-set
   getAnsweredQuestionsCount = () => this.getSubmitCount();
@@ -2655,6 +2644,11 @@ export class PileViewMode extends SurveyQuestions {
     });
 
     const gatedEmptyHasDetails = lockedGateDetails.length > 0;
+    const gatedEmptyRequirementSentence = this.getLockedGateRequirementSentence(lockedGateDetails);
+    const sessionGateDetails = gatedEmptyHasDetails
+      ? lockedGateDetails
+      : this.buildSessionQuestionGateDetails(1);
+    const sessionGateRequirementSentence = this.getLockedGateRequirementSentence(sessionGateDetails);
     const gatedEmptyPanel = hiddenMaskedQuestionIds.length > 0
       ? (
         <div className={styles.gatedEmptyPanelShell}>
@@ -2663,7 +2657,7 @@ export class PileViewMode extends SurveyQuestions {
             lockedGateDetails,
             title: `This session's questions are ${t('gatedLower')}`,
             subtitle: gatedEmptyHasDetails
-              ? `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`
+              ? `${gatedEmptyRequirementSentence ? `${gatedEmptyRequirementSentence} ` : ''}Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`
               : `Connect an eligible ${t('walletLower')} and decrypt to view the questions.`,
             forceExpanded: false,
             surface: 'dark',
@@ -2675,7 +2669,9 @@ export class PileViewMode extends SurveyQuestions {
         <>
           <div className={styles.gatedEmptyHeadline}>{`This session's questions are ${t('gatedLower')}.`}</div>
           <div className={styles.gatedEmptyCopy}>
-            {`These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`}
+            {sessionGateRequirementSentence
+              ? `${sessionGateRequirementSentence} Connect an eligible ${t('walletLower')} to decrypt.`
+              : `These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`}
           </div>
         </>
       );
@@ -2737,21 +2733,25 @@ export class PileViewMode extends SurveyQuestions {
           </div>
           {showListeningAside && (
             <div className={styles.sessionListeningPanelAnchor} ref={this.listeningPanelRef}>
-              <SessionListeningPanel
-                {...this.props}
-                {...this.getAudioInputWorkerProps()}
-                onClose={this.closeListeningPanel}
-              />
+              <React.Suspense fallback={<LazyFallback label="Loading Listening Panel..." minHeight="160px" />}>
+                <LazySessionListeningPanel
+                  {...this.props}
+                  {...this.getAudioInputWorkerProps()}
+                  onClose={this.closeListeningPanel}
+                />
+              </React.Suspense>
             </div>
           )}
         </div>
 
         {!showHologramAssistant && showCreate && (
           <div className={styles.pileFullControls} ref={this.createSectionRef}>
-            <CreateQuestionsAndSurveys
-              {...this.props}
-              hideSurveyQuestionToggleUntilAuthoring={true}
-            />
+            <React.Suspense fallback={<LazyFallback label="Loading Question Authoring..." minHeight="160px" />}>
+              <LazyPileCreateQuestionsAndSurveys
+                {...this.props}
+                hideSurveyQuestionToggleUntilAuthoring={true}
+              />
+            </React.Suspense>
           </div>
         )}
 

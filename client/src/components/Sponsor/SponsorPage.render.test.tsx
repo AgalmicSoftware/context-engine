@@ -229,7 +229,7 @@ describe('SponsorPage', () => {
     expect(screen.getByTestId('ce-sponsor-expiry-input')).toHaveAttribute('min', expect.stringMatching(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/));
     expect(screen.getByText('Issue one-time deploy grants through the selected sponsoring session worker instead of writing raw deploy credentials into the bundle.')).toBeInTheDocument();
     expect(screen.getByText('Uses sponsoring worker: https://worker.example.test')).toBeInTheDocument();
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
+    expect(getToggleCheckbox('Remember non-secret draft fields')).toBeChecked();
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_WORKER_URL_TOGGLE)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_CREATE)).toBeInTheDocument();
 
@@ -487,11 +487,103 @@ describe('SponsorPage', () => {
     }));
   });
 
-  it('persists sponsor bundle fields across remounts when dev keep secrets on refresh is enabled', async () => {
+  it('does not apply stale create completions after the selected session changes', async () => {
+    sessionEntries = [
+      ['edge', buildSessionConfig()],
+      ['other', buildSessionConfig({
+        slug: 'other',
+        sessionName: 'Other Session',
+        __registry: {
+          sessionIdHex: '0xother-session-id',
+          adminAddress: ADMIN_ADDRESS,
+          registryChainId: 84532,
+          chainId: 84532,
+        },
+      })],
+    ];
+    const uploadDeferred = createDeferred<string>();
+    mockUploadDataToArweave.mockReturnValueOnce(uploadDeferred.promise);
+
+    await renderSponsorPage();
+
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    fireEvent.change(getFieldInputByLabel('Label'), {
+      target: { value: 'Launch week sponsor bundle' },
+    });
+    fireEvent.change(getFieldInputByLabel('OpenAI key'), {
+      target: { value: 'sk-live-openai' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
+
+    await waitFor(() => {
+      expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT), {
+      target: { value: 'other' },
+    });
+
+    await act(async () => {
+      uploadDeferred.resolve('stale_sponsor_tx_id');
+      await uploadDeferred.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Sponsored URL ready.')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sponsored share URL')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('other');
+  });
+
+  it('does not apply stale create completions after the selected session config refreshes in place', async () => {
+    const uploadDeferred = createDeferred<string>();
+    mockUploadDataToArweave.mockReturnValueOnce(uploadDeferred.promise);
+
+    await renderSponsorPage();
+
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    fireEvent.change(getFieldInputByLabel('Label'), {
+      target: { value: 'Launch week sponsor bundle' },
+    });
+    fireEvent.change(getFieldInputByLabel('OpenAI key'), {
+      target: { value: 'sk-live-openai' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create sponsored URL' }));
+
+    await waitFor(() => {
+      expect(mockUploadDataToArweave).toHaveBeenCalledTimes(1);
+    });
+
+    sessionEntries = [[
+      'edge',
+      buildSessionConfig({
+        sessionName: 'Edge Session Refresh',
+        __registry: {
+          sessionIdHex: '0xedge-session-id-refreshed',
+        },
+      }),
+    ]];
+    await act(async () => {
+      window.dispatchEvent(new Event(SESSION_REGISTRY_CACHE_UPDATED_EVENT));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      uploadDeferred.resolve('stale_sponsor_tx_id');
+      await uploadDeferred.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Sponsored URL ready.')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Sponsored share URL')).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+  });
+
+  it('persists only non-secret sponsor draft fields across remounts', async () => {
     const view = await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
+    expect(getToggleCheckbox('Remember non-secret draft fields')).toBeChecked();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
       target: { value: 'Repeatable sponsor bundle' },
@@ -503,23 +595,61 @@ describe('SponsorPage', () => {
       target: { value: 'cf-repeat-token' },
     });
 
+    const cached = JSON.parse(localStorage.getItem('ce:sponsorPageDraft:v1') || '{}');
+    expect(cached).toEqual(expect.objectContaining({
+      persistBundleDraft: true,
+      persistBundleSecrets: false,
+      bundleForm: expect.objectContaining({
+        label: 'Repeatable sponsor bundle',
+      }),
+    }));
+    expect(JSON.stringify(cached)).not.toContain('sk-repeat-openai');
+    expect(JSON.stringify(cached)).not.toContain('cf-repeat-token');
+
     view.unmount();
     await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
+    expect(getToggleCheckbox('Remember non-secret draft fields')).toBeChecked();
     expect(getFieldInputByLabel('Label')).toHaveValue('Repeatable sponsor bundle');
-    expect(getFieldInputByLabel('OpenAI key')).toHaveValue('sk-repeat-openai');
-    expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('cf-repeat-token');
+    expect(getFieldInputByLabel('OpenAI key')).toHaveValue('');
+    expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('');
   });
 
-  it('does not persist sponsor bundle fields when dev keep secrets on refresh is disabled', async () => {
+  it('redacts legacy sponsor draft caches that contain raw secrets', async () => {
+    localStorage.setItem('ce:sponsorPageDraft:v1', JSON.stringify({
+      v: 1,
+      persistBundleSecrets: true,
+      bundleForm: {
+        label: 'Legacy cached bundle',
+        openaiKey: 'sk-legacy-openai',
+        cloudflareApiToken: 'cf-legacy-token',
+        customRpcUrl: 'https://rpc.example.test/secret',
+        arweaveJwk: '{"kty":"RSA","d":"secret"}',
+        faucetPrivateKey: '0xlegacyfaucet',
+      },
+    }));
+
+    await renderSponsorPage();
+
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
+    expect(getFieldInputByLabel('Label')).toHaveValue('Legacy cached bundle');
+    expect(getFieldInputByLabel('OpenAI key')).toHaveValue('');
+    expect(getFieldInputByLabel('Cloudflare API token')).toHaveValue('');
+    expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('');
+    const cached = JSON.parse(localStorage.getItem('ce:sponsorPageDraft:v1') || '{}');
+    expect(JSON.stringify(cached)).not.toContain('sk-legacy-openai');
+    expect(JSON.stringify(cached)).not.toContain('cf-legacy-token');
+    expect(JSON.stringify(cached)).not.toContain('0xlegacyfaucet');
+  });
+
+  it('does not persist sponsor draft fields when draft persistence is disabled', async () => {
     const view = await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
 
-    fireEvent.click(getToggleCheckbox('Dev: keep secrets on refresh'));
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
+    fireEvent.click(getToggleCheckbox('Remember non-secret draft fields'));
+    expect(getToggleCheckbox('Remember non-secret draft fields')).not.toBeChecked();
 
     fireEvent.change(getFieldInputByLabel('Label'), {
       target: { value: 'Do not cache me' },
@@ -532,7 +662,7 @@ describe('SponsorPage', () => {
     await renderSponsorPage();
 
     expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('edge');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
+    expect(getToggleCheckbox('Remember non-secret draft fields')).not.toBeChecked();
     expect(getFieldInputByLabel('Label')).toHaveValue('');
     expect(getFieldInputByLabel('OpenAI key')).toHaveValue('');
   });

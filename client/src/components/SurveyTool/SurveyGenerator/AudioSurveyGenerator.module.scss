@@ -515,7 +515,10 @@ $input-border: tokens.$ce-input-border;
   }
 
   .docSaveAudienceButton {
-    padding: 0 12px;
+    width: 38px;
+    min-width: 38px;
+    padding: 0;
+    justify-content: center;
   }
 
   .docSaveAudienceMenu {

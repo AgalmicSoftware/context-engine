@@ -1,23 +1,216 @@
 import {
+  applyUserPageBookmarkNicknameSave,
+  applyUserPageBookmarkToggle,
+  buildUserPageAnalysisAiOptions,
+  buildUserPageAnalysisCacheEntry,
+  buildUserPageAnalysisErrorStatePatch,
+  buildUserPageAnalysisFingerprint,
+  buildUserPageAnalysisCacheWritePayload,
+  buildUserPageCacheRefreshOptions,
+  buildUserPageRefreshTelemetrySignature,
+  buildUserPageRefreshTelemetrySnapshot,
+  buildUserPageAnalysisCreatedQuestions,
+  buildUserPageAnalysisCreatedSurveys,
+  buildUserPageAnalysisCandidateLogRows,
+  buildUserPageAnalysisExcludeSlugSet,
+  buildUserPageAnalysisElapsedStatePatch,
+  buildUserPageAnalysisModalStatePatch,
+  buildUserPageAnalysisQuestions,
+  buildUserPageAnalysisResetStatePatch,
+  buildUserPageAnalysisResultStatePatch,
+  buildUserPageAnalysisSbts,
+  buildUserPageAnalysisSurveys,
+  buildUserPageAddressContextResetStatePatch,
+  buildUserPageAiAvailabilityStatePatch,
+  buildUserPageAiSessionSlugCandidates,
+  buildUserPageAiSessionScopeContext,
+  buildUserPageBookmarkStatusStateUpdate,
+  buildUserPageBooleanTogglePatch,
+  buildUserPageCacheRefreshInputSignature,
+  buildUserPageCacheLoadingHoldFlags,
+  buildUserPageCacheSourcePresence,
+  buildUserPageCacheSourceSnapshot,
+  buildUserPageCopiedStatePatch,
+  buildUserPageBookmarkToggleStatePatch,
+  buildUserPageDeepScanReportSignature,
+  buildUserPageDeepScanReportSamples,
+  buildUserPageDeepScanReportStatus,
+  buildUserPageDeepScanReportStatePatch,
+  buildUserPageDeepScanReportTelemetryPayloads,
+  buildUserPageDeepScanRefreshCarryPatch,
+  buildUserPageDeepScanTooltipDisplayState,
+  buildUserPageDeepScanTooltipOutputSignature,
+  buildUserPageDeepScanProgressStatePatch,
+  buildUserPageDeepScanProgressRow,
+  buildUserPageDeepScanProgressRowDisplayState,
+  buildUserPageDeepScanProgressRowsSignature,
+  buildUserPageDeepScanPrioritySlugs,
+  buildUserPageDeepScanRequestStatePatch,
+  buildUserPageDeepScanTooltipInputSignature,
+  buildUserPageDeriveTelemetrySnapshot,
+  buildUserPageUserStatsMergePatch,
+  buildUserPageDecryptableResponseField,
+  buildUserPageDecryptedResponsePatch,
+  buildUserPageGateAccessCacheKey,
+  buildUserPageGatePendingKey,
+  buildUserPageFullProfileModalStatePatch,
+  buildUserPageMissingAddressCacheStatePatch,
+  buildUserPageMissingAddressCacheStateUpdate,
+  buildUserPageNamespaceSourceMembershipSignature,
+  buildUserPageNicknameEditCancelStatePatch,
+  buildUserPageNicknameEditOpenStatePatch,
+  buildUserPageNicknameInputStatePatch,
+  buildUserPageNicknameSaveStatePatch,
+  buildUserPageNoSbtVisibleTelemetryState,
+  buildUserPageProfileEditVisibility,
+  buildUserPageResponseDecryptSurveyBindings,
+  buildUserPageResponseSectionDeriveSignature,
+  buildUserPageRenderLoadingState,
+  buildUserPageCreatedQuestionWrapperClassName,
+  buildUserPageHeaderBookmarkClassName,
+  buildUserPageRootClassName,
+  buildUserPageSbtSection,
+  buildUserPageSbtSectionDeriveSignature,
+  buildUserPageSectionLoadingEmptyState,
+  buildUserPageSelectedTabStatePatch,
+  buildUserPageSurveyExpansionTogglePatch,
+  buildUserPageTooltipTargetIds,
+  buildUserPageUnifiedCacheAggregateMemoKey,
+  buildUserPageUncertainEmptyText,
+  buildUserPageUncertaintyLoadingFlags,
+  buildUserPageUsernameChangeStatePatch,
+  buildUserPageUsernameEditCancelStatePatch,
+  buildUserPageUsernameEditOpenStatePatch,
+  buildUserPageUsernameErrorStatePatch,
+  buildUserPageUsernameLoadedStatePatch,
+  buildUserPageUsernameSaveStatePatch,
+  buildUserPageViewAddressStatePatch,
   applyUserPageOwnershipSignal,
+  cloneUserPageParsedResponsePayload,
+  compareUserPageResponseRecency,
+  deriveUserPageDeepScanProgressRows,
+  deriveAnalysisAiContextFromSessionConfig,
+  extractUserPageAnalysisAdditionalComment,
+  extractUserPageAnalysisImportance,
+  extractUserPageFirstDefinedValue,
+  extractUserPageResponseRecency,
+  extractUserPageResponseRecencyWithHints,
+  formatAnalysisCacheAge,
+  formatUserPageDeepScanBlockCount,
+  formatUserPageDeepScanTooltipLinesFromRows,
   getActiveUserPageChainNode,
   getPrioritizedUserPageChainNodes,
   getPrioritizedUserPageNetworkCacheNodes,
   getUserPageOwnershipCountMaps,
-  hasMeaningfulUserPageOwnershipCounts,
-  readUserPageNetworkCache,
+  getUserPageGateResourceKeysToCheck,
+  getUserPageErrorMessage,
+  hasDisplayableUserPageResponsePayload,
+  hasUserPageResponseSubmissionHints,
+  inferUserPageResponseEncryptionAudience,
+  inferUserPageResponseFieldEncryptionAudience,
+  isBookmarkUserEntry,
+  isBookmarkUserObjectForAddress,
+  isBookmarkValueForAddress,
+  isDisplayableUserPageResponseValue,
+  isPlainAnalysisObject,
+  isUserPageAdditionalFieldEncrypted,
+  isUserPageAnswerFieldEncrypted,
+  isUserPageEncryptedResponseField,
+  isUserPageGateAccessContext,
+  isUserPageResponsePayloadEncrypted,
+  isUserPageSbtAggregateEntry,
+  normalizeUserPageDeepScanProgressRows,
+  normalizeUserPageDeepScanTooltipLines,
+  normalizeUserAnalysisResult,
+  normalizeUserPageBookmarksCache,
+  normalizeUserPageGateResourceKey,
+  normalizeUserPageGateSlug,
+  normalizeUserPageQuestionResponseInfoOrder,
+  normalizeUserPageResponseField,
+  normalizeUserPageSingleQuestionResponsePayload,
+  normalizeUserPageSourceSlugForSignature,
+  mergeUserPageQuestionCacheSource,
+  mergeUserPageSurveyCacheSource,
+  mergeUserPageSbtCacheEntryIntoAggregate,
+  mergeUserPageUserCacheSbtIntoAggregate,
+  mergeUserPageQueuedCacheRefreshFlags,
+  parseUserPageCachedResponsePayload,
+  readBoolishUserPageTelemetryFlag,
+  readUserPageCacheSourcePresence,
+  readUserPageCacheSourceSnapshot,
+  readUserPageNamespaceSourceEntries,
   readUserPageOwnershipCount,
+  readUserPageAnalysisCacheEntry,
+  readUserPageDirectNetworkCacheBucket,
+  readUserPageNetworkCache,
+  resolveUserPageAnalysisAiContext,
+  resolveUserPageAnalysisCacheStatusState,
+  resolveUserPageAnalysisModalDisplayState,
+  resolveUserPageAnalysisSessionConfigForSlug,
+  resolveUserPageAnalysisSessionFallback,
+  resolveUserPageAddressContextChange,
+  resolveUserPageAddressDisplayState,
+  resolveUserPageAiActionAvailability,
+  resolveUserPageAiAvailabilityRefresh,
+  resolveUserPageAnalyzeButtonDisplayState,
+  resolveUserPageAvatarDisplayState,
+  resolveUserPageBlockieSeed,
+  hasMeaningfulUserPageOwnershipCounts,
+  resolveUserPageBookmarkButtonDisplayState,
+  resolveUserPageBookmarkNickname,
+  resolveUserPageBookmarkStatus,
+  resolveUserPageBookmarksLinkDisplayState,
+  resolveUserPageCompareButtonDisplayState,
+  resolveUserPageInlineEnteredIndicatorDisplayState,
+  resolveUserPageCopyIconDisplayState,
+  resolveUserPageCacheUpdateRefresh,
+  resolveUserPageManagedCacheUpdate,
+  resolveUserPageDeepScanSessionDisplayConfig,
+  resolveUserPageDeepScanProgressStateUpdate,
+  resolveUserPageFullProfileModalDisplayState,
+  resolveUserPageHeaderActionVisibility,
+  resolveUserPageQuestionSectionDisplayState,
+  resolveUserPageQuestionPromptText,
+  resolveUserPageQuestionSourceSessionSlug,
+  resolveUserPageSectionToggleDisplayState,
+  resolveUserPageSbtDisplayState,
+  resolveUserPageSurveyCountDisplayState,
+  resolveUserPageSurveyCreatedCardState,
+  resolveUserPageSurveyPreviewDisplayState,
+  resolveUserPageSurveyResponseCardState,
+  resolveUserPageSurveySectionDisplayState,
+  resolveUserPageUsernameErrorDisplayState,
+  resolveUserPageResponseNonceRefresh,
+  shortenUserPageQuestionId,
+  shouldApplyUserPageDeepScanResponse,
+  shouldRetryUserPageQuestionData,
+  sortUserAnalysisKeys,
+  sortUserPageDeepScanProgressRows,
+  toAnalysisCacheBucket,
+  toAnalysisRecord,
   upsertUserPageResponseByRecency,
   writeUserPageResponseSourceSlug,
   writeUserPageSourceSlug,
-} from './userPageCacheHelpers';
-import type {
-  UserPageResponseBucketMap,
-  UserPageResponseRecencyBucketMap,
-} from './userPageResponseHelpers';
+  type UserPageDeepScanProgressRow,
+  applyUserPageDecryptedPatchToResponseField,
+} from './userPageHelpers';
+
+const makeRow = (overrides: Partial<UserPageDeepScanProgressRow> = {}): UserPageDeepScanProgressRow => ({
+  slug: 'alpha',
+  chainId: 84532,
+  lastBlockScanned: 1000,
+  latestBlock: 1200,
+  remainingBlocks: 200,
+  percentComplete: 50,
+  isDeterminate: true,
+  label: 'Alpha',
+  startBlock: 800,
+  displayLastBlock: 1000,
+  ...overrides,
+});
 
 describe('userPageCacheHelpers', () => {
-  it('reads ownership count maps and applies viewer ownership signals', () => {
+  it('reads user-page ownership count maps for viewer ownership signals', () => {
     const entry = {
       countsLoaded: false,
       mintedCountByAddress: {
@@ -33,19 +226,28 @@ describe('userPageCacheHelpers', () => {
       burnedCountMap: { '0xabc': 1 },
     });
     expect(hasMeaningfulUserPageOwnershipCounts(entry, '0xABC')).toBe(true);
-    expect(hasMeaningfulUserPageOwnershipCounts({ countsLoaded: true, mintedCountByAddress: {} }, '')).toBe(true);
+    expect(hasMeaningfulUserPageOwnershipCounts({
+      countsLoaded: true,
+      mintedCountByAddress: {},
+    }, '')).toBe(true);
     expect(hasMeaningfulUserPageOwnershipCounts({}, '0xabc')).toBe(false);
     expect(readUserPageOwnershipCount({ '0xabc': '3' }, '0xABC')).toBe(3);
     expect(readUserPageOwnershipCount({ '0xabc': -2 }, '0xABC')).toBe(0);
     expect(readUserPageOwnershipCount(null, '0xABC')).toBe(0);
+  });
 
-    const aggregate = {
+  it('applies user-page ownership signals from count maps to aggregate sets', () => {
+    const mintedAggregate = {
       mintedSet: new Set<string>(),
       burnedSet: new Set<string>(['0xabc']),
     };
-    applyUserPageOwnershipSignal(aggregate, entry, '0xABC');
-    expect(aggregate.mintedSet.has('0xabc')).toBe(true);
-    expect(aggregate.burnedSet.has('0xabc')).toBe(false);
+    applyUserPageOwnershipSignal(mintedAggregate, {
+      countsLoaded: false,
+      mintedCountByAddress: { '0xabc': 2 },
+      burnedCountByAddress: { '0xabc': 1 },
+    }, '0xABC');
+    expect(mintedAggregate.mintedSet.has('0xabc')).toBe(true);
+    expect(mintedAggregate.burnedSet.has('0xabc')).toBe(false);
 
     const burnedAggregate = {
       mintedSet: new Set<string>(),
@@ -58,9 +260,19 @@ describe('userPageCacheHelpers', () => {
     }, '0xABC');
     expect(burnedAggregate.mintedSet.has('0xabc')).toBe(false);
     expect(burnedAggregate.burnedSet.has('0xabc')).toBe(true);
+
+    const legacyAggregate = {
+      mintedSet: new Set<string>(['0xabc']),
+      burnedSet: new Set<string>(),
+    };
+    applyUserPageOwnershipSignal(legacyAggregate, {
+      mintedSet: ['0xabc'],
+    }, '0xABC');
+    expect(legacyAggregate.mintedSet.has('0xabc')).toBe(true);
+    expect(legacyAggregate.burnedSet.has('0xabc')).toBe(false);
   });
 
-  it('normalizes cache source slugs and preserves existing entries unless replacing', () => {
+  it('writes normalized user-page source slugs without replacing existing sources by default', () => {
     const sourceSlugById: Record<string, string> = {};
     writeUserPageSourceSlug(sourceSlugById, '  SurveyA  ', ' Session-One ');
     writeUserPageSourceSlug(sourceSlugById, '  SurveyA  ', 'ignored');
@@ -70,13 +282,13 @@ describe('userPageCacheHelpers', () => {
     expect(sourceSlugById).toEqual({
       '  surveya  ': '',
     });
+  });
 
+  it('writes normalized user-page response source slugs by response key', () => {
     const responseSourceSlugByKey: Record<string, string> = {};
     writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', ' 0xABC ', ' Session-One ');
     writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', ' 0xABC ', 'ignored');
-    writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', ' 0xABC ', ' Session-Two ', {
-      replace: true,
-    });
+    writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', ' 0xABC ', ' Session-Two ', { replace: true });
     writeUserPageResponseSourceSlug(responseSourceSlugByKey, ' SurveyA ', '', 'missing');
 
     expect(responseSourceSlugByKey).toEqual({
@@ -85,8 +297,8 @@ describe('userPageCacheHelpers', () => {
   });
 
   it('upserts user-page responses by recency while tracking source slugs', () => {
-    const responses: UserPageResponseBucketMap = {};
-    const responseRecencyMeta: UserPageResponseRecencyBucketMap = {};
+    const responses: Record<string, Record<string, unknown>> = {};
+    const responseRecencyMeta: Record<string, Record<string, any>> = {};
     const sourceSlugById: Record<string, string> = {};
     const responseSourceSlugByKey: Record<string, string> = {};
 
@@ -112,7 +324,6 @@ describe('userPageCacheHelpers', () => {
       metaValue: { blockNumber: 9 },
       slug: 'ignored',
     });
-
     expect(responses.surveya['0xabc']).toEqual({ answer: 'old' });
     expect(sourceSlugById.surveya).toBe('alpha');
     expect(responseSourceSlugByKey['surveya|0xabc']).toBe('alpha');
@@ -133,9 +344,113 @@ describe('userPageCacheHelpers', () => {
     expect(responseRecencyMeta.surveya['0xabc']).toMatchObject({ bn: 11, hasHints: true });
     expect(sourceSlugById.surveya).toBe('beta');
     expect(responseSourceSlugByKey['surveya|0xabc']).toBe('beta');
+
+    upsertUserPageResponseByRecency({
+      id: '',
+      responder: '0xabc',
+      responseRecencyMeta,
+      responses,
+      responseSourceSlugByKey,
+      responseValue: { answer: 'invalid' },
+      sourceSlugById,
+    });
+    expect(Object.keys(responses)).toEqual(['surveya']);
   });
 
-  it('merges active network cache buckets after fallback buckets', () => {
+  it('merges survey and question namespace cache sources into aggregate buckets', () => {
+    const combinedSurveys: Record<string, unknown> = {};
+    const combinedSurveyResponses: Record<string, Record<string, unknown>> = {};
+    const combinedSurveyResponsesMeta: Record<string, Record<string, any>> = {};
+    const surveySourceSlugById: Record<string, string> = {};
+    const surveyResponseSourceSlugById: Record<string, string> = {};
+    const surveyResponseSourceSlugByKey: Record<string, string> = {};
+    const combinedQuestions: Record<string, unknown> = {};
+    const combinedQuestionResponses: Record<string, Record<string, unknown>> = {};
+    const combinedQuestionResponsesMeta: Record<string, Record<string, any>> = {};
+    const questionSourceSlugById: Record<string, string> = {};
+    const questionResponseSourceSlugById: Record<string, string> = {};
+    const questionResponseSourceSlugByKey: Record<string, string> = {};
+
+    mergeUserPageSurveyCacheSource({
+      cacheObj: {
+        84532: {
+          surveys: { SurveyA: { title: 'Survey A' } },
+          surveyResponses: {
+            SurveyA: {
+              '0xABC': { answer: 'old', blockNumber: 10 },
+            },
+          },
+        },
+      },
+      combinedSurveyResponses,
+      combinedSurveyResponsesMeta,
+      combinedSurveys,
+      networkID: 84532,
+      slug: 'alpha',
+      surveyResponseSourceSlugById,
+      surveyResponseSourceSlugByKey,
+      surveySourceSlugById,
+    });
+    mergeUserPageSurveyCacheSource({
+      cacheObj: {
+        84532: {
+          surveyResponses: {
+            surveya: {
+              '0xabc': { answer: 'newer', blockNumber: 11 },
+            },
+          },
+        },
+      },
+      combinedSurveyResponses,
+      combinedSurveyResponsesMeta,
+      combinedSurveys,
+      networkID: 84532,
+      slug: 'beta',
+      surveyResponseSourceSlugById,
+      surveyResponseSourceSlugByKey,
+      surveySourceSlugById,
+    });
+    mergeUserPageQuestionCacheSource({
+      cacheObj: {
+        84532: {
+          questions: { QuestionA: { prompt: 'Question A' } },
+          questionResponses: {
+            QuestionA: {
+              '0xABC': { answer: 'answer-a' },
+            },
+          },
+          questionResponsesMeta: {
+            QuestionA: {
+              '0xABC': { blockNumber: 7 },
+            },
+          },
+        },
+      },
+      combinedQuestionResponses,
+      combinedQuestionResponsesMeta,
+      combinedQuestions,
+      networkID: 84532,
+      questionResponseSourceSlugById,
+      questionResponseSourceSlugByKey,
+      questionSourceSlugById,
+      slug: 'gamma',
+    });
+
+    expect(combinedSurveys.surveya).toEqual({ title: 'Survey A' });
+    expect(combinedSurveyResponses.surveya['0xabc']).toEqual({ answer: 'newer', blockNumber: 11 });
+    expect(combinedSurveyResponsesMeta.surveya['0xabc']).toMatchObject({ bn: 11 });
+    expect(surveySourceSlugById.surveya).toBe('alpha');
+    expect(surveyResponseSourceSlugById.surveya).toBe('beta');
+    expect(surveyResponseSourceSlugByKey['surveya|0xabc']).toBe('beta');
+    expect(combinedQuestions.questiona).toEqual({ prompt: 'Question A' });
+    expect(combinedQuestionResponses.questiona['0xabc']).toEqual({ answer: 'answer-a' });
+    expect(combinedQuestionResponsesMeta.questiona['0xabc']).toMatchObject({ bn: 7 });
+    expect(questionSourceSlugById.questiona).toBe('gamma');
+    expect(questionResponseSourceSlugById.questiona).toBe('gamma');
+    expect(questionResponseSourceSlugByKey['questiona|0xabc']).toBe('gamma');
+  });
+
+  it('merges user-page network cache buckets with active network taking precedence', () => {
     expect(readUserPageNetworkCache(null, 84532)).toEqual({});
     expect(readUserPageNetworkCache({
       '11155420': {
@@ -155,7 +470,7 @@ describe('userPageCacheHelpers', () => {
     });
   });
 
-  it('prioritizes active network and chain cache nodes while skipping invalid nodes', () => {
+  it('prioritizes active user-page network cache nodes and skips non-object buckets', () => {
     const cacheObj = {
       '11155420': { surveys: { op: true } },
       '84532': { surveys: { base: true } },
@@ -165,14 +480,24 @@ describe('userPageCacheHelpers', () => {
       { key: '84532', value: { surveys: { base: true } } },
       { key: '11155420', value: { surveys: { op: true } } },
     ]);
+    expect(getPrioritizedUserPageNetworkCacheNodes(cacheObj, 0)).toEqual([
+      { key: '84532', value: { surveys: { base: true } } },
+      { key: '11155420', value: { surveys: { op: true } } },
+    ]);
     expect(getPrioritizedUserPageNetworkCacheNodes(null, 84532)).toEqual([]);
+  });
 
+  it('prioritizes active user-page chain nodes and skips non-object nodes', () => {
     const userNode = {
       '11155420': { data: { sbts: ['op-sbt'] } },
       '84532': { data: { sbts: ['base-sbt'] } },
       ignored: 'bad',
     };
     expect(getPrioritizedUserPageChainNodes(userNode, 84532)).toEqual([
+      { chainKey: '84532', node: { data: { sbts: ['base-sbt'] } } },
+      { chainKey: '11155420', node: { data: { sbts: ['op-sbt'] } } },
+    ]);
+    expect(getPrioritizedUserPageChainNodes(userNode, '')).toEqual([
       { chainKey: '84532', node: { data: { sbts: ['base-sbt'] } } },
       { chainKey: '11155420', node: { data: { sbts: ['op-sbt'] } } },
     ]);
@@ -207,6 +532,10 @@ describe('userPageCacheHelpers', () => {
         questionResponses: ['base-response'],
       },
     });
+    expect(getActiveUserPageChainNode(null, 84532)).toBeNull();
+  });
+
+  it('preserves empty arrays for plain active user-page chain data', () => {
     expect(getActiveUserPageChainNode({
       '84532': { data: {} },
     }, 84532)).toEqual({
@@ -218,6 +547,71 @@ describe('userPageCacheHelpers', () => {
         questionResponses: [],
       },
     });
-    expect(getActiveUserPageChainNode(null, 84532)).toBeNull();
+  });
+
+  it('keeps sbtCache viewer ownership counts authoritative over userCache fallback rows', () => {
+    const viewAddressKey = '0xabc';
+    const sbtAggregate: Record<string, any> = {};
+
+    mergeUserPageSbtCacheEntryIntoAggregate({
+      sbtAggregate,
+      entry: {
+        sbtAddress: '0xBadge',
+        sbtInfo: { name: 'Registry badge', description: 'From sbt cache' },
+        mintedAddresses: ['0xABC', '0xdef'],
+        burnedAddresses: ['0xABC'],
+        mintedCountByAddress: { '0xabc': 1 },
+        burnedCountByAddress: { '0xabc': 2 },
+        blockNumber: 44,
+      },
+      key: '0xbadge',
+      slug: 'alpha',
+      viewAddressKey,
+    });
+
+    mergeUserPageUserCacheSbtIntoAggregate({
+      sbtAggregate,
+      item: {
+        sbtAddress: '0xBadge',
+        sbtInfo: { name: 'User cache badge' },
+      },
+      slug: 'beta',
+      viewAddressKey,
+    });
+
+    expect(sbtAggregate['0xbadge']).toEqual(expect.objectContaining({
+      blockNumber: 44,
+      sbtAddress: '0xBadge',
+      sbtInfo: {
+        name: 'User cache badge',
+        description: 'From sbt cache',
+      },
+      slug: 'alpha',
+      viewerCountsAuthoritative: true,
+    }));
+    expect(Array.from(sbtAggregate['0xbadge'].mintedSet).sort()).toEqual(['0xdef']);
+    expect(Array.from(sbtAggregate['0xbadge'].burnedSet)).toEqual([viewAddressKey]);
+  });
+
+  it('uses userCache SBT rows as a fallback ownership signal when no aggregate signal exists', () => {
+    const sbtAggregate: Record<string, any> = {};
+
+    mergeUserPageUserCacheSbtIntoAggregate({
+      sbtAggregate,
+      item: {
+        sbtAddress: '0xBadge',
+        sbtInfo: { name: 'Fallback badge' },
+      },
+      slug: 'alpha',
+      viewAddressKey: '0xabc',
+    });
+
+    expect(Array.from(sbtAggregate['0xbadge'].mintedSet)).toEqual(['0xabc']);
+    expect(Array.from(sbtAggregate['0xbadge'].burnedSet)).toEqual([]);
+    expect(sbtAggregate['0xbadge']).toEqual(expect.objectContaining({
+      sbtAddress: '0xBadge',
+      sbtInfo: { name: 'Fallback badge' },
+      slug: 'alpha',
+    }));
   });
 });

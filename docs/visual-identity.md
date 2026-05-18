@@ -1,12 +1,10 @@
 # Visual Identity / Component Style Guide
 
 Source patterns:
-- `client/src/components/MemeMatch/MemeMatch.module.scss`
-- `client/src/components/UpcomingMatches/UpcomingMatches.module.scss`
 - `client/src/components/UserPage/UserPage.module.scss`
 - Shared token values from `client/src/assets/css/contextEngine.scss`
 
-Use `UserPage` as the default for new page-level UI. Pull in `MemeMatch` and `UpcomingMatches` treatments only when a component needs a more theatrical, game-card feel.
+Use `UserPage` as the default for new page-level UI, with shared token values for cross-surface consistency.
 
 ## 1. Color System
 

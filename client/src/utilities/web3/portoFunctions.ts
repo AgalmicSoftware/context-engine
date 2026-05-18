@@ -1191,3 +1191,9 @@ export const createPortoProviderMock = (): any => {
     }
   };
 };
+
+try {
+  if (typeof window !== 'undefined') {
+    (window as any).__ceCreatePortoProviderMock = createPortoProviderMock;
+  }
+} catch (e) { portoLog.warn('portoFunctions: fallback', e); }

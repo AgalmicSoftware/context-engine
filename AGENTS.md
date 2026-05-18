@@ -21,15 +21,15 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Run frontend package commands from `client/`.
 - Root worker/test scripts are standardized on Node `^20.0.0` (`nvm use 20`).
 - The frontend package itself still supports Node `^16.14.2`, npm `9.2.0` (`nvm use 16`) when you are working only inside `client/`.
-- Fresh `client/` installs use the standard `npm install`; the `--legacy-peer-deps` contract is carried automatically via `client/.npmrc` because `react-scripts@4.0.3`'s optional TypeScript peer still conflicts with `@lit-protocol/contracts@0.9.1`'s strict peer. Plain `npm install` just works.
-- When upgrading peer-sensitive `client/` dependencies (Lit Protocol packages, `react-scripts`, `reactstrap`, `react-popper`, or anything else declaring a React / TypeScript peer), re-run `cd client && npm install --legacy-peer-deps=false` in isolation to re-expose any new hard peer conflicts before committing the upgrade. The `.npmrc` suppresses those warnings during normal installs, so this is the only way to catch a regression that shrinks the supported peer surface.
+- Fresh `client/` installs use the standard `npm install`; the `--legacy-peer-deps` contract is carried automatically via `client/.npmrc` for the remaining peer-sensitive web3 and UI dependencies. Plain `npm install` just works.
+- When upgrading peer-sensitive `client/` dependencies (Lit Protocol packages, `reactstrap`, `react-popper`, or anything else declaring a React / TypeScript peer), re-run `cd client && npm install --legacy-peer-deps=false` in isolation to re-expose any new hard peer conflicts before committing the upgrade. The `.npmrc` suppresses those warnings during normal installs, so this is the only way to catch a regression that shrinks the supported peer surface.
 - `npm run dev` is the hot-reload frontend dev server; `npm start` serves the existing production build from `build/`.
 - Useful frontend scripts: `npm test`, `npm test -- --watchAll=false`, `npm run lint`, `npm run build`, `npm run analyze`.
 - Codex targeted Jest runs should use the approval-friendly form from `client/`: `npm test -- --watchAll=false --runTestsByPath <paths...>`. Do not prefix targeted Jest commands with `CI=true`; shell env assignments make sandbox auto-approval less reliable and trigger repeated prompts for Jest's temp-dir haste-map cache.
 - Frontend logging is off by default. In the browser console, run `window.CE_LOGGING.enabled = true`, then `window.CE_LOGGING_HELP()` for categories and usage.
 
 ## Stack
-- React 17 SPA (CRA, mix of class + functional components)
+- React 18 SPA (Vite, mix of class + functional components)
 - Solidity on OP Sepolia (chain 11155420) by default; Base Sepolia (84532) remains supported for legacy/dev compatibility
 - Cloudflare Workers (`sessionCorsWorker`) — CORS proxy, encryption, gating
 - Arweave (metadata/payloads and most uploaded images); some token/image reads still accept IPFS URLs
@@ -59,6 +59,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 | `client/src/contractsABI/` | Contract ABI JSON files |
 | `contracts/` | Solidity smart contracts |
 | `scripts/test-*.ui.js` | Playwright E2E tests |
+| `contextEngine-cc/` | Claude Code integration (hook + passkey auth) |
 | `ARCHITECTURE.md` | System diagram, data flows, contract addresses |
 
 ### Generated / do-not-edit
@@ -94,7 +95,7 @@ npm run ai:seed-survey:question-types            # seed question type data
 - Create any new git worktrees for this repo under the repo-local scratch area,
   typically `.codex/scratch/<descriptive-name>`. Do not create sibling worktree
   directories directly under `/Users/charlie/Desktop/xoCortex/projects/`.
-- Commit convention for automated changes: `<type>(autocoder): <short imperative summary>` (for example, `fix(autocoder): guard empty response payload`). Use `feat`, `fix`, `refactor`, `test`, `docs`, or `chore` as the type.
+- Commit convention for automated changes: `<type>: <short imperative summary>` (for example, `fix: guard empty response payload`). Use `feat`, `fix`, `refactor`, `test`, `docs`, or `chore` as the type.
 - Keep commit messages concise: imperative subject, no trailing period, no internal planning identifiers, and an optional body capped at 0-3 short lines when helpful.
 - Commit messages must describe the change by what it does, not by internal planning IDs or tracking names. Planning IDs churn and referencing them ties public commit history to internal bookkeeping.
 - Keep fixture/test data non-identifying (no real names, emails, API keys)

@@ -1,6 +1,15 @@
 import '@testing-library/jest-dom';
 import { TextDecoder, TextEncoder } from 'util';
 
+jest.mock('react-dom/test-utils', () => {
+  const React = jest.requireActual('react');
+  const testUtils = jest.requireActual('react-dom/test-utils');
+  return {
+    ...testUtils,
+    act: React.act || testUtils.act,
+  };
+});
+
 if (!global.TextEncoder) {
   global.TextEncoder = TextEncoder;
 }
@@ -36,6 +45,7 @@ if (typeof HTMLCanvasElement !== 'undefined') {
     rect: () => {},
     clip: () => {},
   });
+  HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,canvas-mock';
 }
 
 jest.mock('./utilities/useWhisper.js', () => ({

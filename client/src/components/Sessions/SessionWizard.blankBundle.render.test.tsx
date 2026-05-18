@@ -4,7 +4,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 
-const TEST_ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
+const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
+const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
 const mockDownloadDataFromArweave = jest.fn();
@@ -152,13 +153,13 @@ jest.mock('../../utilities/web3/contractScripts.js', () => ({
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
   buildSiweMessage: jest.fn(() => 'siwe-message'),
   buildSignedBootstrapAdminAuth: jest.fn(async ({ slug }) => ({
-    address: TEST_ADMIN_ADDRESS,
+    address: mockTestAdminAddress,
     message: 'bootstrap-siwe-message',
     signature: '0xbootstrap-admin-auth',
     sessionSlug: slug,
   })),
   buildSignedAdminActionAuth: jest.fn(async ({ action, slug, body }) => ({
-    address: TEST_ADMIN_ADDRESS,
+    address: mockTestAdminAddress,
     signature: '0xadmin-action-signature',
     action,
     slug,
@@ -318,7 +319,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit account key, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.'
       );
     });
 
@@ -398,7 +399,7 @@ describe('SessionWizard blank bundle render regression', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit account key, deploy access.'
+        'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, RPC URL, Lit API key, deploy access.'
       );
     });
 

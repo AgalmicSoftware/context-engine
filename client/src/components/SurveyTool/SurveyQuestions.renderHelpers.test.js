@@ -1,10 +1,12 @@
 import SurveyTool from './SurveyTool';
 import { SurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import QuestionCardLinks from './QuestionCardLinks';
 import QuestionDecryptControl from './QuestionDecryptControl';
 import SurveyAudioFieldInput from './SurveyAudioFieldInput';
+import SurveyQuestionsLockAudienceControl from './SurveyQuestionsLockAudienceControl';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import styles from './SurveyTool.module.scss';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -110,8 +112,7 @@ describe('SurveyQuestions render helpers', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const question = { id: 'q1', type: 'rating', prompt: 'Rate this' };
 
     subject.renderPromptWithManualDecrypt = jest.fn(() => 'Rate this');
@@ -203,8 +204,7 @@ describe('SurveyQuestions render helpers', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const question = { id: 'q1', type: 'freeform', prompt: 'Prompt' };
 
     subject.renderPromptWithManualDecrypt = jest.fn(() => 'Prompt');
@@ -235,7 +235,9 @@ describe('SurveyQuestions render helpers', () => {
     expect(inlineRow.props.input.props.placeholder).toBe('Additional comments...');
     expect(renderToStaticMarkup(inlineRow)).toContain(styles.additionalCommentsInputWrap);
     expect(renderToStaticMarkup(inlineRow)).toContain(styles.additionalCommentsLockSlot);
-    expect(treeHasDataTestId(inlineRow.props.lockControl, E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK)).toBe(true);
+    const lockControl = findFirstNodeByType(inlineRow.props.lockControl, SurveyQuestionsLockAudienceControl);
+    expect(lockControl).not.toBeNull();
+    expect(lockControl.props.effectiveFieldKey).toBe('additional');
   });
 
   it('renders pile question icons through the shared footer helper', () => {
@@ -248,8 +250,7 @@ describe('SurveyQuestions render helpers', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.toggleComments = jest.fn();
     subject.isQuestionLockedForResponse = jest.fn(() => false);
@@ -271,7 +272,7 @@ describe('SurveyQuestions render helpers', () => {
     expect(commentsButton).not.toBeNull();
     commentsButton.props.onClick();
     expect(subject.toggleComments).toHaveBeenCalledWith('q1');
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_ANSWER_LOCK)).toBe(true);
+    expect(findFirstNodeByType(tree, SurveyQuestionsLockAudienceControl)).not.toBeNull();
   });
 
   it('renders full-question footer icons through the shared footer helper', () => {
@@ -314,7 +315,7 @@ describe('SurveyQuestions render helpers', () => {
     expect(typeof footer.props.onToggleComments).toBe('function');
     footer.props.onToggleComments();
     expect(subject.toggleComments).toHaveBeenCalledWith('q1', true);
-    expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_ANSWER_LOCK)).toBe(true);
+    expect(findFirstNodeByType(tree, SurveyQuestionsLockAudienceControl)).not.toBeNull();
     expect(dropdown).toBeTruthy();
     expect(dropdown.props.tags).toEqual(['governance']);
   });
@@ -360,8 +361,7 @@ describe('SurveyQuestions render helpers', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const question = { id: 'q1', type: 'freeform', prompt: 'Prompt' };
 
     subject.renderPromptWithManualDecrypt = jest.fn(() => 'Prompt');
@@ -399,8 +399,7 @@ describe('SurveyQuestions render helpers', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
     const question = { id: 'q1', type: 'freeform', prompt: 'Prompt' };
 
     subject.renderPromptWithManualDecrypt = jest.fn(() => 'Prompt');

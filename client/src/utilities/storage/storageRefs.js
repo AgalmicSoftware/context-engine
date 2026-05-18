@@ -25,6 +25,11 @@ const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(
 
 const trim = (value) => toStr(value).trim();
 
+/**
+ * @param {unknown} value
+ * @param {string} [fallback]
+ * @returns {'arweave' | 'lit-arweave' | 'cloudflare'}
+ */
 export const normalizeStorageBackend = (value, fallback = STORAGE_BACKENDS.ARWEAVE) => {
   const raw = trim(value).toLowerCase();
   if (raw === STORAGE_BACKENDS.CLOUDFLARE || raw === 'cf' || raw === 'r2') {

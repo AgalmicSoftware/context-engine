@@ -16,7 +16,7 @@ stays centralized in `client/src/variables/publicDeploymentConfig.js`.
 
 1. Copy the example file: `cp client/.env.example client/.env`
 2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows an empty `.env` file is valid; the default `/new` flow now ships with a project deploy-helper URL, while healthcheck and self-host overrides still need explicit URLs when you use them.
-3. Restart the dev server: `cd client && npm run dev` (CRA reads `.env` only at build time)
+3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
 ## Netlify Static Deploy
@@ -28,7 +28,7 @@ server.
 ### 1. Set frontend variables
 
 Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.js`,
-and `client/src/variables/appConfig.js`. CRA bakes `REACT_APP_*` values into
+and `client/src/variables/appConfig.js`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
@@ -117,7 +117,8 @@ SPA fallback concept, but their redirect config syntax differs.
 - Shared worker fallback now defaults to `https://demo-worker-030226.agalmic.workers.dev` unless `REACT_APP_CE_SHARED_WORKER_URL` overrides it.
 - The deploy-helper now defaults to `https://ce-deploy-helper.agalmic.workers.dev/`.
 - Healthcheck still stays blank until the official project-owned endpoint is finalized for OSS.
-- Only `REACT_APP_*` keys are exposed to the browser in the CRA client.
+- Only `REACT_APP_*` keys are exposed to the browser in the Vite client
+  compatibility env.
 - `publicDeploymentConfig.js` is the single owner of deployment endpoint
   fallbacks; `appConfig.js` re-exports those values for the existing client API.
 - Browser/runtime overrides still exist for some flags (`globalThis`,
@@ -127,8 +128,9 @@ SPA fallback concept, but their redirect config syntax differs.
 
 - Do **not** add Lit API keys to `client/.env` or any `REACT_APP_*` variable.
 - Chipotle auth is now intended to stay server-side:
-  - optional deployment/sponsor worker env fallback: `LIT_ACCOUNT_API_KEY`
-  - per-session worker-secret overrides: `litAccountApiKey`, `litUsageApiKey`
+  - preferred deployment/sponsor worker env fallback: `LIT_USAGE_API_KEY`
+  - legacy-compatible deployment/sponsor worker env fallback: `LIT_ACCOUNT_API_KEY`
+  - per-session worker-secret overrides: `litAccountApiKey` (internal field behind the visible "Lit API key" input), `litUsageApiKey`
 - Session-scoped non-secret Chipotle identifiers are no longer treated like browser env vars:
   - `litApiBase`
   - `litGroupId`
@@ -139,13 +141,13 @@ SPA fallback concept, but their redirect config syntax differs.
   - exposing them can reveal app architecture and action identity
   - they also make abuse easier if a scoped usage key later leaks
 - Do not rely on hiding those identifiers as the main security boundary. The real boundary is the Lit API key scope, the permitted group/PKP/action relationship, and the Lit Action code itself.
-- If a deployment intentionally makes those identifiers public, treat that as an explicit tradeoff rather than an accident. Never expose `LIT_ACCOUNT_API_KEY`, `litUsageApiKey`, wallet private keys, or paid RPC URLs that embed provider secrets.
-- If a sponsored bundle intentionally carries `litAccountApiKey`, treat that as an explicit authority transfer rather than an ordinary config convenience. The durable OSS-friendly version of that pattern is one disposable Lit account per bundle, not one long-lived deployment account copied into many bundles.
+- If a deployment intentionally makes those identifiers public, treat that as an explicit tradeoff rather than an accident. Never expose `LIT_USAGE_API_KEY`, `LIT_ACCOUNT_API_KEY`, `litUsageApiKey`, wallet private keys, or paid RPC URLs that embed provider secrets.
+- If a sponsored bundle intentionally carries `litAccountApiKey`, treat that as an explicit Lit authority transfer rather than an ordinary config convenience. The durable OSS-friendly version of that pattern is one disposable Lit key per bundle, not one long-lived deployment key copied into many bundles.
 - Chipotle v2 metadata may store the non-secret policy fields and policy fingerprint needed to bind a wrapped CEK to an audience, but it must not store secret-bearing RPC URLs. Decrypt/check RPC selection is derived from worker-approved config, secrets, or defaults.
 - Re-provision Chipotle-enabled sessions after default Lit Action source changes so `litActionCid` matches the currently bundled action source. Old v1 / bare-hex Chipotle wrapped keys are not a compatibility target.
 - Current public prod/dev Chipotle environments both report Base mainnet, so environment isolation should come from separate Chipotle accounts, usage keys, groups, and PKPs rather than from shipping different public chain IDs alone.
 - The default CE automation path is now one new Lit account per session. Groups are reserved for internal trust boundaries or future action families inside that session account rather than as the primary cross-session isolation primitive.
-- There is no longer a client-side Lit payer-wallet feature gate in `/new`; the manual `/new` Lit card asks only for `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`, and the worker derives the scoped runtime fields after deploy.
+- There is no longer a client-side Lit payer-wallet feature gate in `/new`; the manual `/new` Lit card asks only for one Lit API key. E2E/deploy env should prefer `LIT_USAGE_API_KEY`; `litAccountApiKey` remains the internal worker-secret field backing that visible input for backward compatibility.
 
 ## RPC Defaults
 
@@ -155,10 +157,9 @@ SPA fallback concept, but their redirect config syntax differs.
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values are used only
   when the on-chain `rpc` gate is open or the current wallet already has a
   verified restricted grant.
-- Browser-safe RPC values authored in the session `rpc.providers.path.rpcUrl`
-  field may be mirrored into the registry `rpcUrl` field for client question and
-  SBT reads. Uploaded sponsored Custom RPC URLs are worker runtime secrets and
-  are not mirrored into browser-visible registry fields.
+- Custom RPC URLs supplied as worker secrets stay worker-private and are not
+  mirrored into public registry fields. Client reads use only explicit
+  browser-visible session `rpcUrl` / `rpcUrlsByChainId` values.
 - OP Sepolia browser fallbacks intentionally avoid leading with
   `https://sepolia.optimism.io`; it remains available later in the list, but the
   wallet/RainbowKit primary URL should prefer less rate-limited public mirrors
@@ -240,5 +241,5 @@ SPA fallback concept, but their redirect config syntax differs.
   - Allows off-list question activity discovery in `UserPage` / compare deep scans when enabled.
 
 - `litActionCid` can be omitted during session setup.
-  - If the wizard only has `litAccountApiKey`, the worker can now auto-bootstrap the default group, PKP, usage key, and CE action for that session, using the default Chipotle API base unless worker config/env overrides it.
+  - If the wizard only has the visible Lit API key (`litAccountApiKey` internally), the worker can now auto-bootstrap the default group, PKP, usage key, and CE action for that session, using the default Chipotle API base unless worker config/env overrides it.
   - If the wizard already has `litGroupId` and `litPkpId`, the worker can still auto-provision the default CE Lit action into an existing account and write the returned CID back into worker config after deploy.

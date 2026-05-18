@@ -7,6 +7,16 @@ import {
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+};
+
 const applyStateUpdate = (stateRef: { current: Record<string, unknown> }, update: unknown) => {
   const patch = typeof update === 'function'
     ? (update as (state: Record<string, unknown>) => Record<string, unknown> | null)(stateRef.current)
@@ -220,6 +230,61 @@ describe('surveyToolSingleQuestionController', () => {
     expect(stateRef.current.displayAnswerMode).toBe(false);
     expect(stateRef.current.isEditing).toBe(true);
     expect(stateRef.current.isLoadingResponse).toBe(false);
+  });
+
+  it('discards stale own single-question response hydration before it can prefill', async () => {
+    const deferred = createDeferred();
+    const latest = {
+      answer: { value: 'late answer', encrypted: false },
+      additional: { value: 'late note', encrypted: false },
+    };
+    const stateRef = {
+      current: {
+        submissionComplete: false,
+        startFresh: false,
+        suppressPrefill: false,
+        isLoadingResponse: true,
+        userHasResponse: false,
+        userResponseEncrypted: false,
+        userAnswers: null,
+        displayAnswerMode: true,
+        isEditing: false,
+      },
+    };
+    const safeSetState = jest.fn((update) => applyStateUpdate(stateRef, update));
+    const writeResponseToCache = jest.fn();
+    const prefillSingleQuestionResponse = jest.fn();
+    let stale = false;
+
+    const pending = executeOwnSingleQuestionResponseBootstrap({
+      props: {
+        provider: {},
+        account: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      },
+      state: stateRef.current,
+      questionId: 'q1',
+      effectiveSingleSlug: 'edge',
+      isStaleRun: () => stale,
+      safeSetState,
+      getResponse: jest.fn(() => deferred.promise),
+      writeResponseToCache,
+      areResponsesConsistent: jest.fn(),
+      prefillSingleQuestionResponse,
+    });
+
+    await Promise.resolve();
+    stale = true;
+    deferred.resolve(latest);
+
+    await expect(pending).resolves.toEqual({
+      applied: false,
+      reason: 'stale',
+    });
+    expect(writeResponseToCache).not.toHaveBeenCalled();
+    expect(prefillSingleQuestionResponse).not.toHaveBeenCalled();
+    expect(stateRef.current.userAnswers).toBeNull();
+    expect(stateRef.current.displayAnswerMode).toBe(true);
+    expect(stateRef.current.isEditing).toBe(false);
   });
 
   it('reuses fresh cache entries from alternate network buckets and updates the caller cache reference', async () => {

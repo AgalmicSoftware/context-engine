@@ -7,6 +7,7 @@ import { faPlus, faSpinner, faExternalLinkAlt, faDownload } from '@fortawesome/f
 import styles from './UserPage.module.scss';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 
 
@@ -53,6 +54,10 @@ type UnknownRecord = Record<string, unknown>;
 type CompareGlobalThis = typeof globalThis & {
   CE_E2E_AI_MOCK?: boolean;
 };
+type CompareRunComparison = (
+  addresses: string[],
+  options?: { skipNavigate?: boolean }
+) => Promise<void>;
 
 interface CompareBookmark {
   address?: string;
@@ -558,6 +563,11 @@ export const resolveCompareAddressBlockieStyle = (): React.CSSProperties => ({
   borderRadius: 3,
 });
 
+export const buildCompareProfileHref = (address: unknown): string => {
+  const normalizedAddress = String(address || '').trim();
+  return normalizedAddress ? buildPublicRoute(`/u/${normalizedAddress}`) : '';
+};
+
 export const buildCompareClassName = (...classNames: unknown[]): string => (
   classNames
     .map((className) => String(className || ''))
@@ -730,6 +740,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
   // per-item drill-down state map: { 'agree-0': {open, loading, error, text, tree?}, ... }
   const [drillState, setDrillState] = useState<CompareDrillStateMap>({});
+  const runComparisonRef = useRef<CompareRunComparison | null>(null);
 
   useEffect(() => {
     // Extract addresses from the URL or use firstAddress
@@ -746,14 +757,13 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
         const key = pathAddresses.map(a => a.toLowerCase()).join('&');
         if (key && key !== lastAutoKeyRef.current) {
           lastAutoKeyRef.current = key;
-          runComparison(pathAddresses, { skipNavigate: true });
+          runComparisonRef.current?.(pathAddresses, { skipNavigate: true });
         }
       }
     } else {
       setCompareAddresses([firstAddress || '', '']);
       setShowComparison(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstAddress, location.pathname]);
 
   const isE2eAutofillDisabled = React.useCallback(() => {
@@ -786,8 +796,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
       }
       return prev;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [account, firstAddress]);
+  }, [account, firstAddress, isE2eAutofillDisabled]);
 
   // Bookmarks (read + listen for changes)
   const readBookmarks = React.useCallback(() => {
@@ -1066,6 +1075,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
 
     if (!isStale()) setLoading(false);
   };
+  runComparisonRef.current = runComparison;
 
   // If user toggles “More visuals” after initial run and we don't have a matrix yet,
   // ask just for the matrix using the same users (avoid recomputing others).
@@ -1080,8 +1090,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     } catch (e) {
       setMatrixData(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMoreViz, currentUsers && currentUsers.length, !!matrixData]);
+  }, [showMoreViz, currentUsers, matrixData]);
 
   const performComparison = async () => runComparison(compareAddresses, { skipNavigate: false });
 
@@ -1706,8 +1715,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
     if (vizMode === 'venn' && !canShowVenn) setVizMode('summary');
     if (vizMode === 'matrix' && !canShowMatrix) setVizMode('summary');
     if (vizMode === 'compass' && !(participantsCount >= 2 && participantsCount <= 10)) setVizMode('summary');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [participantsCount]);
+  }, [canShowMatrix, canShowVenn, participantsCount, vizMode]);
 
   return (
     <div className={styles.compareSection}>
@@ -1829,7 +1837,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                   <span>{label}</span>
                   {addr && (
                     <a
-                      href={`/u/${addr}`}
+                      href={buildCompareProfileHref(addr)}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`Open profile for ${label}`}

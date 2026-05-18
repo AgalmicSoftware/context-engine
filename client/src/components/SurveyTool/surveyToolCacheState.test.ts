@@ -3,6 +3,7 @@ import {
   canUseRecentQuestionPayloadForAccount,
   ensureQuestionsNet,
   ensureSurveysNet,
+  mergeSurveyToolCachePatchIntoSurveysCache,
   hasCacheHydratedFlag,
   isIncomingResponseMetaNewer,
   mergeQuestionResponses,
@@ -153,6 +154,59 @@ describe('surveyToolCacheState', () => {
         surveyResponsesLatestBlock: {},
       },
     });
+  });
+
+  it('merges SurveyTool cache patches into the active surveys cache bucket', () => {
+    const existing = {
+      '84532': {
+        surveysLatestBlock: 10,
+        surveys: {
+          s1: { id: 's1', title: 'Existing' },
+        },
+        surveyResponses: {
+          s1: {
+            '0xabc': { responses: [{ questionID: 'q1', answer: 'old' }] },
+          },
+        },
+        surveyResponsesLatestBlock: {
+          s1: 10,
+        },
+      },
+    };
+
+    const result = mergeSurveyToolCachePatchIntoSurveysCache(existing, '84532', {
+      surveys: {
+        s2: { id: 's2', title: 'New' },
+      },
+      surveyResponses: {
+        s1: {
+          '0xdef': { responses: [{ questionID: 'q1', answer: 'new' }] },
+        },
+      },
+      surveyResponsesLatestBlock: {
+        s1: 12,
+      },
+    });
+
+    expect(result).toBe(existing);
+    expect(result['84532']).toEqual({
+      surveysLatestBlock: 10,
+      surveys: {
+        s1: { id: 's1', title: 'Existing' },
+        s2: { id: 's2', title: 'New' },
+      },
+      surveyResponses: {
+        s1: {
+          '0xdef': { responses: [{ questionID: 'q1', answer: 'new' }] },
+        },
+      },
+      surveyResponsesLatestBlock: {
+        s1: 12,
+      },
+    });
+    expect(mergeSurveyToolCachePatchIntoSurveysCache({}, '', {
+      surveys: { s1: { id: 's1' } },
+    })).toEqual({});
   });
 
   it('compares and stamps response recency metadata in block/log order', () => {

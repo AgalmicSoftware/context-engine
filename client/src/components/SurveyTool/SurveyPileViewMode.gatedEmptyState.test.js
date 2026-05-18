@@ -1,10 +1,20 @@
 import SurveyTool from './SurveyTool';
+import { PileViewMode } from './SurveyPileViewMode';
+import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { t } from '../../utilities/ui/terminology.js';
 
+const expandInspectableNode = (node) => (
+  node?.type === SurveyQuestionsLockedQuestionsPanel
+    ? SurveyQuestionsLockedQuestionsPanel(node.props)
+    : node
+);
+
 const treeHasDataTestId = (node, testId) => {
   if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasDataTestId(expandedNode, testId);
   if (Array.isArray(node)) return node.some((child) => treeHasDataTestId(child, testId));
   if (typeof node !== 'object') return false;
   if (node?.props?.['data-testid'] === testId) return true;
@@ -13,6 +23,8 @@ const treeHasDataTestId = (node, testId) => {
 
 const treeHasText = (node, text) => {
   if (node == null) return false;
+  const expandedNode = expandInspectableNode(node);
+  if (expandedNode !== node) return treeHasText(expandedNode, text);
   if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
   if (typeof node === 'string' || typeof node === 'number') {
     return String(node).includes(text);
@@ -59,8 +71,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -152,8 +163,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -170,10 +180,11 @@ describe('SurveyPileViewMode gated empty states', () => {
       decryptingByKey: {},
       canDecryptOtherResponsesStatus: 'needs-wallet',
     };
+    subject.resolveSbtGateLabel = jest.fn(() => 'Session SBT');
 
     const tree = subject.render();
     expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}.`)).toBe(true);
-    expect(treeHasText(tree, `These questions are ${t('gatedLower')} by a ${t('sbt')}. Connect an eligible ${t('walletLower')} to decrypt.`)).toBe(true);
+    expect(treeHasText(tree, `${t('sbt')} required: Session SBT. Connect an eligible ${t('walletLower')} to decrypt.`)).toBe(true);
     expect(treeHasText(tree, 'No questions available.')).toBe(false);
     expect(treeHasText(tree, 'Loading Metadata')).toBe(false);
   });
@@ -212,8 +223,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -277,8 +287,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -370,8 +379,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -433,9 +441,9 @@ describe('SurveyPileViewMode gated empty states', () => {
     const tree = subject.render();
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBe(true);
     expect(treeHasText(tree, `This session's questions are ${t('gatedLower')}`)).toBe(true);
-    expect(treeHasText(tree, `Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
+    expect(treeHasText(tree, `${t('sbt')} required: VIP SBT. Connect an eligible ${t('walletLower')} that satisfies the ${t('gateLower')} requirements below, then decrypt to view the questions.`)).toBe(true);
     expect(treeHasText(tree, 'VIP Gate')).toBe(false);
-    expect(treeHasText(tree, 'VIP SBT')).toBe(false);
+    expect(treeHasText(tree, 'VIP SBT')).toBe(true);
     expect(treeHasText(tree, 'Retry decrypt')).toBe(false);
     expect(treeHasText(tree, 'Decrypt')).toBe(true);
     expect(treeHasDataTestId(tree, E2E_TESTIDS.SURVEY_LOCKED_BANNER_CARET)).toBe(true);

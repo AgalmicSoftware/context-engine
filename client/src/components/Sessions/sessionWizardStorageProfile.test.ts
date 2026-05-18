@@ -12,7 +12,7 @@ describe('sessionWizardStorageProfile', () => {
 
     expect(profile.backend).toBe(SESSION_STORAGE_BACKENDS.ARWEAVE);
     expect(profile.sessionOwned).toBe(true);
-    expect(profile.demoOwned).toBe(false);
+    expect(profile.telegramOwned).toBe(false);
     expect(profile.resources).toEqual({
       docsContext: 'active',
       questions: 'staged',
@@ -50,7 +50,7 @@ describe('sessionWizardStorageProfile', () => {
 
     expect(profile.backend).toBe(SESSION_STORAGE_BACKENDS.CLOUDFLARE);
     expect(profile.sessionOwned).toBe(true);
-    expect(profile.demoOwned).toBe(false);
+    expect(profile.telegramOwned).toBe(false);
     expect(profile.resources.docsContext).toBe('active');
     expect(profile.resources.questions).toBe('active');
     expect(profile.resources.surveys).toBe('active');

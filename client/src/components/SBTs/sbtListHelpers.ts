@@ -2,10 +2,6 @@ import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import {
-  CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP,
-  SHOW_DEMO_SESSIONS,
-} from '../../variables/appConfig.js';
 import { resolveSessionUniverseEntrySlug } from './sbtSessionUniverse.js';
 export {
   buildSbtListExpandedCardShellClassName,
@@ -21,6 +17,16 @@ export {
   resolveSbtListLoadingProgressFillStyle,
   resolveSbtListRelativeImageStyle,
 } from './sbtListDisplayHelpers';
+export {
+  isSbtListManagedDgCacheName,
+  readSbtListShowDemoSessions,
+  readSbtListSyncBarResearchBlockStep,
+  readSbtListUniverseCollapsedState,
+  readStoredSbtListModeSelectedSessionSlugs,
+  resolveSbtListCreateGroupInitialVisibility,
+  SBT_LIST_MODE_SELECTION_STORAGE_KEY,
+} from './sbtListStorageHelpers';
+export type { SbtListStorageReader } from './sbtListStorageHelpers';
 
 export type SbtListHelperRecord = Record<string, unknown>;
 export type SbtListHelperItem = SbtListHelperRecord & {
@@ -132,6 +138,111 @@ export type SbtCacheMetaSnapshot = {
   lastBlock: number;
   sbtCount: number;
 };
+export type SbtListLiveProgressSnapshot = SbtListHelperRecord & {
+  currentBlock?: unknown;
+  latestBlock?: unknown;
+  updatedAtMs?: unknown;
+};
+export type SbtListSessionProgressSnapshot = {
+  cacheMeta: SbtCacheMetaSnapshot | null;
+  cfg: SbtListHelperRecord | null;
+  deferred: boolean;
+  displayCurrentBlock: number;
+  hasCache: boolean;
+  hasLatest: boolean;
+  lastBlock: number;
+  latestForGroup: number | null;
+  liveCurrentBlock: number | null;
+  liveLatestBlock: number | null;
+  liveProgress: SbtListLiveProgressSnapshot | null;
+  remainingBlocks: number | null;
+  sbtCount: number;
+  scanInProgress: boolean;
+  slug: string;
+  startBlock: number | null;
+};
+export type SbtListSessionLoadingStatusSnapshot = {
+  cfg?: SbtListHelperRecord | null;
+  deferred?: boolean;
+  displayCurrentBlock?: number;
+  hasCache?: boolean;
+  hasLatest?: boolean;
+  lastBlock?: number;
+  latestForGroup?: number | null;
+  remainingBlocks?: number | null;
+  scanInProgress?: boolean;
+  slug?: string;
+  startBlock?: number | null;
+};
+export type SbtListSessionLoadingStatus = {
+  chipBlockProgressText: string;
+  chipRemainingText: string;
+  deferred: boolean;
+  displayCurrentBlock: number;
+  displayName: string;
+  hasLatest: boolean;
+  lastBlock: number;
+  latestForGroup: number | null;
+  progressPct: number;
+  progressText: string;
+  remainingBlocks: number | null;
+  scanInProgress: boolean;
+  slug: string;
+  slugLabel: string;
+  statusLabel: string;
+};
+export type SbtListSessionChipState = {
+  hasCards: boolean;
+  hasLoadedOnce: boolean;
+  isLoaded: boolean;
+  isLoading: boolean;
+};
+export type SbtListSessionChipStateBySlug = Record<string, SbtListSessionChipState | undefined>;
+type BuildSbtListSessionLoadingStatusArgs = {
+  allSessionsMode?: boolean;
+  alwaysShow?: boolean;
+  forceShow?: boolean;
+  formatBlockCount?: (value: unknown) => string;
+  loading?: boolean;
+  snapshot?: SbtListSessionLoadingStatusSnapshot | null;
+};
+type BuildSbtListSessionChipStateBySlugArgs = {
+  allSessionsMode?: unknown;
+  displayedSessionUniverseSlugs?: unknown;
+  getSessionProgressSnapshot?: (slug: string) => {
+    deferred?: unknown;
+    scanInProgress?: unknown;
+  } | null;
+  hasNoSessionCards?: unknown;
+  readSbtCacheMeta?: (slug: string) => unknown;
+  refreshing?: unknown;
+  sbtListBySlug?: Record<string, unknown>;
+  sessionHasLoadedOnceBySlug?: Record<string, unknown>;
+  sessionLoadStateBySlug?: Record<string, unknown>;
+};
+type BuildSbtListSessionProgressSnapshotArgs = {
+  allSessionsMode?: unknown;
+  bridgeMs?: unknown;
+  bridgeTailBlocks?: unknown;
+  bridgedLiveProgress?: SbtListLiveProgressSnapshot | null;
+  cacheMeta?: SbtCacheMetaSnapshot | null;
+  cfg?: SbtListHelperRecord | null;
+  deferredRaw?: unknown;
+  latestBlock?: unknown;
+  liveProgressFromProps?: SbtListLiveProgressSnapshot | null;
+  recentLiveProgressNowMs?: unknown;
+  scanInProgressRaw?: unknown;
+  slug?: unknown;
+};
+type ResolveSbtListConcreteSessionBindingSlugOptions = {
+  getSessionSlugByName?: (sessionName: string) => unknown;
+};
+type ResolveSbtListItemSessionSlugOptions<T extends SbtListHelperItem = SbtListHelperItem> = {
+  allSessionsMode?: unknown;
+  isListModeScopeEnabled?: unknown;
+  listSlug?: unknown;
+  resolveConcreteSessionBindingSlug?: (sbt: T | null | undefined) => string | null;
+};
 
 export type SbtSessionGroupLists = {
   featured_SBTs_LIST?: unknown;
@@ -165,19 +276,6 @@ export type SbtListSessionUniverseOptions = {
   demoSessionMap?: Record<string, SbtListHelperRecord>;
 };
 
-export type SbtListStorageReader = {
-  getItem?: (key: string) => string | null;
-};
-
-type SbtListCreateFormCacheChecker = (args: {
-  clearInvalid: true;
-  migrateLegacyToSessionKey: true;
-  sessionSlug: string;
-}) => boolean;
-type ResolveSbtListCreateGroupInitialVisibilityArgs = {
-  hasCachedCreateSbtForm?: SbtListCreateFormCacheChecker | null;
-  listSlug?: unknown;
-};
 type ResolveSbtListSectionSessionSlugsArgs = {
   allSessionsMode?: unknown;
   isListModeScopeEnabled?: unknown;
@@ -254,37 +352,221 @@ const SESSION_ID_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-
 const SESSION_ID_HEX_RE = /^0x[0-9a-f]{32}$/i;
 const SESSION_ID_COMPACT_RE = /^[0-9a-f]{32}$/i;
 export const SBT_LIST_NO_SESSION_UNIVERSE_SLUG = '__no_session__';
-export const SBT_LIST_MODE_SELECTION_STORAGE_KEY = 'dg:sbtListModeSelectedSessions';
-const SBT_LIST_MANAGED_DG_CACHE_NAMES = new Set<string>([
-  'questionsCache',
-  'surveysCache',
-  'bookmarksCache',
-  'filters',
-  'sbtCache',
-  'userCache',
-]);
+
+export const buildSbtListSessionLoadingStatus = ({
+  allSessionsMode = false,
+  alwaysShow = false,
+  forceShow = false,
+  formatBlockCount = (value) => String(value ?? ''),
+  loading = false,
+  snapshot = null,
+}: BuildSbtListSessionLoadingStatusArgs = {}): SbtListSessionLoadingStatus | null => {
+  if (!snapshot) return null;
+  const {
+    cfg = null,
+    lastBlock = 0,
+    hasCache = false,
+    startBlock = null,
+    latestForGroup = null,
+    hasLatest = false,
+    displayCurrentBlock = 0,
+    remainingBlocks = null,
+    scanInProgress = false,
+    deferred = false,
+  } = snapshot;
+  const slug = normalizeSessionSlug(snapshot.slug || '');
+  const sessionLabel = String(cfg?.sessionName || (slug || 'General'));
+  const slugLabel = slug || 'general';
+  const displayName =
+    sessionLabel && sessionLabel.toLowerCase() !== slugLabel.toLowerCase()
+      ? `${sessionLabel} (${slugLabel})`
+      : sessionLabel;
+  const numericLatestForGroup = Number(latestForGroup || 0);
+  const numericStartBlock = Number(startBlock || 0);
+  const numericRemainingBlocks = Number(remainingBlocks || 0);
+  const totalBlocks = hasLatest ? Math.max(1, numericLatestForGroup - numericStartBlock + 1) : null;
+  const scannedBlocks = hasLatest
+    ? Math.max(0, Math.min(totalBlocks || 0, displayCurrentBlock - numericStartBlock + 1))
+    : 0;
+  const progressPct = hasLatest
+    ? Math.max(0, Math.min(100, Math.round((scannedBlocks / (totalBlocks || 1)) * 100)))
+    : 0;
+  const progressText = hasLatest
+    ? (numericRemainingBlocks === 0
+      ? `In Sync (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`
+      : `Remaining Blocks: ${formatBlockCount(numericRemainingBlocks)} (Current: ${formatBlockCount(displayCurrentBlock)} / Latest: ${formatBlockCount(numericLatestForGroup)})`)
+    : `Loading latest block... (Current: ${formatBlockCount(displayCurrentBlock)})`;
+  const chipRemainingText = hasLatest
+    ? (numericRemainingBlocks > 0
+      ? `${formatBlockCount(numericRemainingBlocks)} remaining`
+      : 'Synced')
+    : 'Syncing';
+  const chipBlockProgressText = hasLatest
+    ? `${formatBlockCount(displayCurrentBlock)} / ${formatBlockCount(latestForGroup)}`
+    : `Current ${formatBlockCount(displayCurrentBlock)}`;
+  const statusLabel = scanInProgress ? 'Scanning' : deferred ? 'Queued' : 'Loading';
+  const shouldShow = alwaysShow || forceShow || (allSessionsMode
+    ? (scanInProgress || deferred || (!hasCache && loading))
+    : true);
+
+  if (!shouldShow) return null;
+  return {
+    slug,
+    slugLabel,
+    displayName,
+    statusLabel,
+    progressText,
+    chipRemainingText,
+    chipBlockProgressText,
+    progressPct,
+    hasLatest,
+    latestForGroup,
+    lastBlock,
+    displayCurrentBlock,
+    remainingBlocks,
+    scanInProgress,
+    deferred,
+  };
+};
+
+export const buildSbtListSessionChipStateBySlug = ({
+  allSessionsMode = false,
+  displayedSessionUniverseSlugs = [],
+  getSessionProgressSnapshot = () => null,
+  hasNoSessionCards = false,
+  readSbtCacheMeta = () => null,
+  refreshing = false,
+  sbtListBySlug = {},
+  sessionHasLoadedOnceBySlug = {},
+  sessionLoadStateBySlug = {},
+}: BuildSbtListSessionChipStateBySlugArgs = {}): SbtListSessionChipStateBySlug => {
+  if (!allSessionsMode) return {};
+  const out: SbtListSessionChipStateBySlug = {};
+  (Array.isArray(displayedSessionUniverseSlugs) ? displayedSessionUniverseSlugs : []).forEach((slugRaw) => {
+    const slug = normalizeSessionSlug(slugRaw || '');
+    if (isSbtListSyntheticNoSessionSlug(slug)) {
+      const hasLoadedOnce = Object.values(sessionHasLoadedOnceBySlug).some(Boolean);
+      const anySessionLoading = Object.values(sessionLoadStateBySlug).some((state) => state === 'loading');
+      const hasCards = !!hasNoSessionCards;
+      const isLoading = !!refreshing || (!hasCards && (!hasLoadedOnce || anySessionLoading));
+      const isLoaded = hasCards || (hasLoadedOnce && !isLoading);
+      out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
+      return;
+    }
+    const cacheMeta = readSbtCacheMeta(slug);
+    const snapshot = getSessionProgressSnapshot(slug);
+    const hasCacheSnapshot = cacheMeta != null;
+    const hasLoadedOnce = !!sessionHasLoadedOnceBySlug[slug];
+    const listForSlug = sbtListBySlug[slug];
+    const hasCards = Array.isArray(listForSlug) && listForSlug.length > 0;
+    const loadState = sessionLoadStateBySlug[slug] || 'idle';
+    const scanInProgress = !!snapshot?.scanInProgress;
+    const deferred = !!snapshot?.deferred;
+    const isLoading = (
+      loadState === 'loading' ||
+      scanInProgress ||
+      deferred ||
+      !!refreshing ||
+      (!hasCacheSnapshot && !hasLoadedOnce)
+    );
+    const isLoaded = (hasLoadedOnce || hasCacheSnapshot) && !scanInProgress && !deferred && loadState !== 'loading';
+    out[slug] = { isLoaded, isLoading, hasLoadedOnce, hasCards };
+  });
+  return out;
+};
+
+export const buildSbtListSessionProgressSnapshot = ({
+  allSessionsMode = false,
+  bridgeMs = 0,
+  bridgeTailBlocks = 0,
+  bridgedLiveProgress = null,
+  cacheMeta = null,
+  cfg = null,
+  deferredRaw = false,
+  latestBlock = 0,
+  liveProgressFromProps = null,
+  recentLiveProgressNowMs = 0,
+  scanInProgressRaw = false,
+  slug: slugIn = '',
+}: BuildSbtListSessionProgressSnapshotArgs = {}): SbtListSessionProgressSnapshot => {
+  const slug = normalizeSessionSlug(slugIn || '');
+  const lastBlock = Number(cacheMeta?.lastBlock || 0);
+  const sbtCount = Number(cacheMeta?.sbtCount || 0);
+  const hasCache = lastBlock > 0 || sbtCount > 0;
+  const bridgedAgeMs = bridgedLiveProgress
+    ? Math.max(0, Number(recentLiveProgressNowMs || 0) - Number(bridgedLiveProgress.updatedAtMs || 0))
+    : Number.POSITIVE_INFINITY;
+  const bridgedRemainingBlocks = Math.max(
+    0,
+    Number(bridgedLiveProgress?.latestBlock || 0) - Number(bridgedLiveProgress?.currentBlock || 0)
+  );
+  // Regression guard: after a scan completes, live progress can clear before the
+  // cache watermark catches up. Keep only a fresh tail bridge to avoid a false restart.
+  const liveProgress = liveProgressFromProps || (
+    !scanInProgressRaw &&
+    !deferredRaw &&
+    bridgedLiveProgress &&
+    bridgedAgeMs <= Number(bridgeMs || 0) &&
+    bridgedRemainingBlocks <= Number(bridgeTailBlocks || 0) &&
+    Number(bridgedLiveProgress.currentBlock || 0) > lastBlock
+      ? bridgedLiveProgress
+      : null
+  );
+  const liveCurrentCandidate = Number(liveProgress?.currentBlock || 0);
+  const liveCurrentBlock = Number.isFinite(liveCurrentCandidate) && liveCurrentCandidate > 0
+    ? liveCurrentCandidate
+    : null;
+  const liveLatestCandidate = Number(liveProgress?.latestBlock || 0);
+  const liveLatestBlock = Number.isFinite(liveLatestCandidate) && liveLatestCandidate > 0
+    ? liveLatestCandidate
+    : null;
+  const cfgRecord = (cfg && typeof cfg === 'object') ? cfg : null;
+  const blockLimits = (cfgRecord?.blockLimits && typeof cfgRecord.blockLimits === 'object')
+    ? cfgRecord.blockLimits as SbtListHelperRecord
+    : {};
+  const startRaw = Number(blockLimits.start);
+  const startBlock = Number.isFinite(startRaw) && startRaw > 0 ? startRaw : null;
+  const latestCandidate = Math.max(
+    Number(latestBlock || 0),
+    Number(liveLatestBlock || 0)
+  );
+  const latestForGroup = Number.isFinite(latestCandidate) && latestCandidate > 0
+    ? latestCandidate
+    : null;
+  const hasLatest = latestForGroup != null && latestForGroup > 0 && startBlock != null;
+  const currentBlockBaseline = liveCurrentBlock != null
+    ? Math.max(lastBlock, liveCurrentBlock)
+    : lastBlock;
+  const displayCurrentBlock = hasLatest
+    ? Math.max(Number(startBlock || 0), currentBlockBaseline)
+    : currentBlockBaseline;
+  const remainingBlocks = hasLatest ? Math.max(0, latestForGroup - displayCurrentBlock) : null;
+  const scanFlagNeedsAttention = !hasCache || !hasLatest || Number(remainingBlocks || 0) > 0;
+  const useRawScanFlags = !allSessionsMode || scanFlagNeedsAttention;
+
+  return {
+    slug,
+    cfg: cfgRecord,
+    cacheMeta,
+    lastBlock,
+    sbtCount,
+    hasCache,
+    liveProgress: liveProgress || null,
+    liveCurrentBlock,
+    liveLatestBlock,
+    startBlock,
+    latestForGroup,
+    hasLatest,
+    displayCurrentBlock,
+    remainingBlocks,
+    scanInProgress: !!scanInProgressRaw && useRawScanFlags,
+    deferred: !!deferredRaw && useRawScanFlags,
+  };
+};
 
 export const isSbtListHelperRecord = (value: unknown): value is SbtListHelperRecord => (
   !!value && typeof value === 'object'
 );
-
-const getDefaultSbtListStorage = (): SbtListStorageReader | null => {
-  try {
-    if (typeof window === 'undefined' || !window.localStorage) return null;
-    return window.localStorage;
-  } catch (_) {
-    return null;
-  }
-};
-
-const getDefaultSbtListRuntimeGlobal = (): SbtListHelperRecord => {
-  try {
-    if (typeof globalThis === 'undefined') return {};
-    return globalThis as unknown as SbtListHelperRecord;
-  } catch (_) {
-    return {};
-  }
-};
 
 export const hasSbtListOwn = (obj: unknown, key: PropertyKey): boolean => (
   isSbtListHelperRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key)
@@ -321,85 +603,109 @@ export const hasSbtListMissingOrEmptySessionSlug = (sbt: unknown): boolean => {
   return String(info.sessionSlug ?? record.sessionSlug ?? '').trim() === '';
 };
 
-export const isSbtListManagedDgCacheName = (name: unknown): boolean => (
-  SBT_LIST_MANAGED_DG_CACHE_NAMES.has(String(name || ''))
-);
+export const resolveSbtListConcreteSessionBindingSlug = <T extends SbtListHelperItem = SbtListHelperItem>(
+  sbt: T | null | undefined,
+  {
+    getSessionSlugByName = () => null,
+  }: ResolveSbtListConcreteSessionBindingSlugOptions = {}
+): string | null => {
+  const sbtInfo = isSbtListHelperRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
 
-export const readStoredSbtListModeSelectedSessionSlugs = (
-  storage?: SbtListStorageReader | null
-): string[] => {
-  try {
-    const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
-    if (!resolvedStorage?.getItem) return [];
-    const raw = resolvedStorage.getItem(SBT_LIST_MODE_SELECTION_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return dedupeNormalizedSbtListSlugs(Array.isArray(parsed) ? parsed : []);
-  } catch (_) {
-    return [];
+  if (hasSbtListAuthoritativeSessionSlug(sbtInfo)) {
+    return normalizeSessionSlug(sbtInfo?.sessionSlug || '');
   }
+  if (hasSbtListAuthoritativeSessionSlug(sbt)) {
+    return normalizeSessionSlug(sbt?.sessionSlug || '');
+  }
+
+  const legacySlugRaw = sbtInfo?.slug;
+  if (legacySlugRaw != null && String(legacySlugRaw).trim() !== '') {
+    return normalizeSessionSlug(legacySlugRaw);
+  }
+
+  const hasInferredSessionSlug = (
+    (hasSbtListOwn(sbtInfo, 'sessionSlug') && sbtInfo?.sessionSlugExplicit === false) ||
+    (hasSbtListOwn(sbt, 'sessionSlug') && sbt?.sessionSlugExplicit === false)
+  );
+  if (hasInferredSessionSlug) return null;
+
+  const legacySessionName = String(
+    sbtInfo?.sessionName ??
+    sbt?.sessionName ??
+    ''
+  ).trim();
+  if (!legacySessionName) return null;
+
+  const mappedSlug = getSessionSlugByName(legacySessionName);
+  if (mappedSlug == null) return null;
+  return normalizeSessionSlug(mappedSlug);
 };
 
-export const resolveSbtListCreateGroupInitialVisibility = ({
-  hasCachedCreateSbtForm = null,
-  listSlug = '',
-}: ResolveSbtListCreateGroupInitialVisibilityArgs = {}): boolean => (
-  typeof hasCachedCreateSbtForm === 'function'
-    ? hasCachedCreateSbtForm({
-      sessionSlug: normalizeSessionSlug(listSlug || ''),
-      migrateLegacyToSessionKey: true,
-      clearInvalid: true,
-    })
-    : false
-);
-
-export const readSbtListUniverseCollapsedState = (
-  storage?: SbtListStorageReader | null
-): boolean => {
-  try {
-    const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
-    return resolvedStorage?.getItem?.('dg:sbtUniverseCollapsed') === 'true';
-  } catch (_) {
-    return false;
+export const resolveSbtListItemSessionSlug = <T extends SbtListHelperItem = SbtListHelperItem>(
+  sbt: T | null | undefined,
+  {
+    allSessionsMode = false,
+    isListModeScopeEnabled = false,
+    listSlug = '',
+    resolveConcreteSessionBindingSlug = (item) => resolveSbtListConcreteSessionBindingSlug(item),
+  }: ResolveSbtListItemSessionSlugOptions<T> = {}
+): string => {
+  const sbtInfo = isSbtListHelperRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
+  const sourceSlug = normalizeSessionSlug(
+    sbt?.__sourceSessionSlug ?? sbt?.slug ?? sbt?.sessionSlug ?? ''
+  );
+  if (allSessionsMode && hasSbtListExplicitNoSessionAssociation(sbt)) {
+    return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
   }
-};
+  const hasMetadataSessionSlug = (
+    hasSbtListOwn(sbtInfo, 'sessionSlug') ||
+    hasSbtListOwn(sbt, 'sessionSlug')
+  );
+  const metadataSessionSlug = hasMetadataSessionSlug
+    ? normalizeSessionSlug(sbtInfo?.sessionSlug ?? sbt?.sessionSlug ?? '')
+    : null;
+  const hasAuthoritativeMetadataSessionSlug = (
+    hasSbtListAuthoritativeSessionSlug(sbtInfo) || hasSbtListAuthoritativeSessionSlug(sbt)
+  );
 
-export const readSbtListShowDemoSessions = (
-  runtimeGlobal = getDefaultSbtListRuntimeGlobal(),
-  fallback: unknown = SHOW_DEMO_SESSIONS
-): boolean => {
-  try {
-    if (
-      isSbtListHelperRecord(runtimeGlobal) &&
-      typeof runtimeGlobal.SHOW_DEMO_SESSIONS !== 'undefined'
-    ) {
-      return !!runtimeGlobal.SHOW_DEMO_SESSIONS;
+  if (allSessionsMode && isListModeScopeEnabled) {
+    const concreteBindingSlug = resolveConcreteSessionBindingSlug(sbt);
+    if (concreteBindingSlug != null) {
+      return concreteBindingSlug === ''
+        ? SBT_LIST_NO_SESSION_UNIVERSE_SLUG
+        : concreteBindingSlug;
     }
-  } catch (e) { void e; /* fallback: demo visibility lookup. */ }
-  return !!fallback;
-};
-
-export const readSbtListSyncBarResearchBlockStep = (
-  runtimeGlobal = getDefaultSbtListRuntimeGlobal(),
-  fallback: unknown = CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP
-): number => {
-  try {
-    if (
-      isSbtListHelperRecord(runtimeGlobal) &&
-      typeof runtimeGlobal.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP !== 'undefined'
-    ) {
-      const runtimeValue = Number(runtimeGlobal.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP);
-      if (Number.isFinite(runtimeValue) && runtimeValue > 0) {
-        return Math.max(1, Math.floor(runtimeValue));
-      }
+    if (hasSbtListMissingOrEmptySessionSlug(sbt)) {
+      return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
     }
-  } catch (e) { void e; /* fallback: sync-bar research step lookup. */ }
-
-  const defaultValue = Number(fallback || 0);
-  if (Number.isFinite(defaultValue) && defaultValue > 0) {
-    return Math.max(1, Math.floor(defaultValue));
+    return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
   }
-  return 50;
+  if (hasSbtListAuthoritativeSessionSlug(sbtInfo)) {
+    return normalizeSessionSlug(sbtInfo?.sessionSlug || '');
+  }
+  if (hasSbtListAuthoritativeSessionSlug(sbt)) {
+    return normalizeSessionSlug(sbt?.sessionSlug || '');
+  }
+  if (
+    metadataSessionSlug != null &&
+    metadataSessionSlug !== sourceSlug &&
+    !hasAuthoritativeMetadataSessionSlug &&
+    sourceSlug
+  ) {
+    return sourceSlug;
+  }
+
+  const legacyRaw = (
+    sbtInfo?.sessionSlug ??
+    sbtInfo?.slug ??
+    sbt?.sessionSlug ??
+    sbt?.slug
+  );
+  if (legacyRaw != null && String(legacyRaw).trim() !== '') {
+    return normalizeSessionSlug(legacyRaw);
+  }
+  if (allSessionsMode) return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
+  return normalizeSessionSlug(listSlug || '');
 };
 
 export const isSbtListSessionIdLikeSlug = (raw: unknown): boolean => {

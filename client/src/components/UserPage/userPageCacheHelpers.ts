@@ -52,6 +52,14 @@ export type UserPageOwnershipSignalAggregate = {
   mintedSet: Set<string>;
   burnedSet: Set<string>;
 };
+export type UserPageSbtAggregateEntry = UserPageUnknownRecord & UserPageOwnershipSignalAggregate & {
+  blockNumber?: number;
+  sbtAddress?: unknown;
+  sbtInfo?: unknown;
+  slug?: unknown;
+  viewerCountsAuthoritative?: boolean;
+};
+export type UserPageSbtAggregateMap = Record<string, UserPageSbtAggregateEntry | undefined>;
 export type UserPageSourceSlugMap = Record<string, string>;
 export type UserPageSourceSlugWriteOptions = {
   replace?: unknown;
@@ -67,12 +75,47 @@ export type UpsertUserPageResponseByRecencyArgs = {
   metaValue?: unknown;
   slug?: unknown;
 };
+export type MergeUserPageSurveyCacheSourceArgs = {
+  cacheObj?: unknown;
+  combinedSurveyResponses: UserPageResponseBucketMap;
+  combinedSurveyResponsesMeta: UserPageResponseRecencyBucketMap;
+  combinedSurveys: UserPageUnknownRecord;
+  networkID?: unknown;
+  slug?: unknown;
+  surveyResponseSourceSlugById: UserPageSourceSlugMap;
+  surveyResponseSourceSlugByKey: UserPageSourceSlugMap;
+  surveySourceSlugById: UserPageSourceSlugMap;
+};
+export type MergeUserPageQuestionCacheSourceArgs = {
+  cacheObj?: unknown;
+  combinedQuestionResponses: UserPageResponseBucketMap;
+  combinedQuestionResponsesMeta: UserPageResponseRecencyBucketMap;
+  combinedQuestions: UserPageUnknownRecord;
+  networkID?: unknown;
+  questionResponseSourceSlugById: UserPageSourceSlugMap;
+  questionResponseSourceSlugByKey: UserPageSourceSlugMap;
+  questionSourceSlugById: UserPageSourceSlugMap;
+  slug?: unknown;
+};
 export type UserPageUserCachePayload = UserPageUnknownRecord & {
   sbts?: unknown;
   createdSurveys?: unknown;
   createdQuestions?: unknown;
   surveyResponses?: unknown;
   questionResponses?: unknown;
+};
+type MergeUserPageSbtCacheEntryIntoAggregateArgs = {
+  entry?: unknown;
+  key?: unknown;
+  sbtAggregate: UserPageSbtAggregateMap;
+  slug?: unknown;
+  viewAddressKey?: unknown;
+};
+type MergeUserPageUserCacheSbtIntoAggregateArgs = {
+  item?: unknown;
+  sbtAggregate: UserPageSbtAggregateMap;
+  slug?: unknown;
+  viewAddressKey?: unknown;
 };
 
 const normalizeUserPageCacheSourceSlug = (slug: unknown): string => {
@@ -141,6 +184,105 @@ export const applyUserPageOwnershipSignal = (
   }
 };
 
+const buildDefaultUserPageSbtAggregateEntry = (
+  entry: UserPageUnknownRecord,
+  key: string,
+  slug: unknown
+): UserPageSbtAggregateEntry => ({
+  sbtAddress: entry.sbtAddress || key,
+  sbtInfo: null,
+  mintedSet: new Set(),
+  burnedSet: new Set(),
+  viewerCountsAuthoritative: false,
+  blockNumber: 0,
+  slug: slug || '',
+});
+
+const applyUserPageSbtAggregateMetadata = (
+  aggEntry: UserPageSbtAggregateEntry,
+  entry: UserPageUnknownRecord,
+  slug: unknown
+): void => {
+  if (slug && !aggEntry.slug) aggEntry.slug = slug;
+  if (!aggEntry.sbtInfo && entry.sbtInfo) aggEntry.sbtInfo = entry.sbtInfo;
+  if (aggEntry.sbtInfo && entry.sbtInfo) {
+    aggEntry.sbtInfo = {
+      ...(aggEntry.sbtInfo as UserPageUnknownRecord),
+      ...(entry.sbtInfo as UserPageUnknownRecord),
+    };
+  }
+};
+
+export const mergeUserPageSbtCacheEntryIntoAggregate = ({
+  entry: entryIn = {},
+  key: keyIn = '',
+  sbtAggregate,
+  slug = '',
+  viewAddressKey = '',
+}: MergeUserPageSbtCacheEntryIntoAggregateArgs): UserPageSbtAggregateEntry | null => {
+  const entry = toAnalysisRecord(entryIn);
+  const key = String(keyIn || entry.sbtAddress || '').toLowerCase();
+  if (!key) return null;
+  const addressKey = String(viewAddressKey || '').toLowerCase();
+  const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(entry, key, slug);
+
+  applyUserPageSbtAggregateMetadata(aggEntry, entry, slug);
+  const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(entry, addressKey);
+  if (hasExplicitCounts) {
+    aggEntry.mintedSet.delete(addressKey);
+    aggEntry.burnedSet.delete(addressKey);
+    aggEntry.viewerCountsAuthoritative = true;
+  }
+  (Array.isArray(entry.mintedAddresses) ? entry.mintedAddresses : [])
+    .forEach((address: unknown) => {
+      const addressLower = String(address || '').toLowerCase();
+      if (!addressLower) return;
+      if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === addressKey) return;
+      aggEntry.mintedSet.add(addressLower);
+    });
+  (Array.isArray(entry.burnedAddresses) ? entry.burnedAddresses : [])
+    .forEach((address: unknown) => {
+      const addressLower = String(address || '').toLowerCase();
+      if (!addressLower) return;
+      if ((hasExplicitCounts || aggEntry.viewerCountsAuthoritative) && addressLower === addressKey) return;
+      aggEntry.burnedSet.add(addressLower);
+    });
+  applyUserPageOwnershipSignal(aggEntry, entry, addressKey);
+  aggEntry.blockNumber = Math.max(aggEntry.blockNumber || 0, Number(entry.blockNumber || 0));
+  if (entry.sbtAddress) aggEntry.sbtAddress = entry.sbtAddress;
+  sbtAggregate[key] = aggEntry;
+  return aggEntry;
+};
+
+export const mergeUserPageUserCacheSbtIntoAggregate = ({
+  item: itemIn = {},
+  sbtAggregate,
+  slug = '',
+  viewAddressKey = '',
+}: MergeUserPageUserCacheSbtIntoAggregateArgs): UserPageSbtAggregateEntry | null => {
+  const itemRecord = toAnalysisRecord(itemIn);
+  const key = String(itemRecord.sbtAddress || '').toLowerCase();
+  if (!key) return null;
+  const addressKey = String(viewAddressKey || '').toLowerCase();
+  const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(itemRecord, key, slug);
+
+  applyUserPageSbtAggregateMetadata(aggEntry, itemRecord, slug);
+  const hasAggregateOwnershipSignal = (
+    aggEntry.mintedSet.has(addressKey) ||
+    aggEntry.burnedSet.has(addressKey)
+  );
+  const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(itemRecord, addressKey);
+  if (hasExplicitCounts) {
+    applyUserPageOwnershipSignal(aggEntry, itemRecord, addressKey);
+  } else if (!hasAggregateOwnershipSignal) {
+    // Regression guard: userCache rows are fallback ownership hints; they must
+    // not re-mint a viewer already burned by the fresher sbtCache aggregate.
+    aggEntry.mintedSet.add(addressKey);
+  }
+  sbtAggregate[key] = aggEntry;
+  return aggEntry;
+};
+
 export const writeUserPageSourceSlug = (
   target: UserPageSourceSlugMap,
   id: unknown,
@@ -203,6 +345,122 @@ export const upsertUserPageResponseByRecency = ({
   responseRecencyMeta[idLower][responderLower] = incomingRecency;
   writeUserPageSourceSlug(sourceSlugById, idLower, slug, { replace: true });
   writeUserPageResponseSourceSlug(responseSourceSlugByKey, idLower, responderLower, slug, { replace: true });
+};
+
+export const mergeUserPageSurveyCacheSource = ({
+  cacheObj,
+  combinedSurveyResponses,
+  combinedSurveyResponsesMeta,
+  combinedSurveys,
+  networkID,
+  slug = '',
+  surveyResponseSourceSlugById,
+  surveyResponseSourceSlugByKey,
+  surveySourceSlugById,
+}: MergeUserPageSurveyCacheSourceArgs): void => {
+  const netObj = readUserPageNetworkCache(cacheObj, networkID);
+  const surveysMap = toAnalysisRecord(netObj.surveys);
+  Object.keys(surveysMap).forEach((sidRaw: string) => {
+    const sid = String(sidRaw || '').toLowerCase();
+    if (!sid) return;
+    if (!combinedSurveys[sid]) {
+      combinedSurveys[sid] = toAnalysisRecord(surveysMap[sidRaw] || surveysMap[sid]);
+    }
+    writeUserPageSourceSlug(surveySourceSlugById, sid, slug);
+  });
+
+  const responseMap = toAnalysisRecord(netObj.surveyResponses);
+  Object.keys(responseMap).forEach((sidRaw: string) => {
+    const sid = String(sidRaw || '').toLowerCase();
+    if (!sid) return;
+    const perSurvey = toAnalysisRecord(responseMap[sidRaw] || responseMap[sid]);
+    Object.keys(perSurvey).forEach((resAddrRaw: string) => {
+      const responder = String(resAddrRaw || '').toLowerCase();
+      if (!responder) return;
+      const responseValue = (
+        Object.prototype.hasOwnProperty.call(perSurvey, resAddrRaw)
+          ? perSurvey[resAddrRaw]
+          : perSurvey[responder]
+      );
+      const responseMeta = (responseValue && typeof responseValue === 'object')
+        ? responseValue
+        : null;
+      upsertUserPageResponseByRecency({
+        id: sid,
+        responder,
+        responseRecencyMeta: combinedSurveyResponsesMeta,
+        responses: combinedSurveyResponses,
+        responseSourceSlugByKey: surveyResponseSourceSlugByKey,
+        responseValue,
+        sourceSlugById: surveyResponseSourceSlugById,
+        metaValue: responseMeta,
+        slug,
+      });
+    });
+  });
+};
+
+export const mergeUserPageQuestionCacheSource = ({
+  cacheObj,
+  combinedQuestionResponses,
+  combinedQuestionResponsesMeta,
+  combinedQuestions,
+  networkID,
+  questionResponseSourceSlugById,
+  questionResponseSourceSlugByKey,
+  questionSourceSlugById,
+  slug = '',
+}: MergeUserPageQuestionCacheSourceArgs): void => {
+  const netObj = readUserPageNetworkCache(cacheObj, networkID);
+  const questionsMap = toAnalysisRecord(netObj.questions);
+  Object.keys(questionsMap).forEach((qidRaw: string) => {
+    const qid = String(qidRaw || '').toLowerCase();
+    if (!qid) return;
+    if (!combinedQuestions[qid]) {
+      combinedQuestions[qid] = toAnalysisRecord(questionsMap[qidRaw] || questionsMap[qid]);
+    }
+    writeUserPageSourceSlug(questionSourceSlugById, qid, slug);
+  });
+
+  const responseMap = toAnalysisRecord(netObj.questionResponses);
+  const responseMetaMap = toAnalysisRecord(netObj.questionResponsesMeta);
+  Object.keys(responseMap).forEach((qidRaw: string) => {
+    const qid = String(qidRaw || '').toLowerCase();
+    if (!qid) return;
+    const perQuestion = toAnalysisRecord(responseMap[qidRaw] || responseMap[qid]);
+    const perQuestionMeta = (
+      isPlainAnalysisObject(responseMetaMap[qidRaw])
+        ? responseMetaMap[qidRaw]
+        : isPlainAnalysisObject(responseMetaMap[qid])
+          ? responseMetaMap[qid]
+          : {}
+    );
+    Object.keys(perQuestion).forEach((resAddrRaw: string) => {
+      const responder = String(resAddrRaw || '').toLowerCase();
+      if (!responder) return;
+      const responseValue = (
+        Object.prototype.hasOwnProperty.call(perQuestion, resAddrRaw)
+          ? perQuestion[resAddrRaw]
+          : perQuestion[responder]
+      );
+      const responseMeta = (
+        perQuestionMeta[resAddrRaw] ??
+        perQuestionMeta[responder] ??
+        null
+      );
+      upsertUserPageResponseByRecency({
+        id: qid,
+        responder,
+        responseRecencyMeta: combinedQuestionResponsesMeta,
+        responses: combinedQuestionResponses,
+        responseSourceSlugByKey: questionResponseSourceSlugByKey,
+        responseValue,
+        sourceSlugById: questionResponseSourceSlugById,
+        metaValue: responseMeta,
+        slug,
+      });
+    });
+  });
 };
 
 export const readUserPageNetworkCache = (

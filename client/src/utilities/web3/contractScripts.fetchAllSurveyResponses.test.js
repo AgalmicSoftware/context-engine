@@ -1,5 +1,7 @@
 const mockFetchLogsSmartWithProvider = jest.fn();
 const mockGetReadProviderForChain = jest.fn();
+const mockGetReadProviderForGroup = jest.fn();
+const mockSessionReadProvider = { name: 'mock-session-provider' };
 
 jest.mock('../logging.js', () => ({
   createLogger: () => ({
@@ -25,6 +27,7 @@ jest.mock('./rpcProviders.js', () => {
   return {
     ...actual,
     getReadProviderForChain: mockGetReadProviderForChain,
+    getReadProviderForGroup: mockGetReadProviderForGroup,
   };
 });
 
@@ -178,6 +181,8 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
     mockFetchLogsSmartWithProvider.mockReset();
     mockGetReadProviderForChain.mockReset();
     mockGetReadProviderForChain.mockReturnValue({ name: 'mock-provider' });
+    mockGetReadProviderForGroup.mockReset();
+    mockGetReadProviderForGroup.mockReturnValue(mockSessionReadProvider);
 
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
       return {
@@ -224,7 +229,19 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       GROUP_CFG
     );
 
-    expect(mockGetReadProviderForChain).toHaveBeenCalledWith(84532);
+    expect(mockGetReadProviderForGroup).toHaveBeenCalledWith(
+      expect.objectContaining({ slug: GROUP_CFG.slug }),
+      expect.objectContaining({ contractKey: 'surveys' })
+    );
+    expect(mockGetReadProviderForChain).not.toHaveBeenCalled();
+    expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledWith(
+      mockSessionReadProvider,
+      expect.objectContaining({
+        address: GROUP_CFG.contracts.surveys.address,
+      }),
+      1,
+      30
+    );
     expect(result.hadPartialFailure).toBe(false);
     expect(result.lowestFailedBlock).toBeNull();
     expect(result.responses).toHaveLength(2);

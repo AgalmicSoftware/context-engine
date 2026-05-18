@@ -85,9 +85,9 @@ const WorkerResourceInputs = ({
   if (resourceKey === 'lit') {
     const litAccountField: ResourceSecretField = {
       key: 'litAccountApiKey',
-      label: 'Lit account API key',
+      label: 'Lit API key',
       type: 'password',
-      placeholder: 'Paste LIT_ACCOUNT_API_KEY',
+      placeholder: 'Paste LIT_USAGE_API_KEY',
     };
 
     return (
@@ -96,7 +96,7 @@ const WorkerResourceInputs = ({
           {renderGenericField(litAccountField)}
         </div>
         <div className={styles.helperText}>
-          {/* Worker deploy derives the Lit group, PKP, usage key, and CE action from this account key. */}
+          {/* Worker deploy derives the Lit group, PKP, and CE action from this key when needed. */}
         </div>
       </div>
     );

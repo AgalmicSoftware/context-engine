@@ -1,6 +1,7 @@
 /** @file CreateQuestionsAndSurveys.tsx */
 
 import React, { Component } from 'react';
+import sha256 from 'crypto-js/sha256';
 import {
   Button,
   Label,
@@ -33,13 +34,14 @@ import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import contractScripts, { getSessionConfigBySlug, normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
 import {
   buildSbtAccessControlConditions,
+  createLitHooks,
   resolveLitChain,
   getGlobalLitHooks,
   litStorage,
 } from '../../utilities/crypto/litProtocol.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
-import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
+import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { ethers } from 'ethers';
 import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator';
 import { callAI } from '../../utilities/ai/aiScripts.js';
@@ -78,6 +80,7 @@ import { notify } from '../../utilities/ui/notify.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
 import { chainHttpRpc, chainHttpRpcNoPath, getChainById } from '../../variables/chains.js';
+import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
 import {
   buildAuthoringEncryptionPayload,
   buildCreateSurveyAiPromptModelLabelPatch,
@@ -102,6 +105,8 @@ import {
   buildCreateSurveyHashPatch,
   buildCreateSurveyMountSubmitResetPatch,
   buildCreateSurveyNetworkSwitchPatch,
+  buildCreateSurveyGateOptions,
+  buildCreateSurveyGateObjectsAndRecipients,
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyOpenLockKeyPatch,
   buildCreateSurveyQuestionFieldUpdateList,
@@ -112,6 +117,7 @@ import {
   buildCreateSurveyQuestionTagInputValueList,
   buildCreateSurveyQuestionTagRemovalList,
   buildCreateSurveyQuestionsSubmitSuccessPatch,
+  buildCreateSurveySubmitGatePlan,
   buildCreateSurveySurveySubmitSuccessPatch,
   buildCreateSurveySubmitBlockingErrorPatch,
   buildCreateSurveySubmitCatchPatch,
@@ -132,7 +138,6 @@ import {
   getCreateSurveyValidationError,
   isMultichoiceQuestionType,
   isEncryptableFieldValueEmpty,
-  normalizeAddressList,
   normalizeAuthoringQuestionOptions,
   normalizeGateIds,
   normalizeGateText,
@@ -142,7 +147,6 @@ import {
   removeCreateSurveyEncryptionGateSbt,
   resolvePayloadSingleSelect,
   resolveQuestionSingleSelect,
-  stableGateColor,
 } from './createQuestionsAndSurveysHelpers.js';
 import {
   sanitizeDocumentUrls,
@@ -233,7 +237,7 @@ type EffectiveAiConfigForCreateSurvey = {
   [key: string]: unknown;
 };
 
-const sha256 = require('crypto-js/sha256') as CreateSurveySha256;
+const createSurveySha256 = sha256 as CreateSurveySha256;
 const getEffectiveAiConfigForCreateSurvey = getEffectiveAiConfig as (
   args?: GetEffectiveAiConfigForCreateSurveyArgs,
 ) => Promise<EffectiveAiConfigForCreateSurvey>;
@@ -497,19 +501,6 @@ type CreateSurveyGateOptionsResult = {
 type CreateSurveyGateOptionsArgs = {
   isStandaloneQuestion?: unknown;
 };
-type CreateSurveyGateSessionConfig = CreateSurveySessionConfigLike & {
-  encryption?: {
-    gates?: unknown;
-    [key: string]: unknown;
-  };
-  sponsored?: {
-    defaultGateId?: unknown;
-    gates?: unknown;
-    resources?: unknown;
-    [key: string]: unknown;
-  };
-};
-
 interface CreateQuestionsAndSurveysGateSbt {
   address?: string;
   name?: string;
@@ -640,16 +631,68 @@ const isPlainObject = (value: unknown): value is UnknownRecord => (
 const isObjectLikeRecord = (value: unknown): value is UnknownRecord => (
   !!value && typeof value === 'object'
 );
+const asPlainRecord = (value: unknown): UnknownRecord => (
+  isPlainObject(value) ? value : {}
+);
+const mergePlainRecords = (...values: unknown[]): UnknownRecord => (
+  values.reduce<UnknownRecord>((acc, value) => ({
+    ...acc,
+    ...asPlainRecord(value),
+  }), {})
+);
+const firstNonEmptyString = (...values: unknown[]): unknown => (
+  values.find((value) => String(value || '').trim()) || ''
+);
+const mergeCreateSurveySessionConfigWithRegistry = ({
+  sessionConfig,
+  registryConfig,
+  slug,
+}: {
+  sessionConfig: unknown;
+  registryConfig: unknown;
+  slug: string;
+}): UnknownRecord => {
+  const inputConfig = asPlainRecord(sessionConfig);
+  const cachedConfig = asPlainRecord(registryConfig);
+  const inputRegistry = asPlainRecord(inputConfig.__registry);
+  const cachedRegistry = asPlainRecord(cachedConfig.__registry);
+  const inputEncryption = asPlainRecord(inputConfig.encryption);
+  const cachedEncryption = asPlainRecord(cachedConfig.encryption);
+  const inputSponsored = asPlainRecord(inputConfig.sponsored);
+  const cachedSponsored = asPlainRecord(cachedConfig.sponsored);
+
+  return {
+    ...cachedConfig,
+    ...inputConfig,
+    slug: slug || String(inputConfig.slug || cachedConfig.slug || '').trim(),
+    corsWorkerUrl: firstNonEmptyString(inputConfig.corsWorkerUrl, cachedConfig.corsWorkerUrl),
+    lit: mergePlainRecords(cachedConfig.lit, inputConfig.lit),
+    litCredentials: mergePlainRecords(cachedConfig.litCredentials, inputConfig.litCredentials),
+    contracts: mergeSessionContractMaps(cachedConfig.contracts, inputConfig.contracts),
+    encryption: {
+      ...cachedEncryption,
+      ...inputEncryption,
+      gates: mergePlainRecords(cachedEncryption.gates, inputEncryption.gates),
+    },
+    sponsored: {
+      ...cachedSponsored,
+      ...inputSponsored,
+      gates: mergePlainRecords(cachedSponsored.gates, inputSponsored.gates),
+    },
+    __registry: {
+      ...cachedRegistry,
+      ...inputRegistry,
+      gatesByResource: mergePlainRecords(
+        cachedRegistry.gatesByResource,
+        inputRegistry.gatesByResource
+      ),
+    },
+  };
+};
 const writeCreateSurveyCache = writeCache as unknown as CreateSurveyCacheWriter;
 const contractScriptsForSubmit = contractScripts as unknown as CreateSurveyContractScriptsWithSession;
 
 const DOCUMENT_URL_ERROR_TEXT = 'Document URLs must use http://, https://, a root-relative path (/...), ar://, or a supported Lit encrypted-doc URL.';
-
-const AUTHORING_GATE_RESOURCE_LABELS: Record<string, string> = Object.freeze({
-  default: 'default',
-  questionResponses: 'questions',
-  surveyResponses: 'survey',
-});
 
 const ensureManagedSurveysNet = (current: unknown = {}, netId: unknown = ''): ManagedCacheSnapshot => {
   const next: ManagedCacheSnapshot = isObjectLikeRecord(current) ? { ...current } : {};
@@ -972,173 +1015,11 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     cfgIn: unknown = this.getResolvedSessionConfig(),
     { isStandaloneQuestion = this.state?.isStandaloneQuestion }: CreateSurveyGateOptionsArgs = {}
   ): CreateSurveyGateOptionsResult => {
-    const cfg = (cfgIn && typeof cfgIn === 'object') ? cfgIn as CreateSurveyGateSessionConfig : {};
-    const fullEncryptionGateMap = isPlainObject(cfg?.encryption?.gates) ? cfg.encryption.gates : null;
-    const fullSponsoredGateMap = isPlainObject(cfg?.sponsored?.gates) ? cfg.sponsored.gates : null;
-    const fullGateMap: CreateSurveyGateMap = ((fullEncryptionGateMap && Object.keys(fullEncryptionGateMap).length)
-      ? fullEncryptionGateMap
-      : (fullSponsoredGateMap && Object.keys(fullSponsoredGateMap).length ? fullSponsoredGateMap : {})) as CreateSurveyGateMap;
-    const primaryResource = isStandaloneQuestion ? 'questionResponses' : 'surveyResponses';
-    const sessionLabel = this.resolveLockAudienceSessionName(cfg);
-    const relevantGates: CreateSurveyGateDefinition[] = [];
-    const seenGateIds = new Set<string>();
-    const seenGateKeys = new Set<string>();
-
-    const pushRelevantGate = (
-      seedGate: CreateSurveyGateDefinition | null = null,
-      resourceKey: unknown = ''
-    ) => {
-      if (!seedGate || typeof seedGate !== 'object') return;
-
-      const candidateIds = [
-        seedGate.gateId,
-        seedGate.id,
-      ]
-        .map((value: unknown) => normalizeGateText(value))
-        .filter((gateId): gateId is string => Boolean(gateId));
-      const seedAddresses = normalizeAddressList([
-        ...(Array.isArray(seedGate.sbtAddresses) ? seedGate.sbtAddresses : []),
-        seedGate.sbtAddress,
-      ]);
-      const seedAddressKey = seedAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
-
-      let resolvedGateId = candidateIds[0] || '';
-      let resolvedGate: CreateSurveyGateDefinition | null = resolvedGateId
-        ? fullGateMap?.[resolvedGateId] || null
-        : null;
-
-      if (!resolvedGate && seedAddressKey) {
-        Object.entries(fullGateMap || {}).some(([gateId, gate]) => {
-          const gateAddresses = normalizeAddressList([
-            ...(Array.isArray(gate?.sbtAddresses) ? gate.sbtAddresses : []),
-            gate?.sbtAddress,
-          ]);
-          const gateAddressKey = gateAddresses.map((address: string) => address.toLowerCase()).sort().join('|');
-          if (!gateAddressKey || gateAddressKey !== seedAddressKey) return false;
-          resolvedGateId = normalizeGateText(gateId);
-          resolvedGate = gate;
-          return true;
-        });
-      }
-
-      const finalGateId = normalizeGateText(resolvedGateId || resourceKey || `gate-${relevantGates.length + 1}`);
-      const mergedGate = {
-        ...seedGate,
-        ...(resolvedGate && typeof resolvedGate === 'object' ? resolvedGate : {}),
-        id: finalGateId,
-        gateId: finalGateId,
-        resourceKey: normalizeGateText(resourceKey || seedGate.resourceKey || primaryResource) || primaryResource,
-      };
-      const mergedAddresses = normalizeAddressList([
-        ...(Array.isArray(mergedGate.sbtAddresses) ? mergedGate.sbtAddresses : []),
-        mergedGate.sbtAddress,
-      ]);
-      mergedGate.sbtAddresses = mergedAddresses;
-      mergedGate.sbtAddress = mergedAddresses[0] || '';
-
-      const dedupeKey = JSON.stringify({
-        gateId: finalGateId.toLowerCase(),
-        resourceKey: String(mergedGate.resourceKey || '').toLowerCase(),
-        sbtAddresses: mergedAddresses.map((address: string) => address.toLowerCase()).sort(),
-      });
-      if (seenGateIds.has(finalGateId.toLowerCase()) || seenGateKeys.has(dedupeKey)) return;
-      seenGateIds.add(finalGateId.toLowerCase());
-      seenGateKeys.add(dedupeKey);
-      relevantGates.push(mergedGate);
-    };
-
-    const primaryState = resolveSponsoredGateStateForResource(cfg, primaryResource);
-    const primaryExplicitOpen = primaryState?.status === SPONSORED_GATE_STATES.OPEN;
-    if (primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED && primaryState.gate) {
-      pushRelevantGate(primaryState.gate, primaryResource);
-    }
-
-    if (!primaryExplicitOpen) {
-      const defaultState = resolveSponsoredGateStateForResource(cfg, 'default');
-      if (defaultState?.status === SPONSORED_GATE_STATES.RESTRICTED && defaultState.gate) {
-        pushRelevantGate(defaultState.gate, 'default');
-      }
-    }
-
-    if (!relevantGates.length) {
-      const resources = isPlainObject(cfg?.sponsored?.resources)
-        ? cfg.sponsored.resources as Record<string, UnknownRecord | undefined>
-        : {};
-      const primaryResourceCfg = (resources?.[primaryResource] && typeof resources[primaryResource] === 'object')
-        ? resources[primaryResource]
-        : {};
-      const defaultResourceCfg = (resources?.default && typeof resources.default === 'object')
-        ? resources.default
-        : {};
-      const fallbackIds = [
-        ...(Array.isArray(primaryResourceCfg.gateIds) ? primaryResourceCfg.gateIds : []),
-        primaryResourceCfg.gateId,
-        ...(Array.isArray(defaultResourceCfg.gateIds) ? defaultResourceCfg.gateIds : []),
-        defaultResourceCfg.gateId,
-        cfg?.sponsored?.defaultGateId,
-      ]
-        .map((value: unknown) => normalizeGateText(value))
-        .filter((gateId): gateId is string => Boolean(gateId));
-      fallbackIds.forEach((gateId: string) => {
-        const resourceKey = gateId === normalizeGateText(cfg?.sponsored?.defaultGateId) ? 'default' : primaryResource;
-        pushRelevantGate({ gateId, resourceKey }, resourceKey);
-      });
-    }
-
-    const gateMap: CreateSurveyGateMap = {};
-    relevantGates.forEach((gate) => {
-      const gateId = String(gate?.id || '');
-      if (!gateId) return;
-      gateMap[gateId] = gate;
-    });
-    const gateIds = Object.keys(gateMap || {}).filter(Boolean).sort();
-    const multipleGateOptions = gateIds.length > 1;
-    const gateOptions = gateIds.map((gateId: string): CreateSurveyGateOption => {
-      const gate: CreateSurveyGateDefinition = gateMap[gateId] || {};
-      const color = String(gate.color || stableGateColor(gateId));
-      const sbtAddresses = normalizeAddressList([
-        ...(Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses : []),
-        gate.sbtAddress,
-      ]);
-      const mode = String(
-        gate.mode ||
-        gate.operator ||
-        gate.gateMode ||
-        (gate.requireAll === true ? 'all' : '')
-      ).trim();
-      const resourceKey = normalizeGateText(gate.resourceKey) || primaryResource;
-      const resourceLabel = AUTHORING_GATE_RESOURCE_LABELS[resourceKey] || resourceKey;
-      const displayLabel = multipleGateOptions
-        ? `${sessionLabel} (${resourceLabel})`
-        : sessionLabel;
-      return {
-        id: gateId,
-        label: displayLabel,
-        displayLabel,
-        badgeLabel: sessionLabel,
-        color,
-        mode,
-        requireAll: gate.requireAll === true,
-        sbtAddresses,
-        sbtAddress: sbtAddresses[0] || '',
-        resourceKey,
-      };
-    });
-
-    const candidateDefaults = [
-      primaryState?.status === SPONSORED_GATE_STATES.RESTRICTED
-        ? normalizeGateText(primaryState?.gate?.gateId || primaryState?.gate?.id)
-        : '',
-      !primaryExplicitOpen
-        ? normalizeGateText(resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.gateId || resolveSponsoredGateStateForResource(cfg, 'default')?.gate?.id)
-        : '',
-      gateOptions[0]?.id,
-    ]
-      .map((val: unknown) => normalizeGateText(val))
-      .filter((gateId): gateId is string => Boolean(gateId));
-    const defaultGateId = candidateDefaults.find((gateId: string) => gateIds.includes(gateId)) || (gateOptions[0]?.id || '');
-
-    return { gateMap, gateOptions, defaultGateId };
+    return buildCreateSurveyGateOptions({
+      cfg: cfgIn,
+      isStandaloneQuestion,
+      sessionLabel: this.resolveLockAudienceSessionName(cfgIn),
+    }) as CreateSurveyGateOptionsResult;
   };
 
   ensureResolvedSessionConfigForSubmit = async (
@@ -1212,6 +1093,55 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       return normalizeSessionSlug(sessionConfig.slug);
     }
     return '';
+  };
+
+  resolveLitHooksForSubmit = (
+    sessionConfig: unknown,
+    chainIdFallback: unknown
+  ): CreateSurveyLitHooks | null => {
+    const scopedLitHooks = (
+      this.props.litHooks &&
+      typeof this.props.litHooks === 'object'
+    ) ? this.props.litHooks as CreateSurveyLitHooks : null;
+    if (scopedLitHooks && typeof scopedLitHooks.saveKey === 'function') return scopedLitHooks;
+
+    const globalLitHooks = getGlobalLitHooks() as CreateSurveyLitHooks | null;
+    if (globalLitHooks && typeof globalLitHooks.saveKey === 'function') return globalLitHooks;
+
+    const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
+    const registrySessionConfig = sessionSlug
+      ? sessionRegistryStore.getSessionConfig(sessionSlug)
+      : null;
+    const mergedSessionConfig = mergeCreateSurveySessionConfigWithRegistry({
+      sessionConfig,
+      registryConfig: registrySessionConfig,
+      slug: sessionSlug,
+    });
+    const {
+      chainId,
+      litNetwork,
+      litChain,
+      accessControlConditions,
+      userMaxPrice,
+      chipotle,
+    } = resolveMainSiteLitSessionConfig({
+      sessionConfig: mergedSessionConfig,
+      networkChainIdFallback: Number(chainIdFallback || 0) || null,
+    });
+    if (!chipotle) return null;
+    return createLitHooks({
+      providerLike: this.props.provider,
+      account: this.props.account,
+      chainId,
+      litChain,
+      litNetwork,
+      userMaxPrice,
+      accessControlConditions: accessControlConditions || undefined,
+      chipotle: {
+        ...chipotle,
+        sessionSlug,
+      },
+    }) as CreateSurveyLitHooks | null;
   };
 
   buildAiRequestOptions = (
@@ -1689,7 +1619,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   updateSurveyHash: () => void = () => {
     const { title, isStandaloneQuestion, documentURLs } = this.state;
     const newHash = buildCreateSurveyHashValue({
-      digest: sha256,
+      digest: createSurveySha256,
       documentURLs,
       isStandaloneQuestion,
       title,
@@ -2342,7 +2272,18 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
 
     if (!this.props.loginComplete) {
-      this.props.toggleLoginModal!(true);
+      if (typeof this.props.toggleLoginModal === 'function') {
+        this.props.toggleLoginModal(true);
+        this.setState({
+          ...buildCreateSurveySubmitResetPatch(),
+          submissionError: '',
+          formValidationError: '',
+        });
+        return;
+      }
+      this.setState(buildCreateSurveySubmitFailurePatch(
+        `Log in to create ${this.state.isStandaloneQuestion ? 'questions' : 'this survey'}.`
+      ));
       return;
     }
 
@@ -2384,50 +2325,24 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     } = this.state;
 
     const { gateMap, defaultGateId } = this.resolveGateOptions(sessionConfig, { isStandaloneQuestion });
-    const knownGateIds = new Set<string>(Object.keys(gateMap || {}));
-
-    const normalizeKnownGateIds = (value: unknown): string[] => (
-      normalizeGateIds(value).filter((gateId): gateId is string => (
-        typeof gateId === 'string' && knownGateIds.has(gateId)
-      ))
-    );
-
-    const defaultSubmitGateIds = defaultGateId ? normalizeKnownGateIds([defaultGateId]) : [];
-    // Regression guard: a restricted session/resource default gate must fail closed.
-    // Empty authoring lock state is an untouched draft, not permission to upload plaintext.
-    const applyDefaultSubmitGateIds = (value: unknown): string[] => {
-      const normalized = normalizeKnownGateIds(value);
-      return normalized.length ? normalized : defaultSubmitGateIds;
-    };
-
-    const resolvedSurveyLockGateIds = !isStandaloneQuestion
-      ? applyDefaultSubmitGateIds(surveyLockGateIds)
-      : [];
-
-    const resolveQuestionSubmitGateIds = (q?: CreateQuestionsAndSurveysQuestion | null): string[] => {
-      if (!q) return [];
-      if (isStandaloneQuestion) return applyDefaultSubmitGateIds(q.lockGateIds);
-      const hasOwnLock = Object.prototype.hasOwnProperty.call(q || {}, 'lockGateIds');
-      if (!hasOwnLock || q.lockGateIds === null) return resolvedSurveyLockGateIds;
-      return applyDefaultSubmitGateIds(q.lockGateIds);
-    };
-
-    const questionNeedsEncryption = (q?: CreateQuestionsAndSurveysQuestion | null) => {
-      const gateIds = resolveQuestionSubmitGateIds(q);
-      return Array.isArray(gateIds) && gateIds.length > 0;
-    };
-
-    const needsLit =
-      resolvedSurveyLockGateIds.length > 0 ||
-      (Array.isArray(questions) ? questions : []).some(questionNeedsEncryption);
+    const {
+      normalizeKnownGateIds,
+      resolvedSurveyLockGateIds,
+      resolveQuestionSubmitGateIds,
+      needsLit,
+    } = buildCreateSurveySubmitGatePlan({
+      defaultGateId,
+      gateMap,
+      isStandaloneQuestion,
+      questions,
+      surveyLockGateIds,
+    });
 
     const chainIdFallback = this.resolveSessionChainId(sessionConfig);
 
-    const scopedLitHooks = (
-      this.props.litHooks &&
-      typeof this.props.litHooks === 'object'
-    ) ? this.props.litHooks as CreateSurveyLitHooks : null;
-    const litHooks = needsLit ? (scopedLitHooks || getGlobalLitHooks() as CreateSurveyLitHooks | null) : null;
+    const litHooks = needsLit
+      ? this.resolveLitHooksForSubmit(sessionConfig, chainIdFallback)
+      : null;
     if (needsLit) {
       if (!this.props.account) {
         this.setState(buildCreateSurveySubmitFailurePatch(
@@ -2444,58 +2359,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
 
     const buildGateObjectsAndRecipients = (gateIdsIn: unknown) => {
-      const gateIds = normalizeKnownGateIds(gateIdsIn);
-      const gates: UnknownRecord[] = [];
-      const recipients: CreateSurveyLitRecipient[] = [];
-      const dedupe = new Set<string>();
-
-      gateIds.forEach((gateId) => {
-        const rawGate = gateMap?.[gateId];
-        if (!rawGate || typeof rawGate !== 'object') return;
-
-        const chainId = Number(rawGate.chainId || chainIdFallback || 0) || chainIdFallback || null;
-        const litChain = resolveLitChain({ chainId, litChain: rawGate.litChain });
-        const sbtAddresses = Array.from(new Set(
-          [
-            ...(Array.isArray(rawGate.sbtAddresses) ? rawGate.sbtAddresses : []),
-            rawGate.sbtAddress,
-          ].filter(Boolean)
-        )) as string[];
-        if (!sbtAddresses.length) return;
-
-        const mode = rawGate.mode || 'any';
-        const label = String(rawGate.label || rawGate.name || gateId);
-        const color = String(rawGate.color || stableGateColor(gateId));
-
-        gates.push({
-          ...rawGate,
-          type: rawGate.type || 'sbt',
-          gateId,
-          sbtAddresses,
-          sbtAddress: sbtAddresses[0] || '',
-          chainId,
-          litChain,
-          mode,
-          label,
-          color,
-        });
-
-        const accessControlConditions = buildSbtAccessControlConditions({
-          sbtAddresses,
-          chainId,
-          litChain,
-          mode,
-        });
-        if (!accessControlConditions) return;
-
-        const recipient = { accessControlConditions, chain: litChain };
-        const sig = JSON.stringify({ accessControlConditions, chain: litChain });
-        if (dedupe.has(sig)) return;
-        dedupe.add(sig);
-        recipients.push(recipient);
-      });
-
-      return { gates, recipients };
+      return buildCreateSurveyGateObjectsAndRecipients({
+        buildSbtAccessControlConditions,
+        chainIdFallback,
+        gateIds: gateIdsIn,
+        gateMap,
+        normalizeKnownGateIds,
+        resolveLitChain,
+      }) as { gates: UnknownRecord[]; recipients: CreateSurveyLitRecipient[] };
     };
 
     const requireRecipientsForGateSelection = ({
@@ -2639,6 +2510,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               creator: this.props.account,
               associatedSurveyId: surveyContextId,
               sessionName: _sessionName,
+              sessionSlug: sessionSlug || '',
             };
             if (questionEncryption && questionEncryption.recipients.length) {
               qD.encryption = buildAuthoringEncryptionPayload({
@@ -2795,6 +2667,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               creator: this.props.account,
               associatedSurveyId: surveyIDForUpload,
               sessionName: _sessionName,
+              sessionSlug: sessionSlug || '',
             };
             if (questionEncryption && questionEncryption.recipients.length) {
               base.encryption = buildAuthoringEncryptionPayload({
@@ -2906,6 +2779,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             surveyArweaveTxId = String(
               await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
                 arweaveJwk: arweaveKey?.arweaveJwk || '',
+                forceDirectArweaveUpload: arweaveKey?.source === 'local' && !!arweaveKey?.arweaveJwk,
                 sessionSlug,
                 sessionConfig,
                 context: {
@@ -3404,7 +3278,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     );
     const applyDefaultSelectedGateIds = (value: unknown) => {
       const normalized = normalizeSelectedGateIds(value);
-      return normalized.length ? normalized : (defaultGateId ? [defaultGateId] : []);
+      if (normalized.length) return normalized;
+      if (Array.isArray(value)) return [];
+      return defaultGateId ? [defaultGateId] : [];
     };
     const surveySelectedGateIds = !isStandaloneQuestion
       ? applyDefaultSelectedGateIds(surveyLockGateIds)

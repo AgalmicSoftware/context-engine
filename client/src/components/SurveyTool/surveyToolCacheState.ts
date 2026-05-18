@@ -180,6 +180,34 @@ export function ensureSurveysNet(cache: UnknownRecord = {}, netIdStr: string): R
   return nextCache as Record<string, SurveyNetworkCache>;
 }
 
+export function mergeSurveyToolCachePatchIntoSurveysCache(
+  cache: UnknownRecord = {},
+  netIdStr: string,
+  patch: UnknownRecord = {}
+): Record<string, SurveyNetworkCache> {
+  if (!netIdStr) return (cache && typeof cache === 'object') ? cache as Record<string, SurveyNetworkCache> : {};
+  const global = ensureSurveysNet(cache, netIdStr);
+  const net = global[netIdStr];
+  if (!net) return global;
+
+  if (patch.surveys && typeof patch.surveys === 'object') {
+    net.surveys = { ...net.surveys, ...(patch.surveys as SurveyNetworkCache['surveys']) };
+  }
+  if (patch.surveyResponses && typeof patch.surveyResponses === 'object') {
+    net.surveyResponses = {
+      ...net.surveyResponses,
+      ...(patch.surveyResponses as SurveyNetworkCache['surveyResponses']),
+    };
+  }
+  if (patch.surveyResponsesLatestBlock && typeof patch.surveyResponsesLatestBlock === 'object') {
+    net.surveyResponsesLatestBlock = {
+      ...net.surveyResponsesLatestBlock,
+      ...(patch.surveyResponsesLatestBlock as UnknownRecord),
+    };
+  }
+  return global;
+}
+
 export const toResponseRecencyMeta = (source: ResponseMetaSource | null = null): ResponseRecencyMeta => {
   const row = (source && typeof source === 'object') ? source : {};
   const nowTs = Math.floor(Date.now() / 1000);

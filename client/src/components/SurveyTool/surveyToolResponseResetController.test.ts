@@ -27,6 +27,7 @@ describe('surveyToolResponseResetController', () => {
       modifiedCount: 0,
       hasEncryptedChanges: false,
       isDirty: false,
+      isLoadingResponse: false,
       submittedSinceLastEdit: false,
     });
 
@@ -210,6 +211,7 @@ describe('surveyToolResponseResetController', () => {
       startFresh: true,
       modifiedCount: 0,
       isDirty: false,
+      isLoadingResponse: false,
       submittedSinceLastEdit: false,
     }), expect.any(Function));
     expect(clearDraftFor).toHaveBeenNthCalledWith(1, 'q1');

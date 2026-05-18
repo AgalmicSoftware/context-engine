@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
-import SurveyResults from './SurveyResults';
 import contractScripts, {
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
@@ -17,6 +16,7 @@ import {
   computeSubmitLabel,
   ensureQuestionsNet,
   ensureSurveysNet,
+  mergeSurveyToolCachePatchIntoSurveysCache,
   readSurveysCache,
   readSurveysCacheAsync,
   readQuestionsCacheAsync,
@@ -50,8 +50,14 @@ import {
   shouldRouteSurveyToolMountToQuestions,
 } from './surveyToolTopLevelHelpers';
 import { SurveySelector } from './SurveySelector';
-import { SurveyQuestions } from './SurveyQuestions';
-import { PileViewMode } from './SurveyPileViewMode';
+
+const LazySurveyQuestions = React.lazy(() => (
+  import('./SurveyQuestions').then((module) => ({ default: module.SurveyQuestions }))
+));
+const LazyPileViewMode = React.lazy(() => (
+  import('./SurveyPileViewMode').then((module) => ({ default: module.PileViewMode }))
+));
+const SurveyResults = React.lazy(() => import('./SurveyResults'));
 
 type SurveyToolRecord = Record<string, unknown>;
 type SurveyToolQuestionDataRecord = SurveyToolRecord & {
@@ -280,7 +286,7 @@ const renderSurveyToolContent = ({
 
   if (renderModeState.shouldRenderPileMode) {
     return (
-      <PileViewMode
+      <LazyPileViewMode
         {...props}
         isStandalone={true}
         surveyIndex={0}
@@ -299,39 +305,41 @@ const renderSurveyToolContent = ({
   if (renderModeState.shouldRenderSingleQuestionMode) {
     return (
       <div id={styles.surveySelectorRow}>
-        <SurveyQuestions
-          questionID={props.questionID}
-          responderAddress={props.responderAddress}
-          singleQuestionMode={true}
-          toggleLoginModal={props.toggleLoginModal}
-          account={props.account}
-          provider={props.provider}
-          lit={props.lit}
-          litHooks={props.litHooks}
-          loginComplete={props.loginComplete}
-          loginInProgress={props.loginInProgress}
-          network={props.network}
-          cache={cache}
-          updateCache={updateCache}
-          pubKey={pubKey}
-          updatePubKey={updatePubKey}
-          refreshSurveyResponsesByID={props.refreshSurveyResponsesByID}
-          refreshQuestionMetadata={props.refreshQuestionMetadata}
-          refreshQuestionResponses={props.refreshQuestionResponses}
-          defaultFeaturedSBTs={props.defaultFeaturedSBTs}
-          isQuestionCacheReady={props.isQuestionCacheReady}
-          isResponsesCacheReady={props.isResponsesCacheReady}
-          isSurveyCacheReady={props.isSurveyCacheReady}
-          isSBTCacheReady={props.isSBTCacheReady}
-          questionResponsesNonce={props.questionResponsesNonce}
-          questionsCacheNonce={questionsCacheNonce}
-          ensureQuestionCached={ensureQuestionCached}
-          computeSubmitLabel={computeSubmitLabel}
-          activeSessionSlug={activeSessionSlug}
-          sessionSlug={toolSessionSlug}
-          sessionSlugPinned={props.sessionSlugPinned}
-          hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
-        />
+        <React.Suspense fallback={null}>
+          <LazySurveyQuestions
+            questionID={props.questionID}
+            responderAddress={props.responderAddress}
+            singleQuestionMode={true}
+            toggleLoginModal={props.toggleLoginModal}
+            account={props.account}
+            provider={props.provider}
+            lit={props.lit}
+            litHooks={props.litHooks}
+            loginComplete={props.loginComplete}
+            loginInProgress={props.loginInProgress}
+            network={props.network}
+            cache={cache}
+            updateCache={updateCache}
+            pubKey={pubKey}
+            updatePubKey={updatePubKey}
+            refreshSurveyResponsesByID={props.refreshSurveyResponsesByID}
+            refreshQuestionMetadata={props.refreshQuestionMetadata}
+            refreshQuestionResponses={props.refreshQuestionResponses}
+            defaultFeaturedSBTs={props.defaultFeaturedSBTs}
+            isQuestionCacheReady={props.isQuestionCacheReady}
+            isResponsesCacheReady={props.isResponsesCacheReady}
+            isSurveyCacheReady={props.isSurveyCacheReady}
+            isSBTCacheReady={props.isSBTCacheReady}
+            questionResponsesNonce={props.questionResponsesNonce}
+            questionsCacheNonce={questionsCacheNonce}
+            ensureQuestionCached={ensureQuestionCached}
+            computeSubmitLabel={computeSubmitLabel}
+            activeSessionSlug={activeSessionSlug}
+            sessionSlug={toolSessionSlug}
+            sessionSlugPinned={props.sessionSlugPinned}
+            hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
+          />
+        </React.Suspense>
       </div>
     );
   }
@@ -356,7 +364,7 @@ const renderSurveyToolContent = ({
   return (
     <div id={styles.surveySelectorRow}>
       <SurveySelector
-        SurveyQuestionsComponent={SurveyQuestions}
+        SurveyQuestionsComponent={LazySurveyQuestions}
         surveyId={normalizedSurveyId}
         displayAnswerMode={props.displayAnswerMode}
         viewAddress={props.viewAddress}
@@ -398,41 +406,43 @@ const renderSurveyToolContent = ({
         sessionSlugPinned={props.sessionSlugPinned}
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
       />
-      <SurveyResults
-        isOpen={showResultsModal}
-        onClose={closeResultsModal}
-        provider={props.provider}
-        lit={props.lit}
-        litHooks={props.litHooks}
-        network={props.network}
-        networkChainId={props.networkChainId}
-        sbtCacheRevision={props.sbtCacheRevision}
-        surveyId={normalizedSurveyId}
-        filterState={effectiveFilterState}
-        questionResponsesNonce={props.questionResponsesNonce}
-        questionsCacheNonce={questionsCacheNonce}
-        refreshSurveyResponsesByID={props.refreshSurveyResponsesByID}
-        refreshQuestionMetadata={props.refreshQuestionMetadata}
-        refreshQuestionResponses={props.refreshQuestionResponses}
-        defaultFeaturedSBTs={props.defaultFeaturedSBTs}
-        defaultTags={props.defaultTags}
-        sessionInfo={props.sessionInfo}
-        sessionName={props.sessionName}
-        isQuestionCacheReady={props.isQuestionCacheReady}
-        isResponsesCacheReady={props.isResponsesCacheReady}
-        isSurveyCacheReady={props.isSurveyCacheReady}
-        isSBTCacheReady={props.isSBTCacheReady}
-        questionScanProgress={props.questionScanProgress}
-        onFilterChange={props.onFilterChange}
-        currentViewModeForUrl={normalizedSurveyId ? 'survey' : 'questions'}
-        currentSurveyIdForUrl={normalizedSurveyId || null}
-        onFilterStateChangeForUrlUpdate={handleTopLevelFilterStateUrlUpdate}
-        preventUrlChange={props.preventUrlChange}
-        sessionSlug={toolSessionSlug}
-        activeSessionSlug={activeSessionSlug}
-        sessionSlugPinned={props.sessionSlugPinned}
-        hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
-      />
+      <React.Suspense fallback={null}>
+        <SurveyResults
+          isOpen={showResultsModal}
+          onClose={closeResultsModal}
+          provider={props.provider}
+          lit={props.lit}
+          litHooks={props.litHooks}
+          network={props.network}
+          networkChainId={props.networkChainId}
+          sbtCacheRevision={props.sbtCacheRevision}
+          surveyId={normalizedSurveyId}
+          filterState={effectiveFilterState}
+          questionResponsesNonce={props.questionResponsesNonce}
+          questionsCacheNonce={questionsCacheNonce}
+          refreshSurveyResponsesByID={props.refreshSurveyResponsesByID}
+          refreshQuestionMetadata={props.refreshQuestionMetadata}
+          refreshQuestionResponses={props.refreshQuestionResponses}
+          defaultFeaturedSBTs={props.defaultFeaturedSBTs}
+          defaultTags={props.defaultTags}
+          sessionInfo={props.sessionInfo}
+          sessionName={props.sessionName}
+          isQuestionCacheReady={props.isQuestionCacheReady}
+          isResponsesCacheReady={props.isResponsesCacheReady}
+          isSurveyCacheReady={props.isSurveyCacheReady}
+          isSBTCacheReady={props.isSBTCacheReady}
+          questionScanProgress={props.questionScanProgress}
+          onFilterChange={props.onFilterChange}
+          currentViewModeForUrl={normalizedSurveyId ? 'survey' : 'questions'}
+          currentSurveyIdForUrl={normalizedSurveyId || null}
+          onFilterStateChangeForUrlUpdate={handleTopLevelFilterStateUrlUpdate}
+          preventUrlChange={props.preventUrlChange}
+          sessionSlug={toolSessionSlug}
+          activeSessionSlug={activeSessionSlug}
+          sessionSlugPinned={props.sessionSlugPinned}
+          hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
+        />
+      </React.Suspense>
     </div>
   );
 };
@@ -771,24 +781,11 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
         const newCache = updateCacheFn(prev.cache || {}) as SurveyToolCachePatch;
         if (netIdStr) {
           try {
-            const global = ensureSurveysNet(readSurveysCache(effectiveSlug), netIdStr);
-            const net = global[netIdStr];
-
-            if (newCache.surveys) {
-              net.surveys = { ...net.surveys, ...newCache.surveys } as typeof net.surveys;
-            }
-            if (newCache.surveyResponses) {
-              net.surveyResponses = {
-                ...net.surveyResponses,
-                ...newCache.surveyResponses,
-              } as typeof net.surveyResponses;
-            }
-            if (newCache.surveyResponsesLatestBlock) {
-              net.surveyResponsesLatestBlock = {
-                ...net.surveyResponsesLatestBlock,
-                ...newCache.surveyResponsesLatestBlock,
-              };
-            }
+            const global = mergeSurveyToolCachePatchIntoSurveysCache(
+              readSurveysCache(effectiveSlug),
+              netIdStr,
+              newCache
+            );
             writeSurveysCache(effectiveSlug, global);
           } catch (err) {
             surveyLog.warn('[SurveyTool] updateCache merge failed:', err);
@@ -1084,6 +1081,8 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       }
     }
   }, []);
+  const initialMountPropsRef = useRef(props);
+  const initialFetchSurveysRef = useRef(fetchSurveys);
 
   const updateCache = useCallback((updater: unknown, cb?: () => void) => {
     if (typeof updater !== 'function') {
@@ -1104,24 +1103,11 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       }
       if (netIdStr) {
         try {
-          const global = ensureSurveysNet(readSurveysCache(effectiveSlug), netIdStr);
-          const net = global[netIdStr];
-
-          if (newCache.surveys) {
-            net.surveys = { ...net.surveys, ...newCache.surveys } as typeof net.surveys;
-          }
-          if (newCache.surveyResponses) {
-            net.surveyResponses = {
-              ...net.surveyResponses,
-              ...newCache.surveyResponses,
-            } as typeof net.surveyResponses;
-          }
-          if (newCache.surveyResponsesLatestBlock) {
-            net.surveyResponsesLatestBlock = {
-              ...net.surveyResponsesLatestBlock,
-              ...newCache.surveyResponsesLatestBlock,
-            };
-          }
+          const global = mergeSurveyToolCachePatchIntoSurveysCache(
+            readSurveysCache(effectiveSlug),
+            netIdStr,
+            newCache
+          );
           writeSurveysCache(effectiveSlug, global);
         } catch (err) {
           surveyLog.warn('[SurveyTool] updateCache merge failed:', err);
@@ -1157,22 +1143,26 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
   }, [cache, cacheCallbackTick]);
 
   useEffect(() => {
+    const initialProps = initialMountPropsRef.current;
     if (shouldRouteSurveyToolMountToQuestions({
       pathname: window.location.pathname,
-      props,
+      props: initialProps,
     })) {
       window.history.pushState({}, '', '/questions');
     }
 
-    fetchSurveys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    initialFetchSurveysRef.current();
   }, []);
 
   useEffect(() => {
+    const currentProps = {
+      network: { id: props.network?.id },
+      isSurveyCacheReady: props.isSurveyCacheReady,
+    };
     if (!didRunFetchUpdateEffectRef.current) {
       didRunFetchUpdateEffectRef.current = true;
-      prevFetchNetworkIdRef.current = props.network?.id;
-      prevSurveyCacheReadyRef.current = props.isSurveyCacheReady;
+      prevFetchNetworkIdRef.current = currentProps.network.id;
+      prevSurveyCacheReadyRef.current = currentProps.isSurveyCacheReady;
       return;
     }
 
@@ -1181,40 +1171,47 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
         network: { id: prevFetchNetworkIdRef.current },
         isSurveyCacheReady: prevSurveyCacheReadyRef.current,
       },
-      props,
+      props: currentProps,
     })) {
       fetchSurveys();
     }
 
-    prevFetchNetworkIdRef.current = props.network?.id;
-    prevSurveyCacheReadyRef.current = props.isSurveyCacheReady;
+    prevFetchNetworkIdRef.current = currentProps.network.id;
+    prevSurveyCacheReadyRef.current = currentProps.isSurveyCacheReady;
   }, [props.network?.id, props.isSurveyCacheReady, fetchSurveys]);
 
   useEffect(() => {
+    const currentProps = { autoOpenResults: props.autoOpenResults };
     if (!didRunAutoOpenUpdateEffectRef.current) {
       didRunAutoOpenUpdateEffectRef.current = true;
-      prevAutoOpenResultsRef.current = props.autoOpenResults;
+      prevAutoOpenResultsRef.current = currentProps.autoOpenResults;
       return;
     }
 
     if (shouldOpenSurveyToolResultsOnPropsChange({
       prevProps: { autoOpenResults: prevAutoOpenResultsRef.current },
-      props,
+      props: currentProps,
       showResultsModal: showResultsModalRef.current,
     })) {
       setShowResultsModal(true);
     }
 
-    prevAutoOpenResultsRef.current = props.autoOpenResults;
+    prevAutoOpenResultsRef.current = currentProps.autoOpenResults;
   }, [props.autoOpenResults]);
 
   useEffect(() => {
+    const currentProps = {
+      isQuestionCacheReady: props.isQuestionCacheReady,
+      isResponsesCacheReady: props.isResponsesCacheReady,
+      questionResponsesNonce: props.questionResponsesNonce,
+      network: { id: props.network?.id },
+    };
     if (!didRunNonceUpdateEffectRef.current) {
       didRunNonceUpdateEffectRef.current = true;
-      prevQuestionCacheReadyRef.current = props.isQuestionCacheReady;
-      prevResponsesCacheReadyRef.current = props.isResponsesCacheReady;
-      prevQuestionResponsesNonceRef.current = props.questionResponsesNonce;
-      prevNonceNetworkIdRef.current = props.network?.id;
+      prevQuestionCacheReadyRef.current = currentProps.isQuestionCacheReady;
+      prevResponsesCacheReadyRef.current = currentProps.isResponsesCacheReady;
+      prevQuestionResponsesNonceRef.current = currentProps.questionResponsesNonce;
+      prevNonceNetworkIdRef.current = currentProps.network.id;
       return;
     }
 
@@ -1225,15 +1222,15 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
         questionResponsesNonce: prevQuestionResponsesNonceRef.current,
         network: { id: prevNonceNetworkIdRef.current },
       },
-      props,
+      props: currentProps,
     })) {
       setQuestionsCacheNonce((prev) => prev + 1);
     }
 
-    prevQuestionCacheReadyRef.current = props.isQuestionCacheReady;
-    prevResponsesCacheReadyRef.current = props.isResponsesCacheReady;
-    prevQuestionResponsesNonceRef.current = props.questionResponsesNonce;
-    prevNonceNetworkIdRef.current = props.network?.id;
+    prevQuestionCacheReadyRef.current = currentProps.isQuestionCacheReady;
+    prevResponsesCacheReadyRef.current = currentProps.isResponsesCacheReady;
+    prevQuestionResponsesNonceRef.current = currentProps.questionResponsesNonce;
+    prevNonceNetworkIdRef.current = currentProps.network.id;
   }, [props.isQuestionCacheReady, props.isResponsesCacheReady, props.questionResponsesNonce, props.network?.id]);
 
   void getSurveyToolSessionProp;

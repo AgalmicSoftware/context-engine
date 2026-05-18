@@ -85,6 +85,8 @@ const chainsModule = require('../../variables/chains.js');
 const debugTelemetryModule = require('../../components/MainSite/debugTelemetry.js');
 const progressHelpersModule = require('../../components/MainSite/progressHelpers.js');
 
+const VALID_RETRY_ADDRESS = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
 const makeHost = (overrides = {}) => ({
   getAccount: jest.fn().mockReturnValue('0xTestAccount'),
   getActiveSessionSlug: jest.fn().mockReturnValue('test-session'),
@@ -136,6 +138,19 @@ const flushMicrotasks = async (times = 6) => {
   }
 };
 
+const flushEventLoop = () => new Promise((resolve) => {
+  setTimeout(resolve, 0);
+});
+
+const waitForProfileScanCalls = async (host, expectedCalls) => {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    await flushMicrotasks();
+    if (host.scanSpecificUserProfile.mock.calls.length >= expectedCalls) return;
+    await flushEventLoop();
+    if (host.scanSpecificUserProfile.mock.calls.length >= expectedCalls) return;
+  }
+};
+
 const clearRuntimeOverrides = () => {
   delete globalThis.CE_SESSION_SCAN_SCOPE;
   delete globalThis.CE_PROFILE_SCAN_SBT_TIMEOUT_MS;
@@ -159,6 +174,7 @@ describe('createSessionProfileScanController', () => {
   });
 
   beforeEach(() => {
+    jest.useRealTimers();
     jest.clearAllMocks();
 
     setWindowValue(originalWindow);
@@ -962,12 +978,12 @@ describe('createSessionProfileScanController', () => {
       const host = makeHost();
       const controller = createSessionProfileScanController(host);
 
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xAbC', 'first');
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xabc', 'duplicate');
-      await flushMicrotasks();
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'first');
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'duplicate');
+      await waitForProfileScanCalls(host, 1);
 
       expect(host.scanSpecificUserProfile).toHaveBeenCalledTimes(1);
-      expect(host.scanSpecificUserProfile).toHaveBeenCalledWith('0xAbC');
+      expect(host.scanSpecificUserProfile).toHaveBeenCalledWith(VALID_RETRY_ADDRESS);
     });
 
     it('waits for the bootstrap promise before scanning', async () => {
@@ -976,13 +992,13 @@ describe('createSessionProfileScanController', () => {
       const deferred = createDeferred();
 
       controller._registryBootstrapPromise = deferred.promise;
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xabc', 'wait');
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'wait');
       await flushMicrotasks();
 
       expect(host.scanSpecificUserProfile).not.toHaveBeenCalled();
 
       deferred.resolve(null);
-      await flushMicrotasks();
+      await waitForProfileScanCalls(host, 1);
 
       expect(host.scanSpecificUserProfile).toHaveBeenCalledTimes(1);
     });
@@ -991,11 +1007,11 @@ describe('createSessionProfileScanController', () => {
       const host = makeHost();
       const controller = createSessionProfileScanController(host);
 
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xabc', 'immediate');
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'immediate');
 
       expect(host.scanSpecificUserProfile).not.toHaveBeenCalled();
 
-      await flushMicrotasks();
+      await waitForProfileScanCalls(host, 1);
 
       expect(host.scanSpecificUserProfile).toHaveBeenCalledTimes(1);
     });
@@ -1004,10 +1020,10 @@ describe('createSessionProfileScanController', () => {
       const host = makeHost();
       const controller = createSessionProfileScanController(host);
 
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xabc', 'first');
-      await flushMicrotasks();
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xabc', 'second');
-      await flushMicrotasks();
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'first');
+      await waitForProfileScanCalls(host, 1);
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'second');
+      await waitForProfileScanCalls(host, 2);
 
       expect(host.scanSpecificUserProfile).toHaveBeenCalledTimes(2);
     });
@@ -1018,7 +1034,7 @@ describe('createSessionProfileScanController', () => {
       });
       const controller = createSessionProfileScanController(host);
 
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xabc', 'unmounted');
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'unmounted');
       await flushMicrotasks();
 
       expect(host.scanSpecificUserProfile).not.toHaveBeenCalled();
@@ -1207,14 +1223,14 @@ describe('createSessionProfileScanController', () => {
       const deferred = createDeferred();
 
       controller._registryBootstrapPromise = deferred.promise;
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xabc', 'before-destroy');
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'before-destroy');
       await flushMicrotasks();
       expect(host.scanSpecificUserProfile).not.toHaveBeenCalled();
 
       controller.destroy();
       controller._registryBootstrapPromise = null;
-      controller.scheduleProfileScanRetryAfterRegistryHydration('0xabc', 'after-destroy');
-      await flushMicrotasks();
+      controller.scheduleProfileScanRetryAfterRegistryHydration(VALID_RETRY_ADDRESS, 'after-destroy');
+      await waitForProfileScanCalls(host, 1);
 
       expect(host.scanSpecificUserProfile).toHaveBeenCalledTimes(1);
 

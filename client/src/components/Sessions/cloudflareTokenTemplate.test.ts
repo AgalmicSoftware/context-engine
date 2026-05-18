@@ -29,7 +29,7 @@ describe('cloudflareTokenTemplate', () => {
     expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(5);
   });
 
-  test('can omit R2/D1 scopes for the default demo smoke deploy', () => {
+  test('can omit R2/D1 scopes for the default Telegram smoke deploy', () => {
     const permissions = buildCloudflareTokenTemplatePermissions({ includeDocStorage: false });
 
     expect(permissions).toEqual([
