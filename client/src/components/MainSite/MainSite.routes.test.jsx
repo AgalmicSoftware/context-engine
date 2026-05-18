@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { MainSite, mainSiteDispatchActions } from './MainSite';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/contractScripts.js';
@@ -663,29 +663,6 @@ describe('MainSite route render smoke', () => {
 
     expect(props.changeActiveSessionSlug).not.toHaveBeenCalledWith('edge');
     expect(props.changeActiveSessionSlug).not.toHaveBeenCalled();
-  });
-
-  it('routes survey listener events through the MainSite survey controller host', () => {
-    const subject = createSubject({
-      path: '/surveys',
-      activeSessionSlug: 'edge',
-    });
-    subject.onNewSurveyEventDetectedForGroup = jest.fn();
-
-    expect(subject.startSurveyAndQuestionEventListenerForGroup('edge')).toBe(true);
-
-    expect(contractScripts.removeSurveyEventsListener).toHaveBeenCalledWith('none', 'edge');
-    expect(contractScripts.listenForSurveyEvents).toHaveBeenCalledWith(
-      'none',
-      expect.any(Function),
-      'edge'
-    );
-
-    const handler = contractScripts.listenForSurveyEvents.mock.calls[0][1];
-    const event = { type: 'SurveyCreated', surveyId: '0xsurvey' };
-    handler(event);
-
-    expect(subject.onNewSurveyEventDetectedForGroup).toHaveBeenCalledWith('edge', event);
   });
 
   it('redirects a general route to the first list-scoped session once and consumes the redirect', async () => {

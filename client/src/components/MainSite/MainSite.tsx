@@ -6275,7 +6275,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     if (fullPath === "/telegram-demo-setup" || fullPath === "/telegram-demo-setup/") {
       return this._renderTelegramDemoSetupRoute(ctx);
     }
-    if (fullPath.startsWith("/session")) {
+    if (firstPathSegment === "session") {
       return this._renderSessionRoute(ctx);
     }
     return <NotFoundRoute path={fullPath} />;
