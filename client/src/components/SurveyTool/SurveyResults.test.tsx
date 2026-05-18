@@ -1,7 +1,11 @@
 // Remaining broad SurveyResults coverage owns pure count helpers and display-helper constants.
 import React from 'react';
-import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
-import {
+import fs from 'fs';
+import path from 'path';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
+import ConnectedSurveyResults, {
   SURVEY_RESULTS_CLICKABLE_ICON_STYLE,
   SURVEY_RESULTS_DOCUMENT_LINK_ICON_STYLE,
   SURVEY_RESULTS_METADATA_MISSING_STYLE,

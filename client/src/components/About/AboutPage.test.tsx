@@ -3,7 +3,6 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import fs from 'fs';
 import path from 'path';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
-import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
 import AboutPage, { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals } from './AboutPage';
 
