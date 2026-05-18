@@ -680,4 +680,104 @@ describe('AudioInput', () => {
     });
     expect(updateSpy).toHaveBeenLastCalledWith('Original version');
   });
+
+  it('restores current text when the first AI rewrite fails', async () => {
+    mockRequestAiRewrite.mockRejectedValueOnce(new Error('rewrite failed'));
+    const updateSpy = jest.fn();
+
+    act(() => {
+      root.render(
+        <AudioInput
+          updateFunction={updateSpy}
+          value=""
+          placeholder="Speak"
+        />
+      );
+    });
+
+    const textarea = requireElement(container.querySelector('textarea'));
+    act(() => {
+      changeElementValue(textarea, 'Current draft');
+    });
+
+    const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await act(async () => {
+      clickElement(rewriteButton);
+      await Promise.resolve();
+    });
+    act(() => {
+      flushRafQueue();
+    });
+
+    expect(mockRequestAiRewrite).toHaveBeenCalledWith('Current draft', expect.any(Object));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[surveys]',
+      '[AudioInput] AI rewrite error:',
+      expect.any(Error)
+    );
+    expect((textarea as HTMLTextAreaElement).value).toBe('Current draft');
+    expect(updateSpy).toHaveBeenLastCalledWith('Current draft');
+  });
+
+  it('does not restore an older original after a later AI rewrite fails', async () => {
+    mockRequestAiRewrite
+      .mockResolvedValueOnce('First rewrite')
+      .mockRejectedValueOnce(new Error('later rewrite failed'));
+    const updateSpy = jest.fn();
+
+    act(() => {
+      root.render(
+        <AudioInput
+          updateFunction={updateSpy}
+          value="First original"
+          placeholder="Speak"
+        />
+      );
+    });
+
+    const textarea = requireElement(container.querySelector('textarea'));
+    const rewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
+
+    await act(async () => {
+      clickElement(rewriteButton);
+      await Promise.resolve();
+    });
+    act(() => {
+      flushRafQueue();
+    });
+    expect(updateSpy).toHaveBeenLastCalledWith('First rewrite');
+
+    const revertButton = requireElement(container.querySelector('button[title="Revert to original"]'));
+    act(() => {
+      clickElement(revertButton);
+    });
+    act(() => {
+      flushRafQueue();
+    });
+
+    act(() => {
+      changeElementValue(textarea, 'Second current draft');
+    });
+
+    const nextRewriteButton = requireElement(container.querySelector('button[title="AI rewrite"]'));
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    await act(async () => {
+      clickElement(nextRewriteButton);
+      await Promise.resolve();
+    });
+    act(() => {
+      flushRafQueue();
+    });
+
+    expect(mockRequestAiRewrite).toHaveBeenLastCalledWith('Second current draft', expect.any(Object));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[surveys]',
+      '[AudioInput] AI rewrite error:',
+      expect.any(Error)
+    );
+    expect((textarea as HTMLTextAreaElement).value).toBe('Second current draft');
+    expect(updateSpy).toHaveBeenLastCalledWith('Second current draft');
+    expect(updateSpy).not.toHaveBeenLastCalledWith('First original');
+  });
 });
