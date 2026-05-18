@@ -73,6 +73,29 @@ describe('client package modernization contract', () => {
     expect(viteIndex).toContain('/src/viteEntry.js');
   });
 
+  it('keeps Vite vendor chunk policy explicit', () => {
+    const viteConfig = readClientFile('vite.config.mjs');
+    const expectedVendorChunks = [
+      'vendor-react',
+      'vendor-wallet',
+      'vendor-lit',
+      'vendor-arweave',
+      'vendor-visualization',
+      'vendor-canvas',
+      'vendor-crypto',
+      'vendor-media',
+      'vendor-ui',
+      'vendor-polyfills',
+      'vendor-misc',
+    ];
+
+    expect(viteConfig).toContain('export const resolveManualChunk');
+    expect(viteConfig).toContain('manualChunks: resolveManualChunk');
+    expectedVendorChunks.forEach((chunkName) => {
+      expect(viteConfig).toContain(chunkName);
+    });
+  });
+
   it('keeps standalone Jest on explicit Babel and jsdom setup', () => {
     const pkg = readClientPackageJson();
     const jestConfig = readClientFile('jest.config.cjs');
