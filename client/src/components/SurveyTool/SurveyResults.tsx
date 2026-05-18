@@ -2858,7 +2858,21 @@ return (
       </div>
     </ModalHeader>
 
-    cleanupScrollWatcher();
+    <ModalBody className={styles.modalBody}>
+      {isDemoAlternateResultsView ? (
+        <div
+          className={styles.demoResultsSurface}
+          data-testid={`ce-surveyresults-demo-surface-${demoResultsViewMode}`}
+        >
+          {this.renderDemoResultsSurface(demoResultsViewMode)}
+        </div>
+      ) : (
+        <>
+      {alertMessage && !filterLoading && (
+        <Alert color="info" className={styles.alertMessage} fade={false}>
+          {alertMessage}
+        </Alert>
+      )}
 
     const attemptScroll = (): boolean => {
       const el = document.getElementById(domId);
