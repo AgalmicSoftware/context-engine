@@ -103,7 +103,9 @@ export default function AgentPage() {
     return asyncActionSeqRef.current;
   };
 
-  const canUpdateForSeq = (seq: number) => mountedRef.current && asyncActionSeqRef.current === seq;
+  const canUpdateForSeq = (seq: number) => (
+    mountedRef.current && asyncActionSeqRef.current === seq
+  );
 
   const appendLog = (entry: Record<string, unknown> & { kind: string }, seq?: number) => {
     if (!mountedRef.current) return;
