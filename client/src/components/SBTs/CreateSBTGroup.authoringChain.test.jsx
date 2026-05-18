@@ -137,6 +137,10 @@ describe('CreateSBTGroup authoring chain selection', () => {
   });
 
   it('keeps the current authoring chain when the wallet switch request is rejected', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const switchError = Object.assign(new Error('User rejected network switch'), {
+      code: 4001,
+    });
     const instance = makeInstance({
       account: '0x00000000000000000000000000000000000000aa',
       network: { id: 84532, name: 'Base Sepolia' },
@@ -158,23 +162,30 @@ describe('CreateSBTGroup authoring chain selection', () => {
       { id: 31337, name: 'Anvil' },
     ]));
 
-    const request = jest.fn().mockRejectedValue(Object.assign(new Error('User rejected network switch'), {
-      code: 4001,
-    }));
+    const request = jest.fn().mockRejectedValue(switchError);
     window.ethereum = { request };
 
-    await act(async () => {
-      await instance.handleNetworkChange({ target: { value: '31337' } });
-    });
+    try {
+      await act(async () => {
+        await instance.handleNetworkChange({ target: { value: '31337' } });
+      });
 
-    expect(request).toHaveBeenCalledWith({
-      method: 'wallet_switchEthereumChain',
-      params: [{ chainId: '0x7a69' }],
-    });
-    expect(instance.state.network).toBe(84532);
-    expect(instance.state.sbtDistribution.network).toEqual(expect.objectContaining({
-      id: 84532,
-      name: 'Base Sepolia',
-    }));
+      expect(request).toHaveBeenCalledWith({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x7a69' }],
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[sbt]',
+        'Failed to switch network',
+        switchError
+      );
+      expect(instance.state.network).toBe(84532);
+      expect(instance.state.sbtDistribution.network).toEqual(expect.objectContaining({
+        id: 84532,
+        name: 'Base Sepolia',
+      }));
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
