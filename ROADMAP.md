@@ -13,7 +13,7 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 - **Scaling**: current public/on-chain defaults target hundreds to low thousands of users per session; larger deployments use the planned scaling profiles and architecture variations.
 - **Runtime decomposition**: large orchestrators such as `MainSite.tsx` and `SessionWizard.tsx` remain the main maintainability targets now that production components are TSX and major helper extraction work has landed.
 - **Chipotle operational polish**: continue hardening worker-mediated Lit provisioning, status reporting, recovery paths, and deployment documentation around the supported Chipotle model.
-- **Frontend/toolchain modernization**: finish the toolchain migration work after the React 18 and TypeScript baselines by moving off CRA, consolidating SCSS, and reducing remaining warning noise.
+- **Frontend/toolchain modernization**: continue tightening the Vite/Jest/ESLint toolchain after the React 18 and TypeScript baselines, consolidate SCSS, and reduce remaining warning noise.
 - **Worker auth trust-boundary hardening**: browser login to the session worker still needs durable nonce/rate-limit state plus scope revalidation / revocation boundaries so auth stays correct under concurrency and gate changes.
 - **Browser secret-storage hardening**: SBT invite and recovery handling should move toward export-only defaults with optional encrypted local recovery.
 

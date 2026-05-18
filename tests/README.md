@@ -32,7 +32,6 @@ If you are deciding where to add new files:
 
 ## Why Foundry still has singular names
 
-Foundry's default vocabulary is singular: `script/` for Solidity deploy scripts
-and `test/` for Forge suites. This repo keeps those conventional names one
-level down under `foundry/` while using plural root-level `scripts/` and
-`tests/` for the broader JavaScript/tooling surface.
+- Co-location keeps E2E scripts near supporting automation code in `scripts/`.
+- React unit tests stay co-located with client app code so components, fixtures, and helpers remain close to the behavior they cover.
+- Forge convention keeps Solidity tests in `test/` as `.t.sol` files.

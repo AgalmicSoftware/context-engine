@@ -330,8 +330,8 @@ Intent for these features:
 
 ### Frontend (React)
 
-- UI lives under `client/` and is primarily React class components with some modern hooks-based modules.
-- CRA/react-app-rewired remains the canonical client dev/build toolchain. Vite is available only as a sidecar compatibility path (`npm run dev:vite`, `npm run build:vite`, `npm run preview:vite`) and writes to `client/build-vite/`.
+- UI lives under `client/` and is a mixed JavaScript/TypeScript React app with class components plus hooks-based modules.
+- Vite is the canonical client dev/build toolchain. `npm run dev` starts the local Vite server, `npm run build` writes the production build to `client/build/`, and `npm run preview:vite` serves a local Vite preview.
 - Routing is centralized via `client/src/components/MainSite/MainSite.tsx` (path parsing and lazy module loading).
 - State management uses Redux (`client/src/store.js`, reducers under `client/src/reducers/`).
 - Group/session-aware caches are stored in localStorage under `dg:<cacheName>:<slug>` keys (see `docs/cache/*`).

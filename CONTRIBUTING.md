@@ -33,9 +33,7 @@ Worker, Arweave, and on-chain E2E flows may also require a funded test wallet, a
 - Type-debt ratchet: `npm run type-debt:check`
 - Client typecheck: `npm run typecheck:client`
 - Root CI-equivalent test flow: `npm test`
-- Client-only tests (no Foundry required): `cd client && npm test -- --watchAll=false` (Jest 30)
-- Client lint: `cd client && npm run lint` (ESLint 9 flat config)
-- Client format check: `cd client && npm run format:check`
+- Client-only tests (no Foundry required): `cd client && npm test -- --watchAll=false`
 - Contract tests: `forge test`
 - Public route/style smoke: `npm run test:e2e`
 
