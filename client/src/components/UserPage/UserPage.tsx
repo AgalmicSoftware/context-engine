@@ -1,5 +1,5 @@
 /** @file UserPage.tsx */
-import React, { Component } from 'react';
+import React, { Component, Suspense } from 'react';
 import styles from './UserPage.module.scss';
 import {
   buildUserPageAnalysisAiOptions,
@@ -189,7 +189,6 @@ import {
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import StatsSection from './UserStats';
-import CompareAddressSection from './CompareAddresses';
 import SBTPage from '../SBTs/SBTPage';
 import { Collapse, Modal, ModalHeader, ModalBody } from 'reactstrap';
 import CETooltip from '../Shared/CETooltip';
@@ -237,6 +236,7 @@ import { buildExplorerAddressUrl } from '../../variables/chains.js';
 import { ethers } from 'ethers';
 
 const accountLog = createLogger('account');
+const CompareAddressSection = React.lazy(() => import('./CompareAddresses'));
 const USERPAGE_GATE_UNKNOWN_RETRY_MS = 30 * 1000;
 const USERPAGE_GATE_TERMINAL_RECHECK_MS = 60 * 1000;
 const USERPAGE_RESPONSE_PARSE_MEMO_LIMIT = 300;
@@ -4247,11 +4247,13 @@ class UserPage extends Component<any, any> {
         {/* Compare section collapses right under header */}
         {!minimized && (
           <Collapse isOpen={collapseOpen}>
-            <CompareAddressSection
-              firstAddress={propViewAddress}
-              account={account}
-              scanSpecificUserProfile={this.props.scanSpecificUserProfile}
-            />
+            <Suspense fallback={null}>
+              <CompareAddressSection
+                firstAddress={propViewAddress}
+                account={account}
+                scanSpecificUserProfile={this.props.scanSpecificUserProfile}
+              />
+            </Suspense>
           </Collapse>
         )}
 
