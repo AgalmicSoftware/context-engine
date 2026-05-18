@@ -24,6 +24,17 @@ Preferred worker sources:
 - Multi-tenant worker: leave `DEFAULT_SESSION_SLUG` empty; all requests must include `X-Session-Slug` (legacy `X-Group-Slug` still accepted) or a token claim.
 - Note: the registry’s default session is stored under the literal `general` slug; the worker maps an empty slug to `general` for gate lookups.
 
+## Runtime dependency boundary
+
+The Worker source keeps runtime wiring explicit so route logic can be tested without Cloudflare bindings or live secrets:
+
+- `worker.js` creates the runtime through `createWorkerRuntimeDepsWithWorkerDeps`.
+- `workerRuntimeDepResolution.js` resolves imported helpers and worker-local primitives into one canonical dependency record.
+- `workerRuntimeInputBinding.js` splits that record into low-level helpers and route runtime input.
+- `workerRouteRuntimeBinding.js` assembles named route groups: registry/login bootstrap, rate-limit/faucet support, anonymous registry access, auth/CORS/admin adapters, execution services, and the route shell.
+
+The route-shell bundle is intentionally still a large boundary object because it is where authenticated, anonymous, admin, AI, Arweave, storage, fetch, and faucet routes meet. Keep behavior changes inside the smaller route/execution modules when possible, and update the binding tests when the boundary adds or removes a dependency.
+
 ## Wizard flow (/new + deploy-helper)
 
 If you deploy via the Group Wizard and a deploy-helper:
