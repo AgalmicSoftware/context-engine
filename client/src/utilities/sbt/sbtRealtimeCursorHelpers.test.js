@@ -25,6 +25,18 @@ describe('sbtRealtimeCursorHelpers', () => {
       });
     });
 
+    it('defaults invalid transactionIndex and logIndex to -1', () => {
+      expect(normalizeSbtRealtimeEventCursor({
+        blockNumber: 12,
+        transactionIndex: -1,
+        logIndex: 'latest',
+      })).toEqual({
+        blockNumber: 12,
+        transactionIndex: -1,
+        logIndex: -1,
+      });
+    });
+
     it('normalizes a valid full cursor to integer fields', () => {
       expect(normalizeSbtRealtimeEventCursor({
         blockNumber: '12',
