@@ -5,8 +5,6 @@ const TOOLTIPS_ENABLED_STORAGE_KEY = 'ce:tooltipsEnabled';
 
 export const normalizeDemoSurfaceMode = (value: unknown): boolean => value === false ? false : true;
 
-export const normalizeTooltipsEnabled = (value: unknown): boolean => value === false ? false : true;
-
 export const readStoredDemoSurfaceMode = (): boolean => {
   try {
     const storedValue = localStorage.getItem(DEMO_SURFACE_MODE_STORAGE_KEY);
@@ -22,7 +20,7 @@ export const readStoredDemoSurfaceMode = (): boolean => {
 export const readStoredTooltipsEnabled = (): boolean => {
   try {
     const storedValue = localStorage.getItem(TOOLTIPS_ENABLED_STORAGE_KEY);
-    return storedValue !== null ? normalizeTooltipsEnabled(JSON.parse(storedValue)) : true;
+    return storedValue !== null ? JSON.parse(storedValue) as boolean : true;
   } catch (_) {
     return true;
   }
@@ -36,6 +34,6 @@ export const persistDemoSurfaceMode = (value: unknown): void => {
 
 export const persistTooltipsEnabled = (value: boolean): void => {
   try {
-    localStorage.setItem(TOOLTIPS_ENABLED_STORAGE_KEY, JSON.stringify(normalizeTooltipsEnabled(value)));
+    localStorage.setItem(TOOLTIPS_ENABLED_STORAGE_KEY, JSON.stringify(value));
   } catch (_) {}
 };

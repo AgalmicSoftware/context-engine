@@ -83,6 +83,16 @@ describe('sessionStateReducer', () => {
     expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
   });
 
+  it('falls back when stored session preferences contain malformed JSON', () => {
+    localStorage.setItem('ce:demoSurfaceMode', '{bad');
+    localStorage.setItem('ce:tooltipsEnabled', '{bad');
+    const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
+    const state = reloadedReducer(undefined, { type: '@@INIT' });
+
+    expect(state.demoSurfaceMode).toBe(false);
+    expect(state.tooltipsEnabled).toBe(true);
+  });
+
   describe('demoSurfaceMode default precedence', () => {
     it('uses stored false regardless of the env default', () => {
       localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(false));
