@@ -66,6 +66,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/deploy-helper-deploy.mjs');
   expectFile('scripts/run-node-tests.js');
   expectFile('scripts/run-node-tests.test.js');
+  expectFile('scripts/vite-navigation-smoke.js');
+  expectFile('scripts/vite-navigation-smoke.test.js');
   expectFile('scripts/verify-worker-bundle-sync.mjs');
   expectFile('scripts/verify-worker-bundle-sync.test.js');
   expectFile(publishWorkflowPath);
@@ -78,6 +80,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
 
   expectScriptContains('test:surveys-sbt', 'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js');
   expectScriptContains('test:node', 'scripts/run-node-tests.js');
+  expectScriptContains('test:e2e', 'npm run -s test:e2e:smoke');
+  expectScriptContains('test:e2e:quick', 'npm run -s test:e2e:smoke');
+  expectScriptContains('test:e2e:smoke', 'npm run -s ai:test-nav:smoke');
+  expectScriptContains('ai:test-nav:smoke', 'node scripts/vite-navigation-smoke.js');
   expectScriptContains('test:ci', 'npm run test:wiring');
   expectScriptContains('test:ci', 'npm run verify:release');
   expectScriptContains('test:ci', 'npm run test:node');
