@@ -134,8 +134,7 @@ describe('SurveyTool pile session scope and progress', () => {
         onFilterChange: jest.fn(),
       });
       const pileElement = shell.render();
-      const PileViewModeClass = pileElement.type;
-      const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
       const idsLower = subject.state.pileQuestions.map((q) => String(q.id).toLowerCase());
       expect(idsLower).toEqual(['q1']);
@@ -222,8 +221,7 @@ describe('SurveyTool pile session scope and progress', () => {
         onFilterChange: jest.fn(),
       });
       const pileElement = shell.render();
-      const PileViewModeClass = pileElement.type;
-      const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
       subject.state = {
         ...subject.state,
@@ -303,8 +301,7 @@ describe('SurveyTool pile session scope and progress', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -351,8 +348,7 @@ describe('SurveyTool pile session scope and progress', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,

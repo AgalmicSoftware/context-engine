@@ -50,9 +50,13 @@ import {
   shouldRouteSurveyToolMountToQuestions,
 } from './surveyToolTopLevelHelpers';
 import { SurveySelector } from './SurveySelector';
-import { SurveyQuestions } from './SurveyQuestions';
-import { PileViewMode } from './SurveyPileViewMode';
 
+const LazySurveyQuestions = React.lazy(() => (
+  import('./SurveyQuestions').then((module) => ({ default: module.SurveyQuestions }))
+));
+const LazyPileViewMode = React.lazy(() => (
+  import('./SurveyPileViewMode').then((module) => ({ default: module.PileViewMode }))
+));
 const SurveyResults = React.lazy(() => import('./SurveyResults'));
 
 type SurveyToolRecord = Record<string, unknown>;
@@ -282,7 +286,7 @@ const renderSurveyToolContent = ({
 
   if (renderModeState.shouldRenderPileMode) {
     return (
-      <PileViewMode
+      <LazyPileViewMode
         {...props}
         isStandalone={true}
         surveyIndex={0}
@@ -301,39 +305,41 @@ const renderSurveyToolContent = ({
   if (renderModeState.shouldRenderSingleQuestionMode) {
     return (
       <div id={styles.surveySelectorRow}>
-        <SurveyQuestions
-          questionID={props.questionID}
-          responderAddress={props.responderAddress}
-          singleQuestionMode={true}
-          toggleLoginModal={props.toggleLoginModal}
-          account={props.account}
-          provider={props.provider}
-          lit={props.lit}
-          litHooks={props.litHooks}
-          loginComplete={props.loginComplete}
-          loginInProgress={props.loginInProgress}
-          network={props.network}
-          cache={cache}
-          updateCache={updateCache}
-          pubKey={pubKey}
-          updatePubKey={updatePubKey}
-          refreshSurveyResponsesByID={props.refreshSurveyResponsesByID}
-          refreshQuestionMetadata={props.refreshQuestionMetadata}
-          refreshQuestionResponses={props.refreshQuestionResponses}
-          defaultFeaturedSBTs={props.defaultFeaturedSBTs}
-          isQuestionCacheReady={props.isQuestionCacheReady}
-          isResponsesCacheReady={props.isResponsesCacheReady}
-          isSurveyCacheReady={props.isSurveyCacheReady}
-          isSBTCacheReady={props.isSBTCacheReady}
-          questionResponsesNonce={props.questionResponsesNonce}
-          questionsCacheNonce={questionsCacheNonce}
-          ensureQuestionCached={ensureQuestionCached}
-          computeSubmitLabel={computeSubmitLabel}
-          activeSessionSlug={activeSessionSlug}
-          sessionSlug={toolSessionSlug}
-          sessionSlugPinned={props.sessionSlugPinned}
-          hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
-        />
+        <React.Suspense fallback={null}>
+          <LazySurveyQuestions
+            questionID={props.questionID}
+            responderAddress={props.responderAddress}
+            singleQuestionMode={true}
+            toggleLoginModal={props.toggleLoginModal}
+            account={props.account}
+            provider={props.provider}
+            lit={props.lit}
+            litHooks={props.litHooks}
+            loginComplete={props.loginComplete}
+            loginInProgress={props.loginInProgress}
+            network={props.network}
+            cache={cache}
+            updateCache={updateCache}
+            pubKey={pubKey}
+            updatePubKey={updatePubKey}
+            refreshSurveyResponsesByID={props.refreshSurveyResponsesByID}
+            refreshQuestionMetadata={props.refreshQuestionMetadata}
+            refreshQuestionResponses={props.refreshQuestionResponses}
+            defaultFeaturedSBTs={props.defaultFeaturedSBTs}
+            isQuestionCacheReady={props.isQuestionCacheReady}
+            isResponsesCacheReady={props.isResponsesCacheReady}
+            isSurveyCacheReady={props.isSurveyCacheReady}
+            isSBTCacheReady={props.isSBTCacheReady}
+            questionResponsesNonce={props.questionResponsesNonce}
+            questionsCacheNonce={questionsCacheNonce}
+            ensureQuestionCached={ensureQuestionCached}
+            computeSubmitLabel={computeSubmitLabel}
+            activeSessionSlug={activeSessionSlug}
+            sessionSlug={toolSessionSlug}
+            sessionSlugPinned={props.sessionSlugPinned}
+            hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
+          />
+        </React.Suspense>
       </div>
     );
   }
@@ -358,7 +364,7 @@ const renderSurveyToolContent = ({
   return (
     <div id={styles.surveySelectorRow}>
       <SurveySelector
-        SurveyQuestionsComponent={SurveyQuestions}
+        SurveyQuestionsComponent={LazySurveyQuestions}
         surveyId={normalizedSurveyId}
         displayAnswerMode={props.displayAnswerMode}
         viewAddress={props.viewAddress}

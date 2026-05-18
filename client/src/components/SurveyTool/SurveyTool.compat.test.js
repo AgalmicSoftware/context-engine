@@ -24,7 +24,17 @@ const findFirstNodeByType = (node, targetType) => (
 );
 
 const findLazySurveyResultsNode = (node) => (
-  findFirstNode(node, (candidate) => candidate?.type?.$$typeof === REACT_LAZY_TYPE)
+  findFirstNode(node, (candidate) => (
+    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
+    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen')
+  ))
+);
+
+const findLazySurveyQuestionsNode = (node) => (
+  findFirstNode(node, (candidate) => (
+    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
+    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode')
+  ))
 );
 
 describe('SurveyTool compatibility wiring', () => {
@@ -63,7 +73,8 @@ describe('SurveyTool compatibility wiring', () => {
 
     const tree = shell.render();
 
-    expect(tree.type).toBe(PileViewMode);
+    expect(tree.type?.$$typeof).toBe(REACT_LAZY_TYPE);
+    expect(tree.props.minifiedMode).toBe('pile');
   });
 
   it('forwards scoped Lit hooks from SurveyTool into normal survey surfaces', () => {
@@ -100,7 +111,7 @@ describe('SurveyTool compatibility wiring', () => {
     });
 
     const tree = shell.render();
-    const questionsNode = findFirstNodeByType(tree, SurveyQuestions);
+    const questionsNode = findLazySurveyQuestionsNode(tree);
 
     expect(questionsNode?.props?.lit).toBe(lit);
     expect(questionsNode?.props?.litHooks).toBe(litHooks);
