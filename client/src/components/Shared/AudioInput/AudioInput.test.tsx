@@ -367,7 +367,7 @@ describe('AudioInput', () => {
   });
 
   it('retries waveform setup until audio refs are ready and then schedules animation', () => {
-    jest.useFakeTimers();
+    jest.useFakeTimers({ doNotFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
 
     const audioContextRef: { current: any } = { current: null };
     const mediaStreamRef: { current: any } = { current: null };
