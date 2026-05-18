@@ -79,14 +79,14 @@ test('active component shim clusters stay explicitly inventoried during sequenci
   });
 });
 
-test('the SurveyTool AudioInput alias remains an explicit bridge to the shared canonical component path', () => {
+test('the SurveyTool AudioInput alias stays retired after shared extraction', () => {
   const relativePath = 'client/src/components/SurveyTool/AudioInput.tsx';
   const absolutePath = path.join(ROOT, relativePath);
 
-  assert.equal(fs.existsSync(absolutePath), true, `${relativePath} should exist as a compatibility alias`);
+  assert.equal(fs.existsSync(absolutePath), false, `${relativePath} should remain removed`);
   assert.equal(
-    fs.readFileSync(absolutePath, 'utf8').trim(),
-    "export { default } from '../Shared/AudioInput/AudioInput';",
-    `${relativePath} should stay a thin re-export to the shared AudioInput implementation`,
+    fs.existsSync(path.join(ROOT, 'client/src/components/Shared/AudioInput/AudioInput.tsx')),
+    true,
+    'Shared AudioInput should remain the canonical implementation path',
   );
 });
