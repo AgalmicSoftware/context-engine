@@ -7,7 +7,7 @@ jest.mock('utilities/logging.js', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   }),
-}), { virtual: true });
+}));
 
 jest.mock('../web3/contractScripts.js', () => ({
   __esModule: true,
@@ -36,12 +36,12 @@ jest.mock('../session/sessionScanScope.js', () => ({
   DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE: 50000,
   readSessionScanMaxBlockRange: jest.fn(),
   resolveValidatedSessionScanWindow: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../crypto/litProtocol.js', () => ({
   __esModule: true,
   getGlobalLitHooks: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../session/sessionQuestionDecryption.js', () => ({
   __esModule: true,
@@ -935,6 +935,7 @@ describe('createSessionQuestionCacheController', () => {
     it('calls buildQuestionDecryptContextForSession with the expected params', async () => {
       const host = createMockHost({
         network: { id: 777 },
+        initialState: { litHooks: globalLitHooks },
         initialStorage: {
           questionsCache: {
             [SESSION_SLUG]: createQuestionsCacheEnvelope({
