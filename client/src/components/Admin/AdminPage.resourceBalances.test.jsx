@@ -5,6 +5,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
+const MOCK_ARWEAVE_ADDRESS = 'arweave-address-for-resource-balance-test-01';
+const MOCK_ARWEAVE_JWK = { mocked: 'arweave-jwk' };
 
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
@@ -92,7 +94,6 @@ jest.mock('../Shared/AudioInput/AudioInput', () => () => <div data-testid="mock-
 jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-selector" />);
 
 const AdminPage = require('./AdminPage').default;
-const Arweave = require('arweave');
 
 const renderAdminPage = async ({
   account = ADMIN_ADDRESS,
@@ -130,7 +131,10 @@ const clickAndSettle = async (element) => {
 const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example.test');
 const openWorkerSecretsPanel = async () => {
   const panel = getWorkerSecretsPanel();
-  await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle Worker secrets section' }));
+  if (!within(panel).queryByRole('button', { name: 'Arweave' })) {
+    await clickAndSettle(within(panel).getByRole('button', { name: 'Toggle Worker secrets section' }));
+  }
+  await within(panel).findByRole('button', { name: 'Arweave' });
   return panel;
 };
 
@@ -190,9 +194,7 @@ describe('AdminPage resource balance previews', () => {
   });
 
   it('shows Arweave and faucet balances inline with worker secrets and refreshes both cards', async () => {
-    const arweave = Arweave.init({ host: 'arweave.example.test', port: 443, protocol: 'https' });
-    const arweaveJwk = await arweave.wallets.generate();
-    const arweaveAddress = await arweave.wallets.jwkToAddress(arweaveJwk);
+    const arweaveAddress = MOCK_ARWEAVE_ADDRESS;
     const arweaveShort = `${arweaveAddress.slice(0, 6)}…${arweaveAddress.slice(-4)}`;
     const faucetWallet = ethers.Wallet.createRandom();
     const faucetPrivateKey = faucetWallet.privateKey;
@@ -217,7 +219,7 @@ describe('AdminPage resource balance previews', () => {
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
       fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
-        target: { value: JSON.stringify(arweaveJwk) },
+        target: { value: JSON.stringify(MOCK_ARWEAVE_JWK) },
       });
       fireEvent.change(getSecretInputByLabel('Faucet private key'), {
         target: { value: faucetPrivateKey },
@@ -279,14 +281,12 @@ describe('AdminPage resource balance previews', () => {
   });
 
   it('hides zero-balance resource summaries in worker secrets', async () => {
-    const arweave = Arweave.init({ host: 'arweave.example.test', port: 443, protocol: 'https' });
-    const arweaveJwk = await arweave.wallets.generate();
     const faucetWallet = ethers.Wallet.createRandom();
     const faucetBalanceSpy = jest
       .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBalance')
       .mockResolvedValue(ethers.constants.Zero);
     mockReadArweaveWalletBalance.mockResolvedValue({
-      address: await arweave.wallets.jwkToAddress(arweaveJwk),
+      address: MOCK_ARWEAVE_ADDRESS,
       balanceUrl: 'https://arweave.example.test/wallet/test/balance',
       gatewayBase: 'https://arweave.example.test',
       winston: '5',
@@ -301,7 +301,7 @@ describe('AdminPage resource balance previews', () => {
       fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'Faucet' }));
 
       fireEvent.change(getSecretInputByLabel('Arweave JWK (JSON)'), {
-        target: { value: JSON.stringify(arweaveJwk) },
+        target: { value: JSON.stringify(MOCK_ARWEAVE_JWK) },
       });
       fireEvent.change(getSecretInputByLabel('Faucet private key'), {
         target: { value: faucetWallet.privateKey },
