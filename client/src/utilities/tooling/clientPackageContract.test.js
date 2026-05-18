@@ -168,11 +168,9 @@ describe('client package modernization contract', () => {
       '@babel/preset-env',
       '@babel/preset-react',
       '@babel/preset-typescript',
-      '@typescript-eslint/eslint-plugin',
       '@typescript-eslint/parser',
       'babel-jest',
       'eslint',
-      'eslint-plugin-import',
       'eslint-plugin-react',
       'eslint-plugin-react-hooks',
       'sass',
@@ -187,14 +185,18 @@ describe('client package modernization contract', () => {
     });
   });
 
-  it('keeps disabled Prettier lint plugin wiring out of the ESLint contract', () => {
+  it('keeps unused lint plugin wiring out of the ESLint contract', () => {
     const pkg = readClientPackageJson();
     const eslintConfig = JSON.parse(readClientFile('.eslintrc.json'));
 
     expect(pkg.devDependencies['eslint-plugin-prettier']).toBeUndefined();
-    expect(eslintConfig.plugins).toContain('import');
+    expect(pkg.devDependencies['@typescript-eslint/eslint-plugin']).toBeUndefined();
+    expect(pkg.devDependencies['eslint-plugin-import']).toBeUndefined();
+    expect(eslintConfig.plugins).not.toContain('import');
     expect(eslintConfig.plugins).toContain('react-hooks');
     expect(eslintConfig.plugins).not.toContain('prettier');
+    expect(eslintConfig.parser).toBe('@typescript-eslint/parser');
+    expect(eslintConfig.rules['@typescript-eslint/no-unused-vars']).toBeUndefined();
     expect(eslintConfig.rules['prettier/prettier']).toBeUndefined();
   });
 

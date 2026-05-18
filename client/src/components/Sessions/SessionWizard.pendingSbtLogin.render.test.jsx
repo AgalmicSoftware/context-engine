@@ -1,4 +1,3 @@
-/* eslint-disable import/first */
 import fs from 'fs';
 import React from 'react';
 import { ethers } from 'ethers';

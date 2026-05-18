@@ -1,5 +1,3 @@
-/* eslint-disable import/first */
-
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 
