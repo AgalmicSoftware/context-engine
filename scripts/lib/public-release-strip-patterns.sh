@@ -46,6 +46,7 @@ video-clickthrough-local
 .env
 .env.local
 .env.*.local
+.env.e2e
 .keys
 .e2e-secrets
 .e2e-cache
@@ -75,11 +76,6 @@ scripts/run-contextengine-cc-tests.test.js
 scripts/e2e-env-example.test.js
 scripts/vendor-cecc-ethers-bundle.js
 scripts/build_external_llm_prompt.py
-scripts/restore-private-pack.sh
-scripts/audit-diff.sh
-scripts/audit-full.sh
-scripts/dependency-audit-hotspots.test.js
-tests/root/*.private.test.*
 artifacts
 private-pack.manifest.json
 Demo Integration Package
@@ -99,6 +95,7 @@ contextEngine-cc/TODO
 .env
 .env.local
 .env.*.local
+.env.e2e
 .keys
 .e2e-secrets
 .e2e-cache
@@ -124,6 +121,7 @@ CLAUDE.md
 .env
 .env.local
 .env.*.local
+.env.e2e
 .keys
 .e2e-secrets
 .e2e-cache

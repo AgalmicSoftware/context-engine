@@ -77,6 +77,9 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, '.DS_Store', 'mac metadata\n');
     writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');
     writeFile(sourceDir, '.env.local', 'SECRET=value\n');
+    writeFile(sourceDir, '.env.e2e', 'E2E_SECRET=value\n');
+    writeFile(sourceDir, '.env.e2e.local', 'E2E_LOCAL_SECRET=value\n');
+    writeFile(sourceDir, '.env.e2e.example', 'E2E_AI_MOCK=1\n');
     writeFile(sourceDir, path.join('.keys', 'arweave-upload.json'), '{"k":"secret"}\n');
     writeFile(sourceDir, path.join('.e2e-cache', 'wallet.json'), '{"address":"0xexample"}\n');
     writeFile(sourceDir, path.join('release-public', 'old-release.txt'), 'old artifact\n');
@@ -124,6 +127,9 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, '.DS_Store')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.secrets.baseline')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.env.local')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, '.env.e2e')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, '.env.e2e.local')), false);
+    assert.equal(fs.readFileSync(path.join(outputDir, '.env.e2e.example'), 'utf8'), 'E2E_AI_MOCK=1\n');
     assert.equal(fs.existsSync(path.join(outputDir, '.keys')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.e2e-cache')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'release-public')), false);
@@ -161,6 +167,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.doesNotMatch(manifestText, new RegExp(`${'PR'}${'D'}s`));
     assert.match(manifestText, /\.secrets\.baseline/);
     assert.doesNotMatch(manifestText, /\.env\.local/);
+    assert.doesNotMatch(manifestText, /\.env\.e2e/);
     assert.doesNotMatch(manifestText, /\.keys/);
     assert.doesNotMatch(manifestText, /codebase-health-modernization/);
     assert.match(manifestText, /private-pack\.manifest\.json/);
