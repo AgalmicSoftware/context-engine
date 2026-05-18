@@ -5161,7 +5161,7 @@ return (
       ) : (
         <>
       {alertMessage && !filterLoading && (
-        <Alert color="info" className={styles.alertMessage}>
+        <Alert color="info" className={styles.alertMessage} fade={false}>
           {alertMessage}
         </Alert>
       )}
