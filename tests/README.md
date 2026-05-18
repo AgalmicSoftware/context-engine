@@ -31,5 +31,5 @@ If you are deciding where to add new files:
 ## Why files are not moved
 
 - Co-location keeps E2E scripts near supporting automation code in `scripts/`.
-- CRA convention keeps React unit tests in the client app structure.
+- React unit tests stay co-located with client app code so components, fixtures, and helpers remain close to the behavior they cover.
 - Forge convention keeps Solidity tests in `test/` as `.t.sol` files.
