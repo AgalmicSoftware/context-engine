@@ -2370,6 +2370,7 @@ class OnePageSession extends Component<any, any> {
               fontSize: '1.5em'
             }}
             isOpen={!this.state.dismissedLoginBanner}
+            fade={false}
             toggle={this.dismissLoginBanner}
             closeClassName={alertCloseClass}
           >
@@ -2385,6 +2386,7 @@ class OnePageSession extends Component<any, any> {
             color='info'
             className={styles.sbtMintStatusItem}
             isOpen={true}
+            fade={false}
             data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_COUNTDOWN}
             style={{ fontSize: '1.15rem', fontWeight: 600 }}
           >
@@ -2437,6 +2439,7 @@ class OnePageSession extends Component<any, any> {
                   color={color}
                   className={styles.sbtMintStatusItem}
                   isOpen={isOpen}
+                  fade={false}
                   data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_STATUS}
                   data-ce-sbt-address={(addrKey || '').toLowerCase() || undefined}
                   data-ce-status={String(v.status || '').trim().toLowerCase() || undefined}
