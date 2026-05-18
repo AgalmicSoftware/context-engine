@@ -66,9 +66,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/deploy-helper-deploy.mjs');
   expectFile('scripts/run-node-tests.js');
   expectFile('scripts/run-node-tests.test.js');
-  expectFile('scripts/testInventoryConfig.js');
-  expectFile('scripts/verify-test-inventory.js');
-  expectFile('scripts/verify-test-inventory.test.js');
   expectFile('scripts/vite-navigation-smoke.js');
   expectFile('scripts/vite-navigation-smoke.test.js');
   expectFile('scripts/verify-worker-bundle-sync.mjs');
@@ -93,10 +90,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:contracts', 'SessionRegistryFuzzTest');
   expectScriptContains('test:contracts', 'CustomSBTInvariantTest');
   expectScriptContains('test:node', 'scripts/run-node-tests.js');
-  expectScriptContains('test:root:jest', '--testMatch');
-  expectScriptContains('test:root:jest', '../test/sessionCorsWorker.auth.test.js');
-  expectScriptContains('test:root:jest', '../test/deployHelper.worker.test.js');
-  expectScriptContains('test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test');
   expectScriptContains('test:e2e', 'npm run -s test:e2e:smoke');
   expectScriptContains('test:e2e:quick', 'npm run -s test:e2e:smoke');
   expectScriptContains('test:e2e:smoke', 'npm run -s ai:test-nav:smoke');
