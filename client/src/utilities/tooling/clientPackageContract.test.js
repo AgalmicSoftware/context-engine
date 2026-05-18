@@ -108,6 +108,37 @@ describe('client package modernization contract', () => {
     });
   });
 
+  it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {
+    const pkg = readClientPackageJson();
+    const viteConfig = readClientFile('vite.config.mjs');
+    const retainedBrowserShims = [
+      'buffer',
+      'process',
+    ];
+    const staleBrowserPolyfills = [
+      'assert',
+      'crypto-browserify',
+      'https-browserify',
+      'os-browserify',
+      'stream-browserify',
+      'stream-http',
+      'url',
+    ];
+
+    retainedBrowserShims.forEach((name) => {
+      expect(pkg.dependencies[name]).toBeUndefined();
+      expect(pkg.devDependencies[name]).toBeDefined();
+      expect(viteConfig).toContain(`/node_modules/${name}/`);
+    });
+    expect(viteConfig).toContain("include: ['buffer', 'process/browser']");
+
+    staleBrowserPolyfills.forEach((name) => {
+      expect(pkg.dependencies[name]).toBeUndefined();
+      expect(pkg.devDependencies[name]).toBeUndefined();
+      expect(viteConfig).not.toContain(`/node_modules/${name}/`);
+    });
+  });
+
   it('keeps standalone Jest on explicit Babel and jsdom setup', () => {
     const pkg = readClientPackageJson();
     const jestConfig = readClientFile('jest.config.cjs');
