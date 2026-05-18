@@ -347,24 +347,6 @@ const litContractsSubpathShim = () => ({
   },
 });
 
-const rawLoaderCompatibilityPlugin = () => ({
-  name: 'ce-raw-loader-compatibility',
-  enforce: 'pre',
-  resolveId(source, importer) {
-    const prefix = '!!raw-loader!';
-    if (!source.startsWith(prefix)) return null;
-    const request = source.slice(prefix.length);
-    const baseDir = importer ? path.dirname(importer) : __dirname;
-    return `\0ce-raw-loader:${path.resolve(baseDir, request)}`;
-  },
-  load(id) {
-    const prefix = '\0ce-raw-loader:';
-    if (!id.startsWith(prefix)) return null;
-    const filePath = id.slice(prefix.length);
-    return `export default ${JSON.stringify(fs.readFileSync(filePath, 'utf8'))};`;
-  },
-});
-
 const jsxInJsCompatibilityPlugin = () => ({
   name: 'ce-jsx-in-js-compatibility',
   enforce: 'pre',
@@ -424,7 +406,6 @@ export default defineConfig(({ mode }) => {
       react(),
       jsToTsCompatibilityPlugin(),
       litContractsSubpathShim(),
-      rawLoaderCompatibilityPlugin(),
       copyStaticImageAssetsPlugin(),
       publicAssetsCompatibilityPlugin(),
       {
