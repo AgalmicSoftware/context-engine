@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 
 import CorpusViewer from './CorpusViewer';
 import PolicyGlobe from './PolicyGlobe';

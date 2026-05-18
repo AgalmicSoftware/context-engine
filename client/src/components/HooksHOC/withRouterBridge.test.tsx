@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import withRouter from './withRouterBridge';
 
 describe('withRouterBridge', () => {
