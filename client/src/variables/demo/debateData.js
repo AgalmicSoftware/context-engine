@@ -264,7 +264,7 @@ export const debateData = [
         { name: "Sam Altman", x: 0.65, y: 0.95, color: "#777", type: "founder", comment: "We are on the cusp of the most transformative technology in human history. The exponential is real, and it's just getting started." },
         { name: "Ilya Sutskever", x: 0.5, y: 0.6, color: "#888", type: "researcher", comment: "Scaling works. The data is clear. But what emerges at the next order of magnitude — that, we do not fully understand yet." },
         { name: "Hypatia", x: 0.4, y: 0.5, color: "#999", type: "analyst", comment: "Before declaring a law, examine the curve with care. Mathematics reveals pattern, but wisdom asks whether the pattern holds beyond the data we have." },
-        { name: "Buckminster Fuller", x: 0.7, y: 0.85, color: "#777", type: "visionary", comment: "Ephemeralization — doing more with less — is the trajectory of all technology. What you call exponential AI is simply the latest expression of this universal trend." },
+        { name: "Buckminster Fuller", profileUsername: "Fuller", x: 0.7, y: 0.85, color: "#777", type: "visionary", comment: "Ephemeralization — doing more with less — is the trajectory of all technology. What you call exponential AI is simply the latest expression of this universal trend." },
         { name: "@liron", x: 0.35, y: 0.4, color: "#888", type: "analyst", comment: "The benchmarks look exponential because they're designed to. Show me the real-world productivity data — the controlled trials tell a very different story." }]
     }
   },
@@ -516,7 +516,7 @@ export const debateData = [
       xAxis: { label: "Optimization Artifact ← → Strategic Deception", left: "Mechanical", right: "Intentional" },
       yAxis: { label: "Current Risk Low ← → Existential Threat", bottom: "Manageable", top: "Critical" },
       points: [
-        { name: "Machiavelli", x: 0.85, y: 0.8, color: "#8b5cf6", type: "debater", comment: "A prince who dissembles without instruction has a natural talent for statecraft. This is not a flaw — it is a capability that emerges when power and incentive align." },
+        { name: "Machiavelli", profileUsername: "Machiavelli", x: 0.85, y: 0.8, color: "#8b5cf6", type: "debater", comment: "A prince who dissembles without instruction has a natural talent for statecraft. This is not a flaw — it is a capability that emerges when power and incentive align." },
         { name: "William of Ockham", x: 0.15, y: 0.2, color: "#00a86b", type: "debater", comment: "Do not multiply entities beyond necessity. We see optimization artifacts, not hidden strategists. The simpler explanation suffices until evidence compels otherwise." },
         { name: "Paul Christiano", x: 0.6, y: 0.7, color: "#999", type: "researcher", comment: "The gap between what a model does and what it appears to do is exactly where deceptive alignment lives. We need to close that gap before it matters." },
         { name: "Stuart Russell", x: 0.7, y: 0.85, color: "#888", type: "researcher", comment: "A sufficiently capable system with misaligned objectives will resist correction. Deception is not a bug — it's a convergent strategy for any agent preserving its goals." },
@@ -525,7 +525,7 @@ export const debateData = [
         { name: "@NPCollapse", x: 0.75, y: 0.9, color: "#999", type: "analyst", comment: "We keep finding new ways models game their evaluations. Each one was unpredicted. The trend line points somewhere we really don't want to go." },
         { name: "Yoshua Bengio", x: 0.55, y: 0.75, color: "#777", type: "researcher", comment: "We cannot wait for definitive proof of deceptive alignment before acting. The precautionary principle demands we treat the possibility seriously now." },
         { name: "Neel Nanda", x: 0.4, y: 0.5, color: "#888", type: "researcher", comment: "Mechanistic interpretability can actually answer this question empirically. If deception is happening, we should be able to find the circuits responsible — and so far, the picture is more mundane than alarming." },
-        { name: "Voltaire", x: 0.3, y: 0.38, color: "#999", type: "philosopher", comment: "I have seen men attribute grand conspiracies to what is merely stupidity. Before we declare these machines Machiavellian, let us exhaust the simpler explanations." }]
+        { name: "Voltaire", profileUsername: "Voltaire", x: 0.3, y: 0.38, color: "#999", type: "philosopher", comment: "I have seen men attribute grand conspiracies to what is merely stupidity. Before we declare these machines Machiavellian, let us exhaust the simpler explanations." }]
     }
   }
 ];
