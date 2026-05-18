@@ -20,6 +20,7 @@ CLAUDE.md
 video-clickthrough-local
 .tmp-review
 .DS_Store
+.secrets.baseline
 .env
 .env.local
 .env.*.local
@@ -83,6 +84,7 @@ CLAUDE.md
 .codex-solc
 .codex-tmp
 .DS_Store
+.secrets.baseline
 .env
 .env.local
 .env.*.local
