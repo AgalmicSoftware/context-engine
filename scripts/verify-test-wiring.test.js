@@ -38,6 +38,10 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:surveys-sbt':
             'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
           'test:node': 'node scripts/run-node-tests.js',
+          'test:e2e': 'npm run -s test:e2e:smoke',
+          'test:e2e:quick': 'npm run -s test:e2e:smoke',
+          'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
+          'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
           'test:ci': 'npm run test:wiring && npm run verify:release && npm run test:node',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
           'test:client': 'npm test -- --coverage',
