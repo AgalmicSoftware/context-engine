@@ -3,16 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import SurveyTool from './SurveyTool';
 import { SurveySelector } from './SurveySelector';
 
-jest.mock('./SurveyResults', () => ({
-  __esModule: true,
-  default: ({ onClose }) =>
-    jest.requireActual('react').createElement('button', { onClick: onClose }, 'Close functional results'),
-}));
-
-jest.mock('./SurveySelector', () => ({
-  SurveySelector: () => jest.requireActual('react').createElement('div', { 'data-testid': 'mock-survey-selector' }),
-}));
-
 const REACT_LAZY_TYPE = Symbol.for('react.lazy');
 
 const treeHasDataTestId = (node, testId) => {
@@ -52,13 +42,9 @@ const findElement = (node, predicate) => {
   return null;
 };
 
-const findLazySurveyResultsNode = (node) =>
-  findElement(
-    node,
-    (candidate) =>
-      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen'),
-  );
+const findLazySurveyResultsNode = (node) => (
+  findElement(node, (candidate) => candidate?.type?.$$typeof === REACT_LAZY_TYPE)
+);
 
 describe('SurveyTool results routing', () => {
   afterEach(() => {

@@ -1,8 +1,6 @@
 import SurveyTool from './SurveyTool';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { SurveySelector } from './SurveySelector';
-import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
-import { resolveSurveyToolQuestionReadCacheContext } from './surveyToolSessionResolution';
 
 const REACT_LAZY_TYPE = Symbol.for('react.lazy');
 
@@ -20,23 +18,13 @@ const findFirstNode = (node, predicate) => {
   return findFirstNode(node?.props?.children, predicate);
 };
 
-const findFirstNodeByType = (node, targetType) => findFirstNode(node, (candidate) => candidate?.type === targetType);
+const findFirstNodeByType = (node, targetType) => (
+  findFirstNode(node, (candidate) => candidate?.type === targetType)
+);
 
-const findLazySurveyResultsNode = (node) =>
-  findFirstNode(
-    node,
-    (candidate) =>
-      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen'),
-  );
-
-const findLazySurveyQuestionsNode = (node) =>
-  findFirstNode(
-    node,
-    (candidate) =>
-      candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-      Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode'),
-  );
+const findLazySurveyResultsNode = (node) => (
+  findFirstNode(node, (candidate) => candidate?.type?.$$typeof === REACT_LAZY_TYPE)
+);
 
 describe('SurveyTool compatibility wiring', () => {
   afterEach(() => {

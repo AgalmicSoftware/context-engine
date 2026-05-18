@@ -3,8 +3,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
-import contractScripts, { getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
-import { listNamespaceEntriesSync, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import contractScripts, {
+  getSessionSlugByName
+} from '../../utilities/web3/contractScripts.js';
+import {
+  listNamespaceEntriesSync,
+  updateCacheAtomic,
+} from '../../utilities/cache/cacheScripts.js';
 import {
   resolveEffectiveSlug,
   getActiveSessionSlugFromProps,
@@ -58,6 +63,8 @@ const LazySurveyQuestions = React.lazy(() =>
 const LazyPileViewMode = React.lazy(() =>
   import('./SurveyPileViewMode').then((module) => ({ default: module.PileViewMode })),
 );
+const SurveyResults = React.lazy(() => import('./SurveyResults'));
+
 const SurveyResults = React.lazy(() => import('./SurveyResults'));
 
 type SurveyToolRecord = Record<string, unknown>;
@@ -445,8 +452,6 @@ const renderSurveyToolContent = ({
           preventUrlChange={props.preventUrlChange}
           sessionSlug={toolSessionSlug}
           activeSessionSlug={activeSessionSlug}
-          sessionConfig={props.sessionConfig}
-          ensureLightSbtUniverse={props.ensureLightSbtUniverse}
           sessionSlugPinned={props.sessionSlugPinned}
           hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
         />

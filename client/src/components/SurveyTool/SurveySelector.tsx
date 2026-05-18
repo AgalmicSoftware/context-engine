@@ -55,7 +55,6 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput';
-import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import type { QuestionFilterHandle } from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
@@ -285,6 +284,7 @@ export const SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE: React.CSSProperties = 
 };
 
 export const LazyCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
+export const LazySurveyResults = React.lazy(() => import('./SurveyResults'));
 
 export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
   isFilterActive
@@ -1680,8 +1680,6 @@ export class SurveySelector extends Component<any, any> {
               preventUrlChange={this.props.preventUrlChange}
               sessionSlug={this.props.sessionSlug}
               activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-              sessionConfig={this.props.sessionConfig}
-              ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
               // Do not drop the pin at the results layer; otherwise /session pages
               // silently fan out to broader scan scope when opening results.
               sessionSlugPinned={this.props.sessionSlugPinned}
