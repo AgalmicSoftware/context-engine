@@ -14,7 +14,7 @@
     "sourceType": "module"
   },
   "extends": ["eslint:recommended", "plugin:react/recommended"],
-  "plugins": ["import", "prettier", "react-hooks"],
+  "plugins": ["import", "react-hooks"],
   "settings": {
     "react": {
       "version": "detect"
@@ -24,7 +24,6 @@
     "globalThis": "readonly"
   },
   "rules": {
-    "prettier/prettier": "off",
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
     "@typescript-eslint/no-unused-vars": "off",
