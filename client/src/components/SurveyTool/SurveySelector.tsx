@@ -297,6 +297,27 @@ export const buildSurveySelectorHeaderSubmitButtonClassName = (
   styleMap: Record<string, string>
 ) => [styleMap.headerSubmitButton, styleMap.submitGlow].filter(Boolean).join(' ');
 
+const buildSurveySelectorFilterUrl = ({
+  pathname = '',
+  search = '',
+  hash = '',
+  serializedState = '',
+}: {
+  pathname?: string;
+  search?: string;
+  hash?: string;
+  serializedState?: string;
+}): string => {
+  const params = new URLSearchParams(String(search || ''));
+  if (serializedState) {
+    params.set('filter', serializedState);
+  } else {
+    params.delete('filter');
+  }
+  const query = params.toString();
+  return `${String(pathname || '')}${query ? `?${query}` : ''}${String(hash || '')}`;
+};
+
 type SurveySelectorRecord = Record<string, unknown>;
 type SurveySelectorNetworkLike = SurveySelectorRecord & {
   chainId?: unknown;
@@ -846,8 +867,7 @@ export class SurveySelector extends Component<any, any> {
     }
   };
 
-
-	  handleFilteredQuestionsWithState = (_filteredQuestions: unknown, filterState: unknown): void => {
+  handleFilteredQuestionsWithState = (_filteredQuestions: unknown, filterState: unknown): void => {
     const nextFilterState = normalizeSurveyToolFilterState(filterState);
     const serializedState = serializeSurveyToolFilterState(nextFilterState);
     if (serializedState !== this._filterStateSig) {
