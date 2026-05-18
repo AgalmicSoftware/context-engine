@@ -14,6 +14,8 @@ Common contents here include:
 - worker build, bundle verification, and deploy-helper publish scripts
 - release, audit, and maintenance helpers
 
+The stripped public checkout keeps `scripts/vite-navigation-smoke.js` as the maintained local route/style smoke runner. Private full-workflow E2E files may be absent in this checkout; see [`../docs/e2e-commands.md`](../docs/e2e-commands.md) for the public smoke command and private-runner notes.
+
 Deploy-helper quick command:
 
 ```bash
