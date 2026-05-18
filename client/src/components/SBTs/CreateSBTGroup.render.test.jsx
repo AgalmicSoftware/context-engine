@@ -319,6 +319,7 @@ describe('CreateSBTGroup render and image authoring', () => {
   });
 
   it('keeps the existing uploaded image when a pasted clipboard image blob is too large', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const originalClipboard = navigator.clipboard;
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -369,6 +370,7 @@ describe('CreateSBTGroup render and image authoring', () => {
         'blob:existing-sbt-preview'
       );
       expect(screen.getByText('Image too large (>10MB)')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'Image too large (>10MB)');
       expect(instance.state.sbtMinted).toBe(true);
       expect(instance.state.sbtAddress).toBe('0x9999999999999999999999999999999999999999');
       expect(instance.state.currentStep).toBe(4);
@@ -383,10 +385,12 @@ describe('CreateSBTGroup render and image authoring', () => {
       });
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
+      consoleErrorSpy.mockRestore();
     }
   });
 
   it('keeps the existing uploaded image when a pasted image URL fails validation', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const originalClipboard = navigator.clipboard;
     const originalCreateObjectURL = URL.createObjectURL;
     const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -431,6 +435,11 @@ describe('CreateSBTGroup render and image authoring', () => {
         'blob:existing-sbt-preview'
       );
       expect(screen.getByText('Invalid image type')).toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[sbt]',
+        'Failed to fetch pasted image via worker:',
+        expect.any(Error)
+      );
     } finally {
       Object.defineProperty(navigator, 'clipboard', {
         configurable: true,
@@ -438,6 +447,7 @@ describe('CreateSBTGroup render and image authoring', () => {
       });
       URL.createObjectURL = originalCreateObjectURL;
       URL.revokeObjectURL = originalRevokeObjectURL;
+      consoleErrorSpy.mockRestore();
     }
   });
 
