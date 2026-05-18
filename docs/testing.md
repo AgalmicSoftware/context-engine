@@ -5,9 +5,10 @@ Context Engine testing spans the root repo, the React client, and the E2E workfl
 ## Runtime Requirements
 
 - Root scripts and CI-style test runs use Node.js 20+
-- Client workflows use Node.js 16.14.2 and npm 9.2.0
-- Install client dependencies with `npm install`; the `--legacy-peer-deps`
-  contract is carried automatically via `client/.npmrc`
+- Client workflows support Node.js 16.14.2/npm 9.2.0 and Node.js 20/npm 10;
+  use Node 20/npm 10 for repo-wide test work
+- Install client dependencies with plain `npm install`; strict peer resolution
+  is the normal install contract
 - Contract and local-chain test flows require Foundry (`forge` / `anvil`)
 
 ## Common Commands
@@ -27,7 +28,7 @@ tests, and cache guards.
 
 ```bash
 cd client
-nvm use 16
+nvm use 20
 npm test -- --watchAll=false
 npm run lint
 npm run typecheck

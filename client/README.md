@@ -6,15 +6,16 @@ other user-facing web3 interactions.
 
 ## Setup
 
-Current client workflows use Node.js `16.14.2` and npm `9.2.0`.
+Current client workflows support Node.js `16.14.2` with npm `9.2.0`, and
+Node.js `20.x` with npm `10.x`. Use Node 20/npm 10 for repo-wide work unless
+you are intentionally checking client-only Node 16 compatibility.
 
-Install client dependencies with `npm install`; the `--legacy-peer-deps`
-contract is carried automatically via `client/.npmrc` for the remaining
-peer-sensitive web3 and UI dependencies.
+Install client dependencies with plain `npm install`. The lockfile is expected
+to resolve under npm's normal strict peer behavior.
 
 ```bash
 cd client
-nvm use 16
+nvm use 20
 npm install
 npm run dev
 ```
