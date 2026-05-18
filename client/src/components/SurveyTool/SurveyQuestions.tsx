@@ -3625,6 +3625,7 @@ export class SurveyQuestions extends Component {
     commentsSection,
   }) => (
     <SurveyQuestionsFullQuestionCardShell
+      key={cardKey}
       cardKey={cardKey}
       promptContent={this.renderPromptWithManualDecrypt(question)}
       cardIcons={cardIcons}
