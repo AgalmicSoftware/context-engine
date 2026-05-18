@@ -38,11 +38,6 @@ jest.mock('../session/sessionScanScope.js', () => ({
   resolveValidatedSessionScanWindow: jest.fn(),
 }));
 
-jest.mock('../session/demoSessionQuestionFixtures.js', () => ({
-  __esModule: true,
-  getTemporaryDemoSessionQuestionFixtures: jest.fn(() => []),
-}));
-
 jest.mock('../crypto/litProtocol.js', () => ({
   __esModule: true,
   getGlobalLitHooks: jest.fn(),

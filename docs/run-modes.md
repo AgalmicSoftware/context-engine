@@ -9,8 +9,8 @@ Context Engine can be used in three main modes depending on how much infrastruct
 Frontend development and local client work only.
 
 - Use the React client without chain, worker, or Arweave dependencies
-- Client workflows support Node.js 16.14.2/npm 9.2.0 and Node.js 20/npm 10;
-  use Node 20/npm 10 for repo-wide work
+- Client workflows support Node.js `^20.19.0` or `>=22.12.0` with
+  npm `^10.0.0`; Node 16/npm 9 are no longer supported for client work
 - Install client dependencies with plain `npm install`; strict peer resolution
   is the normal install contract
 - Typical start command:
@@ -34,7 +34,7 @@ npm run preview:vite
 The Vite production build writes to `client/build/`, which is also what
 `npm start` serves.
 
-Client unit tests run through standalone Jest:
+Client unit tests run through standalone Jest 30:
 
 ```bash
 cd client
@@ -45,11 +45,9 @@ npm test -- --watchAll=false
 
 Local blockchain development with Anvil and Foundry.
 
-- Use this mode for contract work, local deploys, and chain-backed development
-  flows.
-- Root scripts use Node.js 20.19+ or 22.12+.
-- See [local-chain.md](local-chain.md) for chain startup, deploy flow, and local
-  contract testing.
+- Use this mode for contract work, local deploys, and chain-backed development flows
+- Root scripts use Node.js 20.19+ or 22.12+
+- See [docs/local-chain.md](local-chain.md) for chain startup, deploy flow, and local contract testing
 
 ## `manual-fork` verification (advanced)
 

@@ -1668,11 +1668,19 @@ describe('createSessionResponseHydrationController', () => {
           throw new Error('fallback to ethers.utils.id');
         });
 
-      contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => `response-for:${qId.slice(-4)}`);
+      contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => (
+        `response-for:${qId.slice(-4)}`
+      ));
 
       await controller.refreshQuestionResponses(
-        [upperCaseQuestionIdA, QUESTION_ID_A, 'ab-topic-1', 'bad-id', 'ab-topic-1'],
-        { responder: RESPONDER },
+        [
+          upperCaseQuestionIdA,
+          QUESTION_ID_A,
+          'ab-topic-1',
+          'bad-id',
+          'ab-topic-1',
+        ],
+        { responder: RESPONDER }
       );
 
       expect(cryptoUtils.hashIdentifier).toHaveBeenCalledWith('ab-topic-1');

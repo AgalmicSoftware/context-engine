@@ -43,7 +43,6 @@ The result is a decision record that captures not only what the organization dec
 ## Quick Start
 
 ### Prerequisites
-
 - Root scripts, worker bundling, contract tooling, and client workflows: Node.js 20.19+ or 22.12+ with npm 10
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
 
@@ -62,7 +61,7 @@ nvm use 20
 npm install
 
 cd client
-nvm use 16
+nvm use 20
 npm install
 npm run dev
 ```
