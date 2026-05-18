@@ -330,6 +330,27 @@ const buildSurveySelectorFilterUrl = ({
   return `${String(pathname || '')}${query ? `?${query}` : ''}${String(hash || '')}`;
 };
 
+const buildSurveySelectorFilterUrl = ({
+  pathname = '',
+  search = '',
+  hash = '',
+  serializedState = '',
+}: {
+  pathname?: string;
+  search?: string;
+  hash?: string;
+  serializedState?: string;
+}): string => {
+  const params = new URLSearchParams(String(search || ''));
+  if (serializedState) {
+    params.set('filter', serializedState);
+  } else {
+    params.delete('filter');
+  }
+  const query = params.toString();
+  return `${String(pathname || '')}${query ? `?${query}` : ''}${String(hash || '')}`;
+};
+
 type SurveySelectorRecord = Record<string, unknown>;
 type SurveySelectorNetworkLike = SurveySelectorRecord & {
   chainId?: unknown;
@@ -879,6 +900,16 @@ export class SurveySelector extends Component<any, any> {
       const currentUrl = `${window.location.pathname}${window.location.search || ''}${window.location.hash || ''}`;
       if (currentUrl !== newUrl) {
         window.history.replaceState({}, '', newUrl);
+      }
+    }
+  };
+
+
+		  async fetchSurveys() {
+      const requestEpoch = (Number(this._surveySelectorFetchEpoch || 0) + 1);
+	      this._surveySelectorFetchEpoch = requestEpoch;
+      if (!this.state.loading) {
+		    this.setState(buildSurveySelectorLoadingPatch(true));
       }
     }
   };
