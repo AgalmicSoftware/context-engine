@@ -151,6 +151,69 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
+jest.mock('../DemoViews/CorpusViewer', () => {
+  const React = require('react');
+  const fullCorpusUrl = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json';
+
+  function MockCorpusViewer({
+    externalLoadRequestNonce,
+    onAtlasIssueOpen,
+    onExternalLoadStateChange,
+  }) {
+    mockCorpusViewer({ externalLoadRequestNonce, onAtlasIssueOpen, onExternalLoadStateChange });
+    React.useEffect(() => {
+      let cancelled = false;
+      if (Number(externalLoadRequestNonce || 0) <= 0) return undefined;
+
+      const loadCorpus = async () => {
+        onExternalLoadStateChange?.({
+          activeCorpusKey: 'cross_corpus',
+          activeCorpusLabel: 'Cross-Corpus',
+          loadStatus: 'loading',
+          loadButtonLabel: 'Loading full corpus...',
+          disableLoadButton: true,
+          error: '',
+        });
+        const response = await global.fetch(fullCorpusUrl, { cache: 'no-store' });
+        if (response?.json) await response.json();
+        if (!cancelled) {
+          onExternalLoadStateChange?.({
+            activeCorpusKey: 'cross_corpus',
+            activeCorpusLabel: 'Cross-Corpus',
+            loadStatus: 'loaded',
+            loadButtonLabel: 'Full corpus loaded',
+            disableLoadButton: true,
+            error: '',
+          });
+        }
+      };
+
+      loadCorpus();
+      return () => {
+        cancelled = true;
+      };
+    }, [externalLoadRequestNonce, onExternalLoadStateChange]);
+
+    return React.createElement(
+      'div',
+      { 'data-testid': 'corpus-viewer' },
+      React.createElement('button', { type: 'button' }, 'Tweets'),
+      React.createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => onAtlasIssueOpen?.('0x2110000000000000000000000000000000000000000000000000000000000000'),
+        },
+        'Exponential Progress Debate',
+      ),
+    );
+  }
+
+  return {
+    __esModule: true,
+    default: MockCorpusViewer,
+  };
+});
 jest.mock('../DemoViews/DebateHUD/DebateSelector', () => (props) => {
   mockDebateSelector(props);
   return <div data-testid="debate-selector">Debate Selector</div>;
@@ -274,7 +337,11 @@ describe('OnePageSession results routing', () => {
     expect(loadButton).toHaveTextContent('Load full corpus');
     expect(loadButton.parentElement).toBe(githubLink.parentElement);
 
-    fireEvent.click(loadButton);
+    await act(async () => {
+      fireEvent.click(loadButton);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
