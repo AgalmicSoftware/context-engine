@@ -33,7 +33,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faCog, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faBullhorn, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput';
-import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
@@ -264,6 +263,7 @@ export const SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE: React.CSSProperties = 
 };
 
 export const LazyCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
+export const LazySurveyResults = React.lazy(() => import('./SurveyResults'));
 
 export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
   isFilterActive
@@ -1637,48 +1637,50 @@ export class SurveySelector extends Component<any, any> {
         )}
 
         {showResults && (
-          <SurveyResults
-            isOpen={showResults}
-            onClose={this.closeShowResults}
-            provider={this.props.provider}
-            network={this.props.network}
-            networkChainId={this.props.networkChainId}
-            lit={this.props.lit}
-            litHooks={this.props.litHooks}
-            sbtCacheRevision={this.props.sbtCacheRevision}
-            surveyId={viewMode === 'questions' ? null : selectedSurvey?.id}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            viewMode={viewMode}
-            filterState={this.state.filterState}
-            questionResponsesNonce={this.props.questionResponsesNonce}
-            questionsCacheNonce={this.props.questionsCacheNonce}
-            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-            refreshQuestionResponses={this.props.refreshQuestionResponses}
-            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-            defaultTags={this.props.defaultTags}
-            sessionInfo={this.props.sessionInfo}
-            sessionName={this.props.sessionName}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            isSBTCacheReady={this.props.isSBTCacheReady}
-            isSurveyCacheReady={this.props.isSurveyCacheReady}
-            // Props for URL updates
-	            currentSurveyIdForUrl={surveyForUrl}
-	            currentViewModeForUrl={this.state.viewMode}
-	            onFilterStateChangeForUrlUpdate={this.handleFilterChangeForUrl}
-	            // Props for unified count
-	            filteredQuestionsCount={this.state.filteredQuestionCount}
-	            onCountUpdate={this.handleFilteredQuestionCountUpdate}
-            onFilterChange={this.props.onFilterChange}
-            preventUrlChange={this.props.preventUrlChange}
-            sessionSlug={this.props.sessionSlug}
-            activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-            // Do not drop the pin at the results layer; otherwise /session pages
-            // silently fan out to broader scan scope when opening results.
-            sessionSlugPinned={this.props.sessionSlugPinned}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Results..." minHeight="160px" />}>
+            <LazySurveyResults
+              isOpen={showResults}
+              onClose={this.closeShowResults}
+              provider={this.props.provider}
+              network={this.props.network}
+              networkChainId={this.props.networkChainId}
+              lit={this.props.lit}
+              litHooks={this.props.litHooks}
+              sbtCacheRevision={this.props.sbtCacheRevision}
+              surveyId={viewMode === 'questions' ? null : selectedSurvey?.id}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              viewMode={viewMode}
+              filterState={this.state.filterState}
+              questionResponsesNonce={this.props.questionResponsesNonce}
+              questionsCacheNonce={this.props.questionsCacheNonce}
+              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+              refreshQuestionResponses={this.props.refreshQuestionResponses}
+              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+              defaultTags={this.props.defaultTags}
+              sessionInfo={this.props.sessionInfo}
+              sessionName={this.props.sessionName}
+              isQuestionCacheReady={this.props.isQuestionCacheReady}
+              isResponsesCacheReady={this.props.isResponsesCacheReady}
+              isSBTCacheReady={this.props.isSBTCacheReady}
+              isSurveyCacheReady={this.props.isSurveyCacheReady}
+              // Props for URL updates
+              currentSurveyIdForUrl={surveyForUrl}
+              currentViewModeForUrl={this.state.viewMode}
+              onFilterStateChangeForUrlUpdate={this.handleFilterChangeForUrl}
+              // Props for unified count
+              filteredQuestionsCount={this.state.filteredQuestionCount}
+              onCountUpdate={this.handleFilteredQuestionCountUpdate}
+              onFilterChange={this.props.onFilterChange}
+              preventUrlChange={this.props.preventUrlChange}
+              sessionSlug={this.props.sessionSlug}
+              activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+              // Do not drop the pin at the results layer; otherwise /session pages
+              // silently fan out to broader scan scope when opening results.
+              sessionSlugPinned={this.props.sessionSlugPinned}
+            />
+          </React.Suspense>
         )}
 
 
