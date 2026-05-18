@@ -1006,10 +1006,6 @@ export default function DocumentLibraryPanel({
     const storage = toStr(autoOpenDoc.tagMap?.['CE-DocStorage']).trim().toLowerCase();
     const wantsEncrypted = storage === 'lit-arweave' || storage === 'lit';
     if (wantsEncrypted && (!loginComplete || !toStr(account).trim() || !provider)) return;
-    if (wantsEncrypted) {
-      const litHooks = getActiveLitHooks();
-      if (!litHooks || typeof litHooks.getKey !== 'function') return;
-    }
 
     let cancelled = false;
     autoOpeningRef.current = key;
@@ -1037,7 +1033,7 @@ export default function DocumentLibraryPanel({
       cancelled = true;
       if (autoOpeningRef.current === key) autoOpeningRef.current = '';
     };
-  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc, getActiveLitHooks]);
+  }, [autoOpenDoc, panelContextKey, loginComplete, provider, account, openDoc]);
 
   const addCustomSbt = useCallback((sbt: CustomSbtEntry) => {
     const addr = normalizeSbtAddress(sbt?.address);
