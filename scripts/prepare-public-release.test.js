@@ -75,6 +75,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
 
     writeFile(sourceDir, 'public.txt', 'keep\n');
     writeFile(sourceDir, '.DS_Store', 'mac metadata\n');
+    writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');
     writeFile(sourceDir, '.env.local', 'SECRET=value\n');
     writeFile(sourceDir, path.join('.keys', 'arweave-upload.json'), '{"k":"secret"}\n');
     writeFile(sourceDir, path.join('.e2e-cache', 'wallet.json'), '{"address":"0xexample"}\n');
@@ -121,6 +122,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
 
     assert.equal(fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'), 'keep\n');
     assert.equal(fs.existsSync(path.join(outputDir, '.DS_Store')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, '.secrets.baseline')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.env.local')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.keys')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.e2e-cache')), false);
@@ -157,6 +159,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.doesNotMatch(manifestText, /tracked root manifest that should be replaced/);
     assert.doesNotMatch(manifestText, /TODO/);
     assert.doesNotMatch(manifestText, new RegExp(`${'PR'}${'D'}s`));
+    assert.match(manifestText, /\.secrets\.baseline/);
     assert.doesNotMatch(manifestText, /\.env\.local/);
     assert.doesNotMatch(manifestText, /\.keys/);
     assert.doesNotMatch(manifestText, /codebase-health-modernization/);
