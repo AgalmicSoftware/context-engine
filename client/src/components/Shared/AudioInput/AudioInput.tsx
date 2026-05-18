@@ -684,14 +684,14 @@ const AudioInput = ({
   };
 
   const handleAiRewrite = async () => {
+    const currentRewriteText = userText;
     try {
-      const orig = userText;
-      setOriginalText(orig);
+      setOriginalText(currentRewriteText);
       setRewrittenText('');
       setAiRewriteActive(false);
       setWaitingForAI(true);
       setWaitingSeconds(0);
-      const cleaned = String(await requestAiRewrite(orig, {
+      const cleaned = String(await requestAiRewrite(currentRewriteText, {
         sessionSlug: effectiveSessionSlug,
         sessionConfig: effectiveSessionConfig,
         context,
@@ -711,8 +711,8 @@ const AudioInput = ({
       setWaitingSeconds(0);
       setRewrittenText('');
       setAiRewriteActive(false);
-      setUserText(originalText || userText);
-      callParentUpdate(originalText || userText);
+      setUserText(currentRewriteText);
+      callParentUpdate(currentRewriteText);
     }
   };
 
