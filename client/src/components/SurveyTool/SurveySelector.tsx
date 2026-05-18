@@ -459,7 +459,9 @@ type SurveySelectorQuestionCountSnapshot = {
   count: number;
   encryptedCount: number;
 };
-type SurveyQuestionsComponentType = React.ComponentType<SurveySelectorRecord>;
+type SurveyQuestionsComponentType =
+  | React.ComponentType<SurveySelectorRecord>
+  | React.LazyExoticComponent<React.ComponentType<SurveySelectorRecord>>;
 type SurveyQuestionsComponentHost = {
   SurveyQuestionsComponent?: SurveyQuestionsComponentType;
 };
@@ -1597,43 +1599,45 @@ export class SurveySelector extends Component<any, any> {
 
         {/* Survey / questions views */}
         {viewMode !== 'questions' && selectedSurvey && SurveyQuestionsComponent && (
-          <SurveyQuestionsComponent
-            ref={this.surveyQuestionsRef}
-            useHeaderSubmit={true}
-            onPendingStatsChange={this.handlePendingStatsChange}
-            displayAnswerMode={this.props.displayAnswerMode}
-            viewAddress={this.props.viewAddress}
-            account={this.props.account}
-            network={this.props.network}
-            provider={this.props.provider}
-            lit={this.props.lit}
-            litHooks={this.props.litHooks}
-            toggleLoginModal={this.props.toggleLoginModal}
-            surveys={surveys}
-            loginComplete={this.props.loginComplete}
-            pubKey={this.state.pubKey}
-            updatePubKey={this.handlePubKeyUpdate}
-            surveyIndex={this.state.selectedSurveyIndex}
-            surveyId={selectedSurvey.id}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-            refreshQuestionResponses={this.props.refreshQuestionResponses}
-            defaultTags={this.props.defaultTags}
-            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            isSurveyCacheReady={this.props.isSurveyCacheReady}
-            questionsCacheNonce={this.props.questionsCacheNonce}
-            questionResponsesNonce={this.props.questionResponsesNonce}
-            ensureQuestionCached={this.props.ensureQuestionCached}
-            computeSubmitLabel={this.props.computeSubmitLabel}
-            cacheInitializationError={this.props.cacheInitializationError}
-            questionScanProgress={this.props.questionScanProgress}
-            hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
-            sessionSlug={this.props.sessionSlug}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Questions..." minHeight="160px" />}>
+            <SurveyQuestionsComponent
+              ref={this.surveyQuestionsRef}
+              useHeaderSubmit={true}
+              onPendingStatsChange={this.handlePendingStatsChange}
+              displayAnswerMode={this.props.displayAnswerMode}
+              viewAddress={this.props.viewAddress}
+              account={this.props.account}
+              network={this.props.network}
+              provider={this.props.provider}
+              lit={this.props.lit}
+              litHooks={this.props.litHooks}
+              toggleLoginModal={this.props.toggleLoginModal}
+              surveys={surveys}
+              loginComplete={this.props.loginComplete}
+              pubKey={this.state.pubKey}
+              updatePubKey={this.handlePubKeyUpdate}
+              surveyIndex={this.state.selectedSurveyIndex}
+              surveyId={selectedSurvey.id}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+              refreshQuestionResponses={this.props.refreshQuestionResponses}
+              defaultTags={this.props.defaultTags}
+              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+              isQuestionCacheReady={this.props.isQuestionCacheReady}
+              isResponsesCacheReady={this.props.isResponsesCacheReady}
+              isSurveyCacheReady={this.props.isSurveyCacheReady}
+              questionsCacheNonce={this.props.questionsCacheNonce}
+              questionResponsesNonce={this.props.questionResponsesNonce}
+              ensureQuestionCached={this.props.ensureQuestionCached}
+              computeSubmitLabel={this.props.computeSubmitLabel}
+              cacheInitializationError={this.props.cacheInitializationError}
+              questionScanProgress={this.props.questionScanProgress}
+              hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
+              sessionSlug={this.props.sessionSlug}
+            />
+          </React.Suspense>
         )}
 
         {showResults && (
@@ -2017,38 +2021,40 @@ export class QuestionsDashboard extends Component<any, any> {
             <p>Applying filter...</p>
           </div>
         ) : SurveyQuestionsComponent ? (
-          <SurveyQuestionsComponent
-            ref={this.props.surveyQuestionsRef}
-            account={this.props.account}
-            provider={this.props.provider}
-            lit={this.props.lit}
-            litHooks={this.props.litHooks}
-            toggleLoginModal={this.props.toggleLoginModal}
-            loginComplete={this.props.loginComplete}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            questionPool={filteredQuestions}
-            isStandalone={true}
-            useHeaderSubmit={this.props.useHeaderSubmit}
-            pubKey={this.props.pubKey}
-            updatePubKey={this.props.updatePubKey}
-            network={this.props.network}
-            activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
-            sessionSlug={this.props.sessionSlug}
-            refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-            refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-            refreshQuestionResponses={this.props.refreshQuestionResponses}
-            defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
-            isQuestionCacheReady={this.props.isQuestionCacheReady}
-            isResponsesCacheReady={this.props.isResponsesCacheReady}
-            isSurveyCacheReady={this.props.isSurveyCacheReady}
-            isSBTCacheReady={this.props.isSBTCacheReady}
-            ensureQuestionCached={this.props.ensureQuestionCached}
-            computeSubmitLabel={this.props.computeSubmitLabel}
-            onPendingStatsChange={this.props.onPendingStatsChange}
-            questionScanProgress={this.props.questionScanProgress}
-            hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Questions..." minHeight="160px" />}>
+            <SurveyQuestionsComponent
+              ref={this.props.surveyQuestionsRef}
+              account={this.props.account}
+              provider={this.props.provider}
+              lit={this.props.lit}
+              litHooks={this.props.litHooks}
+              toggleLoginModal={this.props.toggleLoginModal}
+              loginComplete={this.props.loginComplete}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              questionPool={filteredQuestions}
+              isStandalone={true}
+              useHeaderSubmit={this.props.useHeaderSubmit}
+              pubKey={this.props.pubKey}
+              updatePubKey={this.props.updatePubKey}
+              network={this.props.network}
+              activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
+              sessionSlug={this.props.sessionSlug}
+              refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+              refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+              refreshQuestionResponses={this.props.refreshQuestionResponses}
+              defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
+              isQuestionCacheReady={this.props.isQuestionCacheReady}
+              isResponsesCacheReady={this.props.isResponsesCacheReady}
+              isSurveyCacheReady={this.props.isSurveyCacheReady}
+              isSBTCacheReady={this.props.isSBTCacheReady}
+              ensureQuestionCached={this.props.ensureQuestionCached}
+              computeSubmitLabel={this.props.computeSubmitLabel}
+              onPendingStatsChange={this.props.onPendingStatsChange}
+              questionScanProgress={this.props.questionScanProgress}
+              hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
+            />
+          </React.Suspense>
         ) : null}
       </div>
     );
