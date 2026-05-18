@@ -34,7 +34,7 @@ nvm use 20
 npm install
 
 cd client
-nvm use 16
+nvm use 20
 npm install
 npm run dev
 ```

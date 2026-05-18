@@ -6,9 +6,8 @@ other user-facing web3 interactions.
 
 ## Setup
 
-Current client workflows support Node.js `16.14.2` with npm `9.2.0`, and
-Node.js `20.x` with npm `10.x`. Use Node 20/npm 10 for repo-wide work unless
-you are intentionally checking client-only Node 16 compatibility.
+Current client workflows support Node.js `^20.19.0` or `>=22.12.0` with
+npm `^10.0.0`. Node 16/npm 9 are no longer supported for client work.
 
 Install client dependencies with plain `npm install`. The lockfile is expected
 to resolve under npm's normal strict peer behavior.
@@ -53,6 +52,6 @@ workers, storage, and data flow details.
 
 - React
 - Vite
-- Jest
+- Jest 30
 - SCSS Modules / Sass
 - ethers and viem for web3 interactions

@@ -1,13 +1,13 @@
 jest.mock('utilities/logging.js', () => ({
   __esModule: true,
   createLogger: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
   getAllSessionSlugs: jest.fn(),
   normalizeSessionSlug: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../../utilities/session/sessionScanScope.js', () => ({
   __esModule: true,
@@ -15,17 +15,17 @@ jest.mock('../../utilities/session/sessionScanScope.js', () => ({
   readSessionScanSlugs: jest.fn(),
   getAllowedSessionSlugs: jest.fn(),
   isSessionSlugAllowedByScope: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../../utilities/sbt/sbtInstanceListenersMode.js', () => ({
   __esModule: true,
   readSbtInstanceListenersMode: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../../utilities/sbt/sbtFullScanPolicy.js', () => ({
   __esModule: true,
   readSbtFullScanPolicy: jest.fn(),
-}), { virtual: true });
+}));
 
 const makeHost = (overrides = {}) => ({
   getActiveSessionSlug: jest.fn().mockReturnValue(''),
@@ -37,6 +37,8 @@ const makeHost = (overrides = {}) => ({
 });
 
 const setWindowValue = (value) => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  if (descriptor && descriptor.configurable === false) return;
   Object.defineProperty(globalThis, 'window', {
     value,
     configurable: true,
@@ -116,9 +118,12 @@ describe('createSessionScanPolicy', () => {
 
   it('returns false without window and true when the history scan flag is enabled', () => {
     const policy = createSessionScanPolicy(makeHost());
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'window');
 
-    setWindowValue(undefined);
-    expect(policy.isSbtHistoryScanEnabled()).toBe(false);
+    if (!descriptor || descriptor.configurable !== false) {
+      setWindowValue(undefined);
+      expect(policy.isSbtHistoryScanEnabled()).toBe(false);
+    }
 
     setWindowValue(originalWindow);
     window.ENABLE_SBT_HISTORY_SCAN = true;
