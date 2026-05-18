@@ -11,8 +11,8 @@ near-term action is lazy-loading or intentional replacement, not deletion.
 
 | Build output | Size | Source / owner | Current use | Safe next action |
 | --- | ---: | --- | --- | --- |
-| `build/assets/index-6db40c55.js` | 1,067.82 KB | app shell bundle | Main React entry and shared app shell code | Continue route-boundary splitting; no single obvious mechanical split remains. |
-| `build/assets/SurveyTool-34740df8.js` | 739.05 KB | SurveyTool route bundle | Survey/question answering runtime | Consider a separate reviewed split for the always-mounted hidden results modal path. |
+| `build/assets/index-52bf1ede.js` | 1,067.87 KB | app shell bundle | Main React entry and shared app shell code | Continue route-boundary splitting; no single obvious mechanical split remains. |
+| `build/assets/SurveyTool-c5f17d7d.js` | 621.08 KB | SurveyTool route bundle | Survey/question answering runtime | Results modal split out; remaining splits need narrower review of survey/question runtime boundaries. |
 | `build/assets/ce_circuit_logo-41136bba.png` | 1,883.03 KB | `client/src/assets/img/ce_circuit_logo.png` | SBT pages and tests | Keep; replacement/compression needs visual review. |
 | `build/assets/magnifying_glass-faf43812.png` | 1,396.30 KB | `client/src/assets/img/magnifying_glass.png` | ToolExplorer visuals | Keep; candidate for future lazy media loading. |
 | `build/assets/explainer_first-5c5b7870.png` | 1,363.02 KB | `client/src/assets/img/explainer_first.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |

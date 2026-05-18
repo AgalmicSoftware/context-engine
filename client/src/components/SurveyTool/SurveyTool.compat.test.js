@@ -24,17 +24,7 @@ const findFirstNodeByType = (node, targetType) => (
 );
 
 const findLazySurveyResultsNode = (node) => (
-  findFirstNode(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'isOpen')
-  ))
-);
-
-const findLazySurveyQuestionsNode = (node) => (
-  findFirstNode(node, (candidate) => (
-    candidate?.type?.$$typeof === REACT_LAZY_TYPE &&
-    Object.prototype.hasOwnProperty.call(candidate.props || {}, 'singleQuestionMode')
-  ))
+  findFirstNode(node, (candidate) => candidate?.type?.$$typeof === REACT_LAZY_TYPE)
 );
 
 describe('SurveyTool compatibility wiring', () => {
