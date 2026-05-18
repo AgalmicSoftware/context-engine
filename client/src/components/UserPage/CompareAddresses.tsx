@@ -7,6 +7,7 @@ import { faPlus, faSpinner, faExternalLinkAlt, faDownload } from '@fortawesome/f
 import styles from './UserPage.module.scss';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 
 
@@ -561,6 +562,11 @@ export const resolveCompareAddressPillContentStyle = (): React.CSSProperties => 
 export const resolveCompareAddressBlockieStyle = (): React.CSSProperties => ({
   borderRadius: 3,
 });
+
+export const buildCompareProfileHref = (address: unknown): string => {
+  const normalizedAddress = String(address || '').trim();
+  return normalizedAddress ? buildPublicRoute(`/u/${normalizedAddress}`) : '';
+};
 
 export const buildCompareClassName = (...classNames: unknown[]): string => (
   classNames
@@ -1831,7 +1837,7 @@ const CompareAddress = ({ firstAddress, account, scanSpecificUserProfile }: Comp
                   <span>{label}</span>
                   {addr && (
                     <a
-                      href={`/u/${addr}`}
+                      href={buildCompareProfileHref(addr)}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`Open profile for ${label}`}
