@@ -690,7 +690,7 @@ const AudioInput = ({
       setAiRewriteActive(false);
       setWaitingForAI(true);
       setWaitingSeconds(0);
-      const cleaned = String(await requestAiRewrite(orig, {
+      const cleaned = String(await requestAiRewrite(currentRewriteText, {
         sessionSlug: effectiveSessionSlug,
         sessionConfig: effectiveSessionConfig,
         context,
