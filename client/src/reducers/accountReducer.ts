@@ -3,8 +3,8 @@ import { FETCH_ACCOUNT, LOGIN_ACCOUNT, CHANGE_NETWORK } from '../actions/types';
 export type AccountState = {
   account: string;
   provider: string;
-  network: any;
-  alerts: any[];
+  network: unknown;
+  alerts: unknown[];
   userImageURL: string | null;
 };
 type AccountPayload = {
@@ -20,7 +20,7 @@ type AccountReducerAction =
   | { type: typeof CHANGE_NETWORK; payload?: ChangeNetworkPayload }
   | { type?: string; payload?: unknown };
 
-const initialState = {
+const initialState: AccountState = {
   account: '',          // ETH address connected to site
   provider: 'none',     // 'none' | 'wagmi' | 'web3auth' | 'porto_passkey'
   network: null,
