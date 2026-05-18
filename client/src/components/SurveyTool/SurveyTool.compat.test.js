@@ -2,21 +2,30 @@ import SurveyTool from './SurveyTool';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
 import { SurveySelector } from './SurveySelector';
-import ConnectedSurveyResults from './SurveyResults';
 
-const findFirstNodeByType = (node, targetType) => {
+const REACT_LAZY_TYPE = Symbol.for('react.lazy');
+
+const findFirstNode = (node, predicate) => {
   if (node == null) return null;
   if (Array.isArray(node)) {
     for (const child of node) {
-      const found = findFirstNodeByType(child, targetType);
+      const found = findFirstNode(child, predicate);
       if (found) return found;
     }
     return null;
   }
   if (typeof node !== 'object') return null;
-  if (node?.type === targetType) return node;
-  return findFirstNodeByType(node?.props?.children, targetType);
+  if (predicate(node)) return node;
+  return findFirstNode(node?.props?.children, predicate);
 };
+
+const findFirstNodeByType = (node, targetType) => (
+  findFirstNode(node, (candidate) => candidate?.type === targetType)
+);
+
+const findLazySurveyResultsNode = (node) => (
+  findFirstNode(node, (candidate) => candidate?.type?.$$typeof === REACT_LAZY_TYPE)
+);
 
 describe('SurveyTool compatibility wiring', () => {
   afterEach(() => {
@@ -69,12 +78,13 @@ describe('SurveyTool compatibility wiring', () => {
 
     const tree = shell.render();
     const selectorNode = findFirstNodeByType(tree, SurveySelector);
-    const resultsNode = findFirstNodeByType(tree, ConnectedSurveyResults);
+    const resultsNode = findLazySurveyResultsNode(tree);
 
     expect(selectorNode?.props?.lit).toBe(lit);
     expect(selectorNode?.props?.litHooks).toBe(litHooks);
     expect(resultsNode?.props?.lit).toBe(lit);
     expect(resultsNode?.props?.litHooks).toBe(litHooks);
+    expect(resultsNode?.props?.isOpen).toBe(false);
   });
 
   it('forwards scoped Lit hooks from SurveyTool into single-question surfaces', () => {

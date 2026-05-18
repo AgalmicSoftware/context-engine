@@ -1,9 +1,8 @@
-import { LazyCreateQuestionsAndSurveys, SurveySelector } from './SurveySelector';
+import { LazyCreateQuestionsAndSurveys, LazySurveyResults, SurveySelector } from './SurveySelector';
 import {
   normalizeSurveyToolFilterState,
   serializeSurveyToolFilterState,
 } from './surveyToolUtils.js';
-import ConnectedSurveyResults from './SurveyResults';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -435,7 +434,7 @@ describe('SurveySelector', () => {
     };
 
     const tree = subject.render();
-    const resultsNode = findElement(tree, (candidate) => candidate?.type === ConnectedSurveyResults);
+    const resultsNode = findElement(tree, (candidate) => candidate?.type === LazySurveyResults);
 
     expect(resultsNode).toBeTruthy();
     expect(resultsNode.props.networkChainId).toBe(11155420);

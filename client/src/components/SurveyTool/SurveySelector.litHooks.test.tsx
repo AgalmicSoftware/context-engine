@@ -1,8 +1,8 @@
 import {
+  LazySurveyResults,
   QuestionsDashboard,
   SurveySelector,
 } from './SurveySelector';
-import ConnectedSurveyResults from './SurveyResults';
 
 const findElement = (node: any, predicate: (candidate: any) => boolean): any => {
   const stack = [node];
@@ -65,7 +65,7 @@ describe('SurveySelector Lit hook forwarding', () => {
 
     const tree = subject.render();
     const questionsNode = findElement(tree, (node) => node.type === SurveyQuestionsComponent);
-    const resultsNode = findElement(tree, (node) => node.type === ConnectedSurveyResults);
+    const resultsNode = findElement(tree, (node) => node.type === LazySurveyResults);
 
     expect(questionsNode?.props?.lit).toBe(lit);
     expect(questionsNode?.props?.litHooks).toBe(litHooks);
