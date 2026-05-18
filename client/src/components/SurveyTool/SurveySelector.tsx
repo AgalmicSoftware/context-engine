@@ -55,6 +55,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput';
+import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import type { QuestionFilterHandle } from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
@@ -284,9 +285,8 @@ export const SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE: React.CSSProperties = 
 };
 
 export const LazyCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
-export const LazySurveyResults = React.lazy(() => import('./SurveyResults'));
 
-export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties =>
+export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
   isFilterActive
     ? {
         color: SURVEY_SELECTOR_ACTIVE_FILTER_COLOR,

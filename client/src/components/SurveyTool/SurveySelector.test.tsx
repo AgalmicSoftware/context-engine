@@ -1,4 +1,4 @@
-import { SurveySelector } from './SurveySelector';
+import { LazyCreateQuestionsAndSurveys, SurveySelector } from './SurveySelector';
 import {
   normalizeSurveyToolFilterState,
   serializeSurveyToolFilterState,
@@ -476,4 +476,5 @@ describe('SurveySelector', () => {
     expect(authoringNode.props.sessionName).toBe('Edge Session');
     expect(authoringNode.props.surveyIndex).toBe(0);
   });
+
 });

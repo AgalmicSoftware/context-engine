@@ -27,8 +27,6 @@ import styles from './SurveyTool.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExternalLinkAlt, faFilter, faExclamationCircle, faMicrophone, faChevronLeft, faChevronRight, faComment, faRobot } from '@fortawesome/free-solid-svg-icons';
 
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
-import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';

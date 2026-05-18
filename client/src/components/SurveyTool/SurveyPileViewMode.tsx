@@ -492,6 +492,10 @@ import { SurveyQuestions } from './SurveyQuestions';
 export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
 export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 
+export class PileViewMode extends SurveyQuestions {
+  constructor(props) {
+    super(props);
+
 export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngine) => {
   const props = engine.props || {};
   let initialFilterState = normalizeSurveyToolFilterState(props.filterState);
@@ -2992,10 +2996,23 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
           </div>
           {showListeningAside && (
             <div className={styles.sessionListeningPanelAnchor} ref={this.listeningPanelRef}>
-              <SessionListeningPanel
+              <React.Suspense fallback={<LazyFallback label="Loading Listening Panel..." minHeight="160px" />}>
+                <LazySessionListeningPanel
+                  {...this.props}
+                  {...this.getAudioInputWorkerProps()}
+                  onClose={this.closeListeningPanel}
+                />
+              </React.Suspense>
+            </div>
+          )}
+        </div>
+
+        {!showHologramAssistant && showCreate && (
+          <div className={styles.pileFullControls} ref={this.createSectionRef}>
+            <React.Suspense fallback={<LazyFallback label="Loading Question Authoring..." minHeight="160px" />}>
+              <LazyPileCreateQuestionsAndSurveys
                 {...this.props}
-                {...this.getAudioInputWorkerProps()}
-                onClose={this.closeListeningPanel}
+                hideSurveyQuestionToggleUntilAuthoring={true}
               />
             </React.Suspense>
           </div>

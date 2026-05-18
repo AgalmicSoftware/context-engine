@@ -9,18 +9,20 @@ source/module names rather than hashes that change after unrelated builds.
 
 ## Large Build Outputs
 
-| Build output family | Current size | Source / owner | Safe next action |
-| --- | ---: | --- | --- |
-| `AppShell-*.js` | 609.65 KiB | Main app shell and shared route runtime | Fixed 625,000-byte temporary exception; continue route/provider work without raising it. |
-| `ce_circuit_logo-*.png` | 1,838.90 KiB | `client/src/assets/img/ce_circuit_logo.png` | Keep; replacement or compression needs visual review. |
-| `magnifying_glass-*.png` | 1,363.57 KiB | `client/src/assets/img/magnifying_glass.png` | Keep; candidate for future lazy media loading or lossless optimization. |
-| `explainer_first-*.png` | 1,331.07 KiB | `client/src/assets/img/explainer_first.png` | Keep; candidate for welcome-slide media optimization. |
-| `cip_photo-*.png` | 976.05 KiB | `client/src/assets/img/cip_photo.png` | Keep; replacement or compression needs visual review. |
-| `art_header-*.png` | 848.55 KiB | `client/src/assets/img/art_header.png` | Keep; candidate for future lazy media loading. |
-| `explainer_final-*.png` | 829.66 KiB | `client/src/assets/img/explainer_final.png` | Keep; candidate for welcome-slide media optimization. |
-| `beta_tab_robot-*.png` | 694.94 KiB | `client/src/assets/img/beta_tab_robot.png` | Keep; candidate for welcome-slide media optimization. |
-| `context_engine_logo_animation-*.gif` | 2,433.21 KiB | Navbar / SBT loading animation | Keep within the checked dimensions, timing, and byte budget. |
-| `context_engine_logo_animation_pingpong-*.gif` | 4,865.64 KiB | Navbar ping-pong animation | Keep within the checked dimensions, timing, and byte budget. |
+| Build output | Size | Source / owner | Current use | Safe next action |
+| --- | ---: | --- | --- | --- |
+| `build/assets/index-6db40c55.js` | 1,067.82 KB | app shell bundle | Main React entry and shared app shell code | Continue route-boundary splitting; no single obvious mechanical split remains. |
+| `build/assets/SurveyTool-34740df8.js` | 739.05 KB | SurveyTool route bundle | Survey/question answering runtime | Consider a separate reviewed split for the always-mounted hidden results modal path. |
+| `build/assets/ce_circuit_logo-41136bba.png` | 1,883.03 KB | `client/src/assets/img/ce_circuit_logo.png` | SBT pages and tests | Keep; replacement/compression needs visual review. |
+| `build/assets/magnifying_glass-faf43812.png` | 1,396.30 KB | `client/src/assets/img/magnifying_glass.png` | ToolExplorer visuals | Keep; candidate for future lazy media loading. |
+| `build/assets/explainer_first-5c5b7870.png` | 1,363.02 KB | `client/src/assets/img/explainer_first.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
+| `build/assets/cip_photo-374b6724.png` | 999.48 KB | `client/src/assets/img/cip_photo.png` | About page | Keep; replacement/compression needs visual review. |
+| `build/assets/art_header-db45a080.png` | 868.92 KB | `client/src/assets/img/art_header.png` | ToolExplorer visuals | Keep; candidate for future lazy media loading. |
+| `build/assets/explainer_final-aa5bb4c6.png` | 849.57 KB | `client/src/assets/img/explainer_final.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
+| `build/assets/jump-ba6fd23f.png` | 810.90 KB | `client/src/assets/img/jump.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
+| `build/assets/beta_tab_robot-68a9427f.png` | 711.62 KB | `client/src/assets/img/beta_tab_robot.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
+| `build/assets/context_engine_logo_animation-138fda1b.gif` | 7,476.94 KB | `client/src/assets/img/context_engine_logo_animation.gif` | Navbar / SBT logo animation | Keep; replacement needs UX review because timing is part of current branding behavior. |
+| `build/assets/context_engine_logo_animation_pingpong-443e0d17.gif` | 14,952.31 KB | `client/src/assets/img/context_engine_logo_animation_pingpong.gif` | Navbar / SBT logo animation variant | Keep; replacement needs UX review because timing is part of current branding behavior. |
 
 The `SurveyTool-*.js` route bundle is currently about 160.69 KiB, below the
 warning threshold. The old opaque `jump.png` is no longer referenced or emitted;
