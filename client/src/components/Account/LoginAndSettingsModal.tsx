@@ -1,5 +1,5 @@
 /** @file LoginAndSettingsModal.tsx */
-import React, { Component } from "react";
+import React, { Component, Suspense } from "react";
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { ethers } from 'ethers';
@@ -41,7 +41,6 @@ import MetaMaskLogo from "assets/img/metamask_icon_white.png";
 // Reactstrap components
 import { Button, Card, CardHeader, CardBody, CardFooter, Modal } from "reactstrap";
 
-import UserPage from "components/UserPage/UserPage";
 import CETooltip from '../Shared/CETooltip';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import {
@@ -121,6 +120,7 @@ import {
 } from './loginSettingsAiDisplayHelpers';
 
 const accountLog = createLogger('account');
+const AccountUserPage = React.lazy(() => import("components/UserPage/UserPage"));
 
 type LoginAndSettingsRecord = Record<string, any>;
 
@@ -2849,9 +2849,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                       provider={this.props.provider}
                       minimized={true}
                       network={this.props.network}
-                      activeSessionSlug={activeSessionSlug}
-                      sessionConfig={activeSessionConfig}
-                      networkChainId={activeSessionConfig?.networkChainId}
                     />
                   </Suspense>
                 </div>
