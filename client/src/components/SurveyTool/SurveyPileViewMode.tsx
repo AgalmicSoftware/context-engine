@@ -24,12 +24,11 @@ import styles from './SurveyTool.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock, faUnlock, faCaretUp, faArrowLeft, faArrowRight, faExternalLinkAlt, faExclamationCircle, faMicrophone } from '@fortawesome/free-solid-svg-icons';
 
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
-import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import SurveyQuestionTagControl from './SurveyQuestionTagControl';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import TagModal from '../TagPage/TagModal';
+import LazyFallback from '../Shared/LazyFallback';
 import BinaryChoiceInput from './BinaryChoiceInput';
 import BullhornToggleButton from './BullhornToggleButton';
 import ConvictionImportanceLabel from './ConvictionImportanceLabel';
@@ -70,7 +69,6 @@ import {
   renderPileFooterSection,
 } from './surveyPileQuestionSections';
 import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
-import SessionListeningPanel from './SessionListeningPanel';
 import {
   buildPileBaselineCheckPlan,
   buildPileBaselineConsistencyPlan,
@@ -473,6 +471,9 @@ import {
 } from './surveyQuestionsTypes.js';
 
 import { SurveyQuestions } from './SurveyQuestions';
+
+export const LazyPileCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
+export const LazySessionListeningPanel = React.lazy(() => import('./SessionListeningPanel'));
 
 export class PileViewMode extends SurveyQuestions {
   constructor(props) {
@@ -2732,21 +2733,25 @@ export class PileViewMode extends SurveyQuestions {
           </div>
           {showListeningAside && (
             <div className={styles.sessionListeningPanelAnchor} ref={this.listeningPanelRef}>
-              <SessionListeningPanel
-                {...this.props}
-                {...this.getAudioInputWorkerProps()}
-                onClose={this.closeListeningPanel}
-              />
+              <React.Suspense fallback={<LazyFallback label="Loading Listening Panel..." minHeight="160px" />}>
+                <LazySessionListeningPanel
+                  {...this.props}
+                  {...this.getAudioInputWorkerProps()}
+                  onClose={this.closeListeningPanel}
+                />
+              </React.Suspense>
             </div>
           )}
         </div>
 
         {!showHologramAssistant && showCreate && (
           <div className={styles.pileFullControls} ref={this.createSectionRef}>
-            <CreateQuestionsAndSurveys
-              {...this.props}
-              hideSurveyQuestionToggleUntilAuthoring={true}
-            />
+            <React.Suspense fallback={<LazyFallback label="Loading Question Authoring..." minHeight="160px" />}>
+              <LazyPileCreateQuestionsAndSurveys
+                {...this.props}
+                hideSurveyQuestionToggleUntilAuthoring={true}
+              />
+            </React.Suspense>
           </div>
         )}
 

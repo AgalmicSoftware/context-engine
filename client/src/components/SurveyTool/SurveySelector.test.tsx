@@ -1,4 +1,4 @@
-import { SurveySelector } from './SurveySelector';
+import { LazyCreateQuestionsAndSurveys, SurveySelector } from './SurveySelector';
 import {
   normalizeSurveyToolFilterState,
   serializeSurveyToolFilterState,
@@ -439,6 +439,43 @@ describe('SurveySelector', () => {
 
     expect(resultsNode).toBeTruthy();
     expect(resultsNode.props.networkChainId).toBe(11155420);
+  });
+
+  it('renders the survey authoring surface through the lazy chunk boundary', () => {
+    const sessionConfig = { slug: 'edge', networkChainId: 11155420 };
+    const subject = new SurveySelector({
+      autoOpenResults: false,
+      filterState: {},
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      singleQuestionMode: false,
+      network: { id: 11155420 },
+      networkChainId: 11155420,
+      activeSessionSlug: 'edge',
+      sessionName: 'Edge Session',
+      sessionConfig,
+      cache: { questions: {} },
+      updateCache: jest.fn(),
+      toggleLoginModal: jest.fn(),
+    });
+    subject.state = {
+      ...subject.state,
+      loading: false,
+      createSurveyMode: true,
+      showResults: false,
+      showLongLoading: false,
+      surveys: [{ id: '0xsurvey', title: 'Survey', questionIDs: ['0xq'] }],
+      selectedSurveyIndex: 0,
+    };
+
+    const tree = subject.render();
+    const authoringNode = findElement(tree, (candidate) => candidate?.type === LazyCreateQuestionsAndSurveys);
+
+    expect(authoringNode).toBeTruthy();
+    expect(authoringNode.props.expanded).toBe(true);
+    expect(authoringNode.props.sessionConfig).toBe(sessionConfig);
+    expect(authoringNode.props.sessionName).toBe('Edge Session');
+    expect(authoringNode.props.surveyIndex).toBe(0);
   });
 
 });
