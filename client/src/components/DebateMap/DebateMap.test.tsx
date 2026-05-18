@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
+import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import DebateMap, {
   AtlasView,
   buildHistoricalCaseBrief,
