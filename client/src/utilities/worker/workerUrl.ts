@@ -18,7 +18,7 @@ export const WORKER_ENDPOINT_SUFFIXES = Object.freeze([
   '/health',
 ]);
 
-export const stripWorkerEndpointSuffix = (rawPath: any): string => {
+export const stripWorkerEndpointSuffix = (rawPath: unknown): string => {
   const base = toStr(rawPath).trim();
   if (!base) return '';
   const cleaned = base.split('?')[0].split('#')[0].replace(/\/+$/, '');
@@ -32,7 +32,7 @@ export const stripWorkerEndpointSuffix = (rawPath: any): string => {
   return cleaned;
 };
 
-export const normalizeWorkerUrl = (url: any): string => {
+export const normalizeWorkerUrl = (url: unknown): string => {
   const ensured = ensureHttpUrl(url);
   const raw = toStr(ensured || url).trim();
   if (!raw || raw.startsWith('/')) return '';
