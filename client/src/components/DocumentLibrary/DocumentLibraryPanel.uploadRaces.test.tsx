@@ -356,6 +356,279 @@ describe('DocumentLibraryPanel upload and list race guards', () => {
     }
   });
 
+  it('ignores repeated file upload clicks while the first upload is pending', async () => {
+    const slowUpload = createDeferred<any>();
+    mockUploadDocLibraryFile.mockReturnValueOnce(slowUpload.promise);
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'f'.repeat(32)}`}
+      />
+    );
+
+    const file = new File(['duplicate'], 'duplicate-upload.txt', { type: 'text/plain' });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [file] },
+    });
+
+    const uploadButton = screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON);
+    fireEvent.click(uploadButton);
+    fireEvent.click(uploadButton);
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(uploadButton).toBeDisabled();
+      expect(uploadButton).toHaveTextContent('Uploading');
+    });
+
+    await act(async () => {
+      slowUpload.resolve({
+        txId: 'F'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'duplicate-upload.txt',
+        },
+        data: { size: 9, type: 'text/plain' },
+      });
+      await slowUpload.promise;
+      await Promise.resolve();
+    });
+
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let an older file upload completion unlock a newer context upload', async () => {
+    const oldUpload = createDeferred<any>();
+    const newUpload = createDeferred<any>();
+    mockUploadDocLibraryFile
+      .mockReturnValueOnce(oldUpload.promise)
+      .mockReturnValueOnce(newUpload.promise);
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge-a',
+      sessionConfig: TEST_SESSION_CONFIG,
+      mode: 'session',
+      sessionIdHex: `0x${'a'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+    const fileInput = screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT);
+    fireEvent.change(fileInput, {
+      target: { files: [new File(['old'], 'old-context.txt', { type: 'text/plain' })] },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledWith(expect.objectContaining({
+        sessionSlug: 'edge-a',
+      }));
+    });
+
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        sessionSlug="edge-b"
+        sessionIdHex={`0x${'b'.repeat(32)}`}
+      />
+    );
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_INPUT), {
+      target: { files: [new File(['new'], 'new-context.txt', { type: 'text/plain' })] },
+    });
+    const uploadButton = screen.getByTestId(E2E_TESTIDS.DOC_UPLOAD_FILE_BUTTON);
+    fireEvent.click(uploadButton);
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(2);
+      expect(mockUploadDocLibraryFile).toHaveBeenLastCalledWith(expect.objectContaining({
+        sessionSlug: 'edge-b',
+      }));
+      expect(uploadButton).toBeDisabled();
+      expect(uploadButton).toHaveTextContent('Uploading');
+    });
+
+    await act(async () => {
+      oldUpload.resolve({
+        txId: 'A'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'old-context.txt',
+        },
+        data: { size: 3, type: 'text/plain' },
+      });
+      await oldUpload.promise;
+      await Promise.resolve();
+    });
+
+    expect(uploadButton).toBeDisabled();
+    fireEvent.click(uploadButton);
+    expect(mockUploadDocLibraryFile).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      newUpload.resolve({
+        txId: 'B'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'file',
+          'CE-DocName': 'new-context.txt',
+        },
+        data: { size: 3, type: 'text/plain' },
+      });
+      await newUpload.promise;
+      await Promise.resolve();
+    });
+  });
+
+  it('ignores repeated URL upload clicks while the first upload is pending', async () => {
+    const slowUpload = createDeferred<any>();
+    mockUploadDocLibraryUrlRecord.mockReturnValueOnce(slowUpload.promise);
+    render(
+      <DocumentLibraryPanel
+        provider={{}}
+        network={{ id: 84532 }}
+        account="0x123"
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="edge"
+        sessionConfig={TEST_SESSION_CONFIG}
+        mode="session"
+        sessionIdHex={`0x${'a'.repeat(32)}`}
+      />
+    );
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {
+      target: { value: 'https://docs.example.test/duplicate' },
+    });
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_TITLE_INPUT), {
+      target: { value: 'Duplicate link' },
+    });
+
+    const addButton = screen.getByTestId(E2E_TESTIDS.DOC_URL_ADD_BUTTON);
+    fireEvent.click(addButton);
+    fireEvent.click(addButton);
+
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(addButton).toBeDisabled();
+      expect(addButton).toHaveTextContent('Adding');
+    });
+
+    await act(async () => {
+      slowUpload.resolve({
+        txId: 'U'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'link',
+          'CE-DocName': 'Duplicate link',
+        },
+        data: { size: null, type: 'application/json' },
+      });
+      await slowUpload.promise;
+      await Promise.resolve();
+    });
+
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let an older URL upload completion unlock a newer context upload', async () => {
+    const oldUpload = createDeferred<any>();
+    const newUpload = createDeferred<any>();
+    mockUploadDocLibraryUrlRecord
+      .mockReturnValueOnce(oldUpload.promise)
+      .mockReturnValueOnce(newUpload.promise);
+    const panelProps = {
+      provider: {},
+      network: { id: 84532 },
+      account: '0x123',
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+      sessionSlug: 'edge-a',
+      sessionConfig: TEST_SESSION_CONFIG,
+      mode: 'session',
+      sessionIdHex: `0x${'c'.repeat(32)}`,
+    };
+
+    const { rerender } = render(<DocumentLibraryPanel {...panelProps} />);
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {
+      target: { value: 'https://docs.example.test/old-context' },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.DOC_URL_ADD_BUTTON));
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledWith(expect.objectContaining({
+        sessionSlug: 'edge-a',
+      }));
+    });
+
+    rerender(
+      <DocumentLibraryPanel
+        {...panelProps}
+        sessionSlug="edge-b"
+        sessionIdHex={`0x${'d'.repeat(32)}`}
+      />
+    );
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.DOC_URL_INPUT), {
+      target: { value: 'https://docs.example.test/new-context' },
+    });
+    const addButton = screen.getByTestId(E2E_TESTIDS.DOC_URL_ADD_BUTTON);
+    fireEvent.click(addButton);
+
+    await waitFor(() => {
+      expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(2);
+      expect(mockUploadDocLibraryUrlRecord).toHaveBeenLastCalledWith(expect.objectContaining({
+        sessionSlug: 'edge-b',
+      }));
+      expect(addButton).toBeDisabled();
+      expect(addButton).toHaveTextContent('Adding');
+    });
+
+    await act(async () => {
+      oldUpload.resolve({
+        txId: 'C'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'link',
+          'CE-DocName': 'Old link',
+        },
+        data: { size: null, type: 'application/json' },
+      });
+      await oldUpload.promise;
+      await Promise.resolve();
+    });
+
+    expect(addButton).toBeDisabled();
+    fireEvent.click(addButton);
+    expect(mockUploadDocLibraryUrlRecord).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      newUpload.resolve({
+        txId: 'D'.repeat(43),
+        tagMap: {
+          'CE-DocStorage': 'arweave',
+          'CE-DocKind': 'link',
+          'CE-DocName': 'New link',
+        },
+        data: { size: null, type: 'application/json' },
+      });
+      await newUpload.promise;
+      await Promise.resolve();
+    });
+  });
+
   it('does not clear a newer selected file when an earlier upload completes', async () => {
     const slowUpload = createDeferred<any>();
     mockUploadDocLibraryFile.mockReturnValueOnce(slowUpload.promise);
