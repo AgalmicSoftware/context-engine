@@ -6,6 +6,7 @@ import { faGithub } from "@fortawesome/free-brands-svg-icons";
 import { changeFocusedTab, toggleLoginModal } from '../../actions/sessionStateActions.js';
 import type { RootState } from '../../reducers/index.js';
 import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 // CSS
 import styles from "./Footer.module.scss";
@@ -55,7 +56,7 @@ class Footer extends React.Component<FooterProps> {
               <ul>
                 <li>
                   <NavLink
-                    href="/new"
+                    href={buildPublicRoute('/new')}
                     target=""
                     id={styles.footerLink}
                   >
@@ -66,7 +67,7 @@ class Footer extends React.Component<FooterProps> {
                   <NavLink
                     // href="https://docsend.com/view/28x54q8ez7pccsqq"
                     // target="_blank"
-                    href="/about"
+                    href={buildPublicRoute('/about')}
                     target=""
                     onClick={this.clickedAboutLink}
                     id={styles.footerLink}
@@ -106,7 +107,7 @@ class Footer extends React.Component<FooterProps> {
                 </li> */}
                   <li>
                   <NavLink
-                    href="/contracts"
+                    href={buildPublicRoute('/contracts')}
                     target=""
                     className="ml-1"
                     onClick={this.clickedContractsLink}
