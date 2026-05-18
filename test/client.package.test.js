@@ -2,7 +2,7 @@
 
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { existsSync, readFileSync } = require('node:fs');
+const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 
 const rootDir = resolve(__dirname, '..');
