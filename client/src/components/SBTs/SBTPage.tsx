@@ -4022,7 +4022,7 @@ renderMintButton() {
 
     return (
       <div className={styles.relevantInfo}>
-        <Alert color="info">
+        <Alert color="info" fade={false}>
           <FontAwesomeIcon icon={faInfoCircle} style={resolveSbtPageMutedInfoIconStyle()}/>
           This section shows relevant documents, URLs, tags, and IDs.
         </Alert>
@@ -5059,7 +5059,7 @@ renderMintButton() {
           <FontAwesomeIcon icon={faArrowLeft} /> {`${t('sbt')} list`}
         </button>
         {passwordAlertState.showDetectedPasswordAlert && (
-          <Alert color="info" className={styles.passwordAlert}>
+          <Alert color="info" className={styles.passwordAlert} fade={false}>
             Password detected – click "start claim" to mint
           </Alert>
         )}
@@ -5253,7 +5253,7 @@ renderMintButton() {
                         </div>
                       )}
                       {actionFeedbackState.showTransactionError && (
-                        <Alert color="danger" className={styles.txErrorAlert}>
+                        <Alert color="danger" className={styles.txErrorAlert} fade={false}>
                           <FontAwesomeIcon icon={faExclamationTriangle} /> Transaction Failed: {this.state.error}
                           <button
                             onClick={this.copyErrorToClipboard}
