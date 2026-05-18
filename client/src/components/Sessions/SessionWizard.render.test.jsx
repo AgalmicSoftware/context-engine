@@ -1,4 +1,3 @@
-/* eslint-disable import/first */
 // Remaining broad SessionWizard render coverage owns section visibility, metadata details, slug validation, tooltips, and login guards.
 import fs from 'fs';
 import React from 'react';

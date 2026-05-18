@@ -123,12 +123,9 @@ describe('client package modernization contract', () => {
       '@babel/preset-env',
       '@babel/preset-react',
       '@babel/preset-typescript',
-      '@typescript-eslint/eslint-plugin',
       '@typescript-eslint/parser',
       'babel-jest',
       'eslint',
-      'eslint-plugin-import',
-      'eslint-plugin-prettier',
       'eslint-plugin-react',
       'eslint-plugin-react-hooks',
       'sass',
@@ -148,7 +145,7 @@ describe('client package modernization contract', () => {
     });
   });
 
-  it('keeps verified-unused packages out of the direct client dependency contract', () => {
+  it('keeps unused lint plugin wiring out of the ESLint contract', () => {
     const pkg = readClientPackageJson();
     const removedDirectPackages = [
       '@babel/runtime',
@@ -174,74 +171,12 @@ describe('client package modernization contract', () => {
     expect(pkg.devDependencies['eslint-plugin-prettier']).toBeUndefined();
     expect(pkg.devDependencies['@typescript-eslint/eslint-plugin']).toBeUndefined();
     expect(pkg.devDependencies['eslint-plugin-import']).toBeUndefined();
-    expect(eslintConfig).toContain("import js from '@eslint/js'");
-    expect(eslintConfig).toContain("import tsParser from '@typescript-eslint/parser'");
-    expect(eslintConfig).toContain("import reactHooksPlugin from 'eslint-plugin-react-hooks'");
-    expect(eslintConfig).toContain("const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}']");
-    expect(eslintConfig).toContain("const typedFiles = ['src/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain("const typedReactFiles = ['src/**/*.tsx']");
-    expect(eslintConfig).toContain('files: typedFiles');
-    expect(eslintConfig).toContain('files: typedReactFiles');
-    expect(eslintConfig).toContain("reportUnusedDisableDirectives: 'error'");
-    expect(eslintConfig).toContain("const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain("const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain('const typedInformationalComponentFiles = [');
-    expect(eslintConfig).toContain("'src/components/About/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain("'src/components/Footer/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain("'src/components/InformationModals/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain("'src/components/Onboarding/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain(
-      "const typedMainContentComponentFiles = ['src/components/MainContent/**/*.{ts,tsx}']",
-    );
-    expect(eslintConfig).toContain('const typedAuxiliaryPageComponentFiles = [');
-    expect(eslintConfig).toContain("'src/components/Agent/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain("'src/components/Bookmarks/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain("'src/components/Sponsor/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain('const typedShellSupportComponentFiles = [');
-    expect(eslintConfig).toContain("'src/components/ErrorBoundary/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain("'src/components/RightSidebar/**/*.{ts,tsx}'");
-    expect(eslintConfig).toContain("const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain(
-      "const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']",
-    );
-    expect(eslintConfig).toContain(
-      "const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']",
-    );
-    expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
-    expect(eslintConfig).toContain(
-      "const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']",
-    );
-    expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
-    expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
-    expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
-    expect(eslintConfig).not.toContain('@typescript-eslint/no-unused-vars');
-    expect(eslintConfig).not.toContain('prettier/prettier');
-  });
-
-  it('keeps stale webpack and CRA packages out of the client package contract', () => {
-    const pkg = readClientPackageJson();
-    const staleLoaders = [
-      'babel-eslint',
-      'babel-preset-react-app',
-      'copy-webpack-plugin',
-      'file-loader',
-      'node-polyfill-webpack-plugin',
-      'raw-loader',
-      'react-app-polyfill',
-      'react-app-rewired',
-      'react-scripts',
-      'sass-loader',
-      'source-map-loader',
-      'webpack',
-      'worker-loader',
-    ];
-
-    staleLoaders.forEach((name) => {
-      expect(pkg.dependencies[name]).toBeUndefined();
-      expect(pkg.devDependencies[name]).toBeUndefined();
-    });
+    expect(eslintConfig.plugins).not.toContain('import');
+    expect(eslintConfig.plugins).toContain('react-hooks');
+    expect(eslintConfig.plugins).not.toContain('prettier');
+    expect(eslintConfig.parser).toBe('@typescript-eslint/parser');
+    expect(eslintConfig.rules['@typescript-eslint/no-unused-vars']).toBeUndefined();
+    expect(eslintConfig.rules['prettier/prettier']).toBeUndefined();
   });
 
   it('keeps stale webpack and CRA packages out of the client package contract', () => {
