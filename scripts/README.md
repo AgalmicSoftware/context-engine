@@ -15,40 +15,7 @@ Common contents here include:
 - worker build, bundle verification, and deploy-helper publish scripts
 - release, audit, and maintenance helpers
 
-Contract ABI parity:
-
-```bash
-npm run verify:abi-sync
-```
-
-This builds the Foundry contracts and compares deterministic ABI extraction
-with `client/src/contractsABI/` without rewriting tracked files. If reviewed
-contract changes intentionally alter an ABI, run `npm run abi:sync` and inspect
-the resulting tracked diff before rerunning the parity command.
-
-Audit entrypoints write their complete report and then resolve the final
-non-empty line through `scripts/lib/audit-verdict.sh`. A terminal `PASS` exits
-zero; `FAIL`, an unreadable report, or a missing/malformed verdict exits
-nonzero. Successful report plumbing alone is never treated as an audit pass.
-
-Type-debt ratchet:
-
-```bash
-npm run type-debt:check
-```
-
-This counts production `client/src` TS/TSX `@ts-nocheck`, explicit-`any`, and double-cast `as unknown as` markers against `scripts/type-debt-baseline.json`. Tests, test utilities, and `*Harness.ts(x)` files are excluded. Use `node scripts/check-type-debt-ratchet.mjs --write-baseline` only after intentional cleanup or a reviewed baseline change.
-
-Client boundary checker:
-
-```bash
-npm run client-boundaries:check
-```
-
-This compares conservative client import-boundary rules against `scripts/client-boundaries-baseline.json` and fails for new violations, duplicate baseline entries, or resolved baseline entries that were not pruned in the same change. The checker resolves Vite client aliases, guards production imports from excluded test/harness files, and flags likely low-level pass-through facades outside sanctioned domain/runtime layers. Use `node scripts/check-client-boundaries.mjs --write-baseline` after reviewed boundary cleanup removes or intentionally reclassifies entries.
-
-The published checkout keeps `scripts/vite-navigation-smoke.js` as the maintained
-local route/style smoke runner. Run it through `npm run test:e2e`.
+The stripped public checkout keeps `scripts/vite-navigation-smoke.js` as the maintained local route/style smoke runner. Private full-workflow E2E files may be absent in this checkout; see [`../docs/e2e-commands.md`](../docs/e2e-commands.md) for the public smoke command and private-runner notes.
 
 Deploy-helper quick command:
 
