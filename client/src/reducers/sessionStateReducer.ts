@@ -16,7 +16,13 @@ import {
   normalizeGlobalSessionSelection,
   readStoredGlobalSessionSelection,
 } from '../utilities/session/globalSessionState.js';
-import { DEFAULT_DEMO_SURFACE_MODE } from '../variables/appConfig.js';
+import {
+  normalizeDemoSurfaceMode,
+  persistDemoSurfaceMode,
+  persistTooltipsEnabled,
+  readStoredDemoSurfaceMode,
+  readStoredTooltipsEnabled,
+} from '../utilities/session/sessionPreferencesStorage.js';
 
 export interface SessionState {
   primarySessionSlug: string;
@@ -73,41 +79,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
   typeof value === 'object' &&
   !Array.isArray(value)
 );
-
-const readStoredTooltipsEnabled = (): boolean => {
-  try {
-    const storedValue = localStorage.getItem('ce:tooltipsEnabled');
-    return storedValue !== null ? JSON.parse(storedValue) as boolean : true;
-  } catch (_) {
-    return true;
-  }
-};
-
-const normalizeDemoSurfaceMode = (value: unknown): boolean => value === false ? false : true;
-
-const readStoredDemoSurfaceMode = () => {
-  try {
-    const storedValue = localStorage.getItem('ce:demoSurfaceMode');
-    if (storedValue !== null) {
-      return normalizeDemoSurfaceMode(JSON.parse(storedValue));
-    }
-    return DEFAULT_DEMO_SURFACE_MODE;
-  } catch (_) {
-    return DEFAULT_DEMO_SURFACE_MODE;
-  }
-};
-
-const persistDemoSurfaceMode = (value: unknown): void => {
-  try {
-    localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(normalizeDemoSurfaceMode(value)));
-  } catch (_) {}
-};
-
-const persistTooltipsEnabled = (value: boolean): void => {
-  try {
-    localStorage.setItem('ce:tooltipsEnabled', JSON.stringify(value));
-  } catch (_) {}
-};
 
 const getInitialState = (): SessionState => ({
     ...readStoredGlobalSessionSelection(),
