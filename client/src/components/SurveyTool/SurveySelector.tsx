@@ -33,13 +33,13 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faLock, faUnlock, faPlus, faMinus, faCaretDown, faCaretUp, faCheck, faTimes, faArrowLeft, faArrowRight, faSpinner, faExpand, faExternalLinkAlt, faFilter, faExclamationCircle, faCog, faMicrophone, faChevronLeft, faChevronRight, faComment, faQuestionCircle, faBullhorn, faRobot } from '@fortawesome/free-solid-svg-icons';
 
 import AudioInput from '../Shared/AudioInput/AudioInput';
-import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import SurveyResults from './SurveyResults';
 import QuestionFilter from './QuestionFilter';
 import PileHologramAssistant from './PileHologramAssistant';
 import QuestionTagDropdown from './QuestionTagDropdown';
 import SingleQuestionResponse from './SingleQuestionResponse';
 import { JsonButtonRow, JsonIconButton, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
+import LazyFallback from '../Shared/LazyFallback';
 import SessionChipSelector from '../Shared/SessionChipSelector';
 import { getQuestionTagDisplayList } from '../../utilities/survey/questionTags.js';
 
@@ -262,6 +262,8 @@ export const SURVEY_SELECTOR_CREATE_BUTTON_STYLE: React.CSSProperties = {
 export const SURVEY_SELECTOR_HEADER_SUBMIT_SPINNER_STYLE: React.CSSProperties = {
   marginLeft: 8,
 };
+
+export const LazyCreateQuestionsAndSurveys = React.lazy(() => import('./CreateQuestionsAndSurveys'));
 
 export const resolveSurveySelectorFilterButtonStyle = (isFilterActive: unknown): React.CSSProperties => (
   isFilterActive
@@ -1578,17 +1580,19 @@ export class SurveySelector extends Component<any, any> {
 
         {/* Create survey */}
         {createSurveyMode && (
-          <CreateQuestionsAndSurveys
-            {...this.props}
-            toggleLoginModal={this.props.toggleLoginModal}
-            expanded={createSurveyMode}
-            surveys={surveys}
-            surveyIndex={selectedSurveyIndex}
-            cache={this.props.cache}
-            updateCache={this.props.updateCache}
-            sessionConfig={sessionConfig}
-            sessionName={this.props.sessionName}
-          />
+          <React.Suspense fallback={<LazyFallback label="Loading Question Authoring..." minHeight="160px" />}>
+            <LazyCreateQuestionsAndSurveys
+              {...this.props}
+              toggleLoginModal={this.props.toggleLoginModal}
+              expanded={createSurveyMode}
+              surveys={surveys}
+              surveyIndex={selectedSurveyIndex}
+              cache={this.props.cache}
+              updateCache={this.props.updateCache}
+              sessionConfig={sessionConfig}
+              sessionName={this.props.sessionName}
+            />
+          </React.Suspense>
         )}
 
         {/* Survey / questions views */}
