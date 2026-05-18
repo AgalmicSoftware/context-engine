@@ -85,6 +85,8 @@ describe('client package modernization contract', () => {
       'vendor-visualization',
       'vendor-canvas',
       'vendor-crypto-core',
+      'vendor-crypto-zk-poseidon-low',
+      'vendor-crypto-zk-poseidon-high',
       'vendor-crypto-zk',
       'vendor-media-canvas-export',
       'vendor-media-pdf',
