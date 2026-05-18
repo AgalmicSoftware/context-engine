@@ -14,13 +14,13 @@ Be constructive in issues and PRs.
 4. Install root dependencies:
    `npm install`
 5. Install client dependencies:
-   `cd client && npm install` (the `--legacy-peer-deps` contract is carried via `client/.npmrc`)
+   `cd client && npm install`
 
 The local React dev server runs with:
 
 `cd client && npm run dev`
 
-Repo-level scripts and CI target Node 20 because the root test flow uses Node's built-in test runner. The client build is also compatible with Node 16.14.2, but contributors should use the project default unless they are intentionally doing client-only compatibility work.
+Repo-level scripts and CI target Node 20 because the root test flow uses Node's built-in test runner. The client package supports Node 16.14.2/npm 9 and Node 20/npm 10; contributors should use the project default unless they are intentionally doing client-only compatibility work. Client installs are expected to pass with npm's normal strict peer resolution.
 Install Foundry as well if you plan to run the root test gate (`npm test`), since it includes Solidity suites via `forge test`. Setup instructions live in [docs/local-chain.md](docs/local-chain.md).
 
 If you need public client environment overrides, use [`client/.env.example`](client/.env.example). Root-level script and E2E variables are documented in [`.env.example`](.env.example).
