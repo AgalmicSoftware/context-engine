@@ -4089,15 +4089,78 @@ renderMintButton() {
     });
 
     return (
-      <SbtPageRelevantInfo
-        documentIDHashes={documentIDHashes}
-        documentURLs={documentURLs}
-        onOpenEncryptedDoc={this.openEncryptedDoc}
-        shouldRenderDocumentIdHashes={relevantInfoDisplayState.shouldRenderDocumentIdHashes}
-        shouldRenderDocumentUrls={relevantInfoDisplayState.shouldRenderDocumentUrls}
-        shouldRenderTags={relevantInfoDisplayState.shouldRenderTags}
-        tags={tags}
-      />
+      <div className={styles.relevantInfo}>
+        <Alert color="info" fade={false}>
+          <FontAwesomeIcon icon={faInfoCircle} style={resolveSbtPageMutedInfoIconStyle()}/>
+          This section shows relevant documents, URLs, tags, and IDs.
+        </Alert>
+        {relevantInfoDisplayState.shouldRenderDocumentUrls && (
+          <div className={styles.docUrlsSection}>
+            <h4>Document URLs:</h4>
+            <ul className={styles.docUrlList}>
+              {documentURLs.map((url, index) => {
+                const litDoc = litStorage.isLitArweaveUrl(url);
+                return (
+                  <li key={index} className={styles.docUrlItem}>
+                    <span className={styles.docUrlBadge}>
+                      {litDoc ? 'Encrypted Doc' : 'Doc URL'}
+                    </span>
+                    {litDoc ? (
+                      <button
+                        type="button"
+                        className={styles.docUrlButton}
+                        onClick={() => this.openEncryptedDoc(url)}
+                      >
+                        Decrypt and view
+                      </button>
+                    ) : (
+                      <a href={url} target="_blank" rel="noopener noreferrer">
+                        {url}
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {relevantInfoDisplayState.shouldRenderDocumentIdHashes && (
+          <div className={styles.docIDsSection}>
+            <h4>Document ID Hashes:</h4>
+            <ul className={styles.docIdList}>
+              {documentIDHashes.map((hash, index) => {
+                const docHash = encodeURIComponent(hash);
+                return (
+                  <li key={index} className={styles.docIdItem}>
+                    <span className={styles.docIdBadge}>Doc ID</span>
+                    <a href={`${window.location.origin}/doc/${docHash}`} target="_blank" rel="noopener noreferrer">
+                      {hash}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+        {relevantInfoDisplayState.shouldRenderTags && (
+          <div className={styles.tagsSection}>
+            <h4>Tags:</h4>
+            <ul className={styles.tagList}>
+              {tags.map((tag, index) => {
+                const tagEnc = encodeURIComponent(tag);
+                return (
+                  <li key={index} className={styles.tagItem}>
+                    <span className={styles.tagBadge}>Tag</span>
+                    <a href={`${window.location.origin}/tag/${tagEnc}`} target="_blank" rel="noopener noreferrer">
+                      {tag}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
     );
   };
 
@@ -4900,57 +4963,156 @@ renderMintButton() {
                 tokenUriHref={tokenUriHref}
               />
               <div className={styles.rightColumn}>
-                <SbtPageStatsSection
-                  adminAddressDisplay={this.renderAddressLink(adminAddress, 'admin')}
-                  burnLabel={burnLabel}
-                  creatorAddressDisplay={this.renderAddressLink(creatorAddress, 'creator')}
-                  isInitialLoading={isInitialLoading}
-                  isOpen={statsSectionToggleState.isOpen}
-                  isRefreshing={isRefreshing}
-                  maxTokensDisplay={maxTokensDisplay}
-                  mintedCountTitle={mintedCountTitle}
-                  mintedLabel={t('minted')}
-                  mintEndDisplay={mintEndDisplay}
-                  netMinted={netMinted}
-                  networkLabel={getChainLabelById(sbtInfo?.chainID || this.state.network?.id)}
-                  onOpenMintedModal={this.openMintedModal}
-                  onToggle={this.toggleStats}
-                  questionIconStyle={resolveSbtPageQuestionIconStyle()}
-                  refreshIndicatorStyle={resolveSbtPageRefreshIndicatorStyle()}
-                  scanProgressFillStyle={scanProgressFillStyle}
-                  scanProgressPct={scanProgressPct}
-                  scanProgressSessionText={scanProgressSessionText}
-                  scanProgressText={scanProgressText}
-                  sectionHeaderClassName={sectionHeaderClassName}
-                  shouldRenderClosedIcon={statsSectionToggleState.shouldRenderClosedIcon}
-                  shouldRenderOpenIcon={statsSectionToggleState.shouldRenderOpenIcon}
-                  showScanProgress={showScanProgress}
-                />
-                <SbtPageActionsSection
-                  actionFeedbackState={actionFeedbackState}
-                  burnButton={this.renderBurnButton()}
-                  burnLabel={t('burn')}
-                  burnSuccessHref={actionFeedbackState.showBurnSuccess ? this.getExplorerLink(lastBurnTxHash) : ''}
-                  burnSuccessText={actionFeedbackState.showBurnSuccess ? getShortenedTransactionHash(lastBurnTxHash) : ''}
-                  burnedLowerLabel={t('burnedLower')}
-                  copyErrorButtonStyle={resolveSbtPageCopyErrorButtonStyle()}
-                  errorCopyIconState={errorCopyIconState}
-                  errorMessage={this.state.error}
-                  isOpen={actionsSectionToggleState.isOpen}
-                  mintButton={this.renderMintButton()}
-                  mintLabel={t('mint')}
-                  mintSuccessHref={actionFeedbackState.showMintSuccess ? this.getExplorerLink(lastMintTxHash) : ''}
-                  mintSuccessText={actionFeedbackState.showMintSuccess ? getShortenedTransactionHash(lastMintTxHash) : ''}
-                  mintedLowerLabel={t('mintedLower')}
-                  onCopyError={this.copyErrorToClipboard}
-                  onToggle={this.toggleActions}
-                  sbtLabel={t('sbt')}
-                  sectionHeaderClassName={sectionHeaderClassName}
-                  shouldRenderClosedIcon={actionsSectionToggleState.shouldRenderClosedIcon}
-                  shouldRenderOpenIcon={actionsSectionToggleState.shouldRenderOpenIcon}
-                  transactionErrorHref={actionFeedbackState.showErrorTransactionHash ? this.getExplorerLink(transactionHash) : ''}
-                  transactionErrorText={actionFeedbackState.showErrorTransactionHash ? getShortenedTransactionHash(transactionHash) : ''}
-                />
+                <div className={styles.statsSection}>
+                  <h2 className={sectionHeaderClassName} onClick={this.toggleStats}>
+                    STATS{' '}
+                    {statsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
+                    {statsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
+                  </h2>
+                  {statsSectionToggleState.isOpen && (
+                    <div className={styles.stats}>
+                      <p>
+                        <span className={styles.label}>{`${t('minted')}:`}</span>
+                        {/* Logic: Show spinner ONLY if we have no data and are loading. Else show count. */}
+                        {isInitialLoading ? (
+                          <FontAwesomeIcon icon={faSpinner} spin />
+                        ) : (
+                          <span title={mintedCountTitle}>
+                            {`${netMinted} / ${maxTokensDisplay}`}
+                          </span>
+                        )}
+                        {/* Logic: Show subtle spinner if we have data BUT are refreshing. */}
+                        {isRefreshing && (
+                          <span style={resolveSbtPageRefreshIndicatorStyle()} title="Refreshing...">
+                            <FontAwesomeIcon icon={faSpinner} spin />
+                          </span>
+                        )}
+
+                        <button onClick={this.openMintedModal} className={styles.expandButton}>
+                          <FontAwesomeIcon icon={faUser} />
+                        </button>
+                      </p>
+                      {showScanProgress && (
+                        <div className={styles.scanProgress}>
+                          <FontAwesomeIcon icon={faSpinner} spin className={styles.scanSpinner} />
+                          <div className={styles.scanProgressContent}>
+                            <span className={styles.scanProgressText}>{scanProgressText}</span>
+                            {scanProgressSessionText ? (
+                              <span className={styles.scanProgressSession}>{scanProgressSessionText}</span>
+                            ) : null}
+                            <div
+                              className={styles.scanProgressBar}
+                              role="progressbar"
+                              aria-valuenow={scanProgressPct}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                            >
+                              <div className={styles.scanProgressFill} style={scanProgressFillStyle} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {mintEndDisplay}
+                      <p>
+                        <span className={styles.label}>Burnable by:</span> {burnLabel}
+                        <FontAwesomeIcon
+                          icon={faQuestionCircle}
+                          className={styles.tooltip}
+                          id="burnAuthQuestionMark"
+                          style={resolveSbtPageQuestionIconStyle()}
+                        />
+                        <CETooltip
+                          placement="right"
+                          target="burnAuthQuestionMark"
+                          delay={{ show: 0, hide: 2500 }}
+                          className={styles.tooltipBubble}
+                          innerClassName={styles.tooltipInner}
+                        >
+                          Specify who can burn the token: Admin Only, Owner Only, Both, or Neither.
+                        </CETooltip>
+                      </p>
+                      <p>
+                        <span className={styles.label}>Network:</span>{' '}
+                        {getChainLabelById(sbtInfo?.chainID || this.state.network?.id)}
+                      </p>
+
+                      <p>
+                        <span className={styles.label}>Admin:</span> {this.renderAddressLink(adminAddress, 'admin')}
+                      </p>
+                      <p>
+                        <span className={styles.label}>Creator:</span> {this.renderAddressLink(creatorAddress, 'creator')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.actionsSection}>
+                  <h2 className={sectionHeaderClassName} onClick={this.toggleActions}>
+                    ACTIONS{' '}
+                    {actionsSectionToggleState.shouldRenderOpenIcon && <FontAwesomeIcon icon={faChevronUp} />}
+                    {actionsSectionToggleState.shouldRenderClosedIcon && <FontAwesomeIcon icon={faChevronDown} />}
+                  </h2>
+                  {actionsSectionToggleState.isOpen && (
+                    <div className={styles.actions}>
+                      {this.renderMintButton()}
+                      {this.renderBurnButton()}
+                      {actionFeedbackState.showMintSuccess && (
+                        <div className={styles.mintProcess}>
+                          <p className={styles.mintSuccess}>
+                            {`${t('sbt')} successfully ${t('mintedLower')}!`}
+                            <br />
+                            {`${t('mint')} Tx Hash:`}{' '}
+                            <a
+                              href={this.getExplorerLink(lastMintTxHash)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {getShortenedTransactionHash(lastMintTxHash)}
+                            </a>
+                          </p>
+                        </div>
+                      )}
+                      {actionFeedbackState.showBurnSuccess && (
+                        <div className={styles.mintProcess}>
+                          <p className={styles.mintSuccess}>
+                            {`${t('sbt')} successfully ${t('burnedLower')}!`}
+                            <br />
+                            {`${t('burn')} Tx Hash:`}{' '}
+                            <a
+                              href={this.getExplorerLink(lastBurnTxHash)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {getShortenedTransactionHash(lastBurnTxHash)}
+                            </a>
+                          </p>
+                        </div>
+                      )}
+                      {actionFeedbackState.showTransactionError && (
+                        <Alert color="danger" className={styles.txErrorAlert} fade={false}>
+                          <FontAwesomeIcon icon={faExclamationTriangle} /> Transaction Failed: {this.state.error}
+                          <button
+                            onClick={this.copyErrorToClipboard}
+                            aria-label="Copy error message"
+                            title="Copy error message"
+                            style={resolveSbtPageCopyErrorButtonStyle()}
+                          >
+                            {errorCopyIconState.shouldRenderCopiedIcon && <FontAwesomeIcon icon={faCheck} />}
+                            {errorCopyIconState.shouldRenderDefaultIcon && <FontAwesomeIcon icon={faCopy} />}
+                          </button>
+                          {actionFeedbackState.showErrorTransactionHash && (
+                            <>
+                              <br />
+                              Tx Hash:{' '}
+                              <a href={this.getExplorerLink(transactionHash)} target="_blank" rel="noopener noreferrer">
+                                {getShortenedTransactionHash(transactionHash)}
+                              </a>
+                            </>
+                          )}
+                        </Alert>
+                      )}
+                    </div>
+                  )}
+                </div>
                 {userIsSbtAdmin && (
                   <div className={styles.adminSection}>
                     <h2 className={sectionHeaderClassName} onClick={this.toggleAdminSection}>
