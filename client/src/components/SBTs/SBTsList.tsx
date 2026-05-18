@@ -2732,6 +2732,7 @@ const SBTsList = ({
 
     return (
       <SbtListCompactLinkCard
+        key={model.key}
         className={compactCardClassName}
         href={buildSbtHref(model.sbtAddress, model.sessionSlug)}
         imageStyle={resolveSbtListRelativeImageStyle()}
@@ -2903,6 +2904,7 @@ const SBTsList = ({
 
     return (
       <SbtListStandardCard
+        key={model.key}
         href={buildSbtHref(sbtAddress, sessionSlug)}
         imageStyle={resolveSbtListRelativeImageStyle()}
         isExpanded={isExpanded}
