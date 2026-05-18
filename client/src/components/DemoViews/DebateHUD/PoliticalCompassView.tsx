@@ -13,6 +13,8 @@ type CompassPoint = {
   color?: string;
   type?: string;
   comment?: string;
+  profileUsername?: string;
+  profileUrl?: string;
 };
 
 type Compass = {
@@ -73,6 +75,17 @@ type StandalonePoliticalCompassProps = PoliticalCompassProps & {
 
 const compassQuotes: Record<string, CompassQuote[]> = {};
 const voterProfileMap = voterProfiles as Record<string, VoterProfile | undefined>;
+
+const getCompassPointProfileHref = (point?: CompassPoint | null): string => {
+  const profileUrl = String(point?.profileUrl || "").trim();
+  if (profileUrl) {
+    return profileUrl.startsWith("/") ? buildPublicRoute(profileUrl) : profileUrl;
+  }
+
+  const profileUsername = String(point?.profileUsername || "").trim();
+  if (!profileUsername) return "";
+  return buildPublicRoute(`/su/${encodeURIComponent(profileUsername)}`);
+};
 
 const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) => {
   const T = useTheme();
