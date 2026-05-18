@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -57,12 +57,19 @@ export default function AgentPage() {
   const [actionsText, setActionsText] = useState(() => `${JSON.stringify(defaultActions, null, 2)}\n`);
   const [logLines, setLogLines] = useState<AgentLogLine[]>([]);
   const [stepIdx, setStepIdx] = useState(0);
+  const mountedRef = useRef(false);
+  const asyncActionSeqRef = useRef(0);
 
   // Agent is installed globally in App.componentDidMount; force one re-render after mount
   // so the initial "Enabled" status reflects the latest window.__ceAgent.
   const [, forceRerender] = useState(0);
   useEffect(() => {
+    mountedRef.current = true;
     forceRerender((n) => n + 1);
+    return () => {
+      mountedRef.current = false;
+      asyncActionSeqRef.current += 1;
+    };
   }, []);
 
   const agent = readAgent();
@@ -91,7 +98,18 @@ export default function AgentPage() {
         .filter(Boolean)
     : [];
 
-  const appendLog = (entry: Record<string, unknown> & { kind: string }) => {
+  const startAsyncAction = () => {
+    asyncActionSeqRef.current += 1;
+    return asyncActionSeqRef.current;
+  };
+
+  const canUpdateForSeq = (seq: number) => (
+    mountedRef.current && asyncActionSeqRef.current === seq
+  );
+
+  const appendLog = (entry: Record<string, unknown> & { kind: string }, seq?: number) => {
+    if (!mountedRef.current) return;
+    if (seq !== undefined && !canUpdateForSeq(seq)) return;
     setLogLines((prev) => [...prev, { at: new Date().toISOString(), ...entry }]);
   };
 
@@ -104,6 +122,7 @@ export default function AgentPage() {
   };
 
   const handleRun = async () => {
+    const seq = startAsyncAction();
     setStepIdx(0);
     setLogLines([]);
     try {
@@ -112,15 +131,16 @@ export default function AgentPage() {
         throw new Error('Agent Mode is not enabled. Add `?agent=1` or set localStorage `ce-agent-enabled=1`, then reload.');
       }
       const actions = parseActionsOrThrow();
-      appendLog({ kind: 'run:start', actions: actions.length });
+      appendLog({ kind: 'run:start', actions: actions.length }, seq);
       const result = await agentNow.run(actions);
-      appendLog({ kind: 'run:result', result });
+      appendLog({ kind: 'run:result', result }, seq);
     } catch (e) {
-      appendLog({ kind: 'run:error', error: e instanceof Error ? e.message : String(e) });
+      appendLog({ kind: 'run:error', error: e instanceof Error ? e.message : String(e) }, seq);
     }
   };
 
   const handleStep = async () => {
+    const seq = startAsyncAction();
     try {
       const agentNow = readAgent();
       if (!agentNow || typeof agentNow.perform !== 'function') {
@@ -128,16 +148,18 @@ export default function AgentPage() {
       }
       const actions = parseActionsOrThrow();
       if (stepIdx >= actions.length) {
-        appendLog({ kind: 'step:done', stepIdx, actions: actions.length });
+        appendLog({ kind: 'step:done', stepIdx, actions: actions.length }, seq);
         return;
       }
       const action = actions[stepIdx];
-      appendLog({ kind: 'step:start', stepIdx, action });
+      appendLog({ kind: 'step:start', stepIdx, action }, seq);
       const res = await agentNow.perform(action);
-      appendLog({ kind: 'step:result', stepIdx, res });
-      setStepIdx((i) => i + 1);
+      appendLog({ kind: 'step:result', stepIdx, res }, seq);
+      if (canUpdateForSeq(seq)) {
+        setStepIdx((i) => i + 1);
+      }
     } catch (e) {
-      appendLog({ kind: 'step:error', stepIdx, error: e instanceof Error ? e.message : String(e) });
+      appendLog({ kind: 'step:error', stepIdx, error: e instanceof Error ? e.message : String(e) }, seq);
     }
   };
 
