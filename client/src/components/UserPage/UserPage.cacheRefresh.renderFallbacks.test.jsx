@@ -159,6 +159,71 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     }
   });
 
+  it('renders user profile internal routes under the configured PUBLIC_URL base path', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce';
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+    const toDataUrlSpy = jest
+      .spyOn(HTMLCanvasElement.prototype, 'toDataURL')
+      .mockReturnValue('data:image/png;base64,');
+    try {
+      const viewAddress = '0x00000000000000000000000000000000000000aa';
+      const instance = makeInstance({
+        account: viewAddress,
+        viewAddress,
+      });
+      instance.state = {
+        ...instance.state,
+        selectedTab: 'surveys',
+        surveyCreationInfo: [
+          {
+            id: 'survey-debate',
+            title: 'Debate Survey',
+            slug: 'DEBATE',
+            questionsCount: 1,
+            tags: [],
+            documentURLs: [],
+            questionIDs: [],
+          },
+          {
+            id: 'survey-general',
+            title: 'General Survey',
+            slug: 'general',
+            questionsCount: 2,
+            tags: [],
+            documentURLs: [],
+            questionIDs: [],
+          },
+        ],
+        loadingSurveys: false,
+        loadingQuestions: false,
+        loadingSBTs: false,
+        isDeepScanning: false,
+      };
+
+      instance.openFullPage();
+      expect(openSpy).toHaveBeenCalledWith(`/ce/u/${viewAddress}`);
+
+      const tree = instance.render();
+      const hrefs = collectTreeNodes(
+        tree,
+        (node) => node?.type === 'a' && typeof node?.props?.href === 'string'
+      ).map((node) => node.props.href);
+
+      expect(hrefs).toContain('/ce/bookmarks');
+      expect(hrefs).toContain('/ce/survey/survey-debate?session=DEBATE');
+      expect(hrefs).toContain('/ce/survey/survey-general');
+    } finally {
+      openSpy.mockRestore();
+      toDataUrlSpy.mockRestore();
+      if (previousPublicUrl === undefined) {
+        delete process.env.PUBLIC_URL;
+      } else {
+        process.env.PUBLIC_URL = previousPublicUrl;
+      }
+    }
+  });
+
   it('includes held SBTs even when metadata name is missing, unless explicitly unlisted', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
     const viewLower = viewAddress.toLowerCase();
