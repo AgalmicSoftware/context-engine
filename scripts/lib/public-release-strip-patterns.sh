@@ -24,6 +24,7 @@ video-clickthrough-local
 .env
 .env.local
 .env.*.local
+.env.e2e
 .keys
 .e2e-secrets
 .e2e-cache
@@ -45,7 +46,6 @@ scripts/run-e2e-*
 scripts/run-ux-*
 scripts/capture-ux-*
 scripts/build_external_llm_prompt.py
-.env.e2e*
 artifacts
 tests/artifacts
 private-pack.manifest.json
@@ -64,6 +64,7 @@ contextEngine-cc/TODO
 .env
 .env.local
 .env.*.local
+.env.e2e
 .keys
 .e2e-secrets
 .e2e-cache
@@ -87,6 +88,7 @@ CLAUDE.md
 .env
 .env.local
 .env.*.local
+.env.e2e
 .keys
 .e2e-secrets
 .e2e-cache
