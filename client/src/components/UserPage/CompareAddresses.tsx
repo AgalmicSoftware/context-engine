@@ -580,6 +580,11 @@ export const resolveCompareAddressBlockieStyle = (): React.CSSProperties => ({
   borderRadius: 3,
 });
 
+export const buildCompareProfileHref = (address: unknown): string => {
+  const normalizedAddress = String(address || '').trim();
+  return normalizedAddress ? buildPublicRoute(`/u/${normalizedAddress}`) : '';
+};
+
 export const buildCompareClassName = (...classNames: unknown[]): string => (
   classNames
     .map((className) => String(className || ''))
