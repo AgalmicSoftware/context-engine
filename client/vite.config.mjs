@@ -59,6 +59,205 @@ const publicAssetContentTypes = {
   '.xml': 'application/xml; charset=utf-8',
 };
 
+const manualChunkGroups = [
+  {
+    name: 'vendor-react',
+    patterns: [
+      '/node_modules/@tanstack/query-core/',
+      '/node_modules/@tanstack/query-persist-client-core/',
+      '/node_modules/@tanstack/query-sync-storage-persister/',
+      '/node_modules/@tanstack/react-query/',
+      '/node_modules/hoist-non-react-statics/',
+      '/node_modules/prop-types/',
+      '/node_modules/react/',
+      '/node_modules/react-dom/',
+      '/node_modules/react-redux/',
+      '/node_modules/react-router/',
+      '/node_modules/react-router-dom/',
+      '/node_modules/redux/',
+      '/node_modules/redux-thunk/',
+      '/node_modules/scheduler/',
+      '/node_modules/use-sync-external-store/',
+    ],
+  },
+  {
+    name: 'vendor-ethers',
+    patterns: [
+      '/node_modules/@ethersproject/',
+      '/node_modules/ethers/',
+    ],
+  },
+  {
+    name: 'vendor-wallet-core',
+    patterns: [
+      '/node_modules/@noble/',
+      '/node_modules/@wagmi/',
+      '/node_modules/viem/',
+      '/node_modules/wagmi/',
+    ],
+  },
+  {
+    name: 'vendor-wallet-connectors',
+    patterns: [
+      '/node_modules/@metamask/',
+      '/node_modules/@rainbow-me/',
+      '/node_modules/@walletconnect/',
+    ],
+  },
+  {
+    name: 'vendor-lit',
+    patterns: [
+      '/node_modules/@lit-protocol/',
+    ],
+  },
+  {
+    name: 'vendor-arweave',
+    patterns: [
+      '/node_modules/arweave/',
+      '/node_modules/arbundles/',
+    ],
+  },
+  {
+    name: 'vendor-visualization',
+    patterns: [
+      '/node_modules/d3',
+      '/node_modules/delaunator/',
+      '/node_modules/dijkstrajs/',
+      '/node_modules/internmap/',
+      '/node_modules/java-random/',
+      '/node_modules/ml-',
+      '/node_modules/ml-kmeans/',
+      '/node_modules/networkanalysis-ts/',
+      '/node_modules/react-simple-maps/',
+      '/node_modules/robust-predicates/',
+      '/node_modules/topojson-',
+      '/node_modules/umap-js/',
+    ],
+  },
+  {
+    name: 'vendor-canvas',
+    patterns: [
+      '/node_modules/canvg/',
+      '/node_modules/dompurify/',
+      '/node_modules/fast-png/',
+      '/node_modules/fflate/',
+      '/node_modules/iobuffer/',
+      '/node_modules/performance-now/',
+      '/node_modules/raf/',
+      '/node_modules/rgbcolor/',
+      '/node_modules/stackblur-canvas/',
+      '/node_modules/svg-pathdata/',
+    ],
+  },
+  {
+    name: 'vendor-crypto-core',
+    patterns: [
+      '/node_modules/aes-js/',
+      '/node_modules/bech32/',
+      '/node_modules/bignumber.js/',
+      '/node_modules/crypto-js/',
+      '/node_modules/hash.js/',
+      '/node_modules/js-sha3/',
+      '/node_modules/scrypt-js/',
+    ],
+  },
+  {
+    name: 'vendor-crypto-zk-poseidon-low',
+    patterns: [
+      '/node_modules/poseidon-lite/constants/1.js',
+      '/node_modules/poseidon-lite/constants/2.js',
+      '/node_modules/poseidon-lite/constants/3.js',
+      '/node_modules/poseidon-lite/constants/4.js',
+      '/node_modules/poseidon-lite/constants/5.js',
+      '/node_modules/poseidon-lite/constants/6.js',
+      '/node_modules/poseidon-lite/constants/7.js',
+      '/node_modules/poseidon-lite/constants/8.js',
+    ],
+  },
+  {
+    name: 'vendor-crypto-zk-poseidon-high',
+    patterns: [
+      '/node_modules/poseidon-lite/constants/9.js',
+      '/node_modules/poseidon-lite/constants/10.js',
+      '/node_modules/poseidon-lite/constants/11.js',
+      '/node_modules/poseidon-lite/constants/12.js',
+      '/node_modules/poseidon-lite/constants/13.js',
+      '/node_modules/poseidon-lite/constants/14.js',
+      '/node_modules/poseidon-lite/constants/15.js',
+      '/node_modules/poseidon-lite/constants/16.js',
+    ],
+  },
+  {
+    name: 'vendor-crypto-zk',
+    patterns: [
+      '/node_modules/poseidon-lite/',
+    ],
+  },
+  {
+    name: 'vendor-media-canvas-export',
+    patterns: [
+      '/node_modules/html2canvas/',
+    ],
+  },
+  {
+    name: 'vendor-media-pdf',
+    patterns: [
+      '/node_modules/jspdf/',
+    ],
+  },
+  {
+    name: 'vendor-media-audio',
+    patterns: [
+      '/node_modules/hark/',
+      '/node_modules/recordrtc/',
+    ],
+  },
+  {
+    name: 'vendor-ui',
+    patterns: [
+      '/node_modules/@dnd-kit/',
+      '/node_modules/@fortawesome/',
+      '/node_modules/@popperjs/',
+      '/node_modules/@vanilla-extract/',
+      '/node_modules/bootstrap/',
+      '/node_modules/classnames/',
+      '/node_modules/clsx/',
+      '/node_modules/copy-to-clipboard/',
+      '/node_modules/get-nonce/',
+      '/node_modules/qrcode/',
+      '/node_modules/qrcode.react/',
+      '/node_modules/react-fast-compare/',
+      '/node_modules/react-popper/',
+      '/node_modules/react-remove-scroll',
+      '/node_modules/react-style-singleton/',
+      '/node_modules/react-transition-group/',
+      '/node_modules/reactstrap/',
+      '/node_modules/toggle-selection/',
+      '/node_modules/use-callback-ref/',
+      '/node_modules/use-sidecar/',
+      '/node_modules/warning/',
+    ],
+  },
+  {
+    name: 'vendor-polyfills',
+    patterns: [
+      '/node_modules/buffer/',
+      '/node_modules/process/',
+    ],
+  },
+];
+
+export const resolveManualChunk = (id) => {
+  const normalizedId = String(id || '').split(path.sep).join('/');
+  if (!normalizedId.includes('/node_modules/')) return undefined;
+
+  const group = manualChunkGroups.find(({ patterns }) => (
+    patterns.some((pattern) => normalizedId.includes(pattern))
+  ));
+
+  return group ? group.name : 'vendor-misc';
+};
+
 const resolvePublicAssetPath = (requestUrl) => {
   const rawPathname = String(requestUrl || '').split('?')[0].split('#')[0];
   if (!rawPathname || rawPathname === '/') return null;
