@@ -354,6 +354,8 @@ describe('sessionStateReducer', () => {
 
     expect(reducer(state, { type: FETCH_SESSION_STATE })).toBe(state);
     expect(reducer(state, { type: LOGIN_IN_PROGRESS })).toBe(state);
+    expect(reducer(state, { type: LOGIN_IN_PROGRESS, payload: true })).toBe(state);
+    expect(reducer(state, { type: UPDATE_GLOBAL_SESSION_SELECTION, payload: null })).toBe(state);
     expect(reducer(state, { type: 'UNKNOWN_ACTION', payload: true })).toBe(state);
   });
 });
