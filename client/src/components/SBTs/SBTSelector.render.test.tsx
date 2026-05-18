@@ -176,6 +176,14 @@ const mockedSessionRegistryUtils = sessionRegistryUtils as any;
 const mockedSbtDisplayNameUtils = sbtDisplayNameUtils as any;
 const globalCe = globalThis as typeof globalThis & Record<string, any>;
 
+const flushSelectorEffects = async (cycles = 4) => {
+  await act(async () => {
+    for (let i = 0; i < cycles; i += 1) {
+      await Promise.resolve();
+    }
+  });
+};
+
 describe('SBTSelector rendered cold-load lifecycle', () => {
   beforeEach(() => {
     try { window.history.replaceState({}, '', '/'); } catch (_) {}
