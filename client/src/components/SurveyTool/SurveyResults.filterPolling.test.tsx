@@ -110,6 +110,18 @@ const createDeferred = <T,>() => {
   return { promise, resolve, reject };
 };
 
+const flushMicrotasks = async (cycles = 3): Promise<void> => {
+  for (let i = 0; i < cycles; i += 1) {
+    await new Promise<void>((resolve) => {
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(resolve);
+        return;
+      }
+      Promise.resolve().then(resolve);
+    });
+  }
+};
+
 const attachStateHarness = (subject: any): any => {
   subject.setState = jest.fn((updater, cb) => {
     const patch = typeof updater === 'function' ? updater(subject.state, subject.props) : updater;
@@ -394,6 +406,11 @@ describe('SurveyResults fallback questions', () => {
 });
 
 describe('SurveyResults question-mode polling and filter state', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.useRealTimers();
+  });
+
   it('invalidates question-filter question memo on nonce ticks with stable refs', () => {
     const subject = createSubject({
       questionResponsesNonce: 30,
@@ -681,6 +698,7 @@ describe('SurveyResults question-mode polling and filter state', () => {
 
     first.resolve(101);
     await firstRunPromise;
+    await flushMicrotasks();
 
     expect(latestSpy).toHaveBeenCalledTimes(2);
     expect(maxInFlight).toBe(1);
