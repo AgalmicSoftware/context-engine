@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import "../../assets/css/contextEngine.scss";
 import styles from './SurveyTool.module.scss';
-import SurveyResults from './SurveyResults';
 import contractScripts, {
   getSessionSlugByName
 } from '../../utilities/web3/contractScripts.js';
@@ -53,6 +52,8 @@ import {
 import { SurveySelector } from './SurveySelector';
 import { SurveyQuestions } from './SurveyQuestions';
 import { PileViewMode } from './SurveyPileViewMode';
+
+const SurveyResults = React.lazy(() => import('./SurveyResults'));
 
 type SurveyToolRecord = Record<string, unknown>;
 type SurveyToolQuestionDataRecord = SurveyToolRecord & {
@@ -399,41 +400,43 @@ const renderSurveyToolContent = ({
         sessionSlugPinned={props.sessionSlugPinned}
         hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
       />
-      <SurveyResults
-        isOpen={showResultsModal}
-        onClose={closeResultsModal}
-        provider={props.provider}
-        lit={props.lit}
-        litHooks={props.litHooks}
-        network={props.network}
-        networkChainId={props.networkChainId}
-        sbtCacheRevision={props.sbtCacheRevision}
-        surveyId={normalizedSurveyId}
-        filterState={effectiveFilterState}
-        questionResponsesNonce={props.questionResponsesNonce}
-        questionsCacheNonce={questionsCacheNonce}
-        refreshSurveyResponsesByID={props.refreshSurveyResponsesByID}
-        refreshQuestionMetadata={props.refreshQuestionMetadata}
-        refreshQuestionResponses={props.refreshQuestionResponses}
-        defaultFeaturedSBTs={props.defaultFeaturedSBTs}
-        defaultTags={props.defaultTags}
-        sessionInfo={props.sessionInfo}
-        sessionName={props.sessionName}
-        isQuestionCacheReady={props.isQuestionCacheReady}
-        isResponsesCacheReady={props.isResponsesCacheReady}
-        isSurveyCacheReady={props.isSurveyCacheReady}
-        isSBTCacheReady={props.isSBTCacheReady}
-        questionScanProgress={props.questionScanProgress}
-        onFilterChange={props.onFilterChange}
-        currentViewModeForUrl={normalizedSurveyId ? 'survey' : 'questions'}
-        currentSurveyIdForUrl={normalizedSurveyId || null}
-        onFilterStateChangeForUrlUpdate={handleTopLevelFilterStateUrlUpdate}
-        preventUrlChange={props.preventUrlChange}
-        sessionSlug={toolSessionSlug}
-        activeSessionSlug={activeSessionSlug}
-        sessionSlugPinned={props.sessionSlugPinned}
-        hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
-      />
+      <React.Suspense fallback={null}>
+        <SurveyResults
+          isOpen={showResultsModal}
+          onClose={closeResultsModal}
+          provider={props.provider}
+          lit={props.lit}
+          litHooks={props.litHooks}
+          network={props.network}
+          networkChainId={props.networkChainId}
+          sbtCacheRevision={props.sbtCacheRevision}
+          surveyId={normalizedSurveyId}
+          filterState={effectiveFilterState}
+          questionResponsesNonce={props.questionResponsesNonce}
+          questionsCacheNonce={questionsCacheNonce}
+          refreshSurveyResponsesByID={props.refreshSurveyResponsesByID}
+          refreshQuestionMetadata={props.refreshQuestionMetadata}
+          refreshQuestionResponses={props.refreshQuestionResponses}
+          defaultFeaturedSBTs={props.defaultFeaturedSBTs}
+          defaultTags={props.defaultTags}
+          sessionInfo={props.sessionInfo}
+          sessionName={props.sessionName}
+          isQuestionCacheReady={props.isQuestionCacheReady}
+          isResponsesCacheReady={props.isResponsesCacheReady}
+          isSurveyCacheReady={props.isSurveyCacheReady}
+          isSBTCacheReady={props.isSBTCacheReady}
+          questionScanProgress={props.questionScanProgress}
+          onFilterChange={props.onFilterChange}
+          currentViewModeForUrl={normalizedSurveyId ? 'survey' : 'questions'}
+          currentSurveyIdForUrl={normalizedSurveyId || null}
+          onFilterStateChangeForUrlUpdate={handleTopLevelFilterStateUrlUpdate}
+          preventUrlChange={props.preventUrlChange}
+          sessionSlug={toolSessionSlug}
+          activeSessionSlug={activeSessionSlug}
+          sessionSlugPinned={props.sessionSlugPinned}
+          hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
+        />
+      </React.Suspense>
     </div>
   );
 };
