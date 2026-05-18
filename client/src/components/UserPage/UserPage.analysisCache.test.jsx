@@ -460,6 +460,7 @@ describe('UserPage analysis cache and routing', () => {
   });
 
   it('does not route analyze calls through default worker fallback when no exact session config resolves', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const instance = makeInstance({
       account: '0x00000000000000000000000000000000000000bb',
       activeSessionSlug: 'missing-session-slug',
@@ -467,11 +468,20 @@ describe('UserPage analysis cache and routing', () => {
     jest.spyOn(instance, '_getAiSessionSlugCandidates').mockReturnValue(['missing-session-slug']);
     jest.spyOn(instance, '_getSessionConfigForSlugExact').mockReturnValue(null);
 
-    await instance.analyzeUser();
+    try {
+      await instance.analyzeUser();
 
-    expect(analyzeUserOpinions).not.toHaveBeenCalled();
-    expect(instance.state.analyzing).toBe(false);
-    expect(instance.state.analysisError).toContain('Unable to generate analysis');
+      expect(analyzeUserOpinions).not.toHaveBeenCalled();
+      expect(instance.state.analyzing).toBe(false);
+      expect(instance.state.analysisError).toContain('Unable to generate analysis');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[account]',
+        '[UserPage] analyzeUser failed:',
+        expect.any(Error)
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('does not treat demo-only slugs as valid analyze-session configs', async () => {
