@@ -1,7 +1,6 @@
-import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
-
+import SurveyTool from './SurveyTool';
+import { SurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
 import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import FullQuestionFooterIcons from './FullQuestionFooterIcons';
 import GatedPromptNotice from './GatedPromptNotice';
@@ -62,7 +61,9 @@ describe('SurveyQuestions render helpers', () => {
       decryptTooltip: 'Connect wallet to decrypt',
       isDecrypting: false,
     });
-    render(<QuestionDecryptControl {...ready} onClick={onDecrypt} />);
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
+    const question = { id: 'q1', type: 'rating', prompt: 'Rate this' };
 
     const button = screen.getByRole('button', { name: 'Decrypt Answer' });
     expect(button).not.toBeDisabled();
@@ -106,31 +107,37 @@ describe('SurveyQuestions render helpers', () => {
   });
 
   it('renders pile additional comments without the extra header and keeps the lock beside the field', () => {
-    const input = (
-      <SurveyAudioFieldInput
-        placeholder="Additional comments..."
-        dataCeQuestionId="q1"
-        updateFunction={jest.fn()}
-        toggleEncryption={jest.fn()}
-      />
-    );
-    const lockControl = (
-      <SurveyQuestionsLockAudienceControl
-        displayState={{
-          qid: 'q1',
-          effectiveFieldKey: 'additional',
-          isPileVisualContext: true,
-          hasAudienceMenu: false,
-          menuOpen: false,
-          isLockDisabled: false,
-          buttonTitle: 'Choose encryption audience',
-          fieldState: {},
-        }}
-        onToggleMenu={jest.fn()}
-        onSelectAudience={jest.fn()}
-      />
-    );
-    const tree = renderPileAdditionalEditorRow({ input, lockControl });
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
+    const question = { id: 'q1', type: 'freeform', prompt: 'Prompt' };
+
+    subject.renderPromptWithManualDecrypt = jest.fn(() => 'Prompt');
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+    subject.state = {
+      ...subject.state,
+      showComments: { q1: true },
+      showConviction: {},
+      surveysResponseState: [
+        {
+          answers: { q1: { value: '', encrypted: false } },
+          additionalComments: { q1: { value: '', encrypted: false, encryptionAudience: 'self' } },
+          importance: {},
+          conviction: {},
+        },
+      ],
+    };
+
+    const tree = subject.renderActiveQuestion(question);
     const inlineRow = findFirstNodeByType(tree, AdditionalCommentsInlineRow);
 
     expect(inlineRow).not.toBeNull();
@@ -144,9 +151,27 @@ describe('SurveyQuestions render helpers', () => {
   });
 
   it('renders pile question icons through the shared footer helper', () => {
-    const onToggleComments = jest.fn();
-    const tree = renderPileQuestionIcons({
-      questionId: 'Q1',
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
+
+    subject.toggleComments = jest.fn();
+    subject.isQuestionLockedForResponse = jest.fn(() => false);
+    subject.resolveQuestionGateOption = jest.fn(() => null);
+    subject.resolveFieldEncryptionAudience = jest.fn(() => 'self');
+
+    const tree = subject.renderPileQuestionIcons({
+      questionId: 'q1',
+      answer: { value: '', encrypted: false },
+      glowAnswer: false,
+      maskedAnswer: false,
       hasAdditionalContent: true,
       onToggleComments,
       answerLockControl: <div data-testid="answer-lock" />,
@@ -430,17 +455,17 @@ describe('SurveyQuestions render helpers', () => {
   });
 
   it('renders pile freeform answers with the shared audio field input wrapper', () => {
-    const input = (
-      <SurveyAudioFieldInput
-        placeholder="Your response..."
-        value="hello"
-        dataCeQuestionId="q1"
-        disableEncryption
-        enableDownloads={false}
-        updateFunction={jest.fn()}
-        toggleEncryption={jest.fn()}
-      />
-    );
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      questionResponsesNonce: 5,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
+    const question = { id: 'q1', type: 'freeform', prompt: 'Prompt' };
 
     expect(input.type).toBe(SurveyAudioFieldInput);
     expect(input.props.placeholder).toBe('Your response...');
@@ -478,6 +503,9 @@ describe('SurveyQuestions render helpers', () => {
       decryptAdditionalControl: <QuestionDecryptControl actionLabel="Decrypt Comments" />,
       additionalEditorRow: <AdditionalCommentsInlineRow input={<textarea />} lockControl={null} />,
     });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
+    const question = { id: 'q1', type: 'freeform', prompt: 'Prompt' };
 
     expect(display.maskedAnswer).toBe(true);
     expect(display.maskedAdditional).toBe(true);

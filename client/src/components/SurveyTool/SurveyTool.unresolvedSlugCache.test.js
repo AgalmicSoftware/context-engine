@@ -1,9 +1,7 @@
-import { screen } from '@testing-library/react';
-
-import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
-import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
-import { resolveQuestionPayloadCacheWriteContext } from './surveyToolUtils';
-import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
+import SurveyTool from './SurveyTool';
+import { SurveyQuestions } from './SurveyQuestions';
+import { PileViewMode } from './SurveyPileViewMode';
+import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 
 const MISSING_SLUG = 'missing-session-slug';
@@ -95,7 +93,16 @@ describe('SurveyTool unresolved slug cache guards', () => {
       return borrowedGeneralQuestionsCache;
     });
 
-    renderUnresolvedPile();
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      account: '',
+      sessionSlug: 'missing-session-slug',
+      activeSessionSlug: '',
+      isQuestionCacheReady: true,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
 
     expect(screen.queryByText('Borrowed general prompt')).toBeNull();
     expect(peekSpy).not.toHaveBeenCalledWith('questionsCache', MISSING_SLUG, { clone: false });
@@ -109,7 +116,18 @@ describe('SurveyTool unresolved slug cache guards', () => {
         Promise.resolve(namespace === 'questionsCache' ? borrowedGeneralQuestionsCache : {}),
       );
 
-    renderUnresolvedPile();
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      account: '',
+      sessionSlug: 'missing-session-slug',
+      activeSessionSlug: '',
+      isQuestionCacheReady: true,
+      questionResponsesNonce: 1,
+      questionsCacheNonce: 1,
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
 
     expect(screen.getByText(/Loading\.\.\./)).toBeInTheDocument();
     expect(screen.queryByText('Borrowed general prompt')).toBeNull();

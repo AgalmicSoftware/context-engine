@@ -1,4 +1,5 @@
 import SurveyTool from './SurveyTool';
+import { PileViewMode } from './SurveyPileViewMode';
 import SurveyQuestionsLockedQuestionsPanel from './SurveyQuestionsLockedQuestionsPanel';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
@@ -102,7 +103,29 @@ describe('SurveyPileViewMode gated empty states', () => {
   it('keeps hydrate loading active when only gate hints are known and no hidden questions are cached', async () => {
     mockQuestionsCache();
 
-    renderPile();
+    const shell = new SurveyTool({
+      minifiedMode: 'pile',
+      network: { id: 84532 },
+      networkChainId: 84532,
+      account: '',
+      loginComplete: false,
+      sessionSlug: 'edge',
+      cacheHasLoaded: true,
+      isQuestionCacheReady: false,
+      questionResponsesNonce: 2,
+      questionsCacheNonce: 2,
+      questionScanProgress: {
+        slug: 'edge',
+        phase: 'hydrate',
+        discoveredQuestions: 1,
+        hydratedQuestions: 0,
+        pendingMetadataCount: 0,
+        remainingBlocks: 0,
+      },
+      onFilterChange: jest.fn(),
+    });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
 
     expect(await screen.findByText(/Loading Metadata/)).toBeInTheDocument();
     expect(screen.queryByText('No accessible questions. This session has gated content.')).toBeNull();
@@ -154,8 +177,7 @@ describe('SurveyPileViewMode gated empty states', () => {
       onFilterChange: jest.fn(),
     });
     const pileElement = shell.render();
-    const PileViewModeClass = pileElement.type;
-    const subject = new PileViewModeClass(pileElement.props);
+    const subject = new PileViewMode(pileElement.props);
 
     subject.state = {
       ...subject.state,
@@ -193,6 +215,8 @@ describe('SurveyPileViewMode gated empty states', () => {
       questionScanProgress: null,
       refreshQuestionMetadata,
     });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
 
     await waitFor(() => {
       expect(refreshQuestionMetadata).toHaveBeenCalledWith({ forceDiscoveryRescan: true });
@@ -225,6 +249,8 @@ describe('SurveyPileViewMode gated empty states', () => {
     renderPile({
       sessionConfig,
     });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
 
     const lockedBanner = await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER);
     expect(lockedBanner).toBeInTheDocument();
@@ -267,6 +293,8 @@ describe('SurveyPileViewMode gated empty states', () => {
     renderPile({
       sessionConfig,
     });
+    const pileElement = shell.render();
+    const subject = new PileViewMode(pileElement.props);
 
     expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBeInTheDocument();
     expect(screen.getByText(`This session's questions are ${t('gatedLower')}`)).toBeInTheDocument();

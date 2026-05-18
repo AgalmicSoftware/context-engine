@@ -57,14 +57,12 @@ import {
 } from './surveyToolWorkerCacheIsolation';
 import { SurveySelector } from './SurveySelector';
 
-const LazySurveyQuestions = React.lazy(() =>
-  import('./SurveyQuestions').then((module) => ({ default: module.SurveyQuestions })),
-);
-const LazyPileViewMode = React.lazy(() =>
-  import('./SurveyPileViewMode').then((module) => ({ default: module.PileViewMode })),
-);
-const SurveyResults = React.lazy(() => import('./SurveyResults'));
-
+const LazySurveyQuestions = React.lazy(() => (
+  import('./SurveyQuestions').then((module) => ({ default: module.SurveyQuestions }))
+));
+const LazyPileViewMode = React.lazy(() => (
+  import('./SurveyPileViewMode').then((module) => ({ default: module.PileViewMode }))
+));
 const SurveyResults = React.lazy(() => import('./SurveyResults'));
 
 type SurveyToolRecord = Record<string, unknown>;
@@ -329,7 +327,6 @@ const renderSurveyToolContent = ({
             loginComplete={props.loginComplete}
             loginInProgress={props.loginInProgress}
             network={props.network}
-            networkChainId={props.networkChainId}
             cache={cache}
             updateCache={updateCache}
             pubKey={pubKey}
@@ -349,7 +346,6 @@ const renderSurveyToolContent = ({
             activeSessionSlug={activeSessionSlug}
             sessionSlug={toolSessionSlug}
             sessionSlugPinned={props.sessionSlugPinned}
-            sessionConfig={props.sessionConfig}
             hideEmbeddedDebugUi={props.hideEmbeddedDebugUi}
           />
         </React.Suspense>

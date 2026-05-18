@@ -11,8 +11,7 @@ source/module names rather than hashes that change after unrelated builds.
 
 | Build output | Size | Source / owner | Current use | Safe next action |
 | --- | ---: | --- | --- | --- |
-| `build/assets/index-52bf1ede.js` | 1,067.87 KB | app shell bundle | Main React entry and shared app shell code | Continue route-boundary splitting; no single obvious mechanical split remains. |
-| `build/assets/SurveyTool-c5f17d7d.js` | 621.08 KB | SurveyTool route bundle | Survey/question answering runtime | Results modal split out; remaining splits need narrower review of survey/question runtime boundaries. |
+| `build/assets/index-d2c14822.js` | 1,067.40 KB | app shell bundle | Main React entry and shared app shell code | Only remaining JS warning; further splits need bootstrap, wallet, contract, Arweave, or cache boundary review. |
 | `build/assets/ce_circuit_logo-41136bba.png` | 1,883.03 KB | `client/src/assets/img/ce_circuit_logo.png` | SBT pages and tests | Keep; replacement/compression needs visual review. |
 | `build/assets/magnifying_glass-faf43812.png` | 1,396.30 KB | `client/src/assets/img/magnifying_glass.png` | ToolExplorer visuals | Keep; candidate for future lazy media loading. |
 | `build/assets/explainer_first-5c5b7870.png` | 1,363.02 KB | `client/src/assets/img/explainer_first.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
@@ -24,15 +23,11 @@ source/module names rather than hashes that change after unrelated builds.
 | `build/assets/context_engine_logo_animation-138fda1b.gif` | 7,476.94 KB | `client/src/assets/img/context_engine_logo_animation.gif` | Navbar / SBT logo animation | Keep; replacement needs UX review because timing is part of current branding behavior. |
 | `build/assets/context_engine_logo_animation_pingpong-443e0d17.gif` | 14,952.31 KB | `client/src/assets/img/context_engine_logo_animation_pingpong.gif` | Navbar / SBT logo animation variant | Keep; replacement needs UX review because timing is part of current branding behavior. |
 
-The `SurveyTool-*.js` route bundle is currently about 160.69 KiB, below the
-warning threshold. The old opaque `jump.png` is no longer referenced or emitted;
-the goals slide uses `jump_transparent.png` (about 232.73 KiB source/output).
-Runtime-owned source images are emitted only once as hashed Vite assets. The
-obsolete `build/images` compatibility copy was removed after source and built
-consumer scans found no local raw-path contract; the build gate rejects a
-future byte-identical compatibility copy.
+Recent chunk split: the SurveyTool route bundle is now under the warning
+threshold (`build/assets/SurveyTool-ca00a311.js`, 177.17 KB) after moving the
+question-answering and pile surfaces behind lazy component boundaries.
 
-## Large Source Assets Not Emitted By Vite
+## Source Assets Over 500 KB Not Emitted By The Client Build
 
 | Source asset | Current use | Action |
 | --- | --- | --- |

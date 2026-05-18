@@ -507,7 +507,8 @@ type SurveySelectorQuestionCountSnapshot = {
   encryptedCount: number;
 };
 type SurveyQuestionsComponentType =
-  React.ComponentType<SurveySelectorRecord> | React.LazyExoticComponent<React.ComponentType<SurveySelectorRecord>>;
+  | React.ComponentType<SurveySelectorRecord>
+  | React.LazyExoticComponent<React.ComponentType<SurveySelectorRecord>>;
 type SurveyQuestionsComponentHost = {
   SurveyQuestionsComponent?: SurveyQuestionsComponentType;
 };
@@ -1634,8 +1635,6 @@ export class SurveySelector extends Component<any, any> {
               questionScanProgress={this.props.questionScanProgress}
               hideEmbeddedDebugUi={this.props.hideEmbeddedDebugUi}
               sessionSlug={this.props.sessionSlug}
-              sessionConfig={sessionConfig}
-              networkChainId={this.props.networkChainId}
             />
           </React.Suspense>
         )}
