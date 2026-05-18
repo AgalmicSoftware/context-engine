@@ -236,6 +236,39 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     }
   });
 
+  it('retries switching after adding an unknown target network', async () => {
+    const originalEthereum = window.ethereum;
+    const request = jest.fn()
+      .mockRejectedValueOnce({ code: 4902 })
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    (window as any).ethereum = { request };
+    try {
+      const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+      subject.getTargetNetwork = jest.fn(() => baseSepolia);
+
+      await subject.switchToCorrectNetwork();
+
+      expect(request).toHaveBeenNthCalledWith(1, {
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x14a34' }],
+      });
+      expect(request).toHaveBeenNthCalledWith(2, {
+        method: 'wallet_addEthereumChain',
+        params: [expect.objectContaining({
+          chainId: '0x14a34',
+          rpcUrls: [getDefaultHttpRpc(84532, { allowPath: false })],
+        })],
+      });
+      expect(request).toHaveBeenNthCalledWith(3, {
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x14a34' }],
+      });
+    } finally {
+      (window as any).ethereum = originalEthereum;
+    }
+  });
+
   it('does not prefetch worker auth when navigating between sessions', () => {
     const prevProps = buildProps({
       account: PASSKEY_ADDRESS,
