@@ -2,7 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import { MemoryRouter } from 'react-router-dom';
+import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import fs from 'fs';
 import path from 'path';
 import TagPage from './TagPage';
