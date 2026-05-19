@@ -144,23 +144,9 @@ describe('client package modernization contract', () => {
     const jestConfig = readClientFile('jest.config.cjs');
     const jsdomPolyfills = readClientFile('scripts/jest/jsdomPolyfills.js');
 
-    expect(pkg.babel.presets).toEqual([
-      [
-        '@babel/preset-env',
-        {
-          targets: {
-            node: 'current',
-          },
-        },
-      ],
-      [
-        '@babel/preset-react',
-        {
-          runtime: 'automatic',
-        },
-      ],
-      '@babel/preset-typescript',
-    ]);
+    expect(pkg.babel).toBeUndefined();
+    expect(jestConfig).toContain('@babel/preset-env');
+    expect(jestConfig).toContain('@babel/preset-react');
     expect(jestConfig).toContain("modules: 'commonjs'");
     expect(jestConfig).toContain('@babel/preset-typescript');
     expect(jestConfig).toContain('scripts/jest/jsdomPolyfills.js');
@@ -177,7 +163,7 @@ describe('client package modernization contract', () => {
 
     expect(pkg.devDependencies['@babel/plugin-proposal-private-property-in-object']).toBeUndefined();
     expect(pkg.devDependencies['@babel/plugin-syntax-import-meta']).toBeUndefined();
-    expect(pkg.babel.plugins).toBeUndefined();
+    expect(pkg.babel).toBeUndefined();
     expect(jestConfig).not.toContain('@babel/plugin-syntax-import-meta');
   });
 
