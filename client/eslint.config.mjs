@@ -24,6 +24,7 @@ const typedShellSupportComponentFiles = [
   'src/components/RightSidebar/**/*.{ts,tsx}',
 ];
 const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}'];
+const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -155,6 +156,17 @@ export default [
   },
   {
     files: typedDevSupportComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedTelegramDemoSetupComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
