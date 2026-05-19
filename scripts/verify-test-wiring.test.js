@@ -37,6 +37,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
         scripts: {
           'test:surveys-sbt':
             'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
+          'test:contracts':
+            'forge test --match-contract "^(SurveysTest|CustomSBTTest|SessionRegistryTest|SurveysFuzzTest|CustomSBTFuzzTest|SessionRegistryFuzzTest|CustomSBTInvariantTest)$"',
           'test:node': 'node scripts/run-node-tests.js',
           'test:e2e': 'npm run -s test:e2e:smoke',
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
