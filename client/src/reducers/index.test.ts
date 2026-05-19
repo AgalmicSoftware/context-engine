@@ -19,14 +19,14 @@ describe('root reducer', () => {
     const afterLogin = reducer(initial, {
       type: LOGIN_ACCOUNT,
       payload: { account: '0xabc', provider: 'wagmi' },
-    } as any);
+    });
     expect(afterLogin.profile.account).toBe('0xabc');
     expect(afterLogin.sessionState).toBe(initial.sessionState);
 
     const afterSession = reducer(afterLogin, {
       type: CHANGE_ACTIVE_SESSION_SLUG,
       payload: 'debate',
-    } as any);
+    });
     expect(afterSession.sessionState.activeSessionSlug).toBe('debate');
     expect(afterSession.profile).toBe(afterLogin.profile);
   });

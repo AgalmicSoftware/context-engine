@@ -710,7 +710,9 @@ describe('QuestionFilter AI ranking lifecycle', () => {
     const gateSpy = jest.spyOn(sponsoredAccessAny, 'resolveSponsoredGateStateForResource')
       .mockReturnValue({ status: sponsoredAccess.SPONSORED_GATE_STATES.OPEN });
     const localSpy = jest.spyOn(aiSettings, 'getLocalAiSettings').mockReturnValue({ providers: {} });
-    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockRejectedValue(new Error('boom'));
+    const rankingError = new Error('boom');
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const rankSpy = jest.spyOn(aiScripts, 'rankQuestionsAI').mockRejectedValue(rankingError);
 
     const questions = [
       { id: 'q1', type: 'binary', tags: [], prompt: 'Q1' },
@@ -742,16 +744,27 @@ describe('QuestionFilter AI ranking lifecycle', () => {
       aiRankedQuestionIds: ['q2'],
     };
 
-    await instance.handleApplyAIFilter({ auto: false, source: 'test' });
+    try {
+      await instance.handleApplyAIFilter({ auto: false, source: 'test' });
 
-    expect(instance.state.aiSearchQuery).toBe('existing');
-    expect(instance.state.aiFilterApplied).toBe(true);
-    expect(instance.state.aiRankedQuestionIds).toEqual(['q2']);
-    expect(instance.state.aiApplyError).toMatch(/boom/i);
-
-    gateSpy.mockRestore();
-    localSpy.mockRestore();
-    rankSpy.mockRestore();
+      expect(instance.state.aiSearchQuery).toBe('existing');
+      expect(instance.state.aiFilterApplied).toBe(true);
+      expect(instance.state.aiRankedQuestionIds).toEqual(['q2']);
+      expect(instance.state.aiApplyError).toMatch(/boom/i);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[questionFilter]',
+        'Failed applying AI filter',
+        expect.objectContaining({
+          error: rankingError,
+          source: 'test',
+        })
+      );
+    } finally {
+      consoleErrorSpy.mockRestore();
+      gateSpy.mockRestore();
+      localSpy.mockRestore();
+      rankSpy.mockRestore();
+    }
   });
 
   it('invalidates memoized AI pipeline when ranked ids change under the same query', () => {

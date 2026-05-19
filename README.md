@@ -21,8 +21,7 @@ Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and n
 ## Quick Start
 
 ### Prerequisites
-- Root scripts, worker bundling, and contract tooling: Node.js 20+
-- Client workflows: Node.js 16.14.2 and npm 9.2.0
+- Root scripts, worker bundling, contract tooling, and client workflows: Node.js 20.19+ or 22.12+ with npm 10
 - Foundry (`forge` / `anvil`) for local-chain and root contract test workflows
 
 ### Clone and Install
@@ -35,7 +34,7 @@ nvm use 20
 npm install
 
 cd client
-nvm use 16
+nvm use 20
 npm install
 npm run dev
 ```

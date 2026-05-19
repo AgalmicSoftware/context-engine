@@ -11,6 +11,30 @@ const readClientFile = (relativePath) => {
   return fs.readFileSync(filePath, 'utf8');
 };
 
+const expectedLintCommand = [
+  'eslint src/',
+  '"src/utilities/ui/**/*.{ts,tsx}"',
+  '"src/components/Shared/**/*.{ts,tsx}"',
+  '"src/components/About/**/*.{ts,tsx}"',
+  '"src/components/Footer/**/*.{ts,tsx}"',
+  '"src/components/InformationModals/**/*.{ts,tsx}"',
+  '"src/components/Onboarding/**/*.{ts,tsx}"',
+  '"src/components/MainContent/**/*.{ts,tsx}"',
+  '"src/components/Agent/**/*.{ts,tsx}"',
+  '"src/components/Bookmarks/**/*.{ts,tsx}"',
+  '"src/components/Sponsor/**/*.{ts,tsx}"',
+  '"src/components/ErrorBoundary/**/*.{ts,tsx}"',
+  '"src/components/RightSidebar/**/*.{ts,tsx}"',
+  '"src/components/E2E/**/*.{ts,tsx}"',
+  '"src/components/TelegramDemoSetup/**/*.{ts,tsx}"',
+  '"src/components/Gates/**/*.{ts,tsx}"',
+  '"src/components/CommunityTab/**/*.{ts,tsx}"',
+  '"src/components/PolisReport/**/*.{ts,tsx}"',
+  '"src/components/DebateMap/**/*.{ts,tsx}"',
+  '"src/components/Navbar/**/*.{ts,tsx}"',
+  '"src/components/ContractPage/**/*.{ts,tsx}"',
+].join(' ');
+
 describe('client package modernization contract', () => {
   it('keeps canonical commands on the Vite and standalone Jest paths', () => {
     const pkg = readClientPackageJson();
@@ -19,11 +43,12 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts.start).toBe('serve -s build');
     expect(pkg.scripts.test).toBe('jest');
+    expect(pkg.scripts.lint).toBe(expectedLintCommand);
   });
 
   it('keeps CRA fallback scripts removed from the client package contract', () => {
     const pkg = readClientPackageJson();
-    const eslintConfig = readClientFile('.eslintrc.json');
+    const eslintConfig = readClientFile('eslint.config.mjs');
 
     expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
     expect(pkg.scripts['build:vite']).toBe('PUBLIC_URL=/ vite build');
@@ -33,6 +58,13 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).not.toContain('vite');
     expect(eslintConfig).not.toContain('react-app');
+    expect(eslintConfig).toContain("const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
@@ -66,11 +98,16 @@ describe('client package modernization contract', () => {
   it('keeps Vite output and entry wiring canonical', () => {
     const viteConfig = readClientFile('vite.config.mjs');
     const viteIndex = readClientFile('index.html');
+    const contractSourceLoader = readClientFile('src/components/ContractPage/contractSourceLoader.ts');
 
     expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
     expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build-vite')");
+    expect(viteConfig).not.toContain('ce-raw-loader-compatibility');
+    expect(viteConfig).not.toContain('!!raw-loader!');
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.js');
+    expect(contractSourceLoader).toContain('.sol?raw');
+    expect(contractSourceLoader).not.toContain('!!raw-loader!');
   });
 
   it('keeps Vite vendor chunk policy explicit', () => {
@@ -103,28 +140,45 @@ describe('client package modernization contract', () => {
     });
   });
 
+  it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {
+    const pkg = readClientPackageJson();
+    const viteConfig = readClientFile('vite.config.mjs');
+    const retainedBrowserShims = [
+      'buffer',
+      'process',
+    ];
+    const staleBrowserPolyfills = [
+      'assert',
+      'crypto-browserify',
+      'https-browserify',
+      'os-browserify',
+      'stream-browserify',
+      'stream-http',
+      'url',
+    ];
+
+    retainedBrowserShims.forEach((name) => {
+      expect(pkg.dependencies[name]).toBeUndefined();
+      expect(pkg.devDependencies[name]).toBeDefined();
+      expect(viteConfig).toContain(`/node_modules/${name}/`);
+    });
+    expect(viteConfig).toContain("include: ['buffer', 'process/browser']");
+
+    staleBrowserPolyfills.forEach((name) => {
+      expect(pkg.dependencies[name]).toBeUndefined();
+      expect(pkg.devDependencies[name]).toBeUndefined();
+      expect(viteConfig).not.toContain(`/node_modules/${name}/`);
+    });
+  });
+
   it('keeps standalone Jest on explicit Babel and jsdom setup', () => {
     const pkg = readClientPackageJson();
     const jestConfig = readClientFile('jest.config.cjs');
     const jsdomPolyfills = readClientFile('scripts/jest/jsdomPolyfills.js');
 
-    expect(pkg.babel.presets).toEqual([
-      [
-        '@babel/preset-env',
-        {
-          targets: {
-            node: 'current',
-          },
-        },
-      ],
-      [
-        '@babel/preset-react',
-        {
-          runtime: 'automatic',
-        },
-      ],
-      '@babel/preset-typescript',
-    ]);
+    expect(pkg.babel).toBeUndefined();
+    expect(jestConfig).toContain('@babel/preset-env');
+    expect(jestConfig).toContain('@babel/preset-react');
     expect(jestConfig).toContain("modules: 'commonjs'");
     expect(jestConfig).toContain('@babel/preset-typescript');
     expect(jestConfig).toContain('scripts/jest/jsdomPolyfills.js');
@@ -133,6 +187,16 @@ describe('client package modernization contract', () => {
     expect(jsdomPolyfills).toContain('class JestResponse');
     expect(jsdomPolyfills).toContain('FileReader');
     expect(jsdomPolyfills).toContain('process.env.PUBLIC_URL');
+  });
+
+  it('keeps stale direct Babel syntax plugin wiring out of the client contract', () => {
+    const pkg = readClientPackageJson();
+    const jestConfig = readClientFile('jest.config.cjs');
+
+    expect(pkg.devDependencies['@babel/plugin-proposal-private-property-in-object']).toBeUndefined();
+    expect(pkg.devDependencies['@babel/plugin-syntax-import-meta']).toBeUndefined();
+    expect(pkg.babel).toBeUndefined();
+    expect(jestConfig).not.toContain('@babel/plugin-syntax-import-meta');
   });
 
   it('keeps Vite browser-loaded compatibility shims free of runtime require calls', () => {
@@ -153,14 +217,13 @@ describe('client package modernization contract', () => {
       '@babel/preset-env',
       '@babel/preset-react',
       '@babel/preset-typescript',
-      '@typescript-eslint/eslint-plugin',
+      '@eslint/js',
       '@typescript-eslint/parser',
       'babel-jest',
       'eslint',
-      'eslint-plugin-import',
-      'eslint-plugin-prettier',
       'eslint-plugin-react',
       'eslint-plugin-react-hooks',
+      'globals',
       'sass',
       'serve',
       'source-map-explorer',
@@ -171,6 +234,46 @@ describe('client package modernization contract', () => {
       expect(pkg.dependencies[name]).toBeUndefined();
       expect(pkg.devDependencies[name]).toBeDefined();
     });
+  });
+
+  it('keeps unused lint plugin wiring out of the ESLint contract', () => {
+    const pkg = readClientPackageJson();
+    const eslintConfig = readClientFile('eslint.config.mjs');
+
+    expect(pkg.devDependencies['eslint-plugin-prettier']).toBeUndefined();
+    expect(pkg.devDependencies['@typescript-eslint/eslint-plugin']).toBeUndefined();
+    expect(pkg.devDependencies['eslint-plugin-import']).toBeUndefined();
+    expect(eslintConfig).toContain("import js from '@eslint/js'");
+    expect(eslintConfig).toContain("import tsParser from '@typescript-eslint/parser'");
+    expect(eslintConfig).toContain("import reactHooksPlugin from 'eslint-plugin-react-hooks'");
+    expect(eslintConfig).toContain("const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}']");
+    expect(eslintConfig).toContain("const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain('const typedInformationalComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/About/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Footer/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/InformationModals/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Onboarding/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("const typedMainContentComponentFiles = ['src/components/MainContent/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain('const typedAuxiliaryPageComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/Agent/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Bookmarks/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Sponsor/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain('const typedShellSupportComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/ErrorBoundary/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/RightSidebar/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
+    expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
+    expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
+    expect(eslintConfig).not.toContain('@typescript-eslint/no-unused-vars');
+    expect(eslintConfig).not.toContain('prettier/prettier');
   });
 
   it('keeps stale webpack and CRA packages out of the client package contract', () => {

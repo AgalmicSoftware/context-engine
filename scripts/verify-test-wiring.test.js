@@ -37,6 +37,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
         scripts: {
           'test:surveys-sbt':
             'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
+          'test:contracts':
+            'forge test --match-contract "^(SurveysTest|CustomSBTTest|SessionRegistryTest|SurveysFuzzTest|CustomSBTFuzzTest|SessionRegistryFuzzTest|CustomSBTInvariantTest)$"',
           'test:node': 'node scripts/run-node-tests.js',
           'test:e2e': 'npm run -s test:e2e:smoke',
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
@@ -45,11 +47,12 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:ci': 'npm run test:wiring && npm run verify:release && npm run test:node',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
           'test:client': 'npm test -- --coverage',
+          'typecheck:client': 'npm --prefix client run typecheck',
           'worker:bundle': 'node scripts/worker-bundle.mjs',
           'deploy-helper:deploy': 'node scripts/deploy-helper-deploy.mjs',
           'verify:worker-bundle': 'node scripts/verify-worker-bundle-sync.mjs',
           'verify:release':
-            'npm run lint && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
+            'npm run lint && npm run typecheck:client && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
         },
       }),
     );

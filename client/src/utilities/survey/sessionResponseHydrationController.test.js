@@ -7,7 +7,7 @@ jest.mock('utilities/logging.js', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   }),
-}), { virtual: true });
+}));
 
 jest.mock('ethers', () => ({
   __esModule: true,
@@ -22,7 +22,7 @@ jest.mock('ethers', () => ({
       }),
     },
   },
-}), { virtual: true });
+}));
 
 jest.mock('../web3/contractScripts.js', () => ({
   __esModule: true,
@@ -32,25 +32,25 @@ jest.mock('../web3/contractScripts.js', () => ({
     getResponse: jest.fn(),
   },
   normalizeSessionSlug: jest.fn((s) => String(s || '')),
-}), { virtual: true });
+}));
 
 jest.mock('../crypto/cryptography.js', () => ({
   __esModule: true,
   cryptoUtils: {
     hashIdentifier: jest.fn(),
   },
-}), { virtual: true });
+}));
 
 jest.mock('../arweave/arweaveRetryHelpers.js', () => ({
   __esModule: true,
   ensureQuestionArweaveCacheBranches: jest.fn(),
   mergeQuestionArweaveCacheBranches: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('./questionResponsesWatermark.js', () => ({
   __esModule: true,
   resolvePersistedQuestionResponsesWatermark: jest.fn(),
-}), { virtual: true });
+}));
 
 jest.mock('../../components/MainSite/progressHelpers.js', () => ({
   __esModule: true,
@@ -805,8 +805,8 @@ describe('createSessionResponseHydrationController', () => {
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
       const upperCaseQuestionIdA = `0x${'A'.repeat(64)}`;
-      const originalHashIdentifier = cryptoUtils.hashIdentifier;
-      const hashIdentifier = jest.fn()
+      cryptoUtils.hashIdentifier
+        .mockReset()
         .mockImplementationOnce(() => {
           throw new Error('fallback to ethers.utils.id');
         })
@@ -815,36 +815,30 @@ describe('createSessionResponseHydrationController', () => {
           throw new Error('fallback to ethers.utils.id');
         });
 
-      cryptoUtils.hashIdentifier = hashIdentifier;
+      contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => (
+        `response-for:${qId.slice(-4)}`
+      ));
 
-      try {
-        contractScripts.getResponse.mockImplementation(async (mode, responder, qId) => (
-          `response-for:${qId.slice(-4)}`
-        ));
+      await controller.refreshQuestionResponses(
+        [
+          upperCaseQuestionIdA,
+          QUESTION_ID_A,
+          'ab-topic-1',
+          'bad-id',
+          'ab-topic-1',
+        ],
+        { responder: RESPONDER }
+      );
 
-        await controller.refreshQuestionResponses(
-          [
-            upperCaseQuestionIdA,
-            QUESTION_ID_A,
-            'ab-topic-1',
-            'bad-id',
-            'ab-topic-1',
-          ],
-          { responder: RESPONDER }
-        );
-
-        expect(hashIdentifier).toHaveBeenCalledWith('ab-topic-1');
-        expect(hashIdentifier).toHaveBeenCalledWith('bad-id');
-        expect(contractScripts.getResponse).toHaveBeenCalledTimes(2);
-        const targetedQuestionIds = contractScripts.getResponse.mock.calls.map((args) => args[2]);
-        expect(targetedQuestionIds[0]).toBe(QUESTION_ID_A);
-        expect(targetedQuestionIds[1]).toMatch(/^0x[0-9a-f]{64}$/);
-        expect(targetedQuestionIds[1]).not.toBe(QUESTION_ID_A);
-        expect(targetedQuestionIds).not.toContain('not-a-hex-hash');
-        expect(new Set(targetedQuestionIds).size).toBe(2);
-      } finally {
-        cryptoUtils.hashIdentifier = originalHashIdentifier;
-      }
+      expect(cryptoUtils.hashIdentifier).toHaveBeenCalledWith('ab-topic-1');
+      expect(cryptoUtils.hashIdentifier).toHaveBeenCalledWith('bad-id');
+      expect(contractScripts.getResponse).toHaveBeenCalledTimes(2);
+      const targetedQuestionIds = contractScripts.getResponse.mock.calls.map((args) => args[2]);
+      expect(targetedQuestionIds[0]).toBe(QUESTION_ID_A);
+      expect(targetedQuestionIds[1]).toMatch(/^0x[0-9a-f]{64}$/);
+      expect(targetedQuestionIds[1]).not.toBe(QUESTION_ID_A);
+      expect(targetedQuestionIds).not.toContain('not-a-hex-hash');
+      expect(new Set(targetedQuestionIds).size).toBe(2);
     });
 
     it('writes updated responses to questionsCache and userCache', async () => {

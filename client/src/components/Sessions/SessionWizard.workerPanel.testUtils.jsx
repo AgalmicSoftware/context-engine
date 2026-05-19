@@ -1,4 +1,3 @@
-/* eslint-disable import/first */
 import fs from 'fs';
 import React from 'react';
 import { ethers } from 'ethers';
@@ -381,6 +380,10 @@ const createPendingFeaturedDraft = async () => {
 
 const resetSessionWizardWorkerPanelTestState = () => {
     jest.clearAllMocks();
+    if (!ethers.providers.JsonRpcProvider.prototype.getBlockNumber._isMockFunction) {
+      jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber');
+    }
+    ethers.providers.JsonRpcProvider.prototype.getBlockNumber.mockResolvedValue(mockSelectorSourceStartBlock);
     mockCreateSbtDraftQueue = [];
     mockCreateSBT.mockReset();
     mockFinalizeDeferredCreateSbtDraftUpload.mockReset();

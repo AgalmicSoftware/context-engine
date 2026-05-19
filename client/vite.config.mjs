@@ -241,15 +241,8 @@ const manualChunkGroups = [
   {
     name: 'vendor-polyfills',
     patterns: [
-      '/node_modules/assert/',
       '/node_modules/buffer/',
-      '/node_modules/crypto-browserify/',
-      '/node_modules/https-browserify/',
-      '/node_modules/os-browserify/',
       '/node_modules/process/',
-      '/node_modules/stream-browserify/',
-      '/node_modules/stream-http/',
-      '/node_modules/url/',
     ],
   },
 ];
@@ -304,6 +297,8 @@ const resolveExistingTsSibling = (request, importer) => {
 
   if (request.startsWith('./') || request.startsWith('../')) {
     candidates.push(path.resolve(path.dirname(importer), tsRequest));
+  } else if (path.isAbsolute(request) && request.startsWith(`${srcDir}${path.sep}`)) {
+    candidates.push(tsRequest);
   } else if (request.startsWith('utilities/')) {
     candidates.push(path.resolve(srcDir, tsRequest));
   }
@@ -344,24 +339,6 @@ const litContractsSubpathShim = () => ({
     const base = fs.existsSync(path.join(nestedBase, 'dist')) ? nestedBase : rootBase;
     const candidate = path.join(base, 'dist', match[1], match[2]);
     return this.resolve(candidate, importer, { ...options, skipSelf: true });
-  },
-});
-
-const rawLoaderCompatibilityPlugin = () => ({
-  name: 'ce-raw-loader-compatibility',
-  enforce: 'pre',
-  resolveId(source, importer) {
-    const prefix = '!!raw-loader!';
-    if (!source.startsWith(prefix)) return null;
-    const request = source.slice(prefix.length);
-    const baseDir = importer ? path.dirname(importer) : __dirname;
-    return `\0ce-raw-loader:${path.resolve(baseDir, request)}`;
-  },
-  load(id) {
-    const prefix = '\0ce-raw-loader:';
-    if (!id.startsWith(prefix)) return null;
-    const filePath = id.slice(prefix.length);
-    return `export default ${JSON.stringify(fs.readFileSync(filePath, 'utf8'))};`;
   },
 });
 
@@ -424,7 +401,6 @@ export default defineConfig(({ mode }) => {
       react(),
       jsToTsCompatibilityPlugin(),
       litContractsSubpathShim(),
-      rawLoaderCompatibilityPlugin(),
       copyStaticImageAssetsPlugin(),
       publicAssetsCompatibilityPlugin(),
       {
@@ -454,9 +430,9 @@ export default defineConfig(({ mode }) => {
       headers,
     },
     css: {
-      // The legacy PostCSS config runs PurgeCSS. CRA does not use it for local
-      // dev, but Vite does, which strips CSS Module selectors before the app
-      // can reference their generated class names.
+      // Keep PostCSS disabled unless a Vite-specific config is reintroduced.
+      // The retired PurgeCSS setup stripped CSS Module selectors before the
+      // app could reference their generated class names.
       postcss: { plugins: [] },
       preprocessorOptions: {
         scss: {

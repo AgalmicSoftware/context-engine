@@ -13,12 +13,12 @@
   },
   "homepage": "https://contextengine.xyz/",
   "engines": {
-    "npm": "^9.2.0 || ^10.0.0",
-    "node": "^16.14.2 || ^20.0.0"
+    "npm": "^10.0.0",
+    "node": "^20.19.0 || >=22.12.0"
   },
   "private": true,
   "dependencies": {
-    "@babel/runtime": "7.28.4",
+    "@babel/runtime": "7.29.2",
     "@dnd-kit/core": "6.3.1",
     "@dnd-kit/sortable": "10.0.0",
     "@fortawesome/fontawesome-svg-core": "1.2.28",
@@ -54,7 +54,7 @@
     "redux-thunk": "2.4.2",
     "superstruct": "1.0.4",
     "umap-js": "1.4.0",
-    "viem": "2.38.3",
+    "viem": "2.50.3",
     "wagmi": "0.9.6",
     "zod": "3.25.76"
   },
@@ -68,48 +68,38 @@
     "build:vite": "PUBLIC_URL=/ vite build",
     "preview:vite": "vite preview --host 0.0.0.0",
     "test": "jest",
-    "lint": "eslint src/"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ \"src/utilities/ui/**/*.{ts,tsx}\" \"src/components/Shared/**/*.{ts,tsx}\" \"src/components/About/**/*.{ts,tsx}\" \"src/components/Footer/**/*.{ts,tsx}\" \"src/components/InformationModals/**/*.{ts,tsx}\" \"src/components/Onboarding/**/*.{ts,tsx}\" \"src/components/MainContent/**/*.{ts,tsx}\" \"src/components/Agent/**/*.{ts,tsx}\" \"src/components/Bookmarks/**/*.{ts,tsx}\" \"src/components/Sponsor/**/*.{ts,tsx}\" \"src/components/ErrorBoundary/**/*.{ts,tsx}\" \"src/components/RightSidebar/**/*.{ts,tsx}\" \"src/components/E2E/**/*.{ts,tsx}\" \"src/components/TelegramDemoSetup/**/*.{ts,tsx}\" \"src/components/Gates/**/*.{ts,tsx}\" \"src/components/CommunityTab/**/*.{ts,tsx}\" \"src/components/PolisReport/**/*.{ts,tsx}\" \"src/components/DebateMap/**/*.{ts,tsx}\" \"src/components/Navbar/**/*.{ts,tsx}\" \"src/components/ContractPage/**/*.{ts,tsx}\""
   },
   "devDependencies": {
-    "@babel/core": "7.28.6",
-    "@babel/plugin-proposal-private-property-in-object": "7.21.11",
-    "@babel/plugin-syntax-import-meta": "7.10.4",
-    "@babel/preset-env": "7.28.5",
+    "@babel/core": "7.29.0",
+    "@babel/preset-env": "7.29.5",
     "@babel/preset-react": "7.28.5",
     "@babel/preset-typescript": "7.28.5",
-    "@fullhuman/postcss-purgecss": "5.0.0",
-    "@testing-library/jest-dom": "5.17.0",
-    "@testing-library/react": "13.4.0",
-    "@testing-library/user-event": "13.5.0",
+    "@eslint/js": "9.39.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
     "@types/node": "20.19.39",
     "@types/react": "18.3.28",
     "@types/react-dom": "18.3.7",
-    "@typescript-eslint/eslint-plugin": "4.33.0",
-    "@typescript-eslint/parser": "4.33.0",
+    "@typescript-eslint/parser": "8.59.4",
     "@vitejs/plugin-react": "4.7.0",
-    "assert": "2.1.0",
-    "babel-jest": "26.6.3",
+    "babel-jest": "30.4.1",
     "buffer": "6.0.3",
-    "crypto-browserify": "3.12.1",
-    "eslint": "7.32.0",
-    "eslint-plugin-import": "2.32.0",
-    "eslint-plugin-prettier": "4.2.5",
+    "eslint": "9.39.1",
     "eslint-plugin-react": "7.37.5",
-    "eslint-plugin-react-hooks": "4.6.2",
-    "https-browserify": "1.0.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.6.0",
     "identity-obj-proxy": "3.0.0",
-    "jest": "26.6.0",
-    "jest-environment-jsdom": "26.6.2",
-    "os-browserify": "0.3.0",
+    "jest": "30.4.2",
+    "jest-environment-jsdom": "30.4.1",
     "patch-package": "8.0.1",
     "process": "0.11.10",
     "sass": "1.78.0",
-    "serve": "14.2.5",
+    "serve": "14.2.6",
     "source-map-explorer": "2.5.3",
-    "stream-browserify": "3.0.0",
-    "stream-http": "3.2.0",
     "typescript": "5.8.3",
-    "url": "0.11.4",
     "vite": "4.5.14"
   },
   "overrides": {
@@ -151,28 +141,6 @@
     "@remix-run/router": "1.23.2",
     "follow-redirects": "1.16.0",
     "@metamask/utils": "9.2.0"
-  },
-  "babel": {
-    "presets": [
-      [
-        "@babel/preset-env",
-        {
-          "targets": {
-            "node": "current"
-          }
-        }
-      ],
-      [
-        "@babel/preset-react",
-        {
-          "runtime": "automatic"
-        }
-      ],
-      "@babel/preset-typescript"
-    ],
-    "plugins": [
-      "@babel/plugin-syntax-import-meta"
-    ]
   },
   "browserslist": [
     ">0.2%",

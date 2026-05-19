@@ -2,11 +2,17 @@ const fs = require('fs');
 const path = require('path');
 
 describe('vite PostCSS compatibility', () => {
-  it('does not run the legacy PurgeCSS config for Vite CSS modules', () => {
-    const config = fs.readFileSync(path.join(__dirname, '..', 'vite.config.mjs'), 'utf8');
+  const clientRoot = path.join(__dirname, '..');
+
+  it('keeps the retired PurgeCSS config out of the Vite CSS module path', () => {
+    const config = fs.readFileSync(path.join(clientRoot, 'vite.config.mjs'), 'utf8');
+    const pkg = JSON.parse(fs.readFileSync(path.join(clientRoot, 'package.json'), 'utf8'));
 
     expect(config).toMatch(/postcss:\s*{\s*plugins:\s*\[\]\s*}/);
     expect(config).toMatch(/PurgeCSS/);
-    expect(config).toMatch(/strips CSS Module selectors/);
+    expect(config).toMatch(/stripped CSS Module selectors/);
+    expect(fs.existsSync(path.join(clientRoot, 'postcss.config.js'))).toBe(false);
+    expect(pkg.dependencies['@fullhuman/postcss-purgecss']).toBeUndefined();
+    expect(pkg.devDependencies['@fullhuman/postcss-purgecss']).toBeUndefined();
   });
 });

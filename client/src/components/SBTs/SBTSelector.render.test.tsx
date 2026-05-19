@@ -176,6 +176,14 @@ const mockedSessionRegistryUtils = sessionRegistryUtils as any;
 const mockedSbtDisplayNameUtils = sbtDisplayNameUtils as any;
 const globalCe = globalThis as typeof globalThis & Record<string, any>;
 
+const flushSelectorEffects = async (cycles = 4) => {
+  await act(async () => {
+    for (let i = 0; i < cycles; i += 1) {
+      await Promise.resolve();
+    }
+  });
+};
+
 describe('SBTSelector rendered cold-load lifecycle', () => {
   beforeEach(() => {
     try { window.history.replaceState({}, '', '/'); } catch (_) {}
@@ -239,10 +247,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
     expect(screen.queryByText('No Groups')).not.toBeInTheDocument();
     expect(screen.getByTestId('mock-sbt-select-loading')).toBeInTheDocument();
 
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await flushSelectorEffects(2);
 
     expect(screen.queryByText('No Groups')).not.toBeInTheDocument();
     expect(screen.getByTestId('mock-sbt-select-loading')).toBeInTheDocument();
@@ -290,6 +295,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       />
     );
 
+    await flushSelectorEffects();
     await screen.findByTestId(E2E_TESTIDS.SBT_SELECTOR_SELECTED);
     const externalLinkIcon = container.querySelector('[data-icon="external-link-alt"]');
     expect(externalLinkIcon).not.toBeNull();
@@ -326,6 +332,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       />
     );
 
+    await flushSelectorEffects();
     await screen.findByTestId(E2E_TESTIDS.SBT_SELECTOR_SELECTED);
     const externalLinkIcon = container.querySelector('[data-icon="external-link-alt"]');
     expect(externalLinkIcon).not.toBeNull();
@@ -456,6 +463,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       />
     );
 
+    await flushSelectorEffects();
     await waitFor(() => {
       expect(screen.getByText('Demo Badge')).toBeInTheDocument();
     });
@@ -515,6 +523,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       />
     );
 
+    await flushSelectorEffects();
     await waitFor(() => {
       expect(screen.getByText('Demo Badge')).toBeInTheDocument();
     });
@@ -543,10 +552,7 @@ describe('SBTSelector rendered cold-load lifecycle', () => {
       />
     );
 
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
+    await flushSelectorEffects(2);
 
     act(() => {
       ref.current.setState({ scopeFeaturedAddresses: [featuredAddress.toLowerCase()] });

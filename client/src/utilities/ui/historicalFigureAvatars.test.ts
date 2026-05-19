@@ -13,6 +13,32 @@ describe('historicalFigureAvatars', () => {
       /^(\/historical-avatars\/|https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/|https:\/\/commons\.wikimedia\.org\/wiki\/Special:FilePath\/)/
     );
   };
+  const createMockCanvas = (dataUrl: string) => {
+    const getContext = jest.fn(() => ({
+      fillStyle: '',
+      fillRect: jest.fn(),
+    } as unknown as CanvasRenderingContext2D));
+    const toDataURL = jest.fn(() => dataUrl);
+    const canvas = {
+      width: 0,
+      height: 0,
+      getContext,
+      toDataURL,
+    } as unknown as HTMLCanvasElement;
+
+    return { canvas, getContext, toDataURL };
+  };
+
+  const mockCanvasCreateElement = (canvas: HTMLCanvasElement) => {
+    const nativeCreateElement = document.createElement.bind(document);
+    const createElement = ((tagName: string, options?: ElementCreationOptions) => {
+      if (tagName === 'canvas') {
+        return canvas;
+      }
+      return nativeCreateElement(tagName, options);
+    }) as typeof document.createElement;
+    return jest.spyOn(document, 'createElement').mockImplementation(createElement);
+  };
 
   it('provides Wikimedia photo URLs for every historical figure in the demo Polis dataset', () => {
     const demoUsernames = (demoPolisData?.participantsVotes || [])
@@ -49,20 +75,8 @@ describe('historicalFigureAvatars', () => {
   });
 
   it('can prefer a deterministic blockie for known historical figures', () => {
-    const nativeCreateElement = document.createElement.bind(document);
-    const getContext = jest.fn(() => ({ fillStyle: '', fillRect: jest.fn() }));
-    const toDataURL = jest.fn(() => 'data:image/png;base64,known-figure-blockie');
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any, options: any) => {
-      if (tagName === 'canvas') {
-        return {
-          width: 0,
-          height: 0,
-          getContext,
-          toDataURL,
-        };
-      }
-      return nativeCreateElement(tagName, options);
-    }) as any);
+    const { canvas, getContext, toDataURL } = createMockCanvas('data:image/png;base64,known-figure-blockie');
+    const createElementSpy = mockCanvasCreateElement(canvas);
 
     expect(getHistoricalFigureAvatarOrBlockie('Franklin', { preferBlockie: true })).toBe('data:image/png;base64,known-figure-blockie');
     expect(getContext).toHaveBeenCalledWith('2d');
@@ -72,20 +86,8 @@ describe('historicalFigureAvatars', () => {
   });
 
   it('falls back to a deterministic blockie for unknown usernames', () => {
-    const nativeCreateElement = document.createElement.bind(document);
-    const getContext = jest.fn(() => ({ fillStyle: '', fillRect: jest.fn() }));
-    const toDataURL = jest.fn(() => 'data:image/png;base64,unknown-figure-blockie');
-    const createElementSpy = jest.spyOn(document, 'createElement').mockImplementation(((tagName: any, options: any) => {
-      if (tagName === 'canvas') {
-        return {
-          width: 0,
-          height: 0,
-          getContext,
-          toDataURL,
-        };
-      }
-      return nativeCreateElement(tagName, options);
-    }) as any);
+    const { canvas, getContext, toDataURL } = createMockCanvas('data:image/png;base64,unknown-figure-blockie');
+    const createElementSpy = mockCanvasCreateElement(canvas);
 
     expect(getHistoricalFigureAvatarOrBlockie('UnknownFigure')).toBe('data:image/png;base64,unknown-figure-blockie');
     expect(getContext).toHaveBeenCalledWith('2d');

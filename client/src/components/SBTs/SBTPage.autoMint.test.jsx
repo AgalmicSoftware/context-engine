@@ -102,6 +102,8 @@ describe('SBTPage auto-mint routing', () => {
   });
 
   it('does not mark public URL auto-mint complete when the real mint path catches a wallet failure', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const walletError = new Error('wallet rejected');
     const sbtAddress = '0x0000000000000000000000000000000000000107';
     const previousHref = window.location.href;
     const successKey = buildSbtPageAutoMintStorageKey({
@@ -127,15 +129,21 @@ describe('SBTPage auto-mint routing', () => {
       jest
         .spyOn(contractScripts, 'getGroupPasswordHash')
         .mockResolvedValue('0x0000000000000000000000000000000000000000000000000000000000000000');
-      jest.spyOn(contractScripts, 'claim').mockRejectedValue(new Error('wallet rejected'));
+      jest.spyOn(contractScripts, 'claim').mockRejectedValue(walletError);
       jest.spyOn(subject, 'loadSBTInfo').mockResolvedValue(undefined);
 
       const result = await subject.handleUrlAutoMintIntent();
 
       expect(result).toBe(false);
       expect(contractScripts.claim).toHaveBeenCalledWith('mock', sbtAddress);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[sbt]',
+        'Minting failed in handleMint:',
+        walletError
+      );
       expect(window.sessionStorage.getItem(successKey)).toBeNull();
     } finally {
+      consoleErrorSpy.mockRestore();
       window.history.replaceState({}, '', previousHref);
     }
   });

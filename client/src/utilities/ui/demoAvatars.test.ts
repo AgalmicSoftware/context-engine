@@ -7,8 +7,16 @@ describe('demoAvatars', () => {
     );
   };
 
+  const requireAvatarInfo = (avatarInfo: ReturnType<typeof getDemoAvatar>) => {
+    expect(avatarInfo).not.toBeNull();
+    if (!avatarInfo) {
+      throw new Error('Expected demo avatar metadata.');
+    }
+    return avatarInfo;
+  };
+
   it('resolves merged demo wallet addresses to avatar metadata', () => {
-    const avatarInfo = getDemoAvatar('0x000000000000000000000000000000000000000b') as any;
+    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x000000000000000000000000000000000000000b'));
 
     expect(avatarInfo).toEqual(expect.objectContaining({
       name: 'Abraham Lincoln',
@@ -19,7 +27,7 @@ describe('demoAvatars', () => {
   });
 
   it('resolves policy atlas pseudo addresses to avatar metadata', () => {
-    const avatarInfo = getDemoAvatar('0x_pseudo_address_turing') as any;
+    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x_pseudo_address_turing'));
 
     expect(avatarInfo).toEqual(expect.objectContaining({
       name: 'Alan Turing',
@@ -29,7 +37,7 @@ describe('demoAvatars', () => {
   });
 
   it('resolves policy atlas-only figures through the local historical avatar manifest by name', () => {
-    const avatarInfo = getDemoAvatar('0x_pseudo_address_aurelius') as any;
+    const avatarInfo = requireAvatarInfo(getDemoAvatar('0x_pseudo_address_aurelius'));
 
     expect(avatarInfo).toEqual(expect.objectContaining({
       name: 'Marcus Aurelius',
