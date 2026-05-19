@@ -68,7 +68,7 @@
     "build:vite": "PUBLIC_URL=/ vite build",
     "preview:vite": "vite preview --host 0.0.0.0",
     "test": "jest",
-    "lint": "eslint src/"
+    "lint": "eslint src/ \"src/utilities/ui/**/*.{ts,tsx}\""
   },
   "devDependencies": {
     "@babel/core": "7.29.0",

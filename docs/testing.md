@@ -39,8 +39,9 @@ Babel-Jest uses explicit Babel presets, and jsdom setup lives under
 `client/scripts/jest/`.
 Client linting runs ESLint 9 through `client/eslint.config.mjs`; the flat
 config preserves the existing JavaScript/JSX lint surface plus React, React
-Hooks, and parser rule intent. Broad TS/TSX lint expansion should be handled as
-a separate rule-tightening change.
+Hooks, and parser rule intent. TypeScript lint coverage starts with the
+`client/src/utilities/ui` utility boundary; broad TS/TSX lint expansion should
+be handled as separate rule-tightening changes.
 
 ### Targeted Root Commands
 
