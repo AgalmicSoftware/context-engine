@@ -27,6 +27,7 @@ const expectedLintCommand = [
   '"src/components/RightSidebar/**/*.{ts,tsx}"',
   '"src/components/E2E/**/*.{ts,tsx}"',
   '"src/components/TelegramDemoSetup/**/*.{ts,tsx}"',
+  '"src/components/Gates/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -53,6 +54,7 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.start).not.toContain('vite');
     expect(eslintConfig).not.toContain('react-app');
     expect(eslintConfig).toContain("const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
@@ -251,6 +253,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("'src/components/ErrorBoundary/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'src/components/RightSidebar/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
