@@ -7,19 +7,19 @@ import {
 } from './storageJson.js';
 
 type MemoryStorage = {
-  getItem: jest.Mock<any, any>;
-  setItem: jest.Mock<any, any>;
-  removeItem: jest.Mock<any, any>;
+  getItem: jest.Mock<string | null, [string]>;
+  setItem: jest.Mock<void, [string, string]>;
+  removeItem: jest.Mock<void, [string]>;
 };
 
 const createMemoryStorage = (): MemoryStorage => {
   const data = new Map<string, string>();
   return {
-    getItem: jest.fn((key) => (data.has(key) ? data.get(key) : null)),
-    setItem: jest.fn((key, value) => {
+    getItem: jest.fn<string | null, [string]>((key) => data.get(key) ?? null),
+    setItem: jest.fn<void, [string, string]>((key, value) => {
       data.set(key, String(value));
     }),
-    removeItem: jest.fn((key) => {
+    removeItem: jest.fn<void, [string]>((key) => {
       data.delete(key);
     }),
   };
