@@ -19,7 +19,9 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts.start).toBe('serve -s build');
     expect(pkg.scripts.test).toBe('jest');
-    expect(pkg.scripts.lint).toBe('eslint src/ "src/utilities/ui/**/*.{ts,tsx}"');
+    expect(pkg.scripts.lint).toBe(
+      'eslint src/ "src/utilities/ui/**/*.{ts,tsx}" "src/components/Shared/**/*.{ts,tsx}"',
+    );
   });
 
   it('keeps CRA fallback scripts removed from the client package contract', () => {
@@ -217,6 +219,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("import reactHooksPlugin from 'eslint-plugin-react-hooks'");
     expect(eslintConfig).toContain("const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}']");
     expect(eslintConfig).toContain("const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
