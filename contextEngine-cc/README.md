@@ -93,6 +93,7 @@ Chain defaults:
 - `lib/litNodeHooks.mjs` calls the session worker's `/lit/chipotle-action` endpoint for SBT-gated response encryption; it does not depend on sibling `client/node_modules`
 - `lib/litChipotleActionCatalog.mjs` mirrors the canonical Chipotle Lit Action source from `client/src/utilities/crypto/litChipotleCatalog.ts`; tests guard this mirror against drift
 - `lib/shared/` mirrors or symlinks utilities from the sibling `client/` tree
+- `public/ethers.umd.min.js` is a vendored browser bundle for `ethers@5.7.2`, matching `contextEngine-cc/package.json`; regenerate it from the repo root with `node scripts/vendor-cecc-ethers-bundle.js` and update the guarded SHA-256 only after reviewing the minified diff
 
 Standalone extraction is out of scope for this cleanup. Publishing `contextEngine-cc` outside the monorepo would require dependency and shared-module extraction work first.
 
