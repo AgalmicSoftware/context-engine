@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const CC_ROOT = resolve(__dirname, '..');
 const EXPECTED_ETHERS_VERSION = '5.7.2';
-const EXPECTED_BUNDLE_SHA256 = '0e96e4d5f5b97a0efa2328c7dd5d8b9ed3b3a4421374125cf389dc379b5a6306';
+const EXPECTED_BUNDLE_SHA256 = '2c6f578c2c12e5ded3d095953e6b30787c47429fa305106d0c13da71854fb503';
 const REGEN_COMMAND = 'node scripts/vendor-cecc-ethers-bundle.js';
 
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8'));
