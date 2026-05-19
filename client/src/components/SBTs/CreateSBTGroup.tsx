@@ -327,8 +327,8 @@ type CreateSbtSessionConfigSources = {
   resolvedSessionConfig: CreateSbtSessionConfig | null;
 };
 type CreateSbtChainOption = Record<string, unknown> & {
-  id?: string | number;
-  name?: string;
+  id: string | number;
+  name: string;
 };
 type ResolveAuthoringChainIdArgs = {
   selectedChainId?: unknown;

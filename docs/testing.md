@@ -57,7 +57,9 @@ Shell support coverage also includes `client/src/components/ErrorBoundary` and
 `client/src/components/DebateMap`. Navbar coverage includes
 `client/src/components/Navbar`, and ContractPage coverage includes
 `client/src/components/ContractPage`. Broad TS/TSX lint expansion should be
-handled as separate rule-tightening changes.
+handled as separate rule-tightening changes. `npm run typecheck` runs the
+production client TypeScript project with `tsc --noEmit`; Jest/spec helper files
+remain covered by the Jest command rather than the release typecheck gate.
 
 ### Targeted Root Commands
 
