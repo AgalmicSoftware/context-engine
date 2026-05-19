@@ -393,6 +393,7 @@ describe('SBTPage metadata load hydration', () => {
       { slug: 'beta', value: betaCache },
     ]);
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
+    jest.spyOn(contractScripts, 'getMintedTokens').mockResolvedValue(null);
 
     const subject = createSubject({
       SBTAddress: sbtAddress,

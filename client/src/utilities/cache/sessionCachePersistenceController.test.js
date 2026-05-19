@@ -1,21 +1,21 @@
-jest.mock('utilities/logging.js', () => ({
+jest.mock('utilities/logging', () => ({
   __esModule: true,
   createLogger: jest.fn(() => ({
     log: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
   })),
-}), { virtual: true });
+}));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
   readCache: jest.fn(),
 }), { virtual: true });
 
-jest.mock('../../components/MainSite/cacheConstants.js', () => ({
+jest.mock('../../components/MainSite/cacheConstants', () => ({
   __esModule: true,
   DG_PRIMARY_ROUTE_CACHE_NAMES: ['surveysCache', 'questionsCache', 'sbtCache'],
-}), { virtual: true });
+}));
 
 jest.mock('../../utilities/web3/contractScripts.js', () => ({
   __esModule: true,
