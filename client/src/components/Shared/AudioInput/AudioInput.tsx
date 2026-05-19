@@ -56,6 +56,22 @@ type UseWhisperResult = {
   getLastRecordingBlob?: () => LastRecording | null | undefined;
 };
 
+type UseWhisperOptions = {
+  apiKey?: string;
+  silenceDetection?: boolean;
+  timeSlice?: number;
+  sessionSlug?: string;
+  sessionConfig?: SessionConfig | null;
+  context?: unknown;
+  workerUrl?: string;
+  onTranscriptionUpdate?: (transcript: string) => void;
+  onTranscriptionComplete?: (finalText: string) => void;
+  onError?: (err: unknown) => void;
+  onRecordingStop?: () => void;
+};
+
+type UseWhisperHook = (options?: UseWhisperOptions) => UseWhisperResult;
+
 type AudioInputProps = {
   placeholder?: string;
   updateFunction?: (text: string) => void;
@@ -87,6 +103,8 @@ type AudioInputProps = {
 type PlaceholderStyle = React.CSSProperties & {
   '--placeholder-opacity'?: string;
 };
+
+const useWhisperHook = useWhisper as UseWhisperHook;
 
 const describeError = (err: unknown) => (err instanceof Error ? err.message : err);
 
@@ -254,7 +272,7 @@ const AudioInput = ({
     mediaStreamRef,
     lastRecordingBlobRef,
     getLastRecordingBlob
-  } = (useWhisper as any)({
+  } = useWhisperHook({
     apiKey: '',
     silenceDetection: false,
     timeSlice: 0,
