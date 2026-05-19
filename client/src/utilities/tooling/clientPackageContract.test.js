@@ -31,6 +31,7 @@ const expectedLintCommand = [
   '"src/components/CommunityTab/**/*.{ts,tsx}"',
   '"src/components/PolisReport/**/*.{ts,tsx}"',
   '"src/components/DebateMap/**/*.{ts,tsx}"',
+  '"src/components/Navbar/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -61,6 +62,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
@@ -263,6 +265,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
