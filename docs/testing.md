@@ -47,8 +47,9 @@ plus the home-tab surface under `client/src/components/MainContent` and
 auxiliary pages under `client/src/components/Agent`,
 `client/src/components/Bookmarks`, and `client/src/components/Sponsor`.
 Shell support coverage also includes `client/src/components/ErrorBoundary` and
-`client/src/components/RightSidebar`. Broad TS/TSX lint expansion should be
-handled as separate rule-tightening changes.
+`client/src/components/RightSidebar`, and dev/E2E support coverage includes
+`client/src/components/E2E`. Broad TS/TSX lint expansion should be handled as
+separate rule-tightening changes.
 
 ### Targeted Root Commands
 
