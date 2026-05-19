@@ -37,6 +37,11 @@ describe('defaultTags helpers', () => {
     expect(hasAnyTagOverlap(['rxc'], [' RXC '])).toBe(true);
   });
 
+  it('hasAnyTagOverlap accepts non-array iterable tag inputs', () => {
+    expect(hasAnyTagOverlap(new Set(['alpha', 'beta']), [' BETA '])).toBe(true);
+    expect(hasAnyTagOverlap('alpha,beta', ['alpha'])).toBe(false);
+  });
+
   it('isDefaultTagRelevant matches exact words and compacted variants', () => {
     expect(isDefaultTagRelevant('Legacy 2025 governance forum', 'legacy2025')).toBe(true);
     expect(isDefaultTagRelevant('Climate change working group', 'climatechange')).toBe(true);
