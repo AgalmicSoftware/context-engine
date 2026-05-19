@@ -12,6 +12,41 @@ import {
   PUBLIC_REPO_URL,
 } from '../../variables/publicRepoMetadata.js';
 
+type StructuredDataNode = {
+  '@type'?: unknown;
+  significantLink?: unknown;
+  url?: unknown;
+};
+
+type StructuredData = {
+  '@graph'?: unknown;
+};
+
+const structuredDataSelector = 'script[type="application/ld+json"][data-ce-structured-data="public-page"]';
+
+const isStructuredDataNode = (entry: unknown): entry is StructuredDataNode => (
+  typeof entry === 'object' && entry !== null
+);
+
+const parseStructuredData = (): StructuredData => (
+  JSON.parse(
+    document.head.querySelector(structuredDataSelector)?.textContent || '{}'
+  ) as StructuredData
+);
+
+const getStructuredDataGraph = (structuredData: StructuredData): StructuredDataNode[] => (
+  Array.isArray(structuredData['@graph'])
+    ? structuredData['@graph'].filter(isStructuredDataNode)
+    : []
+);
+
+const findStructuredDataNode = (
+  structuredData: StructuredData,
+  nodeType: string
+): StructuredDataNode | undefined => (
+  getStructuredDataGraph(structuredData).find((entry) => entry['@type'] === nodeType)
+);
+
 describe('publicPageHead', () => {
   const env = process.env as Record<string, string | undefined>;
   beforeEach(() => {
@@ -138,12 +173,8 @@ describe('publicPageHead', () => {
 
     syncPublicPageHead({ location: window.location });
 
-    const structuredData = JSON.parse(
-      document.head.querySelector(
-        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-      )?.textContent || '{}'
-    );
-    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
+    const structuredData = parseStructuredData();
+    const webPage = findStructuredDataNode(structuredData, 'WebPage');
 
     expect(webPage?.significantLink).toEqual(
       expect.arrayContaining([
@@ -158,12 +189,8 @@ describe('publicPageHead', () => {
 
     syncPublicPageHead({ location });
 
-    const structuredData = JSON.parse(
-      document.head.querySelector(
-        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-      )?.textContent || '{}'
-    );
-    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
+    const structuredData = parseStructuredData();
+    const webPage = findStructuredDataNode(structuredData, 'WebPage');
 
     expect(webPage?.significantLink).toEqual(
       expect.arrayContaining([
@@ -182,12 +209,8 @@ describe('publicPageHead', () => {
     try {
       syncPublicPageHead({ location });
 
-      const structuredData = JSON.parse(
-        document.head.querySelector(
-          'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-        )?.textContent || '{}'
-      );
-      const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
+      const structuredData = parseStructuredData();
+      const webPage = findStructuredDataNode(structuredData, 'WebPage');
 
       expect(webPage?.significantLink).toEqual(
         expect.arrayContaining([
@@ -210,15 +233,14 @@ describe('publicPageHead', () => {
     });
 
     const structuredDataNode = document.head.querySelector(
-      'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
+      structuredDataSelector
     );
     expect(structuredDataNode).not.toBeNull();
 
-    const structuredData = JSON.parse(structuredDataNode?.textContent || '{}');
-    const graph = Array.isArray(structuredData['@graph']) ? structuredData['@graph'] : [];
-    const organization = graph.find((entry) => entry?.['@type'] === 'Organization');
-    const sourceCode = graph.find((entry) => entry?.['@type'] === 'SoftwareSourceCode');
-    const webPage = graph.find((entry) => entry?.['@type'] === 'WebPage');
+    const structuredData = JSON.parse(structuredDataNode?.textContent || '{}') as StructuredData;
+    const organization = findStructuredDataNode(structuredData, 'Organization');
+    const sourceCode = findStructuredDataNode(structuredData, 'SoftwareSourceCode');
+    const webPage = findStructuredDataNode(structuredData, 'WebPage');
 
     expect(organization).toEqual(
       expect.objectContaining({
@@ -276,12 +298,8 @@ describe('publicPageHead', () => {
     expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
       'https://contextengine.xyz/session/demo'
     );
-    const structuredData = JSON.parse(
-      document.head.querySelector(
-        'script[type="application/ld+json"][data-ce-structured-data="public-page"]'
-      )?.textContent || '{}'
-    );
-    const webPage = structuredData['@graph']?.find?.((entry: any) => entry?.['@type'] === 'WebPage');
+    const structuredData = parseStructuredData();
+    const webPage = findStructuredDataNode(structuredData, 'WebPage');
     expect(webPage?.url).toBe('https://contextengine.xyz/session/demo');
   });
 });

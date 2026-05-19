@@ -63,15 +63,13 @@ describe('jsonFunctions', () => {
       value: revokeObjectURL,
     });
 
-    const anchor = {
-      click: jest.fn(),
-      href: '',
-      download: '',
-    } as any;
+    const anchor = document.createElement('a');
+    const clickSpy = jest.spyOn(anchor, 'click').mockImplementation(() => {});
     const originalCreateElement = document.createElement.bind(document);
-    jest.spyOn(document, 'createElement').mockImplementation((tagName) => (
-      tagName === 'a' ? anchor : originalCreateElement(tagName)
-    ));
+    const createElement = ((tagName: string, options?: ElementCreationOptions) => (
+      tagName === 'a' ? anchor : originalCreateElement(tagName, options)
+    )) as typeof document.createElement;
+    jest.spyOn(document, 'createElement').mockImplementation(createElement);
     jest.spyOn(document.body, 'appendChild').mockImplementation((node) => node);
     jest.spyOn(document.body, 'removeChild').mockImplementation((node) => node);
 
@@ -80,7 +78,7 @@ describe('jsonFunctions', () => {
     expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     expect(anchor.href).toBe('blob:test-json');
     expect(anchor.download).toBe('preview.json');
-    expect(anchor.click).toHaveBeenCalledTimes(1);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:test-json');
   });
 });

@@ -3,17 +3,30 @@ import { createCacheUpdateCoalescer } from './cacheUpdateCoalescer.js';
 describe('cacheUpdateCoalescer', () => {
   const originalRaf = window.requestAnimationFrame;
   const originalCancel = window.cancelAnimationFrame;
+  const setAnimationFrameGlobals = (
+    requestAnimationFrame: Window['requestAnimationFrame'] | undefined,
+    cancelAnimationFrame: Window['cancelAnimationFrame'] | undefined
+  ): void => {
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      configurable: true,
+      writable: true,
+      value: requestAnimationFrame,
+    });
+    Object.defineProperty(window, 'cancelAnimationFrame', {
+      configurable: true,
+      writable: true,
+      value: cancelAnimationFrame,
+    });
+  };
 
   afterEach(() => {
     jest.useRealTimers();
-    window.requestAnimationFrame = originalRaf;
-    window.cancelAnimationFrame = originalCancel;
+    setAnimationFrameGlobals(originalRaf, originalCancel);
   });
 
   it('coalesces bursty schedule calls into a single flush', () => {
     jest.useFakeTimers();
-    (window as any).requestAnimationFrame = undefined;
-    (window as any).cancelAnimationFrame = undefined;
+    setAnimationFrameGlobals(undefined, undefined);
 
     const flush = jest.fn();
     const coalescer = createCacheUpdateCoalescer(flush, { delayMs: 12 });
@@ -30,8 +43,7 @@ describe('cacheUpdateCoalescer', () => {
 
   it('cancels queued flushes', () => {
     jest.useFakeTimers();
-    (window as any).requestAnimationFrame = undefined;
-    (window as any).cancelAnimationFrame = undefined;
+    setAnimationFrameGlobals(undefined, undefined);
 
     const flush = jest.fn();
     const coalescer = createCacheUpdateCoalescer(flush, { delayMs: 10 });
