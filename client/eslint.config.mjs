@@ -7,6 +7,12 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}'];
 const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
 const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}'];
+const typedInformationalComponentFiles = [
+  'src/components/About/**/*.{ts,tsx}',
+  'src/components/Footer/**/*.{ts,tsx}',
+  'src/components/InformationModals/**/*.{ts,tsx}',
+  'src/components/Onboarding/**/*.{ts,tsx}',
+];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -83,6 +89,17 @@ export default [
   },
   {
     files: typedSharedComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedInformationalComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
