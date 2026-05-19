@@ -8,7 +8,7 @@
  */
 
 // Deterministic FNV-1a 32-bit hash of a string
-export function hashSeed(str: any): number {
+export function hashSeed(str: unknown): number {
   const s = String(str || '');
   let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) {
@@ -44,7 +44,7 @@ export function hslToRgb(h: number, s: number, l: number): number[] {
 
 // Generate symmetric blockie as a data URL (8×8 grid by default)
 // Browser-only guard: return '' when document is unavailable (e.g., SSR/tests)
-export function generateBlockieDataUrl(seed: any, cells = 8, scale = 4): string {
+export function generateBlockieDataUrl(seed: unknown, cells = 8, scale = 4): string {
   if (typeof document === 'undefined' || !document?.createElement) return '';
 
   const s = String(seed || '').toLowerCase();
