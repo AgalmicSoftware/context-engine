@@ -11,6 +11,16 @@ const readClientFile = (relativePath) => {
   return fs.readFileSync(filePath, 'utf8');
 };
 
+const expectedLintCommand = [
+  'eslint src/',
+  '"src/utilities/ui/**/*.{ts,tsx}"',
+  '"src/components/Shared/**/*.{ts,tsx}"',
+  '"src/components/About/**/*.{ts,tsx}"',
+  '"src/components/Footer/**/*.{ts,tsx}"',
+  '"src/components/InformationModals/**/*.{ts,tsx}"',
+  '"src/components/Onboarding/**/*.{ts,tsx}"',
+].join(' ');
+
 describe('client package modernization contract', () => {
   it('keeps canonical commands on the Vite and standalone Jest paths', () => {
     const pkg = readClientPackageJson();
@@ -19,9 +29,7 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts.start).toBe('serve -s build');
     expect(pkg.scripts.test).toBe('jest');
-    expect(pkg.scripts.lint).toBe(
-      'eslint src/ "src/utilities/ui/**/*.{ts,tsx}" "src/components/Shared/**/*.{ts,tsx}"',
-    );
+    expect(pkg.scripts.lint).toBe(expectedLintCommand);
   });
 
   it('keeps CRA fallback scripts removed from the client package contract', () => {
@@ -220,6 +228,11 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}']");
     expect(eslintConfig).toContain("const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain('const typedInformationalComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/About/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Footer/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/InformationModals/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Onboarding/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
