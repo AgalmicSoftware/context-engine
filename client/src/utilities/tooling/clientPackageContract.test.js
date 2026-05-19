@@ -25,6 +25,7 @@ const expectedLintCommand = [
   '"src/components/Sponsor/**/*.{ts,tsx}"',
   '"src/components/ErrorBoundary/**/*.{ts,tsx}"',
   '"src/components/RightSidebar/**/*.{ts,tsx}"',
+  '"src/components/E2E/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -247,6 +248,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain('const typedShellSupportComponentFiles = [');
     expect(eslintConfig).toContain("'src/components/ErrorBoundary/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'src/components/RightSidebar/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
