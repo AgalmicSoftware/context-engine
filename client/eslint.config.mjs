@@ -28,6 +28,7 @@ const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/
 const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}'];
 const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}'];
 const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}'];
+const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -203,6 +204,17 @@ export default [
   },
   {
     files: typedPolisReportComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedDebateMapComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
