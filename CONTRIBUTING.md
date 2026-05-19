@@ -31,6 +31,7 @@ Worker, Arweave, and on-chain E2E flows may also require a funded test wallet, a
 
 - Root CI-equivalent test flow: `npm test`
 - Client-only tests (no Foundry required): `cd client && npm test -- --watchAll=false` (Jest 30)
+- Client lint: `cd client && npm run lint` (ESLint 9 flat config)
 - Contract tests: `forge test`
 - Gate E2E smoke: `npm run ai:test-gates:any-all`
 - Gated decrypt E2E: `npm run ai:test-gated-decrypt:all-types`

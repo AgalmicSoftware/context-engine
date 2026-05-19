@@ -23,7 +23,7 @@ describe('client package modernization contract', () => {
 
   it('keeps CRA fallback scripts removed from the client package contract', () => {
     const pkg = readClientPackageJson();
-    const eslintConfig = readClientFile('.eslintrc.json');
+    const eslintConfig = readClientFile('eslint.config.mjs');
 
     expect(pkg.scripts['dev:vite']).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
     expect(pkg.scripts['build:vite']).toBe('PUBLIC_URL=/ vite build');
@@ -185,11 +185,13 @@ describe('client package modernization contract', () => {
       '@babel/preset-env',
       '@babel/preset-react',
       '@babel/preset-typescript',
+      '@eslint/js',
       '@typescript-eslint/parser',
       'babel-jest',
       'eslint',
       'eslint-plugin-react',
       'eslint-plugin-react-hooks',
+      'globals',
       'sass',
       'serve',
       'source-map-explorer',
@@ -204,17 +206,20 @@ describe('client package modernization contract', () => {
 
   it('keeps unused lint plugin wiring out of the ESLint contract', () => {
     const pkg = readClientPackageJson();
-    const eslintConfig = JSON.parse(readClientFile('.eslintrc.json'));
+    const eslintConfig = readClientFile('eslint.config.mjs');
 
     expect(pkg.devDependencies['eslint-plugin-prettier']).toBeUndefined();
     expect(pkg.devDependencies['@typescript-eslint/eslint-plugin']).toBeUndefined();
     expect(pkg.devDependencies['eslint-plugin-import']).toBeUndefined();
-    expect(eslintConfig.plugins).not.toContain('import');
-    expect(eslintConfig.plugins).toContain('react-hooks');
-    expect(eslintConfig.plugins).not.toContain('prettier');
-    expect(eslintConfig.parser).toBe('@typescript-eslint/parser');
-    expect(eslintConfig.rules['@typescript-eslint/no-unused-vars']).toBeUndefined();
-    expect(eslintConfig.rules['prettier/prettier']).toBeUndefined();
+    expect(eslintConfig).toContain("import js from '@eslint/js'");
+    expect(eslintConfig).toContain("import tsParser from '@typescript-eslint/parser'");
+    expect(eslintConfig).toContain("import reactHooksPlugin from 'eslint-plugin-react-hooks'");
+    expect(eslintConfig).toContain("const sourceFiles = ['src/**/*.{js,jsx,mjs,cjs}']");
+    expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
+    expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
+    expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
+    expect(eslintConfig).not.toContain('@typescript-eslint/no-unused-vars');
+    expect(eslintConfig).not.toContain('prettier/prettier');
   });
 
   it('keeps stale webpack and CRA packages out of the client package contract', () => {
