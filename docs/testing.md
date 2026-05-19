@@ -51,8 +51,9 @@ Shell support coverage also includes `client/src/components/ErrorBoundary` and
 `client/src/components/RightSidebar`, and dev/E2E support coverage includes
 `client/src/components/E2E`. Telegram demo setup coverage includes
 `client/src/components/TelegramDemoSetup`, and gate UI coverage includes
-`client/src/components/Gates`. Broad TS/TSX lint expansion should be handled as
-separate rule-tightening changes.
+`client/src/components/Gates`. Community tab coverage includes
+`client/src/components/CommunityTab`. Broad TS/TSX lint expansion should be
+handled as separate rule-tightening changes.
 
 ### Targeted Root Commands
 
