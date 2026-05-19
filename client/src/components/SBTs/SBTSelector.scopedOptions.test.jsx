@@ -1113,9 +1113,15 @@ describe('SBTSelector scoped options', () => {
     const groupListsSpy = jest
       .spyOn(contractScriptsUtils, 'getSessionLists')
       .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
-    const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
-    const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['demo']);
-    const hydrateSpy = jest.spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted').mockResolvedValue(null);
+    const scopeSpy = jest
+      .spyOn(sessionScanScopeUtils, 'readSessionScanScope')
+      .mockReturnValue('list');
+    const slugsSpy = jest
+      .spyOn(sessionScanScopeUtils, 'readSessionScanSlugs')
+      .mockReturnValue(['demo']);
+    const hydrateSpy = jest
+      .spyOn(sbtDisplayNameUtils, 'hydrateSbtDisplayNameTargeted')
+      .mockResolvedValue(null);
 
     try {
       await instance.loadSBTOptions({ force: true });

@@ -297,6 +297,8 @@ const resolveExistingTsSibling = (request, importer) => {
 
   if (request.startsWith('./') || request.startsWith('../')) {
     candidates.push(path.resolve(path.dirname(importer), tsRequest));
+  } else if (path.isAbsolute(request) && request.startsWith(`${srcDir}${path.sep}`)) {
+    candidates.push(tsRequest);
   } else if (request.startsWith('utilities/')) {
     candidates.push(path.resolve(srcDir, tsRequest));
   }

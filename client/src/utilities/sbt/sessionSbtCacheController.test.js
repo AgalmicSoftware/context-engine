@@ -39,7 +39,7 @@ jest.mock('../web3/chainGateway.js', () => {
   };
 });
 
-jest.mock('../session/mainSiteUtils', () => ({
+jest.mock('../../components/MainSite/mainSiteUtils', () => ({
   __esModule: true,
   emitMainSiteSbtDebug: jest.fn(),
   hasCoreSbtMetadata: jest.fn((info) => {
@@ -67,7 +67,7 @@ jest.mock('../session/mainSiteUtils', () => ({
   isForcedSbtSelectorDebugEnabled: jest.fn(() => false),
 }));
 
-jest.mock('../session/mainSiteProgressHelpers', () => ({
+jest.mock('../../components/MainSite/progressHelpers', () => ({
   __esModule: true,
   mapSbtWorkProgressToBlock: jest.fn(
     ({ baseFrom = 0, baseTo = 0, completedUnits = 0, totalUnits = 1, reserveTailBlocks = 0 }) => {
@@ -95,8 +95,11 @@ const {
   emitMainSiteSbtDebug,
   hasCoreSbtMetadata,
   isForcedSbtSelectorDebugEnabled,
-} = require('../session/mainSiteUtils');
-const { mergeSbtLiveProgressEntry, shouldCommitThrottledProgress } = require('../session/mainSiteProgressHelpers');
+} = require('../../components/MainSite/mainSiteUtils');
+const {
+  mergeSbtLiveProgressEntry,
+  shouldCommitThrottledProgress,
+} = require('../../components/MainSite/progressHelpers');
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 

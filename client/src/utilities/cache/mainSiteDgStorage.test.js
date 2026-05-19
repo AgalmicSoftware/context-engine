@@ -18,7 +18,7 @@ jest.mock('../../utilities/cache/cacheScripts', () => ({
   writeCacheOptimistic: jest.fn(),
 }));
 
-jest.mock('./sessionCacheConstants', () => ({
+jest.mock('../../components/MainSite/cacheConstants', () => ({
   __esModule: true,
   DG_MANAGED_CACHE_NAMES: new Set([
     'questionsCache',
@@ -30,7 +30,7 @@ jest.mock('./sessionCacheConstants', () => ({
   ]),
 }));
 
-jest.mock('./sessionCacheEviction', () => ({
+jest.mock('../../components/MainSite/storageEviction', () => ({
   __esModule: true,
   evictOldDgEntries: jest.fn(),
   removeDgMetaTimestamp: jest.fn(),
@@ -38,7 +38,7 @@ jest.mock('./sessionCacheEviction', () => ({
   updateDgMetaTimestamp: jest.fn(),
 }));
 
-jest.mock('../session/mainSiteUtils', () => ({
+jest.mock('../../components/MainSite/mainSiteUtils', () => ({
   __esModule: true,
   bumpMainSitePerfCounter: jest.fn(),
   getMainSitePerfNow: jest.fn(),
@@ -46,9 +46,9 @@ jest.mock('../session/mainSiteUtils', () => ({
 }));
 
 const { createMainSiteDgStorage } = require('./mainSiteDgStorage.js');
-const cacheScripts = require('../../utilities/cache/cacheScripts');
-const storageEviction = require('./sessionCacheEviction');
-const mainSiteUtils = require('../session/mainSiteUtils');
+const cacheScripts = require('../../utilities/cache/cacheScripts.js');
+const storageEviction = require('../../components/MainSite/storageEviction');
+const mainSiteUtils = require('../../components/MainSite/mainSiteUtils');
 
 describe('createMainSiteDgStorage', () => {
   beforeEach(() => {
