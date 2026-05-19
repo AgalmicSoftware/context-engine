@@ -12,6 +12,7 @@ import {
   mockUploadDocLibraryFile,
   mockListSessionStorageRefs,
   mockReadSessionStorageBlob,
+  createDeferred,
   DocumentLibraryPanel,
   TEST_SESSION_CONFIG,
   setupDocumentLibraryPanelTestLifecycle,
@@ -61,9 +62,14 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
   it('loads encrypted image thumbnails when scoped Lit hooks become available after render', async () => {
     const litStorage = require('../../utilities/crypto/litProtocol.js').litStorage;
     const getKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
-    litStorage.downloadEncryptedArweaveData.mockResolvedValue({
-      payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' },
-    });
+    const pendingUnscopedPreview = createDeferred<{
+      payload: { ciphertext: string; dataToEncryptHash: string };
+    }>();
+    litStorage.downloadEncryptedArweaveData
+      .mockReturnValueOnce(pendingUnscopedPreview.promise)
+      .mockResolvedValueOnce({
+        payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' },
+      });
     litStorage.decodeLitPayloadToBlob.mockReturnValue(
       new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' }),
     );
@@ -108,6 +114,10 @@ describe('DocumentLibraryPanel thumbnails and storage providers', () => {
       lit: { getKey },
     }));
     expect(image?.getAttribute('src')).toBe('blob:doc-library-image-preview');
+    await act(async () => {
+      pendingUnscopedPreview.resolve({ payload: { ciphertext: 'ciphertext', dataToEncryptHash: 'hash' } });
+      await pendingUnscopedPreview.promise;
+    });
   });
 
   it('lists and opens Cloudflare session docs through storage refs', async () => {

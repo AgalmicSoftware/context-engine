@@ -20,6 +20,7 @@ const PATH_DEFAULT_BASE_SEPOLIA = 'https://base-sepolia-testnet.api.pocket.netwo
 const RESTRICTED_SBT = '0x0000000000000000000000000000000000000A11';
 const OTHER_RESTRICTED_SBT = '0x0000000000000000000000000000000000000A12';
 const CUSTOM_PATH_RPC_URL = 'https://custom-path.example/rpc';
+const BASE_SEPOLIA_NETWORK = { chainId: 84532, name: 'base-sepolia' };
 
 const buildGroupCfg = (overrides = {}) => {
   const base = {
@@ -77,6 +78,11 @@ const buildWizardShapedRpcCfg = ({
   },
   ...(registry ? { __registry: registry } : {}),
 });
+
+const pinMockProviderNetwork = (provider) => {
+  provider.detectNetwork = jest.fn(async () => BASE_SEPOLIA_NETWORK);
+  provider.getNetwork = jest.fn(async () => BASE_SEPOLIA_NETWORK);
+};
 
 describe('rpcProviders session-sponsored reads', () => {
   beforeEach(() => {
@@ -167,6 +173,9 @@ describe('rpcProviders session-sponsored reads', () => {
     const pathConfig = provider.providerConfigs.find(
       (entry) => entry?.provider?.connection?.url === PATH_DEFAULT_BASE_SEPOLIA
     );
+    pinMockProviderNetwork(provider);
+    pinMockProviderNetwork(rootConfig.provider);
+    pinMockProviderNetwork(pathConfig.provider);
 
     const sponsoredError = new Error(
       'missing revert data in call exception; Transaction reverted without a reason string'

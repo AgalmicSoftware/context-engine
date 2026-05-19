@@ -58,6 +58,48 @@ const makeKvBinding = (initial = {}) => {
   };
 };
 
+const parseConsolePayload = (call) => {
+  expect(call).toBeTruthy();
+  return JSON.parse(call[1]);
+};
+
+const expectBundleDiagnosticsLog = (consoleLogSpy, source) => {
+  const call = consoleLogSpy.mock.calls.find(([label, payload]) => {
+    if (label !== '[deploy-helper] bundle diagnostics') return false;
+    try {
+      return JSON.parse(payload)?.diagnostics?.source === source;
+    } catch (_) {
+      return false;
+    }
+  });
+  const payload = parseConsolePayload(call);
+  expect(payload).toEqual(expect.objectContaining({
+    workerName: 'test-worker',
+    sessionSlug: 'alpha-session',
+    diagnostics: expect.objectContaining({ source }),
+  }));
+  return payload;
+};
+
+const expectScriptUploadFailureLog = (consoleErrorSpy, source) => {
+  const call = consoleErrorSpy.mock.calls.find(([label, payload]) => {
+    if (label !== '[deploy-helper] script upload failed') return false;
+    try {
+      return JSON.parse(payload)?.diagnostics?.source === source;
+    } catch (_) {
+      return false;
+    }
+  });
+  const payload = parseConsolePayload(call);
+  expect(payload).toEqual(expect.objectContaining({
+    workerName: 'test-worker',
+    sessionSlug: 'alpha-session',
+    error: expect.stringContaining('no registered event handlers'),
+    diagnostics: expect.objectContaining({ source }),
+  }));
+  return payload;
+};
+
 describe('deploy-helper worker', () => {
   const originalFetch = global.fetch;
   const originalCrypto = global.crypto;
@@ -81,6 +123,7 @@ describe('deploy-helper worker', () => {
   });
 
   it('normalizes worker secrets before writing them to KV during deploy', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
       cfSuccess({ id: 'kv-123' }),
@@ -94,62 +137,67 @@ describe('deploy-helper worker', () => {
     ]);
     global.fetch = fetchMock;
 
-    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
-      apiToken: 'cf-token',
-      accountId: 'acc-123',
-      workerName: 'test-worker',
-      sessionSlug: 'alpha-session',
-      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
-      secrets: {
-        openaiKey: '  sk-openai  ',
-        arweaveJwk: { kty: 'RSA', n: 'abc' },
-        faucetPrivateKey: 12345,
-        litAccountApiKey: '  lit-account-secret  ',
-        litUsageApiKey: '  lit-usage-secret  ',
-      },
-    }), {}, {});
-    const payload = await response.json();
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        secrets: {
+          openaiKey: '  sk-openai  ',
+          arweaveJwk: { kty: 'RSA', n: 'abc' },
+          faucetPrivateKey: 12345,
+          litAccountApiKey: '  lit-account-secret  ',
+          litUsageApiKey: '  lit-usage-secret  ',
+        },
+      }), {}, {});
+      const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload?.ok).toBe(true);
-    expect(fetchMock.calls.length).toBe(9);
+      expect(response.status).toBe(200);
+      expect(payload?.ok).toBe(true);
+      expect(fetchMock.calls.length).toBe(9);
+      expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
 
-    const scriptUpload = fetchMock.calls[2];
-    const uploadForm = scriptUpload[1].body;
-    const metadataBlob = uploadForm.get('metadata');
-    const metadataText = await new Response(metadataBlob).text();
-    const uploadMetadata = JSON.parse(metadataText);
-    expect(uploadMetadata.main_module).toBe('worker.mjs');
-    expect(uploadForm.get('worker.mjs')).toBeTruthy();
-    expect(uploadForm.get('worker.js')).toBeNull();
+      const scriptUpload = fetchMock.calls[2];
+      const uploadForm = scriptUpload[1].body;
+      const metadataBlob = uploadForm.get('metadata');
+      const metadataText = await new Response(metadataBlob).text();
+      const uploadMetadata = JSON.parse(metadataText);
+      expect(uploadMetadata.main_module).toBe('worker.mjs');
+      expect(uploadForm.get('worker.mjs')).toBeTruthy();
+      expect(uploadForm.get('worker.js')).toBeNull();
 
-    const configWrite = fetchMock.calls[4];
-    expect(JSON.parse(configWrite[1].body).allowOrigins).toEqual([
-      'http://localhost:3000',
-    ]);
+      const configWrite = fetchMock.calls[4];
+      expect(JSON.parse(configWrite[1].body).allowOrigins).toEqual([
+        'http://localhost:3000',
+      ]);
 
-    const secretsWrite = fetchMock.calls[5];
-    expect(String(secretsWrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:secrets$/);
-    const secretsEnvelope = JSON.parse(secretsWrite[1].body);
-    expect(secretsEnvelope).toEqual(expect.objectContaining({
-      v: 1,
-      kind: 'session-secrets',
-      createdAt: expect.any(Number),
-      updatedAt: expect.any(Number),
-    }));
-    expect(secretsEnvelope.secrets).toEqual({
-      openaiKey: 'sk-openai',
-      arweaveJwk: '{"kty":"RSA","n":"abc"}',
-      faucetPrivateKey: '12345',
-      litAccountApiKey: 'lit-account-secret',
-      litUsageApiKey: 'lit-usage-secret',
-    });
+      const secretsWrite = fetchMock.calls[5];
+      expect(String(secretsWrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:secrets$/);
+      const secretsEnvelope = JSON.parse(secretsWrite[1].body);
+      expect(secretsEnvelope).toEqual(expect.objectContaining({
+        v: 1,
+        kind: 'session-secrets',
+        createdAt: expect.any(Number),
+        updatedAt: expect.any(Number),
+      }));
+      expect(secretsEnvelope.secrets).toEqual({
+        openaiKey: 'sk-openai',
+        arweaveJwk: '{"kty":"RSA","n":"abc"}',
+        faucetPrivateKey: '12345',
+        litAccountApiKey: 'lit-account-secret',
+        litUsageApiKey: 'lit-usage-secret',
+      });
 
-    const configRewrite = fetchMock.calls[8];
-    expect(String(configRewrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:config$/);
-    expect(JSON.parse(configRewrite[1].body).corsWorkerUrl).toBe(
-      'https://test-worker.tenant-subdomain.workers.dev/' // intentional: real URL — tests worker URL construction
-    );
+      const configRewrite = fetchMock.calls[8];
+      expect(String(configRewrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:config$/);
+      expect(JSON.parse(configRewrite[1].body).corsWorkerUrl).toBe(
+        'https://test-worker.tenant-subdomain.workers.dev/' // intentional: real URL — tests worker URL construction
+      );
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
   });
 
   it('returns a structured 502 when Cloudflare API lookup fails at the network layer', async () => {
@@ -186,6 +234,7 @@ describe('deploy-helper worker', () => {
   });
 
   it('returns a partial-success response when only the final config rewrite fails', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
       cfSuccess({ id: 'kv-123' }),
@@ -199,25 +248,32 @@ describe('deploy-helper worker', () => {
     ]);
     global.fetch = fetchMock;
 
-    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
-      apiToken: 'cf-token',
-      accountId: 'acc-123',
-      workerName: 'test-worker',
-      sessionSlug: 'alpha-session',
-      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
-    }), {}, {});
-    const payload = await response.json();
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
 
-    expect(response.status).toBe(207);
-    expect(payload?.ok).toBe(true);
-    expect(payload?.partial).toBe(true);
-    expect(payload?.workerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/'); // intentional: real URL — tests worker URL construction
-    expect(payload?.configWriteError).toBe('final config rewrite failed');
-    expect(payload?.configWriteStatus).toBe(500);
-    expect(fetchMock.calls.length).toBe(9);
+      expect(response.status).toBe(207);
+      expect(payload?.ok).toBe(true);
+      expect(payload?.partial).toBe(true);
+      expect(payload?.workerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/'); // intentional: real URL — tests worker URL construction
+      expect(payload?.configWriteError).toBe('final config rewrite failed');
+      expect(payload?.configWriteStatus).toBe(500);
+      expect(fetchMock.calls.length).toBe(9);
+      expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
   });
 
   it('includes bundle diagnostics when Cloudflare rejects the uploaded worker entrypoint', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
       cfSuccess({ id: 'kv-123' }),
@@ -225,28 +281,37 @@ describe('deploy-helper worker', () => {
     ]);
     global.fetch = fetchMock;
 
-    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
-      apiToken: 'cf-token',
-      accountId: 'acc-123',
-      workerName: 'test-worker',
-      sessionSlug: 'alpha-session',
-      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
-    }), {}, {});
-    const payload = await response.json();
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
 
-    expect(response.status).toBe(502);
-    expect(payload?.error || '').toContain('no registered event handlers');
-    expect(payload?.error || '').toContain('Bundle diagnostics:');
-    expect(payload?.bundleDiagnostics).toEqual(expect.objectContaining({
-      source: 'bundleUrl',
-      hasAnyExport: true,
-      hasExportDefault: true,
-      hasFetchHandler: true,
-      hasServiceWorkerFetch: false,
-    }));
+      expect(response.status).toBe(502);
+      expect(payload?.error || '').toContain('no registered event handlers');
+      expect(payload?.error || '').toContain('Bundle diagnostics:');
+      expect(payload?.bundleDiagnostics).toEqual(expect.objectContaining({
+        source: 'bundleUrl',
+        hasAnyExport: true,
+        hasExportDefault: true,
+        hasFetchHandler: true,
+        hasServiceWorkerFetch: false,
+      }));
+      expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
+      expectScriptUploadFailureLog(consoleErrorSpy, 'bundleUrl');
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
   });
 
   it('preserves raw bundleText bytes and reports exact bundleText diagnostics', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const bundleText = '\nexport default { fetch() { return new Response("ok"); } };\n';
     const fetchMock = makeFetchSequence([
       cfSuccess({ id: 'kv-123' }),
@@ -259,22 +324,29 @@ describe('deploy-helper worker', () => {
     ]);
     global.fetch = fetchMock;
 
-    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
-      apiToken: 'cf-token',
-      accountId: 'acc-123',
-      workerName: 'test-worker',
-      sessionSlug: 'alpha-session',
-      bundleText,
-    }), {}, {});
-    const payload = await response.json();
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText,
+      }), {}, {});
+      const payload = await response.json();
 
-    expect(response.status).toBe(502);
-    expect(payload?.bundleDiagnostics).toEqual(expect.objectContaining({
-      source: 'bundleText',
-      length: bundleText.length,
-      hasStringExportWrapper: false,
-      hasFetchHandler: true,
-    }));
+      expect(response.status).toBe(502);
+      expect(payload?.bundleDiagnostics).toEqual(expect.objectContaining({
+        source: 'bundleText',
+        length: bundleText.length,
+        hasStringExportWrapper: false,
+        hasFetchHandler: true,
+      }));
+      expectBundleDiagnosticsLog(consoleLogSpy, 'bundleText');
+      expectScriptUploadFailureLog(consoleErrorSpy, 'bundleText');
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
   });
 
   it('rejects admin origins requests without a matching bearer token', async () => {

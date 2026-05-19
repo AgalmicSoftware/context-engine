@@ -79,6 +79,13 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFileMissing('client/src/assets/worker/deploy-helper-worker.js.txt');
 
   expectScriptContains('test:surveys-sbt', 'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js');
+  expectScriptContains('test:contracts', 'SurveysTest');
+  expectScriptContains('test:contracts', 'CustomSBTTest');
+  expectScriptContains('test:contracts', 'SessionRegistryTest');
+  expectScriptContains('test:contracts', 'SurveysFuzzTest');
+  expectScriptContains('test:contracts', 'CustomSBTFuzzTest');
+  expectScriptContains('test:contracts', 'SessionRegistryFuzzTest');
+  expectScriptContains('test:contracts', 'CustomSBTInvariantTest');
   expectScriptContains('test:node', 'scripts/run-node-tests.js');
   expectScriptContains('test:e2e', 'npm run -s test:e2e:smoke');
   expectScriptContains('test:e2e:quick', 'npm run -s test:e2e:smoke');
@@ -90,10 +97,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('tests', 'npm run test:ci');
   expectScriptContains('tests', 'npm run test:surveys-sbt');
   expectScriptContains('test:client', '--coverage');
+  expectScriptContains('typecheck:client', 'npm --prefix client run typecheck');
   expectScriptContains('worker:bundle', 'scripts/worker-bundle.mjs');
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
   expectScriptContains('verify:release', 'npm run lint');
+  expectScriptContains('verify:release', 'npm run typecheck:client');
   expectScriptContains('verify:release', 'npm run worker:bundle');
   expectScriptContains('verify:release', 'npm run verify:worker-bundle');
   expectScriptContains('verify:release', 'npm --prefix client run build');

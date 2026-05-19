@@ -161,6 +161,8 @@ describe('accountReducer', () => {
     });
 
     expect(reducer(state, { type: LOGIN_ACCOUNT })).toBe(state);
+    expect(reducer(state, { type: FETCH_ACCOUNT, payload: null })).toBe(state);
+    expect(reducer(state, { type: LOGIN_ACCOUNT, payload: 'bad-payload' })).toBe(state);
     expect(reducer(state, { type: CHANGE_NETWORK, payload: {} })).toBe(state);
     expect(reducer(state, { type: 'UNKNOWN_ACTION', payload: buildAccountPayload() })).toBe(state);
   });

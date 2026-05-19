@@ -8,6 +8,38 @@ import corpusSample from './corpus_sample.json';
 import historicalFigureUsers from './historical_figure_users.json';
 import riskMatrixCommentContextData from './riskMatrixCommentContext.json';
 
+type UnknownRecord = Record<string, unknown>;
+
+type ContextEntryFixture = {
+  historicalFigure?: {
+    name?: unknown;
+  } | null;
+  corpusRefs?: unknown;
+};
+
+type RiskMatrixCommentContextFixture = {
+  SUBCATEGORY_CONTEXT?: Record<string, ContextEntryFixture>;
+  CATEGORY_CONTEXT?: Record<string, ContextEntryFixture>;
+};
+
+type CorpusSampleFixture = {
+  meta?: {
+    corpuses?: Record<string, { label?: unknown }>;
+  };
+};
+
+const contextSectionKeys = ['SUBCATEGORY_CONTEXT', 'CATEGORY_CONTEXT'] as const;
+const contextFixture = riskMatrixCommentContextData as RiskMatrixCommentContextFixture;
+const corpusFixture = corpusSample as CorpusSampleFixture;
+
+const isRecord = (value: unknown): value is UnknownRecord => (
+  typeof value === 'object' && value !== null
+);
+
+const getContextSectionEntries = (
+  sectionKey: typeof contextSectionKeys[number]
+): ContextEntryFixture[] => Object.values(contextFixture[sectionKey] || {});
+
 describe('riskMatrixCommentContext', () => {
   it('enriches seeded overlap comments from demo context data', () => {
     const entry = enrichRiskMatrixCommentRecord({
@@ -64,8 +96,8 @@ describe('riskMatrixCommentContext', () => {
       .filter(Boolean));
 
     const usedFigureNames = new Set<string>();
-    ['SUBCATEGORY_CONTEXT', 'CATEGORY_CONTEXT'].forEach((sectionKey) => {
-      Object.values((riskMatrixCommentContextData as Record<string, any>)?.[sectionKey] || {}).forEach((entry: any) => {
+    contextSectionKeys.forEach((sectionKey) => {
+      getContextSectionEntries(sectionKey).forEach((entry) => {
         const figureName = String(entry?.historicalFigure?.name || '').trim();
         if (figureName) usedFigureNames.add(figureName);
       });
@@ -76,16 +108,16 @@ describe('riskMatrixCommentContext', () => {
 
   it('keeps seeded corpus refs anchored to real corpus ids and titles', () => {
     const corpusLabelById = Object.fromEntries(
-      Object.entries((corpusSample as any)?.meta?.corpuses || {}).map(([corpusId, corpusEntry]: [string, any]) => [
+      Object.entries(corpusFixture.meta?.corpuses || {}).map(([corpusId, corpusEntry]) => [
         corpusId,
         String(corpusEntry?.label || '').trim(),
       ])
     );
 
-    ['SUBCATEGORY_CONTEXT', 'CATEGORY_CONTEXT'].forEach((sectionKey) => {
-      Object.values((riskMatrixCommentContextData as Record<string, any>)?.[sectionKey] || {}).forEach((entry: any) => {
-        const refs = Array.isArray(entry?.corpusRefs) ? entry.corpusRefs : [];
-        refs.forEach((ref: any) => {
+    contextSectionKeys.forEach((sectionKey) => {
+      getContextSectionEntries(sectionKey).forEach((entry) => {
+        const refs = Array.isArray(entry?.corpusRefs) ? entry.corpusRefs.filter(isRecord) : [];
+        refs.forEach((ref) => {
           const corpusId = String(ref?.corpusId || '').trim();
           expect(corpusId).not.toBe('');
           expect(corpusLabelById[corpusId]).toBe(String(ref?.label || '').trim());

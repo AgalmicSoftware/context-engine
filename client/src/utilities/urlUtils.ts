@@ -10,7 +10,7 @@ import { toStr } from './shared/primitives.js';
 
 const hasScheme = (value: string): boolean => /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value);
 
-export const ensureHttpUrl = (raw: any): string => {
+export const ensureHttpUrl = (raw: unknown): string => {
   const trimmed = toStr(raw).trim();
   if (!trimmed) return '';
   if (hasScheme(trimmed)) return trimmed;
@@ -22,12 +22,12 @@ export const ensureHttpUrl = (raw: any): string => {
   return `https://${trimmed}`;
 };
 
-export const normalizeBaseUrl = (raw: any): string => {
+export const normalizeBaseUrl = (raw: unknown): string => {
   const withScheme = ensureHttpUrl(raw);
   return toStr(withScheme).trim().replace(/\/+$/, '');
 };
 
-export const normalizeOrigin = (raw: any): string => {
+export const normalizeOrigin = (raw: unknown): string => {
   const trimmed = toStr(raw).trim();
   if (!trimmed) return '';
   const withScheme = ensureHttpUrl(trimmed);
@@ -39,8 +39,8 @@ export const normalizeOrigin = (raw: any): string => {
   }
 };
 
-export const normalizeOriginList = (rawList: any): string[] => {
-  const list = Array.isArray(rawList) ? rawList : [rawList];
+export const normalizeOriginList = (rawList: unknown): string[] => {
+  const list: unknown[] = Array.isArray(rawList) ? rawList : [rawList];
   const cleaned = list
     .map((entry) => normalizeOrigin(entry))
     .filter(Boolean);

@@ -2490,7 +2490,7 @@ export default function PolisReport({
                     )}
                     {analysis && (
                       <div className={styles.clusterAnalysisText}>
-                        <div className={styles.clusterAnalysisShort}>"{analysis.short}"</div>
+                        <div className={styles.clusterAnalysisShort}>&quot;{analysis.short}&quot;</div>
                         <div className={styles.clusterAnalysisLong}>{analysis.long}</div>
                       </div>
                     )}

@@ -26,6 +26,14 @@ import {
   restoreSBTsListSyncBarStep,
 } from './SBTsList.listModeRouting.testUtils';
 
+const flushSbtListEffects = async (cycles = 4) => {
+  await act(async () => {
+    for (let i = 0; i < cycles; i += 1) {
+      await Promise.resolve();
+    }
+  });
+};
+
 describe('SBTsList list-mode routing and filtering', () => {
   beforeEach(resetSBTsListListModeTestState);
 
@@ -116,6 +124,8 @@ describe('SBTsList list-mode routing and filtering', () => {
     await act(async () => {
       demoRegistryReady = true;
       window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
+      await Promise.resolve();
+      await Promise.resolve();
     });
 
     await waitFor(() => {
@@ -254,6 +264,7 @@ describe('SBTsList list-mode routing and filtering', () => {
       />
     );
 
+    await flushSbtListEffects();
     await waitFor(() => {
       expect(screen.getByText('List Alpha Explicit Badge')).toBeInTheDocument();
     });
@@ -340,6 +351,7 @@ describe('SBTsList list-mode routing and filtering', () => {
       />
     );
 
+    await flushSbtListEffects();
     await waitFor(() => {
       expect(screen.getByText('List Linked Alpha Badge')).toBeInTheDocument();
     });
@@ -414,6 +426,7 @@ describe('SBTsList list-mode routing and filtering', () => {
       />
     );
 
+    await flushSbtListEffects();
     await waitFor(() => {
       expect(screen.getByText('Alpha Keep Badge')).toBeInTheDocument();
     });
@@ -513,6 +526,7 @@ describe('SBTsList list-mode routing and filtering', () => {
       />
     );
 
+    await flushSbtListEffects();
     await waitFor(() => {
       expect(screen.getByText('Alpha Session Badge')).toBeInTheDocument();
     });

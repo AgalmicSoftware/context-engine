@@ -6,15 +6,15 @@ other user-facing web3 interactions.
 
 ## Setup
 
-Current client workflows use Node.js `16.14.2` and npm `9.2.0`.
+Current client workflows support Node.js `^20.19.0` or `>=22.12.0` with
+npm `^10.0.0`. Node 16/npm 9 are no longer supported for client work.
 
-Install client dependencies with `npm install`; the `--legacy-peer-deps`
-contract is carried automatically via `client/.npmrc` for the remaining
-peer-sensitive web3 and UI dependencies.
+Install client dependencies with plain `npm install`. The lockfile is expected
+to resolve under npm's normal strict peer behavior.
 
 ```bash
 cd client
-nvm use 16
+nvm use 20
 npm install
 npm run dev
 ```
@@ -33,6 +33,10 @@ npm run build
 npm test
 # Run the test suite.
 
+npm run lint
+# Run ESLint 9 with the flat config in `eslint.config.mjs`.
+# Includes JS/JSX, `src/utilities/ui`, shared UI, informational UI, MainContent, auxiliary page, shell support, dev/E2E support, Telegram demo setup, gate UI, CommunityTab, PolisReport, DebateMap, Navbar, and ContractPage components.
+
 npm start
 # Serve the production build.
 ```
@@ -48,6 +52,7 @@ workers, storage, and data flow details.
 
 - React
 - Vite
-- Jest
+- Jest 30
+- ESLint 9 flat config
 - SCSS Modules / Sass
 - ethers and viem for web3 interactions

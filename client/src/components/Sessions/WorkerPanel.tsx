@@ -95,7 +95,7 @@ export type WorkerPanelProps = {
   deployStatusIsError: boolean;
   showWorkerUrlField: boolean;
   displayedWorkerUrl: string;
-  renderField: (key: any, value: any, path: any, opts?: Record<string, unknown>) => React.ReactNode;
+  renderField: (key: unknown, value: unknown, path: unknown, opts?: Record<string, unknown>) => React.ReactNode;
   workerUrlAutoFilled: boolean;
 };
 

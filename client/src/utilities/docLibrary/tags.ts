@@ -8,7 +8,37 @@ export const DOC_LIBRARY_DOC_ROLES = Object.freeze({
   PHOTO_ANALYSIS: 'photo-analysis',
 });
 
-export const normalizeSessionIdHex = (raw: any): string => {
+export type ArweaveTag = {
+  name: string;
+  value: string;
+};
+
+type CommonTagsInput = {
+  kind?: unknown;
+  storage?: unknown;
+};
+
+type SessionTagsInput = {
+  sessionIdHex?: unknown;
+};
+
+type SbtTagsInput = {
+  chainId?: unknown;
+  sbtAddress?: unknown;
+};
+
+type PlaintextFileMetaTagsInput = {
+  name?: unknown;
+  mime?: unknown;
+  size?: unknown;
+};
+
+type RoleTagsInput = {
+  role?: unknown;
+  derivedFromTxId?: unknown;
+};
+
+export const normalizeSessionIdHex = (raw: unknown): string => {
   const value = toStr(raw).trim();
   if (!value) return '';
   if (value.startsWith('0x') && value.length === 34) {
@@ -20,26 +50,26 @@ export const normalizeSessionIdHex = (raw: any): string => {
   return '';
 };
 
-export const normalizeSbtAddress = (raw: any): string => {
+export const normalizeSbtAddress = (raw: unknown): string => {
   const addr = toStr(raw).trim().toLowerCase();
   if (!addr) return '';
   if (!ethers.utils.isAddress(addr)) return '';
   return addr;
 };
 
-export const buildDocLibraryCommonTags = ({ kind, storage }: any = {}): { name: string; value: string }[] => ([
+export const buildDocLibraryCommonTags = ({ kind, storage }: CommonTagsInput = {}): ArweaveTag[] => ([
   { name: 'CE-DocLibrary', value: '1' },
   { name: 'CE-DocKind', value: toStr(kind || '').trim() },
   { name: 'CE-DocStorage', value: toStr(storage || '').trim() },
 ].filter((t) => t && t.name && t.value));
 
-export const buildDocLibrarySessionTags = ({ sessionIdHex }: any = {}): { name: string; value: string }[] => {
+export const buildDocLibrarySessionTags = ({ sessionIdHex }: SessionTagsInput = {}): ArweaveTag[] => {
   const normalized = normalizeSessionIdHex(sessionIdHex);
   if (!normalized) return [];
   return [{ name: 'CE-SessionId', value: normalized }];
 };
 
-export const buildDocLibrarySbtTags = ({ chainId, sbtAddress }: any = {}): { name: string; value: string }[] => {
+export const buildDocLibrarySbtTags = ({ chainId, sbtAddress }: SbtTagsInput = {}): ArweaveTag[] => {
   const id = Number(chainId || 0) || 0;
   const addr = normalizeSbtAddress(sbtAddress);
   if (!id || !addr) return [];
@@ -49,14 +79,14 @@ export const buildDocLibrarySbtTags = ({ chainId, sbtAddress }: any = {}): { nam
   ];
 };
 
-const truncateTagValue = (value: any, maxLen: number): string => {
+const truncateTagValue = (value: unknown, maxLen: number): string => {
   const v = toStr(value).trim();
   if (!maxLen || v.length <= maxLen) return v;
   return v.slice(0, Math.max(0, maxLen - 1)).trim();
 };
 
-export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size }: any = {}): { name: string; value: string }[] => {
-  const out: { name: string; value: string }[] = [];
+export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size }: PlaintextFileMetaTagsInput = {}): ArweaveTag[] => {
+  const out: ArweaveTag[] = [];
   const safeName = truncateTagValue(name, 180);
   const safeMime = truncateTagValue(mime, 120);
   const safeSize = truncateTagValue(size != null ? String(size) : '', 40);
@@ -66,8 +96,8 @@ export const buildDocLibraryPlaintextFileMetaTags = ({ name, mime, size }: any =
   return out;
 };
 
-export const buildDocLibraryRoleTags = ({ role, derivedFromTxId }: any = {}): { name: string; value: string }[] => {
-  const out: { name: string; value: string }[] = [];
+export const buildDocLibraryRoleTags = ({ role, derivedFromTxId }: RoleTagsInput = {}): ArweaveTag[] => {
+  const out: ArweaveTag[] = [];
   const safeRole = truncateTagValue(role, 60).toLowerCase();
   const safeDerivedFromTxId = truncateTagValue(derivedFromTxId, 80);
   if (safeRole) out.push({ name: 'CE-DocRole', value: safeRole });
@@ -75,7 +105,7 @@ export const buildDocLibraryRoleTags = ({ role, derivedFromTxId }: any = {}): { 
   return out;
 };
 
-export const mergeTags = (...lists: any[]): { name: string; value: string }[] => (
+export const mergeTags = (...lists: unknown[]): ArweaveTag[] => (
   lists
     .flatMap((list) => (Array.isArray(list) ? list : []))
     .filter((t) => t && typeof t === 'object' && typeof t.name === 'string' && typeof t.value === 'string')

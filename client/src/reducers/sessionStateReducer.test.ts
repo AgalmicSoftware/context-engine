@@ -83,6 +83,16 @@ describe('sessionStateReducer', () => {
     expect(reloadedReducer(undefined, { type: '@@INIT' }).demoSurfaceMode).toBe(true);
   });
 
+  it('falls back when stored session preferences contain malformed JSON', () => {
+    localStorage.setItem('ce:demoSurfaceMode', '{bad');
+    localStorage.setItem('ce:tooltipsEnabled', '{bad');
+    const reloadedReducer = loadReducerWithDemoSurfaceModeDefault('false');
+    const state = reloadedReducer(undefined, { type: '@@INIT' });
+
+    expect(state.demoSurfaceMode).toBe(false);
+    expect(state.tooltipsEnabled).toBe(true);
+  });
+
   describe('demoSurfaceMode default precedence', () => {
     it('uses stored false regardless of the env default', () => {
       localStorage.setItem('ce:demoSurfaceMode', JSON.stringify(false));
@@ -354,6 +364,8 @@ describe('sessionStateReducer', () => {
 
     expect(reducer(state, { type: FETCH_SESSION_STATE })).toBe(state);
     expect(reducer(state, { type: LOGIN_IN_PROGRESS })).toBe(state);
+    expect(reducer(state, { type: LOGIN_IN_PROGRESS, payload: true })).toBe(state);
+    expect(reducer(state, { type: UPDATE_GLOBAL_SESSION_SELECTION, payload: null })).toBe(state);
     expect(reducer(state, { type: 'UNKNOWN_ACTION', payload: true })).toBe(state);
   });
 });

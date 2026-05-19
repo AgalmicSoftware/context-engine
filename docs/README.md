@@ -58,6 +58,7 @@ Local development:
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
 
 Release:
+- `docs/dependency-audit-hotspots.md`: dependency audit remediations, accepted residuals, and package-specific audit commands.
 - `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
 
 Wallets:
