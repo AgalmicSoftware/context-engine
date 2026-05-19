@@ -33,6 +33,9 @@ npm run build
 npm test
 # Run the test suite.
 
+npm run lint
+# Run ESLint 9 with the flat config in `eslint.config.mjs`.
+
 npm start
 # Serve the production build.
 ```
@@ -49,5 +52,6 @@ workers, storage, and data flow details.
 - React
 - Vite
 - Jest 30
+- ESLint 9 flat config
 - SCSS Modules / Sass
 - ethers and viem for web3 interactions
