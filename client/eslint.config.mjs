@@ -6,6 +6,7 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}'];
 const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
+const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -34,6 +35,27 @@ const sharedRules = {
   'no-redeclare': 'off',
 };
 
+const reactPlugins = {
+  react: reactPlugin,
+  'react-hooks': reactHooksPlugin,
+};
+
+const reactSettings = {
+  react: {
+    version: 'detect',
+  },
+};
+
+const reactRules = {
+  ...reactPlugin.configs.flat.recommended.rules,
+  'react-hooks/rules-of-hooks': 'error',
+  'react-hooks/exhaustive-deps': 'warn',
+  'react/display-name': 'off',
+  'react/prop-types': 'off',
+  'react/react-in-jsx-scope': 'off',
+  'react/jsx-uses-react': 'off',
+};
+
 export default [
   {
     ignores: ['build/**', 'coverage/**', 'node_modules/**'],
@@ -44,24 +66,11 @@ export default [
   {
     files: javascriptFiles,
     languageOptions: sharedLanguageOptions,
-    plugins: {
-      react: reactPlugin,
-      'react-hooks': reactHooksPlugin,
-    },
-    settings: {
-      react: {
-        version: 'detect',
-      },
-    },
+    plugins: reactPlugins,
+    settings: reactSettings,
     rules: {
       ...sharedRules,
-      ...reactPlugin.configs.flat.recommended.rules,
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
-      'react/display-name': 'off',
-      'react/prop-types': 'off',
-      'react/react-in-jsx-scope': 'off',
-      'react/jsx-uses-react': 'off',
+      ...reactRules,
     },
   },
   {
@@ -69,6 +78,17 @@ export default [
     languageOptions: sharedLanguageOptions,
     rules: {
       ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedSharedComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
       'no-undef': 'off',
     },
   },
