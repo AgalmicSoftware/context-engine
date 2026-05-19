@@ -1,5 +1,5 @@
 
-export default function buildCompareToolkitPrompt(envelope: any): string {
+export default function buildCompareToolkitPrompt(envelope: unknown): string {
   const safe = (obj: unknown): string => JSON.stringify(obj ?? {}, null, 2);
 
   return `

@@ -19,7 +19,7 @@
  *   optional "importance" and "additionalComment" fields, and created content:
  *   "questionsCreated", "surveysCreated", plus "createdCounts".
  */
-export default function buildUserAnalysisPrompt(userData: any): string {
+export default function buildUserAnalysisPrompt(userData: unknown): string {
   const safeJson = JSON.stringify(userData ?? {}, null, 2);
   return `
 You are a careful, neutral analyst. Analyze the following on-chain/profile data for one user.
