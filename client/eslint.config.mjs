@@ -30,6 +30,7 @@ const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,t
 const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}'];
 const typedDebateMapComponentFiles = ['src/components/DebateMap/**/*.{ts,tsx}'];
 const typedNavbarComponentFiles = ['src/components/Navbar/**/*.{ts,tsx}'];
+const typedContractPageComponentFiles = ['src/components/ContractPage/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -227,6 +228,17 @@ export default [
   },
   {
     files: typedNavbarComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedContractPageComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
