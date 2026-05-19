@@ -6,10 +6,10 @@ const mockLogger = {
   debug: jest.fn(),
 };
 
-jest.mock('utilities/logging.js', () => ({
+jest.mock('utilities/logging', () => ({
   __esModule: true,
   createLogger: jest.fn(() => mockLogger),
-}), { virtual: true });
+}));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
@@ -18,7 +18,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   writeCacheOptimistic: jest.fn(),
 }), { virtual: true });
 
-jest.mock('../../components/MainSite/cacheConstants.js', () => ({
+jest.mock('../../components/MainSite/cacheConstants', () => ({
   __esModule: true,
   DG_MANAGED_CACHE_NAMES: new Set([
     'questionsCache',
@@ -28,27 +28,27 @@ jest.mock('../../components/MainSite/cacheConstants.js', () => ({
     'sbtCache',
     'userCache',
   ]),
-}), { virtual: true });
+}));
 
-jest.mock('../../components/MainSite/storageEviction.js', () => ({
+jest.mock('../../components/MainSite/storageEviction', () => ({
   __esModule: true,
   evictOldDgEntries: jest.fn(),
   removeDgMetaTimestamp: jest.fn(),
   trimLargeArrays: jest.fn(),
   updateDgMetaTimestamp: jest.fn(),
-}), { virtual: true });
+}));
 
-jest.mock('../../components/MainSite/mainSiteUtils.js', () => ({
+jest.mock('../../components/MainSite/mainSiteUtils', () => ({
   __esModule: true,
   bumpMainSitePerfCounter: jest.fn(),
   getMainSitePerfNow: jest.fn(),
   isMainSitePerfCountersEnabled: jest.fn(),
-}), { virtual: true });
+}));
 
 const { createMainSiteDgStorage } = require('./mainSiteDgStorage.js');
 const cacheScripts = require('../../utilities/cache/cacheScripts.js');
-const storageEviction = require('../../components/MainSite/storageEviction.js');
-const mainSiteUtils = require('../../components/MainSite/mainSiteUtils.js');
+const storageEviction = require('../../components/MainSite/storageEviction');
+const mainSiteUtils = require('../../components/MainSite/mainSiteUtils');
 
 describe('createMainSiteDgStorage', () => {
   beforeEach(() => {

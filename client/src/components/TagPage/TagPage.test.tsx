@@ -807,11 +807,10 @@ describe('TagPage', () => {
   it('keeps the Tag Explorer AI prompt builder in the prompts folder', () => {
     const promptShimPath = path.join(__dirname, '../../prompts/tagInterpretationPrompt.js');
     const promptSourcePath = path.join(__dirname, '../../prompts/tagInterpretationPrompt.ts');
-    const promptShimSource = fs.readFileSync(promptShimPath, 'utf8');
     const promptSource = fs.readFileSync(promptSourcePath, 'utf8');
     const componentSource = fs.readFileSync(path.join(__dirname, 'TagPage.tsx'), 'utf8');
 
-    expect(promptShimSource).toContain("export { default } from './tagInterpretationPrompt.ts';");
+    expect(fs.existsSync(promptShimPath)).toBe(false);
     expect(promptSource).toContain('export default function buildTagInterpretationPrompt');
     expect(componentSource).toContain('../../prompts/tagInterpretationPrompt.js');
   });

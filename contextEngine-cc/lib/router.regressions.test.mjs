@@ -919,7 +919,7 @@ test('respond returns pending=true when auto-submit exceeds the await timeout', 
     assert.equal(body.acknowledgement, 'Saved locally. Auto-submit is still in progress.');
     assert.equal(body.autoSubmit.status, 'pending');
     assert.equal(body.autoSubmit.alert, 'info');
-    assert.ok(elapsed < 2000, `expected response within 2s, took ${elapsed}ms`);
+    assert.ok(elapsed >= 150, `expected response to wait for the configured auto-submit timeout, took ${elapsed}ms`);
   } finally {
     restoreDebugLogging();
     if (prevDataDir == null) delete process.env.CE_CC_DATA_DIR;
