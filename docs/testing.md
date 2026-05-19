@@ -36,6 +36,10 @@ Use the client workflow when you are working only in `client/` and do not need t
 The client test runner is standalone Jest 30 configured by `client/jest.config.cjs`.
 Babel-Jest uses explicit Babel presets, and jsdom setup lives under
 `client/scripts/jest/`.
+Client linting runs ESLint 9 through `client/eslint.config.mjs`; the flat
+config preserves the existing JavaScript/JSX lint surface plus React, React
+Hooks, and parser rule intent. Broad TS/TSX lint expansion should be handled as
+a separate rule-tightening change.
 
 ### Targeted Root Commands
 
