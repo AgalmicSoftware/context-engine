@@ -6,14 +6,73 @@ import AudioInput from './AudioInput';
 import { requestAiRewrite } from '../../../utilities/ai/aiScripts';
 import { useWhisper, RECORDING_STATUS } from '../../../utilities/useWhisper';
 
-type WhisperState = Record<string, any>;
+type LastRecording = {
+  blob: Blob | null;
+  mimeType?: string;
+};
+
+type MutableRef<T> = {
+  current: T | null;
+};
+
+type TranscriptState = {
+  live: string;
+  final: string;
+};
+
+type AnalyserNodeLike = {
+  fftSize: number;
+  frequencyBinCount: number;
+  getByteFrequencyData: (array: Uint8Array) => void;
+  disconnect: () => void;
+};
+
+type MediaStreamLike = {
+  id?: string;
+};
+
+type SourceNodeLike = {
+  connect: (node: AnalyserNodeLike) => void;
+  disconnect: () => void;
+};
+
+type AudioContextLike = {
+  state: AudioContextState;
+  createAnalyser: () => AnalyserNodeLike;
+  createMediaStreamSource: (stream: MediaStreamLike) => SourceNodeLike;
+  resume: () => Promise<void>;
+};
+
+type WhisperState = {
+  status: string;
+  isRecording: boolean;
+  isPaused: boolean;
+  isProcessing: boolean;
+  isStreaming: boolean;
+  transcript: TranscriptState;
+  errorMessage: string;
+  startRecording: () => void;
+  stopRecording: () => void;
+  pauseRecording: () => void;
+  resumeRecording: () => void;
+  audioContextRef: MutableRef<AudioContextLike>;
+  mediaStreamRef: MutableRef<MediaStreamLike>;
+  lastRecordingBlobRef: {
+    current: LastRecording;
+  };
+  getLastRecordingBlob: () => LastRecording;
+};
+
+type UseWhisperMock = jest.MockedFunction<(options?: unknown) => WhisperState>;
+type RequestAiRewriteMock = jest.MockedFunction<(text: string, options?: unknown) => Promise<string>>;
+
 type RafEntry = {
   id: number;
   cb: FrameRequestCallback;
 } | null;
 
-const mockUseWhisper = useWhisper as unknown as jest.Mock;
-const mockRequestAiRewrite = requestAiRewrite as unknown as jest.Mock;
+const mockUseWhisper = useWhisper as unknown as UseWhisperMock;
+const mockRequestAiRewrite = requestAiRewrite as unknown as RequestAiRewriteMock;
 const actGlobal = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT?: boolean;
 };
@@ -32,7 +91,7 @@ jest.mock('../../../utilities/useWhisper', () => {
   return { ...actual, useWhisper: jest.fn() };
 });
 
-const buildWhisperState = (overrides: WhisperState = {}) => ({
+const buildWhisperState = (overrides: Partial<WhisperState> = {}): WhisperState => ({
   status: RECORDING_STATUS.READY,
   isRecording: false,
   isPaused: false,
@@ -369,9 +428,9 @@ describe('AudioInput', () => {
   it('retries waveform setup until audio refs are ready and then schedules animation', () => {
     jest.useFakeTimers({ doNotFake: ['requestAnimationFrame', 'cancelAnimationFrame'] });
 
-    const audioContextRef: { current: any } = { current: null };
-    const mediaStreamRef: { current: any } = { current: null };
-    const analyser = {
+    const audioContextRef: MutableRef<AudioContextLike> = { current: null };
+    const mediaStreamRef: MutableRef<MediaStreamLike> = { current: null };
+    const analyser: AnalyserNodeLike = {
       fftSize: 0,
       frequencyBinCount: 32,
       getByteFrequencyData: jest.fn(),
@@ -544,13 +603,15 @@ describe('AudioInput', () => {
   it('does not re-emit waiting text during parent rerenders with new update callbacks', () => {
     mockRequestAiRewrite.mockImplementation(() => new Promise(() => {}));
     let waitingTick: (() => void) | null = null;
-    jest.spyOn(window, 'setInterval').mockImplementation(((cb: TimerHandler) => {
-      if (typeof cb === 'function') {
-        waitingTick = () => cb();
+    const setIntervalMock: typeof window.setInterval = (handler: TimerHandler) => {
+      if (typeof handler === 'function') {
+        waitingTick = () => handler();
       }
       return 1;
-    }) as any);
-    jest.spyOn(window, 'clearInterval').mockImplementation((() => {}) as any);
+    };
+    const clearIntervalMock: typeof window.clearInterval = () => {};
+    jest.spyOn(window, 'setInterval').mockImplementation(setIntervalMock);
+    jest.spyOn(window, 'clearInterval').mockImplementation(clearIntervalMock);
     const updateFns = [jest.fn(), jest.fn(), jest.fn(), jest.fn()];
 
     act(() => {
