@@ -46,8 +46,8 @@ npm run test:ci
 
 `npm test` is an alias for the same canonical PR gate.
 
-To run only the release-sanity gate (lint, worker bundle verification, and
-production build):
+To run only the release-sanity gate (lint, client typecheck, worker bundle
+verification, and production build):
 
 ```bash
 npm run verify:release

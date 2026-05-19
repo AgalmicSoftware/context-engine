@@ -37,6 +37,29 @@ Use the client workflow when you are working only in `client/` and do not need t
 The client test runner is standalone Jest 30 configured by `client/jest.config.cjs`.
 Babel-Jest uses explicit Babel presets, and jsdom setup lives under
 `client/scripts/jest/`.
+Client linting runs ESLint 9 through `client/eslint.config.mjs`; the flat
+config preserves the existing JavaScript/JSX lint surface plus React, React
+Hooks, and parser rule intent. TypeScript lint coverage starts with the
+`client/src/utilities/ui` utility boundary and shared UI components under
+`client/src/components/Shared`, then extends to informational UI components
+under `client/src/components/About`, `client/src/components/Footer`,
+`client/src/components/InformationModals`, and `client/src/components/Onboarding`,
+plus the home-tab surface under `client/src/components/MainContent` and
+auxiliary pages under `client/src/components/Agent`,
+`client/src/components/Bookmarks`, and `client/src/components/Sponsor`.
+Shell support coverage also includes `client/src/components/ErrorBoundary` and
+`client/src/components/RightSidebar`, and dev/E2E support coverage includes
+`client/src/components/E2E`. Telegram demo setup coverage includes
+`client/src/components/TelegramDemoSetup`, and gate UI coverage includes
+`client/src/components/Gates`. Community tab coverage includes
+`client/src/components/CommunityTab`, Polis report coverage includes
+`client/src/components/PolisReport`, and DebateMap coverage includes
+`client/src/components/DebateMap`. Navbar coverage includes
+`client/src/components/Navbar`, and ContractPage coverage includes
+`client/src/components/ContractPage`. Broad TS/TSX lint expansion should be
+handled as separate rule-tightening changes. `npm run typecheck` runs the
+production client TypeScript project with `tsc --noEmit`; Jest/spec helper files
+remain covered by the Jest command rather than the release typecheck gate.
 
 ### Targeted Root Commands
 

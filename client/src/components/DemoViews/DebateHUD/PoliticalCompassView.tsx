@@ -284,13 +284,9 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
     };
   });
 
-  const avatarPointLayouts = pointLayouts.filter(
-    (
-      layout,
-    ): layout is typeof layout & {
-      avatarInfo: NonNullable<typeof layout.avatarInfo>;
-    } => Boolean(layout.avatarInfo?.url),
-  );
+  const avatarPointLayouts = pointLayouts.filter((layout): layout is typeof layout & {
+    avatarInfo: NonNullable<typeof layout.avatarInfo>;
+  } => Boolean(layout.avatarInfo?.url));
 
   const getShape = (point: CompassPoint, px: number, py: number, size: number) => {
     if (point.type === 'tweeter') {

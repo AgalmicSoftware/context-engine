@@ -126,13 +126,19 @@ const LoginSettingsAiConfigContent = React.lazy(() => import('./LoginSettingsAiC
 const LoginSettingsResourceKeysContent = React.lazy(() => import('./LoginSettingsResourceKeysContent'));
 
 const accountLog = createLogger('account');
-const normalizeAccountForComparison = (value: unknown): string =>
-  String(value || '')
-    .trim()
-    .toLowerCase();
-type LoginTargetNetwork = LoginPasskeyNetwork & {
-  blockExplorers?: { default?: { name?: unknown; url?: unknown } };
+type AccountUserPageProps = {
+  viewAddress?: string;
+  account?: string;
+  provider?: string;
+  minimized?: boolean;
+  network?: unknown;
 };
+const AccountUserPage = React.lazy(
+  () => import("components/UserPage/UserPage")
+) as React.LazyExoticComponent<React.ComponentType<AccountUserPageProps>>;
+
+type LoginAndSettingsRecord = Record<string, any>;
+
 interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'network'>> {
   provider: string;
   network: WagmiInjectedProps['network'] | null;
@@ -955,16 +961,15 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return false;
   };
 
-  switchToCorrectNetwork = async () => {
+  switchToCorrectNetwork: any = async () => {
     const ethereum = window.ethereum;
-    if (ethereum && this.props.provider === 'wagmi') {
+    if (ethereum && this.props.provider === "wagmi") {
       const tn = this.getTargetNetwork();
       const chainIdHex = chainHexId(tn);
-      const switchToTargetNetwork = () =>
-        ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: chainIdHex }],
-        });
+      const switchToTargetNetwork = () => ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: chainIdHex }],
+      });
       try {
         await switchToTargetNetwork();
       } catch (error: any) {

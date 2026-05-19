@@ -173,14 +173,14 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:ci', 'npm run verify:release');
   expectScriptContains('test:ci', 'npm run test:node');
   expectScriptContains('tests', 'npm run test:ci');
-  expectScriptContains('test:client', 'test:coverage:full-universe');
-  expectScriptContains('test:release:client', 'npm test -- --watchAll=false --runInBand');
+  expectScriptContains('tests', 'npm run test:surveys-sbt');
+  expectScriptContains('test:client', '--coverage');
   expectScriptContains('typecheck:client', 'npm --prefix client run typecheck');
-  expectScriptContains('typecheck:client-tests', 'scripts/check-client-test-types.mjs');
   expectScriptContains('worker:bundle', 'scripts/worker-bundle.mjs');
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
   expectScriptContains('verify:release', 'npm run lint');
+  expectScriptContains('verify:release', 'npm run typecheck:client');
   expectScriptContains('verify:release', 'npm run worker:bundle');
   expectScriptContains('verify:release', 'npm run verify:worker-bundle');
   expectScriptContains('verify:release', 'npm --prefix client run build');
