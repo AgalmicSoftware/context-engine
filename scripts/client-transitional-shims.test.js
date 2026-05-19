@@ -6,76 +6,78 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
-const PURE_TS_REEXPORT_RE = /^export \* from '\.\/[^']+\.ts';\s*$/;
+const CLIENT_SRC = path.join(ROOT, 'client/src');
+const ADJACENT_TS_REEXPORT_RE = /from ['"]\.\/[^'"]+\.ts['"]/;
+const PURE_TS_REEXPORT_LINE_RE = /^export (?:\*|\{\s*default\s*\}) from ['"]\.\/[^'"]+\.ts['"];\s*$/;
 
-const EXPECTED_COMPONENT_SHIM_CLUSTERS = Object.freeze({
-  'client/src/components/MainSite': Object.freeze([
-    'cacheConstants.js',
-    'debugTelemetry.js',
-    'litSessionConfig.js',
-    'mainSiteUtils.js',
-    'progressHelpers.js',
-    'reloadWindowLocation.js',
-    'routeConfig.js',
-    'routeLazyComponents.js',
-    'routeStyles.js',
-    'storageEviction.js',
-    'urlUtils.js',
-  ]),
-  'client/src/components/SBTs': Object.freeze([
-    'sbtSelectorSessionResolution.js',
-    'sbtSessionUniverse.js',
-  ]),
-  'client/src/components/Sessions': Object.freeze([
-    'cloudflareTokenTemplate.js',
-    'sessionWizardContracts.js',
-    'sessionWizardDraftCache.js',
-  ]),
-  'client/src/components/SurveyTool': Object.freeze([
-    'surveyToolCacheState.js',
-    'surveyToolDraftState.js',
-    'surveyToolNavigation.js',
-    'surveyToolResponseMerge.js',
-    'surveyToolResponseState.js',
-    'surveyToolRuntimeSupport.js',
-    'surveyToolScope.js',
-    'surveyToolSignatures.js',
-    'surveyToolSliderState.js',
-    'surveyToolSlugLookup.js',
-    'surveyToolViewState.js',
-  ]),
+const EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES = Object.freeze({
+  'client/src/variables/appConfig.js': 'initializes runtime config before re-exporting the typed config surface',
 });
 
-const readPureTsReexportShims = (relativeDir) => {
-  const absoluteDir = path.join(ROOT, relativeDir);
-  return fs.readdirSync(absoluteDir)
-    .filter((entry) => entry.endsWith('.js'))
-    .filter((entry) => {
-      const source = fs.readFileSync(path.join(absoluteDir, entry), 'utf8').trim();
-      return PURE_TS_REEXPORT_RE.test(source);
-    })
-    .sort();
+const stripLineComments = (source) => source
+  .replace(/^\s*\/\/[^\n]*(?:\n|$)/gm, '')
+  .trim();
+
+const listFiles = (absoluteDir) => {
+  const entries = fs.readdirSync(absoluteDir, { withFileTypes: true });
+  const files = [];
+
+  entries.forEach((entry) => {
+    const absolutePath = path.join(absoluteDir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...listFiles(absolutePath));
+      return;
+    }
+    if (entry.isFile()) {
+      files.push(absolutePath);
+    }
+  });
+
+  return files;
 };
 
-test('active component shim clusters stay explicitly inventoried during sequencing', () => {
-  Object.entries(EXPECTED_COMPONENT_SHIM_CLUSTERS).forEach(([relativeDir, expectedEntries]) => {
-    const actualEntries = readPureTsReexportShims(relativeDir);
-    const expectedSorted = [...expectedEntries].sort();
+const toRelativePath = (absolutePath) => path.relative(ROOT, absolutePath).split(path.sep).join('/');
 
-    assert.deepEqual(
-      actualEntries,
-      expectedSorted,
-      `${relativeDir} shim inventory changed; update cleanup tracking before adding or removing wrappers`,
+const listClientJsFiles = () => listFiles(CLIENT_SRC)
+  .filter((absolutePath) => absolutePath.endsWith('.js'))
+  .sort();
+
+const isPureTsReexportShim = (source) => {
+  const lines = stripLineComments(source)
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return lines.length > 0 && lines.every((line) => PURE_TS_REEXPORT_LINE_RE.test(line));
+};
+
+test('pure JS-to-TS re-export shims stay retired', () => {
+  const pureShims = listClientJsFiles()
+    .filter((absolutePath) => isPureTsReexportShim(fs.readFileSync(absolutePath, 'utf8')))
+    .map(toRelativePath);
+
+  assert.deepEqual(
+    pureShims,
+    [],
+    'pure JS wrappers should stay deleted; import the adjacent TS module through existing Vite/Jest compatibility instead',
+  );
+});
+
+test('remaining explicit JS-to-TS transitional files stay documented exceptions', () => {
+  const transitionalFiles = listClientJsFiles()
+    .filter((absolutePath) => ADJACENT_TS_REEXPORT_RE.test(fs.readFileSync(absolutePath, 'utf8')))
+    .map(toRelativePath);
+
+  assert.deepEqual(transitionalFiles, Object.keys(EXPECTED_NON_PURE_TS_TRANSITIONAL_FILES).sort());
+
+  transitionalFiles.forEach((relativePath) => {
+    const source = fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
+    assert.match(source, /initializeRuntimeConfig/);
+    assert.equal(
+      isPureTsReexportShim(source),
+      false,
+      `${relativePath} should remain a documented non-pure exception, not a pure wrapper`,
     );
-
-    expectedSorted.forEach((entry) => {
-      const tsImplementationPath = path.join(ROOT, relativeDir, entry.replace(/\.js$/, '.ts'));
-      assert.equal(
-        fs.existsSync(tsImplementationPath),
-        true,
-        `${path.join(relativeDir, entry)} should keep an adjacent TS implementation`,
-      );
-    });
   });
 });
 
