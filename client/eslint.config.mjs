@@ -27,6 +27,7 @@ const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}'];
 const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/**/*.{ts,tsx}'];
 const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}'];
 const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}'];
+const typedPolisReportComponentFiles = ['src/components/PolisReport/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -191,6 +192,17 @@ export default [
   },
   {
     files: typedCommunityTabComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedPolisReportComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
