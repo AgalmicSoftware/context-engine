@@ -13,6 +13,7 @@ const typedInformationalComponentFiles = [
   'src/components/InformationModals/**/*.{ts,tsx}',
   'src/components/Onboarding/**/*.{ts,tsx}',
 ];
+const typedMainContentComponentFiles = ['src/components/MainContent/**/*.{ts,tsx}'];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -100,6 +101,17 @@ export default [
   },
   {
     files: typedInformationalComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedMainContentComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,
