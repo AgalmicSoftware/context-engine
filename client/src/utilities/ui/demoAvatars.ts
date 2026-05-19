@@ -8,7 +8,34 @@ import {
   hasHistoricalFigureAvatar,
 } from './historicalFigureAvatars.js';
 
-type LooseRecord = Record<string, any>;
+type DemoAvatarInfo = {
+  url: string;
+  name: string;
+  fallbackInitials: string;
+  fallbackColor: string;
+  fallbackSeed: string;
+};
+
+type DemoFigureLike = {
+  id?: unknown;
+  name?: unknown;
+  displayName?: unknown;
+  username?: unknown;
+  aliases?: unknown;
+  polisParticipant?: unknown;
+  avatar?: unknown;
+};
+
+type AvatarRegistrationInput = {
+  names?: unknown[];
+  addresses?: unknown[];
+  usernames?: unknown[];
+  url?: unknown;
+};
+
+type HistoricalFiguresManifest = {
+  figures?: DemoFigureLike[];
+};
 
 const FALLBACK_COLORS = Object.freeze([
   '#5affc2',
@@ -54,6 +81,10 @@ const normalizeLookupKey = (value = ''): string => stripDiacritics(value)
 
 const normalizeAddress = (value = '') => String(value || '').trim().toLowerCase();
 
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
+
 const hashString = (value = ''): number => {
   let hash = 2166136261;
   const input = String(value || '');
@@ -81,7 +112,7 @@ const deriveFallbackInitials = (name = ''): string => {
     .join('');
 };
 
-const buildAvatarInfo = (name = '', url = '') => {
+const buildAvatarInfo = (name = '', url = ''): DemoAvatarInfo | null => {
   const normalizedName = String(name || '').trim();
 
   if (!normalizedName || !url) return null;
@@ -95,10 +126,10 @@ const buildAvatarInfo = (name = '', url = '') => {
   };
 };
 
-const avatarByAddress = new Map<string, LooseRecord>();
-const avatarByName = new Map<string, LooseRecord>();
+const avatarByAddress = new Map<string, DemoAvatarInfo>();
+const avatarByName = new Map<string, DemoAvatarInfo>();
 
-const resolveLocalAvatarUrl = ({ names = [], usernames = [] }: { names?: any[]; usernames?: any[] } = {}): string => {
+const resolveLocalAvatarUrl = ({ names = [], usernames = [] }: AvatarRegistrationInput = {}): string => {
   const normalizedUsernames = usernames
     .map((username) => String(username || '').trim())
     .filter(Boolean);
@@ -122,12 +153,7 @@ const registerAvatarInfo = ({
   addresses = [],
   usernames = [],
   url = '',
-}: {
-  names?: any[];
-  addresses?: any[];
-  usernames?: any[];
-  url?: unknown;
-} = {}): void => {
+}: AvatarRegistrationInput = {}): void => {
   const normalizedNames = names
     .map((name) => String(name || '').trim())
     .filter(Boolean);
@@ -159,11 +185,12 @@ const registerAvatarInfo = ({
     });
 };
 
-const mergedFigures = Array.isArray(historicalFiguresMerged?.figures)
-  ? historicalFiguresMerged.figures
+const mergedManifest = historicalFiguresMerged as HistoricalFiguresManifest;
+const mergedFigures = Array.isArray(mergedManifest?.figures)
+  ? mergedManifest.figures
   : [];
 
-const mergedFigureByKey = new Map();
+const mergedFigureByKey = new Map<string, DemoFigureLike>();
 
 mergedFigures.forEach((figure) => {
   mergedFigureByKey.set(String(figure?.name || '').trim(), figure);
@@ -182,8 +209,8 @@ mergedFigures.forEach((figure) => {
 });
 
 Object.entries(additionalHistoricalFigures || {}).forEach(([key, figure]) => {
-  const additionalFigure = figure as any;
-  const mergedFigure = mergedFigureByKey.get(String(key || '').trim()) as any;
+  const additionalFigure: DemoFigureLike = isRecord(figure) ? figure : {};
+  const mergedFigure = mergedFigureByKey.get(String(key || '').trim());
 
   registerAvatarInfo({
     names: [
@@ -198,7 +225,7 @@ Object.entries(additionalHistoricalFigures || {}).forEach(([key, figure]) => {
   });
 });
 
-(Array.isArray(historicalFigures) ? historicalFigures : []).forEach((figure) => {
+(Array.isArray(historicalFigures) ? historicalFigures as DemoFigureLike[] : []).forEach((figure) => {
   registerAvatarInfo({
     names: [figure?.name, figure?.username],
     usernames: [figure?.username],
@@ -206,7 +233,7 @@ Object.entries(additionalHistoricalFigures || {}).forEach(([key, figure]) => {
   });
 });
 
-(Array.isArray(policyAtlasCouncil) ? policyAtlasCouncil : []).forEach((entry) => {
+(Array.isArray(policyAtlasCouncil) ? policyAtlasCouncil as DemoFigureLike[] : []).forEach((entry) => {
   registerAvatarInfo({
     names: [entry?.name],
     addresses: [entry?.id],
@@ -214,15 +241,15 @@ Object.entries(additionalHistoricalFigures || {}).forEach(([key, figure]) => {
   });
 });
 
-const cloneAvatarInfo = (avatarInfo: LooseRecord | null): any => (avatarInfo ? { ...avatarInfo } : null);
+const cloneAvatarInfo = (avatarInfo: DemoAvatarInfo | null): DemoAvatarInfo | null => (avatarInfo ? { ...avatarInfo } : null);
 
-export const getDemoAvatar = (address = ''): any => {
+export const getDemoAvatar = (address = ''): DemoAvatarInfo | null => {
   const normalizedAddress = normalizeAddress(address);
   if (!normalizedAddress) return null;
   return cloneAvatarInfo(avatarByAddress.get(normalizedAddress) || null);
 };
 
-export const getDemoAvatarByName = (name = ''): any => {
+export const getDemoAvatarByName = (name = ''): DemoAvatarInfo | null => {
   const normalizedName = normalizeLookupKey(name);
   if (!normalizedName) return null;
   return cloneAvatarInfo(avatarByName.get(normalizedName) || null);
