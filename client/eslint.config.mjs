@@ -19,6 +19,10 @@ const typedAuxiliaryPageComponentFiles = [
   'src/components/Bookmarks/**/*.{ts,tsx}',
   'src/components/Sponsor/**/*.{ts,tsx}',
 ];
+const typedShellSupportComponentFiles = [
+  'src/components/ErrorBoundary/**/*.{ts,tsx}',
+  'src/components/RightSidebar/**/*.{ts,tsx}',
+];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -128,6 +132,17 @@ export default [
   },
   {
     files: typedAuxiliaryPageComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedShellSupportComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,

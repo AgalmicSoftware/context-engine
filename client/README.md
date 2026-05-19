@@ -35,7 +35,7 @@ npm test
 
 npm run lint
 # Run ESLint 9 with the flat config in `eslint.config.mjs`.
-# Includes JS/JSX, `src/utilities/ui`, shared UI, informational UI, MainContent, and auxiliary page components.
+# Includes JS/JSX, `src/utilities/ui`, shared UI, informational UI, MainContent, auxiliary page, and shell support components.
 
 npm start
 # Serve the production build.
