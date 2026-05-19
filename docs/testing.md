@@ -41,8 +41,11 @@ Client linting runs ESLint 9 through `client/eslint.config.mjs`; the flat
 config preserves the existing JavaScript/JSX lint surface plus React, React
 Hooks, and parser rule intent. TypeScript lint coverage starts with the
 `client/src/utilities/ui` utility boundary and shared UI components under
-`client/src/components/Shared`; broad TS/TSX lint expansion should be handled
-as separate rule-tightening changes.
+`client/src/components/Shared`, then extends to informational UI components
+under `client/src/components/About`, `client/src/components/Footer`,
+`client/src/components/InformationModals`, and `client/src/components/Onboarding`.
+Broad TS/TSX lint expansion should be handled as separate rule-tightening
+changes.
 
 ### Targeted Root Commands
 
