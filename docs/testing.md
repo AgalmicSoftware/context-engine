@@ -42,9 +42,9 @@ Hooks, and parser rule intent. TypeScript lint coverage starts with the
 `client/src/utilities/ui` utility boundary and shared UI components under
 `client/src/components/Shared`, then extends to informational UI components
 under `client/src/components/About`, `client/src/components/Footer`,
-`client/src/components/InformationModals`, and `client/src/components/Onboarding`.
-Broad TS/TSX lint expansion should be handled as separate rule-tightening
-changes.
+`client/src/components/InformationModals`, and `client/src/components/Onboarding`,
+plus the home-tab surface under `client/src/components/MainContent`. Broad
+TS/TSX lint expansion should be handled as separate rule-tightening changes.
 
 ### Targeted Root Commands
 
