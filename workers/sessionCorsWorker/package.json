@@ -18,5 +18,13 @@
   },
   "devDependencies": {
     "wrangler": "4.33.2"
+  },
+  "overrides": {
+    "asn1.js": {
+      "bn.js": "4.12.3"
+    },
+    "ethers": {
+      "ws": "8.20.1"
+    }
   }
 }

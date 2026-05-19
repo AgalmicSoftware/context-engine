@@ -9,7 +9,6 @@ const ROOT = path.resolve(__dirname, '..');
 
 const readJson = (relativePath) => JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), 'utf8'));
 const readText = (relativePath) => fs.readFileSync(path.join(ROOT, relativePath), 'utf8');
-const fileExists = (relativePath) => fs.existsSync(path.join(ROOT, relativePath));
 
 const getLockPackage = (lock, packagePath) => lock.packages?.[packagePath] || null;
 
@@ -47,16 +46,12 @@ test('sessionCorsWorker keeps narrow production audit overrides wired in lockfil
 test('accepted ethers v5 audit residuals are documented and bounded', () => {
   const rootPkg = readJson('package.json');
   const clientPkg = readJson('client/package.json');
-  const ceccPkg = fileExists('contextEngine-cc/package.json')
-    ? readJson('contextEngine-cc/package.json')
-    : null;
+  const ceccPkg = readJson('contextEngine-cc/package.json');
   const doc = readText('docs/dependency-audit-hotspots.md');
 
   assert.equal(rootPkg.devDependencies.ethers, '5.7.2');
   assert.equal(clientPkg.dependencies.ethers, '5.7.2');
-  if (ceccPkg) {
-    assert.equal(ceccPkg.dependencies.ethers, '5.7.2');
-  }
+  assert.equal(ceccPkg.dependencies.ethers, '5.7.2');
   assert.match(doc, /GHSA-848j-6mx2-7j84/);
   assert.match(doc, /client/);
   assert.match(doc, /contextEngine-cc/);
