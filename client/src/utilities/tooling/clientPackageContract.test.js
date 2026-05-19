@@ -26,6 +26,7 @@ const expectedLintCommand = [
   '"src/components/ErrorBoundary/**/*.{ts,tsx}"',
   '"src/components/RightSidebar/**/*.{ts,tsx}"',
   '"src/components/E2E/**/*.{ts,tsx}"',
+  '"src/components/TelegramDemoSetup/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -51,6 +52,7 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.eject).toBeUndefined();
     expect(pkg.scripts.start).not.toContain('vite');
     expect(eslintConfig).not.toContain('react-app');
+    expect(eslintConfig).toContain("const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
