@@ -54,7 +54,8 @@ Shell support coverage also includes `client/src/components/ErrorBoundary` and
 `client/src/components/CommunityTab`, Polis report coverage includes
 `client/src/components/PolisReport`, and DebateMap coverage includes
 `client/src/components/DebateMap`. Navbar coverage includes
-`client/src/components/Navbar`. Broad TS/TSX lint expansion should be
+`client/src/components/Navbar`, and ContractPage coverage includes
+`client/src/components/ContractPage`. Broad TS/TSX lint expansion should be
 handled as separate rule-tightening changes.
 
 ### Targeted Root Commands
