@@ -50,7 +50,8 @@ function vendorContextEngineCcEthersBundle() {
   const header =
     `/*! Vendored ethers UMD bundle v${expectedVersion} from the ethers npm package dist/ethers.umd.min.js */\n`;
   const source = fs.readFileSync(installed.bundlePath, 'utf8');
-  fs.writeFileSync(targetPath, header + source);
+  const normalizedSource = source.endsWith('\n') ? source : `${source}\n`;
+  fs.writeFileSync(targetPath, header + normalizedSource);
   return targetPath;
 }
 
