@@ -139,25 +139,6 @@
     "follow-redirects": "1.16.0",
     "@metamask/utils": "9.2.0"
   },
-  "babel": {
-    "presets": [
-      [
-        "@babel/preset-env",
-        {
-          "targets": {
-            "node": "current"
-          }
-        }
-      ],
-      [
-        "@babel/preset-react",
-        {
-          "runtime": "automatic"
-        }
-      ],
-      "@babel/preset-typescript"
-    ]
-  },
   "browserslist": [
     ">0.2%",
     "not dead",
