@@ -51,8 +51,9 @@ Shell support coverage also includes `client/src/components/ErrorBoundary` and
 `client/src/components/E2E`. Telegram demo setup coverage includes
 `client/src/components/TelegramDemoSetup`, and gate UI coverage includes
 `client/src/components/Gates`. Community tab coverage includes
-`client/src/components/CommunityTab`, and Polis report coverage includes
-`client/src/components/PolisReport`. Broad TS/TSX lint expansion should be
+`client/src/components/CommunityTab`, Polis report coverage includes
+`client/src/components/PolisReport`, and DebateMap coverage includes
+`client/src/components/DebateMap`. Broad TS/TSX lint expansion should be
 handled as separate rule-tightening changes.
 
 ### Targeted Root Commands
