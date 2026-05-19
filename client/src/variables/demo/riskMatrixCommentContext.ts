@@ -31,10 +31,34 @@ type EnrichableRiskCommentRecord = {
 };
 
 type CorpusEntryRecord = {
-  author?: string;
-  title?: string;
-  summary?: string;
-  url?: string;
+  author?: unknown;
+  title?: unknown;
+  summary?: unknown;
+  url?: unknown;
+};
+
+type CorpusMetaRecord = {
+  label?: unknown;
+};
+
+type CorpusRecord = {
+  entries?: unknown;
+};
+
+type CorpusSampleData = {
+  meta?: {
+    corpuses?: Record<string, CorpusMetaRecord>;
+  };
+  corpuses?: Record<string, CorpusRecord>;
+};
+
+type UnknownRecord = Record<string, unknown>;
+
+type CorpusRefInput = {
+  corpusId?: unknown;
+  label?: unknown;
+  note?: unknown;
+  url?: unknown;
 };
 
 const {
@@ -44,23 +68,30 @@ const {
 } = riskMatrixCommentContextData as RiskMatrixCommentContextData;
 
 const hasText = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+const isRecord = (value: unknown): value is UnknownRecord => (
+  typeof value === 'object' && value !== null
+);
+
+const isCorpusEntryRecord = (value: unknown): value is CorpusEntryRecord => isRecord(value);
+
+const corpusSampleData = corpusSample as CorpusSampleData;
 
 const RISK_MATRIX_CORPUS_LABEL_BY_ID = Object.freeze(
-  Object.entries((corpusSample as any)?.meta?.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
-    const label = hasText((corpusEntry as { label?: string })?.label)
-      ? String((corpusEntry as { label?: string }).label).trim()
+  Object.entries(corpusSampleData.meta?.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
+    const label = hasText(corpusEntry.label)
+      ? corpusEntry.label.trim()
       : '';
     if (label) acc[corpusId] = label;
     return acc;
   }, {} as Record<string, string>)
 );
 
-const normalizeCorpusUrl = (value = '') => String(value || '').trim().replace(/\/+$/g, '');
+const normalizeCorpusUrl = (value: unknown = '') => String(value || '').trim().replace(/\/+$/g, '');
 
 const CORPUS_ENTRY_BY_URL = Object.freeze(
-  Object.entries((corpusSample as any)?.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
-    const entries = Array.isArray((corpusEntry as { entries?: unknown[] })?.entries)
-      ? (corpusEntry as { entries?: CorpusEntryRecord[] }).entries || []
+  Object.entries(corpusSampleData.corpuses || {}).reduce((acc, [corpusId, corpusEntry]) => {
+    const entries = Array.isArray(corpusEntry.entries)
+      ? corpusEntry.entries.filter(isCorpusEntryRecord)
       : [];
 
     entries.forEach((entry) => {
@@ -77,10 +108,9 @@ const CORPUS_ENTRY_BY_URL = Object.freeze(
   }, {} as Record<string, { corpusId: string; entry: CorpusEntryRecord }>)
 );
 
-const isValidCorpusRef = (ref: unknown): ref is RiskMatrixCorpusRef => (
-  Boolean(ref)
-  && typeof ref === 'object'
-  && (hasText((ref as RiskMatrixCorpusRef).label) || hasText((ref as RiskMatrixCorpusRef).corpusId))
+const isValidCorpusRef = (ref: unknown): ref is CorpusRefInput => (
+  isRecord(ref)
+  && (hasText(ref.label) || hasText(ref.corpusId))
 );
 
 const normalizeCorpusRefs = (refs: unknown): RiskMatrixCorpusRef[] => {
