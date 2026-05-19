@@ -110,6 +110,7 @@ describe('arweaveScripts.uploadDataToArweave fallback routing', () => {
     expect(txId).toBe('tx-explicit');
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
     expect(String(fetchWorkerWithAuth.mock.calls[0][0])).toBe('https://selected.worker.example.test/arweave/upload');
+    expect(resolveCorsProxyUrl).not.toHaveBeenCalled();
   });
 
   it('normalizes arweave gateway URLs in worker upload responses to canonical tx ids', async () => {

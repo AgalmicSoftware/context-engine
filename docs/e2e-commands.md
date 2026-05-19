@@ -32,7 +32,7 @@ Porto-style test wallet.
 - Include deterministic chain context and send a real create tx:
   - `npm run ai:ux-workflows:chain-live`
 - End-to-end SessionRegistry gate verification (2 SBTs, 2 wallets, OR/AND behavior) against the worker `/auth/login` path:
-  - `WORKER_URL=https://<your-sessionCorsWorker>.workers.dev npm run ai:test-gates:any-all`
+  - `SESSION_WORKER_URL=https://<your-sessionCorsWorker>.workers.dev npm run ai:test-gates:any-all`
   - Output: `artifacts/session-workflows/gate-any-all-<slug>.json`
 - Seed a survey via UI automation (Playwright) with coverage for all core question types:
   - binary, rating, multichoice (multi-select), multichoice (single-select), freeform
@@ -86,7 +86,7 @@ Porto-style test wallet.
 For repeatable runs across machines, keep E2E configuration in a local file:
 
 1. `cp .env.e2e.example .env.e2e`
-2. Fill required values (`RPC_URL`, `WORKER_URL`, and `ARWEAVE_JWK_PATH` for doc flows).
+2. Fill required values (`RPC_URL`, `SESSION_WORKER_URL`, and `ARWEAVE_JWK_PATH` for doc flows).
 3. Run any `ai:*` command normally (scripts auto-load `.env.e2e.local`, then `.env.e2e`).
 
 For OP Sepolia on-chain runs, the built-in fallback is the first public RPC from the shared manifest. Set `RPC_URL` to your own reliable endpoint for longer E2E or seed runs because public RPCs can rate-limit or time out.
@@ -115,7 +115,7 @@ Environment variables supported by `ai:mint-test-sbt`:
 
 Environment variables supported by `ai:test-gates:any-all`:
 
-- `WORKER_URL` (optional; defaults to SessionRegistry `corsWorkerUrl` for the slug if set, otherwise `CLOUDFLARE_CORS_WORKER_URL` from `client/src/variables/appConfig.js`)
+- `SESSION_WORKER_URL` (optional; legacy `WORKER_URL` is accepted only when it does not look like `agentBridgeWorker`; otherwise defaults to SessionRegistry `corsWorkerUrl` for the slug if set, then `CLOUDFLARE_CORS_WORKER_URL` from `client/src/variables/appConfig.js`)
 - `RPC_URL` (default: OP Sepolia public RPC)
 - `CHAIN_ID` (default: `11155420`)
 - `SESSION_REGISTRY` (default: OP Sepolia SessionRegistry)
@@ -158,7 +158,7 @@ Environment variables supported by `ai:test-gated-decrypt:all-types`:
 - `SESSION_SLUG` (optional explicit slug; when unset, the runner generates a fresh timestamped slug)
 - `RPC_URL`, `CHAIN_ID`, `SESSION_REGISTRY`, `SBT_FACTORY` (OP Sepolia defaults)
 - `PASSKEY_A` and `PASSKEY_B` (wallet rawIds; defaults are fixture values)
-- `WORKER_URL` (optional override; by default read from on-chain `corsWorkerUrl`)
+- `SESSION_WORKER_URL` (optional override; legacy `WORKER_URL` is accepted only for sessionCorsWorker URLs; by default read from on-chain `corsWorkerUrl`)
 - `FUND_WALLET_B` (ETH amount transferred from walletA to walletB if walletB is empty)
 - `PLAYWRIGHT_CORE_PATH` and `PLAYWRIGHT_EXECUTABLE_PATH` (optional UI phase overrides)
 - `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE` (optional; e.g. `mac-arm64` to force arm64 browser resolution)
