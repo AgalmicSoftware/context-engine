@@ -14,6 +14,11 @@ const typedInformationalComponentFiles = [
   'src/components/Onboarding/**/*.{ts,tsx}',
 ];
 const typedMainContentComponentFiles = ['src/components/MainContent/**/*.{ts,tsx}'];
+const typedAuxiliaryPageComponentFiles = [
+  'src/components/Agent/**/*.{ts,tsx}',
+  'src/components/Bookmarks/**/*.{ts,tsx}',
+  'src/components/Sponsor/**/*.{ts,tsx}',
+];
 
 const sharedLanguageOptions = {
   parser: tsParser,
@@ -112,6 +117,17 @@ export default [
   },
   {
     files: typedMainContentComponentFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedAuxiliaryPageComponentFiles,
     languageOptions: sharedLanguageOptions,
     plugins: reactPlugins,
     settings: reactSettings,

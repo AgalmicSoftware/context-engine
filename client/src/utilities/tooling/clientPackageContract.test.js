@@ -20,6 +20,9 @@ const expectedLintCommand = [
   '"src/components/InformationModals/**/*.{ts,tsx}"',
   '"src/components/Onboarding/**/*.{ts,tsx}"',
   '"src/components/MainContent/**/*.{ts,tsx}"',
+  '"src/components/Agent/**/*.{ts,tsx}"',
+  '"src/components/Bookmarks/**/*.{ts,tsx}"',
+  '"src/components/Sponsor/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -235,6 +238,10 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("'src/components/InformationModals/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'src/components/Onboarding/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("const typedMainContentComponentFiles = ['src/components/MainContent/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain('const typedAuxiliaryPageComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/Agent/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Bookmarks/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/Sponsor/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
