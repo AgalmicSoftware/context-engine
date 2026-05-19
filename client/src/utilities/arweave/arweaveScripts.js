@@ -352,14 +352,16 @@ const buildUploadSessionCandidates = async ({
     const source = orderedSources[index];
     const slug = source.slug;
     let resolved = null;
-    try {
-      resolved = await resolveCorsProxyUrl({
-        sessionSlug: slug,
-        context,
-        allowDemoFallback: defaultStrictAllowDemoFallback(),
-      });
-    } catch (_) {
-      resolved = null;
+    if (!source.explicitWorkerUrl) {
+      try {
+        resolved = await resolveCorsProxyUrl({
+          sessionSlug: slug,
+          context,
+          allowDemoFallback: defaultStrictAllowDemoFallback(),
+        });
+      } catch (_) {
+        resolved = null;
+      }
     }
     const workerUrl = source.explicitWorkerUrl
       ? source.explicitWorkerUrl

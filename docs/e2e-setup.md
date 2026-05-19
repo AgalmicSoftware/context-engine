@@ -33,7 +33,7 @@ Arweave is public and permanent. Use non-identifying payloads only.
 1. `cp .env.e2e.example .env.e2e`
 2. Set at minimum:
    - `RPC_URL`
-   - `WORKER_URL` (recommended for determinism; runners can fall back to on-chain/global defaults)
+   - `SESSION_WORKER_URL` (recommended for determinism; legacy `WORKER_URL` still works when it is clearly a sessionCorsWorker)
    - `ARWEAVE_JWK_PATH` (required for doc upload/decrypt flows)
      - Verify the configured key with `npm run -s arweave:jwk:inspect -- --expect-address <known-address>`
    - For Session Wizard custom-worker flows:
@@ -142,13 +142,16 @@ Arweave-required flows:
 ## Worker URL Resolution + Bootstrap
 
 Runners that need the CORS worker will resolve a base URL in this order:
-1. CLI `--worker-url` (when supported), then env `WORKER_URL`
-2. On-chain `corsWorkerUrl` from the SessionRegistry for the `SESSION_SLUG` (http/https only; non-URL strings are ignored)
-3. Shared global fallback from client config (`CLOUDFLARE_CORS_WORKER_URL` in `client/src/variables/appConfig.js`, used for general/default-session fallback)
+1. CLI `--worker-url` when supported, then env `SESSION_WORKER_URL`, `SESSION_CORS_WORKER_URL`, `CE_SESSION_WORKER_BASE_URL`, `AGENT_BRIDGE_SESSION_WORKER_URL`, or `CORS_WORKER_URL`
+2. Legacy env `WORKER_URL`, unless it appears to point at `agentBridgeWorker`
+3. On-chain `corsWorkerUrl` from the SessionRegistry for the `SESSION_SLUG` (http/https only; non-URL strings are ignored)
+4. Shared global fallback from client config (`CLOUDFLARE_CORS_WORKER_URL` in `client/src/variables/appConfig.js`, used for general/default-session fallback)
 
 Reuse-first behavior:
-- If `WORKER_URL` is set and works, runners will reuse it.
-- If `WORKER_URL` is set but broken, runners will try on-chain/global fallbacks and report which one was selected.
+- If `SESSION_WORKER_URL` is set and works, runners will reuse it.
+- `WORKER_URL` remains a legacy session-worker alias. If it looks like an agent bridge URL, normal session-worker E2E ignores it and leaves it available as `AGENT_BRIDGE_PUBLIC_URL`.
+- Set `E2E_ALLOW_WORKER_URL_AGENT_BRIDGE=1` only for explicit bridge tests that intentionally overload `WORKER_URL`.
+- Keep Telegram/agent bridge endpoints in `AGENT_BRIDGE_PUBLIC_URL`; do not use them as session-worker inputs for the normal suite.
 
 Bootstrap behavior:
 - Runners probe `/auth/nonce` + `/auth/login` for the admin/holder wallet used by the flow.
@@ -207,6 +210,7 @@ Suite flags:
 - `E2E_SUITE_INCLUDE_AI=1 E2E_AI_MOCK=1 npm run -s test:e2e`
 - `E2E_SUITE_INCLUDE_AGENT=1 E2E_AGENT_MODE=1 E2E_AI_MOCK=1 npm run -s test:e2e`
 - `E2E_SUITE_CONTINUE=1 npm run -s test:e2e` (run all steps, then exit non-zero if any failed)
+- Full private suites create a fresh session target by default before child steps. When `CLOUDFLARE_API_TOKEN` is set, the default fresh profile is `custom-worker-secrets-v1` so the target session gets its own worker and slug-scoped secrets. Without a token the fallback profile is `default-worker-minimal-v1`, which is only appropriate when the shared/default worker accepts the target session slug. Set `E2E_SUITE_ENSURE_SESSION=0` to skip setup, `E2E_SUITE_REUSE_SESSION_TARGET=1` to reuse `SESSION_SLUG` or the latest active target, or `E2E_SUITE_SESSION_PROFILE=...` to choose explicitly.
 
 Navigation is included in the default suite via `scripts/test-navigation-smoke.js`.
 
@@ -247,7 +251,7 @@ Session Wizard env contract:
 Arweave modes for `ai:test-sbt-metadata-locks`:
 - default/stable: `E2E_ARWEAVE_MOCK=1`
 - live/manual follow-up: `E2E_ARWEAVE_MOCK=0 ARWEAVE_JWK_PATH=/abs/path/to/test-jwk.json`
-- live mode also expects a worker that can authenticate and upload for the chosen `SESSION_SLUG` (`WORKER_URL=...`)
+- live mode also expects a worker that can authenticate and upload for the chosen `SESSION_SLUG` (`SESSION_WORKER_URL=...`)
 
 ### Profile (`/u/:address`)
 
@@ -299,7 +303,7 @@ These flows are intended to run with `E2E_AI_MOCK=1` for determinism:
 ### AI Smoke (Real Provider, Opt-in)
 
 To verify real provider wiring (non-deterministic output, slower, can fail if your worker has no AI secrets):
-- Ensure `WORKER_URL` points at a `sessionCorsWorker` with `scopes.ai=true` and provider keys configured (or set local AI keys in the UI).
+- Ensure `SESSION_WORKER_URL` points at a `sessionCorsWorker` with `scopes.ai=true` and provider keys configured (or set local AI keys in the UI).
   - See: `docs/session-cors-worker.md`
 - Ensure `SESSION_SLUG` points at an existing session with the expected Polis data available.
 - Run without the client-side mock:
