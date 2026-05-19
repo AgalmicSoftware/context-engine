@@ -86,11 +86,7 @@ Porto-style test wallet.
 For repeatable runs across machines, keep E2E configuration in a local file:
 
 1. `cp .env.e2e.example .env.e2e`
-2. Fill common values:
-   - `RPC_URL`
-   - `ARWEAVE_JWK_PATH` for Arweave/doc/manual-follow-up flows
-   - For fresh full private runs, set `CLOUDFLARE_API_TOKEN` and let session setup create the session worker URL
-   - For reuse-only runs, set both `SESSION_SLUG` and `SESSION_WORKER_URL` from a recent successful E2E session setup
+2. Fill required values (`RPC_URL`, `SESSION_WORKER_URL`, and `ARWEAVE_JWK_PATH` for doc flows).
 3. Run any `ai:*` command normally (scripts auto-load `.env.e2e.local`, then `.env.e2e`).
 
 For OP Sepolia on-chain runs, the built-in fallback is the first public RPC from the shared manifest. Set `RPC_URL` to your own reliable endpoint for longer E2E or seed runs because public RPCs can rate-limit or time out.

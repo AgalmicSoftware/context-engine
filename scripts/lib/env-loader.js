@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { sanitizeSessionWorkerEnv } = require('./session-worker-env');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const LOADER_FLAG = '__CE_E2E_ENV_LOADER_INITIALIZED__';
@@ -129,6 +130,8 @@ if (!global[LOADER_FLAG]) {
     console.log(`[e2e-env] no env file loaded (checked: ${listed})`);
   }
 
+  const sessionWorkerEnv = sanitizeSessionWorkerEnv(process.env);
+
   // Non-fatal prereq warnings (do not edit `.env.e2e.local` automatically).
   const warn = (msg) => {
     try {
@@ -143,8 +146,12 @@ if (!global[LOADER_FLAG]) {
     warn('RPC_URL is not set. Public RPCs are often rate-limited; set RPC_URL in `.env.e2e.local`/`.env.e2e` for more reliable on-chain runs.');
   }
 
-  if (!has('WORKER_URL')) {
-    warn('WORKER_URL is not set. Runners will try on-chain `corsWorkerUrl` and then the client default worker URL, but setting WORKER_URL is more deterministic.');
+  if (sessionWorkerEnv.ignored.some((entry) => entry.key === 'WORKER_URL')) {
+    warn('WORKER_URL appears to point at the agent bridge worker, so normal session-worker E2E is ignoring it. Set SESSION_WORKER_URL for sessionCorsWorker, or E2E_ALLOW_WORKER_URL_AGENT_BRIDGE=1 to force legacy WORKER_URL usage.');
+  }
+
+  if (!has('SESSION_WORKER_URL') && !has('WORKER_URL')) {
+    warn('SESSION_WORKER_URL / WORKER_URL is not set. Runners will try on-chain `corsWorkerUrl` and then the client default worker URL, but setting SESSION_WORKER_URL is more deterministic.');
   }
 
   if (!has('ARWEAVE_JWK_PATH') && !has('ARWEAVE_JWK_JSON') && !has('ARWEAVE_JWK')) {
