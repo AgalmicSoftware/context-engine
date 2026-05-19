@@ -18,6 +18,11 @@ type AgreementRate = UnknownRecord & {
   groupName?: unknown;
 };
 
+type ResolvedAgreementRate = UnknownRecord & {
+  rate: number;
+  groupName: string;
+};
+
 type BeeswarmPoint = UnknownRecord & {
   extremity?: unknown;
   x?: number;
@@ -53,9 +58,9 @@ type ResponseAggregate = {
 };
 
 type ComparisonReportGroupRate = {
-  groupName: unknown;
-  segmentKey: unknown;
-  rate: number | undefined;
+  groupName: string;
+  segmentKey: string;
+  rate: number;
 };
 
 export type ComparisonReportRow = {
@@ -104,6 +109,10 @@ type IndicatorHeatmapData = {
   columnLabels: string[];
   pivotData: Array<Array<number | null>>;
 };
+
+const isFiniteNumber = (value: unknown): value is number => (
+  typeof value === 'number' && Number.isFinite(value)
+);
 
 export const parseSegmentKey = (segmentKey: unknown = ''): SegmentDescriptor => {
   const normalized = String(segmentKey || '').trim();
@@ -169,20 +178,35 @@ export const calculateDivisiveness = (
   return Math.max(0, Math.min(divergence / 0.5, 1));
 };
 
-export const getMinMaxAgreement = (groupRates: AgreementRate[] = []) => {
+export const getMinMaxAgreement = (groupRates: AgreementRate[] = []): {
+  min: ResolvedAgreementRate;
+  max: ResolvedAgreementRate;
+} => {
   if (!Array.isArray(groupRates) || groupRates.length === 0) {
     return { min: { rate: 0, groupName: 'N/A' }, max: { rate: 0, groupName: 'N/A' } };
   }
 
-  let min = groupRates[0];
-  let max = groupRates[0];
+  const normalizedRates = groupRates
+    .map((entry) => ({
+      ...entry,
+      groupName: String(entry?.groupName || 'N/A'),
+      rate: Number(entry?.rate || 0),
+    }))
+    .filter((entry): entry is ResolvedAgreementRate => isFiniteNumber(entry.rate));
+  if (!normalizedRates.length) {
+    return { min: { rate: 0, groupName: 'N/A' }, max: { rate: 0, groupName: 'N/A' } };
+  }
 
-  for (let index = 1; index < groupRates.length; index += 1) {
-    if (groupRates[index].rate < min.rate) {
-      min = groupRates[index];
+  let min = normalizedRates[0];
+  let max = normalizedRates[0];
+
+  for (let index = 1; index < normalizedRates.length; index += 1) {
+    const rate = normalizedRates[index];
+    if (rate.rate < min.rate) {
+      min = rate;
     }
-    if (groupRates[index].rate > max.rate) {
-      max = groupRates[index];
+    if (rate.rate > max.rate) {
+      max = rate;
     }
   }
 
@@ -215,7 +239,7 @@ export const beeswarmByExtremity = (
       let layer = 0;
 
       const collides = (x: number, y: number) => placed.some((existing) => (
-        Math.hypot(existing.x - x, existing.y - y) < radius * 2
+        Math.hypot(Number(existing.x || 0) - x, Number(existing.y || 0) - y) < radius * 2
       ));
 
       while (collides(point.x, candidateY)) {
@@ -284,12 +308,15 @@ export const buildComparisonReportRows = ({
     const divisiveness = calculateDivisiveness(ratesBySegment, selectedSegmentKeys);
     if (divergence == null || !Number.isFinite(divergence)) return;
     const groupRates = comparisonGroups
-      .map((group) => ({
-        groupName: group?.name || getSegmentDisplayName(group?.segmentKey),
-        segmentKey: group?.segmentKey,
-        rate: ratesBySegment.get(group?.segmentKey),
-      }))
-      .filter((entry) => Number.isFinite(entry.rate));
+      .map((group) => {
+        const segmentKey = String(group?.segmentKey || '');
+        return {
+          groupName: String(group?.name || getSegmentDisplayName(segmentKey)),
+          segmentKey,
+          rate: ratesBySegment.get(segmentKey),
+        };
+      })
+      .filter((entry): entry is ComparisonReportGroupRate => isFiniteNumber(entry.rate));
     if (groupRates.length < 2) return;
     rows.push({
       questionId,
@@ -347,9 +374,11 @@ export const findMostDivergentPairs = ({
 
       let bestResult: DivergentPairResult | null = null;
       responseMap.forEach(({ questionId, ratesBySegment }) => {
-        const leftRate = ratesBySegment.get(leftSegment);
-        const rightRate = ratesBySegment.get(rightSegment);
-        if (!Number.isFinite(leftRate) || !Number.isFinite(rightRate)) return;
+        const leftRateCandidate = ratesBySegment.get(leftSegment);
+        const rightRateCandidate = ratesBySegment.get(rightSegment);
+        if (!isFiniteNumber(leftRateCandidate) || !isFiniteNumber(rightRateCandidate)) return;
+        const leftRate = leftRateCandidate;
+        const rightRate = rightRateCandidate;
 
         const leftCount = Number(segmentCounts?.[questionId]?.[leftSegment] || 0);
         const rightCount = Number(segmentCounts?.[questionId]?.[rightSegment] || 0);
@@ -391,10 +420,9 @@ export const buildIndicatorHeatmapData = ({
     const category = String(question?.category || '').trim();
     const questionId = String(question?.id || '').trim();
     if (!category || !questionId) return;
-    if (!categoryQuestionIds.has(category)) {
-      categoryQuestionIds.set(category, []);
-    }
-    categoryQuestionIds.get(category).push(questionId);
+    const existingQuestionIds = categoryQuestionIds.get(category) || [];
+    existingQuestionIds.push(questionId);
+    categoryQuestionIds.set(category, existingQuestionIds);
   });
 
   const columnLabels = ['Agree', 'Unsure', 'Disagree'];

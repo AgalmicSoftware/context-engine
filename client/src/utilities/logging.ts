@@ -87,7 +87,7 @@ const defaultCategories = DEFAULT_LOGGING_CONFIG.categories as Record<string, bo
 const defaultLevels = DEFAULT_LOGGING_CONFIG.levels as Record<string, boolean>;
 
 const getRuntimeWindow = (): LoggingRuntimeWindow | null => (
-  typeof window === 'undefined' ? null : window as LoggingRuntimeWindow
+  typeof window === 'undefined' ? null : window as unknown as LoggingRuntimeWindow
 );
 
 const cloneDefaults = (): LoggingConfig => ({
