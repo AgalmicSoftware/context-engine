@@ -17,7 +17,7 @@ const isDevToolsEnabled = (): boolean => (
 
 export const composeWithOptionalDevTools = (...enhancers: StoreEnhancer[]): StoreEnhancer => {
   const composeEnhancer = isDevToolsEnabled()
-    ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
+    ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ as ComposeLike
     : (compose as unknown as ComposeLike);
   return composeEnhancer(...enhancers);
 };

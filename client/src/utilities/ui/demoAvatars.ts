@@ -79,7 +79,7 @@ const normalizeLookupKey = (value = ''): string => stripDiacritics(value)
   .replace(/[^a-zA-Z0-9]+/g, '')
   .toLowerCase();
 
-const normalizeAddress = (value = '') => String(value || '').trim().toLowerCase();
+const normalizeAddress = (value: unknown = '') => String(value || '').trim().toLowerCase();
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -178,7 +178,7 @@ const registerAvatarInfo = ({
   });
 
   addresses
-    .map(normalizeAddress)
+    .map((address) => normalizeAddress(address))
     .filter(Boolean)
     .forEach((address) => {
       avatarByAddress.set(address, avatarInfo);

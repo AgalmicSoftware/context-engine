@@ -105,7 +105,16 @@ import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainBy
 import { createLogger } from 'utilities/logging.js';
 
 const accountLog = createLogger('account');
-const AccountUserPage = React.lazy(() => import("components/UserPage/UserPage"));
+type AccountUserPageProps = {
+  viewAddress?: string;
+  account?: string;
+  provider?: string;
+  minimized?: boolean;
+  network?: unknown;
+};
+const AccountUserPage = React.lazy(
+  () => import("components/UserPage/UserPage")
+) as React.LazyExoticComponent<React.ComponentType<AccountUserPageProps>>;
 
 type LoginAndSettingsRecord = Record<string, any>;
 
@@ -948,10 +957,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   switchToCorrectNetwork: any = async () => {
-    if (window.ethereum && this.props.provider === "wagmi") {
+    const ethereum = window.ethereum;
+    if (ethereum && this.props.provider === "wagmi") {
       const tn = this.getTargetNetwork();
       const chainIdHex = chainHexId(tn);
-      const switchToTargetNetwork = () => window.ethereum.request({
+      const switchToTargetNetwork = () => ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: chainIdHex }],
       });

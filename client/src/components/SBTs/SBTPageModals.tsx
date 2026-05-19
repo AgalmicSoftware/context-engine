@@ -19,7 +19,7 @@ type SbtPageHolderModalProps = {
   isOpen: boolean;
   onClose: () => void;
   showHeaderCount: boolean;
-  holdersDisplayCount: number;
+  holdersDisplayCount: string;
   showCornerSpinner: boolean;
   holderItemsForFilter: unknown[];
   provider?: unknown;
@@ -33,8 +33,8 @@ type SbtPageHolderModalProps = {
   hasFilteredHolders: boolean;
   hasComputedHolders: boolean;
   showScanProgressInModal: boolean;
-  scanProgressText: string;
-  scanProgressSessionText: string;
+  scanProgressText: string | null;
+  scanProgressSessionText: string | null;
   scanProgressPct: number;
   scanProgressFillStyle: React.CSSProperties;
   showEmptyStateInModal: boolean;
