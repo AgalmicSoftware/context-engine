@@ -4,7 +4,35 @@ import globals from 'globals';
 import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
-const sourceFiles = ['src/**/*.{js,jsx,mjs,cjs}'];
+const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}'];
+const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}'];
+
+const sharedLanguageOptions = {
+  parser: tsParser,
+  ecmaVersion: 2021,
+  sourceType: 'module',
+  parserOptions: {
+    ecmaFeatures: {
+      jsx: true,
+    },
+  },
+  globals: {
+    ...globals.browser,
+    ...globals.es2021,
+    ...globals.jest,
+    ...globals.node,
+    globalThis: 'readonly',
+  },
+};
+
+const sharedRules = {
+  ...js.configs.recommended.rules,
+  'no-unused-vars': 'off',
+  'no-console': ['warn', { allow: ['info', 'warn', 'error'] }],
+  'no-empty': 'off',
+  'no-extra-semi': 'off',
+  'no-redeclare': 'off',
+};
 
 export default [
   {
@@ -14,24 +42,8 @@ export default [
     },
   },
   {
-    files: sourceFiles,
-    languageOptions: {
-      parser: tsParser,
-      ecmaVersion: 2021,
-      sourceType: 'module',
-      parserOptions: {
-        ecmaFeatures: {
-          jsx: true,
-        },
-      },
-      globals: {
-        ...globals.browser,
-        ...globals.es2021,
-        ...globals.jest,
-        ...globals.node,
-        globalThis: 'readonly',
-      },
-    },
+    files: javascriptFiles,
+    languageOptions: sharedLanguageOptions,
     plugins: {
       react: reactPlugin,
       'react-hooks': reactHooksPlugin,
@@ -42,19 +54,22 @@ export default [
       },
     },
     rules: {
-      ...js.configs.recommended.rules,
+      ...sharedRules,
       ...reactPlugin.configs.flat.recommended.rules,
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
-      'no-unused-vars': 'off',
-      'no-console': ['warn', { allow: ['info', 'warn', 'error'] }],
-      'no-empty': 'off',
-      'no-extra-semi': 'off',
-      'no-redeclare': 'off',
       'react/display-name': 'off',
       'react/prop-types': 'off',
       'react/react-in-jsx-scope': 'off',
       'react/jsx-uses-react': 'off',
+    },
+  },
+  {
+    files: typedUiUtilityFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
     },
   },
 ];
