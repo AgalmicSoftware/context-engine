@@ -19,6 +19,7 @@ const expectedLintCommand = [
   '"src/components/Footer/**/*.{ts,tsx}"',
   '"src/components/InformationModals/**/*.{ts,tsx}"',
   '"src/components/Onboarding/**/*.{ts,tsx}"',
+  '"src/components/MainContent/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -233,6 +234,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("'src/components/Footer/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'src/components/InformationModals/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'src/components/Onboarding/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("const typedMainContentComponentFiles = ['src/components/MainContent/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
