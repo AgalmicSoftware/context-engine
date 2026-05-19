@@ -23,6 +23,8 @@ const expectedLintCommand = [
   '"src/components/Agent/**/*.{ts,tsx}"',
   '"src/components/Bookmarks/**/*.{ts,tsx}"',
   '"src/components/Sponsor/**/*.{ts,tsx}"',
+  '"src/components/ErrorBoundary/**/*.{ts,tsx}"',
+  '"src/components/RightSidebar/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -242,6 +244,9 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("'src/components/Agent/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'src/components/Bookmarks/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'src/components/Sponsor/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain('const typedShellSupportComponentFiles = [');
+    expect(eslintConfig).toContain("'src/components/ErrorBoundary/**/*.{ts,tsx}'");
+    expect(eslintConfig).toContain("'src/components/RightSidebar/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");

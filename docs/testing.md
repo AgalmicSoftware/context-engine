@@ -46,7 +46,9 @@ under `client/src/components/About`, `client/src/components/Footer`,
 plus the home-tab surface under `client/src/components/MainContent` and
 auxiliary pages under `client/src/components/Agent`,
 `client/src/components/Bookmarks`, and `client/src/components/Sponsor`.
-Broad TS/TSX lint expansion should be handled as separate rule-tightening changes.
+Shell support coverage also includes `client/src/components/ErrorBoundary` and
+`client/src/components/RightSidebar`. Broad TS/TSX lint expansion should be
+handled as separate rule-tightening changes.
 
 ### Targeted Root Commands
 
