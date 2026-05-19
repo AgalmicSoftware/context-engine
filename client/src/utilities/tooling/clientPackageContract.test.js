@@ -28,6 +28,7 @@ const expectedLintCommand = [
   '"src/components/E2E/**/*.{ts,tsx}"',
   '"src/components/TelegramDemoSetup/**/*.{ts,tsx}"',
   '"src/components/Gates/**/*.{ts,tsx}"',
+  '"src/components/CommunityTab/**/*.{ts,tsx}"',
 ].join(' ');
 
 describe('client package modernization contract', () => {
@@ -55,6 +56,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).not.toContain('react-app');
     expect(eslintConfig).toContain("const typedTelegramDemoSetupComponentFiles = ['src/components/TelegramDemoSetup/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
   });
 
   it('keeps web3-sensitive dependencies pinned during modernization', () => {
@@ -254,6 +256,7 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("'src/components/RightSidebar/**/*.{ts,tsx}'");
     expect(eslintConfig).toContain("const typedDevSupportComponentFiles = ['src/components/E2E/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("'react-hooks': reactHooksPlugin");
     expect(eslintConfig).not.toContain("import importPlugin from 'eslint-plugin-import'");
     expect(eslintConfig).not.toContain("import prettierPlugin from 'eslint-plugin-prettier'");
