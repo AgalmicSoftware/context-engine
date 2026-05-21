@@ -73,19 +73,13 @@ type ResolveSbtListChipSelectedSessionSlugsArgs = {
   selectedSlug?: unknown;
   wasSelected?: unknown;
 };
-export type SbtListSessionUniverseSnapshot = {
-  fallbackEntryCount: number;
-  registryEntryCount: number;
-  registryHydrated: boolean;
-  slugs: string[];
-};
-export type SbtListSessionUniverseSnapshotLike = {
+type SbtListSessionUniverseSnapshotLike = {
   fallbackEntryCount?: unknown;
   registryEntryCount?: unknown;
   registryHydrated?: unknown;
   slugs?: unknown;
 };
-type ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext = TPrevious> = {
+type ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext> = {
   nextSnapshot?: TNext;
   previousSnapshot?: TPrevious;
 };
@@ -229,25 +223,13 @@ export const resolveSbtListActionableSessionSlugs = (slugs: unknown = []): strin
   )
 );
 
-export function resolveSbtListSessionUniverseSnapshotUpdate<
-  TSnapshot extends SbtListSessionUniverseSnapshotLike
->(args: {
-  nextSnapshot: TSnapshot;
-  previousSnapshot: TSnapshot;
-}): TSnapshot;
-export function resolveSbtListSessionUniverseSnapshotUpdate<
-  TPrevious extends SbtListSessionUniverseSnapshotLike = SbtListSessionUniverseSnapshotLike,
-  TNext extends SbtListSessionUniverseSnapshotLike = TPrevious
->(
-  args?: ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext>
-): TPrevious | TNext | undefined;
-export function resolveSbtListSessionUniverseSnapshotUpdate({
+export const resolveSbtListSessionUniverseSnapshotUpdate = <
+  TPrevious = unknown,
+  TNext = unknown
+>({
   nextSnapshot,
   previousSnapshot,
-}: ResolveSbtListSessionUniverseSnapshotUpdateArgs<
-  SbtListSessionUniverseSnapshotLike,
-  SbtListSessionUniverseSnapshotLike
-> = {}): SbtListSessionUniverseSnapshotLike | undefined {
+}: ResolveSbtListSessionUniverseSnapshotUpdateArgs<TPrevious, TNext> = {}): TPrevious | TNext | undefined => {
   const prev = (previousSnapshot && typeof previousSnapshot === 'object')
     ? previousSnapshot as SbtListSessionUniverseSnapshotLike
     : {};
@@ -271,7 +253,7 @@ export function resolveSbtListSessionUniverseSnapshotUpdate({
     return previousSnapshot;
   }
   return nextSnapshot;
-}
+};
 
 export const resolveSbtListDefaultSelectedSessionSlugs = ({
   displayedSessionUniverseSlugs = [],
