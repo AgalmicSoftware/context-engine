@@ -58,6 +58,8 @@ npm run build
 ```
 
 The output directory is `client/build/`.
+Before building, the build script removes stale legacy `client/build-vite/` and
+`client/vite-build/` directories if they exist locally.
 
 ### 3. Upload to Netlify
 
@@ -67,6 +69,11 @@ connected repo deploy, set the publish directory to:
 ```text
 client/build
 ```
+
+Do not upload `client/build-vite/` or `client/vite-build/`. Those names are
+legacy ignored artifacts from older local builds and can contain partial or
+stale CSS output. If a Netlify deploy looks unstyled or low-contrast, rebuild
+from `client/` and upload the fresh `client/build/` directory.
 
 Because the app uses client-side routing, configure an SPA route fallback. Either
 include a Netlify `_redirects` file in the published build output:
