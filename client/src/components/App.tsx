@@ -251,12 +251,20 @@ const subscribeToHistorySync = (onChange: () => void) => {
   };
 };
 
+const getColdLoadOnboardingPathname = () => {
+  try {
+    return window.location?.pathname || '';
+  } catch (_) {
+    return '';
+  }
+};
+
 try {
-  _coldLoadSnapshot = readColdLoadOnboardingState(window.localStorage);
+  _coldLoadSnapshot = readColdLoadOnboardingState(window.localStorage, getColdLoadOnboardingPathname());
   firstVisit = _coldLoadSnapshot.firstVisit;
 } catch (_) {
   try {
-    _coldLoadSnapshot = readColdLoadOnboardingState(window.sessionStorage);
+    _coldLoadSnapshot = readColdLoadOnboardingState(window.sessionStorage, getColdLoadOnboardingPathname());
     firstVisit = _coldLoadSnapshot.firstVisit;
   } catch (__) {
     firstVisit = false;

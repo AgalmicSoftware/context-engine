@@ -18,7 +18,7 @@ near-term action is lazy-loading or intentional replacement, not deletion.
 | `build/assets/cip_photo-374b6724.png` | 999.48 KB | `client/src/assets/img/cip_photo.png` | About page | Keep; replacement/compression needs visual review. |
 | `build/assets/art_header-db45a080.png` | 868.92 KB | `client/src/assets/img/art_header.png` | ToolExplorer visuals | Keep; candidate for future lazy media loading. |
 | `build/assets/explainer_final-aa5bb4c6.png` | 849.57 KB | `client/src/assets/img/explainer_final.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
-| `build/assets/jump-ba6fd23f.png` | 810.90 KB | `client/src/assets/img/jump.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
+| `build/assets/jump-ba6fd23f.png` | 810.90 KB | `client/src/assets/img/jump.png` | Replaced by `jump_transparent.png` for welcome/onboarding goals slides after this inventory | Remove from this table after the next build inventory confirms it is no longer emitted. |
 | `build/assets/beta_tab_robot-68a9427f.png` | 711.62 KB | `client/src/assets/img/beta_tab_robot.png` | Welcome/onboarding slides | Keep; candidate for future slide media optimization. |
 | `build/assets/context_engine_logo_animation-138fda1b.gif` | 7,476.94 KB | `client/src/assets/img/context_engine_logo_animation.gif` | Navbar / SBT logo animation | Keep; replacement needs UX review because timing is part of current branding behavior. |
 | `build/assets/context_engine_logo_animation_pingpong-443e0d17.gif` | 14,952.31 KB | `client/src/assets/img/context_engine_logo_animation_pingpong.gif` | Navbar / SBT logo animation variant | Keep; replacement needs UX review because timing is part of current branding behavior. |
@@ -26,6 +26,16 @@ near-term action is lazy-loading or intentional replacement, not deletion.
 Recent chunk split: the SurveyTool route bundle is now under the warning
 threshold (`build/assets/SurveyTool-ca00a311.js`, 177.17 KB) after moving the
 question-answering and pile surfaces behind lazy component boundaries.
+
+Recent slide asset update: the goals welcome slide now references
+`client/src/assets/img/jump_transparent.png` (233 KB source) so minimized
+welcome overlays do not rely on blend mode to hide the source image rectangle.
+
+Cold-load welcome behavior: `COLD_LOAD_ONBOARDING_ENABLED` is on, but the
+automatic overlay only starts on first-load `/session` and `/session/...`
+routes unless `ce:forceColdLoadWelcomeSlides` is set in localStorage. The QA
+bookmarklet for reopening the slide deck lives beside `WELCOME_SLIDES` in
+`client/src/components/MainContent/welcomeSlides.ts`.
 
 ## Source Assets Over 500 KB Not Emitted By The Client Build
 
@@ -38,7 +48,7 @@ question-answering and pile surfaces behind lazy component boundaries.
 Current source references proving the emitted image assets are used:
 - `client/src/components/About/AboutPage.tsx`: `cip_photo.png`
 - `client/src/components/MainContent/ToolExplorer.tsx`: `magnifying_glass.png`, `art_header.png`
-- `client/src/components/MainContent/welcomeSlides.ts`: `explainer_first.png`, `beta_tab_robot.png`, `jump.png`, `explainer_final.png`
+- `client/src/components/MainContent/welcomeSlides.ts`: `explainer_first.png`, `beta_tab_robot.png`, `jump_transparent.png`, `seedsman_slim.jpg`, `explainer_final.png`
 - `client/src/components/Navbar/Navbar.tsx`: `context_engine_logo_animation.gif`, `context_engine_logo_animation_pingpong.gif`
 - `client/src/components/SBTs/SBTPage.tsx` and `client/src/components/SBTs/SBTsPage.tsx`: `ce_circuit_logo.png`, logo animation assets
 - `client/src/variables/appConfig.ts`: animation timing comments for the logo GIFs
