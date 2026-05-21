@@ -40,7 +40,9 @@ describe('client package modernization contract', () => {
     const pkg = readClientPackageJson();
 
     expect(pkg.scripts.dev).toBe('PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000');
+    expect(pkg.scripts.prebuild).toBe('node scripts/clean-legacy-vite-output.mjs');
     expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
+    expect(pkg.scripts['prebuild:vite']).toBe('node scripts/clean-legacy-vite-output.mjs');
     expect(pkg.scripts.start).toBe('serve -s build');
     expect(pkg.scripts.test).toBe('jest');
     expect(pkg.scripts.lint).toBe(expectedLintCommand);
@@ -98,6 +100,9 @@ describe('client package modernization contract', () => {
   it('keeps Vite output and entry wiring canonical', () => {
     const viteConfig = readClientFile('vite.config.mjs');
     const viteIndex = readClientFile('index.html');
+    const viteEntry = readClientFile('src/viteEntry.js');
+    const appEntry = readClientFile('src/index.js');
+    const legacyOutputCleaner = readClientFile('scripts/clean-legacy-vite-output.mjs');
     const contractSourceLoader = readClientFile('src/components/ContractPage/contractSourceLoader.ts');
 
     expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
@@ -106,6 +111,11 @@ describe('client package modernization contract', () => {
     expect(viteConfig).not.toContain('!!raw-loader!');
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.js');
+    expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
+    expect(viteEntry).toContain("import('./index.js')");
+    expect(appEntry).not.toContain("import 'assets/css/contextEngine.scss';");
+    expect(legacyOutputCleaner).toContain("const legacyOutputDirs = ['build-vite', 'vite-build']");
+    expect(legacyOutputCleaner).toContain('fs.rmSync(targetDir, { recursive: true, force: true })');
     expect(contractSourceLoader).toContain('.sol?raw');
     expect(contractSourceLoader).not.toContain('!!raw-loader!');
   });
