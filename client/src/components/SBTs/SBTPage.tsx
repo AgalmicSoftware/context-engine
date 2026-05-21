@@ -285,6 +285,20 @@ type SbtPageInviteClaimOptions = {
   suppressErrors?: boolean;
   sessionSlugOverride?: unknown;
 };
+type SbtPageGroupPasswordClaimOptions = SbtPageInviteClaimOptions & {
+  groupPasswordHashOverride?: unknown;
+};
+type SbtPageAutoMintOptions = SbtPageInviteClaimOptions & {
+  sbtInfoOverride?: unknown;
+};
+type SbtPageManualMintOptions = SbtPageInviteClaimOptions & {
+  passwordOverride?: unknown;
+  sbtAddressOverride?: unknown;
+};
+type SbtPageHandleMintOptions = SbtPageInviteClaimOptions & {
+  sbtAddressOverride?: unknown;
+  sbtInfoOverride?: unknown;
+};
 type SbtPageTransactionResult = Record<string, unknown> & {
   transactionHash?: string;
 };
@@ -965,7 +979,7 @@ class SBTPage extends Component<any, any> {
     }
 
     const slug = targetSlug;
-    let sbtInfo = this.state.sbtInfo;
+    let sbtInfo: SbtPageInfoState | null = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
         sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', currentSbtAddress, slug) as SbtPageInfoState | null;
@@ -1272,7 +1286,7 @@ class SBTPage extends Component<any, any> {
     } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
   };
 
-  autoMintPublicIfAllowed = async (sbtAddress: unknown, options: any = {}): Promise<boolean> => {
+  autoMintPublicIfAllowed = async (sbtAddress: unknown, options: SbtPageAutoMintOptions = {}): Promise<boolean> => {
     if (!sbtAddress) return false;
 
     const slug = options?.sessionSlugOverride != null
@@ -1429,7 +1443,7 @@ class SBTPage extends Component<any, any> {
   claimWithGroupPassword = async (
     rawPassword: unknown,
     sbtOverride?: unknown,
-    options: any = {}
+    options: SbtPageGroupPasswordClaimOptions = {}
   ): Promise<boolean> => {
     let sbt = '';
     let slug = '';
@@ -1617,7 +1631,11 @@ class SBTPage extends Component<any, any> {
     return false;
   };
 
-  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown, options: any = {}): Promise<boolean> => {
+  claimWithInviteCode = async (
+    rawCode: unknown,
+    sbtOverride?: unknown,
+    options: SbtPageGroupPasswordClaimOptions = {}
+  ): Promise<boolean> => {
     const payload = this.decodeInviteInput(rawCode);
     if (payload) {
       const result = await this.claimWithInvitePayload(payload, sbtOverride, options);
@@ -3159,7 +3177,7 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  async mintUnlimitedWithGroupPassword(options: any = {}): Promise<boolean> {
+  async mintUnlimitedWithGroupPassword(options: SbtPageManualMintOptions = {}): Promise<boolean> {
     sbtLog.log('[MANUAL-MINT] Starting manual mint...');
     let sbt: string | null = null;
     let slug = '';
@@ -3278,7 +3296,10 @@ class SBTPage extends Component<any, any> {
     }));
   };
 
-  handleMint = async (forceEventRefreshOnSuccess: boolean = true, options: any = {}): Promise<boolean> => {
+  handleMint = async (
+    forceEventRefreshOnSuccess: boolean = true,
+    options: SbtPageHandleMintOptions = {}
+  ): Promise<boolean> => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return false;
@@ -3293,7 +3314,7 @@ class SBTPage extends Component<any, any> {
       mintStep,
       manualPasswordInput,
     } = this.state;
-    const sbtInfo = options?.sbtInfoOverride || this.state.sbtInfo || {};
+    const sbtInfo = (options?.sbtInfoOverride || this.state.sbtInfo || {}) as SbtPageInfoState;
     const slug = options?.sessionSlugOverride != null
       ? String(options.sessionSlugOverride || '')
       : this.getEffectiveSessionSlug();
