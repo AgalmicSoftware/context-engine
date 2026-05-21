@@ -6,12 +6,12 @@ import {
   buildSbtListLoadingGroupStatusClassName,
   buildSbtListLoadingProgressFillClassName,
   buildSbtListMiniSettingsButtonClassName,
+  buildSbtListRenderBuckets,
   buildSbtListRootClassName,
   buildSbtListSessionChipStateBySlug,
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
-  coerceSbtMintEndSeconds,
   dedupeNormalizedSbtListSlugs,
   getVisibleSbtListSessionSlugsFromEntries,
   getSbtListItemSignature,
@@ -22,13 +22,9 @@ import {
   hasSbtListMissingOrEmptySessionSlug,
   hasSbtListOwn,
   isSbtListManagedDgCacheName,
-  isSbtListHelperRecord,
-  isModifiedSbtListPointerNavigation,
   isSbtListSessionIdLikeSlug,
   isSbtListSyntheticNoSessionSlug,
-  lowerSbtListAddressSet,
   mergeSbtListsByAddress,
-  normalizeSbtListAddressLower,
   normalizeSbtListItems,
   pickNormalizedSbtListSessionSlug,
   readSbtListShowDemoSessions,
@@ -605,33 +601,7 @@ describe('sbtListHelpers', () => {
     ]);
   });
 
-  it('normalizes render addresses and keys by display scope', () => {
-    const sbt = { sbtAddress: ' 0xABC ', slug: 'alpha' };
-
-    expect(normalizeSbtListAddressLower(sbt.sbtAddress)).toBe('0xabc');
-    expect(Array.from(lowerSbtListAddressSet([' 0xABC ', '', null, '0xdef']))).toEqual([
-      '0xabc',
-      '0xdef',
-    ]);
-    expect(Array.from(buildSbtListExpandedAddressSetToggle(new Set(['0xabc']), ' 0xABC '))).toEqual([]);
-    expect(Array.from(buildSbtListExpandedAddressSetToggle(new Set(['0xabc']), ' 0xDEF '))).toEqual([
-      '0xabc',
-      '0xdef',
-    ]);
-    expect(Array.from(buildSbtListExpandedAddressSetToggle('bad', ''))).toEqual([]);
-    expect(buildSbtListRenderItemKey(sbt, {
-      allSessionsMode: false,
-      listSlug: 'alpha',
-      resolveSbtSessionSlug: () => 'beta',
-    })).toBe('alpha|0xabc');
-    expect(buildSbtListRenderItemKey(sbt, {
-      allSessionsMode: true,
-      listSlug: 'alpha',
-      resolveSbtSessionSlug: (item) => item.slug,
-    })).toBe('alpha|0xabc');
-  });
-
-  it('builds SBT detail hrefs and detects modified pointer navigation', () => {
+  it('builds SBT detail hrefs', () => {
     expect(buildSbtListDetailHref('0xABC', 'alpha')).toMatch(
       /^\/(?:group|sbt)\/0xABC\?session=alpha$/
     );
@@ -639,5 +609,99 @@ describe('sbtListHelpers', () => {
       /^\/(?:group|sbt)\/0xABC$/
     );
     expect(buildSbtListDetailHref('', 'alpha')).toBe('#');
+  });
+
+  it('builds render buckets with featured, ignored, and synthetic no-session handling', () => {
+    const featuredAddress = '0x00000000000000000000000000000000000000f1';
+    const ignoredAddress = '0x00000000000000000000000000000000000000d1';
+    const hiddenAddress = '0x00000000000000000000000000000000000000b1';
+    const getSessionListsForSlug = jest.fn(() => ({
+      featured_SBTs_LIST: [featuredAddress],
+      ignored_SBTs_LIST: [ignoredAddress],
+    }));
+
+    expect(isSbtListSyntheticNoSessionSlug(SBT_LIST_NO_SESSION_UNIVERSE_SLUG)).toBe(true);
+    expect(buildSbtListRenderBuckets({
+      allSessionsMode: true,
+      excludePasswordLocked: false,
+      getSessionListsForSlug,
+      isListModeScopeEnabled: true,
+      isMintingLive: (sbt) => sbt.sbtInfo?.mintingEndTime === 0,
+      isPasswordLocked: () => false,
+      listSlug: 'alpha',
+      resolveSbtSessionSlug: (sbt) => String(sbt.slug || ''),
+      sbtList: [
+        { sbtAddress: featuredAddress, slug: 'alpha', sbtInfo: { name: 'Featured', mintingEndTime: 0 } },
+        { sbtAddress: ignoredAddress, slug: 'alpha', sbtInfo: { name: 'Ignored', mintingEndTime: 0 } },
+        { sbtAddress: hiddenAddress, slug: SBT_LIST_NO_SESSION_UNIVERSE_SLUG, sbtInfo: { name: 'Hidden', mintingEndTime: 1 } },
+      ],
+      sectionSessionSlugs: ['alpha', SBT_LIST_NO_SESSION_UNIVERSE_SLUG],
+    }).displayedFeatured.map((sbt) => sbt.sbtAddress)).toEqual([featuredAddress]);
+    expect(getSessionListsForSlug).not.toHaveBeenCalledWith(SBT_LIST_NO_SESSION_UNIVERSE_SLUG);
+  });
+
+  it('computes net holder counts from summaries before address lists', () => {
+    expect(getSbtListNetHolderCount({
+      historySummary: { currentHolderCount: '4.9' },
+      mintedAddresses: ['0x1'],
+      burnedAddresses: [],
+    })).toBe(4);
+    expect(getSbtListNetHolderCount({
+      mintedAddresses: ['0x1', '0x2'],
+      burnedAddresses: ['0x1'],
+    })).toBe(1);
+    expect(getSbtListNetHolderCount({
+      mintedAddresses: ['0x1'],
+      burnedAddresses: ['0x1', '0x2'],
+    })).toBe(0);
+  });
+
+  it('normalizes SBT list items by valid shape, net holders, and address', () => {
+    expect(normalizeSbtListItems([
+      { sbtAddress: '0xB', sbtInfo: { name: 'Beta' }, mintedAddresses: ['0x1'] },
+      { sbtAddress: '0xA', sbtInfo: { name: 'Alpha' }, mintedAddresses: ['0x1', '0x2'] },
+      { sbtAddress: '0xC' },
+      'bad',
+    ])).toEqual([
+      { sbtAddress: '0xA', sbtInfo: { name: 'Alpha' }, mintedAddresses: ['0x1', '0x2'] },
+      { sbtAddress: '0xB', sbtInfo: { name: 'Beta' }, mintedAddresses: ['0x1'] },
+    ]);
+  });
+
+  it('compares SBT list arrays by visible item signatures', () => {
+    const first = [{
+      sbtAddress: '0xA',
+      blockNumber: 5,
+      mintedAddresses: ['0x1'],
+      burnedAddresses: [],
+      sbtInfo: {
+        name: 'Alpha',
+        description: 'One',
+        image: 'image-a',
+      },
+    }];
+    const same = [{
+      sbtAddress: '0xa',
+      blockNumber: 5,
+      mintedAddresses: ['0x1'],
+      burnedAddresses: [],
+      sbtInfo: {
+        name: 'Alpha',
+        description: 'One',
+        image: 'image-a',
+      },
+    }];
+    const changed = [{
+      ...same[0],
+      sbtInfo: {
+        ...same[0].sbtInfo,
+        image: 'image-b',
+      },
+    }];
+
+    expect(getSbtListItemSignature(first[0])).toBe(getSbtListItemSignature(same[0]));
+    expect(areSbtListArraysEqual(first, same)).toBe(true);
+    expect(areSbtListArraysEqual(first, changed)).toBe(false);
+    expect(areSbtListArraysEqual(first, [])).toBe(false);
   });
 });
