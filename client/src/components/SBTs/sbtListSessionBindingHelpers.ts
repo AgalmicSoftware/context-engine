@@ -1,5 +1,8 @@
-import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
-import type { SbtListHelperItem, SbtListHelperRecord } from './sbtListCardDetailsHelpers';
+import { normalizeSessionSlug } from '../../utilities/web3/contractScripts.js';
+import type {
+  SbtListHelperItem,
+  SbtListHelperRecord,
+} from './sbtListCardDetailsHelpers';
 import { SBT_LIST_NO_SESSION_UNIVERSE_SLUG } from './sbtListSessionUniverseHelpers';
 
 type ResolveSbtListConcreteSessionBindingSlugOptions = {
@@ -13,11 +16,13 @@ type ResolveSbtListItemSessionSlugOptions<T extends SbtListHelperItem = SbtListH
   resolveConcreteSessionBindingSlug?: (sbt: T | null | undefined) => string | null;
 };
 
-export const isSbtListHelperRecord = (value: unknown): value is SbtListHelperRecord =>
-  !!value && typeof value === 'object';
+export const isSbtListHelperRecord = (value: unknown): value is SbtListHelperRecord => (
+  !!value && typeof value === 'object'
+);
 
-export const hasSbtListOwn = (obj: unknown, key: PropertyKey): boolean =>
-  isSbtListHelperRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key);
+export const hasSbtListOwn = (obj: unknown, key: PropertyKey): boolean => (
+  isSbtListHelperRecord(obj) && Object.prototype.hasOwnProperty.call(obj, key)
+);
 
 export const hasSbtListAuthoritativeSessionSlug = (obj: unknown): boolean => {
   const record = isSbtListHelperRecord(obj) ? obj : {};
@@ -27,7 +32,7 @@ export const hasSbtListAuthoritativeSessionSlug = (obj: unknown): boolean => {
 };
 
 export const hasSbtListExplicitNoSessionAssociation = (sbt: unknown): boolean => {
-  const record = isSbtListHelperRecord(sbt) ? (sbt as SbtListHelperItem) : {};
+  const record = isSbtListHelperRecord(sbt) ? sbt as SbtListHelperItem : {};
   const info = isSbtListHelperRecord(record.sbtInfo) ? record.sbtInfo : {};
   if (hasSbtListAuthoritativeSessionSlug(info)) {
     return String(info.sessionSlug ?? '').trim() === '';
@@ -39,12 +44,12 @@ export const hasSbtListExplicitNoSessionAssociation = (sbt: unknown): boolean =>
 };
 
 export const hasSbtListMetadataSessionSlugField = (sbt: unknown): boolean => {
-  const record = isSbtListHelperRecord(sbt) ? (sbt as SbtListHelperItem) : {};
+  const record = isSbtListHelperRecord(sbt) ? sbt as SbtListHelperItem : {};
   return hasSbtListOwn(record.sbtInfo, 'sessionSlug') || hasSbtListOwn(record, 'sessionSlug');
 };
 
 export const hasSbtListMissingOrEmptySessionSlug = (sbt: unknown): boolean => {
-  const record = isSbtListHelperRecord(sbt) ? (sbt as SbtListHelperItem) : {};
+  const record = isSbtListHelperRecord(sbt) ? sbt as SbtListHelperItem : {};
   const info = isSbtListHelperRecord(record.sbtInfo) ? record.sbtInfo : {};
   if (!hasSbtListMetadataSessionSlugField(record)) return true;
   return String(info.sessionSlug ?? record.sessionSlug ?? '').trim() === '';
@@ -52,7 +57,9 @@ export const hasSbtListMissingOrEmptySessionSlug = (sbt: unknown): boolean => {
 
 export const resolveSbtListConcreteSessionBindingSlug = <T extends SbtListHelperItem = SbtListHelperItem>(
   sbt: T | null | undefined,
-  { getSessionSlugByName = () => null }: ResolveSbtListConcreteSessionBindingSlugOptions = {},
+  {
+    getSessionSlugByName = () => null,
+  }: ResolveSbtListConcreteSessionBindingSlugOptions = {}
 ): string | null => {
   const sbtInfo = isSbtListHelperRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
 
@@ -68,12 +75,17 @@ export const resolveSbtListConcreteSessionBindingSlug = <T extends SbtListHelper
     return normalizeSessionSlug(legacySlugRaw);
   }
 
-  const hasInferredSessionSlug =
+  const hasInferredSessionSlug = (
     (hasSbtListOwn(sbtInfo, 'sessionSlug') && sbtInfo?.sessionSlugExplicit === false) ||
-    (hasSbtListOwn(sbt, 'sessionSlug') && sbt?.sessionSlugExplicit === false);
+    (hasSbtListOwn(sbt, 'sessionSlug') && sbt?.sessionSlugExplicit === false)
+  );
   if (hasInferredSessionSlug) return null;
 
-  const legacySessionName = String(sbtInfo?.sessionName ?? sbt?.sessionName ?? '').trim();
+  const legacySessionName = String(
+    sbtInfo?.sessionName ??
+    sbt?.sessionName ??
+    ''
+  ).trim();
   if (!legacySessionName) return null;
 
   const mappedSlug = getSessionSlugByName(legacySessionName);
@@ -88,24 +100,32 @@ export const resolveSbtListItemSessionSlug = <T extends SbtListHelperItem = SbtL
     isListModeScopeEnabled = false,
     listSlug = '',
     resolveConcreteSessionBindingSlug = (item) => resolveSbtListConcreteSessionBindingSlug(item),
-  }: ResolveSbtListItemSessionSlugOptions<T> = {},
+  }: ResolveSbtListItemSessionSlugOptions<T> = {}
 ): string => {
   const sbtInfo = isSbtListHelperRecord(sbt?.sbtInfo) ? sbt.sbtInfo : {};
-  const sourceSlug = normalizeSessionSlug(sbt?.__sourceSessionSlug ?? sbt?.slug ?? sbt?.sessionSlug ?? '');
+  const sourceSlug = normalizeSessionSlug(
+    sbt?.__sourceSessionSlug ?? sbt?.slug ?? sbt?.sessionSlug ?? ''
+  );
   if (allSessionsMode && hasSbtListExplicitNoSessionAssociation(sbt)) {
     return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
   }
-  const hasMetadataSessionSlug = hasSbtListOwn(sbtInfo, 'sessionSlug') || hasSbtListOwn(sbt, 'sessionSlug');
+  const hasMetadataSessionSlug = (
+    hasSbtListOwn(sbtInfo, 'sessionSlug') ||
+    hasSbtListOwn(sbt, 'sessionSlug')
+  );
   const metadataSessionSlug = hasMetadataSessionSlug
     ? normalizeSessionSlug(sbtInfo?.sessionSlug ?? sbt?.sessionSlug ?? '')
     : null;
-  const hasAuthoritativeMetadataSessionSlug =
-    hasSbtListAuthoritativeSessionSlug(sbtInfo) || hasSbtListAuthoritativeSessionSlug(sbt);
+  const hasAuthoritativeMetadataSessionSlug = (
+    hasSbtListAuthoritativeSessionSlug(sbtInfo) || hasSbtListAuthoritativeSessionSlug(sbt)
+  );
 
   if (allSessionsMode && isListModeScopeEnabled) {
     const concreteBindingSlug = resolveConcreteSessionBindingSlug(sbt);
     if (concreteBindingSlug != null) {
-      return concreteBindingSlug === '' ? SBT_LIST_NO_SESSION_UNIVERSE_SLUG : concreteBindingSlug;
+      return concreteBindingSlug === ''
+        ? SBT_LIST_NO_SESSION_UNIVERSE_SLUG
+        : concreteBindingSlug;
     }
     if (hasSbtListMissingOrEmptySessionSlug(sbt)) {
       return SBT_LIST_NO_SESSION_UNIVERSE_SLUG;
@@ -127,7 +147,12 @@ export const resolveSbtListItemSessionSlug = <T extends SbtListHelperItem = SbtL
     return sourceSlug;
   }
 
-  const legacyRaw = sbtInfo?.sessionSlug ?? sbtInfo?.slug ?? sbt?.sessionSlug ?? sbt?.slug;
+  const legacyRaw = (
+    sbtInfo?.sessionSlug ??
+    sbtInfo?.slug ??
+    sbt?.sessionSlug ??
+    sbt?.slug
+  );
   if (legacyRaw != null && String(legacyRaw).trim() !== '') {
     return normalizeSessionSlug(legacyRaw);
   }
