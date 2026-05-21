@@ -282,6 +282,73 @@ describe('SurveyTool draft persistence', () => {
     sessionStorage.clear();
   });
 
+  it('migrates richer anonymous drafts into the account draft on login', () => {
+    sessionStorage.clear();
+
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: true,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+      activeSessionSlug: 'edge',
+      sessionSlug: 'edge',
+      questionPool: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }],
+    });
+    subject.state = {
+      ...subject.state,
+      questionPool: [{ id: 'q1' }, { id: 'q2' }, { id: 'q3' }],
+      surveysResponseState: [
+        {
+          answers: {
+            q1: { value: 'live q1', encrypted: false, encryptionAudience: 'self' },
+            q2: { value: 'live q2', encrypted: false, encryptionAudience: 'self' },
+            q3: { value: 'live q3', encrypted: false, encryptionAudience: 'self' },
+          },
+          additionalComments: {},
+          importance: {},
+          conviction: {},
+        },
+      ],
+      editBaseline: { answers: {}, additionalComments: {}, importance: {}, conviction: {} },
+    };
+
+    const accountKey = subject.getDraftKey();
+    const anonKey = accountKey.replace(':0xabc:', ':anon:');
+    sessionStorage.setItem(accountKey, JSON.stringify({
+      meta: { networkId: 84532, surveyId: 'questions', ts: 100 },
+      answers: {
+        q1: { value: 'account q1' },
+        q2: { value: 'account q2' },
+        q3: { value: 'account q3' },
+      },
+    }));
+    sessionStorage.setItem(anonKey, JSON.stringify({
+      meta: { networkId: 84532, surveyId: 'questions', ts: 200 },
+      answers: Object.fromEntries(
+        Array.from({ length: 10 }, (_, index) => {
+          const qid = `q${index + 1}`;
+          return [qid, { value: `anon ${qid}` }];
+        })
+      ),
+    }));
+
+    const loaded = subject.loadDraft();
+    expect(Object.keys(loaded?.answers || {})).toHaveLength(10);
+    expect(loaded?.answers?.q10?.value).toBe('anon q10');
+    expect(sessionStorage.getItem(anonKey)).toBeNull();
+    expect(Object.keys(JSON.parse(sessionStorage.getItem(accountKey) || '{}')?.answers || {})).toHaveLength(10);
+
+    subject.persistDraft();
+    const persisted = JSON.parse(sessionStorage.getItem(accountKey) || '{}');
+    expect(Object.keys(persisted?.answers || {})).toHaveLength(10);
+    expect(persisted?.answers?.q1?.value).toBe('live q1');
+    expect(persisted?.answers?.q10?.value).toBe('anon q10');
+
+    sessionStorage.clear();
+  });
+
   it('applies draft tracking patches without clobbering omitted fields', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: false,

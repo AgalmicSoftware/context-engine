@@ -202,6 +202,85 @@ const toRecord = (value: unknown): CacheRecord => (
   isRecord(value) ? value : {}
 );
 
+const isPendingQuestionMetadataPlaceholder = (value: unknown): boolean => (
+  isRecord(value) && value.__ceQuestionMetadataPending === true
+);
+
+const hasHydratedQuestionMetadata = (value: unknown): boolean => (
+  isRecord(value) && !isPendingQuestionMetadataPlaceholder(value)
+);
+
+const buildPendingQuestionMetadataPlaceholder = (
+  qid: unknown,
+  slug: unknown,
+  existing: unknown = null
+): CacheRecord | null => {
+  const id = String(qid || '').trim().toLowerCase();
+  if (!id) return null;
+
+  const existingQuestion = isRecord(existing) ? existing : {};
+  const sessionName = String(existingQuestion.sessionName || slug || '').trim();
+  const encryption = isRecord(existingQuestion.encryption)
+    ? existingQuestion.encryption
+    : {
+      enabled: true,
+      status: 'metadata-pending',
+      targets: {
+        questions: true,
+      },
+    };
+
+  return {
+    ...existingQuestion,
+    id,
+    type: String(existingQuestion.type || '').trim() || 'freeform',
+    prompt: '[encrypted]',
+    tags: Array.isArray(existingQuestion.tags) ? existingQuestion.tags : [],
+    ...(sessionName ? { sessionName } : {}),
+    encryption,
+    __ceQuestionMetadataPending: true,
+  };
+};
+
+const seedPendingQuestionMetadataFromResponse = (
+  net: QuestionCacheNetworkNode,
+  qid: unknown,
+  slug: unknown
+): boolean => {
+  const questionId = String(qid || '').trim().toLowerCase();
+  if (!questionId || !net || typeof net !== 'object') return false;
+
+  if (!net.questions || typeof net.questions !== 'object') net.questions = {};
+  if (!net.pendingQuestionMetadata || typeof net.pendingQuestionMetadata !== 'object') {
+    net.pendingQuestionMetadata = {};
+  }
+
+  const existingQuestion = net.questions[questionId];
+  if (hasHydratedQuestionMetadata(existingQuestion)) return false;
+
+  let changed = false;
+  if (!net.pendingQuestionMetadata[questionId]) {
+    net.pendingQuestionMetadata[questionId] = {
+      attempts: 0,
+      nextRetryAtMs: 0,
+      state: 'discovered-from-response',
+      lastStatus: null,
+      message: 'Question response discovered before question metadata; awaiting Arweave hydration.',
+    };
+    changed = true;
+  }
+
+  if (!isPendingQuestionMetadataPlaceholder(existingQuestion)) {
+    const placeholder = buildPendingQuestionMetadataPlaceholder(questionId, slug, existingQuestion);
+    if (placeholder) {
+      net.questions[questionId] = placeholder;
+      changed = true;
+    }
+  }
+
+  return changed;
+};
+
 const createEmptyQuestionCacheNetworkNode = (initialLastBlockQR: number): QuestionCacheNetworkNode => ({
   questionsLatestBlock: initialLastBlockQR,
   questionsDiscoveryCheckpointBlock: initialLastBlockQR,
@@ -1003,8 +1082,9 @@ export const createSessionResponseHydrationController = (
           questionsCache?.[networkID] as QuestionCacheNetworkNode
         );
 
-        const currentQR = (fresh[networkID] as QuestionCacheNetworkNode).questionResponses;
-        const metaQR = (fresh[networkID] as QuestionCacheNetworkNode).questionResponsesMeta;
+        const freshNet = fresh[networkID] as QuestionCacheNetworkNode;
+        const currentQR = freshNet.questionResponses;
+        const metaQR = freshNet.questionResponsesMeta;
 
         // Proactive user cache population
         const userCache = mergeFreshUserCacheIntoPendingSnapshot(
@@ -1035,6 +1115,7 @@ export const createSessionResponseHydrationController = (
 
         // Merge partialAgg deterministically
         Object.keys(partialAgg).forEach((qId) => {
+          seedPendingQuestionMetadataFromResponse(freshNet, qId, slug);
           if (!currentQR[qId]) currentQR[qId] = {};
           if (!metaQR[qId]) metaQR[qId] = {};
 
@@ -1341,6 +1422,7 @@ export const createSessionResponseHydrationController = (
         let userCacheUpdated = false;
 
         nextByQid.forEach((response, qId) => {
+          seedPendingQuestionMetadataFromResponse(net, qId, slug);
           if (!net.questionResponses[qId] || typeof net.questionResponses[qId] !== 'object') {
             net.questionResponses[qId] = {};
           }

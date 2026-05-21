@@ -24,6 +24,7 @@ import {
   getPendingStatsSnapshotFromState,
   hasConvictionOrImportanceValueForQuestion,
   hasMeaningfulFieldValue,
+  mergePersistedDraftPayloads,
   shouldAutoEncryptAdditionalOnAudienceChange,
   shouldEncryptResponseFieldForSubmit,
   shouldForceOverwriteDraftValues,
@@ -439,6 +440,44 @@ describe('surveyToolDraftState', () => {
     });
 
     expect(buildDraftAnswersByQuestionId(null)).toEqual({});
+  });
+
+  it('merges account and anonymous drafts without dropping richer unanswered-window entries', () => {
+    const merged = mergePersistedDraftPayloads({
+      drafts: [
+        {
+          meta: { networkId: 84532, surveyId: '0xsurvey', ts: 100 },
+          answers: {
+            q1: { value: 'account newer old q1' },
+            q2: { value: 'account q2' },
+            q3: { value: 'account q3' },
+          },
+          baseline: {
+            q1: { value: 'account baseline q1' },
+          },
+        },
+        {
+          meta: { networkId: 84532, surveyId: '0xsurvey', ts: 200 },
+          answers: Object.fromEntries(
+            Array.from({ length: 10 }, (_, index) => {
+              const qid = `q${index + 1}`;
+              return [qid, { value: `anon ${qid}` }];
+            })
+          ),
+          baseline: {
+            q10: { value: 'anon baseline q10' },
+          },
+        },
+      ],
+    });
+
+    expect(Object.keys(merged?.answers || {})).toHaveLength(10);
+    expect(merged?.answers?.q1).toEqual({ value: 'anon q1' });
+    expect(merged?.answers?.q3).toEqual({ value: 'anon q3' });
+    expect(merged?.answers?.q10).toEqual({ value: 'anon q10' });
+    expect(merged?.baseline?.q1).toEqual({ value: 'account baseline q1' });
+    expect(merged?.baseline?.q10).toEqual({ value: 'anon baseline q10' });
+    expect(merged?.meta?.ts).toBe(200);
   });
 
   it('builds persisted draft write plans for compat mirror writes and anon cleanup', () => {
