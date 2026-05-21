@@ -107,11 +107,33 @@ import {
 } from './adminPageMetadataDraftHelpers';
 
 const log = createLogger('general');
-const renderTestResult = (entry: any) => {
+
+type AdminLinkedResult = {
+  label?: string;
+  text?: string;
+  href?: string;
+};
+
+type AdminTestResult = string | AdminLinkedResult;
+type AdminTestResults = Record<string, AdminTestResult>;
+type AdminSecrets = Record<string, string>;
+type AdminSecretKeySet = Set<string>;
+type AdminOpenSecretCards = Record<string, boolean>;
+type AdminMetadataBlockLimitsDraft = {
+  start: string;
+  end: string;
+};
+
+const isAdminLinkedResult = (entry: unknown): entry is AdminLinkedResult => (
+  !!entry && typeof entry === 'object'
+);
+
+const renderTestResult = (entry: AdminTestResult | null | undefined) => {
   if (!entry) return 'Not run';
   if (typeof entry === 'string') return entry;
-  const label = toStr(entry?.label || entry?.text).trim();
-  const href = toStr(entry?.href).trim();
+  if (!isAdminLinkedResult(entry)) return 'OK';
+  const label = toStr(entry.label || entry.text).trim();
+  const href = toStr(entry.href).trim();
   if (href) {
     return (
       <a href={href} target="_blank" rel="noreferrer">
@@ -143,74 +165,74 @@ const AdminPage = ({
   initialRegistryChainId,
 }: any) => {
   const [sessions, setSessions] = useState<any>([]);
-  const [selectedSlug, setSelectedSlug] = useState<any>('');
-  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState<any>(false);
-  const [workerUrl, setWorkerUrl] = useState<any>('');
-  const [workerUrlEditable, setWorkerUrlEditable] = useState<any>(false);
-  const [workerStatus, setWorkerStatus] = useState<any>('');
-  const [workerDebug, setWorkerDebug] = useState<any>('');
-  const [corsPatchStatus, setCorsPatchStatus] = useState<any>('');
-  const [corsPatchBusy, setCorsPatchBusy] = useState<any>(false);
-  const [allowOriginsDraft, setAllowOriginsDraft] = useState<any>('');
-  const [allowOriginsDraftDirty, setAllowOriginsDraftDirty] = useState<any>(false);
-  const [showAllowlistEditor, setShowAllowlistEditor] = useState<any>(false);
-  const [saveStatus, setSaveStatus] = useState<any>('');
-  const [chainStatus, setChainStatus] = useState<any>('');
-  const [testStatus, setTestStatus] = useState<any>('');
-  const [testResults, setTestResults] = useState<any>({
+  const [selectedSlug, setSelectedSlug] = useState('');
+  const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
+  const [workerUrl, setWorkerUrl] = useState('');
+  const [workerUrlEditable, setWorkerUrlEditable] = useState(false);
+  const [workerStatus, setWorkerStatus] = useState('');
+  const [workerDebug, setWorkerDebug] = useState('');
+  const [corsPatchStatus, setCorsPatchStatus] = useState('');
+  const [corsPatchBusy, setCorsPatchBusy] = useState(false);
+  const [allowOriginsDraft, setAllowOriginsDraft] = useState('');
+  const [allowOriginsDraftDirty, setAllowOriginsDraftDirty] = useState(false);
+  const [showAllowlistEditor, setShowAllowlistEditor] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('');
+  const [chainStatus, setChainStatus] = useState('');
+  const [testStatus, setTestStatus] = useState('');
+  const [testResults, setTestResults] = useState<AdminTestResults>({
     health: '',
     ai: '',
     arweave: '',
     faucet: '',
     transcribe: '',
   });
-  const [testBusy, setTestBusy] = useState<any>(false);
-  const [litTestValue, setLitTestValue] = useState<any>('lit-test');
-  const [litTestEnvelope, setLitTestEnvelope] = useState<any>('');
-  const [litTestDecrypted, setLitTestDecrypted] = useState<any>('');
-  const [litTestStatus, setLitTestStatus] = useState<any>('');
-  const [litTestBusy, setLitTestBusy] = useState<any>(false);
-  const [deniedStatus, setDeniedStatus] = useState<any>('');
-  const [deniedResults, setDeniedResults] = useState<any>({
+  const [testBusy, setTestBusy] = useState(false);
+  const [litTestValue, setLitTestValue] = useState('lit-test');
+  const [litTestEnvelope, setLitTestEnvelope] = useState('');
+  const [litTestDecrypted, setLitTestDecrypted] = useState('');
+  const [litTestStatus, setLitTestStatus] = useState('');
+  const [litTestBusy, setLitTestBusy] = useState(false);
+  const [deniedStatus, setDeniedStatus] = useState('');
+  const [deniedResults, setDeniedResults] = useState<AdminTestResults>({
     login: '',
     ai: '',
     arweave: '',
     transcribe: '',
     faucet: '',
   });
-  const [deniedBusy, setDeniedBusy] = useState<any>(false);
-  const [transcribeText, setTranscribeText] = useState<any>('');
-  const [openSection, setOpenSection] = useState<any>('');
-  const [showTestsPanel, setShowTestsPanel] = useState<any>(false);
+  const [deniedBusy, setDeniedBusy] = useState(false);
+  const [transcribeText, setTranscribeText] = useState('');
+  const [openSection, setOpenSection] = useState('');
+  const [showTestsPanel, setShowTestsPanel] = useState(false);
   const [encryptedFields, setEncryptedFields] = useState<any>({});
   const [decryptedFields, setDecryptedFields] = useState<any>({});
-  const [sessionLookupStatus, setSessionLookupStatus] = useState<any>('');
-  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState<any>('');
-  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState<any>(false);
-  const [defaultGateTouched, setDefaultGateTouched] = useState<any>(false);
-  const [gateConfigDirty, setGateConfigDirty] = useState<any>(false);
-  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<any>({ start: '', end: '' });
-  const [metadataDraftTouched, setMetadataDraftTouched] = useState<any>(false);
-  const [metadataAutoFeatureDraft, setMetadataAutoFeatureDraft] = useState<any>(true);
-  const [metadataAutoFeatureTouched, setMetadataAutoFeatureTouched] = useState<any>(false);
+  const [sessionLookupStatus, setSessionLookupStatus] = useState('');
+  const [sessionsRefreshStatus, setSessionsRefreshStatus] = useState('');
+  const [sessionsRefreshBusy, setSessionsRefreshBusy] = useState(false);
+  const [defaultGateTouched, setDefaultGateTouched] = useState(false);
+  const [gateConfigDirty, setGateConfigDirty] = useState(false);
+  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<AdminMetadataBlockLimitsDraft>({ start: '', end: '' });
+  const [metadataDraftTouched, setMetadataDraftTouched] = useState(false);
+  const [metadataAutoFeatureDraft, setMetadataAutoFeatureDraft] = useState(true);
+  const [metadataAutoFeatureTouched, setMetadataAutoFeatureTouched] = useState(false);
   const [metadataConfigDraft, setMetadataConfigDraft] = useState<any>(() => buildAdminMetadataDraft({}));
-  const [metadataContractDraftTouched, setMetadataContractDraftTouched] = useState<any>(false);
-  const [metadataContractsVerified, setMetadataContractsVerified] = useState<any>(false);
+  const [metadataContractDraftTouched, setMetadataContractDraftTouched] = useState(false);
+  const [metadataContractsVerified, setMetadataContractsVerified] = useState(false);
   const [metadataLatestBlock, setMetadataLatestBlock] = useState<any>(null);
-  const [metadataLatestBlockStatus, setMetadataLatestBlockStatus] = useState<any>('');
-  const [metadataUpdateBusy, setMetadataUpdateBusy] = useState<any>(false);
-  const [metadataUpdateStatus, setMetadataUpdateStatus] = useState<any>('');
-  const [copiedRawMetadataJson, setCopiedRawMetadataJson] = useState<any>(false);
-  const [heroHeaderImageReady, setHeroHeaderImageReady] = useState<any>(false);
+  const [metadataLatestBlockStatus, setMetadataLatestBlockStatus] = useState('');
+  const [metadataUpdateBusy, setMetadataUpdateBusy] = useState(false);
+  const [metadataUpdateStatus, setMetadataUpdateStatus] = useState('');
+  const [copiedRawMetadataJson, setCopiedRawMetadataJson] = useState(false);
+  const [heroHeaderImageReady, setHeroHeaderImageReady] = useState(false);
   const [defaultGateDraft, setDefaultGateDraft] = useState<any>({
     sbts: [],
     mode: 'any',
     chainId: '',
   });
-  const [gateSyncStatus, setGateSyncStatus] = useState<any>('');
+  const [gateSyncStatus, setGateSyncStatus] = useState('');
   const [gateSyncResult, setGateSyncResult] = useState<any>(null);
-  const [gateSyncBusy, setGateSyncBusy] = useState<any>(false);
-  const [secrets, setSecrets] = useState<any>({
+  const [gateSyncBusy, setGateSyncBusy] = useState(false);
+  const [secrets, setSecrets] = useState<AdminSecrets>({
     openaiKey: '',
     anthropicKey: '',
     openrouterKey: '',
@@ -221,9 +243,9 @@ const AdminPage = ({
     litAccountApiKey: '',
     litUsageApiKey: '',
   });
-  const [workerSecretsDirty, setWorkerSecretsDirty] = useState<any>(false);
-  const [clearedSecretKeys, setClearedSecretKeys] = useState<any>(() => new Set());
-  const [openSecretCards, setOpenSecretCards] = useState<any>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
+  const [workerSecretsDirty, setWorkerSecretsDirty] = useState(false);
+  const [clearedSecretKeys, setClearedSecretKeys] = useState<AdminSecretKeySet>(() => new Set());
+  const [openSecretCards, setOpenSecretCards] = useState<AdminOpenSecretCards>({ ai: false, rpc: false, arweave: false, faucet: false, lit: false });
   const [arweaveResource, setArweaveResource] = useState<any>({
     address: '',
     display: 'No JWK entered',
@@ -243,31 +265,31 @@ const AdminPage = ({
     loading: false,
     manualRefreshAvailable: false,
   });
-  const arweaveResourceRequestRef = useRef<any>(0);
-  const faucetResourceRequestRef = useRef<any>(0);
-  const litResourceRequestRef = useRef<any>(0);
+  const arweaveResourceRequestRef = useRef(0);
+  const faucetResourceRequestRef = useRef(0);
+  const litResourceRequestRef = useRef(0);
   const rawMetadataCopyResetRef = useRef<any>(null);
-  const prevSelectedSlugForDraftRef = useRef<any>(selectedSlug);
-  const prevSelectedSlugForAllowOriginsDraftRef = useRef<any>(selectedSlug);
-  const metadataDraftTouchedRef = useRef<any>(metadataDraftTouched);
+  const prevSelectedSlugForDraftRef = useRef(selectedSlug);
+  const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
+  const metadataDraftTouchedRef = useRef(metadataDraftTouched);
   metadataDraftTouchedRef.current = metadataDraftTouched;
 
   const handleSecretChange = useCallback((key: any, value: any) => {
-    setSecrets((prev: any) => ({ ...prev, [key]: value }));
+    setSecrets((prev) => ({ ...prev, [key]: value }));
     setWorkerSecretsDirty(true);
-    setClearedSecretKeys((prev: any) => {
+    setClearedSecretKeys((prev) => {
       if (!prev.has(key)) return prev;
-      const next: any = new Set(prev);
+      const next = new Set(prev);
       next.delete(key);
       return next;
     });
   }, []);
 
   const handleClearSecret = useCallback((key: any) => {
-    setSecrets((prev: any) => ({ ...prev, [key]: '' }));
+    setSecrets((prev) => ({ ...prev, [key]: '' }));
     setWorkerSecretsDirty(true);
-    setClearedSecretKeys((prev: any) => {
-      const next: any = new Set(prev);
+    setClearedSecretKeys((prev) => {
+      const next = new Set(prev);
       next.add(key);
       return next;
     });
@@ -286,8 +308,8 @@ const AdminPage = ({
   const requestedSessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(requestedSessionRaw);
   const requestedSessionSlug = requestedSessionIdHex ? '' : normalizeSlug(requestedSessionRaw);
   const requestedChainId = parseChainIdInput(initialRegistryChainId) || null;
-  const requestedFetchKeyRef = useRef<any>('');
-  const requestedAutoRefreshKeyRef = useRef<any>('');
+  const requestedFetchKeyRef = useRef('');
+  const requestedAutoRefreshKeyRef = useRef('');
   // Avoid any automatic wallet RPC calls in /admin (some wallets show connect popups even for
   // "read-only" methods). Treat wallet as "ready" only if the app believes login is complete.
   const walletReady = !!account && (loginComplete !== false);
@@ -687,7 +709,7 @@ const AdminPage = ({
     if (Number.isFinite(existingStart) && existingStart > 0) return;
     const latestBlock = Number(metadataLatestBlock || 0);
     if (!Number.isFinite(latestBlock) || latestBlock <= 0) return;
-    setMetadataBlockLimitsDraft((prev: any) => {
+    setMetadataBlockLimitsDraft((prev) => {
       const currentStart = Number(prev?.start || 0);
       if (Number.isFinite(currentStart) && currentStart > 0) return prev;
       return {
@@ -728,7 +750,7 @@ const AdminPage = ({
     });
   }, [encryptedFieldsSessionKey, groupMetadata, walletReady]);
 
-  const [decryptFieldsBusy, setDecryptFieldsBusy] = useState<any>(false);
+  const [decryptFieldsBusy, setDecryptFieldsBusy] = useState(false);
   const handleDecryptEncryptedFields = useCallback(async () => {
     if (!groupMetadata) return;
     if (!walletReady) {
@@ -1474,21 +1496,21 @@ const AdminPage = ({
       const { loginResp, loginData } = await attemptWorkerLogin();
       if (loginResp.status === 403) {
         const detail = toStr(loginData?.error || 'Forbidden').trim();
-        setDeniedResults((prev: any) => ({ ...prev, [key]: `OK (403 ${detail})` }));
+        setDeniedResults((prev) => ({ ...prev, [key]: `OK (403 ${detail})` }));
         setDeniedStatus(`Expected 403 for ${key}.`);
         return;
       }
       if (loginResp.ok) {
-        setDeniedResults((prev: any) => ({ ...prev, [key]: 'FAILED (login succeeded)' }));
+        setDeniedResults((prev) => ({ ...prev, [key]: 'FAILED (login succeeded)' }));
         setDeniedStatus('Unexpectedly allowed login; gating may be misconfigured.');
         return;
       }
       const detail = toStr(loginData?.error || `Login failed (${loginResp.status})`).trim();
-      setDeniedResults((prev: any) => ({ ...prev, [key]: `FAILED (${detail})` }));
+      setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${detail})` }));
       setDeniedStatus(detail);
     } catch (err: any) {
       const msg = getErrorMessage(err, 'Denied test failed.');
-      setDeniedResults((prev: any) => ({ ...prev, [key]: `FAILED (${msg})` }));
+      setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${msg})` }));
       setDeniedStatus(msg);
     } finally {
       setDeniedBusy(false);
@@ -1647,7 +1669,7 @@ const AdminPage = ({
       unauthStatus = Number(unauthResp.status || 0) || 0;
       unauthError = toStr(unauthData?.error).trim();
       if (unauthResp.ok) {
-        setTestResults((prev: any) => ({ ...prev, health: `OK (${unauthData?.ts ? new Date(unauthData.ts).toISOString() : 'healthy'})` }));
+        setTestResults((prev) => ({ ...prev, health: `OK (${unauthData?.ts ? new Date(unauthData.ts).toISOString() : 'healthy'})` }));
         setTestStatus('Health check succeeded.');
         return;
       }
@@ -1656,14 +1678,14 @@ const AdminPage = ({
         const suffix = detail ? `: ${detail}` : '';
         if (defaultGateIsEmpty) {
           if (!walletReady) {
-            setTestResults((prev: any) => ({ ...prev, health: `Auth required${suffix}` }));
+            setTestResults((prev) => ({ ...prev, health: `Auth required${suffix}` }));
             setTestStatus('Health requires authentication; connect a wallet to verify.');
             return;
           }
           // Fall through to authenticated /health (some deployments always gate /health).
         }
         if (!walletReady) {
-          setTestResults((prev: any) => ({ ...prev, health: `Auth required${suffix}` }));
+          setTestResults((prev) => ({ ...prev, health: `Auth required${suffix}` }));
           setTestStatus('Connect a wallet to test /health for gated sessions.');
           return;
         }
@@ -1688,7 +1710,7 @@ const AdminPage = ({
         if (!resp.ok) throw new Error(payload?.error || `Health check failed (${resp.status})`);
         return payload;
       });
-      setTestResults((prev: any) => ({ ...prev, health: `OK (${data?.ts ? new Date(data.ts).toISOString() : 'healthy'})` }));
+      setTestResults((prev) => ({ ...prev, health: `OK (${data?.ts ? new Date(data.ts).toISOString() : 'healthy'})` }));
       setTestStatus('Health check succeeded.');
     } catch (err: any) {
       const authMismatch = buildHealthAuthMismatchState({
@@ -1697,12 +1719,12 @@ const AdminPage = ({
         authError: getErrorMessage(err, ''),
       });
       if (authMismatch) {
-        setTestResults((prev: any) => ({ ...prev, health: authMismatch.healthLabel }));
+        setTestResults((prev) => ({ ...prev, health: authMismatch.healthLabel }));
         setTestStatus(authMismatch.statusMessage);
         return;
       }
       const message = addSessionConfigHint(getErrorMessage(err, 'Health check failed.'));
-      setTestResults((prev: any) => ({ ...prev, health: message }));
+      setTestResults((prev) => ({ ...prev, health: message }));
       setTestStatus(message);
     } finally {
       setTestBusy(false);
@@ -1784,11 +1806,11 @@ const AdminPage = ({
         return parsed;
       });
       const preview = data?.completion || data?.content?.[0]?.text || 'ok';
-      setTestResults((prev: any) => ({ ...prev, ai: `OK (${preview.slice(0, 80)})` }));
+      setTestResults((prev) => ({ ...prev, ai: `OK (${preview.slice(0, 80)})` }));
       setTestStatus('AI test succeeded.');
     } catch (err: any) {
       const msg = addSessionConfigHint(getErrorMessage(err, 'AI test failed.'));
-      setTestResults((prev: any) => ({ ...prev, ai: msg }));
+      setTestResults((prev) => ({ ...prev, ai: msg }));
       setTestStatus(msg);
     } finally {
       setTestBusy(false);
@@ -1822,11 +1844,11 @@ const AdminPage = ({
       const tx = String(txId || '').trim();
       const txLabel = tx ? `OK (tx ${tx.slice(0, 12)}…)` : 'OK';
       const txUrl = tx ? arweaveScripts.buildArweaveGatewayUrl(tx) : '';
-      setTestResults((prev: any) => ({ ...prev, arweave: { label: txLabel, href: txUrl } }));
+      setTestResults((prev) => ({ ...prev, arweave: { label: txLabel, href: txUrl } }));
       setTestStatus('Arweave upload succeeded.');
     } catch (err: any) {
       const msg = addSessionConfigHint(getErrorMessage(err, 'Arweave test failed.'));
-      setTestResults((prev: any) => ({ ...prev, arweave: msg }));
+      setTestResults((prev) => ({ ...prev, arweave: msg }));
       setTestStatus(msg);
     } finally {
       setTestBusy(false);
@@ -1879,11 +1901,11 @@ const AdminPage = ({
         ? `OK (tx ${hash.slice(0, 12)}…)`
         : `OK (sent to ${shortAddress(burnAddress)})`;
       const txUrl = hash ? buildTxExplorerUrl(hash, testChainId) : '';
-      setTestResults((prev: any) => ({ ...prev, faucet: { label, href: txUrl } }));
+      setTestResults((prev) => ({ ...prev, faucet: { label, href: txUrl } }));
       setTestStatus('Faucet test succeeded.');
     } catch (err: any) {
       const msg = addSessionConfigHint(getErrorMessage(err, 'Faucet test failed.'));
-      setTestResults((prev: any) => ({ ...prev, faucet: msg }));
+      setTestResults((prev) => ({ ...prev, faucet: msg }));
       setTestStatus(msg);
     } finally {
       setTestBusy(false);
@@ -1991,7 +2013,7 @@ const AdminPage = ({
     const nextStart = Number(metadataLatestBlock || 0);
     if (!Number.isFinite(nextStart) || nextStart <= 0) return;
     setMetadataDraftTouched(true);
-    setMetadataBlockLimitsDraft((prev: any) => ({
+    setMetadataBlockLimitsDraft((prev) => ({
       ...(prev || {}),
       start: String(nextStart),
     }));
@@ -2716,7 +2738,7 @@ const AdminPage = ({
                           value={metadataBlockLimitsDraft.start}
                           onChange={(e: any) => {
                             setMetadataDraftTouched(true);
-                            setMetadataBlockLimitsDraft((prev: any) => ({
+                            setMetadataBlockLimitsDraft((prev) => ({
                               ...(prev || {}),
                               start: e.target.value,
                             }));
@@ -2731,7 +2753,7 @@ const AdminPage = ({
                           placeholder="Optional"
                           onChange={(e: any) => {
                             setMetadataDraftTouched(true);
-                            setMetadataBlockLimitsDraft((prev: any) => ({
+                            setMetadataBlockLimitsDraft((prev) => ({
                               ...(prev || {}),
                               end: e.target.value,
                             }));
@@ -3134,7 +3156,7 @@ const AdminPage = ({
                       type="button"
                       className={styles.secretOptionHeader}
                       aria-label={card.label}
-                      onClick={() => setOpenSecretCards((p: any) => ({ ...p, [card.key]: !p[card.key] }))}
+                      onClick={() => setOpenSecretCards((p) => ({ ...p, [card.key]: !p[card.key] }))}
                       aria-expanded={isOpen}
                     >
                       <FontAwesomeIcon icon={cardStatus.iconLocked ? faLock : faLockOpen} style={{ opacity: cardStatus.iconLocked ? 0.9 : 0.4, marginRight: 8 }} />
@@ -3329,7 +3351,7 @@ const AdminPage = ({
               updateFunction={(next: any) => {
                 setTranscribeText(next);
                 const trimmed = toStr(next).trim();
-                setTestResults((prev: any) => ({ ...prev, transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '' }));
+                setTestResults((prev) => ({ ...prev, transcribe: trimmed ? `OK (${trimmed.slice(0, 80)})` : '' }));
               }}
               toggleEncryption={() => {}}
               value={transcribeText}
