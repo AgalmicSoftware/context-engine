@@ -19,7 +19,9 @@ describe('Modals contrast styles', () => {
     expect(scss).toMatch(/@media \(max-width:\s*768px\)\s*{[\s\S]*?\.welcomeSlideMediaButton\[data-slide-layout='flushBottom'\],\s*\.welcomeSlideMediaButtonCentered\[data-slide-layout='centered'\]\s*\{\s*overflow:\s*hidden;/);
     expect(scss).toMatch(/@media \(max-width:\s*768px\)\s*{[\s\S]*?\.welcomeSlideImageToolkit\[data-slide-layout='centered'\]\s*\{[\s\S]*?object-position:\s*center center;/);
     expect(scss).toMatch(/\.welcomeSlideImageIntro\s*\{[\s\S]*?max-width:\s*95vw;/);
-    expect(scss).toMatch(/\.welcomeSlideImageToolkit\s*\{[\s\S]*?max-height:\s*100%;[\s\S]*?max-width:\s*170%;/);
+    expect(scss).toMatch(/\.welcomeSlideImageToolkit\s*\{[\s\S]*?max-height:\s*100%;[\s\S]*?max-width:\s*116%;[\s\S]*?align-self:\s*center;[\s\S]*?object-position:\s*center center;/);
+    expect(scss).not.toMatch(/\.welcomeSlideImageToolkit\s*\{[\s\S]*?transform:\s*translateX\(8%\);/);
+    expect(scss).toMatch(/@media \(max-width:\s*768px\)\s*{[\s\S]*?\.welcomeSlideImageToolkit\[data-slide-layout='centered'\]\s*\{[\s\S]*?object-position:\s*center center;[\s\S]*?transform:\s*none;/);
   });
 
   it('keeps the desktop right sidebar visible even when its inner content is empty', () => {
@@ -27,5 +29,19 @@ describe('Modals contrast styles', () => {
 
     expect(scss).toMatch(/@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.welcomeSlideSidebar\s*\{[\s\S]*?align-self:\s*stretch;[\s\S]*?min-height:\s*clamp\(280px,\s*31vw,\s*340px\);/);
     expect(scss).toMatch(/@media \(min-width:\s*1367px\)\s*{[\s\S]*?\.welcomeSlideSidebar\s*\{[\s\S]*?align-self:\s*stretch;[\s\S]*?min-height:\s*380px;/);
+  });
+
+  it('uses the transparent goals image without restoring the black source rectangle', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.welcomeSlideImageGoals\s*\{[\s\S]*?max-height:\s*100%;[\s\S]*?mix-blend-mode:\s*screen\s*!important;[\s\S]*?opacity:\s*0\.86;/);
+    expect(scss).not.toMatch(/\.welcomeSlideImageGoals\s*\{[\s\S]*?filter:\s*invert\(1\);/);
+  });
+
+  it('blends the audience slide jpeg background in embedded welcome slides', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Modals.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.welcomeSlideImageAudience\s*\{[\s\S]*?mix-blend-mode:\s*screen\s*!important;[\s\S]*?opacity:\s*1;[\s\S]*?filter:\s*brightness\(1\.08\) saturate\(1\.18\) contrast\(1\.08\);/);
+    expect(scss).not.toMatch(/\.welcomeSlideImageAudience\s*\{[\s\S]*?mask-image:/);
   });
 });

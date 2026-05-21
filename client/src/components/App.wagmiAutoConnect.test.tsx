@@ -43,7 +43,7 @@ const mockMetaMaskConnector = jest.fn((options: unknown) => ({
   id: 'metaMask-injected',
   options,
 }));
-const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage) => ({
+const mockReadColdLoadOnboardingState = jest.fn((_storage?: Storage, _pathname?: string) => ({
   firstVisit: true,
   shouldStartOnboarding: false,
 }));
@@ -464,6 +464,7 @@ describe('App wagmi auto-connect persistence', () => {
   });
 
   it('reuses the cold-load onboarding snapshot on mount', () => {
+    window.history.replaceState({}, '', '/session/demo');
     mockReadColdLoadOnboardingState.mockReturnValue({
       firstVisit: true,
       shouldStartOnboarding: true,
@@ -480,6 +481,7 @@ describe('App wagmi auto-connect persistence', () => {
     );
 
     expect(mockReadColdLoadOnboardingState).toHaveBeenCalledTimes(1);
+    expect(mockReadColdLoadOnboardingState).toHaveBeenCalledWith(window.localStorage, '/session/demo');
     expect(mockStoreDispatch).toHaveBeenCalledWith({
       type: 'SET_ONBOARDING_STEP',
       payload: 1,
@@ -513,8 +515,8 @@ describe('App wagmi auto-connect persistence', () => {
       />
     );
 
-    expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(1, window.localStorage);
-    expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(2, window.sessionStorage);
+    expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(1, window.localStorage, '/');
+    expect(mockReadColdLoadOnboardingState).toHaveBeenNthCalledWith(2, window.sessionStorage, '/');
     expect(routeProps[0].element.props.firstVisit).toBe(true);
   });
 

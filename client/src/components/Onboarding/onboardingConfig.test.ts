@@ -20,19 +20,37 @@ describe('readColdLoadOnboardingState', () => {
   it('does not auto-open cold-load onboarding by default on first visit', () => {
     const storage = createStorageMock();
 
-    expect(readColdLoadOnboardingState(storage)).toEqual({
+    expect(readColdLoadOnboardingState(storage, '/')).toEqual({
       firstVisit: true,
       shouldStartOnboarding: false,
     });
     expect(storage.setItem).toHaveBeenCalledWith(FIRST_VISIT_STORAGE_KEY, 'true');
   });
 
-  it('allows explicitly disabling the cold-load onboarding for testing', () => {
+  it('auto-opens cold-load onboarding by default on direct session links', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session/demo')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: true,
+    });
+  });
+
+  it('auto-opens cold-load onboarding on the base session route too', () => {
+    const storage = createStorageMock();
+
+    expect(readColdLoadOnboardingState(storage, '/session')).toEqual({
+      firstVisit: true,
+      shouldStartOnboarding: true,
+    });
+  });
+
+  it('allows explicitly disabling the cold-load onboarding for testing on session links', () => {
     const storage = createStorageMock({
       [COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY]: 'false',
     });
 
-    expect(readColdLoadOnboardingState(storage)).toEqual({
+    expect(readColdLoadOnboardingState(storage, '/session/demo')).toEqual({
       firstVisit: true,
       shouldStartOnboarding: false,
     });
@@ -43,7 +61,7 @@ describe('readColdLoadOnboardingState', () => {
       [COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY]: 'true',
     });
 
-    expect(readColdLoadOnboardingState(storage)).toEqual({
+    expect(readColdLoadOnboardingState(storage, '/')).toEqual({
       firstVisit: true,
       shouldStartOnboarding: true,
     });
@@ -55,7 +73,7 @@ describe('readColdLoadOnboardingState', () => {
       [ONBOARDING_COMPLETE_STORAGE_KEY]: 'true',
     });
 
-    expect(readColdLoadOnboardingState(storage)).toEqual({
+    expect(readColdLoadOnboardingState(storage, '/session/demo')).toEqual({
       firstVisit: true,
       shouldStartOnboarding: false,
     });
@@ -66,7 +84,7 @@ describe('readColdLoadOnboardingState', () => {
       [FIRST_VISIT_STORAGE_KEY]: 'true',
     });
 
-    expect(readColdLoadOnboardingState(storage)).toEqual({
+    expect(readColdLoadOnboardingState(storage, '/session/demo')).toEqual({
       firstVisit: false,
       shouldStartOnboarding: false,
     });

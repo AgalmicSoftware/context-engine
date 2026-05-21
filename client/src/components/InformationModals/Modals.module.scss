@@ -1691,9 +1691,10 @@ input[type='radio']:checked:after {
 
 .welcomeSlideImageToolkit {
   max-height: 100%;
-  max-width: 170%;
+  max-width: 116%;
   mix-blend-mode: color-dodge !important;
-  align-self: flex-start;
+  align-self: center;
+  object-position: center center;
   filter: opacity(0.5);
 }
 
@@ -1751,23 +1752,26 @@ input[type='radio']:checked:after {
     align-self: stretch !important;
     object-fit: contain;
     object-position: center center;
+    transform: none;
     filter: opacity(0.58);
   }
 }
 
 .welcomeSlideImageGoals {
-  max-height: 116%;
+  max-height: 100%;
   max-width: 100%;
-  mix-blend-mode: lighten;
+  mix-blend-mode: screen !important;
   align-self: flex-end;
-  filter: invert(1);
+  opacity: 0.86;
 }
 
 .welcomeSlideImageAudience {
   max-height: 140%;
   max-width: 100%;
-  mix-blend-mode: color-dodge;
+  mix-blend-mode: screen !important;
   align-self: flex-end;
+  opacity: 1;
+  filter: brightness(1.08) saturate(1.18) contrast(1.08);
 }
 
 .welcomeSlideImageAudienceBlend {
