@@ -784,18 +784,60 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   // Passkey wallet handlers
 
-  startPasskeyWalletAction = (): number => {
-    this._passkeyWalletActionId += 1;
-    return this._passkeyWalletActionId;
+  handlePortoSignUp = async () => {
+    this.props.updateLoginInfo({
+      loginInProgress: true,
+      loginComplete: false,
+      provider: "porto_passkey",
+    });
+
+    try {
+      const portoNetwork = this.getPortoNetwork();
+      const address = await portoFunctions.authenticatePorto();
+      this._finalizePortoLogin(address, portoNetwork);
+    } catch (error) {
+      accountLog.error("Porto Sign Up Error:", error);
+      this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
+    }
   };
 
-  isCurrentPasskeyWalletAction = (actionId: number): boolean =>
-    this._isMounted && actionId === this._passkeyWalletActionId;
+  handlePortoSignIn = async () => {
+    this.props.updateLoginInfo({
+      loginInProgress: true,
+      loginComplete: false,
+      provider: "porto_passkey",
+    });
+
+    try {
+      const portoNetwork = this.getPortoNetwork();
+      const address = await portoFunctions.loginWithPorto();
+      this._finalizePortoLogin(address, portoNetwork);
+    } catch (error) {
+      accountLog.error("Porto Sign In Error:", error);
+      this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
+    }
+  };
+
+  _finalizePortoLogin = (address: any, targetNetwork: any = null) => {
+      const portoNetwork = this.getPortoNetwork(targetNetwork);
+      const web3info = {
+        account: address,
+        provider: 'porto_passkey',
+        network: portoNetwork,
+        userImageURL: undefined,
+      };
+
+      this.props.changeAccount(web3info);
+      this.props.updateLoginInfo({
+        loginInProgress: false,
+        loginComplete: true,
+        provider: "porto_passkey",
+      });
+  };
 
   handleLogout = async () => {
-    this._passkeyWalletActionId += 1;
-    if (this.props.provider === 'passkey_eoa') {
-      await passkeyWallet.logoutPasskeyWallet();
+    if (this.props.provider === 'porto_passkey') {
+       portoFunctions.logoutPorto();
     }
 
     if (this.props.provider === 'wagmi' && this.props.wagmiDisconnect) {
@@ -930,7 +972,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   addCorrectNetwork = async () => {
-    if (window.ethereum && this.props.provider === 'wagmi') {
+    if (window.ethereum && this.props.provider === "wagmi") {
       try {
         const tn = this.getTargetNetwork();
         const chainIdHex = chainHexId(tn);
@@ -961,7 +1003,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return false;
   };
 
-  switchToCorrectNetwork: any = async () => {
+  switchToCorrectNetwork = async () => {
     const ethereum = window.ethereum;
     if (ethereum && this.props.provider === "wagmi") {
       const tn = this.getTargetNetwork();
@@ -1277,10 +1319,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   handleAiModeChange = (event: any) => {
-    const nextMode =
-      toStr(event?.target?.value || '')
-        .trim()
-        .toLowerCase() || 'openai';
+    const nextMode = toStr(event?.target?.value || '').trim().toLowerCase() || 'openai';
     this.updateAiSettings((s: any) => {
       const next = {
         ...s,
@@ -1371,23 +1410,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }));
   };
 
-  handleAgentTokenInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    this.setState({
-      agentTokenInput: event.target.value,
-      agentTokenError: '',
-      agentTokenStatus: '',
-    });
-  };
-
-  renderAgentTokenLoginPanel = () => {
-    if (!this.shouldShowAgentTokenLogin()) return null;
-    const { agentBridgeUrl, sessionId, sessionSlug, workerUrl } = this.getAgentTokenLoginSessionContext();
-    const cachedEnvelope = readAgentClientLoginEnvelope({
-      sessionSlug,
-      sessionId,
-      workerUrl,
-      agentBridgeUrl,
-    });
+  getDisplaySessionConfig = (slugIn: any = '', cfgIn: any = null) => {
+    const slug = normalizeSettingsSessionSlug(slugIn || cfgIn?.slug || '');
     return (
       <LoginAgentTokenPanel
         agentTokenError={this.state.agentTokenError}
@@ -1402,7 +1426,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  handlePreLoginAiEndpointChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  handlePreLoginAiEndpointChange = (event: any) => {
     const rpcUrl = toStr(event?.target?.value || '');
     const current = this.cloneAiSettings(this.state.aiSettings || getLocalAiSettings());
     const saved = saveLocalAiSettings({
@@ -1422,7 +1446,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
-  handlePreLoginAiProviderKeyChange = (provider: string, event: React.ChangeEvent<HTMLInputElement>) => {
+  handlePreLoginAiProviderKeyChange = (provider: any, event: any) => {
     const current = this.cloneAiSettings(this.state.aiSettings || getLocalAiSettings());
     const saved = saveLocalAiSettings(
       applyPreLoginAiProviderKeyChange(current, {
@@ -1513,11 +1537,21 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return descriptor.label || descriptor.slugLabel || 'General';
   };
 
-  renderConfigToggleControl = ({ expanded = false, onToggle = null, testId = '' }: any = {}) =>
-    LoginSettingsConfigToggleControl({
-      expanded,
-      onToggle,
-      testId,
+  renderConfigToggleControl = ({
+    expanded = false,
+    onToggle = null,
+    testId = '',
+  }: any = {}) => LoginSettingsConfigToggleControl({
+    expanded,
+    onToggle,
+    testId,
+  });
+
+  renderSessionSummary = (activeSessionIn: any = null) => {
+    const activeSession = activeSessionIn || this.getSessionDescriptor(this.getActiveSessionSlug());
+    return LoginSettingsSessionSummary({
+      activeSession,
+      sessionHref: buildSettingsSessionHref(activeSession.slug),
     });
 
   renderSettingsControlRow = ({
@@ -1907,7 +1941,54 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  getSettingsOverviewContext = () => getLoginSettingsOverviewContext(this);
+  getSettingsOverviewContext = () => {
+    const walletNet = (this.props.provider === 'wagmi' ? this.props.wagmiNetwork : this.props.network);
+    const tn = this.getTargetNetwork();
+    const targetNetworkName = tn?.name || 'not configured';
+    const walletNetworkName = walletNet?.name || 'not connected';
+    const corrId = Number(tn.id);
+    const isCorrectNetwork = (walletNet?.id === corrId);
+    const needsNetworkSwitch = this.props.provider === 'wagmi' && !isCorrectNetwork && this.props.loginComplete;
+    const showWalletNetwork = this.props.provider === 'wagmi' && !!walletNet && walletNet?.id !== corrId;
+    const sessionSlug = this.getActiveSessionSlug();
+    const sessionConfig = this.getDisplaySessionConfig(sessionSlug);
+    const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
+    const sponsoredAccess = this.state.sponsoredAccess || {};
+    const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
+    const buildSponsorshipCard = (key: any, title: any) => {
+      const sessions = sponsorSessions.byResource[key] || [];
+      const activeSponsorSession = sessions.find((entry: any) => entry?.isActive) || null;
+      const otherSponsorSessions = sessions.filter((entry: any) => !entry?.isActive);
+      return {
+        key,
+        title,
+        status: formatSponsoredStatusMeta(sponsoredAccess[key] || null, !!activeSponsorSession),
+        access: sponsoredAccess[key] || null,
+        activeSession,
+        activeSponsorSession,
+        otherSponsorSessions,
+        sessions,
+      };
+    };
+    const sponsorshipCards = [
+      buildSponsorshipCard('ai', 'AI'),
+      buildSponsorshipCard('arweave', 'Arweave'),
+      buildSponsorshipCard('rpc', 'RPC'),
+      buildSponsorshipCard('txGas', 'Tx gas'),
+    ];
+
+    return {
+      activeSession,
+      cryptoTerminology: isCryptoMode(),
+      needsNetworkSwitch,
+      showWalletNetwork,
+      sponsorshipCards,
+      sponsorSessions,
+      targetNetworkName,
+      targetNetwork: tn,
+      walletNetworkName,
+    };
+  };
 
   renderInlineNetworkSummary = ({
     targetNetworkName = 'not configured',
@@ -1984,7 +2065,11 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  renderStaticSettingsSection = ({ title = '', summary = '', children = null }: any = {}) => (
+  renderStaticSettingsSection = ({
+    title = '',
+    summary = '',
+    children = null,
+  }: any = {}) => (
     <LoginSettingsSectionCard title={title} summary={summary}>
       {children}
     </LoginSettingsSectionCard>
@@ -2325,6 +2410,61 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
   };
 
+  renderTooltipsToggleControl = ({ infoId, tooltipPlacement = 'top' }: any) => {
+    const tooltipsEnabled = this.props.tooltipsEnabled !== false;
+
+    return (
+      <div className={styles.tooltipsToggleControl}>
+        <Button
+          type="button"
+          onClick={() => this.props.toggleTooltips?.()}
+          className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton} ${styles.tooltipsToggleButton}`}
+          aria-pressed={tooltipsEnabled}
+        >
+          Explainers {tooltipsEnabled ? 'On' : 'Off'}
+        </Button>
+        {tooltipsEnabled ? (
+          <>
+            <FontAwesomeIcon
+              icon={faQuestionCircle}
+              className={`${styles.infoIcon} ${styles.tooltipsToggleInfoIcon}`}
+              id={infoId}
+            />
+            <CETooltip
+              placement={tooltipPlacement}
+              target={infoId}
+              delay={0}
+              trigger="hover click focus"
+              autohide={false}
+              className={styles.networkTooltip}
+            >
+              <div style={{ padding: '10px' }}>
+                Toggle explainers throughout the app.
+              </div>
+            </CETooltip>
+          </>
+        ) : null}
+      </div>
+    );
+  };
+
+  renderDemoSurfaceToggleControl = () => {
+    const demoSurfaceEnabled = this.props.demoSurfaceMode !== false;
+
+    return (
+      <div className={styles.tooltipsToggleControl}>
+        <Button
+          type="button"
+          onClick={() => this.props.setDemoSurfaceMode?.(!demoSurfaceEnabled)}
+          className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton} ${styles.tooltipsToggleButton}`}
+          aria-pressed={demoSurfaceEnabled}
+        >
+          Demo Mode {demoSurfaceEnabled ? 'On' : 'Off'}
+        </Button>
+      </div>
+    );
+  };
+
   getPreLoginSettingsDisplay = () => {
     const overview = this.getSettingsOverviewContext();
 
@@ -2342,26 +2482,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     });
   };
 
+  openBookmarks = () => {
+    this.closeLoginModal();
+    if (typeof window !== 'undefined') {
+      window.location.href = '/bookmarks';
+    }
+  };
+
   getModalDisplay = () => {
-    const activeSessionSlug = this.getActiveSessionSlug();
-    const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);
-    const activeSessionCapabilities = this._sessionCapabilityProjectionResolver(activeSessionConfig);
-    const hasConcreteActiveSession = !!normalizeSettingsSessionSlug(activeSessionSlug);
-    const sessionIdentityUnavailable =
-      hasConcreteActiveSession &&
-      (activeSessionCapabilities.source === 'missing' || activeSessionCapabilities.source === 'invalid_profile');
-    const isValidatedPasskeyOnlyWorkerSession =
-      activeSessionCapabilities.profileValid &&
-      activeSessionCapabilities.isWorkerCanonical &&
-      activeSessionCapabilities.usesPasskeyIdentity &&
-      !activeSessionCapabilities.usesWalletIdentity;
-    const showAdvancedWalletAccess =
-      isValidatedPasskeyOnlyWorkerSession && !activeSessionCapabilities.isPureWorkerCanonical;
-    const showWalletIdentity =
-      !sessionIdentityUnavailable &&
-      (activeSessionCapabilities.isRegistryCanonical ||
-        (activeSessionCapabilities.profileValid && activeSessionCapabilities.usesWalletIdentity) ||
-        !hasConcreteActiveSession);
     const activeChain = this.props.wagmiNetwork || this.props.network || this.getTargetNetwork();
     const showTestnetOnly = (showWalletIdentity || showAdvancedWalletAccess) && !!activeChain?.testnet;
     const activeSessionNetworkChainId =
@@ -2465,7 +2593,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return <CardBody><p>Please log in.</p></CardBody>;
   }
 
-  getModalTitle: any = () => {
+  getModalTitle = () => {
     if (!this.props.loginComplete && !this.props.loginInProgress) return "LOGIN";
     if (this.props.loginInProgress) return "ACCOUNT";
     if (this.props.loginComplete) return "ACCOUNT";
