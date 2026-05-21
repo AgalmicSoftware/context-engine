@@ -1,4 +1,4 @@
-import { buildArweaveGatewayUrlCandidates, normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
+import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 
 export type SbtListHelperRecord = Record<string, unknown>;
 export type SbtListHelperItem = SbtListHelperRecord & {
@@ -32,24 +32,28 @@ export type SbtCardDetails = {
   tags: string[];
 };
 
-const isSbtListCardRecord = (value: unknown): value is SbtListHelperRecord => !!value && typeof value === 'object';
+const isSbtListCardRecord = (value: unknown): value is SbtListHelperRecord => (
+  !!value && typeof value === 'object'
+);
 
-export const normalizeSbtListGatewayUri = (uri: unknown, contextLabel: string = 'sbt_list_asset'): string | null => {
+export const normalizeSbtListGatewayUri = (
+  uri: unknown,
+  contextLabel: string = 'sbt_list_asset'
+): string | null => {
   if (!uri) return null;
   const s = String(uri).trim();
   if (!s) return null;
   if (/^ipfs:\/\//i.test(s)) return `https://ipfs.io/ipfs/${s.replace(/^ipfs:\/\//i, '')}`;
-  const arweaveCandidates = buildArweaveGatewayUrlCandidates(s, { gateway: 'https://arweave.net' });
-  const preferredArweaveCandidate = arweaveCandidates[0] || '';
-  if (preferredArweaveCandidate && preferredArweaveCandidate !== s) return preferredArweaveCandidate;
   return normalizeArweaveUrl(s, { contextLabel });
 };
 
-export const normalizeSbtListTokenUri = (uri: unknown): string | null =>
-  normalizeSbtListGatewayUri(uri, 'sbt_list_image');
+export const normalizeSbtListTokenUri = (uri: unknown): string | null => (
+  normalizeSbtListGatewayUri(uri, 'sbt_list_image')
+);
 
-export const normalizeSbtListDocumentHref = (uri: unknown): string | null =>
-  normalizeSbtListGatewayUri(uri, 'sbt_list_document');
+export const normalizeSbtListDocumentHref = (uri: unknown): string | null => (
+  normalizeSbtListGatewayUri(uri, 'sbt_list_document')
+);
 
 export const dedupeCaseInsensitiveStrings = (values: unknown = []): string[] => {
   const out: string[] = [];
@@ -82,9 +86,12 @@ export const collectSbtTagValues = (...candidates: unknown[]): string[] => {
       return;
     }
     if (isSbtListCardRecord(candidate)) {
-      const objectText = [candidate.label, candidate.name, candidate.value, candidate.tag].find(
-        (value: unknown) => typeof value === 'string' && value.trim().length > 0,
-      );
+      const objectText = [
+        candidate.label,
+        candidate.name,
+        candidate.value,
+        candidate.tag,
+      ].find((value: unknown) => typeof value === 'string' && value.trim().length > 0);
       if (typeof objectText === 'string') values.push(objectText);
     }
   };
@@ -123,7 +130,7 @@ export const collectSbtDocumentUrls = (...candidates: unknown[]): string[] => {
 };
 
 export const getSbtCardDetails = (sbt: unknown): SbtCardDetails => {
-  const record = isSbtListCardRecord(sbt) ? (sbt as SbtListHelperItem) : {};
+  const record = isSbtListCardRecord(sbt) ? sbt as SbtListHelperItem : {};
   const sbtInfo = isSbtListCardRecord(record.sbtInfo) ? record.sbtInfo : {};
   const tags = collectSbtTagValues(
     sbtInfo.tags,
