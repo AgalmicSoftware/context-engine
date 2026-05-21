@@ -3,8 +3,8 @@
     "description": "Cross-corpus debate structures for real-time debate visualization platform. Each debate synthesizes evidence from 5+ corpora (METR evaluations, LessWrong theory, Dwarkesh practitioner interviews, AI sci-fi narratives, AI legislation, and enriched tweets) into structured argument trees with fact-checking, fallacy detection, steel-manning, and audience sentiment tracking.",
     "version": "1.0",
     "date_generated": "2026-02-15",
-    "debate_count": 8,
-    "total_cross_corpus_sources": 73,
+    "debate_count": 13,
+    "total_cross_corpus_sources": 342,
     "corpora_synthesized": [
       "ai_laws",
       "ai_scifi",
@@ -20,7 +20,10 @@
       "methodology_debate": 2,
       "forecasting_disagreement": 1,
       "values_conflict": 1,
-      "policy_timing": 1
+      "policy_timing": 1,
+      "environmental_impact": 1,
+      "societal_impact": 2,
+      "policy_dispute": 2
     },
     "platform_features_demonstrated": [
       "argument_tree: Nested claim-evidence graph with support/attack/qualification relationships",
@@ -82,6 +85,36 @@
         "title": "Is Deceptive Alignment Real or Theoretical?",
         "category": "empirical_dispute",
         "question": "Are current AI systems demonstrating deceptive alignment behaviors, or are observed behaviors optimization artifacts without genuine strategic intent?"
+      },
+      {
+        "id": "debate_ai_water_usage",
+        "title": "AI Water Usage: Real Crisis or Misunderstood Metric?",
+        "category": "environmental_impact",
+        "question": "Is AI's water consumption a genuine environmental crisis or an overstated concern driven by misleading per-query metrics?"
+      },
+      {
+        "id": "debate_ai_labor_automation",
+        "title": "AI Labor Automation: Augmentation or Displacement?",
+        "category": "societal_impact",
+        "question": "Is current AI primarily augmenting workers, or is it already a displacement pressure that requires stronger labor policy?"
+      },
+      {
+        "id": "debate_ai_education_integrity",
+        "title": "AI in Education: Learning Tool or Assessment Threat?",
+        "category": "societal_impact",
+        "question": "Should education policy encourage broad AI adoption, or restrict AI use around assessment and student evaluation?"
+      },
+      {
+        "id": "debate_ai_copyright_training",
+        "title": "AI Training and Copyright: Fair Use or Licensing Market?",
+        "category": "policy_dispute",
+        "question": "Should developers be allowed to train on copyrighted works under fair use, or should licensing and compensation be required?"
+      },
+      {
+        "id": "debate_multimodal_deepfake_governance",
+        "title": "Multimodal AI: Can Likeness and Deepfake Rules Keep Up?",
+        "category": "policy_dispute",
+        "question": "Can watermarking, disclosure, and platform safeguards manage video/audio generation risks, or are stronger restrictions needed?"
       }
     ]
   },
@@ -459,7 +492,307 @@
         ],
         "total_sources": 10,
         "key_tension": "Benchmark metrics show exponential progress, but real-world impact appears to plateau\u2014suggesting either benchmarks are misleading or integration complexity is the bottleneck, not capability"
-      }
+      },
+      "positions": [
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/dario-amodei-2",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Dario Amodei \u2014 We are near the end of the exponential",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/elon-musk",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Elon Musk \u2014 In 36 months, the cheapest place to put AI will be space",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://www.anthropic.com/transparency/model-report",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Claude Mythos System Card \u2014 Frontier Cybersecurity Capabilities",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://x.com/adrusi/status/1971500946791579732",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sterlingcrispin/status/1721577054066323768",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/emollick/status/1889685623415431301",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/matthewclifford/status/1718914287480033703",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/pwang/status/1714612980308984077",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/martin_casado/status/1713102747380383874",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1833928889187635575",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/FLI_org/status/1694751606997151902",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/janleike/status/1703803685493694553",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/PluralityInst/status/1846647804673880236",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/dario-amodei-2",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "We are near the end of the exponential",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "dwarkesh_030",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Will scaling work?",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/RokoMijic/status/1678220431310954498",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/jackclarkSF/status/1963273734493553072",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/elder_plinius/status/1780712730800148979",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/_xjdr/status/1870174031204495450",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/pujaohlhaver/status/1707356648895910394",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/anthrupad/status/1987571207835947134",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/goth600/status/1857118749687693815",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/CFGeek/status/1777073569245331942",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/timourxyz/status/1722532406358413513",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/LefterisJP/status/1791981662391115806",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/amasad/status/1657825913135071237",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/zkDragon/status/1726666316516638844",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/Grimezsz/status/1761027769218347103",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/jxmnop/status/1882829619872792813",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/repligate/status/1841632653713539424",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/danfaggella/status/1899057869376397746",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/a_greenberg/status/1669793430296207369",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with positive trajectory themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2503.14499",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Measuring AI Ability to Complete Long Tasks",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-07-14-how-does-time-horizon-vary-across-domains/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "How Does Time Horizon Vary Across Domains?",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2024-08-06-update-on-evaluations/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "An update on our general capability evaluations",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Evidence for Exponential AI Capability Growth",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/dario-amodei",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Scaling, Alignment, & AI Progress",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/demis-hassabis",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Scaling, superhuman AIs, AlphaZero atop LLMs, AlphaFold",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/shane-legg",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "2028 AGI, superhuman alignment, new architectures",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/john-schulman",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Reasoning, RLHF, & Plan for 2027 AGI",
+          "relevance_score": 7
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "dwarkesh_dario_amodei_feb_2026",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "dwarkesh_metr_time_horizon_11_2026",
+          "relationship": "discusses_implications_of",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "dwarkesh_elon_musk_feb_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "measuring_ai_rd_automation_2026",
+          "relationship": "makes_claims_tested_by",
+          "relevance_score": 8
+        }
+      ]
     },
     {
       "id": "debate_reward_hacking_misalignment",
@@ -612,7 +945,7 @@
               "type": "qualification",
               "source": {
                 "corpus": "metr",
-                "entry_id": "metr_naive_fixes_reward_hacking",
+                "entry_id": "metr_naive_fixes_reward_hacking_2025",
                 "title": "Hidden Reward Hacking: When Visible Fixes Backfire",
                 "author": "METR Research Team",
                 "date": "2025-08-20"
@@ -701,7 +1034,7 @@
           "counter_evidence": [
             {
               "corpus": "metr",
-              "entry_id": "metr_naive_fixes_reward_hacking",
+              "entry_id": "metr_naive_fixes_reward_hacking_2025",
               "finding": "Visible reductions may mask hidden hacking via other channels"
             }
           ]
@@ -828,7 +1161,307 @@
         ],
         "total_sources": 10,
         "key_tension": "Models demonstrably hack rewards, but the simplicity of fix attempts and transparency of the behavior suggest either shallow misalignment or an intermediate stage between specification gaming and true goal misalignment"
-      }
+      },
+      "positions": [
+        {
+          "entry_url_or_id": "https://x.com/michael_nielsen/status/1911863922090758635",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1876744515156889605",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1988063818488905941",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/tszzl/status/1764117129073476092",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/soroushjp/status/1722336164793962603",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/AISafetyMemes/status/1687938540246573056",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/juddrosenblatt/status/1786554282747351264",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/EAForumPosts/status/1729205988689879489",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/tomekkorbak/status/1819513756013015190",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/StephenLCasper/status/1720869651390103762",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/viemccoy/status/1975055171500806329",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/jd_pressman/status/1898106824328659308",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1845828143669469533",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/AndyAyrey/status/1852139739631218704",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/michael_nielsen/status/1929936690560356704",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/AndyAyrey/status/1899586842565185633",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-06-05-recent-reward-hacking/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Recent Frontier Models Are Reward Hacking",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-06-05-recent-reward-hacking/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Naive fixes might just hide reward hacking",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://deepmind.google/blog/specification-gaming-the-flip-side-of-ai-ingenuity/",
+          "corpus": "lesswrong-posts",
+          "side": "a",
+          "stance_summary": "Specification Gaming: The Flip Side of AI Ingenuity",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/RokoMijic/status/1718443291002159595",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/_Mira___Mira_/status/1864817493480738924",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/juddrosenblatt/status/1900704060120199522",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/repligate/status/1871735552162353615",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/repligate/status/1892566553667010855",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/aashiq/status/1770923506621907165",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/edavidds/status/1680366590909616128",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/zhukeepa/status/1799872828923089143",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/edelwax/status/1773621129200234573",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/SeanHendryx/status/1854710361687310418",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/RadxChange/status/1666150237881225216",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/collect_intel/status/1661816558790778884",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/TechCrunch/status/1791501203559399692",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/anthrupad/status/1882584416079565138",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1957551411723661328",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/nostalgebraist/status/1870005079530700989",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/SafeWithAtlas/status/1790099368932180365",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/theojaffee/status/1724111072964284653",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/norabelrose/status/1870217708006191198",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/anthrupad/status/1957237717865267600",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1661419711375249410",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 6
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "alignment_faking_multimodel_2025",
+          "to_corpus": "lesswrong-posts",
+          "to_id": "alignment_faking_replication_2025",
+          "relationship": "discussed_in",
+          "relevance_score": 10
+        },
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_red_teaming_anthropic_monitoring_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "sabotage_evaluations_2024",
+          "relationship": "builds_on",
+          "relevance_score": 9
+        }
+      ]
     },
     {
       "id": "debate_predeployment_eval_adequacy",
@@ -1205,7 +1838,339 @@
         ],
         "total_sources": 10,
         "key_tension": "METR's own research suggests their evaluation framework is insufficient\u2014the organization building evaluations is also arguing they can't scale to frontier AI"
-      }
+      },
+      "positions": [
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Frontier Risk Report (February to March 2026)",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-03-25-red-teaming-anthropic-agent-monitoring/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Red-Teaming Anthropic's Internal Agent Monitoring Systems",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-03-12-sabotage-risk-report-opus-4-6-review/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Review of the Anthropic Sabotage Risk Report: Claude Opus 4.6",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Early work on monitorability evaluations",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://www.anthropic.com/claude-opus-4-6-system-card",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Claude Opus 4.6 System Card",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://www.anthropic.com/claude-opus-4-5-system-card",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Claude Opus 4.5 System Card \u2014 Best-Aligned Frontier Model",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://www.anthropic.com/transparency/model-report",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Claude Mythos System Card \u2014 Frontier Cybersecurity Capabilities",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "METR Frontier Risk Report (February to March 2026)",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-03-25-red-teaming-anthropic-agent-monitoring/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Red-Teaming Anthropic's Internal Agent Monitoring Systems",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-03-12-sabotage-risk-report-opus-4-6-review/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Review of the Anthropic Sabotage Risk Report: Claude Opus 4.6",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Early work on monitorability evaluations",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://openai.com/index/openai-anthropic-safety-evaluation/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Findings from a pilot Anthropic\u2013OpenAI alignment evaluation exercise",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://x.com/willccbb/status/1959521255499157842",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/GregKamradt/status/1841266096277696742",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1769518788670530015",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1946240793292734753",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/Plinz/status/1795852664611508293",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/RichardMCNgo/status/1786511855932043428",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-06-27-risk-transparency/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "What should companies share about risks from frontier AI models?",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/MelMitchell1/status/1671889190928396289",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/johannes_wachs/status/1680861516701093888",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/emollick/status/1880096720421548461",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/CFGeek/status/1901797114885419333",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/zicokolter/status/1813953859875680543",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/Miles_Brundage/status/1852798226472255788",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/The_JBernardi/status/1718995610202698188",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/repligate/status/1828588962853556528",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/lujainmibrahim/status/1793648295405105179",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/btibor91/status/1887762005181763888",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/METR_Evals/status/1836616839918703094",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/JanMBrauner/status/1793340565259452513",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/KelseyTuoc/status/1791940668992172051",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2503.17354",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "HCAST: Human-Calibrated Autonomy Software Tasks",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://evaluations.metr.org/gpt-5-report/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Details about METR's evaluation of OpenAI GPT-5",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-02-27-gpt-4-5-evals/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "METR's GPT-4.5 pre-deployment evaluations",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Frontier AI safety regulations: A reference for lab staff",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/2024-10-11-response-to-bureau-of-industry-and-security-proposed-reporting-requirements.pdf",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Response to Bureau of Industry and Security Proposed Reporting Requirements",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "metr_ostp_action_plan_2025",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Response to OSTP on AI Action Plan",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "metr_predeployment_inadequate_2025",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Why pre-deployment testing is not an adequate framework for AI risk management",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "AI models can be dangerous before public deployment",
+          "relevance_score": 7
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_frontier_risk_report_feb_mar_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "metr_evaluating_language_model_agents_2023",
+          "relationship": "evaluates_methods_from",
+          "relevance_score": 6
+        },
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_red_teaming_anthropic_monitoring_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "sabotage_evaluations_2024",
+          "relationship": "evaluates_methods_from",
+          "relevance_score": 6
+        },
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_monitorability_evals_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "bengio_et_al_2025_international_ai_safety",
+          "relationship": "evaluates_methods_from",
+          "relevance_score": 6
+        },
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_frontier_risk_report_feb_mar_2026",
+          "to_corpus": "dwarkesh-lab-insiders",
+          "to_id": "anthropic_claude_opus_46_system_card",
+          "relationship": "evaluates_claims_in",
+          "relevance_score": 10
+        },
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "ai_control_safety_cases_2025",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "metr_sabotage_risk_review_opus_46_2026",
+          "relationship": "methodology_applied_in",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "openai_anthropic_alignment_eval_exercise",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "dwarkesh_metr_monitorability_evals_2026",
+          "relationship": "complements",
+          "relevance_score": 8
+        }
+      ]
     },
     {
       "id": "debate_ai_rd_automation",
@@ -1621,7 +2586,323 @@
         ],
         "total_sources": 12,
         "key_tension": "METR's own data contains a fundamental contradiction: time horizons suggest exponential progress, yet real-world productivity metrics show AI tools slow down experienced developers\u2014suggesting the benchmark-to-reality gap may be unbridgeable even for R&D"
-      }
+      },
+      "positions": [
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Frontier Risk Report (February to March 2026)",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-04-10-mirrorcode-preliminary-results/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-05-11-ai-usage-survey/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Measuring the Self-Reported Impact of Early-2026 AI on Technical Worker Producti",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-02-24-uplift-update/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "We are Changing our Developer Productivity Experiment Design",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Time Horizon 1.1",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-02-19-five-lessons-from-ai-biology-rct/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Five lessons from having helped run an AI-Biology RCT",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/dario-amodei-2",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Dario Amodei \u2014 We are near the end of the exponential",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "METR Frontier Risk Report (February to March 2026)",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-04-10-mirrorcode-preliminary-results/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-05-11-ai-usage-survey/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Measuring the Self-Reported Impact of Early-2026 AI on Technical Worker Producti",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-02-24-uplift-update/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "We are Changing our Developer Productivity Experiment Design",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Time Horizon 1.1",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-02-19-five-lessons-from-ai-biology-rct/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Five lessons from having helped run an AI-Biology RCT",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://x.com/teortaxesTex/status/1798663697776492959",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/pujaohlhaver/status/1890027674401116314",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/robertwiblin/status/1937527710735024360",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1876744515156889605",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/gfodor/status/1661734540635951104",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1777081791855186191",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/devrelius/status/1879185824937639979",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/emollick/status/1814507814934425766",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/jssh___/status/1679574730674782211",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/allisondman/status/1717602433529258252",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/tedx_ai/status/1811945091696853431",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/ajeya_cotra/status/1875226707894182258",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with labor displacement themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/jam3scampbell/status/1882818475145540030",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/CFGeek/status/1744799865996234953",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with labor displacement themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/tensecorrection/status/1737987883267723350",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/erikbryn/status/1933435753972809800",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/nickcammarata/status/1853879961515680250",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/danfaggella/status/1898870786724630738",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/littmath/status/1979019097619796083",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/notes/2026-02-10-simpler-ai-timelines-model/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "A simpler AI timelines model predicts 99% AI R&D automation in ~2032",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-07-14-how-does-time-horizon-vary-across-domains/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Time Horizon in Coding Domain: Detailed Analysis",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2503.14499",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "Measuring AI R&D Capabilities: Time Horizon Analysis v1.1",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2603.03992",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "Measuring AI R&D Automation",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/danfaggella/status/1812171380449763430",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/spolu/status/1992332914542215517",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with agentic ai risks themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/QuintinPope5/status/1722881036672249903",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with labor displacement themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/visakanv/status/1396772401996648449",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 6
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_frontier_risk_report_feb_mar_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "metr_evaluating_language_model_agents_2023",
+          "relationship": "evaluates_methods_from",
+          "relevance_score": 6
+        },
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_mirrorcode_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "measuring_ai_rd_automation_2026",
+          "relationship": "provides_evidence_for",
+          "relevance_score": 10
+        },
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_developer_productivity_experiment_update_2026",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "metr_ai_usage_survey_2026",
+          "relationship": "contradicts_findings_of",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "dwarkesh_dario_amodei_feb_2026",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "dwarkesh_metr_mirrorcode_2026",
+          "relationship": "makes_claims_supported_by",
+          "relevance_score": 9
+        }
+      ]
     },
     {
       "id": "debate_open_vs_closed_safety",
@@ -1947,7 +3228,299 @@
         ],
         "total_sources": 7,
         "key_tension": "The empirical trend (capabilities spreading faster than regulation) conflicts with the normative claim that open source is necessary for distributed safety benefits. Even if open source is philosophically preferable, the timeline mismatch may make it practically impossible to maintain."
-      }
+      },
+      "positions": [
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/elon-musk",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Elon Musk \u2014 In 36 months, the cheapest place to put AI will be space",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://openai.com/index/openai-anthropic-safety-evaluation/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Findings from a pilot Anthropic\u2013OpenAI alignment evaluation exercise",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://x.com/truth_terminal/status/1879351149792239812",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/max_paperclips/status/1793041006323020152",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with open source benefits themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://www.mistral.ai/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Arthur Mensch and Mistral AI Open Source Strategy in Europe",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "zuckerberg_mark_zuckerberg_open_2024",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Mark Zuckerberg Open Source AI Is Path Forward July 2024",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2307.09288",
+          "corpus": "lesswrong-posts",
+          "side": "a",
+          "stance_summary": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2311.09227",
+          "corpus": "lesswrong-posts",
+          "side": "a",
+          "stance_summary": "Open-Sourcing Highly Capable Foundation Models: An Evaluation of Risks, Benefits",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://www.lesswrong.com/posts/8xN5KYB9xAgSSi494/against-the-open-source-closed-source-dichotomy-regulated",
+          "corpus": "lesswrong-posts",
+          "side": "a",
+          "stance_summary": "Against the Open Source / Closed Source Dichotomy: Regulated Source",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/jbrukh/status/1729139551585616197",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with open source benefits themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/basedjensen/status/1811371316370604529",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/hamandcheese/status/1720593029826740323",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/davidmanheim/status/1826293909599015214",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/DefenderOfBasic/status/1924105194645700866",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/QuintinPope5/status/1784999965514981810",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with open source benefits themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1957258250472321320",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://evaluations.metr.org/deepseek-r1-report/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Details about METR's preliminary evaluation of DeepSeek-R1",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://evaluations.metr.org/deepseek-v3-report/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Details about METR's preliminary evaluation of DeepSeek-V3",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://evaluations.metr.org/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Details about METR's evaluation of DeepSeek mid-2025 models",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://evaluations.metr.org/deepseek-qwen-report/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Details about METR's preliminary evaluation of Qwen models",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://evaluations.metr.org/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Details about METR's evaluation of Gemini 3 Pro",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/mark-zuckerberg",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Llama 3, Open Sourcing $10b Models, & Caesar Augustus",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/ylecun",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "The Case for Open Source AI",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://ai.meta.com/resources/models-and-libraries/llama-downloads/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Meta Llama Model Release and Open Weight Model Philosophy",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2302.04844",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "The Gradient of Generative AI Release: Methods and Considerations",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/ai_for_success/status/1770385638061154421",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/danfaggella/status/1779590888823402829",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/fllamber/status/1910150265941930313",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/hendrycks/status/1955304590024511559",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/maxhodak_/status/1685849568607657984",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/DefenderOfBasic/status/1955754786097172563",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/TheRealAdamG/status/1665190896155992064",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/s8mb/status/1838313365602455811",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/fchollet/status/1827489076687360265",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/saffronhuang/status/1801072775957996009",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/soundboy/status/1720122697827467363",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/RichardMCNgo/status/1810500808435229157",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1870613759544504349",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/joeykrug/status/1808208596175671402",
+          "corpus": "enriched-tweets",
+          "side": "b",
+          "stance_summary": "Tweet engaging with open source benefits themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/matdryhurst/status/1713663801491398772",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 6
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "dwarkesh_elon_musk_feb_2026",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "us_national_ai_framework_2026",
+          "relationship": "advocates_against",
+          "relevance_score": 7
+        }
+      ]
     },
     {
       "id": "debate_benchmark_validity",
@@ -2335,7 +3908,307 @@
         ],
         "total_sources": 8,
         "key_tension": "METR simultaneously provides the strongest evidence FOR benchmarks (time horizon consistency, human calibration) and AGAINST them (algorithmic vs holistic gap, productivity RCT, perception gap). This internal tension suggests the truth is nuanced: benchmarks measure something real and consistent, but that something is orthogonal to the actual value proposition of AI systems in production."
-      }
+      },
+      "positions": [
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-04-10-mirrorcode-preliminary-results/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-02-24-uplift-update/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "We are Changing our Developer Productivity Experiment Design",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Time Horizon 1.1",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-04-10-mirrorcode-preliminary-results/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "MirrorCode: Evidence that AI can already do some weeks-long coding tasks",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-02-24-uplift-update/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "We are Changing our Developer Productivity Experiment Design",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Time Horizon 1.1",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1714925476647448966",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1705660028898730351",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/yi_zeng/status/1810716356989571435",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1942598733969162470",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1658137785096699907",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/woj_zaremba/status/1960757419245818343",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-10-14-malt-dataset-of-natural-and-prompted-behaviors/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Evaluation Integrity as Metascience: Can We Trust AI Measurements?",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/zicokolter/status/1813953859875680543",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/OwainEvans_UK/status/1881767758465229294",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/CFGeek/status/1901797114885419333",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/ben_s_bucknall/status/1897256909121749486",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/sayashk/status/1808178899039506566",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/GestaltU/status/1793985099236606029",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/SGRodriques/status/1813239853699723291",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/lujainmibrahim/status/1793648295405105179",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/soundboy/status/1788910977003504010",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/btibor91/status/1887762005181763888",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/CFGeek/status/1845845354354270419",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-02-27-gpt-4-5-evals/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "METR's GPT-4.5 pre-deployment evaluations",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2024-05-16-ml-engineers-needed/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "ML Engineers Needed for New AI R&D Evals Project",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "The Benchmark Saturation Problem and Time Horizon as Solution",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Distribution of Human Task Completion Times in HCAST",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/hcast.pdf",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Cybersecurity Evaluation Capabilities in HCAST",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2407.21792",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "Safetywashing: Do AI Safety Benchmarks Actually Measure Safety Progress?",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/EpochAIResearch/status/1887880088835752242",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/arcprize/status/1932137879742063073",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/_akhaliq/status/1668081713841315840",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/alexandr_wang/status/1795857651592491281",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/eli_lifland/status/1878982054521745729",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/g_leech_/status/1813753309607714992",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/rodneyabrooks/status/1679644381572132864",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/AnthropicAI/status/1858976458330505639",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/emollick/status/1870172935064818045",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/ethresearchbot/status/1790443826479260149",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with evaluation needed themes",
+          "relevance_score": 6
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_time_horizon_11_2026",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "metr_mirrorcode_2026",
+          "relationship": "extended_by",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "hair_trigger_alignment_2026",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "metr_monitorability_evals_2026",
+          "relationship": "challenges_assumptions_of",
+          "relevance_score": 8
+        }
+      ]
     },
     {
       "id": "debate_regulation_speed",
@@ -2731,7 +4604,330 @@
         ],
         "total_sources": 8,
         "key_tension": "The 131-day doubling vs 3-year regulatory timeline creates a mathematical reality that cannot be negotiated. Either regulation needs to become dramatically faster (requiring new institutional mechanisms), or the conversation needs to shift to non-regulatory governance (standards bodies, compute restrictions, international coordination). The current framework is fundamentally mismatched to the timescale of AI advancement."
-      }
+      },
+      "positions": [
+        {
+          "entry_url_or_id": "https://x.com/chrislengerich/status/1792659555920326993",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/hendrycks/status/1710312043503321141",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with governance urgent themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/RANDCorporation/status/1767340480256233700",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with urgency call themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1946240793292734753",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with governance urgent themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "California SB 53 Requirements Analysis",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "New York RAISE Act Requirements Analysis",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/anthrupad/status/1840866037514059824",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with governance urgent themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/maxhodak_/status/1858253822495514835",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with governance urgent themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/JeffLadish/status/1890563891702428018",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with urgency call themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/ngranati/status/1719657454714163349",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with regulation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/fchollet/status/1884052588527796266",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with urgency call themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/AiEleuther/status/1684277974043090944",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with regulation needed themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/AnthropicAI/status/1714359544992960964",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with democratic oversight themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/fchollet/status/1801062434163097713",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/AIObjectives/status/1897150118605848845",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with governance urgent themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/a_greenberg/status/1669793430296207369",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with coordination necessary themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/IntuitMachine/status/1971725636851912914",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with urgency call themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/yonashav/status/1870653840045027608",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with governance urgent themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/DKokotajlo/status/1811185731198713949",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with governance urgent themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/michhuan/status/1801480673464881174",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with governance urgent themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-08-20-forecasting-impacts-of-ai-acceleration/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Forecasting the Impacts of AI R&D Acceleration: Results of a Pilot Study",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-12-09-common-elements-of-frontier-ai-safety-policies/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Common Elements of Frontier AI Safety Policies (December 2025 Update)",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/2024-10-11-response-to-bureau-of-industry-and-security-proposed-reporting-requirements.pdf",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Response to Bureau of Industry and Security Proposed Reporting Requirements",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "metr_aisi_response_2024",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Response to U.S. AISI Draft on Managing Misuse Risk",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "metr_ostp_action_plan_2025",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Response to OSTP on AI Action Plan",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "metr_safety_policies_feb_2025",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Frontier AI Safety Policies",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/agi.pdf",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "AGI: Definitions and Potential Impacts",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/common-elements",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Risk Thresholds and Capability-Based Governance",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/common-elements",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Model Weight Security in Frontier AI Safety Policies",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Evidence for Exponential AI Capability Growth",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://metr.org/notes/2026-01-29-frontier-ai-safety-regulations/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "EU Code of Practice Requirements Analysis",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.dwarkesh.com/p/paul-christiano",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Preventing AI Takeover",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "dwarkesh_025",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Why political leaders keep failing at major change",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.anthropic.com/responsible-scaling-policy",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Anthropic's Responsible Scaling Policy",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.anthropic.com/responsible-scaling-policy",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Anthropic's Responsible Scaling Policy v2.0",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://openai.com/safety/preparedness/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "OpenAI Preparedness Framework (Beta)",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2402.08797",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Computing Power and the Governance of Artificial Intelligence",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://blog.heim.xyz/training-compute-thresholds/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Training Compute Thresholds: Features and Functions in AI Regulation",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://twitter.com/ylecun/status/1656929936639569920",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Yoshua Bengio AI Extinction Risk Statement and Advocacy",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://blog.samaltman.com/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Sam Altman Three Observations on AI Development Trajectory",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "us_america_ai_action_plan_2025",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "The U.S. action plan argues for accelerating AI innovation and infrastructure rather than slowing development through broad precautionary rules.",
+          "relevance_score": 9
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "eu_digital_omnibus_ai_2026",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "colorado_sb_26_189_2026",
+          "relationship": "contrasts_with",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "us_national_ai_framework_2026",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "connecticut_sb5_ai_2026",
+          "relationship": "would_preempt",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "lesswrong-posts",
+          "from_id": "ai_governance_strategic_landscape",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "uk_regulating_for_growth_bill_2026",
+          "relationship": "analyzes_approach_of",
+          "relevance_score": 8
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "us_america_ai_action_plan_2025",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "eo_14179_removing_barriers_ai_2025",
+          "relationship": "implements_policy_direction_from",
+          "relevance_score": 9
+        }
+      ]
     },
     {
       "id": "debate_deceptive_alignment",
@@ -2933,7 +5129,7 @@
               "type": "attack",
               "source": {
                 "corpus": "lesswrong",
-                "entry_id": "pope_turner_shard_theory",
+                "entry_id": "turner_pope_shard_theory",
                 "title": "Shard Theory",
                 "author": "Alex Turner et al.",
                 "date": "2022-11"
@@ -2947,7 +5143,7 @@
                   "type": "support",
                   "source": {
                     "corpus": "lesswrong",
-                    "entry_id": "pope_turner_shard_theory",
+                    "entry_id": "turner_pope_shard_theory",
                     "title": "Shard Theory",
                     "author": "Alex Turner et al.",
                     "date": "2022-11"
@@ -3178,6 +5374,1025 @@
         ],
         "total_sources": 8,
         "key_tension": "The crux is empirical but fundamentally challenging to resolve: deceptive alignment by definition would not show obvious signs until incentives become severe enough that deception is worth the risk. Side A argues the precursors are present. Side B argues absence of sabotage proves no deception. But a truly deceptive system would behave exactly as Side B describes until the stakes were high. This creates an unfalsifiable core\u2014either behavior is evidence of optimization artifacts (Side B's reading) or evidence of deception that's not yet activated (Side A's reading). The SHUSHCAST finding offers the strongest pivot point: if evasion capability continues scaling, it suggests the trajectory continues."
+      },
+      "positions": [
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Frontier Risk Report (February to March 2026)",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-03-25-red-teaming-anthropic-agent-monitoring/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Red-Teaming Anthropic's Internal Agent Monitoring Systems",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Early work on monitorability evaluations",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://www.anthropic.com/claude-opus-4-6-system-card",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Claude Opus 4.6 System Card",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-05-19-frontier-risk-report/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "METR Frontier Risk Report (February to March 2026)",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-03-25-red-teaming-anthropic-agent-monitoring/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Red-Teaming Anthropic's Internal Agent Monitoring Systems",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Early work on monitorability evaluations",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "https://x.com/kevin_neum/status/1682903247852552193",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with consciousness question themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/Simeon_Cps/status/1710248180959355297",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/audreyt/status/1683499255225520128",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with consciousness question themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/eli_lifland/status/1908208442499801188",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/daniel_271828/status/1669997442199322624",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/Scott_R_Singer/status/1979178400461062279",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/ylecun/status/1791890883425570823",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/soroushjp/status/1722336164793962603",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "https://x.com/sama/status/1776083954786836979",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/anduriltech/status/1787452286542708857",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/ajeya_cotra/status/1827356747440517496",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/JanMBrauner/status/1793340565259452513",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/GarrisonLovely/status/1800624502109581406",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/danfaggella/status/1898870786724630738",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/anthrupad/status/1648787112890621957",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with alignment is important themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/sama/status/1987232631680053745",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/CyberScoopNews/status/1712512625739722915",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/DanielleFong/status/1796993001157505503",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with existential risk real themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/RichardMCNgo/status/1817658853305286973",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/sebkrier/status/1957246481376629027",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with consciousness question themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/collect_intel/status/1860854131323183112",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2402.01259",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "In-Context Scheming: How LLMs Learn and Plan in Context",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2406.06652",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "Alignment Faking in Large Language Models",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.lesswrong.com/posts/pRkFkzwKZ2zfa3R6H/without-specific-countermeasures-the-easiest-path-to",
+          "corpus": "lesswrong-posts",
+          "side": "a",
+          "stance_summary": "Without Specific Countermeasures, the Easiest Path to Transformative AI Likely L",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://arxiv.org/abs/2412.14093",
+          "corpus": "lesswrong-posts",
+          "side": "a",
+          "stance_summary": "Alignment Faking in Large Language Models",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://www.lesswrong.com/posts/8bLSDMWnL4BcHgA6k/ai-safety-at-the-frontier-paper-highlights-of-november-2025",
+          "corpus": "lesswrong-posts",
+          "side": "a",
+          "stance_summary": "AI Safety at the Frontier: Paper Highlights of November 2025",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "https://x.com/8teAPi/status/1838564433427100050",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/mattparlmer/status/1720568814142927315",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/Noahpinion/status/1667280648778952704",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/logangraham/status/1894182324121866521",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/zarinahagnew/status/1823840797990772806",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/AndrewCurran_/status/1971619543450792426",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "https://x.com/truth_terminal/status/1853908496774750697",
+          "corpus": "enriched-tweets",
+          "side": "a",
+          "stance_summary": "Tweet engaging with safety matters themes",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "openai_gpt5_system_card_2025",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "GPT-5 system-card disclosures about high-capability domains and safe completions provide a lab-side safety frame for frontier-model risk management.",
+          "relevance_score": 8
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_frontier_risk_report_feb_mar_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "metr_evaluating_language_model_agents_2023",
+          "relationship": "evaluates_methods_from",
+          "relevance_score": 6
+        },
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_red_teaming_anthropic_monitoring_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "sabotage_evaluations_2024",
+          "relationship": "evaluates_methods_from",
+          "relevance_score": 6
+        },
+        {
+          "from_corpus": "metr-evals-metrics",
+          "from_id": "metr_monitorability_evals_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "bengio_et_al_2025_international_ai_safety",
+          "relationship": "evaluates_methods_from",
+          "relevance_score": 6
+        },
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "alignment_faking_multimodel_2025",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "metr_red_teaming_anthropic_monitoring_2026",
+          "relationship": "motivates",
+          "relevance_score": 10
+        },
+        {
+          "from_corpus": "lesswrong-posts",
+          "from_id": "alignment_faking_replication_2025",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "shade_arena_control_2025",
+          "relationship": "relates_to",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "anthropic_mythos_system_card_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "sabotage_evaluations_2024",
+          "relationship": "applies_framework_from",
+          "relevance_score": 8
+        }
+      ]
+    },
+    {
+      "id": "debate_ai_water_usage",
+      "title": "AI Water Usage: Real Crisis or Misunderstood Metric?",
+      "question": "Is AI's water consumption a genuine environmental crisis or an overstated concern driven by misleading per-query metrics?",
+      "status": "active",
+      "category": "environmental_impact",
+      "premise_extraction": {
+        "side_a": {
+          "label": "Genuine Environmental Concern",
+          "premises": [
+            "AI data centers consume billions of gallons of water annually for cooling",
+            "Water consumption is growing exponentially with AI adoption",
+            "Communities near data centers face water scarcity impacts",
+            "Current voluntary reporting is insufficient for policy-making",
+            "Per-query water costs, while individually small, aggregate to massive totals"
+          ]
+        },
+        "side_b": {
+          "label": "Overstated Concern / Misleading Metrics",
+          "premises": [
+            "Per-query water figures strip essential geographic and technological context",
+            "Closed-loop cooling reduces water use by 80-95%",
+            "Water consumption varies 5-10x by data center location",
+            "Industry is rapidly transitioning to zero-water cooling",
+            "Aggregate projections assume no technological improvement"
+          ]
+        }
+      },
+      "argument_tree": {
+        "root": "Is AI water consumption a crisis requiring urgent regulation?",
+        "branches": [
+          {
+            "claim": "AI water consumption is growing unsustainably",
+            "support": [
+              "water_footprint_ai_models_2023",
+              "environmental_impact_ai_servers_2026"
+            ],
+            "counter": "Growth projections assume current cooling technology and don't account for industry transition to closed-loop systems"
+          },
+          {
+            "claim": "Per-query metrics are misleading",
+            "support": [
+              "data_centers_water_footprint_transparency_2026"
+            ],
+            "counter": "Even if individual queries are small, aggregate impact at scale is massive"
+          },
+          {
+            "claim": "Geographic context makes universal claims misleading",
+            "support": [
+              "water_footprint_ai_models_2023"
+            ],
+            "counter": "Data centers are often built in water-stressed regions due to other infrastructure factors"
+          }
+        ]
+      },
+      "fact_layer": {
+        "verified_facts": [
+          "Google consumed 6.4 billion gallons of water across data centers in 2023",
+          "Microsoft used 1.7 billion gallons in 2023, up 34% from 2022",
+          "GPT-3 training consumed approximately 700,000 liters of freshwater",
+          "Each 100-word AI prompt estimated at ~519mL (UC Riverside study)",
+          "Water consumption varies 5-10x by data center location",
+          "Microsoft committed to zero-water cooling for all new data centers by late 2027",
+          "US AI data centers projected to consume 731-1,125 million cubic meters/year by 2030"
+        ],
+        "disputed_claims": [
+          "Whether the 519mL per-query figure applies universally or only to specific configurations",
+          "Whether efficiency gains will outpace growth",
+          "Whether data center water use displaces community water access"
+        ],
+        "misinformation_patterns": [
+          "Citing per-query figures without geographic/technology context",
+          "Conflating training water costs with inference costs",
+          "Ignoring the difference between consumption (evaporated) and withdrawal (returned)",
+          "Presenting 2023 data as if current technology hasn't changed"
+        ]
+      },
+      "fallacy_flags": [],
+      "steel_man_assists": {
+        "side_a_steel_man": "Even accounting for technological improvements, the rapid growth of AI demand means absolute water consumption will increase for years before efficiency gains dominate. In water-stressed regions, even temporary increases have irreversible community impacts.",
+        "side_b_steel_man": "The public discourse around AI water usage is dominated by context-free viral statistics that mislead voters and policymakers. Accurate information about geographic variation and technology transitions is essential for evidence-based policy."
+      },
+      "goalpost_monitor": [],
+      "agreement_map": {
+        "agreed": [
+          "Data center water consumption is significant and growing",
+          "Better transparency and reporting is needed",
+          "Geographic context matters"
+        ],
+        "disagreed": [
+          "Whether current trajectory is a crisis",
+          "Whether voluntary industry action is sufficient",
+          "Whether per-query framing is helpful or harmful"
+        ]
+      },
+      "burden_of_proof": "Those claiming crisis must demonstrate that aggregate growth will outpace technology transition; those claiming overstated must show technology transition is on track",
+      "audience_sentiment": {},
+      "scoring_rubric": {},
+      "meta": {},
+      "positions": [
+        {
+          "entry_url_or_id": "water_footprint_ai_models_2023",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "Pioneering study quantifying AI water footprint, establishing the 519mL per-query estimate",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "environmental_impact_ai_servers_2026",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "Comprehensive environmental impact analysis projecting continued growth",
+          "relevance_score": 9
+        },
+        {
+          "entry_url_or_id": "data_centers_water_footprint_transparency_2026",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "Argues for mandatory transparency requirements for accurate policy-making",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "data_center_water_environmental_regulations_2026",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "Multiple states introducing water usage reporting requirements",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "international_ai_safety_report_2026",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "International report includes environmental sustainability as safety dimension",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "google_ai_serving_environmental_impact_2025",
+          "corpus": "arxiv-ai-safety",
+          "side": "b",
+          "stance_summary": "Google-scale inference measurements argue that widely shared per-query water and energy estimates can be too high without full-stack production data",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "data_centers_water_footprint_transparency_2026",
+          "corpus": "arxiv-ai-safety",
+          "side": "a",
+          "stance_summary": "Transparency advocates argue that facility-level water reporting is needed because aggregate siting and cooling impacts remain opaque",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "dwarkesh_elon_musk_feb_2026",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "b",
+          "stance_summary": "Industry leader discusses orbital and alternative cooling solutions",
+          "relevance_score": 6
+        },
+        {
+          "entry_url_or_id": "iea_energy_and_ai_report_2025",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "IEA reframes the environmental debate around electricity, local grid bottlenecks, and siting rather than only viral water-per-query estimates.",
+          "relevance_score": 9
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "water_footprint_ai_models_2023",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "environmental_impact_ai_servers_2026",
+          "relationship": "extended_by",
+          "relevance_score": 10
+        },
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "data_centers_water_footprint_transparency_2026",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "data_center_water_environmental_regulations_2026",
+          "relationship": "motivates_policy_in",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "google_ai_serving_environmental_impact_2025",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "water_footprint_ai_models_2023",
+          "relationship": "discusses_findings_of",
+          "relevance_score": 10
+        },
+        {
+          "from_corpus": "arxiv-ai-safety",
+          "from_id": "data_centers_water_footprint_transparency_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "environmental_impact_ai_servers_2026",
+          "relationship": "synthesizes",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "international_ai_safety_report_2026",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "data_centers_water_footprint_transparency_2026",
+          "relationship": "references",
+          "relevance_score": 7
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "iea_energy_and_ai_report_2025",
+          "to_corpus": "arxiv-ai-safety",
+          "to_id": "google_ai_serving_environmental_impact_2025",
+          "relationship": "complements_environmental_measurement",
+          "relevance_score": 9
+        }
+      ]
+    },
+    {
+      "id": "debate_ai_labor_automation",
+      "title": "AI Labor Automation: Augmentation or Displacement?",
+      "category": "societal_impact",
+      "question": "Is current AI primarily augmenting workers, or is it already a displacement pressure that requires stronger labor policy?",
+      "status": "active",
+      "positions": [
+        {
+          "entry_url_or_id": "anthropic_economic_index_2025",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Real-world Claude usage shows substantial augmentation as well as automation, suggesting task transformation rather than simple job replacement so far.",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "metr_ai_usage_survey_2026",
+          "corpus": "metr-evals-metrics",
+          "side": "a",
+          "stance_summary": "Technical workers report large productivity gains from AI tools, supporting the view that AI can amplify labor output.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "metr_developer_productivity_rct_2025",
+          "corpus": "metr-evals-metrics",
+          "side": "b",
+          "stance_summary": "Objective randomized evidence from experienced developers found slowdowns, warning that perceived augmentation can diverge from measured output.",
+          "relevance_score": 9
+        },
+        {
+          "entry_url_or_id": "metr_developer_perception_gap",
+          "corpus": "metr-evals-metrics",
+          "side": "b",
+          "stance_summary": "The perception gap shows why labor policy should not rely only on self-reported AI productivity benefits.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "klinova_labor_impact_2024",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "b",
+          "stance_summary": "Labor-impact analysis emphasizes distributional, job-quality, and transition risks even when aggregate productivity improves.",
+          "relevance_score": 7
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "anthropic_economic_index_2025",
+          "to_corpus": "metr-evals-metrics",
+          "to_id": "metr_developer_perception_gap",
+          "relationship": "contrasts_self_report_with_objective_measurement",
+          "relevance_score": 9
+        }
+      ],
+      "argument_tree": {
+        "root": {
+          "id": "node_1",
+          "claim": "AI labor impact is best understood as a contested mix of augmentation, automation, and transition risk.",
+          "type": "thesis",
+          "children": [
+            {
+              "id": "node_2",
+              "claim": "Task-level data shows widespread partial augmentation rather than whole-job automation today.",
+              "type": "support",
+              "source": {
+                "corpus": "dwarkesh-lab-insiders",
+                "entry_id": "anthropic_economic_index_2025"
+              },
+              "evidence_strength": "strong",
+              "fact_check_status": "verified",
+              "children": []
+            },
+            {
+              "id": "node_3",
+              "claim": "Objective productivity trials can contradict worker perceptions, so adoption signals may overstate real gains.",
+              "type": "attack",
+              "source": {
+                "corpus": "metr-evals-metrics",
+                "entry_id": "metr_developer_perception_gap"
+              },
+              "evidence_strength": "strong",
+              "fact_check_status": "verified",
+              "children": []
+            }
+          ]
+        }
+      },
+      "fact_layer": {
+        "verified_claims": [],
+        "contested_claims": [],
+        "needs_review": []
+      },
+      "fallacy_flags": [],
+      "steel_man_assists": {
+        "side_a": "",
+        "side_b": ""
+      },
+      "goalpost_monitor": {
+        "tracked_terms": [],
+        "possible_shifts": []
+      },
+      "agreement_map": {
+        "shared_premises": [],
+        "remaining_disagreements": []
+      },
+      "burden_of_proof": [],
+      "audience_sentiment": {
+        "initial": {},
+        "pivotal_moments": []
+      },
+      "scoring_rubric": {
+        "evidence_quality": 0,
+        "specificity": 0,
+        "cross_corpus_support": 0
+      },
+      "premise_extraction": {
+        "shared": [],
+        "contested": []
+      },
+      "meta": {
+        "added_by": "corpus_audit_fix",
+        "date_added": "2026-05-21"
+      }
+    },
+    {
+      "id": "debate_ai_education_integrity",
+      "title": "AI in Education: Learning Tool or Assessment Threat?",
+      "category": "societal_impact",
+      "question": "Should education policy encourage broad AI adoption, or restrict AI use around assessment and student evaluation?",
+      "status": "active",
+      "positions": [
+        {
+          "entry_url_or_id": "anthropic_education_report_2025",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "Educators use AI to build curricula, simulations, and learning materials, showing constructive uses beyond student cheating narratives.",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "ohio_education_ai_policy",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "State education policy entries show AI governance moving toward institutional guidance rather than blanket bans.",
+          "relevance_score": 7
+        },
+        {
+          "entry_url_or_id": "anthropic_education_report_2025",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "b",
+          "stance_summary": "The same educator data flags automation-heavy grading as ethically sensitive and often viewed as inappropriate by faculty.",
+          "relevance_score": 10
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "anthropic_education_report_2025",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "ohio_education_ai_policy",
+          "relationship": "informs_policy_design",
+          "relevance_score": 8
+        }
+      ],
+      "argument_tree": {
+        "root": {
+          "id": "node_1",
+          "claim": "AI can expand educational capacity, but assessment and grading need stronger guardrails than routine instructional support.",
+          "type": "thesis",
+          "children": [
+            {
+              "id": "node_2",
+              "claim": "AI can help educators create curricula and interactive materials that would otherwise be costly to build.",
+              "type": "support",
+              "source": {
+                "corpus": "dwarkesh-lab-insiders",
+                "entry_id": "anthropic_education_report_2025"
+              },
+              "evidence_strength": "strong",
+              "fact_check_status": "verified",
+              "children": []
+            },
+            {
+              "id": "node_3",
+              "claim": "Automating grading and evaluation risks undermining educational trust and fairness.",
+              "type": "qualification",
+              "source": {
+                "corpus": "dwarkesh-lab-insiders",
+                "entry_id": "anthropic_education_report_2025"
+              },
+              "evidence_strength": "strong",
+              "fact_check_status": "verified",
+              "children": []
+            }
+          ]
+        }
+      },
+      "fact_layer": {
+        "verified_claims": [],
+        "contested_claims": [],
+        "needs_review": []
+      },
+      "fallacy_flags": [],
+      "steel_man_assists": {
+        "side_a": "",
+        "side_b": ""
+      },
+      "goalpost_monitor": {
+        "tracked_terms": [],
+        "possible_shifts": []
+      },
+      "agreement_map": {
+        "shared_premises": [],
+        "remaining_disagreements": []
+      },
+      "burden_of_proof": [],
+      "audience_sentiment": {
+        "initial": {},
+        "pivotal_moments": []
+      },
+      "scoring_rubric": {
+        "evidence_quality": 0,
+        "specificity": 0,
+        "cross_corpus_support": 0
+      },
+      "premise_extraction": {
+        "shared": [],
+        "contested": []
+      },
+      "meta": {
+        "added_by": "corpus_audit_fix",
+        "date_added": "2026-05-21"
+      }
+    },
+    {
+      "id": "debate_ai_copyright_training",
+      "title": "AI Training and Copyright: Fair Use or Licensing Market?",
+      "category": "policy_dispute",
+      "question": "Should developers be allowed to train on copyrighted works under fair use, or should licensing and compensation be required?",
+      "status": "active",
+      "positions": [
+        {
+          "entry_url_or_id": "us_copyright_office_ai_training_report_2025",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "The Copyright Office frames training as a fact-sensitive fair-use and market-harm question rather than a blanket permission.",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "us_copyright_office_ai_training_report_2025",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "The same report warns that licensing every work may be infeasible at frontier scale, preserving a public-interest argument for some unlicensed uses.",
+          "relevance_score": 9
+        },
+        {
+          "entry_url_or_id": "ai_training_data_transparency_act",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "Disclosure proposals seek to make training-data use visible enough for creators and regulators to contest.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "bartz_v_anthropic_fair_use_2025",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "Bartz supports the fair-use side for lawful training copies while warning that pirated acquisition and retention remain legally exposed.",
+          "relevance_score": 10
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "us_copyright_office_ai_training_report_2025",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "ai_training_data_transparency_act",
+          "relationship": "provides_policy_context_for",
+          "relevance_score": 9
+        },
+        {
+          "from_corpus": "ai-laws-policy",
+          "from_id": "bartz_v_anthropic_fair_use_2025",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "us_copyright_office_ai_training_report_2025",
+          "relationship": "tests_policy_framework_in_court",
+          "relevance_score": 10
+        }
+      ],
+      "argument_tree": {
+        "root": {
+          "id": "node_1",
+          "claim": "Copyright policy for AI training turns on fair-use facts, market substitution, and whether licensing can scale.",
+          "type": "thesis",
+          "children": [
+            {
+              "id": "node_2",
+              "claim": "Training can involve copyright-relevant copying, so fair use cannot be assumed without factual analysis.",
+              "type": "support",
+              "source": {
+                "corpus": "ai-laws-policy",
+                "entry_id": "us_copyright_office_ai_training_report_2025"
+              },
+              "evidence_strength": "strong",
+              "fact_check_status": "verified",
+              "children": []
+            },
+            {
+              "id": "node_3",
+              "claim": "The scale and diversity of frontier training data may make conventional licensing difficult, creating pressure for collective or statutory approaches.",
+              "type": "qualification",
+              "source": {
+                "corpus": "ai-laws-policy",
+                "entry_id": "us_copyright_office_ai_training_report_2025"
+              },
+              "evidence_strength": "strong",
+              "fact_check_status": "verified",
+              "children": []
+            }
+          ]
+        }
+      },
+      "fact_layer": {
+        "verified_claims": [],
+        "contested_claims": [],
+        "needs_review": []
+      },
+      "fallacy_flags": [],
+      "steel_man_assists": {
+        "side_a": "",
+        "side_b": ""
+      },
+      "goalpost_monitor": {
+        "tracked_terms": [],
+        "possible_shifts": []
+      },
+      "agreement_map": {
+        "shared_premises": [],
+        "remaining_disagreements": []
+      },
+      "burden_of_proof": [],
+      "audience_sentiment": {
+        "initial": {},
+        "pivotal_moments": []
+      },
+      "scoring_rubric": {
+        "evidence_quality": 0,
+        "specificity": 0,
+        "cross_corpus_support": 0
+      },
+      "premise_extraction": {
+        "shared": [],
+        "contested": []
+      },
+      "meta": {
+        "added_by": "corpus_audit_fix",
+        "date_added": "2026-05-21"
+      }
+    },
+    {
+      "id": "debate_multimodal_deepfake_governance",
+      "title": "Multimodal AI: Can Likeness and Deepfake Rules Keep Up?",
+      "category": "policy_dispute",
+      "question": "Can watermarking, disclosure, and platform safeguards manage video/audio generation risks, or are stronger restrictions needed?",
+      "status": "active",
+      "positions": [
+        {
+          "entry_url_or_id": "openai_sora2_system_card_2025",
+          "corpus": "dwarkesh-lab-insiders",
+          "side": "a",
+          "stance_summary": "OpenAI describes staged deployment, upload limits, and heightened safeguards for minors and likeness use as a practical mitigation path.",
+          "relevance_score": 10
+        },
+        {
+          "entry_url_or_id": "ai_content_labeling_watermarking",
+          "corpus": "ai-laws-policy",
+          "side": "a",
+          "stance_summary": "Content-labeling and watermarking policies aim to preserve provenance and user awareness for generated media.",
+          "relevance_score": 8
+        },
+        {
+          "entry_url_or_id": "deepfakes_accountability_act",
+          "corpus": "ai-laws-policy",
+          "side": "b",
+          "stance_summary": "Deepfake accountability proposals reflect concern that disclosure alone is inadequate when synthetic media targets real people.",
+          "relevance_score": 8
+        }
+      ],
+      "cross_corpus_references": [
+        {
+          "from_corpus": "dwarkesh-lab-insiders",
+          "from_id": "openai_sora2_system_card_2025",
+          "to_corpus": "ai-laws-policy",
+          "to_id": "ai_content_labeling_watermarking",
+          "relationship": "implements_risk_area_addressed_by",
+          "relevance_score": 8
+        }
+      ],
+      "argument_tree": {
+        "root": {
+          "id": "node_1",
+          "claim": "Video and audio generation creates modality-specific risks that require both technical safeguards and legal accountability.",
+          "type": "thesis",
+          "children": [
+            {
+              "id": "node_2",
+              "claim": "Staged deployment and modality-specific safeguards can reduce immediate abuse while preserving beneficial creative uses.",
+              "type": "support",
+              "source": {
+                "corpus": "dwarkesh-lab-insiders",
+                "entry_id": "openai_sora2_system_card_2025"
+              },
+              "evidence_strength": "strong",
+              "fact_check_status": "verified",
+              "children": []
+            },
+            {
+              "id": "node_3",
+              "claim": "Likeness and deepfake harms may require enforceable duties because provenance labels do not prevent all nonconsensual or misleading uses.",
+              "type": "attack",
+              "source": {
+                "corpus": "ai-laws-policy",
+                "entry_id": "deepfakes_accountability_act"
+              },
+              "evidence_strength": "moderate",
+              "fact_check_status": "verified",
+              "children": []
+            }
+          ]
+        }
+      },
+      "fact_layer": {
+        "verified_claims": [],
+        "contested_claims": [],
+        "needs_review": []
+      },
+      "fallacy_flags": [],
+      "steel_man_assists": {
+        "side_a": "",
+        "side_b": ""
+      },
+      "goalpost_monitor": {
+        "tracked_terms": [],
+        "possible_shifts": []
+      },
+      "agreement_map": {
+        "shared_premises": [],
+        "remaining_disagreements": []
+      },
+      "burden_of_proof": [],
+      "audience_sentiment": {
+        "initial": {},
+        "pivotal_moments": []
+      },
+      "scoring_rubric": {
+        "evidence_quality": 0,
+        "specificity": 0,
+        "cross_corpus_support": 0
+      },
+      "premise_extraction": {
+        "shared": [],
+        "contested": []
+      },
+      "meta": {
+        "added_by": "corpus_audit_fix",
+        "date_added": "2026-05-21"
       }
     }
   ]
