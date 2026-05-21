@@ -130,6 +130,13 @@ Per-network shape:
         "state": "transient",
         "lastStatus": 404,
         "message": "Arweave content not available yet. Retry later."
+      },
+      "0xresponseonlyquestionid": {
+        "attempts": 0,
+        "nextRetryAtMs": 0,
+        "state": "discovered-from-response",
+        "lastStatus": null,
+        "message": "Question response discovered before question metadata; awaiting Arweave hydration."
       }
     },
     "arweaveTxCache": {
@@ -159,9 +166,10 @@ Semantics:
 - `questionsLatestBlock`: stable completed discovery watermark
 - `questionsDiscoveryCheckpointBlock`: in-progress checkpoint used for resume-after-refresh behavior
 - `questions[qid].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
+- `questions[qid].__ceQuestionMetadataPending`: temporary placeholder marker used when a response has been discovered before its question metadata has hydrated
 - `questionResponsesLatestBlock`: response watermark for the session+network
 - `questionResponsesMeta[qid][responder]`: recency guard used to reject stale response payload writes
-- `pendingQuestionMetadata[qid]`: retry/backoff state for question metadata hydration failures
+- `pendingQuestionMetadata[qid]`: retry/backoff state for question metadata hydration failures and response-discovered metadata gaps
 - `arweaveTxCache[txId]`: cached raw Arweave payload text
 - `arweaveTxFailureCache[txId]`: bounded negative cache for failed Arweave fetches
 - `questionHydrationMeta`: reserved per-question hydration metadata map

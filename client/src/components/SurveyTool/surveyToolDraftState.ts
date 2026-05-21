@@ -58,6 +58,10 @@ type SurveyDraftLoadPlanArgs = {
   perQuestionAnonKey?: unknown;
 };
 
+type MergePersistedDraftPayloadsArgs = {
+  drafts?: unknown[];
+};
+
 type PersistedDraftWritePlanArgs = {
   draftKey?: unknown;
   sessionSlug?: unknown;
@@ -319,6 +323,80 @@ export const buildSurveyDraftSemanticSignature = (payload: SurveyDraftPayload | 
     parts.push(`badditionalEncryptedPortion:${buildStableDraftValueSignature(baselineEntry.additionalEncryptedPortion)}`);
   });
   return parts.join('||');
+};
+
+const normalizePersistedDraftQuestionMap = (
+  map: unknown
+): Record<string, SurveyDraftQuestionEntry> => {
+  const out: Record<string, SurveyDraftQuestionEntry> = {};
+  if (!isRecord(map)) return out;
+
+  Object.keys(map).forEach((rawQuestionId) => {
+    const questionId = normalizeQuestionIdKey(rawQuestionId);
+    if (!questionId || out[questionId]) return;
+    const entry = map[rawQuestionId];
+    if (isRecord(entry)) {
+      out[questionId] = entry as SurveyDraftQuestionEntry;
+    }
+  });
+
+  return out;
+};
+
+const getPersistedDraftTimestamp = (payload: unknown): number => {
+  const meta = isRecord(payload) && isRecord(payload.meta) ? payload.meta : {};
+  const ts = Number(meta.ts);
+  return Number.isFinite(ts) ? ts : 0;
+};
+
+const mergePersistedDraftQuestionMaps = (
+  drafts: SurveyDraftPayload[],
+  mapKey: 'answers' | 'baseline'
+): Record<string, SurveyDraftQuestionEntry> => {
+  const merged: Record<string, SurveyDraftQuestionEntry> = {};
+  const sourceByQuestionId: Record<string, { timestamp: number; index: number }> = {};
+
+  drafts.forEach((draft, index) => {
+    const timestamp = getPersistedDraftTimestamp(draft);
+    const questionMap = normalizePersistedDraftQuestionMap(draft?.[mapKey]);
+    Object.keys(questionMap).forEach((questionId) => {
+      const previous = sourceByQuestionId[questionId];
+      if (previous && timestamp < previous.timestamp) return;
+      if (previous && timestamp === previous.timestamp && index > previous.index) return;
+      merged[questionId] = questionMap[questionId];
+      sourceByQuestionId[questionId] = { timestamp, index };
+    });
+  });
+
+  return merged;
+};
+
+export const mergePersistedDraftPayloads = ({
+  drafts = [],
+}: MergePersistedDraftPayloadsArgs = {}): SurveyDraftPayload | null => {
+  const normalizedDrafts = (Array.isArray(drafts) ? drafts : [])
+    .filter((draft): draft is SurveyDraftPayload => isRecord(draft));
+  if (normalizedDrafts.length === 0) return null;
+
+  const answers = mergePersistedDraftQuestionMaps(normalizedDrafts, 'answers');
+  const baseline = mergePersistedDraftQuestionMaps(normalizedDrafts, 'baseline');
+  if (Object.keys(answers).length === 0 && Object.keys(baseline).length === 0) return null;
+
+  let metaSource = normalizedDrafts[0];
+  normalizedDrafts.forEach((draft) => {
+    if (getPersistedDraftTimestamp(draft) > getPersistedDraftTimestamp(metaSource)) {
+      metaSource = draft;
+    }
+  });
+  const meta = isRecord(metaSource.meta) ? { ...metaSource.meta } : {};
+  meta.ts = Math.max(...normalizedDrafts.map((draft) => getPersistedDraftTimestamp(draft)), 0);
+
+  return {
+    ...metaSource,
+    meta,
+    answers,
+    baseline,
+  };
 };
 
 export const buildPersistedDraftTrackingOnKeyChange = ({

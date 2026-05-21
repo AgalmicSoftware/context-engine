@@ -92,6 +92,7 @@ export {
   getPendingStatsSnapshotFromState,
   hasConvictionOrImportanceValueForQuestion,
   hasMeaningfulFieldValue,
+  mergePersistedDraftPayloads,
   shouldAutoEncryptAdditionalOnAudienceChange,
   shouldEncryptResponseFieldForSubmit,
   shouldForceOverwriteDraftValues,
