@@ -289,6 +289,20 @@ type SbtPageInviteClaimOptions = {
   suppressErrors?: boolean;
   sessionSlugOverride?: unknown;
 };
+type SbtPageGroupPasswordClaimOptions = SbtPageInviteClaimOptions & {
+  groupPasswordHashOverride?: unknown;
+};
+type SbtPageAutoMintOptions = SbtPageInviteClaimOptions & {
+  sbtInfoOverride?: unknown;
+};
+type SbtPageManualMintOptions = SbtPageInviteClaimOptions & {
+  passwordOverride?: unknown;
+  sbtAddressOverride?: unknown;
+};
+type SbtPageHandleMintOptions = SbtPageInviteClaimOptions & {
+  sbtAddressOverride?: unknown;
+  sbtInfoOverride?: unknown;
+};
 type SbtPageTransactionResult = Record<string, unknown> & {
   transactionHash?: string;
 };
@@ -466,6 +480,76 @@ type SbtPageRefreshOptions = {
 type SbtPagePrimaryMetadataState = Record<string, unknown> & {
   sbtInfo?: unknown;
 };
+type SbtPageInfoState = Record<string, unknown> & {
+  burnAuth?: unknown;
+  chainID?: unknown;
+  hasPasswordMint?: boolean;
+  image?: unknown;
+  maxTokens?: unknown;
+  tokenURI?: unknown;
+  tokenUri?: unknown;
+};
+type SbtPageNetworkState = Record<string, unknown> & {
+  id?: unknown;
+};
+type SbtPageState = Record<string, unknown> & {
+  adminGeneratedPasswords: string[];
+  bookmarked: boolean;
+  burnedAddresses: unknown[];
+  burningStatus: string;
+  burnSearchInput: string;
+  burnSearchResult: SbtPageBurnSearchResult | null;
+  cachedPasswords: string[];
+  claimCountdown: number;
+  countsLoaded: boolean;
+  copiedAddress: unknown;
+  copiedError?: unknown;
+  displayImageFallbackIndex?: unknown;
+  displayImageFallbackKey?: unknown;
+  docModalContent: string;
+  docModalError: string;
+  docModalLoading: boolean;
+  docModalName: string;
+  docModalOpen: boolean;
+  docModalBlobUrl: string;
+  error: React.ReactNode;
+  exportFormat: string;
+  filteredMintedUsers: unknown[];
+  groupPasswordHash: unknown;
+  groupPasswordHashLoaded: boolean;
+  groupPasswordInput: string;
+  hasGroupPasswordMint: boolean;
+  hasInviteMint: boolean;
+  includePreviousPasswords: boolean;
+  intervalId: ReturnType<typeof setInterval> | null;
+  lastBurnTxHash: string | null;
+  lastMintTxHash: string | null;
+  loadingMintedFilter: boolean;
+  loadingMintersBurners: boolean;
+  manualPasswordInput: string;
+  mintCountdown: React.ReactNode;
+  mintingStatus: string;
+  mintPassword: string;
+  mintStep: number;
+  mintedAddresses: unknown[];
+  mintedTokensOverride: unknown;
+  network: SbtPageNetworkState | null;
+  passwordGenerationCount: string | number;
+  resolvedSessionSlug: string | null;
+  sbtInfo: SbtPageInfoState | null;
+  showActions: boolean;
+  showAdminSection: boolean;
+  showDocsSection: boolean;
+  showFullImage: boolean;
+  showModal: boolean;
+  showMoreDetails: boolean;
+  showPasswordAlert: boolean;
+  showStats: boolean;
+  showMiniPasswordInput: boolean;
+  transactionHash: string | null;
+  userHasSBT: boolean;
+  userIsSbtAdmin: boolean;
+};
 class SBTPage extends Component<any, any> {
   _isMounted = false;
   hasAttemptedListMint = false; // Flag for sequential minting
@@ -501,7 +585,7 @@ class SBTPage extends Component<any, any> {
   _burnSearchTimer: ReturnType<typeof setTimeout> | null = null;
   _activeMintPendingTargetKey = '';
 
-  state: any = buildSbtPageInitialState({ network: this.props.network });
+  state: SbtPageState = buildSbtPageInitialState({ network: this.props.network }) as SbtPageState;
 
   getRecoveryCacheChainId = (): number | null => {
     return resolveSbtPageRecoveryCacheChainId({
@@ -899,10 +983,10 @@ class SBTPage extends Component<any, any> {
     }
 
     const slug = targetSlug;
-    let sbtInfo = this.state.sbtInfo;
+    let sbtInfo: SbtPageInfoState | null = this.state.sbtInfo;
     if (!sbtInfo || typeof sbtInfo !== 'object') {
       try {
-        sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', currentSbtAddress, slug);
+        sbtInfo = await contractScriptsUntyped.getSbtMetadata('none', currentSbtAddress, slug) as SbtPageInfoState | null;
       } catch (_) {
         sbtInfo = null;
       }
@@ -1206,7 +1290,7 @@ class SBTPage extends Component<any, any> {
     } catch (e) { sbtLog.warn('SBTPage: telemetry', e); }
   };
 
-  autoMintPublicIfAllowed = async (sbtAddress: unknown, options: any = {}): Promise<boolean> => {
+  autoMintPublicIfAllowed = async (sbtAddress: unknown, options: SbtPageAutoMintOptions = {}): Promise<boolean> => {
     if (!sbtAddress) return false;
 
     const slug = options?.sessionSlugOverride != null
@@ -1363,7 +1447,7 @@ class SBTPage extends Component<any, any> {
   claimWithGroupPassword = async (
     rawPassword: unknown,
     sbtOverride?: unknown,
-    options: any = {}
+    options: SbtPageGroupPasswordClaimOptions = {}
   ): Promise<boolean> => {
     let sbt = '';
     let slug = '';
@@ -1551,7 +1635,11 @@ class SBTPage extends Component<any, any> {
     return false;
   };
 
-  claimWithInviteCode = async (rawCode: unknown, sbtOverride?: unknown, options: any = {}): Promise<boolean> => {
+  claimWithInviteCode = async (
+    rawCode: unknown,
+    sbtOverride?: unknown,
+    options: SbtPageGroupPasswordClaimOptions = {}
+  ): Promise<boolean> => {
     const payload = this.decodeInviteInput(rawCode);
     if (payload) {
       const result = await this.claimWithInvitePayload(payload, sbtOverride, options);
@@ -3093,7 +3181,7 @@ class SBTPage extends Component<any, any> {
     }
   };
 
-  async mintUnlimitedWithGroupPassword(options: any = {}): Promise<boolean> {
+  async mintUnlimitedWithGroupPassword(options: SbtPageManualMintOptions = {}): Promise<boolean> {
     sbtLog.log('[MANUAL-MINT] Starting manual mint...');
     let sbt: string | null = null;
     let slug = '';
@@ -3212,7 +3300,10 @@ class SBTPage extends Component<any, any> {
     }));
   };
 
-  handleMint = async (forceEventRefreshOnSuccess: boolean = true, options: any = {}): Promise<boolean> => {
+  handleMint = async (
+    forceEventRefreshOnSuccess: boolean = true,
+    options: SbtPageHandleMintOptions = {}
+  ): Promise<boolean> => {
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return false;
@@ -3227,7 +3318,7 @@ class SBTPage extends Component<any, any> {
       mintStep,
       manualPasswordInput,
     } = this.state;
-    const sbtInfo = options?.sbtInfoOverride || this.state.sbtInfo || {};
+    const sbtInfo = (options?.sbtInfoOverride || this.state.sbtInfo || {}) as SbtPageInfoState;
     const slug = options?.sessionSlugOverride != null
       ? String(options.sessionSlugOverride || '')
       : this.getEffectiveSessionSlug();
@@ -3649,9 +3740,10 @@ class SBTPage extends Component<any, any> {
   };
 
   handleGenerateAdminInvites = async (): Promise<void> => {
-    if (!this.state.passwordGenerationCount || this.state.passwordGenerationCount <= 0) return;
+    const passwordGenerationCount = this.state.passwordGenerationCount;
+    if (!passwordGenerationCount || Number(passwordGenerationCount) <= 0) return;
 
-    const newPasswordList = this.generateRandomPasswords(this.state.passwordGenerationCount);
+    const newPasswordList = this.generateRandomPasswords(passwordGenerationCount);
 
     const hashedPasswords = newPasswordList.map((password) => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password)));
 
@@ -4932,9 +5024,10 @@ renderMintButton() {
       sbtScanPending: this.props.sbtScanPending,
     });
 
-    const burnLabel = resolveSbtPageBurnAuthLabel(sbtInfo.burnAuth);
+    const sbtInfoForDetails = sbtInfo as SbtPageInfoState;
+    const burnLabel = resolveSbtPageBurnAuthLabel(sbtInfoForDetails.burnAuth);
 
-    const maxTokensDisplay = resolveSbtPageMaxTokensDisplay(sbtInfo.maxTokens);
+    const maxTokensDisplay = resolveSbtPageMaxTokensDisplay(sbtInfoForDetails.maxTokens);
 
     const tokenUriRaw = sbtInfo?.tokenURI || sbtInfo?.tokenUri || '';
     const tokenUriHref = resolveSbtPageTokenMetadataHref(tokenUriRaw);
