@@ -283,6 +283,7 @@ import {
   clampSliderValue,
   computeSubmitLabel,
   doesQuestionProgressMatchSlug,
+  mergePersistedDraftPayloads,
   ensureQuestionsNet,
   ensureSurveysNet,
   formatQuestionScanBlockCount,
@@ -3914,19 +3915,62 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         perQuestionAnonKey: anonPerQidKey,
       });
 
+      const draftHits = [];
       for (const step of loadPlan) {
         const hit = rawDraftByKey.get(step.readKey) || readAndParse(step.readKey);
         if (!hit) continue;
-        if (step.writeKey) {
-          try { sessionStorage.setItem(step.writeKey, hit.raw); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          try { sessionStorage.removeItem(step.readKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
-          rawDraftByKey.set(step.writeKey, hit);
-        }
-        return hit.obj;
+        draftHits.push({ ...step, ...hit });
       }
 
-      return null;
+      if (draftHits.length === 0) return null;
+
+      const mergedDraft = mergePersistedDraftPayloads({
+        drafts: draftHits.map((hit) => hit.obj),
+      });
+      if (!mergedDraft) return null;
+
+      const targetKey = accountLower ? acctKey : anonKey;
+      const mergedRaw = JSON.stringify(mergedDraft);
+      const targetHit = draftHits.find((hit) => hit.readKey === targetKey);
+      const shouldWriteTarget =
+        !!targetKey &&
+        (
+          !targetHit ||
+          targetHit.raw !== mergedRaw ||
+          draftHits.some((hit) => hit.readKey !== targetKey || hit.writeKey)
+        );
+
+      let wroteTarget = !shouldWriteTarget;
+      if (shouldWriteTarget) {
+        try {
+          sessionStorage.setItem(targetKey, mergedRaw);
+          wroteTarget = true;
+        } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+      }
+
+      if (wroteTarget && targetKey) {
+        draftHits.forEach((hit) => {
+          if (!hit.readKey || hit.readKey === targetKey) return;
+          try { sessionStorage.removeItem(hit.readKey); } catch (e) { surveyLog.warn('SurveyTool: fallback', e); }
+        });
+      }
+
+      if (targetKey && wroteTarget) {
+        rawDraftByKey.set(targetKey, { raw: mergedRaw, obj: mergedDraft });
+      }
+
+      return mergedDraft;
     } catch (_) {
+      return null;
+    }
+  };
+
+  migratePersistedDraftForActiveAccount = () => {
+    try {
+      if (!this.props?.account) return null;
+      return this.loadDraft();
+    } catch (e) {
+      surveyLog.warn('SurveyTool: fallback', e);
       return null;
     }
   };
@@ -3955,6 +3999,8 @@ export class SurveyQuestions extends Component<SurveyQuestionsProps, SurveyQuest
         draftParseCache: this._draftParseCache,
       });
       this._applyDraftTrackingState(keyTracking);
+
+      this.migratePersistedDraftForActiveAccount();
 
       // Preload prior persisted answers so we don't prune non-rendered QIDs
       const {
