@@ -46,11 +46,4 @@ describe('sbtListCardDetailsHelpers', () => {
     ]);
     expect(details.hasDetails).toBe(true);
   });
-
-  it('prefers arweave.net for Arweave-backed list card images', () => {
-    const txId = 'NMc_EMP1kKWx9hL17XrDhvFBSEnmLIO1DivrOUsBwIE';
-
-    expect(normalizeSbtListTokenUri(txId)).toBe(`https://arweave.net/${txId}`);
-    expect(normalizeSbtListTokenUri(`ar://${txId}`)).toBe(`https://arweave.net/${txId}`);
-  });
 });

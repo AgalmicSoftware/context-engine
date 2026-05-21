@@ -1,7 +1,4 @@
-import {
-  buildArweaveGatewayUrlCandidates,
-  normalizeArweaveUrl,
-} from '../../utilities/arweave/arweaveUrls.js';
+import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 
 export type SbtListHelperRecord = Record<string, unknown>;
 export type SbtListHelperItem = SbtListHelperRecord & {
@@ -47,9 +44,6 @@ export const normalizeSbtListGatewayUri = (
   const s = String(uri).trim();
   if (!s) return null;
   if (/^ipfs:\/\//i.test(s)) return `https://ipfs.io/ipfs/${s.replace(/^ipfs:\/\//i, '')}`;
-  const arweaveCandidates = buildArweaveGatewayUrlCandidates(s, { gateway: 'https://arweave.net' });
-  const preferredArweaveCandidate = arweaveCandidates[0] || '';
-  if (preferredArweaveCandidate && preferredArweaveCandidate !== s) return preferredArweaveCandidate;
   return normalizeArweaveUrl(s, { contextLabel });
 };
 
