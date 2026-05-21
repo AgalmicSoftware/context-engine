@@ -4,6 +4,7 @@ import CreateQuestionsAndSurveys, {
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
 } from './CreateQuestionsAndSurveys';
+import type { ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import { arweaveScripts } from '../../utilities/arweave/arweaveScripts';
@@ -15,6 +16,22 @@ import { getChainById, getDefaultHttpRpc } from '../../variables/chains.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 
+type CreateQuestionsAndSurveysProps = ComponentProps<typeof CreateQuestionsAndSurveys> & Record<string, unknown>;
+type CreateQuestionsAndSurveysHarness = InstanceType<typeof CreateQuestionsAndSurveys> & {
+  _isMounted: boolean;
+  props: CreateQuestionsAndSurveysProps;
+  state: Record<string, unknown>;
+  setState: (update: unknown, cb?: () => void) => void;
+};
+type TreeElement = Record<string, unknown> & {
+  props?: {
+    children?: unknown;
+    className?: unknown;
+  };
+};
+type TreeNode = unknown;
+type TreePredicate = (node: TreeElement) => boolean;
+
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => null),
   removeCache: jest.fn(),
@@ -24,26 +41,27 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 const REGISTRY_CACHE_KEY = 'dg:sessionRegistryCache:v1';
-type TreeNode = any;
-type TreePredicate = (node: TreeNode) => boolean;
-type CreateQuestionsAndSurveysProps = Record<string, any>;
 const peekCacheSyncMock = cacheScripts.peekCacheSync as jest.Mock;
 const subscribeCacheUpdatesMock = cacheScripts.subscribeCacheUpdates as jest.Mock;
 const writeCacheOptimisticMock = cacheScripts.writeCacheOptimistic as jest.Mock;
 
-const makeInstance = (props: CreateQuestionsAndSurveysProps = {}): any => {
+const asTreeElement = (node: unknown): TreeElement | null => (
+  node !== null && typeof node === 'object' ? node as TreeElement : null
+);
+
+const makeInstance = (props: Partial<CreateQuestionsAndSurveysProps> = {}): CreateQuestionsAndSurveysHarness => {
   const instance = new CreateQuestionsAndSurveys({
     network: { id: 84532 },
     activeSessionSlug: 'edge',
     ...props,
-  }) as any;
+  } as CreateQuestionsAndSurveysProps) as CreateQuestionsAndSurveysHarness;
   instance._isMounted = true;
-  instance.setState = jest.fn((update, cb) => {
+  instance.setState = jest.fn((update: unknown, cb?: () => void) => {
     const patch = typeof update === 'function'
-      ? update(instance.state, instance.props)
+      ? (update as (state: Record<string, unknown>, props: CreateQuestionsAndSurveysProps) => unknown)(instance.state, instance.props)
       : update;
     if (patch && typeof patch === 'object') {
-      instance.state = { ...instance.state, ...patch };
+      instance.state = { ...instance.state, ...(patch as Record<string, unknown>) };
     }
     if (typeof cb === 'function') cb();
   });
@@ -56,9 +74,10 @@ const collectTreeNodes = (node: TreeNode, predicate: TreePredicate, acc: TreeNod
     node.forEach((child) => collectTreeNodes(child, predicate, acc));
     return acc;
   }
-  if (typeof node !== 'object') return acc;
-  if (predicate(node)) acc.push(node);
-  return collectTreeNodes(node?.props?.children, predicate, acc);
+  const element = asTreeElement(node);
+  if (!element) return acc;
+  if (predicate(element)) acc.push(element);
+  return collectTreeNodes(element.props?.children, predicate, acc);
 };
 
 const treeHasText = (node: TreeNode, text: string): boolean => {
@@ -67,12 +86,13 @@ const treeHasText = (node: TreeNode, text: string): boolean => {
   if (typeof node === 'string' || typeof node === 'number') {
     return String(node).includes(text);
   }
-  if (typeof node !== 'object') return false;
-  return treeHasText(node?.props?.children, text);
+  const element = asTreeElement(node);
+  if (!element) return false;
+  return treeHasText(element.props?.children, text);
 };
 
 const nodeHasClassName = (node: TreeNode, className: string): boolean => {
-  const raw = node?.props?.className;
+  const raw = asTreeElement(node)?.props?.className;
   if (!raw) return false;
   return String(raw).split(/\s+/).includes(className);
 };

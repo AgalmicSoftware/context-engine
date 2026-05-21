@@ -35,6 +35,10 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   defaultTags?: string | string[] | null;
   onClose?: () => void;
 };
+type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
+type BrowserAudioWindow = Window & typeof globalThis & {
+  webkitAudioContext?: typeof AudioContext;
+};
 
 const formatElapsed = (secondsRaw: unknown) => {
   const seconds = Math.max(0, Math.floor(Number(secondsRaw || 0)));
@@ -198,7 +202,8 @@ function SessionListeningWaveform({
     const stream = streamRef?.current;
     const canvas = canvasRef.current;
     if (!stream || !canvas) return false;
-    const AudioContextCtor = (window as any).AudioContext || (window as any).webkitAudioContext;
+    const audioWindow = window as BrowserAudioWindow;
+    const AudioContextCtor = audioWindow.AudioContext || audioWindow.webkitAudioContext;
     if (!AudioContextCtor) return false;
 
     try {
@@ -614,12 +619,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       {generatedQuestions.length > 0 && (
         <div className={styles.sessionListeningCreateWrap} data-testid={E2E_TESTIDS.SESSION_LISTENING_SUGGESTIONS}>
           <CreateQuestionsAndSurveys
-            {...(props as any)}
+            {...(props as CreateQuestionsAndSurveysPanelProps)}
             key={`listening-generated-${generationKey}`}
-            preformedQuestions={generatedQuestions as any}
+            preformedQuestions={generatedQuestions as CreateQuestionsAndSurveysPanelProps['preformedQuestions']}
             preformedSurvey={{ title: generatedTitle }}
             preformedMode="questions"
-            defaultTags={defaultTags as any}
+            defaultTags={defaultTags as CreateQuestionsAndSurveysPanelProps['defaultTags']}
             documentURLs={[]}
           />
         </div>
