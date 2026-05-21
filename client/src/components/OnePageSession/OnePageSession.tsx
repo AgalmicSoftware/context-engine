@@ -795,17 +795,33 @@ class OnePageSession extends Component<any, any> {
     );
   }
 
-  buildAggregator = () =>
-    measureSync('ce.onePageDemo.buildAggregator', () => {
-      if (!this.state.showResults) return;
-      bumpPerfCounter('aggregatorBuildCount');
-      const applyAggregatorData = (nextMap: any, providedSig: any = '', sourceSigKey: any = '') => {
-        const sig = providedSig || computeAggregatorDataSignature(nextMap);
-        if (sourceSigKey) {
-          this._aggregatorSourceSigKey = sourceSigKey;
-        }
-        if (sig === this._aggregatorDataSig) {
-          bumpPerfCounter('noopSkips');
+
+  buildAggregator = () => measureSync('ce.onePageDemo.buildAggregator', () => {
+    if (!this.state.showResults) return;
+    bumpPerfCounter('aggregatorBuildCount');
+    const applyAggregatorData = (nextMap: any, providedSig: any = '', sourceSigKey: any = '') => {
+      const sig = providedSig || computeAggregatorDataSignature(nextMap);
+      if (sourceSigKey) {
+        this._aggregatorSourceSigKey = sourceSigKey;
+      }
+      if (sig === this._aggregatorDataSig) {
+        bumpPerfCounter('noopSkips');
+        return;
+      }
+      this._aggregatorDataSig = sig;
+      this.setState({ aggregatorData: nextMap });
+    };
+
+    const slug = resolveEffectiveSlug(this.props);
+    const netIdVal = this.props.network?.id ?? this.props.networkChainId ?? 0;
+
+    if (this.props.isQuestionCacheReady && netIdVal != null) {
+      const netIdStr = String(netIdVal);
+      try {
+        let qCache = peekCacheSync('questionsCache', slug, { clone: false }) || {};
+        if (!qCache || typeof qCache !== 'object') qCache = {};
+        if (Object.keys(qCache).length === 0) {
+          applyAggregatorData({}, '0:0:0', `${slug}|${netIdStr}|empty-cache`);
           return;
         }
         this._aggregatorDataSig = sig;
@@ -944,6 +960,26 @@ class OnePageSession extends Component<any, any> {
 
     // Auto-close login modal and surface success state
     if (typeof this.props.toggleLoginModal === 'function') {
+      try { this.props.toggleLoginModal(false); } catch (e) { demoLog.warn('OnePageSession: callback', e); }
+    }
+    this.setState((prevState: Readonly<OnePageSession['state']>) => {
+      const prevTargets = Array.isArray(prevState.autoMintTargets) ? prevState.autoMintTargets : [];
+      const nextTargets = successfulSbtKey
+        ? prevTargets.filter((target: any) => String(target?.sbt || '').trim().toLowerCase() !== successfulSbtKey)
+        : prevTargets;
+      const autoMintComplete = nextTargets.length === 0;
+      return {
+        autoMintingMode: false,
+        mintSuccess: autoMintComplete,
+        autoMintTargets: nextTargets,
+      };
+    }, () => {
+      if ((this.state.autoMintTargets || []).length > 0) return;
+
+      // Clear persisted auto-mint intent to prevent re-trigger on refresh
+      try { sessionStorage.removeItem(this.getAutoHashStorageKey()); } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
+
+      // --- NEW: Clear URL hash to remove the 'intent' from the browser address bar ---
       try {
         this.props.toggleLoginModal(false);
       } catch (e) {
@@ -1059,55 +1095,8 @@ class OnePageSession extends Component<any, any> {
           getNameFromNet(netKey);
         }
 
-        // B. Iterate ALL keys to find any missing names.
-        // This ensures we find the SBT name even if the wallet isn't connected yet
-        // or if the cached data resides under a different chain ID key.
-        Object.keys(parsed).forEach((k: any) => {
-          if (k !== netKey) getNameFromNet(k);
-        });
-      }
-    } catch (e) {
-      demoLog.warn('OnePageSession: fallback', e);
-    }
-
-    // Set immediate cache hits to UI
-    if (Object.keys(cachedNames).length > 0 || Object.keys(cachedImages).length > 0) {
-      this.setState((prev: Readonly<OnePageSession['state']>) => {
-        const updates: Record<string, any> = {};
-        if (Object.keys(cachedNames).length > 0) {
-          updates.sbtNames = { ...(prev.sbtNames || {}), ...cachedNames };
-        }
-        if (Object.keys(cachedImages).length > 0) {
-          updates.sbtImages = { ...(prev.sbtImages || {}), ...cachedImages };
-        }
-        return updates;
-      });
-    }
-
-    // 2. Fetch missing names via RPC
-    try {
-      const existing = { ...(this.state.sbtNames || {}), ...cachedNames };
-      const fetchedNames: Record<string, any> = {};
-      const fetchedImages: Record<string, any> = {};
-      for (const t of targets) {
-        const addr = (t?.sbt || '').toLowerCase();
-        if (!addr || existing[addr]) continue;
-        let info: any = null;
-        try {
-          // Use internal read provider ('none' resolves to read-only)
-          info = await sbtMetadataReadsPort.getSbtMetadata('none', addr, slug);
-        } catch (e) {
-          demoLog.warn('OnePageSession: fallback', e);
-        }
-        const name = getSbtDisplayName(info) || `Group ${addr.slice(0, 6)}...`;
-        fetchedNames[addr] = name;
-        if (info?.image) {
-          fetchedImages[addr] = info.image;
-        }
-        existing[addr] = name;
-      }
-
-      if (Object.keys(fetchedNames).length > 0 || Object.keys(fetchedImages).length > 0) {
+      // Set immediate cache hits to UI
+      if (Object.keys(cachedNames).length > 0 || Object.keys(cachedImages).length > 0) {
         this.setState((prev: Readonly<OnePageSession['state']>) => {
           const updates: Record<string, any> = {};
           if (Object.keys(fetchedNames).length > 0) {
@@ -1119,8 +1108,41 @@ class OnePageSession extends Component<any, any> {
           return updates;
         });
       }
-    } catch (e) {
-      demoLog.warn('OnePageSession: fallback', e);
+
+      // 2. Fetch missing names via RPC
+      try {
+        const existing = { ...(this.state.sbtNames || {}), ...cachedNames };
+        const fetchedNames: Record<string, any> = {};
+        const fetchedImages: Record<string, any> = {};
+        for (const t of targets) {
+          const addr = (t?.sbt || '').toLowerCase();
+          if (!addr || existing[addr]) continue;
+          let info: any = null;
+          try {
+            // Use internal read provider ('none' resolves to read-only)
+            info = await contractScriptsAny.getSbtMetadata('none', addr, slug);
+          } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
+          const name = getSbtDisplayName(info) || `Group ${addr.slice(0,6)}...`;
+          fetchedNames[addr] = name;
+          if (info?.image) {
+            fetchedImages[addr] = info.image;
+          }
+          existing[addr] = name;
+        }
+
+        if (Object.keys(fetchedNames).length > 0 || Object.keys(fetchedImages).length > 0) {
+          this.setState((prev: Readonly<OnePageSession['state']>) => {
+            const updates: Record<string, any> = {};
+            if (Object.keys(fetchedNames).length > 0) {
+              updates.sbtNames = { ...(prev.sbtNames || {}), ...fetchedNames };
+            }
+            if (Object.keys(fetchedImages).length > 0) {
+              updates.sbtImages = { ...(prev.sbtImages || {}), ...fetchedImages };
+            }
+            return updates;
+          });
+        }
+      } catch (e) { demoLog.warn('OnePageSession: fallback', e); }
     }
   }
 
@@ -2085,7 +2107,7 @@ class OnePageSession extends Component<any, any> {
   toggleGroups() {
     this.setState(
       (prevState: Readonly<OnePageSession['state']>) => ({ showGroups: !prevState.showGroups }),
-      () => this.resetDemoURL(),
+      () => this.resetDemoURL()
     );
   }
 
@@ -2147,9 +2169,11 @@ class OnePageSession extends Component<any, any> {
 
   handlePileSubmitRailVisibilityChange(visible: any) {
     const nextVisible = !!visible;
-    this.setState((prevState: Readonly<OnePageSession['state']>) =>
-      prevState.pileSubmitRailVisible === nextVisible ? null : { pileSubmitRailVisible: nextVisible },
-    );
+    this.setState((prevState: Readonly<OnePageSession['state']>) => (
+      prevState.pileSubmitRailVisible === nextVisible
+        ? null
+        : { pileSubmitRailVisible: nextVisible }
+    ));
   }
 
   toggleGroupsAbout() {
@@ -2159,7 +2183,7 @@ class OnePageSession extends Component<any, any> {
   toggleResults() {
     this.setState(
       (prevState: Readonly<OnePageSession['state']>) => ({ showResults: !prevState.showResults }),
-      () => this.resetDemoURL(),
+      () => this.resetDemoURL()
     );
   }
 
@@ -2168,9 +2192,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   toggleResultsAbout() {
-    this.setState((prevState: Readonly<OnePageSession['state']>) => ({
-      showResultsAbout: !prevState.showResultsAbout,
-    }));
+    this.setState((prevState: Readonly<OnePageSession['state']>) => ({ showResultsAbout: !prevState.showResultsAbout }));
   }
 
   /* =======================
@@ -2198,7 +2220,7 @@ class OnePageSession extends Component<any, any> {
   dismissStatusItem(addrKey: any) {
     const key = (addrKey || '').toLowerCase();
     this.setState((prev: Readonly<OnePageSession['state']>) => ({
-      dismissedStatusItems: { ...(prev.dismissedStatusItems || {}), [key]: true },
+      dismissedStatusItems: { ...(prev.dismissedStatusItems || {}), [key]: true }
     }));
   }
 
