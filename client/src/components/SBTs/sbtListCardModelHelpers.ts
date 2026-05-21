@@ -133,7 +133,7 @@ export const buildSbtListDisplayCardModel = <T extends SbtListHelperItem>({
   const rawSbtAddress = String(sbt.sbtAddress || '');
   const sbtAddress = addressMode === 'raw' ? rawSbtAddress : rawSbtAddress.trim();
   if (!sbtAddress) return null;
-  const sbtInfo = sbt.sbtInfo;
+  const sbtInfo = sbt.sbtInfo as unknown;
   const sbtInfoRecord = isSbtListCardModelRecord(sbtInfo) ? sbtInfo : {};
   const sessionSlug = String(resolveSbtSessionSlug(sbt) || '');
   const sbtAddressLower = sbtAddress.toLowerCase();
