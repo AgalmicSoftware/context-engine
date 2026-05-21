@@ -52,6 +52,7 @@ describe('OnboardingOverlay', () => {
     const deck = screen.getByTestId('ce-onboarding-deck');
     const controls = screen.getByTestId('ce-onboarding-controls');
     const controlSlots = screen.getAllByTestId('ce-onboarding-control-slot');
+    const controlPlaceholder = screen.getByTestId('ce-onboarding-control-placeholder');
 
     expect(screen.getByTestId('ce-onboarding-step-1')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-onboarding-title')).not.toBeInTheDocument();
@@ -61,8 +62,15 @@ describe('OnboardingOverlay', () => {
     expect(greetingImage).toHaveAttribute('data-slide-layout', 'flushBottom');
     expect(controls.className).toContain(styles.onboardingControlsSingleArrow);
     expect(controlSlots).toHaveLength(1);
+    expect(controls).toContainElement(controlPlaceholder);
+    expect(controlPlaceholder.className).toContain(styles.controlSlotPlaceholder);
+    expect(screen.queryByRole('button', { name: 'Back' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Skip' })).toBeInTheDocument();
     expect(screen.queryByText('Get Started')).not.toBeInTheDocument();
+
+    fireEvent.click(controlPlaceholder);
+
+    expect(store.getState().sessionState.onboardingStep).toBe(1);
   });
 
   it('keeps the titleless toolkit slide and advances with the shared arrow pattern', async () => {

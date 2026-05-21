@@ -2,8 +2,8 @@ export const FIRST_VISIT_STORAGE_KEY = 'firstVisit';
 export const ONBOARDING_COMPLETE_STORAGE_KEY = 'ce_onboarding_complete';
 export const COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY = 'ce:forceColdLoadWelcomeSlides';
 
-// Keep welcome slides manual by default; tests/dev can still force the cold-load overlay on.
-export const COLD_LOAD_ONBOARDING_ENABLED = false;
+// Keep welcome slides active only for direct session entry points; tests/dev can still force the overlay on.
+export const COLD_LOAD_ONBOARDING_ENABLED = true;
 
 type OnboardingStorage = {
   getItem: (key: string) => string | null;
@@ -16,13 +16,21 @@ const parseStorageBoolean = (value: unknown): boolean | null => {
   return null;
 };
 
-export const shouldAutoOpenColdLoadOnboarding = (storage: Pick<OnboardingStorage, 'getItem'>): boolean => {
-  const forcedValue = parseStorageBoolean(storage?.getItem?.(COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY));
-  if (forcedValue != null) return forcedValue;
-  return COLD_LOAD_ONBOARDING_ENABLED;
+export const isSessionColdLoadOnboardingRoute = (pathname: unknown): boolean => {
+  const normalizedPathname = String(pathname || '').trim();
+  return normalizedPathname === '/session' || normalizedPathname.startsWith('/session/');
 };
 
-export const readColdLoadOnboardingState = (storage: OnboardingStorage) => {
+export const shouldAutoOpenColdLoadOnboarding = (
+  storage: Pick<OnboardingStorage, 'getItem'>,
+  pathname: unknown = ''
+): boolean => {
+  const forcedValue = parseStorageBoolean(storage?.getItem?.(COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY));
+  if (forcedValue != null) return forcedValue;
+  return COLD_LOAD_ONBOARDING_ENABLED && isSessionColdLoadOnboardingRoute(pathname);
+};
+
+export const readColdLoadOnboardingState = (storage: OnboardingStorage, pathname: unknown = '') => {
   const firstVisit = storage.getItem(FIRST_VISIT_STORAGE_KEY) == null;
   storage.setItem(FIRST_VISIT_STORAGE_KEY, String(firstVisit));
 
@@ -31,6 +39,6 @@ export const readColdLoadOnboardingState = (storage: OnboardingStorage) => {
     shouldStartOnboarding:
       firstVisit &&
       storage.getItem(ONBOARDING_COMPLETE_STORAGE_KEY) == null &&
-      shouldAutoOpenColdLoadOnboarding(storage),
+      shouldAutoOpenColdLoadOnboarding(storage, pathname),
   };
 };

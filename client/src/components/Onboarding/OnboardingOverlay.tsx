@@ -158,7 +158,13 @@ const OnboardingOverlay = () => {
                     <FontAwesomeIcon className={styles.takeSurveyIcon} icon={faArrowLeft} />
                   </button>
                 </div>
-              ) : null}
+              ) : (
+                <div
+                  className={[styles.controlSlot, styles.controlSlotPlaceholder].filter(Boolean).join(' ')}
+                  data-testid='ce-onboarding-control-placeholder'
+                  aria-hidden='true'
+                />
+              )}
 
               <div className={styles.controlSlot} data-testid='ce-onboarding-control-slot'>
                 <button

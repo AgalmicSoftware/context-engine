@@ -4,34 +4,23 @@ import path from 'path';
 describe('Onboarding overlay welcome slide styles', () => {
   const scss = fs.readFileSync(path.join(__dirname, 'OnboardingOverlay.module.scss'), 'utf8');
 
-  it('moves medium slide arrows below the skip button instead of leaving them in the content flow', () => {
+  it('keeps the modal arrow controls as a top-to-bottom rail until phone layouts', () => {
     expect(scss).toMatch(/\.panelFrame\s*\{[\s\S]*?height:\s*min\(92vh,\s*1180px\);[\s\S]*?min-height:\s*680px;/);
     expect(scss).toMatch(/\.panel\s*\{[\s\S]*?--modal-panel-pad-top:\s*24px;[\s\S]*?--modal-panel-pad-bottom:\s*76px;/);
     expect(scss).toMatch(/\.onboardingControls\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*calc\(-1 \* var\(--modal-panel-pad-top\)\);[\s\S]*?right:\s*calc\(-1 \* var\(--modal-panel-pad-x\)\);[\s\S]*?bottom:\s*calc\(-1 \* var\(--modal-panel-pad-bottom\)\);[\s\S]*?height:\s*auto;/);
     expect(scss).toMatch(/\.onboardingControlsSingleArrow\s*\{[\s\S]*?grid-template-rows:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/);
     expect(scss).toMatch(/\.controlSlot\s*\{[\s\S]*?min-height:\s*0;[\s\S]*?height:\s*auto;/);
     expect(scss).toMatch(/\.controlSlotPlaceholder\s*\{[\s\S]*?pointer-events:\s*none;[\s\S]*?background:\s*rgba\(139,\s*183,\s*150,\s*0\.28\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.panel\s*\{[\s\S]*?--modal-panel-pad-bottom:\s*158px;/);
-    expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?top:\s*auto;[\s\S]*?right:\s*calc\(-1 \* var\(--modal-panel-pad-x\)\);[\s\S]*?bottom:\s*calc\(-1 \* var\(--modal-panel-pad-bottom\)\);[\s\S]*?left:\s*calc\(-1 \* var\(--modal-panel-pad-x\)\);[\s\S]*?transform:\s*none;/);
-    expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?width:\s*auto;[\s\S]*?height:\s*76px;[\s\S]*?gap:\s*0;/);
-    expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.takeSurveyButton\s*\{[\s\S]*?background:\s*rgba\(139,\s*183,\s*150,\s*0\.42\);[\s\S]*?color:\s*rgba\(16,\s*43,\s*35,\s*0\.82\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.skipButton\s*\{[\s\S]*?bottom:\s*98px;/);
+    expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?position:\s*static;/);
     expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.controlSlotPlaceholder\s*\{[\s\S]*?display:\s*none;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.panel\s*\{[\s\S]*?--modal-panel-pad-x:\s*10px;[\s\S]*?--modal-panel-pad-bottom:\s*138px;[\s\S]*?padding:\s*16px 10px var\(--modal-panel-pad-bottom\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.skipButton\s*\{[\s\S]*?bottom:\s*82px;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?bottom:\s*calc\(-1 \* var\(--modal-panel-pad-bottom\)\);[\s\S]*?height:\s*62px;/);
-    expect(scss).not.toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?position:\s*static;/);
+    expect(scss).not.toMatch(/@media \(max-width:\s*900px\)\s*\{[\s\S]*?\.onboardingControls\s*\{[\s\S]*?position:\s*static;/);
   });
 
   it('keeps minimized slide titles and bullets on the full welcome scale', () => {
-    expect(scss).toMatch(/\.onboardingTitle\s*\{[\s\S]*?font-weight:\s*800;[\s\S]*?letter-spacing:\s*0;[\s\S]*?font-size:\s*clamp\(4\.75rem,\s*6\.2vw,\s*7\.6rem\);/);
+    expect(scss).toMatch(/\.onboardingTitle\s*\{[\s\S]*?font-weight:\s*800;[\s\S]*?letter-spacing:\s*0;[\s\S]*?font-size:\s*clamp\(4\.25rem,\s*5\.4vw,\s*6\.8rem\);/);
     expect(scss).toMatch(/\.deck\s*\{[\s\S]*?align-items:\s*center;[\s\S]*?flex:\s*1 1 auto;/);
-    expect(scss).toMatch(/\.bulletList\s*\{[\s\S]*?font-size:\s*clamp\(1\.35rem,\s*1\.9vw,\s*2\.05rem\);[\s\S]*?gap:\s*clamp\(14px,\s*1\.45vh,\s*26px\);/);
-    expect(scss).toMatch(/\.bulletText\s*\{[\s\S]*?font-size:\s*1\.32em;[\s\S]*?line-height:\s*1\.14;/);
-    expect(scss).toMatch(/@media \(max-width:\s*760px\)\s*\{[\s\S]*?\.onboardingTitle\s*\{[\s\S]*?font-size:\s*clamp\(3\.4rem,\s*8\.4vw,\s*5\.4rem\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.onboardingTitle\s*\{[\s\S]*?font-size:\s*clamp\(3rem,\s*11vw,\s*4\.6rem\);[\s\S]*?line-height:\s*0\.95;/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.bulletList\s*\{[\s\S]*?font-size:\s*clamp\(1\.35rem,\s*5\.4vw,\s*2\.05rem\);[\s\S]*?gap:\s*clamp\(9px,\s*1\.6vh,\s*16px\);/);
-    expect(scss).toMatch(/@media \(max-width:\s*640px\)\s*\{[\s\S]*?\.bulletText\s*\{[\s\S]*?font-size:\s*1\.08em;[\s\S]*?line-height:\s*1\.15;/);
+    expect(scss).toMatch(/\.bulletList\s*\{[\s\S]*?font-size:\s*clamp\(1\.15rem,\s*1\.45vw,\s*1\.6rem\);[\s\S]*?gap:\s*clamp\(12px,\s*1\.25vh,\s*22px\);/);
+    expect(scss).toMatch(/\.bulletText\s*\{[\s\S]*?font-size:\s*1\.25em;[\s\S]*?line-height:\s*1\.12;/);
   });
 
   it('gives the first minimized slide a larger artwork slot without changing later slide media sizing', () => {
