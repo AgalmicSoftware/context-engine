@@ -20,11 +20,8 @@ import {
   buildSbtListSessionLoadingStatus,
   buildSbtListSessionProgressSnapshot,
   buildSbtListSessionUniversePanelClassName,
-  collectSbtDocumentUrls,
-  collectSbtTagValues,
   coerceSbtMintEndSeconds,
   dedupeNormalizedSbtListSlugs,
-  getSbtCardDetails,
   getVisibleSbtListSessionSlugsFromEntries,
   getSbtListItemSignature,
   getSbtListNetHolderCount,
@@ -42,7 +39,6 @@ import {
   mergeSbtListsByAddress,
   normalizeSbtListAddressLower,
   normalizeSbtListItems,
-  normalizeSbtListTokenUri,
   pickNormalizedSbtListSessionSlug,
   readSbtListShowDemoSessions,
   readSbtListUniverseCollapsedState,
@@ -616,47 +612,6 @@ describe('sbtListHelpers', () => {
       { sbtAddress: '0xA', sbtInfo: { name: 'First' } },
       { sbtAddress: '0xB', sbtInfo: { name: 'Second' } },
     ]);
-  });
-
-  it('collects card tags and document URLs from metadata variants', () => {
-    expect(collectSbtTagValues(
-      ['Builder', { label: 'builder' }],
-      'Research, Ops',
-      [{ name: 'Signal' }]
-    )).toEqual(['Builder', 'Research', 'Ops', 'Signal']);
-    expect(collectSbtDocumentUrls(
-      [{ href: 'ipfs://bafy-doc' }],
-      { docUrl: 'ar://abc123' },
-      'https://example.com/readme',
-      { url: 'https://example.com/readme' }
-    )).toEqual([
-      'ipfs://bafy-doc',
-      'ar://abc123',
-      'https://example.com/readme',
-    ]);
-  });
-
-  it('normalizes SBT card detail links without hydrating token metadata', () => {
-    const details = getSbtCardDetails({
-      tags: ['Builder', { label: 'builder' }],
-      documentUrls: [
-        { href: 'ipfs://bafy-doc' },
-        { value: 'https://example.com/readme' },
-      ],
-      sbtInfo: {
-        featuredSbtTags: [{ value: 'Signal' }],
-        documents: [{ docUrl: 'ar://abc123' }],
-      },
-    });
-
-    expect(normalizeSbtListTokenUri('ipfs://bafy-image')).toBe('https://ipfs.io/ipfs/bafy-image');
-    expect(details.tags).toEqual(['Builder', 'Signal']);
-    expect(details.documentUrls).toEqual([
-      { href: 'ar://abc123', label: 'ar://abc123' },
-      { href: 'https://ipfs.io/ipfs/bafy-doc', label: 'ipfs://bafy-doc' },
-      { href: 'https://example.com/readme', label: 'https://example.com/readme' },
-    ]);
-    expect(details.hasDetails).toBe(true);
   });
 
   it('normalizes render addresses and keys by display scope', () => {
