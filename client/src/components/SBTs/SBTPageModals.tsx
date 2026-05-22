@@ -13,6 +13,7 @@ import styles from './SBTPage.module.scss';
 import SBTFilter from './SBTFilter';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { resolveSbtPageCopyIconState } from './sbtPageHelpers';
 
 type SbtPageHolderModalProps = {
@@ -178,7 +179,7 @@ export const renderSbtPageHolderModal = ({
                         className={styles.userBlockie}
                       />
                     ) : null}
-                    <a href={`/u/${address}`} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
+                    <a href={buildPublicRoute(`/u/${address}`)} target="_blank" rel="noopener noreferrer" className={styles.userAddressLink}>
                       {getShortenedAddress(address, false)}
                     </a>
                   </div>
