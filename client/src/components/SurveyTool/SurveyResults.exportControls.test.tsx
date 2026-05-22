@@ -469,6 +469,43 @@ describe('SurveyResults export/view controls', () => {
     expect(lines).toHaveLength(2);
   });
 
+  it('falls back to the aggregate bucket key when response payloads omit question IDs', () => {
+    const subject = attachStateHarness(createSubject({
+      viewMode: 'questions',
+    }));
+
+    subject.state = {
+      ...subject.state,
+      viewMode: 'questions',
+      sbtFilteredAggregatorQuestionResponses: {
+        q2: [
+          {
+            responder: '0xDef',
+            response: {
+              timeStamp: '2025-04-01T00:00:00.000Z',
+              answer: { value: 'Yes', encrypted: false },
+              importance: 4,
+            },
+          },
+        ],
+      },
+    };
+
+    subject.getNetworkQuestionsForCurrentContext = jest.fn(() => ({
+      q2: {
+        id: 'q2',
+        prompt: 'Fallback Question',
+        type: 'multichoice',
+        options: ['Yes', 'No'],
+      },
+    }));
+
+    const csv = subject.generateResponsesCSV();
+    const lines = csv.split('\n');
+
+    expect(lines[1]).toBe('"q2","Fallback Question","multichoice","Yes;No","0xDef","4","Yes","","","false","","","2025-04-01T00:00:00.000Z"');
+  });
+
   it('exports results JSON for the current filtered question view', () => {
     const subject = attachStateHarness(createSubject({
       viewMode: 'questions',
