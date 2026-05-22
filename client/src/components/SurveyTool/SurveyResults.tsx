@@ -1797,7 +1797,7 @@ class SurveyResults extends Component<any, any> {
     this.stopLocalStoragePolling();
 
     // If unmounting while still open, remove "/results" from the URL
-    if (this.props.isOpen) {
+    if (this.props.isOpen && !this.props.preventUrlChange) {
       const currentPath = window.location.pathname;
       if (currentPath.includes('/results')) {
         let newPath = currentPath.replace('/results', '').replace(/\/+$/, '');
