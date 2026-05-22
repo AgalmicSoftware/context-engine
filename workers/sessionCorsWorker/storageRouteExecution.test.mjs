@@ -328,6 +328,43 @@ test('storageRoute treats docLibrary provider cloudflare as a worker storage bac
   assert.equal(listBody.items[0].storageRef.id, CF_ID);
 });
 
+test('storageRoute accepts Cloudflare document tags that look like ordinary filenames', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const uploadRequest = new Request('https://worker.example/storage/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: 'document bytes',
+      contentType: 'text/plain',
+      resource: 'docsContext',
+      tags: [{ name: 'CE-DocName', value: 'secret.txt' }],
+    }),
+  });
+
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: uploadRequest,
+    env,
+    config: CLOUDFLARE_WORKER_GATE_CONFIG,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+
+  const body = await readJson(uploadResponse);
+  assert.equal(uploadResponse.status, 200);
+  assert.equal(body.storageRef.backend, 'cloudflare');
+  assert.doesNotMatch(JSON.stringify(body), /account|bucket|token|secret|r2:\/\//i);
+});
+
 test('storageRoute denies Cloudflare worker_sbt_gate reads when SBT gate check fails', async () => {
   const r2 = createMockR2();
   const kv = createMockKv();
