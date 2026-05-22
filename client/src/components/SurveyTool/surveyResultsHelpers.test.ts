@@ -279,6 +279,7 @@ describe('surveyResultsHelpers state patches', () => {
       surveyDocumentURLs: [],
       totalQuestionsCount: 0,
       totalResponsesCount: 0,
+      filteredQuestionsCount: 0,
       filteredResponsesCount: 0,
       surveyResultsHydrated: true,
     });
@@ -301,6 +302,7 @@ describe('surveyResultsHelpers state patches', () => {
       surveyDocumentURLs: docUrls,
       totalQuestionsCount: 1,
       totalResponsesCount: 1,
+      filteredQuestionsCount: 1,
       responses: rawResponses,
       filteredResponsesCount: 1,
       surveyResultsHydrated: true,
