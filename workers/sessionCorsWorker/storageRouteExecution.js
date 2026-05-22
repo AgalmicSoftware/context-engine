@@ -373,7 +373,15 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
     createdAt,
     payloadAccessMode: payloadAccess.mode,
   };
-  assertNoCloudflarePrivateMaterial(metadata);
+  assertNoCloudflarePrivateMaterial({
+    id,
+    backend: metadata.backend,
+    resource,
+    contentType: metadata.contentType,
+    gate: metadata.gate,
+    createdAt,
+    payloadAccessMode: payloadAccess.mode,
+  });
 
   await r2.put(objectKey, payload.bytes, {
     httpMetadata: { contentType: metadata.contentType },
