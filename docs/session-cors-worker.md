@@ -264,7 +264,8 @@ Vars:
 - `DEFAULT_GROUP_SLUG` (optional; legacy alias still read for compatibility)
 - `DEPLOY_HELPER_ENABLED` (optional; only if you embed deploy endpoints in the same worker)
 - `LIT_ACCOUNT_API_KEY` or `LIT_USAGE_API_KEY` (optional; used for worker-mediated Lit Chipotle execution when no per-session Lit account or usage key has been stored yet, or when a sponsor intentionally runs a shared-account model)
-- `LIT_API_BASE` (optional; only if you need a non-default Chipotle API base such as self-hosted/local dev)
+- `LIT_API_BASE` (optional; defaults to `https://api.chipotle.litprotocol.com`; production requests are restricted to the approved Chipotle API host)
+- `LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE` (optional; dev/test only, allows `LIT_API_BASE` to target localhost/loopback Chipotle stubs over `http` or `https`)
 
 Runtime:
 - Enable Node.js compatibility when deploying from the dashboard.
