@@ -272,6 +272,62 @@ test('storageRoute stores Cloudflare docs payloads behind opaque refs and reads 
   assert.equal(await readResponse.text(), 'hello storage');
 });
 
+test('storageRoute treats docLibrary provider cloudflare as a worker storage backend', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const config = {
+    docLibrary: { provider: 'cloudflare' },
+    __registry: CLOUDFLARE_WORKER_GATE_CONFIG.__registry,
+  };
+  const uploadRequest = new Request('https://worker.example/storage/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: 'doc-library provider storage',
+      contentType: 'text/plain',
+      resource: 'docsContext',
+    }),
+  });
+
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: uploadRequest,
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+
+  assert.equal(uploadResponse.status, 200);
+  const uploadBody = await readJson(uploadResponse);
+  assert.equal(uploadBody.storageRef.backend, 'cloudflare');
+
+  const listResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=docsContext'),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: { json },
+  });
+
+  const listBody = await readJson(listResponse);
+  assert.equal(listResponse.status, 200);
+  assert.equal(listBody.items.length, 1);
+  assert.equal(listBody.items[0].storageRef.id, CF_ID);
+});
+
 test('storageRoute denies Cloudflare worker_sbt_gate reads when SBT gate check fails', async () => {
   const r2 = createMockR2();
   const kv = createMockKv();
