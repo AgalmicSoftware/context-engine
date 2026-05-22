@@ -3303,7 +3303,7 @@ class CreateSBTGroup extends Component<any, any> {
     const distribution = (sbtDistribution || {}) as CreateSbtDistributionState;
     const isInvite = distribution.isLimited && distribution.distributionOption === 'groupPassword';
     const base = window.location.origin;
-    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug());
+    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), readPublicUrlBasePath());
     const encodeGroupPassword = (code: unknown) => {
       const normalized = cryptoUtils.normalizeGroupPasswordInput(code);
       return cryptoUtils.encodeGroupPasswordForUrl(normalized) || '';

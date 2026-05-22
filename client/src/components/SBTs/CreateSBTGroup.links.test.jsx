@@ -146,6 +146,36 @@ describe('CreateSBTGroup success links', () => {
     ]);
   });
 
+  it('prepends PUBLIC_URL when generating limited group-password invite links', async () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+
+    try {
+      const sbtAddress = '0x00000000000000000000000000000000000000b1';
+      const encodedPassword = encodeURIComponent(
+        cryptoUtils.encodeGroupPasswordForUrl('shared-secret')
+      );
+      const instance = makeInstance({ sessionSlug: 'edge' });
+      instance.state = {
+        ...instance.state,
+        sbtDistribution: {
+          ...instance.state.sbtDistribution,
+          isLimited: true,
+          distributionOption: 'groupPassword',
+        },
+      };
+
+      await instance.generateSBTInviteLinks(sbtAddress, ['shared-secret']);
+
+      expect(instance.state.sbtInviteLinks).toEqual([
+        `http://localhost/ce/session/edge?auto=1&sbt=${encodeURIComponent(sbtAddress)}&gp=${encodedPassword}`,
+      ]);
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
   it('builds unlimited invite links with session-hinted SBT detail paths', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000b1';
     const instance = makeInstance({ sessionSlug: 'edge' });
