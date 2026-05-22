@@ -837,6 +837,21 @@ describe('MainSite route render smoke', () => {
     expect(mockOnePageSession).not.toHaveBeenCalled();
   });
 
+  it.each(['/atlas-old', '/surveys-old', '/questions-old', '/foo/question/abc'])(
+    'renders a clean 404 for invalid lookalike route %s',
+    async (path) => {
+      const subject = createSubject({ path });
+
+      render(subject.render());
+
+      expect(await screen.findByRole('heading', { name: /page not found/i })).toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.PAGE_ATLAS_ROOT)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.PAGE_SURVEYS_ROOT)).not.toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.PAGE_QUESTIONS_ROOT)).not.toBeInTheDocument();
+      expect(mockSurveyPage).not.toHaveBeenCalled();
+    }
+  );
+
   it.each(['/compare', '/compare/'])('renders the compare route root for %s', async (path) => {
     const subject = createSubject({ path });
 

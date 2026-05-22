@@ -6408,7 +6408,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     if (fullPath === '/debate' || fullPath === '/debate/') {
       return this._renderDebateRoute(fullPath);
     }
-    if (fullPath.startsWith("/atlas")) {
+    if (isOnOrWithinRoutePathFn(fullPath, '/atlas')) {
       return this._renderAtlasRoute(ctx);
     }
     if (fullPath.startsWith('/tag/')) {
@@ -6421,13 +6421,13 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
       return this._renderCompareRoute(ctx);
     }
     if (
-      fullPath.startsWith("/surveys") ||
+      isOnOrWithinRoutePathFn(fullPath, '/surveys') ||
       fullPath.startsWith("/survey/") ||
-      fullPath.startsWith("/questions")
+      isOnOrWithinRoutePathFn(fullPath, '/questions')
     ) {
       return this._renderSurveysOrQuestionsListRoute(ctx);
     }
-    if (fullPath.includes("/question/")) {
+    if (fullPath.startsWith("/question/")) {
       return this._renderQuestionDetailRoute(ctx);
     }
     if (isSbtsListRoute) {
@@ -6436,7 +6436,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
     if (isSbtDetailRoute) {
       return this._renderSbtDetailRoute(ctx);
     }
-    if (fullPath.includes("/su/")) {
+    if (fullPath.startsWith("/su/")) {
       return this._renderSimUserRoute(fullPath, defaultSessionNetwork);
     }
     if (fullPath.includes("0x")) {
