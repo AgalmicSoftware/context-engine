@@ -141,6 +141,96 @@ describe('SBTPage admin open-mint URL', () => {
     }
   });
 
+  it('prepends PUBLIC_URL when rendering admin invite links', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+
+    try {
+      const account = '0x00000000000000000000000000000000000000a2';
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const encodedPassword = encodeURIComponent(
+        cryptoUtils.encodeGroupPasswordForUrl('claim-code')
+      );
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        account,
+        sessionSlug: 'edge',
+      });
+      subject.state = {
+        ...subject.state,
+        userIsSbtAdmin: true,
+        hasInviteMint: true,
+        adminGeneratedPasswords: ['claim-code'],
+        cachedPasswords: [],
+        includePreviousPasswords: false,
+        sbtInfo: {
+          hasPasswordMint: true,
+          maxTokens: '0',
+          admin: account,
+          burnAuth: 0,
+        },
+      };
+
+      expect(flattenText(subject.renderAdminActions())).toContain(
+        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`
+      );
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
+  it('prepends PUBLIC_URL when exporting admin invite links', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+    const originalCreateObjectUrl = URL.createObjectURL;
+    const originalRevokeObjectUrl = URL.revokeObjectURL;
+    const OriginalBlob = global.Blob;
+    let capturedBlob = null;
+
+    global.Blob = jest.fn((parts, options) => ({ parts, options }));
+    URL.createObjectURL = jest.fn((blob) => {
+      capturedBlob = blob;
+      return 'blob:invite-export';
+    });
+    URL.revokeObjectURL = jest.fn();
+
+    try {
+      const sbtAddress = '0x00000000000000000000000000000000000000a1';
+      const encodedPassword = encodeURIComponent(
+        cryptoUtils.encodeGroupPasswordForUrl('claim-code')
+      );
+      const subject = createSubject({
+        SBTAddress: sbtAddress,
+        sessionSlug: 'edge',
+      });
+      subject.state = {
+        ...subject.state,
+        hasInviteMint: true,
+        adminGeneratedPasswords: ['claim-code'],
+        cachedPasswords: [],
+        includePreviousPasswords: false,
+        exportFormat: 'json',
+        sbtInfo: {
+          name: 'Invite Badge',
+        },
+      };
+
+      subject.exportPasswords();
+
+      expect(capturedBlob).not.toBeNull();
+      expect(String(capturedBlob.parts.join(''))).toContain(
+        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`
+      );
+    } finally {
+      global.Blob = OriginalBlob;
+      URL.createObjectURL = originalCreateObjectUrl;
+      URL.revokeObjectURL = originalRevokeObjectUrl;
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
+
   it('canonicalizes reserved session aliases when building the admin open-mint URL', () => {
     const sbtAddress = '0x00000000000000000000000000000000000000a1';
 
