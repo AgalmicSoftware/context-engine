@@ -1,6 +1,8 @@
 // Focused SBTPage holder-modal render coverage owns modal row display, spinners, and filtered-holder preservation.
+import { render, screen } from '@testing-library/react';
 import SBTPage from './SBTPage';
 import styles from './SBTPage.module.scss';
+import { renderSbtPageHolderModal } from './SBTPageModals';
 import * as contractScriptsModule from '../../utilities/web3/contractScripts.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 
@@ -143,6 +145,51 @@ describe('SBTPage holder modal rendering', () => {
 
     expect(sbtFilterNode).toBeTruthy();
     expect(sbtFilterNode.props.network).toEqual(expect.objectContaining({ id: 84532 }));
+  });
+
+  it('preserves PUBLIC_URL for holder modal user links', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+
+    try {
+      const holderAddress = '0x00000000000000000000000000000000000000b1';
+      render(renderSbtPageHolderModal({
+        isOpen: true,
+        onClose: jest.fn(),
+        showHeaderCount: true,
+        holdersDisplayCount: '1',
+        showCornerSpinner: false,
+        holderItemsForFilter: [holderAddress],
+        provider: 'mock',
+        network: { id: 84532 },
+        sessionSlug: 'rxc',
+        defaultFeaturedSBTs: [],
+        onFilter: jest.fn(),
+        isSBTCacheReady: true,
+        sbtCacheRevision: 1,
+        loadingMintedFilter: false,
+        hasFilteredHolders: true,
+        hasComputedHolders: true,
+        showScanProgressInModal: false,
+        scanProgressText: '',
+        scanProgressSessionText: '',
+        scanProgressPct: 0,
+        scanProgressFillStyle: {},
+        showEmptyStateInModal: false,
+        showApproximateCountHint: false,
+        showSpinnerInModalBody: false,
+        filteredMintedUsers: [holderAddress],
+        copiedAddress: '',
+        copyToClipboard: jest.fn(),
+        getExplorerUrl: () => 'https://explorer.example/address',
+      }));
+
+      expect(screen.getByRole('link', { name: getShortenedAddress(holderAddress, false) }))
+        .toHaveAttribute('href', `/ce/u/${holderAddress}`);
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
   });
 
   it('clears modal loading even when filtered-list signature is unchanged', () => {
