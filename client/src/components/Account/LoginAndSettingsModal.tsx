@@ -82,13 +82,8 @@ import {
 import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../utilities/cache/cacheScripts.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
-import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
-import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
-import {
-  exchangeAgentClientLogin,
-  extractAgentClientToken,
-  readAgentClientLoginEnvelope,
-} from '../../utilities/session/agentClientLogin';
+import { isCryptoMode } from '../../utilities/ui/terminology.js';
+import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
 // Chain helpers
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainById } from '../../variables/chains.js';
@@ -236,6 +231,7 @@ type AiPresetConfig = {
   provider?: unknown;
   models?: Readonly<Record<string, unknown>>;
 };
+export const buildBookmarksRoutePath = (): string => buildPublicRoute('/bookmarks');
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );
@@ -2485,7 +2481,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   openBookmarks = () => {
     this.closeLoginModal();
     if (typeof window !== 'undefined') {
-      window.location.href = '/bookmarks';
+      window.location.href = buildBookmarksRoutePath();
     }
   };
 

@@ -131,8 +131,8 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
 }));
 
 import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
-import contractScripts from '../../utilities/web3/chainGateway.js';
-import * as passkeyWallet from '../../wallet/passkeyWallet.js';
+import contractScripts from '../../utilities/web3/contractScripts.js';
+import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
@@ -549,6 +549,12 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     render(subject.getSettingsDisplay());
 
     expect(screen.getByRole('link', { name: 'Open session Edge Session' })).toHaveAttribute('href', '/ce/session/edge');
+  });
+
+  it('preserves PUBLIC_URL when building the Bookmarks route', () => {
+    process.env.PUBLIC_URL = '/ce/';
+
+    expect(buildBookmarksRoutePath()).toBe('/ce/bookmarks');
   });
 
   it('preserves PUBLIC_URL when building the Bookmarks route', () => {
