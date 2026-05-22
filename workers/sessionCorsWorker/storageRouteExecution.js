@@ -146,8 +146,20 @@ export const readStorageUploadRequestPayload = async (request) => {
   return { ok: false, error: 'Unsupported Content-Type.' };
 };
 
-const resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncrypted }) => {
-  const configured = normalizeStorageBackend(config?.storageProfile?.backend || config?.storageBackend);
+const readConfiguredStorageBackendCandidate = (config = {}) => {
+  const storageProfile = isObj(config?.storageProfile) ? config.storageProfile : {};
+  const docLibrary = isObj(config?.docLibrary) ? config.docLibrary : {};
+  return (
+    storageProfile.backend ||
+    config?.storageBackend ||
+    docLibrary.provider ||
+    docLibrary.backend ||
+    docLibrary.storageBackend
+  );
+};
+
+const resolveConfiguredStorageBackend = ({ config, requestedBackend, payloadEncrypted } = {}) => {
+  const configured = normalizeStorageBackend(readConfiguredStorageBackendCandidate(config));
   if (configured === STORAGE_BACKENDS.CLOUDFLARE || configured === STORAGE_BACKENDS.LIT_ARWEAVE) return configured;
   if (payloadEncrypted) return STORAGE_BACKENDS.LIT_ARWEAVE;
   return normalizeStorageBackend(requestedBackend, configured);
@@ -500,7 +512,7 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     return handleCloudflareUpload({ env, config, slug, uploaderAddress, payload, baseHeaders, deps });
   }
 
-  const configuredBackend = normalizeStorageBackend(config?.storageProfile?.backend || config?.storageBackend);
+  const configuredBackend = resolveConfiguredStorageBackend({ config });
   if (configuredBackend !== STORAGE_BACKENDS.CLOUDFLARE) {
     return responseJson(deps, { error: 'Storage route read/list is only available for Cloudflare storage.' }, 400, baseHeaders);
   }
