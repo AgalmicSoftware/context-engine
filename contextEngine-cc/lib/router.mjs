@@ -3172,6 +3172,18 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
               stored.submitted = true;
               stored.txHash = result.txHash;
               stored.blockNumber = result.blockNumber ?? null;
+              const storageRef = buildStorageRefFromResult(result, 0);
+              const surveyStorageRef = buildSurveyStorageRefFromResult(result);
+              stored.arweaveTxId = getLegacyArweaveTxId({
+                storageRef,
+                arweaveTxId: result.arweaveTxIds?.[0],
+              }) || null;
+              stored.storageRef = storageRef || null;
+              stored.surveyArweaveTxId = getLegacyArweaveTxId({
+                storageRef: surveyStorageRef,
+                arweaveTxId: result.surveyArweaveTxId,
+              }) || null;
+              stored.surveyStorageRef = surveyStorageRef || null;
               stored.submittedAt = new Date().toISOString();
               writeSecureFile(file, JSON.stringify(stored, null, 2));
               debug(`[router] Auto-submitted response ${canonicalQuestionId} → tx ${result.txHash}`);

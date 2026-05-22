@@ -778,7 +778,13 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
         submitOnChain: async (pending, slug, workerToken) => {
           submitInvocation = { pending, slug, workerToken };
           resolveSubmit();
-          return { ok: true, txHash: '0xsubmit123', count: pending.length };
+          return {
+            ok: true,
+            txHash: '0xsubmit123',
+            count: pending.length,
+            arweaveTxIds: ['tx-respond-auto'],
+            surveyArweaveTxId: 'survey-respond-auto',
+          };
         },
       },
     );
@@ -805,6 +811,26 @@ test('respond immediate auto-submit auto-authenticates worker, auto-faucets, and
 
     await submitDone;
     await flushBackgroundWork();
+
+    const storedAutoResponse = JSON.parse(
+      readFileSync(resolve(dataDir, 'responses', session, `${questionId}.json`), 'utf8'),
+    );
+    assert.equal(storedAutoResponse.submitted, true);
+    assert.equal(storedAutoResponse.txHash, '0xsubmit123');
+    assert.equal(storedAutoResponse.arweaveTxId, 'tx-respond-auto');
+    assert.deepEqual(storedAutoResponse.storageRef, {
+      backend: 'arweave',
+      id: 'tx-respond-auto',
+      uri: 'ar://tx-respond-auto',
+      resource: 'responses',
+    });
+    assert.equal(storedAutoResponse.surveyArweaveTxId, 'survey-respond-auto');
+    assert.deepEqual(storedAutoResponse.surveyStorageRef, {
+      backend: 'arweave',
+      id: 'survey-respond-auto',
+      uri: 'ar://survey-respond-auto',
+      resource: 'responses',
+    });
 
     assert.deepEqual(
       fetchCalls.map((entry) => entry.url),
