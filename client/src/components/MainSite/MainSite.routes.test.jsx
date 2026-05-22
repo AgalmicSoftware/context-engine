@@ -1031,6 +1031,14 @@ describe('MainSite route render smoke', () => {
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'edge');
   });
 
+  it('resolves PUBLIC_URL-prefixed SBT detail paths during route reinitialization', () => {
+    process.env.PUBLIC_URL = '/ce/';
+    const sbtAddress = '0x1234567890abcdef1234567890abcdef12345678';
+    const subject = createSubject({ path: `/ce/group/${sbtAddress}` });
+
+    expect(subject.getSbtAddressFromPath(`/ce/group/${sbtAddress}`)).toBe(sbtAddress);
+  });
+
   it('renders the session route with explicit demo-session metadata when strict shared config misses', async () => {
     const demoConfig = buildSessionConfig({
       slug: 'rxc',
