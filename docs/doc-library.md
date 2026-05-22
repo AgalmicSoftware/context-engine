@@ -56,8 +56,8 @@ Session metadata can select a backend-owned session storage profile. This is sto
 ```
 
 Defaults:
-- If missing, `storageProfile.backend` defaults to `arweave`.
-- `lit-arweave` remains available and represents encrypted Arweave payloads. Selecting it for session docs forces encrypted Doc Library uploads.
+- If missing, `storageProfile.backend` defaults to `arweave`; worker storage routes also accept legacy `docLibrary.provider = "cloudflare"` as a Cloudflare routing signal when no storage profile backend is present.
+- `lit-arweave` remains available and represents encrypted Arweave envelope payloads. Selecting it for session docs forces encrypted Doc Library uploads.
 - `cloudflare` routes plaintext session docs/context through the session worker `/storage/*` routes and keeps Cloudflare object identifiers private. Lit-encrypted Cloudflare document upload/read is intentionally blocked until the encrypted-envelope path is implemented.
 - `ipfs` and `local` `docLibrary.provider` values remain stubbed (UI disables list/upload with a “not implemented” notice).
 
