@@ -192,6 +192,32 @@ describe('SurveyResults session resolution', () => {
     jest.restoreAllMocks();
   });
 
+  it('does not rewrite route-owned results URLs on unmount', () => {
+    const priorUrl = window.location.href;
+    const pushStateSpy = jest.spyOn(window.history, 'pushState');
+    try {
+      window.history.replaceState({}, '', '/session/edge/questions/results');
+      const subject = createSubject({
+        activeSessionSlug: 'edge',
+        isOpen: true,
+        preventUrlChange: true,
+        sessionSlug: 'edge',
+        viewMode: 'questions',
+      });
+      subject.state = {
+        ...subject.state,
+        viewMode: 'questions',
+      };
+
+      subject.componentWillUnmount();
+
+      expect(pushStateSpy).not.toHaveBeenCalled();
+      expect(window.location.pathname).toBe('/session/edge/questions/results');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
   it('removes the old SurveyResults session selector chrome while keeping header spacing intact', () => {
     const scssPath = path.join(__dirname, 'SurveyResults.module.scss');
     const scss = fs.readFileSync(scssPath, 'utf8');
