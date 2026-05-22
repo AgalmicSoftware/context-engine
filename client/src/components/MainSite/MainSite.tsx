@@ -1472,7 +1472,7 @@ export class MainSite extends Component<MainSiteProps, MainSiteState> {
 
   getSbtAddressFromPath = (pathIn = '') =>
     getSbtAddressFromPathFn(
-      pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
+      this.getEffectiveRoutePath(pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || ''),
       { isAddress: ethers.utils.isAddress }
     );
 
