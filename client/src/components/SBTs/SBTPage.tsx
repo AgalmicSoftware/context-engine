@@ -3811,7 +3811,7 @@ class SBTPage extends Component<any, any> {
     });
 
     const baseUrl = window.location.origin;
-    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug());
+    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), readPublicUrlBasePath());
     const inviteLinks = buildSbtPagePasswordExportRows({
       baseUrl,
       codeLabel,
@@ -4253,7 +4253,7 @@ renderMintButton() {
       : "unknown_sbt";
 
     const baseUrl = window.location.origin;
-    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug());
+    const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), readPublicUrlBasePath());
     const buildInviteLink = (code: string): string => (
       buildSbtPagePasswordInviteLink({
         baseUrl,
