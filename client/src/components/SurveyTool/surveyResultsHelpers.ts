@@ -169,6 +169,7 @@ export const buildSurveyResultsEmptySurveyModePatch = () => ({
   surveyDocumentURLs: [],
   totalQuestionsCount: 0,
   totalResponsesCount: 0,
+  filteredQuestionsCount: 0,
   filteredResponsesCount: 0,
   surveyResultsHydrated: true,
 });
@@ -201,6 +202,7 @@ export const buildSurveyResultsSurveyModeHydratedPatch = ({
   surveyDocumentURLs,
   totalQuestionsCount,
   totalResponsesCount,
+  filteredQuestionsCount: totalQuestionsCount,
   responses,
   filteredResponsesCount,
   surveyResultsHydrated: true,
