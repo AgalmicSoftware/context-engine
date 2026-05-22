@@ -1,3 +1,5 @@
+import { escapeSbtCsvField } from './sbtCsvExportHelpers';
+
 export type CreateSbtPasswordExportFile = {
   content: string;
   fileName: string;
@@ -60,9 +62,9 @@ export const buildCreateSbtPasswordExportFile = ({
     })), null, 2);
     fileName = `${symbolText}_${nameText}_${fileLabel}_${dateText}.json`;
   } else if (exportFormat === 'csv') {
-    content = `index,${codeLabel},inviteLink\n` +
+    content = `index,${escapeSbtCsvField(codeLabel)},inviteLink\n` +
       codes.map((code, index) =>
-        `${index},${code},${links[index] || fallbackLink}`
+        `${index},${escapeSbtCsvField(code)},${escapeSbtCsvField(links[index] || fallbackLink)}`
       ).join('\n');
     fileName = `${symbolText}_${nameText}_${fileLabel}_${dateText}.csv`;
   }

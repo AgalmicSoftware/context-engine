@@ -50,6 +50,28 @@ describe('createSbtGroupPasswordHelpers', () => {
       fileName: 'BET_Beta_group-passwords_2026-05-05.csv',
       mimeType: 'text/csv',
     });
+    expect(buildCreateSbtPasswordExportFile({
+      autoJoinUrl: 'https://app.example/session?fallback=1',
+      date: '2026-05-05',
+      exportFormat: 'csv',
+      passwordList: ['alpha,beta', 'quote"code', 'line\nbreak'],
+      sbtDistribution: { isLimited: true, distributionOption: 'groupPassword' },
+      sbtInviteLinks: [
+        'https://app.example/session?gp=alpha,beta',
+        'https://app.example/session?gp=quote"code',
+      ],
+      sbtName: 'Beta',
+      sbtSymbol: 'BET',
+    })).toEqual({
+      content: [
+        'index,groupPassword,inviteLink',
+        '0,"alpha,beta","https://app.example/session?gp=alpha,beta"',
+        '1,"quote""code","https://app.example/session?gp=quote""code"',
+        '2,"line\nbreak",https://app.example/session?fallback=1',
+      ].join('\n'),
+      fileName: 'BET_Beta_group-passwords_2026-05-05.csv',
+      mimeType: 'text/csv',
+    });
   });
 
   it('builds CreateSBT invite links and resolves invite code lists', () => {
