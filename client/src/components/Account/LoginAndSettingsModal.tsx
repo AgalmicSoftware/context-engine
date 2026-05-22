@@ -98,6 +98,7 @@ import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../u
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isCryptoMode } from '../../utilities/ui/terminology.js';
+import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 
 // Chain helpers
 import { chainHexId, chainHttpRpc, chainHttpRpcNoPath, chainCurrency, getChainById } from '../../variables/chains.js'
@@ -208,6 +209,7 @@ const buildSettingsSessionHref = (slugIn?: string) => {
   const slug = normalizeSettingsSessionSlug(slugIn);
   return `${normalizedBasePath}${slug ? `/session/${encodeURIComponent(slug)}` : '/session'}`;
 };
+export const buildBookmarksRoutePath = (): string => buildPublicRoute('/bookmarks');
 const getErrorCode = (error: unknown) => (
   error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined
 );

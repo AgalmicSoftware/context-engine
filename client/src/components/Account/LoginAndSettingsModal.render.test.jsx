@@ -100,7 +100,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   removeCache: jest.fn(async () => true),
 }));
 
-import { LoginAndSettingsModal } from './LoginAndSettingsModal';
+import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
