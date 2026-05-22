@@ -100,7 +100,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   removeCache: jest.fn(async () => true),
 }));
 
-import { LoginAndSettingsModal } from './LoginAndSettingsModal';
+import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
 import contractScripts from '../../utilities/web3/contractScripts.js';
 import * as portoFunctions from '../../utilities/web3/portoFunctions.js';
 import { saveLocalAiSettings } from '../../utilities/ai/aiSettings.js';
@@ -338,6 +338,12 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     expect(screen.getByRole('link', { name: 'Open session Edge Session' }))
       .toHaveAttribute('href', '/ce/session/edge');
+  });
+
+  it('preserves PUBLIC_URL when building the Bookmarks route', () => {
+    process.env.PUBLIC_URL = '/ce/';
+
+    expect(buildBookmarksRoutePath()).toBe('/ce/bookmarks');
   });
 
   it('falls back to the general session route when no active session slug exists', () => {
