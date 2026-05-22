@@ -408,4 +408,44 @@ describe('SBTPage metadata display', () => {
     expect(subject.renderAddressLink(ethers.constants.AddressZero, 'admin')).toBe('N/A');
     expect(subject.renderAddressLink('not-an-address', 'admin')).toBe('N/A');
   });
+
+  it('preserves PUBLIC_URL for actor and metadata links', () => {
+    const previousPublicUrl = process.env.PUBLIC_URL;
+    process.env.PUBLIC_URL = '/ce/';
+
+    try {
+      const subject = createSubject();
+      const actorAddress = '0x00000000000000000000000000000000000000a2';
+      const actorTree = subject.renderAddressLink(actorAddress, 'admin');
+      const actorLink = findElementInTree(
+        actorTree,
+        (element) => element?.type === 'a' && element?.props?.href?.includes('/u/')
+      );
+
+      expect(actorLink?.props?.href).toBe(`/ce/u/${actorAddress}`);
+
+      subject.state = {
+        ...subject.state,
+        sbtInfo: {
+          documentIDHashes: ['doc hash'],
+          tags: ['AI Policy'],
+        },
+      };
+      const metadataTree = subject.renderRelevantInfo();
+      const docLink = findElementInTree(
+        metadataTree,
+        (element) => element?.type === 'a' && element?.props?.href?.includes('/doc/')
+      );
+      const tagLink = findElementInTree(
+        metadataTree,
+        (element) => element?.type === 'a' && element?.props?.href?.includes('/tag/')
+      );
+
+      expect(docLink?.props?.href).toBe('/ce/doc/doc%20hash');
+      expect(tagLink?.props?.href).toBe('/ce/tag/AI%20Policy');
+    } finally {
+      if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
+      else process.env.PUBLIC_URL = previousPublicUrl;
+    }
+  });
 });

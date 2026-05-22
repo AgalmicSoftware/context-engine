@@ -26,7 +26,7 @@ import { createLogger } from 'utilities/logging.js';
 import { sessionRegistryStore } from '../../utilities/web3/sessionRegistry.js';
 import { listNamespaceEntriesSync, peekCacheSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
-import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { notify } from '../../utilities/ui/notify.js';
 import {
   getSbtDescriptionText,
@@ -2106,7 +2106,7 @@ class SBTPage extends Component<any, any> {
     });
     return (
       <>
-        <a href={`/u/${normalized}`} target="_blank" rel="noopener noreferrer">
+        <a href={buildPublicRoute(`/u/${normalized}`)} target="_blank" rel="noopener noreferrer">
           {shortenedAddress}
         </a>
         <button onClick={() => this.copyToClipboard(normalized, key)} className={styles.copyButton}>
@@ -4157,7 +4157,7 @@ renderMintButton() {
                 return (
                   <li key={index} className={styles.docIdItem}>
                     <span className={styles.docIdBadge}>Doc ID</span>
-                    <a href={`${window.location.origin}/doc/${docHash}`} target="_blank" rel="noopener noreferrer">
+                    <a href={buildPublicRoute(`/doc/${docHash}`)} target="_blank" rel="noopener noreferrer">
                       {hash}
                     </a>
                   </li>
@@ -4175,7 +4175,7 @@ renderMintButton() {
                 return (
                   <li key={index} className={styles.tagItem}>
                     <span className={styles.tagBadge}>Tag</span>
-                    <a href={`${window.location.origin}/tag/${tagEnc}`} target="_blank" rel="noopener noreferrer">
+                    <a href={buildPublicRoute(`/tag/${tagEnc}`)} target="_blank" rel="noopener noreferrer">
                       {tag}
                     </a>
                   </li>
