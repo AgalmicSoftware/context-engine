@@ -310,6 +310,20 @@ function loadWorkerToken(slug) {
   catch { return null; }
 }
 
+function loadValidatedWorkerToken(slug, walletAddress = '') {
+  const tokenStr = loadWorkerToken(slug);
+  if (!tokenStr) return null;
+  const validation = validateWorkerToken(tokenStr, {
+    session: slug,
+    walletAddress,
+  });
+  if (!validation.ok) {
+    debug(`[auth] Ignoring invalid worker token for ${slug}: ${validation.error}`);
+    return null;
+  }
+  return tokenStr;
+}
+
 function getWorkerTokenStatus(slug, walletAddress = '') {
   const tokenStr = loadWorkerToken(slug);
   if (!tokenStr) {
@@ -1333,7 +1347,7 @@ async function requestFaucetWorkerTransfer({ slug, recipientAddress, requestBody
     : getCorsWorkerUrl;
   const fetchImpl = typeof deps.fetch === 'function' ? deps.fetch : fetch;
   const workerUrl = await resolveWorkerUrl(slug);
-  const workerToken = loadWorkerToken(slug);
+  const workerToken = loadValidatedWorkerToken(slug, recipientAddress);
   if (!workerUrl || !workerToken) {
     return {
       workerUrl,
@@ -1439,7 +1453,7 @@ async function authenticateWithWorker(slug, walletAddress, privateKey, deps = {}
 }
 
 async function ensureWorkerToken(slug, walletAddress, deps = {}) {
-  const existing = loadWorkerToken(slug);
+  const existing = loadValidatedWorkerToken(slug, walletAddress);
   if (existing) return existing;
   const privateKey = getStoredPrivateKeyFromFile();
   if (!privateKey) return null;
@@ -1455,16 +1469,16 @@ async function ensureWorkerToken(slug, walletAddress, deps = {}) {
   }
 }
 
-function findFirstSessionWithWorkerToken(slugs = []) {
+function findFirstSessionWithWorkerToken(slugs = [], walletAddress = '') {
   for (const slug of slugs) {
-    if (loadWorkerToken(slug)) return slug;
+    if (loadValidatedWorkerToken(slug, walletAddress)) return slug;
   }
   return '';
 }
 
 async function autoRequestFaucetAfterAuth(walletAddress, hookConfig, deps = {}) {
   const selectedSessions = getConfiguredSessions(hookConfig);
-  let slug = findFirstSessionWithWorkerToken(selectedSessions);
+  let slug = findFirstSessionWithWorkerToken(selectedSessions, walletAddress);
   if (!slug && selectedSessions.length > 0) {
     const privateKey = getStoredPrivateKeyFromFile();
     if (privateKey) {
