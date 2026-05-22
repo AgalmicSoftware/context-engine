@@ -623,7 +623,7 @@ async function buildMiniAppState({
         canonicalApiRequest: buildCanonicalAgentRequest({
           capabilityId: 'agent.account.create',
           body: {
-            telegramPrincipalRef: 'telegram_principal_ref',
+            telegramPrincipalId: 'telegram_principal_id',
             accountMode: 'managed_telegram_demo',
             session: sessionSlug,
             idempotencyKey: 'provided_on_submit',
