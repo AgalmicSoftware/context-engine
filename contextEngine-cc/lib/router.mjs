@@ -424,6 +424,20 @@ function loadAgentRequestByIdempotencyKey(walletAddress = '', idempotencyKey = '
     .find((entry) => normalizeAgentIdempotencyKey(entry?.idempotencyKey) === normalizedKey) || null;
 }
 
+function agentRequestMatchesSession(request = {}, sessionSlug = '') {
+  const requestedSession = String(sessionSlug || '').trim().toLowerCase();
+  if (!requestedSession) return true;
+  if (String(request?.session || '').trim().toLowerCase() === requestedSession) return true;
+
+  const requestedSessions = [
+    ...(Array.isArray(request?.requestedSessions) ? request.requestedSessions : []),
+    ...(Array.isArray(request?.payload?.requestedSessions) ? request.payload.requestedSessions : []),
+  ];
+  return requestedSessions.some((entry) => (
+    String(entry || '').trim().toLowerCase() === requestedSession
+  ));
+}
+
 function saveAgentGrant(record = {}) {
   const file = getAgentGrantFilePath(record.grantId);
   if (!file) throw new Error('Invalid agent grant id.');
@@ -1966,10 +1980,7 @@ export async function handleRoute(req, res, { url, method, body }, deps = {}) {
         auth.payload?.sub || '',
       ).map((response) => summarizePendingResponseForAgent(response, { session: slug })));
       const requests = loadAgentRequestsForWallet(auth.payload?.sub || '')
-        .filter((request) => (
-          !sessionValidation.slug
-          || String(request?.session || '').trim().toLowerCase() === sessionValidation.slug.toLowerCase()
-        ))
+        .filter((request) => agentRequestMatchesSession(request, sessionValidation.slug))
         .map((request) => summarizeAgentRequestForRead(request).summary);
       const requestStatusCounts = summarizeAgentRequestStatusCounts(requests);
       return json(res, 200, buildAgentOk({

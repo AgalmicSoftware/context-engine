@@ -1002,6 +1002,30 @@ test('agent connect request routes create human-approved scoped grants without l
   assert.equal(read.payload.connectRequest.requiresApproval, true);
   assert.equal(read.payload.connectRequest.grantId, null);
 
+  const alphaInbox = await callRoute(handleRoute, {
+    path: '/api/agent/inbox?session=alpha',
+  });
+  assert.equal(alphaInbox.status, 200);
+  assert.deepEqual(
+    alphaInbox.payload.requests.map((request) => request.requestId),
+    [created.payload.requestId],
+  );
+
+  const betaInbox = await callRoute(handleRoute, {
+    path: '/api/agent/inbox?session=beta',
+  });
+  assert.equal(betaInbox.status, 200);
+  assert.deepEqual(betaInbox.payload.requests, []);
+
+  const allSessionInbox = await callRoute(handleRoute, {
+    path: '/api/agent/inbox',
+  });
+  assert.equal(allSessionInbox.status, 200);
+  assert.deepEqual(
+    allSessionInbox.payload.requests.map((request) => request.requestId),
+    [created.payload.requestId],
+  );
+
   const replay = await callRoute(handleRoute, {
     path: '/api/agent/connect-requests',
     method: 'POST',
