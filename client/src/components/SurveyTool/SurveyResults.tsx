@@ -2963,7 +2963,7 @@ if (viewMode === 'survey' && surveyViewMode === 'individuals') {
   const latest = new Map<string, SurveyResultsCsvLatestEntry>();
   const passthroughRows: string[] = [];
 
-  Object.values(dataToExport).forEach((responsesArray) => {
+  Object.entries(dataToExport).forEach(([questionIdFromBucket, responsesArray]) => {
     const rows = Array.isArray(responsesArray) ? responsesArray as SurveyResultsCsvResponseEntry[] : [];
     rows.forEach((respObj) => {
       const parsed = this.parseResponse(respObj.response) as SurveyResultsResponseRecord | null;
@@ -2976,7 +2976,7 @@ if (viewMode === 'survey' && surveyViewMode === 'individuals') {
         responderAddress = toSurveyResultsRecord(respObj.responder).address as string;
       }
 
-      const qid = getResponseQuestionId(parsed);
+      const qid = getResponseQuestionId(parsed) || String(questionIdFromBucket || '');
       const questionData = networkQuestions[qid?.toLowerCase?.() ?? qid];
       let optionsString = '';
       if (questionData && questionData.type === 'multichoice' && Array.isArray(questionData.options)) {
