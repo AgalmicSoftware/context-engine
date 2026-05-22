@@ -4154,7 +4154,7 @@ renderMintButton() {
                 return (
                   <li key={index} className={styles.docIdItem}>
                     <span className={styles.docIdBadge}>Doc ID</span>
-                    <a href={`${window.location.origin}/doc/${docHash}`} target="_blank" rel="noopener noreferrer">
+                    <a href={buildPublicRoute(`/doc/${docHash}`)} target="_blank" rel="noopener noreferrer">
                       {hash}
                     </a>
                   </li>
@@ -4172,7 +4172,7 @@ renderMintButton() {
                 return (
                   <li key={index} className={styles.tagItem}>
                     <span className={styles.tagBadge}>Tag</span>
-                    <a href={`${window.location.origin}/tag/${tagEnc}`} target="_blank" rel="noopener noreferrer">
+                    <a href={buildPublicRoute(`/tag/${tagEnc}`)} target="_blank" rel="noopener noreferrer">
                       {tag}
                     </a>
                   </li>
