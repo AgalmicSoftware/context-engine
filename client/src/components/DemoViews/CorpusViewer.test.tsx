@@ -267,7 +267,7 @@ describe('CorpusViewer', () => {
       { cache: 'no-store' }
     );
     expect(screen.getByTestId('ce-context-corpus-status')).toHaveTextContent(
-      'Loaded full Cross-Corpus corpus • 8 entries'
+      'Loaded full Cross-Corpus corpus • 13 entries'
     );
     expect(screen.getByTestId('ce-context-load-full-corpus')).toBeDisabled();
   });
