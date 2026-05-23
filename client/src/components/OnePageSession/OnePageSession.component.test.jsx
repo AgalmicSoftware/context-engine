@@ -415,7 +415,7 @@ describe('OnePageSession view gating', () => {
     }
   });
 
-  it('aggregates embedded PolisReport question responses across list scope on session pages', async () => {
+  it('keeps embedded PolisReport question responses scoped to visible route questions', async () => {
     jest.useFakeTimers();
     const priorUrl = window.location.href;
     window.history.replaceState({}, '', '/session/edge');
@@ -427,11 +427,39 @@ describe('OnePageSession view gating', () => {
         if (slug === 'edge') {
           return {
             '84532': {
+              questions: {
+                q1: { id: 'q1', prompt: 'Edge prompt', type: 'binary' },
+                qPending: {
+                  id: 'qPending',
+                  prompt: '[encrypted]',
+                  type: 'binary',
+                  __ceQuestionMetadataPending: true,
+                },
+                qForeignExplicit: {
+                  id: 'qForeignExplicit',
+                  prompt: 'Foreign prompt',
+                  type: 'binary',
+                  sessionSlug: 'demo',
+                  sessionSlugExplicit: true,
+                },
+              },
               questionResponses: {
                 q1: {
                   '0xedge': {
                     type: 'binary',
                     answer: { value: 'yes', encrypted: false },
+                  },
+                },
+                qPending: {
+                  '0x02a2a289d5cde3c7d7b957c7f32299ca35d53526': {
+                    type: 'binary',
+                    answer: { value: 'no', encrypted: false },
+                  },
+                },
+                qForeignExplicit: {
+                  '0x02a2a289d5cde3c7d7b957c7f32299ca35d53526': {
+                    type: 'binary',
+                    answer: { value: 'no', encrypted: false },
                   },
                 },
               },
@@ -475,6 +503,7 @@ describe('OnePageSession view gating', () => {
       const polisCalls = mockPolisReport.mock.calls.map((args) => args[0]).filter(Boolean);
       const latestQuestionResponses = polisCalls[polisCalls.length - 1]?.questionResponses || {};
       expect(Object.keys(latestQuestionResponses).sort()).toEqual(['q1']);
+      expect(JSON.stringify(latestQuestionResponses)).not.toContain('0x02a2a289d5cde3c7d7b957c7f32299ca35d53526');
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }

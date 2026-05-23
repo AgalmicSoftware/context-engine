@@ -50,6 +50,10 @@ describe('OnePageSession helpers', () => {
   describe('buildAggregatorFromLocalCache', () => {
     it('filters to binary, non-encrypted responses and drops invalid entries', () => {
       const networkObj = {
+        questions: {
+          q1: { id: 'q1', type: 'binary' },
+          q2: { id: 'q2', type: 'binary' },
+        },
         questionResponses: {
           q1: {
             '0xA': JSON.stringify({
@@ -89,6 +93,9 @@ describe('OnePageSession helpers', () => {
 
     it('reuses parse memo across repeated aggregator builds', () => {
       const networkObj = {
+        questions: {
+          q1: { id: 'q1', type: 'binary' },
+        },
         questionResponses: {
           q1: {
             '0xA': JSON.stringify({
@@ -113,6 +120,9 @@ describe('OnePageSession helpers', () => {
     it('preserves raw string payload formatting for accepted binary responses', () => {
       const rawBinaryPayload = '{"type":"binary","answer":{"value":"yes"},"meta":{"order":[3,2,1]}}';
       const networkObj = {
+        questions: {
+          q1: { id: 'q1', type: 'binary' },
+        },
         questionResponses: {
           q1: {
             '0xA': rawBinaryPayload,
