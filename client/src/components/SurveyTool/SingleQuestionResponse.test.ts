@@ -262,6 +262,41 @@ describe('SingleQuestionResponse masked prompt copy', () => {
 
     expect(button).toBeTruthy();
   });
+
+  it('hides visible response values while the prompt is still masked', () => {
+    const subject = createSubject({
+      mode: 'fullscreen',
+      question: {
+        id: 'q1',
+        prompt: '[encrypted]',
+        type: 'binary',
+      },
+      response: {
+        answer: { value: 'Agree', encrypted: false },
+        additional: { value: 'private note', encrypted: false },
+        conviction: null,
+      },
+    });
+
+    const tree = subject.renderSinglePersonView();
+    const notice = findElement(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-encrypted-answer-notice'
+    );
+    const visibleAgree = findElement(
+      tree,
+      (node) => node?.props?.children === 'Agree'
+    );
+    const visibleNote = findElement(
+      tree,
+      (node) => node?.props?.children === 'private note'
+    );
+
+    expect(notice).toBeTruthy();
+    expect(notice?.props?.children).toBe('This response is gated with the question.');
+    expect(visibleAgree).toBeNull();
+    expect(visibleNote).toBeNull();
+  });
 });
 
 describe('SingleQuestionResponse option lookup memoization', () => {
@@ -663,6 +698,6 @@ describe('SingleQuestionResponse gate tooltip integration', () => {
       mode: 'all',
     });
     expect(tooltip.props.sbtAddresses).toEqual([gateSbt]);
-    expect(tooltip.props.children).toBe('[encrypted]');
+    expect(tooltip.props.children).toBe('Encrypted');
   });
 });
