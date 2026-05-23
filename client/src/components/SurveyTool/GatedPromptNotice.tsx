@@ -9,6 +9,8 @@ type GatedPromptNoticeProps = {
   questionId?: string;
   tooltipId: string;
   tooltipText: string;
+  leadingText?: string;
+  statusText?: string;
   suffix?: string;
   actionBusy?: boolean;
   actionDisabled?: boolean;
@@ -37,6 +39,8 @@ const GatedPromptNotice = ({
   questionId = '',
   tooltipId,
   tooltipText,
+  leadingText = 'This question is',
+  statusText = 'gated',
   suffix = 'Decrypt the prompt to answer.',
   actionBusy = false,
   actionDisabled = false,
@@ -53,14 +57,14 @@ const GatedPromptNotice = ({
   >
     <FontAwesomeIcon icon={faLock} style={resolveGatedPromptLockIconStyle()} />
     <span className={styles.gatedPromptNoticeText}>
-      This question is{' '}
+      {leadingText}{' '}
       <span
         id={tooltipId}
         data-testid={`ce-gated-prompt-tooltip-${questionId}`}
         className={styles.gatedPromptTooltipTrigger}
         onClick={(event) => event.stopPropagation()}
       >
-        gated
+        {statusText}
         <FontAwesomeIcon
           icon={faQuestionCircle}
           className={buildGatedPromptTooltipIconClassName({

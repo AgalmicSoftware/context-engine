@@ -154,6 +154,43 @@ describe('questionRouting helper regressions', () => {
     expect(picked).toBe(fetched);
   });
 
+  it('labels masked prompts by payload access mode instead of surfacing the raw mask', () => {
+    expect(resolveQuestionPayloadDisplayState({
+      id: 'q-public',
+      prompt: '[encrypted]',
+    }, {
+      storageProfile: {
+        backend: 'cloudflare',
+        payloadAccessControl: { mode: 'public_read' },
+      },
+    })).toMatchObject({
+      status: 'unavailable',
+      label: 'Unavailable',
+      requiresAuth: false,
+    });
+
+    expect(resolveQuestionPayloadDisplayState({
+      id: 'q-gated',
+      prompt: '[encrypted]',
+      payloadAccessMode: 'worker_sbt_gate',
+    })).toMatchObject({
+      status: 'worker_sbt_gate',
+      label: 'Requires session access',
+      requiresAuth: true,
+    });
+
+    expect(resolveQuestionPayloadDisplayState({
+      id: 'q-lit',
+      prompt: '[encrypted]',
+      promptEncrypted: '{"ciphertext":"cipher"}',
+      payloadAccessMode: 'lit_encrypted',
+    })).toMatchObject({
+      status: 'lit_encrypted',
+      label: 'Encrypted',
+      requiresAuth: true,
+    });
+  });
+
   it('does not treat unknown query slugs as pinnable', () => {
     const getSessionConfigBySlug = (slug: string | null): KnownSessionConfig | null => (
       slug === 'test-65'

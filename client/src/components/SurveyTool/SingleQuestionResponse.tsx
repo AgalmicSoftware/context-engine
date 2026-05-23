@@ -155,6 +155,7 @@ type SingleQuestionResponseProps = SingleQuestionRecord & {
   response?: SingleQuestionResponseLike | null;
   sbtAddresses?: unknown;
   selectQuestionById?: (questionId: unknown) => unknown;
+  sessionConfig?: unknown;
   sessionSlug?: unknown;
   showImportance?: unknown;
   stackCompactDecryptCta?: boolean;
