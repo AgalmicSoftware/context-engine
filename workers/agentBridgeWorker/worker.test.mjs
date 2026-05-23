@@ -95,8 +95,11 @@ function mockSessionWorkerFetch(calls = [], { txId = arweaveId() } = {}) {
         headers: { 'content-type': 'application/json' },
       });
     }
-    if (String(url).endsWith('/arweave/upload')) {
-      return new Response(JSON.stringify({ id: txId }), {
+    if (String(url).endsWith('/storage/upload')) {
+      return new Response(JSON.stringify({
+        id: txId,
+        storageRef: { backend: 'arweave', id: txId, resource: 'responses' },
+      }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
@@ -117,6 +120,10 @@ function assertOpaqueTelegramButtons(buttons = []) {
     }
     if (button.url) {
       const url = new URL(button.url);
+      if (url.hostname === 'optimism-sepolia.blockscout.com') {
+        assert.match(url.pathname, /^\/address\/0x[0-9a-f]{40}$/i);
+        continue;
+      }
       const launch = url.searchParams.get('start') || '';
       assert.match(launch, /^ce(?:cb|tg)_[a-z0-9]{10,48}$/);
       assert.equal(button.url.includes('q-readiness'), false);
@@ -203,7 +210,8 @@ test('worker serves Telegram Mini App shell', async () => {
   assert.match(text, /Context Engine/);
   assert.match(text, /telegram-web-app\.js/);
   assert.match(text, /telegram\/mini-app\/api\/state/);
-  assert.equal(text.includes('button.innerHTML'), false);
+  assert.match(text, /mic\.innerHTML = MIC_ICON/);
+  assert.equal(text.includes('prompt.innerHTML'), false);
   assert.match(text, /prompt\.textContent = question\.prompt \|\| question\.title/);
 });
 
@@ -252,7 +260,9 @@ test('worker preview update exercises command builder without Telegram network c
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.preview.screen, 'question_list');
-  assert.match(body.preview.response.text, /Choose a question to pose to the group/);
+  assert.match(body.preview.response.text, /^Questions \(1\/1\)/);
+  assert.match(body.preview.response.text, /1\. What should Alpha decide next\?/);
+  assert.equal(body.preview.response.text.includes('Choose a question'), false);
   assert.equal(JSON.stringify(body).includes('TELEGRAM_BOT_TOKEN'), false);
 });
 
@@ -281,15 +291,15 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'private', text: '/questions alpha' }),
+    body: JSON.stringify({ chatType: 'private', text: '/start' }),
   }), env);
   const preview = await previewResponse.json();
   const miniButton = preview.preview.response.replyMarkup.inline_keyboard
     .flat()
-    .find((button) => button.text === 'Open Mini App');
+    .find((button) => button.text === 'Mini App');
   const launch = launchFromMiniButton(miniButton);
 
-  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`), env);
+  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
   const state = await stateResponse.json();
 
   assert.equal(stateResponse.status, 200);
@@ -297,6 +307,9 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   assert.equal(state.session.sessionSlug, 'alpha');
   assert.equal(state.pageSize, 5);
   assert.equal(state.questionCount, 6);
+  assert.equal(state.availableQuestionCount, 6);
+  assert.equal(state.discoveredQuestionCount, 6);
+  assert.equal(state.unavailableQuestionCount, 0);
   assert.equal(JSON.stringify(state).includes(bytes32QuestionId), false);
   assert.equal(Object.hasOwn(state.questions[0], 'idShort'), false);
   assert.match(state.questions[0].questionKey, /^cecb_[a-z0-9]{10,48}$/);
@@ -467,14 +480,14 @@ test('worker Mini App direct submit broadcasts on-chain when worker and policy a
   const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'private', text: '/questions alpha' }),
+    body: JSON.stringify({ chatType: 'private', text: '/start' }),
   }), env);
   const preview = await previewResponse.json();
   const miniButton = preview.preview.response.replyMarkup.inline_keyboard
     .flat()
-    .find((button) => button.text === 'Open Mini App');
+    .find((button) => button.text === 'Mini App');
   const launch = launchFromMiniButton(miniButton);
-  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`), env);
+  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
   const state = await stateResponse.json();
 
   const draftResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
@@ -498,7 +511,7 @@ test('worker Mini App direct submit broadcasts on-chain when worker and policy a
   assert.deepEqual(submitted.questionIds, [bytes32QuestionId]);
   assert.equal(submitted.signer, draft.submitRequest.onChain.accountAddress);
   assert.equal(calls.some((call) => call.url === 'https://session.example/'), true);
-  assert.equal(calls.some((call) => call.url === 'https://session.example/arweave/upload'), true);
+  assert.equal(calls.some((call) => call.url === 'https://session.example/storage/upload'), true);
 
   const storedSubmitRequests = Array.from(kv.store.entries())
     .filter(([key]) => key.startsWith('telegram:submit-request:'))
@@ -552,13 +565,13 @@ test('worker Mini App submit returns actionable worker auth failure details', as
   const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'private', text: '/questions alpha' }),
+    body: JSON.stringify({ chatType: 'private', text: '/start' }),
   }), env);
   const preview = await previewResponse.json();
   const launch = launchFromMiniButton(preview.preview.response.replyMarkup.inline_keyboard
     .flat()
-    .find((button) => button.text === 'Open Mini App'));
-  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`), env);
+    .find((button) => button.text === 'Mini App'));
+  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
   const state = await stateResponse.json();
 
   const draftResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
@@ -580,6 +593,106 @@ test('worker Mini App submit returns actionable worker auth failure details', as
   assert.match(draft.message, /managed Telegram account/);
   assert.match(draft.message, /worker_nonce_failed: Untrusted worker login origin\./);
   assert.equal(calls[0].init.headers.Origin, 'https://bridge.example');
+});
+
+test('worker Mini App retries failed direct submit records instead of replaying auth failures', async () => {
+  const kv = new MemoryKv();
+  const calls = [];
+  const bytes32QuestionId = `0x${'25'.repeat(32)}`;
+  let authFails = true;
+  let submitCount = 0;
+  const env = {
+    BROADCAST_ENABLED: 'true',
+    TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    DEFAULT_CHAIN_ID: '11155420',
+    DEFAULT_RPC_URL: 'https://rpc.example',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha',
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        sessionWorkerUrl: 'https://session.example',
+        surveysAddress: '0x1111111111111111111111111111111111111111',
+      }],
+    }),
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
+      { questionId: bytes32QuestionId, questionType: 'rating', prompt: 'How strong is the signal?' },
+    ]),
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_FETCH: async (url, init = {}) => {
+      calls.push({ url: String(url), init });
+      if (authFails && String(url).endsWith('/auth/nonce')) {
+        return new Response(JSON.stringify({ error: 'temporarily missing nonce route' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return mockSessionWorkerFetch(calls, { txId: arweaveId(9) })(url, init);
+    },
+    AGENT_BRIDGE_CONTRACT_FACTORY: ({ signer }) => ({
+      async submitResponses() {
+        submitCount += 1;
+        return {
+          hash: `0x${'57'.repeat(32)}`,
+          wait: async () => ({ blockNumber: 89, signer: signer.address }),
+        };
+      },
+    }),
+  };
+  const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chatType: 'private', text: '/start' }),
+  }), env);
+  const preview = await previewResponse.json();
+  const launch = launchFromMiniButton(preview.preview.response.replyMarkup.inline_keyboard
+    .flat()
+    .find((button) => button.text === 'Mini App'));
+  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`), env);
+  const state = await stateResponse.json();
+  const submitBody = {
+    launch,
+    questionKey: state.questions[0].questionKey,
+    answer: { value: 7 },
+    submit: true,
+  };
+
+  const failedResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(submitBody),
+  }), env);
+  const failed = await failedResponse.json();
+  assert.equal(failedResponse.status, 503);
+  const failedSubmitRecords = Array.from(kv.store.entries())
+    .filter(([key]) => key.startsWith('telegram:submit-request:'))
+    .map(([key, value]) => ({ key, record: JSON.parse(value) }));
+  assert.equal(failedSubmitRecords.length, 1);
+  assert.equal(failedSubmitRecords[0].record.status, 'direct_submit_failed');
+  assert.match(failed.message, /worker_nonce_failed: temporarily missing nonce route/);
+
+  authFails = false;
+  const retryResponse = await worker.fetch(new Request('https://bridge.example/telegram/mini-app/api/draft', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(submitBody),
+  }), env);
+  const retry = await retryResponse.json();
+
+  assert.equal(retryResponse.status, 200);
+  assert.equal(retry.ok, true);
+  assert.equal(retry.status, 'direct_submitted');
+  assert.equal(retry.submitRequest.requestId, failedSubmitRecords[0].record.requestId);
+  assert.equal(retry.submitRequest.replayed, false);
+  assert.equal(retry.submitRequest.onChain.txHash, `0x${'57'.repeat(32)}`);
+  assert.equal(submitCount, 1);
 });
 
 test('worker Mini App handoff keeps question-specific group launches opaque through private start', async () => {
@@ -759,13 +872,13 @@ test('worker Mini App draft endpoint requires a matching opaque launch in Telegr
   const previewResponse = await worker.fetch(new Request('https://bridge.example/mock/telegram/preview-update', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chatType: 'supergroup', text: '/questions alpha' }),
+    body: JSON.stringify({ chatType: 'private', text: '/start' }),
   }), env);
   const preview = await previewResponse.json();
   const launch = launchFromMiniButton(preview.preview.response.replyMarkup.inline_keyboard
     .flat()
-    .find((button) => button.text === 'Open Mini App'));
-  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}`, {
+    .find((button) => button.text === 'Mini App'));
+  const stateResponse = await worker.fetch(new Request(`https://bridge.example/telegram/mini-app/api/state?launch=${launch}&sessions=alpha`, {
     headers: { 'x-telegram-init-data': initData },
   }), env);
   const state = await stateResponse.json();
@@ -1042,17 +1155,20 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   assert.match(byCommand['/start'].text, /Context Engine/);
   assert.match(byCommand['/join alpha'].text, /Session: Alpha Session/);
   assert.match(byCommand['/join alpha'].text, /Use \/attachments for session files/);
-  assert.match(byCommand['/sessions'].text, /Available sessions:/);
-  assert.match(byCommand['/questions'].text, /Questions for alpha:/);
-  assert.match(byCommand['/questions'].text, /1\. What should Alpha decide next\?\n\n2\. Encrypted question/);
+  assert.match(byCommand['/sessions'].text, /Sessions \(2\/2\)/);
+  assert.match(byCommand['/questions'].text, /^Questions \(2\/2\)/);
+  assert.match(byCommand['/questions'].text, /1\. What should Alpha decide next\?/);
+  assert.equal(byCommand['/questions'].text.includes('Choose a question'), false);
   assert.equal(byCommand['/questions'].text.includes('q-readiness'), false);
   assert.equal(byCommand['/questions'].text.includes('q-locked'), false);
-  assert.match(byCommand['/q 1'].text, /Question for alpha:/);
+  assert.equal(byCommand['/q 1'].text.startsWith('Question for alpha:'), false);
   assert.match(byCommand['/q 1'].text, /What should Alpha decide next/);
   assert.match(byCommand['/attachments'].text, /Attachments for alpha:/);
   assert.match(byCommand['/docs'].text, /Attachments for alpha:/);
   assert.match(byCommand['/me'].text, /Account/);
-  assert.match(byCommand['/me'].text, /Address: 0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}/);
+  assert.match(byCommand['/me'].text, /Address: <a href="https:\/\/optimism-sepolia\.blockscout\.com\/address\/0x[0-9a-f]{40}">0x[0-9a-f]{4}\.\.\.[0-9a-f]{4}<\/a>/i);
+  assert.match(byCommand['/me'].text, /Chain: OP Sepolia Testnet \(11155420\)/);
+  assert.equal(byCommand['/me'].parse_mode, 'HTML');
 
   for (const command of ['/join alpha', '/sessions', '/questions', '/q 1', '/attachments', '/docs']) {
     assertGroupSafeText(byCommand[command].text);
@@ -1064,10 +1180,10 @@ test('worker Telegram webhook mocked live-bot smoke covers core commands with sa
   const joinButtons = flattenButtons(byCommand['/join alpha'].reply_markup);
   const joinStart = joinButtons.find((button) => button.text === 'Join Session');
   const questionButtons = flattenButtons(byCommand['/questions'].reply_markup);
-  const miniApp = questionButtons.find((button) => button.text === 'Open Mini App');
 
   assert.match(joinStart.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cetg_[a-z0-9]{10,48}$/);
-  assert.match(miniApp.url, /^https:\/\/t\.me\/ce_demo_bot\?start=cecb_[a-z0-9]{10,48}$/);
+  assert.deepEqual(questionButtons.map((button) => button.text), ['Pose 1', 'Pose 2']);
+  assert.equal(questionButtons.some((button) => button.text === 'Open Mini App'), false);
   assert.equal(Array.from(kv.store.keys()).some((key) => key.startsWith('telegram:group-session:')), true);
   assert.equal(Array.from(kv.store.keys()).filter((key) => key.startsWith('telegram:action:')).length >= 12, true);
 });

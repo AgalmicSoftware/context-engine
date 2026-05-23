@@ -255,6 +255,7 @@ test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2
 
   assert.equal(metadata.main_module, 'worker.js');
   assert.equal(metadata.compatibility_date, '2024-09-02');
+  assert.deepEqual(metadata.compatibility_flags, ['nodejs_compat', 'global_fetch_strictly_public']);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_ACTION_KV' && binding.type === 'kv_namespace'), true);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_R2'), false);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_D1'), false);

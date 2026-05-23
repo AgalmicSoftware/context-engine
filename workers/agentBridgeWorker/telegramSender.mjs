@@ -87,6 +87,55 @@ export async function telegramBotApiRequest({
   };
 }
 
+export async function telegramBotApiFormDataRequest({
+  botToken = '',
+  method = '',
+  formData = null,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  let url;
+  try {
+    url = buildTelegramApiUrl(botToken, method);
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      error: safeString(error?.message || error) || 'invalid_telegram_api_request',
+    };
+  }
+
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: 'POST',
+      body: formData,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      status: 502,
+      error: redactTelegramErrorText(error?.message || error, botToken),
+    };
+  }
+
+  const body = await readTelegramResponseBody(response);
+  if (!response.ok || body?.ok === false) {
+    const description = safeString(body?.description || `Telegram API error (${response.status})`);
+    return {
+      ok: false,
+      status: response.status || Number(body?.error_code || 0) || 502,
+      error: redactTelegramErrorText(description, botToken),
+      telegramErrorCode: Number(body?.error_code || 0) || null,
+    };
+  }
+
+  return {
+    ok: true,
+    status: response.status || 200,
+    result: body?.result ?? body,
+  };
+}
+
 export async function sendTelegramMessage({
   botToken = '',
   chatId = '',
@@ -107,6 +156,35 @@ export async function sendTelegramMessage({
     botToken,
     method: 'sendMessage',
     payload,
+    fetchImpl,
+  });
+}
+
+export async function sendTelegramPhoto({
+  botToken = '',
+  chatId = '',
+  photo = null,
+  caption = '',
+  replyMarkup = null,
+  parseMode = '',
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const form = new FormData();
+  form.append('chat_id', safeString(chatId));
+  const photoBytes = photo?.bytes instanceof Uint8Array ? photo.bytes : null;
+  if (photoBytes) {
+    form.append('photo', new Blob([photoBytes], { type: safeString(photo.contentType) || 'image/png' }), safeString(photo.filename) || 'results.png');
+  } else {
+    form.append('photo', safeString(photo?.url || photo));
+  }
+  const captionText = safeString(caption).slice(0, 1024);
+  if (captionText) form.append('caption', captionText);
+  if (replyMarkup) form.append('reply_markup', JSON.stringify(replyMarkup));
+  if (safeString(parseMode)) form.append('parse_mode', safeString(parseMode));
+  return telegramBotApiFormDataRequest({
+    botToken,
+    method: 'sendPhoto',
+    formData: form,
     fetchImpl,
   });
 }
