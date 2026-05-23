@@ -40,7 +40,8 @@
       "cross_corpus": {
         "label": "Cross-Corpus Debates",
         "sample_count": 8,
-        "full_count": 8
+        "full_count": 8,
+        "count": 13
       }
     }
   },
@@ -3743,7 +3744,7 @@
     "cross_corpus": {
       "label": "Cross-Corpus Debates",
       "icon": "link",
-      "count_full": 8,
+      "count_full": 13,
       "entries": [
         {
           "id": "debate_exponential_progress",
@@ -3949,6 +3950,138 @@
             "Evaluation Awareness",
             "METR",
             "LessWrong"
+          ]
+        },
+        {
+          "id": "debate_ai_water_usage",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "AI Water Usage: Real Crisis or Misunderstood Metric?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "environmental_impact",
+          "summary": "Is AI's water consumption a genuine environmental crisis or an overstated concern driven by misleading per-query metrics?",
+          "central_tension": "AI infrastructure has material local water and energy impacts, but per-query water metrics can mislead without production, siting, and cooling context.",
+          "featured_source_title": "Data Centers Water Footprint: The Need for More Transparency",
+          "featured_source_author": "Ana Pinheiro Privette, Ana Barros, Ximing Cai",
+          "featured_source_corpus": "ArXiv / AGU Advances",
+          "corpora_synthesized": [
+            "ArXiv",
+            "AI Laws",
+            "METR",
+            "Interviews"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Water Usage",
+            "Data Centers",
+            "Environmental Impact",
+            "Energy"
+          ]
+        },
+        {
+          "id": "debate_ai_labor_automation",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "AI Labor Automation: Augmentation or Displacement?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "societal_impact",
+          "summary": "Is current AI primarily augmenting workers, or is it already a displacement pressure that requires stronger labor policy?",
+          "central_tension": "Task-level productivity and augmentation signals do not settle displacement, job-quality, or algorithmic employment-governance risks.",
+          "featured_source_title": "The Anthropic Economic Index",
+          "featured_source_author": "Anthropic Societal Impacts Team",
+          "featured_source_corpus": "Interviews / Lab Reports",
+          "corpora_synthesized": [
+            "Interviews",
+            "METR",
+            "AI Laws",
+            "ArXiv"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Labor",
+            "Automation",
+            "Employment",
+            "Productivity"
+          ]
+        },
+        {
+          "id": "debate_ai_education_integrity",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "AI in Education: Learning Tool or Assessment Threat?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "societal_impact",
+          "summary": "Should education policy encourage broad AI adoption, or restrict AI use around assessment and student evaluation?",
+          "central_tension": "AI can expand teaching capacity while undermining assessment trust if grading, attribution, and foundational-skill policies lag adoption.",
+          "featured_source_title": "Anthropic Education Report: How educators use Claude",
+          "featured_source_author": "Drew Bent et al.",
+          "featured_source_corpus": "Interviews / Lab Reports",
+          "corpora_synthesized": [
+            "Interviews",
+            "AI Laws",
+            "ArXiv"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Education",
+            "Assessment Integrity",
+            "AI Literacy",
+            "Human Oversight"
+          ]
+        },
+        {
+          "id": "debate_ai_copyright_training",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "AI Training and Copyright: Fair Use or Licensing Market?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "policy_dispute",
+          "summary": "Should developers be allowed to train on copyrighted works under fair use, or should licensing and compensation be required?",
+          "central_tension": "AI training copyright policy turns on fair-use facts, market substitution, training-data transparency, and whether licensing can scale.",
+          "featured_source_title": "Copyright and Artificial Intelligence, Part 3: Generative AI Training",
+          "featured_source_author": "U.S. Copyright Office",
+          "featured_source_corpus": "AI Laws",
+          "corpora_synthesized": [
+            "AI Laws",
+            "Court Filings",
+            "Policy Reports"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Copyright",
+            "Training Data",
+            "Fair Use",
+            "Transparency"
+          ]
+        },
+        {
+          "id": "debate_multimodal_deepfake_governance",
+          "url": "https://github.com/AgalmicSoftware/context-engine/blob/main/ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+          "source_label": "Open dataset",
+          "title": "Multimodal AI: Can Likeness and Deepfake Rules Keep Up?",
+          "author": "Cross-corpus synthesis",
+          "date": "2026-02-15",
+          "category": "policy_dispute",
+          "summary": "Can watermarking, disclosure, and platform safeguards manage video/audio generation risks, or are stronger restrictions needed?",
+          "central_tension": "Provenance and staged deployment reduce some synthetic-media risks, but likeness, voice, NCII, and election harms often require enforceable duties.",
+          "featured_source_title": "NIST AI 100-4: Reducing Risks Posed by Synthetic Content",
+          "featured_source_author": "NIST",
+          "featured_source_corpus": "AI Laws",
+          "corpora_synthesized": [
+            "AI Laws",
+            "Interviews",
+            "Technical Guidance"
+          ],
+          "tags": [
+            "Cross-Corpus",
+            "Deepfakes",
+            "Multimodal AI",
+            "Watermarking",
+            "Likeness Rights"
           ]
         }
       ]

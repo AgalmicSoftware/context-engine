@@ -1637,11 +1637,12 @@
     ],
     "year": 2026,
     "venue": "Loophole historical council",
-    "category": "Overreach Finder",
-    "debate_map_issues": [
-      "0x2220000000000000000000000000000000000000000000000000000000000000"
-    ],
-    "source_label": "Loophole methodology",
+  "category": "Overreach Finder",
+  "debate_map_issues": [
+    "0x2220000000000000000000000000000000000000000000000000000000000000",
+    "0x4140000000000000000000000000000000000000000000000000000000000000"
+  ],
+  "source_label": "Loophole methodology",
     "url": "https://github.com/brendanhogan/loophole",
     "principles_by_figure": {
       "Alexander the Great": [
