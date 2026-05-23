@@ -9,6 +9,8 @@ type GatedPromptNoticeProps = {
   questionId?: string;
   tooltipId: string;
   tooltipText: string;
+  leadingText?: string;
+  statusText?: string;
   suffix?: string;
 };
 
@@ -16,6 +18,8 @@ const GatedPromptNotice = ({
   questionId = '',
   tooltipId,
   tooltipText,
+  leadingText = 'This question is',
+  statusText = 'gated',
   suffix = 'Decrypt the prompt to answer.',
 }: GatedPromptNoticeProps) => (
   <div
@@ -24,16 +28,16 @@ const GatedPromptNotice = ({
     data-testid={E2E_TESTIDS.SURVEY_GATED_PROMPT_NOTICE}
     data-ce-question-id={String(questionId || '').trim().toLowerCase()}
   >
-    <FontAwesomeIcon icon={faLock} style={{ marginRight: 8 }} />
-    <span>
-      This question is{' '}
+    <FontAwesomeIcon icon={faLock} style={resolveGatedPromptLockIconStyle()} />
+    <span className={styles.gatedPromptNoticeText}>
+      {leadingText}{' '}
       <span
         id={tooltipId}
         data-testid={`ce-gated-prompt-tooltip-${questionId}`}
         className={styles.gatedPromptTooltipTrigger}
         onClick={(event) => event.stopPropagation()}
       >
-        gated
+        {statusText}
         <FontAwesomeIcon
           icon={faQuestionCircle}
           className={`${styles.tooltip} ${styles.gatedPromptTooltipIcon}`}

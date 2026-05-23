@@ -228,6 +228,68 @@ describe('SurveyTool locked-question tags', () => {
     expect(button.props.title).toBe('Decrypt gated prompt');
   });
 
+  it('labels public-read masked prompts as unavailable rather than encrypted', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '',
+      loginComplete: false,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+    };
+
+    const tree = subject.renderPromptWithManualDecrypt({
+      id: 'q-public-read',
+      prompt: '[encrypted]',
+      payloadAccessMode: 'public_read',
+    });
+    const button = findElement(
+      tree,
+      (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SURVEY_DECRYPT_PROMPT
+    );
+
+    expect(button).toBeTruthy();
+    expect(button.props.title).toBe('Retry loading question prompt');
+    expect(treeHasText(tree, 'Unavailable')).toBe(true);
+    expect(treeHasText(tree, '[encrypted]')).toBe(false);
+  });
+
+  it('labels worker-gated masked prompts as requiring session access', () => {
+    const subject = new SurveyQuestions({
+      singleQuestionMode: false,
+      isStandalone: false,
+      surveyIndex: 0,
+      account: '0xabc',
+      loginComplete: true,
+      network: { id: 84532 },
+    });
+
+    subject.state = {
+      ...subject.state,
+      decryptingByKey: {},
+    };
+
+    const tree = subject.renderGatedPromptNotice({
+      question: {
+        id: 'q-worker-gated',
+        prompt: '[encrypted]',
+        payloadAccessMode: 'worker_sbt_gate',
+      },
+      tooltipIdSuffix: 'full',
+    });
+    const notice = findElement(tree, (node) => node?.type === GatedPromptNotice);
+
+    expect(notice).toBeTruthy();
+    expect(notice.props.statusText).toBe('requires session access');
+    expect(notice.props.actionLabel).toBe('Load Prompt');
+    expect(notice.props.actionTitle).toBe('Load gated prompt');
+  });
+
   it('passes an explicit decrypt prompt action into gated prompt notices', () => {
     const subject = new SurveyQuestions({
       singleQuestionMode: true,

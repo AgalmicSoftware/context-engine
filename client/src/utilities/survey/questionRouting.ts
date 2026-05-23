@@ -9,7 +9,6 @@ import { normalizeSessionSlug } from '../session/sessionNaming.js';
 import {
   SESSION_STORAGE_PAYLOAD_ACCESS_MODES,
   normalizeSessionStorageConfig,
-  normalizeSessionStoragePayloadAccessControl,
 } from '../storage/sessionStorageConfig.js';
 
 type SessionConfig = {
@@ -67,12 +66,10 @@ type MaskedQuestionRefreshArgs = {
 };
 
 const normalizeSlug = (rawSlug: unknown): string => normalizeSessionSlug(rawSlug);
-const toLowerString = (value: unknown): string =>
-  String(value || '')
-    .trim()
-    .toLowerCase();
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
+const toLowerString = (value: unknown): string => String(value || '').trim().toLowerCase();
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  !!value && typeof value === 'object' && !Array.isArray(value)
+);
 
 const normalizePayloadAccessModeValue = (value: unknown): string => {
   const normalized = toLowerString(value).replace(/-/g, '_');
@@ -99,13 +96,11 @@ const normalizePayloadAccessModeValue = (value: unknown): string => {
 
 const readPayloadAccessMode = (value: unknown): string => {
   if (!isRecord(value)) return normalizePayloadAccessModeValue(value);
-  if (
-    Object.prototype.hasOwnProperty.call(value, 'gate') ||
-    Object.prototype.hasOwnProperty.call(value, 'encryption')
-  ) {
-    return normalizeSessionStoragePayloadAccessControl(value).mode;
-  }
-  return normalizePayloadAccessModeValue(value.mode ?? value.payloadAccessMode ?? value.accessControlMode);
+  return normalizePayloadAccessModeValue(
+    value.mode ??
+    value.payloadAccessMode ??
+    value.accessControlMode
+  );
 };
 
 const hasEnvelope = (value: unknown): boolean => {
@@ -118,8 +113,11 @@ const hasEnvelope = (value: unknown): boolean => {
 
 const hasPromptEncryptionEnvelope = (payload: QuestionPayload): boolean => {
   const encryptedFields = isRecord(payload.encryptedFields) ? payload.encryptedFields : {};
-  const encryptionTargets =
-    isRecord(payload.encryption) && isRecord(payload.encryption.targets) ? payload.encryption.targets : {};
+  const encryptionTargets = (
+    isRecord(payload.encryption) && isRecord(payload.encryption.targets)
+      ? payload.encryption.targets
+      : {}
+  );
   return (
     hasEnvelope(payload.promptEncrypted) ||
     hasEnvelope(payload.encryptedPrompt) ||
@@ -210,8 +208,11 @@ export const isMaskedQuestionPayload = (question: unknown): question is Question
   return false;
 };
 
-export const resolveQuestionPayloadAccessMode = (question: unknown, sessionConfig: unknown = null): string => {
-  const payload = isRecord(question) ? (question as QuestionPayload) : {};
+export const resolveQuestionPayloadAccessMode = (
+  question: unknown,
+  sessionConfig: unknown = null
+): string => {
+  const payload = isRecord(question) ? question as QuestionPayload : {};
   const storageRef = isRecord(payload.storageRef) ? payload.storageRef : {};
   const explicitMode =
     readPayloadAccessMode(payload.payloadAccessControl) ||
@@ -222,12 +223,15 @@ export const resolveQuestionPayloadAccessMode = (question: unknown, sessionConfi
     normalizePayloadAccessModeValue(storageRef.payloadAccessMode) ||
     normalizePayloadAccessModeValue(storageRef.accessControlMode);
   if (explicitMode) return explicitMode;
-  const cfg = normalizeSessionStorageConfig(sessionConfig as any);
+  const cfg = normalizeSessionStorageConfig(sessionConfig);
   return cfg.payloadAccessControl.mode;
 };
 
-export const resolveQuestionPayloadDisplayState = (question: unknown, sessionConfig: unknown = null) => {
-  const payload = isRecord(question) ? (question as QuestionPayload) : {};
+export const resolveQuestionPayloadDisplayState = (
+  question: unknown,
+  sessionConfig: unknown = null
+) => {
+  const payload = isRecord(question) ? question as QuestionPayload : {};
   const masked = isMaskedQuestionPayload(payload);
   if (!masked) {
     return {
@@ -245,11 +249,12 @@ export const resolveQuestionPayloadDisplayState = (question: unknown, sessionCon
   }
 
   const visibility = toLowerString(payload.visibility);
-  const unavailable =
+  const unavailable = (
     payload.__ceQuestionMetadataPending === true ||
     payload.payloadUnavailable === true ||
     visibility === 'payload_unavailable' ||
-    visibility === 'unavailable';
+    visibility === 'unavailable'
+  );
   const accessMode = resolveQuestionPayloadAccessMode(payload, sessionConfig);
   if (unavailable || accessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.PUBLIC_READ) {
     return {
@@ -279,7 +284,10 @@ export const resolveQuestionPayloadDisplayState = (question: unknown, sessionCon
       requiresAuth: true,
     };
   }
-  if (accessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED || hasPromptEncryptionEnvelope(payload)) {
+  if (
+    accessMode === SESSION_STORAGE_PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED ||
+    hasPromptEncryptionEnvelope(payload)
+  ) {
     return {
       masked: true,
       status: 'lit_encrypted',

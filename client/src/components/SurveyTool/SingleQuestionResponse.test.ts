@@ -305,9 +305,18 @@ describe('SingleQuestionResponse masked prompt copy', () => {
     });
 
     const tree = subject.renderSinglePersonView();
-    const notice = findElement(tree, (node) => node?.props?.['data-testid'] === 'ce-encrypted-answer-notice');
-    const visibleAgree = findElement(tree, (node) => node?.props?.children === 'Agree');
-    const visibleNote = findElement(tree, (node) => node?.props?.children === 'private note');
+    const notice = findElement(
+      tree,
+      (node) => node?.props?.['data-testid'] === 'ce-encrypted-answer-notice'
+    );
+    const visibleAgree = findElement(
+      tree,
+      (node) => node?.props?.children === 'Agree'
+    );
+    const visibleNote = findElement(
+      tree,
+      (node) => node?.props?.children === 'private note'
+    );
 
     expect(notice).toBeTruthy();
     expect(notice?.props?.children).toBe('This response is gated with the question.');

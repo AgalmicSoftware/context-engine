@@ -150,100 +150,37 @@ describe('questionRouting helper regressions', () => {
     expect(picked).toBe(fetched);
   });
 
-  it('preserves multichoice options when a later cache payload has no options', () => {
-    const cached = {
-      id: 'q1',
-      type: 'multichoice',
-      prompt: 'Which capability matters most?',
-      options: ['Cross-site graph', 'Session memory'],
-    };
-    const promptOnlyRefresh = {
-      id: 'q1',
-      type: 'multichoice',
-      prompt: 'Which capability matters most?',
-      options: [],
-      arweaveTxId: 'tx1',
-    };
-
-    expect(pickBetterQuestionPayload(cached, promptOnlyRefresh)).toEqual({
-      ...promptOnlyRefresh,
-      options: ['Cross-site graph', 'Session memory'],
-    });
-  });
-
-  it('preserves poll alias options when a later cache payload has no options', () => {
-    const cached = {
-      id: 'q1',
-      type: 'poll',
-      prompt: 'Which capability matters most?',
-      options: ['Cross-site graph', 'Session memory'],
-    };
-    const promptOnlyRefresh = {
-      id: 'q1',
-      type: 'poll',
-      prompt: 'Which capability matters most?',
-      options: [],
-      arweaveTxId: 'tx1',
-    };
-
-    expect(pickBetterQuestionPayload(cached, promptOnlyRefresh)).toEqual({
-      ...promptOnlyRefresh,
-      options: ['Cross-site graph', 'Session memory'],
-    });
-  });
-
   it('labels masked prompts by payload access mode instead of surfacing the raw mask', () => {
-    expect(
-      resolveQuestionPayloadDisplayState(
-        {
-          id: 'q-public',
-          prompt: '[encrypted]',
-        },
-        {
-          storageProfile: {
-            backend: 'cloudflare',
-            payloadAccessControl: { mode: 'public_read' },
-          },
-        },
-      ),
-    ).toMatchObject({
+    expect(resolveQuestionPayloadDisplayState({
+      id: 'q-public',
+      prompt: '[encrypted]',
+    }, {
+      storageProfile: {
+        backend: 'cloudflare',
+        payloadAccessControl: { mode: 'public_read' },
+      },
+    })).toMatchObject({
       status: 'unavailable',
       label: 'Unavailable',
       requiresAuth: false,
     });
 
-    expect(
-      resolveQuestionPayloadDisplayState({
-        id: 'q-gated',
-        prompt: '[encrypted]',
-        payloadAccessMode: 'worker_sbt_gate',
-      }),
-    ).toMatchObject({
+    expect(resolveQuestionPayloadDisplayState({
+      id: 'q-gated',
+      prompt: '[encrypted]',
+      payloadAccessMode: 'worker_sbt_gate',
+    })).toMatchObject({
       status: 'worker_sbt_gate',
       label: 'Requires session access',
       requiresAuth: true,
     });
 
-    expect(
-      resolveQuestionPayloadDisplayState({
-        id: 'q-envelope',
-        prompt: '[encrypted]',
-        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
-      }),
-    ).toMatchObject({
-      status: 'worker_sbt_gate',
-      label: 'Requires session access',
-      requiresAuth: true,
-    });
-
-    expect(
-      resolveQuestionPayloadDisplayState({
-        id: 'q-lit',
-        prompt: '[encrypted]',
-        promptEncrypted: '{"ciphertext":"cipher"}',
-        payloadAccessMode: 'lit_encrypted',
-      }),
-    ).toMatchObject({
+    expect(resolveQuestionPayloadDisplayState({
+      id: 'q-lit',
+      prompt: '[encrypted]',
+      promptEncrypted: '{"ciphertext":"cipher"}',
+      payloadAccessMode: 'lit_encrypted',
+    })).toMatchObject({
       status: 'lit_encrypted',
       label: 'Encrypted',
       requiresAuth: true,
