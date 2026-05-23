@@ -46,6 +46,7 @@ scripts/run-e2e-*
 scripts/run-ux-*
 scripts/capture-ux-*
 scripts/build_external_llm_prompt.py
+test/*.private.test.*
 artifacts
 tests/artifacts
 private-pack.manifest.json
@@ -70,6 +71,7 @@ contextEngine-cc/TODO
 .e2e-cache
 docs/codebase-*.md
 docs/assets/codebase-*
+test/*.private.test.*
 EOF
 }
 
@@ -111,6 +113,7 @@ local-private-version
 scripts/test-*.js
 scripts/test-*.ui.js
 scripts/lib/e2e
+test/*.private.test.*
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md
 EOF

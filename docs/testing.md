@@ -20,8 +20,9 @@ npm test
 ```
 
 This runs the canonical root gate (`npm run test:ci`), which includes wiring
-checks, the release-sanity gate, contract tests, client coverage, Node-side
-tests, and cache guards.
+checks, the release-sanity gate, contract tests, client coverage, public-safe
+root Jest tests, public `sessionCorsWorker` module tests, Node-side tests, and
+cache guards.
 
 ### Client-Only Tests
 
@@ -66,9 +67,27 @@ remain covered by the Jest command rather than the release typecheck gate.
 ```bash
 nvm use 20
 npm run test:contracts
+npm run test:root:jest
+npm run test:worker:session-cors
 npm run test:node
 npm run test:client
 ```
+
+`npm run test:wiring` also runs `scripts/verify-test-inventory.js`. That
+inventory check keeps root `test/*.test.*` files classified as one of:
+
+- public-safe Node tests run by `npm run test:node`
+- public-safe Jest tests run by `npm run test:root:jest`
+- local-chain tests run by dedicated chain-backed commands such as
+  `npm run test:surveys-sbt`
+- private/stripped Node tests named `*.private.test.*`; these run in private
+  checkouts through `npm run test:node` and are stripped from public releases
+
+Do not add non-public worker package paths, live credentials, private deployment
+names, or identifying fixtures to root `package.json` scripts. Private and
+stripped surfaces should stay behind their own package-local commands or
+release-strip rules so the public branch does not gain new references to
+private implementation details.
 
 ## E2E Workflows
 
